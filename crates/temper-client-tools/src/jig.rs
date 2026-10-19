@@ -10,3 +10,5 @@ pub mod rows;
 pub mod runner;
 pub mod subject;
 pub use runner::Printed;
+
+pub mod help;

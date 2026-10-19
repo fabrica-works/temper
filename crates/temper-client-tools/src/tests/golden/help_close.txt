@@ -1,0 +1,6 @@
+close N [--move D]... [--reason TEXT] --key NAME
+Close a chat and cancel or move its delegates
+Result: close
+  task: Task number
+  move: Delegate to move to the party
+  reason: Reason, empty by default

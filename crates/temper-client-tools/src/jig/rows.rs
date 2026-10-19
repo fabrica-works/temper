@@ -34,7 +34,7 @@ pub const TASKS: Tool = Tool {
         flag(b"label", b"L", Kind::Word { set: &[b"chat", b"goal"] }, Optional, b"Task label"),
         switch(b"tracked", b"Only tracked tasks"),
         switch(b"mine", b"Only my tasks"),
-        switch(b"ended", b"Include ended tasks"),
+        switch(b"ended", b"Only ended tasks"),
         flag(b"order", b"O", Kind::Order, Optional, b"activity or priority; number by default"),
         flag(b"after", b"C", Kind::Cursor, Optional, b"Continue after this cursor"),
     ]],
@@ -135,8 +135,8 @@ pub const CHAT_CREATE: Tool = Tool {
     line: b"Start a chat",
     result: b"chat_create",
     forms: &[&[
-        positional(b"text", b"TEXT", Kind::Text, Required, b"Opening words"),
         flag(b"project", b"P", Kind::Project, Required, b"Project name or number"),
+        positional(b"text", b"TEXT", Kind::Text, Required, b"Opening words"),
     ]],
     keyed: Keyed::Required,
     area: 1,
@@ -194,6 +194,7 @@ pub const DECIDE: Tool = Tool {
         ],
         &[
             positional(b"task", b"N", Kind::Number, Required, b"Task number"),
+            flag(b"hold", b"R", Kind::Number, Required, b"Hold revision"),
             positional(
                 b"outcome",
                 b"OUTCOME",
@@ -202,7 +203,6 @@ pub const DECIDE: Tool = Tool {
                 b"Decision",
             ),
             positional(b"reason", b"REASON", Kind::Text, Optional, b"Reason"),
-            flag(b"hold", b"R", Kind::Number, Required, b"Hold revision"),
         ],
     ],
     keyed: Keyed::Optional,
@@ -234,8 +234,8 @@ pub const CANCEL: Tool = Tool {
     result: b"cancel",
     forms: &[&[
         positional(b"task", b"N", Kind::Number, Required, b"Task number"),
-        positional(b"reason", b"REASON", Kind::Text, Required, b"Reason"),
         flag(b"grace", b"D", Kind::Duration, Optional, b"Grace before cancellation"),
+        positional(b"reason", b"REASON", Kind::Text, Required, b"Reason"),
     ]],
     keyed: Keyed::Optional,
     area: 1,

@@ -35,3 +35,11 @@ fn the_rows_repeats_are_within_the_client_limits() {
         }
     }
 }
+
+#[test]
+fn the_help_fits_the_tools_window() {
+    let window = usize::try_from(limits::TEXT).expect("text fits usize");
+    let mut measured = skein_lib::Writer::new(window);
+    crate::help::text(None, &mut measured).expect("the help fits its text window");
+    assert!(measured.written() <= window);
+}

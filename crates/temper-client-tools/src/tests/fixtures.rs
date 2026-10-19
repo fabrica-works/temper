@@ -467,3 +467,73 @@ pub(crate) fn read_call(argv: &[&str]) -> (Harness, u32) {
 pub(crate) const UNKNOWN_ASKER: client::Asker = client::Asker(999);
 /// A stable stored request's engine key, unrelated to its client call prefix.
 const KEPT_KEY: skein_lib::RequestKey = [9; 16];
+/// Six calls are needed for sign-in, me, wait, inbox, task and message.
+pub(super) const GUIDE_CALLS: u32 = 6;
+/// One slot per guide line, including the final line; fewer loses that line.
+const GUIDE_LINES: u32 = 55;
+/// One slot per row and form; fewer omits decide's second form.
+pub(super) const TOOL_FORMS: u32 = 23;
+/// Exactly one example exercises each row and form; zero misses it entirely.
+pub(super) const EXAMPLES_PER_FORM: u32 = 1;
+/// One missing byte exercises the first refused destination; zero would fit.
+pub(super) const HELP_SHORTFALL: usize = 1;
+/// Refusing an output must publish no bytes; any positive count is partial help.
+pub(super) const NO_HELP_BYTES: usize = 0;
+/// The guide's examples use whitespace-separated words without shell quoting.
+pub(super) fn parse_line(line: &[u8]) -> Result<crate::jig::call::Parsed, crate::jig::argv::Usage> {
+    let mut words = List::with_capacity(WORDS);
+    let mut start = 0;
+    for at in 0..=line.len() {
+        let boundary = match line.get(at) {
+            Some(byte) => byte.is_ascii_whitespace(),
+            None => true,
+        };
+        if boundary {
+            if start < at {
+                words.push(line.get(start..at).expect("word range")).expect("bounded guide words");
+            }
+            start = at.checked_add(1).expect("guide range fits usize");
+        }
+    }
+    crate::table::parse(words.as_slice())
+}
+/// Measure help inside its window, then fill an exact-length writer.
+pub(super) fn help(tool: Option<u8>) -> Box<[u8]> {
+    let mut measured = skein_lib::Writer::new(usize::try_from(crate::limits::TEXT).expect("text fits usize"));
+    crate::help::text(tool, &mut measured).expect("help fits its window");
+    let mut exact = skein_lib::Writer::new(measured.written());
+    crate::help::text(tool, &mut exact).expect("help fits its measured length");
+    exact.finish()
+}
+/// A row's usage lines, sharing help's text bound.
+pub(super) fn usage(tool: &crate::jig::table::Tool) -> Box<[u8]> {
+    let mut measured = skein_lib::Writer::new(usize::try_from(crate::limits::TEXT).expect("text fits usize"));
+    crate::jig::help::usage(tool, &mut measured).expect("usage fits its window");
+    let mut exact = skein_lib::Writer::new(measured.written());
+    crate::jig::help::usage(tool, &mut exact).expect("usage fits its measured length");
+    exact.finish()
+}
+
+/// Lines of the guide, shared by its parsing and coverage checks.
+pub(super) fn guide_lines() -> List<&'static [u8]> {
+    let mut lines = List::with_capacity(GUIDE_LINES);
+    let mut start = 0;
+    for at in 0..=crate::guide::GUIDE.len() {
+        match crate::guide::GUIDE.get(at) {
+            Some(b'\n') | None => {
+                lines.push(crate::guide::GUIDE.get(start..at).expect("guide line range")).expect("bounded guide lines");
+                start = at.checked_add(1).expect("guide range fits usize");
+            }
+            Some(_) => {}
+        }
+    }
+    lines
+}
+
+/// Recovery examples are checked in the same hand-recorded full-help golden.
+pub(super) fn guide_golden_has(expected: &[&[u8]]) {
+    let golden = golden("help");
+    for text in expected {
+        assert!(skein_lib::bytes::find(&golden, text).is_some(), "{text:?}");
+    }
+}

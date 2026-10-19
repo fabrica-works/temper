@@ -1,0 +1,20 @@
+wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
+Wait for a watch's change or condition
+Result: wait
+  subject: Watch subject
+  since: Wait for a different digest
+  until: Wait for a condition
+  timeout: Timeout, 300 seconds by default
+Subjects and --until conditions:
+  me: waiting
+  inbox: waiting|updates (no subject flags)
+  task N: ended|waiting-on-me|held|replied|phase:<phase>
+  tree N: ended
+  run N: ended
+  tasks: no condition; its read arguments except --after and --ended
+Live phases: waiting|idle|due|preparing|claimed|running|backing-off|active|closing|held
+Use --until ended for done, failed, cancelled or ended; terminal phase conditions are usage errors.
+waiting-on-me covers the task's tree. An ended task answers with its ended read.
+--since is the matching read's digest of the watched document, not its cursor.
+--since and --until together require both change and condition.
+Timeout: 300 seconds by default, at most 3600 seconds.

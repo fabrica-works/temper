@@ -21,6 +21,23 @@ pub enum Condition {
     Replied,
     Phase(Phase),
 }
+/// Every phase, in its vocabulary order; help filters this with `live`.
+pub(crate) const PHASES: &[Phase] = &[
+    Phase::Waiting,
+    Phase::Idle,
+    Phase::Due,
+    Phase::Preparing,
+    Phase::Claimed,
+    Phase::Running,
+    Phase::BackingOff,
+    Phase::Active,
+    Phase::Closing,
+    Phase::Held,
+    Phase::Ended,
+    Phase::Done,
+    Phase::Failed,
+    Phase::Cancelled,
+];
 /// Parse a condition for its subject; terminal phases name `--until ended`.
 pub fn condition(subject: &Subject, word: &[u8]) -> Result<Condition, Usage> {
     let value = parse(word).ok_or(Usage::Condition)?;
@@ -94,7 +111,7 @@ pub fn phase_word(phase: Phase) -> &'static [u8] {
         Phase::Cancelled => b"cancelled",
     }
 }
-fn live(phase: Phase) -> bool {
+pub(crate) fn live(phase: Phase) -> bool {
     match phase {
         Phase::Waiting
         | Phase::Idle

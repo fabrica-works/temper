@@ -1,0 +1,11 @@
+decide tN/K|pN/K accept|reject|pass-up [REASON] [--key NAME]
+decide N --hold R release|leave|pass-up [REASON] [--key NAME]
+Decide a proposal or an escalation
+Result: decide
+  proposal: Typed proposer and proposal number
+  outcome: Decision
+  reason: Reason
+  task: Task number
+  hold: Hold revision
+  outcome: Decision
+  reason: Reason
