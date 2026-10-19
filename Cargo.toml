@@ -13,6 +13,7 @@ members = [
     "tests/engine/protocol-forge",
     "crates/temper-client-shell-terminal",
     "crates/temper-client-shell-cli",
+    "crates/temper-client-shell-web",
     "tests/client",
     "crates/temper-client-view",
     "crates/temper-client-domain",
@@ -77,6 +78,7 @@ jig-protocol-engine-clients = { git = "https://github.com/fabrig-dev/jig.git" }
 skein-shell = { git = "https://github.com/fabrig-dev/skein.git" }
 temper-client-shell-terminal = { path = "crates/temper-client-shell-terminal" }
 temper-client-shell-cli = { path = "crates/temper-client-shell-cli" }
+temper-client-shell-web = { path = "crates/temper-client-shell-web" }
 jig-client = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-client-domain = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-client-protocol-http = { git = "https://github.com/fabrig-dev/jig.git" }
@@ -92,6 +94,10 @@ jig-client-world = { git = "https://github.com/fabrig-dev/jig.git" }
 skein-fake-person = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-ui = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-ui-text = { git = "https://github.com/fabrig-dev/skein.git" }
+skein-ui-web = { git = "https://github.com/fabrig-dev/skein.git" }
+jig-client-shell-web = { git = "https://github.com/fabrig-dev/jig.git" }
+wasm-bindgen = "=0.2.126"
+web-sys = "=0.3.103"
 jig-client-test-domain = { git = "https://github.com/fabrig-dev/jig.git" }
 temper-client-view = { path = "crates/temper-client-view" }
 temper-client-domain = { path = "crates/temper-client-domain" }
