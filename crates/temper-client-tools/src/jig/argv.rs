@@ -1,5 +1,5 @@
 //! One table-driven argv parser and checker.
-mod value;
+pub(crate) mod value;
 use super::{
     Limits,
     call::{Call, Parsed, Source, Value, Values},
@@ -205,7 +205,11 @@ fn repeated(occurs: Occurs) -> bool {
     }
 }
 /// Separate the watch's words; its task query still uses the table's parser.
-fn watch<'a>(table: &[&Tool], words: &[&'a [u8]], limits: &Limits) -> Result<(Subject, List<&'a [u8]>), Usage> {
+pub(crate) fn watch<'a>(
+    table: &[&Tool],
+    words: &[&'a [u8]],
+    limits: &Limits,
+) -> Result<(Subject, List<&'a [u8]>), Usage> {
     let (name, rest) = words.split_first().ok_or(Usage::Missing { argument: 0 })?;
     let count = u32::try_from(words.len()).or(Err(Usage::Tool))?;
     let mut outer = List::with_capacity(count);
@@ -430,7 +434,7 @@ fn escaped_position(args: &[Argument], values: &[Option<Values>], table: &[&Tool
     }
     Ok(args.len())
 }
-fn write_subject(table: &[&Tool], subject: &Subject, out: &mut List<Box<[u8]>>) -> Result<(), Unwritten> {
+pub(crate) fn write_subject(table: &[&Tool], subject: &Subject, out: &mut List<Box<[u8]>>) -> Result<(), Unwritten> {
     let (word, number) = match subject {
         Subject::Me => (b"me".as_slice(), None),
         Subject::Inbox => (b"inbox".as_slice(), None),

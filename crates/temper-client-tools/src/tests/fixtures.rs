@@ -97,3 +97,61 @@ pub(super) fn adoption() -> crate::jig::call::Call {
 /// Required adoption fields and its named key, shared by form tests.
 pub(super) const ADOPTION: &[&str] =
     &["adopt", "--project", "shop", "--owner", "o", "--name", "n", "--landing", "main", "--key", "adopt-repo"];
+
+pub(super) fn from_json(bytes: &[u8]) -> crate::jig::call::Call {
+    json(bytes).expect("fixture JSON call")
+}
+pub(super) fn json(bytes: &[u8]) -> Result<crate::jig::call::Call, crate::jig::argv::Usage> {
+    crate::jig::json::call(
+        crate::table::TOOLS,
+        bytes,
+        crate::jig::call::Source::Path(Box::from(b"call.json".as_slice())),
+        &crate::limits::tools(),
+    )
+}
+/// Shared JSON wait, deliberately putting the condition before the subject.
+pub(super) fn json_wait(subject: &str, until: Option<&str>) -> Box<[u8]> {
+    let limits = skein_json::writer::Limits { depth: 2, length: crate::limits::TEXT };
+    let mut measured = skein_json::writer::Encoder::measure(&limits);
+    encode_wait(&mut measured, subject, until);
+    let length = measured.measured().expect("fixture JSON size");
+    let mut output = skein_json::writer::Encoder::write(length, &limits);
+    encode_wait(&mut output, subject, until);
+    output.finish()
+}
+fn encode_wait(out: &mut skein_json::writer::Encoder, subject: &str, until: Option<&str>) {
+    out.object_start();
+    out.key(b"tool");
+    out.string(b"wait");
+    out.key(b"arguments");
+    out.object_start();
+    if let Some(until) = until {
+        out.key(b"until");
+        out.string(until.as_bytes());
+    }
+    out.key(b"since");
+    out.string(b"0011223344556677");
+    out.key(b"subject");
+    out.string(subject.as_bytes());
+    out.object_end();
+    out.object_end();
+}
+pub(super) fn wait_call(subject: &str, until: Option<&str>) -> crate::jig::call::Call {
+    let mut words = List::with_capacity(WORDS);
+    words.push(b"wait".as_slice()).expect("bounded words");
+    for word in subject.split_ascii_whitespace() {
+        words.push(word.as_bytes()).expect("bounded words");
+    }
+    words.push(b"--since".as_slice()).expect("bounded words");
+    words.push(b"0011223344556677".as_slice()).expect("bounded words");
+    if let Some(until) = until {
+        words.push(b"--until".as_slice()).expect("bounded words");
+        words.push(until.as_bytes()).expect("bounded words");
+    }
+    let crate::jig::call::Parsed::Call { call, json: false } =
+        crate::table::parse(words.as_slice()).expect("wait argv")
+    else {
+        panic!("a plain wait call");
+    };
+    call
+}

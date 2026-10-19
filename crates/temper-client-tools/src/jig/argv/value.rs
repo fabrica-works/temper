@@ -104,7 +104,7 @@ pub(super) fn valid(
     };
     if correct { Ok(()) } else { Err(Usage::Kind { argument }) }
 }
-pub(super) fn decode(table: &[&Tool], kind: Kind, word: &[u8]) -> Option<Value> {
+pub(crate) fn decode(table: &[&Tool], kind: Kind, word: &[u8]) -> Option<Value> {
     Some(match kind {
         Kind::Number | Kind::Count => Value::Number(number(word)?),
         Kind::Word { set } => {
@@ -231,7 +231,7 @@ fn hex(word: &[u8]) -> Option<Box<[u8]>> {
     }
     Some(out.finish())
 }
-pub(super) fn encode(table: &[&Tool], kind: Kind, value: &Value) -> Result<Box<[u8]>, Unwritten> {
+pub(crate) fn encode(table: &[&Tool], kind: Kind, value: &Value) -> Result<Box<[u8]>, Unwritten> {
     Ok(match value {
         Value::Number(n) => Box::from(Decimal::of(*n).as_bytes()),
         Value::Word(index) => {
