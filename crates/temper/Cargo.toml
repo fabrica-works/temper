@@ -69,6 +69,10 @@ path = "tests/process.rs"
 name = "live"
 path = "tests/live.rs"
 
+[[test]]
+name = "qa_serving"
+path = "tests/qa_serving.rs"
+
 [lints.rust]
 unsafe_code = "forbid"
 elided_lifetimes_in_paths = "deny"

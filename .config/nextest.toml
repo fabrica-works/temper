@@ -5,7 +5,7 @@
 # slow period is flagged SLOW as it runs.
 
 [profile.default]
-default-filter = "not binary(/^fuzzy_/) & not binary(/^(process|live)$/)"
+default-filter = "not binary(/^fuzzy_/) & not binary(/^(process|live)$/) & not binary(/^qa_/)"
 global-timeout = "15s"
 slow-timeout = { period = "3s" }
 
@@ -16,7 +16,7 @@ filter = "kind(test)"
 priority = 10
 
 [profile.fuzzy]
-default-filter = "binary(/^fuzzy_/) & not binary(/^(process|live)$/)"
+default-filter = "binary(/^fuzzy_/) & not binary(/^(process|live)$/) & not binary(/^qa_/)"
 global-timeout = "60s"
 slow-timeout = { period = "20s" }
 
@@ -44,3 +44,11 @@ default-filter = "binary(/^(process|live)$/) & not binary(=process)"
 global-timeout = "20m"
 test-threads = 1
 retries = 0
+
+[profile.qa]
+# The QA passes' tests (skein's docs/foundation/owners.md, 4.6): the binaries
+# named qa_*, which the gate builds and does not run. One at a time: some start
+# the shipped binary.
+default-filter = "binary(/^qa_/)"
+global-timeout = "10m"
+test-threads = 1
