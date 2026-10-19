@@ -193,9 +193,14 @@ Removes: nothing.
 Scope: 11.2's reply waited for, message and close, with 5.4's `replied`
 and `ended`.
 Needs: 06.1's agent.
-Files: `tests/client/tests/agent.rs`.
+Files: `tests/client/tests/agent.rs`; `tests/client/src/front.rs`
+(`park_runs`, ruling 113).
 Shape: as `stories.rs`'s answered chat, each test begins with
-`world.front().engine.hello(Token::new(7))` and `answer_runs = true`;
+`world.front().engine.hello(Token::new(7))` and `park_runs = true`
+(ruling 113): `Joint.park_runs`, beside `answer_runs`, answers each
+assignment as `answer_runs` does but with `End::Parked`: a chat's run
+done for now (tools.md, 5.4), where `Finished` ends the chat and drops
+it from the reads; `answer_runs` and its stories are unchanged;
 then `chat` and `wait task T --until replied`; after that reply,
 `message T More --key more` and a new wait, met only by the run that
 answers it; `close T --key bye` and `wait task T --until ended`.
@@ -204,7 +209,7 @@ Test shape: `tests/agent.rs`: `the_agent_waits_for_its_chats_reply`,
 `a_chat_the_agent_closes_ends`; each focused, under 0.5 s, asserting
 each call's status and `done: task T, <operation>`.
 Proof: joint, no higher than its test (06.1).
-Don't: commit turns by hand here; the run's report is the reply.
+Don't: commit turns here; the run's park is the reply (ruling 113).
 Size: at most ~20 lines of `tests/client/src`, by the same command; 0
 by part 1's count.
 Removes: nothing.
@@ -220,7 +225,8 @@ and `temper-worker-domain-world = { path = "../worker/domain" }`, as
 `tests/system/Cargo.toml` has the first two and the path, and
 `tests/worker/domain/Cargo.toml` `smith-transcript`) and `Cargo.lock`;
 `tests/client/src/{front.rs, fixtures.rs, translate.rs}`;
-`tests/client/tests/agent_turn.rs` (new).
+`tests/client/tests/agent_turn.rs` (new); `crates/temper-engine-domain/src/lib.rs`
+(`LOAD_BYTES` joins `pub use limits::{..}`, ruling 113).
 Shape:
 - `Joint::with_large_turns(seed, &client::Limits)` (Choice 5);
   `fixtures::large_turn(front, task)` commits the turn, returning
@@ -254,8 +260,8 @@ fn a_large_turns_rows_overlap_the_page_bound() {
     let task = fixtures::chat(world.front(), b"Hello");
     fixtures::large_turn(world.front(), task);
     let (single, activity) = fixtures::turn_row_costs(world.front(), task);
-    assert!(single <= temper_engine_domain::limits::LOAD_BYTES, "{single}");
-    assert!(temper_engine_domain::limits::LOAD_BYTES < activity, "{activity}");
+    assert!(single <= temper_engine_domain::LOAD_BYTES, "{single}");
+    assert!(temper_engine_domain::LOAD_BYTES < activity, "{activity}");
 }
 ```
 Proof: joint, no higher than its test (06.1). The bodies are about

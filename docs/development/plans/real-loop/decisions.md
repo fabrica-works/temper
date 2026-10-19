@@ -333,6 +333,14 @@ pass:
         - Its Files cross 08's "nothing of `tests/one-process`" and 13's "No edit to … `testing/temper-fake-git`". That exception is the supervisor's ruling.
         - No step for the client world: 0.95 s for 37 tests is about 26 ms each.
 
+113. **temper 06.2 and 06.3: a chat's run parks for its reply, and LOAD_BYTES is public** (plan defect, temper 06's block of 2026-10-19T14:45:26Z).
+     Plan defect: 06.2's Shape answered each run as `answer_runs` does, `End::Finished` with a report, which ends the chat and drops it from the party's reads, so its first `wait --until replied` finds no task and no message can follow. tools.md 5.4's `replied` is "a chat's run done for now", which jig's facts read as a parked run (`RunStage::Idle`). A park needs no turn and no codec, so the proposal's report-then-Parked mode, on 06.3's dependencies, is not needed.
+
+     - **`Joint.park_runs`** (`tests/client/src/front.rs`), beside `answer_runs`: it answers each assignment as `answer_runs` does, but with `End::Parked` and `Parts::none()`. 06.2's tests set it in place of `answer_runs`; `answer_runs` and the stories that use it are unchanged. 06.2's Files gain `front.rs`, within its ~20 lines of `tests/client/src`.
+     - **The close story** ends as the engine ends a closed chat. A further fixture answer it needs, within 06.2's Files, needs no question.
+     - **08.3's two headings** are answered here: ruling 111 answered the first, but its `Answer to` line left out the heading's time, so the block stayed. Nothing changes for 08.3: it goes on as ruling 111 says.
+     - **06.3's `LOAD_BYTES`** is reached as `temper_engine_domain::LOAD_BYTES`: it joins `crates/temper-engine-domain/src/lib.rs`'s `pub use limits::{..}`, beside `VIEWS` and `WATCHES_PER_STREAM`, its sibling bounds; 06.3's Files gain that line, and its sketch's two asserts use the public path. 06.3's Files already named `limits.rs` (`LOAD_BYTES`); no running or waiting step changes `lib.rs`, and no session file names the private path again. A further copy of `limits::LOAD_BYTES` outside the crate takes the public path; list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
