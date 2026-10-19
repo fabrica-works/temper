@@ -20,8 +20,9 @@ default-filter = "binary(/^fuzzy_/) & not binary(/^(process|live)$/)"
 global-timeout = "60s"
 slow-timeout = { period = "20s" }
 
+# The walking story's eight shards first, the suite's longest tests.
 [[profile.fuzzy.overrides]]
-filter = "test(=fuzzy_walking_commit_cuts_latency_replay_and_observation_pressure)"
+filter = "test(/^fuzzy_walking_shard_/)"
 priority = 20
 
 # Measuring, not gating: no budget. With -j 1, each test's own time:
@@ -37,8 +38,8 @@ global-timeout = "10m"
 test-threads = 1
 
 [profile.live]
-# The live binary arrives in 15.4. Name the two tiers, then exclude process,
-# so this selects live without naming a binary that cargo does not hold yet.
+# The live tier (docs/design/domain/testing.md, 2.7): crates/temper's live binary
+# alone, one test at a time, which scripts/proof-live.sh runs.
 default-filter = "binary(/^(process|live)$/) & not binary(=process)"
 global-timeout = "20m"
 test-threads = 1
