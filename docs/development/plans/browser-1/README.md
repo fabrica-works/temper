@@ -205,8 +205,10 @@ plan's sessions change, measured as their tests' summed time
 `temper-client-world`, and `temper-client-browser-world`, whose units
 run in the default profile and its stories in the browser profile (Done
 when, 3). `temper-client-shell-web` holds no host code. At the base
-(`findings/base-runs.md`, 8c) they sum to 5.50 s focused and 0.41 s
-fuzzy, and the focused sum swings by about 0.6 s between gate runs (8b).
+they sum to 5.50 s focused and 0.41 s fuzzy run alone
+(`findings/base-runs.md`, 8c), and to 5.09 s and 0.38 s inside the whole
+suite, as the pulse reads them from a land gate's log (8d); the focused
+sum swings by about 0.6 s between gate runs (8b).
 The run may add what its Proof bounds sum to (development.md, 5.6):
 
 - **Focused, 5.7 s.**
@@ -248,7 +250,7 @@ skein, for skein's) at `origin/main`, the plan's worktrees removed.
 5. The test-time aims (Pulse), measured once, three runs a profile:
 
    ```
-   heavy --gate -- bash -c 'set -o pipefail; export NEXTEST_DOUBLE_SPAWN=0; for p in default default default fuzzy fuzzy fuzzy; do cargo nextest run --profile $p -p temper-service -p temper-client-domain -p temper-client-view -p temper -p temper-client-shell-terminal -p temper-client-world -p temper-client-browser-world 2>&1 | sed -n "s/^ *PASS \[ *\([0-9.]*\)s\].*/\1/p" | awk "{t += \$1; n += 1} END {if (n == 0) exit 1; print t}" || exit 1; done'
+   heavy --gate -- bash -c 'set -o pipefail; export NEXTEST_DOUBLE_SPAWN=0; for p in default default default fuzzy fuzzy fuzzy; do cargo nextest run --workspace --profile $p 2>&1 | sed -nE "s/^ *PASS \[ *([0-9.]+)s\] \([^)]*\) ([^: ]+)[: ].*/\1 \2/p" | awk "\$2 ~ /^temper(-service|-client-domain|-client-view|-client-shell-terminal|-client-world|-client-browser-world)?\$/ {t += \$1; n += 1} END {if (n == 0) exit 1; print t}" || exit 1; done'
    ```
 
    prints six sums, and exits non-zero when a run fails or reads no

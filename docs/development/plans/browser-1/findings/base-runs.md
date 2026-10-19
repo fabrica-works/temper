@@ -555,6 +555,126 @@ the 450 tests of section 8b plus the 37 of `temper-client-world`, which add abou
 0.74 s to the default sum (section 8b's five-package median was 4.731 s) and 0.16 to
 0.31 s to the fuzzy one. The default runs vary 5.27 to 5.54 s.
 
+### 8d. The six packages' sum inside the whole suite
+
+The pulse sums the aim packages' test times from a land gate's log, where the whole
+workspace runs at once (skein's `development.md`, 5.2). Section 8c ran the six
+packages alone; here the same six are read out of `cargo nextest run --workspace`.
+The script is `run-8d.sh` in the logs directory (it also does the `cd` to the
+worktree); each run's nextest output is in `aims4/` there (`warmup.log`,
+`default-run<n>.log`, `fuzzy-run<n>.log`, with the `heavy` output beside each as
+`.heavy`). `LOG` below is an exported variable holding that run's log file. One
+warm-up first, not counted:
+
+```
+$ NEXTEST_DOUBLE_SPAWN=0 heavy --gate -- sh -c 'cargo nextest run --workspace --profile default > "$LOG" 2>&1'
+heavy: queued task 28 in the gate lane
+heavy: load 0.25 0.24 0.31 on 4 cores as it starts alone; busiest: codebase-memory 98.0%, …
+heavy: ran alone for 17s
+heavy: task 28 (gate) exit 0, waited 0s, ran 19s, log …
+   Compiling temper-codecs-world v0.0.0 (…/tests/codecs)
+…
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.63s
+    Starting 1861 tests across 116 binaries (28 binaries skipped via profile.default.default-filter)
+     Summary [   6.899s] 1861 tests run: 1861 passed, 0 skipped
+```
+
+Exit 0. It compiled six workspace crates that were not yet built here (9.63 s: the
+`Compiling` lines are `temper-codecs-world`, `temper-one-process-world`,
+`forgejo-conformance`, `git-transcripts`, `temper-forge-setup-reconcile-world`,
+`live-login`); the counted runs then compiled nothing (no `Compiling` line; `Finished … in
+0.19 s` to 0.35 s).
+
+The sum expression, checked against real lines. A `PASS` line reads
+`        PASS [   0.024s] (  82/1861) temper-client-world::stories a_chat_started_on_the_chats_page_is_answered_by_the_run`;
+the package is the binary id's first part, before `::` (an integration binary:
+`temper::configuration`, `temper-client-world::stories`) or before the space (a
+unit-test binary: `temper-service tests::accounts::…`). The `sed` matched every
+`PASS` line in every log (1861 of 1861 in each default log, 50 of 50 in each fuzzy
+log), and the `awk` pattern is anchored (`^temper(…)?$`), so the other
+`temper-*` packages in the workspace (`temper-system-world`, `temper-engine-domain-world`
+and the rest) do not match. Nothing printed a `FAIL`, `SLOW`, `LEAK` or `FLAKY` line.
+
+The matched lines per package, default profile, the same in all three runs and the
+same as section 8c's (`sum-8d.sh` in the logs directory prints these from the same
+`sed` and an `awk` that counts instead of summing; run 1's times):
+
+```
+temper                           59 lines   1.835 s     (8c: 59)
+temper-client-domain             63 lines   0.211 s     (8c: 63)
+temper-client-shell-terminal     25 lines   0.124 s     (8c: 25)
+temper-client-view               75 lines   0.335 s     (8c: 75)
+temper-client-world              37 lines   0.730 s     (8c: 37)
+temper-service                  228 lines   2.104 s     (8c: 228)
+total                           487 lines   5.339 s     (8c: 487)
+```
+
+Fuzzy profile, the same in all three runs and as in 8c: `temper-client-shell-terminal`
+1 line (`fuzzy_terminal`) and `temper-client-world` 1 line (`fuzzy_client`), 2 in all.
+
+The six-package sum of each run, the expression of the brief run on each log:
+
+```
+$ sed -nE 's/^ *PASS \[ *([0-9.]+)s\] \([^)]*\) ([^: ]+)[: ].*/\1 \2/p' default-run1.log | awk '$2 ~ /^temper(-service|-client-domain|-client-view|-client-shell-terminal|-client-world)?$/ {s += $1} END {printf "%.3f\n", s}'
+5.339
+$ … default-run2.log | …
+5.082
+$ … default-run3.log | …
+5.088
+$ … fuzzy-run1.log | …
+0.378
+$ … fuzzy-run2.log | …
+0.381
+$ … fuzzy-run3.log | …
+0.403
+```
+
+(`…` stands for the same `sed` and `awk` text; only the log name changes.) The three
+runs of each profile, each `NEXTEST_DOUBLE_SPAWN=0 heavy --gate -- sh -c 'cargo
+nextest run --workspace --profile <profile> > "$LOG" 2>&1'`, with the `Summary` line
+and heavy's `ran`, all exit 0 and alone in the gate lane:
+
+```
+default  (Starting 1861 tests across 116 binaries (28 binaries skipped via profile.default.default-filter))
+run 1: six 5.339 s   Summary [   5.422s] 1861 tests run: 1861 passed, 0 skipped   heavy: ran 8s
+run 2: six 5.082 s   Summary [   5.395s] 1861 tests run: 1861 passed, 0 skipped   heavy: ran 8s
+run 3: six 5.088 s   Summary [   5.315s] 1861 tests run: 1861 passed, 0 skipped   heavy: ran 7s
+median six 5.088 s   (8c: 5.501 s; difference -0.413 s)   Summary median 5.395 s
+
+fuzzy  (Starting 50 tests across 26 binaries (118 binaries skipped via profile.fuzzy.default-filter))
+run 1: six 0.378 s   Summary [  14.287s] 50 tests run: 50 passed, 0 skipped   heavy: ran 16s
+run 2: six 0.381 s   Summary [  14.448s] 50 tests run: 50 passed, 0 skipped   heavy: ran 16s
+run 3: six 0.403 s   Summary [  14.233s] 50 tests run: 50 passed, 0 skipped   heavy: ran 16s
+median six 0.381 s   (8c: 0.407 s; difference -0.026 s)   Summary median 14.287 s
+```
+
+(The `run` lines are cut from the `.heavy` and `.log` files, not printed by one
+command.) No fuzzy run came near 10 minutes (16 s each), so all three ran. The
+`heavy` start lines printed a load average of 1.9 to 3.1 as each counted run began
+(that one-minute figure includes the run before it), with only the agent's own
+processes (2 to 8 %) listed as busiest.
+
+The whole suite for scale, the sum of every `PASS` time in run 1 (`sed -nE
+'s/^ *PASS \[ *([0-9.]+)s\].*/\1/p' <log> | awk '{s += $1} END {printf "%.3f\n", s}'`):
+
+```
+default run 1:  21.502 s over 1861 tests    (the six: 5.339 s, 24.8 %)    Summary 5.422 s
+fuzzy   run 1:  56.745 s over   50 tests    (the six: 0.378 s,  0.7 %)    Summary 14.287 s
+```
+
+(Runs 2 and 3 are 21.366 and 21.075 s default, 56.970 and 55.999 s fuzzy.) The
+whole-suite sum is the test time added up across four cores, so it is four times the
+`Summary` wall time at most; the fuzzy profile's wall time is set by the larger
+`*-world` fuzzy tests (the slowest in run 1 is `temper-engine-domain-world` at
+10.127 s), not by the six packages' two tests, 0.14 and 0.24 s.
+
+What it shows: the six packages' sum read from the whole-suite log is not larger than
+section 8c's alone. It is 0.41 s lower in the default profile (5.088 s against 5.501 s
+medians; the three runs spread 5.08 to 5.34 s, 8c's 5.27 to 5.54 s) and 0.03 s lower
+in the fuzzy one (0.381 s against 0.407 s; 0.378 to 0.403 s, 8c's 0.372 to 0.539 s),
+with the same matched lines per package as 8c. The base for the pulse's sum from a
+land gate's log is 5.09 s default and 0.38 s fuzzy.
+
 ### 10b. The process tier, with Forgejo
 
 The director installed Forgejo and its runner under `~/.local/opt` and set the two
