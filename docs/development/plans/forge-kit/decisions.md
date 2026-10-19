@@ -494,6 +494,18 @@ where its answer lands.
 
      Through heavy, exact repin, workspace all-target check, formatting and sketch clippy pass. The git-transcripts and forgejo-conformance suites pass 42 tests, zero skipped, including the JSON and refusal probes; quiet execution is 0.115 s, JSON units 2–5 ms and refusal tests 5 ms. Fuzzy selects none successfully. Missing skein 06.1 is a declared prerequisite, not a reason to keep the ready check open: the coordinator starts the session after it lands. Actual kit swap/owned::attach, complete reads/writes, full suites and process/recording proofs remain unrun. Evidence: pump/ready-temper-06.md and scratch-ready-temper-06/report.txt; source/patch/logs retained and completed targets released.
 
+117. **temper 05's Shapes against main** (ready check of temper-05.1).
+     Reverses: nothing.
+     Amends: temper/05-fakes.md, 05.2 constructor inventory, factory Shape, Test shape and relative Proof counts.
+
+     Rename the existing tests/one-process/src/world.rs::peer LLM factory to llm_peer and update run_phase's spawn_restartable function item before adding the planned forge peer() factory. The private factory has only that caller. Correct the constructor inventory: testing/temper-fake-git/src/fixtures.rs::named has one Forge::new; tests/one-process/src/stories.rs::forge is separate.
+
+     Apply testing-strategy.md 10, One behaviour per test, to the new hooks-address unit: a_port_zero_bind_names_the_hooks_address checks the successful port-zero bind; a_fixed_port_bind_is_not_a_hooks_address checks the fixed-port refusal; a_failed_bind_is_not_a_hooks_address checks the failed-bind refusal. Preserve all three original cases and literal outcomes. The new unit and focused-count deltas become +3, with fuzzy counts unchanged; existing moved tests retain their identities. Refresh further copies and derived counts and list them in the commit body.
+
+     Checked skein 7436461f0fce6d0178c483f3b631e1a4db5fc343 and temper 52eba416314f30a384bdf24902ec31cb08c00ad5. search_graph in the exact temper project locates world::{peer,run_phase} and fake-git fixtures::named. rg -n '\bpeer\b' tests/one-process/src/world.rs finds only the existing definition and run_phase's spawn_restartable use. rg -n 'Forge::new|fn named' testing/temper-fake-git/src/fixtures.rs confirms the single constructor. The ready check covers both increments, names/content/derived users across downstream repositories; no other missing caller was found.
+
+     Exact repin, workspace/all-target check, clippy and prebuilds pass through heavy, including the factory correction. Ten reached packages pass 455 focused tests (4.660 s) and 39 fuzzy (23.388 s); one-process has 12 focused / 4 fuzzy and fake-git 14 focused; the three new units take 10–11 ms. The unchanged Adopt story takes 1.801 s under this check's load. The plan already records its 0.953 s baseline above the 0.5 s ceiling and requires its cost/cause report; that requirement and suite budgets remain. This is not a new baseline miss of the whole-run measured suite aims. Its final peer/delivery execution and cost diagnosis remain to be proved at the assigned implementation step. Future fake/peer APIs, actual migration, hand_hooks and delivery assertions, full gate and process/live proofs were unrun. Evidence: pump/ready-temper-05.md and scratch-ready-temper-05/. Source and results retained; completed targets released.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

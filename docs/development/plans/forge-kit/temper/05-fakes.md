@@ -148,14 +148,17 @@ Shape: temper-fake-git's `Forge` (struct and `new`, 18 lines) is deleted;
   take `Rc<RefCell<skein_fake_peers::forge::Forge>>`; `call` takes its token
   from `forge.next_reply()` in place of `serial` and `(7 << 60) + serial`, and
   reserves room in the pending Queue before stepping as skein 05.4's tiny git
-  caller does (copy its form). `fixtures.rs`' three `Forge::new` and
-  `stories.rs`, `referee/forge.rs` import the new type; `stories.rs`'
+  caller does (copy its form). `testing/temper-fake-git/src/fixtures.rs::named`
+  contains one `Forge::new`; it and `tests/one-process/src/stories.rs::forge`
+  plus `referee/forge.rs` import the new type. `stories.rs`'
   `prepare_merge_branch` steps the domain itself and pushes into `forge.pending`
   at two sites, so it takes the same reservation and `next_reply()` for its
   hand-made `Token::new(1 << 60)`; `Cargo.toml` adds
   `skein-fake-peers.workspace = true`. Commit 2 does this and adapts the old
   host's pending drain; commit 3 replaces the host.
-  One-process: `world.rs` takes the handle (sketch B). `Proc::Forge` holds
+  One-process: rename the existing LLM `world.rs::peer` factory to `llm_peer`
+  and update `run_phase`'s `spawn_restartable` call before adding sketch B's forge
+  `peer()`. `world.rs` takes the handle. `Proc::Forge` holds
   `Box<SignalHost<skein_fake_peers::forge::Peer>>`; `fake_forge` and the two
   `world.spawn` closures call `peer()`; the `forge::set` calls become `share`.
   `fixtures.rs`: `FORGE` replaces the three literals of `document()` and
@@ -171,11 +174,13 @@ Shape: temper-fake-git's `Forge` (struct and `new`, 18 lines) is deleted;
   `act`, which calls `referee::forge::Forge::hand_hooks` when it changes. The
   referee asserts each peer's `address()` is `None` or `Some(FORGE)`, and
   gathers the live peer's `Delivery` outcomes into `Outcome.deliveries`.
-Test shape: one new unit, `a_port_zero_bind_names_the_hooks_address`, in
-  `world.rs`' tests, no world: `hooks_address` of a `Complete` for a bind of
-  `127.0.0.1:0` done as `Bound(127.0.0.1:41000)` is `Some` of that; a bind of
-  fixed port 7102, and a port-0 bind failed `AddressInUse`, are `None`;
-  <20 ms (0.004 s in the scratch). One changed test,
+Test shape: three new units in `world.rs`' tests, no world, each <20 ms:
+  `a_port_zero_bind_names_the_hooks_address` passes `hooks_address` a `Complete`
+  for a bind of `127.0.0.1:0` done as `Bound(127.0.0.1:41000)` and expects
+  `Some` of that; `a_fixed_port_bind_is_not_a_hooks_address` uses fixed port
+  7102 and expects `None`; `a_failed_bind_is_not_a_hooks_address` uses a port-0
+  bind failed `AddressInUse` and expects `None`. Follow testing-strategy.md 10,
+  One behaviour per test. One changed test,
   `an_adopted_repository_gets_its_change_pushed_through_git`
   (`tests/one_process.rs`, `world::run(fixtures::calm(SEED), Story::Adopt)`),
   adds `assert_eq!(outcome.deliveries, [Delivery::Written, Delivery::Written])`: the 2 hooks
@@ -188,9 +193,9 @@ Test shape: one new unit, `a_port_zero_bind_names_the_hooks_address`, in
   until the peer exists: a count other than `deliveries` that moves, or a
   delivery count other than 2, goes to the supervisor, not into an edit.
 Proof: unit; `heavy cargo nextest run -p temper-one-process-world -E
-  'test(a_port_zero_bind_names_the_hooks_address)'`: 1 passed, <20 ms.
+  'test(a_port_zero_bind_names_the_hooks_address) | test(a_fixed_port_bind_is_not_a_hooks_address) | test(a_failed_bind_is_not_a_hooks_address)'`: 3 passed, each <20 ms.
 Proof: joint; `heavy cargo nextest run -p temper-one-process-world`: its count at
-  the step's start plus 1 (10 from the base's 9, 0.953 s; the scratch with webhooks configured ran them in
+  the step's start plus 3 (12 from the base's 9, 0.953 s; the scratch with webhooks configured ran them in
   1.96 s serially, the Adopt story in 1.08 s). The Adopt story alone took
   0.953 s at the base, over the 0.5 s focused ceiling: its time and cause are
   reported, never a raised budget or a new world; the added check is an assertion.
@@ -199,7 +204,7 @@ Proof: joint; `heavy cargo nextest run -p temper-one-process-world --profile
   two rounds), under about 5 s.
 Proof: joint; `heavy cargo nextest run -p temper-fake-git`: its count at the step's start (14, 0.021 s, at the base).
 Proof: joint; `heavy --gate scripts/check.sh`: origin/main's focused count at the
-  step's start plus 1 and its fuzzy count unchanged, clean clippy, focused <15 s, fuzzy <60 s.
+  step's start plus 3 and its fuzzy count unchanged, clean clippy, focused <15 s, fuzzy <60 s.
 Proof: process; `TEMPER_FORGEJO=$WS/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-linux-amd64
   TEMPER_FORGEJO_RUNNER=$WS/tmp/temper/forgejo/runner-v13.2.0/forgejo-runner-13.2.0-linux-amd64
   heavy --gate scripts/proof-one-process.sh`, once: its count at the step's start passed (19, 145.440 s
@@ -210,7 +215,7 @@ Don't: add a story or a world; edit a story's name or an assertion beyond the
   or `ForgeHost` anywhere; touch the engine's webhooks listener (temper 01.3,
   03.1); name `temper` in skein's peer.
 Size: about 12 lines moved (the handle), 215 new (estimated: `fixtures.rs` 75,
-  `world.rs` 75 with the unit test, `referee/forge.rs` and `referee.rs` 30,
+  `world.rs` 75 plus the three unit fixtures, `referee/forge.rs` and `referee.rs` 30,
   `transport.rs` 15, `stories.rs` and `one_process.rs` 14, manifests 6).
 Removes: `forge.rs` (about 256 lines of the host); the fake-git `Forge` (18 lines); the one-process
   dependency on `temper-engine-protocol-forge-world`.
