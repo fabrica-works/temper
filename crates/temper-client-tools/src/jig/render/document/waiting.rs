@@ -84,6 +84,10 @@ pub(super) fn text(
         }
         super::subjects::text_digest(wait.name, &part, limits, out);
     }
+    if wait.delivery.is_none() && (wait.met || wait.why == b"ended") {
+        out.put(wait.name);
+        out.put(b" ended\n");
+    }
     if wait.met {
         out.put(b"met\n");
     } else {

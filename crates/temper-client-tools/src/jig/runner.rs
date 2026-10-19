@@ -128,7 +128,9 @@ fn run(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, call
     }
 }
 pub fn told(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, told: Told, out: &mut Queue<Out>) {
-    wait::told(runner, client, env, &told, out);
+    if wait::told(runner, client, env, &told, out) {
+        return;
+    }
     match told {
         Told::Changed { handle } if handle == runner.me() => {
             if live(runner, client) {

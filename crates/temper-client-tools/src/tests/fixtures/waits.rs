@@ -201,14 +201,7 @@ impl Harness {
         self.outputs(out);
     }
     pub(crate) fn watch_event(&mut self, wanted: &client::Watchable, event: c::WatchEvent) {
-        let mut found = None;
-        for (token, subject) in &self.watches {
-            if subject == wanted {
-                found = Some(*token);
-                break;
-            }
-        }
-        let token = found.expect("open subject");
+        let token = self.watch_token(wanted);
         self.client(client::Event::Up { up: client::Up::Watched { watch: token, event } });
     }
 }
@@ -370,4 +363,61 @@ pub(crate) fn appended(bytes: &[u8], line: &[u8]) -> Box<[u8]> {
 pub(crate) fn parked_task() -> c::Task {
     let c::Delivery::Task(task) = parked() else { panic!("parked task") };
     *task
+}
+
+pub(crate) const UNTIL_ENDED: &[&str] = &["--until", "ended"];
+pub(crate) const UNTIL_REPLIED: &[&str] = &["--until", "replied"];
+pub(crate) const UNTIL_RUNNING: &[&str] = &["--until", "phase:running"];
+pub(crate) const UNTIL_WAITING_ON_ME: &[&str] = &["--until", "waiting-on-me"];
+pub(crate) fn tree_watch() -> client::Watchable {
+    client::Watchable::Jig(c::Subject::Tree { task: TASK, window: crate::limits::ROWS })
+}
+pub(crate) fn run_watch() -> client::Watchable {
+    client::Watchable::Jig(c::Subject::Run { task: TASK, turn: None, offset: 0 })
+}
+pub(crate) fn ended_task(phase: c::Phase) -> c::Task {
+    let c::Delivery::Task(task) = delivery(ended_chat(phase)) else { panic!("ended task") };
+    *task
+}
+pub(crate) fn finishing_call() -> (Harness, u32) {
+    let (mut root, call) = waiting_call(WAIT_TASK, UNTIL_ENDED);
+    root.end(call, &task_watch(), c::WatchEnd::SubjectEnded);
+    (root, call)
+}
+pub(crate) fn met_json(read: &[u8]) -> Box<[u8]> {
+    appended(&appended(b"{\"task\":", read), b",\"met\":true}")
+}
+impl Harness {
+    fn watch_token(&self, wanted: &client::Watchable) -> Token {
+        for (token, subject) in &self.watches {
+            if subject == wanted {
+                return *token;
+            }
+        }
+        panic!("open subject")
+    }
+    pub(crate) fn end(&mut self, call: u32, wanted: &client::Watchable, end: c::WatchEnd) -> Token {
+        let watch = self.watch_token(wanted);
+        self.watches.remove(&watch).expect("engine ended watch");
+        self.serving = Some(call);
+        self.client(client::Event::Up { up: client::Up::WatchEnded { watch, end } });
+        self.serving = None;
+        watch
+    }
+    pub(crate) fn final_delivery(&mut self, call: u32, task: c::Task) {
+        self.serving = Some(call);
+        self.deliver_subject(&task_watch(), c::Delivery::Task(Box::new(task)));
+        self.serving = None;
+    }
+}
+
+/// Only the runner's shared me fits; a task handle must hit the client's limit.
+pub(crate) const SHARED_HANDLES: u32 = 1;
+
+pub(crate) fn signed_in_with_handle_limit() -> Harness {
+    let mut limits = limits_root();
+    limits.domain.client.domain.handles = SHARED_HANDLES;
+    let mut root = started_with_limits(List::with_capacity(EMPTY), SEED, false, limits);
+    root.deliver(c::Delivery::Me(Box::new(me(PARTY))));
+    root
 }

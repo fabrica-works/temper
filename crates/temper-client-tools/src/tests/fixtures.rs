@@ -292,7 +292,14 @@ pub(crate) fn started(kept: List<skein_lib::RequestRecord<client::Held>>) -> Har
     started_with(kept, SEED, false)
 }
 pub(crate) fn started_with(kept: List<skein_lib::RequestRecord<client::Held>>, seed: u64, json: bool) -> Harness {
-    let limits = limits_root();
+    started_with_limits(kept, seed, json, limits_root())
+}
+pub(crate) fn started_with_limits(
+    kept: List<skein_lib::RequestRecord<client::Held>>,
+    seed: u64,
+    json: bool,
+    limits: root::Limits,
+) -> Harness {
     let mut root =
         root::Root::with_client(client::Client::unlinked(&limits.domain.client, seed).expect("shipped client limits"));
     root.kept_json(json);
