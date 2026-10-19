@@ -66,6 +66,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `skein/09-protocol-world.md` | skein 09: the protocol world's component and fake tests, `tests/forge/protocol`, moved, with its owner, stories and invariants on skein's client and component (forge-connection.md 10; decisions 22, 23) | skein 07.1, skein 08.1, temper 03.1, temper 05.1, skein 06.2 | |
 | `skein/10-plans.md` | skein 10: `skein-forge`'s plans' pure tests on canned exchanges, and the plans' differences from the design (answers 7 to 12 and 35), each its own increment (decision 28) | skein 01.4 | 10.5: skein 08.1 |
 | `skein/10.s1-named-page-fixtures.md` | skein10.s1: named page fixtures and scoped AST recurrence checks | skein10.5 | |
+| `skein/10.s2-plan-contracts.md` | skein10.s2: independent plan contracts, exhaustive repository matches and scoped AST checks | skein10.4; normal ready check | |
 
 ### jig
 
@@ -85,7 +86,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `temper/06-throwaway.md` | temper 06: temper's process tier, tools and conformance on skein's throwaway; temper's deleted; the conformance on skein-json (decision 27) | skein 06.1 | 06.2: skein06.s1 |
 | `temper/07-worlds.md` | temper 07: the moved worlds, the dialect's tests and the conformance with its transcripts deleted from temper; the protocol world keeps temper's own tests (decision 22) | skein 06.3; temper 06.1 | the client's world: skein 07.1; setup's: skein 07.3; the component's: skein 08.1 and 09.1; 07.1: temper 05.2 |
 
-17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2,06.s1,10.s1 and jig01.s1. The brief's fifth step, the fakes and
+17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2,06.s1,10.s1,10.s2 and jig01.s1. The brief's fifth step, the fakes and
 the conformance, is skein 05 to 09 and temper 05 to 07, by size. The
 increments per session are in each file.
 
@@ -122,6 +123,8 @@ also waits for temper 05.2, behind skein 05.5 (decision 26): a shorter
 chain.
 
 ## Rules of this plan
+
+- **Plan contracts and repository matches:** skein10.s2 owns hourly05’s three sampled corrections after10.4: separate the literal subscription contract from delivery mapping, keep word-validity assertions separate from marker round trips, and match repository Documents exhaustively under programming-model.md10.2. Preserve every mapped assertion, outcome and ordering. Add only the scoped plan-shapes AST gate mode under development.md14.4; preserve recovery/listing controls. Normal readiness precedes implementation; serialize shared checker/gate edits with10.s1 without holding existing starts. Closing temper-repin waits for10.s2. Final calls/edges counts include its relative +2; historical increment proofs retain their original counts.
 
 - **Graph freshness:** the supervisor refreshes only the primary checkout indexes. Use the exact primary project names and check each result in the actual worktree. Until a stale index's refresh is reported, use source searches for that repository; a missing graph result proves no absence. A refresh applies through its reported source commit; later source landings require a fresh comparison. Source search remains available throughout.
 
@@ -330,7 +333,7 @@ and fail naming the one that is unset (decisions.md, Design questions
 ## Repin
 
 temper's, in each temper increment that needs a new skein step (Rules),
-and the closing `temper-repin` once every skein step and jig01.s1 have
+and the closing `temper-repin` once every skein step, including10.s2, and jig01.s1 have
 landed, dropped or split (development.md, 5.7): temper 07.1's repin may land
 before skein's last tests do. skein's changes are new crates, a module
 of `skein-fake-peers` and new test crates, so nothing of smith, jig or

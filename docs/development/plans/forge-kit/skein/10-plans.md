@@ -188,7 +188,7 @@ Shape: no production change. Answer 11 and answer 35 settle the design, not the 
 Test shape: 13 new tests in edges.rs, each <20 ms; the first six call skein 01.3's pure
   `hint(forge, word, delivery)` and `marker::{valid_word, length, encode, decode}` (word first),
   no Run:
-  `deliveries_map_subscribed_events_to_hints`: 22 events over 13 headers, section 7's literal
+  `deliveries_map_subscribed_events_to_hints`: the literal22-name subscription list and15 delivery rows over13 headers, section 7's literal
   Hints, a branch's deletion and the job ends included, a Long body's key None;
   `irrelevant_delivery_has_no_hint`: a tag push, a tag create and delete, a repository id of
   4_294_967_296 -> None;
@@ -322,7 +322,9 @@ Removes: the differing 404, Date and header behaviours; the undated scripted hea
 
 ## Done when
 
-- `heavy cargo nextest run -p skein-forge -E 'test(/plans::tests::(calls|edges)::/)'` prints 48
+After skein10.s2, final calls/edges coverage adds its two independent contract tests to the parent-session total (48+2 after10.5). The historical10.1–10.5 Proof counts stay8/17/30/41/48; when a later increment starts after the supplement, include its +2 in the runtime count. Preserve every assertion in findings/plan-shapes.md. The subscription literal has22 names; the landed delivery table has15 rows over13 distinct headers, whose coverage10.s2 preserves without claiming22 mapping rows.
+
+- `heavy cargo nextest run -p skein-forge -E 'test(/plans::tests::(calls|edges)::/)'` prints the parent-session48 plus skein10.s2’s2
   passed, 0 failed, <1 s in all; each test <20 ms.
 - `heavy cargo nextest run -p skein-forge-machine-world` prints the count skein 08 has
   reached passed (33 after 08.1, 42 after 08.5), 0 failed, each <0.5 s.
