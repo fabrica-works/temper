@@ -140,7 +140,9 @@ hotspot):
 - T6: `tests/client/src/fixtures.rs` (`codec`), `tests/client/Cargo.toml`
   (its `smith-transcript` line), and so `Cargo.lock`;
 - only if step 7 is reached: `crates/temper/tests/support/configuration.rs`
-  (`documents`) and `docs/examples/owned/agent.json`.
+  (`documents`) and `docs/examples/owned/agent.json`;
+- if step 7's owned-example check refuses: `docs/examples/owned.json`
+  (`engine.memory_bytes` and `workers[0].memory_bytes`, nothing else).
 None of these is in the fake forge, the forge client, the forge
 component, the fake LLM or the providers. `testing/temper-fake-git`
 stays in temper under temper's `draft/forge-kit.md`, section 2.
@@ -188,7 +190,13 @@ Shape, in this order:
    change smith
    `99356013` made to its shipped memory; jig 01 drops its tests'
    declared memory instead (01.3), so it names no value for temper.
-   Any other failure follows the 5.7 rule.
+   If `serve_prepares_once_on_the_owned_example` (`crates/temper/tests/startup.rs`)
+   refuses `engine.memory_bytes` or `workers[0].memory_bytes` of
+   `docs/examples/owned.json`, "the worst case passes memory_bytes by N
+   bytes", each refused number rises by its N, as forge-setup's
+   `temper-14.s2` did (setup.md, 8.1: "Its `memory_bytes` hold its worst
+   cases wherever a person lays it"), and the commit body gives each
+   refusal before the raise. Any other failure follows the 5.7 rule.
 Test shape: one new unit test, `a_job_request_is_not_a_turn`, in
 `crates/temper-engine-smith/src/tests.rs`. It asserts that
 `turn(smith::Request::Job { owner: Token::new(1), act:
@@ -219,7 +227,7 @@ Don't:
 - take or answer a lock, or give `Busy` any meaning but the errno;
 - hand-edit `Cargo.lock` or generated code;
 - raise `memory` past `2_214_592_512`, or change any other declared
-  quantity;
+  quantity than the owned example's two `memory_bytes` (Shape, 7);
 - edit `docs/design/STATUS.md`.
 Size: at most 200 lines. The rehearsal had 43 changed lines (+30 −13),
 and steps 6 and 7 add about 4. Tests and `Cargo.lock` are not counted.
