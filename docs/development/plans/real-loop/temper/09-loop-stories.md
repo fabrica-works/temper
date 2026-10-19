@@ -12,7 +12,8 @@ what it needs of temper 05's acts, waits, `pending` and lock, and of the
 tools plan's temper-03.4, the kept lines; temper 05's names below are
 those `05-ctl.md` sketches, created by temper 05 (`host::OneShot`, `limits`): check each as
 landed.
-Steps: `temper-09.1`, `temper-09.2`, `temper-09.3`, `temper-09.4`.
+Steps: `temper-09.1`, `temper-09.s1` (`09.s1-resume-behind-refusal.md`),
+`temper-09.2`, `temper-09.3`, `temper-09.4` (dropped, ruling 130).
 
 ## Read first
 
@@ -148,7 +149,7 @@ D2, signed in as the same party (tools.md, 7, 8.2, 11.3). The next act's
 answer on D1 is proved lower: `tests/client`'s `agent_recovery.rs` and
 `temper-client-shell-cli`'s tests (ruling 130).
 Needs: temper 05's `chat` act with the kept requests sent first (8.2,
-step 4); the tools plan's temper-03.4, the kept lines.
+step 4); the tools plan's temper-03.4, the kept lines; temper-09.s1.
 Files: `tests/real-loop/src/{calls.rs, service.rs, world.rs, lib.rs,
 fixtures.rs}`, `tests/real-loop/tests/lost.rs` (new), `tests/real-loop/Cargo.toml`
 (`temper-client-tools`), root `Cargo.lock` (hotspot: forge kit).

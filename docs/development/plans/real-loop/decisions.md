@@ -620,6 +620,23 @@ pass:
 
      Done when: 09's names sum to 3, its kill and lock lines to at least two; 13's names sum to 8. 09.2's diagnosis (ruling 129) goes on for the story kept. The designer amends testing.md 2.4 to match, as a design question.
 
+131. **Owner work resumes behind a refused input** (cross-session scope, temper 09's block of 2026-10-19T16:45:40Z).
+     Cross-session scope, as ruling 129 foresaw: the cause lies in
+     temper-service, outside 09.2's Files, and the design already answers
+     it: "Owner progress is a step of its own. `Resume` admits one"
+     (`docs/design/domain/root.md`, 4). The host's `release` withholds that
+     step while a refused input waits, so a refusal behind owner work never
+     clears. Not a design gap: the fix makes the host follow root.md 4.
+
+     Ruling 131 adds `temper-09.s1` (`temper/09.s1-resume-behind-refusal.md`),
+     in session 09, before 09.2, which waits for it: `release` steps `Resume`
+     while an input waits refused, and the input is retried once the work
+     drains; its unit test in `crates/temper-service/src/tests/` is the
+     lower-world proof. 09.2 then rebases onto it and runs its Proof again,
+     the same-pass kill unchanged. Ruling 129's budget is spent on the cause;
+     09.s1 gets none of its own: past its Size or a second failing gate, a
+     block with what was seen.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
