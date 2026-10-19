@@ -1,6 +1,7 @@
 mod fixtures;
 use crate::{directory, limits};
 use skein_io::kernel::{Exit, ServiceSignal};
+const SIGN_IN_FILE_CALL: &[u8] = br#"{"tool":"sign-in","arguments":{"file":"link-file"}}"#;
 #[test]
 fn a_busy_directory_is_refused_after_60_s_of_retries() {
     let mut f = fixtures::Frame::act(fixtures::CHAT);
@@ -522,6 +523,26 @@ fn a_json_call_reads_its_file_beneath_the_file_root() {
     assert_eq!(f.link_root, Some(fixtures::FILE_PARENT));
     assert_eq!(f.link_leaf.as_deref(), Some(b"call.json".as_slice()));
     assert_eq!(f.exit(), Some(Exit::Code(0)));
+}
+#[test]
+fn a_call_read_from_a_file_that_names_a_file_is_usage() {
+    for call in [SIGN_IN_FILE_CALL, br#"{"tool":"sign-in","arguments":{"file":"-"}}"#] {
+        let mut f = fixtures::Frame::read(&["--call", "/elsewhere/call.json"]);
+        f.link = call;
+        f.drain();
+        assert_eq!(f.exit(), Some(Exit::Code(1)), "{call:?}");
+        assert_eq!(f.stderr(), b"temper ctl: usage: temper ctl DIRECTORY TOOL [ARGUMENT...]\n", "{call:?}");
+        assert!(!f.opened(b"directory"), "{call:?}");
+    }
+}
+#[test]
+fn a_call_read_from_stdin_that_names_a_file_is_usage() {
+    let mut f = fixtures::Frame::read(&["--call", "-"]);
+    f.input = SIGN_IN_FILE_CALL;
+    f.drain();
+    assert_eq!(f.exit(), Some(Exit::Code(1)));
+    assert_eq!(f.stderr(), b"temper ctl: usage: temper ctl DIRECTORY TOOL [ARGUMENT...]\n");
+    assert!(f.no_directory());
 }
 #[test]
 fn text_dash_reads_stdin() {

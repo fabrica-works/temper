@@ -5,6 +5,7 @@ use temper_client_tools::{
     jig::{
         self,
         call::{Source, Value, Values},
+        table::Kind,
     },
     table::TOOLS,
 };
@@ -56,6 +57,15 @@ impl OneShot {
         match self.call.take().expect("input's call") {
             Parsed::File { file, json } => match jig::json::call(TOOLS, &bytes, file, &self.root_env.limits.tools) {
                 Ok(call) => {
+                    let specs = TOOLS[usize::from(call.tool)].forms[usize::from(call.form)];
+                    if specs
+                        .iter()
+                        .zip(call.values.iter())
+                        .any(|(spec, value)| spec.kind == Kind::File && value.is_some())
+                    {
+                        self.fail(b"usage: temper ctl DIRECTORY TOOL [ARGUMENT...]");
+                        return;
+                    }
                     self.class = arguments::class(&call);
                     self.directory.start(self.class);
                     self.call = Some(Parsed::Call { call, json });
