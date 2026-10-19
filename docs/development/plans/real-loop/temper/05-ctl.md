@@ -287,8 +287,8 @@ mod pending`), `src/tests/jig.rs`, new `src/tests/jig/pending.rs`, and
 `src/jig/rows.rs` (`SIGN_OUT`'s `line`, "End sign-in and erase the
 token", becomes "End sign-in and leave the token empty": tools.md 5.6,
 "leaves `token` empty, zero bytes, read as signed out"; ruling 102),
-`src/guide.rs` with `tests/golden/{help,help_pending}.txt` and
-`tests/help.rs` (`PENDING`'s stale `create` becomes `chat`, the word
+`src/guide.rs` with `src/tests/golden/{help,help_pending}.txt` and
+`src/tests/help.rs` (`PENDING`'s stale `create` becomes `chat`, the word
 `Operation::of` prints, `findings/code-checks.md`); root
 `Cargo.toml`, `Cargo.lock` (a `jig-client-domain` workspace line, its
 URL copied from the root's jig lines); and the nine comments in

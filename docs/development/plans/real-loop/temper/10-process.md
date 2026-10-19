@@ -173,11 +173,15 @@ Shape:
   - program `CARGO_BIN_EXE_temper`, args `ctl client` and the call's
     (or `Call::bare`'s alone after `ctl`);
   - an empty environment, as `serve`'s;
-  - `dir` the scratch; pipes 0 `Way::In`, 1 and 2 `Way::Out`.
+  - `root` the scratch's root, declared among `Calls`' descriptors,
+    and `dir` empty (`Spawn.dir` is relative to `Spawn.root`); pipes 0
+    `Way::In`, 1 and 2 `Way::Out`.
 - Its stdin gets the link and `\n` for `Stdin::Link`, then is closed.
-- Its stdout and stderr are read to EOF, each up to `OUTPUT`
-  (65,536 bytes, serve's limit; the guide is 4,698).
-- Then `Op::Wait` with `reap: true`, and its `Ended` is kept. The next
+- Its stdout and stderr are read to EOF, each up to `OUTPUT`, a
+  `const` of `ctl.rs` (65,536 bytes, serve's limit; the guide is 4,698).
+- Then `Op::Wait { reap: false }`, then `Op::Wait { reap: true }` (skein-io
+  reaps only after an observed exit, one `Wait` per pidfd at a time),
+  then `Close` of the pidfd; its `Ended` is kept. The next
   step starts once the call's descriptors are closed.
 - `run`: the world holds `Process::Binary(serve)` and `Process::Calls`,
   spawned with their descriptors as `run_story` does. A private referee
@@ -277,7 +281,7 @@ fn an_adopt_cut_by_a_signal_is_made_once() {
     assert_eq!(again.exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&again.stderr));
     let adopted = json(again);
     let kept: serde_json::Value = serde_json::from_slice(&again.stderr).expect("one kept line, JSON");
-    assert_eq!(kept, serde_json::json!({"operation": "adopt", "outcome": adopted["outcome"]}), "the first answer");
+    assert_eq!(kept, serde_json::json!({"operation": "adopt", "outcome": adopted}), "the first answer");
     assert_eq!((empty.exit, empty.stdout.as_slice()), (Some(Exit::Code(0)), b"".as_slice()));
     forgejo.stop();
     scratch.remove();

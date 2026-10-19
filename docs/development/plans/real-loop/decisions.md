@@ -251,6 +251,15 @@ pass:
      - `ServiceHost`'s spawn closure writes the documents with the held forge listener's address standing in for the peer's, takes `envelope_in`, and its `Host::worst_case` and `operations` return those two throughout. Once handed the peer's address, it writes the documents again and calls `prepare_in`, as the Shape says, and asserts the prepared service's `worst_case()` and `operations()` equal the admitted ones.
      - Nothing typed, no check switched off, no upstream edit, no copy of startup. If the two differ, if `prepare` refuses the stand-in address, or if dropping a prepared service leaves a descriptor open, raise it with the values or the descriptor. Refresh any further copy of the admission envelope, and list it in the commit body.
 
+105. **temper 10's Shapes against main** (ready check of temper-10.1).
+     Ready check of temper 10 against temper 60e76617d (none of 10.1's or 10.2's Files moved since the claim, ed725ce57). Its corrections:
+
+     - 10.1's Shape: `Op::Wait { reap: false }`, then `Op::Wait { reap: true }`, then `Close` of the pidfd (skein-io `kernel::Op::Wait`, "Observes a child exit, or reaps it after observation"); `Spawn.root` the scratch's root, declared among `Calls`' descriptors, with `dir` empty, since `dir` is relative to `root`; `OUTPUT` is a `const` of `ctl.rs`.
+     - 10.2's reference test: the kept line is `{"operation": "adopt", "outcome": adopted}`, the act's whole JSON (`crates/temper-client-tools/src/forge.rs`, `print`), not `adopted["outcome"]`, which is null.
+     - 05.5's Files: the goldens and the help test are `crates/temper-client-tools/src/tests/golden/{help,help_pending}.txt` and `src/tests/help.rs`.
+
+     The check compiled the corrected `ctl.rs` fixture and the five tests under clippy (clean) and ran `rdeps(temper)`: 59 passed. None of them ran against the shipped binary: `Start`, `Until` and `Cut` need temper 05. 10.1 and forge kit's 02.1 both edit `Process`, `ChatJudge::observe` and `process.rs`: the second to land rebases. Refresh any further copy of these lines, and list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
