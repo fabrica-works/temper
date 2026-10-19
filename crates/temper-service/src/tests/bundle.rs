@@ -26,6 +26,28 @@ fn each_head_is_routed_in_the_designs_order() {
         assert_eq!(route(bundled.then_some(&bundle), &head), answer, "{method:?} {target:?}");
     }
 }
+#[test]
+fn if_none_match_is_a_star_or_a_list_of_tags_compared_weakly() {
+    let bundle = fixtures::bundle::bundle();
+    let rows: [(&[u8], Answer); 12] = [
+        (b"\"0011223344556677\"", Answer::NotModified),
+        (b"*", Answer::NotModified),
+        (b" * ", Answer::NotModified),
+        (b"W/\"0011223344556677\"", Answer::NotModified),
+        (b"\"stale\", \"0011223344556677\"", Answer::NotModified),
+        (b"\"0011223344556677\",\"stale\"", Answer::NotModified),
+        (b"\"stale\",\tW/\"0011223344556677\" ", Answer::NotModified),
+        (b"\"stale\"", Answer::Page),
+        (b"0011223344556677", Answer::Page),
+        (b"\"0011223344556677", Answer::Page),
+        (b"\"stale\" \"0011223344556677\"", Answer::Page),
+        (b"", Answer::Page),
+    ];
+    for (value, answer) in rows {
+        let head = fixtures::bundle::head(Method::Get, b"/chats/7", &[(b"If-None-Match", value)]);
+        assert_eq!(route(Some(&bundle), &head), answer, "{value:?}");
+    }
+}
 fn get(target: &[u8], field: &[u8]) -> (crate::Service, fixtures::http::Peer, u16, Box<[skein_http::Header]>) {
     let mut service = fixtures::started();
     service.adopt_bundle(fixtures::bundle::bundle());

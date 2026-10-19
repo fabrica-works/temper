@@ -118,6 +118,32 @@ impl Bundle {
         }
     }
 }
+/// An entity tag without its weakness mark and the blanks around it.
+fn strong(tag: &[u8]) -> &[u8] {
+    let tag = tag.trim_ascii();
+    tag.strip_prefix(b"W/").unwrap_or(tag)
+}
+/// Whether an `If-None-Match` field holds the page's tag: `*`, or a comma-separated list with a member equal to it,
+/// compared weakly (RFC 9110, 13.1.2).
+fn revalidates(field: &[u8], etag: &[u8]) -> bool {
+    if field.trim_ascii() == b"*" {
+        return true;
+    }
+    let mut rest = field;
+    loop {
+        let (member, next) = match bytes::find(rest, b",") {
+            Some(at) => (rest.get(..at).expect("comma position"), rest.get(at.saturating_add(1)..)),
+            None => (rest, None),
+        };
+        if strong(member) == strong(etag) {
+            return true;
+        }
+        match next {
+            Some(next) => rest = next,
+            None => return false,
+        }
+    }
+}
 /// The answer to a call the mapping does not claim, in the design's order.
 pub(crate) fn route(bundle: Option<&Bundle>, head: &http::Call) -> Answer {
     let Some(bundle) = bundle else { return Answer::NotFound };
@@ -131,7 +157,9 @@ pub(crate) fn route(bundle: Option<&Bundle>, head: &http::Call) -> Answer {
     if path == b"/robots.txt" && bundle.file(path).is_none() {
         return Answer::NotFound;
     }
-    if head.header(b"If-None-Match") == Some(&bundle.etag) {
+    if let Some(field) = head.header(b"If-None-Match")
+        && revalidates(field, &bundle.etag)
+    {
         return Answer::NotModified;
     }
     if path == b"/robots.txt" { Answer::Root } else { Answer::Page }
