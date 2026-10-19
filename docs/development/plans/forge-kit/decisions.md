@@ -738,6 +738,23 @@ where its answer lands.
 
      Mark skein-10.1 ready immediately with the two checked full commits; the coordinator keeps its01.4 dependency. Preserve every mapped assertion case and report any further necessary split with its relative count and named consumer. Only10.5 awaits08.1; retain existing proof budgets and future-behaviour verification.
 
+133. **Hourly primary graph refresh completed** (hourly check of 2026-10-19T08:20:55Z).
+     Reverses: ruling131 of2026-10-19T08:30:16Z and steer2026-10-19T08:30:42Z only their temporary graph hold.
+     Amends: no graph rule; correct skein/10-plans.md's two residual narrative counts to its ruling132 inventory (eight10.1 tests; six pure10.3 tests).
+
+     The two primary source graphs are refreshed; lift the temporary hold under README Graph freshness. Use exact projects srv-data-git-runner-src-skein and srv-data-git-runner-src-temper, verifying each result in the actual worktree. Skein is covered through source6e29079218b9aa0bced12e8fe62b6c1ea02fb2c6; its later49725ecab135926f1f783bc30f70ab0ea1449b6d changes only docs/design/oauth.md. Temper is covered through source e3430f46ffeef64f62f44fbf8c11fdff82522f47 (checkout caada357b8e5fbf5de522720ed074b588c4c8a54). Later source landings require the same comparison. Use source searches for excluded paths, partial parses, unavailable graph tools and newer code. The kit remains d6d4abe.
+
+     ## Checked
+
+     - index_repository exact primary roots, fast/persistence:true; index_status: skein08:31:21Z26828nodes, temper08:34:22Z22399nodes. Temper refreshed again after concurrent tools source landing to avoid inferring coverage from its timestamp.
+     - git rev-parse HEAD origin/main: skein both49725eca after clean fast-forward; git diff --name-only6e290792..origin/main prints only docs/design/oauth.md. Temper bothcaada357b; e3430f46source precedes its last refresh, then132Markdown only.
+     - Partial parses remain3skein/2temper;8hostileJSON files unusable in skein; excluded docs/tools/scripts require source coverage. No absence inferred from graph gaps. Primary checkout code is untouched by the supervisor.
+     - log.md records steer08:30:42Z point1 acknowledged08:30:51Z, passed to all six sessions. Kit plan ring/ruling dispatch verified. No process or kit update taken.
+
+     ## Instructions
+
+     Pass restored graph permission to the running sessions; retain source-search permission and actual-worktree checks. Future sessions follow README Graph freshness. Refresh any further uncovered copy by source and name it in the work's report. Ruling132's cumulative counts and all proof budgets remain.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

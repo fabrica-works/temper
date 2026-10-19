@@ -86,7 +86,7 @@ Shape: no production change. `fixtures::Run` (names are a sketch) owns a Plan, T
   `METHOD target`, encoded by the dialect; `tables()` shows the Tables. No cost field: the
   component counts cost, one per request written (answer 34). The default head's `Date`,
   every resolve answering the id asked, and a PullFiles case with fewer rows than its page
-  keep these five tests as they are through 10.4 and 10.5.
+  keep these eight tests as they are through 10.4 and 10.5.
 Test shape: 8 new tests in calls.rs, each <20 ms; the 19 cases are a table, walked by a loop:
   `read_calls_follow_canned_exchanges`: the 19 reads of 5.2, one case each, 5.2's request
   sequence (a resolve by id first where the row is unknown), literal Answer and literal sends,
@@ -185,7 +185,7 @@ Shape: no production change. Answer 11 and answer 35 settle the design, not the 
   pins: its 429 half is `rate_limited_without_retry_after_waits_zero` here, its X-HasMore half
   is `pull_files_without_has_more_is_more_only_when_full` in 10.5 (that half changes
   behaviour). The first's doc comment says so.
-Test shape: 13 new tests in edges.rs, each <20 ms; the first five call skein 01.3's pure
+Test shape: 13 new tests in edges.rs, each <20 ms; the first six call skein 01.3's pure
   `hint(forge, word, delivery)` and `marker::{valid_word, length, encode, decode}` (word first),
   no Run:
   `deliveries_map_subscribed_events_to_hints`: 22 events over 13 headers, section 7's literal
