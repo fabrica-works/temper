@@ -201,7 +201,13 @@ Shape: as `stories.rs`'s answered chat, each test begins with
 (ruling 113): `Joint.park_runs`, beside `answer_runs`, answers each
 assignment as `answer_runs` does but with `End::Parked`: a chat's run
 done for now (tools.md, 5.4), where `Finished` ends the chat and drops
-it from the reads; `answer_runs` and its stories are unchanged;
+it from the reads; `answer_runs` and its stories are unchanged. An
+assignment that delivers messages is first answered by one committed
+turn whose `read` is its last message, through
+`temper_engine_domain_world::protocol::turn` with an opaque body, as
+`fixtures::replied_chat` commits, then parked: a park's read may not
+pass the last committed turn's (jig's `routing/run_payloads.rs`;
+ruling 115);
 then `chat` and `wait task T --until replied`; after that reply,
 `message T More --key more` and a new wait, met only by the run that
 answers it; `close T --key bye` and `wait task T --until ended`.
@@ -210,7 +216,8 @@ Test shape: `tests/agent.rs`: `the_agent_waits_for_its_chats_reply`,
 `a_chat_the_agent_closes_ends`; each focused, under 0.5 s, asserting
 each call's status and `done: task T, <operation>`.
 Proof: joint, no higher than its test (06.1).
-Don't: commit turns here; the run's park is the reply (ruling 113).
+Don't: commit a turn but the one that reads an assignment's messages,
+or decode its body; the run's park is the reply (rulings 113, 115).
 Size: at most ~20 lines of `tests/client/src`, by the same command; 0
 by part 1's count.
 Removes: nothing.

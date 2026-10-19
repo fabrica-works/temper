@@ -348,6 +348,13 @@ pass:
      - **`--key NAME`** is the agent's own key (tools.md: "The agent names the key"): the test's chosen key stands.
      - **06.4's Files** gain `tests/client/src/agent.rs`, and its Size is ~45 lines of `tests/client/src`. Its Don't: no revision printed in the agent's tree, and no `Sent` card or revision set apart for the agent; jig's check runs unchanged.
 
+115. **temper 06.2: a run reads its messages in one turn before it parks** (plan defect, temper 06's block of 2026-10-19T15:01:58Z).
+     Plan defect: ruling 113's premise that a park needs no turn holds only for an assignment with no messages. A message stays unread until a committed turn's `read` covers it, and jig refuses a park whose read passes the last committed turn's, so the run is reassigned or fails Invalid. A real run reads its messages in a turn; the fixture does the same.
+
+     - **`park_runs`**: for an assignment that delivers messages (the `More` message, the close's), the Joint first commits one turn whose `read` is the assignment's last message, through `temper_engine_domain_world::protocol::turn` with an opaque body, as `fixtures::replied_chat` already commits one without a codec; then it parks as ruling 113 says. An assignment with no messages parks with no turn. No wait for 06.3: no codec is needed, since nothing decodes the body.
+     - **Don't**, now: commit a turn other than the one that reads an assignment's messages, or decode its body.
+     - **The `request limit` fix** in `crates/temper-client-tools/src/root.rs` is on `main` already: 05.4's 4445f2d9a adds `client.reclaim` after each routing drain, the same two lines. Rebase 06.2 onto `origin/main` and drop its own copy.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
