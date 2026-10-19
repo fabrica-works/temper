@@ -824,6 +824,15 @@ where its answer lands.
 
      The existing audit is complete and its three targeted runs are spent. Allow each of the four existing Proof commands once in the prescribed order: package clippy, then default, fuzzy and browser package nextest profiles. Stop on failure and report it; this grants no additional fixture investigation or iterative retry. The extension permits 15 minutes of command execution, excluding queue waiting. Continue the normal dependent checks and landing gate once these pass. Keep all36 mapped assertion cases, relative+16 count, shared-fixture ownership and existing per-test/suite ceilings; record any newly reached fixture caller or derived bound and its preservation in the commit body. Production and shipped profiles remain outside this test-only correction.
 
+139. **One fresh archived-write receipt probe** (process, skein06.s1 block of2026-10-19T09:15:28Z).
+     Authorize exactly one fresh-scratch pre-repair archived-write process probe under ruling 139. The session's Shape still requires proving whether the remaining archived-write reply reached io before Reset. Task934 establishes a driver defect for a complete supplied reply with submitted Recv tokens/buffers; it does not establish actual archived-write receipt. Tasks938/945 stopped during startup/nonempty-scratch validation, so neither supplies that missing evidence.
+
+     Use the retained targeted cargo-test diagnostic through pinned heavy, outside the default unit suite, with a fresh run-owned instance directory. Preserve the prior scratch/evidence. Allow10minutes of command execution excluding queue, with this process bounded to180seconds and no retry or full recording. Keep the existing binary fingerprint and exact masked request comparison before the exchange; capture typed receive completions and framing evidence sufficient to decide whether the complete reply entered io before Reset. Remove temporary diagnostic code/prints afterward.
+
+     If that trace establishes complete receipt and the same scheduling loss, the session's existing conditional OneShot repair and separate complete/incomplete/close/deadline regressions apply. Otherwise return the remaining uncertainty before changing production. Keep the original one post-repair archived-write comparison and temper06.2's later two-recording proof; this extra pre-repair probe replaces neither. Keep io/HTTP/shell contracts, request bytes, deadlines, bounds, public APIs and all test/profile ceilings.
+
+     Add the README Diagnostic process attempts rule: a bounded process probe preflights a fresh instance path, its proper process harness and the exact request comparison; preserve prior evidence, count setup failures as attempts, and report budget exhaustion before another attempt. Refresh any further reached driver copy or diagnostic fixture and list it in the commit body. Propose this prerequisite rule for the retrospective, rather than changing the pinned kit during the run.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
