@@ -746,12 +746,12 @@ step.
 
 | Proposal | Decision | Where |
 |---|---|---|
-| 1 | adopted | to apply: development.md, 2.2, 5.1 and 5.3 |
-| 2 | adopted | to apply: development.md, 5.2 and 10.3; implementer.md, 8.1 and 8.6 |
-| 3 | adopted | to apply: implementer.md, 8.3; development.md, 14.2; the pulse |
-| 4 | adopted | to apply: development.md, 3.6 and 12; supervisor.md, 3 |
-| 5 | adopted | to apply: development.md, 7.3, 7.4 and 10.3; `plan unblocked` and `plan steered` |
-| 6 | adopted | to apply: development.md, 2.1, 10.4 and 14.1; supervisor.md, 6 and 8; `plan`'s designer prompt |
-| 7 | adopted | to apply: development.md, 5.5, 10.4 and 14.1; implementer.md, 8.4; supervisor.md, 6 |
-| 8 | adopted | to apply: development.md, 11.4 and 14.1; `plan check`, `plan resume` and the pulse |
-| 9 | adopted | to apply: development.md, 15.2; `numbers.sh` and `metrics.sh` |
+| 1 | adopted | skein 656ef69: development.md 5.1 (a plan's size); 2.2 already had the split; skein 1d105bc: 5.3 (a chain of about 20 increments) |
+| 2 | adopted | skein 1d105bc: development.md 5.2 (the rules under about 300 lines) and 10.3 (a steer replaces a rule's text); implementer.md 8.1 and 8.6 |
+| 3 | adopted | skein 1d105bc: implementer.md 8.3 (`// @exec`, `write_stdin`'s 31 s); the pulse's count by return, with 7.4 and 14.2: skein's kit, to land |
+| 4 | adopted | skein 1d105bc: development.md 3.6, 12 and 14.1; supervisor.md 3 and 6. No kit: the supervisor runs `test-plan` in `kit/` |
+| 5 | adopted | skein's kit, to land: `plan unblocked` and `plan steered`, with development.md 7.3, 7.4 and 10.3 |
+| 6 | adopted | skein 1d105bc: development.md 2.1 and 14.1; supervisor.md 4, 5, 6 and 8; `plan`'s designer prompt, with 10.4: skein's kit, to land |
+| 7 | adopted | skein 1d105bc: development.md 5.5 and 14.1; implementer.md 8.4, 8.7 and 8.8; supervisor.md 6; testing-strategy.md 8 |
+| 8 | adopted | skein 1d105bc: development.md 11.4, by hand; `plan check`, `plan resume` and the pulse: the next kit batch (which filesystem, sudo, and a btrfs machine to test on) |
+| 9 | adopted | skein's kit, to land: `numbers.sh` and `metrics.sh`, with development.md 15.2 |
