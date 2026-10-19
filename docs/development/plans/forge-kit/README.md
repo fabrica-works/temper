@@ -306,15 +306,19 @@ chain.
   establish compatibility with the normal checks, rather than treating
   that landed trailer as proof of downstream compatibility.
 - **Accounts compatibility has separate owners:** accounts/smith-01.3 owns
-  smith's changed credential, failure and report interfaces. Jig's OAuth
-  `SavedToken` and `Limits` literals are separate downstream repairs already
-  inventoried by accounts/skein-05.2 and assigned to accounts' repins. A smith
-  landing alone proves neither jig nor temper compatible. Report each reached
-  typed failure with exact sources and locks to that existing owner; retain
-  independent work and this plan's normal all-target check and gate. Do not
-  patch dependencies or repeat the settled live-text adapter sweep. Refresh
-  any further reached copy or derived value within the owning repin, and list
-  every user in its commit body.
+  smith's changed credential, failure and report interfaces; its landing is
+  not proof that downstream repositories compile. Jig's OAuth `SavedToken`,
+  inner `Limits`, `ClientLimits` (`nonce_bytes`, `parameter_bytes`,
+  `resource_bytes`) literals and `Failure::Incomplete` translation belong to
+  accounts' existing closing `jig-repin`, inventoried by skein05.2–05.4.
+  The channel-v4 copies in `tests/core/src/{protocol,agents_tools}.rs` belong
+  to accounts/jig-repin.s1 under smith01.2; forge-kit/jig01.s2's earlier
+  live-text adapters do not cover them. Report each reached typed failure
+  with exact sources and locks to its existing owner and retain independent
+  work plus this plan's normal all-target check and gate. Do not patch
+  dependencies, backpin or duplicate another plan's adapter sweep. Refresh
+  any further reached copy or derived value within the owning repin, and
+  list every user in its commit body.
 - **Settled smith adapters at the next repin:** smith's live-text
   decisions2.2/answer4 and For the user9 settle v3 paths, `live: None`
   and ignored `OpenEvent::Live`; its later.md expressly assigns them to
