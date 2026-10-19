@@ -401,6 +401,14 @@ pass:
      - **The close story** begins its wait before the fixture's `Finished` report, as the report says: a wait begun after it reads an ended chat's watch as unknown. That needs no question.
      - A further `ReadValue::Task` arm in the tools that an ended task reaches takes the same historical task; list each in the commit body.
 
+122. **temper 06.5: the cut agent is reloaded before another directory asks again** (plan defect, temper 06's block of 2026-10-19T15:27:04Z).
+     Plan defect, the proposal adopted. 06.5's third story takes the cut agent's process as ended, but jig's world ends no client: `reload` is its one way to end a client's process, and it starts the process again at once. The cut agent stays signed in, so once the engine is back the referee asks it to be online within `link_within`, and its first retry is at 1 s (`limits::client()`'s `backoff.first`). Raising either bound breaks the guide, and an upstream close is outside this plan.
+
+     - **The third story,** `a_chat_cut_by_an_engine_restart_asked_again_from_another_directory_is_made_once`: `cut`, then `FrontFault::Restart { offline }` before any rerun, then `world.reload(agent)` of the cut agent, then a second `fixtures::agent` gives the same call: same T, `chats == 1`, and nothing asserted on the way (ruling 117). The reload resends the cut agent's kept chat under its key. The second agent has its own records, gives the same call under the same name and gets the same T, so the chat is still made once across directories. Its name stays.
+     - **The runner's `Me` fix** (its `Me` read opened again after a `SignedOut` end, which a reload's `SignedIn` after `Start` needs) lands in 06.5's commit, named in its body. 06.5's Files gain it, and its Size is ~5 lines by part 1's count.
+     - **Restart's re-hello of the hosted assignments** stays within `front.rs`, which 06.5's Files name. It needs no question.
+     - The four stories that pass land with the fifth; there is no split.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

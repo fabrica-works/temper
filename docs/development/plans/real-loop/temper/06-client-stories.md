@@ -318,7 +318,8 @@ Scope: 11.2's faults over a chat and over the forge's owner, and 7 and
 8.2's unkeyed act (Choice 3).
 Needs: 06.1's agent.
 Files: `tests/client/src/{front.rs, fixtures.rs}`,
-`tests/client/tests/agent_recovery.rs` (new).
+`tests/client/tests/agent_recovery.rs` (new); `crates/temper-client-tools`'
+runner, its `Me` read opened again after a `SignedOut` end (ruling 122).
 Shape: `Joint::answers_to_lose()`: the count `FrontFault::NoAnswer`
 arms. `fixtures::cut(world, agent, words)` arms `NoAnswer`, gives the
 call, runs `Until::Steps(2)` until `answers_to_lose()` is 0 (bounded by
@@ -333,8 +334,9 @@ cutting the call it names.
   the same call after `reload` prints `done: task T, chat`, with the same
   T, and `chats == 1`.
 - `a_chat_cut_by_an_engine_restart_asked_again_from_another_directory_is_made_once`:
-  `cut`, then `FrontFault::Restart { offline }` before any rerun, then a
-  second `fixtures::agent` gives the same call: same T, `chats == 1`.
+  `cut`, then `FrontFault::Restart { offline }` before any rerun, then
+  `world.reload(agent)`, as jig's world ends no client (ruling 122), then
+  a second `fixtures::agent` gives the same call: same T, `chats == 1`.
 - `an_adoption_cut_by_a_lost_answer_asked_again_under_its_name_is_made_once`:
   the same `adopt` cut, then `reload`, then the same call:
   exit 0, and `applications_admitted() == 1`.
@@ -359,8 +361,8 @@ fn an_unkeyed_stop_cut_before_its_answer_is_resent_with_its_kept_line() {
 Proof: joint, no higher than its test: a signal's cut and DIRECTORY on
 disk belong to temper 09 and 10.
 Don't: stop a run at a wall time; let a retry land before `reload`.
-Size: at most ~40 lines of `tests/client/src`, by the same command; 0
-by part 1's count.
+Size: at most ~40 lines of `tests/client/src`, by the same command; ~5
+by part 1's count (ruling 122).
 Removes: nothing.
 
 Each test's cost: the crate's focused tests take 0.79 s together at
