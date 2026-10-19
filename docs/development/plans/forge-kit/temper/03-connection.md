@@ -7,7 +7,7 @@ deletes `crates/temper-engine-protocol-forge`. 03.2 repins onto skein 03.2 and 0
 the page sizes).
 
 **Needs at start:** **skein 03.1** and **temper 02.1** on `origin/main` (README), for 03.1;
-**03.2 needs skein 03.3**, which needs skein 03.2 (the README row names only 03.2: Choices). Temper
+**03.2 needs skein 03.3**, which needs skein 03.2 (as the README row says). Temper
 01.3 and 01.4 have landed (they took the marker, the start plans and `host` from the crate).
 
 ## Read first
@@ -46,7 +46,7 @@ the page sizes).
   name (the base chose by `server_name.is_some()`): equal for every fixture; skein 01.4's `host`
   tests pin the server name's case, and the start test below the plaintext one.
 - The setup shell keeps its own `reconcile::Settings` with `host` and `user_agent`: `reconcile_settings`
-  keeps `skein_forge::host::host(address, None)` (01.4), takes `temper_service::USER_AGENT` and
+  keeps `skein_forge::host::host(address, None)` (01.4), takes `temper_service::forge::USER_AGENT` and
   `skein_forge_connection::limits::{http, documents}`; of 03.1 and 04.1 the second keeps the
   first's lines.
 
@@ -82,7 +82,8 @@ Files (from -> to): `crates/temper-engine-protocol-forge/` -> `skein-forge-conne
   `skein-forge-connection.workspace = true`: `crates/{temper-service,temper,temper-forge-setup-shell}`,
   `tools/forgejo-conformance`, `tests/{codecs,one-process,engine/protocol-forge}` (the world, which
   stays until temper 07.1). Changed Rust at the base: temper-service
-  `src/{forge,settings,lib,stop,route,limits,engine,system}.rs` and `src/tests/{forge,fixtures}.rs`,
+  `src/{forge,settings,lib,stop,route,limits,engine,system}.rs`,
+  `src/startup/application.rs::{Resolved,resolve}` and `src/tests/{forge,fixtures}.rs`,
   `src/tests/fixtures/forge.rs`; `crates/temper/src/{forge,lib,host}.rs`; the shell's
   `tests/support/mod.rs`; `tests/codecs/{src/forgejo.rs,tests/{fuzzy_forgejo,forgejo_deliveries}.rs}`;
   the conformance's `src/{component.rs,component/hosted.rs}`; `tests/one-process/src/fixtures.rs`;
@@ -101,13 +102,23 @@ Shape: three commits, each builds and passes its crates' tests.
      the base's `What::Bound` push for a missing host is the `PlaintextName` arm now. `small()`'s
      `body_bytes` is `16_384.max(skein_forge::marker::length(WORD, op_bytes).unwrap_or(u32::MAX))`,
      the base's saturation (`2 * op_bytes + 21` for `temper`: the same numbers). `Webhooks` is named
-     `skein_forge_connection::hooks::Webhooks`: the `pub use` in `settings.rs` goes, and the two
-     `settings::Webhooks` lines of `startup/application.rs` and `forge.rs` name the path. `problems` gains
+     `skein_forge_connection::hooks::Webhooks`: the `pub use` in `settings.rs` goes; the three
+     occurrences in `startup/application.rs::{Resolved,resolve}` and `forge.rs::settings` name the path.
+     Before consuming the component Settings, compute checked `settings::owned_bytes(&settings)`
+     and thread the retained-owner byte count through its landed `limits::worst_case` signature:
+     temper-service `system::{Service::new,startup_worst_case,memory}` and the conformance's
+     `component/hosted.rs::Hosted::new`. Follow skein 03.1's landed signature; retain checked
+     overflow/refusal handling and separate TLS-root accounting. Refresh each reached startup or
+     memory fixture and further derived copy, report the complete sum and list changed users in the
+     commit body. Historical sums 2,812,325 and 2,812,377 are not the new owner-byte total.
+     `problems` gains
      `Unusable::Zero | Unusable::Word => &[b"forge_component"]` and the `PlaintextName { forge }`
      arm (pushes `forges[i].api` as `What::Bound`, returns); `indexed` gains `PlaintextName`.
-     Fixture builders: temper-service `tests/{forge,fixtures,fixtures/forge}.rs`, the shell's
-     `forges()`, one-process `fixtures::forges`, the conformance's `hosted::new`, the world's
+     Fixture builders: temper-service `tests/{forge,fixtures,fixtures/forge}.rs`,
+     `crates/temper/src/lib.rs::forges`, one-process `fixtures::forges`, the conformance's `hosted::new`, the world's
      `settings()`: `Plaintext { name: None }`, no `host`, `word: temper`, `user_agent: temper/0.0.0`.
+     The setup-shell `tests/support/mod.rs::settings` retains its reconcile Settings, including
+     `host` and the fixture agent `test`; only its component-limits paths change.
   3. **The deletion**: the crate's directory, its member, its `path` entry, its manifest lines.
 Test shape: **no test of the crate stays** (112 at the step's start, 117 at the base, 0.099 s; skein
   03.1 owns them). Five new tests in temper-service `tests/forge.rs`, each <20 ms:
@@ -190,8 +201,10 @@ Test shape: two new units, <20 ms (0.007 and 0.010 s in the scratch):
   The edge is `io.output` less the head's fixed 192, Host `forge.example:3000` (18), token `api-token`
   (9) and the agent (12): 1_048_576 - 231 = 1_048_345. The scratch ran the base head, without the
   agent, at 1_048_357 and 1_048_358; if skein 03.2's head differs, return the question. The shipped
-  profile's worst head is 4096 + 258 + 512 + 12 + 192 = 5070, under `tls.send` 16_384 and
-  `io.output` 1_048_576 (derived by hand, not run).
+  profile's maximum Host is 253 name bytes + one colon + five port digits = 259 bytes. Its worst
+  head is 4096 + 259 + 512 + 12 + 192 = 5071, under `tls.send` 16_384 and
+  `io.output` 1_048_576 (the landed Host helper and arithmetic passed a scratch oracle; future
+  component admission remains unproved).
 Proof: unit; `heavy cargo nextest run -p temper-service tests::forge`: 18 passed (16 at 03.1, plus 2).
 Proof: joint; the users command of 03.1: its count at the step's start plus 2, <15 s.
 Proof: process; 03.1's component recording: exit 0, about 30 s. Once.
