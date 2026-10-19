@@ -515,3 +515,9 @@ and the user, or the director, may veto it before the run:
   or a designer joins the run (`plan join designer`, in a design
   session) and answers question.md. temper 02.1 waits on it, and 02.2,
   02.3 and temper 03 behind it.
+  Decision: the default, by director, 2026-10-19: the tools' rows are 32,
+  jig's client wire ceiling, wherever tools.md, 12, and the plan say 50
+  (`limits::ROWS` and the sessions that read it: temper 02, 03, 04 and
+  11). A page of 32 rows serves the tools as well as 50, and changes
+  later without a wire version; jig's wire stays as it is. tools.md, 12,
+  says so at the designer's next pass, after this plan.
