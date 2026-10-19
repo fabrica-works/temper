@@ -57,7 +57,7 @@ Shape:
   stay. Decision 3 replaces `binary.rs::Forgejo::from_path`'s `skein_io::digest::digest(&bytes).0`
   with `skein_lib::sha256::digest(&bytes)`, rendering each byte as `{byte:02x}`; the hex is identical.
 - Remove `Forgejo::from_env` and its `Refusal::Unset`; `from_path(&Path) -> Result<Forgejo,
-  Refusal>` reads no environment. Use the moved dialect pin. Keep `pub use
+  Refusal>` reads no environment. Use the moved dialect pin. Add the designed `pub use
   skein_forge::forgejo::pin::{RUNNER_VERSION, names_runner}`. `tests/throwaway.rs` imports VERSION
   from `skein_forge::forgejo::pin`, and binary.rs names_forgejo comes from that pin; remove root
   VERSION. APP_NAME becomes `kit throwaway`; retain the existing neutral `fixture` login. Only the
@@ -163,8 +163,9 @@ Shape:
   -> `kit-conformance-hook-secret`, `TEMPER_CONFORMANCE_FAILED_JOB` -> `KIT_CONFORMANCE_FAILED_JOB`,
   all `temper:key` markers -> `kit:key` (13 source and 29 corpus occurrences;
   49 corpus files use the old word); the component
-  receives the owner's `kit` word. Keep registration.rs's RUNNER_VERSION, runner.rs's names_runner
-  and tests.rs's runner version assertion on the throwaway's designed re-exports. `--forgejo` is
+  receives the owner's `kit` word. Switch `registration.rs`'s RUNNER_VERSION, `runner.rs::version`'s
+  names_runner and `tests.rs::a_listed_runner_is_found_by_its_uuid`'s version reference from
+  the dialect pin to `skein_throwaway_forgejo`'s designed re-exports, added by 06.1. `--forgejo` is
   required; `--runner` optional; `--scratch`, `--out` and `--component` retain meaning (designer
   answer 31).
 ```rust
@@ -265,7 +266,8 @@ Shape:
   tokenizer depth 16, string 16,384, number 32, chunk 4,096, length 16,777,216; writer depth 16,
   length 16,777,216; string_bytes 512, body_bytes 16,384, inner 32, target_bytes 4,096. The delivery
   fuzzy test uses this same helper. `forgejo_deliveries.rs::shipped` also calls
-  `common::forgejo::profile_limits`, replacing its temper-service profile lookup.
+  `forgejo::profile_limits()` through its existing `use common::forgejo`, replacing its
+  temper-service profile lookup and avoiding a redundant qualification.
   Refresh further copies and derived values reached by these repairs, and list
   further users and lint adaptations in the commit body.
 Test shape: 55 focused + 3 fuzzy move. Add six table tests in `forgejo_bounds.rs`, reusing

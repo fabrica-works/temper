@@ -472,6 +472,18 @@ where its answer lands.
 
      Scratch exact-commit repin and workspace/all-target check pass without source repairs. Corrected fragment and five reached packages pass clippy; sequential suites pass 237 focused and 1 fuzzy, 0.887/0.579 s; the seven-command startup test passes in 0.242 s in the exclusive lane. Future behavior, complete cutovers, full gate and process/live proofs remain unrun. Evidence: pump/ready-temper-04.md and scratch-ready-temper-04/report.txt. Scratch source/logs remain; completed targets were released.
 
+115. **skein 06's moved inputs against main** (started re-check of skein-06.1).
+     Reverses: ruling 108 of 2026-10-19T05:39:47Z only for the qualification of shipped's profile helper; its remaining corrections stand.
+     Amends: skein/06-conformance.md, 06.1 pin re-export wording, 06.2 runner-pin users and 06.3 shipped helper.
+
+     After temper's pin cutover, the copied throwaway has no runner-pin re-exports to retain. Skein 06.1 adds the designed `pub use skein_forge::forgejo::pin::{RUNNER_VERSION,names_runner}`. When 06.2 moves the conformance, switch registration.rs's RUNNER_VERSION, runner.rs::version's names_runner and tests.rs::a_listed_runner_is_found_by_its_uuid's version reference from the dialect pin to skein_throwaway_forgejo's re-exports. This implements the plan's existing fake-forge 6 exception to its general no-re-export rule.
+
+     In 06.3's crates/skein-forge/tests/forgejo_deliveries.rs::shipped, call `forgejo::profile_limits()` through `use common::forgejo`; the longer qualification triggers unused_qualifications under skein's lints. Preserve all 58 moved test names and assertions. Refresh further copies and derived users and list them in the commit body.
+
+     Checked skein 7436461f0fce6d0178c483f3b631e1a4db5fc343 and temper 52eba416314f30a384bdf24902ec31cb08c00ad5. search_code of the exact temper graph locates the three runner users. git -C /srv/data/git/runner/src/temper show origin/main:tools/forgejo-conformance/src/registration.rs contains `use skein_forge::forgejo::pin::RUNNER_VERSION`; runner.rs and tests.rs likewise name that pin. rg -n 'RUNNER_VERSION|names_runner' testing/temper-throwaway-forgejo/src/*.rs finds no remaining re-export. The planned 06.1 explicitly supplies both exports. The corrected scratch integration file imports common::forgejo and clippy passes with `fn shipped() -> Limits { forgejo::profile_limits() }`. Searches across all five repositories found no additional repair.
+
+     Sequential heavy proofs: temper clippy passes including the 06.4 sketch; 167 focused pass (1 skipped) and 13 fuzzy. Skein clippy passes after the corrections; 142 focused and 3 fuzzy pass, browser selects none. A transplant-script-only Malformed qualification error was corrected before those passes. Future Host/attach, recorder and mask/boundary proofs remain unrun; unchanged HTTP/live proofs were not repeated. Evidence: pump/recheck-skein-06-start.md and scratch-recheck-skein-06-start/results.txt. No running step is held.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
