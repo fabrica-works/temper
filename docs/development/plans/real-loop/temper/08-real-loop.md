@@ -279,7 +279,9 @@ fn a_signed_in_chat_shows_its_reply_only_once_committed() {
 `a_signed_in_directory_is_private_to_its_user`: `sign_in(D1)` alone;
 DIRECTORY is 0700, `token` and `address` 0600, each owned by the
 effective user (tools.md, 8.1).
-Proof: joint, as 08.2's.
+Proof: joint, as 08.2's. Reads that finish but never show the reply
+are diagnosed in at most 3 world runs and 30 minutes, then asked
+(ruling 125).
 Don't: pass a descriptor of DIRECTORY to the host; retry a lock or
 end a call in the caller (temper 05's); read the link from argv; raise
 `CALLS_AT_ONCE`, the profile's streams or the heartbeat, or wait in the

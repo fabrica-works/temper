@@ -491,6 +491,32 @@ pass:
      - **A fresh allowance of three diagnostic runs** begins after 08.s1 lands. If the wait still misses its ceiling then, the cause is a new one: report it as a block with the run's log.
      - **Until then,** nothing in 10.1 goes round the cause: no wait or retry in `support::ctl`, no bound or heartbeat changed, no test moved (ruling 118's Don't).
 
+125. **08.s1 lands on its unit proof; 08.3 diagnoses the missing reply** (process, temper 08's block of 2026-10-19T15:44:01Z).
+     Ruling 125: 08.s1 lands on its unit proof; the missing reply is
+     08.3's, with a diagnosis budget.
+
+     08.s1's Scope is "a call's stream is free once its process exits", and
+     its test proves it. 08.3's proof run shows it too: by 1 s, sign-in and
+     `chat` exited 0 and read attempt 23 was running, so the reads no longer
+     wait behind two ended streams. A reply that the finished reads never
+     show is another cause, inside 08.3's story, which 08.s1 does not own.
+
+     - 08.s1's Proof is now "unit, its test, and the land gate; 08.3's story
+       is 08.3's proof". It lands as it is (57334ab86, with the land gate).
+     - 08.3 then goes on from its saved branch, rebased on that landing, and
+       diagnoses why the finished reads never hold `scripts::REPLY`: at most
+       3 world runs and 30 minutes. Each run captures each finished read's
+       stdout (the last few is enough), what the scripted LLM peer received
+       and answered, and the chat task's state in the engine: whether its
+       run was assigned, how that run ended, and whether a turn was
+       committed. Past the budget, ask, with what the runs showed. Remove the
+       diagnostics before landing.
+     - A cause found in another owner's files (temper-service beyond
+       08.s1's arm, temper 05's client, jig, skein) is raised as a block
+       before those files are changed. 08.3's Don't stands: no retry, no
+       wait in the caller, no raised bound.
+     - 10.1 needs only 08.s1 (its Needs): it may start once 08.s1 lands.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
