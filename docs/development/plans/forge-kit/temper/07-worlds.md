@@ -106,7 +106,7 @@ Files (at the base):
 - `Cargo.lock`: the repin commit, then the entries `cargo check` writes.
 - `Cargo.toml`: delete members `"tests/engine/forge/client"` and
   `"tests/forge-setup/reconcile"`; `[workspace.dependencies]` gains
-  `skein-forge-machine-world = { git = "https://github.com/forgetic/skein.git" }`.
+  `skein-forge-machine-world = { git = "https://github.com/fabrig-dev/skein.git" }`.
 - Moved: `tests/engine/forge/client/src/translate.rs` (567 lines) ->
   `tests/engine/forge/src/translate.rs`; changed `tests/engine/forge/src/lib.rs`
   (the `#[path = "../client/src/translate.rs"]` line deleted).

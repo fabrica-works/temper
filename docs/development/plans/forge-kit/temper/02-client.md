@@ -67,7 +67,7 @@ Needs: skein 02.2 and temper 01.3 on `origin/main` (README); for its naming
   guard and 02.4's frame checks may be on it; if they are, the repin commit
   repairs the two places below.
 Files: Cargo.toml (root: delete the member `crates/temper-engine-domain-forge-client`
-  and its `path` entry, add `skein-forge-client = { git = "https://github.com/forgetic/skein.git" }`
+  and its `path` entry, add `skein-forge-client = { git = "https://github.com/fabrig-dev/skein.git" }`
   beside the other skein entries) and Cargo.lock; the 15 manifests naming
   `temper-engine-domain-forge-client.workspace = true` at the base:
   `crates/temper-{engine-domain,engine-domain-forge,engine-protocol-forge,engine-smith,protocol-store,service}`,

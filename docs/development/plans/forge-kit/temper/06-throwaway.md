@@ -110,7 +110,7 @@ Files (changed; at the base):
   (the kit's package in, the copy's out).
 - `Cargo.toml`: delete member `"testing/temper-throwaway-forgejo"`; the
   dependency line becomes `skein-throwaway-forgejo = { git =
-  "https://github.com/forgetic/skein.git" }`.
+  "https://github.com/fabrig-dev/skein.git" }`.
 - `crates/temper/Cargo.toml` (dev-dependencies), `tools/git-transcripts/Cargo.toml`,
   `tools/forgejo-conformance/Cargo.toml`: `temper-throwaway-forgejo` becomes
   `skein-throwaway-forgejo` (one line each).
