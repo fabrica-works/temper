@@ -130,7 +130,7 @@ pub(super) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, cal
     }
     runner.active.insert(reading.called.call_number, reading);
 }
-fn project(call: &Call, me: &c::Me) -> Option<u32> {
+pub(super) fn project(call: &Call, me: &c::Me) -> Option<u32> {
     match value(call, 0) {
         Some(Value::Project(Project::Number(number))) => Some(*number),
         Some(Value::Project(Project::Name(name))) => {

@@ -15,7 +15,6 @@ pub struct Root {
     client: Client,
     runner: runner::Runner,
     next: Option<u32>,
-    kept_json: bool,
 }
 #[derive(Debug)]
 pub enum Event {
@@ -39,14 +38,18 @@ impl Root {
     pub(crate) fn with_client(client: Client) -> Self {
         let mut runner = runner::Runner::new(RUNNER.asker(), crate::key::TOOLS);
         runner.parts(owner_part);
-        Self { client, runner, next: Some(1), kept_json: false }
+        Self { client, runner, next: Some(1) }
     }
     #[must_use]
     pub fn client(&self) -> &Client {
         &self.client
     }
+    #[must_use]
+    pub fn kept(&self) -> u32 {
+        self.runner.kept(&self.client)
+    }
     pub fn kept_json(&mut self, json: bool) {
-        self.kept_json = json;
+        self.runner.kept_json(json);
     }
 }
 pub fn step(root: &mut Root, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
@@ -174,3 +177,7 @@ fn owner_part(part: &jig_client::contract::OwnerPart, out: &mut jig::render::Tex
     use jig::render::Parts as _;
     Parts.owner_part(part, out);
 }
+
+#[cfg(test)]
+#[path = "tests/fixtures/root_acts.rs"]
+pub(crate) mod act_fixture;

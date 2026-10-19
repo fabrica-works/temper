@@ -6,7 +6,9 @@ use jig_client::{
     contract::{Delivery, Subject},
 };
 use skein_lib::{Env, Queue};
+mod acts;
 pub(crate) mod reads;
+mod recovery;
 #[derive(Debug)]
 pub struct Printed {
     pub status: u8,
@@ -18,6 +20,11 @@ pub struct Runner {
     asker: Asker,
     waiting: BTreeMap<u32, Called>,
     active: BTreeMap<u32, reads::Reading>,
+    salt: &'static [u8],
+    acts: BTreeMap<u32, acts::Reading>,
+    sent: BTreeMap<jig_client::Key, acts::Sent>,
+    kept: BTreeMap<jig_client::Key, render::outcome::Operation>,
+    kept_json: bool,
     ready: bool,
     watching: bool,
     owner_part: Option<fn(&jig_client::contract::OwnerPart, &mut render::Text)>,
@@ -38,11 +45,16 @@ pub enum Out {
 }
 impl Runner {
     #[must_use]
-    pub fn new(asker: Asker, _salt: &'static [u8]) -> Self {
+    pub fn new(asker: Asker, salt: &'static [u8]) -> Self {
         Self {
             asker,
             waiting: BTreeMap::new(),
             active: BTreeMap::new(),
+            salt,
+            acts: BTreeMap::new(),
+            sent: BTreeMap::new(),
+            kept: BTreeMap::new(),
+            kept_json: false,
             ready: false,
             watching: false,
             owner_part: None,
@@ -50,6 +62,12 @@ impl Runner {
     }
     pub fn parts(&mut self, owner_part: fn(&jig_client::contract::OwnerPart, &mut render::Text)) {
         self.owner_part = Some(owner_part);
+    }
+    pub(crate) fn kept_json(&mut self, json: bool) {
+        self.kept_json = json;
+    }
+    pub(crate) fn kept(&self, client: &Client) -> u32 {
+        recovery::count(self, client)
     }
     fn me(&self) -> Handle {
         Handle { asker: self.asker, number: 0 }
@@ -62,7 +80,15 @@ impl Runner {
     }
 }
 pub fn call(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, called: Called, out: &mut Queue<Out>) {
-    let count = runner.waiting.len().checked_add(runner.active.len()).expect("bounded calls");
+    let count = runner
+        .waiting
+        .len()
+        .checked_add(runner.active.len())
+        .expect("bounded calls")
+        .checked_add(runner.acts.len())
+        .expect("bounded calls")
+        .checked_add(runner.sent.len())
+        .expect("bounded calls");
     if count >= usize::try_from(env.limits.rows).expect("rows fit") {
         let printed = render::failure(b"call limit", called.json, 1);
         finish(called, printed, out);
@@ -86,6 +112,7 @@ fn run(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, call
             finish(called, printed, out);
         }
         1..=7 => reads::start(runner, client, env, called, out),
+        8..=15 => acts::start(runner, client, env, called, out),
         _ => {
             let printed = render::failure(b"call not supported", called.json, 1);
             finish(called, printed, out);
@@ -98,6 +125,7 @@ pub fn told(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>,
             if live(runner, client) {
                 if !runner.ready {
                     runner.ready = true;
+                    recovery::parked(runner, client, out);
                     out.push(Out::Ready);
                 }
                 for _ in 0..runner.waiting.len() {
@@ -106,11 +134,20 @@ pub fn told(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>,
                 }
             }
         }
-        Told::Page { handle, page } => reads::page(runner, client, env, handle, page, out),
+        Told::Page { handle, page } => {
+            let prefix = u32::try_from(handle.number >> 32u32).expect("high half");
+            if runner.acts.contains_key(&prefix) {
+                acts::page(runner, client, env, handle, page, out);
+            } else {
+                reads::page(runner, client, env, handle, page, out);
+            }
+        }
         Told::Changed { handle } | Told::Text { handle } => reads::changed(runner, client, env, handle, out),
         Told::Ended { handle, why } => reads::ended(runner, handle, why, out),
-        Told::Link { .. } | Told::Kept { .. } | Told::Dropped { .. } | Told::Answered { .. } | Told::Pending { .. } => {
-        }
+        Told::Kept { key, request } => recovery::kept(runner, key, &request, client),
+        Told::Dropped { count } => recovery::dropped(runner, count, out),
+        Told::Answered { key, outcome } => acts::answered(runner, client, env, key, &outcome, out),
+        Told::Link { .. } | Told::Pending { .. } => {}
     }
 }
 fn finish(called: Called, printed: Printed, out: &mut Queue<Out>) {

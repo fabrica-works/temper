@@ -1,0 +1,438 @@
+//! Offered acts are read once, then kept by the shared client's request table.
+use super::{Called, Out, Runner, finish};
+use crate::jig::{
+    Limits,
+    call::{Call, Value, Values, number, value},
+    render::{self, outcome::Operation},
+};
+use alloc::boxed::Box;
+use jig_client::{Client, Event, Handle, Key, Latest, Readable, Readout, contract as c, shapes};
+use skein_lib::{Env, List, Queue};
+#[derive(Debug)]
+pub(super) struct Reading {
+    called: Called,
+    document: Option<c::ReadValue>,
+}
+#[derive(Debug)]
+pub(super) struct Sent {
+    called: Called,
+    operation: Operation,
+}
+fn me<'a>(runner: &Runner, client: &'a Client) -> Option<&'a c::Me> {
+    match client.document(runner.me())?.latest? {
+        Latest::Jig(c::Delivery::Me(me)) => Some(me),
+        Latest::Jig(_) | Latest::Family(_) => None,
+    }
+}
+pub(super) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, called: Called, out: &mut Queue<Out>) {
+    if called.call.tool == 8 {
+        let Some(me) = me(runner, client) else { return };
+        let ask = chat(&called.call, me, &env.limits);
+        prepared(runner, client, env, called, ask, out);
+        return;
+    }
+    let call = &called.call;
+    let task = number(call, 0).unwrap_or(0);
+    let read = match call.tool {
+        12 if call.form == 0 => {
+            let Some(Value::Proposal(proposal)) = value(call, 0) else { unreachable!("proposal form") };
+            c::Read::Proposal { proposal: *proposal }
+        }
+        12 => c::Read::Escalation { task },
+        11 => c::Read::Question { task, message: number(call, 1).expect("question") },
+        _ => c::Read::Task { task },
+    };
+    out.push(Out::Client {
+        event: Event::Read {
+            handle: Handle { asker: runner.asker, number: (u64::from(called.call_number) << 32u32) | 1 },
+            read: Readable::Jig(read),
+        },
+    });
+    runner.acts.insert(called.call_number, Reading { called, document: None });
+}
+type Prepared = Result<(c::Ask, Option<c::Recipient>), &'static [u8]>;
+fn chat(call: &Call, me: &c::Me, limits: &Limits) -> Prepared {
+    let project = super::reads::project(call, me).ok_or(b"unknown project".as_slice())?;
+    let Ok(ask) = shapes::chat(me, project, words(call, 1, limits)?) else { return Err(b"chat not offered") };
+    let c::Ask::Create { tasks, .. } = &ask else { unreachable!("chat creates") };
+    let task = tasks.get(0).expect("chat creates one task");
+    let mut creating = None;
+    for membership in &me.projects {
+        if membership.project == project {
+            creating = membership.creating.as_ref();
+        }
+    }
+    let creating = creating.ok_or(b"chat not offered".as_slice())?;
+    let draft = shapes::GoalDraft {
+        words: task.spec.words.clone(),
+        executor: task.executor,
+        budget: task.authority.spend,
+        deadline: task.authority.deadline,
+        priority: task.tracked,
+    };
+    match shapes::fall(creating, &draft, task.deadline) {
+        shapes::Fall::Within => Ok((ask, None)),
+        shapes::Fall::Proposable(to) => {
+            let c::Ask::Create { tasks, .. } = ask else { unreachable!("chat creates") };
+            Ok((
+                c::Ask::Propose { project, action: c::ProposeAction::Batch { tasks }, reason: empty(limits) },
+                Some(to),
+            ))
+        }
+        shapes::Fall::Refused(_) | shapes::Fall::NotOffered(_) => Err(b"chat exceeds offered bounds"),
+    }
+}
+fn words(call: &Call, index: usize, limits: &Limits) -> Result<c::Text, &'static [u8]> {
+    let bytes = match value(call, index) {
+        Some(Value::Text(bytes)) => bytes.as_ref(),
+        None => b"",
+        _ => return Err(b"text not loaded"),
+    };
+    match c::Text::new(Box::from(bytes), limits.text) {
+        Ok(text) => Ok(text),
+        Err(_) => Err(b"text limit"),
+    }
+}
+fn empty(limits: &Limits) -> c::Text {
+    c::Text::new(Box::default(), limits.text).expect("empty words fit")
+}
+pub(super) fn page(
+    runner: &mut Runner,
+    client: &Client,
+    env: &Env<Limits>,
+    handle: Handle,
+    page: Readout,
+    out: &mut Queue<Out>,
+) {
+    let prefix = u32::try_from(handle.number >> 32u32).expect("high half");
+    let Some(mut reading) = runner.acts.remove(&prefix) else { return };
+    if let Some(document) = reading.document.take() {
+        let called = reading.called;
+        let ask = match page {
+            Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(task))) => {
+                let Some(me) = me(runner, client) else { return };
+                build(&called.call, &document, me, &env.limits, Some(task.project))
+            }
+            Readout::Limit | Readout::NotServed { .. } | Readout::Jig(_) | Readout::Family { .. } => {
+                Err(b"task project unavailable".as_slice())
+            }
+        };
+        prepared(runner, client, env, called, ask, out);
+        return;
+    }
+    if let Readout::Jig(c::ReadResult::Value(document)) = &page {
+        let chip = match document {
+            c::ReadValue::Question(q) => Some(&q.task),
+            c::ReadValue::Escalation(e) => Some(&e.task),
+            c::ReadValue::Tasks(_)
+            | c::ReadValue::OwnerProject(_)
+            | c::ReadValue::Historical(_)
+            | c::ReadValue::Me(_)
+            | c::ReadValue::Turn(_)
+            | c::ReadValue::Task(_)
+            | c::ReadValue::Proposal(_)
+            | c::ReadValue::OwnerProposal(_)
+            | c::ReadValue::OwnerEscalation(_)
+            | c::ReadValue::PersonTask(_)
+            | c::ReadValue::OwnerPersonTask(_)
+            | c::ReadValue::Result(_)
+            | c::ReadValue::Ended(_)
+            | c::ReadValue::OwnerEnded(_)
+            | c::ReadValue::History(_)
+            | c::ReadValue::Activity(_)
+            | c::ReadValue::Inbox(_)
+            | c::ReadValue::OwnerInbox(_)
+            | c::ReadValue::Spend(_)
+            | c::ReadValue::OwnerSpend(_)
+            | c::ReadValue::Project(_)
+            | c::ReadValue::Notes(_)
+            | c::ReadValue::Deployment(_)
+            | c::ReadValue::OwnerDeployment(_) => None,
+        };
+        if let Some(chip) = chip
+            && chip_project(chip).is_none()
+        {
+            out.push(Out::Client {
+                event: Event::Read { handle, read: Readable::Jig(c::Read::Task { task: chip.task }) },
+            });
+            reading.document = Some(document.clone());
+            runner.acts.insert(prefix, reading);
+            return;
+        }
+    }
+    let called = reading.called;
+    let Some(me) = me(runner, client) else {
+        let printed = render::failure(b"signed out", called.json, 1);
+        finish(called, printed, out);
+        return;
+    };
+    let ask = match &page {
+        Readout::Jig(c::ReadResult::Value(document)) => build(&called.call, document, me, &env.limits, None),
+        Readout::Limit | Readout::NotServed { .. } | Readout::Jig(_) | Readout::Family { .. } => {
+            let printed = render::read(
+                &page,
+                client,
+                runner.me(),
+                called.json,
+                &env.limits,
+                runner.owner_part.expect("host vocabulary"),
+            );
+            finish(called, printed, out);
+            return;
+        }
+    };
+    prepared(runner, client, env, called, ask, out);
+}
+fn build(call: &Call, document: &c::ReadValue, me: &c::Me, limits: &Limits, project: Option<u32>) -> Prepared {
+    let (project, offers) = match document {
+        c::ReadValue::Task(task) => (task.project, &task.acts),
+        c::ReadValue::Question(question) => {
+            (chip_project(&question.task).or(project).ok_or(b"project unavailable".as_slice())?, &question.acts)
+        }
+        c::ReadValue::Proposal(proposal) => (proposal.project, &proposal.acts),
+        c::ReadValue::OwnerProposal(proposal) => (proposal.project, &proposal.acts),
+        c::ReadValue::Escalation(escalation) => {
+            (chip_project(&escalation.task).or(project).ok_or(b"project unavailable".as_slice())?, &escalation.acts)
+        }
+        c::ReadValue::OwnerEscalation(escalation) => (escalation.task.project, &escalation.acts),
+        c::ReadValue::Tasks(_)
+        | c::ReadValue::OwnerProject(_)
+        | c::ReadValue::Historical(_)
+        | c::ReadValue::Me(_)
+        | c::ReadValue::Turn(_)
+        | c::ReadValue::PersonTask(_)
+        | c::ReadValue::OwnerPersonTask(_)
+        | c::ReadValue::Result(_)
+        | c::ReadValue::Ended(_)
+        | c::ReadValue::OwnerEnded(_)
+        | c::ReadValue::History(_)
+        | c::ReadValue::Activity(_)
+        | c::ReadValue::Inbox(_)
+        | c::ReadValue::OwnerInbox(_)
+        | c::ReadValue::Spend(_)
+        | c::ReadValue::OwnerSpend(_)
+        | c::ReadValue::Project(_)
+        | c::ReadValue::Notes(_)
+        | c::ReadValue::Deployment(_)
+        | c::ReadValue::OwnerDeployment(_) => {
+            return Err(b"tools' bug; unexpected act document; report it as a finding");
+        }
+    };
+    let act = kind(call);
+    let mut admission = None;
+    for offer in offers {
+        if offer.act == act {
+            admission = Some(&offer.admission);
+        }
+    }
+    let to = match admission {
+        Some(c::Admission::Allowed) => None,
+        Some(c::Admission::Proposed { to }) => Some(to.clone()),
+        Some(c::Admission::Bounded { .. }) => return Err(b"act has no bounded draft"),
+        Some(c::Admission::Refused(_)) | None => return Err(b"act not offered"),
+    };
+    let task = number(call, 0).unwrap_or(0);
+    let ask = match call.tool {
+        9 => c::Ask::Message { project, task, words: words(call, 1, limits)? },
+        10 => close(call, document, me, project, limits)?,
+        11 => c::Ask::Answer {
+            project,
+            on: c::AnswerOn::Question {
+                task,
+                message: number(call, 1).expect("question"),
+                words: words(call, 2, limits)?,
+            },
+        },
+        12 => {
+            let on = if call.form == 0 {
+                let Some(Value::Proposal(proposal)) = value(call, 0) else { unreachable!("proposal form") };
+                c::DecideOn::Proposal { proposal: *proposal, decision: decision(call, limits)? }
+            } else {
+                c::DecideOn::Escalation {
+                    task,
+                    revision: c::Revision { value: number(call, 1).expect("hold") },
+                    decision: decision(call, limits)?,
+                }
+            };
+            c::Ask::Decide { project, on }
+        }
+        13 => c::Ask::Release {
+            project,
+            task,
+            revision: c::Revision { value: number(call, 1).expect("hold") },
+            again: if value(call, 2).is_some() { Some(true) } else { None },
+        },
+        14 => c::Ask::Stop { project, task },
+        15 => c::Ask::Cancel {
+            project,
+            task,
+            reason: words(call, 2, limits)?,
+            grace: match value(call, 1) {
+                Some(Value::Duration(duration)) => Some(*duration),
+                _ => None,
+            },
+        },
+        _ => unreachable!("act tool"),
+    };
+    Ok((ask, to))
+}
+fn chip_project(chip: &c::Chip) -> Option<u32> {
+    match chip.details.as_ref() {
+        c::ChipPhase::Owner { details, .. } => Some(details.project),
+        c::ChipPhase::Active(_)
+        | c::ChipPhase::Waiting { .. }
+        | c::ChipPhase::Idle { .. }
+        | c::ChipPhase::Starting
+        | c::ChipPhase::Running { .. }
+        | c::ChipPhase::WaitingForWords { .. }
+        | c::ChipPhase::BackingOff { .. }
+        | c::ChipPhase::Procedure { .. }
+        | c::ChipPhase::Person { .. }
+        | c::ChipPhase::Closing(_)
+        | c::ChipPhase::Held { .. }
+        | c::ChipPhase::Ended { .. } => None,
+    }
+}
+fn kind(call: &Call) -> c::ActKind {
+    match call.tool {
+        9 => c::ActKind::Message,
+        10 | 15 => c::ActKind::Cancel,
+        11 => c::ActKind::Answer,
+        12 => match value(call, if call.form == 0 { 1 } else { 2 }) {
+            Some(Value::Word(0)) => {
+                if call.form == 0 {
+                    c::ActKind::Accept
+                } else {
+                    c::ActKind::Release
+                }
+            }
+            Some(Value::Word(1)) => {
+                if call.form == 0 {
+                    c::ActKind::Reject
+                } else {
+                    c::ActKind::LeaveHeld
+                }
+            }
+            _ => c::ActKind::PassUp,
+        },
+        13 => c::ActKind::Release,
+        14 => c::ActKind::Stop,
+        _ => unreachable!("act tool"),
+    }
+}
+fn decision(call: &Call, limits: &Limits) -> Result<c::Decision, &'static [u8]> {
+    let index = if call.form == 0 { 1 } else { 2 };
+    let reason = words(call, if call.form == 0 { 2 } else { 3 }, limits)?;
+    Ok(match value(call, index) {
+        Some(Value::Word(0)) => {
+            if call.form == 0 {
+                c::Decision::Accepted
+            } else {
+                c::Decision::Released { again: None }
+            }
+        }
+        Some(Value::Word(1)) => {
+            if call.form == 0 {
+                c::Decision::Rejected { reason }
+            } else {
+                c::Decision::LeftHeld { reason }
+            }
+        }
+        _ => c::Decision::PassedUp,
+    })
+}
+fn prepared(
+    runner: &mut Runner,
+    client: &Client,
+    _env: &Env<Limits>,
+    called: Called,
+    ask: Prepared,
+    out: &mut Queue<Out>,
+) {
+    let (ask, to) = match ask {
+        Ok(ask) => ask,
+        Err(why) => {
+            let printed = render::failure(why, called.json, 1);
+            finish(called, printed, out);
+            return;
+        }
+    };
+    let key = Key { asker: runner.asker, number: (u64::from(called.call_number) << 32u32) | 1 };
+    if client.pending(key).is_some() {
+        let printed = render::failure(b"tools' bug; client key collision; report it as a finding", called.json, 1);
+        finish(called, printed, out);
+        return;
+    }
+    let name = match &called.call.key {
+        Some(name) => Some(crate::jig::key::named(runner.salt, name)),
+        None => None,
+    };
+    let mut operation = Operation::of(&jig_client::Ask::Jig(Box::new(ask.clone())));
+    operation.to = to;
+    operation.retry = Some(render::outcome::retry(&called.call));
+    if let Some(me) = me(runner, client) {
+        operation.party = Some(me.party.number);
+    }
+    // The compound's public operation is close, rather than its final cancellation.
+    if called.call.tool == 10 {
+        operation.word = b"close";
+    }
+    runner.sent.insert(key, Sent { called, operation });
+    out.push(Out::Client { event: Event::Send { key, name, request: jig_client::Ask::Jig(Box::new(ask)) } });
+}
+pub(super) fn answered(
+    runner: &mut Runner,
+    client: &Client,
+    env: &Env<Limits>,
+    key: Key,
+    outcome: &jig_client::Outcome,
+    out: &mut Queue<Out>,
+) {
+    if let Some(sent) = runner.sent.remove(&key) {
+        let printed =
+            render::outcome::print(&sent.operation, outcome, sent.called.json, me(runner, client), &env.limits);
+        finish(sent.called, printed, out);
+    } else if let Some(operation) = runner.kept.remove(&key) {
+        let line = render::outcome::kept(&operation, outcome, runner.kept_json, me(runner, client), &env.limits);
+        out.push(Out::Kept { line });
+    }
+}
+
+fn close(
+    call: &Call,
+    document: &c::ReadValue,
+    me: &c::Me,
+    project: u32,
+    limits: &Limits,
+) -> Result<c::Ask, &'static [u8]> {
+    let c::ReadValue::Task(task) = document else { return Err(b"unexpected close document") };
+    if let Some(Some(Values::Many(moves))) = call.values.get(1) {
+        for moved in moves {
+            let mut found = false;
+            for delegate in &task.delegates {
+                if *moved == Value::Number(delegate.chip.task) {
+                    found = true;
+                }
+            }
+            if !found {
+                return Err(b"move is not a live delegate");
+            }
+        }
+    }
+    let mut delegates = List::with_capacity(task.delegates.len());
+    for delegate in &task.delegates {
+        let mut fate = shapes::Fate::Cancel;
+        if let Some(Some(Values::Many(moves))) = call.values.get(1) {
+            for moved in moves {
+                if *moved == Value::Number(delegate.chip.task) {
+                    fate = shapes::Fate::Move;
+                }
+            }
+        }
+        delegates.push(shapes::Delegate { task: delegate.chip.task, fate }).expect("one fate per delegate");
+    }
+    match shapes::close_chat(me, project, task.chip.task, delegates.as_slice(), words(call, 2, limits)?) {
+        Ok(ask) => Ok(ask),
+        Err(_) => Err(b"close not offered"),
+    }
+}

@@ -63,14 +63,14 @@ pub(crate) const EVERY_TOOL: &[&[&str]] = &[
     &["activity", "41"],
     &["turn", "41", "3.7"],
     &["run", "41"],
-    &["chat", "hello", "--project", "shop", "--key", "start-chat"],
+    CREATE_CHAT_CALL,
     &["message", "41", "hello", "--key", "say-hello"],
-    &["close", "41", "--key", "close-chat"],
+    CLOSE_CALL,
     &["answer", "41", "3", "yes"],
     &["decide", "t41/3", "accept"],
     &["decide", "41", "release", "--hold", "2"],
     &["release", "41", "--hold", "2"],
-    &["stop", "41"],
+    STOP_CALL,
     &["cancel", "41", "finished"],
     &["wait", "me"],
     ADOPTION,
@@ -272,6 +272,8 @@ pub(crate) fn golden(name: &str) -> Box<[u8]> {
 }
 pub(crate) struct Harness {
     pub root: root::Root,
+    pub now: Time,
+    pub wall: Wall,
     pub limits: root::Limits,
     pub reads: BTreeMap<u32, (Token, c::Read)>,
     pub extra_reads: BTreeMap<u32, Queue<(Token, c::Read)>>,
@@ -279,16 +281,25 @@ pub(crate) struct Harness {
     pub closed: List<client::Watchable>,
     pub watches: BTreeMap<Token, client::Watchable>,
     pub answers: BTreeMap<u32, crate::jig::Printed>,
+    pub sends: BTreeMap<u32, (Token, skein_lib::RequestKey, client::Ask)>,
+    pub saved: BTreeMap<u32, skein_lib::RequestKey>,
+    pub kept_lines: List<Box<[u8]>>,
     pub facts: u32,
     pub next: u32,
     pub pending_reads: Queue<u32>,
 }
 pub(crate) fn started(kept: List<skein_lib::RequestRecord<client::Held>>) -> Harness {
+    started_with(kept, SEED, false)
+}
+pub(crate) fn started_with(kept: List<skein_lib::RequestRecord<client::Held>>, seed: u64, json: bool) -> Harness {
     let limits = limits_root();
-    let root =
-        root::Root::with_client(client::Client::unlinked(&limits.domain.client, SEED).expect("shipped client limits"));
+    let mut root =
+        root::Root::with_client(client::Client::unlinked(&limits.domain.client, seed).expect("shipped client limits"));
+    root.kept_json(json);
     let mut harness = Harness {
         root,
+        now: Time::ZERO,
+        wall: Wall::EPOCH,
         limits,
         reads: BTreeMap::new(),
         extra_reads: BTreeMap::new(),
@@ -296,6 +307,9 @@ pub(crate) fn started(kept: List<skein_lib::RequestRecord<client::Held>>) -> Har
         closed: List::with_capacity(OUTPUTS),
         watches: BTreeMap::new(),
         answers: BTreeMap::new(),
+        sends: BTreeMap::new(),
+        saved: BTreeMap::new(),
+        kept_lines: List::with_capacity(OUTPUTS),
         facts: 0,
         next: 0,
         pending_reads: Queue::with_capacity(OUTPUTS),
@@ -313,8 +327,8 @@ pub(crate) fn signed_in(party: u64) -> Harness {
 impl Harness {
     fn event(&mut self, event: root::Event) {
         let env = Env {
-            now: Time::ZERO,
-            wall: Wall::EPOCH,
+            now: self.now,
+            wall: self.wall,
             limits: root::Limits { domain: self.limits.domain, tools: self.limits.tools },
         };
         let mut out = Queue::with_capacity(OUTPUTS);
@@ -349,8 +363,21 @@ impl Harness {
                 root::Request::Printed { number, printed } => {
                     assert!(self.answers.insert(number, printed).is_none(), "answered exactly once");
                 }
+                root::Request::Client {
+                    request: client::Request::Down { down: client::Down::Send { attempt, key, request } },
+                } => {
+                    let call = self.serving.unwrap_or(self.next);
+                    self.sends.insert(call, (attempt, key, request));
+                }
+                root::Request::Client { request: client::Request::Down { down: client::Down::Save { record } } } => {
+                    let call = self.serving.unwrap_or(self.next);
+                    self.saved.insert(call, record.key);
+                }
+                root::Request::Kept { line } => {
+                    self.kept_lines.push(line).expect("bounded recovery lines");
+                }
                 root::Request::Fact { .. } => self.facts = self.facts.checked_add(1).expect("bounded facts"),
-                root::Request::Client { .. } | root::Request::Ready | root::Request::Kept { .. } => {}
+                root::Request::Client { .. } | root::Request::Ready => {}
             }
         }
     }
@@ -363,7 +390,7 @@ impl Harness {
             panic!("parsed call")
         };
         let count = match call.tool {
-            1 | 2 | 4 | 5 | 6 => SINGLE_READ,
+            1 | 2 | 4 | 5 | 6 | 9..=15 => SINGLE_READ,
             3 => {
                 if crate::jig::call::number(&call, 2).is_some() {
                     COMPOSITE_READS
@@ -582,3 +609,6 @@ pub(super) fn guide_golden_has(expected: &[&[u8]]) {
 
 mod reads;
 pub(crate) use reads::*;
+
+mod acts;
+pub(crate) use acts::*;

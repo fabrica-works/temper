@@ -3,6 +3,7 @@ mod activity;
 pub mod acts;
 pub mod document;
 mod lists;
+pub(crate) mod outcome;
 mod turn;
 use crate::jig::{Limits, runner::Printed};
 use alloc::boxed::Box;

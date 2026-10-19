@@ -60,7 +60,7 @@ fn text(
         Document::SizedTurn { task, name, bytes } => super::turn::sized(*task, *name, *bytes, true, out),
     }
 }
-fn phrasebook(text: u32) -> Phrasebook {
+pub(super) fn phrasebook(text: u32) -> Phrasebook {
     let shapes = words::phrase_shapes(text);
     let limits = PhraseLimits {
         languages: 1,
@@ -267,7 +267,7 @@ fn amount(value: u64, out: &mut Text) {
     }
     out.number(value % 100);
 }
-fn utc(wall: skein_lib::Wall, out: &mut Text) {
+pub(super) fn utc(wall: skein_lib::Wall, out: &mut Text) {
     let minute = wall.as_secs() / 60;
     let hour = (minute / 60) % 24;
     if hour < 10 {
@@ -442,4 +442,15 @@ pub(super) fn part(part: &jig_client::contract::Part, out: &mut Text) {
     let mut write = Encoder::write(size, &limits);
     encode_part(part, &mut write, &mut budget);
     out.put(&write.finish());
+}
+
+mod act_answers;
+use act_answers::encode_answer;
+pub(super) fn answer_json(answer: &jig_client::contract::Answer, out: &mut Encoder) {
+    let mut budget = Cut { room: usize::MAX, left: 0, turn: None };
+    encode_answer(answer, out, &mut budget);
+}
+pub(super) fn recipient_json(to: &Recipient, out: &mut Encoder) {
+    let mut budget = Cut { room: usize::MAX, left: 0, turn: None };
+    encode_recipient(to, out, &mut budget);
 }
