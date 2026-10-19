@@ -79,23 +79,21 @@ use skein_lib::{Duration, Queue, Time, Token, Wall};
 use skein_shell::{Clock, Host};
 use skein_world::{
     Referee,
-    end_to_end::{Binary, Command, Mode, Streams},
+    end_to_end::{Binary, Command, Expectation, Mode, Streams},
     real,
 };
 
 #[must_use]
 pub fn serve(directory: &Path) -> Binary {
-    Binary::start(
-        Command {
-            program: env!("CARGO_BIN_EXE_temper").into(),
-            arguments: vec!["serve".into(), "config.json".into()],
-            directory: directory.into(),
-            environment: Vec::new(),
-        },
-        Mode::Pipes,
-        65_536,
-    )
-    .expect("temper serve starts")
+    Binary::start(serve_command(directory), Mode::Pipes, 65_536).expect("temper serve starts")
+}
+fn serve_command(directory: &Path) -> Command {
+    Command {
+        program: env!("CARGO_BIN_EXE_temper").into(),
+        arguments: vec!["serve".into(), "config.json".into()],
+        directory: directory.into(),
+        environment: Vec::new(),
+    }
 }
 #[must_use]
 pub fn fake_llm(scripts: Box<[skein_fake_llm_domain::api::Script]>) -> skein_fake_peers::llm::Peer {
@@ -370,7 +368,13 @@ pub struct Seen {
     pub finished: bool,
     pub stderr: Vec<u8>,
 }
+#[derive(Clone, Copy)]
+enum Ending {
+    Stop,
+    Crash,
+}
 struct ChatJudge<'a> {
+    ending: Ending,
     ended: bool,
     settled: bool,
     deadline: Time,
@@ -397,7 +401,10 @@ impl Referee<Process> for ChatJudge<'_> {
             let Process::Binary(binary) = &mut procs[0] else {
                 panic!("binary");
             };
-            binary.signal(Signal::Kill);
+            match self.ending {
+                Ending::Stop => binary.signal(Signal::Terminate),
+                Ending::Crash => binary.signal_tree(Signal::Kill),
+            }
             for proc in procs {
                 if let Process::Peer(peer) = proc {
                     peer.shutdown();
@@ -437,6 +444,14 @@ impl Referee<Process> for ChatJudge<'_> {
             "temper serve failed: {}",
             String::from_utf8_lossy(binary.stderr())
         );
+        match self.ending {
+            Ending::Stop => assert!(
+                binary.exit_status().is_none_or(|exit| exit == Exit::Code(0)),
+                "temper serve did not stop cleanly: {}",
+                String::from_utf8_lossy(binary.stderr())
+            ),
+            Ending::Crash => assert!(!binary.stderr_overflowed(), "crashed temper serve overflowed stderr"),
+        }
         assert!(
             now < self.deadline || self.settled,
             "native chat did not settle: {}",
@@ -464,7 +479,7 @@ pub fn run(
     peer: Option<skein_fake_peers::llm::Peer>,
     deadline: Duration,
 ) -> Seen {
-    run_story(directory, script, peer, deadline, None)
+    run_story(directory, script, peer, deadline, None, Ending::Stop)
 }
 /// domain/testing.md 2.6 bounds each landing story at 180 seconds.
 pub const LANDING: Duration = Duration::from_secs(180);
@@ -490,7 +505,7 @@ pub fn run_until_landed(
     peer: skein_fake_peers::llm::Peer,
     forge: &forgejo::Throwaway,
 ) -> Seen {
-    run_story(directory, script, Some(peer), LANDING, Some(forge))
+    run_story(directory, script, Some(peer), LANDING, Some(forge), Ending::Crash)
 }
 fn run_story(
     directory: &Path,
@@ -498,9 +513,16 @@ fn run_story(
     peer: Option<skein_fake_peers::llm::Peer>,
     deadline: Duration,
     forge: Option<&forgejo::Throwaway>,
+    ending: Ending,
 ) -> Seen {
     let clock = Clock::new();
-    let mut binary = serve(directory);
+    let mut binary = match ending {
+        Ending::Stop => serve(directory),
+        Ending::Crash => {
+            Binary::start_with_tree(serve_command(directory), Mode::Pipes, 65_536, Expectation::Supervise, false)
+                .expect("temper serve starts for a whole-tree crash")
+        }
+    };
     let streams = binary.take_streams().expect("binary pipes");
     let mut fds = streams.descriptors();
     let Streams::Pipes { input, output } = streams else {
@@ -509,6 +531,7 @@ fn run_story(
     let root = skein_shell::open_root(directory).expect("client's parent root");
     fds.push(root);
     let mut world = real::World::new(ChatJudge {
+        ending,
         ended: false,
         settled: false,
         forge,
@@ -528,6 +551,9 @@ fn run_story(
     let Process::Binary(binary) = &outcome.procs[0] else {
         panic!("binary");
     };
+    if matches!(ending, Ending::Crash) {
+        assert!(binary.counts().is_some(), "the crashed temper serve tree settled before the restart");
+    }
     let Process::Person(person) = &outcome.procs[1] else {
         panic!("native person");
     };

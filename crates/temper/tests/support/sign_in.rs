@@ -256,7 +256,7 @@ impl Referee<Process> for Judge {
                     match proc {
                         Process::Issuer(peer) => peer.shutdown(),
                         Process::Llm(peer) => peer.shutdown(),
-                        Process::Binary(binary) if binary.exit_status().is_none() => binary.signal(Signal::Kill),
+                        Process::Binary(binary) if binary.exit_status().is_none() => binary.signal(Signal::Terminate),
                         Process::Binary(_) | Process::Stdout(_) | Process::Browser { .. } | Process::Person { .. } => {}
                     }
                 }
@@ -289,6 +289,14 @@ impl Referee<Process> for Judge {
             "sign-in refused: {}",
             String::from_utf8_lossy(binary.stderr())
         );
+        if self.running {
+            let Process::Binary(engine) = &procs[4] else { panic!("engine") };
+            assert!(
+                engine.exit_status().is_none_or(|exit| exit == Exit::Code(0)),
+                "engine did not stop cleanly: {}",
+                String::from_utf8_lossy(engine.stderr())
+            );
+        }
     }
     fn next_deadline(&self) -> Option<Time> {
         self.wake.or_else(|| (!self.settled).then_some(self.deadline))
