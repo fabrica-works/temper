@@ -313,6 +313,23 @@ where its answer lands.
      - MCP index_status: srv-data-git-runner-src-skein indexed 2026-10-13T09:30:32Z; srv-data-git-runner-src-temper indexed 2026-10-11T09:45:04Z; both ready, primary roots matched.
      - `git show -s --format='%h %cI' origin/main`: skein d6d4abe 2026-10-19T05:46:18+01:00; temper f10b03ea7 2026-10-19T04:57:21Z.
 
+102. **Refresh skein and temper graph indexes** (claim-time index refresh).
+     Reverses: 2026-10-19T05:02:59Z (ruling 101's temporary graph restriction only).
+     Amends: README, Rules of this plan, removes Graph refresh at the claim.
+
+     The primary-checkout indexes are refreshed. Remove the temporary rule
+     added by ruling 101 and resume the workspace's graph-first discovery, using
+     `srv-data-git-runner-src-skein` for `/srv/data/git/runner/src/skein` and
+     `srv-data-git-runner-src-temper` for `/srv/data/git/runner/src/temper`.
+     Check graph names in each working checkout with `rg`, as workspace guidance
+     says. The director's tools-plan ordering and other rules remain in force.
+
+     ## Checked
+
+     - MCP index_repository returned indexed, then index_status returned ready for both primary roots: skein indexed_at 2026-10-19T05:04:07Z; temper indexed_at 2026-10-19T05:04:37Z.
+     - Run kit numbers.sh graph_index, with root=/srv/data/git/runner/src: `graph_index skein` -> `srv-data-git-runner-src-skein current`; `graph_index temper` -> `srv-data-git-runner-src-temper current`.
+     - Completed 2026-10-19T05:05:27Z. Existing malformed JSON transcripts remain direct-read coverage gaps in skein; no temper Rust parse gaps were reported.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

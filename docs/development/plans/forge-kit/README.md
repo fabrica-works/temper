@@ -111,9 +111,6 @@ chain.
 
 ## Rules of this plan
 
-- **Graph refresh at the claim.** Do not use the code graph for skein or
-  temper; search with `rg`. This holds from the claim until a supervisor
-  ruling removes this rule after refreshing their primary-checkout indexes.
 
 - **The tools plan runs beside this one,** on another machine, on the
   same temper `main` (temper's tools, area 1, first part: temper
