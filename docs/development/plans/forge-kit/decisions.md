@@ -760,6 +760,27 @@ where its answer lands.
 
      Temper06.2 retains its clean JSON checkpoint; recording proof awaits the landed evidenced repair and a compatible skein repin/all-target check. No full recording during diagnosis. Existing required recording/facts/transcript assertions and budgets remain. The closing temper repin also awaits skein-06.s1; none has landed, so no repeated repin step is added.
 
+135. **Correct recovery test shapes and check recurring setup** (hourly check of 2026-10-19T08:20:55Z).
+     Reverses: nothing. Ruling126 keeps its contract-only scope; this follow-up amends the original02.4 fresh-success-per-rejection prose and final02-client counts after02.s1.
+     Amends: README sessions/Rules, skein/02-client.md02.4 and Done when; adds skein/02.s2-recovery-tests.md and findings/recovery-{assertions,checker}.md.
+
+     Assign skein-02.s2 after landed02.s1 for hourly03 findings2–6. Its assertion map preserves all72 original locations/cases and21 rejected causes. The21 fresh successes all use the same generic paired record, independently of the rejection input: one separately named generic success preserves that behavior. The failed instance's rejection, Keep Busy and persistence stay with every cause; Held and Remake get independent observations through one assertion-free setup.
+
+     Add the nine independently derived exact-bound accepting records and precise4097-byte pull refusal; retain the old4101-byte pull refusal. Name value-identical clocks/counts from fixtures/design bounds. No production, limit, saved deadline, failure semantic, process proof or budget changes. Counts stay relative: recovery24->30; observed post-s1 client130->136,74 preserved+62new. Historical proofs keep their numbers.
+
+     Repeated setup/size findings require the bounded Rust AST checker and explicit positive/negative controls in the supplement. Its controls cover only the reached mechanical shapes; row data, semantic behavior separation and true bound pairing remain manual mapped checks. Preserve02.s1's separate four-file checker. Refresh any further reached copy/count consumer and name it in the commit body.
+
+     ## Checked
+
+     - rg primary skein recovery.rs finds oversized_hints_read_nothing label dispatch, remake_releases_a_held_entry pre-Remake Held assertion; fixtures/recovery.rs::failed_restore constructs the same fresh paired(live()) for every rejection. LIMITS is rows4,inbox16,answer_bytes4096,op_bytes256,lifetime10s,margin1s,resources4,repositories2.
+     - Python test-attribute count on primary6ab44a32a6e09e47bfdd88cc0e0ee7fee02b62dd: recovery24,client130. git diff6e290792..origin/main -- the two recovery paths is empty. The follow-up's all-five-repository name/content/count searches found only these behavior owners and the final02-client Done when count consumers; downstream restart tests are separate behavior consumers.
+     - Follow-up scratch-hourly-03-recovery maps72/72 original assertion locations with unresolved0. Task876 compiled the AST checker and passed6 positive/7 negative controls. Task877 failed on three moved fixture:: prefixes; corrected sketch is UNCOMPILED, profiles UNRUN. No successful final implementation proof is inferred; owned workers ended and targets released.
+     - Kit plan dispatch contains ruling/ready/ring; pinned testing-strategy.md10 supplies Rows carry data, One behaviour per test, The setup the assertion reads, A setup written once, Named fixtures and sizes, A bound's two sides. plan status shows closing temper-repin waiting, not landed: no extra closing repin is needed.
+
+     ## Instructions
+
+     Register skein-02.s2 using skein/02.s2-recovery-tests.md after skein-02.s1, with the normal ready check, a fresh implementation session and closing temper-repin dependency. Keep02.s1 and01.s1 scope unchanged. The recovered candidate/map/checker controls are review artifacts, not tested final code; the implementer must validate the corrected post-s1 source. No additional repin is added because no closing repin has landed.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

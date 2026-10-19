@@ -54,6 +54,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `skein/01.s1-test-shapes.md` | skein 01.s1: sampled unit test shapes and fixture costs (ruling 118) | skein 01.4 | |
 | `skein/02-client.md` | skein 02: `skein-forge-client`: the client moved, effects' keys on the owner's namespace; the measure, the dialect's and the client's (decision 24); the design's differences; the tests section 10 asks for | temper 01.1 | 02.2: skein 01.3 |
 | `skein/02.s1-contract-tests.md` | skein 02.s1: contract-test shapes, paired row bounds and source checks | skein 02.4 | |
+| `skein/02.s2-recovery-tests.md` | skein02.s2: recovery test shapes, paired restore bounds and scoped AST checks | skein02.s1 | |
 | `skein/03-connection.md` | skein 03: `skein-forge-connection`: the component moved, on plain numbers, the owner's values and the transport's name; the head check counts the user agent; the checks at their bounds; page sizes on the measure | temper 01.4 | 03.3: skein 02.2 |
 | `skein/04-setup.md` | skein 04: `skein-forge-setup`: reconcile's machine moved, on the owner's given values and the kit's item; the design's differences; section 7's step tests | temper 01.2 | 04.1: skein 01.3 |
 | `skein/05-fakes.md` | skein 05: the fake forge's domain and protocol layer moved, with their tests; the forge peer in `skein-fake-peers` | temper 01.2 | 05.4: temper 05.1 |
@@ -76,7 +77,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `temper/06-throwaway.md` | temper 06: temper's process tier, tools and conformance on skein's throwaway; temper's deleted; the conformance on skein-json (decision 27) | skein 06.1 | 06.2: skein06.s1 |
 | `temper/07-worlds.md` | temper 07: the moved worlds, the dialect's tests and the conformance with its transcripts deleted from temper; the protocol world keeps temper's own tests (decision 22) | skein 06.3; temper 06.1 | the client's world: skein 07.1; setup's: skein 07.3; the component's: skein 08.1 and 09.1; 07.1: temper 05.2 |
 
-17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1 and06.s1. The brief's fifth step, the fakes and
+17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2 and06.s1. The brief's fifth step, the fakes and
 the conformance, is skein 05 to 09 and temper 05 to 07, by size. The
 increments per session are in each file.
 
@@ -119,6 +120,8 @@ chain.
 - **Throwaway reset repair:** skein06.s1 owns the bounded driver diagnosis/repair before temper06.2 resumes recording proof. Preserve io's Failed contract and genuine incomplete-reply failure; no further full recording precedes deterministic cause proof. The closing temper repin waits for skein06.s1.
 
 - **Wait discipline:** follow development.md 7.4. Prefer completion notifications; use supported work-completion waits of at least 300 seconds and identify tool-imposed exceptions instead of repeatedly polling on expiry. This does not delay handling messages or required operational checks.
+
+- **Client recovery fixtures:** skein02.s2 owns hourly-03 recovery findings after02.s1, with the mapped assertions, independent boundary records and bounded Rust AST gate controls in its session/findings. Preserve every rejection cause and failed-instance persistence; the repeated identical generic fresh success is one independent behavior. The closing temper repin waits for02.s2. Final counts are relative; historical increment proofs retain their original meaning.
 
 - **Client contract fixtures:** skein 02.s1 owns hourly-02's new contract-test corrections after 02.4, following testing-strategy.md 10's One behaviour per test, The setup the assertion reads, A setup written once, Named fixtures and sizes, and A bound's two sides. The repeated setup/size findings also require the scoped Rust gate checks in that supplement (development.md 14.4). The closing temper repin waits for skein 02.s1; skein 01.s1's preserved-test scope stays.
 

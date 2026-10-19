@@ -373,8 +373,10 @@ Test shape: retain 90 tests; 24 new tests in `tests/recovery.rs`, <20 ms each.
 
   Valid write-answer shapes measure 0 (forge.md 3.3, 3.7): none can exceed
   a byte cap. The size assertion above isolates bounds, not write dispatch.
-  Rejected restores also succeed in a fresh Domain with corrected paired rows;
-  the failed instance stays failed. Every-table saturation belongs to skein 07.1.
+  The failed instance stays failed. After02.4, skein02.s2 separates the
+  identical generic fresh paired-row success from the21 rejection cases,
+  preserving all mapped assertions and adding exact-bound pairs. Every-table
+  saturation belongs to skein07.1.
 Proof: unit, `heavy cargo nextest run -p skein-forge-client`: 114 passed,
   zero skipped, <0.5 s, each <20 ms; echo read at 101, resend deadline 113.
   The durable-parent world first connects in skein 07.1.
@@ -387,12 +389,12 @@ Removes: hinted-only echo landing and recovery's acceptance of unframed/foreign 
 
 In skein at `origin/main`; base forms/outputs are in findings.
 
-- `heavy cargo nextest list -p skein-forge-client` lists 130 tests after skein 02.s1:
-  74 preserved names and 56 new names; no purpose tests or missing locate tests.
-- `heavy cargo nextest run -p skein-forge-client` prints 130 passed after skein 02.s1,
+- `heavy cargo nextest list -p skein-forge-client` lists the post-02.s1 count plus6 after02.s2 (136 at the checked base):
+  74 preserved names and62 new names at that base; no purpose tests or missing locate tests.
+- `heavy cargo nextest run -p skein-forge-client` prints that same relative count passed after02.s2 (136 at the checked base),
   zero skipped; under 0.5 s and every new unit below 20 ms.
 - `heavy cargo nextest run -p skein-forge -E 'test(measure_)'` prints
-  12 passed, <0.5 s, every test <20 ms; client total remains 130 after skein 02.s1.
+  12 passed, <0.5 s, every test <20 ms; client total is the post-02.s1 count plus6 after02.s2 (136 at the checked base).
 - `heavy cargo clippy -p skein-forge -p skein-forge-client --all-targets -- -D warnings` exits 0.
 - `heavy rg -n -i 'temper|jig|EffectPurpose' crates/skein-forge-client` prints nothing (status 1).
 - `heavy -- sh -c 'wc -l crates/skein-forge-client/src/*.rs crates/skein-forge-client/src/*/*.rs crates/skein-forge-client/src/tests/fixtures/*.rs | awk '\''$1 > 800 && $2 != "total"'\'''`
