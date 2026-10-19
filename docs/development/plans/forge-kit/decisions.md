@@ -639,6 +639,24 @@ where its answer lands.
 
      Register skein-02.s1 from skein/02.s1-contract-tests.md after skein-02.4; make temper-repin await it. Pass the Client contract fixtures rule to the running skein02 session and later implementers. Preserve all independent work and existing proof obligations; implement and validate the supplement against its actual post02.4 source.
 
+127. **Refresh primary graphs after the next source landings** (graph comparison at the 08:12 ready events).
+     Reverses: ruling124 of2026-10-19T07:31:24Z and ruling122 of2026-10-19T07:19:58Z only as permission to use stale primary indexes; exact-project/worktree verification remains.
+     Amends: README Rules, standing Graph freshness rule and current temporary hold.
+
+     ## Decision
+
+     Both primary indexes lag new source landings. Until the supervisor reports each refresh complete, use source searches for skein and temper rather than their graphs. Refresh only the primary checkouts, retaining exact project identities and worktree source verification. The README's Graph freshness rule persists after this temporary hold lifts; empty/stale coverage never proves absence. No implementation, ready check or unrelated work waits for the refresh when source searches suffice. Kit d6d4abe stays pinned with its adapter.
+
+     ## Checked
+
+     - index_status: srv-data-git-runner-src-skein root/srv/data/git/runner/src/skein indexed07:28:55Z; srv-data-git-runner-src-temper root/srv/data/git/runner/src/temper indexed07:18:49Z, both ready but stale.
+     - git log -1 origin/main: skein5aaba05472924164e6fb6f07ea779036dbe4c153 at08:08:45Z; temper e83e552e4591ad6f73d35a615f27c10085d98e17 at08:11:18Z. git rev-parse HEAD agrees with each primary origin/main.
+     - Pinned kit/scripts/dev/plan declares ruling/ring; no watch or kit move is needed. Ready-check backgrounds ready-skein-10 and ready-skein-01s1 already carry source fallback for the stale indexes.
+
+     ## Instructions
+
+     Pass the current two-repository graph hold and continuing source-search permission to running sessions. Supervisor refreshes the exact primary projects; lift the temporary hold after status/source comparison, retaining the standing rule.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

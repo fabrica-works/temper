@@ -113,6 +113,8 @@ chain.
 
 ## Rules of this plan
 
+- **Graph freshness:** the supervisor refreshes only the primary checkout indexes. Use the exact primary project names and check each result in the actual worktree. Until a stale index's refresh is reported, use source searches for that repository; a missing graph result proves no absence. Current hold: both skein and temper, pending the refresh begun after the 08:12 ready events. Source search remains available throughout.
+
 - **Wait discipline:** follow development.md 7.4. Prefer completion notifications; use supported work-completion waits of at least 300 seconds and identify tool-imposed exceptions instead of repeatedly polling on expiry. This does not delay handling messages or required operational checks.
 
 - **Client contract fixtures:** skein 02.s1 owns hourly-02's new contract-test corrections after 02.4, following testing-strategy.md 10's One behaviour per test, The setup the assertion reads, A setup written once, Named fixtures and sizes, and A bound's two sides. The repeated setup/size findings also require the scoped Rust gate checks in that supplement (development.md 14.4). The closing temper repin waits for skein 02.s1; skein 01.s1's preserved-test scope stays.
