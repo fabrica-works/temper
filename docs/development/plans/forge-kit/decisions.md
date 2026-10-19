@@ -781,6 +781,25 @@ where its answer lands.
 
      Register skein-02.s2 using skein/02.s2-recovery-tests.md after skein-02.s1, with the normal ready check, a fresh implementation session and closing temper-repin dependency. Keep02.s1 and01.s1 scope unchanged. The recovered candidate/map/checker controls are review artifacts, not tested final code; the implementer must validate the corrected post-s1 source. No additional repin is added because no closing repin has landed.
 
+136. **Recovery supplement Shapes against main** (ready check of skein-02.s2).
+     Reverses: nothing; ruling135's scope, preservation mapping and budgets stay.
+     Amends: skein/02.s2-recovery-tests.md Gate/Proof and findings/recovery-checker.md; no production change.
+
+     Use the post-s1 ready check's corrected artifacts for the recovery supplement. Wire the bounded checker exactly once after the existing contract checker. In Shape::visit_item_fn, recognize assertions and Event::Remake through AST path/macro visits, not token-string matching; retain the six positive/seven negative controls and two additional string-decoy regressions. Apply formatting to both reached recovery files.
+
+     The corrected client passes136 tests, retaining all72 mapped assertion locations,21 rejected causes, the single independent generic fresh-success case, nine exact accepts and both4097/4101 pull refusals. Counts remain N+6. The shared-load20–24ms observations do not establish the new cache/page/byte units'20ms ceiling: obtain isolated proof under pinned heavy --gate during implementation before claiming compliance or landing. Report any remaining miss without changing the ceiling, cases or budgets.
+
+     ## Checked
+
+     - Ready check snapshots: skein6ab44a32a6e09e47bfdd88cc0e0ee7fee02b62dd and temper8517cd677ae0e0a95a6aaafc3048163b01ee0137. No Files/symbol mismatch; the new helper/checker names belong to02.s2. All-five-repository name/content/derived sweeps found no additional code copy requiring repair.
+     - rg scratch-hourly-03-recovery/gate-wiring.patch shows duplicate recovery checker invocations; gate-wiring.corrected.patch has one. Shape::visit_item_fn originally searched stmt token strings; corrected StatementShape visits AST paths/macros and passes two string probes. These are scratch artifacts, not landed source.
+     - Heavy906PASS compiled checker and6 positive/7 negative controls, rejected original files and accepted correction. Heavy909PASS client all-target clippy; default136/136PASS0.320s, fuzzy0/browser0PASS sequentially. Recovery24->30; client130->136,74 preserved+62new. New bodies3–18lines; timing20–24ms under concurrent load remains open. No full gate/process/live or isolated timing proof claimed.
+     - Kit heavy documents --gate at lines5/39 and parses it at119; kit plan provides ready/ruling/ring. All owned workers ended; only own completed targets removed. Artifacts retained at scratch-ready-skein-02s2.
+
+     ## Instructions
+
+     Mark skein-02.s2 ready immediately with the checked full hashes. Its implementer validates the corrected post-s1 source and isolated timing before land; normal landing gate remains. Keep all135 cases/controls,01.s1 scope and closing-repin dependency. Refresh any further reached copy/count consumer and list it in the commit body.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
