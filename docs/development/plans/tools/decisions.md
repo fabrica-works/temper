@@ -792,3 +792,9 @@ and the user, or the director, may veto it before the run:
   a plan of their own); or a designer joins the run (`plan join
   designer`, in a design session) and answers question.md. temper 03.2's
   landing waits on it; the rest of 03.2 goes on.
+  Decision: the default, by director, 2026-10-19: an offered act with no
+  tool prints its name in the tools' words and ` (no tool)`, in the
+  document's order, with no call and no admission. JSON prints the
+  document's offers as 03.2 says. The agent learns the act exists and can
+  hand it to a person; no call names a missing tool. tools.md, 6.1, says
+  so at the designer's next pass, after this plan.
