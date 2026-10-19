@@ -2,7 +2,10 @@
 use core::net::SocketAddr;
 use skein_http::server as http;
 use skein_io as io;
-use skein_lib::{Duration, Env, Map, Queue, Time, Token, Wall, stream::Down};
+use skein_lib::{
+    Duration, Env, Map, Queue, Time, Token, Wall,
+    stream::{Down, Up},
+};
 
 const LISTENER: Token = Token::new(0);
 #[derive(Clone, Copy, Debug)]
@@ -130,7 +133,14 @@ impl Server {
                     && !connection.closing
                 {
                     connection.deadline = self.env.now.saturating_add(self.env.limits.stall);
+                    let ended = match &up {
+                        Up::End => connection.call.is_some(),
+                        Up::Bytes(_) | Up::Room | Up::Failed(_) => false,
+                    };
                     http::up(&mut connection.http, &env, up, &mut connection.events, &mut connection.below);
+                    if ended {
+                        end(connection, false, out);
+                    }
                 }
             }
             io::Event::Closed { owner } => {

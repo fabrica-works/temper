@@ -162,6 +162,27 @@ fn a_sign_in_ending_waits_for_its_erase_to_commit() {
 
 use super::fixtures::http as peer;
 #[test]
+fn the_next_clients_stream_opens_once_a_peer_ends_its_own() {
+    // The small profile admits two streams; a third needs a predecessor freed.
+    const CLIENTS: u32 = 3;
+    let mut service = super::fixtures::ready();
+    let link = service.links().pop().unwrap();
+    let body = peer::link_body(&service.engine, &link);
+    let mut sign_in = peer::Peer::new(&mut service.engine, b"POST", b"/jig/v1/sign-in/link", &body, None);
+    sign_in.pump(&mut service.engine, true);
+    let jig_client_protocol_wire::v9::SignInAnswer::SignedIn(answer) = sign_in.sign_in_answer(&service.engine) else {
+        panic!("signed in")
+    };
+    let bearer = peer::bearer(answer.token().as_ref().expect("native credential").expose());
+    let mut third_opened = false;
+    for _ in 0..CLIENTS {
+        let mut stream = peer::Peer::new(&mut service.engine, b"GET", b"/jig/v1/stream", &[], Some(&bearer));
+        third_opened = stream.read_hello(&mut service.engine);
+        stream.end(&mut service.engine);
+    }
+    assert!(third_opened, "the third client receives its hello before a heartbeat");
+}
+#[test]
 fn the_engine_prints_one_sign_in_link_at_start() {
     let mut service = super::fixtures::ready();
     let link = service.links().pop().expect("sign-in link");
