@@ -1109,6 +1109,16 @@ where its answer lands.
 
      Use supported index_repository on the resolved primary roots, explicitly preserving project names srv-data-git-runner-src-{skein,smith,jig,hearth,temper}; report readiness, gaps and pre/post HEADs. No kit or source behavior changes. Hourly/process checks continue independently and no extra suite is justified by index metadata updates.
 
+158. **Director's coordinated Cargo org cutover** (director instruction of 2026-10-19).
+     Reverses: nothing; the director’s 2026-10-19 org/source instruction governs future Cargo URL changes, including older literal examples in the plan.
+     Amends: README Rules, The director’s Cargo org cutover.
+
+     Record the director’s instruction as the standing rule for this run. GitHub’s org is now fabrig-dev and primary remotes already point there, but Cargo treats the forgetic and fabrig-dev URLs as distinct sources. The director owns one coordinated change of smith’s, jig’s and temper’s Cargo.toml and Cargo.lock after temper’s tools part 1 ends; pins stay unchanged. Keep forgetic in all Cargo source lines until that change lands; use fabrig-dev in all such lines after it. New dependencies copy their manifest’s existing URL. On a source-line rebase conflict, take main’s Cargo file and rerun the step’s authorized repin. A two-skein-source gate error means a forgetic line remains and must be renamed. No supervisor Cargo edit or pin change is part of this ruling; existing gates, source-unification checks and settled adapter ownership continue.
+
+     Checked: pump/director-org-url-check.json records git remote get-url origin and git grep -n -E 'github.com/(forgetic|fabrig-dev)/' origin/main -- Cargo.toml Cargo.lock for all five primaries. All remotes use fabrig-dev. smith/jig/temper currently have respectively 53/105/204 forgetic source matches and zero fabrig-dev; hearth has16/0 and skein0/0. These checks confirm the current pre-cutover phase, not a completed Cargo migration. The director’s instruction names smith/jig/temper as the coordinated change and does not authorize an independent supervisor migration of any repository.
+
+     Checked commands: pinned kit/scripts/dev/plan contains plan ruling --text at21/499 and plan ring at19/669. No new build, gate or repin command is introduced. The new README rule covers every current and later dependency addition and source-line rebase; refresh any further literal source copy reached by the director’s cutover, and list it in that change’s commit body.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
