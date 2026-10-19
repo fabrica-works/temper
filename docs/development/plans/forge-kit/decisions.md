@@ -1308,6 +1308,13 @@ where its answer lands.
 
      The root supervisor owns refresh and removal of the temporary rule; implementers retain source verification for every graph locator and any further reached copy.
 
+170. **Hourly08 graph refresh and accounts compatibility owners** (hourly check of 2026-10-19T13:50:58Z).
+     The five primary graph refreshes completed successfully. Remove ruling169's temporary Hourly08 graph refresh rule; the permanent Graph freshness rule remains. Refreshed source inputs are skein 2bd29bd29d63d733005396132f94731465c1a64c, smith 014b134b905696fcc8162880928a84a2ab9801a4, jig 8cc7e79f9ba72d64eac30597b8fe07f4f628eeb6, hearth 61ab3d16477c4dc97b10d4b7dc2ac6e0cddf7ef0 and temper d272f68d14dec9c8002ea40e729257c29bf99558. Use exact primary project names and verify every locator in the actual worktree. Later source landings require comparison and source fallback. Parser gaps, including jig's generated wire v9 file, still require direct source searches; a missing result proves no absence.
+
+     Hourly08 separately found jig's OAuth literal incompatibilities at crates/jig-protocol-accounts/src/handed_in.rs, crates/jig-protocol-config/src/profile/small.rs and crates/jig-protocol-accounts/src/tests/fixtures.rs. These are already named, with tests/protocol-accounts/src/fixtures.rs, by accounts/skein-05.2's Files and Downstream; accounts' closing jig-repin owns the downstream sweep. Report this evidence to that existing owner through the director. Keep the accounts/smith-01.3 await for smith's separate interfaces; its landing alone is not downstream compatibility proof. This assigns no OAuth production repair to forge-kit, adds no speculative retry and preserves independent work and all existing checks. Refresh any further reached copy or derived value within the owning repin and list every user.
+
+     Checked: hourly08-graph-inputs.json records clean main fast-forwards before indexing; hourly08-graph-refresh-results.json and hourly08-graph-post.json record all five successful exact-root refreshes. Post-input HEAD comparisons are empty; the index-created untracked hearth persistence artifacts were removed after completion, with their checksums recorded, leaving primary source trees clean. Hourly08's jig-check.log and temper-check.log contain E0063 at the three named jig literals; source verification confirms them. Accounts' README closing-repin table and skein/05-oauth.md 05.2 explicitly inventory the repair. Smith's archive-only missing-git build-script error is a check setup limitation, not a production finding. No process change is adopted and kit d6d4abeb remains pinned.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
