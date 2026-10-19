@@ -121,7 +121,8 @@ Files (changed; at the base):
   (temper 01.2 has already repointed both READMEs' pin sentence).
 - `tools/forgejo-conformance/src/*.rs`: 18 files, 30 lines at the base (the
   crate path), `lib.rs` (the helper) and `component.rs::record` (calls it);
-  nothing in its README.
+  also `src/component/hosted.rs::Hosted::new`, whose `Token` parameter becomes
+  `skein_throwaway_forgejo::Token`. Nothing in its README.
 - New: `tools/git-transcripts/tests/refusal.rs`,
   `tools/forgejo-conformance/tests/refusal.rs`.
 - Deleted: `testing/temper-throwaway-forgejo/` (Removes).
@@ -270,14 +271,15 @@ Scope: decision 27, second part: every read of a captured or fetched body goes t
 Needs: 06.2 (the module); nothing outside.
 Files: `tools/forgejo-conformance/src/json.rs` (`has_key`, its test); `src/lib.rs::json` and
   `src/fixture.rs` (`api_answer`, `api`, `get`, `branch`, `pull`, `put` return `Json`); read sites in
-  `cases.rs`, `facts.rs` (`Case.body: Json`, `matches`, `updated`), `registration.rs::listed`,
+  `cases.rs`, `cli.rs::tokens` (all three captured-body `crate::json` reads),
+  `facts.rs` (`Case.body: Json`, `matches`, `updated`), `registration.rs::listed`,
   `runner.rs` (`rows` and the helper returning a `Value`), `deliveries.rs` (its helpers, `act`'s
   answer), `hooks.rs` (`no_secret` through `Json::has_key("secret")`, `event_set`), `orgs.rs`
   (`write_team`), `tokens.rs`, `users.rs`, `component/{reads,writes}.rs`, `job_clone.rs`, `setup.rs`;
   `src/tests.rs` (the runner row `a_listed_runner_is_found_by_its_uuid` parses).
 Shape: the family cannot split by module (every file calls `Fixture::api`), so it splits by direction:
   a body goes in as `&Value` for now and the answer comes out as `Json`. Each read keeps its meaning,
-  `v["a"]["b"].as_str()` becoming `v.get("a").get("b").str()`; at the base 347 lines at most, in 18
+  `v["a"]["b"].as_str()` becoming `v.root().get("a").get("b").str()`; at the base 347 lines at most, in 18
   files (facts 75, deliveries 51, runner 45, hooks 28, component/writes 25, orgs 19, component/reads
   17, registration 15, cases 15, tokens 14, users 13, fixture 11, six files 19), and 146 lines of the
   `api` family in 14 files. `has_key` walks the document for a member at any depth and never matches

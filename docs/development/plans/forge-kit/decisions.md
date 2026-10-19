@@ -484,6 +484,16 @@ where its answer lands.
 
      Sequential heavy proofs: temper clippy passes including the 06.4 sketch; 167 focused pass (1 skipped) and 13 fuzzy. Skein clippy passes after the corrections; 142 focused and 3 fuzzy pass, browser selects none. A transplant-script-only Malformed qualification error was corrected before those passes. Future Host/attach, recorder and mask/boundary proofs remain unrun; unchanged HTTP/live proofs were not repeated. Evidence: pump/recheck-skein-06-start.md and scratch-recheck-skein-06-start/results.txt. No running step is held.
 
+116. **temper 06's Shapes against main** (ready check of temper-06.1).
+     Reverses: nothing.
+     Amends: temper/06-throwaway.md, 06.1 Files and 06.3 Files/Shape.
+
+     Include tools/forgejo-conformance/src/component/hosted.rs::Hosted::new in 06.1's crate-name cutover; its Token parameter becomes skein_throwaway_forgejo::Token. Include src/cli.rs::tokens in 06.3's captured-body read migration, covering all three crate::json reads. Correct the Json read sketch to `v.root().get("a").get("b").str()`: Json supplies root and At supplies get. Preserve payload interpretation, assertions and all existing prerequisites; refresh further copies and derived users and list them in the commit body.
+
+     Checked skein 7436461f0fce6d0178c483f3b631e1a4db5fc343 and temper 52eba416314f30a384bdf24902ec31cb08c00ad5. rg -n 'Token|fn new' tools/forgejo-conformance/src/component/hosted.rs confirms Hosted::new's temper_throwaway_forgejo::Token parameter. rg -n 'crate::json' tools/forgejo-conformance/src/cli.rs finds the three body reads in tokens. The planned json.rs interface in this session has Json::root and At::get; the materialized scratch interface compiles with the corrected read. All-increment path/name/content/derived-value searches across the applicable downstream repositories found no further missing user.
+
+     Through heavy, exact repin, workspace all-target check, formatting and sketch clippy pass. The git-transcripts and forgejo-conformance suites pass 42 tests, zero skipped, including the JSON and refusal probes; quiet execution is 0.115 s, JSON units 2–5 ms and refusal tests 5 ms. Fuzzy selects none successfully. Missing skein 06.1 is a declared prerequisite, not a reason to keep the ready check open: the coordinator starts the session after it lands. Actual kit swap/owned::attach, complete reads/writes, full suites and process/recording proofs remain unrun. Evidence: pump/ready-temper-06.md and scratch-ready-temper-06/report.txt; source/patch/logs retained and completed targets released.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
