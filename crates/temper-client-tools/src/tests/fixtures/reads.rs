@@ -158,26 +158,15 @@ pub(crate) fn read_answer(argv: &[&str], value: c::ReadResult) -> crate::jig::Pr
     root.answer(call).expect("terminal read answer")
 }
 pub(crate) fn composite() -> (Harness, u32) {
-    let (mut root, call) = read_call(COMPOSITE_CALL);
+    composite_call(COMPOSITE_CALL)
+}
+pub(crate) fn composite_call(argv: &[&str]) -> (Harness, u32) {
+    let (mut root, call) = read_call(argv);
     root.serve(call, task_result(goal(TASK, waiting_on_me())));
     root.serve(call, activity_too_large());
     root.deliver_subject(
         &client::Watchable::Jig(c::Subject::Tree { task: TASK, window: crate::limits::ROWS }),
-        c::Delivery::Tree(Box::new(c::Tree {
-            task: TASK,
-            nodes: List::with_capacity(EMPTY),
-            folded: c::PhaseCounts {
-                ended: 0,
-                running: 0,
-                waiting: 0,
-                held: 0,
-                closing: 0,
-                done: 0,
-                failed: 0,
-                cancelled: 0,
-            },
-            held_below: 0,
-        })),
+        c::Delivery::Tree(Box::new(composite_tree())),
     );
     root.deliver_run(no_provisional());
     (root, call)
@@ -333,4 +322,22 @@ pub(crate) fn extended<'a>(base: &[&'a str], extra: &[&'a str]) -> List<&'a str>
         argv.push(*word).expect("extended fixture argv");
     }
     argv
+}
+
+pub(crate) fn composite_tree() -> c::Tree {
+    c::Tree {
+        task: TASK,
+        nodes: List::with_capacity(EMPTY),
+        folded: c::PhaseCounts {
+            ended: 0,
+            running: 0,
+            waiting: 0,
+            held: 0,
+            closing: 0,
+            done: 0,
+            failed: 0,
+            cancelled: 0,
+        },
+        held_below: 0,
+    }
 }

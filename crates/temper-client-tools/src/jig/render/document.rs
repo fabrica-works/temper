@@ -59,6 +59,11 @@ fn text(
         Document::ReadSet(reading, me) => read_sets::text(reading, *me, book, limits, owner_part, out),
         Document::SizedTurn { task, name, bytes } => super::turn::sized(*task, *name, *bytes, true, out),
     }
+    match document {
+        Document::Me(me) => subjects::text_digest(b"me", &super::Part::Me(me), limits, out),
+        Document::Task(task, _) => subjects::text_digest(b"task", &super::Part::Task(task), limits, out),
+        Document::ReadSet(..) | Document::SizedTurn { .. } => {}
+    }
 }
 pub(crate) fn phrasebook(text: u32) -> Phrasebook {
     let shapes = words::phrase_shapes(text);
@@ -284,6 +289,8 @@ struct Cut {
     room: usize,
     left: u64,
     turn: Option<turn_window::Window>,
+    subject: bool,
+    digest: Option<crate::jig::digest::Digest>,
 }
 impl Cut {
     fn words(&mut self, bytes: &[u8], out: &mut Encoder) {
@@ -311,10 +318,16 @@ fn hex(bytes: &[u8], out: &mut Encoder) {
     out.string(&hex.finish());
 }
 fn encode(document: &Document<'_>, limits: &Limits, out: &mut Encoder) {
-    let mut cut = Cut { room: usize::try_from(limits.text).expect("text limit fits"), left: 0, turn: None };
+    let mut cut = Cut {
+        room: usize::try_from(limits.text).expect("text limit fits"),
+        left: 0,
+        turn: None,
+        subject: false,
+        digest: None,
+    };
     match document {
-        Document::Me(me) => encode_me(me, out, &mut cut),
-        Document::Task(task, _) => encode_task(task, out, &mut cut),
+        Document::Me(me) => subjects::encode(&super::Part::Me(me), limits, true, out),
+        Document::Task(task, _) => subjects::encode(&super::Part::Task(task), limits, true, out),
         Document::ReadSet(reading, _) => read_sets::encode(reading, limits, out, &mut cut),
         Document::SizedTurn { task, name, bytes } => {
             out.object_start();
@@ -435,7 +448,7 @@ mod turn_window;
 
 pub(super) fn part(part: &jig_client::contract::Part, out: &mut Text) {
     let limits = skein_json::writer::Limits { depth: 32, length: u32::MAX };
-    let mut budget = Cut { room: 0, left: 0, turn: None };
+    let mut budget = Cut { room: 0, left: 0, turn: None, subject: false, digest: None };
     let mut measure = Encoder::measure(&limits);
     encode_part(part, &mut measure, &mut budget);
     let size = measure.measured().expect("bounded part identity");
@@ -447,15 +460,26 @@ pub(super) fn part(part: &jig_client::contract::Part, out: &mut Text) {
 mod act_answers;
 use act_answers::encode_answer;
 pub(super) fn answer_json(answer: &jig_client::contract::Answer, out: &mut Encoder) {
-    let mut budget = Cut { room: usize::MAX, left: 0, turn: None };
+    let mut budget = Cut { room: usize::MAX, left: 0, turn: None, subject: false, digest: None };
     encode_answer(answer, out, &mut budget);
 }
 pub(super) fn recipient_json(to: &Recipient, out: &mut Encoder) {
-    let mut budget = Cut { room: usize::MAX, left: 0, turn: None };
+    let mut budget = Cut { room: usize::MAX, left: 0, turn: None, subject: false, digest: None };
     encode_recipient(to, out, &mut budget);
 }
 
 pub(crate) fn refusal_json(refusal: &jig_client::contract::Refusal, out: &mut Encoder) {
-    let mut budget = Cut { room: usize::MAX, left: 0, turn: None };
+    let mut budget = Cut { room: usize::MAX, left: 0, turn: None, subject: false, digest: None };
     encode_refusal(refusal, out, &mut budget);
+}
+
+pub(crate) mod subjects;
+pub(crate) use subjects::part_bytes;
+
+fn subject_end(digest: Option<crate::jig::digest::Digest>, out: &mut Encoder) {
+    if let Some(digest) = digest {
+        out.key(b"digest");
+        out.string(&digest.hex());
+    }
+    out.object_end();
 }

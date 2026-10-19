@@ -4,3 +4,5 @@ mod turn;
 
 mod acts;
 mod conditions;
+
+mod digest;

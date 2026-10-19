@@ -169,8 +169,10 @@ pub(super) fn encode_owner_inbox_entry(
         }
         None => out.null(),
     }
-    out.key(b"cursor");
-    encode_owner_inbox_cursor(&value.cursor, out, budget);
+    if !budget.subject {
+        out.key(b"cursor");
+        encode_owner_inbox_cursor(&value.cursor, out, budget);
+    }
     out.object_end();
 }
 
@@ -279,8 +281,10 @@ pub(super) fn encode_owner_inbox_selection(
     budget: &mut super::Cut,
 ) {
     out.object_start();
-    out.key(b"cursor");
-    encode_owner_inbox_cursor(&value.cursor, out, budget);
+    if !budget.subject {
+        out.key(b"cursor");
+        encode_owner_inbox_cursor(&value.cursor, out, budget);
+    }
     out.key(b"goals");
     out.array_start();
     for item_1 in &value.goals {

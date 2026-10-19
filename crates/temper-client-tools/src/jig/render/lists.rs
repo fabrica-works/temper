@@ -9,7 +9,7 @@ use alloc::boxed::Box;
 use jig_client::{Readout, contract as c, words::Word};
 use skein_lib::List;
 use skein_ui::phrases::Phrasebook;
-pub(super) fn tasks(page: &c::TaskPage, call: &Call, rows_limit: u32, book: &Phrasebook, out: &mut Text) {
+pub(super) fn tasks(page: &c::TaskPage, call: &Call, limits: &crate::jig::Limits, book: &Phrasebook, out: &mut Text) {
     let (rows, after) = if value(call, 4).is_some() {
         match &page.ended {
             c::EndedGroup::Rows { rows, after, .. } => (rows, after.as_ref()),
@@ -21,8 +21,11 @@ pub(super) fn tasks(page: &c::TaskPage, call: &Call, rows_limit: u32, book: &Phr
     } else {
         (&page.live, page.live_after.as_ref())
     };
-    for row in rows.as_slice().iter().take(usize::try_from(rows_limit).expect("rows fit")) {
+    for row in rows.as_slice().iter().take(usize::try_from(limits.rows).expect("rows fit")) {
         chip(&row.chip, book, out);
+    }
+    if super::document::subjects::tasks_eligible(call) {
+        super::document::subjects::text_digest(b"tasks", &super::Part::TaskPage(page), limits, out);
     }
     next(call, 6, after, out);
 }
@@ -144,7 +147,8 @@ pub(super) fn activity_limit(call: &Call, rows: u32) -> u32 {
     }
 }
 
-pub(super) fn inboxes(reading: &Reading, rows: u32, out: &mut Text) {
+pub(super) fn inboxes(reading: &Reading, limits: &crate::jig::Limits, out: &mut Text) {
+    let rows = limits.rows;
     let updates_fit = updates_fit(reading, rows);
     for (local, page) in &reading.pages {
         if *local == 5 && !updates_fit {
@@ -165,6 +169,15 @@ pub(super) fn inboxes(reading: &Reading, rows: u32, out: &mut Text) {
                 unreachable!("validated inbox page")
             }
         }
+    }
+    if super::document::subjects::inbox_eligible(&reading.called.call) {
+        let normalized = super::document::subjects::inbox(reading, limits, false);
+        super::document::subjects::text_digest(
+            b"inbox",
+            &super::Part::read(&normalized).expect("inbox form"),
+            limits,
+            out,
+        );
     }
     next(&reading.called.call, 3, inbox_cursor(reading, rows).as_ref(), out);
 }

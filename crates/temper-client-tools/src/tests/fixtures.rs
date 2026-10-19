@@ -617,3 +617,5 @@ pub(crate) use waits::*;
 
 mod adopt;
 pub(crate) use adopt::*;
+mod digest;
+pub(crate) use digest::*;

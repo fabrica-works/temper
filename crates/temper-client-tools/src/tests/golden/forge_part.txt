@@ -6,3 +6,4 @@ resource: o/n on example.com
 acts:
   stop 41 --key NAME
   cancel 41 REASON --key NAME
+digest: task 1c78994397fd84be

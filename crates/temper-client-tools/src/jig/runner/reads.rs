@@ -198,6 +198,11 @@ pub(super) fn changed(runner: &mut Runner, client: &Client, env: &Env<Limits>, h
         reading.documents.insert(local, delivery.clone());
         if local == 4 {
             reading.text = client.text(handle).cloned();
+            if let Some(c::Delivery::RunState(run)) = reading.documents.get_mut(&local)
+                && let Some(text) = &reading.text
+            {
+                run.writing = Some(text.clone());
+            }
         }
         out.push(Out::Client { event: Event::Unwatch { handle } });
     }

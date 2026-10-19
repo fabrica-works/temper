@@ -25,6 +25,7 @@ pub(super) fn encode_malformed(value: jig_client::contract::Malformed, out: &mut
 }
 
 pub(super) fn encode_me(value: &jig_client::contract::Me, out: &mut Encoder, budget: &mut super::Cut) {
+    let digest = budget.digest.take();
     out.object_start();
     out.key(b"party");
     encode_me_party(&value.party, out, budget);
@@ -55,7 +56,7 @@ pub(super) fn encode_me(value: &jig_client::contract::Me, out: &mut Encoder, bud
     }
     out.key(b"bytes_left");
     out.unsigned(budget.left);
-    out.object_end();
+    super::subject_end(digest, out);
 }
 
 pub(super) fn encode_me_party(value: &jig_client::contract::MeParty, out: &mut Encoder, budget: &mut super::Cut) {

@@ -14,7 +14,7 @@ pub(super) fn text(
 ) {
     let call = &reading.called.call;
     if call.tool == 1 {
-        super::super::lists::inboxes(reading, limits.rows, out);
+        super::super::lists::inboxes(reading, limits, out);
         return;
     }
     if let Some(thread) = &reading.thread {
@@ -25,9 +25,10 @@ pub(super) fn text(
         match page {
             Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(task))) => {
                 super::task_text(task, me, book, owner_part, out);
+                super::subjects::text_digest(b"task", &super::super::Part::Task(task), limits, out);
             }
             Readout::Jig(c::ReadResult::Value(c::ReadValue::Tasks(page))) => {
-                super::super::lists::tasks(page, call, limits.rows, book, out);
+                super::super::lists::tasks(page, call, limits, book, out);
             }
             Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(page))) => {
                 super::super::activity::page(page, call, limits, out);
@@ -45,13 +46,36 @@ pub(super) fn text(
     }
     for (local, document) in &reading.documents {
         match local {
-            3 => super::super::lists::tree(document, book, out),
-            4 => super::super::activity::run(document, reading.text.as_ref(), out),
+            3 => {
+                super::super::lists::tree(document, book, out);
+                super::subjects::text_digest(
+                    b"tree",
+                    &super::super::Part::delivery(document).expect("tree form"),
+                    limits,
+                    out,
+                );
+            }
+            4 => {
+                super::super::activity::run(document, reading.text.as_ref(), out);
+                if call.tool != 4 {
+                    super::subjects::text_digest(
+                        b"run",
+                        &super::super::Part::delivery(document).expect("run form"),
+                        limits,
+                        out,
+                    );
+                }
+            }
             _ => unreachable!("selected watch"),
         }
     }
 }
 pub(super) fn encode(reading: &Reading, limits: &Limits, out: &mut Encoder, budget: &mut Cut) {
+    let call = &reading.called.call;
+    if call.tool == 1 && super::subjects::inbox_eligible(call) {
+        super::subjects::encode_inbox_read(reading, limits, out);
+        return;
+    }
     let compound = reading.called.call.tool == 1 || reading.called.call.tool == 3 || reading.called.call.tool == 4;
     if compound {
         out.object_start();
@@ -68,12 +92,30 @@ pub(super) fn encode(reading: &Reading, limits: &Limits, out: &mut Encoder, budg
                 if compound {
                     out.key(b"task");
                 }
-                super::encode_task(task, out, budget);
+                super::subjects::encode(&super::super::Part::Task(task), limits, true, out);
             }
             Readout::Jig(c::ReadResult::Value(c::ReadValue::Tasks(page))) => {
                 let call = &reading.called.call;
                 let next = super::super::lists::task_read_on(page, call);
-                super::encode_task_page(page, crate::jig::call::value(call, 4).is_some(), next.as_deref(), out, budget);
+                if super::subjects::tasks_eligible(call) {
+                    out.object_start();
+                    out.key(b"tasks");
+                    super::subjects::encode(&super::super::Part::TaskPage(page), limits, true, out);
+                    out.key(b"read_on");
+                    match next {
+                        Some(next) => out.string(&next),
+                        None => out.null(),
+                    }
+                    out.object_end();
+                } else {
+                    super::encode_task_page(
+                        page,
+                        crate::jig::call::value(call, 4).is_some(),
+                        next.as_deref(),
+                        out,
+                        budget,
+                    );
+                }
             }
             Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(page))) => {
                 if compound {
@@ -114,15 +156,36 @@ pub(super) fn encode(reading: &Reading, limits: &Limits, out: &mut Encoder, budg
             }
         }
     }
+    encode_documents(reading, limits, compound, out);
+    if reading.called.call.tool == 1 {
+        out.key(b"read_on");
+        match super::super::lists::inbox_cursor(reading, limits.rows) {
+            Some(cursor) => out.string(&super::super::lists::read_on(&reading.called.call, 3, &cursor)),
+            None => out.null(),
+        }
+    }
+    if compound {
+        out.object_end();
+    }
+}
+
+fn encode_documents(reading: &Reading, limits: &Limits, compound: bool, out: &mut Encoder) {
     for (local, document) in &reading.documents {
         if compound {
             out.key(if *local == 3 { b"tree" } else { b"run" });
         }
         match document {
-            c::Delivery::Tree(tree) => super::encode_tree(tree, out, budget),
-            c::Delivery::OwnerTree(tree) => super::encode_owner_tree(tree, out, budget),
+            c::Delivery::Tree(tree) => super::subjects::encode(&super::super::Part::Tree(tree), limits, true, out),
+            c::Delivery::OwnerTree(tree) => {
+                super::subjects::encode(&super::super::Part::OwnerTree(tree), limits, true, out);
+            }
             c::Delivery::RunState(_) | c::Delivery::Run(_) => {
-                encode_run(document, reading.text.as_ref(), out, budget);
+                super::subjects::encode(
+                    &super::super::Part::delivery(document).expect("run form"),
+                    limits,
+                    reading.called.call.tool != 4,
+                    out,
+                );
             }
             c::Delivery::OwnerProject(_)
             | c::Delivery::Me(_)
@@ -136,41 +199,4 @@ pub(super) fn encode(reading: &Reading, limits: &Limits, out: &mut Encoder, budg
             | c::Delivery::OwnerDeployment(_) => unreachable!("selected watch value"),
         }
     }
-    if reading.called.call.tool == 1 {
-        out.key(b"read_on");
-        match super::super::lists::inbox_cursor(reading, limits.rows) {
-            Some(cursor) => out.string(&super::super::lists::read_on(&reading.called.call, 3, &cursor)),
-            None => out.null(),
-        }
-    }
-    if compound {
-        out.object_end();
-    }
-}
-
-fn encode_run(delivery: &c::Delivery, text: Option<&c::RunText>, out: &mut Encoder, budget: &mut Cut) {
-    out.object_start();
-    out.key(b"state");
-    match delivery {
-        c::Delivery::RunState(run) => super::encode_run_state(run, out, budget),
-        c::Delivery::Run(run) => super::encode_run_text(run, out, budget),
-        c::Delivery::OwnerProject(_)
-        | c::Delivery::Me(_)
-        | c::Delivery::Task(_)
-        | c::Delivery::OwnerProposal(_)
-        | c::Delivery::Tree(_)
-        | c::Delivery::OwnerTree(_)
-        | c::Delivery::Chips(_)
-        | c::Delivery::Inbox(_)
-        | c::Delivery::OwnerInbox(_)
-        | c::Delivery::Tasks(_)
-        | c::Delivery::Deployment(_)
-        | c::Delivery::OwnerDeployment(_) => unreachable!("run delivery"),
-    }
-    out.key(b"provisional");
-    match text {
-        Some(text) => super::encode_run_text(text, out, budget),
-        None => out.null(),
-    }
-    out.object_end();
 }

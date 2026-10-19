@@ -13,6 +13,104 @@ use jig_client::{
 };
 use skein_json::writer::{Encoder, Limits as JsonLimits};
 use skein_lib::Writer;
+/// A subject's supplied facts, borrowed only during this step.
+#[derive(Clone, Copy, Debug)]
+pub enum Part<'a> {
+    Me(&'a contract::Me),
+    Inbox(&'a contract::Inbox),
+    OwnerInbox(&'a contract::OwnerInbox),
+    InboxPage(&'a contract::InboxPage),
+    OwnerInboxPage(&'a contract::OwnerInboxPage),
+    Tasks(&'a contract::Tasks),
+    TaskPage(&'a contract::TaskPage),
+    Task(&'a contract::Task),
+    Tree(&'a contract::Tree),
+    OwnerTree(&'a contract::OwnerTree),
+    Run(&'a contract::RunText),
+    RunState(&'a contract::RunState),
+}
+impl<'a> Part<'a> {
+    #[must_use]
+    pub fn read(value: &'a ReadValue) -> Option<Self> {
+        match value {
+            ReadValue::Inbox(value) => Some(Self::InboxPage(value)),
+            ReadValue::OwnerInbox(value) => Some(Self::OwnerInboxPage(value)),
+            ReadValue::Tasks(value) => Some(Self::TaskPage(value)),
+            ReadValue::Task(value) => Some(Self::Task(value)),
+            ReadValue::OwnerProject(_)
+            | ReadValue::Historical(_)
+            | ReadValue::Me(_)
+            | ReadValue::Turn(_)
+            | ReadValue::Proposal(_)
+            | ReadValue::OwnerProposal(_)
+            | ReadValue::Escalation(_)
+            | ReadValue::OwnerEscalation(_)
+            | ReadValue::Question(_)
+            | ReadValue::PersonTask(_)
+            | ReadValue::OwnerPersonTask(_)
+            | ReadValue::Result(_)
+            | ReadValue::Ended(_)
+            | ReadValue::OwnerEnded(_)
+            | ReadValue::History(_)
+            | ReadValue::Activity(_)
+            | ReadValue::Spend(_)
+            | ReadValue::OwnerSpend(_)
+            | ReadValue::Project(_)
+            | ReadValue::Notes(_)
+            | ReadValue::Deployment(_)
+            | ReadValue::OwnerDeployment(_) => None,
+        }
+    }
+    #[must_use]
+    pub fn delivery(delivery: &'a Delivery) -> Option<Self> {
+        match delivery {
+            Delivery::Me(value) => Some(Self::Me(value)),
+            Delivery::Inbox(value) => Some(Self::Inbox(value)),
+            Delivery::OwnerInbox(value) => Some(Self::OwnerInbox(value)),
+            Delivery::Tasks(value) => Some(Self::Tasks(value)),
+            Delivery::Task(value) => Some(Self::Task(value)),
+            Delivery::Tree(value) => Some(Self::Tree(value)),
+            Delivery::OwnerTree(value) => Some(Self::OwnerTree(value)),
+            Delivery::Run(value) => Some(Self::Run(value)),
+            Delivery::RunState(value) => Some(Self::RunState(value)),
+            Delivery::OwnerProject(_)
+            | Delivery::OwnerProposal(_)
+            | Delivery::Chips(_)
+            | Delivery::Deployment(_)
+            | Delivery::OwnerDeployment(_) => None,
+        }
+    }
+}
+impl Part<'_> {
+    #[must_use]
+    pub fn rows(&self) -> usize {
+        let rows = match self {
+            Self::Inbox(value) => value.entries.len(),
+            Self::OwnerInbox(value) => value.needs.len().checked_add(value.updates.len()).expect("bounded inbox"),
+            Self::InboxPage(value) => value.rows.len(),
+            Self::OwnerInboxPage(value) => value.rows.len(),
+            Self::Tasks(value) => value.rows.len(),
+            Self::TaskPage(value) => value.live.len(),
+            Self::Tree(value) => value.nodes.len(),
+            Self::OwnerTree(value) => value.rows.len(),
+            Self::Me(_) | Self::Task(_) | Self::Run(_) | Self::RunState(_) => 1,
+        };
+        usize::try_from(rows).expect("row count fits")
+    }
+    #[must_use]
+    pub fn more(&self) -> bool {
+        match self {
+            Self::Inbox(value) => value.more,
+            Self::OwnerInbox(value) => value.next.is_some(),
+            Self::InboxPage(value) => value.after.is_some(),
+            Self::OwnerInboxPage(value) => value.after.is_some(),
+            Self::Tasks(value) => value.more,
+            Self::TaskPage(value) => value.live_after.is_some(),
+            Self::OwnerTree(value) => value.next.is_some(),
+            Self::Me(_) | Self::Task(_) | Self::Tree(_) | Self::Run(_) | Self::RunState(_) => false,
+        }
+    }
+}
 /// Application vocabulary for owner parts, borrowed for this step alone.
 pub trait Parts {
     fn owner_part(&self, part: &contract::OwnerPart, out: &mut Text);

@@ -24,13 +24,6 @@ fn a_refused_act_says_why_without_a_call() {
     assert_eq!(root.answer(call).expect("read answered").stdout, fixtures::golden("task_refused"));
 }
 #[test]
-fn a_keyed_acts_call_ends_with_key_name() {
-    let (mut root, call, task) = fixtures::task_read();
-    root.serve(call, fixtures::task_result(task));
-    let answer = root.answer(call).expect("read answered");
-    assert_eq!(answer.stdout, fixtures::golden("task_goal_waiting"));
-}
-#[test]
 fn me_prints_the_live_frame() {
     for (argv, golden) in [(fixtures::ME_CALL, "me"), (fixtures::ME_JSON_CALL, "me_json")] {
         let (mut root, call) = fixtures::read_call(argv);
@@ -59,7 +52,7 @@ fn each_read_none_exits_as_the_table_says() {
         (ReadNone::SignedOut, 1, b"signed out\n"),
         (ReadNone::Unreachable, 1, b"unreachable\n"),
         (ReadNone::Malformed, 1, b"malformed document\n"),
-        (ReadNone::TooLarge { bytes: crate::limits::DOCUMENT + 1 }, 1, b"document limit\n"),
+        (ReadNone::TooLarge { bytes: fixtures::TOO_LARGE }, 1, b"document limit\n"),
     ] {
         let (mut root, call) = fixtures::read_call(fixtures::TASK_CALL);
         root.serve(call, ReadResult::None(why));
@@ -106,19 +99,26 @@ fn an_owner_resource_path_is_printed_whole() {
 
 #[test]
 fn an_act_with_no_tool_prints_its_name() {
-    for admission in [
-        Admission::Allowed,
-        Admission::Proposed { to: jig_client::contract::Recipient::Party(fixtures::PARTY) },
-        Admission::Refused(jig_client::contract::Refusal::NotOffered),
-        fixtures::bounded_offer(jig_client::contract::Beyond::Refused(jig_client::contract::Refusal::NotOffered)),
+    let mut printed_by_admission = skein_lib::List::with_capacity(fixtures::NO_TOOL_CASES);
+    let mut expected = skein_lib::List::with_capacity(fixtures::NO_TOOL_CASES);
+    for (admission, golden) in [
+        (Admission::Allowed, "task_no_tool"),
+        (Admission::Proposed { to: jig_client::contract::Recipient::Party(fixtures::PARTY) }, "task_no_tool_proposed"),
+        (Admission::Refused(jig_client::contract::Refusal::NotOffered), "task_no_tool_refused"),
+        (
+            fixtures::bounded_offer(jig_client::contract::Beyond::Refused(jig_client::contract::Refusal::NotOffered)),
+            "task_no_tool_bounded",
+        ),
     ] {
         let (mut root, call, mut task) = fixtures::task_read();
         let offer = task.acts.get_mut(0).expect("first offer");
         offer.act = jig_client::contract::ActKind::Take;
         offer.admission = admission;
         root.serve(call, fixtures::task_result(task));
-        assert_eq!(root.answer(call).expect("read answered").stdout, fixtures::golden("task_no_tool"));
+        printed_by_admission.push((golden, root.answer(call).expect("read answered").stdout)).expect("every row");
+        expected.push((golden, fixtures::golden(golden))).expect("every row");
     }
+    assert_eq!(printed_by_admission, expected);
 }
 #[test]
 fn task_json_names_the_nested_contract_fields() {

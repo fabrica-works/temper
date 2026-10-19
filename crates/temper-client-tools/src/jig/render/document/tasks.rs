@@ -79,11 +79,12 @@ pub(super) fn encode_taken_by(value: &jig_client::contract::TakenBy, out: &mut E
 }
 
 pub(super) fn encode_task(value: &jig_client::contract::Task, out: &mut Encoder, budget: &mut super::Cut) {
+    let digest = budget.digest.take();
     out.object_start();
     encode_task_from_label(value, out, budget);
     encode_task_from_person_revision(value, out, budget);
     encode_task_from_hold(value, out, budget);
-    out.object_end();
+    super::subject_end(digest, out);
 }
 
 fn encode_task_from_label(value: &jig_client::contract::Task, out: &mut Encoder, budget: &mut super::Cut) {

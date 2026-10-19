@@ -58,6 +58,7 @@ pub(super) fn encode_object_key(value: &jig_client::contract::ObjectKey, out: &m
 }
 
 pub(super) fn encode_owner_tree(value: &jig_client::contract::OwnerTree, out: &mut Encoder, budget: &mut super::Cut) {
+    let digest = budget.digest.take();
     out.object_start();
     out.key(b"root");
     super::encode_chip(&value.root, out, budget);
@@ -75,14 +76,17 @@ pub(super) fn encode_owner_tree(value: &jig_client::contract::OwnerTree, out: &m
     out.array_end();
     out.key(b"held_below");
     out.unsigned(u64::from(value.held_below));
-    out.key(b"next");
-    match &value.next {
-        Some(item_3) => {
-            super::encode_cursor(item_3, out, budget);
+    if budget.subject {
+        out.key(b"more");
+        out.boolean(value.next.is_some());
+    } else {
+        out.key(b"next");
+        match &value.next {
+            Some(item_3) => super::encode_cursor(item_3, out, budget),
+            None => out.null(),
         }
-        None => out.null(),
     }
-    out.object_end();
+    super::subject_end(digest, out);
 }
 
 pub(super) fn encode_owner_tree_fold(
@@ -171,6 +175,7 @@ pub(super) fn encode_run_ending(value: &jig_client::contract::RunEnding, out: &m
 }
 
 pub(super) fn encode_run_state(value: &jig_client::contract::RunState, out: &mut Encoder, budget: &mut super::Cut) {
+    let digest = budget.digest.take();
     out.object_start();
     out.key(b"task");
     out.unsigned(value.task);
@@ -197,10 +202,11 @@ pub(super) fn encode_run_state(value: &jig_client::contract::RunState, out: &mut
         }
         None => out.null(),
     }
-    out.object_end();
+    super::subject_end(digest, out);
 }
 
 pub(super) fn encode_run_text(value: &jig_client::contract::RunText, out: &mut Encoder, budget: &mut super::Cut) {
+    let digest = budget.digest.take();
     out.object_start();
     out.key(b"attempt");
     out.unsigned(value.attempt);
@@ -228,10 +234,11 @@ pub(super) fn encode_run_text(value: &jig_client::contract::RunText, out: &mut E
         }
         None => out.null(),
     }
-    out.object_end();
+    super::subject_end(digest, out);
 }
 
 pub(super) fn encode_tree(value: &jig_client::contract::Tree, out: &mut Encoder, budget: &mut super::Cut) {
+    let digest = budget.digest.take();
     out.object_start();
     out.key(b"task");
     out.unsigned(value.task);
@@ -245,7 +252,7 @@ pub(super) fn encode_tree(value: &jig_client::contract::Tree, out: &mut Encoder,
     super::encode_phase_counts(&value.folded, out, budget);
     out.key(b"held_below");
     out.unsigned(u64::from(value.held_below));
-    out.object_end();
+    super::subject_end(digest, out);
 }
 
 pub(super) fn encode_tree_node(value: &jig_client::contract::TreeNode, out: &mut Encoder, budget: &mut super::Cut) {
