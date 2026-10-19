@@ -7,6 +7,7 @@ use jig_domain_tasks as tasks;
 use skein_fake_forge_domain::{self as fake, api as raw};
 use skein_lib::{Duration, Env, List, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::{BTreeMap, VecDeque};
+use std::fmt::Write;
 use temper_engine_domain as engine;
 use temper_engine_domain::{Delivery, Key, Record};
 use temper_engine_domain_forge as forge_top;
@@ -1896,25 +1897,39 @@ fn a_worker_frozen_past_its_grace_resumes_with_a_push_in_hand_and_lands_nothing_
         .store
         .rows
         .values()
-        .filter(|stored| {
-            matches!(stored,
-                Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Change(change)
-                    if matches!(change.change.state, temper_engine_domain_forge_change::State::Landed { .. }))
-            )
+        .filter_map(|stored| match stored {
+            Record::Forge { row, .. } => match row.as_ref() {
+                forge_top::Stored::Change(change) => match change.change.state {
+                    temper_engine_domain_forge_change::State::Landed { merge } => Some(merge),
+                    _ => None,
+                },
+                _ => None,
+            },
+            Record::Core(_) => None,
         })
-        .count();
-    assert_eq!(landed, 1, "one landing after a frozen worker resumes");
+        .collect::<Vec<_>>();
+    assert_eq!(landed.len(), 1, "one landing after a frozen worker resumes");
+    let merge_id = landed[0].iter().fold(String::new(), |mut id, byte| {
+        write!(id, "{byte:02x}").expect("writing a merge id into a string");
+        id
+    });
     assert_eq!(
         world
             .store
             .rows
             .values()
-            .filter(|stored| matches!(stored,
-                Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(row))) if row.requester == tasks::Party::Task(chat.task)
-                    && matches!(row.phase, tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Change { .. })))
-            ))
-            .count(),
-        1,
+            .filter_map(|stored| match stored {
+                Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(row)))
+                    if row.requester == tasks::Party::Task(chat.task) =>
+                    match &row.phase {
+                        tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Change { words, .. })) =>
+                            Some(words.as_ref()),
+                        _ => None,
+                    },
+                _ => None,
+            })
+            .collect::<Vec<_>>(),
+        [&merge_id.as_bytes()[..32]],
         "one result after recovery"
     );
 }

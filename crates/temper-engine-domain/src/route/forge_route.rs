@@ -126,6 +126,12 @@ fn commit_text(commit: &skein_forge::api::Commit) -> Box<[u8]> {
     out.into_boxed()
 }
 
+fn landing_words(merge: &skein_forge::api::Commit, bound: u32) -> Box<[u8]> {
+    let digits = commit_text(merge);
+    let length = digits.len().min(usize::try_from(bound).unwrap_or(usize::MAX));
+    Box::from(digits.get(..length).expect("landing words fit the merge id"))
+}
+
 fn news_words(news: &forge::News, limit: u32) -> Box<[u8]> {
     let mut out = List::with_capacity(limit);
     match news {
@@ -1862,11 +1868,20 @@ fn change_decision(domain: &mut Domain, env: &Env<Limits>, task: u64, choice: fo
                 }));
                 return;
             };
+            let bound = match domain.core.tasks.task(task) {
+                Some(row) => match row.contract {
+                    tasks::Contract::Change { words, .. } => words,
+                    tasks::Contract::Approval { .. }
+                    | tasks::Contract::Report { .. }
+                    | tasks::Contract::Verdict { .. } => 0,
+                },
+                None => 0,
+            };
             ProcedureStep::new(StepEnd::Result(tasks::TaskResult::Change {
                 connector: domain.config.forge_connector,
                 kind: 1,
                 resource: pull,
-                words: Box::from(&merge[..]),
+                words: landing_words(&merge, bound),
             }))
         }
         forge_change::Decision::Hold(why) => {
