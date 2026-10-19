@@ -24,7 +24,8 @@ pub struct Clients {
     mount_env: Env<http::Limits>,
     mount_out: Queue<http::Request>,
     server_out: Queue<crate::server::Routed>,
-    unclaimed: Map<Token, ()>,
+    replies: Map<Token, bundle::Reply>,
+    send: u32,
     bundle: Option<bundle::Bundle>,
     component_closed: bool,
     stopping: Option<()>,
@@ -131,7 +132,8 @@ impl Clients {
             mount_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config.limits.clients_http },
             mount_out: Queue::with_capacity(room),
             server_out: Queue::with_capacity(room),
-            unclaimed: Map::with_capacity(crate::limits::server(&config.limits).connections),
+            replies: Map::with_capacity(crate::limits::server(&config.limits).connections),
+            send: crate::limits::server(&config.limits).http.send,
             bundle: None,
             component_closed: false,
             stopping: None,
@@ -252,39 +254,12 @@ impl Clients {
                     if http::claims(&http_settings(), &head) {
                         self.mount.down(&self.mount_env, http::Event::Call { call, head }, &mut self.mount_out);
                     } else {
-                        let end = match skein_lib::bytes::find(&head.target, b"?") {
-                            Some(end) => end,
-                            None => head.target.len(),
-                        };
-                        let path = head.target.get(..end).expect("target path");
-                        let headers: Box<[skein_http::Header]> =
-                            if head.method == skein_http::Method::Get && path == b"/jig/v1/sign-in/link" {
-                                Box::new([http::link_page()])
-                            } else {
-                                Box::new([])
-                            };
-                        self.unclaimed.insert(call, ()).expect("bounded server calls");
-                        self.server.answer(
-                            call,
-                            skein_http::server::Request::Respond(skein_http::server::Response {
-                                status: 404,
-                                headers,
-                                body: skein_http::server::Body::None,
-                                close: true,
-                            }),
-                            &mut self.server_out,
-                        );
+                        self.serve_call(call, &head);
                     }
                 }
                 crate::server::Routed::Http { call, event } => {
-                    if self.unclaimed.get(&call).is_some() {
-                        if let skein_http::server::Event::Done(_)
-                        | skein_http::server::Event::Closed
-                        | skein_http::server::Event::Failed(_) = event
-                        {
-                            self.unclaimed.remove(&call);
-                            self.server.done(call, &mut self.server_out);
-                        }
+                    if self.replies.get(&call).is_some() {
+                        self.serve_event(call, event);
                     } else {
                         self.mount.down(&self.mount_env, http::Event::Http { call, event }, &mut self.mount_out);
                     }
@@ -449,7 +424,8 @@ pub fn worst_case(
         // First-clock initialization briefly owns both validated component instances.
         .checked_add(kit::worst_case(limits)?)?
         .checked_add(http::worst_case(mapping)?)?
-        .checked_add(Map::<Token, ()>::worst_case(transport.connections)?)?
+        .checked_add(Map::<Token, bundle::Reply>::worst_case(transport.connections)?)?
+        .checked_add(u64::from(transport.connections).checked_mul(u64::from(transport.http.head))?)?
         .checked_add(crate::server::worst_case(transport)?)?
         .checked_add(Queue::<crate::server::Routed>::worst_case(room)?)?
         .checked_add(Queue::<http::Request>::worst_case(room)?)?

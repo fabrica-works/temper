@@ -484,6 +484,7 @@ fn start_with_worker(
     service
 }
 mod agent;
+pub mod bundle;
 mod clients;
 pub mod http;
 mod server;
