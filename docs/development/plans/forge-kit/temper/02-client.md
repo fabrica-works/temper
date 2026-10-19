@@ -212,6 +212,20 @@ Shape: six commits, each builds and passes its crates' tests.
      `Signal::Terminate` in place of `Signal::Kill`, and its `observe`
      asserts the engine's exit, once it has one, `Exit::Code(0)`. No test
      is added, renamed or loosened.
+  Supervisor-owned HTTP call-table diagnosis: the required commit-6 process
+  proof stopped before its requested ending at the pinned Jig HTTP mount's
+  call insertion. Preserve the clean six-commit checkpoint and all artifacts;
+  implementation and further process proof wait for diagnosis and a scope ruling.
+  The supervisor's read-only checker may trace the actual pinned call lifecycle,
+  server/mount capacity and removal in its own scratch, with deterministic
+  lower-layer Rust probes only. Budget: 20 minutes and two executable attempts
+  through pinned heavy and explicit bash script files; setup failures count,
+  and waits grant no extra attempts. No full process run, recording, gate,
+  production repair, limit increase or assertion change is authorized here.
+  Return at most 20 lines with exact sources/pins, a valid-event reproducer or
+  remaining uncertainty, proposed owner/location, commands/results and task/target
+  ownership; retain active targets until their workers end. Map each further
+  reached copy/derived value for any proposed repair and list it in the report.
   Diagnostic exception for the pinned Jig UTF-8 panic: investigate the retained
   failed retry in run `logs/temper-02/process-attempt2/process`, comparing the
   failing four-commit tree and its actual pins with the last passing source.

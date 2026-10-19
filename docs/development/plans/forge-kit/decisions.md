@@ -1315,6 +1315,33 @@ where its answer lands.
 
      Checked: hourly08-graph-inputs.json records clean main fast-forwards before indexing; hourly08-graph-refresh-results.json and hourly08-graph-post.json record all five successful exact-root refreshes. Post-input HEAD comparisons are empty; the index-created untracked hearth persistence artifacts were removed after completion, with their checksums recorded, leaving primary source trees clean. Hourly08's jig-check.log and temper-check.log contain E0063 at the three named jig literals; source verification confirms them. Accounts' README closing-repin table and skein/05-oauth.md 05.2 explicitly inventory the repair. Smith's archive-only missing-git build-script error is a check setup limitation, not a production finding. No process change is adopted and kit d6d4abeb remains pinned.
 
+171. **Bounded diagnosis of the pinned HTTP call table** (cross-session scope, temper02.1 block of 2026-10-19T14:01:32Z).
+     Ruling 171 assigns a supervisor-owned, scratch-only lower-layer diagnosis
+     under pinned supervisor.md9 and development.md10.4's authority over scope.
+     The commit-6 process proof passed two stories, failed the restart story before
+     its requested ending, and left sixteen unchecked; this is a new HTTP call-table
+     finding, with no established shared cause with the earlier UTF-8 or child findings.
+     Preserve the clean six-commit checkpoint92425da290227502bc853359bc0925c374deca09
+     and all original instances, stores and logs. It has the same tree as the process
+     source8afc00ec8862245661dd72f06e5dcce0331be07c. The actual Jig pin is
+     eceadcaf8d5b19a2495c5bf81355232f512c9f1f; a new main diagnosis alone does not
+     establish its historical cause.
+     The checker owns twenty minutes and at most two executable diagnostic attempts,
+     using pinned heavy with explicit bash script files. Setup/compile failures
+     consume attempts; queue waits authorize none. Trace actual pinned call admission,
+     lifetime, terminal events and capacity between server and mount, compare the last
+     passing source, and prefer a deterministic lower-layer Rust reproducer that
+     respects the server's event contract. An arbitrary over-capacity input is not
+     cause proof. Return at most twenty lines with full hashes/pins, established cause
+     or uncertainty, smallest valid reproducer, proposed repair owner/location, exact
+     commands/results and task/target ownership. Map further reached copies and derived
+     values for any proposed repair and list them; retain active targets until workers end.
+     No repair, dependency repin, full process retry, recording or gate is authorized by
+     this diagnosis. Preserve all limits, assertions, payloads, errors, deadlines,
+     existing proof requirements and the original failed artifacts. The six-commit
+     step stays held until the report and a further scope ruling; use a fresh
+     continuation after W49's114K checkpoint when implementation is authorized.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
