@@ -133,6 +133,7 @@ skein-forge-setup = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-lib = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-fake-forge-domain = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-fake-forge-protocol = { git = "https://github.com/fabrig-dev/skein.git" }
+skein-forge-client = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-forge = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-json = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-world = { git = "https://github.com/fabrig-dev/skein.git" }

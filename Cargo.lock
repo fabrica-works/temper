@@ -1387,6 +1387,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "skein-forge-client"
+version = "0.0.0"
+source = "git+https://github.com/fabrig-dev/skein.git#f1458557f5e1bce486db0e21d2f7414261087de6"
+dependencies = [
+ "skein-forge",
+ "skein-lib",
+]
+
+[[package]]
 name = "skein-forge-setup"
 version = "0.0.0"
 source = "git+https://github.com/fabrig-dev/skein.git#bc6c16cd85a79daa1d2f04a37cf362f3f4492753"
@@ -2422,6 +2431,7 @@ version = "0.0.0"
 dependencies = [
  "jig-domain-people",
  "skein-forge",
+ "skein-forge-client",
  "skein-lib",
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-client",

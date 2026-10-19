@@ -321,16 +321,13 @@ fn effect_access(repository: &forge::Repository, what: &forge::What, kind: u16) 
 }
 
 fn effect_key(domain: &Domain, key: CallKey) -> Box<[u8]> {
-    forge_client::effect_key(
-        &domain.core.counters.deployment().id,
-        &forge_client::EffectPurpose::Call {
-            task: key.task,
-            attempt: key.attempt,
-            completion: key.completion,
-            position: key.position,
-        },
-        44,
-    )
+    temper_engine_domain_forge::purpose::EffectPurpose::Call {
+        task: key.task,
+        attempt: key.attempt,
+        completion: key.completion,
+        position: key.position,
+    }
+    .key(&domain.core.counters.deployment().id, 44)
     .expect("fixed call key fits its frame")
 }
 

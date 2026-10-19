@@ -2672,18 +2672,12 @@ fn projection_key(namespace: &[u8], goal: u64, key: issues::Key, l: &Limits) -> 
         issues::Key::Body(revision) => (2, revision),
         issues::Key::Milestone(milestone) => match milestone {
             issues::MilestoneKey::Lifecycle { task, position } => {
-                return client::effect_key(
-                    namespace,
-                    &client::EffectPurpose::ProjectionHistory { goal, task, position, family: 1 },
-                    l.client.op_bytes,
-                );
+                return crate::purpose::EffectPurpose::ProjectionHistory { goal, task, position, family: 1 }
+                    .key(namespace, l.client.op_bytes);
             }
             issues::MilestoneKey::TaskRevision { task, revision } => {
-                return client::effect_key(
-                    namespace,
-                    &client::EffectPurpose::ProjectionHistory { goal, task, position: revision, family: 2 },
-                    l.client.op_bytes,
-                );
+                return crate::purpose::EffectPurpose::ProjectionHistory { goal, task, position: revision, family: 2 }
+                    .key(namespace, l.client.op_bytes);
             }
             issues::MilestoneKey::PlanAccepted => (3, 0),
             issues::MilestoneKey::Revision(number) => (4, number),
@@ -2694,7 +2688,7 @@ fn projection_key(namespace: &[u8], goal: u64, key: issues::Key, l: &Limits) -> 
         },
         issues::Key::Close => (9, 0),
     };
-    client::effect_key(namespace, &client::EffectPurpose::Projection { goal, part, number }, l.client.op_bytes)
+    crate::purpose::EffectPurpose::Projection { goal, part, number }.key(namespace, l.client.op_bytes)
 }
 
 fn projection_outcome(d: &mut Domain, entry: u64, outcome: client::Outcome, out: &mut Queue<Request>) {

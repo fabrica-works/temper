@@ -23,6 +23,7 @@ mod held;
 pub mod items;
 mod judge;
 mod limits;
+pub mod purpose;
 pub mod resources;
 mod settle;
 #[cfg(test)]
