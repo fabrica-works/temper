@@ -351,6 +351,9 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
 ## Rulings
 
 
+101. **jig 01.1's skein pin after smith's update** (plan defect, jig 01's block of 2026-10-19 03:31:33 UTC).
+     Ruling 101: a plan defect. The Pins rule fixes the result, "prints two lines: `skein.git#b4c6241…`; `smith.git#a277e922…`" (jig/01-repin.md, Rules that bind it), and the Shape's order cannot reach it once skein's `main` has moved past `b4c6241`: smith's update moves the skein packages that only smith's crates use to skein's `main`. temper 01.1's Shape already says "If a source still holds two revisions, run its command once more." jig 01.1 does the same: after smith's command, run `heavy cargo update -p skein-io --precise b4c6241aefea0e434b6e1128754168d02bae0706` once more, then check the Pins rule's two lines; a second revision still there after that is a question. The README's Pins rule now says it for every step: a source left with two revisions by a later command gets its own command once more, last.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

@@ -132,8 +132,9 @@ Files (the rehearsal's 30, `Cargo.lock` a shared hotspot):
 None is the fake forge, a forge client or component, the fake LLM or a provider.
 Shape, in this order:
 1. The pins, from jig's root: `heavy cargo update -p skein-io --precise b4c6241aefea0e434b6e1128754168d02bae0706`, then
-   `heavy cargo update -p smith-domain --precise a277e9226273bf71c845db98b62a59b9ca4c9bfd`. Check the Pins rule's two lines;
-   a second revision of either is a question.
+   `heavy cargo update -p smith-domain --precise a277e9226273bf71c845db98b62a59b9ca4c9bfd`, then skein's command once more:
+   smith's update moves the skein packages only smith's crates use to skein's `main`. Check the Pins rule's two lines; a
+   second revision still there after that is a question.
 2. J1, skein's `file::Event::{Locked, Busy}`: `| file::Event::Locked { .. } | file::Event::Busy { .. }` joins each exhaustive
    ignore arm. J2, `file::Request::{ListPage, Lock}`: they join the store tests' arms and `Files::answer`'s panic arm, and
    `file_owner`'s owner arm as `ListPage { owner, .. } | Lock { owner, .. }`. Nothing in jig takes a lock (smith `b415f737`).
@@ -248,7 +249,7 @@ impl Builder {
 
 - **01.1: a test that fails for a reason Shape step 6 does not cover**, or a repair past about 200 lines. Raise it with the
   test, its output and the smith or skein commit it points at. The rehearsal found none, but the browser tier was not run.
-- **01.1: a third revision in `Cargo.lock`**, or smith `a277e922` resolving a skein other than `b4c6241`.
+- **01.1: a third revision in `Cargo.lock`** after skein's command has run again, or smith `a277e922` resolving a skein other than `b4c6241`.
 - **01.2: the joint world shows no call's region for a turn** (no joint story yet sees a call outcome). Raise it before
   proving at the world layer instead.
 

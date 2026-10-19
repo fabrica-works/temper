@@ -162,8 +162,10 @@ should move the pin and repair nothing (findings/base-repin.md).
     jig's skein and smith at it.
   - After any `cargo update`, `grep -o
     'git+https://github.com/forgetic/[a-z]*.git#[0-9a-f]*' Cargo.lock |
-    sort -u` prints one line per repository; a second revision of a
-    source is a question.
+    sort -u` prints one line per repository. A source left with two
+    revisions by a later command (smith's update moves the skein that
+    only smith's crates use to skein's `main`) gets its own command once
+    more, last; a second revision still there is a question.
 - **Version owners.** jig's client wire goes to version 9 once, in jig
   03.1; jig 03.2, 03.3, 05.2 and 05.3 change version 9 in place, jig
   05.2 after jig 03's last landing; nothing makes a version 10. jig's
