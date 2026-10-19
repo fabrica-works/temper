@@ -53,7 +53,7 @@ pub fn settings(
                 continue;
             }
         };
-        let Some(host) = kit::conventions::host(endpoint.address, name) else {
+        let Some(host) = skein_forge::host::host(endpoint.address, name) else {
             found.push(path, What::Bound);
             continue;
         };
@@ -64,7 +64,7 @@ pub fn settings(
                 address: skein_io::Addr::Ip(endpoint.address),
                 transport: endpoint.transport,
                 host,
-                token: forge.api_token.clone(),
+                credential: skein_forge::credential::Credential::Token(forge.api_token.clone()),
                 user: forge.user,
             })
             .expect("configured forge capacity");

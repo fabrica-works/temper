@@ -124,7 +124,7 @@ impl Hosted {
                 address: skein_io::Addr::Ip(([127, 0, 0, 1], f.instance.port()).into()),
                 transport: kit::settings::Transport::Plaintext,
                 host: format!("127.0.0.1:{}", f.instance.port()).into_bytes().into(),
-                token: Secret::new(token.value().as_bytes().into()),
+                credential: skein_forge::credential::Credential::Token(Secret::new(token.value().as_bytes().into())),
                 user: f.writer.id,
             })
             .expect("one forge");

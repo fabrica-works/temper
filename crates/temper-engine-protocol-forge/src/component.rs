@@ -13,6 +13,7 @@ use skein_forge::api;
 use skein_forge::forgejo::plans::{
     Body, Failure, Heard,
     plan::{Plan, Step},
+    start::Read,
     tables::Tables,
 };
 /// Output reservations for each entry point.
@@ -62,6 +63,7 @@ pub struct Component {
     connections: Map<Token, Id<Connection>>,
     connection_slab: Slab<Connection>,
     start_tokens: List<Option<Token>>,
+    start_plans: List<Option<skein_forge::forgejo::plans::start::Plan>>,
     next_token: u64,
     wake: Option<Time>,
     ended: bool,
@@ -71,9 +73,11 @@ impl Component {
         limits::check(limits, shared, &settings)?;
         let mut starts = List::with_capacity(limits.forges);
         let mut start_tokens = List::with_capacity(limits.forges);
+        let mut start_plans = List::with_capacity(limits.forges);
         for _ in &settings.forges {
             starts.push(Start::Checking { next: limits.start_backoff }).expect("checked forge count");
             start_tokens.push(None).expect("checked forge count");
+            start_plans.push(None).expect("checked forge count");
         }
         Ok(Self {
             hooks: crate::hooks::Hooks::new(limits),
@@ -90,6 +94,7 @@ impl Component {
             connections: Map::with_capacity(limits.connections),
             connection_slab: Slab::with_capacity(limits.connections),
             start_tokens,
+            start_plans,
             next_token: 1,
             wake: None,
             ended: false,
@@ -276,8 +281,9 @@ impl Component {
                     for at in 0..self.start_tokens.len() {
                         if self.start_tokens.get(at) == Some(&Some(owner)) {
                             *self.start_tokens.get_mut(at).expect("configured forge") = None;
+                            *self.start_plans.get_mut(at).expect("configured forge") = None;
                             if !self.closed && !closing {
-                                self.start_heard(at, start::Heard::Unanswered, env, up);
+                                self.start_heard(at, skein_forge::forgejo::plans::start::Heard::Unanswered, env, up);
                             }
                         }
                     }
@@ -359,12 +365,18 @@ impl Component {
         }
         earliest
     }
-    fn start_heard(&mut self, at: u32, heard: start::Heard, env: &Env<Limits>, up: &mut Queue<Event>) {
+    fn start_heard(
+        &mut self,
+        at: u32,
+        heard: skein_forge::forgejo::plans::start::Heard,
+        env: &Env<Limits>,
+        up: &mut Queue<Event>,
+    ) {
         let forge = self.settings.forges.get(at).expect("configured forge");
         let state = self.starts.get_mut(at).expect("configured start");
         let previous = *state;
         *state = start::heard(previous, heard, forge.user, env.now, &env.limits);
-        if start_request(*state) == Some(skein_forge::forgejo::request::Request::ApiSettings)
+        if start_read(*state) == Some(Read::ApiSettings)
             && *state != previous
             && let Some(Some(token)) = self.start_tokens.get(at)
             && let Some(id) = self.connections.get(token)
@@ -404,7 +416,7 @@ impl Component {
             let mut token = *self.start_tokens.get(at).expect("configured slot");
             if !self.closed
                 && token.is_none()
-                && start_request(*state).is_some()
+                && start_read(*state).is_some()
                 && self.connections.len() < self.connections.capacity()
             {
                 token = Some(self.open_start(at, env, io));
@@ -422,6 +434,7 @@ impl Component {
                     .get_mut(*self.connections.get(&token).expect("indexed token"))
                     .expect("indexed connection");
                 if self.closed {
+                    *self.start_plans.get_mut(at).expect("configured forge") = None;
                     c.close(c.in_flight(), io);
                     break;
                 }
@@ -436,27 +449,33 @@ impl Component {
                     c.timeout();
                 }
                 if c.phase == Phase::Idle
-                    && let Some(request) = start_request(state)
+                    && let Some(read) = start_read(state)
                 {
-                    c.start(env, self.settings.forges.get(at).expect("configured forge"), request, None)
-                        .expect("checked start request");
+                    let holder = self.start_plans.get_mut(at).expect("configured forge");
+                    if holder.is_none() {
+                        *holder = Some(skein_forge::forgejo::plans::start::Plan::new(read));
+                    }
+                    let plan = holder.as_mut().expect("active start read");
+                    let skein_forge::forgejo::plans::start::Step::Send(exchange) = plan.begin() else {
+                        unreachable!("a new start plan sends its read");
+                    };
+                    c.start(
+                        env,
+                        self.settings.forges.get(at).expect("configured forge"),
+                        exchange.request,
+                        exchange.range,
+                    )
+                    .expect("checked start request");
                 }
                 c.pump(env, io, below_room.saturating_sub(io.len().saturating_sub(below)).saturating_sub(1));
                 if let Some(heard) = c.heard() {
-                    let heard = match heard {
-                        Heard::Head { status, fields } if status != 200 => {
-                            Some(start::Heard::Status { status, retry: fields.retry_after })
-                        }
-                        Heard::Done(Body::Document(skein_forge::forgejo::document::Document::User(user))) => {
-                            Some(start::Heard::User { id: user.id })
-                        }
-                        Heard::Done(Body::Document(skein_forge::forgejo::document::Document::ApiSettings(
-                            settings,
-                        ))) => Some(start::Heard::ApiSettings { max_response_items: settings.max_response_items }),
-                        Heard::Done(_) | Heard::Failed(_) => Some(start::Heard::Unanswered),
-                        Heard::Head { .. } | Heard::Row(_) => None,
+                    let plan = self.start_plans.get_mut(at).expect("configured forge");
+                    let step = match plan {
+                        Some(plan) => plan.heard(heard),
+                        None => None,
                     };
-                    if let Some(heard) = heard {
+                    if let Some(skein_forge::forgejo::plans::start::Step::Done(heard)) = step {
+                        *plan = None;
                         self.start_heard(at, heard, env, up);
                     }
                     let c = self
@@ -533,6 +552,11 @@ impl Component {
         let _previous = self.connections.insert(owner, id).expect("connection index has room");
         io.push(skein_io::Request::Connect { owner, addr: forge.address });
         *self.start_tokens.get_mut(at).expect("configured slot") = Some(owner);
+        let plan = self.start_plans.get_mut(at).expect("configured forge");
+        *plan = None;
+        if let Some(read) = start_read(*self.starts.get(at).expect("configured start")) {
+            *plan = Some(skein_forge::forgejo::plans::start::Plan::new(read));
+        }
         owner
     }
     #[must_use]
@@ -559,10 +583,10 @@ impl Component {
     }
 }
 
-fn start_request(state: Start) -> Option<skein_forge::forgejo::request::Request> {
+fn start_read(state: Start) -> Option<Read> {
     match state {
-        Start::Checking { .. } => Some(skein_forge::forgejo::request::Request::User),
-        Start::Settings { .. } => Some(skein_forge::forgejo::request::Request::ApiSettings),
+        Start::Checking { .. } => Some(Read::User),
+        Start::Settings { .. } => Some(Read::ApiSettings),
         Start::Waiting { .. } | Start::Ready { .. } | Start::Stopped(_) => None,
     }
 }

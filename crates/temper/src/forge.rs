@@ -257,7 +257,7 @@ pub fn reconcile_settings(
         setup_index: u32::try_from(setup_index).expect("bounded setup entries"),
         given: temper_forge_setup::given::values(entry, webhook_listener(named)?, &checked.limits),
         address,
-        host: conventions::host(address, None).expect("checked address"),
+        host: skein_forge::host::host(address, None).expect("checked address"),
         user_agent: conventions::USER_AGENT,
         directory,
         admin_token,

@@ -116,12 +116,9 @@ impl Connection {
         let encoded = documents::encode(&request, &limits::documents(&env.limits))?;
         let mut headers = List::with_capacity(5);
         headers.push(field(b"Host", &forge.host)).expect("five header fields");
-        let mut auth = Writer::new(forge.token.len().saturating_add(6));
-        auth.put(b"token ").expect("prefix measured");
-        auth.put(forge.token.expose()).expect("token measured");
-        headers
-            .push(skein_http::Header { name: Box::from(&b"Authorization"[..]), value: auth.finish() })
-            .expect("five header fields");
+        let auth =
+            skein_forge::forgejo::credential::authorization(&forge.credential).expect("checked credential length");
+        headers.push(field(b"Authorization", auth.expose())).expect("five header fields");
         headers.push(field(b"User-Agent", crate::conventions::USER_AGENT.as_bytes())).expect("five header fields");
         let body = match &encoded.body {
             Some(body) => {

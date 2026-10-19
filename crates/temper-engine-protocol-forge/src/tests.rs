@@ -5,11 +5,11 @@ mod hooks;
 mod reads;
 mod writes;
 use crate::{
-    StartRead, Stopped, conventions,
-    start::{self, Heard, Start},
+    StartRead, Stopped,
+    start::{self, Start},
 };
 use alloc::boxed::Box;
-use core::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+use core::net::{Ipv4Addr, SocketAddr};
 use skein_lib::{Duration, Time};
 
 #[test]
@@ -53,26 +53,11 @@ fn the_start_stops_on_another_user_or_a_4xx_and_waits_otherwise() {
     }
 }
 
-#[test]
-fn host_names_include_only_nondefault_ports_and_bracket_ipv6() {
-    type HostRow = (&'static str, SocketAddr, Option<&'static [u8]>, &'static [u8]);
-    let rows: [HostRow; 5] = [
-        ("plain default", SocketAddr::from((Ipv4Addr::LOCALHOST, 80)), None, b"127.0.0.1"),
-        ("plain custom", SocketAddr::from((Ipv4Addr::LOCALHOST, 3000)), None, b"127.0.0.1:3000"),
-        ("TLS default", SocketAddr::from((Ipv4Addr::LOCALHOST, 443)), Some(b"forge.example"), b"forge.example"),
-        ("TLS custom", SocketAddr::from((Ipv4Addr::LOCALHOST, 3000)), Some(b"forge.example"), b"forge.example:3000"),
-        ("IPv6", SocketAddr::from((Ipv6Addr::LOCALHOST, 80)), None, b"[0:0:0:0:0:0:0:1]"),
-    ];
-    for (name, address, server, expected) in rows {
-        assert_eq!(conventions::host(address, server), Some(Box::from(expected)), "{name}");
-    }
-}
-
 use crate::{
     Answered, Event, Limits, Request, Unusable,
     limits::{self, Listing},
 };
-use skein_forge::api;
+use skein_forge::{api, forgejo::plans::start::Heard};
 use skein_lib::{Secret, Token};
 
 #[test]
@@ -189,7 +174,7 @@ fn unusable_forge_settings_name_the_forge() {
         let mut settings = fixtures::settings();
         let forge = settings.forges.get_mut(0).expect("one forge");
         forge.address = address;
-        forge.token = Secret::new(Box::from(token));
+        forge.credential = skein_forge::credential::Credential::Token(Secret::new(Box::from(token)));
         forge.user = user;
         assert_eq!(limits::check(&fixtures::limits(), &fixtures::shared(), &settings), Err(expected), "{name}");
     }

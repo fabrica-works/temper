@@ -238,7 +238,8 @@ fn check_settings(l: &Limits, s: &Shared, settings: &Settings) -> Result<(), Unu
                 return Err(Unusable::Duplicate { forge: forge.number });
             }
         }
-        if forge.token.is_empty() || forge.token.len() > usize::try_from(l.token_bytes).expect("u32 fits") {
+        let skein_forge::credential::Credential::Token(token) = &forge.credential;
+        if token.is_empty() || token.len() > usize::try_from(l.token_bytes).expect("u32 fits") {
             return Err(Unusable::Token { forge: forge.number });
         }
         if forge.user == 0 {
@@ -262,7 +263,7 @@ fn check_settings(l: &Limits, s: &Shared, settings: &Settings) -> Result<(), Unu
             .checked_add(u64::try_from(forge.host.len()).ok().ok_or(Unusable::Zero)?)
             .ok_or(Unusable::Zero)?;
         let head = head
-            .checked_add(u64::try_from(forge.token.len()).ok().ok_or(Unusable::Zero)?)
+            .checked_add(u64::try_from(token.len()).ok().ok_or(Unusable::Zero)?)
             .ok_or(Unusable::Zero)?
             .checked_add(192)
             .ok_or(Unusable::Zero)?;
@@ -462,6 +463,7 @@ pub fn worst_case(l: &Limits, s: &Shared, forges: u32) -> Option<u64> {
         .checked_add(Map::<Token, Id<crate::connection::Connection>>::worst_case(l.connections)?)?
         .checked_add(Slab::<crate::connection::Connection>::worst_case(l.connections)?)?
         .checked_add(List::<Option<Token>>::worst_case(l.forges)?)?
+        .checked_add(List::<Option<skein_forge::forgejo::plans::start::Plan>>::worst_case(l.forges)?)?
         .checked_add(hooks)?
         .checked_add(calls)?
         .checked_add(held)?

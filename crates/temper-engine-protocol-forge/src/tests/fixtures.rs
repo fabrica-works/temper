@@ -98,7 +98,7 @@ pub fn settings() -> Settings {
             address: skein_io::Addr::Ip(SocketAddr::from((Ipv4Addr::LOCALHOST, 3000))),
             transport: Transport::Plaintext,
             host: Box::from(&b"127.0.0.1:3000"[..]),
-            token: Secret::new(Box::from(TOKEN)),
+            credential: skein_forge::credential::Credential::Token(Secret::new(Box::from(TOKEN))),
             user: WRITER,
         })
         .expect("one forge");

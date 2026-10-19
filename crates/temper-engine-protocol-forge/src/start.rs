@@ -1,6 +1,7 @@
 //! Forge component start (protocol/forge.md, sections 2, 3.5, 7 and 8).
 use super::boundary::{StartRead, Stopped};
 use super::limits::Limits;
+use skein_forge::forgejo::plans::start::Heard;
 use skein_lib::{Duration, Time};
 
 /// Where a forge's start is; `next` is the wait the next unanswered read takes.
@@ -16,19 +17,6 @@ pub enum Start {
     Ready { cap: u32 },
     /// The engine stops, naming the forge. Terminal.
     Stopped(Stopped),
-}
-
-/// What one start read heard.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum Heard {
-    /// `/user`'s `id`.
-    User { id: u64 },
-    /// `/settings/api`'s `max_response_items`.
-    ApiSettings { max_response_items: u32 },
-    /// A status that is no `2xx`, with a `429`'s `Retry-After` wait.
-    Status { status: u16, retry: Option<Duration> },
-    /// Nothing that decodes: unreachable, cut, past its deadline, malformed.
-    Unanswered,
 }
 
 /// The start's next state after `heard` (protocol/forge.md, 8, "A forge's start").
