@@ -1119,6 +1119,27 @@ where its answer lands.
 
      Checked commands: pinned kit/scripts/dev/plan contains plan ruling --text at21/499 and plan ring at19/669. No new build, gate or repin command is introduced. The new README rule covers every current and later dependency addition and source-line rebase; refresh any further literal source copy reached by the director’s cutover, and list it in that change’s commit body.
 
+159. **Hourly06 primary graph coverage refreshed** (graph refresh after ruling157 of 2026-10-19T11:40:58Z).
+     Reverses: ruling157’s temporary graph hold (2026-10-19T11:40:58Z), lifted only through the refreshed source inputs below; its standing source-verification/freshness rule remains.
+     Amends: README Rules, Graph freshness: remove the temporary hourly06 prohibition.
+
+     All five exact primary projects are ready after supported index_repository refreshes; use the graphs as locators through their recorded source inputs and verify every result in the actual worktree. The primary-only restriction, source fallback for gaps and later changes, and missing-node-is-not-absence rule continue. No worktree/dependency checkout was indexed and no kit, production behavior, proof or budget changed.
+
+     Recorded primary inputs and index_status readiness (UTC; nodes/edges):
+     - srv-data-git-runner-src-skein:92e177c3165f937df5d51138c2d0974e15e033e0,11:42:09,28262/211509.
+     - srv-data-git-runner-src-smith:7b4dfc07cc64c125514f2ce5caa662442789f4ff,11:43:03,27156/193724.
+     - srv-data-git-runner-src-jig:eceadcaf8d5b19a2495c5bf81355232f512c9f1f,11:45:13,57767/481008.
+     - srv-data-git-runner-src-hearth:292f8a60670315a58e0aec77281dc7e51cbe92f2,11:45:50,12696/75142.
+     - srv-data-git-runner-src-temper:cd472781947898ab3be0c57635c22f97f68ca5c9,11:52:06,23600/159782.
+
+     Checked: pump/hourly06-graph-index-inputs.json records clean ancestry-checked fast-forwards before the initial refresh; graph-results.json and graph-post.json retain results/diagnostics. The first temper refresh raced nine later paths; detect_changes from7a992b10f6a32b3450b9103dfeaba57e0c272383 listed those paths, and a second supported refresh at clean cd4727819 resolves that known movement (pump/hourly06-temper-reindex.json). Other primary heads stayed at the recorded inputs in graph-post-heads.json. Later source is not claimed covered.
+
+     Known gaps remain: skein3 partial files and8 intentionally hostile JSON parses; smith1 partial reference patch; jig generated/v9.rs parse timeout; hearth12 partial/14 unusable Jinja fixtures; temper2 partial mockup/proof-script ranges. Deliberately omitted lock/golden/binary files remain source-only; diagnostics are not completeness guarantees. graph-post.json records exact paths/ranges. Preserve source fallback for any additional omission and list a newly relevant gap in the session’s report.
+
+     Checked locators/source: search_graph found skein-tls config.rs::Name::server/Server; smith-agent-service service.rs::Service::lost_live_bytes; jig-test-service tests/worker.rs::start_on_pipes; hearth-domain-builder lib.rs::Builder; temper-service system.rs::memory. Exact rg checks in each primary confirmed lines205/185,753,164,23,550 respectively. A search for encode_start as a function returned zero, while rg found its call at temper-service tests/worker.rs:53; this is recorded as a locator gap, never absence. Locator results are in pump/hourly06-graph-locators.json.
+
+     Pinned plan still supports ruling --text and ring (scripts/dev/plan21/499 and19/669). The coordinator passes the refreshed input bounds and fallback rule to running/resumed sessions; no extra suites or repeated completed checks follow from index metadata alone.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
