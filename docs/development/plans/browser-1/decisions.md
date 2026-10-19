@@ -194,13 +194,21 @@ None yet.
      themselves are jig's tests.
    - `a_framed_page_shows_nothing`: only a browser enforces
      `frame-ancestors`.
+   Decision: accepted, by director, 2026-10-19 (each proves only what a
+   browser alone can; the rest is in the worlds and the real loop).
 
 2. **No repin of smith, jig or hearth** onto skein 01 (decision 5).
+   Decision: accepted, by director, 2026-10-19.
 
 3. **The bundle's limits,** 128 files and 16 MiB (decision 6).
+   Decision: accepted, by director, 2026-10-19.
 
 4. **The bundle's words and title** (decision 7).
+   Decision: accepted, by director, 2026-10-19.
 
 5. **Light only** (decision 11).
+   Decision: accepted, by director, 2026-10-19 (dark stays browser.md 5's
+   open question).
 
 6. **Enter sends in the terminal too** (decision 13).
+   Decision: accepted, by director, 2026-10-19.
