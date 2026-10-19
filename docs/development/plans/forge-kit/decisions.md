@@ -1027,6 +1027,45 @@ where its answer lands.
 
      Mark skein-10.s2 ready at these checked snapshots immediately after this ruling. Send the reciprocal dispatch/controls instruction to coordinator, skein10 and supplement implementer, and refresh the skein10 checkpoint's future-count/ownership notes. Closing temper-repin dependency remains; no repeat repin. Refresh reached copies/count consumers and list them in the implementation commit body. Preserve historical base findings and unchanged10.5/10.s1 Needs.
 
+153. **TLS Name typed reading and IP Host answer** (design answer to skein03.1 block of2026-10-19T09:47:53Z).
+     Apply the designer's answer in skein1908a365559463adf86582cce7ca0ff88c684387 and temper10e0a568d4dc2ad2407dddd15e4ab1b63794ec9e.
+
+     Landed: skein 1908a365 (design: tls.md 2, 3.4, 6; forge.md 5.1;
+     forge-connection.md 3.1, 3.2, 7.5; STATUS.md) and temper 10e0a568 (plan:
+     skein/03-connection.md 03.1, and 03.2's head test).
+
+     1. The accessor is typed and borrowed, not owned text. tls.md, 3.4:
+        "Whoever holds a name reads it back with `Name::server`, as what it
+        is, borrowed: `Server::Dns`, the DNS name's text as it was given, or
+        `Server::Ip`, core's `IpAddr`. A name is one or the other, and reading
+        it allocates nothing". The listing: `Name::server(&self) -> Server<'_>`.
+        `ServerName::to_str` is not used (tls.md, 6).
+     2. A TLS IP name is the Host, written as an address is. forge.md, 5.1:
+        "A TLS server name that is an IP address is written as the address's
+        IP is, with the address's port, whichever IP the address holds: IPv4
+        in dotted decimal, IPv6 in brackets as its eight groups in lowercase
+        hexadecimal without leading zeros, never compressed
+        (`[2001:db8:0:0:0:0:0:7]`); a DNS name is written as it was given."
+     3. One path for check and send. forge-connection.md, 3.1: "a DNS name
+        goes to `host` as the name, and an IP name in place of the address's
+        IP, with the address's port … An IP name that differs from the
+        address's IP is the `Host`, as a DNS name is: the name names the
+        forge, and the address only reaches it. Start's check and each request
+        make it by the same function, from the same values, so they agree."
+        3.2: "A TLS name is refused by none of them".
+     4. Accounting, 7.5: "each forge's credential, secret and name, a TLS
+        name's DNS text or a plaintext name (an IP name holds none); and the
+        word and the user agent". 03.1's `owned_bytes` counts them.
+     5. Unchanged: TLS IP names stay admitted; `skein_forge::host`, decision
+        25's port rule and the plaintext name's refusals; temper's seam (it
+        hands `Transport::Tls { server_name, trust }` and reads nothing back).
+     6. 03.1 now names `crates/skein-tls/src/{config,lib}.rs` and
+        `src/tests/config.rs`; `Name` keeps which of the two it holds so that
+        `server` is total over rustls's non-exhaustive `ServerName`; the wiring
+        check adds 192.0.2.7 on 127.0.0.1:3000 -> `192.0.2.7:3000`, 2001:db8::7
+        on :443 -> `[2001:db8:0:0:0:0:0:7]`, ::1 -> `[0:0:0:0:0:0:0:1]`.
+        Nothing is deferred.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
