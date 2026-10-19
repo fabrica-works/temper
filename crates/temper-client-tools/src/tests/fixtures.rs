@@ -274,6 +274,9 @@ pub(crate) struct Harness {
     pub root: root::Root,
     pub limits: root::Limits,
     pub reads: BTreeMap<u32, (Token, c::Read)>,
+    pub extra_reads: BTreeMap<u32, Queue<(Token, c::Read)>>,
+    pub serving: Option<u32>,
+    pub closed: List<client::Watchable>,
     pub watches: BTreeMap<Token, client::Watchable>,
     pub answers: BTreeMap<u32, crate::jig::Printed>,
     pub facts: u32,
@@ -288,6 +291,9 @@ pub(crate) fn started(kept: List<skein_lib::RequestRecord<client::Held>>) -> Har
         root,
         limits,
         reads: BTreeMap::new(),
+        extra_reads: BTreeMap::new(),
+        serving: None,
+        closed: List::with_capacity(OUTPUTS),
         watches: BTreeMap::new(),
         answers: BTreeMap::new(),
         facts: 0,
@@ -319,13 +325,26 @@ impl Harness {
                     request:
                         client::Request::Down { down: client::Down::Read { read, what: client::Readable::Jig(what) } },
                 } => {
-                    // Each submit emits its first read during this step.
-                    self.reads.insert(self.pending_reads.pop().expect("submitted read"), (read, what));
+                    let call = match self.serving {
+                        Some(call) => call,
+                        None => self.pending_reads.pop().expect("submitted read"),
+                    };
+                    if let alloc::collections::btree_map::Entry::Vacant(e) = self.reads.entry(call) {
+                        e.insert((read, what));
+                    } else {
+                        self.extra_reads.entry(call).or_insert(Queue::with_capacity(OUTPUTS));
+                        self.extra_reads.get_mut(&call).expect("read queue").push((read, what));
+                    }
                 }
                 root::Request::Client {
                     request: client::Request::Down { down: client::Down::Open { watch, subject } },
                 } => {
                     self.watches.insert(watch, subject);
+                }
+                root::Request::Client { request: client::Request::Down { down: client::Down::Close { watch } } } => {
+                    let subject = self.watches.remove(&watch).expect("open watch closes");
+                    self.closed.push(subject).expect("bounded closes");
+                    self.client(client::Event::Up { up: client::Up::WatchEnded { watch, end: c::WatchEnd::Closed } });
                 }
                 root::Request::Printed { number, printed } => {
                     assert!(self.answers.insert(number, printed).is_none(), "answered exactly once");
@@ -343,7 +362,18 @@ impl Harness {
         let crate::jig::call::Parsed::Call { call, json } = parse(words).expect("fixture call") else {
             panic!("parsed call")
         };
-        if call.tool == 3 {
+        let count = match call.tool {
+            1 | 2 | 4 | 5 | 6 => SINGLE_READ,
+            3 => {
+                if crate::jig::call::number(&call, 2).is_some() {
+                    COMPOSITE_READS
+                } else {
+                    SINGLE_READ
+                }
+            }
+            _ => 0,
+        };
+        for _ in 0..count {
             self.pending_reads.push(self.next);
         }
         self.event(root::Event::Call { number: self.next, call, json });
@@ -367,7 +397,14 @@ impl Harness {
     }
     pub fn serve_readout(&mut self, call: u32, result: client::Readout) {
         let (token, _) = self.reads.remove(&call).expect("the call read once");
+        if let Some(reads) = self.extra_reads.get_mut(&call)
+            && let Some(next) = reads.pop()
+        {
+            self.reads.insert(call, next);
+        }
+        self.serving = Some(call);
         self.client(client::Event::Up { up: client::Up::ReadDone { read: token, result } });
+        self.serving = None;
     }
     pub fn answer(&mut self, call: u32) -> Option<crate::jig::Printed> {
         self.answers.remove(&call)
@@ -430,13 +467,7 @@ const PATH_SEGMENTS: u32 = 2;
 /// One resource suffices to route an owner part through the application's words.
 const RESOURCES: u32 = 1;
 pub(crate) fn long_resource(task: &mut c::Task) {
-    let mut words = skein_lib::Writer::new(usize::try_from(LONG_WORDS).expect("fixture size"));
-    for _ in 0..LONG_WORDS {
-        words.put(b"x").expect("fixture length");
-    }
-    let mut path = List::with_capacity(PATH_SEGMENTS);
-    path.push(Box::from(b"src".as_slice())).expect("first segment");
-    path.push(words.finish()).expect("long segment");
+    let path = long_path();
     task.resources = List::with_capacity(RESOURCES);
     task.resources
         .push(c::TaskResource::Owner(Box::new(c::OwnerResourceLine {
@@ -448,6 +479,17 @@ pub(crate) fn long_resource(task: &mut c::Task) {
             writer_lost: false,
         })))
         .expect("one owner resource");
+}
+
+pub(crate) fn long_path() -> List<Box<[u8]>> {
+    let mut words = skein_lib::Writer::new(usize::try_from(LONG_WORDS).expect("fixture size"));
+    for _ in 0..LONG_WORDS {
+        words.put(b"x").expect("fixture length");
+    }
+    let mut path = List::with_capacity(PATH_SEGMENTS);
+    path.push(Box::from(b"src".as_slice())).expect("first segment");
+    path.push(words.finish()).expect("long segment");
+    path
 }
 
 /// Start one read of the common waiting goal before its answer is supplied.
@@ -537,3 +579,6 @@ pub(super) fn guide_golden_has(expected: &[&[u8]]) {
         assert!(skein_lib::bytes::find(&golden, text).is_some(), "{text:?}");
     }
 }
+
+mod reads;
+pub(crate) use reads::*;

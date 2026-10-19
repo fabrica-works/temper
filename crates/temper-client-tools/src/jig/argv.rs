@@ -286,6 +286,9 @@ pub fn check(table: &[&Tool], call: &Call, limits: &Limits) -> Result<(), Usage>
         Keyed::Never | Keyed::Optional | Keyed::Required => {}
     }
     check_values(table, args, &call.values, limits)?;
+    if tool.name == b"inbox" {
+        check_inbox(call)?;
+    }
     if tool.name == b"wait" {
         let Some(Some(Values::One(Value::Subject(subject)))) = call.values.first() else {
             return Err(Usage::Condition);
@@ -513,6 +516,22 @@ fn store(slot: &mut Option<Values>, occurs: Occurs, value: Value, argument: u8) 
             *slot = Some(Values::Many(many.into_boxed()));
         }
         Occurs::Required | Occurs::Optional => *slot = Some(Values::One(value)),
+    }
+    Ok(())
+}
+
+fn check_inbox(call: &Call) -> Result<(), Usage> {
+    use jig_client::contract::InboxReadGroup;
+    let Some(Value::Cursor(bytes)) = crate::jig::call::value(call, 3) else { return Ok(()) };
+    let group = match bytes.first() {
+        Some(0) => InboxReadGroup::Needs,
+        Some(1) => InboxReadGroup::Updates,
+        _ => return Err(Usage::Kind { argument: 3 }),
+    };
+    if let Some(Value::Group(kind)) = crate::jig::call::value(call, 1)
+        && InboxReadGroup::of(*kind) != group
+    {
+        return Err(Usage::Kind { argument: 3 });
     }
     Ok(())
 }

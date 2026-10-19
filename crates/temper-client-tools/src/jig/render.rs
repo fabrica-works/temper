@@ -1,6 +1,9 @@
 //! Bounded terminal bytes and integer JSON (tools contract, 6).
+mod activity;
 pub mod acts;
 pub mod document;
+mod lists;
+mod turn;
 use crate::jig::{Limits, runner::Printed};
 use alloc::boxed::Box;
 use jig_client::{
@@ -38,6 +41,11 @@ impl Text {
         let mut output = Self::bounded(limits, structural);
         output.writer = Some(Writer::new(self.written));
         output
+    }
+    pub(crate) fn writing_exact(measured: Self) -> Self {
+        let mut out = Self::measure();
+        out.writer = Some(Writer::new(measured.written));
+        out
     }
     pub fn put(&mut self, bytes: &[u8]) {
         self.written = self.written.checked_add(bytes.len()).expect("document bound");
@@ -156,5 +164,62 @@ pub fn read(
         Readout::Family { .. } | Readout::Jig(ReadResult::Value(_)) => {
             failure(b"tools' bug; unexpected document; report it as a finding", json, 1)
         }
+    }
+}
+
+#[must_use]
+pub(crate) fn reads(
+    reading: &crate::jig::runner::reads::Reading,
+    client: &Client,
+    me: Handle,
+    limits: &Limits,
+    owner_part: fn(&contract::OwnerPart, &mut Text),
+) -> Printed {
+    let party = match client.document(me) {
+        Some(document) => match document.latest {
+            Some(Latest::Jig(Delivery::Me(me))) => Some(me.as_ref()),
+            _ => None,
+        },
+        None => None,
+    };
+    for (local, page) in &reading.pages {
+        match page {
+            Readout::Jig(ReadResult::Value(value)) => {
+                if check_selected(reading.called.call.tool, *local, value).is_err() {
+                    return failure(b"tools' bug; unexpected document; report it as a finding", reading.called.json, 1);
+                }
+            }
+            Readout::Jig(ReadResult::None(ReadNone::TooLarge { bytes })) if reading.called.call.tool == 6 => {
+                let Some(crate::jig::call::Value::Turn(name)) = crate::jig::call::value(&reading.called.call, 1) else {
+                    unreachable!("turn call")
+                };
+                let task = crate::jig::call::number(&reading.called.call, 0).expect("turn task");
+                return document::print(
+                    document::Document::SizedTurn { task, name: *name, bytes: *bytes },
+                    reading.called.json,
+                    limits,
+                    owner_part,
+                );
+            }
+            Readout::Limit | Readout::NotServed { .. } | Readout::Jig(_) | Readout::Family { .. } => {
+                return read(page, client, me, reading.called.json, limits, owner_part);
+            }
+        }
+    }
+    if reading.called.call.tool == 3 && reading.pages.len() == 1 && reading.documents.is_empty() {
+        return read(reading.pages.get(&1).expect("task read"), client, me, reading.called.json, limits, owner_part);
+    }
+    document::print(document::Document::ReadSet(reading, party), reading.called.json, limits, owner_part)
+}
+
+fn check_selected(tool: u8, local: u32, value: &ReadValue) -> Result<(), ()> {
+    match (tool, local, value) {
+        (1, _, ReadValue::Inbox(_) | ReadValue::OwnerInbox(_))
+        | (2, 1, ReadValue::Tasks(_))
+        | (3, 1, ReadValue::Task(_))
+        | (3, 2, ReadValue::Activity(_))
+        | (4 | 5, 1, ReadValue::Activity(_))
+        | (6, 1, ReadValue::Turn(_)) => Ok(()),
+        _ => Err(()),
     }
 }

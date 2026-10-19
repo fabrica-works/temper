@@ -9,12 +9,14 @@ use jig_client::{
 use skein_json::writer::Encoder;
 use skein_ui::phrases::{PhraseLimits, Phrasebook};
 #[derive(Debug)]
-pub enum Document<'a> {
+pub(crate) enum Document<'a> {
     Me(&'a Me),
     Task(&'a Task, Option<&'a Me>),
+    ReadSet(&'a crate::jig::runner::reads::Reading, Option<&'a Me>),
+    SizedTurn { task: u64, name: jig_client::contract::TurnName, bytes: u64 },
 }
 #[must_use]
-pub fn print(
+pub(crate) fn print(
     document: Document<'_>,
     json: bool,
     limits: &Limits,
@@ -34,12 +36,12 @@ pub fn print(
     } else {
         let book = phrasebook(limits.text);
         let mut measure = Text::measure();
-        text(&document, &book, owner_part, &mut measure);
+        text(&document, &book, limits, owner_part, &mut measure);
         let structural = measure.structural();
         let mut measure = Text::bounded(limits, structural);
-        text(&document, &book, owner_part, &mut measure);
+        text(&document, &book, limits, owner_part, &mut measure);
         let mut out = measure.writing(limits, structural);
-        text(&document, &book, owner_part, &mut out);
+        text(&document, &book, limits, owner_part, &mut out);
         out.finish()
     };
     Printed { status: 0, stdout, stderr: Box::default() }
@@ -47,12 +49,15 @@ pub fn print(
 fn text(
     document: &Document<'_>,
     book: &Phrasebook,
+    limits: &Limits,
     owner_part: fn(&jig_client::contract::OwnerPart, &mut Text),
     out: &mut Text,
 ) {
     match document {
         Document::Me(me) => me_text(me, book, out),
         Document::Task(task, me) => task_text(task, *me, book, owner_part, out),
+        Document::ReadSet(reading, me) => read_sets::text(reading, *me, book, limits, owner_part, out),
+        Document::SizedTurn { task, name, bytes } => super::turn::sized(*task, *name, *bytes, true, out),
     }
 }
 fn phrasebook(text: u32) -> Phrasebook {
@@ -278,6 +283,7 @@ fn utc(wall: skein_lib::Wall, out: &mut Text) {
 struct Cut {
     room: usize,
     left: u64,
+    turn: Option<turn_window::Window>,
 }
 impl Cut {
     fn words(&mut self, bytes: &[u8], out: &mut Encoder) {
@@ -305,10 +311,23 @@ fn hex(bytes: &[u8], out: &mut Encoder) {
     out.string(&hex.finish());
 }
 fn encode(document: &Document<'_>, limits: &Limits, out: &mut Encoder) {
-    let mut cut = Cut { room: usize::try_from(limits.text).expect("text limit fits"), left: 0 };
+    let mut cut = Cut { room: usize::try_from(limits.text).expect("text limit fits"), left: 0, turn: None };
     match document {
         Document::Me(me) => encode_me(me, out, &mut cut),
         Document::Task(task, _) => encode_task(task, out, &mut cut),
+        Document::ReadSet(reading, _) => read_sets::encode(reading, limits, out, &mut cut),
+        Document::SizedTurn { task, name, bytes } => {
+            out.object_start();
+            out.key(b"task");
+            out.unsigned(*task);
+            out.key(b"name");
+            encode_turn_name(name, out, &mut cut);
+            out.key(b"bytes");
+            out.unsigned(*bytes);
+            out.key(b"error");
+            out.string(b"past the limit; report it");
+            out.object_end();
+        }
     }
 }
 mod admissions;
@@ -371,7 +390,7 @@ use parties::{
     encode_phase_counts, encode_pool_ledger, encode_proposal_key,
 };
 use parts::{encode_owner_wake_policy, encode_parameter_document, encode_part};
-use results::{encode_result_details, encode_result_value, encode_results_wake, encode_retention};
+use results::{encode_result_details, encode_result_field, encode_result_value, encode_results_wake, encode_retention};
 use runs::{encode_retry_notice, encode_revision, encode_run_observation, encode_run_stage};
 use runtime::{encode_runtime, encode_specification_document, encode_spend_line, encode_steering, encode_subscription};
 use task_fields::{
@@ -383,3 +402,44 @@ use templates::{
     encode_template_deadline, encode_template_executor, encode_verdict_choice, encode_waits_on, encode_wake_policy,
     encode_wake_rule, encode_writer_slot,
 };
+
+mod read_activity;
+use read_activity::{encode_activity_page, encode_archived_turn};
+
+mod read_turns;
+use read_turns::{
+    encode_current_call, encode_live_call, encode_provisional_turn_name, encode_turn_name, encode_turn_read,
+};
+
+mod read_queries;
+use read_queries::{encode_cursor, encode_owner_phase_counts, encode_task_line, encode_task_page};
+
+mod read_inbox;
+use read_inbox::{encode_inbox_page, encode_owner_inbox_page};
+
+mod read_owner_activity;
+use read_owner_activity::encode_owner_activity_line;
+
+mod read_owner_words;
+use read_owner_words::encode_owner_message_kind;
+
+mod read_watches;
+use read_watches::{
+    encode_object_key, encode_owner_tree, encode_run_beginning, encode_run_ending, encode_run_state, encode_run_text,
+    encode_tree,
+};
+
+mod read_sets;
+
+mod turn_window;
+
+pub(super) fn part(part: &jig_client::contract::Part, out: &mut Text) {
+    let limits = skein_json::writer::Limits { depth: 32, length: u32::MAX };
+    let mut budget = Cut { room: 0, left: 0, turn: None };
+    let mut measure = Encoder::measure(&limits);
+    encode_part(part, &mut measure, &mut budget);
+    let size = measure.measured().expect("bounded part identity");
+    let mut write = Encoder::write(size, &limits);
+    encode_part(part, &mut write, &mut budget);
+    out.put(&write.finish());
+}

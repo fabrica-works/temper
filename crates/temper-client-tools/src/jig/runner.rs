@@ -1,14 +1,12 @@
 //! Calls share an asker and partition their local numbers (tools contract, 4).
-use crate::jig::{
-    call::{Call, Value, Values},
-    render,
-};
+use crate::jig::{call::Call, render};
 use alloc::{boxed::Box, collections::BTreeMap};
 use jig_client::{
-    Asker, Client, Event, Handle, Latest, Readable, State, Told, Watchable,
-    contract::{Delivery, Read, Subject},
+    Asker, Client, Event, Handle, Latest, State, Told, Watchable,
+    contract::{Delivery, Subject},
 };
 use skein_lib::{Env, Queue};
+pub(crate) mod reads;
 #[derive(Debug)]
 pub struct Printed {
     pub status: u8,
@@ -19,7 +17,7 @@ pub struct Printed {
 pub struct Runner {
     asker: Asker,
     waiting: BTreeMap<u32, Called>,
-    active: BTreeMap<u32, Called>,
+    active: BTreeMap<u32, reads::Reading>,
     ready: bool,
     watching: bool,
     owner_part: Option<fn(&jig_client::contract::OwnerPart, &mut render::Text)>,
@@ -87,17 +85,7 @@ fn run(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, call
                 render::me(me, called.json, &env.limits, runner.owner_part.expect("host supplies part vocabulary"));
             finish(called, printed, out);
         }
-        3 => {
-            let Some(Some(Values::One(Value::Number(task)))) = called.call.values.first() else {
-                let printed = render::failure(b"invalid task call", called.json, 1);
-                finish(called, printed, out);
-                return;
-            };
-            let handle = Handle { asker: runner.asker, number: (u64::from(called.call_number) << 32u32) | 1 };
-            let read = Readable::Jig(Read::Task { task: *task });
-            runner.active.insert(called.call_number, called);
-            out.push(Out::Client { event: Event::Read { handle, read } });
-        }
+        1..=7 => reads::start(runner, client, env, called, out),
         _ => {
             let printed = render::failure(b"call not supported", called.json, 1);
             finish(called, printed, out);
@@ -118,28 +106,11 @@ pub fn told(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>,
                 }
             }
         }
-        Told::Page { handle, page } => {
-            let prefix = u32::try_from(handle.number >> 32u32).expect("high half fits");
-            if let Some(called) = runner.active.remove(&prefix) {
-                let printed = render::read(
-                    &page,
-                    client,
-                    runner.me(),
-                    called.json,
-                    &env.limits,
-                    runner.owner_part.expect("host supplies part vocabulary"),
-                );
-                finish(called, printed, out);
-            }
+        Told::Page { handle, page } => reads::page(runner, client, env, handle, page, out),
+        Told::Changed { handle } | Told::Text { handle } => reads::changed(runner, client, env, handle, out),
+        Told::Ended { handle, why } => reads::ended(runner, handle, why, out),
+        Told::Link { .. } | Told::Kept { .. } | Told::Dropped { .. } | Told::Answered { .. } | Told::Pending { .. } => {
         }
-        Told::Changed { .. }
-        | Told::Link { .. }
-        | Told::Text { .. }
-        | Told::Ended { .. }
-        | Told::Kept { .. }
-        | Told::Dropped { .. }
-        | Told::Answered { .. }
-        | Told::Pending { .. } => {}
     }
 }
 fn finish(called: Called, printed: Printed, out: &mut Queue<Out>) {

@@ -1,0 +1,2 @@
+41 · goal · Running
+read on with: tasks --project shop --ended --after 1122

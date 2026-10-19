@@ -52,3 +52,24 @@ pub enum Source {
     Path(Box<[u8]>),
     Stdin,
 }
+
+pub(crate) fn value(call: &Call, index: usize) -> Option<&Value> {
+    match call.values.get(index) {
+        Some(Some(Values::One(value))) => Some(value),
+        _ => None,
+    }
+}
+pub(crate) fn number(call: &Call, index: usize) -> Option<u64> {
+    match value(call, index) {
+        Some(Value::Number(number)) => Some(*number),
+        _ => None,
+    }
+}
+pub(crate) fn cursor(call: &Call, index: usize) -> Option<jig_client::contract::Cursor> {
+    match value(call, index) {
+        Some(Value::Cursor(bytes)) => {
+            Some(jig_client::contract::Cursor::new(bytes.clone(), u32::MAX).expect("parsed cursor"))
+        }
+        _ => None,
+    }
+}
