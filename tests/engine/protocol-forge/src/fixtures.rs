@@ -35,7 +35,6 @@ pub fn limits() -> Limits {
 use core::net::{Ipv4Addr, SocketAddr};
 use skein_forge::api;
 use skein_lib::{List, Secret};
-use temper_engine_domain_forge_client::{self as client};
 use temper_engine_protocol_forge::{
     Settings, Shared,
     settings::{Forge, Kind, Transport},
@@ -46,7 +45,7 @@ pub const TOKEN: &[u8] = b"0123456789abcdef0123456789abcdef01234567";
 #[must_use]
 pub fn shared() -> Shared {
     Shared {
-        client: client::Limits {
+        client: skein_forge_client::Limits {
             pending: 4,
             calls: 2,
             rate: 100,

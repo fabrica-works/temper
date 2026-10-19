@@ -2,7 +2,6 @@ use skein_fake_forge_protocol::Route;
 use skein_lib::Wall;
 use temper_engine_domain_forge as top;
 use temper_engine_domain_forge_change as change;
-use temper_engine_domain_forge_client as client;
 use temper_engine_domain_forge_issues as issues;
 use temper_engine_protocol_forge_world::{
     fixtures,
@@ -412,13 +411,13 @@ fn opened_change() -> Protocol {
 
 fn enqueue_merge(world: &mut Protocol, pull: u64, head: skein_forge::api::Commit) {
     world.event(top::Event::Enqueue {
-        entry: client::Entry {
+        entry: skein_forge_client::Entry {
             number: 1,
             task: 51,
             repository: REPO,
-            effect: client::Effect {
+            effect: skein_forge_client::Effect {
                 write: skein_forge::api::Write::Merge { number: pull, head },
-                condition: client::Condition::Merge { base: Box::from(&b"main"[..]) },
+                condition: skein_forge_client::Condition::Merge { base: Box::from(&b"main"[..]) },
             },
             start: None,
             attempt: None,

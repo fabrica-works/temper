@@ -4,7 +4,6 @@
 use alloc::boxed::Box;
 use skein_lib::Token;
 use temper_engine_domain_forge_change as change;
-use temper_engine_domain_forge_client as client;
 use temper_engine_domain_forge_issues as issues;
 
 /// A pull request whose context the connector gathers for a run brief.
@@ -402,7 +401,7 @@ pub struct NamedCall {
 /// The connector's part of a named answer; core decisions remain outside it.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum CallPayload {
-    Effect { entry: u64, deadline: skein_lib::Wall, outcome: Option<client::Outcome> },
+    Effect { entry: u64, deadline: skein_lib::Wall, outcome: Option<skein_forge_client::Outcome> },
     Refused(skein_forge::api::Error),
     Read(Box<Result<skein_forge::api::Answer, skein_forge::api::Error>>),
 }
@@ -442,11 +441,11 @@ pub enum Stored {
     /// keeping its room until a person makes it again or it is settled not
     /// made (domain/forge.md, 6; jig's `domain/connectors.md`, 4.3).
     Entry {
-        entry: client::Entry,
+        entry: skein_forge_client::Entry,
         held: bool,
     },
     /// A client working-set row.
-    Client(client::Stored),
+    Client(skein_forge_client::Stored),
     /// A change procedure's committed state.
     Change(ChangeRow),
     /// A goal issue's committed projection.
@@ -464,7 +463,7 @@ pub enum Stored {
 pub struct ProposedEffect {
     pub number: u64,
     pub resource: What,
-    pub entry: client::Entry,
+    pub entry: skein_forge_client::Entry,
 }
 
 /// Stable store key of a connector record.
@@ -481,7 +480,7 @@ pub enum Key {
     Ci { repository: skein_forge::api::Repository, head: skein_forge::api::Commit },
     Landed(skein_forge::api::Commit),
     Entry(u64),
-    Client(client::Key),
+    Client(skein_forge_client::Key),
     Change(u64),
     Issue(u64),
     Release(u64),
@@ -541,9 +540,9 @@ pub enum Event {
     /// Remove the payload of a terminal proposal.
     DropProposedEffect { number: u64 },
     /// Enqueue a checked effect in the same decision as its cause.
-    Enqueue { entry: client::Entry },
+    Enqueue { entry: skein_forge_client::Entry },
     /// Keep a projection candidate after core admission.
-    KeepProjection { row: IssueRow, entry: client::Entry },
+    KeepProjection { row: IssueRow, entry: skein_forge_client::Entry },
     /// Describe the next write for a goal projection.
     Project { entry: u64, repository: skein_forge::api::Repository, view: issues::GoalView },
     /// Continue the latest authorized snapshot after an outbox outcome or interval.
@@ -592,11 +591,11 @@ pub enum Event {
     /// One provider hint passed from the protocol.
     Hint { hint: skein_forge::api::Hint },
     /// A client event returned after an earlier connector request.
-    Client(client::Event),
+    Client(skein_forge_client::Event),
     /// Restore one durable connector record.
     Restore { record: Stored },
     /// Finish restoration and reconcile loaded entries.
-    Restored { clock: client::RecoveryClock },
+    Restored { clock: skein_forge_client::RecoveryClock },
     /// Read the system's live resources before procedures step.
     ReadAfresh,
     /// Look for each restored uncertain entry before procedures step.
@@ -642,7 +641,7 @@ pub enum Request {
     },
     /// Feed the next bounded read of a forge section to this connector's client.
     BriefClient {
-        event: client::Event,
+        event: skein_forge_client::Event,
     },
     /// One connector-owned section is ready for the root to route to the brief.
     BriefReady {
@@ -689,7 +688,7 @@ pub enum Request {
     Outcome {
         entry: u64,
         task: u64,
-        outcome: client::Outcome,
+        outcome: skein_forge_client::Outcome,
     },
     /// A held entry settled as not made, by a person or its task's close.
     NotMade {
@@ -721,7 +720,7 @@ pub enum Request {
     /// A connector-described projection candidate, awaiting core admission.
     ProjectionEffect {
         row: IssueRow,
-        entry: client::Entry,
+        entry: skein_forge_client::Entry,
         description: crate::ProjectionEffect,
     },
     /// A projection has to wait until its interval or prior effect settles.

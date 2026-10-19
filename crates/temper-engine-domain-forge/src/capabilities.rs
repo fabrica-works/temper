@@ -3,7 +3,6 @@
 use crate::{Domain, Kinds, Limits, Protection, Request, Role, Stored};
 use skein_forge::api;
 use skein_lib::{Env, Queue, Token};
-use temper_engine_domain_forge_client::{self as client};
 
 #[derive(Debug)]
 pub(crate) enum Stage {
@@ -44,7 +43,7 @@ pub(crate) fn refresh(d: &mut Domain, env: &Env<Limits>, repository: api::Reposi
     crate::domain::child(
         d,
         env,
-        client::Event::Read { owner, repository, read: api::Read::Permission { user: author } },
+        skein_forge_client::Event::Read { owner, repository, read: api::Read::Permission { user: author } },
         out,
     );
 }
@@ -90,7 +89,7 @@ pub(crate) fn answered(
         }
     };
     d.capabilities.insert(owner, pending).expect("refresh advances in its reserved slot");
-    crate::domain::child(d, env, client::Event::Read { owner, repository, read }, out);
+    crate::domain::child(d, env, skein_forge_client::Event::Read { owner, repository, read }, out);
 }
 
 fn kinds(permission: api::Permission, role: Role, settings: &api::Settings) -> Kinds {

@@ -3,7 +3,6 @@ use skein_fake_forge_domain::{self as fake, api as raw};
 use skein_forge::api;
 use skein_lib::{Env, Queue, ReplyTo, Time, Token, Wall};
 use temper_engine_domain as engine;
-use temper_engine_domain_forge_client::{self as client};
 use temper_engine_forge_world::translate;
 
 pub struct ForgeStand {
@@ -11,7 +10,7 @@ pub struct ForgeStand {
     env: Env<fake::Config>,
     out: Queue<fake::Request>,
     pending: std::collections::BTreeMap<Token, api::Op>,
-    limits: client::Limits,
+    limits: skein_forge_client::Limits,
     repositories: std::collections::BTreeMap<u32, Box<[u8]>>,
     pub calls: u32,
 }
@@ -85,7 +84,7 @@ impl ForgeStand {
         }
     }
 
-    pub fn call(&mut self, call: Token, repository: api::Repository, op: api::Op, limits: &client::Limits) {
+    pub fn call(&mut self, call: Token, repository: api::Repository, op: api::Op, limits: &skein_forge_client::Limits) {
         self.limits = *limits;
         self.calls = self.calls.checked_add(1).expect("stand calls bound");
         assert_eq!(repository.forge, 1);
@@ -121,7 +120,7 @@ impl ForgeStand {
                     Err(error) => Err(translate::error(error, self.env.now)),
                 };
                 replies.push(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Client(
-                    client::Event::Answered { call, cost: 1, result },
+                    skein_forge_client::Event::Answered { call, cost: 1, result },
                 ))));
             }
         }

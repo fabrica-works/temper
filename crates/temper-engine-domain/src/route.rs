@@ -39,7 +39,6 @@ pub use landing::{Approval, Freshness, Gate, LandingRule};
 use skein_lib::{Env, Id, List, Queue, ReplyTo, Token};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_change as forge_change;
-use temper_engine_domain_forge_client as forge_client;
 use temper_engine_domain_forge_issues as forge_issues;
 pub(crate) use tools::relay_payload;
 

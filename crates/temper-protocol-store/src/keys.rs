@@ -3,7 +3,6 @@ use alloc::boxed::Box;
 use skein_kv::{KeyReader, KeyWriter};
 use skein_lib::List;
 use temper_engine_domain_forge as forge;
-use temper_engine_domain_forge_client as client;
 
 fn write_name(writer: &mut KeyWriter, name: &forge::Name) {
     writer.u64(u64::from(name.forge)).u64(u64::from(name.repository));
@@ -226,46 +225,46 @@ fn read_topic(reader: &mut KeyReader<'_>, limits: &forge::Limits) -> Option<forg
         _ => None,
     }
 }
-fn write_client(writer: &mut KeyWriter, key: &client::Key) {
+fn write_client(writer: &mut KeyWriter, key: &skein_forge_client::Key) {
     match key {
-        client::Key::Live(resource) => {
+        skein_forge_client::Key::Live(resource) => {
             writer.tag(0);
             write_repository(writer, resource.repository);
             match &resource.what {
-                client::What::Repository => {
+                skein_forge_client::What::Repository => {
                     writer.tag(0);
                 }
-                client::What::Branch(branch) => {
+                skein_forge_client::What::Branch(branch) => {
                     writer.tag(1).bytes(branch);
                 }
-                client::What::Pull(number) => {
+                skein_forge_client::What::Pull(number) => {
                     writer.tag(2).u64(*number);
                 }
-                client::What::Issue(number) => {
+                skein_forge_client::What::Issue(number) => {
                     writer.tag(3).u64(*number);
                 }
             }
         }
-        client::Key::Repository(repository) => {
+        skein_forge_client::Key::Repository(repository) => {
             writer.tag(1);
             write_repository(writer, *repository);
         }
     }
 }
-fn read_client(reader: &mut KeyReader<'_>, limits: &forge::Limits) -> Option<client::Key> {
+fn read_client(reader: &mut KeyReader<'_>, limits: &forge::Limits) -> Option<skein_forge_client::Key> {
     match reader.tag()? {
         0 => {
             let repository = read_repository(reader)?;
             let what = match reader.tag()? {
-                0 => client::What::Repository,
-                1 => client::What::Branch(read_branch(reader, limits)?),
-                2 => client::What::Pull(reader.u64()?),
-                3 => client::What::Issue(reader.u64()?),
+                0 => skein_forge_client::What::Repository,
+                1 => skein_forge_client::What::Branch(read_branch(reader, limits)?),
+                2 => skein_forge_client::What::Pull(reader.u64()?),
+                3 => skein_forge_client::What::Issue(reader.u64()?),
                 _ => return None,
             };
-            Some(client::Key::Live(client::Resource { repository, what }))
+            Some(skein_forge_client::Key::Live(skein_forge_client::Resource { repository, what }))
         }
-        1 => Some(client::Key::Repository(read_repository(reader)?)),
+        1 => Some(skein_forge_client::Key::Repository(read_repository(reader)?)),
         _ => None,
     }
 }

@@ -13,7 +13,6 @@ use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::{Env, Queue, Token};
 use temper_engine_domain_forge as forge;
-use temper_engine_domain_forge_client as forge_client;
 
 /// Store transport terminals are read-only; cold rows reserve their full restore route.
 pub(crate) fn load_decision(domain: &mut Domain, limits: &Limits) -> Option<Decision> {
@@ -273,7 +272,7 @@ pub(crate) fn startup_page(
     domain.startup_range = None;
     let request = if range == Range::Forge {
         // The connector confirms that its restored rows have been reconciled.
-        domain.work.push(Work::Forge(forge::Event::Restored { clock: forge_client::RecoveryClock::Wall }));
+        domain.work.push(Work::Forge(forge::Event::Restored { clock: skein_forge_client::RecoveryClock::Wall }));
         jig_domain_core::RestartRequest::Idle
     } else {
         domain.core.restart_done(jig_domain_core::RestartStep::LoadCore)

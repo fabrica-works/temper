@@ -5,7 +5,6 @@ use jig_protocol_config::{Path, Problems, Segment, What};
 use skein_lib::{Duration, Env, List, Queue, Time, Wall};
 use temper_engine_domain as root;
 use temper_engine_domain_forge as forge;
-use temper_engine_domain_forge_client as client;
 use temper_engine_protocol_forge as kit;
 /// A forge's resolved endpoint and configured TLS transport, supplied by the shell.
 #[derive(Debug)]
@@ -96,7 +95,7 @@ pub fn shared(limits: &limits::Limits, io: &skein_io::Limits) -> kit::Shared {
 /// Wrap the client's terminal without bringing protocol state into the root.
 #[must_use]
 pub fn event(answer: kit::Answered) -> root::Event {
-    root::Event::Forge(Box::new(forge::Event::Client(client::Event::Answered {
+    root::Event::Forge(Box::new(forge::Event::Client(skein_forge_client::Event::Answered {
         call: answer.call,
         cost: answer.cost,
         result: answer.result,
@@ -109,7 +108,7 @@ pub fn hinted(hinted: kit::hooks::Hinted) -> root::Event {
 }
 /// Recover an answer refused by admission or returned during the drain.
 pub fn back(event: Box<forge::Event>) -> Result<kit::Answered, Box<forge::Event>> {
-    if let forge::Event::Client(client::Event::Answered { call, cost, result }) = *event {
+    if let forge::Event::Client(skein_forge_client::Event::Answered { call, cost, result }) = *event {
         Ok(kit::Answered { call, cost, result })
     } else {
         Err(event)
@@ -352,15 +351,21 @@ pub(crate) fn roots(config: &settings::Engine, runtime: &List<ForgeRuntime>) -> 
     if found.is_empty() { Ok(bytes) } else { Err(found) }
 }
 
-pub(crate) fn config(settings: &settings::Engine, deployment: [u8; 16]) -> (client::Config, Box<[forge::GitIdentity]>) {
+pub(crate) fn config(
+    settings: &settings::Engine,
+    deployment: [u8; 16],
+) -> (skein_forge_client::Config, Box<[forge::GitIdentity]>) {
     let count = u32::try_from(settings.forges.len()).expect("configured forges");
     let mut writers = List::with_capacity(count);
     let mut identities = List::with_capacity(count);
     for forge in &settings.forges {
-        writers.push(client::Writer { forge: forge.number, author: forge.user }).expect("forge writers");
+        writers.push(skein_forge_client::Writer { forge: forge.number, author: forge.user }).expect("forge writers");
         identities
             .push(forge::GitIdentity { forge: forge.number, credential: forge.identity })
             .expect("forge identities");
     }
-    (client::Config { namespace: Box::new(deployment), writers: writers.into_boxed() }, identities.into_boxed())
+    (
+        skein_forge_client::Config { namespace: Box::new(deployment), writers: writers.into_boxed() },
+        identities.into_boxed(),
+    )
 }

@@ -3,8 +3,8 @@
 use crate::translate;
 use skein_fake_forge_domain::Observation;
 use skein_forge::api;
+use skein_forge_client::Entry;
 use skein_lib::Map;
-use temper_engine_domain_forge_client::Entry;
 #[derive(Debug)]
 pub(crate) struct Referee {
     keys: Map<Box<[u8]>, u64>,

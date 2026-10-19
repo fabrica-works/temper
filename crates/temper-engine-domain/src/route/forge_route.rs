@@ -3,8 +3,8 @@
 use super::{
     CallAnswer, CallKey, Decision, Delivery, Domain, Env, Family, ForgeRepository, ForgeStart, ForgeWorkspace, Id, Key,
     Limits, List, ProcedureStep, Queue, Record, ReplyTo, Request, StepEnd, Token, Work, Write, authority,
-    connector_answer, core_call, decide_call, emit, escalation, forge, forge_change, forge_client, forge_issues,
-    people, save, save_connector_answer, tasks,
+    connector_answer, core_call, decide_call, emit, escalation, forge, forge_change, forge_issues, people, save,
+    save_connector_answer, tasks,
 };
 use alloc::boxed::Box;
 use jig_domain_brief as brief;
@@ -506,7 +506,7 @@ pub(crate) fn read_call(
     domain.next_effect_owner = serial;
     let owner = Token::new(serial | (1_u64 << 61_u32));
     assert!(domain.forge_reading.insert(owner, (to, key)) == Ok(None), "one fresh read correlation");
-    domain.work.push(Work::Forge(forge::Event::Client(forge_client::Event::Read { owner, repository, read })));
+    domain.work.push(Work::Forge(forge::Event::Client(skein_forge_client::Event::Read { owner, repository, read })));
 }
 
 #[expect(clippy::too_many_arguments, reason = "one typed task and connector subscription is routed together")]
@@ -2130,7 +2130,9 @@ pub(crate) fn outputs(
                 }
                 if let Some(entry) = failed {
                     let (_, key) = domain.forge_effecting.remove(&entry).expect("effect awaiting connector admission");
-                    domain.forge.named_outcome(entry, forge_client::Outcome::Failed(skein_forge::api::Error::Busy));
+                    domain
+                        .forge
+                        .named_outcome(entry, skein_forge_client::Outcome::Failed(skein_forge::api::Error::Busy));
                     domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(
                         jig_domain_core::connector::Event::Outbox {
                             connector: domain.config.forge_connector,
@@ -2157,13 +2159,13 @@ pub(crate) fn outputs(
                     save_connector_answer(domain, &env.limits, decision, core_call(named));
                 }
                 let result = match outcome {
-                    forge_client::Outcome::Made { .. } => jig_domain_core::connector::OutboxOutcome::Made,
-                    forge_client::Outcome::Failed(_) | forge_client::Outcome::Raced { .. } => {
+                    skein_forge_client::Outcome::Made { .. } => jig_domain_core::connector::OutboxOutcome::Made,
+                    skein_forge_client::Outcome::Failed(_) | skein_forge_client::Outcome::Raced { .. } => {
                         jig_domain_core::connector::OutboxOutcome::Failed
                     }
-                    forge_client::Outcome::Withdrawn => jig_domain_core::connector::OutboxOutcome::Withdrawn,
-                    forge_client::Outcome::Uncertain => jig_domain_core::connector::OutboxOutcome::Uncertain,
-                    forge_client::Outcome::Held => jig_domain_core::connector::OutboxOutcome::Held { entry },
+                    skein_forge_client::Outcome::Withdrawn => jig_domain_core::connector::OutboxOutcome::Withdrawn,
+                    skein_forge_client::Outcome::Uncertain => jig_domain_core::connector::OutboxOutcome::Uncertain,
+                    skein_forge_client::Outcome::Held => jig_domain_core::connector::OutboxOutcome::Held { entry },
                 };
                 domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(
                     jig_domain_core::connector::Event::Outbox {
@@ -2342,14 +2344,14 @@ pub(crate) enum EffectFlight {
     Call {
         description: Box<EffectDescription>,
         repository: skein_forge::api::Repository,
-        effect: forge_client::Effect,
+        effect: skein_forge_client::Effect,
         key: CallKey,
         resource: forge::What,
     },
     Projection {
         description: Box<EffectDescription>,
         row: Box<forge::IssueRow>,
-        entry: forge_client::Entry,
+        entry: skein_forge_client::Entry,
     },
     Procedure {
         description: Box<EffectDescription>,
@@ -2476,7 +2478,7 @@ pub(crate) fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, as
                         row: forge::ProposedEffect {
                             number: proposal,
                             resource,
-                            entry: forge_client::Entry {
+                            entry: skein_forge_client::Entry {
                                 number: 0,
                                 task,
                                 repository,
@@ -2518,7 +2520,7 @@ pub(crate) fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, as
                         "admitted connector keep"
                     );
                     domain.work.push(Work::Forge(forge::Event::Enqueue {
-                        entry: forge_client::Entry {
+                        entry: skein_forge_client::Entry {
                             number: entry,
                             task,
                             repository,

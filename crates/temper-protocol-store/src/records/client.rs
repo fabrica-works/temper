@@ -1,32 +1,32 @@
 use super::{Bounds, FITS, Undecodable, answers, api, entries, names, w};
 use alloc::boxed::Box;
 use skein_lib::{List, Time};
-use temper_engine_domain_forge_client as d;
 
-fn encode_what(value: &d::What) -> w::LiveWhat {
+fn encode_what(value: &skein_forge_client::What) -> w::LiveWhat {
     match value {
-        d::What::Repository => w::LiveWhat::Repository,
-        d::What::Branch(branch) => w::LiveWhat::Branch(
+        skein_forge_client::What::Repository => w::LiveWhat::Repository,
+        skein_forge_client::What::Branch(branch) => w::LiveWhat::Branch(
             w::LiveBranch::new(&w::CEILINGS, w::LiveBranchParts { branch: branch.clone() }).expect(FITS),
         ),
-        d::What::Pull(number) => {
+        skein_forge_client::What::Pull(number) => {
             w::LiveWhat::Pull(w::Number::new(&w::CEILINGS, w::NumberParts { number: *number }).expect(FITS))
         }
-        d::What::Issue(number) => {
+        skein_forge_client::What::Issue(number) => {
             w::LiveWhat::Issue(w::Number::new(&w::CEILINGS, w::NumberParts { number: *number }).expect(FITS))
         }
     }
 }
-fn decode_what(value: w::LiveWhat) -> d::What {
+fn decode_what(value: w::LiveWhat) -> skein_forge_client::What {
     match value {
-        w::LiveWhat::Repository => d::What::Repository,
-        w::LiveWhat::Branch(value) => d::What::Branch(value.into_parts().branch),
-        w::LiveWhat::Pull(value) => d::What::Pull(value.number()),
-        w::LiveWhat::Issue(value) => d::What::Issue(value.number()),
+        w::LiveWhat::Repository => skein_forge_client::What::Repository,
+        w::LiveWhat::Branch(value) => skein_forge_client::What::Branch(value.into_parts().branch),
+        w::LiveWhat::Pull(value) => skein_forge_client::What::Pull(value.number()),
+        w::LiveWhat::Issue(value) => skein_forge_client::What::Issue(value.number()),
     }
 }
-fn encode_watch(value: &d::Watch) -> w::Watch {
-    let d::Watch { resource: d::Resource { repository, what }, participating } = value;
+fn encode_watch(value: &skein_forge_client::Watch) -> w::Watch {
+    let skein_forge_client::Watch { resource: skein_forge_client::Resource { repository, what }, participating } =
+        value;
     let resource = w::LiveResource::new(
         &w::CEILINGS,
         w::LiveResourceParts { repository: names::encode_repository(*repository), what: encode_what(what) },
@@ -34,17 +34,20 @@ fn encode_watch(value: &d::Watch) -> w::Watch {
     .expect(FITS);
     w::Watch::new(&w::CEILINGS, w::WatchParts { resource, participating: *participating }).expect(FITS)
 }
-fn decode_watch(value: w::Watch) -> d::Watch {
+fn decode_watch(value: w::Watch) -> skein_forge_client::Watch {
     let w::WatchParts { resource, participating } = value.into_parts();
     let w::LiveResourceParts { repository, what } = resource.into_parts();
-    d::Watch {
-        resource: d::Resource { repository: names::decode_repository(repository), what: decode_what(what) },
+    skein_forge_client::Watch {
+        resource: skein_forge_client::Resource {
+            repository: names::decode_repository(repository),
+            what: decode_what(what),
+        },
         participating,
     }
 }
 #[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
-fn encode_cached(value: &d::Cached) -> w::Cached {
-    let d::Cached { item, pull, tip } = value;
+fn encode_cached(value: &skein_forge_client::Cached) -> w::Cached {
+    let skein_forge_client::Cached { item, pull, tip } = value;
     w::Cached::new(
         &w::CEILINGS,
         w::CachedParts {
@@ -62,9 +65,9 @@ fn encode_cached(value: &d::Cached) -> w::Cached {
     .expect(FITS)
 }
 #[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
-fn decode_cached(value: w::Cached, bounds: &Bounds) -> Result<d::Cached, Undecodable> {
+fn decode_cached(value: w::Cached, bounds: &Bounds) -> Result<skein_forge_client::Cached, Undecodable> {
     let w::CachedParts { item, pull, tip } = value.into_parts();
-    Ok(d::Cached {
+    Ok(skein_forge_client::Cached {
         item: match item {
             Some(value) => Some(api::decode_summary(value, bounds)?),
             None => None,
@@ -76,8 +79,8 @@ fn decode_cached(value: w::Cached, bounds: &Bounds) -> Result<d::Cached, Undecod
         tip,
     })
 }
-fn encode_live(value: &d::LiveRecord) -> w::LiveRecord {
-    let d::LiveRecord {
+fn encode_live(value: &skein_forge_client::LiveRecord) -> w::LiveRecord {
+    let skein_forge_client::LiveRecord {
         watch,
         position,
         listed,
@@ -112,7 +115,7 @@ fn encode_live(value: &d::LiveRecord) -> w::LiveRecord {
     )
     .expect(FITS)
 }
-fn decode_live(value: w::LiveRecord, bounds: &Bounds) -> Result<d::LiveRecord, Undecodable> {
+fn decode_live(value: w::LiveRecord, bounds: &Bounds) -> Result<skein_forge_client::LiveRecord, Undecodable> {
     let w::LiveRecordParts {
         watch,
         position,
@@ -128,7 +131,7 @@ fn decode_live(value: w::LiveRecord, bounds: &Bounds) -> Result<d::LiveRecord, U
         pushed,
         echoes,
     } = value.into_parts();
-    Ok(d::LiveRecord {
+    Ok(skein_forge_client::LiveRecord {
         watch: decode_watch(watch),
         position: entries::decode_position(position),
         listed: Time::from_nanos(listed),
@@ -145,8 +148,8 @@ fn decode_live(value: w::LiveRecord, bounds: &Bounds) -> Result<d::LiveRecord, U
     })
 }
 #[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
-fn encode_repository(value: d::RepositoryRecord) -> w::RepositoryRecord {
-    let d::RepositoryRecord { repository, mark, clock } = value;
+fn encode_repository(value: skein_forge_client::RepositoryRecord) -> w::RepositoryRecord {
+    let skein_forge_client::RepositoryRecord { repository, mark, clock } = value;
     w::RepositoryRecord::new(
         &w::CEILINGS,
         w::RepositoryRecordParts {
@@ -161,9 +164,9 @@ fn encode_repository(value: d::RepositoryRecord) -> w::RepositoryRecord {
     .expect(FITS)
 }
 #[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
-fn decode_repository(value: w::RepositoryRecord) -> d::RepositoryRecord {
+fn decode_repository(value: w::RepositoryRecord) -> skein_forge_client::RepositoryRecord {
     let w::RepositoryRecordParts { repository, mark, clock } = value.into_parts();
-    d::RepositoryRecord {
+    skein_forge_client::RepositoryRecord {
         repository: names::decode_repository(repository),
         mark: match mark {
             Some(value) => Some(Time::from_nanos(value)),
@@ -172,44 +175,44 @@ fn decode_repository(value: w::RepositoryRecord) -> d::RepositoryRecord {
         clock: Time::from_nanos(clock),
     }
 }
-pub(super) fn encode(value: &d::Stored) -> w::ClientRow {
+pub(super) fn encode(value: &skein_forge_client::Stored) -> w::ClientRow {
     let value = match value {
-        d::Stored::Live(value) => w::ClientValue::Live(Box::new(encode_live(value))),
-        d::Stored::Repository(value) => w::ClientValue::Repository(encode_repository(*value)),
+        skein_forge_client::Stored::Live(value) => w::ClientValue::Live(Box::new(encode_live(value))),
+        skein_forge_client::Stored::Repository(value) => w::ClientValue::Repository(encode_repository(*value)),
     };
     w::ClientRow::new(&w::CEILINGS, w::ClientRowParts { value }).expect(FITS)
 }
-pub(super) fn decode(value: w::ClientRow, bounds: &Bounds) -> Result<d::Stored, Undecodable> {
+pub(super) fn decode(value: w::ClientRow, bounds: &Bounds) -> Result<skein_forge_client::Stored, Undecodable> {
     Ok(match value.into_parts().value {
-        w::ClientValue::Live(value) => d::Stored::Live(decode_live(*value, bounds)?),
-        w::ClientValue::Repository(value) => d::Stored::Repository(decode_repository(value)),
+        w::ClientValue::Live(value) => skein_forge_client::Stored::Live(decode_live(*value, bounds)?),
+        w::ClientValue::Repository(value) => skein_forge_client::Stored::Repository(decode_repository(value)),
     })
 }
-fn encode_deliveries(values: &[d::Delivery]) -> List<w::Delivery> {
+fn encode_deliveries(values: &[skein_forge_client::Delivery]) -> List<w::Delivery> {
     let mut result = List::with_capacity(u32::try_from(values.len()).expect("admitted count"));
     for value in values {
-        let d::Delivery { id, revision } = *value;
+        let skein_forge_client::Delivery { id, revision } = *value;
         let item = w::Delivery::new(&w::CEILINGS, w::DeliveryParts { id, revision }).expect(FITS);
         result.push(item).expect("same count");
     }
     result
 }
-fn decode_deliveries(values: List<w::Delivery>) -> Box<[d::Delivery]> {
+fn decode_deliveries(values: List<w::Delivery>) -> Box<[skein_forge_client::Delivery]> {
     let mut result = List::with_capacity(values.len());
     for value in values.into_boxed() {
         let w::DeliveryParts { id, revision } = value.into_parts();
-        result.push(d::Delivery { id, revision }).expect("same count");
+        result.push(skein_forge_client::Delivery { id, revision }).expect("same count");
     }
     result.into_boxed()
 }
-fn encode_echoes(values: &[d::Echo]) -> List<w::Echo> {
+fn encode_echoes(values: &[skein_forge_client::Echo]) -> List<w::Echo> {
     let mut result = List::with_capacity(u32::try_from(values.len()).expect("admitted count"));
     for value in values {
         let item = match value {
-            d::Echo::Comment(number) => {
+            skein_forge_client::Echo::Comment(number) => {
                 w::Echo::Comment(w::Number::new(&w::CEILINGS, w::NumberParts { number: *number }).expect(FITS))
             }
-            d::Echo::Review(number) => {
+            skein_forge_client::Echo::Review(number) => {
                 w::Echo::Review(w::Number::new(&w::CEILINGS, w::NumberParts { number: *number }).expect(FITS))
             }
         };
@@ -217,12 +220,12 @@ fn encode_echoes(values: &[d::Echo]) -> List<w::Echo> {
     }
     result
 }
-fn decode_echoes(values: List<w::Echo>) -> Box<[d::Echo]> {
+fn decode_echoes(values: List<w::Echo>) -> Box<[skein_forge_client::Echo]> {
     let mut result = List::with_capacity(values.len());
     for value in values.into_boxed() {
         let item = match value {
-            w::Echo::Comment(value) => d::Echo::Comment(value.number()),
-            w::Echo::Review(value) => d::Echo::Review(value.number()),
+            w::Echo::Comment(value) => skein_forge_client::Echo::Comment(value.number()),
+            w::Echo::Review(value) => skein_forge_client::Echo::Review(value.number()),
         };
         result.push(item).expect("same count");
     }

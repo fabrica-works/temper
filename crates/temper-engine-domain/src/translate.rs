@@ -9,7 +9,6 @@ use jig_domain_notes as notes;
 use jig_domain_tasks as tasks;
 use skein_lib::{Env, Map, ReplyTo};
 use temper_engine_domain_forge as forge;
-use temper_engine_domain_forge_client as forge_client;
 
 /// Startup configuration, supplied once by the shell (domain/root.md, 6):
 /// the core's whole, as jig's applications hold it, and temper's own.
@@ -23,7 +22,7 @@ pub struct Config {
     /// Forge landing requirements and their connector-owned judge parameters.
     pub landing: LandingPolicy,
     /// Forge writer identities and this deployment's branch namespace.
-    pub forge: forge_client::Config,
+    pub forge: skein_forge_client::Config,
     /// Each forge's git identity, an application credential (D10;
     /// protocol/credentials.md, "each repository to a git identity").
     pub identities: Box<[forge::GitIdentity]>,

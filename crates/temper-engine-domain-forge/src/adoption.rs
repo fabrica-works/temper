@@ -7,7 +7,6 @@ use crate::{
 use jig_domain_people as people;
 use skein_forge::api;
 use skein_lib::{Duration, Env, List, Map, Queue, Token, Wall};
-use temper_engine_domain_forge_client::{self as client};
 
 #[derive(Debug)]
 pub(crate) struct Pending {
@@ -95,7 +94,7 @@ pub(crate) fn start(
         collaborators: List::with_capacity(env.limits.collaborators),
     };
     assert!(d.adoptions.insert(request, pending).is_ok(), "reserved adoption flight");
-    child(d, env, client::Event::Read { owner: request, repository, read }, out);
+    child(d, env, skein_forge_client::Event::Read { owner: request, repository, read }, out);
 }
 
 /// Record exactly what the adoption reads decided before forwarding to the core.
@@ -254,7 +253,7 @@ pub(crate) fn adopt(d: &mut Domain, env: &Env<Limits>, reply_to: Token, out: &mu
     child(
         d,
         env,
-        client::Event::Read { owner: reply_to, repository, read: api::Read::Permission { user: author } },
+        skein_forge_client::Event::Read { owner: reply_to, repository, read: api::Read::Permission { user: author } },
         out,
     );
 }
@@ -306,7 +305,7 @@ pub(crate) fn adoption_read(
                 pending.stage = if check_prefix { AdoptionStage::Branches } else { AdoptionStage::Settings };
                 d.adoptions.insert(owner, pending).expect("replaces read chain");
                 let read = if check_prefix { api::Read::Branches } else { api::Read::Settings };
-                child(d, env, client::Event::Read { owner, repository, read }, out);
+                child(d, env, skein_forge_client::Event::Read { owner, repository, read }, out);
             }
             Ok(_) => adopted(d, out, owner, Err(api::Error::InvalidAnswer)),
             Err(error) => adopted(d, out, owner, Err(error)),
@@ -321,7 +320,7 @@ pub(crate) fn adoption_read(
                 }
                 pending.stage = AdoptionStage::Settings;
                 d.adoptions.insert(owner, pending).expect("replaces read chain");
-                child(d, env, client::Event::Read { owner, repository, read: api::Read::Settings }, out);
+                child(d, env, skein_forge_client::Event::Read { owner, repository, read: api::Read::Settings }, out);
             }
             Ok(_) => adopted(d, out, owner, Err(api::Error::InvalidAnswer)),
             Err(error) => adopted(d, out, owner, Err(error)),
@@ -332,7 +331,12 @@ pub(crate) fn adoption_read(
                 pending.stage = AdoptionStage::Protection;
                 let branch = pending.request.landing.clone();
                 d.adoptions.insert(owner, pending).expect("replaces read chain");
-                child(d, env, client::Event::Read { owner, repository, read: api::Read::Protection { branch } }, out);
+                child(
+                    d,
+                    env,
+                    skein_forge_client::Event::Read { owner, repository, read: api::Read::Protection { branch } },
+                    out,
+                );
             }
             Ok(_) => adopted(d, out, owner, Err(api::Error::InvalidAnswer)),
             Err(error) => adopted(d, out, owner, Err(error)),
@@ -355,7 +359,12 @@ pub(crate) fn adoption_read(
             }
             pending.stage = AdoptionStage::Collaborators(1);
             d.adoptions.insert(owner, pending).expect("replaces read chain");
-            child(d, env, client::Event::Read { owner, repository, read: api::Read::Collaborators { page: 1 } }, out);
+            child(
+                d,
+                env,
+                skein_forge_client::Event::Read { owner, repository, read: api::Read::Collaborators { page: 1 } },
+                out,
+            );
         }
         AdoptionStage::Collaborators(page) => adoption_collaborators(d, env, owner, pending, page, result, out),
     }
@@ -389,7 +398,11 @@ fn adoption_collaborators(
                 child(
                     d,
                     env,
-                    client::Event::Read { owner, repository, read: api::Read::Collaborators { page: next } },
+                    skein_forge_client::Event::Read {
+                        owner,
+                        repository,
+                        read: api::Read::Collaborators { page: next },
+                    },
                     out,
                 );
             } else {

@@ -4,10 +4,9 @@ mod fixtures;
 mod purpose;
 use alloc::boxed::Box;
 use skein_lib::{Duration, Env, Queue, Time, Token, Wall};
-use temper_engine_domain_forge_client as client;
 
 const REPO: skein_forge::api::Repository = skein_forge::api::Repository { forge: 1, repository: 2 };
-const CLIENT: client::Limits = client::Limits {
+const CLIENT: skein_forge_client::Limits = skein_forge_client::Limits {
     pending: 4,
     calls: 2,
     rate: 100,
@@ -82,9 +81,9 @@ fn domain() -> Domain {
     Domain::new(
         &LIMITS,
         4,
-        client::Config {
+        skein_forge_client::Config {
             namespace: Box::from(&b"test"[..]),
-            writers: Box::new([client::Writer { forge: 1, author: 7 }]),
+            writers: Box::new([skein_forge_client::Writer { forge: 1, author: 7 }]),
         },
         &[GitIdentity { forge: 1, credential: 1 }],
     )
@@ -141,18 +140,18 @@ fn adopted() -> Repository {
     }
 }
 /// A commit status write: a set, made without a find.
-fn status(number: u64, task: u64) -> client::Entry {
-    client::Entry {
+fn status(number: u64, task: u64) -> skein_forge_client::Entry {
+    skein_forge_client::Entry {
         number,
         task,
         repository: REPO,
-        effect: client::Effect {
+        effect: skein_forge_client::Effect {
             write: skein_forge::api::Write::Status {
                 commit: [3; 32],
                 context: Box::from(&b"test"[..]),
                 check: skein_forge::api::Check::Passed,
             },
-            condition: client::Condition::None,
+            condition: skein_forge_client::Condition::None,
         },
         start: None,
         attempt: None,
@@ -221,7 +220,7 @@ fn an_outbox_entry_waits_for_its_commit() {
     let mut d = domain();
     outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
     assert_eq!(
-        outputs(&mut d, Event::Restored { clock: client::RecoveryClock::Monotonic }).as_ref(),
+        outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic }).as_ref(),
         &[Request::RestartDone { stage: RestartStage::Restored }],
     );
     assert_eq!(
@@ -296,7 +295,7 @@ fn adoption_reads_permission_before_committing_its_role() {
     assert_eq!(op, skein_forge::api::Op::Read(skein_forge::api::Read::Permission { user: 7 }));
     let result = outputs(
         &mut d,
-        Event::Client(client::Event::Answered {
+        Event::Client(skein_forge_client::Event::Answered {
             call,
             cost: 1,
             result: Ok(skein_forge::api::Answer::Permission(skein_forge::api::Permission::Write)),
@@ -344,7 +343,7 @@ fn adoption_reads_permission_before_committing_its_role() {
     assert!(
         outputs(
             &mut d,
-            Event::Client(client::Event::Answered {
+            Event::Client(skein_forge_client::Event::Answered {
                 call: branches,
                 cost: 1,
                 result: Ok(skein_forge::api::Answer::Branches(Box::new([Box::from(&b"main"[..])]))),
@@ -432,7 +431,7 @@ fn restored_ci_subscriptions_are_read_in_the_fresh_step_and_delay_its_completion
         },
     );
     assert_eq!(
-        outputs(&mut d, Event::Restored { clock: client::RecoveryClock::Monotonic }).as_ref(),
+        outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic }).as_ref(),
         &[Request::RestartDone { stage: RestartStage::Restored }]
     );
     let fresh = outputs(&mut d, Event::ReadAfresh);
@@ -446,7 +445,7 @@ fn restored_ci_subscriptions_are_read_in_the_fresh_step_and_delay_its_completion
     assert_eq!(*commit, [4; 32]);
     let done = outputs(
         &mut d,
-        Event::Client(client::Event::Answered {
+        Event::Client(skein_forge_client::Event::Answered {
             call: *call,
             cost: 1,
             result: Ok(skein_forge::api::Answer::Statuses {
@@ -503,7 +502,7 @@ fn a_workspace_item_names_its_forges_git_identity() {
 fn named_resource_reports_distinguish_private_branches_context_and_shared_landings() {
     let mut d = domain();
     outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
-    outputs(&mut d, Event::Restored { clock: client::RecoveryClock::Monotonic });
+    outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
     let private = branch();
     assert_eq!(d.resource_facts(&private), Some((Access::Owned, resources::HoldKind::Exclusive { wait: true })));
     let shared = Name { what: What::Branch(Box::new([Box::from(&b"main"[..])])), ..private.clone() };
@@ -558,11 +557,11 @@ fn native_effect_rows_keep_the_clients_recovery_promises() {
     for (kind, expected_form, write) in writes {
         let (form, recovery) = effect_shape(kind).expect("native effect kind");
         assert_eq!(form, expected_form, "kind {kind}");
-        let expected = match client::recovery(&write) {
-            client::Recovery::Keyed => Recovery::Keyed,
-            client::Recovery::Conditional => Recovery::Conditional,
-            client::Recovery::Idempotent => Recovery::Idempotent,
-            client::Recovery::Unrecoverable => Recovery::Unrecoverable,
+        let expected = match skein_forge_client::recovery(&write) {
+            skein_forge_client::Recovery::Keyed => Recovery::Keyed,
+            skein_forge_client::Recovery::Conditional => Recovery::Conditional,
+            skein_forge_client::Recovery::Idempotent => Recovery::Idempotent,
+            skein_forge_client::Recovery::Unrecoverable => Recovery::Unrecoverable,
         };
         assert_eq!(recovery, expected, "kind {kind}");
     }
@@ -570,21 +569,21 @@ fn native_effect_rows_keep_the_clients_recovery_promises() {
 
 /// An issue creation whose lifetime ran out unanswered: unrecoverable, it
 /// is held for a person (domain/forge.md, 6).
-fn held_issue() -> client::Entry {
-    client::Entry {
+fn held_issue() -> skein_forge_client::Entry {
+    skein_forge_client::Entry {
         number: 11,
         task: 7,
         repository: REPO,
-        effect: client::Effect {
+        effect: skein_forge_client::Effect {
             write: skein_forge::api::Write::CreateIssue {
                 key: Box::from(&b"k"[..]),
                 title: Box::from(&b"Finding"[..]),
                 body: Box::from(&b"Fix"[..]),
             },
-            condition: client::Condition::None,
+            condition: skein_forge_client::Condition::None,
         },
-        start: Some(client::Position { at: Time::from_nanos(1), comment: 0, review: 0, review_page: 1 }),
-        attempt: Some(client::Attempt {
+        start: Some(skein_forge_client::Position { at: Time::from_nanos(1), comment: 0, review: 0, review_page: 1 }),
+        attempt: Some(skein_forge_client::Attempt {
             sent: Time::from_nanos(1),
             deadline: Time::from_nanos(2),
             wall: Wall::from_nanos(1),
@@ -605,7 +604,7 @@ fn held_restored() -> Domain {
 /// A restarted forge whose held issue creation waits for a person.
 fn held_creation() -> Domain {
     let mut d = held_restored();
-    outputs(&mut d, Event::Restored { clock: client::RecoveryClock::Monotonic });
+    outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
     outputs(&mut d, Event::ReadAfresh);
     outputs(&mut d, Event::SettleOutbox);
     d
@@ -615,7 +614,7 @@ fn held_creation() -> Domain {
 fn a_held_effect_survives_a_restart_out_of_the_clients_outbox() {
     let mut d = held_restored();
     assert_eq!(
-        outputs(&mut d, Event::Restored { clock: client::RecoveryClock::Monotonic }).as_ref(),
+        outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic }).as_ref(),
         &[Request::RestartDone { stage: RestartStage::Restored }]
     );
     assert_eq!(
@@ -726,7 +725,7 @@ fn four_writers() -> Domain {
         outputs(&mut d, Event::Hold { task: holder, resource: name.clone(), from: None });
         outputs(&mut d, Event::Claim { task: 9, attempt: 1, writes: Box::new([name]), holders: Box::new([holder]) });
     }
-    outputs(&mut d, Event::Restored { clock: client::RecoveryClock::Monotonic });
+    outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
     outputs(&mut d, Event::ReadAfresh);
     outputs(&mut d, Event::SettleOutbox);
     d
@@ -735,7 +734,8 @@ fn four_writers() -> Domain {
 /// The forge's answer to client call `call`: the branch is at `commit`.
 fn branch_at(d: &mut Domain, call: u64, commit: u8) -> Box<[Request]> {
     let result = Ok(skein_forge::api::Answer::Commit([commit; 32]));
-    let answered = outputs(d, Event::Client(client::Event::Answered { call: Token::new(call), cost: 1, result }));
+    let answered =
+        outputs(d, Event::Client(skein_forge_client::Event::Answered { call: Token::new(call), cost: 1, result }));
     d.reclaim();
     answered
 }

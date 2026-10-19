@@ -3,7 +3,6 @@ mod names;
 use skein_lib::Duration;
 use temper_engine_domain as engine;
 use temper_engine_domain_forge as forge;
-use temper_engine_domain_forge_client as client;
 use temper_worker_domain_checkout as checkout;
 /// Temper's profile for one person's machine.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -43,7 +42,7 @@ pub enum Refused {
     /// Value outside the field's representation.
     Range,
 }
-const CLIENT: client::Limits = client::Limits {
+const CLIENT: skein_forge_client::Limits = skein_forge_client::Limits {
     // Logical calls retained, queued and in flight, from the engine forge world fixture.
     pending: 4,
     // Calls in flight, from the engine forge world fixture.

@@ -4,7 +4,6 @@ use crate::{BriefCommit, BriefItem, BriefRead, BriefSource, Domain, Request};
 use alloc::boxed::Box;
 use skein_lib::{List, Queue, Token};
 use temper_engine_domain_forge_change as change;
-use temper_engine_domain_forge_client as client;
 
 #[derive(Debug)]
 pub(crate) struct BriefFetch {
@@ -167,7 +166,7 @@ pub(super) fn brief_pull(
     };
     domain.brief_fetches.insert(call, fetch).expect("brief read room checked");
     out.push(Request::BriefClient {
-        event: client::Event::Read {
+        event: skein_forge_client::Event::Read {
             owner: call,
             repository,
             read: skein_forge::api::Read::Item { number: item.number, after: 0 },
@@ -355,7 +354,7 @@ pub(crate) fn brief_answer(
     if let Some(read) = next {
         let repository = fetch.repository;
         domain.brief_fetches.insert(owner, fetch).expect("same brief read room");
-        out.push(Request::BriefClient { event: client::Event::Read { owner, repository, read } });
+        out.push(Request::BriefClient { event: skein_forge_client::Event::Read { owner, repository, read } });
     } else {
         let read = brief_part(&fetch.words, fetch.parts, fetch.bytes);
         crate::held::ready(domain, fetch.owner, read, out);
@@ -481,7 +480,7 @@ pub(super) fn brief_reviews(
     };
     domain.brief_fetches.insert(call, fetch).expect("brief read room checked");
     out.push(Request::BriefClient {
-        event: client::Event::Read {
+        event: skein_forge_client::Event::Read {
             owner: call,
             repository,
             read: skein_forge::api::Read::Reviews { number: item.number, page: 1 },
@@ -554,7 +553,11 @@ pub(super) fn brief_ci(
     };
     domain.brief_fetches.insert(call, fetch).expect("brief read room checked");
     out.push(Request::BriefClient {
-        event: client::Event::Read { owner: call, repository, read: skein_forge::api::Read::Checks { commit: head.0 } },
+        event: skein_forge_client::Event::Read {
+            owner: call,
+            repository,
+            read: skein_forge::api::Read::Checks { commit: head.0 },
+        },
     });
     None
 }

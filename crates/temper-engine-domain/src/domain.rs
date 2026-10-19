@@ -22,7 +22,6 @@ use jig_domain_views as views;
 use skein_lib::{Env, Id, List, Map, Queue, ReplyTo, Slab, Token};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_change as forge_change;
-use temper_engine_domain_forge_client as forge_client;
 
 /// Core, forge, journal and bounded child-requested continuation bindings.
 /// The core owns policy and current proofs; the forge owns connector payloads
@@ -150,7 +149,7 @@ impl Domain {
         }
         let mut forge_config = core::mem::replace(
             &mut config.forge,
-            forge_client::Config { namespace: Box::new([]), writers: Box::new([]) },
+            skein_forge_client::Config { namespace: Box::new([]), writers: Box::new([]) },
         );
         forge_config.namespace = Box::from(config.core.deployment);
         let mut forge = forge::Domain::new(&limits.forge, config.core.seed, forge_config, &config.identities)
@@ -794,8 +793,10 @@ pub fn refused(mut config: Config, limits: &Limits) -> Box<[Refused]> {
     let Some(&connector) = config.core.connectors.first() else {
         return refused.into_boxed();
     };
-    let mut forge_config =
-        core::mem::replace(&mut config.forge, forge_client::Config { namespace: Box::new([]), writers: Box::new([]) });
+    let mut forge_config = core::mem::replace(
+        &mut config.forge,
+        skein_forge_client::Config { namespace: Box::new([]), writers: Box::new([]) },
+    );
     forge_config.namespace = Box::from(config.core.deployment);
     let Ok(mut forge) = forge::Domain::new(&limits.forge, config.core.seed, forge_config, &config.identities) else {
         refused.push(Refused::Forges).expect("counted refusals");

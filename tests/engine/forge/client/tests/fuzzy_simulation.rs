@@ -1,5 +1,5 @@
 use skein_forge::api;
-use temper_engine_domain_forge_client::{Condition, Effect, Entry};
+use skein_forge_client::{Condition, Effect, Entry};
 use temper_engine_forge_client_world::{REPO, Settings, World};
 #[test]
 fn seeded_faults_restarts_and_keyed_effects() {
@@ -16,7 +16,17 @@ fn seeded_faults_restarts_and_keyed_effects() {
                 repository: REPO,
                 effect: Effect {
                     write: api::Write::CreateIssue {
-                        key: Box::new([u8::try_from(entry).expect("world entry bound")]),
+                        key: Box::new([
+                            1,
+                            0,
+                            5,
+                            b'w',
+                            b'o',
+                            b'r',
+                            b'l',
+                            b'd',
+                            u8::try_from(entry).expect("world entry bound"),
+                        ]),
                         title: Box::from(&b"goal"[..]),
                         body: Box::from(&b"plan"[..]),
                     },

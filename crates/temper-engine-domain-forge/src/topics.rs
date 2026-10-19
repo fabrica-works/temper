@@ -9,7 +9,6 @@ use crate::{
 use alloc::boxed::Box;
 use skein_lib::{Env, List, Queue, Token};
 use temper_engine_domain_forge_change as change;
-use temper_engine_domain_forge_client as client;
 
 /// One bounded file list pinned to an open pull's head.
 #[derive(Debug)]
@@ -156,7 +155,7 @@ pub(crate) fn refresh(d: &mut Domain, env: &Env<Limits>, task: u64, out: &mut Qu
     domain::child(
         d,
         env,
-        client::Event::Read { owner, repository, read: skein_forge::api::Read::Pull { number: pull } },
+        skein_forge_client::Event::Read { owner, repository, read: skein_forge::api::Read::Pull { number: pull } },
         out,
     );
 }
@@ -229,7 +228,7 @@ pub(crate) fn answer(
         Some(read) => {
             let repository = pending.repository;
             d.goal_file_reads.insert(owner, pending).expect("replaces pending read");
-            domain::child(d, env, client::Event::Read { owner, repository, read }, out);
+            domain::child(d, env, skein_forge_client::Event::Read { owner, repository, read }, out);
         }
         None => finish(d, pending, None),
     }

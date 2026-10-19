@@ -23,7 +23,7 @@ struct Pending {
 pub struct FakeForge {
     pub domain: fake::Domain,
     config: fake::Config,
-    client_limits: temper_engine_domain_forge_client::Limits,
+    client_limits: skein_forge_client::Limits,
     out: std::collections::VecDeque<fake::Request>,
     pending: BTreeMap<Token, Pending>,
     late: Vec<(Token, api::Repository, api::Op, SystemKey)>,
@@ -150,7 +150,7 @@ impl FakeForge {
             self.late.push((call, repository, op, key));
             self.uncertainty(key);
             return vec![engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Client(
-                temper_engine_domain_forge_client::Event::Answered { call, cost: 1, result: Err(api::Error::Timeout) },
+                skein_forge_client::Event::Answered { call, cost: 1, result: Err(api::Error::Timeout) },
             )))];
         }
         self.send(clock, call, op, key, false);
@@ -281,7 +281,7 @@ impl FakeForge {
                 }
                 if pending.generation == self.generation {
                     events.push(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Client(
-                        temper_engine_domain_forge_client::Event::Answered {
+                        skein_forge_client::Event::Answered {
                             call: pending.root_call,
                             cost: 1,
                             result: match result {

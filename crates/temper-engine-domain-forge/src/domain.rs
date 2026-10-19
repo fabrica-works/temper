@@ -4,7 +4,6 @@
 use alloc::boxed::Box;
 use skein_lib::{Env, List, Map, Queue, Token};
 use temper_engine_domain_forge_change as change;
-use temper_engine_domain_forge_client as client;
 use temper_engine_domain_forge_issues as issues;
 
 use crate::{
@@ -77,7 +76,7 @@ struct StepInput {
 /// (domain/forge.md, 6; jig's `domain/connectors.md`, 4.3).
 #[derive(Debug)]
 pub(crate) struct Outboxed {
-    entry: client::Entry,
+    entry: skein_forge_client::Entry,
     held: bool,
 }
 
@@ -114,8 +113,8 @@ pub struct Domain {
     /// and fetch with (protocol/credentials.md).
     pub(crate) identities: Map<u16, u32>,
     pub(crate) capabilities: Map<Token, crate::capabilities::Pending>,
-    client: client::Domain,
-    client_out: Queue<client::Request>,
+    client: skein_forge_client::Domain,
+    client_out: Queue<skein_forge_client::Request>,
     pub(crate) brief_fetches: Map<Token, brief::BriefFetch>,
     brief_planned: Map<Token, crate::BriefSource>,
     pub(crate) brief_pending: Map<Token, held::Pending>,
@@ -175,8 +174,11 @@ impl Domain {
         }
         let within = match &answer {
             crate::CallPayload::Read(result) => match &**result {
-                Ok(value) => match client::answer_bytes(value, &limits.client) {
-                    Some(bytes) => bytes <= u64::from(limits.client.answer_bytes),
+                Ok(value) => match skein_forge::measure::answer(value) {
+                    Some(bytes) => {
+                        skein_forge_client::measure::answer_rows(value, limits.client.rows)
+                            && bytes <= u64::from(limits.client.answer_bytes)
+                    }
                     None => false,
                 },
                 Err(_) => true,
@@ -210,8 +212,8 @@ impl Domain {
     }
 
     /// Update the connector's own part when its client reports an effect outcome.
-    pub fn named_outcome(&mut self, entry: u64, outcome: client::Outcome) {
-        if outcome == client::Outcome::Uncertain {
+    pub fn named_outcome(&mut self, entry: u64, outcome: skein_forge_client::Outcome) {
+        if outcome == skein_forge_client::Outcome::Uncertain {
             return;
         }
         let Some(key) = self.named_effect(entry) else { return };
@@ -272,7 +274,7 @@ impl Domain {
     pub fn new(
         l: &Limits,
         seed: u64,
-        config: client::Config,
+        config: skein_forge_client::Config,
         identities: &[crate::GitIdentity],
     ) -> Result<Domain, skein_forge::api::Error> {
         if crate::worst_case(l).is_none() {
@@ -319,8 +321,8 @@ impl Domain {
             capabilities: Map::with_capacity(l.repositories),
             writers,
             identities: credentials,
-            client: client::Domain::configured(&l.client, seed, config)?,
-            client_out: Queue::with_capacity(client::max_out(&l.client)),
+            client: skein_forge_client::Domain::configured(&l.client, seed, config)?,
+            client_out: Queue::with_capacity(skein_forge_client::max_out(&l.client)),
             brief_fetches: Map::with_capacity(l.brief_sections),
             brief_planned: Map::with_capacity(l.brief_sections),
             brief_pending: Map::with_capacity(l.brief_sections),
@@ -798,20 +800,20 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
                 d.procedure_wakes.insert(task, true).expect("one pending wake per change");
             }
             ci_hint(d, env, &hint, out);
-            child(d, env, client::Event::Hint { hint }, out);
+            child(d, env, skein_forge_client::Event::Hint { hint }, out);
         }
         Event::Client(event) => child(d, env, event, out),
         Event::Restore { record } => restore(d, env, record),
         Event::Restored { clock } => restored(d, env, clock, out),
         Event::ReadAfresh => read_afresh(d, env, out),
-        Event::SettleOutbox => child(d, env, client::Event::SettleOutbox, out),
+        Event::SettleOutbox => child(d, env, skein_forge_client::Event::SettleOutbox, out),
     }
 }
 
 /// Drive one child call after prior saves have committed.
 pub fn resume(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     let child_env = child_env(env);
-    client::resume(&mut d.client, &child_env, &mut d.client_out);
+    skein_forge_client::resume(&mut d.client, &child_env, &mut d.client_out);
     drain(d, env, out);
     if d.client.has_room() {
         ask_lost_again(d, env, out);
@@ -829,7 +831,7 @@ pub fn resume(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
 pub fn fire(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     // Keep the client child's whole cohort available. Excess ready timers stay
     // in their owner's bounded tables for the next iteration.
-    let room = out.room().saturating_sub(client::max_out(&env.limits.client));
+    let room = out.room().saturating_sub(skein_forge_client::max_out(&env.limits.client));
     let mut goals = List::with_capacity(env.limits.issues.min(room));
     for (goal, when) in &d.projection_due {
         if *when <= env.wall && goals.room() > 0 {
@@ -840,7 +842,7 @@ pub fn fire(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         d.projection_due.remove(goal);
         emit(out, Request::ProjectAfter { goal: *goal, when: None });
     }
-    let room = out.room().saturating_sub(client::max_out(&env.limits.client));
+    let room = out.room().saturating_sub(skein_forge_client::max_out(&env.limits.client));
     let mut changes = List::with_capacity(env.limits.changes.min(room));
     for (task, when) in &d.change_due {
         if *when <= env.wall && changes.room() > 0 {
@@ -852,16 +854,16 @@ pub fn fire(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         emit(out, Request::WakeProcedure { task: *task });
     }
     let child_env = child_env(env);
-    client::fire(&mut d.client, &child_env, &mut d.client_out);
+    skein_forge_client::fire(&mut d.client, &child_env, &mut d.client_out);
     drain(d, env, out);
 }
 
-fn child_env(env: &Env<Limits>) -> Env<client::Limits> {
+fn child_env(env: &Env<Limits>) -> Env<skein_forge_client::Limits> {
     Env { now: env.now, wall: env.wall, limits: env.limits.client }
 }
 
-pub(crate) fn child(d: &mut Domain, env: &Env<Limits>, event: client::Event, out: &mut Queue<Request>) {
-    client::step(&mut d.client, &child_env(env), event, &mut d.client_out);
+pub(crate) fn child(d: &mut Domain, env: &Env<Limits>, event: skein_forge_client::Event, out: &mut Queue<Request>) {
+    skein_forge_client::step(&mut d.client, &child_env(env), event, &mut d.client_out);
     drain(d, env, out);
 }
 
@@ -869,17 +871,17 @@ fn drain(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     for _ in 0..d.client_out.len() {
         let request = d.client_out.pop().expect("counted child output");
         match request {
-            client::Request::Save { record } => {
+            skein_forge_client::Request::Save { record } => {
                 emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Client(record) });
             }
-            client::Request::Erase { key } => emit(out, Request::Erase { key: Key::Client(key) }),
-            client::Request::Progress { entry } => keep_entry(d, entry, None, out),
-            client::Request::Outcome { entry, task, outcome } => {
+            skein_forge_client::Request::Erase { key } => emit(out, Request::Erase { key: Key::Client(key) }),
+            skein_forge_client::Request::Progress { entry } => keep_entry(d, entry, None, out),
+            skein_forge_client::Request::Outcome { entry, task, outcome } => {
                 d.named_outcome(entry, outcome);
                 outcome_facts(d, env, entry, task, outcome, out);
                 match outcome {
-                    client::Outcome::Uncertain => {}
-                    client::Outcome::Held => {
+                    skein_forge_client::Outcome::Uncertain => {}
+                    skein_forge_client::Outcome::Held => {
                         // It stays in the outbox, keeping its room, until a
                         // person or its task's close settles it.
                         if let Some(row) = d.entries.get_mut(&entry) {
@@ -888,16 +890,16 @@ fn drain(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                             emit(out, Request::Save { read_afresh: None, release: None, record });
                         }
                     }
-                    client::Outcome::Made { .. }
-                    | client::Outcome::Failed(_)
-                    | client::Outcome::Raced { .. }
-                    | client::Outcome::Withdrawn => {
+                    skein_forge_client::Outcome::Made { .. }
+                    | skein_forge_client::Outcome::Failed(_)
+                    | skein_forge_client::Outcome::Raced { .. }
+                    | skein_forge_client::Outcome::Withdrawn => {
                         d.entries.remove(&entry);
                         emit(out, Request::Erase { key: Key::Entry(entry) });
                     }
                 }
                 emit(out, Request::Outcome { entry, task, outcome });
-                if outcome != client::Outcome::Uncertain
+                if outcome != skein_forge_client::Outcome::Uncertain
                     && match d.releases.get(&task) {
                         Some(row) => !row.failed,
                         None => false,
@@ -906,17 +908,19 @@ fn drain(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                     emit(out, Request::ContinueRelease { task });
                 }
             }
-            client::Request::Changed { resource, result } => changed(d, env, resource, result, out),
-            client::Request::Drift { resource, expected, observed } => {
+            skein_forge_client::Request::Changed { resource, result } => changed(d, env, resource, result, out),
+            skein_forge_client::Request::Drift { resource, expected, observed } => {
                 drift(d, env, resource, crate::DriftChange::Branch { expected, observed }, out);
             }
-            client::Request::Call { call, repository, op } => emit(out, Request::Call { call, repository, op }),
-            client::Request::Kept { owner, result } => {
+            skein_forge_client::Request::Call { call, repository, op } => {
+                emit(out, Request::Call { call, repository, op });
+            }
+            skein_forge_client::Request::Kept { owner, result } => {
                 if result.is_err() {
                     emit(out, Request::Refused { task: owner.raw() });
                 }
             }
-            client::Request::Read { owner, result } => {
+            skein_forge_client::Request::Read { owner, result } => {
                 if d.capabilities.contains_key(&owner) {
                     crate::capabilities::answered(d, env, owner, result, out);
                 } else if d.brief_fetches.contains_key(&owner) {
@@ -937,8 +941,8 @@ fn drain(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                     lost_read(d, env, owner, result, out);
                 }
             }
-            client::Request::ReadAfreshDone => d.restart_fresh = Some(true),
-            client::Request::OutboxDone => emit(out, Request::RestartDone { stage: RestartStage::Settled }),
+            skein_forge_client::Request::ReadAfreshDone => d.restart_fresh = Some(true),
+            skein_forge_client::Request::OutboxDone => emit(out, Request::RestartDone { stage: RestartStage::Settled }),
         }
     }
     read_afresh_complete(d, out);
@@ -949,17 +953,19 @@ fn outcome_facts(
     env: &Env<Limits>,
     entry: u64,
     task: u64,
-    outcome: client::Outcome,
+    outcome: skein_forge_client::Outcome,
     out: &mut Queue<Request>,
 ) {
     let forbidden = match outcome {
-        client::Outcome::Failed(skein_forge::api::Error::Forbidden | skein_forge::api::Error::Protected) => true,
-        client::Outcome::Made { .. }
-        | client::Outcome::Failed(_)
-        | client::Outcome::Raced { .. }
-        | client::Outcome::Uncertain
-        | client::Outcome::Held
-        | client::Outcome::Withdrawn => false,
+        skein_forge_client::Outcome::Failed(
+            skein_forge::api::Error::Forbidden | skein_forge::api::Error::Protected,
+        ) => true,
+        skein_forge_client::Outcome::Made { .. }
+        | skein_forge_client::Outcome::Failed(_)
+        | skein_forge_client::Outcome::Raced { .. }
+        | skein_forge_client::Outcome::Uncertain
+        | skein_forge_client::Outcome::Held
+        | skein_forge_client::Outcome::Withdrawn => false,
     };
     if forbidden && let Some(row) = d.entries.get(&entry) {
         let repository = row.entry.repository;
@@ -969,7 +975,7 @@ fn outcome_facts(
     change_outcome(d, env, entry, outcome, out);
     release_outcome(d, entry, outcome, out);
     match outcome {
-        client::Outcome::Made { made: client::Made::Branch(commit), .. } => {
+        skein_forge_client::Outcome::Made { made: skein_forge_client::Made::Branch(commit), .. } => {
             if let Some(Outboxed { entry: kept, .. }) = d.entries.get(&entry) {
                 let branch = match &kept.effect.write {
                     skein_forge::api::Write::CreateBranch { branch, .. } => Some(branch.clone()),
@@ -987,7 +993,10 @@ fn outcome_facts(
                     | skein_forge::api::Write::DeleteBranch { .. } => None,
                 };
                 if let Some(branch) = branch {
-                    let resource = client::Resource { repository: kept.repository, what: client::What::Branch(branch) };
+                    let resource = skein_forge_client::Resource {
+                        repository: kept.repository,
+                        what: skein_forge_client::What::Branch(branch),
+                    };
                     if let Some(name) = from_client(&resource, &env.limits) {
                         let head = BranchHead { name: name.clone(), commit, owned: true };
                         if d.heads.insert(name, head.clone()).is_ok() {
@@ -1000,26 +1009,26 @@ fn outcome_facts(
                 }
             }
         }
-        client::Outcome::Made { made: client::Made::Merged(commit), .. } => {
+        skein_forge_client::Outcome::Made { made: skein_forge_client::Made::Merged(commit), .. } => {
             if d.landed.len() < env.limits.landings || d.landed.contains_key(&commit) {
                 d.landed.insert(commit, task).expect("preflighted landed capacity");
                 emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Landed { commit, task } });
             }
         }
-        client::Outcome::Made {
+        skein_forge_client::Outcome::Made {
             made:
-                client::Made::Created(_)
-                | client::Made::Commented(_)
-                | client::Made::Reviewed(_)
-                | client::Made::Updated(_)
-                | client::Made::Set,
+                skein_forge_client::Made::Created(_)
+                | skein_forge_client::Made::Commented(_)
+                | skein_forge_client::Made::Reviewed(_)
+                | skein_forge_client::Made::Updated(_)
+                | skein_forge_client::Made::Set,
             ..
         }
-        | client::Outcome::Failed(_)
-        | client::Outcome::Raced { .. }
-        | client::Outcome::Uncertain
-        | client::Outcome::Held
-        | client::Outcome::Withdrawn => {}
+        | skein_forge_client::Outcome::Failed(_)
+        | skein_forge_client::Outcome::Raced { .. }
+        | skein_forge_client::Outcome::Uncertain
+        | skein_forge_client::Outcome::Held
+        | skein_forge_client::Outcome::Withdrawn => {}
     }
 }
 
@@ -1058,12 +1067,12 @@ fn valid_name(d: &Domain, l: &Limits, name: &Name) -> bool {
     }
 }
 
-fn to_client(name: &Name, l: &Limits) -> Option<client::Resource> {
+fn to_client(name: &Name, l: &Limits) -> Option<skein_forge_client::Resource> {
     let repository = skein_forge::api::Repository { forge: name.forge, repository: name.repository };
     let what = match &name.what {
-        What::Repository => client::What::Repository,
-        What::Pull(number) => client::What::Pull(*number),
-        What::Issue(number) => client::What::Issue(*number),
+        What::Repository => skein_forge_client::What::Repository,
+        What::Pull(number) => skein_forge_client::What::Pull(*number),
+        What::Issue(number) => skein_forge_client::What::Issue(*number),
         What::Branch(parts) => {
             let mut bytes = List::with_capacity(l.name_bytes);
             for (index, part) in parts.iter().enumerate() {
@@ -1076,14 +1085,16 @@ fn to_client(name: &Name, l: &Limits) -> Option<client::Resource> {
                     }
                 }
             }
-            client::What::Branch(bytes.into_boxed())
+            skein_forge_client::What::Branch(bytes.into_boxed())
         }
     };
-    Some(client::Resource { repository, what })
+    Some(skein_forge_client::Resource { repository, what })
 }
 
-fn participating(d: &Domain, resource: &client::Resource) -> bool {
-    let (client::What::Issue(number) | client::What::Pull(number)) = &resource.what else { return false };
+fn participating(d: &Domain, resource: &skein_forge_client::Resource) -> bool {
+    let (skein_forge_client::What::Issue(number) | skein_forge_client::What::Pull(number)) = &resource.what else {
+        return false;
+    };
     for (_, subscriber) in &d.subscriptions {
         if subscriber.topic == (Topic::Participation { repository: resource.repository, number: *number }) {
             return true;
@@ -1108,7 +1119,7 @@ fn names(d: &mut Domain, env: &Env<Limits>, task: u64, resources: Box<[Name]>, o
                     return;
                 };
                 let participating = participating(d, &resource);
-                if watches.insert(resource.clone(), client::Watch { resource, participating }).is_err() {
+                if watches.insert(resource.clone(), skein_forge_client::Watch { resource, participating }).is_err() {
                     emit(out, Request::Refused { task });
                     return;
                 }
@@ -1125,19 +1136,19 @@ fn names(d: &mut Domain, env: &Env<Limits>, task: u64, resources: Box<[Name]>, o
             return;
         };
         let participating = participating(d, &resource);
-        if watches.insert(resource.clone(), client::Watch { resource, participating }).is_err() {
+        if watches.insert(resource.clone(), skein_forge_client::Watch { resource, participating }).is_err() {
             emit(out, Request::Refused { task });
             return;
         }
     }
-    let mut list: List<client::Watch> = List::with_capacity(env.limits.client.resources);
+    let mut list: List<skein_forge_client::Watch> = List::with_capacity(env.limits.client.resources);
     for (_, watch) in &watches {
         list.push(watch.clone()).expect("map capped to watch list");
     }
-    client::step(
+    skein_forge_client::step(
         &mut d.client,
         &child_env(env),
-        client::Event::Keep { owner: Token::new(task), watches: list.into_boxed() },
+        skein_forge_client::Event::Keep { owner: Token::new(task), watches: list.into_boxed() },
         &mut d.client_out,
     );
     if kept(&d.client_out) {
@@ -1164,7 +1175,7 @@ fn names(d: &mut Domain, env: &Env<Limits>, task: u64, resources: Box<[Name]>, o
 }
 
 fn unnamed(d: &mut Domain, env: &Env<Limits>, task: u64, out: &mut Queue<Request>) {
-    let mut list: List<client::Watch> = List::with_capacity(env.limits.client.resources);
+    let mut list: List<skein_forge_client::Watch> = List::with_capacity(env.limits.client.resources);
     for (owner, row) in &d.names {
         if *owner == task {
             continue;
@@ -1178,16 +1189,16 @@ fn unnamed(d: &mut Domain, env: &Env<Limits>, task: u64, out: &mut Queue<Request
                 }
             }
             let participating = participating(d, &resource);
-            if !present && list.push(client::Watch { resource, participating }).is_err() {
+            if !present && list.push(skein_forge_client::Watch { resource, participating }).is_err() {
                 emit(out, Request::Refused { task });
                 return;
             }
         }
     }
-    client::step(
+    skein_forge_client::step(
         &mut d.client,
         &child_env(env),
-        client::Event::Keep { owner: Token::new(task), watches: list.into_boxed() },
+        skein_forge_client::Event::Keep { owner: Token::new(task), watches: list.into_boxed() },
         &mut d.client_out,
     );
     if kept(&d.client_out) && d.names.remove(&task).is_some() {
@@ -1196,20 +1207,20 @@ fn unnamed(d: &mut Domain, env: &Env<Limits>, task: u64, out: &mut Queue<Request
     drain(d, env, out);
 }
 
-fn kept(out: &Queue<client::Request>) -> bool {
+fn kept(out: &Queue<skein_forge_client::Request>) -> bool {
     for request in out {
         match request {
-            client::Request::Kept { result, .. } => return result.is_ok(),
-            client::Request::Changed { .. }
-            | client::Request::Drift { .. }
-            | client::Request::Save { .. }
-            | client::Request::Progress { .. }
-            | client::Request::Erase { .. }
-            | client::Request::Outcome { .. }
-            | client::Request::Call { .. }
-            | client::Request::Read { .. }
-            | client::Request::ReadAfreshDone
-            | client::Request::OutboxDone => {}
+            skein_forge_client::Request::Kept { result, .. } => return result.is_ok(),
+            skein_forge_client::Request::Changed { .. }
+            | skein_forge_client::Request::Drift { .. }
+            | skein_forge_client::Request::Save { .. }
+            | skein_forge_client::Request::Progress { .. }
+            | skein_forge_client::Request::Erase { .. }
+            | skein_forge_client::Request::Outcome { .. }
+            | skein_forge_client::Request::Call { .. }
+            | skein_forge_client::Request::Read { .. }
+            | skein_forge_client::Request::ReadAfreshDone
+            | skein_forge_client::Request::OutboxDone => {}
         }
     }
     false
@@ -1290,7 +1301,7 @@ fn claim(
         let saved = row.clone();
         save_hold(out, saved);
         if let Some(resource) = to_client(name, &env.limits) {
-            child(d, env, client::Event::Writer { resource, taken: true }, out);
+            child(d, env, skein_forge_client::Event::Writer { resource, taken: true }, out);
         }
     }
 }
@@ -1327,10 +1338,15 @@ fn answered(
                     let head = BranchHead { name: name.clone(), commit: *commit, owned: true };
                     d.heads.insert(name.clone(), head.clone()).expect("reported head was a live resource");
                     emit(out, Request::Save { read_afresh: None, release: None, record: Stored::BranchHead(head) });
-                    child(d, env, client::Event::Pushed { resource: resource.clone(), commit: *commit }, out);
+                    child(
+                        d,
+                        env,
+                        skein_forge_client::Event::Pushed { resource: resource.clone(), commit: *commit },
+                        out,
+                    );
                 }
             }
-            child(d, env, client::Event::Writer { resource, taken: false }, out);
+            child(d, env, skein_forge_client::Event::Writer { resource, taken: false }, out);
         }
     }
 }
@@ -1348,8 +1364,10 @@ fn lost(d: &mut Domain, env: &Env<Limits>, task: u64, attempt: u64, out: &mut Qu
         save_hold(out, row.clone());
         let Some(resource) = to_client(name, &env.limits) else { continue };
         let read = match resource.what {
-            client::What::Branch(branch) => skein_forge::api::Read::Branch { branch },
-            client::What::Repository | client::What::Pull(_) | client::What::Issue(_) => {
+            skein_forge_client::What::Branch(branch) => skein_forge::api::Read::Branch { branch },
+            skein_forge_client::What::Repository
+            | skein_forge_client::What::Pull(_)
+            | skein_forge_client::What::Issue(_) => {
                 emit(out, Request::Refused { task });
                 continue;
             }
@@ -1367,7 +1385,7 @@ fn lost(d: &mut Domain, env: &Env<Limits>, task: u64, attempt: u64, out: &mut Qu
             emit(out, Request::Refused { task });
             return;
         }
-        child(d, env, client::Event::Read { owner, repository: resource.repository, read }, out);
+        child(d, env, skein_forge_client::Event::Read { owner, repository: resource.repository, read }, out);
     }
 }
 
@@ -1387,12 +1405,17 @@ fn ask_lost_again(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     let Some(resource) = to_client(&pending.name, &env.limits) else { return };
     let read = match (comparison, resource.what) {
         (Some((before, after)), _) => skein_forge::api::Read::Compare { before, after },
-        (None, client::What::Branch(branch)) => skein_forge::api::Read::Branch { branch },
-        (None, client::What::Repository | client::What::Pull(_) | client::What::Issue(_)) => {
+        (None, skein_forge_client::What::Branch(branch)) => skein_forge::api::Read::Branch { branch },
+        (
+            None,
+            skein_forge_client::What::Repository
+            | skein_forge_client::What::Pull(_)
+            | skein_forge_client::What::Issue(_),
+        ) => {
             unreachable!("a lost writer holds a branch")
         }
     };
-    child(d, env, client::Event::Read { owner, repository: resource.repository, read }, out);
+    child(d, env, skein_forge_client::Event::Read { owner, repository: resource.repository, read }, out);
 }
 
 fn lost_read(
@@ -1423,7 +1446,7 @@ fn lost_read(
                 child(
                     d,
                     env,
-                    client::Event::Read {
+                    skein_forge_client::Event::Read {
                         owner,
                         repository: resource.repository,
                         read: skein_forge::api::Read::Compare { before, after: commit },
@@ -1476,12 +1499,12 @@ fn lost_read(
             return;
         }
         emit(out, Request::Save { read_afresh: None, release: None, record: Stored::BranchHead(head) });
-        child(d, env, client::Event::Pushed { resource: resource.clone(), commit }, out);
+        child(d, env, skein_forge_client::Event::Pushed { resource: resource.clone(), commit }, out);
     }
-    child(d, env, client::Event::Writer { resource, taken: false }, out);
+    child(d, env, skein_forge_client::Event::Writer { resource, taken: false }, out);
 }
 
-fn enqueue(d: &mut Domain, env: &Env<Limits>, entry: client::Entry, out: &mut Queue<Request>) {
+fn enqueue(d: &mut Domain, env: &Env<Limits>, entry: skein_forge_client::Entry, out: &mut Queue<Request>) {
     let task = entry.task;
     let Some(repository) = d.repositories.get(&entry.repository) else {
         emit(out, Request::Refused { task });
@@ -1504,7 +1527,7 @@ fn enqueue(d: &mut Domain, env: &Env<Limits>, entry: client::Entry, out: &mut Qu
 
 /// Save one entry in the client's hands: newly committed, for the client to
 /// make once the commit is durable, or a known entry's progress.
-fn keep_entry(d: &mut Domain, entry: client::Entry, release: Option<u64>, out: &mut Queue<Request>) {
+fn keep_entry(d: &mut Domain, entry: skein_forge_client::Entry, release: Option<u64>, out: &mut Queue<Request>) {
     let row = Outboxed { entry: entry.clone(), held: false };
     d.entries.insert(entry.number, row).expect("entry capacity checked or a known entry replaced");
     emit(out, Request::Save { read_afresh: None, release, record: Stored::Entry { entry, held: false } });
@@ -1688,7 +1711,12 @@ fn step_change(d: &mut Domain, env: &Env<Limits>, input: StepInput, out: &mut Qu
         reviews_complete: true,
     };
     d.steps.insert(owner, pending).expect("step capacity checked");
-    child(d, env, client::Event::Read { owner, repository, read: skein_forge::api::Read::Branch { branch } }, out);
+    child(
+        d,
+        env,
+        skein_forge_client::Event::Read { owner, repository, read: skein_forge::api::Read::Branch { branch } },
+        out,
+    );
 }
 
 fn status(ci: skein_forge::api::Ci) -> change::Status {
@@ -1768,7 +1796,7 @@ fn step_read(
                 child(
                     d,
                     env,
-                    client::Event::Read {
+                    skein_forge_client::Event::Read {
                         owner,
                         repository,
                         read: skein_forge::api::Read::Statuses { commit: base_tip, page: 1 },
@@ -1860,7 +1888,7 @@ fn step_read(
         },
     };
     d.steps.insert(owner, pending).expect("replaces step");
-    child(d, env, client::Event::Read { owner, repository, read: next }, out);
+    child(d, env, skein_forge_client::Event::Read { owner, repository, read: next }, out);
 }
 
 #[expect(
@@ -1934,8 +1962,10 @@ fn finish_step(d: &mut Domain, env: &Env<Limits>, pending: PendingStep, out: &mu
             None
         };
         if let Some(change) = changed {
-            let resource =
-                client::Resource { repository: row.repository, what: client::What::Branch(row.branch.clone()) };
+            let resource = skein_forge_client::Resource {
+                repository: row.repository,
+                what: skein_forge_client::What::Branch(row.branch.clone()),
+            };
             if let Some(name) = from_client(&resource, &env.limits)
                 && let Some(hold) = d.holds.get_mut(&name)
             {
@@ -2006,7 +2036,10 @@ fn change_facts(
         Some(pull) => pull.base != row.base,
         None => false,
     };
-    let branch_name = client::Resource { repository: row.repository, what: client::What::Branch(row.branch.clone()) };
+    let branch_name = skein_forge_client::Resource {
+        repository: row.repository,
+        what: skein_forge_client::What::Branch(row.branch.clone()),
+    };
     let writer_taken = match from_client(&branch_name, &env.limits) {
         Some(name) => match d.holds.get(&name) {
             Some(hold) => hold.writer.is_some(),
@@ -2082,18 +2115,18 @@ fn emit_change_effect(
         return;
     }
     let condition = match effect {
-        change::Effect::Update { head, base } => client::Condition::Update { head, base },
-        change::Effect::Merge { .. } => client::Condition::Merge { base: row.base.clone() },
+        change::Effect::Update { head, base } => skein_forge_client::Condition::Update { head, base },
+        change::Effect::Merge { .. } => skein_forge_client::Condition::Merge { base: row.base.clone() },
         change::Effect::Open
         | change::Effect::CreateBranch { .. }
         | change::Effect::Reopen
-        | change::Effect::Retarget => client::Condition::None,
+        | change::Effect::Retarget => skein_forge_client::Condition::None,
     };
-    let entry = client::Entry {
+    let entry = skein_forge_client::Entry {
         number: pending.entry,
         task: row.task,
         repository: row.repository,
-        effect: client::Effect { write, condition },
+        effect: skein_forge_client::Effect { write, condition },
         start: None,
         attempt: None,
         failures: 0,
@@ -2148,7 +2181,13 @@ fn change_write(row: &ChangeRow, effect: change::Effect) -> Option<skein_forge::
     }
 }
 
-fn change_outcome(d: &mut Domain, env: &Env<Limits>, entry: u64, outcome: client::Outcome, out: &mut Queue<Request>) {
+fn change_outcome(
+    d: &mut Domain,
+    env: &Env<Limits>,
+    entry: u64,
+    outcome: skein_forge_client::Outcome,
+    out: &mut Queue<Request>,
+) {
     let mut task = None;
     for (number, row) in &d.changes {
         if row.pending == Some(entry) {
@@ -2158,22 +2197,25 @@ fn change_outcome(d: &mut Domain, env: &Env<Limits>, entry: u64, outcome: client
     let Some(task) = task else { return };
     let Some(row) = d.changes.get_mut(&task) else { unreachable!("found change row") };
     let pull_closed = match outcome {
-        client::Outcome::Raced { made: client::Made::Created(_), why: skein_forge::api::Error::Closed } => true,
-        client::Outcome::Made { .. }
-        | client::Outcome::Failed(_)
-        | client::Outcome::Raced { .. }
-        | client::Outcome::Uncertain
-        | client::Outcome::Held
-        | client::Outcome::Withdrawn => false,
+        skein_forge_client::Outcome::Raced {
+            made: skein_forge_client::Made::Created(_),
+            why: skein_forge::api::Error::Closed,
+        } => true,
+        skein_forge_client::Outcome::Made { .. }
+        | skein_forge_client::Outcome::Failed(_)
+        | skein_forge_client::Outcome::Raced { .. }
+        | skein_forge_client::Outcome::Uncertain
+        | skein_forge_client::Outcome::Held
+        | skein_forge_client::Outcome::Withdrawn => false,
     };
     row.effect = match outcome {
-        client::Outcome::Made { .. } => change::EffectResult::Made,
-        client::Outcome::Failed(skein_forge::api::Error::Conflict) => change::EffectResult::Conflict,
-        client::Outcome::Failed(_)
-        | client::Outcome::Raced { .. }
-        | client::Outcome::Held
-        | client::Outcome::Withdrawn => change::EffectResult::Failed,
-        client::Outcome::Uncertain => return,
+        skein_forge_client::Outcome::Made { .. } => change::EffectResult::Made,
+        skein_forge_client::Outcome::Failed(skein_forge::api::Error::Conflict) => change::EffectResult::Conflict,
+        skein_forge_client::Outcome::Failed(_)
+        | skein_forge_client::Outcome::Raced { .. }
+        | skein_forge_client::Outcome::Held
+        | skein_forge_client::Outcome::Withdrawn => change::EffectResult::Failed,
+        skein_forge_client::Outcome::Uncertain => return,
     };
     row.pending = None;
     if pull_closed {
@@ -2182,8 +2224,10 @@ fn change_outcome(d: &mut Domain, env: &Env<Limits>, entry: u64, outcome: client
     let saved = row.clone();
     emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(saved.clone()) });
     if pull_closed {
-        let branch =
-            client::Resource { repository: saved.repository, what: client::What::Branch(saved.branch.clone()) };
+        let branch = skein_forge_client::Resource {
+            repository: saved.repository,
+            what: skein_forge_client::What::Branch(saved.branch.clone()),
+        };
         if from_client(&branch, &env.limits).is_some() {
             drift(
                 d,
@@ -2195,35 +2239,35 @@ fn change_outcome(d: &mut Domain, env: &Env<Limits>, entry: u64, outcome: client
         }
     }
     match outcome {
-        client::Outcome::Made { made: client::Made::Updated(commit), .. } => {
+        skein_forge_client::Outcome::Made { made: skein_forge_client::Made::Updated(commit), .. } => {
             child(
                 d,
                 env,
-                client::Event::Pushed {
-                    resource: client::Resource {
+                skein_forge_client::Event::Pushed {
+                    resource: skein_forge_client::Resource {
                         repository: saved.repository,
-                        what: client::What::Branch(saved.branch),
+                        what: skein_forge_client::What::Branch(saved.branch),
                     },
                     commit,
                 },
                 out,
             );
         }
-        client::Outcome::Made {
+        skein_forge_client::Outcome::Made {
             made:
-                client::Made::Created(_)
-                | client::Made::Commented(_)
-                | client::Made::Reviewed(_)
-                | client::Made::Merged(_)
-                | client::Made::Branch(_)
-                | client::Made::Set,
+                skein_forge_client::Made::Created(_)
+                | skein_forge_client::Made::Commented(_)
+                | skein_forge_client::Made::Reviewed(_)
+                | skein_forge_client::Made::Merged(_)
+                | skein_forge_client::Made::Branch(_)
+                | skein_forge_client::Made::Set,
             ..
         }
-        | client::Outcome::Failed(_)
-        | client::Outcome::Raced { .. }
-        | client::Outcome::Uncertain
-        | client::Outcome::Held
-        | client::Outcome::Withdrawn => {}
+        | skein_forge_client::Outcome::Failed(_)
+        | skein_forge_client::Outcome::Raced { .. }
+        | skein_forge_client::Outcome::Uncertain
+        | skein_forge_client::Outcome::Held
+        | skein_forge_client::Outcome::Withdrawn => {}
     }
     emit(out, Request::ChangeDecision { task, decision: change::Decision::None, entry: None, evidence: None });
 }
@@ -2313,8 +2357,8 @@ fn settle_effects(
             {
                 d.entries.remove(&number);
                 emit(out, Request::Erase { key: Key::Entry(number) });
-                d.named_outcome(number, client::Outcome::Withdrawn);
-                emit(out, Request::Outcome { entry: number, task, outcome: client::Outcome::Withdrawn });
+                d.named_outcome(number, skein_forge_client::Outcome::Withdrawn);
+                emit(out, Request::Outcome { entry: number, task, outcome: skein_forge_client::Outcome::Withdrawn });
             }
         }
     }
@@ -2441,7 +2485,7 @@ fn continue_release(d: &mut Domain, env: &Env<Limits>, task: u64, entry: u64, ou
             }
             if let Some(resource) = to_client(&name, &env.limits) {
                 match resource.what {
-                    client::What::Branch(branch) => {
+                    skein_forge_client::What::Branch(branch) => {
                         enqueue_release(
                             d,
                             env,
@@ -2454,7 +2498,9 @@ fn continue_release(d: &mut Domain, env: &Env<Limits>, task: u64, entry: u64, ou
                         );
                         return;
                     }
-                    client::What::Repository | client::What::Pull(_) | client::What::Issue(_) => {}
+                    skein_forge_client::What::Repository
+                    | skein_forge_client::What::Pull(_)
+                    | skein_forge_client::What::Issue(_) => {}
                 }
             }
             d.holds.remove(&name);
@@ -2494,11 +2540,11 @@ fn enqueue_release(
         emit(out, Request::ReleaseFailed { task: row.task });
         return;
     }
-    let entry = client::Entry {
+    let entry = skein_forge_client::Entry {
         number,
         task: row.task,
         repository,
-        effect: client::Effect { write, condition: client::Condition::None },
+        effect: skein_forge_client::Effect { write, condition: skein_forge_client::Condition::None },
         start: None,
         attempt: None,
         failures: 0,
@@ -2509,8 +2555,8 @@ fn enqueue_release(
     keep_entry(d, entry, Some(number), out);
 }
 
-fn release_outcome(d: &mut Domain, entry: u64, outcome: client::Outcome, out: &mut Queue<Request>) {
-    if outcome == client::Outcome::Uncertain {
+fn release_outcome(d: &mut Domain, entry: u64, outcome: skein_forge_client::Outcome, out: &mut Queue<Request>) {
+    if outcome == skein_forge_client::Outcome::Uncertain {
         return;
     }
     let mut owner = None;
@@ -2527,21 +2573,21 @@ fn release_outcome(d: &mut Domain, entry: u64, outcome: client::Outcome, out: &m
     let mut row = d.releases.get(&task).expect("selected release").clone();
     let (_, resource) = row.pending.take().expect("selected pending release");
     match outcome {
-        client::Outcome::Made { .. } => match resource {
+        skein_forge_client::Outcome::Made { .. } => match resource {
             Some(name) => {
                 d.holds.remove(&name);
                 emit(out, Request::Erase { key: Key::Hold(name) });
             }
             None => row.close_pull = None,
         },
-        client::Outcome::Failed(_)
-        | client::Outcome::Raced { .. }
-        | client::Outcome::Held
-        | client::Outcome::Withdrawn => {
+        skein_forge_client::Outcome::Failed(_)
+        | skein_forge_client::Outcome::Raced { .. }
+        | skein_forge_client::Outcome::Held
+        | skein_forge_client::Outcome::Withdrawn => {
             row.failed = true;
             emit(out, Request::ReleaseFailed { task });
         }
-        client::Outcome::Uncertain => unreachable!("uncertain returned above"),
+        skein_forge_client::Outcome::Uncertain => unreachable!("uncertain returned above"),
     }
     d.releases.insert(task, row.clone()).expect("replaces release");
     emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Release(row) });
@@ -2619,11 +2665,11 @@ fn project(
                 emit(out, Request::ProjectionFailed { goal });
                 return;
             };
-            let entry = client::Entry {
+            let entry = skein_forge_client::Entry {
                 number,
                 task: goal,
                 repository,
-                effect: client::Effect { write, condition: client::Condition::None },
+                effect: skein_forge_client::Effect { write, condition: skein_forge_client::Condition::None },
                 start: None,
                 attempt: None,
                 failures: 0,
@@ -2691,7 +2737,7 @@ fn projection_key(namespace: &[u8], goal: u64, key: issues::Key, l: &Limits) -> 
     crate::purpose::EffectPurpose::Projection { goal, part, number }.key(namespace, l.client.op_bytes)
 }
 
-fn projection_outcome(d: &mut Domain, entry: u64, outcome: client::Outcome, out: &mut Queue<Request>) {
+fn projection_outcome(d: &mut Domain, entry: u64, outcome: skein_forge_client::Outcome, out: &mut Queue<Request>) {
     let mut goal = None;
     for (number, row) in &d.issues {
         if row.pending == Some(entry) {
@@ -2701,24 +2747,24 @@ fn projection_outcome(d: &mut Domain, entry: u64, outcome: client::Outcome, out:
     let Some(goal) = goal else { return };
     let Some(row) = d.issues.get_mut(&goal) else { unreachable!("found issue row") };
     match outcome {
-        client::Outcome::Uncertain => return,
-        client::Outcome::Made { made, .. } => {
+        skein_forge_client::Outcome::Uncertain => return,
+        skein_forge_client::Outcome::Made { made, .. } => {
             if row.number.is_none() {
                 match made {
-                    client::Made::Created(number) => row.number = Some(number),
-                    client::Made::Commented(_)
-                    | client::Made::Reviewed(_)
-                    | client::Made::Merged(_)
-                    | client::Made::Updated(_)
-                    | client::Made::Branch(_)
-                    | client::Made::Set => row.failed = true,
+                    skein_forge_client::Made::Created(number) => row.number = Some(number),
+                    skein_forge_client::Made::Commented(_)
+                    | skein_forge_client::Made::Reviewed(_)
+                    | skein_forge_client::Made::Merged(_)
+                    | skein_forge_client::Made::Updated(_)
+                    | skein_forge_client::Made::Branch(_)
+                    | skein_forge_client::Made::Set => row.failed = true,
                 }
             }
         }
-        client::Outcome::Failed(_)
-        | client::Outcome::Raced { .. }
-        | client::Outcome::Held
-        | client::Outcome::Withdrawn => {
+        skein_forge_client::Outcome::Failed(_)
+        | skein_forge_client::Outcome::Raced { .. }
+        | skein_forge_client::Outcome::Held
+        | skein_forge_client::Outcome::Withdrawn => {
             if let Some(before) = row.before.take() {
                 row.state = before;
             }
@@ -2751,7 +2797,7 @@ fn committed(d: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Req
     if let Some(row) = d.entries.get(&number)
         && !row.held
     {
-        child(d, env, client::Event::Make { entry: row.entry.clone() }, out);
+        child(d, env, skein_forge_client::Event::Make { entry: row.entry.clone() }, out);
     }
 }
 
@@ -2773,7 +2819,7 @@ fn resolve(d: &mut Domain, env: &Env<Limits>, number: u64, again: bool, out: &mu
         out,
         Request::Save { read_afresh: None, release: None, record: Stored::Entry { entry: entry.clone(), held: false } },
     );
-    child(d, env, client::Event::Remake { entry }, out);
+    child(d, env, skein_forge_client::Event::Remake { entry }, out);
 }
 
 /// Settle one held entry as not made, freeing its room.
@@ -2818,7 +2864,7 @@ fn withdraw(d: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Requ
     if let Some(row) = d.entries.get(&number)
         && !row.held
     {
-        child(d, env, client::Event::Withdraw { entry: number }, out);
+        child(d, env, skein_forge_client::Event::Withdraw { entry: number }, out);
     }
 }
 
@@ -2902,7 +2948,11 @@ fn ci_refresh(
     child(
         d,
         env,
-        client::Event::Read { owner, repository, read: skein_forge::api::Read::Statuses { commit: head, page: 1 } },
+        skein_forge_client::Event::Read {
+            owner,
+            repository,
+            read: skein_forge::api::Read::Statuses { commit: head, page: 1 },
+        },
         out,
     );
 }
@@ -2976,7 +3026,7 @@ fn ci_observed(
 fn changed(
     d: &mut Domain,
     env: &Env<Limits>,
-    resource: client::Resource,
+    resource: skein_forge_client::Resource,
     result: Result<skein_forge::api::Answer, skein_forge::api::Error>,
     out: &mut Queue<Request>,
 ) {
@@ -2990,11 +3040,14 @@ fn changed(
             }
         }
         Ok(skein_forge::api::Answer::Reviews { reviews, more: _ }) => match resource.what {
-            client::What::Pull(number) if !reviews.is_empty() => {
+            skein_forge_client::What::Pull(number) if !reviews.is_empty() => {
                 let topic = Topic::Participation { repository: resource.repository, number };
                 publish(d, topic, News::Changed { number }, out);
             }
-            client::What::Pull(_) | client::What::Repository | client::What::Branch(_) | client::What::Issue(_) => {}
+            skein_forge_client::What::Pull(_)
+            | skein_forge_client::What::Repository
+            | skein_forge_client::What::Branch(_)
+            | skein_forge_client::What::Issue(_) => {}
         },
         Ok(
             skein_forge::api::Answer::Items { .. }
@@ -3022,12 +3075,12 @@ fn changed(
     }
 }
 
-fn from_client(resource: &client::Resource, l: &Limits) -> Option<Name> {
+fn from_client(resource: &skein_forge_client::Resource, l: &Limits) -> Option<Name> {
     let what = match &resource.what {
-        client::What::Repository => What::Repository,
-        client::What::Pull(number) => What::Pull(*number),
-        client::What::Issue(number) => What::Issue(*number),
-        client::What::Branch(branch) => {
+        skein_forge_client::What::Repository => What::Repository,
+        skein_forge_client::What::Pull(number) => What::Pull(*number),
+        skein_forge_client::What::Issue(number) => What::Issue(*number),
+        skein_forge_client::What::Branch(branch) => {
             if branch.is_empty() || branch.len() > usize::try_from(l.name_bytes).ok()? {
                 return None;
             }
@@ -3056,7 +3109,7 @@ fn from_client(resource: &client::Resource, l: &Limits) -> Option<Name> {
 fn branch_changed(
     d: &mut Domain,
     env: &Env<Limits>,
-    resource: client::Resource,
+    resource: skein_forge_client::Resource,
     commit: skein_forge::api::Commit,
     out: &mut Queue<Request>,
 ) {
@@ -3067,8 +3120,10 @@ fn branch_changed(
         return;
     }
     let Some(branch) = (match &resource.what {
-        client::What::Branch(branch) => Some(branch.clone()),
-        client::What::Repository | client::What::Pull(_) | client::What::Issue(_) => None,
+        skein_forge_client::What::Branch(branch) => Some(branch.clone()),
+        skein_forge_client::What::Repository
+        | skein_forge_client::What::Pull(_)
+        | skein_forge_client::What::Issue(_) => None,
     }) else {
         return;
     };
@@ -3104,7 +3159,7 @@ fn branch_changed(
     child(
         d,
         env,
-        client::Event::Read {
+        skein_forge_client::Event::Read {
             owner,
             repository: resource.repository,
             read: skein_forge::api::Read::Compare { before, after: commit },
@@ -3138,7 +3193,7 @@ fn landing_read(
 fn pull_changed(
     d: &mut Domain,
     env: &Env<Limits>,
-    resource: client::Resource,
+    resource: skein_forge_client::Resource,
     pull: skein_forge::api::Pull,
     out: &mut Queue<Request>,
 ) {
@@ -3165,7 +3220,10 @@ fn pull_changed(
         drift(
             d,
             env,
-            client::Resource { repository: resource.repository, what: client::What::Branch(branch) },
+            skein_forge_client::Resource {
+                repository: resource.repository,
+                what: skein_forge_client::What::Branch(branch),
+            },
             change,
             out,
         );
@@ -3268,7 +3326,7 @@ fn updating_entry(d: &Domain, task: u64) -> bool {
 fn drift(
     d: &mut Domain,
     env: &Env<Limits>,
-    resource: client::Resource,
+    resource: skein_forge_client::Resource,
     change: crate::DriftChange,
     out: &mut Queue<Request>,
 ) {
@@ -3298,7 +3356,7 @@ fn drift(
     }
 }
 
-fn deleting_entry(d: &Domain, task: u64, resource: &client::Resource, change: &crate::DriftChange) -> bool {
+fn deleting_entry(d: &Domain, task: u64, resource: &skein_forge_client::Resource, change: &crate::DriftChange) -> bool {
     match change {
         crate::DriftChange::Branch { observed: None, .. } => {}
         crate::DriftChange::Branch { observed: Some(_), .. }
@@ -3310,8 +3368,10 @@ fn deleting_entry(d: &Domain, task: u64, resource: &client::Resource, change: &c
     let Some(Outboxed { entry, .. }) = d.entries.get(number) else { return false };
     match &entry.effect.write {
         skein_forge::api::Write::DeleteBranch { branch } => match &resource.what {
-            client::What::Branch(found) => entry.repository == resource.repository && branch == found,
-            client::What::Repository | client::What::Pull(_) | client::What::Issue(_) => false,
+            skein_forge_client::What::Branch(found) => entry.repository == resource.repository && branch == found,
+            skein_forge_client::What::Repository
+            | skein_forge_client::What::Pull(_)
+            | skein_forge_client::What::Issue(_) => false,
         },
         skein_forge::api::Write::CreateIssue { .. }
         | skein_forge::api::Write::OpenPull { .. }
@@ -3366,7 +3426,7 @@ fn restore(d: &mut Domain, env: &Env<Limits>, record: Stored) {
         }
         Stored::Client(row) => {
             let mut discarded = Queue::with_capacity(env.limits.output);
-            child(d, env, client::Event::Restore { record: row }, &mut discarded);
+            child(d, env, skein_forge_client::Event::Restore { record: row }, &mut discarded);
             assert!(discarded.is_empty(), "restoration emits no output");
         }
         Stored::Change(row) => {
@@ -3388,8 +3448,8 @@ fn restore(d: &mut Domain, env: &Env<Limits>, record: Stored) {
     }
 }
 
-fn restored(d: &mut Domain, env: &Env<Limits>, clock: client::RecoveryClock, out: &mut Queue<Request>) {
-    child(d, env, client::Event::Restored { clock }, out);
+fn restored(d: &mut Domain, env: &Env<Limits>, clock: skein_forge_client::RecoveryClock, out: &mut Queue<Request>) {
+    child(d, env, skein_forge_client::Event::Restored { clock }, out);
     // The client's transient watcher flags are rebuilt from the connector's
     // durable writers before any fresh background read can classify a push.
     {
@@ -3405,10 +3465,10 @@ fn restored(d: &mut Domain, env: &Env<Limits>, clock: client::RecoveryClock, out
             }
         }
         for resource in &resources {
-            child(d, env, client::Event::Writer { resource: resource.clone(), taken: true }, out);
+            child(d, env, skein_forge_client::Event::Writer { resource: resource.clone(), taken: true }, out);
         }
     }
-    child(d, env, client::Event::PauseOutbox, out);
+    child(d, env, skein_forge_client::Event::PauseOutbox, out);
     // A held entry waits for a person, out of the client's outbox.
     let mut entries = List::with_capacity(env.limits.entries);
     for (_, row) in &d.entries {
@@ -3417,7 +3477,7 @@ fn restored(d: &mut Domain, env: &Env<Limits>, clock: client::RecoveryClock, out
         }
     }
     for entry in &entries {
-        child(d, env, client::Event::Make { entry: entry.clone() }, out);
+        child(d, env, skein_forge_client::Event::Make { entry: entry.clone() }, out);
     }
     emit(out, Request::RestartDone { stage: RestartStage::Restored });
 }
@@ -3454,7 +3514,7 @@ fn read_afresh(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     for (repository, head) in &ci {
         ci_refresh(d, env, *repository, *head, out);
     }
-    child(d, env, client::Event::ReadAfresh, out);
+    child(d, env, skein_forge_client::Event::ReadAfresh, out);
 }
 
 fn read_afresh_complete(d: &mut Domain, out: &mut Queue<Request>) {

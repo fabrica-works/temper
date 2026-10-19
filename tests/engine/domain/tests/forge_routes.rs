@@ -10,7 +10,6 @@ use std::collections::{BTreeMap, VecDeque};
 use temper_engine_domain as engine;
 use temper_engine_domain::{Delivery, Key, Record};
 use temper_engine_domain_forge as forge_top;
-use temper_engine_domain_forge_client as client;
 use temper_engine_domain_world::protocol::{self, Protocol};
 use temper_engine_domain_world::{store::Store, walking};
 use temper_engine_forge_world::{self as forge_world, translate};
@@ -448,13 +447,11 @@ impl World {
                         && matches!(op, skein_forge::api::Op::Read(skein_forge::api::Read::Job { .. }))
                     {
                         self.events.push_back(engine::Event::Forge(Box::new(
-                            temper_engine_domain_forge::Event::Client(
-                                temper_engine_domain_forge_client::Event::Answered {
-                                    call,
-                                    cost: 1,
-                                    result: Err(skein_forge::api::Error::MissingJob),
-                                },
-                            ),
+                            temper_engine_domain_forge::Event::Client(skein_forge_client::Event::Answered {
+                                call,
+                                cost: 1,
+                                result: Err(skein_forge::api::Error::MissingJob),
+                            }),
                         )));
                         continue;
                     }
@@ -563,7 +560,7 @@ impl World {
                         }
                     };
                     self.events.push_back(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Client(
-                        temper_engine_domain_forge_client::Event::Answered { call, cost: 1, result },
+                        skein_forge_client::Event::Answered { call, cost: 1, result },
                     ))));
                 }
                 fake::Request::Hook { .. } => {}
@@ -2543,7 +2540,9 @@ fn a_named_forge_effect_is_committed_before_its_write_and_made_once() {
     world.until(Until::Effect);
     let entry = match world.answers[0] {
         temper_engine_domain::CallAnswer::ForgeEffect {
-            entry, outcome: Some(client::Outcome::Made { .. }), ..
+            entry,
+            outcome: Some(skein_forge_client::Outcome::Made { .. }),
+            ..
         } => entry,
         ref other => panic!("unexpected effect answer: {other:?}"),
     };
@@ -2583,7 +2582,7 @@ fn a_named_forge_effect_is_committed_before_its_write_and_made_once() {
         world.tick();
     }
     assert!(
-        matches!(world.answers.last(), Some(temper_engine_domain::CallAnswer::ForgeEffect { entry: observed, outcome: Some(client::Outcome::Made { .. }), .. }) if *observed == entry)
+        matches!(world.answers.last(), Some(temper_engine_domain::CallAnswer::ForgeEffect { entry: observed, outcome: Some(skein_forge_client::Outcome::Made { .. }), .. }) if *observed == entry)
     );
 }
 
@@ -2775,7 +2774,7 @@ fn effect_survives_each_commit_and_outbox_cut_without_a_second_issue() {
                             event,
                             engine::Event::Forge(event) if matches!(event.as_ref(),
                                 temper_engine_domain_forge::Event::Client(
-                                    temper_engine_domain_forge_client::Event::Answered {
+                                    skein_forge_client::Event::Answered {
                                         result: Ok(skein_forge::api::Answer::Created(_)), ..
                                     }
                                 ))
@@ -2802,7 +2801,7 @@ fn effect_survives_each_commit_and_outbox_cut_without_a_second_issue() {
                                 event,
                                 engine::Event::Forge(event) if matches!(event.as_ref(),
                                     temper_engine_domain_forge::Event::Client(
-                                        temper_engine_domain_forge_client::Event::Answered {
+                                        skein_forge_client::Event::Answered {
                                             result: Ok(skein_forge::api::Answer::Created(_)), ..
                                         }
                                     ))

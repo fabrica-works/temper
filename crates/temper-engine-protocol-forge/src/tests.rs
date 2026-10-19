@@ -64,8 +64,7 @@ use skein_lib::{Secret, Token};
 fn limits_that_disagree_with_the_client_name_both_limits() {
     let l = fixtures::limits();
     let s = fixtures::shared();
-    let short_answer =
-        crate::Shared { client: temper_engine_domain_forge_client::Limits { answer_bytes: 64, ..s.client }, ..s };
+    let short_answer = crate::Shared { client: skein_forge_client::Limits { answer_bytes: 64, ..s.client }, ..s };
     let rows = [
         ("connections", Limits { connections: 3, ..l }, s, Unusable::Connections { connections: 3, calls: 2 }),
         (
@@ -91,10 +90,7 @@ fn a_page_is_the_smallest_of_rows_cap_and_answer_room() {
     let shared = fixtures::shared();
     let rows = [("forge cap", 2, 65_536, 2), ("client rows", 50, 65_536, 8), ("answer room", 50, 4096, 1)];
     for (name, cap, answer_bytes, expected) in rows {
-        let shared = crate::Shared {
-            client: temper_engine_domain_forge_client::Limits { answer_bytes, ..shared.client },
-            ..shared
-        };
+        let shared = crate::Shared { client: skein_forge_client::Limits { answer_bytes, ..shared.client }, ..shared };
         assert_eq!(limits::page_size(Listing::Items, cap, &limits, &shared), expected, "{name}");
     }
 }
@@ -238,8 +234,7 @@ fn the_worst_case_counts_answers_and_refuses_overflow() {
 fn many_due_calls_keep_the_timer_output_bound() {
     let limits = Limits { connections: 20, ..fixtures::limits() };
     let shared = fixtures::shared();
-    let shared =
-        crate::Shared { client: temper_engine_domain_forge_client::Limits { calls: 20, ..shared.client }, ..shared };
+    let shared = crate::Shared { client: skein_forge_client::Limits { calls: 20, ..shared.client }, ..shared };
     let mut h = fixtures::Harness::with(limits, shared, fixtures::settings());
     for call in 0..20 {
         h.call(call, fixtures::REPO, api::Op::Read(api::Read::Settings));
@@ -258,8 +253,7 @@ fn many_due_calls_keep_the_timer_output_bound() {
 fn many_held_answers_keep_the_offer_output_bound() {
     let limits = Limits { connections: 20, ..fixtures::limits() };
     let shared = fixtures::shared();
-    let shared =
-        crate::Shared { client: temper_engine_domain_forge_client::Limits { calls: 20, ..shared.client }, ..shared };
+    let shared = crate::Shared { client: skein_forge_client::Limits { calls: 20, ..shared.client }, ..shared };
     let mut h = fixtures::Harness::with(limits, shared, fixtures::settings());
     for call in 0..20 {
         h.send(Request::Refused(Answered { call: Token::new(call), cost: 0, result: Err(api::Error::Unavailable) }));

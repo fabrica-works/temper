@@ -1,9 +1,8 @@
 use skein_lib::{Duration, List, Rng};
 use temper_engine_domain_forge as top;
-use temper_engine_domain_forge_client as client;
 pub const REPO: skein_forge::api::Repository = skein_forge::api::Repository { forge: 1, repository: 2 };
 
-const CLIENT: client::Limits = client::Limits {
+const CLIENT: skein_forge_client::Limits = skein_forge_client::Limits {
     pending: 4,
     calls: 2,
     rate: 100,
@@ -124,18 +123,18 @@ fn topic(random: &mut Rng) -> top::Topic {
         _ => top::Topic::Participation { repository, number: random.next_u64() },
     }
 }
-fn client_key(random: &mut Rng) -> client::Key {
+fn client_key(random: &mut Rng) -> skein_forge_client::Key {
     let repository = repository(random);
     if random.below(2) == 0 {
-        return client::Key::Repository(repository);
+        return skein_forge_client::Key::Repository(repository);
     }
     let what = match random.below(4) {
-        0 => client::What::Repository,
-        1 => client::What::Branch(random_bytes(random)),
-        2 => client::What::Pull(random.next_u64()),
-        _ => client::What::Issue(random.next_u64()),
+        0 => skein_forge_client::What::Repository,
+        1 => skein_forge_client::What::Branch(random_bytes(random)),
+        2 => skein_forge_client::What::Pull(random.next_u64()),
+        _ => skein_forge_client::What::Issue(random.next_u64()),
     };
-    client::Key::Live(client::Resource { repository, what })
+    skein_forge_client::Key::Live(skein_forge_client::Resource { repository, what })
 }
 pub fn key(random: &mut Rng) -> top::Key {
     let number = random.next_u64();
@@ -349,14 +348,19 @@ pub fn names_holds_and_topics() -> Box<[(&'static str, top::Stored)]> {
     rows.into_boxed()
 }
 
-pub fn entry(write: skein_forge::api::Write, condition: client::Condition) -> client::Entry {
-    client::Entry {
+pub fn entry(write: skein_forge::api::Write, condition: skein_forge_client::Condition) -> skein_forge_client::Entry {
+    skein_forge_client::Entry {
         number: 3,
         task: 4,
         repository: REPO,
-        effect: client::Effect { write, condition },
-        start: Some(client::Position { at: skein_lib::Time::from_nanos(11), comment: 12, review: 13, review_page: 14 }),
-        attempt: Some(client::Attempt {
+        effect: skein_forge_client::Effect { write, condition },
+        start: Some(skein_forge_client::Position {
+            at: skein_lib::Time::from_nanos(11),
+            comment: 12,
+            review: 13,
+            review_page: 14,
+        }),
+        attempt: Some(skein_forge_client::Attempt {
             sent: skein_lib::Time::from_nanos(15),
             deadline: skein_lib::Time::from_nanos(16),
             wall: skein_lib::Wall::from_nanos(17),
@@ -389,12 +393,12 @@ pub fn writes() -> [(&'static str, skein_forge::api::Write); 13] {
         ("delete branch", Write::DeleteBranch { branch: Box::new([2]) }),
     ]
 }
-pub fn conditions() -> [client::Condition; 4] {
+pub fn conditions() -> [skein_forge_client::Condition; 4] {
     [
-        client::Condition::None,
-        client::Condition::Merge { base: Box::new([0, 255]) },
-        client::Condition::Update { head: [2; 32], base: [3; 32] },
-        client::Condition::Review { head: [4; 32] },
+        skein_forge_client::Condition::None,
+        skein_forge_client::Condition::Merge { base: Box::new([0, 255]) },
+        skein_forge_client::Condition::Update { head: [2; 32], base: [3; 32] },
+        skein_forge_client::Condition::Review { head: [4; 32] },
     ]
 }
 
@@ -425,7 +429,7 @@ pub fn named_call(answer: top::CallPayload) -> top::Stored {
     top::Stored::Call { key: top::NamedCall { task: 1, attempt: 2, completion: 3, position: 4 }, answer }
 }
 pub fn payloads() -> List<top::CallPayload> {
-    use client::{Made, Outcome};
+    use skein_forge_client::{Made, Outcome};
     let mut rows = List::with_capacity(80);
     for made in [
         Made::Created(1),
@@ -456,7 +460,7 @@ pub fn payloads() -> List<top::CallPayload> {
     }
     rows
 }
-fn payload(outcome: Option<client::Outcome>) -> top::CallPayload {
+fn payload(outcome: Option<skein_forge_client::Outcome>) -> top::CallPayload {
     top::CallPayload::Effect { entry: 8, deadline: skein_lib::Wall::from_nanos(123), outcome }
 }
 pub fn answers_without_item_pieces() -> [skein_forge::api::Answer; 19] {
@@ -637,10 +641,13 @@ pub fn pull() -> skein_forge::api::Pull {
     }
 }
 
-pub fn live(what: client::What) -> client::LiveRecord {
-    client::LiveRecord {
-        watch: client::Watch { resource: client::Resource { repository: REPO, what }, participating: true },
-        position: entry(skein_forge::api::Write::Close { number: 1 }, client::Condition::None)
+pub fn live(what: skein_forge_client::What) -> skein_forge_client::LiveRecord {
+    skein_forge_client::LiveRecord {
+        watch: skein_forge_client::Watch {
+            resource: skein_forge_client::Resource { repository: REPO, what },
+            participating: true,
+        },
+        position: entry(skein_forge::api::Write::Close { number: 1 }, skein_forge_client::Condition::None)
             .start
             .expect("fixture position"),
         listed: skein_lib::Time::from_nanos(2),
@@ -649,25 +656,25 @@ pub fn live(what: client::What) -> client::LiveRecord {
         comment_scanning: true,
         comment_repair: false,
         review_page: 5,
-        comments: Box::new([client::Delivery { id: 6, revision: 7 }]),
-        reviews: Box::new([client::Delivery { id: 8, revision: 9 }]),
-        cached: Box::new(client::Cached { item: Some(summary()), pull: Some(pull()), tip: Some([10; 32]) }),
+        comments: Box::new([skein_forge_client::Delivery { id: 6, revision: 7 }]),
+        reviews: Box::new([skein_forge_client::Delivery { id: 8, revision: 9 }]),
+        cached: Box::new(skein_forge_client::Cached { item: Some(summary()), pull: Some(pull()), tip: Some([10; 32]) }),
         pushed: Some([11; 32]),
-        echoes: Box::new([client::Echo::Comment(12), client::Echo::Review(13)]),
+        echoes: Box::new([skein_forge_client::Echo::Comment(12), skein_forge_client::Echo::Review(13)]),
     }
 }
 pub fn client_rows() -> List<top::Stored> {
     let mut rows = List::with_capacity(6);
     for what in [
-        client::What::Repository,
-        client::What::Branch(Box::new([0, 255])),
-        client::What::Pull(1),
-        client::What::Issue(2),
+        skein_forge_client::What::Repository,
+        skein_forge_client::What::Branch(Box::new([0, 255])),
+        skein_forge_client::What::Pull(1),
+        skein_forge_client::What::Issue(2),
     ] {
-        rows.push(top::Stored::Client(client::Stored::Live(live(what)))).expect("fixture room");
+        rows.push(top::Stored::Client(skein_forge_client::Stored::Live(live(what)))).expect("fixture room");
     }
     for mark in [None, Some(skein_lib::Time::from_nanos(1))] {
-        rows.push(top::Stored::Client(client::Stored::Repository(client::RepositoryRecord {
+        rows.push(top::Stored::Client(skein_forge_client::Stored::Repository(skein_forge_client::RepositoryRecord {
             repository: REPO,
             mark,
             clock: skein_lib::Time::from_nanos(2),

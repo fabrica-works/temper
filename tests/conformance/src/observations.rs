@@ -7,7 +7,6 @@ use jig_test_system::SystemKey;
 use std::collections::{BTreeMap, BTreeSet};
 use temper_engine_domain as root;
 use temper_engine_domain_forge as forge;
-use temper_engine_domain_forge_client as client;
 
 #[must_use]
 pub fn value(bytes: &[u8]) -> u64 {
@@ -65,7 +64,7 @@ pub fn parts(write: &skein_forge::api::Write) -> (u16, Vec<r::Name>, Option<u64>
 }
 #[must_use]
 #[expect(clippy::wildcard_enum_match_arm, reason = "only named effect call rows identify this outbox entry")]
-pub fn key(store: &Store, entry: &client::Entry) -> SystemKey {
+pub fn key(store: &Store, entry: &skein_forge_client::Entry) -> SystemKey {
     let call = store.rows.values().find_map(|row| match row {
         root::Record::Core(core::Record::Core(core::CoreRecord::Call(row))) if matches!(row.part, core::CallPart::Effect { entry: n, .. } if n == entry.number) => Some(row.key),
         _ => None,

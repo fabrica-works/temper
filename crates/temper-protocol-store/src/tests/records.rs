@@ -79,7 +79,7 @@ fn a_proposed_effect_round_trips_unchanged() {
         resource: forge::What::Branch(Box::new([Box::new([0_u8, 255])])),
         entry: fixtures::entry(
             skein_forge::api::Write::Merge { number: 2, head: [3; 32] },
-            temper_engine_domain_forge_client::Condition::Merge { base: Box::new([4]) },
+            skein_forge_client::Condition::Merge { base: Box::new([4]) },
         ),
     });
     let bytes = records::encode(&row);
@@ -88,7 +88,7 @@ fn a_proposed_effect_round_trips_unchanged() {
 #[test]
 fn outbox_decoding_refuses_fields_past_their_bounds() {
     use skein_forge::api::Write;
-    use temper_engine_domain_forge_client::Condition;
+    use skein_forge_client::Condition;
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
     let rows = [
         ("reviewer count", Write::SetReviewers { number: 1, reviewers: Box::new([1; 9]) }),
@@ -227,7 +227,7 @@ fn each_client_row_round_trips_unchanged() {
 }
 #[test]
 fn client_list_counts_take_their_domain_bounds() {
-    use temper_engine_domain_forge_client::{Delivery, Echo, Stored, What};
+    use skein_forge_client::{Delivery, Echo, Stored, What};
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
     let mut echoes = fixtures::live(What::Issue(1));
     echoes.echoes = Box::new([Echo::Comment(1); 9]);
@@ -244,7 +244,7 @@ fn client_list_counts_take_their_domain_bounds() {
 }
 #[test]
 fn a_cached_summary_key_uses_the_answer_byte_bound() {
-    use temper_engine_domain_forge_client::{Stored, What};
+    use skein_forge_client::{Stored, What};
     let mut live = fixtures::live(What::Issue(1));
     let mut summary = fixtures::summary();
     summary.key = Some(Box::new([1_u8; 600]));
@@ -345,7 +345,7 @@ fn an_issue_row_with_its_desired_view_round_trips_unchanged() {
 #[test]
 fn every_family_encodes_and_decodes_to_itself() {
     use skein_forge::api::Write;
-    use temper_engine_domain_forge_client::{Condition, Stored, What};
+    use skein_forge_client::{Condition, Stored, What};
     let entry = fixtures::entry(Write::Post { number: 1, key: Box::new([2]), body: Box::new([3]) }, Condition::None);
     let remaining = [
         ("call", fixtures::named_call(forge::CallPayload::Refused(skein_forge::api::Error::Busy))),

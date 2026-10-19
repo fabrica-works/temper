@@ -1,7 +1,6 @@
 //! Forge component limits (protocol/forge.md, sections 2, 3.5, 7 and 8).
 use skein_forge::forgejo::limits as documents;
 use skein_lib::Duration;
-use temper_engine_domain_forge_client as client;
 
 /// The component's limits (protocol/forge.md, 7), in temper's `limits`
 /// member as `forge_component.<field>`; the profile `small`'s values are
@@ -58,7 +57,7 @@ pub struct Limits {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Shared {
     /// The forge client's: `calls`, `rows`, `answer_bytes`, `op_bytes`, `lifetime`.
-    pub client: client::Limits,
+    pub client: skein_forge_client::Limits,
     /// The forge's `name_bytes` (`temper_engine_domain_forge::Limits`).
     pub name_bytes: u32,
     /// The forge's `repositories`.

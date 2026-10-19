@@ -3,7 +3,6 @@
 use crate::{BranchHead, Criterion, Hold, Key, Name, PullState, Repository, Stored, Subscriber, Topic};
 use core::mem::size_of;
 use skein_lib::{Map, Queue};
-use temper_engine_domain_forge_client as client;
 
 /// Capacity of each durable top table and its child.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -37,7 +36,7 @@ pub struct Limits {
     pub issue_policy: temper_engine_domain_forge_issues::Limits,
     pub change_policy: temper_engine_domain_forge_change::Limits,
     pub queue_window: skein_lib::Duration,
-    pub client: client::Limits,
+    pub client: skein_forge_client::Limits,
 }
 
 /// Maximum retained heap for the top and its child, excluding owned output
@@ -69,11 +68,11 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         return None;
     }
     if l.output
-        < client::max_out(&l.client)
+        < skein_forge_client::max_out(&l.client)
             .checked_add(l.subscriptions.checked_mul(3)?)?
             .checked_add(l.holds.checked_mul(3)?)?
             .checked_add(9)?
-        || l.output < client::max_out(&l.client).checked_add(l.resources_per_task)?.checked_add(1)?
+        || l.output < skein_forge_client::max_out(&l.client).checked_add(l.resources_per_task)?.checked_add(1)?
     {
         return None;
     }
@@ -87,7 +86,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
     let judges = Map::<u32, Box<[Criterion]>>::worst_case(l.judge_projects)?
         .checked_add(criteria.checked_mul(u64::from(l.judge_projects).checked_add(1)?)?)?;
     crate::adoption::worst_case(l)?
-        .checked_add(client::worst_case(&l.client)?)?
+        .checked_add(skein_forge_client::worst_case(&l.client)?)?
         .checked_add(Map::<skein_forge::api::Repository, Repository>::worst_case(l.repositories)?)?
         // Each forge's writer and git identity.
         .checked_add(Map::<u16, u64>::worst_case(l.repositories)?)?
@@ -99,7 +98,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         )?
         .checked_add(Map::<u64, Box<[Name]>>::worst_case(l.tasks)?)?
         .checked_add(Map::<Name, Hold>::worst_case(l.holds)?)?
-        .checked_add(skein_lib::List::<client::Resource>::worst_case(l.holds)?)?
+        .checked_add(skein_lib::List::<skein_forge_client::Resource>::worst_case(l.holds)?)?
         .checked_add(u64::from(l.holds).checked_mul(u64::from(l.name_bytes))?)?
         .checked_add(u64::from(l.holds).checked_mul(u64::from(l.client.answer_bytes).checked_mul(2)?)?)?
         .checked_add(Map::<(u64, Topic), Subscriber>::worst_case(l.subscriptions)?)?
@@ -155,7 +154,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         .checked_add(u64::from(l.brief_bytes).checked_mul(2)?)?
         .checked_add(Queue::<Stored>::worst_case(l.output)?)?
         .checked_add(Queue::<Key>::worst_case(l.output)?)?
-        .checked_add(Queue::<client::Fact>::worst_case(l.facts)?)?
+        .checked_add(Queue::<skein_forge_client::Fact>::worst_case(l.facts)?)?
         .checked_add(names)?
         .checked_add(subscribers)?
         .checked_add(goal_tasks)?

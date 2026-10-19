@@ -23,7 +23,7 @@ pub fn begin_adoption(d: &mut Domain, request: Token, adoption: Adoption) -> Box
     let [Request::Call { call, .. }] = sent.as_ref() else { panic!("one locate call") };
     outputs(
         d,
-        Event::Client(client::Event::Answered {
+        Event::Client(skein_forge_client::Event::Answered {
             call: *call,
             cost: 1,
             result: Ok(skein_forge::api::Answer::Located { repository: REPO.repository }),

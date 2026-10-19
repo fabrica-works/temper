@@ -276,9 +276,9 @@ pub fn config(seed: u64) -> engine::Config {
             connectors: Box::new([0]),
         },
         landing: engine::LandingPolicy { deployment: Box::new([]), projects: skein_lib::Map::with_capacity(1) },
-        forge: temper_engine_domain_forge_client::Config {
+        forge: skein_forge_client::Config {
             namespace: Box::from(&b"root"[..]),
-            writers: Box::new([temper_engine_domain_forge_client::Writer { forge: 1, author: 1 }]),
+            writers: Box::new([skein_forge_client::Writer { forge: 1, author: 1 }]),
         },
         // The forge's git identity is application credential 1, which the
         // worlds name at start (D10).

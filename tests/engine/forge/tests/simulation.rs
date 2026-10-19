@@ -1,7 +1,6 @@
 use skein_lib::{Token, Wall};
 use temper_engine_domain_forge as top;
 use temper_engine_domain_forge_change as change;
-use temper_engine_domain_forge_client as client;
 use temper_engine_domain_forge_issues as issues;
 use temper_engine_forge_world::changes::{
     change_row, change_step, change_step_task, change_step_with_release, reviewed_change,
@@ -77,17 +76,17 @@ fn a_context_repository_cannot_receive_a_write() {
     let mut world = World::new(5);
     world.adopt_as(top::Role::Context);
     world.event(top::Event::Enqueue {
-        entry: client::Entry {
+        entry: skein_forge_client::Entry {
             number: 1,
             task: 9,
             repository: REPO,
-            effect: client::Effect {
+            effect: skein_forge_client::Effect {
                 write: skein_forge::api::Write::CreateIssue {
                     key: Box::from(&b"context"[..]),
                     title: Box::from(&b"No"[..]),
                     body: Box::from(&b"write"[..]),
                 },
-                condition: client::Condition::None,
+                condition: skein_forge_client::Condition::None,
             },
             start: None,
             attempt: None,
@@ -105,17 +104,17 @@ fn a_permission_refusal_rereads_capabilities_and_narrows_later_writes() {
     let mut world = World::new(5);
     world.adopt();
     world.permission(skein_fake_forge_domain::api::Permission::Read);
-    let entry = client::Entry {
+    let entry = skein_forge_client::Entry {
         number: 1,
         task: 9,
         repository: REPO,
-        effect: client::Effect {
+        effect: skein_forge_client::Effect {
             write: skein_forge::api::Write::Status {
                 commit: translate::commit(1),
                 context: Box::from(&b"build"[..]),
                 check: skein_forge::api::Check::Passed,
             },
-            condition: client::Condition::None,
+            condition: skein_forge_client::Condition::None,
         },
         start: None,
         attempt: None,
@@ -126,7 +125,7 @@ fn a_permission_refusal_rereads_capabilities_and_narrows_later_writes() {
     world.run_for(5);
     assert!(world.seen().iter().any(|request| matches!(
         request,
-        top::Request::Outcome { outcome: client::Outcome::Failed(skein_forge::api::Error::Forbidden), .. }
+        top::Request::Outcome { outcome: skein_forge_client::Outcome::Failed(skein_forge::api::Error::Forbidden), .. }
     )));
     let Some(top::Stored::Repository(repository)) = world.stored().get(&top::Key::Repository(REPO)) else {
         panic!("repository");
@@ -134,7 +133,7 @@ fn a_permission_refusal_rereads_capabilities_and_narrows_later_writes() {
     assert!(repository.kinds.read);
     assert!(!repository.kinds.issue && !repository.kinds.push && !repository.kinds.land);
     let before = world.calls();
-    world.event(top::Event::Enqueue { entry: client::Entry { number: 2, ..entry } });
+    world.event(top::Event::Enqueue { entry: skein_forge_client::Entry { number: 2, ..entry } });
     world.run_for(1);
     assert_eq!(world.calls(), before, "later writes are refused before any provider call");
     assert!(world.seen().iter().any(|request| matches!(request, top::Request::Refused { task: 9 })));
@@ -740,7 +739,7 @@ fn a_goal_issue_is_created_only_after_its_outbox_commit() {
     assert_eq!(world.writes(), 1);
     let mut made = false;
     for event in world.seen() {
-        if let top::Request::Outcome { entry: 1, outcome: client::Outcome::Made { .. }, .. } = event {
+        if let top::Request::Outcome { entry: 1, outcome: skein_forge_client::Outcome::Made { .. }, .. } = event {
             made = true;
         }
     }
@@ -841,17 +840,17 @@ fn a_restored_write_waits_for_the_fresh_repository_read() {
     });
     world.run_for(1);
     world.event(top::Event::Enqueue {
-        entry: client::Entry {
+        entry: skein_forge_client::Entry {
             number: 1,
             task: 51,
             repository: REPO,
-            effect: client::Effect {
+            effect: skein_forge_client::Effect {
                 write: skein_forge::api::Write::CreateIssue {
                     key: Box::from(&b"restart-read"[..]),
                     title: Box::from(&b"Restart read"[..]),
                     body: Box::from(&b"after fresh repository state"[..]),
                 },
-                condition: client::Condition::None,
+                condition: skein_forge_client::Condition::None,
             },
             start: None,
             attempt: None,
@@ -885,13 +884,13 @@ fn a_merge_with_its_answer_lost_is_found_after_restart_without_merging_twice() {
     let head = temper_engine_forge_world::translate::commit(world.branch(b"temper/51"));
     world.slow_calls(skein_lib::Duration::from_secs(5));
     world.event(top::Event::Enqueue {
-        entry: client::Entry {
+        entry: skein_forge_client::Entry {
             number: 1,
             task: 51,
             repository: REPO,
-            effect: client::Effect {
+            effect: skein_forge_client::Effect {
                 write: skein_forge::api::Write::Merge { number: pull, head },
-                condition: client::Condition::Merge { base: Box::from(&b"main"[..]) },
+                condition: skein_forge_client::Condition::Merge { base: Box::from(&b"main"[..]) },
             },
             start: None,
             attempt: None,
@@ -920,13 +919,13 @@ fn a_merge_decided_for_an_old_head_cannot_land_the_new_head() {
     let landing = world.branch(b"main");
     world.push(b"temper/51", b"later work");
     world.event(top::Event::Enqueue {
-        entry: client::Entry {
+        entry: skein_forge_client::Entry {
             number: 1,
             task: 51,
             repository: REPO,
-            effect: client::Effect {
+            effect: skein_forge_client::Effect {
                 write: skein_forge::api::Write::Merge { number: pull, head: old_head },
-                condition: client::Condition::Merge { base: Box::from(&b"main"[..]) },
+                condition: skein_forge_client::Condition::Merge { base: Box::from(&b"main"[..]) },
             },
             start: None,
             attempt: None,
@@ -1036,17 +1035,17 @@ fn prior_effects_settle_before_cleanup_can_delete_a_held_resource() {
     };
     world.event(top::Event::Hold { task: 51, resource: name.clone(), from: None });
     world.event(top::Event::Enqueue {
-        entry: client::Entry {
+        entry: skein_forge_client::Entry {
             number: 9,
             task: 51,
             repository: REPO,
-            effect: client::Effect {
+            effect: skein_forge_client::Effect {
                 write: skein_forge::api::Write::CreateIssue {
                     key: Box::from(&b"prior"[..]),
                     title: Box::from(&b"Prior effect"[..]),
                     body: Box::from(&b"settles first"[..]),
                 },
-                condition: client::Condition::None,
+                condition: skein_forge_client::Condition::None,
             },
             start: None,
             attempt: None,
@@ -1067,8 +1066,8 @@ fn prior_effects_settle_before_cleanup_can_delete_a_held_resource() {
     assert!(matches!(
         world.stored().get(&top::Key::Entry(11)),
         Some(top::Stored::Entry {
-            entry: client::Entry {
-                effect: client::Effect { write: skein_forge::api::Write::DeleteBranch { .. }, .. },
+            entry: skein_forge_client::Entry {
+                effect: skein_forge_client::Effect { write: skein_forge::api::Write::DeleteBranch { .. }, .. },
                 ..
             },
             held: false,
@@ -1081,17 +1080,17 @@ fn cancelling_withdraws_a_prior_effect_that_never_went_out() {
     let mut world = World::new(122);
     world.adopt();
     world.event(top::Event::Enqueue {
-        entry: client::Entry {
+        entry: skein_forge_client::Entry {
             number: 9,
             task: 51,
             repository: REPO,
-            effect: client::Effect {
+            effect: skein_forge_client::Effect {
                 write: skein_forge::api::Write::CreateIssue {
                     key: Box::from(&b"unsent"[..]),
                     title: Box::from(&b"Unsent"[..]),
                     body: Box::from(&b"no effect"[..]),
                 },
-                condition: client::Condition::None,
+                condition: skein_forge_client::Condition::None,
             },
             start: None,
             attempt: None,
@@ -1101,12 +1100,10 @@ fn cancelling_withdraws_a_prior_effect_that_never_went_out() {
     world.take_seen();
     world.event(top::Event::SettleEffects { task: 51, root: 51, ending: top::ReleaseEnding::Cancelled });
     assert!(!world.stored().contains_key(&top::Key::Entry(9)));
-    assert!(
-        world.seen().iter().any(|request| matches!(
-            request,
-            top::Request::Outcome { entry: 9, outcome: client::Outcome::Withdrawn, .. }
-        ))
-    );
+    assert!(world.seen().iter().any(|request| matches!(
+        request,
+        top::Request::Outcome { entry: 9, outcome: skein_forge_client::Outcome::Withdrawn, .. }
+    )));
     assert!(world.seen().iter().any(|request| matches!(request, top::Request::EffectsSettled { task: 51 })));
     assert_eq!(world.writes(), 0);
 }
@@ -1196,7 +1193,7 @@ fn cancelling_a_change_closes_its_pull_before_deleting_its_branch() {
     world.take_seen();
     world.event(top::Event::Release { task: 51, root: 51, ending: top::ReleaseEnding::Cancelled, entry: 10 });
     assert!(
-        matches!(world.stored().get(&top::Key::Entry(10)), Some(top::Stored::Entry { entry: client::Entry { effect: client::Effect { write: skein_forge::api::Write::Close { number }, .. }, .. }, held: false }) if *number == pull)
+        matches!(world.stored().get(&top::Key::Entry(10)), Some(top::Stored::Entry { entry: skein_forge_client::Entry { effect: skein_forge_client::Effect { write: skein_forge::api::Write::Close { number }, .. }, .. }, held: false }) if *number == pull)
     );
     world.event(top::Event::Committed { entry: 10 });
     world.run_for(5);
@@ -1204,8 +1201,8 @@ fn cancelling_a_change_closes_its_pull_before_deleting_its_branch() {
     assert!(matches!(
         world.stored().get(&top::Key::Entry(11)),
         Some(top::Stored::Entry {
-            entry: client::Entry {
-                effect: client::Effect { write: skein_forge::api::Write::DeleteBranch { .. }, .. },
+            entry: skein_forge_client::Entry {
+                effect: skein_forge_client::Effect { write: skein_forge::api::Write::DeleteBranch { .. }, .. },
                 ..
             },
             held: false,

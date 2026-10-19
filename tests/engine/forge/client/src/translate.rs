@@ -3,8 +3,8 @@
 //! the fake's bounded snapshots; comparisons remain whole responses.
 use skein_fake_forge_domain::api as forge;
 use skein_forge::api as client;
+use skein_forge_client::Limits;
 use skein_lib::{List, Time};
-use temper_engine_domain_forge_client::Limits;
 const KEY: &[u8] = b"<!-- temper:key ";
 const END: &[u8] = b" -->\n";
 #[must_use]

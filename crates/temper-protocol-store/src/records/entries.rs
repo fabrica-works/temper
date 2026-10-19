@@ -2,48 +2,47 @@ use super::{Bounds, FITS, Undecodable, api, names, w};
 use alloc::boxed::Box;
 use skein_lib::{Time, Wall};
 use temper_engine_domain_forge as top;
-use temper_engine_domain_forge_client as d;
 
-fn encode_condition(value: &d::Condition) -> w::Condition {
+fn encode_condition(value: &skein_forge_client::Condition) -> w::Condition {
     match value {
-        d::Condition::None => w::Condition::None,
-        d::Condition::Merge { base } => w::Condition::Merge(
+        skein_forge_client::Condition::None => w::Condition::None,
+        skein_forge_client::Condition::Merge { base } => w::Condition::Merge(
             w::MergeCondition::new(&w::CEILINGS, w::MergeConditionParts { base: base.clone() }).expect(FITS),
         ),
-        d::Condition::Update { head, base } => w::Condition::Update(
+        skein_forge_client::Condition::Update { head, base } => w::Condition::Update(
             w::UpdateCondition::new(&w::CEILINGS, w::UpdateConditionParts { head: *head, base: *base }).expect(FITS),
         ),
-        d::Condition::Review { head } => {
+        skein_forge_client::Condition::Review { head } => {
             w::Condition::Review(w::Commit::new(&w::CEILINGS, w::CommitParts { commit: *head }).expect(FITS))
         }
     }
 }
-fn decode_condition(value: w::Condition) -> d::Condition {
+fn decode_condition(value: w::Condition) -> skein_forge_client::Condition {
     match value {
-        w::Condition::None => d::Condition::None,
-        w::Condition::Merge(value) => d::Condition::Merge { base: value.into_parts().base },
+        w::Condition::None => skein_forge_client::Condition::None,
+        w::Condition::Merge(value) => skein_forge_client::Condition::Merge { base: value.into_parts().base },
         w::Condition::Update(value) => {
             let w::UpdateConditionParts { head, base } = value.into_parts();
-            d::Condition::Update { head, base }
+            skein_forge_client::Condition::Update { head, base }
         }
-        w::Condition::Review(value) => d::Condition::Review { head: *value.commit() },
+        w::Condition::Review(value) => skein_forge_client::Condition::Review { head: *value.commit() },
     }
 }
-fn encode_effect(value: &d::Effect) -> w::Effect {
-    let d::Effect { write, condition } = value;
+fn encode_effect(value: &skein_forge_client::Effect) -> w::Effect {
+    let skein_forge_client::Effect { write, condition } = value;
     w::Effect::new(
         &w::CEILINGS,
         w::EffectParts { write: api::encode_write(write), condition: encode_condition(condition) },
     )
     .expect(FITS)
 }
-fn decode_effect(value: w::Effect) -> d::Effect {
+fn decode_effect(value: w::Effect) -> skein_forge_client::Effect {
     let w::EffectParts { write, condition } = value.into_parts();
-    d::Effect { write: api::decode_write(write), condition: decode_condition(condition) }
+    skein_forge_client::Effect { write: api::decode_write(write), condition: decode_condition(condition) }
 }
 #[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
-fn encode_entry(value: &d::Entry) -> w::Entry {
-    let d::Entry { number, task, repository, effect, start, attempt, failures } = value;
+fn encode_entry(value: &skein_forge_client::Entry) -> w::Entry {
+    let skein_forge_client::Entry { number, task, repository, effect, start, attempt, failures } = value;
     w::Entry::new(
         &w::CEILINGS,
         w::EntryParts {
@@ -65,9 +64,9 @@ fn encode_entry(value: &d::Entry) -> w::Entry {
     .expect(FITS)
 }
 #[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
-fn decode_entry(value: w::Entry) -> d::Entry {
+fn decode_entry(value: w::Entry) -> skein_forge_client::Entry {
     let w::EntryParts { number, task, repository, effect, start, attempt, failures } = value.into_parts();
-    d::Entry {
+    skein_forge_client::Entry {
         number,
         task,
         repository: names::decode_repository(repository),
@@ -83,16 +82,16 @@ fn decode_entry(value: w::Entry) -> d::Entry {
         failures,
     }
 }
-pub(super) fn encode_position(value: d::Position) -> w::Position {
-    let d::Position { at, comment, review, review_page } = value;
+pub(super) fn encode_position(value: skein_forge_client::Position) -> w::Position {
+    let skein_forge_client::Position { at, comment, review, review_page } = value;
     w::Position::new(&w::CEILINGS, w::PositionParts { at: at.as_nanos(), comment, review, review_page }).expect(FITS)
 }
-pub(super) fn decode_position(value: w::Position) -> d::Position {
+pub(super) fn decode_position(value: w::Position) -> skein_forge_client::Position {
     let w::PositionParts { at, comment, review, review_page } = value.into_parts();
-    d::Position { at: Time::from_nanos(at), comment, review, review_page }
+    skein_forge_client::Position { at: Time::from_nanos(at), comment, review, review_page }
 }
-fn encode_attempt(value: d::Attempt) -> w::Attempt {
-    let d::Attempt { sent, deadline, wall, expires } = value;
+fn encode_attempt(value: skein_forge_client::Attempt) -> w::Attempt {
+    let skein_forge_client::Attempt { sent, deadline, wall, expires } = value;
     w::Attempt::new(
         &w::CEILINGS,
         w::AttemptParts {
@@ -104,16 +103,16 @@ fn encode_attempt(value: d::Attempt) -> w::Attempt {
     )
     .expect(FITS)
 }
-fn decode_attempt(value: w::Attempt) -> d::Attempt {
+fn decode_attempt(value: w::Attempt) -> skein_forge_client::Attempt {
     let w::AttemptParts { sent, deadline, wall, expires } = value.into_parts();
-    d::Attempt {
+    skein_forge_client::Attempt {
         sent: Time::from_nanos(sent),
         deadline: Time::from_nanos(deadline),
         wall: Wall::from_nanos(wall),
         expires: Wall::from_nanos(expires),
     }
 }
-pub(super) fn encode_entry_row(entry: &d::Entry, held: bool) -> w::EntryRow {
+pub(super) fn encode_entry_row(entry: &skein_forge_client::Entry, held: bool) -> w::EntryRow {
     w::EntryRow::new(&w::CEILINGS, w::EntryRowParts { entry: encode_entry(entry), held }).expect(FITS)
 }
 pub(super) fn decode_entry_row(value: w::EntryRow) -> top::Stored {

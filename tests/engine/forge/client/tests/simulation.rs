@@ -1,5 +1,5 @@
 use skein_forge::api;
-use temper_engine_domain_forge_client::{Condition, Effect, Entry, Made, Outcome, Resource, Watch, What};
+use skein_forge_client::{Condition, Effect, Entry, Made, Outcome, Resource, Watch, What};
 use temper_engine_forge_client_world::{REPO, Settings, World};
 fn issue(entry: u64) -> Entry {
     Entry {
@@ -8,7 +8,7 @@ fn issue(entry: u64) -> Entry {
         repository: REPO,
         effect: Effect {
             write: api::Write::CreateIssue {
-                key: Box::from(&b"deployment:goal"[..]),
+                key: Box::from(&b"\x01\x00\x05worlddeployment:goal"[..]),
                 title: Box::from(&b"goal"[..]),
                 body: Box::from(&b"plan"[..]),
             },
@@ -27,7 +27,7 @@ fn post(entry: u64, number: u64) -> Entry {
         effect: Effect {
             write: api::Write::Post {
                 number,
-                key: Box::new([u8::try_from(entry).expect("test entry bound")]),
+                key: Box::new([1, 0, 5, b'w', b'o', b'r', b'l', b'd', u8::try_from(entry).expect("test entry bound")]),
                 body: Box::from(&b"milestone"[..]),
             },
             condition: Condition::None,

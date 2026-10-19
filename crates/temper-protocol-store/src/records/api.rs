@@ -1,7 +1,6 @@
 use super::{FITS, w};
 use skein_forge::api as d;
 use skein_lib::List;
-use temper_engine_domain_forge_client::{self as client};
 
 fn encode_verdict(value: d::Verdict) -> w::Verdict {
     match value {
@@ -212,74 +211,74 @@ pub(super) fn decode_error(value: w::Error) -> d::Error {
         w::Error::Busy => d::Error::Busy,
     }
 }
-fn encode_made(value: client::Made) -> w::Made {
+fn encode_made(value: skein_forge_client::Made) -> w::Made {
     match value {
-        client::Made::Created(number) => {
+        skein_forge_client::Made::Created(number) => {
             w::Made::Created(w::Number::new(&w::CEILINGS, w::NumberParts { number }).expect(FITS))
         }
-        client::Made::Commented(number) => {
+        skein_forge_client::Made::Commented(number) => {
             w::Made::Commented(w::Number::new(&w::CEILINGS, w::NumberParts { number }).expect(FITS))
         }
-        client::Made::Reviewed(number) => {
+        skein_forge_client::Made::Reviewed(number) => {
             w::Made::Reviewed(w::Number::new(&w::CEILINGS, w::NumberParts { number }).expect(FITS))
         }
-        client::Made::Merged(commit) => {
+        skein_forge_client::Made::Merged(commit) => {
             w::Made::Merged(w::Commit::new(&w::CEILINGS, w::CommitParts { commit }).expect(FITS))
         }
-        client::Made::Updated(commit) => {
+        skein_forge_client::Made::Updated(commit) => {
             w::Made::Updated(w::Commit::new(&w::CEILINGS, w::CommitParts { commit }).expect(FITS))
         }
-        client::Made::Branch(commit) => {
+        skein_forge_client::Made::Branch(commit) => {
             w::Made::Branch(w::Commit::new(&w::CEILINGS, w::CommitParts { commit }).expect(FITS))
         }
-        client::Made::Set => w::Made::Set,
+        skein_forge_client::Made::Set => w::Made::Set,
     }
 }
-fn decode_made(value: w::Made) -> client::Made {
+fn decode_made(value: w::Made) -> skein_forge_client::Made {
     match value {
-        w::Made::Created(value) => client::Made::Created(value.into_parts().number),
-        w::Made::Commented(value) => client::Made::Commented(value.into_parts().number),
-        w::Made::Reviewed(value) => client::Made::Reviewed(value.into_parts().number),
-        w::Made::Merged(value) => client::Made::Merged(value.into_parts().commit),
-        w::Made::Updated(value) => client::Made::Updated(value.into_parts().commit),
-        w::Made::Branch(value) => client::Made::Branch(value.into_parts().commit),
-        w::Made::Set => client::Made::Set,
+        w::Made::Created(value) => skein_forge_client::Made::Created(value.into_parts().number),
+        w::Made::Commented(value) => skein_forge_client::Made::Commented(value.into_parts().number),
+        w::Made::Reviewed(value) => skein_forge_client::Made::Reviewed(value.into_parts().number),
+        w::Made::Merged(value) => skein_forge_client::Made::Merged(value.into_parts().commit),
+        w::Made::Updated(value) => skein_forge_client::Made::Updated(value.into_parts().commit),
+        w::Made::Branch(value) => skein_forge_client::Made::Branch(value.into_parts().commit),
+        w::Made::Set => skein_forge_client::Made::Set,
     }
 }
-pub(super) fn encode_outcome(value: client::Outcome) -> w::Outcome {
+pub(super) fn encode_outcome(value: skein_forge_client::Outcome) -> w::Outcome {
     match value {
-        client::Outcome::Made { made, found } => w::Outcome::Made(
+        skein_forge_client::Outcome::Made { made, found } => w::Outcome::Made(
             w::OutcomeMade::new(&w::CEILINGS, w::OutcomeMadeParts { made: encode_made(made), found }).expect(FITS),
         ),
-        client::Outcome::Failed(error) => w::Outcome::Failed(
+        skein_forge_client::Outcome::Failed(error) => w::Outcome::Failed(
             w::ErrorValue::new(&w::CEILINGS, w::ErrorValueParts { error: encode_error(error) }).expect(FITS),
         ),
-        client::Outcome::Raced { made, why } => w::Outcome::Raced(
+        skein_forge_client::Outcome::Raced { made, why } => w::Outcome::Raced(
             w::OutcomeRaced::new(
                 &w::CEILINGS,
                 w::OutcomeRacedParts { made: encode_made(made), why: encode_error(why) },
             )
             .expect(FITS),
         ),
-        client::Outcome::Uncertain => w::Outcome::Uncertain,
-        client::Outcome::Held => w::Outcome::Held,
-        client::Outcome::Withdrawn => w::Outcome::Withdrawn,
+        skein_forge_client::Outcome::Uncertain => w::Outcome::Uncertain,
+        skein_forge_client::Outcome::Held => w::Outcome::Held,
+        skein_forge_client::Outcome::Withdrawn => w::Outcome::Withdrawn,
     }
 }
-pub(super) fn decode_outcome(value: w::Outcome) -> client::Outcome {
+pub(super) fn decode_outcome(value: w::Outcome) -> skein_forge_client::Outcome {
     match value {
         w::Outcome::Made(value) => {
             let w::OutcomeMadeParts { made, found } = value.into_parts();
-            client::Outcome::Made { made: decode_made(made), found }
+            skein_forge_client::Outcome::Made { made: decode_made(made), found }
         }
-        w::Outcome::Failed(error) => client::Outcome::Failed(decode_error(error.into_parts().error)),
+        w::Outcome::Failed(error) => skein_forge_client::Outcome::Failed(decode_error(error.into_parts().error)),
         w::Outcome::Raced(value) => {
             let w::OutcomeRacedParts { made, why } = value.into_parts();
-            client::Outcome::Raced { made: decode_made(made), why: decode_error(why) }
+            skein_forge_client::Outcome::Raced { made: decode_made(made), why: decode_error(why) }
         }
-        w::Outcome::Uncertain => client::Outcome::Uncertain,
-        w::Outcome::Held => client::Outcome::Held,
-        w::Outcome::Withdrawn => client::Outcome::Withdrawn,
+        w::Outcome::Uncertain => skein_forge_client::Outcome::Uncertain,
+        w::Outcome::Held => skein_forge_client::Outcome::Held,
+        w::Outcome::Withdrawn => skein_forge_client::Outcome::Withdrawn,
     }
 }
 

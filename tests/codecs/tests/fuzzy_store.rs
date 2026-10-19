@@ -1,7 +1,6 @@
 //! Arbitrary and mutated durable rows and keys (protocol/store.md, section 6).
 use skein_lib::{Duration, Rng};
 use temper_engine_domain_forge as forge;
-use temper_engine_domain_forge_client as client;
 use temper_protocol_store::{Bounds, keys, records};
 
 const LIMITS: forge::Limits = forge::Limits {
@@ -26,7 +25,7 @@ const LIMITS: forge::Limits = forge::Limits {
     judge_criteria: 8,
     brief_sections: 32,
     brief_bytes: 4096,
-    client: client::Limits {
+    client: skein_forge_client::Limits {
         pending: 4,
         calls: 2,
         rate: 100,

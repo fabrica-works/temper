@@ -10,7 +10,6 @@ use skein_io::{
 };
 use skein_lib::{Duration, Env, List, Queue, Secret, Time, Token, Wall, stream::Down};
 use skein_shell::{Clock, Host, Kernel, Wait};
-use temper_engine_domain_forge_client::{self as client};
 use temper_engine_protocol_forge::{self as kit, Component, Event, Request, Stopped};
 /// Counts request lines, never retaining a send's authentication bytes.
 pub(crate) fn sent_requests(bytes: &[u8]) -> u64 {
@@ -46,7 +45,7 @@ pub(super) struct Hosted {
     pub(super) costs: u64,
 }
 impl Hosted {
-    fn limits() -> (skein_io::Limits, client::Limits, kit::Limits) {
+    fn limits() -> (skein_io::Limits, skein_forge_client::Limits, kit::Limits) {
         let io_limits = skein_io::Limits {
             sockets: 8,
             names: 0,
@@ -60,7 +59,7 @@ impl Hosted {
             close_timeout: Duration::from_secs(1),
             retry: Duration::from_millis(10),
         };
-        let client = client::Limits {
+        let client = skein_forge_client::Limits {
             pending: 4,
             calls: 2,
             rate: 100,

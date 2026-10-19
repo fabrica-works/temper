@@ -2,10 +2,9 @@ use crate::translate;
 use skein_fake_forge_domain::{self as forge, api as raw};
 use skein_lib::{Duration, Env, List, Map, Queue, ReplyTo, Time, Token, Wall};
 use temper_engine_domain_forge as top;
-use temper_engine_domain_forge_client as client;
 
 pub const REPO: skein_forge::api::Repository = skein_forge::api::Repository { forge: 1, repository: 2 };
-const CLIENT: client::Limits = client::Limits {
+const CLIENT: skein_forge_client::Limits = skein_forge_client::Limits {
     pending: 4,
     calls: 2,
     rate: 100,
@@ -113,7 +112,7 @@ impl World {
     }
 
     fn configured(seed: u64, facts: u32, hooked: bool) -> World {
-        let limits = top::Limits { facts, client: client::Limits { facts, ..CLIENT }, ..LIMITS };
+        let limits = top::Limits { facts, client: skein_forge_client::Limits { facts, ..CLIENT }, ..LIMITS };
         let config = fake_config();
         let mut fake = forge::Domain::new(&config, seed);
         forge::repository(
@@ -143,9 +142,9 @@ impl World {
         let top = top::Domain::new(
             &limits,
             seed,
-            client::Config {
+            skein_forge_client::Config {
                 namespace: Box::from(&b"world"[..]),
-                writers: Box::new([client::Writer { forge: REPO.forge, author: 1 }]),
+                writers: Box::new([skein_forge_client::Writer { forge: REPO.forge, author: 1 }]),
             },
             &[top::GitIdentity { forge: REPO.forge, credential: 1 }],
         )
@@ -170,7 +169,7 @@ impl World {
             calls: 0,
             hints: Vec::new(),
         };
-        world.event(top::Event::Restored { clock: client::RecoveryClock::Monotonic });
+        world.event(top::Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
         world
     }
 
@@ -289,9 +288,9 @@ impl World {
         self.top = top::Domain::new(
             &self.env.limits,
             self.seed,
-            client::Config {
+            skein_forge_client::Config {
                 namespace: Box::from(&b"world"[..]),
-                writers: Box::new([client::Writer { forge: REPO.forge, author: 1 }]),
+                writers: Box::new([skein_forge_client::Writer { forge: REPO.forge, author: 1 }]),
             },
             &[top::GitIdentity { forge: REPO.forge, credential: 1 }],
         )
@@ -303,7 +302,7 @@ impl World {
         for record in rows.into_boxed() {
             self.event(top::Event::Restore { record });
         }
-        self.event(top::Event::Restored { clock: client::RecoveryClock::Monotonic });
+        self.event(top::Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
     }
 
     /// Script a worker's pushed branch through the independent fake git.
@@ -585,7 +584,11 @@ impl World {
                     };
                     self.to_top.push((
                         pending.generation,
-                        top::Event::Client(client::Event::Answered { call: pending.client, cost: 1, result }),
+                        top::Event::Client(skein_forge_client::Event::Answered {
+                            call: pending.client,
+                            cost: 1,
+                            result,
+                        }),
                     ));
                 }
                 hook @ forge::Request::Hook { .. } => self.hear(&hook),
@@ -608,8 +611,8 @@ fn key(row: &top::Stored) -> top::Key {
         top::Stored::ProposedEffect(row) => top::Key::ProposedEffect(row.number),
         top::Stored::Entry { entry, .. } => top::Key::Entry(entry.number),
         top::Stored::Client(row) => top::Key::Client(match row {
-            client::Stored::Live(row) => client::Key::Live(row.watch.resource.clone()),
-            client::Stored::Repository(row) => client::Key::Repository(row.repository),
+            skein_forge_client::Stored::Live(row) => skein_forge_client::Key::Live(row.watch.resource.clone()),
+            skein_forge_client::Stored::Repository(row) => skein_forge_client::Key::Repository(row.repository),
         }),
         top::Stored::Change(row) => top::Key::Change(row.task),
         top::Stored::Issue(row) => top::Key::Issue(row.goal),

@@ -26,7 +26,7 @@ pub enum CallAnswer {
     /// The revision named by the caller moved to this value.
     Moved { task: u64, now: jig_domain_people::Moved },
     /// A forge write joined the named call's decision; later attempts can reask for its settled result.
-    ForgeEffect { entry: u64, deadline: skein_lib::Wall, outcome: Option<temper_engine_domain_forge_client::Outcome> },
+    ForgeEffect { entry: u64, deadline: skein_lib::Wall, outcome: Option<skein_forge_client::Outcome> },
     /// A forge write was refused before an outbox entry existed.
     ForgeEffectRefused(skein_forge::api::Error),
     /// The pure policy check declined a forge write, retaining its bounded reasons.
@@ -95,20 +95,19 @@ impl CallAnswer {
             CallAnswer::Moved { task, now } => jig_domain_core::CallPart::Moved { task: *task, now: *now },
             CallAnswer::ForgeEffect { entry, deadline, outcome } => {
                 let outcome = match outcome {
-                    Some(temper_engine_domain_forge_client::Outcome::Made { .. }) => {
+                    Some(skein_forge_client::Outcome::Made { .. }) => {
                         Some(jig_domain_core::connector::OutboxOutcome::Made)
                     }
-                    Some(
-                        temper_engine_domain_forge_client::Outcome::Failed(_)
-                        | temper_engine_domain_forge_client::Outcome::Raced { .. },
-                    ) => Some(jig_domain_core::connector::OutboxOutcome::Failed),
-                    Some(temper_engine_domain_forge_client::Outcome::Withdrawn) => {
+                    Some(skein_forge_client::Outcome::Failed(_) | skein_forge_client::Outcome::Raced { .. }) => {
+                        Some(jig_domain_core::connector::OutboxOutcome::Failed)
+                    }
+                    Some(skein_forge_client::Outcome::Withdrawn) => {
                         Some(jig_domain_core::connector::OutboxOutcome::Withdrawn)
                     }
-                    Some(temper_engine_domain_forge_client::Outcome::Uncertain) => {
+                    Some(skein_forge_client::Outcome::Uncertain) => {
                         Some(jig_domain_core::connector::OutboxOutcome::Uncertain)
                     }
-                    Some(temper_engine_domain_forge_client::Outcome::Held) => {
+                    Some(skein_forge_client::Outcome::Held) => {
                         Some(jig_domain_core::connector::OutboxOutcome::Held { entry: *entry })
                     }
                     None => None,
@@ -685,7 +684,7 @@ fn decision_bytes(decision: &jig_domain_people::EscalationDecision) -> Option<u6
 pub(crate) fn call_answer_bytes(answer: &CallAnswer) -> Option<u64> {
     match answer {
         CallAnswer::ForgeRead(result) => match result.as_ref() {
-            Ok(answer) => temper_engine_domain_forge_client::answer_bytes_unbounded(answer),
+            Ok(answer) => skein_forge::measure::answer(answer),
             Err(_) => Some(0),
         },
         CallAnswer::ForgeEffect { .. }

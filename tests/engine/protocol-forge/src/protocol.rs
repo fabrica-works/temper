@@ -6,7 +6,6 @@ use skein_fake_forge_protocol::{Faults, Route, Tally};
 use skein_lib::{Duration, Env, List, Map, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::{BTreeMap, BTreeSet};
 use temper_engine_domain_forge as top;
-use temper_engine_domain_forge_client as client;
 use temper_engine_forge_world::LIMITS;
 use temper_engine_protocol_forge::Component;
 
@@ -67,16 +66,16 @@ impl Protocol {
             item_pages: Vec::new(),
             item_start: 0,
         };
-        world.event(top::Event::Restored { clock: client::RecoveryClock::Monotonic });
+        world.event(top::Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
         world
     }
     fn top(seed: u64) -> top::Domain {
         top::Domain::new(
             &LIMITS,
             seed,
-            client::Config {
+            skein_forge_client::Config {
                 namespace: Box::from(b"world".as_slice()),
-                writers: Box::new([client::Writer { forge: REPO.forge, author: 1 }]),
+                writers: Box::new([skein_forge_client::Writer { forge: REPO.forge, author: 1 }]),
             },
             &[top::GitIdentity { forge: REPO.forge, credential: 1 }],
         )
@@ -250,7 +249,7 @@ impl Protocol {
         for record in records {
             self.event(top::Event::Restore { record });
         }
-        self.event(top::Event::Restored { clock: client::RecoveryClock::Monotonic });
+        self.event(top::Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
     }
     pub fn issue(&mut self, title: &[u8], body: &[u8]) {
         self.external_at(
@@ -469,7 +468,7 @@ impl Protocol {
             self.costs += u64::from(answer.cost);
             self.secrets_kept &= fixtures::token_absent(&answer);
             if generation == self.generation {
-                self.event(top::Event::Client(client::Event::Answered {
+                self.event(top::Event::Client(skein_forge_client::Event::Answered {
                     call,
                     cost: answer.cost,
                     result: answer.result,
@@ -524,8 +523,8 @@ fn key(row: &top::Stored) -> top::Key {
         top::Stored::ProposedEffect(row) => top::Key::ProposedEffect(row.number),
         top::Stored::Entry { entry, .. } => top::Key::Entry(entry.number),
         top::Stored::Client(row) => top::Key::Client(match row {
-            client::Stored::Live(row) => client::Key::Live(row.watch.resource.clone()),
-            client::Stored::Repository(row) => client::Key::Repository(row.repository),
+            skein_forge_client::Stored::Live(row) => skein_forge_client::Key::Live(row.watch.resource.clone()),
+            skein_forge_client::Stored::Repository(row) => skein_forge_client::Key::Repository(row.repository),
         }),
         top::Stored::Change(row) => top::Key::Change(row.task),
         top::Stored::Issue(row) => top::Key::Issue(row.goal),
