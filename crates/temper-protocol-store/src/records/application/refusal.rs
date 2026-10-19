@@ -1,6 +1,6 @@
 //! Jig's complete refusal facts at its pinned people-store version.
 use jig_domain_people as p;
-use jig_protocol_store::people_v3 as w;
+use jig_protocol_store::people_v4 as w;
 use skein_lib::Wall;
 pub(super) fn encode_failure_class(value: p::FailureClass, _l: &w::Limits) -> w::FailureClass {
     match value {

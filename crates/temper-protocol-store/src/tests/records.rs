@@ -606,7 +606,7 @@ fn every_application_outcome_preserves_its_complete_record() {
         assert_eq!(bytes[2], 15, "the Application family tag");
     }
     assert!(
-        jig_protocol_store::people_v3::Refusal::worst_case_bytes(&jig_protocol_store::people_v3::CEILINGS)
+        jig_protocol_store::people_v4::Refusal::worst_case_bytes(&jig_protocol_store::people_v4::CEILINGS)
             .expect("bounded facts")
             <= 24
     );
