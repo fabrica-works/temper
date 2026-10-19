@@ -63,6 +63,9 @@ impl Runner {
     pub fn parts(&mut self, owner_part: fn(&jig_client::contract::OwnerPart, &mut render::Text)) {
         self.owner_part = Some(owner_part);
     }
+    pub(crate) fn forget_kept(&mut self, key: jig_client::Key) {
+        self.kept.remove(&key);
+    }
     pub(crate) fn kept_json(&mut self, json: bool) {
         self.kept_json = json;
     }

@@ -614,3 +614,6 @@ mod acts;
 pub(crate) use acts::*;
 mod waits;
 pub(crate) use waits::*;
+
+mod adopt;
+pub(crate) use adopt::*;

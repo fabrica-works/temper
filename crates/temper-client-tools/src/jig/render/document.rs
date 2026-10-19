@@ -60,7 +60,7 @@ fn text(
         Document::SizedTurn { task, name, bytes } => super::turn::sized(*task, *name, *bytes, true, out),
     }
 }
-pub(super) fn phrasebook(text: u32) -> Phrasebook {
+pub(crate) fn phrasebook(text: u32) -> Phrasebook {
     let shapes = words::phrase_shapes(text);
     let limits = PhraseLimits {
         languages: 1,
@@ -453,4 +453,9 @@ pub(super) fn answer_json(answer: &jig_client::contract::Answer, out: &mut Encod
 pub(super) fn recipient_json(to: &Recipient, out: &mut Encoder) {
     let mut budget = Cut { room: usize::MAX, left: 0, turn: None };
     encode_recipient(to, out, &mut budget);
+}
+
+pub(crate) fn refusal_json(refusal: &jig_client::contract::Refusal, out: &mut Encoder) {
+    let mut budget = Cut { room: usize::MAX, left: 0, turn: None };
+    encode_refusal(refusal, out, &mut budget);
 }

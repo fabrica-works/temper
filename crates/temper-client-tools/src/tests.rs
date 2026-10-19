@@ -7,3 +7,5 @@ mod key;
 mod limits;
 mod subject;
 mod table;
+
+mod adopt;

@@ -202,7 +202,7 @@ pub fn adoption(form: &Form, most: u32) -> Option<Adoption> {
         checks: Box::from(checks(form, most)?),
     })
 }
-pub(super) fn write(form: &mut Form, text: Text, value: Box<[u8]>, typed: Typed, bound: u32, most: u32) {
+pub fn write(form: &mut Form, text: Text, value: Box<[u8]>, typed: Typed, bound: u32, most: u32) {
     form.outcome = None;
     let field = form.texts.get_mut(text.index()).expect("six form fields");
     // A refused write also sends the retained value back to the view.

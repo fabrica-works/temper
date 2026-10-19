@@ -14,6 +14,7 @@ pub struct Limits {
 pub struct Root {
     client: Client,
     runner: runner::Runner,
+    adopter: crate::forge::Adopter,
     next: Option<u32>,
 }
 #[derive(Debug)]
@@ -38,7 +39,7 @@ impl Root {
     pub(crate) fn with_client(client: Client) -> Self {
         let mut runner = runner::Runner::new(RUNNER.asker(), crate::key::TOOLS);
         runner.parts(owner_part);
-        Self { client, runner, next: Some(1) }
+        Self { client, runner, adopter: crate::forge::Adopter::new(), next: Some(1) }
     }
     #[must_use]
     pub fn client(&self) -> &Client {
@@ -50,6 +51,7 @@ impl Root {
     }
     pub fn kept_json(&mut self, json: bool) {
         self.runner.kept_json(json);
+        self.adopter.kept_json(json);
     }
 }
 pub fn step(root: &mut Root, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
@@ -65,13 +67,14 @@ pub fn step(root: &mut Root, env: &Env<Limits>, event: Event, out: &mut Queue<Re
         Event::Call { number, call, json } => {
             if let Some(call_number) = root.next {
                 root.next = call_number.checked_add(1);
-                runner::call(
-                    &mut root.runner,
-                    &root.client,
-                    &tools_env(env),
-                    runner::Called { number, call_number, call, json },
-                    &mut child,
-                );
+                let forge = crate::table::TOOLS.get(usize::from(call.tool)).expect("parsed tool").name
+                    == crate::adopt::ROW.name;
+                let called = runner::Called { number, call_number, call, json };
+                if forge {
+                    crate::forge::call(&mut root.adopter, &root.client, &env.limits, called, &mut child);
+                } else {
+                    runner::call(&mut root.runner, &root.client, &tools_env(env), called, &mut child);
+                }
             } else {
                 out.push(Request::Printed { number, printed: jig::render::failure(b"call number exhausted", json, 1) });
             }
@@ -134,10 +137,43 @@ fn route(root: &mut Root, env: &Env<Limits>, told: Told, child: &mut Queue<runne
             handle.asker
         }
     };
+    let me_changed = match &told {
+        Told::Changed { handle } => handle.asker == RUNNER.asker() && handle.number == 0,
+        Told::Link { .. }
+        | Told::Pending { .. }
+        | Told::Answered { .. }
+        | Told::Kept { .. }
+        | Told::Dropped { .. }
+        | Told::Text { .. }
+        | Told::Ended { .. }
+        | Told::Page { .. } => false,
+    };
     match Owner::of(asker) {
         Some(Owner::Runner) => runner::told(&mut root.runner, &root.client, &tools_env(env), told, child),
-        Some(Owner::Forge) => {}
+        Some(Owner::Forge) => {
+            match &told {
+                Told::Kept { key, request } => runner::told(
+                    &mut root.runner,
+                    &root.client,
+                    &tools_env(env),
+                    Told::Kept { key: *key, request: request.clone() },
+                    child,
+                ),
+                Told::Answered { key, .. } => root.runner.forget_kept(*key),
+                Told::Link { .. }
+                | Told::Pending { .. }
+                | Told::Dropped { .. }
+                | Told::Changed { .. }
+                | Told::Text { .. }
+                | Told::Ended { .. }
+                | Told::Page { .. } => {}
+            }
+            crate::forge::told(&mut root.adopter, &env.limits, told, child);
+        }
         Some(Owner::Pages) | None => out.push(Request::Fact { fact: temper_client_domain::Fact::UnknownAsker }),
+    }
+    if me_changed {
+        crate::forge::ready(&mut root.adopter, &root.client, &env.limits, child);
     }
 }
 pub fn fire(root: &mut Root, env: &Env<Limits>, out: &mut Queue<Request>) {
@@ -155,22 +191,12 @@ pub fn next_deadline(root: &Root) -> Option<Time> {
 #[path = "tests/root.rs"]
 mod tests;
 
-/// Whole owner identities until the application's part words are installed.
+/// Forge parts use the domain's shared words and whole resource paths.
 #[derive(Debug)]
 pub struct Parts;
 impl jig::render::Parts for Parts {
     fn owner_part(&self, part: &jig_client::contract::OwnerPart, out: &mut jig::render::Text) {
-        match &part.key {
-            jig_client::contract::OwnerPartKey::Path(path) => {
-                for (at, segment) in path.iter().enumerate() {
-                    if at > 0 {
-                        out.put(b"/");
-                    }
-                    out.put(segment);
-                }
-            }
-            jig_client::contract::OwnerPartKey::Number(number) => out.number(*number),
-        }
+        crate::forge::part(part, out);
     }
 }
 fn owner_part(part: &jig_client::contract::OwnerPart, out: &mut jig::render::Text) {

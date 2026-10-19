@@ -5,7 +5,7 @@ mod form;
 pub(crate) mod me;
 mod vocabulary;
 pub mod words;
-pub use form::{Act, Broken, Check, Field, Form, Marks, Text, Typed, adoption, broken, form};
+pub use form::{Act, Broken, Check, Field, Form, Marks, Text, Typed, adoption, broken, form, write};
 pub use vocabulary::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -150,21 +150,16 @@ fn act_on(side: &mut Side, limits: Limits, act: Act, out: &mut Queue<Request>) {
                 side.serial = side.serial.checked_add(1).expect("forge request serial fits u64");
                 let request = skein_lib::Token::new(side.serial);
                 draft.pending = Some((request, skein_lib::RequestProgress::Parked));
-                let bounds = wire_limits(&limits).expect("forge bounds are checked");
-                let ask = family::request(&adoption, &bounds).expect("validated adoption fits wire");
                 out.push(Request::Send {
                     request,
-                    ask: jig_client::Ask::Family {
-                        scope: jig_client::contract::Scope::Project(adoption.project),
-                        record: ask,
-                    },
+                    ask: ask(&adoption, &limits).expect("validated adoption fits wire"),
                 });
             }
             side.changed();
         }
         Act::Write { field, text, typed } => {
             if let Some(draft) = &mut side.form {
-                form::write(draft, field, text, typed, limits.field_bytes, limits.checks);
+                write(draft, field, text, typed, limits.field_bytes, limits.checks);
                 side.changed();
             }
         }
@@ -253,21 +248,10 @@ pub(crate) fn told(client: &jig_client::Client, limits: &crate::Limits, told: ji
         Told::Answered { key, outcome } => {
             let request = skein_lib::Token::new(key.number);
             let answer = match outcome {
-                Outcome::Answered(jig_client::Answered::Family(record)) => {
-                    let link =
-                        jig_client_protocol_link::Limits::new(limits.client.domain, limits.client.exchanges).ok()?;
-                    family::answer(&record, &wire_limits(&limits.forge)?, &link)?
+                Outcome::Answered(answered) => answer(limits, &answered)?,
+                Outcome::Unknown | Outcome::Limit | Outcome::Held | Outcome::NotKept | Outcome::Unconfirmed => {
+                    Answer::Unknown
                 }
-                Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Refused {
-                    refusal: why,
-                    ..
-                })) => Answer::EntranceRefused(jig_client::contract::EntranceRefusal::new(why).ok()?),
-                Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Done(_)))
-                | Outcome::Unknown
-                | Outcome::Limit
-                | Outcome::Held
-                | Outcome::NotKept
-                | Outcome::Unconfirmed => Answer::Unknown,
             };
             Some(Event::Answered { request, answer })
         }
@@ -278,5 +262,28 @@ pub(crate) fn told(client: &jig_client::Client, limits: &crate::Limits, told: ji
         | Told::Text { .. }
         | Told::Ended { .. }
         | Told::Page { .. } => None,
+    }
+}
+
+/// Encode the validated adoption in its project scope.
+#[must_use]
+pub fn ask(adoption: &Adoption, limits: &Limits) -> Option<jig_client::Ask> {
+    Some(jig_client::Ask::Family {
+        scope: jig_client::contract::Scope::Project(adoption.project),
+        record: family::request(adoption, &wire_limits(limits)?)?,
+    })
+}
+/// Decode the same terminal answers the adoption side receives.
+#[must_use]
+pub fn answer(limits: &crate::Limits, answered: &jig_client::Answered) -> Option<Answer> {
+    match answered {
+        jig_client::Answered::Family(record) => {
+            let link = jig_client_protocol_link::Limits::new(limits.client.domain, limits.client.exchanges).ok()?;
+            family::answer(record, &wire_limits(&limits.forge)?, &link)
+        }
+        jig_client::Answered::Jig(jig_client::contract::Answer::Refused { refusal, .. }) => {
+            Some(Answer::EntranceRefused(jig_client::contract::EntranceRefusal::new(refusal.clone()).ok()?))
+        }
+        jig_client::Answered::Jig(jig_client::contract::Answer::Done(_)) => Some(Answer::Unknown),
     }
 }
