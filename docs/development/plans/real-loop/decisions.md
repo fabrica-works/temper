@@ -678,6 +678,15 @@ pass:
      feature. The moved accounts cases stay "not planned" in their existing
      rows (STATUS.md's "The LLM accounts' tests"; later.md's area 5 row).
 
+133. **Named positions, and the gate's check of them** (hourly check of 2026-10-19T16:52:04Z).
+     Reverses: ruling 131 (2026-10-19T16:48Z), its instruction 1's "give it to session 09's implementer, who found the cause": development.md 7.3, step 4 holds.
+     Amends: the README's rule "A setup written once, and rows carry data"; `temper/09-loop-stories.md`'s Steps; new `temper/09.s2-named-positions.md`; `temper/09.s1-resume-behind-refusal.md` line 3 (its number, 131).
+
+     From the hourly check of 2026-10-19T16:52:04Z, bare numbers in a story's body, sent a second time (08.4's `tools.rs`, 8 hits at temper f4f5e43b3: `grep -rnE '\b(task|watching|join|number)\([0-9]+\)|calls\(\)\[[0-9]+\]' tests/real-loop/tests | wc -l` → 8), become, as development.md 14.4 says:
+     - the README rule's text: a story's calls' positions are named consts as its parties, tasks, projects and tokens are, as `restart.rs`'s `CHAT`, `READ` and `CHATS`; no integer literal is the argument of `task(`, `watching(`, `join(` or `number(`, nor an index of `calls()`, in a test body;
+     - a check in temper's gate, step `temper-09.s2` (`temper/09.s2-named-positions.md`), in session 09 after temper-09.s1: `scripts/check.sh` refuses such a line in `tests/real-loop/tests`, and the step names tools.rs's eight. The gate today is `scripts/check.sh`, cargo alone (18 lines at f4f5e43b3).
+     09's and 13's sketches that type such positions (`task(3)`, `ran.number(3)`) are written with named consts when they are made. temper is the most downstream repository: no repin.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

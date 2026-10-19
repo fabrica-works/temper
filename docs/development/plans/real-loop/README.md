@@ -169,9 +169,12 @@ plan's own.
   helper of the crate's fixtures: before defining one, `rg 'fn <name>'
   <crate>/tests <crate>/src/tests`, and move a sibling file's there. A
   size an assertion reads is a named const with a line on what a smaller
-  value would miss; a story's parties, tasks, projects and tokens are
-  named fixtures with a line on their value, never bare numbers in a
-  test body; a case that extends a fixture is built from it, never
+  value would miss; a story's parties, tasks, projects and tokens, and so its
+  calls' positions, are named consts with a line on their value, as
+  `tests/real-loop/tests/restart.rs`'s `CHAT`, `READ` and `CHATS` are:
+  no integer literal is the argument of `task(`, `watching(`, `join(` or
+  `number(`, nor an index of `calls()`, in a test body, and the gate
+  refuses one (temper-09.s2, ruling 133); a case that extends a fixture is built from it, never
   retyped. A table's body checks every row alike and never branches on a
   row: rows that expect different outcomes are tests of their own
   (ruling 126).

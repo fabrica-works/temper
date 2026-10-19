@@ -13,7 +13,7 @@ tools plan's temper-03.4, the kept lines; temper 05's names below are
 those `05-ctl.md` sketches, created by temper 05 (`host::OneShot`, `limits`): check each as
 landed.
 Steps: `temper-09.1`, `temper-09.s1` (`09.s1-resume-behind-refusal.md`),
-`temper-09.2`, `temper-09.3`, `temper-09.4` (dropped, ruling 130).
+`temper-09.s2` (`09.s2-named-positions.md`), `temper-09.2`, `temper-09.3`, `temper-09.4` (dropped, ruling 130).
 
 ## Read first
 
