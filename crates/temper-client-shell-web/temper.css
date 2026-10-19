@@ -1,0 +1,23 @@
+:root {
+  color-scheme: light;
+  --temper-canvas: #fbfaf7;
+  --temper-sidebar: #f3f0e9;
+  --temper-paper: #fffefd;
+  --temper-ink: #292721;
+  --temper-muted: #77756e;
+  --temper-faint: #a09c93;
+  --temper-line: #e8e4dc;
+  --temper-line-strong: #dcd5ca;
+  --temper-accent: #ba694e;
+  --temper-accent-dark: #9d5139;
+  --temper-accent-pale: #f7ece6;
+  --temper-green: #447864;
+  --temper-green-pale: #e9f1eb;
+  --temper-amber: #9b7343;
+  --temper-amber-pale: #f6efe1;
+  --temper-red: #a65d53;
+  --temper-red-pale: #f9ece9;
+  --temper-shadow: 0 12px 35px rgba(55, 42, 27, .045), 0 1px 3px rgba(55, 42, 27, .04);
+}
+body { background: var(--temper-canvas); color: var(--temper-ink); font: 14px/1.5 ui-monospace, monospace; }
+button, input, textarea, select { font: inherit; }

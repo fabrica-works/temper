@@ -10,6 +10,7 @@ crate-type = ["cdylib"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 jig-client.workspace = true
+jig-client-protocol-http.workspace = true
 jig-client-shell-web.workspace = true
 skein-lib.workspace = true
 skein-ui.workspace = true

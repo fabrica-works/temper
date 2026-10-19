@@ -9,6 +9,12 @@
 )]
 use skein_lib::{Duration, RequestLimits};
 use temper_client_domain as client;
+/// Concurrent HTTP exchanges, beside the event stream.
+pub const EXCHANGES: u32 = 8;
+/// Whole small-store and HTTP response bodies.
+pub const BODY_BYTES: u32 = 33_554_432;
+/// Stream body chunk bytes.
+pub const PIECE: u32 = 4096;
 /// The root's bounds: `temper-client-shell-terminal`'s `native().client`.
 #[must_use]
 pub fn client() -> client::Limits {
@@ -46,7 +52,7 @@ pub fn client() -> client::Limits {
             fields: 16,
             segments: 9,
         },
-        exchanges: 8,
+        exchanges: EXCHANGES,
     };
     client::Limits { forge: client::forge::Limits { field_bytes: 256, checks: 8 }, client }
 }
@@ -58,4 +64,19 @@ pub fn view(client: &client::Limits) -> Option<(temper_client_view::Limits, temp
             .ok()?;
     let view = temper_client_view::Limits::of(client, &words)?;
     Some((view, words))
+}
+/// The event stream's record and chunk bounds.
+#[must_use]
+pub fn stream() -> Option<jig_client_protocol_http::Limits> {
+    Some(jig_client_protocol_http::Limits { record: BODY_BYTES.checked_add(512)?, chunk: PIECE })
+}
+/// Sum the root, view, stream and the exchanges' bodies, with overflow refusing the bounds.
+#[must_use]
+pub fn worst_case(client: &client::Limits) -> Option<u64> {
+    let (bounds, words) = view(client)?;
+    let root = client::worst_case(client)?;
+    let view = temper_client_view::worst_case(&bounds, client, &words)?;
+    let stream = jig_client_protocol_http::worst_case(&stream()?)?;
+    let bodies = u64::from(EXCHANGES.checked_add(1)?).checked_mul(u64::from(BODY_BYTES))?;
+    root.checked_add(view)?.checked_add(stream)?.checked_add(bodies)
 }

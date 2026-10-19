@@ -21,3 +21,5 @@ cargo clippy --target wasm32-unknown-unknown \
 export NEXTEST_DOUBLE_SPAWN=0
 cargo nextest run --workspace
 cargo nextest run --workspace --profile fuzzy
+# The browser bundle, built once by the gate (client/browser.md, 4.3).
+scripts/bundle.sh target/temper-bundle >/dev/null
