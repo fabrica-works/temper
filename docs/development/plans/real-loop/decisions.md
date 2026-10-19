@@ -687,6 +687,22 @@ pass:
      - a check in temper's gate, step `temper-09.s2` (`temper/09.s2-named-positions.md`), in session 09 after temper-09.s1: `scripts/check.sh` refuses such a line in `tests/real-loop/tests`, and the step names tools.rs's eight. The gate today is `scripts/check.sh`, cargo alone (18 lines at f4f5e43b3).
      09's and 13's sketches that type such positions (`task(3)`, `ran.number(3)`) are written with named consts when they are made. temper is the most downstream repository: no repin.
 
+134. **Two calls' exits after one commit have no order** (plan defect, temper 09's block of 2026-10-19T17:02:57Z).
+     Plan defect, 08.4's sketch: `assert!(wait.ended > close.ended, ..)`
+     orders two processes' exits that follow one commit. The engine answers
+     the close's call and delivers `ended` to the wait's watch from the same
+     commit; which client process exits first is the kernel's, not the
+     story's. The story's claim, "a wait satisfied by another client"
+     (08.4), is causal: the wait ends only once the close has been asked.
+
+     Ruling 134: the assertion becomes `wait.ended > close.spawned`, in
+     08.4's sketch and in `tests/real-loop/tests/tools.rs`'s
+     `another_clients_close_meets_a_running_wait`, and 09.s1 makes that
+     one-line change with its fix, its Files gaining `tools.rs`. The exits
+     assertion stays. Then 09.s1 runs its land gate again. A further
+     assertion that orders two calls' `ended` after one commit is refreshed
+     the same way, and listed in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

@@ -323,7 +323,7 @@ fn another_clients_close_meets_a_running_wait() {
     ]);
     let (wait, close) = (&ran.calls()[3], &ran.calls()[4]);
     assert_eq!([wait.exit, close.exit], [Some(Exit::Code(0)); 2], "{}", String::from_utf8_lossy(&wait.stderr));
-    assert!(wait.ended > close.ended, "the wait ended at {:?}, before the close", wait.ended);
+    assert!(wait.ended > close.spawned, "the wait ended at {:?}, before the close was asked", wait.ended); // ruling 134: two exits after one commit have no order
 }
 ```
 Proof: joint, as 08.2's.
