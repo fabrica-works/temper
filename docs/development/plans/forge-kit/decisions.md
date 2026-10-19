@@ -718,6 +718,26 @@ where its answer lands.
 
      Apply the temporary source-search instruction to running and ready-check sessions. Supervisor refreshes only the two exact primary indexes, then reports commits and partial/excluded coverage before lifting this temporary restriction. Check every graph name against the actual worktree and use source searches for every further uncovered copy.
 
+132. **Skein 10 Shapes against main** (ready check of skein-10.1).
+     Reverses: the original skein10 test-name preservation and fixed5/14/22/25/28 counts only as the explicit assertion mapping now records; no earlier ruling or steer is reversed.
+     Amends: skein/10-plans.md Rules, Shapes, Files, Test shapes, Proof and Done when.
+
+     Use the corrected skein10 plan. Its Run dispatches through the landed request/error decoders and Raw/Empty/Document body kinds, retains encoded request bodies, and can select the repository passed to Plan::new. Remarks is locally sliced, with no wire limit; include PullFor fallback and Checks among paged wire listings. Side-overflow tests first admit metadata and then exercise the raw shortage. Preserve the write resolver's range-before-equality order while moving owner caching after validation.
+
+     The explicit old/new assertion map separates independent behaviours while preserving all literal cases and budgets: increments add8/9/13/11/7 tests, cumulative8/17/30/41/48. This path-filtered total replaces28; package totals stay relative. Repair the full headerless PullFiles fixture with explicit X-HasMore:false in the connection copy after03.1 and in temper on its next repin while present; preserve its side-advance expectations. Refresh any further content copy and list it in the commit body.
+
+     ## Checked
+
+     - Agent checked all five increments at skein5aaba05472924164e6fb6f07ea779036dbe4c153 and tempere83e552e4591ad6f73d35a615f27c10085d98e17; smith e79b9a6b, jig01b53884, hearthd0a552d8. Name/content/derived-user searches found no other required downstream repair.
+     - rg primary skein: client.rs has Encoded.body:Option<Box<[u8]>>, decoder(request,limits), error_decoder(limits); plans.rs Body::Document/Raw/Empty; plan.rs Plan::new(repository,op); measure::FILE_BYTES=64. reviews.rs ReviewComments target appends /comments and no page.
+     - rg primary temper contents.rs: multiple_changed_files_each_advance_to_their_own_sides uses a two-row fixtures::ok page and expects more:false. The future03.1 copy is named, not claimed landed. writes.rs caches keep_document before unequal-id rejection.
+     - Scratch heavy attempts844/853/859 completed; final clippyPASS, skein109PASS with fuzzy/browser0selected; temper160PASS and fuzzy6PASS. Future Run and10.4/10.5 behaviours/machine proofs remain unverified. Sources/patches/validation retained under scratch-ready-skein-10; owned completed targets removed.
+     - Python sum([8,9,13,11,7])=48 checks the explicit planned test inventory; no package count is inferred. Kit plan has ruling/ready dispatch; all compile commands used pinned heavy with explicit script files.
+
+     ## Instructions
+
+     Mark skein-10.1 ready immediately with the two checked full commits; the coordinator keeps its01.4 dependency. Preserve every mapped assertion case and report any further necessary split with its relative count and named consumer. Only10.5 awaits08.1; retain existing proof budgets and future-behaviour verification.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

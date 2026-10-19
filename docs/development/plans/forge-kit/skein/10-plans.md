@@ -24,8 +24,9 @@ Needs at start: skein 01.4 (README, sessions).
 ## Rules that bind it
 
 - This was the draft of skein 01's 01.5: about 1,100 new lines and five behaviour changes in one
-  increment (decision 28). Every test and behaviour it had is kept with its name, values and
-  budget; only the split changed, and what the split forces (a reference test where a file
+  increment (decision 28). Every assertion case, value and budget is kept. The ready-check splits below
+  replace mixed test names under testing-strategy.md 10; retain an old/new assertion map.
+  The increment split also forces (a reference test where a file
   or a kind of test first appears; a default `Date` in the harness).
 - 10.1 to 10.3 pin what the plans do now and change no production file. A behaviour change is
   its own increment's, with its own test (10.4, 10.5); nothing else changes behaviour.
@@ -38,6 +39,35 @@ Needs at start: skein 01.4 (README, sessions).
 - Files stay under 800 lines and test functions under 40 (organization 8): a table of cases
   is data walked by a short loop.
 
+## Ready-check assertion mapping and counts
+
+The groups below retain all original cases; split by the named behaviour, with named sizes
+and fixture derivations (testing-strategy.md 10). Counts filter only calls/edges, not package totals.
+- 10.1: the five original groups become eight: add `remarks_are_sliced_without_wire_paging`;
+  split `branch_slashes_and_2554_have_golden_targets` into `branch_slashes_have_golden_targets`
+  and `far_future_times_have_golden_targets`; split the long/kept revision cases into
+  `long_body_revision_has_big_endian_golden` and `kept_body_revision_has_big_endian_golden`.
+- 10.2: nine tests stay nine; cumulative 17.
+- 10.3: eight groups become thirteen. Split marker fitting/refusal into
+  `markers_accept_words_at_both_bounds` and `markers_past_the_limit_are_refused`.
+  Keep successful statuses in `success_statuses_match_each_exchange`; move unexpected statuses
+  into `unexpected_read_status_is_invalid_answer`, `unexpected_write_status_is_timeout`,
+  and `unexpected_open_pull_read_status_is_unavailable`. Keep GET429 cases in
+  `merge_read_429_is_timeout`; move POST429 into `merge_write_429_is_rate_limited`.
+  Cumulative 30; each row still carries literal status/message/result data.
+- 10.4: three groups become eleven. Keep `write_inner_overflow_is_timeout`; add
+  `read_inner_overflow_is_too_large`, `open_pull_inner_overflow_is_too_large`, and
+  `log_body_overflow_is_invalid_answer`. Keep `file_cuts_to_remaining_answer_room`; add
+  `job_cuts_to_remaining_answer_room` and `file_sides_past_remaining_room_are_too_large`.
+  Keep read mismatches in `repository_id_mismatch_is_invalid_answer`; add
+  `write_repository_mismatch_is_timeout`, `open_pull_repository_mismatch_is_unavailable`,
+  and `locate_accepts_a_nonzero_repository_id`. Cumulative 41.
+- 10.5: three groups become seven. Keep answering404 cases in `answering_404_keeps_the_path`;
+  add `terminal_404_drops_the_path` and `redirect_drops_the_path`. Keep the undated Items test.
+  Replace the mixed header test with `short_pull_files_without_has_more_is_last`,
+  `full_pull_files_without_has_more_has_more`, and `explicit_last_pull_files_page_has_no_more`.
+  Cumulative 48. The size estimates allow these splits while keeping files/tests within their limits.
+
 ## Increments
 
 ### 10.1 The plans' harness and the read calls
@@ -49,23 +79,25 @@ Shape: no production change. `fixtures::Run` (names are a sketch) owns a Plan, T
   Bounds {page_size 2, rows 8, answer_bytes 65_536, body_bytes 1045}; `Run::known(op)` seeds
   REPO's row from `specimen`, `Run::new(op)` leaves the tables empty, `Run::with(bounds, op)`
   takes other bounds. `begin()` and `answer(status, body)` feed Heard: a head with a `Date`
-  and no Retry-After, X-HasMore or Content-Range (`answer_with` names other Fields), then the
-  JSON body decoded by the dialect's `fixtures::{decode,limits}` into Heard::Row and Done; a
+  and no Retry-After, X-HasMore or Content-Range (`answer_with` names other Fields), then dispatch an expected JSON response to its request decoder, raw Raw/JobLog responses
+  to Body::Raw with an explicitly supplied more flag, empty successful writes to Body::Empty,
+  and error statuses to client::error_decoder. The JSON body is decoded by the dialect's `fixtures::{decode,limits}` into Heard::Row and Done; a
   plan's Err comes back as Step::Done(Err(..)). `sent()` lists each Send as its request line,
   `METHOD target`, encoded by the dialect; `tables()` shows the Tables. No cost field: the
   component counts cost, one per request written (answer 34). The default head's `Date`,
   every resolve answering the id asked, and a PullFiles case with fewer rows than its page
   keep these five tests as they are through 10.4 and 10.5.
-Test shape: 5 new tests in calls.rs, each <20 ms; the 19 cases are a table, walked by a loop:
+Test shape: 8 new tests in calls.rs, each <20 ms; the 19 cases are a table, walked by a loop:
   `read_calls_follow_canned_exchanges`: the 19 reads of 5.2, one case each, 5.2's request
   sequence (a resolve by id first where the row is unknown), literal Answer and literal sends,
   and `tables()` after each: REPO's row kept by the resolve, the login kept by Permission, the
   row dropped by a terminal 404;
   Job's log read is Range::Tail(4), File's Range::Head(4), both set explicitly;
   `user_search_uses_id_and_one_result`: `GET /api/v1/users/search?uid=7&limit=1`; absent ->
-  Missing; `page_size_is_passed_to_each_listing`: the seven listings (Items, Reviews,
-  Statuses, Remarks, Branches, Collaborators, PullFiles) at page sizes 2, 8 and 1, each
-  `limit=` the size; `branch_slashes_and_2554_have_golden_targets`: a branch `a/b` goes out
+  Missing; `page_size_is_passed_to_each_listing`: the wire listings (Items, Reviews,
+  Statuses, Branches, Collaborators, PullFiles, PullFor fallback, Checks) at page sizes 2, 8 and 1,
+  each `limit=` the size; test Remarks separately: its request remains unpaged and page_size
+  controls its local slice (forge.md 5.2); `branch_slashes_and_2554_have_golden_targets`: a branch `a/b` goes out
   `a%2Fb`, and a `since` of u64::MAX nanoseconds as its literal UTC 2554 target;
   `long_body_revision_has_big_endian_golden`: Long(5), updated 3 ns -> 0x46c3_95ed_52b0_b56f;
   kept b"abc" -> 0xba78_16bf_8f01_cfea. References (the golden is the source's, the other
@@ -87,7 +119,7 @@ fn long_body_revision_has_big_endian_golden() {
 }
 ```
 Proof: unit; `heavy cargo nextest run -p skein-forge -E 'test(/plans::tests::(calls|edges)::/)'`
-  passes 5 tests, <1 s; no connected component yet (skein 03.1 brings component tests).
+  passes 8 tests, <1 s; no connected component yet (skein 03.1 brings component tests).
 Don't: change a production file, give Run a cost field, a Component, a socket or a clock,
   rewrite a decoder, change a measurement (skein 02.2, 03.3), verify a signature, or put a
   system name in a value or comment.
@@ -102,7 +134,8 @@ Files: new `forgejo/plans/tests/edges.rs`; `forgejo/plans/tests/calls.rs`,
   file.
 Shape: no production change; the tests pin the moved failure table and write order. Run gains
   `fail(Failure)` (Unseen or Seen, how the component tells an exchange failed) and `answer_with`
-  for a Retry-After. A write's Heard comes from the Run exactly as a read's.
+  for a Retry-After. A write's Heard comes from the Run exactly as a read's. Expose encoded request bodies
+  beside sent request lines and assert each write's literal body.
 Test shape: 9 new tests, 7 in calls.rs and 2 in edges.rs, each <20 ms; the 13 writes are a
   table walked by a loop:
   `write_calls_follow_canned_exchanges`: the 13 writes of 5.2, literal body, status, result and
@@ -133,7 +166,7 @@ fn pull_files_stops_at_a_stale_head() {
 }
 ```
 Proof: unit; `heavy cargo nextest run -p skein-forge -E 'test(/plans::tests::(calls|edges)::/)'`
-  passes 14 tests, <1 s; no connected component yet (skein 03.1 connects it); base form is the failure and write tests of findings/base-skein-01.md.
+  passes 17 tests, <1 s; no connected component yet (skein 03.1 connects it); base form is the failure and write tests of findings/base-skein-01.md.
 Don't: change a status, a refusal or a drop, reorder the reviewers, count cost in Run, or
   test through a Component (the 68 component tests are skein 03.1's).
 Size: about 0 lines moved, 270 new: tests and fixtures only (estimated: calls.rs 211, edges.rs
@@ -152,7 +185,7 @@ Shape: no production change. Answer 11 and answer 35 settle the design, not the 
   pins: its 429 half is `rate_limited_without_retry_after_waits_zero` here, its X-HasMore half
   is `pull_files_without_has_more_is_more_only_when_full` in 10.5 (that half changes
   behaviour). The first's doc comment says so.
-Test shape: 8 new tests in edges.rs, each <20 ms; the first five call skein 01.3's pure
+Test shape: 13 new tests in edges.rs, each <20 ms; the first five call skein 01.3's pure
   `hint(forge, word, delivery)` and `marker::{valid_word, length, encode, decode}` (word first),
   no Run:
   `deliveries_map_subscribed_events_to_hints`: 22 events over 13 headers, section 7's literal
@@ -179,7 +212,7 @@ fn another_word_has_no_key() {
 }
 ```
 Proof: unit; `heavy cargo nextest run -p skein-forge -E 'test(/plans::tests::(calls|edges)::/)'`
-  passes 22 tests, <1 s; no connected component yet (skein 03.1 connects it); base forms are the hint, marker and writes tests of
+  passes 30 tests, <1 s; no connected component yet (skein 03.1 connects it); base forms are the hint, marker and writes tests of
   findings/base-skein-01.md. A 2xx that fails here is a plan defect: stop, do not edit it.
 Don't: change a status table, a marker or a hint; touch `classify`'s generic 429; add a
   production line to make a test pass.
@@ -192,7 +225,9 @@ Needs: skein 10.3, whose tests pin the neighbouring behaviour.
 Files: plans/{writes,reads,contents,actions}.rs and plans/reads/done.rs; edges.rs;
   `forgejo/tests/fixtures.rs` (Run).
 Shape: three behaviour changes, each with its test. Show each against the base first. Run
-  gains `with_limits(limits, bounds, op)` (the dialect's Limits, `inner` among them) and
+  gains `with_limits(limits, bounds, op)` (the dialect's Limits, `inner` among them),
+  `at_repository(repository, limits, bounds, op)` to exercise asked repository 7 without
+  changing fixtures::REPO, and
   `hear(Heard)`, which feeds a Heard as given (a raw body, or a failure such as the `log`
   field's Bound); names are a sketch.
   Q7 (`write_inner_overflow_is_timeout`): a Malformed::Bound (a list past `inner`) is
@@ -208,26 +243,28 @@ Shape: three behaviour changes, each with its test. Show each against the base f
   when cut, as Job's tail after its step name does; drop the `more && length < max` arm for
   File. A side of PullFiles or Compare is never cut: it stays TooLarge.
   Q12 (`repository_id_mismatch_is_invalid_answer`): reads/done.rs accepts any nonzero id from
-  `repositories/{id}`. Compare the id with the one asked, for RepositoryById (resolve and
+  `repositories/{id}`. The write resolver already rejects unequal ids but caches the owner first.
+  Compare the id with the one asked, for RepositoryById (resolve and
   Settings) before `keep_document` and `keep_repository`, in reads and in writes, so a mismatch
   caches no row and no owner. Read -> InvalidAnswer; write -> Timeout, OpenPull before its
   POST -> Unavailable (through `error`); an id past 32 bits stays TooLarge, checked first.
   Locate asks by path and still accepts any nonzero id.
   temper's side: none; no temper test expects the old behaviour (findings/base-skein-01.md,
   "Answers 7–12 and 35": rg and the named component tests' bodies).
-Test shape: 3 new tests in edges.rs, each <20 ms, each a Run on its call:
+Test shape: 11 new tests in edges.rs, each <20 ms, each a Run on its call:
   `write_inner_overflow_is_timeout`: limits with inner = 2, an answer of 3 labels ->
   Timeout after a POST; a read of the same overflow -> TooLarge; OpenPull's read before its
   POST -> TooLarge; a Job read failed with the `log` field's Bound -> InvalidAnswer;
   `file_cuts_to_remaining_answer_room`: path b"x", answer_bytes 4, max 4, fed b"abcd" ->
   b"abc" with truncated; a Job with step name b"x" has raw_room 3, fed b"bcd" and more ->
   b"bcd" with truncated (pinned already); the same short PullFiles and Compare sides ->
-  TooLarge;
+  TooLarge; give the side cases a bound that admits their FILE_BYTES/path/commit metadata
+  before leaving three raw bytes of room, so failure is reached in contents::Plan::raw;
   `repository_id_mismatch_is_invalid_answer`: asked 7, answered 8 at resolve and at
   Settings -> InvalidAnswer, no row and no owner in the tables; a write -> Timeout (OpenPull
   before its POST -> Unavailable); Locate -> Located 8.
 Proof: unit; `heavy cargo nextest run -p skein-forge -E 'test(/plans::tests::(calls|edges)::/)'`
-  passes 25 tests, <1 s; no connected component yet (skein 03.1 connects it); the 22 of 10.1 to 10.3 pass unedited.
+  passes 41 tests, <1 s; no connected component yet (skein 03.1 connects it); the 30 of 10.1 to 10.3 pass unedited.
 Don't: change skein 02.2's admission, the generic 429, a decoder or a limit; cut a PullFiles or
   Compare side; make Locate check its id; fold the three changes into one commit.
 Size: about 0 lines moved, 240 new: 135 production plus 105 tests and fixtures (estimated:
@@ -239,6 +276,12 @@ Scope: forge.md 5.2, 5.3 (absent headers), 5.4 (a 404 that ends nothing); forge-
 Needs: skein 10.4; skein 08.1, which moves the machine world to skein.
 Files: plans/{contents,actions,reads}.rs; edges.rs; skein
   `tests/forge/machine/src/fixtures.rs` and `tests/forge/machine/tests/machine.rs`.
+  Also repair crates/skein-forge-connection/src/tests/{contents,fixtures}.rs when 03.1 has
+  copied them; otherwise temper's next repin repairs the original
+  crates/temper-engine-protocol-forge/src/tests/{contents,fixtures}.rs.
+  multiple_changed_files_each_advance_to_their_own_sides scripts a full two-row page
+  without X-HasMore but expects more=false: give that response an explicit false header,
+  preserving its side-advance assertions. Refresh any further copy and name it in the commit body.
 Shape: two behaviour changes, each with its test.
   Q8, B (`answering_404_keeps_the_path`): contents.rs and actions.rs drop the path before
   they ask whether a 404 is an answer. Decide first: a missing side of PullFiles or Compare,
@@ -258,7 +301,7 @@ Shape: two behaviour changes, each with its test.
   would lengthen them. skein-http supplies a Date on the wire, so no Reply changes. temper's
   side: `tests/engine/protocol-forge` (`src/fixtures.rs::response`, `tests/machine.rs`) has the
   same test; temper's next repin repairs it while temper has it (temper 07 deletes it).
-Test shape: 3 new tests in edges.rs, each <20 ms; no machine test is added or removed:
+Test shape: 7 new tests in edges.rs, each <20 ms; no machine test is added or removed:
   `answering_404_keeps_the_path`: a missing PullFiles or Compare side and Checks' missing run
   or job -> path in the tables; a terminal Job 404 -> MissingJob, path dropped; a 302 ->
   Unavailable, dropped;
@@ -267,7 +310,7 @@ Test shape: 3 new tests in edges.rs, each <20 ms; no machine test is added or re
   `pull_files_without_has_more_is_more_only_when_full`: page size 2, 1 and 2 rows with no
   X-HasMore -> more false and true; an explicit false with 2 rows -> false.
 Proof: unit; `heavy cargo nextest run -p skein-forge -E 'test(/plans::tests::(calls|edges)::/)'`
-  passes 28 tests, <1 s; no connected component yet in skein-forge itself;
+  passes 48 tests, <1 s; no connected component yet in skein-forge itself;
   world; `heavy cargo nextest run -p skein-forge-machine-world` passes the count it had at
   the step's start, each <0.5 s: 33 after skein 08.1, then 38, 40, 41 and 42 after 08.2 to
   08.5 (none added or removed here); only that world scripts an Items head without a Date.
@@ -279,7 +322,7 @@ Removes: the differing 404, Date and header behaviours; the undated scripted hea
 
 ## Done when
 
-- `heavy cargo nextest run -p skein-forge -E 'test(/plans::tests::(calls|edges)::/)'` prints 28
+- `heavy cargo nextest run -p skein-forge -E 'test(/plans::tests::(calls|edges)::/)'` prints 48
   passed, 0 failed, <1 s in all; each test <20 ms.
 - `heavy cargo nextest run -p skein-forge-machine-world` prints the count skein 08 has
   reached passed (33 after 08.1, 42 after 08.5), 0 failed, each <0.5 s.
