@@ -1159,6 +1159,9 @@ where its answer lands.
 
      Use index_repository on the resolved primary roots with names srv-data-git-runner-src-{skein,smith,jig,hearth,temper}. Report readiness and known parser/coverage gaps, with pre/post commits. No kit move or production change follows from metadata maintenance, and no extra suite is justified by it. Pinned plan supports ruling --text and ring at scripts/dev/plan671/669.
 
+162. **Diagnose pinned Jig UTF-8 provenance before further process proof** (cross-session scope, temper02.1 block of 2026-10-19T12:44:46Z).
+     Authorize the bounded scratch-only diagnosis in 02.1's new exception, under ruling162. The preserved retry proves that invalid UTF-8 reached pinned Jig's documents::small::text; it does not yet prove which layer supplied the bytes or which code must change. Trace that provenance from the actual failing tree and pins, comparing the last passing source, and seek a deterministic lower-layer reproducer before assigning a repair. Budget: 20 minutes and three executable diagnostic attempts through pinned heavy and explicit bash script files; compile/setup failures count, queue waits grant no extra attempts. No further full process run, recording or gate precedes the diagnostic report and next scope ruling. No production repair lands under this exception, and no UTF-8 assertion, input payload, error, bound or proof is relaxed. Preserve both original process attempts and the four-commit implementation; map any further reached caller or copy in the report. Required process and gate proofs remain outstanding. A fresh implementer thread performs this diagnostic only, then returns the evidence and proposed owner/location or uncertainty; any design gap goes to the designer under development.md10.4.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

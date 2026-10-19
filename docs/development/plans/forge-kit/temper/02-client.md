@@ -170,7 +170,25 @@ Shape: four commits, each builds and passes its crates' tests.
      rather than applying a stale delta. Refresh any further reached copy or
      derived value and list every user in the commit body.
   4. **The deletion**: the crate's directory, its member and its path entry.
-Test shape: **2 tests move, 74 leave with the crate.** `cargo nextest list -p
+  Diagnostic exception for the pinned Jig UTF-8 panic: investigate the retained
+  failed retry in run `logs/temper-02/process-attempt2/process`, comparing the
+  failing four-commit tree and its actual pins with the last passing source.
+  Scope is scratch-only provenance tracing into
+  `jig-domain-core/src/documents/small.rs::text` and the reached callers and
+  application translations; check each discovered name in the frozen sources.
+  Budget: 20 minutes and three executable diagnostic attempts through pinned
+  heavy with explicit bash script files; compile/setup failures consume attempts,
+  and queue waits grant none. Use retained artifacts and deterministic lower-layer
+  probes; no further full process run, recording or gate is authorized by this
+  exception. Preserve the original artifacts and implementation checkpoint.
+  Return at most 15 lines naming full source/pin hashes, the invalid value's
+  provenance, smallest reproducer and proposed repair owner/location, or the
+  remaining uncertainty. No repair lands here: return the report for an upstream
+  scope ruling or design question. Keep UTF-8 validation, payload bytes, errors,
+  assertions, admission limits and existing proof requirements unchanged. At
+  cutoff identify any active task/source/target owner and retain its target until
+  it ends; refresh any further reached copy in the diagnosis map and list it.
+  Test shape: **2 tests move, 74 leave with the crate.** `cargo nextest list -p
   temper-engine-domain-forge-client` shows 76 at the base (0.084 s); the two
   purpose tests keep their names and move to `tests/purpose.rs`, adapted to
   `purpose.key(&[1; 16], N)`: `effect_keys_are_stable_by_purpose_and_separate_deployments`
