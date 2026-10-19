@@ -657,6 +657,9 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
          21:#   plan ruling [--text FILE] TITLE SOURCE  land a ruling in decisions.md, once
          490:# Decision of unblock.draft.md, or with --text a file's. It becomes the next
 
+129. **temper 03.3: the inbox's call that reads on, interim** (design, temper 03.3's block of 2026-10-19 09:18:06 UTC).
+     Interim, until decisions.md, For the user, N, is decided: how the call that reads on after an `inbox` selects its group is a design gap, and waits (jig's `Read::Inbox` reads one `InboxReadGroup` a call, each with its own opaque cursor, and tools.md 5.2's table has no group selector); it goes to the user as N, as no designer is joined. temper 03.3 goes on with everything else: `tasks`, `task N --tree --activity K --run`, `activity N`, `run N`, `chat N`, `turn N A.T`, and `inbox`'s first answer, needs then updates, each `Read::Inbox` with `after: None`, as its Shape says. Its inbox tests and goldens use groups that end on their first page, printed with `no more`; the parse of `inbox --after C` and the printed call that reads on after an inbox are the one part that waits, and no inbox cursor is printed or parsed meanwhile. 03.3 does not land before the ruling on N reaches it. A further read whose cursor names no group: treat it as this one, and say so in the report.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
@@ -832,3 +835,23 @@ and the user, or the director, may veto it before the run:
   document's offers as 03.2 says. The agent learns the act exists and can
   hand it to a person; no call names a missing tool. tools.md, 6.1, says
   so at the designer's next pass, after this plan.
+- **N. The inbox's call that reads on** (question.md in the run's
+  directory, from temper 03.3's block of 09:18:06Z; no designer is joined
+  to answer it): tools.md, 5.2, has `inbox [--project P] [--kind K]
+  [--root N] [--after C]` answer "what needs the party, then updates",
+  and lists print "the cursor for the next page" (6.1). jig reads the
+  inbox one group a call (`Read::Inbox { group: InboxReadGroup, .. }`):
+  "the two groups carry independent opaque cursors", and "a kind belongs
+  to exactly one of the two query groups" (`InboxReadGroup::of`). The
+  table has no group selector, so the cursor printed after an inbox
+  without `--kind` does not say which group it reads on. Default: an
+  inbox's printed cursor is one leading byte naming its group (0 needs, 1
+  updates), then jig's cursor bytes, kept whole; the call that reads on
+  goes on where the page stopped, in needs while needs has more, then in
+  updates; `--after C` reads C's group, and with `--kind K` a C of the
+  other group is a usage error, exit 1; tools.md, 5.2, says so at the
+  designer's next pass, after this plan. Or: `inbox` reads one group a
+  call, as `tasks` does (L), with a flag for updates (a table change); or
+  a designer joins the run (`plan join designer`, in a design session)
+  and answers question.md. temper 03.3's inbox call that reads on waits
+  on it; the rest of 03.3 goes on.
