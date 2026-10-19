@@ -174,15 +174,16 @@ managed or owned.
   | the bot's login and email | the setup's `bot.login` and `bot.email` (section 8) |
   | the tokens' names | `temper-api` for the API's, `temper-git` for git's |
   | the orgs | the setup's `orgs` |
-  | the orgs' owner | `mode.owned.person.login` (6.5) when owned; none when managed |
-  | whether an absent org is made | yes when owned; no when managed |
+  | the orgs' owner, which makes an absent org | `mode.owned.person.login` (6.5) when owned; none when managed |
   | the name a failure gives the admin | `temper-admin` |
   | the listener's address | `application.webhooks.listener`'s address, when configured; none otherwise. The hook's URL is derived from it (skein's `forge-setup.md`, section 4.1) |
   | the word | `temper`, so the bot's mark is `temper:bot` |
   | its limits | `setup.orgs`, `setup.deadline_ms`, `setup.backoff_ms` and `setup.backoff_max_ms` (configuration.md, section 7) |
 
   The API's address is the host's: the forge's `api` (configuration.md,
-  section 3).
+  section 3). A value the kit's check refuses comes back as its `Place`
+  (skein's `forge-setup.md`, section 6.1), and the setup shell names the
+  path this table gives for it.
 - **What the host answers, as needs:**
 
   | Reconcile asks for | The setup shell answers |
