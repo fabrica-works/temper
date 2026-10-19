@@ -800,6 +800,25 @@ where its answer lands.
 
      Mark skein-02.s2 ready immediately with the checked full hashes. Its implementer validates the corrected post-s1 source and isolated timing before land; normal landing gate remains. Keep all135 cases/controls,01.s1 scope and closing-repin dependency. Refresh any further reached copy/count consumer and list it in the commit body.
 
+137. **OneShot supplement Shapes against main** (ready check of skein-06.s1).
+     Reverses: nothing; ruling134's cause-before-repair, diagnostic budget and recording limits stay.
+     Amends: skein/06.s1-oneshot.md Test shape, clarifying valid fixture feeding and the proof boundary.
+
+     Build demand-correct HTTP fixtures: http/host/tests.rs::feed retains each pending Read and uses skein_lib::Intake::meet to supply only what that demand accepts. Preserve the original fragments/order; never invent End to finish incomplete input. Keep actual submitted operation tokens/buffers and valid completion order in the driver regression.
+
+     The six scratch sketches prove fixture/public-boundary feasibility and leave the eight existing library identities intact. They do not prove the archived-write cause or the future OneShot scheduling repair. All134 diagnostic/repair conditions,15minute/three-probe limit, genuine incomplete-reply failure, scope boundaries and consumer recordings remain. Package counts stay relative; no final regression count is inferred from the feasibility sketches. Refresh any further reached driver copy and list it in the commit body.
+
+     ## Checked
+
+     - Ready check at skein6ab44a32a6e09e47bfdd88cc0e0ee7fee02b62dd / tempercfc50c4adcc0d8ca80515ac21bd767e5d4b2bf9f found no missing landed Files/signature and no extra driver repair target across all five repositories. host::exchange/wait and ExchangeHost interfaces are present; downstream uses need no public API/capture change.
+     - Exact primary graph finds Intake::meet in crates/skein-lib/src/intake.rs132–153; rg verifies pub fn meet(&mut self, read:Read)->Option<Box<[u8]>>. Existing skein-http body/tests satisfy pending reads with intake.meet(read). Corrected scratch host/tests.rs::feed retains pending until meet succeeds; original whole-fragment fixture failed, not the production driver.
+     - Pinned heavy904 exposed that fixture error after all-target clippy passed. Corrected917 passed all-target clippy and sequential --lib default14 (8 existing+6 sketches), fuzzy0/browser0 with --no-tests=pass; new sketches4–10ms. No live HTTP, cause investigation, repair, recordings, full gate or repin proof is claimed. Sources/patches/logs retained under scratch-ready-skein-06s1; owned workers ended and only own target removed.
+     - Kit plan provides ruling/ready/ring. The source/config changes since checked6ab44a32 are fake peer/protocol only; throwaway/io/HTTP/lib files read by this check remain unchanged. Existing source fallback remains available for graph exclusions.
+
+     ## Instructions
+
+     Mark skein-06.s1 ready immediately with the checked full commits. Start its fresh upstream implementation under134's bounded diagnostic scope; feasibility sketches do not spend or enlarge its diagnostic probe allowance. Temper06.2 remains waiting for the evidenced landed repair before its repin/recording proof. Retain closing temper-repin dependency and all existing case/budget limits.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
