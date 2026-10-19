@@ -8,7 +8,6 @@ members = [
     "tools/live-login",
     "tests/one-process",
     "testing/temper-fake-git",
-    "testing/temper-fake-forge-protocol",
     "crates/temper",
     "tests/engine/protocol-forge",
     "crates/temper-client-shell-terminal",
@@ -37,14 +36,12 @@ members = [
     "crates/temper-engine-domain-forge",
     "crates/temper-worker-domain",
     "crates/temper-worker-domain-checkout",
-    "testing/temper-fake-forge-domain",
     "tests/fake-checkout",
     "tests/engine/domain",
     "tests/system",
     "tests/conformance",
     "tests/engine/forge/client",
     "tests/engine/forge",
-    "tests/fake-forge",
     "tests/worker/checkout",
     "tests/worker/domain",
 ]
@@ -61,7 +58,6 @@ temper-forge-setup-shell = { path = "crates/temper-forge-setup-shell" }
 temper-forge-setup = { path = "crates/temper-forge-setup" }
 jig-boundary = { git = "https://github.com/forgetic/jig.git" }
 temper-fake-git = { path = "testing/temper-fake-git" }
-temper-fake-forge-protocol = { path = "testing/temper-fake-forge-protocol" }
 skein-fake-peers = { git = "https://github.com/forgetic/skein.git" }
 skein-llm = { git = "https://github.com/forgetic/skein.git" }
 skein-llm-world = { git = "https://github.com/forgetic/skein.git" }
@@ -171,7 +167,6 @@ jig-protocol-charter = { git = "https://github.com/forgetic/jig.git" }
 jig-core-world = { git = "https://github.com/forgetic/jig.git" }
 jig-tasks-world = { git = "https://github.com/forgetic/jig.git" }
 jig-people-world = { git = "https://github.com/forgetic/jig.git" }
-temper-fake-forge-domain = { path = "testing/temper-fake-forge-domain" }
 temper-fake-checkout = { path = "tests/fake-checkout" }
 temper-worker-checkout-world = { path = "tests/worker/checkout" }
 
