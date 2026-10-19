@@ -105,7 +105,8 @@ RequestAdmission`. `send` matches `self.table.ask(..)`: `Ok(admission)` keeps th
 tells `Outcome::Limit`, as `Err(_)` does today; `Err(RequestRefused::Held(_))` is `unreachable!("a drawn key is never held")`.
 `restore_record` keeps its checks in order (the invalid family, the application key already held, then `self.table.restore(..)`):
 `Ok(admission)` keeps and tells `Kept`; `Full` and `Held` are both dropped and counted, as `.is_err()` is today (the same engine
-key in two kept records is now `Held`). `not_kept(key)` takes `self.table.owner(key)`, then `self.requests.get(&owner)`, then
+key in two kept records is now `Held`). It takes the admission as `self.table.restore(..).ok()`: a `match` of `Ok` to `Some`
+trips clippy's `manual_ok_err`, and the exhaustive-match rule covers a `match` only. `not_kept(key)` takes `self.table.owner(key)`, then `self.requests.get(&owner)`, then
 `self.table.not_kept(key, held.admission.number)`; when that hands back the owner, it removes the request and tells `NotKept`,
 as today. An owner whose current request was admitted under another key passes that admission's number, which skein ignores.
 Test shape: every existing test passes unchanged; the not-kept path, now by number, runs in jig-client's `tests/store.rs`
@@ -140,13 +141,15 @@ root/fixtures.rs}`; `tests/client/tests/{fuzzy_memory.rs,shell.rs}`; `tests/clie
 `Event::Send` sites that list their fields at f50c3f63; the compiler names any other. No hotspot.
 Shape: both `Event::Send` variants gain `name: Option<RequestKey>`; every constructor outside the new tests passes `name: None`,
 and jig-client's two arms pass it on. `Domain::send`: registers a family's owner, as today; under a held application key, asserts
-`held.request == request && name.is_none_or(|n| n == held.admission.key)` with "request key conflict", and returns; without an
+`held.request == request && named` with "request key conflict", after `let named = match name { None => true, Some(name) =>
+name == held.admission.key };` (clippy.toml disallows `Option::is_none_or`), and returns; without an
 identity tells `Unconfirmed`, as today; then asks `self.table.ask(key, party, size, held)` for `None`, or
 `self.table.ask_given(key, party, size, name, held)` for `Some(name)`, and matches the result: `Ok(admission)` keeps the request, `Full(_)` tells `Limit`,
 `Held(_)` tells `Outcome::Held`, nothing saved, sent or told pending. `Outcome::Held` sits last, with its doc line;
 `outcome.rs`'s two matches give it `unreachable!("the reference UI names no send")`; `examples/ops` and the test domain add `|
 Outcome::Held` to their `RequestProgress::Unknown` arm. The protocol world's `Story` gains `send_named` and `made_under`, the
-latter counting `Observed::Made` under one engine key, as the crate's `transient_request` counts it inline.
+latter counting `Observed::Made` under one engine key, as the crate's `transient_request` counts it inline. `cargo fmt` runs
+after `send`'s signature is pasted from the sketch, which is wider than rustfmt keeps it.
 Test shape: in `crates/jig-client-domain/src/tests/requests.rs`, with new fixtures in `tests/fixtures.rs`: `pub(crate) const
 NAME: skein_lib::RequestKey = [3; 16];` and `OTHER_NAME = [4; 16]`, given names beside `ENGINE_KEY` (`[1; 16]`) and
 `OTHER_ENGINE_KEY` (`[2; 16]`); `Client::send_as(key, name) -> Token`, written as `send` is today, and `send` becomes
@@ -173,7 +176,7 @@ Beside it:
 - `the_same_key_and_name_sent_again_joins_the_first`.
 - `#[should_panic(expected = "request key conflict")] the_same_key_under_another_name_is_a_loud_key_conflict`, with `OTHER_NAME`.
 - `a_name_is_admitted_again_once_its_holder_is_answered`: a `Final` answer as in `a_final_answer_is_told_once_with_its_outcome`,
-  then `OTHER_KEY` under `NAME` is saved and sent under `NAME`.
+  `c.downs()` and `c.told()` both drained after it, then `OTHER_KEY` under `NAME` is saved and sent under `NAME`.
 - `a_name_admitted_again_is_retired_by_its_own_not_kept`: `NotKept { key: NAME }`, `send_as(OTHER_KEY, Some(NAME))`, `NotKept {
   key: NAME }` again; told is `[Told::Answered { key: OTHER_KEY, outcome: Outcome::NotKept }]`: the second admission's number.
 - In `tests/versions.rs`, `a_family_send_under_a_held_name_is_answered_held`: with its `live()` and `record()`, an `Ask::Family`
@@ -283,8 +286,7 @@ pub enum Outcome {
 ```rust
 // crates/jig-client/src/client.rs
 pub enum Event {
-    // The other variants unchanged.
-    /// A keyed request under the application's key, with a name or none (client.md, 4.1 and 6).
+    // The other variants unchanged; `Send` takes no doc line, which cargo fmt would split the enum for.
     Send { key: Key, name: Option<skein_lib::RequestKey>, request: Ask },
 }
 ```
