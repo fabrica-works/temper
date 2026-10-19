@@ -1205,6 +1205,48 @@ where its answer lands.
 
      Instructions: mark skein-03.s1 ready now with these snapshots; coordinator starts after its landed03.3 prerequisite. Preserve all shared modes/controls present at implementation, rechecking listing if it lands meanwhile; serialize common-file edits without holding other starts. Refresh further reached copies/derived counts and list each in the commit body. Existing closing forge-kit/temper-repin waits for03.s1, with no additional repin.
 
+166. **Apply the bounded landing-result text answer** (designer answer, temper02.1 block of2026-10-19T12:59:50Z).
+     Apply the designer's answer landed in temper6d4741a4b1f1f3655f615c9bc9cdc8a7ff9cbeb5 and jig8cc7e79f9ba72d64eac30597b8fe07f4f628eeb6:
+
+
+     Landed with `land --docs`: temper 6d4741a4b1f1f3655f615c9bc9cdc8a7ff9cbeb5 (design
+     root.md 6, forge.md 8.2, STATUS.md; plan temper/02-client.md 02.1; later.md) and
+     jig 8cc7e79f9ba72d64eac30597b8fe07f4f628eeb6 (contract.md 5.3, STATUS.md).
+
+     1. The words are the merge's lowercase hex id via `commit_text`, shortened to
+        the task's own bound. temper root.md 6: "A landed change's result is a change
+        of the forge's connector and kind, its resource the pull request, and its
+        words the merge commit's id as text: in lowercase hexadecimal, as a
+        delegate's commits are (below), shortened to its first digits, as a short id
+        is, when the task's contract bounds its words under the id's 40 or 64. …
+        never the commit's bytes; the whole id stays the change's and its pull
+        request's (`forge.md`, 8.2). The short id keeps any bound the task's creator
+        chose: a bound under the id's digits is not refused, and the result never
+        passes it."
+     2. Owner: temper's translation, `change_decision` (forge_route.rs), through a new
+        `landing_words(merge, bound)` beside `commit_text`; `bound` is the `words` of
+        the task's own `Contract::Change` (read as `link.rs:26` reads it). jig's
+        assertion stays.
+     3. Bound: 64 digits fit the ceiling (`result_bytes`, 512 in jig's small profile;
+        `batch.rs:426`) but not every task: the creator picks the bound, no floor, and
+        the forge-kit tests use 32, where a whole id is refused (`invalid_result`) and
+        the task stays due. No bound, test value, encoding or `STORE_VERSION` changes.
+     4. Retained raw words: test artifacts only (the run's attempt stores and logs);
+        temper's formats are pre-release, no deployment's store must outlive a
+        release. Keep the failed artifacts as they are; no fixed tree restores them.
+     5. 02.1 gains commit 5, "The landing's words", on the four-commit checkpoint:
+        unit `landing_words_are_the_merge_id_cut_to_the_contract_bound`; the
+        frozen-worker forge_routes.rs test asserts its words are the first 32 digits
+        of `State::Landed { merge }`; joint "plus 6 (927 from the base's 921)",
+        check.sh "less 70 (… 1809 …)", new proof `heavy cargo nextest run -p
+        temper-engine-domain forge_route::tests` "plus 1 (2 from the base's 1)"
+        (`git grep -c '#\[test\]' origin/main --
+        crates/temper-engine-domain/src/route/forge_route/tests.rs` prints `…:1`).
+        Don't: more digits than the bound, a raised bound, `logs/temper-02/` touched.
+     6. Deferred: jig 5.3 now lists "a task's result's texts … refused as a result its
+        contract does not admit wherever the tasks child admits a result"; its check
+        has a later.md row and jig STATUS.md's.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
