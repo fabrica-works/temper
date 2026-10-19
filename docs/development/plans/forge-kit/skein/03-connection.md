@@ -127,6 +127,17 @@ PlaintextName { forge: u16 },
   body_bytes:1045 becomes 1042 for kit. Other fixture limits stay unchanged.
   Reuse skein 01.3's table storage sizing; price changed Settings/Forge holders
   in worst_case and report the complete fixture sum now and after each change.
+  Price retained owner bytes explicitly: Settings.word, Settings.user_agent and
+  plaintext name boxes have no size input in worst_case(l,s,forges). In 03.1,
+  add checked settings::owned_bytes(&Settings) for the newly retained owner
+  byte slices and pass that byte count into
+  worst_case; thread it through check and every caller, including temper's
+  crates/temper-service/src/system.rs::memory and the conformance's
+  tools/forgejo-conformance/src/component/hosted.rs::Hosted::new. Adapt the
+  moved src/tests.rs and src/tests/hooks.rs bound callers too. Refresh any
+  further caller, copied expected sum or derived startup fixture reached by
+  the change, and list it in the commit body. This is pending owner-value code, not a ready-check
+  implementation. Keep the old fixture's complete sum 2,812,325 as the baseline.
   skein 08.5 adds its independent allocator measurement.
   Temper's side: crates/temper-service/src/forge.rs::{settings,shared,problems,
   indexed} must construct Forge/Credential/Transport, flatten Shared, handle
@@ -134,7 +145,14 @@ PlaintextName { forge: u16 },
   setup construction uses skein-forge's host and the owner's user agent.
   Repair runtime fixtures in crates/temper-service/src/tests/fixtures.rs::forge_runtime,
   tests/one-process/src/fixtures.rs::forges and tools/forgejo-conformance/src/component/hosted.rs::new;
-  adapt this crate's src/tests/fixtures.rs::settings before copying. Verify
+  adapt this crate's src/tests/fixtures.rs::settings before copying.
+  Also inventory tests/engine/protocol-forge/src/fixtures.rs::{settings,shared,
+  protocol_shared}: hand the component word and agent, flatten the five client
+  numbers in shared and protocol_shared. Keep the world's temper word and its
+  1045-byte body bound until its skein 08 move adapts the word to kit.
+  crates/temper/src/lib.rs::forges also imports the runtime transport; its
+  plaintext-name construction is temper 01.4's prerequisite, and its crate
+  path changes at the next temper repin. Verify
   tests/system/src/composed/link.rs::assignment too: its settings::Transport
   is temper's configuration enum, not the component enum. Preserve that seam.
 Test shape: 112 inherited component test identities: root 12, connection 20, hooks 12,
@@ -149,6 +167,10 @@ Test shape: 112 inherited component test identities: root 12, connection 20, hoo
   Extend unusable_forge_settings_name_the_forge: None is Ok; empty, NUL, tab,
   0x1f, space, DEL, 0x80, 0xff and each /:[] -> PlaintextName{forge:1};
   !, ~ and adjacent . 0 9 ; Z \\ ^ -> Ok. Check and construction agree.
+  Define fixtures::WORD and USER_AGENT from kit and kit/0.0.0 once. Define
+  OP_BYTES=512 from fixtures::shared, BODY_ROOM=1042 from 2*OP_BYTES+WORD.len()+15,
+  BODY_ROOM_SHORT=BODY_ROOM-1 and MAX_WORD_BODY_ROOM=1055 from 2*512+16+15.
+  Use the named bounds in the new body/word units per testing-strategy.md §10.
   Three new tests in src/tests.rs, reusing the sole src/tests/fixtures.rs:
   the wiring check above, plus two units:
   owner_words_are_checked_before_io: 0/1/16/17 bytes and K -> Word/Ok/Ok/Word/Word
@@ -161,8 +183,10 @@ fn body_room_includes_the_owner_word() {
     let shared = fixtures::shared();
     let settings = fixtures::settings();
     for (body_bytes, expected) in [
-        (1041, Err(Unusable::BodyBytes { body_bytes: 1041, needed: 1042 })),
-        (1042, Ok(())),
+        (fixtures::BODY_ROOM_SHORT, Err(Unusable::BodyBytes {
+            body_bytes: fixtures::BODY_ROOM_SHORT, needed: u64::from(fixtures::BODY_ROOM),
+        })),
+        (fixtures::BODY_ROOM, Ok(())),
     ] {
         let limits = Limits { body_bytes, ..fixtures::limits() };
         assert_eq!(limits::check(&limits, &shared, &settings), expected);
@@ -217,7 +241,7 @@ Shape: three changes against the base, each tested below. Head admission:
   explanation to head validity and size, and index its forge number.
   Its prepare/settings and small profile, and the 03.1 runtime fixtures,
   must pass the longer head check at the next repin; keep their owner bytes.
-Test shape: six new tests, using fixtures::{limits,shared,settings,hook_settings}.
+Test shape: seven new tests, using fixtures::{limits,shared,settings,hook_settings}.
   Extend the inherited unusable_forge_settings_name_the_forge in src/tests.rs:
   forges 2/3, token 0/64/65, user 0/1, duplicate, loopback v4/v6 versus
   nonloopback/InProcess listener, off-loopback plaintext, secret 0/128/129
@@ -272,7 +296,15 @@ fn a_verified_delivery_without_an_event_is_answered_204_without_a_hint() {
   next=2 s. This covers the gaps in moved
   the_start_stops_on_another_user_or_a_4xx_and_waits_otherwise (5 s only) and
   a_call_waiting_for_its_forge_is_unavailable_at_its_deadline (no 429).
-  New private-file reference, using the same fixtures; no production test API:
+  Split the new token boundary coverage into two tests so should_panic cannot
+  hide rejection of the valid predecessor. api_tokens_stop_before_the_listener_range
+  starts next_token at LISTENER_OWNER and makes one call; a separate
+  the_last_api_token_is_still_issued starts at LAST_API_OWNER and asserts the
+  returned token. Define LISTENER_OWNER=1_u64<<59_u32 from hooks' reserved prefix,
+  LAST_API_OWNER=LISTENER_OWNER-1, and use MAX_OUT.below for the queue capacity.
+  Keep the production guard before token issuance and checked increment.
+  This adds one new test, changing 03.2 to seven new/122 total and 03.3 to 128.
+  The corrected private-file reference follows:
 ```rust
 // crates/skein-forge-connection/src/component/tests.rs
 use super::*;
@@ -283,13 +315,25 @@ fn api_tokens_stop_before_the_listener_range() {
     let limits = fixtures::limits();
     let mut c = Component::new(fixtures::settings(), &limits, &fixtures::shared()).expect("valid");
     let env = Env { now: Time::ZERO, wall: skein_lib::Wall::EPOCH, limits };
-    let mut io = Queue::with_capacity(16);
-    c.next_token = (1_u64 << 59) - 1;
-    assert_eq!(c.open_start(0, &env, &mut io).raw(), (1_u64 << 59) - 1);
+    let mut io = Queue::with_capacity(MAX_OUT.below);
+    c.next_token = LISTENER_OWNER;
     c.open_start(0, &env, &mut io);
 }
+
+// The listener owns 2^59; an API owner may still use its predecessor.
+const LISTENER_OWNER: u64 = 1_u64 << 59_u32;
+const LAST_API_OWNER: u64 = LISTENER_OWNER - 1;
+#[test]
+fn the_last_api_token_is_still_issued() {
+    let limits = fixtures::limits();
+    let mut c = Component::new(fixtures::settings(), &limits, &fixtures::shared()).expect("valid");
+    let env = Env { now: Time::ZERO, wall: skein_lib::Wall::EPOCH, limits };
+    let mut io = Queue::with_capacity(MAX_OUT.below);
+    c.next_token = LAST_API_OWNER;
+    assert_eq!(c.open_start(0, &env, &mut io).raw(), LAST_API_OWNER);
+}
 ```
-Proof: world, `heavy cargo nextest run -p skein-forge-connection`: 121 passed,
+Proof: world, `heavy cargo nextest run -p skein-forge-connection`: 122 passed,
   <0.5 s total, new units <20 ms; harnesses observe HTTP requests/refusals.
   The component harness is the highest local caller; temper's next repin
   (temper 03.2 if next) repairs and proves its configuration mapping.
@@ -350,7 +394,13 @@ fn limits_check_admits_one_largest_row_of_every_listing() {
     }
 }
 ```
-  In src/tests/connection.rs, reuse fixtures::Harness with its admitted limits:
+  In src/tests/connection.rs, reuse fixtures::Harness with its admitted limits.
+  First repair tests/fixtures.rs::Harness::{with,drain}: keep a bounded mapping
+  from configured endpoint address to forge number, and route Request::Connect
+  using addr instead of assigning every Peer forge:FORGE. Give the two forges
+  distinct loopback ports in a shared fixture. Keep existing moved identities.
+  For an unknown-forge assertion of zero total connects, use empty configured
+  forges; otherwise assert the connect count did not change around the call.
   an_unconfigured_forge_is_unavailable_at_zero_cost: forge 99 ->one
   Answered{cost:0,result:Err(Unavailable)}, zero connection requests.
   a_stopped_forge_does_not_stop_another: forge 1 wrong user ->Stopped once;
@@ -359,7 +409,7 @@ fn limits_check_admits_one_largest_row_of_every_listing() {
   ready forges 1/2; idle forge 1 closes, forge 2 connects and answers once.
   start_backoff_doubles_to_its_maximum: failed start waits 1,2,4,8,8 s;
   before each deadline no connect, at it one; Ready/Stopped ignore later heard.
-Proof: world, `heavy cargo nextest run -p skein-forge-connection`: 127 passed,
+Proof: world, `heavy cargo nextest run -p skein-forge-connection`: 128 passed,
   <0.5 s total, new units <20 ms; Component/HTTP harness proves calls and
   eviction over bytes. skein 08.1 connects the separate machine world after
   temper 03.1, temper 05.1, skein 05.2 and skein 06.2 supply its dependencies.
@@ -371,8 +421,8 @@ Removes: largest_row's target-layout-dependent size_of row pricing.
 
 Run once from skein's root; base forms and outputs are in base-skein-03.md.
 
-- `heavy cargo nextest run -p skein-forge-connection` prints 127 passed:
-  112 inherited component test identities +15 new (3+6+6), within the bounds
+- `heavy cargo nextest run -p skein-forge-connection` prints 128 passed:
+  112 inherited component test identities +16 new (3+7+6), within the bounds
   above. Pure host vectors belong to skein 01.4; world tests to skein 08.
 - `heavy cargo clippy -p skein-forge-connection --all-targets -- -D warnings`
   exits 0 without warnings.

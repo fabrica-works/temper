@@ -528,6 +528,26 @@ where its answer lands.
 
      Checked with rg -l 'fixtures::(limits|small)|fixtures::\*|fixtures::\{' /srv/data/git/runner/src/skein/crates/skein-forge/src/forgejo -g '*.rs': tests.rs and precisely those five modules are direct fixture users. The ready check must verify any additional aliases or newer users against its own snapshots. The audit's bounded scope and proofs remain as ruling 118.
 
+120. **skein 03 Shapes against main** (ready check of skein-03.1).
+     Reverses: nothing.
+     Amends: skein/03-connection.md, 03.1 sizing and temper-side inventory, named body fixtures, 03.2 token test/guard, 03.3 routing fixture and relative proof counts.
+
+     03.1 must account for retained Settings.word, Settings.user_agent and plaintext names as required by forge-connection.md 7.4 (the worst case fits u64). Add checked settings::owned_bytes and thread its byte count into worst_case, check and each reached caller. Inventory temper-service/src/system.rs::memory, tools/forgejo-conformance/src/component/hosted.rs::Hosted::new and the moved tests.rs/tests/hooks.rs bound callers. The complete old fixture sum is 2,812,325 bytes, a baseline rather than the final expected sum. Remeasure after the full owner-value adaptation and refresh further copied/derived bounds, listing each in the commit body.
+
+     The next temper repin also repairs tests/engine/protocol-forge/src/fixtures.rs::{settings,shared,protocol_shared}: supply owner word/agent and flatten the five client numbers. Keep temper's six-byte word and 1045-byte body bound until the skein 08 move. Include crates/temper/src/lib.rs::forges transport consumer. The existing rule leaves these temper edits to its next repin.
+
+     Name the new fixture word, agent, operation cap and body bounds: kit and kit/0.0.0, OP_BYTES 512, BODY_ROOM 1042 = 2*512+3+15, BODY_ROOM_SHORT one below, and MAX_WORD_BODY_ROOM 1055 = 2*512+16+15. The supplied body-bound sketch uses them.
+
+     Split the new token boundary proof: api_tokens_stop_before_the_listener_range starts at the listener prefix and must panic on one allocation; the_last_api_token_is_still_issued independently accepts its predecessor. Name LISTENER_OWNER = 1_u64 << 59_u32 and LAST_API_OWNER one below; use MAX_OUT.below for queue capacity. Guard before issuing/incrementing, retain checked increment. This prevents should_panic from hiding rejection of the valid predecessor. 03.2 now adds seven tests (122 total); 03.3 reaches 128, or 112 preserved identities plus 3+7+6 new. Inherited assertions/names remain.
+
+     03.3's two-forge harness must map configured endpoint addresses to forge numbers in tests/fixtures.rs::Harness::{with,drain}; route Request::Connect.addr instead of assigning every peer FORGE. Give the two endpoints distinct fixture ports. An unknown-forge test with no total connects uses no configured forges; otherwise compare connect count around the call.
+
+     Checked: ready-skein-03 examined all three increments and downstream users at skein 50f743621439da9376b871ba0e366a4deacbffea and temper a6f34f6af3f484e9f24b58fed9feab1d8ac04aa2. Exact-project search_graph locates worst_case/check/open_start, Harness::drain and world settings/shared/protocol_shared; rg confirms each in main. sed of open_start shows allocation then increment then 2^60 assertion; hooks.rs reserves 2^59. sed of Harness::drain shows Connect { owner, .. } and forge: FORGE. rg finds op_bytes 512/body_bytes 1045 and the startup/conformance/test bound callers; system.rs defines memory. New helper/constants/tests belong to the named future increments. The ready check's copy/derived sweeps found no affected smith/jig/hearth forge user.
+
+     Proof: pinned-kit heavy baseline clippy and suites passed 523 focused/11 fuzzy; token counterexample independently failed valid-bound acceptance while the original panic test passed. Corrected sketch clippy and suites passed 531 focused/11 fuzzy (2.817/6.258 s); new probes 4–7 ms. Skein forge/http clippy and 275 focused passed; fuzzy selected none. All 117 current inherited identities are retained. Actual owner-value, head and page-measure implementation proofs await their named prerequisites; no full gate/process/live result is claimed. Budgets/lints unchanged. Evidence: scratch-ready-skein-03/report.md, corrections.patch, results.tsv and derivations.md; completed targets released.
+
+     Instructions: mark skein-03.1 ready after this ruling, retaining its checked commits; normal prerequisites still govern its start. Future declarations are required implementation work, with complete worst-case and relative test-count proofs. The kit's plan ready/ruling/ring dispatch is present.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
