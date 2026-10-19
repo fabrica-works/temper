@@ -2,6 +2,7 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+pub mod adopt;
 pub mod jig;
 pub mod key;
 pub mod limits;

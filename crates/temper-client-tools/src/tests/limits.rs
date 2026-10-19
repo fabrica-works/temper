@@ -19,3 +19,19 @@ fn the_tools_preset_is_the_terminals_but_its_rows() {
 fn the_tools_preset_has_a_worst_case() {
     assert!(temper_client_domain::worst_case(&limits::client()).is_some(), "the tools preset is priced");
 }
+#[test]
+fn the_rows_repeats_are_within_the_client_limits() {
+    use crate::jig::table::Occurs;
+    let limits = limits::client();
+    for row in crate::table::TOOLS {
+        let most = if row.name == b"adopt" { limits.forge.checks } else { limits.client.domain.delegates };
+        for form in row.forms {
+            for argument in *form {
+                match argument.occurs {
+                    Occurs::Repeated { most: repeated } => assert!(repeated <= most, "{:?}", row.name),
+                    Occurs::Required | Occurs::Optional => {}
+                }
+            }
+        }
+    }
+}

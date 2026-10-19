@@ -1,18 +1,16 @@
 use crate::jig::key::Name;
 use skein_lib::List;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 /// Source files under the extraction boundary; capacity is a source-tree bound.
 const SOURCE_FILES: u32 = 128;
 pub(super) fn name(bytes: &[u8]) -> Name {
     Name::new(bytes).expect("a fixture key name")
 }
-#[expect(clippy::disallowed_macros, reason = "the boundary fixture reads this crate's source tree")]
 pub(super) fn sources() -> List<(PathBuf, Box<str>)> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut paths = List::with_capacity(SOURCE_FILES);
     let mut sources = List::with_capacity(SOURCE_FILES);
-    paths.push(root.join("src/jig.rs")).expect("module root");
-    paths.push(root.join("src/jig")).expect("module directory");
+    paths.push(PathBuf::from("src/jig.rs")).expect("module root");
+    paths.push(PathBuf::from("src/jig")).expect("module directory");
     for index in 0..SOURCE_FILES {
         let Some(path) = paths.get(index).cloned() else {
             break;
@@ -65,8 +63,37 @@ pub(super) const EVERY_TOOL: &[&[&str]] = &[
     &["activity", "41"],
     &["turn", "41", "3.7"],
     &["run", "41"],
+    &["chat", "hello", "--project", "shop", "--key", "start-chat"],
+    &["message", "41", "hello", "--key", "say-hello"],
+    &["close", "41", "--key", "close-chat"],
+    &["answer", "41", "3", "yes"],
+    &["decide", "t41/3", "accept"],
+    &["decide", "41", "release", "--hold", "2"],
+    &["release", "41", "--hold", "2"],
+    &["stop", "41"],
+    &["cancel", "41", "finished"],
+    &["wait", "me"],
+    ADOPTION,
     &["sign-in", "-"],
     &["sign-out"],
     &["pending"],
     &["help"],
 ];
+
+/// Parse the printer's bytes back without re-creating argv in each test.
+pub(super) fn printed(call: &crate::jig::call::Call) -> crate::jig::call::Parsed {
+    let words = back(call);
+    let mut borrowed = List::with_capacity(WORDS);
+    for word in &words {
+        borrowed.push(word.as_ref()).expect("bounded words");
+    }
+    crate::table::parse(borrowed.as_slice()).expect("printed argv")
+}
+/// The common adoption form; optional flags stay absent.
+pub(super) fn adoption() -> crate::jig::call::Call {
+    call(ADOPTION)
+}
+
+/// Required adoption fields and its named key, shared by form tests.
+pub(super) const ADOPTION: &[&str] =
+    &["adopt", "--project", "shop", "--owner", "o", "--name", "n", "--landing", "main", "--key", "adopt-repo"];

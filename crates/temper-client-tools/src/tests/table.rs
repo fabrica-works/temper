@@ -22,12 +22,7 @@ fn each_read_parses_into_its_call_and_prints_back() {
     for words in READS {
         let call = fixtures::call(words);
         assert_eq!(fixtures::back(&call), fixtures::owned(words), "{words:?}");
-        let written = fixtures::back(&call);
-        let mut borrowed = List::with_capacity(u32::try_from(written.len()).expect("bounded words"));
-        for word in &written {
-            borrowed.push(word.as_ref()).expect("bounded words");
-        }
-        assert_eq!(crate::table::parse(borrowed.as_slice()), Ok(Parsed::Call { call, json: false }), "{words:?}");
+        assert_eq!(fixtures::printed(&call), Parsed::Call { call, json: false }, "{words:?}");
     }
 }
 const HOST: &[&[&str]] =
@@ -139,5 +134,217 @@ fn tasks_default_to_number_and_unwritten_orders_are_refused() {
             Err(Unwritten::NoForm),
             "{order:?}"
         );
+    }
+}
+const ACTS: &[&[&str]] = &[
+    &["chat", "hello", "--project", "shop", "--key", "start-chat"],
+    &["message", "41", "hello", "--key", "say-hello"],
+    &["message", "41", "-", "--key", "stdin"],
+    &["close", "41", "--move", "2", "--move", "3", "--reason", "done", "--key", "close-chat"],
+    &["answer", "41", "3", "yes"],
+    &["answer", "41", "3", "yes", "--key", "answer"],
+    &["decide", "t41/3", "accept", "yes"],
+    &["decide", "p3/17", "reject"],
+    &["decide", "41", "leave", "later", "--hold", "2"],
+    &["release", "41", "--hold", "2", "--again"],
+    &["stop", "41", "--key", "stop"],
+    &["cancel", "41", "finished", "--grace", "60"],
+];
+#[test]
+fn each_act_parses_into_its_call_and_prints_back() {
+    for words in ACTS {
+        let call = fixtures::call(words);
+        assert_eq!(fixtures::back(&call), fixtures::owned(words), "{words:?}");
+        assert_eq!(fixtures::printed(&call), Parsed::Call { call, json: false }, "{words:?}");
+    }
+}
+const KEY_REQUIRED: &[&[&str]] = &[
+    &["chat", "hello", "--project", "shop"],
+    &["message", "41", "hello"],
+    &["close", "41"],
+    &["adopt", "--project", "shop", "--owner", "o", "--name", "n", "--landing", "main"],
+];
+#[test]
+fn a_keyed_act_without_its_key_is_a_usage_error() {
+    for words in KEY_REQUIRED {
+        assert_eq!(fixtures::parse(words), Err(Usage::Key), "{words:?}");
+    }
+    for key in ["", "Bad", "a_b"] {
+        assert_eq!(fixtures::parse(&["message", "41", "hello", "--key", key]), Err(Usage::Key), "{key}");
+    }
+    assert_eq!(fixtures::parse(&["stop", "41", "--key", "one", "--key", "two"]), Err(Usage::Key));
+}
+const KEY_NEVER: &[&[&str]] = &[
+    &["me", "--key", "key"],
+    &["inbox", "--key", "key"],
+    &["tasks", "--project", "shop", "--key", "key"],
+    &["task", "41", "--key", "key"],
+    &["chat", "41", "--key", "key"],
+    &["activity", "41", "--key", "key"],
+    &["turn", "41", "3.7", "--key", "key"],
+    &["run", "41", "--key", "key"],
+    &["wait", "me", "--key", "key"],
+    &["sign-in", "file", "--key", "key"],
+    &["sign-out", "--key", "key"],
+    &["pending", "--key", "key"],
+    &["help", "--key", "key"],
+];
+#[test]
+fn a_key_on_a_read_wait_or_host_tool_is_a_usage_error() {
+    for words in KEY_NEVER {
+        let error = fixtures::parse(words).expect_err("unkeyed tool");
+        assert_eq!(
+            error,
+            Usage::Unknown { at: u16::try_from(words.len().checked_sub(3).unwrap()).unwrap() },
+            "{words:?}"
+        );
+    }
+}
+#[test]
+fn close_takes_an_optional_reason() {
+    for (words, reason) in [
+        (&["close", "41", "--key", "close"][..], None),
+        (
+            &["close", "41", "--reason", "done", "--key", "close"][..],
+            Some(Values::One(Value::Text(Box::from(*b"done")))),
+        ),
+    ] {
+        assert_eq!(fixtures::call(words).values[2], reason, "{words:?}");
+    }
+}
+const DECISIONS: &[(&[&str], u8)] = &[
+    (&["decide", "t41/3", "accept"], 0),
+    (&["decide", "p3/17", "pass-up"], 0),
+    (&["decide", "41", "release", "--hold", "2"], 1),
+    (&["decide", "41", "leave", "--hold", "2"], 1),
+    (&["decide", "41", "pass-up", "--hold", "2"], 1),
+];
+#[test]
+fn decides_two_forms_parse_by_their_arguments() {
+    use jig_client::contract::{ProposalKey, Proposer};
+    for (words, form) in DECISIONS {
+        assert_eq!(fixtures::call(words).form, *form, "{words:?}");
+    }
+    for (word, proposer, number) in [("t41/3", Proposer::Task(41), 3), ("p3/17", Proposer::Party(3), 17)] {
+        assert_eq!(
+            fixtures::call(&["decide", word, "accept"]).values[0],
+            Some(Values::One(Value::Proposal(ProposalKey { proposer, number })))
+        );
+    }
+    assert_eq!(fixtures::parse(&["decide", "3/17", "accept"]), Err(Usage::Kind { argument: 0 }));
+}
+#[test]
+fn adopts_flags_parse_and_its_absent_flags_stay_absent() {
+    let call = fixtures::adoption();
+    for index in [1, 5, 6, 7, 8, 9] {
+        assert_eq!(call.values[index], None, "slot {index}");
+    }
+    let words = &[
+        "adopt",
+        "--project",
+        "3",
+        "--forge",
+        "65535",
+        "--owner",
+        "o",
+        "--name",
+        "n",
+        "--landing",
+        "main",
+        "--role",
+        "context",
+        "--prefix",
+        "x/",
+        "--no-home",
+        "--no-ci",
+        "--check",
+        "1",
+        "--check",
+        "2",
+        "--key",
+        "adopt",
+    ];
+    assert_eq!(fixtures::back(&fixtures::call(words)), fixtures::owned(words));
+    assert_eq!(
+        fixtures::parse(&[
+            "adopt",
+            "--project",
+            "3",
+            "--forge",
+            "65536",
+            "--owner",
+            "o",
+            "--name",
+            "n",
+            "--landing",
+            "main",
+            "--key",
+            "adopt"
+        ]),
+        Err(Usage::Kind { argument: 1 })
+    );
+}
+/// Eight is the delegate/check ceiling; one more must fail before a call is made.
+const REPEATS_MOST: u32 = 8;
+#[test]
+fn repeated_moves_and_checks_stop_at_their_bound() {
+    for (base, flag, argument) in
+        [(&["close", "41", "--key", "close"][..], "--move", 1), (fixtures::ADOPTION, "--check", 9)]
+    {
+        for count in [REPEATS_MOST, REPEATS_MOST.checked_add(1).unwrap()] {
+            let mut words = List::with_capacity(32);
+            for word in base {
+                words.push(*word).unwrap();
+            }
+            for _ in 0..count {
+                words.push(flag).unwrap();
+                words.push("1").unwrap();
+            }
+            let parsed = fixtures::parse(words.as_slice());
+            if count == REPEATS_MOST {
+                assert!(parsed.is_ok(), "{flag} {count}");
+            } else {
+                assert_eq!(parsed, Err(Usage::Many { argument }), "{flag} {count}");
+            }
+        }
+    }
+}
+#[test]
+fn a_text_flag_keeps_json_as_its_value() {
+    let call = fixtures::call(&["close", "41", "--reason", "--json", "--key", "close"]);
+    assert_eq!(call.values[2], Some(Values::One(Value::Text(Box::from(*b"--json")))));
+    assert_eq!(fixtures::printed(&call), Parsed::Call { call, json: false });
+}
+
+const LITERAL_TEXT: &[&[&str]] = &[
+    &["message", "41", "--key", "literal", "--", "--json"],
+    &["chat", "--project", "shop", "--key", "literal", "--", "--words"],
+    &["decide", "41", "leave", "--hold", "2", "--", "--reason"],
+];
+#[test]
+fn a_literal_positional_keeps_its_marker_after_the_flags() {
+    for words in LITERAL_TEXT {
+        let call = fixtures::call(words);
+        assert_eq!(fixtures::printed(&call), Parsed::Call { call, json: false }, "{words:?}");
+    }
+}
+/// A tiny text budget exercises both sides without allocating the preset's maximum.
+const ASK_BYTES: u64 = 2;
+#[test]
+fn text_is_bounded_for_argv_and_typed_calls() {
+    let mut limits = crate::limits::tools();
+    limits.ask_bytes = ASK_BYTES;
+    for (text, result) in [("ok", Ok(())), ("bad", Err(Usage::Long { argument: 1 }))] {
+        let words: &[&[u8]] = &[b"message", b"41", text.as_bytes(), b"--key", b"text"];
+        let call = fixtures::call(&["message", "41", text, "--key", "text"]);
+        assert_eq!(
+            match argv::parse(crate::table::TOOLS, words, &limits) {
+                Ok(_) => Ok(()),
+                Err(error) => Err(error),
+            },
+            result,
+            "{text}"
+        );
+        assert_eq!(argv::check(crate::table::TOOLS, &call, &limits), result, "{text}");
     }
 }

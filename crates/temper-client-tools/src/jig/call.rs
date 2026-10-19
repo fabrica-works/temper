@@ -1,7 +1,10 @@
 //! A table row's typed arguments (tools contract, 5.1).
-use super::key::Name;
+use super::{
+    key::Name,
+    subject::{Condition, Subject},
+};
 use alloc::boxed::Box;
-use jig_client::contract::{InboxGroup, QueryOrder, TurnName};
+use jig_client::contract::{InboxGroup, ProposalKey, QueryOrder, TurnName};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Call {
     pub tool: u8,
@@ -21,6 +24,11 @@ pub enum Value {
     Text(Box<[u8]>),
     Stdin,
     File(Box<[u8]>),
+    Duration(skein_lib::Duration),
+    Proposal(ProposalKey),
+    Digest([u8; 8]),
+    Condition(Condition),
+    Subject(Subject),
     Switch,
     Project(Project),
     Turn(TurnName),

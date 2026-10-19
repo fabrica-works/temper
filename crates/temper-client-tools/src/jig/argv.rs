@@ -1,12 +1,16 @@
 //! One table-driven argv parser and checker.
+mod value;
 use super::{
     Limits,
-    call::{Call, Parsed, Project, Source, Value, Values},
-    table::{Argument, Kind, Occurs, Place, Tool},
+    call::{Call, Parsed, Source, Value, Values},
+    key::Name,
+    subject::{self, Subject},
+    table::{Argument, Keyed, Kind, Occurs, Place, Tool},
 };
 use alloc::boxed::Box;
-use jig_client::contract::{InboxGroup, QueryOrder, TurnName};
+use jig_client::contract::QueryOrder;
 use skein_lib::{Decimal, List, Overflow, Writer};
+use value::{decode, encode, valid};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Usage {
     Tool,
@@ -28,43 +32,59 @@ pub enum Unwritten {
     Overflow(Overflow),
     NoForm,
 }
+struct Form {
+    values: Box<[Option<Values>]>,
+    key: Option<Name>,
+    json: bool,
+}
 /// Parse argv after the host's directory.
 pub fn parse(table: &[&Tool], words: &[&[u8]], limits: &Limits) -> Result<Parsed, Usage> {
-    let count = u16::try_from(words.len()).or(Err(Usage::Tool))?;
-    let mut args = List::with_capacity(u32::from(count));
-    let mut json = false;
-    let mut positional = false;
-    for word in words {
-        if !positional && *word == b"--json" {
-            if json {
-                return Err(Usage::Json);
-            }
-            json = true;
-        } else {
-            args.push(*word).or(Err(Usage::Tool))?;
-            positional |= *word == b"--";
-        }
-    }
-    let (name, words) = args.as_slice().split_first().ok_or(Usage::Tool)?;
-    if *name == b"--call" {
-        let [file] = words else {
-            return Err(Usage::Json);
+    u16::try_from(words.len()).or(Err(Usage::Tool))?;
+    let (first, rest) = words.split_first().ok_or(Usage::Tool)?;
+    let (name, words, json) = if *first == b"--json" {
+        let (name, words) = rest.split_first().ok_or(Usage::Tool)?;
+        (*name, words, true)
+    } else {
+        (*first, rest, false)
+    };
+    if name == b"--call" {
+        let (file, tail) = words.split_first().ok_or(Usage::Json)?;
+        let json = match tail {
+            [] => json,
+            [b"--json"] if !json => true,
+            _ => return Err(Usage::Json),
         };
         let file = if *file == b"-" { Source::Stdin } else { Source::Path(Box::from(*file)) };
         return Ok(Parsed::File { file, json });
     }
-    let tool = tool_index(table, name).ok_or(Usage::Tool)?;
-    let row = table.get(usize::from(tool)).ok_or(Usage::Tool)?;
     let mut error = Usage::Tool;
-    for (index, arguments) in row.forms.iter().enumerate() {
-        let form = u8::try_from(index).or(Err(Usage::Tool))?;
-        match form_values(table, arguments, words, limits) {
-            Ok(values) => {
-                let call = Call { tool, form, values, key: None };
-                check(table, &call, limits)?;
-                return Ok(Parsed::Call { call, json });
+    for (tool, row) in table.iter().enumerate() {
+        if row.name != name {
+            continue;
+        }
+        let tool = u8::try_from(tool).or(Err(Usage::Tool))?;
+        for (form, arguments) in row.forms.iter().enumerate() {
+            let form = u8::try_from(form).or(Err(Usage::Tool))?;
+            let parsed = if row.name == b"wait" {
+                let (subject, words) = watch(table, words, limits)?;
+                form_values(table, arguments, words.as_slice(), limits, row.keyed, json, Some(subject))
+            } else {
+                form_values(table, arguments, words, limits, row.keyed, json, None)
+            };
+            match parsed {
+                Ok(parsed) => {
+                    let call = Call { tool, form, values: parsed.values, key: parsed.key };
+                    match check(table, &call, limits) {
+                        Ok(()) => return Ok(Parsed::Call { call, json: parsed.json }),
+                        Err(failed) => error = failed,
+                    }
+                }
+                Err(failed) => {
+                    if error == Usage::Tool {
+                        error = failed;
+                    }
+                }
             }
-            Err(failed) => error = failed,
         }
     }
     Err(error)
@@ -82,12 +102,16 @@ fn form_values(
     arguments: &[Argument],
     words: &[&[u8]],
     limits: &Limits,
-) -> Result<Box<[Option<Values>]>, Usage> {
+    keyed: Keyed,
+    json: bool,
+    subject: Option<Subject>,
+) -> Result<Form, Usage> {
     let count = u8::try_from(arguments.len()).or(Err(Usage::Tool))?;
     let mut values = List::with_capacity(u32::from(count));
     for _ in arguments {
         values.push(None).or(Err(Usage::Tool))?;
     }
+    let mut result = Form { values: Box::from([]), key: None, json };
     let mut skip = None;
     let mut positional = false;
     for (index, word) in words.iter().enumerate() {
@@ -100,6 +124,22 @@ fn form_values(
         }
         let at = u16::try_from(index).or(Err(Usage::Tool))?;
         let flag = !positional && word.starts_with(b"--");
+        if flag && *word == b"--json" {
+            if result.json {
+                return Err(Usage::Json);
+            }
+            result.json = true;
+            continue;
+        }
+        if flag && *word == b"--key" && keyed != Keyed::Never {
+            if result.key.is_some() {
+                return Err(Usage::Key);
+            }
+            let next = index.checked_add(1).ok_or(Usage::Tool)?;
+            result.key = Some(Name::new(words.get(next).ok_or(Usage::Key)?).ok_or(Usage::Key)?);
+            skip = Some(next);
+            continue;
+        }
         let mut found = None;
         for (slot, argument) in arguments.iter().enumerate() {
             let id = u8::try_from(slot).or(Err(Usage::Tool))?;
@@ -116,11 +156,13 @@ fn form_values(
         let argument = found.ok_or(if flag { Usage::Unknown { at } } else { Usage::Extra { at } })?;
         let spec = arguments.get(usize::from(argument)).ok_or(Usage::Tool)?;
         let slot = values.get_mut(u32::from(argument)).ok_or(Usage::Tool)?;
-        if slot.is_some() {
+        if slot.is_some() && !repeated(spec.occurs) {
             return Err(Usage::Twice { argument });
         }
         let value = if spec.place == Place::Switch {
             Value::Switch
+        } else if spec.kind == Kind::Subject {
+            Value::Subject(subject.clone().ok_or(Usage::Kind { argument })?)
         } else {
             let text = if flag {
                 let next = index.checked_add(1).ok_or(Usage::Tool)?;
@@ -129,347 +171,344 @@ fn form_values(
             } else {
                 *word
             };
-            decode(table, spec.kind, text).ok_or(Usage::Kind { argument })?
+            decode(table, spec.kind, text).ok_or(if spec.kind == Kind::Condition {
+                Usage::Condition
+            } else {
+                Usage::Kind { argument }
+            })?
         };
         valid(table, spec, &value, argument, limits)?;
-        *slot = Some(Values::One(value));
+        store(slot, spec.occurs, value, argument)?;
     }
     for (index, argument) in arguments.iter().enumerate() {
-        if argument.kind == Kind::Order {
-            let index = u32::try_from(index).or(Err(Usage::Tool))?;
-            let slot = values.get_mut(index).ok_or(Usage::Tool)?;
-            if slot.is_none() {
+        let index = u32::try_from(index).or(Err(Usage::Tool))?;
+        let slot = values.get_mut(index).ok_or(Usage::Tool)?;
+        if slot.is_none() {
+            if argument.occurs == Occurs::Required {
+                return Err(Usage::Missing { argument: u8::try_from(index).or(Err(Usage::Tool))? });
+            }
+            if argument.kind == Kind::Order {
                 *slot = Some(Values::One(Value::Order(QueryOrder::Number)));
+            }
+            if argument.name == b"timeout" {
+                *slot = Some(Values::One(Value::Duration(limits.wait)));
             }
         }
     }
-    Ok(values.into_boxed())
+    result.values = values.into_boxed();
+    Ok(result)
+}
+fn repeated(occurs: Occurs) -> bool {
+    match occurs {
+        Occurs::Repeated { .. } => true,
+        Occurs::Required | Occurs::Optional => false,
+    }
+}
+/// Separate the watch's words; its task query still uses the table's parser.
+fn watch<'a>(table: &[&Tool], words: &[&'a [u8]], limits: &Limits) -> Result<(Subject, List<&'a [u8]>), Usage> {
+    let (name, rest) = words.split_first().ok_or(Usage::Missing { argument: 0 })?;
+    let count = u32::try_from(words.len()).or(Err(Usage::Tool))?;
+    let mut outer = List::with_capacity(count);
+    outer.push(*name).or(Err(Usage::Tool))?;
+    let (subject, consumed) = match *name {
+        b"me" => (Subject::Me, 0),
+        b"inbox" => (Subject::Inbox, 0),
+        b"task" | b"tree" | b"run" => {
+            let number = value::number(rest.first().ok_or(Usage::Missing { argument: 0 })?)
+                .ok_or(Usage::Kind { argument: 0 })?;
+            let subject = match *name {
+                b"task" => Subject::Task(number),
+                b"tree" => Subject::Tree(number),
+                _ => Subject::Run(number),
+            };
+            (subject, 1)
+        }
+        b"tasks" => {
+            let tool = tool_index(table, b"tasks").ok_or(Usage::Tool)?;
+            let row = table.get(usize::from(tool)).ok_or(Usage::Tool)?;
+            let arguments = *row.forms.first().ok_or(Usage::Tool)?;
+            let mut query = List::with_capacity(count);
+            let mut skip = None;
+            for (index, word) in rest.iter().enumerate() {
+                if skip == Some(index) {
+                    continue;
+                }
+                let mut found = None;
+                for argument in arguments {
+                    if word.strip_prefix(b"--") == Some(argument.name) {
+                        found = Some(argument);
+                        break;
+                    }
+                }
+                let target = match found {
+                    Some(_) => &mut query,
+                    None => &mut outer,
+                };
+                target.push(*word).or(Err(Usage::Tool))?;
+                let takes_value = match found {
+                    Some(argument) => {
+                        if argument.name == b"after" || argument.name == b"ended" {
+                            return Err(Usage::Unknown { at: u16::try_from(index).or(Err(Usage::Tool))? });
+                        }
+                        argument.place == Place::Flag
+                    }
+                    None => *word == b"--since" || *word == b"--until" || *word == b"--timeout",
+                };
+                if takes_value {
+                    let next = index.checked_add(1).ok_or(Usage::Tool)?;
+                    target.push(*rest.get(next).ok_or(Usage::Missing { argument: 0 })?).or(Err(Usage::Tool))?;
+                    skip = Some(next);
+                }
+            }
+            let parsed = form_values(table, arguments, query.as_slice(), limits, Keyed::Never, false, None)?;
+            let call = Call { tool, form: 0, values: parsed.values, key: parsed.key };
+            check_values(table, arguments, &call.values, limits)?;
+            return Ok((Subject::Tasks(Box::new(call)), outer));
+        }
+        _ => return Err(Usage::Kind { argument: 0 }),
+    };
+    for word in rest.get(consumed..).ok_or(Usage::Tool)? {
+        outer.push(*word).or(Err(Usage::Tool))?;
+    }
+    Ok((subject, outer))
 }
 /// The same validation is used for typed JSON calls.
 pub fn check(table: &[&Tool], call: &Call, limits: &Limits) -> Result<(), Usage> {
     let tool = table.get(usize::from(call.tool)).ok_or(Usage::Tool)?;
-    let args = tool.forms.get(usize::from(call.form)).ok_or(Usage::Tool)?;
-    if args.len() != call.values.len() {
-        return Err(Usage::Tool);
+    let args = *tool.forms.get(usize::from(call.form)).ok_or(Usage::Tool)?;
+    match tool.keyed {
+        Keyed::Never if call.key.is_some() => return Err(Usage::Key),
+        Keyed::Required if call.key.is_none() => return Err(Usage::Key),
+        Keyed::Never | Keyed::Optional | Keyed::Required => {}
     }
-    if call.key.is_some() {
-        return Err(Usage::Key);
-    }
-    let mut stdin = false;
-    for (index, (argument, values)) in args.iter().zip(&call.values).enumerate() {
-        let argument_id = u8::try_from(index).or(Err(Usage::Tool))?;
-        match values {
-            None if argument.occurs == Occurs::Required => return Err(Usage::Missing { argument: argument_id }),
-            None => {}
-            Some(Values::One(value)) => {
-                valid(table, argument, value, argument_id, limits)?;
-                if *value == Value::Stdin {
-                    if stdin {
-                        return Err(Usage::Stdin);
-                    }
-                    stdin = true;
+    check_values(table, args, &call.values, limits)?;
+    if tool.name == b"wait" {
+        let Some(Some(Values::One(Value::Subject(subject)))) = call.values.first() else {
+            return Err(Usage::Condition);
+        };
+        validate_subject(table, subject, limits)?;
+        for slot in &call.values {
+            match slot {
+                Some(Values::One(Value::Condition(condition))) if !subject::takes(subject, condition) => {
+                    return Err(Usage::Condition);
                 }
+                _ => {}
             }
-            Some(Values::Many(_)) => return Err(Usage::Many { argument: argument_id }),
         }
     }
     Ok(())
 }
-fn valid(table: &[&Tool], spec: &Argument, value: &Value, argument: u8, limits: &Limits) -> Result<(), Usage> {
-    if spec.place == Place::Switch {
-        return if *value == Value::Switch { Ok(()) } else { Err(Usage::Kind { argument }) };
-    }
-    let correct = match spec.kind {
-        Kind::Number => {
-            let Value::Number(_) = value else {
-                return Err(Usage::Kind { argument });
-            };
-            true
-        }
-        Kind::Count => {
-            let Value::Number(n) = value else {
-                return Err(Usage::Kind { argument });
-            };
-            if *n == 0 || *n > u64::from(limits.rows) {
-                return Err(Usage::Rows { argument });
+fn validate_subject(table: &[&Tool], subject: &Subject, limits: &Limits) -> Result<(), Usage> {
+    match subject {
+        Subject::Tasks(call) => {
+            let row = table.get(usize::from(call.tool)).ok_or(Usage::Condition)?;
+            if row.name != b"tasks" || call.form != 0 || call.key.is_some() {
+                return Err(Usage::Condition);
             }
-            true
-        }
-        Kind::Word { set } => {
-            let Value::Word(index) = value else {
-                return Err(Usage::Kind { argument });
-            };
-            set.get(usize::from(*index)).is_some()
-        }
-        Kind::Text => {
-            if *value == Value::Stdin {
-                return Ok(());
-            }
-            let Value::Text(text) = value else {
-                return Err(Usage::Kind { argument });
-            };
-            if u64::try_from(text.len()).unwrap_or(u64::MAX) > limits.ask_bytes {
-                return Err(Usage::Long { argument });
-            }
-            true
-        }
-        Kind::File => {
-            if *value == Value::Stdin {
-                return Ok(());
-            }
-            let Value::File(_) = value else {
-                return Err(Usage::Kind { argument });
-            };
-            true
-        }
-        Kind::Project => {
-            let Value::Project(project) = value else {
-                return Err(Usage::Kind { argument });
-            };
-            match project {
-                Project::Number(_) => true,
-                Project::Name(name) => {
-                    let mut digits = true;
-                    for byte in name {
-                        digits &= byte.is_ascii_digit();
-                    }
-                    !name.is_empty() && !digits
+            let args = *row.forms.first().ok_or(Usage::Condition)?;
+            check_values(table, args, &call.values, limits)?;
+            for (argument, value) in args.iter().zip(&call.values) {
+                if (argument.name == b"after" || argument.name == b"ended") && value.is_some() {
+                    return Err(Usage::Condition);
                 }
             }
         }
-        Kind::Turn => {
-            let Value::Turn(_) = value else {
-                return Err(Usage::Kind { argument });
-            };
-            true
-        }
-        Kind::Group => {
-            let Value::Group(_) = value else {
-                return Err(Usage::Kind { argument });
-            };
-            true
-        }
-        Kind::Order => {
-            let Value::Order(_) = value else {
-                return Err(Usage::Kind { argument });
-            };
-            true
-        }
-        Kind::Cursor => {
-            let Value::Cursor(bytes) = value else {
-                return Err(Usage::Kind { argument });
-            };
-            !bytes.is_empty()
-        }
-        Kind::Tool => {
-            let Value::Tool(id) = value else {
-                return Err(Usage::Kind { argument });
-            };
-            table.get(usize::from(*id)).is_some()
-        }
-    };
-    if correct { Ok(()) } else { Err(Usage::Kind { argument }) }
+        Subject::Me | Subject::Inbox | Subject::Task(_) | Subject::Tree(_) | Subject::Run(_) => {}
+    }
+    Ok(())
 }
-fn decode(table: &[&Tool], kind: Kind, word: &[u8]) -> Option<Value> {
-    Some(match kind {
-        Kind::Number | Kind::Count => Value::Number(number(word)?),
-        Kind::Word { set } => {
-            let mut found = None;
-            for (index, name) in set.iter().enumerate() {
-                if *name == word {
-                    found = Some(u8::try_from(index).ok()?);
-                    break;
+fn check_values(table: &[&Tool], args: &[Argument], values: &[Option<Values>], limits: &Limits) -> Result<(), Usage> {
+    if args.len() != values.len() {
+        return Err(Usage::Tool);
+    }
+    let mut stdin = false;
+    for (index, (argument, values)) in args.iter().zip(values).enumerate() {
+        let id = u8::try_from(index).or(Err(Usage::Tool))?;
+        match values {
+            None if argument.occurs == Occurs::Required => return Err(Usage::Missing { argument: id }),
+            None => {}
+            Some(Values::One(value)) => {
+                if repeated(argument.occurs) {
+                    return Err(Usage::Many { argument: id });
+                }
+                checked_value(table, argument, value, id, limits, &mut stdin)?;
+            }
+            Some(Values::Many(values)) => {
+                let Occurs::Repeated { most } = argument.occurs else {
+                    return Err(Usage::Many { argument: id });
+                };
+                if values.is_empty() || u32::try_from(values.len()).unwrap_or(u32::MAX) > most {
+                    return Err(Usage::Many { argument: id });
+                }
+                for value in values {
+                    checked_value(table, argument, value, id, limits, &mut stdin)?;
                 }
             }
-            Value::Word(found?)
         }
-        Kind::Text | Kind::File if word == b"-" => Value::Stdin,
-        Kind::Text => Value::Text(Box::from(word)),
-        Kind::File => Value::File(Box::from(word)),
-        Kind::Project => {
-            if word.is_empty() {
-                return None;
-            }
-            let mut digits = true;
-            for byte in word {
-                digits &= byte.is_ascii_digit();
-            }
-            Value::Project(if digits {
-                Project::Number(u32::try_from(number(word)?).ok()?)
-            } else {
-                Project::Name(Box::from(word))
-            })
-        }
-        Kind::Turn => {
-            let mut dot = None;
-            for (index, byte) in word.iter().enumerate() {
-                if *byte == b'.' {
-                    dot = Some(index);
-                    break;
-                }
-            }
-            let split = dot?;
-            let end = split.checked_add(1)?;
-            Value::Turn(TurnName {
-                attempt: number(word.get(..split)?)?,
-                number: u32::try_from(number(word.get(end..)?)?).ok()?,
-            })
-        }
-        Kind::Cursor => Value::Cursor(hex(word)?),
-        Kind::Group => Value::Group(match word {
-            b"questions" => InboxGroup::Questions,
-            b"proposals" => InboxGroup::Proposals,
-            b"escalations" => InboxGroup::Escalations,
-            b"person-tasks" => InboxGroup::PersonTasks,
-            b"results" => InboxGroup::Results,
-            b"replies" => InboxGroup::Replies,
-            _ => return None,
-        }),
-        Kind::Order => Value::Order(match word {
-            b"activity" => QueryOrder::Activity,
-            b"priority" => QueryOrder::Priority,
-            _ => return None,
-        }),
-        Kind::Tool => Value::Tool(tool_index(table, word)?),
-    })
+    }
+    Ok(())
 }
-fn number(word: &[u8]) -> Option<u64> {
-    if word.is_empty() {
-        return None;
-    }
-    let mut value = 0_u64;
-    for byte in word {
-        if !byte.is_ascii_digit() {
-            return None;
+fn checked_value(
+    table: &[&Tool],
+    argument: &Argument,
+    value: &Value,
+    id: u8,
+    limits: &Limits,
+    stdin: &mut bool,
+) -> Result<(), Usage> {
+    valid(table, argument, value, id, limits)?;
+    if *value == Value::Stdin {
+        if *stdin {
+            return Err(Usage::Stdin);
         }
-        value = value.checked_mul(10)?.checked_add(u64::from(byte.checked_sub(b'0')?))?;
+        *stdin = true;
     }
-    Some(value)
-}
-fn hex(word: &[u8]) -> Option<Box<[u8]>> {
-    if word.is_empty() || word.len().checked_rem(2)? != 0 {
-        return None;
-    }
-    let mut out = Writer::new(word.len().checked_div(2)?);
-    for pair in word.chunks_exact(2) {
-        let mut value = 0_u8;
-        for byte in pair {
-            let nibble = match byte {
-                b'0'..=b'9' => byte.checked_sub(b'0')?,
-                b'a'..=b'f' => byte.checked_sub(b'a')?.checked_add(10)?,
-                _ => return None,
-            };
-            value = value.checked_mul(16)?.checked_add(nibble)?;
-        }
-        out.put(&[value]).ok()?;
-    }
-    Some(out.finish())
+    Ok(())
 }
 /// Write positionals followed by flags, in the row's order.
 pub fn back(table: &[&Tool], call: &Call, out: &mut List<Box<[u8]>>) -> Result<(), Unwritten> {
     let row = table.get(usize::from(call.tool)).ok_or(Unwritten::NoForm)?;
     let args = row.forms.get(usize::from(call.form)).ok_or(Unwritten::NoForm)?;
-    if args.len() != call.values.len() || call.key.is_some() {
+    if args.len() != call.values.len() {
         return Err(Unwritten::NoForm);
     }
     push(out, row.name)?;
+    let delayed = escaped_position(args, &call.values, table)?;
     for positional in [true, false] {
-        for (argument, slot) in args.iter().zip(&call.values) {
-            let place = argument.place;
-            if (place == Place::Positional) != positional {
+        for (index, (argument, slot)) in args.iter().zip(&call.values).enumerate() {
+            if positional && delayed <= index {
                 continue;
             }
-            let Some(Values::One(value)) = slot else {
-                if slot.is_some() {
-                    return Err(Unwritten::NoForm);
+            if (argument.place == Place::Positional) != positional {
+                continue;
+            }
+            match slot {
+                Some(Values::One(Value::Subject(subject))) => write_subject(table, subject, out)?,
+                Some(Values::One(value)) => emit(table, argument, value, out)?,
+                Some(Values::Many(values)) => {
+                    for value in values {
+                        emit(table, argument, value, out)?;
+                    }
                 }
+                None => {}
+            }
+        }
+    }
+    if let Some(name) = &call.key {
+        push(out, b"--key")?;
+        push(out, name.bytes())?;
+    }
+    if delayed < args.len() {
+        push(out, b"--")?;
+        for (argument, slot) in args.iter().zip(&call.values).skip(delayed) {
+            if argument.place != Place::Positional {
                 continue;
-            };
-            if *value == Value::Order(QueryOrder::Number) {
-                continue;
             }
-            if *value == Value::Order(QueryOrder::Changed) || *value == Value::Order(QueryOrder::Ended) {
-                return Err(Unwritten::NoForm);
-            }
-            if place != Place::Positional {
-                let mut flag = Writer::new(argument.name.len().saturating_add(2));
-                written(flag.put(b"--"))?;
-                written(flag.put(argument.name))?;
-                push(out, &flag.finish())?;
-            }
-            if place != Place::Switch {
-                let word = encode(table, argument.kind, value)?;
-                if place == Place::Positional && word.starts_with(b"--") {
-                    push(out, b"--")?;
-                }
-                push(out, &word)?;
+            match slot {
+                Some(Values::One(value)) => push(out, &encode(table, argument.kind, value)?)?,
+                None => {}
+                Some(Values::Many(_)) => return Err(Unwritten::NoForm),
             }
         }
     }
     Ok(())
 }
-fn push(out: &mut List<Box<[u8]>>, bytes: &[u8]) -> Result<(), Unwritten> {
-    match out.push(Box::from(bytes)) {
-        Ok(()) => Ok(()),
-        Err(_) => Err(Unwritten::Overflow(Overflow)),
+fn escaped_position(args: &[Argument], values: &[Option<Values>], table: &[&Tool]) -> Result<usize, Unwritten> {
+    for (index, (argument, slot)) in args.iter().zip(values).enumerate() {
+        if argument.place != Place::Positional || argument.kind == Kind::Subject {
+            continue;
+        }
+        let Some(values) = slot else {
+            continue;
+        };
+        let Values::One(value) = values else {
+            return Err(Unwritten::NoForm);
+        };
+        if encode(table, argument.kind, value)?.starts_with(b"--") {
+            return Ok(index);
+        }
     }
+    Ok(args.len())
 }
-fn encode(table: &[&Tool], kind: Kind, value: &Value) -> Result<Box<[u8]>, Unwritten> {
-    Ok(match value {
-        Value::Number(n) => Box::from(Decimal::of(*n).as_bytes()),
-        Value::Word(index) => {
-            let Kind::Word { set } = kind else {
+fn write_subject(table: &[&Tool], subject: &Subject, out: &mut List<Box<[u8]>>) -> Result<(), Unwritten> {
+    let (word, number) = match subject {
+        Subject::Me => (b"me".as_slice(), None),
+        Subject::Inbox => (b"inbox".as_slice(), None),
+        Subject::Task(n) => (b"task".as_slice(), Some(*n)),
+        Subject::Tree(n) => (b"tree".as_slice(), Some(*n)),
+        Subject::Run(n) => (b"run".as_slice(), Some(*n)),
+        Subject::Tasks(call) => {
+            let row = table.get(usize::from(call.tool)).ok_or(Unwritten::NoForm)?;
+            let args = row.forms.get(usize::from(call.form)).ok_or(Unwritten::NoForm)?;
+            if row.name != b"tasks" || args.len() != call.values.len() {
                 return Err(Unwritten::NoForm);
-            };
-            Box::from(*set.get(usize::from(*index)).ok_or(Unwritten::NoForm)?)
-        }
-        Value::Text(text) | Value::File(text) => text.clone(),
-        Value::Stdin => Box::from(b"-".as_slice()),
-        Value::Project(Project::Number(n)) => Box::from(Decimal::of(u64::from(*n)).as_bytes()),
-        Value::Project(Project::Name(name)) => name.clone(),
-        Value::Turn(turn) => {
-            let attempt = Decimal::of(turn.attempt);
-            let number = Decimal::of(u64::from(turn.number));
-            let prefix = attempt.as_bytes().len().checked_add(1).ok_or(Unwritten::Overflow(Overflow))?;
-            let size = prefix.checked_add(number.as_bytes().len()).ok_or(Unwritten::Overflow(Overflow))?;
-            let mut out = Writer::new(size);
-            written(out.put(attempt.as_bytes()))?;
-            written(out.put(b"."))?;
-            written(out.put(number.as_bytes()))?;
-            out.finish()
-        }
-        Value::Cursor(bytes) => {
-            let size = bytes.len().checked_mul(2).ok_or(Unwritten::Overflow(Overflow))?;
-            let mut hex = Writer::new(size);
-            for byte in bytes {
-                for nibble in [byte.checked_div(16).unwrap_or(0), byte.checked_rem(16).unwrap_or(0)] {
-                    let digit = b"0123456789abcdef".get(usize::from(nibble)).ok_or(Unwritten::NoForm)?;
-                    written(hex.put(&[*digit]))?;
+            }
+            push(out, b"tasks")?;
+            for (argument, slot) in args.iter().zip(&call.values) {
+                match slot {
+                    Some(Values::One(value)) => emit(table, argument, value, out)?,
+                    None => {}
+                    Some(Values::Many(_)) => return Err(Unwritten::NoForm),
                 }
             }
-            hex.finish()
+            return Ok(());
         }
-        Value::Group(group) => Box::from(match group {
-            InboxGroup::Questions => b"questions".as_slice(),
-            InboxGroup::Proposals => b"proposals",
-            InboxGroup::Escalations => b"escalations",
-            InboxGroup::PersonTasks => b"person-tasks",
-            InboxGroup::Results => b"results",
-            InboxGroup::Replies => b"replies",
-        }),
-        Value::Order(order) => Box::from(match order {
-            QueryOrder::Number | QueryOrder::Changed | QueryOrder::Ended => return Err(Unwritten::NoForm),
-            QueryOrder::Activity => b"activity".as_slice(),
-            QueryOrder::Priority => b"priority",
-        }),
-        Value::Tool(id) => Box::from(table.get(usize::from(*id)).ok_or(Unwritten::NoForm)?.name),
-        Value::Switch => return Err(Unwritten::NoForm),
-    })
+    };
+    push(out, word)?;
+    if let Some(n) = number {
+        push(out, Decimal::of(n).as_bytes())?;
+    }
+    Ok(())
 }
-
+fn emit(table: &[&Tool], argument: &Argument, value: &Value, out: &mut List<Box<[u8]>>) -> Result<(), Unwritten> {
+    if *value == Value::Order(QueryOrder::Number) {
+        return Ok(());
+    }
+    if *value == Value::Order(QueryOrder::Changed) || *value == Value::Order(QueryOrder::Ended) {
+        return Err(Unwritten::NoForm);
+    }
+    if argument.place != Place::Positional {
+        let mut flag = Writer::new(argument.name.len().checked_add(2).ok_or(Unwritten::Overflow(Overflow))?);
+        written(flag.put(b"--"))?;
+        written(flag.put(argument.name))?;
+        push(out, &flag.finish())?;
+    }
+    if argument.place != Place::Switch {
+        let word = encode(table, argument.kind, value)?;
+        if argument.place == Place::Positional && word.starts_with(b"--") {
+            push(out, b"--")?;
+        }
+        push(out, &word)?;
+    }
+    Ok(())
+}
+fn push(out: &mut List<Box<[u8]>>, bytes: &[u8]) -> Result<(), Unwritten> {
+    out.push(Box::from(bytes)).or(Err(Unwritten::Overflow(Overflow)))
+}
 fn written(result: Result<(), Overflow>) -> Result<(), Unwritten> {
     match result {
         Ok(()) => Ok(()),
         Err(error) => Err(Unwritten::Overflow(error)),
     }
+}
+
+fn store(slot: &mut Option<Values>, occurs: Occurs, value: Value, argument: u8) -> Result<(), Usage> {
+    match occurs {
+        Occurs::Repeated { most } => {
+            let mut many = List::with_capacity(most);
+            match slot {
+                Some(Values::Many(old)) => {
+                    for value in old.iter() {
+                        many.push(value.clone()).or(Err(Usage::Many { argument }))?;
+                    }
+                }
+                Some(Values::One(_)) => return Err(Usage::Many { argument }),
+                None => {}
+            }
+            many.push(value).or(Err(Usage::Many { argument }))?;
+            *slot = Some(Values::Many(many.into_boxed()));
+        }
+        Occurs::Required | Occurs::Optional => *slot = Some(Values::One(value)),
+    }
+    Ok(())
 }

@@ -130,3 +130,126 @@ pub const HELP: Tool = Tool {
     keyed: Keyed::Never,
     area: 1,
 };
+pub const CHAT_CREATE: Tool = Tool {
+    name: b"chat",
+    line: b"Start a chat",
+    result: b"chat_create",
+    forms: &[&[
+        positional(b"text", b"TEXT", Kind::Text, Required, b"Opening words"),
+        flag(b"project", b"P", Kind::Project, Required, b"Project name or number"),
+    ]],
+    keyed: Keyed::Required,
+    area: 1,
+};
+pub const MESSAGE: Tool = Tool {
+    name: b"message",
+    line: b"Send words to a task",
+    result: b"message",
+    forms: &[&[
+        positional(b"task", b"N", Kind::Number, Required, b"Task number"),
+        positional(b"text", b"TEXT", Kind::Text, Required, b"Words to send"),
+    ]],
+    keyed: Keyed::Required,
+    area: 1,
+};
+pub const CLOSE: Tool = Tool {
+    name: b"close",
+    line: b"Close a chat and cancel or move its delegates",
+    result: b"close",
+    forms: &[&[
+        positional(b"task", b"N", Kind::Number, Required, b"Task number"),
+        super::table::repeated(b"move", b"D", Kind::Number, 8, b"Delegate to move to the party"),
+        flag(b"reason", b"TEXT", Kind::Text, Optional, b"Reason, empty by default"),
+    ]],
+    keyed: Keyed::Required,
+    area: 1,
+};
+pub const ANSWER: Tool = Tool {
+    name: b"answer",
+    line: b"Answer a task's question",
+    result: b"answer",
+    forms: &[&[
+        positional(b"task", b"N", Kind::Number, Required, b"Task number"),
+        positional(b"question", b"M", Kind::Number, Required, b"Question number"),
+        positional(b"text", b"TEXT", Kind::Text, Required, b"Answer"),
+    ]],
+    keyed: Keyed::Optional,
+    area: 1,
+};
+pub const DECIDE: Tool = Tool {
+    name: b"decide",
+    line: b"Decide a proposal or an escalation",
+    result: b"decide",
+    forms: &[
+        &[
+            positional(b"proposal", b"P/K", Kind::Proposal, Required, b"Typed proposer and proposal number"),
+            positional(
+                b"outcome",
+                b"OUTCOME",
+                Kind::Word { set: &[b"accept", b"reject", b"pass-up"] },
+                Required,
+                b"Decision",
+            ),
+            positional(b"reason", b"REASON", Kind::Text, Optional, b"Reason"),
+        ],
+        &[
+            positional(b"task", b"N", Kind::Number, Required, b"Task number"),
+            positional(
+                b"outcome",
+                b"OUTCOME",
+                Kind::Word { set: &[b"release", b"leave", b"pass-up"] },
+                Required,
+                b"Decision",
+            ),
+            positional(b"reason", b"REASON", Kind::Text, Optional, b"Reason"),
+            flag(b"hold", b"R", Kind::Number, Required, b"Hold revision"),
+        ],
+    ],
+    keyed: Keyed::Optional,
+    area: 1,
+};
+pub const RELEASE: Tool = Tool {
+    name: b"release",
+    line: b"Lift a task's hold",
+    result: b"release",
+    forms: &[&[
+        positional(b"task", b"N", Kind::Number, Required, b"Task number"),
+        flag(b"hold", b"R", Kind::Number, Required, b"Hold revision"),
+        switch(b"again", b"Run again"),
+    ]],
+    keyed: Keyed::Optional,
+    area: 1,
+};
+pub const STOP: Tool = Tool {
+    name: b"stop",
+    line: b"Stop a task's run and hold it",
+    result: b"stop",
+    forms: &[&[positional(b"task", b"N", Kind::Number, Required, b"Task number")]],
+    keyed: Keyed::Optional,
+    area: 1,
+};
+pub const CANCEL: Tool = Tool {
+    name: b"cancel",
+    line: b"Cancel a task and its tree",
+    result: b"cancel",
+    forms: &[&[
+        positional(b"task", b"N", Kind::Number, Required, b"Task number"),
+        positional(b"reason", b"REASON", Kind::Text, Required, b"Reason"),
+        flag(b"grace", b"D", Kind::Duration, Optional, b"Grace before cancellation"),
+    ]],
+    keyed: Keyed::Optional,
+    area: 1,
+};
+pub const WAIT: Tool = Tool {
+    name: b"wait",
+    line: b"Wait for a watch's change or condition",
+    result: b"wait",
+    forms: &[&[
+        positional(b"subject", b"SUBJECT", Kind::Subject, Required, b"Watch subject"),
+        flag(b"since", b"DIGEST", Kind::Digest, Optional, b"Wait for a different digest"),
+        flag(b"until", b"CONDITION", Kind::Condition, Optional, b"Wait for a condition"),
+        flag(b"timeout", b"DURATION", Kind::Duration, Optional, b"Timeout, 300 seconds by default"),
+    ]],
+    keyed: Keyed::Never,
+    area: 1,
+};
