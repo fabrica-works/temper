@@ -580,6 +580,16 @@ where its answer lands.
 
      Instructions: coordinator passes both README rules to running implementers. Supervisor refreshes only primary skein, then removes its temporary rule with a verified lifting steer. Hourly-02 findings2–6 have a bounded scratch follow-up for a concrete test-only supplement and detectable gate checks; those corrections remain pending, not waived.
 
+124. **Use skein graph after setup landing** (hourly check of 2026-10-19T07:15:01Z).
+     Reverses: ruling123 of2026-10-19T07:27:29Z and its following graph-restriction steer, only the temporary skein prohibition; its wait-discipline rule stands.
+     Amends: README Rules removes the hourly-02 follow-up graph restriction.
+
+     The later skein primary source has been reindexed; resume graph discovery with exact project srv-data-git-runner-src-skein and worktree verification. Temper keeps its refreshed exact-primary graph; newer worktree changes and parse/excluded gaps use source search. The wait-discipline rule and all proof budgets remain.
+
+     Checked: index_repository fast succeeded; index_status reports ready at2026-10-19T07:28:55Z, root/srv/data/git/runner/src/skein,26593nodes. git rev-parse HEAD origin/main agrees at4c0895d676c9c80ebc5e95c1f03d686f076e0b0c. Temper's intervening ruling122/123 changes are Markdown only, so its07:18:49Z index still covers the indexed source. The kit's plan ruling/ring commands are present.
+
+     Instructions: coordinator passes the lifting graph instruction to running implementers, retaining worktree source verification and source fallbacks. Hourly-02 contract findings and unfinished process/downstream results remain under their bounded follow-ups, not waived.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
