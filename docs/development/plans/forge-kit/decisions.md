@@ -396,6 +396,13 @@ where its answer lands.
 
      The corrected scratch fixture passes clippy for temper-forge-setup, its shell and reconcile world; their focused suite passes 145 tests in 1.377 s and fuzzy passes 1 in 1.126 s. Skein's declaration sketch passes clippy; skein-forge plus sketch pass 86 tests, with no fuzzy/browser tests selected. Runtime Given and future 17/33/54-test proofs await their implementations. Evidence: pump/ready-skein-04.md and scratch-ready-skein-04/temper/.ready-check/fixture.patch.
 
+107. **skein 02's Shapes against main** (ready check of skein-02.1).
+     Amends: skein/02-client.md 02.4 Test shape, invalid_reads_make_no_call. Reverses: nothing.
+
+     The invalid-read table covers six paged reads: skein-forge/src/api.rs::Read::{Items,Reviews,Statuses,Remarks,PullFiles,Collaborators}, each at page zero. Correct “seven” to “six” and name the variants in the table. Keep File's empty-path cases and File/Job byte-limit cases, existing outcome and zero-Call assertions. No consumer correction was found; refresh further copies/derived tables if encountered and list them in the commit body.
+
+     Checked skein 0db7b1fc7307aa50980ce75637e686e384adc4e4 and temper c4f89032047e4980b9f946ce8abf1c2c81653ba8. The Read enum has exactly those six page fields; the check searched all increments and downstream repositories. Other absent names belong to declared future increments. The corrected scratch table compiles under clippy and passes within the 78-test temper client suite (0.159 s); client world passes 29 focused tests (0.041 s) and 2 fuzzy (0.329 s). Skein-forge passes clippy and 86 tests (0.148 s); client fuzzy selects no tests. Future opaque-key, measure, echo and 81/84/90/114-test proofs await their APIs. Evidence: pump/ready-skein-02.md.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

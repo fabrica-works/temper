@@ -362,7 +362,7 @@ Test shape: retain 90 tests; 24 new tests in `tests/recovery.rs`, <20 ms each.
 | `worst_case_rejects_invalid_limits` | Zeros for each required positive field, calls>pending, reserve>rate, backoff>backoff_max, poll>poll_max: None. Zero backoff_max/poll_max fail their ordered pairs. |
 | `worst_case_accepts_permitted_zeroes` | Independently zero op_bytes, answer_bytes, reserve, facts: Some; no constructor with invalid ordered pairs. |
 | `max_out_covers_floor_and_batch` | Reference above; never construct with zero resources/repositories. |
-| `invalid_reads_make_no_call` | Page 0 for seven paged reads; File empty path; File/Job max_bytes 0 or 4097: Read(TooLarge), zero Call. |
+| `invalid_reads_make_no_call` | Page 0 for six paged reads (Items, Reviews, Statuses, Remarks, PullFiles, Collaborators); File empty path; File/Job max_bytes 0 or 4097: Read(TooLarge), zero Call. |
 | `rate_refused_writes_save_a_new_attempt` | Send at 100; RateLimited(after=2s); both clocks to 102; resend: distinct token, failures 0, same start, Progress before Call; sent/wall 102, deadline/expires 113 (was 111). A subsequent find keeps 113. |
 | `attempted_or_unknown_withdrawals_are_noops` | Drain prior output/facts; attempted entry and unknown number separately: zero requests/facts; attempted entry still reaches Made once. |
 | `echo_landing_rearms_the_resting_resource` | Participating issue/pull resting until 160; Commented/Reviewed at 100: Save echo, read at 101 (hinted=1), no echo news. |
