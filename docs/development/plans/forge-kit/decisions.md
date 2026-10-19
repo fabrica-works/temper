@@ -657,6 +657,11 @@ where its answer lands.
 
      Pass the current two-repository graph hold and continuing source-search permission to running sessions. Supervisor refreshes the exact primary projects; lift the temporary hold after status/source comparison, retaining the standing rule.
 
+128. **Investigate archived-write reset within a bounded diagnostic scope** (cross-session scope, temper 06.2's block of 2026-10-19T08:13:14Z).
+     Authorize the new06.2 diagnostic exception: scratch only,20minutes and three executable diagnostic attempts, at most one full recording among them. Compare the unchanged archived-write request with pre-06.2 code and report its failure layer/proposed repair location or remaining uncertainty in at most15lines. This assigns diagnostic scope without presuming the JSON migration is independent.
+
+     The plan's “Behaviour unchanged” and Don't's “change a transcript, a delivery or facts.txt” still hold. No outside-scope repair lands under this authorization; the next ruling assigns upstream scope. Preserve the JSON implementation checkpoint and all proof checks; do not swallow the reset. Independent sessions continue.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

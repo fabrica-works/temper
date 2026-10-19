@@ -257,6 +257,7 @@ Proof: process; both recordings, with `T` a fresh directory under `$WS/tmp` and 
   `$T/out/facts.txt` prints the counts and the digest, and the transcripts diff (the same) names
   exactly `merge-conflict/request` and `merge-stale-head/request`. The leaves `hooks::body` and the
   registration read run only live.
+Diagnostic exception for archived-write `Stream(Reset)`: scratch-only cause investigation through `cases::failures`/`Fixture::exchange` and skein throwaway `http::{ExchangeHost,exchange}`/`http::host::OneShot`. Budget: 20 minutes and three executable diagnostic attempts, at most one full recording among them; compilation/tests use pinned heavy. Compare the unchanged failing request against pre-06.2 code before attributing the reset. Return a report of at most 15 lines naming snapshots, typed failure evidence and proposed repair location or remaining uncertainty. No outside-scope repair lands under this exception: the next ruling assigns upstream scope. Preserve facts, transcripts, deliveries and budgets; do not mask the reset or relax a check. Queue waits authorize no extra attempts; at cutoff record any active task/source owner and retain its target until it ends.
 Proof: joint; `heavy --gate scripts/check.sh`: origin/main's focused count at the step's start plus 4,
   fuzzy unchanged, clippy and format clean (the gate runs both).
 Don't: add a value tree, a `serde_json::Value` bridge or a second parser; re-serialize a captured body;
