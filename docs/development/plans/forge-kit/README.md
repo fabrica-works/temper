@@ -115,8 +115,6 @@ chain.
 
 ## Rules of this plan
 
-- **Graph refresh pending (hourly04):** do not use the code graph for skein or temper until the supervisor reports the next verified primary refresh; use scoped source searches. Coverage through6df8817b/3fe3cf80 predates newer source.
-
 - **Graph freshness:** the supervisor refreshes only the primary checkout indexes. Use the exact primary project names and check each result in the actual worktree. Until a stale index's refresh is reported, use source searches for that repository; a missing graph result proves no absence. A refresh applies through its reported source commit; later source landings require a fresh comparison. Source search remains available throughout.
 
 - **Diagnostic process attempts:** before spending an authorized process probe, select a fresh run-owned instance path and the harness for its process tier; verify prerequisites and the exact request comparison before execution. Preserve earlier evidence instead of reusing a nonempty instance. Setup failures still consume attempts. Exhausting a diagnostic budget requires a report and a new ruling before another attempt; it does not expand unit-suite time limits or authorize retries.

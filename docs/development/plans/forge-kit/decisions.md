@@ -845,6 +845,16 @@ where its answer lands.
 
      The pinned numbers.sh::record_check at lines538–542 excludes .sN headings; the five pulse flags are supplement headings, not malformed coordinator reports. Record a retrospective proposal with ordinary-session/supplement/malformed-heading controls; keep the kit fixed. Process974 and three downstream checks remain pending and unverified; completion director806964 owns them. Hearth975 already passes. No other proof is repeated by this ruling.
 
+141. **Hourly04 primary graph refresh verified** (steer of2026-10-19T09:36:44Z).
+     Reverses: ruling140 of2026-10-19T09:26:37Z only its temporary graph-refresh hold; its named page fixture rule remains.
+     Amends: README Rules, removes Graph refresh pending (hourly04).
+
+     Both exact primary checkouts are now refreshed and verified clean at the indexed source commits. Lift the temporary graph hold: use project srv-data-git-runner-src-skein through f1a6219445776335612dc9a04c925aec388ea1bf, indexed09:35:55Z with27401nodes/202973edges; use srv-data-git-runner-src-temper through b0bce4541ffdb80535bf6581ce532e3d3d531c6f, indexed09:36:44Z with22791nodes/152502edges. Verify graph results against each actual session worktree. Later source changes require a new comparison under the permanent README freshness rule; later docs-only commits do not change source coverage.
+
+     Checked: fetched origins, then git status --porcelain empty before fast-forward; git merge --ff-only origin/main updated both exact primaries. Following fast index_repository, index_status reports ready at the timestamps/counts above, and git rev-parse HEAD origin/main returns the same covered pair, with both working trees clean. search_graph finds both new plan-call test functions; scoped primary rg verifies those names and PAGE_SIZE:u32=2.
+
+     Coverage gaps remain source fallbacks: skein3 partial files and8 intentionally hostile JSON parses, plus excluded docs/scripts/lock/binary artifacts; temper2 partial files and excluded docs/tools/scripts/lock/binary artifacts. Missing graph output proves no absence. No worktree index or kit move occurred. Keep ruling140's page-fixture correction and bounded check follow-up. Refresh any further reached symbol/copy using the actual source and record it in the implementation commit body.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
