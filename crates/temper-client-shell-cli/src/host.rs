@@ -4,6 +4,7 @@ use crate::{
     directory::Directory,
     limits,
     output::Output,
+    transport::Memory,
 };
 use skein_io::{
     self as io,
@@ -12,10 +13,10 @@ use skein_io::{
 };
 use skein_lib::{Env, Queue, Time, Token, Wall};
 use skein_shell::Host;
-use temper_client_tools::jig::call::Parsed;
+use temper_client_tools::{jig::call::Parsed, root};
 const TAG: u64 = 1 << 61;
 const FILES: u64 = 1 << 62;
-const ROOM: u32 = 256; // io's bounded operations plus file and pipe completions.
+const ROOM: u32 = (limits::EXCHANGES + 1) * 128; // Two bounded socket bursts plus pipe and file completions.
 /// Descriptors opened by the entry point; parent belongs to this host.
 #[derive(Clone, Copy)]
 pub struct Startup {
@@ -35,6 +36,14 @@ pub struct Invocation {
 /// The shell's one-shot host.
 pub struct OneShot {
     directory: Directory,
+    call: Option<Parsed>,
+    class: Class,
+    root: root::Root,
+    root_env: Env<root::Limits>,
+    requests: Queue<root::Request>,
+    transport: Option<Memory>,
+    until: Option<Time>,
+    link: jig_client::Link,
     io: io::Io,
     env: Env<io::Limits>,
     output: Output,
@@ -57,6 +66,8 @@ impl OneShot {
             Parsed::Call { call, .. } => arguments::class(call),
             Parsed::File { .. } => Class::Help,
         };
+        let root = root::Root::new(&limits.root, startup.seed)?;
+        let request_room = jig_client::max_out(&limits.root.domain.client) * (limits.root.tools.rows + 1);
         let mut io = io::Io::new(&limits.io);
         let output = Output::new(&mut io, startup.stdout, startup.stderr, limits.io.output);
         let stdin = Some(io.adopt_read_pipe(startup.stdin).expect("stdin slot"));
@@ -68,6 +79,9 @@ impl OneShot {
             + Queue::<io::Event>::worst_case(ROOM).expect("io events")
             + Queue::<io::file::Event>::worst_case(16).expect("file events")
             + u64::from(limits.io.output) * 128
+            + limits::transport(&limits).expect("native envelope")
+            + jig_client::worst_case(&limits.root.domain.client).expect("client envelope")
+            + Queue::<root::Request>::worst_case(request_room).expect("root outputs")
             + 8192; // Output lines and DIRECTORY's bounded path.
         let mut host = Self {
             directory: Directory::new(
@@ -77,6 +91,14 @@ impl OneShot {
                 startup.user,
                 startup.seed,
             ),
+            call: Some(call.parsed),
+            class,
+            root,
+            root_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.root },
+            requests: Queue::with_capacity(request_room),
+            transport: None,
+            until: None,
+            link: jig_client::Link::SignedOut,
             io,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.io },
             output,
@@ -90,7 +112,7 @@ impl OneShot {
             closed: false,
             memory,
         };
-        if matches!(call.parsed, Parsed::File { .. }) {
+        if matches!(host.call, Some(Parsed::File { .. })) {
             host.fail(b"usage: temper ctl DIRECTORY TOOL [ARGUMENT...]");
         } else if class == Class::Help {
             host.finish(0, false);
@@ -113,6 +135,10 @@ impl OneShot {
     }
     fn finish(&mut self, status: u8, signal: bool) {
         self.status = Some(status);
+        self.until = None;
+        if let Some(transport) = &mut self.transport {
+            transport.close();
+        }
         self.directory.close();
         if signal {
             for request in self.output.close(true) {
@@ -122,6 +148,84 @@ impl OneShot {
         }
         for entity in [self.stdin.take(), self.signals.take()].into_iter().flatten() {
             self.request(io::Request::Abort { entity });
+        }
+    }
+    fn root_event(&mut self, event: jig_client::Event) {
+        root::step(&mut self.root, &self.root_env, root::Event::Client { event }, &mut self.requests);
+    }
+    fn client_progress(&mut self) {
+        if self.status.is_some() {
+            return;
+        }
+        if self.transport.is_none()
+            && matches!(self.class, Class::Read | Class::Wait)
+            && let Some(token) = self.directory.token.take()
+        {
+            self.transport =
+                Some(Memory::new(self.directory.engine.expect("loaded engine"), &limits::native().connections));
+            self.until = Some(self.env.now.saturating_add(limits::DEADLINE));
+            self.root_event(jig_client::Event::Start { kept: skein_lib::List::with_capacity(0) });
+            self.root_event(jig_client::Event::SignIn { with: jig_client::With::Held(skein_lib::Secret::new(token)) });
+        }
+        if self.transport.is_none() {
+            return;
+        }
+        while let Some(event) = self.transport.as_mut().expect("memory").events.pop() {
+            self.root_event(event);
+        }
+        if root::next_deadline(&self.root).is_some_and(|at| self.env.now >= at) {
+            root::fire(&mut self.root, &self.root_env, &mut self.requests);
+        }
+        while let Some(request) = self.requests.pop() {
+            match request {
+                root::Request::Client { request } => {
+                    self.transport.as_mut().expect("memory").down(self.env.now, request);
+                }
+                root::Request::Ready => {
+                    if let Some(Parsed::Call { call, json }) = self.call.take() {
+                        self.until = (self.class == Class::Read).then(|| self.env.now.saturating_add(limits::DEADLINE));
+                        root::step(
+                            &mut self.root,
+                            &self.root_env,
+                            root::Event::Call { number: 1, call, json },
+                            &mut self.requests,
+                        );
+                    }
+                }
+                root::Request::Printed { printed, .. } => {
+                    self.output.push(false, printed.stdout);
+                    if printed.status == 1 && !printed.stderr.is_empty() {
+                        self.fail(printed.stderr.strip_suffix(b"\n").unwrap_or(&printed.stderr));
+                    } else {
+                        self.output.push(true, printed.stderr);
+                        self.finish(printed.status, false);
+                    }
+                }
+                root::Request::Kept { line } => self.output.push(false, line),
+                root::Request::Fact { .. } => {}
+            }
+        }
+        if self.status.is_some() {
+            return;
+        }
+        let link = self.root.client().link().state;
+        if link != self.link {
+            if self.class == Class::Wait && self.call.is_none() && link == jig_client::Link::Live {
+                self.until = None;
+            } else if self.link == jig_client::Link::Live && self.until.is_none() {
+                self.until = Some(self.env.now.saturating_add(limits::DEADLINE));
+            }
+            self.link = link;
+        }
+        match link {
+            jig_client::Link::SignedOut => self.fail(b"signed out"),
+            jig_client::Link::OutOfDate => self.fail(b"client is out of date"),
+            jig_client::Link::Starting | jig_client::Link::Live | jig_client::Link::Offline => {}
+        }
+        if self.until.is_some_and(|at| self.env.now >= at) {
+            let address = std::str::from_utf8(self.directory.address.as_deref().expect("loaded address"))
+                .expect("numeric address");
+            self.fail(format!("the engine at {address} did not answer within 30 s").as_bytes());
         }
     }
     fn complete(&mut self, mut complete: Complete) {
@@ -154,6 +258,8 @@ impl Host for OneShot {
     fn iterate(&mut self, now: Time, wall: Wall) {
         self.env.now = now;
         self.env.wall = wall;
+        self.root_env.now = now;
+        self.root_env.wall = wall;
         while self.io.is_ready()
             && self.raw.room() >= io::MAX_OUT_RESUME.submissions
             && self.told.room() >= io::MAX_OUT_RESUME.events
@@ -176,6 +282,26 @@ impl Host for OneShot {
             io::fire(&mut self.io, &self.env, &mut self.told, &mut self.raw);
         }
         while let Some(event) = self.told.pop() {
+            let owner = match &event {
+                io::Event::Connecting { owner, .. }
+                | io::Event::Connected { owner }
+                | io::Event::Stream { owner, .. }
+                | io::Event::Closed { owner }
+                | io::Event::Failed { owner, .. } => Some(*owner),
+                io::Event::Output { .. }
+                | io::Event::Listening { .. }
+                | io::Event::Accepted { .. }
+                | io::Event::Spawned { .. }
+                | io::Event::Exited { .. }
+                | io::Event::Usage { .. }
+                | io::Event::Resized
+                | io::Event::Window { .. }
+                | io::Event::Shutdown { .. } => None,
+            };
+            if owner.is_some_and(Memory::owns) {
+                self.transport.as_mut().expect("memory socket").event(now, event);
+                continue;
+            }
             match event {
                 io::Event::Shutdown { signal } => self.finish(
                     match signal {
@@ -208,6 +334,12 @@ impl Host for OneShot {
         if let Some(error) = self.directory.error.take() {
             self.fail(&error);
         }
+        self.client_progress();
+        if let Some(transport) = &mut self.transport {
+            for request in transport.progress(now) {
+                self.request(request);
+            }
+        }
         for request in self.output.requests() {
             self.request(request);
         }
@@ -234,9 +366,22 @@ impl Host for OneShot {
             || self.io.is_ready()
             || self.io.is_due(now)
             || self.directory.pending(now)
+            || self.transport.as_ref().is_some_and(Memory::pending)
+            || self.status.is_none()
+                && (self.until.is_some_and(|at| now >= at)
+                    || root::next_deadline(&self.root).is_some_and(|at| now >= at))
     }
     fn next_deadline(&self) -> Option<Time> {
-        [self.io.next_deadline(), self.directory.deadline()].into_iter().flatten().min()
+        [
+            self.io.next_deadline(),
+            self.directory.deadline(),
+            self.transport.as_ref().and_then(Memory::next_deadline),
+            self.until,
+            self.status.is_none().then(|| root::next_deadline(&self.root)).flatten(),
+        ]
+        .into_iter()
+        .flatten()
+        .min()
     }
     fn next_policy_deadline(&self) -> Option<Time> {
         self.directory.retry()
@@ -246,6 +391,7 @@ impl Host for OneShot {
             && self.closed
             && self.io.is_empty()
             && self.directory.is_empty()
+            && self.transport.as_ref().is_none_or(Memory::is_empty)
             && self.complete.is_empty()
             && self.raw.is_empty()
             && self.submit.is_empty()

@@ -2,9 +2,11 @@ use crate::{
     arguments,
     host::{Invocation, OneShot, Startup},
 };
+use jig_client_protocol_wire as w;
 use skein_io::kernel::{Complete, Done, Error, Exit, Fd, Kind, Op, OpenHow, ServiceSignal, Signalled, Stat, Submit};
 use skein_lib::{Duration, Time, Wall};
 use skein_shell::Host;
+use std::collections::{BTreeMap, VecDeque};
 pub const CHAT: &[&[u8]] = &[b"chat", b"hello", b"--project", b"shop", b"--key", b"start-chat"];
 const DIRECTORY: Fd = Fd::new(20);
 const ADDRESS: Fd = Fd::new(21);
@@ -15,6 +17,15 @@ const TOKEN_BYTES: &[u8] = b"0123456789012345678901234567890123456789";
 pub const PARTIAL: usize = 3; // More than one short write is needed for every host diagnostic.
 pub struct Frame {
     pub host: OneShot,
+    sockets: BTreeMap<Fd, Socket>,
+    held: Vec<Submit>,
+    opened: Vec<Box<[u8]>>,
+    requests: Vec<Box<[u8]>>,
+    deliver: Option<()>,
+    watch: Option<u64>,
+    stream: Option<Fd>,
+    stdout: Vec<u8>,
+    next_socket: i32,
     now: Time,
     start: Time,
     signal: Option<Submit>,
@@ -50,6 +61,15 @@ impl Frame {
         .expect("native limits");
         Self {
             host,
+            sockets: BTreeMap::new(),
+            held: Vec::new(),
+            opened: Vec::new(),
+            requests: Vec::new(),
+            deliver: None,
+            watch: None,
+            stream: None,
+            stdout: Vec::new(),
+            next_socket: 100,
             now: Time::ZERO,
             start: Time::ZERO,
             signal: None,
@@ -65,6 +85,28 @@ impl Frame {
             write_size: usize::MAX,
             writes: 0,
         }
+    }
+    pub fn read(words: &[&str]) -> Self {
+        Self::act(&words.iter().map(|word| word.as_bytes()).collect::<Vec<_>>())
+    }
+    pub fn sign_in_then_deliver_me(&mut self) {
+        self.deliver = Some(());
+        if self.watch.is_some() {
+            self.deliver_me();
+        }
+        self.run();
+    }
+    pub fn drain(&mut self) {
+        self.run();
+    }
+    pub fn opened(&self, path: &[u8]) -> bool {
+        self.opened.iter().any(|name| name.as_ref() == path)
+    }
+    pub fn stdout(&self) -> &[u8] {
+        &self.stdout
+    }
+    pub fn sent_stream_gone(&self) -> bool {
+        self.requests.iter().any(|path| path.as_ref() == b"/jig/v1/stream-gone")
     }
     pub fn started(&self) -> Time {
         self.start
@@ -98,11 +140,27 @@ impl Frame {
     }
     pub fn run(&mut self) {
         for _ in 0..2000 {
+            for mut submit in std::mem::take(&mut self.held) {
+                if let Op::Recv { fd, .. } = &submit.kind
+                    && self.sockets.get(fd).is_some_and(|s| !s.reply.is_empty())
+                {
+                    let result = self.answer(&mut submit.kind);
+                    self.host.completions().push(Complete { op: submit.op, kind: submit.kind, result });
+                } else {
+                    self.held.push(submit);
+                }
+            }
             self.host.iterate(self.now, Wall::EPOCH);
             let mut answered = false;
             while let Some(mut submit) = self.host.submissions().pop() {
                 if matches!(submit.kind, Op::ReadSignal { .. }) {
                     self.signal = Some(submit);
+                    continue;
+                }
+                if let Op::Recv { fd, .. } = &submit.kind
+                    && self.sockets.get(fd).is_some_and(|s| s.reply.is_empty())
+                {
+                    self.held.push(submit);
                     continue;
                 }
                 let result = self.answer(&mut submit.kind);
@@ -115,9 +173,35 @@ impl Frame {
         }
         panic!("host did not settle");
     }
+    fn stat(&self, fd: Fd) -> Done {
+        let (kind, size, mode, links) = if fd == DIRECTORY {
+            (Kind::Directory, 0, if self.refused { 0o777 } else { 0o700 }, 2)
+        } else {
+            (
+                Kind::File,
+                u64::try_from(if fd == ADDRESS { self.address.len() } else { self.token.len() }).expect("fixture size"),
+                0o600,
+                1,
+            )
+        };
+        Done::Stat(Stat { kind, size, mode, owner: USER, links })
+    }
+    fn read_file(&self, fd: Fd, buf: &mut [u8], at: u64) -> Done {
+        let bytes = if fd == ADDRESS {
+            self.address
+        } else {
+            assert_eq!(fd, TOKEN);
+            self.token
+        };
+        let start = usize::try_from(at).expect("fixture offset").min(bytes.len());
+        let count = buf.len().min(bytes.len() - start);
+        buf[..count].copy_from_slice(&bytes[start..start + count]);
+        Done::Count(u32::try_from(count).expect("fixture count"))
+    }
     fn answer(&mut self, kind: &mut Op) -> Result<Done, Error> {
         match kind {
             Op::Open { path, how, .. } => {
+                self.opened.push(path.clone());
                 if path.as_ref() == b"directory" {
                     if *how == OpenHow::ReadNoFollow {
                         self.private_opens += 1;
@@ -136,46 +220,53 @@ impl Frame {
                     Ok(Done::Fd(Fd::new(19)))
                 }
             }
-            Op::Stat { fd } => {
-                let (kind, size, mode, links) = if *fd == DIRECTORY {
-                    (Kind::Directory, 0, if self.refused { 0o777 } else { 0o700 }, 2)
-                } else {
-                    (
-                        Kind::File,
-                        u64::try_from(if *fd == ADDRESS { self.address.len() } else { self.token.len() })
-                            .expect("fixture size"),
-                        0o600,
-                        1,
-                    )
-                };
-                Ok(Done::Stat(Stat { kind, size, mode, owner: USER, links }))
-            }
-            Op::Read { fd, buf, at } => {
-                let bytes = if *fd == ADDRESS {
-                    self.address
-                } else {
-                    assert_eq!(*fd, TOKEN);
-                    self.token
-                };
-                let start = usize::try_from(*at).expect("fixture offset").min(bytes.len());
-                let count = buf.len().min(bytes.len() - start);
-                buf[..count].copy_from_slice(&bytes[start..start + count]);
-                Ok(Done::Count(u32::try_from(count).expect("fixture count")))
-            }
+            Op::Stat { fd } => Ok(self.stat(*fd)),
+            Op::Read { fd, buf, at } => Ok(self.read_file(*fd, buf, *at)),
             Op::Lock { fd } => {
                 assert_eq!(*fd, DIRECTORY);
                 self.locks += 1;
                 if self.busy { Err(Error::Busy) } else { Ok(Done::Nothing) }
             }
             Op::PipeWrite { fd, bytes, from } => {
-                assert_eq!(*fd, STDERR);
+                assert!([STDERR, Fd::new(4)].contains(fd));
                 let start = usize::try_from(*from).expect("fixture offset");
                 let count = (bytes.len() - start).min(self.write_size);
-                self.stderr.extend_from_slice(&bytes[start..start + count]);
+                if *fd == STDERR {
+                    self.stderr.extend_from_slice(&bytes[start..start + count]);
+                } else {
+                    self.stdout.extend_from_slice(&bytes[start..start + count]);
+                }
                 self.writes += 1;
                 Ok(Done::Count(u32::try_from(count).expect("fixture count")))
             }
+            Op::Socket { .. } => {
+                let fd = Fd::new(self.next_socket);
+                self.next_socket += 1;
+                self.sockets.insert(fd, Socket::default());
+                Ok(Done::Fd(fd))
+            }
+            Op::Connect { .. } | Op::Shutdown { .. } | Op::Close { .. } => Ok(Done::Nothing),
+            Op::Send { fd, bytes, from } => {
+                let start = usize::try_from(*from).expect("send offset");
+                self.sockets.get_mut(fd).expect("socket").request.extend_from_slice(&bytes[start..]);
+                let count = bytes.len() - start;
+                self.http_request(*fd);
+                Ok(Done::Count(u32::try_from(count).expect("send count")))
+            }
+            Op::Recv { fd, buf } => {
+                let reply = &mut self.sockets.get_mut(fd).expect("socket").reply;
+                let count = buf.len().min(reply.len());
+                for byte in &mut buf[..count] {
+                    *byte = reply.pop_front().expect("response byte");
+                }
+                Ok(Done::Count(u32::try_from(count).expect("recv count")))
+            }
             Op::Cancel { target } => {
+                if let Some(index) = self.held.iter().position(|submit| submit.op == *target) {
+                    let Submit { op, kind } = self.held.remove(index);
+                    self.host.completions().push(Complete { op, kind, result: Err(Error::Cancelled) });
+                    return Ok(Done::Nothing);
+                }
                 if self.signal.as_ref().is_none_or(|signal| signal.op != *target) {
                     return Err(Error::TooLate);
                 }
@@ -183,16 +274,10 @@ impl Frame {
                 self.host.completions().push(Complete { op, kind, result: Err(Error::Cancelled) });
                 Ok(Done::Nothing)
             }
-            Op::Close { .. } => Ok(Done::Nothing),
             Op::PipeRead { .. } => Ok(Done::Count(0)),
-            Op::Socket { .. }
-            | Op::Bind { .. }
+            Op::Bind { .. }
             | Op::Listen { .. }
             | Op::Accept { .. }
-            | Op::Connect { .. }
-            | Op::Recv { .. }
-            | Op::Send { .. }
-            | Op::Shutdown { .. }
             | Op::Write { .. }
             | Op::Append { .. }
             | Op::Truncate { .. }
@@ -209,4 +294,100 @@ impl Frame {
             | Op::ReadSignal { .. } => panic!("unexpected kernel operation"),
         }
     }
+}
+
+#[derive(Default)]
+struct Socket {
+    request: Vec<u8>,
+    reply: VecDeque<u8>,
+    answered: bool,
+}
+pub type Engine = Frame;
+impl Frame {
+    fn http_request(&mut self, fd: Fd) {
+        let socket = self.sockets.get_mut(&fd).expect("socket");
+        if socket.answered {
+            return;
+        }
+        let Some(end) = socket.request.windows(4).position(|b| b == b"\r\n\r\n") else { return };
+        let head = std::str::from_utf8(&socket.request[..end]).expect("HTTP head");
+        let length = head
+            .lines()
+            .find_map(|line| line.to_ascii_lowercase().strip_prefix("content-length: ").map(str::to_owned))
+            .map_or(0, |number| number.parse::<usize>().expect("content length"));
+        if socket.request.len() < end + 4 + length {
+            return;
+        }
+        let path = head.split_whitespace().nth(1).expect("request path").as_bytes().to_vec();
+        self.requests.push(path.clone().into_boxed_slice());
+        socket.answered = true;
+        match path.as_slice() {
+            b"/jig/v1/stream" => {
+                self.stream = Some(fd);
+                socket.reply.extend(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n");
+                let mut served = skein_lib::List::with_capacity(1);
+                served
+                    .push(
+                        w::Served::new(
+                            &w::CEILINGS,
+                            w::ServedParts { owner: w::Owner::Jig, first: w::VERSION, last: w::VERSION },
+                        )
+                        .expect("served version"),
+                    )
+                    .expect("one family");
+                let hello = w::StreamEvent::Hello(
+                    w::Hello::new(
+                        &w::CEILINGS,
+                        w::HelloParts { stream: [1; 16], served, heartbeat: Duration::from_secs(60) },
+                    )
+                    .expect("hello"),
+                );
+                socket.reply.extend(sse(&hello));
+            }
+            b"/jig/v1/watch" => {
+                let open = w::Open::decode(&w::CEILINGS, &mut skein_lib::Reader::new(&socket.request[end + 4..]))
+                    .expect("watch record");
+                self.watch = Some(open.watch());
+                let answer = w::OpenAnswer::Admitted;
+                let mut writer = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("answer size"));
+                answer.encode(&mut writer).expect("answer fits");
+                let body = writer.finish();
+                socket.reply.extend(format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", body.len()).bytes());
+                socket.reply.extend(body.iter().copied());
+                if self.deliver.is_some() {
+                    self.deliver_me();
+                }
+            }
+            _ => panic!("unexpected HTTP route"),
+        }
+    }
+    fn deliver_me(&mut self) {
+        let value = w::DeliveryValue::Me(jig_client_test_records::frame_record());
+        let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("delivery size"));
+        value.encode(&mut writer).expect("delivery fits");
+        let document = w::Owned::new(
+            &w::CEILINGS,
+            w::OwnedParts { owner: w::Owner::Jig, version: w::VERSION, record: writer.finish() },
+        )
+        .expect("owned delivery");
+        let event = w::StreamEvent::Delivery(
+            w::Delivery::new(&w::CEILINGS, w::DeliveryParts { watch: self.watch.expect("opened watch"), document })
+                .expect("me delivery"),
+        );
+        self.sockets.get_mut(&self.stream.expect("open stream")).expect("stream socket").reply.extend(sse(&event));
+    }
+}
+fn sse(event: &w::StreamEvent) -> Vec<u8> {
+    use skein_lib::base64::{self, Alphabet};
+    let mut writer = skein_lib::Writer::new(usize::try_from(event.measure()).expect("event size"));
+    event.encode(&mut writer).expect("event fits");
+    let bytes = writer.finish();
+    let length =
+        base64::encoded_len(Alphabet::Standard, u32::try_from(bytes.len()).expect("event size")).expect("base64 size");
+    let mut writer = skein_lib::Writer::new(usize::try_from(length).expect("base64 size"));
+    base64::encode(Alphabet::Standard, &bytes, &mut writer).expect("base64 fits");
+    let mut frame = b"data: ".to_vec();
+    frame.extend_from_slice(&writer.finish());
+    frame.extend_from_slice(b"\n\n");
+    frame
 }

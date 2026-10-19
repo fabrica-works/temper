@@ -32,6 +32,7 @@ pub(crate) struct Directory {
     retry: Option<Time>,
     closing: bool,
     pub(crate) engine: Option<Addr>,
+    pub(crate) address: Option<Box<[u8]>>,
     pub(crate) token: Option<Box<[u8]>>,
     pub(crate) error: Option<Box<[u8]>>,
     pub(crate) events: Queue<file::Event>,
@@ -54,6 +55,7 @@ impl Directory {
             retry: None,
             closing: false,
             engine: None,
+            address: None,
             token: None,
             error: None,
             events: Queue::with_capacity(16),
@@ -136,6 +138,7 @@ impl Directory {
             (Stage::Address, file::Event::Loaded { bytes, .. }) => match address(&bytes) {
                 Ok(engine) => {
                     self.engine = Some(engine);
+                    self.address = Some(bytes[..bytes.len() - 1].into());
                     self.stage = Stage::Token;
                 }
                 Err(error) => self.fail(error),

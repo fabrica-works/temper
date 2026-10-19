@@ -90,3 +90,68 @@ fn a_zero_byte_token_is_not_signed_in() {
     assert_eq!(f.stderr(), b"temper ctl: DIRECTORY is not signed in\n");
     assert_eq!(f.exit(), Some(Exit::Code(1)));
 }
+#[test]
+fn a_read_never_opens_the_store() {
+    let mut f = fixtures::Engine::read(&["me", "--json"]);
+    f.sign_in_then_deliver_me();
+    f.drain();
+    assert!(!f.opened(b"store"));
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+}
+#[test]
+fn a_read_waits_for_me() {
+    let mut f = fixtures::Engine::read(&["me", "--json"]);
+    f.drain();
+    assert_eq!(f.exit(), None);
+    assert_eq!(f.stdout(), b"");
+    f.sign_in_then_deliver_me();
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+    assert!(f.stdout().starts_with(b"{\""));
+}
+#[test]
+fn an_unheard_read_exits_1_at_the_link_deadline() {
+    let mut f = fixtures::Engine::read(&["me"]);
+    f.drain();
+    f.advance_past(limits::DEADLINE);
+    assert_eq!(f.stderr(), b"temper ctl: the engine at http://127.0.0.1:4000 did not answer within 30 s\n");
+    assert_eq!(f.exit(), Some(Exit::Code(1)));
+}
+#[test]
+fn a_read_sends_no_stream_gone() {
+    let mut f = fixtures::Engine::read(&["me"]);
+    f.sign_in_then_deliver_me();
+    f.drain();
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+    assert!(!f.sent_stream_gone());
+}
+#[test]
+fn memory_saves_are_stored_in_order_without_file_operations() {
+    use jig_client::{Event, Request};
+    use skein_lib::{List, Time};
+    let limits = limits::native();
+    let mut memory = crate::transport::Memory::new(
+        directory::address(b"http://127.0.0.1:4000\n").expect("fixture address"),
+        &limits.connections,
+    );
+    for request in [
+        Request::Save { records: List::with_capacity(0) },
+        Request::Erase { records: List::with_capacity(0) },
+        Request::Save { records: List::with_capacity(0) },
+    ] {
+        memory.down(Time::ZERO, request);
+        assert_eq!(memory.events.pop(), Some(Event::Stored));
+    }
+    assert_eq!(memory.events.pop(), None);
+    assert!(memory.progress(Time::ZERO).is_empty());
+}
+#[test]
+fn host_bounds_cover_its_holders() {
+    use skein_shell::Host;
+    let f = fixtures::Engine::read(&["me"]);
+    let limits = limits::native();
+    let holders = limits::transport(&limits).expect("native transport bound")
+        + jig_client::worst_case(&limits.root.domain.client).expect("native root bound")
+        + skein_io::worst_case(&limits.io).expect("native io bound");
+    assert!(f.host.worst_case() > holders);
+    assert_eq!(f.host.operations(), skein_io::operations(&limits.io).expect("native operation bound") + 2);
+}
