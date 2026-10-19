@@ -154,6 +154,10 @@ impl Service {
     pub fn adopt_store(&mut self, root: Fd, effective_user: u32) -> Result<(), Fd> {
         self.engine.store.adopt(root, effective_user)
     }
+    /// Hold the bundle the binary read at start, served on the clients' listener.
+    pub fn adopt_bundle(&mut self, bundle: clients::bundle::Bundle) {
+        self.engine.clients.adopt_bundle(bundle);
+    }
     /// Earliest deadline of the root and its children.
     #[must_use]
     pub fn next_policy_deadline(&self) -> Option<Time> {
@@ -588,6 +592,7 @@ fn memory(
         temper_engine_domain::max_out(root).checked_add(1)?.checked_mul(jig_protocol_engine_clients::MAX_OUT_DOWN)?,
         &root.journal,
     )?)?;
+    bytes = bytes.checked_add(clients::bundle::worst_case(&settings.limits.clients)?)?;
     let forges = u32::try_from(settings.forges.len()).ok()?;
     let batch = temper_engine_domain::max_out(root).checked_add(2)?;
     bytes = bytes

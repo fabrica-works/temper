@@ -389,3 +389,101 @@ fn every_command_checks_setup_before_reading_files() {
     assert_eq!(runner.stderr, format!("temper forge run: forge 1: {line}").as_bytes());
     scratch.remove();
 }
+
+const PAGE: &[u8] = b"<!doctype html><title>t</title>";
+const DIGEST: &str = "bundle/0123456789abcdef";
+
+/// A refusal's row: its name, what spoils the bundle, and the start's refusal.
+type Spoiled<'a> = (&'a str, fn(&std::path::Path), &'a str);
+/// A limit's row: its name, the configuration's change, and the start's refusal.
+type Limited<'a> = (&'a str, fn(&mut serde_json::Value), &'a str);
+
+fn fixture_bundle(directory: &std::path::Path) {
+    fs::create_dir_all(directory.join(DIGEST).join("files")).expect("bundle directory");
+    fs::write(directory.join("bundle/index.html"), PAGE).expect("bundle page");
+    fs::write(directory.join(DIGEST).join("boot.js"), b"boot();").expect("bundle script");
+    fs::write(directory.join(DIGEST).join("files/robots.txt"), b"User-agent: *\nDisallow:\n")
+        .expect("bundle root file");
+}
+fn bundle_configuration(directory: &std::path::Path) {
+    support::configuration(directory, &support::Forge::Unreached);
+    support::owned::configuration_value(directory, |value| value["application"]["clients"]["bundle"] = "bundle".into());
+}
+#[test]
+fn a_bundle_directory_is_read_with_its_one_digest_directory() {
+    let scratch = support::Scratch::startup("bundle-read");
+    let directory = scratch.path();
+    fixture_bundle(directory);
+    let limits = temper_service::limits::Clients { bundle_files: 128, bundle_bytes: 16 << 20 };
+    let bundle = temper::bundle::read(directory, b"bundle", limits).expect("bundle read");
+    assert_eq!(bundle.page.as_ref(), PAGE);
+    assert_eq!(bundle.etag.as_ref(), b"\"edaa28e315690734\"");
+    assert_eq!(bundle.digest.as_ref(), b"0123456789abcdef");
+    assert_eq!(bundle.files.len(), 2);
+    let script = bundle.files.get(b"boot.js".as_slice()).expect("script");
+    assert_eq!((script.kind, script.bytes.as_ref()), (b"text/javascript".as_slice(), b"boot();".as_slice()));
+    let robots = bundle.files.get(b"files/robots.txt".as_slice()).expect("root file");
+    assert_eq!(
+        (robots.kind, robots.bytes.as_ref()),
+        (b"text/plain; charset=utf-8".as_slice(), b"User-agent: *\nDisallow:\n".as_slice())
+    );
+    scratch.remove();
+}
+#[test]
+fn a_directory_that_is_no_bundle_refuses_the_start() {
+    let rows: [Spoiled<'_>; 4] = [
+        (
+            "no-page",
+            |directory| fs::remove_file(directory.join("bundle/index.html")).expect("page removed"),
+            "temper serve: application.clients.bundle: bundle/index.html: absent\n",
+        ),
+        (
+            "no-digest",
+            |directory| fs::remove_dir_all(directory.join(DIGEST)).expect("digest removed"),
+            "temper serve: application.clients.bundle: bundle: no digest directory\n",
+        ),
+        (
+            "two-digests",
+            |directory| fs::create_dir(directory.join("bundle/fedcba9876543210")).expect("second digest"),
+            "temper serve: application.clients.bundle: bundle/fedcba9876543210: more than one digest directory\n",
+        ),
+        (
+            "off-the-list",
+            |directory| fs::write(directory.join(DIGEST).join("files/data.bin"), b"x").expect("odd file"),
+            "temper serve: application.clients.bundle: bundle/0123456789abcdef/files/data.bin: file type is not on the closed list\n",
+        ),
+    ];
+    for (name, spoil, expected) in rows {
+        let scratch = support::Scratch::startup(&format!("bundle-{name}"));
+        let directory = scratch.path();
+        bundle_configuration(directory);
+        fixture_bundle(directory);
+        spoil(directory);
+        assert_eq!(temper::prepare_in(directory).err().expect("refused"), expected, "row {name}");
+        scratch.remove();
+    }
+}
+#[test]
+fn a_bundle_past_a_limit_refuses_the_start() {
+    let rows: [Limited<'_>; 2] = [
+        (
+            "files",
+            |value| value["application"]["limits"]["overrides"]["clients.bundle_files"] = 2.into(),
+            "temper serve: application.clients.bundle: bundle/0123456789abcdef/files/robots.txt: past clients.bundle_files\n",
+        ),
+        (
+            "bytes",
+            |value| value["application"]["limits"]["overrides"]["clients.bundle_bytes"] = 61.into(),
+            "temper serve: application.clients.bundle: bundle/0123456789abcdef/files/robots.txt: past clients.bundle_bytes\n",
+        ),
+    ];
+    for (name, limit, expected) in rows {
+        let scratch = support::Scratch::startup(&format!("bundle-limit-{name}"));
+        let directory = scratch.path();
+        bundle_configuration(directory);
+        fixture_bundle(directory);
+        support::owned::configuration_value(directory, limit);
+        assert_eq!(temper::prepare_in(directory).err().expect("refused"), expected, "row {name}");
+        scratch.remove();
+    }
+}

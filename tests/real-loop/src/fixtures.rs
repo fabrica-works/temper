@@ -48,7 +48,7 @@ pub fn documents(directory: &Path, llm: SocketAddr, forge: SocketAddr) -> (serde
     value["engine"]["limits"]["overrides"]["views.watchers_per_party"] = 16.into();
     value["application"] = serde_json::json!({
         "webhooks":null,
-"clients":{"listener":{"socket":"127.0.0.1:0"}},
+"clients":{"listener":{"socket":"127.0.0.1:0"},"bundle":null},
         "forges":[{"number":1,"kind":"forgejo","api":{"socket":forge.to_string()},"transport":"plaintext",
             "git":format!("http://{forge}"),"webhook_secret":null,"api_token":"secrets/forge-1.api-token","user":{"file":"secrets/forge-1.user"},"identity":1}],
         "identities":[{"number":1,"token":"secrets/forge-1.git-token","login":"temper",

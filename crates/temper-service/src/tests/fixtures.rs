@@ -84,7 +84,10 @@ pub fn engine() -> settings::Engine {
     settings::Engine {
         jig: jig_protocol_config::engine(&document, 0).expect("typed jig engine"),
         webhooks: None,
-        clients: crate::startup::application::Clients { listener: jig_protocol_config::Address::Addr(http::address()) },
+        clients: crate::startup::application::Clients {
+            listener: jig_protocol_config::Address::Addr(http::address()),
+            bundle: None,
+        },
         files: settings::Files { entries: skein_lib::List::with_capacity(0) },
         forges: Box::new([settings::Forge {
             number: 1,

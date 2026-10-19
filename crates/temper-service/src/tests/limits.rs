@@ -36,12 +36,14 @@ fn no_two_component_prefixes_meet() {
 #[test]
 fn an_override_sets_the_field_its_dotted_name_names() {
     let mut limits = limits::profile(limits::Profile::Small);
-    let rows: [(&[u8], u64); 5] = [
+    let rows: [(&[u8], u64); 7] = [
         (b"forge.repositories", 3),
         (b"forge.client.calls", 5),
         (b"forge.client.settle_ms", 2_000),
         (b"checkout.remote_timeout_ms", 7_000),
         (b"root.loads.rows", 9),
+        (b"clients.bundle_files", 2),
+        (b"clients.bundle_bytes", 61),
     ];
     for (name, value) in rows {
         assert_eq!(limits::apply(&mut limits, name, value), Ok(()), "{name:?}");
@@ -51,6 +53,7 @@ fn an_override_sets_the_field_its_dotted_name_names() {
     assert_eq!(limits.forge.client.settle, Duration::from_secs(2));
     assert_eq!(limits.checkout.remote_timeout, Duration::from_millis(7_000));
     assert_eq!(limits.root.loads.rows, 9);
+    assert_eq!(limits.clients, limits::Clients { bundle_files: 2, bundle_bytes: 61 });
 }
 
 #[test]

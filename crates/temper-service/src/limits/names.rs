@@ -167,6 +167,8 @@ pub(super) fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), 
         b"git_component.sweep_bytes" => {
             limits.git_component.sweep_bytes = u32::try_from(value).or(Err(Refused::Range))?;
         }
+        b"clients.bundle_files" => limits.clients.bundle_files = u32::try_from(value).or(Err(Refused::Range))?,
+        b"clients.bundle_bytes" => limits.clients.bundle_bytes = u32::try_from(value).or(Err(Refused::Range))?,
         b"forge_component.forges" => limits.forge_component.forges = u32::try_from(value).or(Err(Refused::Range))?,
         b"forge_component.token_bytes" => {
             limits.forge_component.token_bytes = u32::try_from(value).or(Err(Refused::Range))?;

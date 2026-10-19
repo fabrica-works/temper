@@ -19,7 +19,7 @@ fn the_clients_listener_is_read_from_the_application_member() {
 fn a_missing_clients_member_is_named_by_its_path() {
     let jig = fixtures::engine().jig;
     let input = core::str::from_utf8(fixtures::APPLICATION).unwrap();
-    let input = input.replace("\"clients\":{\"listener\":{\"socket\":\"127.0.0.1:7100\"}},", "");
+    let input = input.replace("\"clients\":{\"listener\":{\"socket\":\"127.0.0.1:7100\"},\"bundle\":null},", "");
     let (members, problems) = application(input.as_bytes(), &jig);
     assert!(members.is_none());
     assert_eq!(&*lines(&problems), b"application.clients: missing\n");
@@ -507,4 +507,25 @@ fn the_webhook_secret_excludes_its_final_newline() {
     let (members, _) = application(input.as_bytes(), &fixtures::engine().jig);
     let resolved = application::resolve(&members.unwrap(), &fixtures::files(), &mut Problems::empty()).unwrap();
     assert_eq!(resolved.webhooks.unwrap().secrets.get(0).unwrap().1.expose(), b"fixture-hook-secret");
+}
+#[test]
+fn the_configured_bundle_is_named_for_the_binary() {
+    let document = fixtures::with(&fixtures::document(), b"application.clients.bundle", br#""bundle""#);
+    let named = crate::named(&document).expect("named");
+    assert_eq!(named.bundle.as_deref(), Some(b"bundle".as_slice()));
+    assert_eq!(named.bundle_limits, crate::limits::Clients { bundle_files: 128, bundle_bytes: 16 << 20 });
+}
+#[test]
+fn a_missing_bundle_is_named_by_its_path() {
+    let input = core::str::from_utf8(fixtures::APPLICATION).unwrap().replace(",\"bundle\":null}", "}");
+    assert_eq!(&*refused(input.as_bytes()), b"application.clients.bundle: missing\n");
+}
+#[test]
+fn a_webhook_listener_with_a_bundle_is_refused() {
+    let document = fixtures::with(
+        &fixtures::webhook_document(),
+        b"application.webhooks",
+        br#"{"listener":{"socket":"127.0.0.1:7200"},"bundle":null}"#,
+    );
+    assert_eq!(&*lines(&crate::named(&document).unwrap_err()), b"application.webhooks.bundle: unknown member\n");
 }

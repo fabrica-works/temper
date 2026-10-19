@@ -17,6 +17,14 @@ pub struct Root {
     pub loads: engine::loads::Limits,
     pub brief: engine::BriefLimits,
 }
+/// The clients' listener's own limits: the browser's bundle (protocol/configuration.md, 7).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Clients {
+    /// The bundle's files, its page among them.
+    pub bundle_files: u32,
+    /// The bundle's files' bytes in all, held in memory while `temper serve` runs.
+    pub bundle_bytes: u32,
+}
 /// Temper's domain limits, each under its owner's prefix.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
@@ -25,6 +33,7 @@ pub struct Limits {
     pub forge: forge::Limits,
     pub checkout: checkout::Limits,
     pub git_component: temper_worker_protocol_git::Limits,
+    pub clients: Clients,
 }
 /// Refusal of an override; the caller retains its name.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -244,6 +253,12 @@ const ROOT: Root = Root {
         gather: Duration::from_secs(1),
     },
 };
+const CLIENTS: Clients = Clients {
+    // Files of a bundle, the page among them: far above the shell's dev bundle (decision 6 of browser-1).
+    bundle_files: 128,
+    // Bytes of a bundle in all, read into memory at start.
+    bundle_bytes: 16 << 20,
+};
 /// The standalone process's socket admission.
 pub const SOCKETS: u32 = 48;
 
@@ -257,6 +272,7 @@ pub fn profile(profile: Profile) -> Limits {
             forge: FORGE,
             checkout: CHECKOUT,
             git_component: GIT,
+            clients: CLIENTS,
         },
     }
 }

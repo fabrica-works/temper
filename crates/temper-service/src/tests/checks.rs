@@ -305,3 +305,20 @@ fn the_shipped_profile_admits_a_webhook_listener() {
     let found = started(&fixtures::webhook_document(), &fixtures::files(), &fixtures::startup_agent());
     assert_eq!(&*lines(&found), b"");
 }
+#[test]
+fn a_bundle_limit_of_zero_refuses_the_start() {
+    for (overrides, expected) in [
+        (
+            br#"{"clients.bundle_files":0}"#.as_slice(),
+            "application.limits.overrides.clients.bundle_files: must agree with a nonempty bundle\n",
+        ),
+        (
+            br#"{"clients.bundle_bytes":0}"#.as_slice(),
+            "application.limits.overrides.clients.bundle_bytes: must agree with a nonempty bundle\n",
+        ),
+    ] {
+        let document = fixtures::with(&fixtures::document(), b"application.limits.overrides", overrides);
+        let found = crate::named(&document).unwrap_err();
+        assert_eq!(&*lines(&found), expected.as_bytes(), "row {overrides:?}");
+    }
+}

@@ -10,6 +10,7 @@ use jig_protocol_engine_clients_http as http;
 use skein_io as io;
 use skein_lib::{Env, List, Map, Queue, Time, Token, Wall};
 use temper_engine_domain as root;
+pub mod bundle;
 pub(crate) mod printed;
 pub mod translation;
 const PREFIX: u64 = crate::tokens::CLIENTS;
@@ -24,6 +25,7 @@ pub struct Clients {
     mount_out: Queue<http::Request>,
     server_out: Queue<crate::server::Routed>,
     unclaimed: Map<Token, ()>,
+    bundle: Option<bundle::Bundle>,
     component_closed: bool,
     stopping: Option<()>,
 
@@ -130,6 +132,7 @@ impl Clients {
             mount_out: Queue::with_capacity(room),
             server_out: Queue::with_capacity(room),
             unclaimed: Map::with_capacity(crate::limits::server(&config.limits).connections),
+            bundle: None,
             component_closed: false,
             stopping: None,
 
@@ -149,6 +152,10 @@ impl Clients {
             durable: 0,
             writes: journal.writes,
         })
+    }
+    /// Hold the bundle the binary read at start.
+    pub(crate) fn adopt_bundle(&mut self, bundle: bundle::Bundle) {
+        self.bundle = Some(bundle);
     }
     fn print_link(&mut self) {
         if let Some(listener) = self.server.listening()

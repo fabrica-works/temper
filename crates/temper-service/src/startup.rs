@@ -21,6 +21,10 @@ pub struct Named {
     pub forges: Box<[Forge]>,
     pub identities: Box<[Identity]>,
     pub clients: config::Address,
+    /// `application.clients.bundle`, for the binary's read.
+    pub bundle: Option<Box<[u8]>>,
+    /// The bundle's limits, overrides applied.
+    pub bundle_limits: crate::limits::Clients,
     pub webhooks: Option<application::Webhooks>,
     pub overrides: Box<[(Box<[u8]>, u64)]>,
 }
@@ -169,6 +173,8 @@ pub fn named(document: &[u8]) -> Result<Named, Problems> {
     Ok(Named {
         files,
         clients: parsed.application.clients.listener,
+        bundle: parsed.application.clients.bundle,
+        bundle_limits: parsed.application.limits.clients,
         webhooks: parsed.application.webhooks,
         forges: parsed.application.forges,
         identities: parsed.application.identities,

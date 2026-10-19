@@ -27,17 +27,29 @@ pub struct Members {
 pub struct Clients {
     /// The socket address used for the listener, Host guard and printed links.
     pub listener: config::Address,
+    /// `application.clients.bundle`: the bundle's directory; `None` serves no browser.
+    pub bundle: Option<Box<[u8]>>,
 }
 /// The optional webhook listener (protocol/configuration.md, section 3).
 #[derive(Debug)]
 pub struct Webhooks {
     pub listener: config::Address,
 }
-/// Read the listener with jig's address reader, refusing non-socket forms.
+/// Read the listener with jig's address reader, refusing non-socket forms; and `bundle` when asked (the clients').
 #[must_use]
-pub fn clients(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Clients> {
+pub fn clients(document: &Document, at: u32, path: &Path, bundle: bool, problems: &mut Problems) -> Option<Clients> {
     let mut object = read::object(document, at, path, problems)?;
     let at = read::required(&mut object, document, b"listener", path, problems);
+    let mut directory = None;
+    if bundle
+        && let Some(at) = read::required(&mut object, document, b"bundle", path, problems)
+        && document.token(at)?.kind != Kind::Null
+    {
+        match config::read::text(document, at, 1_048_576) {
+            Ok(value) => directory = Some(value),
+            Err(what) => problems.push(path.member(b"bundle"), What::Jig(what)),
+        }
+    }
     read::finish(object, document, path, problems);
     let path = path.member(b"listener");
     let mut found = config::Problems::empty();
@@ -49,7 +61,7 @@ pub fn clients(document: &Document, at: u32, path: &Path, problems: &mut Problem
         config::Address::Addr(skein_io::Addr::InProcess(_)) | config::Address::Host { .. } => false,
     };
     read::form(socket, path, problems);
-    Some(Clients { listener })
+    Some(Clients { listener, bundle: directory })
 }
 #[derive(Debug)]
 pub struct Forge {
@@ -455,7 +467,7 @@ pub fn parse(document: &Document, at: u32, jig: &config::Engine, problems: &mut 
     let charter = read::number(&mut object, document, b"charter", &path, problems);
     let clients_at = read::required(&mut object, document, b"clients", &path, problems);
     let clients = match clients_at {
-        Some(at) => clients(document, at, &path.member(b"clients"), problems),
+        Some(at) => clients(document, at, &path.member(b"clients"), true, problems),
         None => None,
     };
     let landing_at = read::required(&mut object, document, b"landing", &path, problems);
@@ -463,7 +475,7 @@ pub fn parse(document: &Document, at: u32, jig: &config::Engine, problems: &mut 
     let mut webhooks = None;
     if let Some(at) = at
         && document.token(at)?.kind != Kind::Null
-        && let Some(value) = self::clients(document, at, &path.member(b"webhooks"), problems)
+        && let Some(value) = self::clients(document, at, &path.member(b"webhooks"), false, problems)
     {
         webhooks = Some(Webhooks { listener: value.listener });
     }

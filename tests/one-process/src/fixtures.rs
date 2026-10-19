@@ -117,7 +117,7 @@ pub(crate) fn document() -> Vec<u8> {
     }
     value["application"] = serde_json::json!({
         "webhooks":null,
-"clients":{"listener":{"socket":CLIENTS.to_string()}},
+"clients":{"listener":{"socket":CLIENTS.to_string()},"bundle":null},
         "forges":[{"number":1,"kind":"forgejo","api":{"socket":"127.0.0.1:3000"},"transport":"plaintext",
             "git":"http://127.0.0.1:3000","webhook_secret":null,"api_token":"secrets/forge.api-token","user":{"file":"secrets/forge-1.user"},"identity":1}],
         "identities":[{"number":1,"token":"secrets/forge.git-token","login":"worker","author":{"name":"Worker","email":"worker@example.invalid"}}],

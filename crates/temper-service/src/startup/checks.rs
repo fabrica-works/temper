@@ -185,6 +185,12 @@ pub fn limits(limits: &limits::Limits, git: &temper_worker_protocol_git::Limits,
             }
         }
     }
+    if limits.clients.bundle_files == 0 {
+        against(problems, b"clients.bundle_files", b"a nonempty bundle");
+    }
+    if limits.clients.bundle_bytes == 0 {
+        against(problems, b"clients.bundle_bytes", b"a nonempty bundle");
+    }
 }
 /// The longest routed remote: base, two separators, owner, name and `.git`.
 pub fn longest_remote(forges: &[settings::Forge], name_bytes: u32) -> Option<u64> {

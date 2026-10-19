@@ -16,6 +16,7 @@ use temper_service::{
 };
 
 pub mod box_command;
+pub mod bundle;
 pub mod ctl;
 pub mod forge;
 mod host;
@@ -336,6 +337,11 @@ fn prepare(directory: &Path, bytes: &[u8], owned: &mut Vec<Fd>) -> Result<servic
     let engine = config::engine(&document, member(&document, 0, b"engine")).expect("named checked engine");
     let user = skein_shell::effective_user();
     let files = read_files(directory, named.files, user)?;
+    let bundle = named
+        .bundle
+        .as_deref()
+        .map(|configured| bundle::read(directory, configured, named.bundle_limits))
+        .transpose()?;
     let agent =
         agent(&directory.join(path(&named.agent))).map_err(|why| format!("workers[0].agent.configuration: {why}"))?;
     let root_path = directory.join(path(&named.worker_root));
@@ -367,6 +373,9 @@ fn prepare(directory: &Path, bytes: &[u8], owned: &mut Vec<Fd>) -> Result<servic
         .map_err(|errno| format!("engine.deployment.directory: errno {errno}"))?;
     owned.push(root);
     service.adopt_store(root, user).map_err(|_| "store refused its deployment root")?;
+    if let Some(bundle) = bundle {
+        service.adopt_bundle(bundle);
+    }
     Ok(service)
 }
 fn close(owned: Vec<Fd>) {
