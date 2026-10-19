@@ -242,6 +242,8 @@ and the user, or the director, may veto it before the run:
   (testing.md 2.6). No proof of this plan is on the live tier. A veto
   proves the five by units of `crates/temper` and leaves the executable
   to the tier's existing stories.
+  Decision: accepted, by director, 2026-10-19 (each proof is what only
+  the executable shows).
 - **B. The forge stories run unchecked** (temper 13; design question
   4). Hosted fake git writes into skein's forge peer's shared handle, so
   temper 13's stories run on skein-world's `World::new_controlled`:
@@ -259,6 +261,9 @@ and the user, or the director, may veto it before the run:
   `fuzzy_landing.rs`), never excepted. The plan's packages go from 9.90 s summed at the base
   to at most 37 s focused, the sum of the Proof bounds; about 20 s is
   expected (README, Pulse).
+  Decision: accepted, by director, 2026-10-19 (the testing vision: the
+  real loop over all of temper; a story's cost is cut or moved, never
+  excepted).
 - **D. Skein's forge peer, awaited from forge-kit** (1). temper 13
   waits for forge-kit's temper-05.2 (skein-05.5 has landed), run on
   another machine; the rest of the plan waits for no other plan. A veto builds a
@@ -271,11 +276,14 @@ and the user, or the director, may veto it before the run:
   token come with the QA loop (`later.md`). A veto needs skein's
   throwaway Forgejo to sign in on the web (a session cookie, the form
   and its CSRF token: a skein plan and a repin) before temper 10.
+  Decision: accepted, by director, 2026-10-19 (the web sign-in comes
+  with the QA loop).
 - **F. One landing in the process tier** (7). The native client's
   landing stays the tier's one landing on real git and CI; the tools'
   landing is the real loop's (temper 13), and the tier's cut act stops
   at the adoption. A veto adds a second landing to the tier, about 86 s
   alone, past its 3 min aim.
+  Decision: accepted, by director, 2026-10-19.
 - **G. Another party's kept request waits for area 3** (9).
   Decision: accepted, by director, 2026-10-19.
 - **H. A wait across an engine restart waits for the faults row** (10).
