@@ -7,13 +7,13 @@ use crate::{
     write::{self, SecretKind, Secrets},
 };
 use serde_json::{Value, json};
+use skein_throwaway_forgejo::{Exchange, Range};
 use std::{
     fs::{self, File},
     path::{Path, PathBuf},
     process::{Child, Command},
     time::Duration,
 };
-use temper_throwaway_forgejo::{Exchange, Range};
 const NAMES: [&str; 13] = [
     "actions-report-each-job-as-a-status-on-its-head",
     "actions-status-link-is-runs-n-jobs-i",
@@ -120,7 +120,7 @@ fn run_with(f: &Fixture, out: Option<&Path>, mask: &mut Mask, secrets: &mut Secr
     let log = format!("{R}/actions/jobs/{job_id}/logs?attempt={attempt}");
     let whole = exchange(f, out, mask, secrets, "actions-job-log", &log, None)?;
     let response =
-        f.exchange("GET", &log, None, Some(&f.writer.token), Some(temper_throwaway_forgejo::Range::Head(3)))?;
+        f.exchange("GET", &log, None, Some(&f.writer.token), Some(skein_throwaway_forgejo::Range::Head(3)))?;
     record(out, mask, secrets, "actions-job-log-range", &response)?;
     let mut facts = Vec::new();
     connection_facts(&mut facts, statuses, online);
@@ -204,7 +204,7 @@ fn capture(
     secrets: &Secrets,
     name: &str,
     target: &str,
-    range: Option<temper_throwaway_forgejo::Range>,
+    range: Option<skein_throwaway_forgejo::Range>,
 ) -> Result<Value> {
     Ok(serde_json::from_slice(&exchange(f, out, mask, secrets, name, target, range)?.body).unwrap_or(Value::Null))
 }
@@ -213,7 +213,7 @@ fn record(
     mask: &mut Mask,
     secrets: &Secrets,
     name: &str,
-    response: &temper_throwaway_forgejo::Exchange,
+    response: &skein_throwaway_forgejo::Exchange,
 ) -> Result<()> {
     write::check(name, &response.sent, &response.body, secrets)?;
     let request = mask::request(mask, response);

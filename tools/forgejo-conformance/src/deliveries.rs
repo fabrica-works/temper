@@ -8,6 +8,7 @@ use crate::{
     write::{self, SecretKind, Secrets},
 };
 use serde_json::{Value, json};
+use skein_throwaway_forgejo::{Exchange, Forgejo, Settings};
 #[expect(clippy::disallowed_types, reason = "the recorder probes real deliveries against a wall clock deadline")]
 use std::time::Instant;
 use std::{
@@ -19,7 +20,6 @@ use std::{
     thread,
     time::Duration,
 };
-use temper_throwaway_forgejo::{Exchange, Forgejo, Settings};
 const REPO: &str = "/api/v1/repos/hooked/specimen";
 const SECRET: &str = "temper-conformance-hook-secret";
 const EVENTS: [&str; 22] = [

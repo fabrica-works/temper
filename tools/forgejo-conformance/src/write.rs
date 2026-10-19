@@ -1,6 +1,6 @@
 use crate::Result;
+use skein_throwaway_forgejo::Instance;
 use std::{fs, path::Path};
-use temper_throwaway_forgejo::Instance;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SecretKind {
     Password,

@@ -5,8 +5,8 @@ use crate::{
     setup,
     write::SecretKind,
 };
+use skein_throwaway_forgejo::{Token, fresh_secret};
 use std::path::Path;
-use temper_throwaway_forgejo::{Token, fresh_secret};
 pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
     let password = fresh_secret().map_err(|e| crate::failure(&e))?;
     let body = format!(

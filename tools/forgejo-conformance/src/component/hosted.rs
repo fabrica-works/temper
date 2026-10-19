@@ -114,7 +114,7 @@ impl Hosted {
         };
         (io_limits, client, limits)
     }
-    pub(super) fn new(f: &Fixture, token: &temper_throwaway_forgejo::Token) -> Result<Self> {
+    pub(super) fn new(f: &Fixture, token: &skein_throwaway_forgejo::Token) -> Result<Self> {
         let (io_limits, client, limits) = Self::limits();
         let mut forges = List::with_capacity(1);
         forges

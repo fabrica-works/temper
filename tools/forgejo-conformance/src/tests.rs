@@ -3,7 +3,7 @@ use crate::{
     mask::{self, Mask},
     write::{self, Leak, SecretKind, Secrets},
 };
-use temper_throwaway_forgejo::Exchange;
+use skein_throwaway_forgejo::Exchange;
 #[test]
 fn masking_rewrites_ports_ids_times_and_dates_by_first_appearance() {
     let rows: &[(&[u8], &[u8])] = &[

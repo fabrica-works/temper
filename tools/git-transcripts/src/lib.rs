@@ -2,6 +2,7 @@
 mod cases;
 mod invocation;
 pub mod mask;
+use skein_throwaway_forgejo::{Forgejo, Settings};
 use std::{
     error::Error,
     fs,
@@ -10,7 +11,6 @@ use std::{
     path::{Path, PathBuf},
     process::Stdio,
 };
-use temper_throwaway_forgejo::{Forgejo, Settings};
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 pub(crate) struct Capture {
     git: PathBuf,
@@ -73,7 +73,8 @@ pub fn run(git: &Path, scratch: &Path, out: &Path) -> Result<()> {
     if !git.is_absolute() {
         return Err("--git must be an absolute path".into());
     }
-    let forgejo = Forgejo::from_env().map_err(|e| format!("{e:?}"))?;
+    let binary = std::env::var_os("TEMPER_FORGEJO").ok_or("TEMPER_FORGEJO must name the pinned Forgejo")?;
+    let forgejo = Forgejo::from_path(Path::new(&binary)).map_err(|e| format!("{e:?}"))?;
     let mut settings = Settings::small();
     settings.actions = false;
     settings.git = git.into();

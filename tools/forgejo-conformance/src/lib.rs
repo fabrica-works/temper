@@ -15,16 +15,16 @@ mod setup;
 mod tokens;
 mod users;
 pub mod write;
+use skein_throwaway_forgejo::{Exchange, Forgejo};
 use std::{error::Error, path::Path};
-use temper_throwaway_forgejo::{Exchange, Forgejo};
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
-fn failure(error: &temper_throwaway_forgejo::Failure) -> Box<dyn Error> {
+fn failure(error: &skein_throwaway_forgejo::Failure) -> Box<dyn Error> {
     format!("{error:?}").into()
 }
 /// # Errors
 /// Returns a refused binary, provisioning, exchange or secret-scan failure.
 pub fn run(scratch: &Path, out: &Path) -> Result<()> {
-    let forgejo = Forgejo::from_env().map_err(|e| format!("{e:?}"))?;
+    let forgejo = forgejo()?;
     let mut fixture = fixture::Fixture::new(&forgejo, scratch)?;
     let mut mask = mask::Mask::new(fixture.instance.port());
     let mut secrets = write::Secrets::from_instance(&fixture.instance);
@@ -50,6 +50,10 @@ pub fn run(scratch: &Path, out: &Path) -> Result<()> {
         format!("version {}\nsha256 {}\n", forgejo.version(), forgejo.sha256()),
     )?;
     fixture.instance.stop().map_err(|e| failure(&e))
+}
+pub(crate) fn forgejo() -> Result<Forgejo> {
+    let binary = std::env::var_os("TEMPER_FORGEJO").ok_or("TEMPER_FORGEJO must name the pinned Forgejo")?;
+    Forgejo::from_path(Path::new(&binary)).map_err(|e| format!("{e:?}").into())
 }
 fn json(exchange: &Exchange) -> Result<serde_json::Value> {
     Ok(serde_json::from_slice(&exchange.body)?)

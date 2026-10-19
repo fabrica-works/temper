@@ -1,7 +1,7 @@
 use crate::{Result, failure};
 use serde_json::{Value, json};
+use skein_throwaway_forgejo::{Account, Exchange, Forgejo, Init, Instance, Outgoing, Settings, Token};
 use std::path::Path;
-use temper_throwaway_forgejo::{Account, Exchange, Forgejo, Init, Instance, Outgoing, Settings, Token};
 pub const R: &str = "/api/v1/repos/fixture/specimen";
 pub struct Fixture {
     pub instance: Instance,
@@ -82,7 +82,7 @@ impl Fixture {
         target: &str,
         body: Option<&[u8]>,
         token: Option<&Token>,
-        range: Option<temper_throwaway_forgejo::Range>,
+        range: Option<skein_throwaway_forgejo::Range>,
     ) -> Result<Exchange> {
         self.instance.exchange(&Outgoing { method, target, token, body, range }).map_err(|e| failure(&e))
     }

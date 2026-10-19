@@ -5,8 +5,8 @@ use crate::{
     fixture::{Fixture, R},
     write::{SecretKind, Secrets},
 };
+use skein_throwaway_forgejo::{Forgejo, Output, Settings, Token, WorkPath};
 use std::fs;
-use temper_throwaway_forgejo::{Forgejo, Output, Settings, Token, WorkPath};
 
 pub(crate) fn password_of(stdout: &str) -> Option<&str> {
     let line = stdout.lines().next()?;
@@ -140,7 +140,7 @@ fn token(f: &Fixture, secrets: &mut Secrets, login: &str, name: &str, scopes: &s
     remember(&out, secrets);
     Ok(out)
 }
-fn get(f: &Fixture, out: &Output, target: &str) -> Result<temper_throwaway_forgejo::Exchange> {
+fn get(f: &Fixture, out: &Output, target: &str) -> Result<skein_throwaway_forgejo::Exchange> {
     let token = Token::new(raw_token(&out.stdout).unwrap_or_default().into());
     f.exchange("GET", target, None, Some(&token), None)
 }

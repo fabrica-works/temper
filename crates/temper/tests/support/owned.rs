@@ -396,15 +396,15 @@ pub fn reconcile(directory: &Path, forge: u16) -> Output {
 }
 /// Attaches the read-only proof handle with preparation's private admin token.
 #[must_use]
-pub fn attach(directory: &Path, port: u16, running: Running) -> temper_throwaway_forgejo::Instance {
-    use temper_throwaway_forgejo::{Instance, Settings, Token};
+pub fn attach(directory: &Path, port: u16, running: Running) -> skein_throwaway_forgejo::Instance {
+    use skein_throwaway_forgejo::{Instance, Settings, Token};
     let token = fs::read_to_string(directory.join("forge-1/admin_token")).expect("admin token");
     Instance::attach(running.into_child(), port, directory, Token::new(token.trim().into()), &Settings::small())
         .expect("owned forge answers")
 }
 /// Reads the converged bot, its id, and its private organization's team.
-pub fn assert_converged(directory: &Path, instance: &temper_throwaway_forgejo::Instance) {
-    use temper_throwaway_forgejo::{Outgoing, Token};
+pub fn assert_converged(directory: &Path, instance: &skein_throwaway_forgejo::Instance) {
+    use skein_throwaway_forgejo::{Outgoing, Token};
     let api = fs::read_to_string(directory.join("forge-1/api_token")).expect("API token");
     let token = Token::new(api.trim().into());
     let response = instance.exchange(&Outgoing::get("/api/v1/user", Some(&token))).expect("bot answers");

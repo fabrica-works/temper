@@ -6,8 +6,8 @@ use crate::{
     setup,
 };
 use serde_json::{Value, json};
+use skein_throwaway_forgejo::Token;
 use std::{path::Path, thread, time::Duration};
-use temper_throwaway_forgejo::Token;
 const ORG: &str = "/api/v1/orgs/ensemble";
 const TEAM: &str = r#"{"name":"writer","permission":"write","includes_all_repositories":true,"units_map":{"repo.code":"write","repo.issues":"write","repo.pulls":"write","repo.actions":"write"}}"#;
 const EDIT: &str = r#"{"name":"writer","permission":"write","includes_all_repositories":false,"units_map":{"repo.code":"write","repo.issues":"write","repo.pulls":"read","repo.actions":"none"}}"#;

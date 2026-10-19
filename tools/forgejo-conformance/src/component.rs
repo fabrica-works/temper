@@ -9,12 +9,12 @@ use crate::{
     write,
 };
 use hosted::Hosted;
+use skein_throwaway_forgejo::Forgejo;
 use std::{fs, path::Path};
-use temper_throwaway_forgejo::Forgejo;
 /// # Errors
 /// Returns a binary, fixture, io, exchange or secret-scan failure.
 pub fn record(scratch: &Path, out: &Path) -> Result<()> {
-    let forgejo = Forgejo::from_env().map_err(|e| format!("{e:?}"))?;
+    let forgejo = crate::forgejo()?;
     let facts = run(&forgejo, scratch)?;
     let path = out.join("facts.txt");
     let before = fs::read_to_string(&path)?;
@@ -38,7 +38,7 @@ pub fn run(forgejo: &Forgejo, scratch: &Path) -> Result<Vec<Fact>> {
         ),
         (
             "component-start-wrong-token-stops",
-            &temper_throwaway_forgejo::Token::new("0".repeat(40)),
+            &skein_throwaway_forgejo::Token::new("0".repeat(40)),
             temper_engine_protocol_forge::Stopped::Refused {
                 read: temper_engine_protocol_forge::StartRead::User,
                 status: 401,

@@ -5,8 +5,8 @@ use crate::{
     fixture::Fixture,
 };
 use serde_json::{Value, json};
+use skein_throwaway_forgejo::Token;
 use std::{collections::BTreeSet, path::Path, thread, time::Duration};
-use temper_throwaway_forgejo::Token;
 const ROUTE: &str = "/api/v1/orgs/ensemble/hooks";
 const FIRST: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 const SECOND: &str = "2222222222222222222222222222222222222222222222222222222222222222";

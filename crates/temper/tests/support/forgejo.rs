@@ -1,12 +1,12 @@
 //! The process tier's isolated Forgejo, credentials and landing scripts.
 use super::{Forge, Scratch, owned, write_private};
 use serde_json::{Value, json};
+use skein_throwaway_forgejo::{Instance, Outgoing, Token};
 use std::{
     fs,
     net::SocketAddr,
     path::{Path, PathBuf},
 };
-use temper_throwaway_forgejo::{Instance, Outgoing, Token};
 pub type BranchHead = (Box<[u8]>, Box<[u8]>);
 // A created member owns all ten grants, their segment boxes and executor kinds.
 const MEMBER_BYTES: u32 = 2048;
@@ -69,7 +69,7 @@ impl Throwaway {
             git: self.instance.base(),
         }
     }
-    fn get(&self, suffix: &str) -> temper_throwaway_forgejo::Exchange {
+    fn get(&self, suffix: &str) -> skein_throwaway_forgejo::Exchange {
         self.instance
             .exchange(&Outgoing::get(&format!("/api/v1/repos/acme/widget/{suffix}"), Some(&self.person)))
             .expect("throwaway forge answer")

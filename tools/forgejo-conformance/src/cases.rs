@@ -5,8 +5,8 @@ use crate::{
     write::{self, SecretKind, Secrets},
 };
 use serde_json::json;
+use skein_throwaway_forgejo::{Exchange, Token};
 use std::path::Path;
-use temper_throwaway_forgejo::{Exchange, Token};
 pub(crate) struct Recorder<'a> {
     pub(crate) f: &'a Fixture,
     pub(crate) out: &'a Path,
@@ -52,7 +52,7 @@ impl Recorder<'_> {
         target: &str,
         body: Option<&str>,
         token: Option<&Token>,
-        range: Option<temper_throwaway_forgejo::Range>,
+        range: Option<skein_throwaway_forgejo::Range>,
     ) -> Result<Exchange> {
         let exchange = self.f.exchange(method, target, body.map(str::as_bytes), token, range)?;
         write::check(name, &exchange.sent, &exchange.body, self.secrets)?;
@@ -229,7 +229,7 @@ fn reads(r: &mut Recorder<'_>, written: &Written) -> Result<()> {
         ("raw-file-range", format!("/raw/file-0.txt?ref={head}")),
     ] {
         let token = if name.starts_with("branch-protection") { owner } else { writer };
-        let range = (name == "raw-file-range").then_some(temper_throwaway_forgejo::Range::Head(3));
+        let range = (name == "raw-file-range").then_some(skein_throwaway_forgejo::Range::Head(3));
         r.send(name, "GET", &format!("{R}{suffix}"), None, Some(token), range)?;
     }
     Ok(())

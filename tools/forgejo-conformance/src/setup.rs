@@ -6,8 +6,8 @@ use crate::{
     mask::Mask,
     write::{SecretKind, Secrets},
 };
+use skein_throwaway_forgejo::Token;
 use std::path::Path;
-use temper_throwaway_forgejo::Token;
 pub(crate) const ADMIN: &[&str] = &["write:admin", "write:organization", "write:user"];
 pub(crate) fn scoped(f: &Fixture, secrets: &mut Secrets, login: &str, name: &str, scopes: &[&str]) -> Result<Token> {
     let row = f.api(

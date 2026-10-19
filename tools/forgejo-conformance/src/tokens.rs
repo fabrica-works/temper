@@ -6,8 +6,8 @@ use crate::{
     setup,
 };
 use serde_json::json;
+use skein_throwaway_forgejo::Token;
 use std::path::Path;
-use temper_throwaway_forgejo::Token;
 const ROUTE: &str = "/api/v1/admin/users/bot/tokens";
 pub(crate) const API: &[&str] = &["read:user", "write:issue", "write:repository"];
 const STORED_API: &[&str] = &["write:issue", "write:repository", "read:user"];

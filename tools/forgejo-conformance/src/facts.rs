@@ -3,8 +3,8 @@ use crate::{
     fixture::{Fixture, R, encode},
 };
 use serde_json::{Value, json};
+use skein_throwaway_forgejo::{Forgejo, Outgoing, Settings};
 use std::{fs, path::Path, time::Duration};
-use temper_throwaway_forgejo::{Forgejo, Outgoing, Settings};
 #[derive(Debug, PartialEq, Eq)]
 pub enum Outcome {
     Holds,
@@ -54,7 +54,7 @@ pub(crate) fn case(out: &Path, name: &str) -> Result<Case> {
     Ok(Case { status, body: serde_json::from_slice(&raw).unwrap_or(Value::Null), raw, head })
 }
 #[must_use]
-pub fn matches(exchange: &temper_throwaway_forgejo::Exchange, status: u16, message: &str) -> bool {
+pub fn matches(exchange: &skein_throwaway_forgejo::Exchange, status: u16, message: &str) -> bool {
     exchange.status == status
         && serde_json::from_slice::<Value>(&exchange.body).is_ok_and(|body| body["message"] == message)
 }

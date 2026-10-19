@@ -26,7 +26,6 @@ members = [
     "crates/temper-protocol-worker-wire",
     "tests/codecs",
     "crates/temper-protocol-store",
-    "testing/temper-throwaway-forgejo",
     "crates/temper-engine-domain",
     "crates/temper-engine-smith",
     "crates/temper-engine-domain-forge-client",
@@ -109,7 +108,7 @@ skein-oauth = { git = "https://github.com/forgetic/skein.git" }
 skein-oauth-accounts = { git = "https://github.com/forgetic/skein.git" }
 jig-protocol-store = { git = "https://github.com/forgetic/jig.git" }
 skein-kv = { git = "https://github.com/forgetic/skein.git" }
-temper-throwaway-forgejo = { path = "testing/temper-throwaway-forgejo" }
+skein-throwaway-forgejo = { git = "https://github.com/forgetic/skein.git" }
 skein-channel = { git = "https://github.com/forgetic/skein.git" }
 skein-io = { git = "https://github.com/forgetic/skein.git" }
 serde_json = "=1.0.154"
