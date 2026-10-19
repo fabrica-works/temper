@@ -703,6 +703,43 @@ pass:
      assertion that orders two calls' `ended` after one commit is refreshed
      the same way, and listed in the commit body.
 
+135. **temper 09.3: the lock ends at its Close** (design answer, temper 09's block of 2026-10-19T17:13:58Z).
+     Ruling 135, the designer's answer, landed in temper 6a287983a ("End DIRECTORY's lock at its Close, before the call exits"); its decision follows.
+
+
+     Yes. A call ends DIRECTORY's lock at the `Close` of the descriptor it locked, once its
+     reads and writes of DIRECTORY have completed, before its output drains and it exits.
+     temper 05's `OneShot` already does this and stays unchanged. tools.md 8.3 now says:
+     > **The lock ends when the call is done with DIRECTORY,** before its process exits: once
+     > the call has its status and its reads and writes of DIRECTORY have completed, a store
+     > write in flight at a signal included, it closes the descriptor it locked, and the lock
+     > ends with that `Close` (skein's `io.md`, section 5: "The lock lasts as long as the
+     > root's descriptor: until its `Close`"). [...] A process that ends sooner, however it
+     > ends, ends the lock with its descriptor.
+
+     This replaces "for its run" and "The lock ends with the process, however it ends."
+     09.3 now (`temper/09-loop-stories.md`, as landed):
+     - `calls::Recorded` also notes the completed `Op::Close` of the descriptor it locked, as
+       `Called.released: Option<Time>`. The sketch asserts
+       `assert!(x <= b || y <= a, "both held DIRECTORY's lock at once");` on `one.released`
+       and `two.released`, keeps both exit equalities, and Don't adds "assert the turns
+       against `Called.ended`; change temper 05's `OneShot`."
+     - A unit test `the_lock_outlasts_a_store_write_in_flight` goes in
+       `crates/temper-client-shell-cli/src/tests.rs`. The `Disk` fixture notes
+       `released_after: Option<u32>`, its `store_count()` at each `Op::Close` of `DIRECTORY`
+       after a `Lock` it answered taken. The test:
+       - holds the act's erase (`answer_new_act()`), signals `Terminate`, and asserts
+         `released_after == None`;
+       - then runs `store_erase()`, and asserts exit 143, a store write, and
+         `released_after == Some(store_count())`.
+     - Files add that test file and `src/tests/fixtures.rs`. Size adds at most ~20 lines
+       there. Proof adds "unit for the `Close` after a store write in flight". Done when adds
+       the test's `git grep -c`, which prints a count of 1.
+     It rests on `host.rs` `link_progress`: `if self.status.is_some() &&
+     self.signing.as_ref().is_some_and(Signing::is_empty) { self.directory.close(); }`, and
+     on jig's `Files::close`, which only sets `closing`. Also amended: 05-ctl.md's "held to
+     the end", and 09's 8.3 line. STATUS.md is unchanged, and there is no `later.md` row.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
