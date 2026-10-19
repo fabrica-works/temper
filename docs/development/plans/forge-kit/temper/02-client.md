@@ -89,7 +89,7 @@ Derived fixture Files: `docs/examples/owned.json`; existing regression in
   whose body stays unchanged. Its consumers are `crates/temper/tests/support/owned.rs`
   (`EXAMPLE`), `tests/{startup,configuration,process}.rs` under that crate,
   and the copy command in `docs/guide/box.md`; preserve them and their assertions.
-Shape: six commits, each builds and passes its crates' tests.
+Shape: seven commits, each builds and passes its crates' tests.
   1. **The repin**: update and check; repair there what skein's steps broke
      since the last repin (at the base the check fails on `Op::Lock` and jig's
      `Event::Locked`, which the tools plan's first repin, landed before this
@@ -212,20 +212,30 @@ Shape: six commits, each builds and passes its crates' tests.
      `Signal::Terminate` in place of `Signal::Kill`, and its `observe`
      asserts the engine's exit, once it has one, `Exit::Code(0)`. No test
      is added, renamed or loosened.
-  Supervisor-owned HTTP call-table diagnosis: the required commit-6 process
-  proof stopped before its requested ending at the pinned Jig HTTP mount's
-  call insertion. Preserve the clean six-commit checkpoint and all artifacts;
-  implementation and further process proof wait for diagnosis and a scope ruling.
-  The supervisor's read-only checker may trace the actual pinned call lifecycle,
-  server/mount capacity and removal in its own scratch, with deterministic
-  lower-layer Rust probes only. Budget: 20 minutes and two executable attempts
-  through pinned heavy and explicit bash script files; setup failures count,
-  and waits grant no extra attempts. No full process run, recording, gate,
-  production repair, limit increase or assertion change is authorized here.
-  Return at most 20 lines with exact sources/pins, a valid-event reproducer or
-  remaining uncertainty, proposed owner/location, commands/results and task/target
-  ownership; retain active targets until their workers end. Map each further
-  reached copy/derived value for any proposed repair and list it in the report.
+  7. **The mount's room** (jig's `protocol/client.md`, 17.4, "The engine
+     end's room": "The application asks for its room before it hands the
+     engine end a call, and answers a call under the prefix that finds
+     none itself, as it answers a call no route claims: `503`, with no
+     body, closing the connection"; design `client/README.md`, 1), the
+     repair the HTTP call-table diagnosis returned for, on the six-commit
+     checkpoint, once jig01.s3 has landed (README, Rules). It repins jig
+     onto that landing; then `crates/temper-service/src/clients.rs`'s
+     `server_requests` hands a call `http::claims` to `mount.down` only
+     while `mount.room()` is not 0. One that finds none goes into
+     `unclaimed`, as a path no one claims does, answered
+     `Respond(Response { status: 503, headers: [], body: Body::None,
+     close: true })`; its end removes it and calls `server.done`, as now.
+     One test in `crates/temper-service/src/tests/server.rs`,
+     `a_call_past_the_mounts_room_is_answered_busy`: with the mount's
+     `calls` (read from the limits, not a literal) each holding a read
+     head whose body is withheld, the next call under `/jig` is answered
+     503 with nothing reaching the root; once one of them is closed and
+     the mount has handled its end, a further call is mounted. No sum is
+     re-derived: `clients::worst_case` already counts `unclaimed` at the
+     server's connections, and a 503 with no header is within the
+     response head's bound, so `system::memory`, the startup worst case
+     and the owned example's memory stay.
+  The HTTP call-table diagnosis and its artifacts stay as they are.
   Diagnostic exception for the pinned Jig UTF-8 panic: investigate the retained
   failed retry in run `logs/temper-02/process-attempt2/process`, comparing the
   failing four-commit tree and its actual pins with the last passing source.
@@ -306,9 +316,9 @@ Proof: joint; `heavy cargo nextest run -p temper-engine-domain-forge
   -p temper-engine-protocol-forge -p temper-engine-protocol-forge-world
   -p temper-engine-domain-world -p temper-conformance-world -p temper-codecs-world
   -p temper-client-world -p temper-system-world -p forgejo-conformance`: the
-  set's count at the step's start plus 6 (927 from the base's 921, 4.823 s; the
-  client's 76 are not in it): the five purpose tests and commit 5's unit are
-  the only change; <15 s. A failure of a profile, limits or
+  set's count at the step's start plus 7 (928 from the base's 921, 4.823 s; the
+  client's 76 are not in it): the five purpose tests, commit 5's unit and
+  commit 7's test are the only change; <15 s. A failure of a profile, limits or
   size test after the measure is a design question: return it, change no bound,
   except for the fully traced derived owned-example allowance correction
   explicitly authorized above. An unexplained difference still returns.
@@ -326,9 +336,12 @@ Proof: process; `TEMPER_FORGEJO=$WS/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-li
   is temper's shutdown's (`domain/root.md`, 9.2, and io's group close),
   not a load failure to rerun: return it as a finding, with each PID's
   command. One left by the crash's kill is skein's kit's: return it as a
-  question.
+  question. With commit 7, a call the mount has no room for is answered
+  503 and the client sends it again; a story stalled on 503s until its
+  deadline is a call the mount never lets go, jig01.s3's finding, never
+  a bound to raise.
 Proof: joint; `heavy --gate scripts/check.sh`: origin/main's focused count at the
-  step's start less 70 (the client's 76 out, 6 in: 1809 from the base's 1879) and
+  step's start less 69 (the client's 76 out, 7 in: 1810 from the base's 1879) and
   its fuzzy count unchanged (50 at the base; 3.754 s and 16.803 s), clean
   clippy and format, focused <15 s, fuzzy <60 s.
 Don't: add an alias, a re-export or a `mod client`; change
@@ -340,7 +353,9 @@ Don't: add an alias, a re-export or a `mod client`; change
   `jig_domain_core::EffectPurpose` (`forge_route.rs` names it as an effect's
   `origin`); give a landing's words more digits than its contract's bound,
   raise a contract's words bound (the tests' 32 stay) or refuse a bound
-  under the id's digits; relax jig's UTF-8 assertion, or rewrite, migrate or
+  under the id's digits; change `limits::server`'s connections or jig's
+  `clients_http`, loosen the mount's insertion assertion, count mounted
+  calls in temper (the room is the mount's), or add a `Retry-After`; relax jig's UTF-8 assertion, or rewrite, migrate or
   delete the run's retained failed artifacts (`logs/temper-02/`): their
   stores keep the raw words, test artifacts that no fixed tree restores;
   end a story's healthy binary with `Binary::signal(Signal::Kill)`, give a
@@ -354,7 +369,8 @@ Size: about 680 lines moved (changed callers counted as moved: 561 lines
   and root entries about 3; commit 5 about 35: `landing_words` and its use
   about 15, its unit about 15, the tightened assertion about 5; commit 6
   about 40: the ending and the crash's start about 25, the two judges'
-  signals and assertions about 15). Under 300: no 02.2.
+  signals and assertions about 15; commit 7 about 45: the room check
+  and the busy answer about 10, its test about 35). Under 300: no 02.2.
 Removes: `crates/temper-engine-domain-forge-client/`, 7,209 lines at the base
   (4,913 source, 2,283 test, 13 manifest; about 6,757 after 01.1 took the
   vocabulary and `locate.rs`): its 74 other tests live in skein; its

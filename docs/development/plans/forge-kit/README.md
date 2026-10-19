@@ -81,7 +81,7 @@ more says so in its row and its file. Dependencies are by capability:
 | File | Session | Needs at start | Increments that need more |
 |---|---|---|---|
 | `temper/01-forge.md` | temper 01: temper on `skein-forge`: the vocabulary's and the dialect's users moved, temper-forge-forgejo deleted, the component on skein's plans and start reads, temper's word handed | skein 01.1; the tools plan's first repin (Rules) | 01.2: skein 01.2; 01.3: skein 01.3; 01.4: skein 01.4 |
-| `temper/02-client.md` | temper 02: temper on `skein-forge-client` and the measure; temper's client deleted; effects' purposes in temper's connector | skein 02.2, temper 01.3 | 02.1's naming proof and landing: jig01.s1; compatible repin: jig01.s2 (Rules) |
+| `temper/02-client.md` | temper 02: temper on `skein-forge-client` and the measure; temper's client deleted; effects' purposes in temper's connector | skein 02.2, temper 01.3 | 02.1's naming proof and landing: jig01.s1; compatible repin: jig01.s2; commit 7: jig01.s3 (Rules) |
 | `temper/03-connection.md` | temper 03: temper on `skein-forge-connection`; the component's crate deleted; temper-service hands the word, the user agent, the transport's name and the limits; the new refusals mapped | skein 03.1, temper 02.1 | 03.2: skein 03.3 |
 | `temper/04-setup.md` | temper 04: temper on `skein-forge-setup`; reconcile's modules deleted; temper's setup hands its values | skein 04.1 | |
 | `temper/05-fakes.md` | temper 05: temper on skein's fakes, temper's deleted; the one-process world on skein's forge peer | skein 05.2 | 05.2: skein 05.5 |
@@ -267,6 +267,26 @@ chain.
   does not change: its empty `breaches` and its two exempted crates
   (`temper`, `temper-one-process-world`) stay, and no crate is exempted
   for using a capability's client.
+- **The HTTP mount's room** (temper 02.1, commit 7): jig's
+  `protocol/client.md`, 17.4, as jig `8922bfa` amended it, gives the
+  mapping's engine end its calls in flight alone: it holds a call until
+  it has handled the call's end, and the application asks for its room
+  before it hands it a call, and answers one that finds none `503`,
+  closing the connection, as it answers a call no route claims. jig's
+  repair is a jig step the supervisor adds (jig01.s3, as it added
+  jig01.s1), with normal readiness before implementation:
+  `Mount::room`, the calls the engine end can still take, counting a
+  call whose end it has heard and not yet handled; the mount's insertion
+  assertion kept, as the application's contract; `jig-test-service`'s
+  `clients.rs` refusing as temper's does, its refused calls held until
+  their end in a `Map<Token, ()>` at the server's connections, with
+  `clients::worst_case` and `limits::worst_case` re-derived for it; every
+  other caller of the mount's `Event::Call` in jig asking first; a test
+  at each seam (the room across a heard, unhandled end; the reference's
+  call past the room answered `503`). No profile or connection number
+  changes. temper 02.1's commit 7 takes it with `heavy cargo update -p
+  jig-protocol-engine-clients-http --precise <the repair's commit>`, one
+  jig revision per source, and the closing temper repin waits for it.
 - **A compatible smith source during a temper repin:** if taking skein main
   breaks the pinned smith source, the same temper repin may take the earliest
   compatible smith revision landed on origin/main. Keep an already newer
@@ -397,7 +417,7 @@ and fail naming the one that is unset (decisions.md, Design questions
 ## Repin
 
 temper's, in each temper increment that needs a new skein step (Rules),
-and the closing `temper-repin` once every skein step, including03.s1 and10.s2, and jig01.s1/01.s2 have
+and the closing `temper-repin` once every skein step, including03.s1 and10.s2, and jig01.s1/01.s2/01.s3 have
 landed, dropped or split (development.md, 5.7): temper 07.1's repin may land
 before skein's last tests do. skein's changes are new crates, a module
 of `skein-fake-peers` and new test crates, so nothing of smith, jig or

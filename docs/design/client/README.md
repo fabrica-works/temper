@@ -83,7 +83,12 @@ not contract. What is still open is listed in section 11.
   sign-in provider is open (section 11).
 - **temper's server owns the clients' listener,** and mounts jig's
   clients' component on it with jig's default HTTP mapping, under
-  `/jig`, with its example guards (section 8).
+  `/jig`, with its example guards (section 8). The mapping's engine end
+  owns its calls in flight: the server asks for its room before it
+  hands it a call, and answers a call under `/jig` that finds none
+  itself, as it answers a path no one claims: `503`, with no body,
+  closing the connection (jig's `protocol/client.md`, 17.4). The
+  server's connections are its own bound, never the engine end's.
 - **Joined to the engine from the start.** `tests/client`
   (`temper-client-world`) runs temper's client and view, with skein's
   fake person, against temper's engine root (section 10;
