@@ -101,7 +101,7 @@ pub fn serve(directory: &Path) -> Binary {
 pub fn fake_llm(scripts: Box<[skein_fake_llm_domain::api::Script]>) -> skein_fake_peers::llm::Peer {
     smith_agent_process_world::fake::configured_transport(
         scripts,
-        skein_llm::Credential { access_token: b"token".as_slice().into(), account_id: b"acc".as_slice().into() },
+        skein_llm::Credential::codex(b"token".as_slice().into(), b"acc".as_slice().into()),
         Duration::ZERO,
         skein_fake_peers::Transport::Tls,
     )

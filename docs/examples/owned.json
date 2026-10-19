@@ -23,7 +23,7 @@
         {
           "name": "codex",
           "number": 1,
-          "dialect": 0,
+          "dialect": 1,
           "account": 1,
           "provider": "codex",
           "address": {
@@ -189,7 +189,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 78675204505610,
+    "memory_bytes": 78675210792817,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -822,7 +822,7 @@
           "hub.event_bytes": 598
         }
       },
-      "memory_bytes": 2356584587922
+      "memory_bytes": 2466461737474
     }
   ],
   "application": {

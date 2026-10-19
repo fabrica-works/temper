@@ -171,8 +171,11 @@ impl Accounts {
                             client_secret: secret,
                             pkce_for_confidential: false,
                             metadata_claim: None,
+                            terms: None,
                         },
                         endpoint,
+                        shared: false,
+                        origins: List::with_capacity(0),
                         keeper: driver::Keeper::Private {
                             root: private_root,
                             directory: config.llm.records.clone(),
@@ -374,6 +377,7 @@ impl Accounts {
                         file_layer::cancel(keeper, owner, &mut self.submitted);
                     }
                 }
+                driver::FileLower::Remove { .. } => unreachable!("the owner never signs out or removes an account"),
             }
         }
         if let Some(keeper) = &mut self.keeper {

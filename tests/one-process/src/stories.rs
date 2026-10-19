@@ -113,10 +113,7 @@ pub(crate) fn provider(story: Story) -> skein_fake_peers::llm::Peer {
                 turns: Box::new([call(b"shell", br#"{"command":"echo fixed > conflict.txt"}"#), finish]),
             },
         ]),
-        skein_llm::Credential {
-            access_token: jig_channel_world::fixtures::TOKEN.into(),
-            account_id: b"acc".as_slice().into(),
-        },
+        skein_llm::Credential::codex(jig_channel_world::fixtures::TOKEN.into(), b"acc".as_slice().into()),
         Duration::ZERO,
     )
 }

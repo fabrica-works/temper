@@ -6,7 +6,7 @@ pub fn documents(directory: &Path, program: &str) -> (Vec<u8>, Vec<u8>) {
         "profile":{"name":"standard","declared":{"memory":2_147_483_648_u64,"tool_payload":600,"read_window":256,
             "conversations":1,"calls_per_response":1},
             "policy":{"max_turns":5,"group_stop":10,"inbox":8,"unacknowledged":8}},
-        "endpoints":[{"name":"fake","number":0,"dialect":0,"account":1,"provider":"codex",
+        "endpoints":[{"name":"fake","number":0,"dialect":1,"account":1,"provider":"codex",
             "address":"127.0.0.1:34443","transport":"tls","server_name":"skein.test","trust_der":directory.join("root.der"),
             "identity":"plain","connect":1000,"handshake":1000,
             "models":[{"name":"fake","prices":{"input":1,"cached":1,"output":1,"unit":1_000_000},"window":1_048_576,"output":1024,"reasoning_item":64,"head":60000,"idle":30000}]}],

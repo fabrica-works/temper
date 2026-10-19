@@ -33,7 +33,7 @@ pub struct World {
 pub fn charter() -> engine::Charter {
     let mut charter = walking::charter();
     charter.policy.model = engine::Model {
-        dialect: 0,
+        dialect: temper_worker_domain_world::DIALECT,
         account: 1,
         endpoint: 0,
         name: b"fake-1".as_slice().into(),
@@ -333,7 +333,7 @@ pub fn copy_answer(answer: &run::Answer) -> run::Answer {
         run::Answer::Refused(refusal) => run::Answer::Refused(*refusal),
         run::Answer::Parked { spent, turns } => run::Answer::Parked { spent: *spent, turns: *turns },
         run::Answer::Failed { failure, spent, turns } => {
-            run::Answer::Failed { failure: *failure, spent: *spent, turns: *turns }
+            run::Answer::Failed { failure: failure.clone(), spent: *spent, turns: *turns }
         }
         run::Answer::Accepted { outcome, spent, turns } => {
             let outcome = match outcome {

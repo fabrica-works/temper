@@ -564,7 +564,6 @@ impl Workers {
                 .push(smith_protocol_channel::Endpoint {
                     name: endpoint.name.clone(),
                     number: endpoint.number,
-                    account: endpoint.account,
                     dialect: endpoint.dialect,
                 })
                 .expect("endpoint count");

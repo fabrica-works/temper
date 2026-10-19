@@ -226,8 +226,8 @@ fn word(number: u64, from: jig_domain_tasks::Party, words: &[u8]) -> jig_domain_
     }
 }
 
-fn decoded_charter(bytes: &[u8]) -> smith_charter::v2::Charter {
-    smith_charter::v2::Charter::decode(&smith_charter::CEILINGS, &mut skein_lib::Reader::new(bytes)).unwrap()
+fn decoded_charter(bytes: &[u8]) -> smith_charter::Charter {
+    smith_charter::Charter::decode(&smith_charter::CEILINGS, &mut skein_lib::Reader::new(bytes)).unwrap()
 }
 
 #[test]

@@ -8,6 +8,9 @@ use skein_lib::{Duration, List, Token};
 pub const RUN: Token = Token::new(31);
 pub const ATTEMPT: Token = Token::new(932);
 pub const WORKSTREAM: u64 = 31;
+pub const ACCOUNT: u32 = 1;
+// A provider-supplied five-millisecond reset keeps the prior exhausted story.
+pub const ACCOUNT_RESET: Duration = Duration::from_millis(5);
 
 /// Two runs of up to two repositories each, two turns and two calls in flight
 /// at a time, with smith's limits around the hub's.
@@ -191,7 +194,7 @@ pub fn charter() -> agent::Charter {
             effort: None,
             prices: smith_domain_run::Prices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1 },
             dialect: 0,
-            account: 0,
+            account: Some(0),
             endpoint: Endpoint(0),
             model: Box::from(&b"model"[..]),
             window: 1_000,
@@ -239,7 +242,7 @@ pub fn turn(number: u32) -> agent::Turn {
         effort: None,
         version: record::VERSION,
         kind: record::Kind::Ordinary,
-        endpoint: llm::Endpoint(0),
+        endpoint: Some(llm::Endpoint(0)),
         dialect: 0,
         sequence: number,
         usage: llm::Usage::ZERO,

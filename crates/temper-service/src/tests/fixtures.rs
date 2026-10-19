@@ -2,13 +2,16 @@ use crate::{limits, settings};
 use jig_domain_host as host;
 use skein_lib::{Secret, Token};
 
+// smith's protocol/channel.md section 6 assigns Codex replay dialect one.
+pub const DIALECT: u32 = 1;
+
 pub const ENGINE: &[u8] = br#"{
 "limits": {"profile": "small", "overrides": {"tasks.result_bytes":32,"people.amendment_bytes":64,"core.policy_bytes":256,"tasks.spec_bytes":128,"tasks.message_bytes":512,"tasks.hold_bytes":64,"tasks.authority_bytes":64,"people.words":512,"core.call_answer_bytes":2048,"notes.recalled":1}},
 "llm": {
 "endpoints": [{
 "name": "fake",
 "number": 1,
-"dialect": 0,
+"dialect": 1,
 "account": 1,
 "provider": "fake-provider",
 "address": {"socket": "127.0.0.1:7101"},
@@ -612,7 +615,6 @@ pub fn encoding(settings: &settings::Engine) -> crate::assignment::Encoding {
             .push(smith_protocol_channel::Endpoint {
                 name: endpoint.name.clone(),
                 number: endpoint.number,
-                account: endpoint.account,
                 dialect: endpoint.dialect,
             })
             .unwrap();

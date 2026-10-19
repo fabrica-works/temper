@@ -17,6 +17,9 @@ pub mod whole;
 /// The most text in one of the scripted agent's turns.
 pub const TURN_TEXT: usize = 24;
 
+// smith's protocol/channel.md section 6 assigns Codex replay dialect one.
+pub const DIALECT: u32 = 1;
+
 /// The bytes of the largest turn the scripted agent says: encoded, as the
 /// hub keeps it, and owned, as smith's host counts it.
 #[must_use]

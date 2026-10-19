@@ -74,6 +74,7 @@ pub fn account(bytes: &[u8], number: u32) -> Result<SignIn, Refused> {
             client_secret: None,
             pkce_for_confidential: false,
             metadata_claim: None,
+            terms: None,
         },
         endpoint: skein_oauth_accounts::Endpoint { address, transport },
         records: engine.llm.records,

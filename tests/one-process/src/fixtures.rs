@@ -222,14 +222,12 @@ pub(crate) fn agent_configuration() -> smith_agent_service::Config {
         Box::new([smith_protocol_llm::ConfiguredEndpoint {
             name: smith_domain::llm::Endpoint(0),
             destination,
-            account: 1,
             connect: Duration::from_secs(1),
             handshake: Duration::from_secs(1),
             identity: smith_protocol_llm::IdentityProfile::Plain,
             models: Box::default(),
         }]),
         1,
-        2,
     )
     .expect("derived provider endpoint");
     config
@@ -252,7 +250,7 @@ pub(crate) fn provider() -> skein_fake_peers::llm::Peer {
     script.result = br#"{"form":"report","text":"World answer","fields":{}}"#.as_slice().into();
     smith_agent_process_world::fake::configured(
         Box::new([skein_fake_llm_domain::api::Script { cue: Box::default(), turns: channel::provider_turns(&script) }]),
-        skein_llm::Credential { access_token: channel::TOKEN.into(), account_id: b"acc".as_slice().into() },
+        skein_llm::Credential::codex(channel::TOKEN.into(), b"acc".as_slice().into()),
         Duration::ZERO,
     )
 }
@@ -280,7 +278,7 @@ pub(crate) fn read_then_wait_provider() -> skein_fake_peers::llm::Peer {
                 },
             ]),
         }]),
-        skein_llm::Credential { access_token: channel::TOKEN.into(), account_id: b"acc".as_slice().into() },
+        skein_llm::Credential::codex(channel::TOKEN.into(), b"acc".as_slice().into()),
         Duration::ZERO,
     )
 }

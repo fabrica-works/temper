@@ -40,6 +40,7 @@ pub fn scripted(scripts: Box<[api::Script]>) -> Recipe {
         transport: Transport::Plaintext,
         limits: smith_agent_process_world::fake::limits(),
         config: provider::Config {
+            without_credential: false,
             echo: skein_llm::openai::Echo::NONE,
             usage_fields: documents::UsageFields::ALL,
             provider: documents::Provider::OpenAi,
@@ -47,7 +48,8 @@ pub fn scripted(scripts: Box<[api::Script]>) -> Recipe {
             headers: Box::new([]),
         },
         credential: skein_llm::Credential {
-            access_token: crate::fixtures::TOKEN.into(),
+            value: crate::fixtures::TOKEN.into(),
+            scheme: skein_llm::Scheme::Bearer,
             account_id: b"acc".as_slice().into(),
         },
         protocol_limits: protocol,

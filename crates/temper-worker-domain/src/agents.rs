@@ -124,12 +124,15 @@ pub(crate) fn up(domain: &mut Domain, env: &Env<Limits>, request: smith::parent:
         smith::parent::Request::LongDone { client } => {
             host::Event::Activity { owner: client, activity: host::Activity::LongDone }
         }
-        smith::parent::Request::Rejected { client, account, generation } => {
+        smith::parent::Request::Unauthorized { client, account, generation } => {
             host::Event::Rejected { owner: client, account, generation }
         }
-        smith::parent::Request::Exhausted { client, account, retry_after } => {
-            host::Event::Exhausted { owner: client, account, retry_after }
+        smith::parent::Request::Limited { client, account, reset } => {
+            host::Event::Exhausted { owner: client, account, retry_after: reset.unwrap_or(skein_lib::Duration::ZERO) }
         }
+        // Accounts decision 16: the failed answer carries provider refusals
+        // until jig's account vocabulary gains a refusal notice.
+        smith::parent::Request::Refused { .. } => return,
         smith::parent::Request::Faulted { client, fault } => {
             // Before its run is admitted, the agent's end answers for it.
             if !admitted(domain, client) {

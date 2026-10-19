@@ -3,7 +3,7 @@ pub fn agent() -> settings::Agent {
     use skein_lib::Duration;
     let mut endpoints = skein_lib::List::with_capacity(1);
     endpoints
-        .push(smith_protocol_channel::Endpoint { name: b"fake".as_slice().into(), number: 1, account: 1, dialect: 0 })
+        .push(smith_protocol_channel::Endpoint { name: b"fake".as_slice().into(), number: 1, dialect: super::DIALECT })
         .unwrap();
     let host_limits = smith_host_domain::Limits {
         agents: 1,

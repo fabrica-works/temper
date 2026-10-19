@@ -661,13 +661,12 @@ fn grant_value(table: &Table, grant: smith::Grant, now: Time) -> Option<host::Va
     let value = account(table, grant, now)?;
     Some(host::Values { paths: Box::default(), credentials: Box::new([value]) })
 }
-fn account(table: &Table, grant: smith::Grant, now: Time) -> Option<Box<[u8]>> {
+fn account(table: &Table, grant: smith::Grant, now: Time) -> Option<smith_protocol_channel::GrantValue> {
     let value = table.value(grant.account, grant.generation, now)?;
-    let mut writer = Writer::new(2_usize.checked_add(value.account_id.len())?.checked_add(value.token.len())?);
-    writer.put(&u16::try_from(value.account_id.len()).ok()?.to_be_bytes()).ok()?;
-    writer.put(value.account_id.expose()).ok()?;
-    writer.put(value.token.expose()).ok()?;
-    Some(writer.finish())
+    Some(smith_protocol_channel::GrantValue::Withdrawn {
+        account_id: value.account_id.expose().into(),
+        bearer: value.token.expose().into(),
+    })
 }
 pub(crate) fn start_values(table: &Table, start: &smith::Start, root: &[u8], now: Time) -> Option<host::Values> {
     let mut values = List::with_capacity(u32::try_from(start.grants.len()).ok()?);

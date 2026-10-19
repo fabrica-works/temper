@@ -13,14 +13,14 @@ use temper_worker_domain::{Encodable, Encoded, Invalid, agent, host};
 #[must_use]
 pub fn endpoints() -> Endpoints {
     let mut entries = List::with_capacity(1);
-    entries.push(Endpoint { name: Box::new([]), number: 0, dialect: 0, account: 0 }).expect("one endpoint");
+    entries.push(Endpoint { name: Box::new([]), number: 0, dialect: crate::DIALECT }).expect("one endpoint");
     Endpoints::new(entries)
 }
 
-// smith's smallest v2 charter, as jig's reference worker's fixture takes it.
-const SMALLEST: [u8; 119] = {
-    let mut bytes = [0; 119];
-    bytes[1] = 2;
+// smith's smallest v3 charter, as jig's reference worker's fixture takes it.
+const SMALLEST: [u8; 120] = {
+    let mut bytes = [0; 120];
+    bytes[1] = 3;
     bytes
 };
 
@@ -59,7 +59,11 @@ pub fn charter() -> Box<[u8]> {
 #[must_use]
 pub fn session_turn(sequence: u32, spent: u64, length: usize, first: bool) -> record::Turn {
     let kind = if first {
-        record::Kind::First { affinity: llm::Affinity { key: [5; 16], thread: 0 } }
+        record::Kind::First {
+            affinity: llm::Affinity { key: [5; 16], thread: 0 },
+            account: Some(0),
+            backend: record::Backend::Direct,
+        }
     } else {
         record::Kind::Ordinary
     };
@@ -69,8 +73,8 @@ pub fn session_turn(sequence: u32, spent: u64, length: usize, first: bool) -> re
         effort: None,
         version: record::VERSION,
         kind,
-        endpoint: llm::Endpoint(0),
-        dialect: 0,
+        endpoint: Some(llm::Endpoint(0)),
+        dialect: crate::DIALECT,
         sequence,
         usage: llm::Usage::ZERO,
         jobs: 0,

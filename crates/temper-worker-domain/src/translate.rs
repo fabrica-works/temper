@@ -195,12 +195,15 @@ pub(crate) const fn operation(operation: agent::Operation) -> host::Operation {
 /// engine to retry the run once the account has room.
 pub(crate) const fn run_failure(failure: &agent::RunFailure) -> host::RunFailure {
     match failure {
-        agent::RunFailure::Model(agent::ModelFault::Exhausted { .. }) => host::RunFailure::Exhausted,
+        agent::RunFailure::Model(agent::ModelFault::Limited { .. }) => host::RunFailure::Exhausted,
         agent::RunFailure::Transcript(_)
         | agent::RunFailure::Model(
             agent::ModelFault::Completion { .. }
             | agent::ModelFault::Provider
-            | agent::ModelFault::Refused
+            | agent::ModelFault::Refused { .. }
+            | agent::ModelFault::Unauthorized { .. }
+            | agent::ModelFault::Program { .. }
+            | agent::ModelFault::Declined
             | agent::ModelFault::Truncated
             | agent::ModelFault::Malformed,
         ) => host::RunFailure::Model,

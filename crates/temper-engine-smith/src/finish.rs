@@ -53,8 +53,9 @@ pub fn turn(request: smith::Request, transcript: Box<[u8]>) -> Result<host::Turn
         | smith::Request::LongDone { .. }
         | smith::Request::Deliver { .. }
         | smith::Request::Complete { .. }
-        | smith::Request::Rejected { .. }
-        | smith::Request::Exhausted { .. }
+        | smith::Request::Unauthorized { .. }
+        | smith::Request::Limited { .. }
+        | smith::Request::Refused { .. }
         | smith::Request::Cancel { .. }
         | smith::Request::Io { .. }
         | smith::Request::CancelIo { .. }

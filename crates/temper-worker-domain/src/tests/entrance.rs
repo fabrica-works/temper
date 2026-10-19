@@ -1,7 +1,7 @@
 //! What the root refuses or answers at the entrance, and how a start comes
 //! back decoded.
 
-use super::fixtures::{assignment, fields, items, refused};
+use super::fixtures::{ACCOUNT, ACCOUNT_RESET, assignment, fields, items, refused};
 use super::harness::Harness;
 use crate::{Event, Invalid, Request, agent, host, translate};
 use alloc::boxed::Box;
@@ -99,7 +99,7 @@ fn a_worker_told_to_shut_down_with_nothing_left_says_stop_once() {
 
 #[test]
 fn an_exhausted_account_stays_a_failure_of_its_own() {
-    let exhausted = agent::ModelFault::Exhausted { account: 1, retry_after_ms: Some(5) };
+    let exhausted = agent::ModelFault::Limited { account: ACCOUNT, reset: Some(ACCOUNT_RESET) };
     assert_eq!(translate::run_failure(&agent::RunFailure::Model(exhausted)), host::RunFailure::Exhausted);
 }
 

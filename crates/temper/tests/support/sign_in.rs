@@ -147,13 +147,14 @@ fn llm() -> skein_fake_peers::llm::Peer {
         skein_fake_peers::Transport::Plaintext,
         smith_agent_process_world::fake::limits(),
         provider::Config {
+            without_credential: false,
             echo: skein_llm::openai::Echo::NONE,
             usage_fields: documents::UsageFields::ALL,
             provider: documents::Provider::Anthropic,
             path: skein_llm::Endpoint::anthropic().target,
             headers: Box::new([]),
         },
-        skein_llm::Credential { access_token: ACCESS.into(), account_id: Box::new([]) },
+        skein_llm::Credential::bearer(ACCESS.into()),
         protocol,
         skein_fake_llm_domain::Domain::try_scripted(&config, 17, Box::new([chat_script(super::ANSWER)]))
             .expect("sign-in chat script"),

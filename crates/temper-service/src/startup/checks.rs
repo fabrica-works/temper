@@ -443,13 +443,10 @@ pub fn root(
         problems.push(path, what);
     }
 }
-/// Endpoint names and accounts, and every charter model, agree with the agent.
+/// Endpoint names, and every charter model, agree with the agent.
 pub fn agent(engine: &config::Engine, agent: &settings::Agent, problems: &mut Problems) {
     for (index, endpoint) in engine.llm.endpoints.iter().enumerate() {
-        let agrees = match agent.endpoints.resolve(&endpoint.name) {
-            Some(found) => found.account == endpoint.account,
-            None => false,
-        };
+        let agrees = agent.endpoints.resolve(&endpoint.name).is_some();
         if !agrees {
             problems.push(at(index, Path::root().member(b"engine").member(b"llm").member(b"endpoints")), What::Agent);
         }
