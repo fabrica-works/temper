@@ -72,7 +72,7 @@ this turn read and jig 05's deadline spans), including this session's last step,
 - Change the existing enums and every exhaustive consumer in the same increment; add no catch-all, compatibility alias,
   retry loop, watched turn, or second fixture for the same world. The new modules below keep additions out of long files.
 - All cargo commands use `heavy`, unoptimized. Unit tests stay under 20 ms, focused world/joint stories under 0.5 s each;
-  the focused and fuzzy budgets remain `.config/nextest.toml`'s, 30 s and 60 s. Run each named proof once, besides land's gate. A proof naming a new
+  the focused and fuzzy budgets remain `.config/nextest.toml`'s `global-timeout`s, 15 s and 60 s. Run each named proof once, besides land's gate. A proof naming a new
   test becomes executable when its increment builds it; the supervisor checks the sketches at readiness.
 
 ## Increments
@@ -146,7 +146,7 @@ In the store, distinguish exhausted search/no transcript place from a failed fra
 the latter gives Malformed for a single turn. Read the fixed metadata and payload length before allocating the payload;
 reuse the existing header/length validation and bounded frame walk. An oversized selected frame gives its payload length,
 not `Failure::Cut`; metadata and owner still count against `party.bytes`. Normal frame checksums remain checked. Keep the
-new party-specific handling in `read/party.rs`, called by `read.rs`, whose 745-line base must stay below 800. Preserve the
+new party-specific handling in `read/party.rs`, called by `read.rs`, whose 752-line base must stay below 800. Preserve the
 existing reply/page routes. Recompute core/store worst cases for the evidence carrier; no unpriced owner is held.
 Test shape: replace `an_unread_turn_is_an_empty_page` with `an_unread_turn_is_malformed`; replace the one-byte-budget
 expectation with Busy (even evidence cannot fit). Reuse `party_store`, `turn_range`, `waiting_party`, `read_disk`,
@@ -179,7 +179,11 @@ exhaustive consumers in `crates/jig-client-view/src/{application,objects,page/in
 `testing/jig-client-scripted-engine/src/{reads,watches,requests,truth}.rs`, `testing/jig-client-test-kit/src/check.rs`,
 `tests/client/src/joint/{read_packets,wire/reads,wire/historical}.rs`, `ReadValue`'s matches in `tests/client/src/{observe,scripted,
 harness/referee,harness/referee/offers}.rs`, `tests/ops/src/client/transport.rs`;
-`tests/client-protocol/src/client{,/thread}.rs`, `src/fixtures.rs`, new `tests/client-protocol/tests/turn_read.rs`.
+`tests/client-protocol/src/client{,/thread}.rs`, `src/fixtures.rs`, new `tests/client-protocol/tests/turn_read.rs`;
+`testing/jig-client-scripted-engine/src/payload.rs` (`impl Payload for Read`, `impl Payload for ReadValue`),
+`crates/jig-client-view/src/tests/domain/objects.rs` (its `ReadValue` match), and `tests/client/src/joint/read_ledger_pages.rs`,
+whose `match what` lists every `client::Read`: `client::Read::Turn { .. }` joins its `panic!("one of the two original
+histories")` arm.
 No forge, LLM or provider hotspot.
 Shape: client `Read::Turn { task: u64, attempt: u64, turn: u32 }`, wire `ReadTurn` with those same fields;
 client `ReadValue::Turn(Box<ArchivedTurn>)`, wire `ReadValue::Turn(ArchivedTurn)`. No subject gains a variant.
@@ -241,11 +245,12 @@ Needs: one turn through the public client, from 03.3; nothing beyond the session
 Files: `crates/jig-client-domain/src/contract/turn.rs`;
 `crates/jig-client-protocol-link/src/translate/{pages,pages_part0,pages_part1,turn}.rs`, `src/tests/{pages,fixtures/turns}.rs`;
 `crates/jig-client-view/src/turns/turn.rs`, `src/tests/turn_read.rs`;
-`tests/client/src/joint/wire/{activity,turns,pages}.rs` (`pages.rs`'s three `client::TurnProblem::TooLarge`),
+`tests/client/src/joint/wire/{activity,turns,pages}.rs` (`pages.rs`'s two `client::TurnProblem::TooLarge`),
 `tests/client-protocol/tests/turn_read.rs`,
 `tests/client-protocol/src/client/thread.rs`, `tests/client-protocol/src/fixtures.rs`.
 Shape: change the variant in place. `archived_turn_fields` copies `w::TurnTooLarge::bytes()`; `turn_fields` captures the
-input payload length before decoding and keeps it on `Undecodable::TooLarge`. Share that decoder with the single read,
+input payload length before decoding and keeps it on the `jig_protocol_transcript::Undecodable::TooLarge` arm of its match on `jig_protocol_transcript::decode` (the link's
+`translate::Undecodable` is another enum). Share that decoder with the single read,
 with the applicable byte bound passed explicitly; a single read converts its problem to 03.2's `ReadNone`.
 The reference UI keeps its existing too-large phrase, matching `{ .. }`; no new UI is designed here. Update every constructor
 and exhaustive match, including the typed joint world's decoder. Page markers never trigger an automatic second read.

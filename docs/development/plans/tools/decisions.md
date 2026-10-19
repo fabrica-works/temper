@@ -385,6 +385,17 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
 111. **temper 02.1's worktree** (process, temper 02.1's block of 2026-10-19 05:26:05 UTC).
      `wt/temper-02` was the supervisor's: ruling 111's premise is that temper 02's ready check, behind ruling 108, added it as its scratch worktree at `origin/main` 482d5fefe, at 04:40Z, and left its sketch of `crates/temper-client-tools/` there. It held no implementer's work. The supervisor removed it, and `wt/temper-01r`, a re-check's that was not restarted. Run `plan worktree temper 02` again and start 02.1 from temper/02-tools-table.md as landed: it includes ruling 110, J's order of `tasks` without `--order`, which ends ruling 108's interim wait on `--order`; the rest of ruling 108 stands. The supervisor's scratch worktrees are named `<repository>-<NN>r` from now, as `jig-02r`, `jig-03r` and `jig-05r` are: a worktree under `wt/` with a session's own name that the ledger gives no implementer is a block, as this one was.
 
+112. **jig 03's Shapes against main** (re-check of jig-03.3).
+     jig 03's re-check (jig f67d51c7, after 03.1 and 03.2 landed; 03.3 running) corrected jig/03-turn-read.md: 03.3's Files add `testing/jig-client-scripted-engine/src/payload.rs` (`impl Payload for Read`, `impl Payload for ReadValue`), `crates/jig-client-view/src/tests/domain/objects.rs` (its `ReadValue` match) and `tests/client/src/joint/read_ledger_pages.rs`, whose `match what` lists every `client::Read` with no wildcard: `client::Read::Turn { .. }` joins its `panic!("one of the two original histories")` arm; 03.4's `pages.rs` has two `client::TurnProblem::TooLarge`, not three; 03.4's `Undecodable::TooLarge` is the arm of `turn_fields`'s match on `jig_protocol_transcript::decode`, not the link's `translate::Undecodable`; the budgets are `.config/nextest.toml`'s `global-timeout`s, 15 s and 60 s; `read.rs`'s base is 752 lines. A further exhaustive consumer the compiler names: add its arm, and list it in the commit body.
+
+     Checked (jig origin/main f67d51c7):
+     - `git grep -n 'impl Payload for Read\b\|impl Payload for ReadValue' -- testing/jig-client-scripted-engine/src/payload.rs`: 888 `impl Payload for Read {`, 919 `impl Payload for ReadValue {`.
+     - `git grep -n 'match what\|one of the two original' -- tests/client/src/joint/read_ledger_pages.rs`: 35 `let expected = match what {`, 51 `| client::Read::Deployment => panic!("one of the two original histories"),`.
+     - `git grep -c 'TurnProblem::TooLarge' -- tests/client/src/joint/wire/pages.rs`: 2.
+     - translate/pages.rs `turn_fields`: `Err(jig_protocol_transcript::Undecodable::TooLarge) => c::TurnProblem::TooLarge`; translate.rs:11 `pub enum Undecodable { Malformed, TooLarge, Version }`.
+     - `.config/nextest.toml`: `[profile.default]` `global-timeout = "15s"`, `[profile.fuzzy]` `global-timeout = "60s"`.
+     - `git show origin/main:crates/jig-protocol-store/src/transcripts/read.rs | wc -l`: 752.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
