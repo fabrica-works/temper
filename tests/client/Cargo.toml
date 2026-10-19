@@ -27,7 +27,6 @@ jig-domain-host.workspace = true
 jig-domain-views.workspace = true
 skein-ui.workspace = true
 jig-protocol-transcript.workspace = true
-smith-transcript.workspace = true
 temper-client-protocol-wire.workspace = true
 temper-service.workspace = true
 temper-client-domain.workspace = true

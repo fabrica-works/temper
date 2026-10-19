@@ -10,7 +10,7 @@ use temper_engine_domain as engine;
 
 const CALL_TASK: u64 = 23;
 
-use crate::{ChangeResource, Problem, answer, call, result, start, tools};
+use crate::{ChangeResource, Problem, answer, call, result, start, tools, turn};
 
 fn decoded(tool: &[u8], json: &[u8]) -> Result<engine::Call, Problem> {
     let input = run::HostInput::attested(json.into()).expect("bounded object exterior");
@@ -427,4 +427,12 @@ fn each_of_jigs_new_call_answers_renders_its_task_and_value() {
         assert_eq!(rendered.text(), *words, "{value:?}");
         assert_eq!(rendered.error(), *error, "{value:?}");
     }
+}
+
+#[test]
+fn a_job_request_is_not_a_turn() {
+    assert_eq!(
+        turn(smith::Request::Job { owner: Token::new(1), act: smith::tools::JobAct::Hasten }, Box::default()).err(),
+        Some(Problem::Type)
+    );
 }

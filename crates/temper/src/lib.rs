@@ -96,6 +96,7 @@ fn member(document: &skein_json::Document, at: u32, key: &[u8]) -> u32 {
 fn errno(error: Error) -> i32 {
     match error {
         Error::Refused => 111,
+        Error::Busy => 11,
         Error::Reset => 104,
         Error::BrokenPipe => 32,
         Error::NotConnected => 107,

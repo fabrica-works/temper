@@ -165,7 +165,8 @@ fn refused_directory() -> temper_client_shell_terminal::terminal::Terminal {
                     terminal.completions().push(Complete { op: *target, kind, result: Err(Error::Cancelled) });
                     Ok(Done::Nothing)
                 }
-                other @ (Op::Socket { .. }
+                other @ (Op::Lock { .. }
+                | Op::Socket { .. }
                 | Op::Bind { .. }
                 | Op::Listen { .. }
                 | Op::Accept { .. }

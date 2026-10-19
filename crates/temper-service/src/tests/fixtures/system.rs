@@ -151,7 +151,8 @@ impl Kernel {
                     }
                     Ok(Done::Nothing)
                 }
-                other @ (Op::Recv { .. }
+                other @ (Op::Lock { .. }
+                | Op::Recv { .. }
                 | Op::Send { .. }
                 | Op::Shutdown { .. }
                 | Op::Read { .. }

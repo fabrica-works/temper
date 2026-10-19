@@ -224,7 +224,8 @@ impl Started {
             | skein_io::kernel::Op::MakeDirectory { .. }
             | skein_io::kernel::Op::Remove { .. }
             | skein_io::kernel::Op::Close { .. } => skein_io::kernel::Done::Nothing,
-            skein_io::kernel::Op::Socket { .. }
+            skein_io::kernel::Op::Lock { .. }
+            | skein_io::kernel::Op::Socket { .. }
             | skein_io::kernel::Op::Bind { .. }
             | skein_io::kernel::Op::Listen { .. }
             | skein_io::kernel::Op::Accept { .. }
@@ -260,7 +261,8 @@ impl Started {
                     *slot = *byte;
                 }
             }
-            Op::Socket { .. }
+            Op::Lock { .. }
+            | Op::Socket { .. }
             | Op::Bind { .. }
             | Op::Listen { .. }
             | Op::Accept { .. }
@@ -308,7 +310,8 @@ impl Started {
                     start = start.checked_add(name.len()).expect("test names");
                 }
             }
-            Op::Socket { .. }
+            Op::Lock { .. }
+            | Op::Socket { .. }
             | Op::Bind { .. }
             | Op::Listen { .. }
             | Op::Accept { .. }
@@ -431,7 +434,8 @@ fn clone_file_kind(kind: &skein_io::kernel::Op) -> skein_io::kernel::Op {
         Op::MakeDirectory { dir, name, mode } => Op::MakeDirectory { dir: *dir, name: name.clone(), mode: *mode },
         Op::List { fd, entries, names } => Op::List { fd: *fd, entries: entries.clone(), names: names.clone() },
         Op::Close { fd } => Op::Close { fd: *fd },
-        Op::Socket { .. }
+        Op::Lock { .. }
+        | Op::Socket { .. }
         | Op::Bind { .. }
         | Op::Listen { .. }
         | Op::Accept { .. }

@@ -96,11 +96,10 @@ pub fn world(seed: u64) -> World<Temper, Joint> {
 }
 #[must_use]
 pub fn codec() -> jig_protocol_transcript::Limits {
-    jig_protocol_transcript::Limits {
-        smith: smith_transcript::v3::CEILINGS,
-        bytes: 32768,
-        turn: jig_client::contract::TurnLimits { messages: 32, blocks: 32, text: 8192 },
-    }
+    jig_protocol_transcript::Limits::new(
+        32768,
+        jig_client::contract::TurnLimits { messages: 32, blocks: 32, text: 8192 },
+    )
 }
 
 #[must_use]

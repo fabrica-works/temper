@@ -295,7 +295,8 @@ impl Scan {
                 Ok(n) => {
                     let buf = match complete.kind {
                         Op::Read { buf, .. } => buf,
-                        Op::Socket { .. }
+                        Op::Lock { .. }
+                        | Op::Socket { .. }
                         | Op::Bind { .. }
                         | Op::Listen { .. }
                         | Op::Accept { .. }
@@ -353,7 +354,8 @@ fn page(complete: kernel::Complete) -> Result<Box<[u8]>, Error> {
         Op::List { entries, names, .. } => {
             Ok(Box::from(entries.first().expect("nonempty listing").name(&names).expect("kernel entry name")))
         }
-        Op::Socket { .. }
+        Op::Lock { .. }
+        | Op::Socket { .. }
         | Op::Bind { .. }
         | Op::Listen { .. }
         | Op::Accept { .. }

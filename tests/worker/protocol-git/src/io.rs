@@ -443,7 +443,8 @@ impl Below {
             }
             Op::Rename { from_dir, from, to_dir, to } => self.moving(*from_dir, from, *to_dir, to),
             Op::List { fd, entries, names } => Ok(self.listing(*fd, entries, names)),
-            other @ (Op::Socket { .. }
+            other @ (Op::Lock { .. }
+            | Op::Socket { .. }
             | Op::Bind { .. }
             | Op::Listen { .. }
             | Op::Accept { .. }

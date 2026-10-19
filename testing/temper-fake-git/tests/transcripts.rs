@@ -193,7 +193,8 @@ impl Disk {
                 | Op::Remove { .. }
                 | Op::List { .. }
                 | Op::Close { .. }) => self.file(op).map_err(skein_fake_machine::kernel_error),
-                other @ (Op::Socket { .. }
+                other @ (Op::Lock { .. }
+                | Op::Socket { .. }
                 | Op::Bind { .. }
                 | Op::Listen { .. }
                 | Op::Accept { .. }
@@ -274,7 +275,8 @@ impl Disk {
                 self.machine.close(opened(*fd));
                 Ok(Done::Nothing)
             }
-            other @ (Op::Socket { .. }
+            other @ (Op::Lock { .. }
+            | Op::Socket { .. }
             | Op::Bind { .. }
             | Op::Listen { .. }
             | Op::Accept { .. }

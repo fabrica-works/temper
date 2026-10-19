@@ -73,6 +73,7 @@ pub fn session_turn(sequence: u32, spent: u64, length: usize, first: bool) -> re
         dialect: 0,
         sequence,
         usage: llm::Usage::ZERO,
+        jobs: 0,
         spent,
         messages: Box::new([llm::Message {
             role: llm::Role::Assistant,

@@ -242,6 +242,7 @@ pub fn turn(number: u32) -> agent::Turn {
         dialect: 0,
         sequence: number,
         usage: llm::Usage::ZERO,
+        jobs: 0,
         spent: u64::from(number),
         messages: Box::new([]),
     };
