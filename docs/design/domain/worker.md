@@ -395,7 +395,8 @@ among temper's tiers and keeps their fakes.
   branch another party advanced making the push moved, nothing forced;
   saved work where a later run resumes; an abort ending a prepare under
   way; merges that conflict, keep their markers until resolved and
-  commit both parents, and a stale expected head refused.
+  commit both parents, a stale expected head refused, and a push that
+  lands but times out.
 - **The worker's world** (`tests/worker/domain`): jig's hub, smith's host
   domain and the checkout, against scripted engine and agent peers, the
   protocol layer's routing played with smith's codecs, and the fake

@@ -6,11 +6,10 @@ changes, with `temper ctl`, a command line. It serves the agents
 (smith's) that QA and develop temper's core: they drive a throwaway
 deployment on coding tasks of growing size, then on temper's features,
 until the first milestone (`README.md`, section 2) is usable for real
-tasks. Their QA loop extends the tools area by area (5.5). Their
-bounds are section 12; what
-the tools ask of jig is section 13; an MCP endpoint and the tools'
-extraction into jig are later (section 14). What is still open is
-listed in section 15.
+tasks. Their QA loop extends the tools area by area (5.5). Their bounds
+are section 12, and what they take of jig section 13; an MCP endpoint
+and the tools' extraction into jig are later (section 14). What is
+still open is listed in section 15.
 
 ## 1. In one page
 
@@ -32,7 +31,7 @@ listed in section 15.
 - **Each request once.** A tool that makes something requires a key the
   agent names; asked again under that name, it gets the first answer,
   never a second chat. Acts that decide name the revision the agent saw
-  (section 7). The named key is asked of jig (section 13).
+  (section 7). The named key is jig's (section 13).
 - **A turn too large for a page is read alone,** by jig's read of one
   turn (5.2, section 13).
 - **Thin command line.** `temper ctl DIRECTORY TOOL ...` makes one call
@@ -96,7 +95,7 @@ listed in section 15.
 temper-client-tools          the table, a call, the runner, digests and conditions, the rendering (text,
 │                            JSON), the argv parser and help, the guide, the limits; the tools' root
 ├── jig-client               jig's client and its helpers (shapes, facts, thread, words)
-├── temper-client-domain     the forge's client side (client/README.md, 3.1 and section 4) and its words (4.1, 4.7)
+├── temper-client-domain     the forge's client side and its words (client/README.md, 3.1, section 4, 4.1 and 4.7)
 ├── temper-client-protocol-wire  the forge family's records (client/README.md, 4.6)
 ├── skein-ui                 phrases: jig's words and the tools' own, rendered as text
 └── skein-json               the JSON writer and tokenizer
@@ -163,18 +162,33 @@ watch's subject, its digest (5.4). It needs no key.
 |---|---|---|
 | `me` | the party, its projects with their roles and pools, what waits for it counted, the bounds of what it may create, the retention | `me` |
 | `inbox [--project P] [--kind K] [--root N] [--after C]` | what needs the party, then updates, each with its acts | `inbox` |
-| `tasks --project P [--label chat\|goal] [--tracked] [--mine] [--ended] [--order activity\|priority] [--after C]` | task lines | `tasks{query}` (jig's `client/domain/contract.md`, 6.1) |
+| `tasks --project P [--label chat\|goal] [--tracked] [--mine] [--ended] [--order activity\|priority] [--after C]` | task lines of one group: the live tasks, or with `--ended` the ended | `tasks{query}` (jig's `client/domain/contract.md`, 6.1) |
 | `task N [--tree] [--activity K] [--run]` | a task's document, with its acts; with its live tree, its K latest activity lines, its live run, in one answer | `task{n}`, `tree{root}`, `activity{n}`, `run{n}` |
 | `chat N [--before C]` | a conversation: turns, words and, where the run's host gives it, provisional text, in order, a page from its end | `activity{n}`, `run{n}`, through `thread` |
 | `activity N [--before C] [--limit K]` | a task's activity, a page from its end | `activity{n}` |
-| `turn N A.T [--part K] [--from B]` | one turn of task N, attempt A, turn T, whole: its text, each call and its result | jig's read of one turn (section 13) |
+| `turn N A.T [--part K] [--from B]` | one turn of task N, attempt A, turn T, whole: its text, each call and its result | `turn{n, attempt, turn}` (jig's `client/domain/contract.md`, section 6) |
 | `run N` | a task's live run: its attempt, its provisional text where its host gives it, its current call | `run{n}` |
 
+- **`tasks` reads one group a call.** jig answers a task query in two
+  groups, live then ended, each with its own cursor (jig's
+  `client/domain/contract.md`, 6.1), and a printed cursor is one
+  group's. Without `--ended`, `tasks` reads the live group, `--after C`
+  its cursor; with `--ended`, the ended group alone, as jig's view reads
+  it, `--after C` the ended group's. The call that reads on keeps
+  `--ended`, whose help reads "Only ended tasks". An agent that wants
+  both groups makes two calls; the printed cursor is jig's, with nothing
+  added.
+- **`tasks`' order:** by number, ascending, without `--order`, with
+  `--ended` or without; by activity or priority with it. The tools never
+  send jig's other orders, `Changed` and `Ended`: no command line makes
+  a call with either, and such a call is refused a command line, never
+  given a guessed one, so that a call's command line parses back to
+  that call (6.1).
 - **Provisional text is the run's host's.** An agent process gives none
   (`protocol/llm.md`, section 7), and `chat` and `run` then print none:
   a run shows by its activity, and its words as each turn commits.
 - **A turn too large for a page** comes in a page by its size in place
-  of its bytes (jig's `client/domain/contract.md`, section 6).
+  of its bytes (jig's `client/domain/contract.md`, 5.1).
   `activity`, `chat` and `task --activity` print it as one line, its
   number, its size and the call that reads it: `turn 3.7 · 412 KB ·
   read with: turn 41 3.7`.
@@ -419,8 +433,7 @@ area lands with its stories (section 11).
 - **Areas 1 and 5 are designed here in full.** Areas 2 to 4 name their
   tools and jig's operations; each area's arguments are checked against
   jig's operations as they stand when the QA loop reaches it, by a
-  design pass (`development.md`, section 4), and land with it. Area 5's
-  are checked so against jig's requests for accounts once jig has them.
+  design pass (skein's `development.md`, section 4), and land with it.
 - **The QA loop may ask for a tool no area names.** It goes to the
   designer as a design question, and joins the table as a row of an
   area.
@@ -537,9 +550,8 @@ may change with them.
   it sent stays in the small store, for the next call that sends (8.2).
 - **`adopt`:** adopted exits 0, with branch protection unknown or not
   (`client/README.md`, 4.7, prints "Branch protection could not be read."
-  then); unknown past the retention exits 1; each other outcome of 4.7,
-  not found, no access and refused among them, exits 2, in 4.7's
-  words.
+  then); unknown past the retention exits 1; each other outcome there,
+  not found, no access and refused among them, exits 2, in its words.
 
 ### 6.4 Bounded
 
@@ -785,7 +797,7 @@ the chat closed; a repository adopted; a held task released. A turn
 too large for a page exists only where the engine's bound on a turn
 passes its page bound, so the world's profile sets it so. The world's
 faults hold: a call cut by a link drop or an engine restart, asked
-again under its named key, is made once. Each later area adds its
+again under its named key, is made once. Each area adds its
 stories. Area 5's, over the engine root's accounts child with each
 source's mechanism scripted: a key added, then the deployment's,
 `accounts` showing both with no value in DIRECTORY's store or in any
@@ -808,7 +820,7 @@ over the fake forge, on one thread and one real ring (`testing.md`,
 pipes. The store and client credentials use a scratch directory on the
 real filesystem.
 
-The first stories sign in, start a chat and wait for its reply, and
+Its stories sign in, start a chat and wait for its reply, and
 satisfy one client's wait by another client's act; each drains with
 everything settled. Then a service restart retains the work. A call
 whose answer was lost is made once: the tools' root is dropped once
@@ -822,8 +834,7 @@ kept request stays unsent, and the call goes on. The forge's
 stories adopt a repository, and clone, push and land through the fake
 git program on the shared in-memory fake forge, with CI by the fake
 forge's content marker and its webhooks delivered to the engine
-(`testing.md`, 2.4). Real git waits for the real-git bridge (`testing.md`,
-section 10).
+(`testing.md`, 2.4). Real git meets a forge in the process tier (11.4).
 
 Every story first adds a key the fake LLM peer accepts, `add-key` from
 a scratch file, as section 10's harness does, and waits for `usable`.
@@ -900,7 +911,7 @@ Four bounds decide how much of a document a call prints:
 
 | Bound | Whose | It decides | Past it |
 |---|---|---|---|
-| a page's bytes | the engine's (jig's `client/domain/contract.md`, section 6) | whether a turn comes in a page by its bytes or by its size | the turn's line, its size and the call that reads it (5.2) |
+| a page's bytes | the engine's (jig's `client/domain/contract.md`, 5.1) | whether a turn comes in a page by its bytes or by its size | the turn's line, its size and the call that reads it (5.2) |
 | one read's bytes | the engine's (the read of one turn, jig's `client/domain/contract.md`, section 6) | whether `turn` is answered whole | its size, and that it is past the limit |
 | one document's bytes | the client's, `document_bytes` | whether the client takes a document whole | a turn: its size, and that it is past the limit; any other document: the client's `Limit`, exit 1 |
 | the tools' window | the tools' | how much of a result prints | the rest by its cursor, or `--part` and `--from` (6.4) |
@@ -918,7 +929,7 @@ terminal's, whose window shows two rows:
 
 | What | Bound |
 |---|---|
-| rows: a list's page, the activity lines `task` adds, a conversation's page; the client's rows per window | 50 |
+| rows: a list's page, the activity lines `task` adds, a conversation's page; the client's rows per window | 32, the most jig's client wire takes in a limit of rows (its schemas' ceilings; jig's `protocol/client.md`, section 3) |
 | a result's text | 32 KiB |
 | a turn's part | 16 KiB |
 | one document, the client's `document_bytes` | 1 MiB |
@@ -930,58 +941,40 @@ terminal's, whose window shows two rows:
 
 The client's other limits are the terminal's (`client/README.md`, section 2).
 
-## 13. What it asks of jig
+## 13. What it takes of jig
 
-Area 1 needs two things of jig and skein, which the tools do not work
-around:
+The tools work around nothing of jig's and skein's. Besides the
+contract's reads, watches and requests, they take:
 
-- **A named key.** `jig-client`'s `Send` under an engine key the
-  application gives, in place of the one the request table draws (jig's
-  `client/domain/client.md`, section 6), which needs skein's request
-  table to admit a request under a given key, refused as `Held` when it
-  holds that key already (skein's `lib.md`, section 12), which the
-  client answers `Held`. Everything else of keyed requests stays: kept
-  before sent, sent again until durable, answered once, the same name
-  asked again answered the first answer, and with another ask a
-  conflict (jig's `client/domain/contract.md`, 3.1).
-- **A read of one turn.** A contract read, `turn{n, attempt, turn}`
-  (jig's `client/domain/contract.md`, section 6), answered from the
-  store's `Scope::Turn` (jig's `protocol/store.md`, 7.3) with the turn
-  decoded, within the engine's bound on one read and the client's limit
-  for one document, and with its size in its place past either; on a
-  page, a turn past the page's bound keeps its size as the client
-  decodes it.
-
-Area 5 needs four more of jig, which its accounts design brings (jig's
-`domain/accounts.md`, section 5):
-
-- **The accounts' requests,** each of section 5's as a request of the
-  contract (jig's `client/domain/contract.md`, 3.2), with a key as the
-  others. A key's bytes are held to the tools' own bound (section 12);
-  the engine's refusal past its own, if it has one, is exit 2.
-- **A watch of a party's accounts,** `accounts` (jig's
-  `client/domain/contract.md`, 7.1): the accounts that pay for the
-  party's work, their own and the deployment's where its uses cover the
-  party, each with its sources' states, the sign-ins the party asked
-  that are in progress, the checks the party asked that are in progress
-  and how the last of each ended, and the runs and tasks waiting on
-  each. The `deployment` subject is for a deployment role alone and
-  holds no sign-in or check.
-- **The models a party may use** in `me` (jig's
-  `client/domain/contract.md`, 5.3), with each model's efforts and
-  prices, and the LLM choice in a task's request (jig's
-  `domain/tasks.md`, section 3).
-- **A request carrying a value,** sent once and never kept nor resent
-  (jig's `client/domain/client.md`, section 6; jig's
-  `protocol/client.md`, section 10), answered under its key as any
-  other within the engine's retention.
-
-Everything else the tools use is jig's as designed: its helpers
-(`shapes`, `facts`, `thread`, `words`), the documents' acts and `me`'s
-bounds (jig's `client/domain/contract.md`, 5.3), the client's bound on a
-path's segments, a service's sign-in, and the one-shot mode, whose modes
-"differ in the host alone" (jig's `client/domain/client.md`, section
-20).
+- **A named key:** `jig-client`'s `Send` under a key the application
+  names, refused `Held` when the client holds it already (jig's
+  `client/domain/client.md`, section 6), on skein's request table's
+  given keys (skein's `lib.md`, section 12); everything else of keyed
+  requests is the contract's (jig's `client/domain/contract.md`, 3.1).
+- **A read of one turn,** `turn{n, attempt, turn}` (jig's
+  `client/domain/contract.md`, section 6), answered from the store's
+  `Scope::Turn` (jig's `protocol/store.md`, 7.3); on a page, a turn past
+  the page's bound keeps its size (jig's `client/domain/contract.md`,
+  5.1).
+- **A deadline as a span** in a request a template gives one (jig's
+  `client/domain/contract.md`, 3.2), so that a named request is built
+  without the clock (section 7).
+- **For area 5,** jig's accounts (jig's `domain/accounts.md`, section 5):
+  their requests (jig's `client/domain/contract.md`, 3.2), each under a
+  key as the others, a key's bytes held to the tools' own bound
+  (section 12) and the engine's refusal past its own exit 2; the
+  `accounts` watch (jig's `client/domain/contract.md`, 7.1); the models
+  a party may use, in `me` (jig's `client/domain/contract.md`, 5.1),
+  and the LLM choice in a task's request (jig's `domain/tasks.md`,
+  section 3); and a request carrying a value,
+  sent once and never kept nor resent (jig's `client/domain/client.md`,
+  section 6; jig's `protocol/client.md`, section 10).
+- **The rest as jig designs it:** its helpers (`shapes`, `facts`,
+  `thread`, `words`; jig's `client/domain/client.md`, section 19), the
+  documents' acts and `me`'s bounds (jig's `client/domain/contract.md`,
+  5.3), the client's bound on a path's segments, a service's sign-in,
+  and the one-shot mode, whose modes "differ in the host alone" (jig's
+  `client/domain/client.md`, section 20).
 
 ## 14. Later
 
