@@ -294,7 +294,9 @@ Shape:
   pass `--reason` or empty text. Parse and print `tN/K` and `pN/K` through the table's proposal codec.
 - **Outcomes:**
   - `Done(Made)` prints `done: task 41, chat`.
-  - `Done(Proposed)` prints `proposed: t3/17, to <recipient>` (or `p3/17`).
+  - `Done(Proposed)` prints `proposed: t3/17, to <recipient>` (or `p3/17`). A kept line of a restored proposal prints its
+    identity alone, `kept: chat, proposed: t3/17`, with no `to` (decisions.md, For the user, Q, decided by the director,
+    temper 37849f0b0).
   - `Done(DecidedFirst)` prints `decided first: by <party>, <decision>, HH:MM`.
   - `Done(Changed)` and `Done(Decided)` print `done: task N, <act>`.
   - `Refused` exits 2 with the refusal in jig's words, then its alternatives: `read again: <call>` where a revision
@@ -327,6 +329,7 @@ Test shape:
   `a_refusal_exits_2_with_its_alternatives_in_text_and_json`, `an_engine_key_conflict_exits_2`,
   `held_exits_1_and_nothing_is_sent`, `another_partys_parked_name_is_held_and_exits_1` (nothing kept or sent),
   `an_act_not_offered_exits_1_with_nothing_sent`, `each_kept_request_prints_operation_and_outcome_without_name_or_keys` (named/unnamed, text/JSON; no `name` field),
+  `a_restored_proposals_kept_line_prints_its_identity_without_a_recipient` (Q),
   `dropped_and_other_party_kept_lines_use_text_or_json` (counts per party, only live me's party in `Root::kept()`, no unread payload decoded),
   `a_named_chat_has_the_same_request_bytes_under_two_clocks` (including a Span template),
   `a_named_act_has_no_process_local_fields`, `close_passes_its_reason_or_empty`,
@@ -336,7 +339,7 @@ Proof: unit, `heavy cargo nextest run -p temper-client-tools -E 'test(/held|key|
 as the engine key, `Held` exiting 1, and the kept lines. The next plan's stories connect it: "asked again under its named key, made once"
 and "a named key told Held".
 Don't: confirm before sending; send what the offer refuses; print a kept name or key; keep runner records to recover names.
-Size: at most 300 lines.
+Size: at most 310 lines, with a restored proposal's kept line (decisions.md, Q).
 Removes: nothing.
 
 ## Interface sketches

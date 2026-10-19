@@ -712,6 +712,19 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
 135. **temper 03.4: a restored proposal's recipient, interim** (design, temper 03.4's block of 2026-10-19 10:01:22 UTC).
      Interim, until decisions.md, For the user, Q, is decided: how a kept line of a restored proposal prints, when jig's `Outcome::Proposed { proposal }` keeps no recipient and tools.md, 6.1, has a kept line print "its outcome as an act's prints" (`proposed: p3/17, to maintainers`), is a design gap, and waits; it goes to the user as Q, as no designer is joined. temper 03.4 goes on with everything else, a new call's `Proposed` outcome with its offered recipient included; the kept line of a restored proposal, and its test, wait on Q, and never print a recipient the kept request does not hold. 03.4 lands once they follow Q.
 
+136. **temper 03.4: a restored proposal's recipient** (decision Q, for temper 03.4's block of 2026-10-19 10:01:22 UTC).
+     The director decided Q (decisions.md, For the user, Q, temper 37849f0b0), the default: a kept line of a restored proposal prints its identity alone (`kept: chat, proposed: t3/17`), with no `to`, as jig's `Outcome::Proposed { proposal }` keeps no recipient; a new call's outcome keeps `, to <recipient>`. temper 03.4's Shape says so under its outcomes, its Test shape adds `a_restored_proposals_kept_line_prints_its_identity_without_a_recipient`, its Size is at most 310 lines, and later.md has a row for tools.md 6.1 and 8.2. This ends ruling 135's wait; temper 03.4 lands once its kept line does this. Any further copy of a restored proposal's kept line (a fixture, a golden): refresh it as this says, and list it in the commit body.
+
+     ## Checked
+
+     - `git -C ~/src/rust/temper show 37849f0b0:docs/development/plans/tools/decisions.md | sed -n 983,985p`:
+           Decision: the default, by director, 2026-10-19: a kept line of a
+           restored proposal prints its identity alone (`kept: chat, proposed:
+           t3/17`), with no `to`. A new call's outcome keeps `, to <recipient>`.
+     - `grep -n 'kept: chat, proposed\|a_restored_proposals' docs/development/plans/tools/temper/03-tools-root.md`:
+         298:    identity alone, `kept: chat, proposed: t3/17`, with no `to` (decisions.md, For the user, Q, decided by the director,
+         332:  `a_restored_proposals_kept_line_prints_its_identity_without_a_recipient` (Q),
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
