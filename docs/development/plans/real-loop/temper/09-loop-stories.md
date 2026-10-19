@@ -45,9 +45,12 @@ Steps: `temper-09.1`, `temper-09.s1` (`09.s1-resume-behind-refusal.md`),
   `crates/temper-service/src/clients.rs`).
 - **8.2 and 6.1, the next call that sends** sends what DIRECTORY kept
   first; its line names operation and outcome, no name, no key. 09.2.
-- **8.3, the lock:** acts in turn. 09.3. None for reads, waits and
-  `pending` is `temper-client-shell-cli`'s; its end with the process is
-  the kernel's `flock` (ruling 130).
+- **8.3, the lock:** acts in turn, each holding it from its `Lock` to
+  the `Close` of the descriptor it locked, which comes after its last
+  write of DIRECTORY and before its exit. 09.3. None for reads, waits
+  and `pending`, and the `Close` after a store write in flight, are
+  `temper-client-shell-cli`'s; its end with a process that ends sooner
+  is the kernel's `flock` (ruling 130).
 - **5.6 and 11.3, an unread record:** `temper-client-shell-cli`'s and the
   tools' (ruling 130); 09.4 is dropped.
 - **8.2 and design question 3, a signal:** a killed call's status is the
@@ -198,14 +201,22 @@ Removes: 08.2's "nothing killed" end check, replaced by the count of
 
 ### 09.3 DIRECTORY's lock
 
-Scope: two acts take the lock in turn (tools.md, 8.3). Calls that send
+Scope: two acts take the lock in turn (tools.md, 8.3). A call holds it
+from its `Lock` to the `Close` of the descriptor it locked, which comes
+before its process exits (tools.md, 8.3: "it closes the descriptor it
+locked, and the lock ends with that `Close`"): the story asserts the
+turns against those `Close`s, never against the calls' exits. The
+`Close` after a store write in flight is `temper-client-shell-cli`'s
+`the_lock_outlasts_a_store_write_in_flight`. Calls that send
 nothing run unlocked in `temper-client-shell-cli`'s
 `calls_that_send_nothing_take_no_lock`, and a killed holder's lock is
 the kernel's to free: neither is a real-loop story (ruling 130).
 Needs: temper 05's lock (its retry pace, its `limits`), its reads,
 waits and `pending`.
 Files: `tests/real-loop/src/{calls.rs, world.rs, lib.rs}`,
-`tests/real-loop/tests/lock.rs` (new).
+`tests/real-loop/tests/lock.rs` (new);
+`crates/temper-client-shell-cli/src/tests.rs` and
+`src/tests/fixtures.rs`.
 Shape:
 - The caller gets a root on the scratch (`World::spawn_with_fds`).
   `probe(at)`: `Op::Open { how: OpenHow::Directory, .. }` of DIRECTORY,
@@ -214,10 +225,19 @@ Shape:
 - `fixtures::CTL`'s factory wraps temper 05's `OneShot` in
   `calls::Recorded`, which notes each `Op::Lock` the host submits and its
   completion before forwarding it, as `ServiceHost` observes the
-  service's: `Called.locked`, when one completed taken, and
-  `Called.busy`, how many completed `Busy`.
+  service's, and the completion of the first `Op::Close` of the
+  descriptor whose `Lock` completed taken: `Called.locked`, when one
+  completed taken, `Called.released`, when that `Close` completed, and
+  `Called.busy`, how many completed `Busy`. `temper-client-shell-cli`
+  stays as temper 05 landed it.
 - `contended(calls)` holds the caller until each named call's `busy` is
   at least 1.
+- In `temper-client-shell-cli`, the `Disk` fixture notes
+  `released_after: Option<u32>`, its `store_count()` at each `Op::Close`
+  of `DIRECTORY` after a `Lock` it answered taken (its opens of
+  DIRECTORY share one descriptor, so the last such `Close` is the
+  lock's). The test below holds the act's erase, as
+  `a_chat_answer_waits_for_its_erase` does, and signals then.
 Test shape: `tests/lock.rs`, the counting allocator.
 ```rust
 #[test]
@@ -238,16 +258,36 @@ fn two_acts_on_one_directory_take_its_lock_in_turn() {
     let (one, two) = (&ran.calls()[1], &ran.calls()[2]);
     assert_eq!([one.exit, two.exit], [Some(Exit::Code(0)); 2], "{}", String::from_utf8_lossy(&two.stderr));
     let (a, b) = (one.locked.expect("one took the lock"), two.locked.expect("two took the lock"));
-    assert!(one.ended <= b || two.ended <= a, "both held DIRECTORY's lock at once");
+    let (x, y) = (one.released.expect("one closed its lock"), two.released.expect("two closed its lock"));
+    assert!(x <= b || y <= a, "both held DIRECTORY's lock at once");
+}
+```
+`crates/temper-client-shell-cli/src/tests.rs`, beside
+`sigterm_mid_act_keeps_its_record`:
+```rust
+#[test]
+fn the_lock_outlasts_a_store_write_in_flight() {
+    let mut f = fixtures::Disk::act_with(fixtures::small_store(&[]));
+    f.answer_new_act();
+    assert_eq!(f.exit(), None);
+    f.signal(ServiceSignal::Terminate);
+    assert_eq!(f.released_after, None, "DIRECTORY's lock ended with a store write in flight");
+    let before = f.store_count();
+    f.store_erase();
+    assert_eq!(f.exit(), Some(Exit::Code(limits::TERMINATED)));
+    assert!(f.store_count() > before);
+    assert_eq!(f.released_after, Some(f.store_count()));
 }
 ```
 Cost: two agent turns and at least one 100 ms retry: about 08.3's,
 under 1 s; measured as 08.2's.
 Proof: joint, as 09.1's: `flock` on the real kernel, which no lower
-world has.
-Don't: retry a lock in the caller; hold the probe past the story's steps.
+world has; unit for the `Close` after a store write in flight.
+Don't: retry a lock in the caller; hold the probe past the story's steps;
+assert the turns against `Called.ended`; change temper 05's `OneShot`.
 Size: at most ~120 lines of `tests/real-loop/src`, counted as 09.1
-(ruling 130).
+(ruling 130), and at most ~20 lines of `temper-client-shell-cli`'s
+`src/tests.rs` and `src/tests/fixtures.rs`.
 Removes: nothing.
 
 ### 09.4 A record these tools cannot read
@@ -273,6 +313,8 @@ pub struct Called {
     /* 08's fields, then: */
     /// When its `Lock` on DIRECTORY completed taken; `None` if it took none.
     pub locked: Option<Time>,
+    /// When the `Close` of the descriptor it locked completed; `None` if it took none.
+    pub released: Option<Time>,
     /// Its `Lock` completions that were `Busy`.
     pub busy: u32,
 }
@@ -293,8 +335,9 @@ pub fn probe(at: Dir) -> Step;
 pub fn release(at: Dir) -> Step;
 pub fn contended(calls: &'static [usize]) -> Step;
 pub fn listed(stdout: &[u8]) -> Vec<u64>;
-/// temper 05's `OneShot`, each `Lock` it submits and its completion noted before forwarding.
-pub struct Recorded { /* the host, the lock's token, locked, busy */ }
+/// temper 05's `OneShot`, each `Lock` it submits and its completion, and the `Close` of
+/// the descriptor it locked, noted before forwarding.
+pub struct Recorded { /* the host, the lock's token, the locked descriptor, locked, released, busy */ }
 
 // tests/real-loop/src/service.rs
 /// The engine's durable hold of one named request, after one-process's `Capture`.
@@ -333,6 +376,10 @@ decisions.md 9 and 10:
 - **temper 05's or temper-03.4's names or lines** differ from `05-ctl.md`'s
   and tools.md 6.1's: follow the landed code; a kept name or key printed
   is a finding. **The native shell dials at start:** raise it.
+- **The `Disk` fixture cannot hold the erase across the signal** in
+  `the_lock_outlasts_a_store_write_in_flight`: hold another store write
+  of the act's at the signal, by the fixture's `hold_stores`; raise it
+  only if none can be held, with what the host did.
 
 ## Done when
 
@@ -342,5 +389,7 @@ Each prints what it says, on `origin/main`, after `git fetch`:
   prints counts that sum to 3 (ruling 130).
 - `git grep -n -F -e 'Signal::Kill' -e 'Op::Lock' origin/main -- tests/real-loop/src`
   prints at least two lines.
+- `git grep -c -F 'fn the_lock_outlasts_a_store_write_in_flight(' origin/main -- crates/temper-client-shell-cli/src`
+  prints a count of 1.
 - `git grep -n -E '127\.0\.0\.1:[1-9]' origin/main -- tests/real-loop`
   prints nothing.

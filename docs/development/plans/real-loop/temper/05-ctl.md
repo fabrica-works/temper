@@ -54,7 +54,9 @@ read, `sign-in FILE` and the `chat` act, all temper 08.3 needs; 05.5 and
   host opens a second descriptor, `Op::Open { root: parent, path: b".",
   how: OpenHow::Directory }` (`Op::is_valid` allows it), which
   `Shell::adopt` owns, with `Settings.directory` the leaf. The lock is
-  the host's open, held to the end; the OS frees it on a kill. Tokens:
+  the host's open, held until the host closes it, once the call has its
+  status and `Shell` is empty, before its output drains and it exits
+  (tools.md, 8.3); the OS frees it on a kill. Tokens:
   the host's io `host::TAG` (1 << 61, as `terminal/run.rs`), its
   `FileIo` `host::FILES` (1 << 62); `Shell` keeps its own (`files.rs`).
 - **The recovery barrier:** `Request::Ready`, `Root::kept() == 0` (the

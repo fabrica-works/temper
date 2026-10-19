@@ -757,13 +757,22 @@ as the terminal's host is:
 
 An agent runs a `wait` while it acts, or several agents share a party.
 
-- **A call that sends** takes an exclusive lock on DIRECTORY for its
-  run, so two never write the small store over each other: skein's
-  `Lock` on a root (skein's `io.md`, section 5), on DIRECTORY itself,
-  since `store` is replaced by a rename on each write. A second tries
-  again every 100 ms, and past the lock's wait (section 12) exits 1,
-  "DIRECTORY is busy with another call". The lock ends with the process,
-  however it ends.
+- **A call that sends** takes an exclusive lock on DIRECTORY before it
+  loads the small store's records (8.2, step 2), so two never write the
+  small store over each other: skein's `Lock` on a root (skein's
+  `io.md`, section 5), on DIRECTORY itself, since `store` is replaced by
+  a rename on each write. A second tries again every 100 ms, and past
+  the lock's wait (section 12) exits 1, "DIRECTORY is busy with another
+  call".
+- **The lock ends when the call is done with DIRECTORY,** before its
+  process exits: once the call has its status and its reads and writes
+  of DIRECTORY have completed, a store write in flight at a signal
+  included, it closes the descriptor it locked, and the lock ends with
+  that `Close` (skein's `io.md`, section 5: "The lock lasts as long as
+  the root's descriptor: until its `Close`"). Its output drains and its
+  process exits after, touching nothing of DIRECTORY, so the next call
+  never waits on a slow reader of this one's output. A process that ends
+  sooner, however it ends, ends the lock with its descriptor.
 - **Which take it:** every act, `sign-in` and `sign-out`; never
   `pending`, `help`, a read or a wait.
 - **A read and a wait** take no lock, and hold their client's store in
