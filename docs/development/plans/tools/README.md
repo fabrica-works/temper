@@ -208,7 +208,19 @@ should move the pin and repair nothing (findings/base-repin.md).
   `tiny` row and its three-line opener) and
   `crates/jig-client-domain/src/tests/requests.rs` (its save-then-send
   destructuring) are mended by the first increment that edits them,
-  said in its commit body.
+  said in its commit body. A case that extends a fixture is built from
+  it (`[fixtures::ADOPTION, &["--no-home"]].concat()`), never retyped;
+  each size a test uses (a depth, a capacity, a chunk) is a named const
+  of its fixtures, with a line on what a smaller value would miss. Both
+  hold for each test an increment touches in a file it edits (the
+  steer of 07:05).
+- **One behaviour per test** (testing-strategy.md, 10). A test checks
+  one behaviour and is named for it, never with "and": temper's
+  `adopts_flags_parse_and_its_absent_flags_stay_absent` becomes
+  `adopt_flags_parse_to_their_values` and
+  `adopt_absent_flags_stay_absent`. A two-behaviour test in a file an
+  increment edits is split there, said in its commit body; 12.1's
+  plan-given names stay.
 - **No lint exception for a plan's words.** A Shape or sketch that needs
   a call clippy.toml bans is a question, raised before any `#[expect]`;
   each new `#[expect]` or `#[allow]` is named in the report. temper's

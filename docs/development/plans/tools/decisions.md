@@ -452,6 +452,13 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
      - temper `crates/temper-client-tools/src/tests/boundary.rs:5`: `assert!(!text.to_ascii_lowercase().contains("temper"), …)`; `docs/examples/owned.json:192`: `"memory_bytes": 78669036813790`, +370824 is 78669037184614; `temper-service/src/tests/family.rs:276`: `fn a_request_under_the_pages_owner_is_answered_undecodable()`.
      - jig `crates/jig-client-view/src/page/conversations.rs:405`: `query.phase = Some(contract::PhaseClass::Ended);` `jig-client-domain/src/contract/reads.rs:47`: `Tasks { query: super::TaskQuery, live: Option<Cursor>, ended: Option<Cursor> }`.
 
+120. **Test shape: fixtures built on, sizes named, one behaviour per test** (steer of 07:05).
+     From the hourly check of 06:51:27Z: the README's "Rules of this plan" now hold, for each test an increment touches in a file it edits, that a case extending a fixture is built from it (`[fixtures::ADOPTION, &["--no-home"]].concat()`), never retyped; that each size a test uses (a depth, a capacity, a chunk) is a named const of its fixtures, with a line on what a smaller value would miss; and, as a rule of its own, "One behaviour per test" (testing-strategy.md, 10): a test checks one behaviour and is named for it, never with "and", and a two-behaviour test in a file an increment edits is split there, said in its commit body. 12.1's plan-given test names stay.
+
+     Checked:
+     - `git -C ~/src/rust/temper grep -n 'fn adopts_flags_parse_and_its_absent_flags_stay_absent\|fn json_arguments_use_snake_case\|List::with_capacity(32)\|depth: 6\|depth: 2' origin/main -- crates/temper-client-tools/src/tests`: `table.rs:237` the adopt test, `table.rs:295` `List::with_capacity(32)`, `json.rs:168` `depth: 6`, `json.rs:180` `fn json_arguments_use_snake_case()`, `fixtures.rs:114` `writer::Limits { depth: 2, … }`.
+     - The kit's testing-strategy.md, 10: line 540 "One behaviour per test", line 561 "Named fixtures and sizes".
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
