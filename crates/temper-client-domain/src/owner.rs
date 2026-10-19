@@ -4,6 +4,7 @@
 pub enum Owner {
     Pages,
     Forge,
+    Runner,
 }
 impl Owner {
     #[must_use]
@@ -11,6 +12,9 @@ impl Owner {
         match self {
             Self::Pages => jig_client::Asker(u32::from(temper_client_protocol_wire::number(
                 temper_client_protocol_wire::Owner::Pages,
+            ))),
+            Self::Runner => jig_client::Asker(u32::from(temper_client_protocol_wire::number(
+                temper_client_protocol_wire::Owner::Runner,
             ))),
             Self::Forge => jig_client::Asker(u32::from(temper_client_protocol_wire::number(
                 temper_client_protocol_wire::Owner::Forge,
@@ -23,6 +27,8 @@ impl Owner {
             Some(Self::Pages)
         } else if asker == Self::Forge.asker() {
             Some(Self::Forge)
+        } else if asker == Self::Runner.asker() {
+            Some(Self::Runner)
         } else {
             None
         }

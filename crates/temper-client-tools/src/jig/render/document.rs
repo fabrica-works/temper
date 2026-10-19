@@ -1,0 +1,385 @@
+//! Step-local document rendering; no borrowed document survives a step.
+use super::{Text, acts};
+use crate::jig::{Limits, runner::Printed};
+use alloc::boxed::Box;
+use jig_client::{
+    contract::{HeldRole, Me, OwnerRequester, Recipient, Task, WaitedFor, WaitsOn, Whom},
+    words::{self, Word},
+};
+use skein_json::writer::Encoder;
+use skein_ui::phrases::{PhraseLimits, Phrasebook};
+#[derive(Debug)]
+pub enum Document<'a> {
+    Me(&'a Me),
+    Task(&'a Task, Option<&'a Me>),
+}
+#[must_use]
+pub fn print(
+    document: Document<'_>,
+    json: bool,
+    limits: &Limits,
+    owner_part: fn(&jig_client::contract::OwnerPart, &mut Text),
+) -> Printed {
+    let stdout = if json {
+        let bounds = skein_json::writer::Limits {
+            depth: 32,
+            length: u32::try_from(limits.ask_bytes).expect("output bound fits"),
+        };
+        let mut measure = Encoder::measure(&bounds);
+        encode(&document, limits, &mut measure);
+        let Ok(size) = measure.measured() else { return super::failure(b"result limit", true, 1) };
+        let mut write = Encoder::write(size, &bounds);
+        encode(&document, limits, &mut write);
+        write.finish()
+    } else {
+        let book = phrasebook(limits.text);
+        let mut measure = Text::measure();
+        text(&document, &book, owner_part, &mut measure);
+        let structural = measure.structural();
+        let mut measure = Text::bounded(limits, structural);
+        text(&document, &book, owner_part, &mut measure);
+        let mut out = measure.writing(limits, structural);
+        text(&document, &book, owner_part, &mut out);
+        out.finish()
+    };
+    Printed { status: 0, stdout, stderr: Box::default() }
+}
+fn text(
+    document: &Document<'_>,
+    book: &Phrasebook,
+    owner_part: fn(&jig_client::contract::OwnerPart, &mut Text),
+    out: &mut Text,
+) {
+    match document {
+        Document::Me(me) => me_text(me, book, out),
+        Document::Task(task, me) => task_text(task, *me, book, owner_part, out),
+    }
+}
+fn phrasebook(text: u32) -> Phrasebook {
+    let shapes = words::phrase_shapes(text);
+    let limits = PhraseLimits {
+        languages: 1,
+        phrases: words::PHRASES,
+        holes: 3,
+        segments: words::PHRASES.checked_mul(8).expect("phrase segments"),
+        text_bytes: 16_384,
+        hole_bytes: text,
+    };
+    Phrasebook::load(shapes, Box::new([words::english()]), &limits).expect("checked jig phrases")
+}
+fn me_text(me: &Me, book: &Phrasebook, out: &mut Text) {
+    out.put(b"party ");
+    out.number(me.party.number);
+    out.put(b" \xc2\xb7 ");
+    out.words(me.party.login.bytes());
+    out.put(b" \xc2\xb7 ");
+    out.words(me.party.name.bytes());
+    out.put(b"\nprojects:\n");
+    for project in &me.projects {
+        out.put(b"  ");
+        out.number(u64::from(project.project));
+        if let Some(name) = &project.name {
+            out.put(b" \xc2\xb7 ");
+            out.words(name.bytes());
+        }
+        out.put(b" \xc2\xb7 ");
+        role(project.role, out);
+        if let Some(pool) = &project.pool {
+            out.put(b" \xc2\xb7 pool left ");
+            out.number(pool.left);
+        }
+        out.put(b"\n");
+        if let Some(creating) = &project.creating {
+            out.put(b"    creating within ");
+            acts::create_bounds(&creating.within, out);
+            match &creating.beyond {
+                jig_client::contract::Beyond::Proposed { to } => acts::proposed(to, Some(me), out),
+                jig_client::contract::Beyond::Refused(why) => {
+                    out.put(b"; refused beyond them: ");
+                    acts::refusal(why, book, out);
+                }
+            }
+            out.put(b"\n");
+        }
+    }
+    out.put(b"needs: ");
+    out.number(u64::from(me.needs_total));
+    out.put(b" \xc2\xb7 questions ");
+    out.number(u64::from(me.needs.questions));
+    out.put(b" \xc2\xb7 proposals ");
+    out.number(u64::from(me.needs.proposals));
+    out.put(b" \xc2\xb7 escalations ");
+    out.number(u64::from(me.needs.escalations));
+    out.put(b" \xc2\xb7 person tasks ");
+    out.number(u64::from(me.needs.person_tasks));
+    out.put(b"\nupdates: ");
+    out.number(u64::from(me.updates.value));
+    if me.updates.limited {
+        out.put(b"+");
+    }
+    out.put(b"\nretention: ");
+    out.number(me.retention.as_nanos());
+    out.put(b" ns\n");
+}
+fn role(role: HeldRole, out: &mut Text) {
+    match role {
+        HeldRole::Owner => out.put(b"owner"),
+        HeldRole::Maintainer => out.put(b"maintainer"),
+        HeldRole::Member => out.put(b"member"),
+        HeldRole::Observer => out.put(b"observer"),
+        HeldRole::Policy { role } => {
+            out.put(b"role ");
+            out.number(u64::from(role));
+        }
+    }
+}
+fn task_text(
+    task: &Task,
+    me: Option<&Me>,
+    book: &Phrasebook,
+    owner_part: fn(&jig_client::contract::OwnerPart, &mut Text),
+    out: &mut Text,
+) {
+    out.put(b"task ");
+    out.number(task.chip.task);
+    out.put(b" \xc2\xb7 ");
+    match task.flags.conversation {
+        true => out.put(b"chat"),
+        false if task.goal == Some(task.chip.task) => out.put(b"goal"),
+        false => {
+            out.put(b"label ");
+            out.number(u64::from(task.label));
+        }
+    }
+    out.put(b" \xc2\xb7 ");
+    out.put(&book.say(0, Word::Phase(task.chip.phase).id(), &[]).expect("phase phrase").text);
+    out.put(b" \xc2\xb7 ");
+    project(task.project, me, out);
+    if let Some(priority) = task.priority {
+        out.put(b" \xc2\xb7 priority ");
+        out.number(u64::from(priority));
+    }
+    out.put(b"\nasked: ");
+    out.words(task.spec.specification.words.bytes());
+    out.put(b"\nrequester: ");
+    match task.requester {
+        OwnerRequester::Person(party) => acts::party(party, me, out),
+        OwnerRequester::Task(task) => {
+            out.put(b"task ");
+            out.number(task);
+        }
+        OwnerRequester::Deployment { project } => {
+            out.put(b"deployment ");
+            out.number(u64::from(project));
+        }
+    }
+    out.put(b" \xc2\xb7 spent ");
+    amount(task.budget.numbers.spent, out);
+    out.put(b" of ");
+    amount(task.budget.numbers.budget, out);
+    match task.budget.deadline {
+        None => out.put(b" \xc2\xb7 no deadline"),
+        Some(wall) => {
+            out.put(b" \xc2\xb7 deadline ");
+            utc(wall, out);
+        }
+    }
+    out.put(b"\nwaiting on: ");
+    waiting(&task.waits_on, me, book, out);
+    out.put(b"\n");
+    if let Some(context) = &task.context {
+        out.put(b"plan: ");
+        out.number(
+            u64::from(context.impact.tasks.running)
+                .checked_add(u64::from(context.impact.tasks.waiting))
+                .expect("plan counts fit")
+                .checked_add(u64::from(context.impact.tasks.held))
+                .expect("plan counts fit"),
+        );
+        out.put(b" live (");
+        out.number(u64::from(context.impact.tasks.running));
+        out.put(b" running, ");
+        out.number(u64::from(context.impact.tasks.waiting));
+        out.put(b" waiting, ");
+        out.number(u64::from(context.impact.tasks.held));
+        out.put(b" held below)\n");
+    }
+    for resource in &task.resources {
+        if let jig_client::contract::TaskResource::Owner(resource) = resource {
+            out.put(b"resource: ");
+            owner_part(&resource.part, out);
+            out.put(b"\n");
+        }
+    }
+    acts::text(task, me, book, out);
+}
+fn project(number: u32, me: Option<&Me>, out: &mut Text) {
+    if let Some(me) = me {
+        for project in &me.projects {
+            if project.project == number
+                && let Some(name) = &project.name
+            {
+                out.words(name.bytes());
+                return;
+            }
+        }
+    }
+    out.put(b"project ");
+    out.number(u64::from(number));
+}
+fn waiting(value: &WaitsOn, me: Option<&Me>, book: &Phrasebook, out: &mut Text) {
+    match value {
+        WaitsOn::Party { whom, task, kind, entries } => {
+            match whom {
+                Whom::Person(party) => acts::party(*party, me, out),
+                Whom::Role { project, role } => {
+                    acts::recipient(&Recipient::Role { project: *project, role: *role }, me, out);
+                }
+            }
+            out.put(b": ");
+            match kind {
+                WaitedFor::Question => out.put(b"question"),
+                WaitedFor::Proposal => out.put(b"proposal"),
+                WaitedFor::Escalation => out.put(b"escalation"),
+                WaitedFor::PersonTask => out.put(b"person task"),
+            }
+            out.put(b" of task ");
+            out.number(*task);
+            out.put(b" \xc2\xb7 ");
+            out.number(u64::from(*entries));
+            out.put(b" waiting");
+        }
+        WaitsOn::Delegates | WaitsOn::News | WaitsOn::Nothing => {
+            out.put(&book.say(0, Word::waiting(value).id(), &[]).expect("waiting phrase").text);
+        }
+    }
+}
+fn amount(value: u64, out: &mut Text) {
+    out.number(value / 100);
+    out.put(b".");
+    if value % 100 < 10 {
+        out.put(b"0");
+    }
+    out.number(value % 100);
+}
+fn utc(wall: skein_lib::Wall, out: &mut Text) {
+    let minute = wall.as_secs() / 60;
+    let hour = (minute / 60) % 24;
+    if hour < 10 {
+        out.put(b"0");
+    }
+    out.number(hour);
+    out.put(b":");
+    if minute % 60 < 10 {
+        out.put(b"0");
+    }
+    out.number(minute % 60);
+}
+struct Cut {
+    room: usize,
+    left: u64,
+}
+impl Cut {
+    fn words(&mut self, bytes: &[u8], out: &mut Encoder) {
+        let end = super::text_end(bytes, self.room);
+        self.room = self.room.checked_sub(end).expect("within text budget");
+        self.left = self
+            .left
+            .checked_add(u64::try_from(bytes.len().checked_sub(end).expect("within value")).expect("byte count fits"))
+            .expect("within document budget");
+        out.string(bytes.get(..end).expect("UTF-8 cut"));
+    }
+}
+fn hex(bytes: &[u8], out: &mut Encoder) {
+    let mut hex = skein_lib::Writer::new(bytes.len().checked_mul(2).expect("document bound fits"));
+    for byte in bytes {
+        for digit in [byte >> 4u32, byte & 15] {
+            hex.put(&[if digit < 10 {
+                b'0'.checked_add(digit).expect("digit")
+            } else {
+                b'a'.checked_add(digit.checked_sub(10).expect("hex letter")).expect("letter")
+            }])
+            .expect("measured hex");
+        }
+    }
+    out.string(&hex.finish());
+}
+fn encode(document: &Document<'_>, limits: &Limits, out: &mut Encoder) {
+    let mut cut = Cut { room: usize::try_from(limits.text).expect("text limit fits"), left: 0 };
+    match document {
+        Document::Me(me) => encode_me(me, out, &mut cut),
+        Document::Task(task, _) => encode_task(task, out, &mut cut),
+    }
+}
+mod admissions;
+mod bounds;
+mod chips;
+mod creation;
+mod endings;
+mod hold_reasons;
+mod hold_states;
+mod holds;
+mod limits;
+mod me;
+mod outcomes;
+mod owner_authority;
+mod owner_chips;
+mod owner_links;
+mod owner_resources;
+mod parties;
+mod parts;
+mod results;
+mod runs;
+mod runtime;
+mod task_fields;
+mod tasks;
+mod templates;
+use admissions::{encode_act_kind, encode_active_run, encode_actor, encode_admission};
+use bounds::{
+    encode_admission_limit, encode_attempt_failure, encode_beyond, encode_bounds, encode_budget, encode_call_identity,
+};
+use chips::{encode_chip, encode_closing, encode_closing_stage};
+use creation::{
+    encode_count, encode_create_bounds, encode_creating, encode_current_hold, encode_decision,
+    encode_document_specification, encode_document_text, encode_effect,
+};
+use endings::{encode_ending, encode_escalation, encode_executor, encode_failure_class, encode_field_rule};
+use hold_reasons::{encode_hold_reason, encode_impact};
+use hold_states::{encode_hold_category, encode_hold_failure};
+use holds::{encode_funder, encode_grant, encode_held_role, encode_held_runtime, encode_hold};
+use limits::{encode_lacking, encode_limit};
+use me::{encode_live_delegate, encode_malformed, encode_me, encode_moved, encode_offered, encode_owner_authority};
+use outcomes::{encode_proposer, encode_recipient, encode_refusal, encode_release_effect, encode_result};
+use owner_authority::{
+    encode_owner_authority_document, encode_owner_authority_executor, encode_owner_budget, encode_owner_chip_details,
+    encode_owner_chip_ending, encode_owner_chip_hold,
+};
+use owner_chips::{
+    encode_owner_chip_phase, encode_owner_chip_work, encode_owner_delegation, encode_owner_escalation_holder,
+    encode_owner_executor, encode_owner_failure_tries,
+};
+use owner_links::{
+    encode_owner_person_wait, encode_owner_prior_phase, encode_owner_requester, encode_owner_resource_line,
+    encode_owner_resource_scope, encode_owner_task_link,
+};
+use owner_resources::{
+    encode_owner_grant, encode_owner_hold_escalation, encode_owner_kind_implication, encode_owner_numbers,
+    encode_owner_part, encode_owner_pattern, encode_owner_person_stall_notice,
+};
+use parties::{
+    encode_part_scope, encode_party, encode_party_kind, encode_passed, encode_person_address, encode_phase,
+    encode_phase_counts, encode_pool_ledger, encode_proposal_key,
+};
+use parts::{encode_owner_wake_policy, encode_parameter_document, encode_part};
+use results::{encode_result_details, encode_result_value, encode_results_wake, encode_retention};
+use runs::{encode_retry_notice, encode_revision, encode_run_observation, encode_run_stage};
+use runtime::{encode_runtime, encode_specification_document, encode_spend_line, encode_steering, encode_subscription};
+use task_fields::{
+    encode_task_contract_document, encode_task_flags, encode_task_hold, encode_task_resource, encode_task_result,
+    encode_template,
+};
+use tasks::{encode_subscription_kind, encode_taken_by, encode_task};
+use templates::{
+    encode_template_deadline, encode_template_executor, encode_verdict_choice, encode_waits_on, encode_wake_policy,
+    encode_wake_rule, encode_writer_slot,
+};

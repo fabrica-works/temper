@@ -1,5 +1,6 @@
 mod boundary;
-mod fixtures;
+pub(crate) mod fixtures;
+mod jig;
 mod json;
 mod key;
 mod limits;

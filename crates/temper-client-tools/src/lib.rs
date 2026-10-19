@@ -6,6 +6,7 @@ pub mod adopt;
 pub mod jig;
 pub mod key;
 pub mod limits;
+pub mod root;
 pub mod table;
 #[cfg(test)]
 mod tests;

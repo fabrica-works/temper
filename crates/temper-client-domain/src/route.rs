@@ -132,7 +132,7 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: jig_client::Told,
                 forge(root, env, event, out);
             }
         }
-        None => out.push(Request::Fact { fact: Fact::UnknownAsker }),
+        Some(Owner::Runner) | None => out.push(Request::Fact { fact: Fact::UnknownAsker }),
     }
 }
 

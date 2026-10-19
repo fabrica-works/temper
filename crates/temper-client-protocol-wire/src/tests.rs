@@ -70,10 +70,14 @@ fn limits_take_each_bound_from_its_source_field() {
 }
 
 #[test]
-fn each_owner_has_its_number_and_back() {
-    for (owner, number) in [(crate::Owner::Forge, 1), (crate::Owner::Pages, 2)] {
+fn each_owner_round_trips_its_number() {
+    for (owner, number) in [(crate::Owner::Forge, 1), (crate::Owner::Pages, 2), (crate::Owner::Runner, 3)] {
         assert_eq!(crate::number(owner), number);
         assert_eq!(crate::owner(number), Some(owner));
     }
-    assert_eq!(crate::owner(65_535), None, "a number no owner of this build has");
+}
+
+#[test]
+fn an_unknown_owner_number_has_no_owner() {
+    assert_eq!(crate::owner(65_535), None);
 }

@@ -20,7 +20,7 @@ pub fn to_root(
                 Some(wire::Owner::Forge) if version == wire::CLIENT_VERSION => {
                     w::Adopt::decode(limits, &mut reader).ok()
                 }
-                Some(wire::Owner::Forge | wire::Owner::Pages) | None => None,
+                Some(wire::Owner::Forge | wire::Owner::Pages | wire::Owner::Runner) | None => None,
             };
             let Some(request) = request else {
                 return Err(Box::new(kit::Event::Application(kit::FromApplication::Undecodable { to: reply_to })));

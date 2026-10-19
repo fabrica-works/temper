@@ -273,16 +273,19 @@ fn an_adopted_repository_keeps_its_protection_rule() {
 }
 
 #[test]
-fn a_request_under_the_pages_owner_is_answered_undecodable() {
-    let pages = wire::number(wire::Owner::Pages);
-    let Err(answer) = family::to_root(exchange(pages, wire::CLIENT_VERSION, wire::adopt(&adopt())), &[], &w::CEILINGS)
-    else {
-        panic!("pages is not served")
-    };
-    let kit::Event::Application(kit::FromApplication::Undecodable { to }) = *answer else {
-        panic!("undecodable answer")
-    };
-    assert_eq!(to, REPLY);
+fn a_request_under_an_owner_without_records_is_answered_undecodable() {
+    for owner in [wire::Owner::Pages, wire::Owner::Runner] {
+        let number = wire::number(owner);
+        let Err(answer) =
+            family::to_root(exchange(number, wire::CLIENT_VERSION, wire::adopt(&adopt())), &[], &w::CEILINGS)
+        else {
+            panic!("owner is not served: {owner:?}")
+        };
+        let kit::Event::Application(kit::FromApplication::Undecodable { to }) = *answer else {
+            panic!("undecodable answer: {owner:?}")
+        };
+        assert_eq!(to, REPLY, "{owner:?}");
+    }
 }
 
 const NOT_OFFERED_RECORD: &[u8] = &[10];
@@ -311,7 +314,7 @@ fn an_authority_refusal_keeps_whom_a_proposal_could_go_to() {
     assert_eq!(refusal_bytes(refusal).as_ref(), PROPOSABLE_WRITER_RECORD);
 }
 #[test]
-fn a_malformed_refusal_keeps_its_position_and_reason() {
+fn a_malformed_refusal_encodes_its_fields() {
     let refusal = people::Refusal::NotWellFormed { at: MALFORMED_POSITION, why: people::Malformed::Cycle };
     assert_eq!(refusal_bytes(refusal).as_ref(), MALFORMED_RECORD);
 }

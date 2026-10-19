@@ -19,6 +19,8 @@ pub enum Owner {
     Forge,
     /// The application's pages, using jig's operations and subjects.
     Pages,
+    /// Calls made by the tools runner.
+    Runner,
 }
 /// The owner's number, never assigned to another owner.
 #[must_use]
@@ -26,6 +28,7 @@ pub const fn number(owner: Owner) -> u16 {
     match owner {
         Owner::Forge => FORGE,
         Owner::Pages => 2,
+        Owner::Runner => 3,
     }
 }
 /// The owner a number names, if this build knows it.
@@ -34,6 +37,7 @@ pub const fn owner(number: u16) -> Option<Owner> {
     match number {
         FORGE => Some(Owner::Forge),
         2 => Some(Owner::Pages),
+        3 => Some(Owner::Runner),
         _ => None,
     }
 }
