@@ -260,6 +260,15 @@ pass:
 
      The check compiled the corrected `ctl.rs` fixture and the five tests under clippy (clean) and ran `rdeps(temper)`: 59 passed. None of them ran against the shipped binary: `Start`, `Until` and `Cut` need temper 05. 10.1 and forge kit's 02.1 both edit `Process`, `ChatJudge::observe` and `process.rs`: the second to land rebases. Refresh any further copy of these lines, and list it in the commit body.
 
+106. **temper 09's Shapes against main** (ready check of temper-09.1).
+     Ready check of temper 09 against temper 28aef8f70 (08.1 landed as 2065dd47f; rulings 102 and 103 touch only 05 and 06): no name of 09 mismatches landed code. Its corrections:
+
+     - 09.4's Shape: `Unread`'s `Event` match names every variant (`wildcard_enum_match_arm` is denied), and its `Debug` is written by hand, since `jig_client_shell_native::Shell` has none (`missing_debug_implementations` is denied); the key's name is `temper_client_tools::jig::key::Name`.
+     - 09.4's Files: `temper-client-tools` comes with 09.2, `skein-io` and `skein-lib` with 08.2.
+     - 09.2's Files gain `tests/real-loop/src/fixtures.rs`: D2's parent is `fixtures::write`'s, as D1's; if 08.2's `write` makes D1's alone, 09.2 makes D2's there.
+
+     The check compiled 09.4's `unread::record()` and `Unread` sketch and 09.1's landed names under clippy (clean) and ran `rdeps(temper-real-loop-world)`: 3 passed. 09's stories cannot compile before 08.2 to 08.4 and temper 05. Refresh any further copy of these names, and list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

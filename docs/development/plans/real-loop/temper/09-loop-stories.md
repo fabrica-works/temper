@@ -149,9 +149,11 @@ D2, signed in as the same party; then from D1 by the next act (tools.md,
 7, 8.2, 11.3).
 Needs: temper 05's `chat` act with the kept requests sent first (8.2,
 step 4); the tools plan's temper-03.4, the kept lines.
-Files: `tests/real-loop/src/{calls.rs, service.rs, world.rs, lib.rs}`,
-`tests/real-loop/tests/lost.rs` (new), `tests/real-loop/Cargo.toml`
+Files: `tests/real-loop/src/{calls.rs, service.rs, world.rs, lib.rs,
+fixtures.rs}`, `tests/real-loop/tests/lost.rs` (new), `tests/real-loop/Cargo.toml`
 (`temper-client-tools`), root `Cargo.lock` (hotspot: forge kit).
+D2's parent is `fixtures::write`'s, as D1's: if 08.2's `write` makes
+D1's alone, 09.2 makes D2's there (ruling 106).
 Shape:
 - `service::Cue`, after `Capture::complete` (Choices). The referee arms
   `ServiceHost` with each `held` step's key before the run starts.
@@ -271,10 +273,12 @@ temper-03.4, the `dropped:` line.
 Files: `tests/real-loop/src/{unread.rs (new), fixtures.rs, world.rs,
 calls.rs, lib.rs}`, `tests/real-loop/tests/unread.rs` (new),
 `tests/real-loop/Cargo.toml` (`jig-client`, `jig-client-shell-native`,
-`jig-client-protocol-wire`), root `Cargo.lock`.
+`jig-client-protocol-wire`; `temper-client-tools` comes with 09.2,
+`skein-io` and `skein-lib` with 08.2), root `Cargo.lock`.
 Shape:
 - `unread::record()`: a `jig_client::Record` keyed by
-  `temper_client_tools::key::engine` of the `jig::key::Name` `unread`
+  `temper_client_tools::key::engine` of the
+  `temper_client_tools::jig::key::Name` `unread`
   (its `new` is an `Option`), whose bytes are
   `jig_client_protocol_wire::Kept::new(&CEILINGS, KeptParts {
   store_version: u16::MAX, record: Box::default() })` measured and
@@ -285,7 +289,10 @@ Shape:
   `limits`, `engine` `127.0.0.1:0`, never dialled), `adopt`s DIRECTORY,
   and once `loaded()` answers, `down(jig_client::Request::Save { .. })`
   of the record; at `jig_client::Event::Stored` it closes and exits 0,
-  at `NotStored` 1.
+  at `NotStored` 1. Its `Event` match names every variant
+  (`wildcard_enum_match_arm` is denied), and `Unread`'s `Debug` is
+  written by hand, since `jig_client_shell_native::Shell` has none
+  (`missing_debug_implementations` is denied).
 - `unread(at)`: `Step::Unread`, a call at its index.
 Test shape: `tests/unread.rs`, the counting allocator.
 ```rust
