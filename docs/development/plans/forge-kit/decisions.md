@@ -1162,6 +1162,25 @@ where its answer lands.
 162. **Diagnose pinned Jig UTF-8 provenance before further process proof** (cross-session scope, temper02.1 block of 2026-10-19T12:44:46Z).
      Authorize the bounded scratch-only diagnosis in 02.1's new exception, under ruling162. The preserved retry proves that invalid UTF-8 reached pinned Jig's documents::small::text; it does not yet prove which layer supplied the bytes or which code must change. Trace that provenance from the actual failing tree and pins, comparing the last passing source, and seek a deterministic lower-layer reproducer before assigning a repair. Budget: 20 minutes and three executable diagnostic attempts through pinned heavy and explicit bash script files; compile/setup failures count, queue waits grant no extra attempts. No further full process run, recording or gate precedes the diagnostic report and next scope ruling. No production repair lands under this exception, and no UTF-8 assertion, input payload, error, bound or proof is relaxed. Preserve both original process attempts and the four-commit implementation; map any further reached caller or copy in the report. Required process and gate proofs remain outstanding. A fresh implementer thread performs this diagnostic only, then returns the evidence and proposed owner/location or uncertainty; any design gap goes to the designer under development.md10.4.
 
+163. **Report hourly07 refreshed primary graph coverage** (hourly07 graph refresh completion).
+     Reverses: ruling161's temporary graph prohibition, 2026-10-19T12:49:00Z, and steer2026-10-19T12:50:00Z point1, only through the refreshed source inputs below; the standing freshness and source-verification rule remains.
+     Amends: README Rules, Graph freshness, removing the temporary hourly07 prohibition.
+
+     All five exact primary projects are ready after supported primary-only index_repository refreshes. Use the graphs as locators through the recorded inputs, checking every result in the actual worktree; source searches remain required for gaps and later source changes. No worktree or dependency checkout was indexed, and no production, kit, proof or budget changed.
+
+     Recorded primary inputs and index_status readiness (UTC; nodes/edges):
+     - srv-data-git-runner-src-skein:dae2ab6bc9ea8eb16b86fcaf9ae95cd062ab2da5,12:52:27,28409/212268.
+     - srv-data-git-runner-src-smith:83eaa2ae173ba34c2d68b2cb06d175cd97136af2,12:52:49,27207/193775.
+     - srv-data-git-runner-src-jig:149970b999bf2ffb639c2e3398b842084525afab,12:53:29,57767/481008.
+     - srv-data-git-runner-src-hearth:5efba43e0a036628119cb5892fe5c6de2a2eb319,12:53:43,12696/75142.
+     - srv-data-git-runner-src-temper:efe462a251ea681f1d193830c32d7b95b3a6d48f,12:54:02,23613/159797.
+
+     Checked: pump/hourly07-graph-index-inputs2.json records the clean ancestry-checked primary fast-forwards; graph-refresh-results.json and graph-post.json retain refresh and readiness diagnostics. graph-post-heads.json confirms the same clean heads afterward. The git.head_sha field alone was not used as index evidence; the recorded source inputs bracket the explicit refreshes. Later origin/main landings are outside this coverage claim.
+
+     Known gaps remain: skein3 partial files and8 intentionally hostile JSON files; smith1 partial reference patch; jig1 skipped generated parser file; hearth12 partial/14 unusable template fixtures; temper2 partial mockup/proof-script ranges. Omitted lock/golden/binary files remain source-only. Diagnostics are not completeness guarantees: preserve source fallback for any further omission and name a newly reached gap in the session report.
+
+     Checked graph/source locators: search_graph found skein connection.rs::start_backoff_doubles_to_its_maximum, jig documents/small.rs::text, smith service.rs::lost_live_bytes, hearth lib.rs::Builder and temper system.rs::startup_worst_case; exact rg checks confirmed lines506,10,753,23,532. pump/hourly07-graph-locators.json retains results. Pinned plan supports ruling --text and ring at scripts/dev/plan671/669. Pass the refreshed input bounds to running/resumed sessions without repeating completed suites for metadata changes.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

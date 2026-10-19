@@ -131,8 +131,6 @@ chain.
 
 - **Graph freshness:** the supervisor refreshes only the primary checkout indexes. Use the exact primary project names and check each result in the actual worktree. Until a stale index's refresh is reported, use source searches for that repository; a missing graph result proves no absence. A refresh applies through its reported source commit; later source landings require a fresh comparison. Source search remains available throughout.
 
-  Hourly07 refresh pending: do not use the code graph for skein, smith, jig, hearth or temper; search with `rg` until the supervisor reports their refreshed coverage. Existing starts and proof requirements continue.
-
 - **Diagnostic process attempts:** before spending an authorized process probe, select a fresh run-owned instance path and the harness for its process tier; verify prerequisites and the exact request comparison before execution. Preserve earlier evidence instead of reusing a nonempty instance. Setup failures still consume attempts. Exhausting a diagnostic budget requires a report and a new ruling before another attempt; it does not expand unit-suite time limits or authorize retries.
 
 - **Throwaway reset repair:** skein06.s1 owns the bounded driver diagnosis/repair before temper06.2 resumes recording proof. Preserve io's Failed contract and genuine incomplete-reply failure; no further full recording precedes deterministic cause proof. The closing temper repin waits for skein06.s1.
