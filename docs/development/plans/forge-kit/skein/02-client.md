@@ -387,12 +387,12 @@ Removes: hinted-only echo landing and recovery's acceptance of unframed/foreign 
 
 In skein at `origin/main`; base forms/outputs are in findings.
 
-- `heavy cargo nextest list -p skein-forge-client` lists 114 tests:
-  74 preserved names and 40 new names; no purpose tests or missing locate tests.
-- `heavy cargo nextest run -p skein-forge-client` prints 114 passed,
+- `heavy cargo nextest list -p skein-forge-client` lists 130 tests after skein 02.s1:
+  74 preserved names and 56 new names; no purpose tests or missing locate tests.
+- `heavy cargo nextest run -p skein-forge-client` prints 130 passed after skein 02.s1,
   zero skipped; under 0.5 s and every new unit below 20 ms.
 - `heavy cargo nextest run -p skein-forge -E 'test(measure_)'` prints
-  12 passed, <0.5 s, every test <20 ms; client total remains 114.
+  12 passed, <0.5 s, every test <20 ms; client total remains 130 after skein 02.s1.
 - `heavy cargo clippy -p skein-forge -p skein-forge-client --all-targets -- -D warnings` exits 0.
 - `heavy rg -n -i 'temper|jig|EffectPurpose' crates/skein-forge-client` prints nothing (status 1).
 - `heavy -- sh -c 'wc -l crates/skein-forge-client/src/*.rs crates/skein-forge-client/src/*/*.rs crates/skein-forge-client/src/tests/fixtures/*.rs | awk '\''$1 > 800 && $2 != "total"'\'''`

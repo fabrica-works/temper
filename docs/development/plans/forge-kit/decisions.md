@@ -614,6 +614,31 @@ where its answer lands.
 
      Mark skein-07.1 ready with those checked commits. Implement the revised private result in 07.3 and run its existing proofs; its capability dependencies and the coordinator's landing checks still apply.
 
+126. **Correct the new client contract tests and check recurring shapes** (hourly check of 2026-10-19T07:15:01Z).
+     Reverses: nothing; the preserved-test exceptions of rulings 118/119 keep their scope.
+     Amends: README session inventory/Rules; skein/02-client.md final Done when; new skein/02.s1-contract-tests.md and findings/contracts-assertions.md.
+
+     ## Decision
+
+     Register skein-02.s1 as the test/gate supplement in `skein/02.s1-contract-tests.md`, after skein-02.4 and before the closing temper-repin. No closing repin has landed, so no repeated repin is added. It resolves hourly-02 findings 2–6 without changing production or any original assertion case. The permanent assertion map records the 60 checked cases and eight added row-success assertions.
+
+     Repeated pull setup and unnamed capacities recur after the earlier hourly steer. Under development.md 14.4 their rules become the README's Client contract fixtures rule and scoped Rust source checks in the repository gate. The checker must demonstrate positive and negative controls; the scratch prototype remains uncompiled and is evidence for implementation, not approved code.
+
+     Two mixed tests become eighteen focused tests, a relative +16. At the checked 02.2 base that is client84->100; after planned 02.4,114->130 (74 preserved+56 new). Only final Done when count consumers change; historical increment proof counts remain. Reconcile any intervening contract additions and refresh further reached copies/count consumers in the supplement, listing them in its commit body.
+
+     ## Checked
+
+     - Bounded report pump/hourly-02-contracts.md and its source/assertion inventories checked skein origin/main4c0895d676c9c80ebc5e95c1f03d686f076e0b0c; no primary edits. Rust task829 never started before cancellation: no compiler, checker-control or suite pass claimed.
+     - `rg -n '^fn |^#\[test\]' skein/crates/skein-forge-client/src/tests/contracts.rs`: ten tests, including the stored/answer combined tests. `rg` finds identical pull.head/base/reviewers assignments in both, capacity65535 and expected length65539.
+     - Source map derives five-row byte widths80/80/46/83 and four-row64/64/38/67 independently; byte room83 isolates the four row limits. The map preserves twelve scheduling read/cap cases and all namespace/key/binding assertions.
+     - `sed` of skein/scripts/check.sh shows Rust fmt/clippy and sequential default/fuzzy/browser suites, but no contract source checker. New checker is Rust; no kit change or new language.
+     - `rg '114|74 preserved|40 new'` plus the bounded all-repository consumer sweep finds only skein/02-client.md final Done when count consumers; its historical02.4 proof remains114. `plan status`: temper-repin waiting,11/61 landed.
+     - Pinned kit/scripts/dev/plan declares set/ruling/ready/ring; kit d6d4abe retained. Supplement dependencies and registration follow development.md10.3/10.4.
+
+     ## Instructions
+
+     Register skein-02.s1 from skein/02.s1-contract-tests.md after skein-02.4; make temper-repin await it. Pass the Client contract fixtures rule to the running skein02 session and later implementers. Preserve all independent work and existing proof obligations; implement and validate the supplement against its actual post02.4 source.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
