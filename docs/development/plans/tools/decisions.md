@@ -487,3 +487,20 @@ and the user, or the director, may veto it before the run:
   form, a refusal and never a guess, and `parse(back(call)) == call`
   holds over every call `parse` makes. tools.md, 5.2, says so at the
   designer's next pass over tools.md, after this plan.
+- **K. The tools' rows pass jig's wire ceiling** (question.md in the run's
+  directory, from temper 02.1's block of 05:31:30Z; no designer is
+  joined to answer it): tools.md, 12, gives 50 rows, "a list's page, the
+  activity lines `task` adds, a conversation's page; the client's rows
+  per window", in the tools' own preset of `jig-client`'s `Limits`.
+  jig's client wire (v8 and v9, `CEILINGS`) admits at most 32 in each of
+  the 33 limits that take the client's rows, so the preset has no worst
+  case (`temper_client_domain::worst_case` is `None`, and
+  `jig_client::max_out` panics on it); at 32 rows it is
+  `Some(91854289240)`. Default: the tools' rows are 32, the wire's
+  ceiling, wherever tools.md, 12, and the plan say 50 (`limits::ROWS`,
+  and the sessions that read it: temper 02, 03, 04 and 11), and tools.md
+  says so at the designer's next pass, after this plan. Or: jig's wire
+  admits 50 rows, a jig step and wire version this plan does not hold;
+  or a designer joins the run (`plan join designer`, in a design
+  session) and answers question.md. temper 02.1 waits on it, and 02.2,
+  02.3 and temper 03 behind it.
