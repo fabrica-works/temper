@@ -380,6 +380,13 @@ where its answer lands.
      the copies and repairs in the repin commit body. A remaining incompatible
      interface is reported with its compiler error. Vocabulary work continues.
 
+105. **Complete the authorized jig repin's people_v4 sweep** (cross-session scope, temper 01's block of 2026-10-19T05:32:59Z).
+     Complete the people_v4 successor-name sweep in temper 01.1's existing, separate repin commit. The authorized jig b2eebe6ab includes tools jig-05.1's store-family move; its people schema differs only in the family version header. The tools plan's temper 03.1 Shape already says “people_v3 becomes people_v4 in the three temper-protocol-store files; nothing in temper names tasks_v3.” Bring forward that mechanical repair and its schema comment only.
+
+     The checked consumers are crates/temper-protocol-store/src/records/application.rs (encode/decode), src/records/application/refusal.rs (module import), src/tests/records.rs (Refusal worst-case assertion), and schema/store-v2.schema (comment), all under temper-protocol-store. Replace people_v3 with people_v4 throughout them. Preserve fields, behaviour, temper's store-v2 family, test names and assertions; use the repin's existing all-target check and normal increment proofs/gate. Keep ruling 104's precise compatible jig pin and skein update.
+
+     The README now makes mechanical repin repairs a standing rule. Implementer 8.2 already permits “a removed or renamed name replaced by its successor” and “a version's move with its whole sweep”. Follow those landed upstream changes through source, tests, comments, copies and derived fixtures within the existing repin; no further scope block is needed for a straightforward rename. Report structural or behavioural differences beyond the landed change. Refresh any further copy and list every further user and repair in the commit body. Tools temper 03.1's remaining work keeps the director's existing hotspot/rebase ordering.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

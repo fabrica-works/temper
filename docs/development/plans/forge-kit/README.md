@@ -194,6 +194,20 @@ chain.
   this rule authorizes no backward pin. The remaining tools steps add no
   wait to this repair. Refresh derived fixtures reached by the normal check
   and name further copies and repairs in the repin commit body.
+- **Mechanical repairs during repins** belong to the existing repin commit.
+  Follow landed upstream renames, paths, signatures and generated-version
+  moves through their whole sweep, including source, tests, schema comments,
+  copied values and derived fixtures, as implementer 8.2 allows. Keep fields,
+  behaviour, test identities and assertions; list further users and repairs
+  in the commit body. Use the increment's existing all-target check and gate.
+  A straightforward successor-name repair needs no further scope block;
+  report a structural or behavioural difference beyond the landed change.
+  For temper 01.1's authorized jig pin, replace `people_v3` with `people_v4`
+  in `crates/temper-protocol-store/src/records/application.rs`,
+  `src/records/application/refusal.rs`, `src/tests/records.rs` and the comment
+  in `schema/store-v2.schema` (all under that crate). This brings forward
+  only the tools plan's temper 03.1 store-family name repair; its remaining
+  work follows the existing hotspot/rebase rule.
 - **A move copies files and renames paths** (code-organization.md, 6):
   besides that, it changes only what its new home forces, each named in
   the increment's Shape: temper's names out of skein's code (the owner

@@ -72,6 +72,9 @@ Files: Cargo.toml/Cargo.lock; changed Cargo.toml and src/tests Rust users in
   All 15 external client dependents are enumerated in base-temper-01.md.
   Repin-only repairs, if the tools plan left them: worker-protocol-git/src/files.rs
   and client-shell-terminal/tests/terminal.rs (both under crates/temper-).
+  The jig repin's store-family name repair also includes
+  crates/temper-protocol-store/{src/records/application.rs,
+  src/records/application/refusal.rs,src/tests/records.rs,schema/store-v2.schema}.
   Client src/{lib,api,bounds,boundary,calls,domain,facts,keep,outbox,identity}.rs and
   src/tests{.rs,/keep.rs,/outbox.rs,/locate.rs} change imports as needed;
   src/locate.rs deleted. Source destination: skein-forge/src/{api,locate}.rs.
@@ -80,6 +83,10 @@ Shape: follow README's first-repin jig repair rule when the lock still
   b2eebe6ab91af9eca121588f2d44072fcbdf3b9c in the same repin commit, retaining
   the skein update; run the existing all-target check. Keep an already newer
   compatible jig pin, and refresh derived fixtures reached by that check.
+  Apply README's mechanical-repair rule: the authorized jig pin includes
+  people_v4, so replace all people_v3 references in those four store files
+  with people_v4, including the schema comment. Keep temper's store-v2 family,
+  fields and behaviour; the existing record tests retain their assertions.
   Add workspace git dependency skein-forge and direct dependencies to
   vocabulary users, keeping client dependencies where they still use state.
   Replace client::api, qualified client vocabulary paths, and local crate::api
