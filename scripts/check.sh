@@ -8,6 +8,10 @@ cd "$(dirname "$0")/.."
 
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
+# The browser's step crates (client/browser.md, 4.3).
+cargo clippy --target wasm32-unknown-unknown \
+    -p temper-client-domain -p temper-client-view \
+    -p temper-client-protocol-wire -- -D warnings
 # skein's testing-strategy.md, section 8: a test is a process.
 export NEXTEST_DOUBLE_SPAWN=0
 cargo nextest run --workspace

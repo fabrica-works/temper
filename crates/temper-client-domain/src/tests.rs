@@ -1,4 +1,5 @@
 mod acts;
+mod address;
 mod fixtures;
 mod form;
 mod pages;
