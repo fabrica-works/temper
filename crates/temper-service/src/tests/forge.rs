@@ -162,3 +162,15 @@ fn a_hook_server_over_io_names_both_limits() {
     assert_eq!(crate::startup::lines(&crate::startup::Problems::jig(found, &jig_protocol_config::Path::root())).as_ref(),
         b"application.limits.overrides.forge_component.hook_head_bytes: past its bound\napplication.limits.overrides.io.intake: past its bound\napplication.limits.overrides.io.output: past its bound\n");
 }
+
+#[test]
+fn temper_word_keeps_the_marker_bytes_and_length() {
+    let config = fixtures::engine();
+    let mut found = jig_protocol_config::Problems::empty();
+    let settings =
+        forge::settings(&config.forges, fixtures::forge_runtime(), None, &mut found).expect("fixture settings");
+    assert_eq!(settings.word.as_ref(), b"temper");
+    assert_eq!(skein_forge::marker::length(&settings.word, 2), Some(25));
+    let encoded = skein_forge::marker::encode(&settings.word, &[0xab, 1], b"", 25);
+    assert_eq!(encoded.as_deref(), Some(b"<!-- temper:key ab01 -->\n".as_slice()));
+}

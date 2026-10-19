@@ -138,8 +138,12 @@ impl Hosted {
                     + std::mem::size_of::<Complete>()
                     + std::mem::size_of::<Submit>()) as u64
             + 256 * (u64::from(client.answer_bytes) + 2 * u64::from(io_limits.output));
-        let component = Component::new(kit::Settings { forges, webhooks: None }, &limits, &shared)
-            .map_err(|e| format!("component limits: {e:?}"))?;
+        let component = Component::new(
+            kit::Settings { forges, webhooks: None, word: Box::from(b"temper".as_slice()) },
+            &limits,
+            &shared,
+        )
+        .map_err(|e| format!("component limits: {e:?}"))?;
         let clock = Clock::new();
         let now = clock.now();
         let mut host = Self {

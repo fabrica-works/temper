@@ -103,7 +103,7 @@ pub fn settings() -> Settings {
             user: WRITER,
         })
         .expect("one forge");
-    Settings { forges, webhooks: None }
+    Settings { forges, webhooks: None, word: Box::from(b"temper".as_slice()) }
 }
 /// Makes a literal HTTP answer for scenarios independent of recorded cases.
 #[must_use]

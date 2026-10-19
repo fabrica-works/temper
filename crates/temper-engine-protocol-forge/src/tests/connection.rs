@@ -1,11 +1,11 @@
 //! Connection machinery and each forge's start.
 use super::fixtures;
 use crate::{
-    connection::{Failure, Heard, Phase},
+    connection::Phase,
     grow::{Full, Grow, Tail},
-    plan::Range,
 };
 use alloc::boxed::Box;
+use skein_forge::forgejo::plans::{Failure, Heard, plan::Range};
 use skein_forge::forgejo::request;
 use skein_lib::{
     Duration, Time, Wall,
@@ -51,7 +51,7 @@ fn a_json_response_is_decoded_through_its_body_end() {
         heard.get(0),
         Some(&Heard::Head {
             status: 200,
-            fields: crate::connection::Fields {
+            fields: skein_forge::forgejo::plans::Fields {
                 date: Some(Wall::from_nanos(1_577_836_800_000_000_000)),
                 retry_after: None,
                 has_more: None,
@@ -63,14 +63,14 @@ fn a_json_response_is_decoded_through_its_body_end() {
     );
     assert_eq!(
         heard.get(1),
-        Some(&Heard::Done(crate::connection::Body::Document(skein_forge::forgejo::document::Document::User(
-            skein_forge::forgejo::document::User {
+        Some(&Heard::Done(skein_forge::forgejo::plans::Body::Document(
+            skein_forge::forgejo::document::Document::User(skein_forge::forgejo::document::User {
                 id: 2,
                 login: Box::from(&b"writer"[..]),
                 is_admin: false,
                 full_name: Box::from([])
-            }
-        )))),
+            })
+        ))),
         "decoded whole"
     );
     assert_eq!(h.connection.phase, Phase::Idle, "reusable");
@@ -81,7 +81,7 @@ fn a_malformed_document_closes_without_reading_more() {
     let mut h = fixtures::ConnectionHarness::new();
     h.connection.start(&h.env, &h.forge, request::Request::User, None).expect("valid request");
     let heard = h.answer(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}");
-    let Some(Heard::Done(crate::connection::Body::Malformed(_))) = heard.last() else {
+    let Some(Heard::Done(skein_forge::forgejo::plans::Body::Malformed(_))) = heard.last() else {
         unreachable!("malformed terminal");
     };
     assert_eq!(h.connection.phase, Phase::Closed, "malformed closes");
@@ -186,7 +186,7 @@ fn a_connection_close_answer_ends_its_connection_after_it() {
     h.connection.start(&h.env, &h.forge, request::Request::User, None).expect("valid request");
     let heard =
         h.answer(b"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 25\r\n\r\n{\"id\":2,\"login\":\"writer\"}");
-    let Some(Heard::Done(crate::connection::Body::Document(_))) = heard.last() else {
+    let Some(Heard::Done(skein_forge::forgejo::plans::Body::Document(_))) = heard.last() else {
         unreachable!("document ends first");
     };
     assert_eq!(h.connection.phase, Phase::Closed, "answer closed connection");
@@ -224,7 +224,7 @@ fn raw_reads_keep_the_range_and_refuse_bytes_past_remaining_answer_room() {
         let heard = h.answer(&fixtures::ok(response));
         assert_eq!(
             heard.last(),
-            Some(&Heard::Done(crate::connection::Body::Raw { bytes: Box::from(expected), more })),
+            Some(&Heard::Done(skein_forge::forgejo::plans::Body::Raw { bytes: Box::from(expected), more })),
             "{name}: raw body"
         );
         assert_eq!(h.connection.phase, phase, "{name}: connection state");
@@ -268,7 +268,7 @@ fn a_json_upload_sends_its_body_and_content_headers() {
         )
         .expect("valid upload");
     let heard = h.answer(b"HTTP/1.1 204 No Content\r\n\r\n");
-    assert_eq!(heard.last(), Some(&Heard::Done(crate::connection::Body::Empty)), "bodyless answer");
+    assert_eq!(heard.last(), Some(&Heard::Done(skein_forge::forgejo::plans::Body::Empty)), "bodyless answer");
     assert_eq!(h.sent.as_ref(), b"DELETE /api/v1/repos/fixture/specimen/pulls/7/requested_reviewers HTTP/1.1\r\nHost: 127.0.0.1:3000\r\nAuthorization: token 0123456789abcdef0123456789abcdef01234567\r\nUser-Agent: temper/0.0.0\r\nContent-Type: application/json\r\nContent-Length: 23\r\n\r\n{\"reviewers\":[\"alice\"]}", "encoded upload");
 }
 
@@ -293,7 +293,7 @@ fn a_chunked_raw_read_keeps_the_last_short_piece() {
     let heard = h.answer(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nab\r\n0\r\n\r\n");
     assert_eq!(
         heard.last(),
-        Some(&Heard::Done(crate::connection::Body::Raw { bytes: Box::from(&b"ab"[..]), more: false })),
+        Some(&Heard::Done(skein_forge::forgejo::plans::Body::Raw { bytes: Box::from(&b"ab"[..]), more: false })),
         "final bytes kept"
     );
     assert_eq!(h.connection.phase, Phase::Idle, "complete body reusable");
@@ -325,7 +325,7 @@ fn a_tail_read_keeps_a_200s_last_bytes_and_closes_when_some_were_dropped() {
         let mut h = fixtures::ConnectionHarness::new();
         h.connection.start(&h.env, &h.forge, raw_request(), Some(Range::Tail(3))).expect("Valid raw request");
         let heard = h.answer(&fixtures::ok(response));
-        let kept = Heard::Done(crate::connection::Body::Raw { bytes: Box::from(expected), more });
+        let kept = Heard::Done(skein_forge::forgejo::plans::Body::Raw { bytes: Box::from(expected), more });
         assert_eq!(heard.last(), Some(&kept), "{name}: The last bytes");
         assert_eq!(h.connection.phase, phase, "{name}: Connection state");
         assert!(contains(&h.sent, b"Range: bytes=-3\r\n"), "{name}: Suffix range");
@@ -339,7 +339,7 @@ fn a_tail_read_keeps_at_most_the_raw_room() {
     let heard = h.answer(&fixtures::ok(b"abcdefghijklmnopqrst"));
     assert_eq!(
         heard.last(),
-        Some(&Heard::Done(crate::connection::Body::Raw { bytes: Box::from(&b"mnopqrst"[..]), more: true }))
+        Some(&Heard::Done(skein_forge::forgejo::plans::Body::Raw { bytes: Box::from(&b"mnopqrst"[..]), more: true }))
     );
     assert_eq!(h.connection.phase, Phase::Closed, "Earlier bytes were dropped");
 }
@@ -350,7 +350,7 @@ fn a_chunked_tail_read_keeps_the_last_bytes_across_pieces() {
     let heard = h.answer(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nab\r\n3\r\ncde\r\n0\r\n\r\n");
     assert_eq!(
         heard.last(),
-        Some(&Heard::Done(crate::connection::Body::Raw { bytes: Box::from(&b"cde"[..]), more: true }))
+        Some(&Heard::Done(skein_forge::forgejo::plans::Body::Raw { bytes: Box::from(&b"cde"[..]), more: true }))
     );
     assert_eq!(h.connection.phase, Phase::Closed, "Earlier bytes were dropped");
 }
@@ -362,9 +362,9 @@ fn a_tail_read_past_body_bytes_in_is_malformed_and_closes() {
     let heard = h.answer(&fixtures::ok(b"abcdefghi"));
     assert_eq!(
         heard.last(),
-        Some(&Heard::Done(crate::connection::Body::Malformed(skein_forge::forgejo::decode::Malformed::Bound {
-            field: b"log"
-        })))
+        Some(&Heard::Done(skein_forge::forgejo::plans::Body::Malformed(
+            skein_forge::forgejo::decode::Malformed::Bound { field: b"log" }
+        )))
     );
     assert_eq!(h.connection.phase, Phase::Closed, "Body limit closes");
 }

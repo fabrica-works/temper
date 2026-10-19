@@ -11,6 +11,8 @@ pub struct Settings {
     pub forges: List<Forge>,
     /// The listener and secrets, present together (protocol/forge.md, 5).
     pub webhooks: Option<crate::hooks::Webhooks>,
+    /// Owner word used in markers and webhook hints, at most 16 bytes.
+    pub word: Box<[u8]>,
 }
 
 /// One forge, from `application.forges` (protocol/configuration.md, 3) and

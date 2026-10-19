@@ -191,18 +191,18 @@ fn bounded_cases() -> [BoundedCase; 2] {
     [
         (
             "exact",
-            &[b'x'; 4047],
+            &[b'x'; 4031],
             Ok(Answer::PullFiles {
                 head: HEAD,
                 files: Box::new([File {
                     path: Box::from(&b"x"[..]),
                     before: None,
-                    after: Some(Box::from([b'x'; 4047])),
+                    after: Some(Box::from([b'x'; 4031])),
                 }]),
                 more: false,
             }),
         ),
-        ("past", &[b'x'; 4048], Err(Error::TooLarge)),
+        ("past", &[b'x'; 4032], Err(Error::TooLarge)),
     ]
 }
 #[test]
@@ -254,12 +254,12 @@ fn file_reads_accept_partial_content_and_preserve_raw_bytes() {
 #[test]
 fn contents_sizes_agree_with_the_clients_measure() {
     for (name, answer, expected) in measured_contents() {
-        assert_eq!(crate::reads::size::answer(&answer, 8), Ok(expected), "{name}: running measure");
         assert_eq!(
-            temper_engine_domain_forge_client::answer_bytes_unbounded(&answer),
-            Some(expected),
-            "{name}: client measure"
+            skein_forge::forgejo::plans::reads::size::answer(&answer, 8),
+            Ok(expected),
+            "{name}: running measure"
         );
+        assert_eq!(skein_forge::measure::answer(&answer), Some(expected), "{name}: client measure");
     }
 }
 fn measured_contents() -> [(&'static str, Answer, u64); 4] {
@@ -290,7 +290,7 @@ fn measured_contents() -> [(&'static str, Answer, u64); 4] {
                 }]),
                 more: false,
             },
-            52,
+            68,
         ),
         (
             "comparison",
@@ -305,7 +305,7 @@ fn measured_contents() -> [(&'static str, Answer, u64); 4] {
                 }]),
                 commits: Box::new([HEAD]),
             },
-            84,
+            100,
         ),
     ]
 }

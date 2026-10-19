@@ -44,7 +44,7 @@ pub fn host(address: SocketAddr, server_name: Option<&[u8]>) -> Option<Box<[u8]>
                         let digit = u8::try_from((segment >> shift) & 15).ok()?;
                         if begun || digit != 0 || shift == 0 {
                             begun = true;
-                            put(&mut out, &[super::marker::hex(digit)])?;
+                            put(&mut out, &[*b"0123456789abcdef".get(usize::from(digit)).expect("hexadecimal digit")])?;
                         }
                     }
                 }

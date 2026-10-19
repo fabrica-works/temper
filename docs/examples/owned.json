@@ -189,7 +189,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 78669036813790,
+    "memory_bytes": 78669036813854,
     "rules": {
       "ceiling": {
         "tools": 1,

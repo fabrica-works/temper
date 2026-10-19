@@ -1,9 +1,9 @@
 //! Write plans through the component's scripted byte peer.
 use super::fixtures::{self, Harness};
-use crate::failure::{self, Asked, Classified, Drop};
 use alloc::boxed::Box;
 use skein_forge::api::{Answer, BranchCreation, Check, Error, Op, Verdict, Write};
 use skein_forge::forgejo::failure::Refusal;
+use skein_forge::forgejo::plans::failure::{self, Asked, Classified, Drop};
 use skein_lib::{Duration, bytes};
 const ISSUE: &[u8] = br#"{"number":7,"state":"open","user":{"id":2,"login":"writer"},"labels":[],"updated_at":"2020-01-01T00:00:00Z","title":"title","body":"body"}"#;
 const COMMENT: &[u8] = br#"{"id":9,"user":{"id":2,"login":"writer"},"body":"body"}"#;

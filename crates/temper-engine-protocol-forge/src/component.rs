@@ -1,17 +1,20 @@
 //! Waiting calls and returned answers (protocol/forge.md, sections 2 and 8).
 use crate::{
     boundary::{Answered, Event, Request},
-    connection::{Body, Connection, Failure, Heard, Phase},
+    connection::{Connection, Phase},
     limits::{self, Limits, Shared, Unusable},
     settings::Settings,
     start,
     start::Start,
-    tables::Tables,
 };
 use skein_lib::{Env, Id, List, Map, Queue, Slab, Time, Token};
 mod calls;
-use crate::plan::{Plan, Step};
 use skein_forge::api;
+use skein_forge::forgejo::plans::{
+    Body, Failure, Heard,
+    plan::{Plan, Step},
+    tables::Tables,
+};
 /// Output reservations for each entry point.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct MaxOut {
@@ -31,6 +34,7 @@ pub(crate) struct Waiting {
     pub repository: api::Repository,
     pub op: Option<api::Op>,
     pub plan: Option<Plan>,
+    pub page_size: u32,
     pub connection: Option<Token>,
     pub cost: u32,
     pub charged: bool,
@@ -124,6 +128,7 @@ impl Component {
                         repository,
                         op: Some(op),
                         plan: None,
+                        page_size: 1,
                         connection: None,
                         cost: 0,
                         charged: false,
@@ -151,8 +156,8 @@ impl Component {
             Request::Offer => {
                 self.hooks.offer();
                 let before = up.len();
-                if let Some(settings) = &self.settings.webhooks {
-                    self.hooks.drive(env, settings, up, io, MAX_OUT.above, MAX_OUT.below);
+                if self.settings.webhooks.is_some() {
+                    self.hooks.drive(env, &self.settings, up, io, MAX_OUT.above, MAX_OUT.below);
                 }
                 for _ in 0..MAX_OUT.above.saturating_sub(up.len().saturating_sub(before)) {
                     let mut next = None;
@@ -488,8 +493,8 @@ impl Component {
     ) {
         let above = up.len();
         let below = io.len();
-        if let Some(settings) = &self.settings.webhooks {
-            self.hooks.drive(env, settings, up, io, above_room, below_room);
+        if self.settings.webhooks.is_some() {
+            self.hooks.drive(env, &self.settings, up, io, above_room, below_room);
         }
         self.drive_starts(
             env,

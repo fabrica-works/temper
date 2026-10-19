@@ -1,8 +1,9 @@
 //! One streaming, authenticated webhook connection (protocol/forge.md, 5 and 8).
-use super::{Hinted, Webhooks, hint};
-use crate::{Event, Limits, limits, marker};
+use super::Hinted;
+use crate::{Event, Limits, limits, settings::Settings};
 use alloc::boxed::Box;
 use skein_forge::api;
+use skein_forge::forgejo::plans::hint;
 use skein_forge::forgejo::{
     client::delivery as decode,
     delivery::{self, Delivery},
@@ -124,10 +125,10 @@ impl Hooked {
             }),
         );
     }
-    fn call(&mut self, env: &Env<Limits>, settings: &Webhooks, call: http::Call) {
+    fn call(&mut self, env: &Env<Limits>, settings: &Settings, call: http::Call) {
         let forge = delivery::hook_forge(&call.target);
         let mut secret = None;
-        for (number, value) in &settings.secrets {
+        for (number, value) in &settings.webhooks.as_ref().expect("configured listener").secrets {
             if Some(*number) == forge {
                 secret = Some(value);
                 break;
@@ -191,13 +192,13 @@ impl Hooked {
             self.read(env);
         }
     }
-    fn verified(&mut self, env: &Env<Limits>) {
+    fn verified(&mut self, env: &Env<Limits>, word: &[u8]) {
         let digest = self.mac.take().expect("body signed").finish();
         let mut signature = [0; 64];
         for (digits, byte) in signature.chunks_exact_mut(2).zip(digest) {
             let [high, low] = digits else { unreachable!("hexadecimal pair") };
-            *high = marker::hex(byte / 16);
-            *low = marker::hex(byte % 16);
+            *high = *b"0123456789abcdef".get(usize::from(byte / 16)).expect("hexadecimal digit");
+            *low = *b"0123456789abcdef".get(usize::from(byte % 16)).expect("hexadecimal digit");
         }
         let status = if !sha256::equal(&signature, &self.signature) {
             403
@@ -208,7 +209,7 @@ impl Hooked {
         };
         if status == 204 {
             self.hint = match self.decoded.take() {
-                Some(delivery) => hint::hint(self.forge, &delivery),
+                Some(delivery) => hint::hint(self.forge, word, &delivery),
                 None => None,
             };
         }
@@ -237,7 +238,7 @@ impl Hooked {
         &mut self,
         owner: Token,
         env: &Env<Limits>,
-        settings: &Webhooks,
+        settings: &Settings,
         up: &mut Queue<Event>,
         io: &mut Queue<skein_io::Request>,
         room: (u32, u32),
@@ -276,7 +277,7 @@ impl Hooked {
             } else if let Some(down) = self.json_down.pop() {
                 self.down(env, http::Request::Body(down));
             } else if self.ended && self.decoder.is_none() && self.mac.is_some() {
-                self.verified(env);
+                self.verified(env, &settings.word);
             } else if let Some(event) = self.events.pop() {
                 match event {
                     http::Event::Call(call) => {

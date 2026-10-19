@@ -102,7 +102,7 @@ pub fn settings() -> Settings {
             user: WRITER,
         })
         .expect("one forge");
-    Settings { forges, webhooks: None }
+    Settings { forges, webhooks: None, word: Box::from(b"temper".as_slice()) }
 }
 #[derive(Debug)]
 pub struct Harness {
@@ -147,7 +147,7 @@ impl Harness {
     pub fn call(&mut self, call: u64, repository: api::Repository, op: api::Op) {
         self.send(crate::Request::Call { call: skein_lib::Token::new(call), repository, op });
     }
-    pub fn known(&mut self, repository: api::Repository, row: crate::tables::Repository) {
+    pub fn known(&mut self, repository: api::Repository, row: skein_forge::forgejo::plans::tables::Repository) {
         self.component.tables().keep_repository(repository, row);
     }
     pub fn send(&mut self, request: crate::Request) {
@@ -397,8 +397,8 @@ pub fn user_ok() -> Box<[u8]> {
 pub fn settings_ok() -> Box<[u8]> {
     ok(b"{\"max_response_items\":2,\"default_paging_num\":30}")
 }
-pub fn specimen() -> crate::tables::Repository {
-    crate::tables::Repository {
+pub fn specimen() -> skein_forge::forgejo::plans::tables::Repository {
+    skein_forge::forgejo::plans::tables::Repository {
         owner: Box::from(&b"fixture"[..]),
         name: Box::from(&b"specimen"[..]),
         object_format: skein_forge::forgejo::id::ObjectFormat::Sha1,
@@ -430,7 +430,7 @@ impl ConnectionHarness {
     pub fn pump(&mut self) {
         self.connection.pump(&self.env, &mut self.io, 16);
     }
-    pub fn answer(&mut self, response: &[u8]) -> List<crate::connection::Heard> {
+    pub fn answer(&mut self, response: &[u8]) -> List<skein_forge::forgejo::plans::Heard> {
         let mut wire = skein_world::stream::Wire::new(1);
         let mut written = false;
         let mut heard = List::with_capacity(16);

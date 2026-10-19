@@ -4,7 +4,6 @@ use skein_forge::api;
 use skein_io::Addr;
 use skein_lib::{Env, Id, List, Map, Queue, Secret, Slab, Time, Token};
 mod connection;
-pub(crate) mod hint;
 use connection::{Closing, Hooked};
 /// The listener and the secrets it alone owns.
 #[derive(Clone, Debug)]
@@ -119,7 +118,7 @@ impl Hooks {
     pub fn drive(
         &mut self,
         env: &Env<Limits>,
-        settings: &Webhooks,
+        settings: &crate::settings::Settings,
         up: &mut Queue<Event>,
         io: &mut Queue<skein_io::Request>,
         above: u32,

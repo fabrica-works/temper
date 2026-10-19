@@ -1,8 +1,8 @@
 //! Document translations; the byte-level read-plan tests follow in 13.3b.
-use crate::reading;
 use alloc::boxed::Box;
 use skein_forge::api;
 use skein_forge::forgejo::document as d;
+use skein_forge::forgejo::plans::reading;
 use skein_lib::{Time, Wall};
 
 #[test]
@@ -163,16 +163,19 @@ fn a_summary_keeps_its_marker_and_a_long_body_carries_no_key_or_bytes() {
         ("long", d::Body::Long(30), None, Box::from(&b""[..])),
     ];
     for (name, body, key, expected_body) in rows {
-        let summary = reading::summary(d::Issue {
-            number: 7,
-            pull: true,
-            state: d::IssueState::Open,
-            user: d::User { id: 2, login: Box::from(&b"writer"[..]), is_admin: false, full_name: Box::from([]) },
-            labels: Box::from([]),
-            updated_at: Wall::from_nanos(3),
-            title: Box::from(&b"title"[..]),
-            body,
-        });
+        let summary = reading::summary(
+            b"temper",
+            d::Issue {
+                number: 7,
+                pull: true,
+                state: d::IssueState::Open,
+                user: d::User { id: 2, login: Box::from(&b"writer"[..]), is_admin: false, full_name: Box::from([]) },
+                labels: Box::from([]),
+                updated_at: Wall::from_nanos(3),
+                title: Box::from(&b"title"[..]),
+                body,
+            },
+        );
         assert_eq!(
             summary,
             api::Summary {
@@ -485,8 +488,8 @@ fn measured_answers() -> [(&'static str, Answer); 10] {
 fn the_running_answer_size_agrees_with_the_clients_measure() {
     for (name, answer) in measured_answers() {
         assert_eq!(
-            crate::reads::size::answer(&answer, 8).ok(),
-            temper_engine_domain_forge_client::answer_bytes_unbounded(&answer),
+            skein_forge::forgejo::plans::reads::size::answer(&answer, 8).ok(),
+            skein_forge::measure::answer(&answer),
             "{name}"
         );
     }

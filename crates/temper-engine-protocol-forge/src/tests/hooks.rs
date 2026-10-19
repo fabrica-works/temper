@@ -63,7 +63,7 @@ fn the_worst_case_grows_with_the_webhook_connections() {
 fn each_delivery_becomes_the_hint_forge_md_5_names() {
     for (delivery, change, key) in hint_rows() {
         assert_eq!(
-            crate::hooks::hint::hint(1, &delivery),
+            skein_forge::forgejo::plans::hint::hint(1, b"temper", &delivery),
             Some(skein_forge::api::Hint {
                 repository: skein_forge::api::Repository { forge: 1, repository: 2 },
                 change,
@@ -124,11 +124,11 @@ fn hint_rows() -> [HintRow; 7] {
 #[test]
 fn a_tag_delivery_hints_nothing() {
     let delivery = fixtures::hook_ref(b"refs/tags/version");
-    assert_eq!(crate::hooks::hint::hint(1, &delivery), None);
+    assert_eq!(skein_forge::forgejo::plans::hint::hint(1, b"temper", &delivery), None);
 }
 #[test]
 fn a_repository_id_past_u32_hints_nothing() {
     let delivery =
         skein_forge::forgejo::delivery::Delivery::Pull { repository: u64::MAX, number: fixtures::HOOK_NUMBER };
-    assert_eq!(crate::hooks::hint::hint(1, &delivery), None);
+    assert_eq!(skein_forge::forgejo::plans::hint::hint(1, b"temper", &delivery), None);
 }

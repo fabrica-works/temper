@@ -2,8 +2,9 @@
 use super::{Body, Component, Heard, Phase, Plan, Start, Step, Waiting, api};
 use crate::{
     boundary::{Answered, Event},
-    limits::Limits,
+    limits::{self, Limits, Listing, Shared},
 };
+use skein_forge::forgejo::plans::plan::Bounds;
 use skein_lib::{Env, Id, List, Queue, Token};
 impl Component {
     pub(super) fn expire(
@@ -172,8 +173,10 @@ impl Component {
             return true;
         }
         let op = waiting.op.take().expect("waiting operation");
-        let mut plan = Plan::new(waiting.repository, op, cap);
-        let step = plan.begin(&env.limits, &self.shared, &mut self.tables);
+        waiting.page_size = page_size(&op, cap, &env.limits, &self.shared);
+        let mut plan = Plan::new(waiting.repository, op);
+        let step =
+            plan.begin(bounds(waiting.page_size, &env.limits, &self.shared), &self.settings.word, &mut self.tables);
         waiting.plan = Some(plan);
         match step {
             Ok(step) => {
@@ -215,7 +218,15 @@ impl Component {
                     self.waiting.get_mut(id).expect("indexed call").plan.as_mut().expect("call plan").pending();
                 if let Some(request) = request {
                     c.deadline = Some(self.waiting.get(id).expect("call").deadline);
-                    c.raw_room(self.waiting.get(id).expect("call").plan.as_ref().expect("plan").raw_room(&self.shared));
+                    c.raw_room(
+                        self.waiting
+                            .get(id)
+                            .expect("call")
+                            .plan
+                            .as_ref()
+                            .expect("plan")
+                            .raw_room(self.shared.client.answer_bytes),
+                    );
                     match c.start(env, self.settings.forges.get(at).expect("forge"), request.request, request.range) {
                         Ok(()) => {
                             c.keep_after(self.waiting.get(id).expect("call").plan.as_ref().expect("plan").after());
@@ -235,7 +246,7 @@ impl Component {
                 waiting.charged = true;
             }
             if let Some(heard) = c.heard() {
-                if crate::reads::long(&heard) {
+                if skein_forge::forgejo::plans::reads::keep::long(&heard) {
                     self.diagnostics.long_bodies = self.diagnostics.long_bodies.saturating_add(1);
                 }
                 let malformed = match &heard {
@@ -248,8 +259,12 @@ impl Component {
                 if malformed {
                     self.diagnostics.malformed = self.diagnostics.malformed.saturating_add(1);
                 }
-                let step =
-                    waiting.plan.as_mut().expect("call plan").heard(heard, &env.limits, &self.shared, &mut self.tables);
+                let step = waiting.plan.as_mut().expect("call plan").heard(
+                    heard,
+                    bounds(waiting.page_size, &env.limits, &self.shared),
+                    &self.settings.word,
+                    &mut self.tables,
+                );
                 if waiting.plan.as_mut().expect("plan").take_cut() {
                     c.cut(env);
                 }
@@ -319,4 +334,34 @@ impl Component {
             }
         }
     }
+}
+
+fn bounds(page_size: u32, l: &Limits, s: &Shared) -> Bounds {
+    Bounds { page_size, rows: s.client.rows, answer_bytes: s.client.answer_bytes, body_bytes: l.body_bytes }
+}
+
+fn page_size(op: &api::Op, cap: u32, l: &Limits, s: &Shared) -> u32 {
+    let listing = match op {
+        api::Op::Read(read) => match read {
+            api::Read::Items { .. } | api::Read::PullFor { .. } => Listing::Items,
+            api::Read::Reviews { .. } => Listing::Reviews,
+            api::Read::Statuses { .. } | api::Read::Checks { .. } => Listing::Statuses,
+            api::Read::Remarks { .. } => Listing::Remarks,
+            api::Read::Branches => Listing::Branches,
+            api::Read::Collaborators { .. } => Listing::Collaborators,
+            api::Read::PullFiles { .. } => Listing::PullFiles,
+            api::Read::Locate { .. }
+            | api::Read::Item { .. }
+            | api::Read::Pull { .. }
+            | api::Read::Branch { .. }
+            | api::Read::Protection { .. }
+            | api::Read::Permission { .. }
+            | api::Read::Compare { .. }
+            | api::Read::File { .. }
+            | api::Read::Job { .. }
+            | api::Read::Settings => return 1,
+        },
+        api::Op::Write(_) => return 1,
+    };
+    limits::page_size(listing, cap, l, s)
 }

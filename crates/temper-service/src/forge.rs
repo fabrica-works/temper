@@ -74,7 +74,11 @@ pub fn settings(
             found.push(forge_path(u32::try_from(index).expect("runtime index")).member(b"api"), What::Refers);
         }
     }
-    if found.is_empty() { Some(kit::settings::Settings { forges: configured, webhooks }) } else { None }
+    if found.is_empty() {
+        Some(kit::settings::Settings { forges: configured, webhooks, word: Box::from(b"temper".as_slice()) })
+    } else {
+        None
+    }
 }
 fn forge_path(index: u32) -> Path {
     Path::root().member(b"application").member(b"forges").child(Segment::Index(index))

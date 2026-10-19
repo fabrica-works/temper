@@ -185,8 +185,7 @@ pub fn check(l: &Limits, s: &Shared, settings: &Settings) -> Result<(), Unusable
     if l.deadline > s.client.lifetime {
         return Err(Unusable::Deadline { deadline: l.deadline, lifetime: s.client.lifetime });
     }
-    let needed =
-        u64::from(s.client.op_bytes).checked_mul(2).ok_or(Unusable::Zero)?.checked_add(21).ok_or(Unusable::Zero)?;
+    let needed = u64::from(skein_forge::marker::length(&settings.word, s.client.op_bytes).ok_or(Unusable::Zero)?);
     if u64::from(l.body_bytes) < needed {
         return Err(Unusable::BodyBytes { body_bytes: l.body_bytes, needed });
     }
@@ -380,8 +379,8 @@ pub fn worst_case(l: &Limits, s: &Shared, forges: u32) -> Option<u64> {
         component::{Held, Waiting},
         settings::Forge,
         start::Start,
-        tables::{RepositoryEntry, UserEntry},
     };
+    use skein_forge::forgejo::plans::tables::{RepositoryEntry, UserEntry};
     use skein_lib::{Id, Intake, List, Map, Queue, Slab, Token};
     let docs = documents(l);
     let raw = u64::from(s.client.answer_bytes).checked_mul(2)?;
@@ -421,8 +420,8 @@ pub fn worst_case(l: &Limits, s: &Shared, forges: u32) -> Option<u64> {
             u64::from(s.client.calls).checked_mul(
                 u64::from(s.client.op_bytes)
                     .checked_mul(3)?
-                    .checked_add(u64::try_from(size_of::<crate::reads::Plan>()).ok()?)?
-                    .checked_add(u64::try_from(size_of::<crate::writes::Plan>()).ok()?)?
+                    .checked_add(u64::try_from(size_of::<skein_forge::forgejo::plans::reads::Plan>()).ok()?)?
+                    .checked_add(u64::try_from(size_of::<skein_forge::forgejo::plans::writes::Plan>()).ok()?)?
                     .checked_add(List::<u64>::worst_case(s.client.op_bytes.checked_div(8)?)?)?
                     .checked_add(List::<Box<[u8]>>::worst_case(
                         s.client.op_bytes.checked_div(8)?.checked_add(l.inner)?,
@@ -469,6 +468,8 @@ pub fn worst_case(l: &Limits, s: &Shared, forges: u32) -> Option<u64> {
         .checked_add(repositories)?
         .checked_add(users)?
         .checked_add(configured)?
+        .checked_add(u64::try_from(size_of::<Box<[u8]>>()).ok()?)?
+        .checked_add(16)?
         .checked_add(u64::try_from(size_of::<Answered>()).ok()?)
 }
 
