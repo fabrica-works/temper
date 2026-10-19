@@ -7,6 +7,16 @@ use skein_io::kernel::{Complete, Done, Error, Exit, Fd, Kind, Op, OpenHow, Servi
 use skein_lib::{Duration, Time, Wall};
 use skein_shell::Host;
 use std::collections::{BTreeMap, VecDeque};
+macro_rules! encode {
+    ($value:expr) => {{
+        let value = &$value;
+        let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("record size"));
+        value.encode(&mut writer).expect("record fits");
+        writer.finish()
+    }};
+}
+mod recovery;
+pub use recovery::{dropped, kept_chat, other_party, small_store};
 pub const LINK: &[u8] = b"http://127.0.0.1:4000/jig/v1/sign-in/link?secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const LINK_FILE: Fd = Fd::new(23);
 pub const CHAT: &[&[u8]] = &[b"chat", b"hello", b"--project", b"shop", b"--key", b"start-chat"];
@@ -22,6 +32,13 @@ pub struct Frame {
     pub link: &'static [u8],
     pub refuse_link: Option<()>,
     hold_stores: Option<()>,
+    store: Option<Box<[u8]>>,
+    offers: Option<()>,
+    answer_kept: Option<()>,
+    answer_new: Option<()>,
+    acts: Vec<[u8; 16]>,
+    fail_store: Option<()>,
+    store_writes: u32,
     files: BTreeMap<Fd, Vec<u8>>,
     names: BTreeMap<Box<[u8]>, Fd>,
     stored: BTreeMap<Box<[u8]>, Vec<u8>>,
@@ -72,6 +89,13 @@ impl Frame {
             link: LINK,
             refuse_link: None,
             hold_stores: None,
+            store: None,
+            offers: None,
+            answer_kept: None,
+            answer_new: None,
+            acts: Vec::new(),
+            fail_store: None,
+            store_writes: 0,
             files: BTreeMap::new(),
             names: BTreeMap::new(),
             stored: BTreeMap::new(),
@@ -225,6 +249,8 @@ impl Frame {
             self.token
         } else if fd == LINK_FILE {
             self.link
+        } else if fd == Fd::new(24) {
+            self.store.as_deref().expect("existing store")
         } else {
             self.files.get(&fd).expect("fixture file")
         }
@@ -249,7 +275,7 @@ impl Frame {
             return Ok(Done::Fd(LINK_FILE));
         }
         if path == b"store" {
-            return Err(Error::NotFound);
+            return self.store.as_ref().map_or(Err(Error::NotFound), |_| Ok(Done::Fd(Fd::new(24))));
         }
         if path == b"directory" {
             if how == OpenHow::ReadNoFollow {
@@ -284,6 +310,9 @@ impl Frame {
             Op::Rename { from, to, .. } => {
                 let fd = self.names.remove(from).expect("temporary name");
                 self.stored.insert(to.clone(), self.files.get(&fd).expect("temporary contents").clone());
+                if to.as_ref() == b"store" {
+                    self.store_writes += 1;
+                }
                 Ok(Done::Nothing)
             }
             Op::Stat { fd } => Ok(self.stat(*fd)),
@@ -311,6 +340,7 @@ impl Frame {
                 self.sockets.insert(fd, Socket::default());
                 Ok(Done::Fd(fd))
             }
+            Op::Sync { .. } if self.fail_store.is_some() => Err(Error::Permission),
             Op::Sync { .. } | Op::Remove { .. } | Op::Connect { .. } | Op::Shutdown { .. } | Op::Close { .. } => {
                 Ok(Done::Nothing)
             }
@@ -445,11 +475,20 @@ impl Frame {
                     self.deliver_me();
                 }
             }
+            b"/jig/v1/request" => {
+                let body = socket.request[end + 4..].to_vec();
+                self.act_reply(fd, &body);
+            }
+            b"/jig/v1/stream-gone" => self.reply(fd, &[]),
             _ => panic!("unexpected HTTP route"),
         }
     }
     fn deliver_me(&mut self) {
-        let value = w::DeliveryValue::Me(jig_client_test_records::frame_record());
+        let value = w::DeliveryValue::Me(if self.offers.is_some() {
+            recovery::chat_me()
+        } else {
+            jig_client_test_records::frame_record()
+        });
         let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("delivery size"));
         value.encode(&mut writer).expect("delivery fits");
         let document = w::Owned::new(

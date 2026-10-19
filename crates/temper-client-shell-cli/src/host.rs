@@ -4,6 +4,7 @@ use crate::{
     directory::Directory,
     limits,
     output::Output,
+    recovery::Recovery,
     signing::{Credential, Signing},
     transport::Memory,
 };
@@ -40,11 +41,12 @@ pub struct OneShot {
     directory: Directory,
     call: Option<Parsed>,
     class: Class,
-    root: root::Root,
+    pub(crate) root: root::Root,
     root_env: Env<root::Limits>,
     requests: Queue<root::Request>,
     transport: Option<Memory>,
     signing: Option<Signing>,
+    recovery: Recovery,
     startup: Startup,
     until: Option<Time>,
     link: jig_client::Link,
@@ -88,6 +90,8 @@ impl OneShot {
             + u64::from(limits.connections.body_bytes) * 3 // Loaded store, credential and routing copies.
             + jig_client::worst_case(&limits.root.domain.client).expect("client envelope")
             + Queue::<root::Request>::worst_case(request_room).expect("root outputs")
+            + Queue::<jig_client::Request>::worst_case(request_room).expect("ordered store writes")
+            + u64::from(request_room) * u64::from(limits.connections.body_bytes) // Queued store records.
             + 8192; // Output lines and DIRECTORY's bounded path.
         let mut host = Self {
             directory: Directory::new(
@@ -104,6 +108,7 @@ impl OneShot {
             requests: Queue::with_capacity(request_room),
             transport: None,
             signing: None,
+            recovery: Recovery::new(request_room),
             startup,
             until: None,
             link: jig_client::Link::SignedOut,
@@ -217,6 +222,9 @@ impl OneShot {
         }
     }
     fn signing_keep(&mut self) {
+        if self.class != Class::SignIn {
+            return;
+        }
         let Some(signing) = &mut self.signing else { return };
         let Some(shell) = &mut signing.shell else { return };
         if signing.credential == Credential::New
@@ -249,6 +257,10 @@ impl OneShot {
                 self.signing.as_mut().and_then(|s| s.shell.as_mut()).and_then(|s| s.events().pop())
             };
             let Some(event) = event else { break };
+            if self.class == Class::Act && !self.recovery.event(&event) {
+                self.fail(b"not kept (DIRECTORY's store not written)");
+                return;
+            }
             let signed = self.signing.as_mut().is_some_and(|s| {
                 if matches!(&event, jig_client::Event::Reply { exchange, .. } | jig_client::Event::Lost { exchange } if Some(*exchange) == s.exchange) {
                     s.exchange = None;
@@ -277,7 +289,14 @@ impl OneShot {
             self.root_event(jig_client::Event::SignIn { with: jig_client::With::Held(skein_lib::Secret::new(token)) });
         }
         self.signing_start();
+        self.recovery_start();
+        if self.status.is_some() {
+            return;
+        }
         if self.signing.as_ref().is_some_and(|s| s.with.is_some()) {
+            return;
+        }
+        if self.class == Class::Act && !self.recovery.loaded {
             return;
         }
         if self.transport.is_none() && self.signing.is_none() {
@@ -290,56 +309,32 @@ impl OneShot {
         if root::next_deadline(&self.root).is_some_and(|at| self.env.now >= at) {
             root::fire(&mut self.root, &self.root_env, &mut self.requests);
         }
-        while let Some(request) = self.requests.pop() {
-            match request {
-                root::Request::Client { request } => {
-                    if let Some(signing) = &mut self.signing
-                        && let jig_client::Request::Exchange {
-                            exchange,
-                            message: jig_client::Message::SignInLink(_),
-                            ..
-                        } = &request
-                    {
-                        signing.exchange = Some(*exchange);
-                    }
-                    if let Some(transport) = &mut self.transport {
-                        transport.down(self.env.now, request);
-                    } else if let Some(shell) = self.signing.as_mut().and_then(|s| s.shell.as_mut()) {
-                        shell.down(request);
-                    }
-                }
-                root::Request::Ready => {
-                    if let Some(Parsed::Call { call, json }) = self.call.take() {
-                        self.until = (self.class == Class::Read).then(|| self.env.now.saturating_add(limits::DEADLINE));
-                        root::step(
-                            &mut self.root,
-                            &self.root_env,
-                            root::Event::Call { number: 1, call, json },
-                            &mut self.requests,
-                        );
-                    }
-                }
-                root::Request::Printed { printed, .. } => {
-                    if let Some(signing) = &mut self.signing
-                        && printed.status == 0
-                    {
-                        signing.printed = Some(printed.stdout);
-                        continue;
-                    }
-                    self.output.push(false, printed.stdout);
-                    if printed.status == 1 && !printed.stderr.is_empty() {
-                        self.fail(printed.stderr.strip_suffix(b"\n").unwrap_or(&printed.stderr));
-                    } else {
-                        self.output.push(true, printed.stderr);
-                        self.finish(printed.status, false);
-                    }
-                }
-                root::Request::Kept { line } => self.output.push(false, line),
-                root::Request::Fact { .. } => {}
-            }
-        }
+        self.root_requests();
         if self.status.is_some() {
             return;
+        }
+        if self.class == Class::Act {
+            if let Some(shell) = self.signing.as_mut().and_then(|s| s.shell.as_mut()) {
+                self.recovery.pump(shell);
+            }
+            if self.recovery.admits(self.root.kept())
+                && let Some(Parsed::Call { call, json }) = self.call.take()
+            {
+                self.until = Some(self.env.now.saturating_add(limits::DEADLINE));
+                root::step(
+                    &mut self.root,
+                    &self.root_env,
+                    root::Event::Call { number: 1, call, json },
+                    &mut self.requests,
+                );
+            }
+            if self.recovery.admits(self.root.kept())
+                && let Some(printed) = self.recovery.printed.take()
+            {
+                self.output.push(false, printed.stdout);
+                self.output.push(true, printed.stderr);
+                self.finish(printed.status, false);
+            }
         }
         self.signing_keep();
         if self.status.is_some() {
@@ -359,6 +354,106 @@ impl OneShot {
             jig_client::Link::SignedOut => self.fail(b"signed out"),
             jig_client::Link::OutOfDate => self.fail(b"client is out of date"),
             jig_client::Link::Starting | jig_client::Link::Live | jig_client::Link::Offline => {}
+        }
+    }
+    fn root_requests(&mut self) {
+        while let Some(request) = self.requests.pop() {
+            match request {
+                root::Request::Client { request } => {
+                    if let Some(signing) = &mut self.signing
+                        && let jig_client::Request::Exchange {
+                            exchange,
+                            message: jig_client::Message::SignInLink(_),
+                            ..
+                        } = &request
+                    {
+                        signing.exchange = Some(*exchange);
+                    }
+                    if let Some(transport) = &mut self.transport {
+                        transport.down(self.env.now, request);
+                    } else if let Some(shell) = self.signing.as_mut().and_then(|s| s.shell.as_mut()) {
+                        if self.class == Class::Act {
+                            self.recovery.down(shell, request);
+                        } else {
+                            shell.down(request);
+                        }
+                    }
+                }
+                root::Request::Ready => {
+                    self.recovery.ready = true;
+                    if self.class == Class::Act {
+                        continue;
+                    }
+                    if let Some(Parsed::Call { call, json }) = self.call.take() {
+                        self.until = (self.class == Class::Read).then(|| self.env.now.saturating_add(limits::DEADLINE));
+                        root::step(
+                            &mut self.root,
+                            &self.root_env,
+                            root::Event::Call { number: 1, call, json },
+                            &mut self.requests,
+                        );
+                    }
+                }
+                root::Request::Printed { printed, .. } => {
+                    if self.class == Class::Act && printed.status == 0 {
+                        self.recovery.printed = Some(printed);
+                        continue;
+                    }
+                    if self.class == Class::SignIn
+                        && let Some(signing) = &mut self.signing
+                        && printed.status == 0
+                    {
+                        signing.printed = Some(printed.stdout);
+                        continue;
+                    }
+                    self.output.push(false, printed.stdout);
+                    if printed.status == 1 && !printed.stderr.is_empty() {
+                        self.fail(printed.stderr.strip_suffix(b"\n").unwrap_or(&printed.stderr));
+                    } else {
+                        self.output.push(true, printed.stderr);
+                        self.finish(printed.status, false);
+                    }
+                }
+                root::Request::Kept { line } => self.output.push(true, line),
+                root::Request::Fact { .. } => {}
+            }
+        }
+    }
+    fn recovery_start(&mut self) {
+        if self.class != Class::Act || !self.directory.ready() || self.recovery.loaded {
+            return;
+        }
+        if self.signing.is_none() {
+            self.signing = Some(Signing::held(
+                self.directory.engine.expect("loaded engine"),
+                self.directory.parent(),
+                self.directory.leaf(),
+                self.startup,
+                &mut self.submit,
+            ));
+            self.until = Some(self.env.now.saturating_add(limits::DEADLINE));
+            return;
+        }
+        let signing = self.signing.as_mut().expect("act shell");
+        let Some(shell) = &mut signing.shell else {
+            self.fail(b"DIRECTORY's store cannot be read");
+            return;
+        };
+        if let Some((token, records)) = shell.loaded() {
+            let Some(token) = token else {
+                self.fail(b"DIRECTORY is not signed in");
+                return;
+            };
+            self.recovery.loaded = true;
+            self.root.kept_json(matches!(self.call, Some(Parsed::Call { json: true, .. })));
+            let mut kept = skein_lib::List::with_capacity(u32::try_from(records.len()).expect("bounded store"));
+            for record in records {
+                kept.push(record).expect("loaded record room");
+            }
+            self.root_event(jig_client::Event::Start { kept });
+            self.root_event(jig_client::Event::SignIn { with: jig_client::With::Held(token) });
+        } else if self.recovery.unreadable(signing.opening, shell, self.env.now) {
+            self.fail(b"DIRECTORY's store cannot be read");
         }
     }
     fn link_progress(&mut self, now: Time, wall: Wall) {
@@ -524,7 +619,8 @@ impl Host for OneShot {
             || self.transport.as_ref().is_some_and(Memory::pending)
             || self.signing.as_ref().and_then(|s| s.shell.as_ref()).is_some_and(|s| s.work_pending(now))
             || self.status.is_none()
-                && (self.until.is_some_and(|at| now >= at)
+                && (!self.requests.is_empty()
+                    || self.until.is_some_and(|at| now >= at)
                     || root::next_deadline(&self.root).is_some_and(|at| now >= at))
     }
     fn next_deadline(&self) -> Option<Time> {

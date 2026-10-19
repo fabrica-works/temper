@@ -86,6 +86,7 @@ pub fn step(root: &mut Root, env: &Env<Limits>, event: Event, out: &mut Queue<Re
         }
     }
     drain(root, env, &mut client, &mut child, out);
+    root.client.reclaim();
 }
 fn tools_env(env: &Env<Limits>) -> Env<jig::Limits> {
     Env { now: env.now, wall: env.wall, limits: env.limits.tools }
@@ -188,6 +189,7 @@ pub fn fire(root: &mut Root, env: &Env<Limits>, out: &mut Queue<Request>) {
     drain(root, env, &mut client, &mut child, out);
     jig::wait::fire(&mut root.runner, &root.client, &tools_env(env), &mut child);
     drain(root, env, &mut client, &mut child, out);
+    root.client.reclaim();
 }
 #[must_use]
 pub fn next_deadline(root: &Root) -> Option<Time> {

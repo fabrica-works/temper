@@ -18,11 +18,35 @@ pub(crate) struct Signing {
     pub(crate) printed: Option<Box<[u8]>>,
     pub(crate) error: bool,
     pub(crate) exchange: Option<Token>,
-    opening: bool,
+    pub(crate) opening: bool,
     closing: bool,
     startup: Startup,
 }
 impl Signing {
+    pub(crate) fn held(
+        engine: skein_io::Addr,
+        parent: Fd,
+        leaf: Box<[u8]>,
+        startup: Startup,
+        out: &mut Queue<Submit>,
+    ) -> Self {
+        out.push(Submit {
+            op: OPEN,
+            kind: Op::Open { root: parent, path: b".".as_slice().into(), how: OpenHow::ReadNoFollow },
+        });
+        Self {
+            shell: Some(Shell::new(limits::settings(engine, leaf))),
+            with: None,
+            address: None,
+            credential: Credential::Kept,
+            printed: None,
+            error: false,
+            exchange: None,
+            opening: true,
+            closing: false,
+            startup,
+        }
+    }
     pub(crate) fn new(
         bytes: &[u8],
         parent: Fd,

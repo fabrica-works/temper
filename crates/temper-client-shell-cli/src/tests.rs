@@ -206,3 +206,101 @@ fn sign_in_waits_for_live_me() {
     assert_eq!(f.exit(), Some(Exit::Code(0)));
     assert!(!f.stdout().is_empty());
 }
+#[test]
+fn a_new_act_waits_for_the_kept_answers_erase_to_be_stored() {
+    let mut f = fixtures::Disk::act_with(fixtures::kept_chat());
+    f.answer_kept();
+    assert_eq!(f.root_kept(), 0);
+    assert!(!f.act_sent());
+    f.store_erase();
+    assert!(f.act_sent());
+    assert!(f.stderr().starts_with(b"kept: chat, "));
+}
+#[test]
+fn a_kept_line_names_no_name_or_key() {
+    let mut f = fixtures::Disk::act_with(fixtures::kept_chat());
+    f.answer_kept();
+    assert_eq!(f.stderr(), b"kept: chat, done: task 41, chat\n");
+    assert_eq!(f.stdout(), b"");
+}
+#[test]
+fn a_dropped_record_prints_its_line() {
+    let mut f = fixtures::Disk::act_with(fixtures::dropped());
+    f.answer_kept();
+    assert_eq!(f.stderr(), b"dropped: 1 kept records these tools cannot read\n");
+    assert!(f.act_sent());
+}
+#[test]
+fn another_partys_record_prints_the_parked_line() {
+    let mut f = fixtures::Disk::act_with(fixtures::other_party());
+    f.answer_kept();
+    assert_eq!(f.stderr(), b"kept: 1 for party 8, unsent while it is not signed in here\ntemper ctl: request limit\n");
+    assert!(!f.act_sent());
+}
+#[test]
+fn a_failed_erase_admits_no_act() {
+    let mut f = fixtures::Disk::act_with(fixtures::kept_chat());
+    f.answer_kept();
+    f.fail_erase();
+    assert!(!f.act_sent());
+    assert_eq!(f.exit(), Some(Exit::Code(1)));
+    assert_eq!(f.stderr(), b"kept: chat, done: task 41, chat\ntemper ctl: not kept (DIRECTORY's store not written)\n");
+}
+#[test]
+fn two_writes_get_two_ordered_terminals() {
+    let mut f = fixtures::Disk::act_with(fixtures::kept_chat());
+    f.answer_kept();
+    let first = f.store_count();
+    assert!(!f.act_sent());
+    f.store_erase();
+    assert!(f.store_count() >= first + 2);
+    assert!(f.act_sent());
+}
+#[test]
+fn an_unheard_act_stays_kept() {
+    let mut f = fixtures::Disk::act_with(fixtures::small_store(&[]));
+    f.answer_kept();
+    assert!(f.act_sent());
+    let kept = f.stored(b"store").expect("kept act").to_vec();
+    f.advance_past(limits::DEADLINE);
+    assert_eq!(f.exit(), Some(Exit::Code(1)));
+    assert_eq!(f.stored(b"store"), Some(kept.as_slice()));
+    assert!(f.kept_records() > 0);
+}
+#[test]
+fn a_bad_store_exits_1_cannot_be_read() {
+    let mut f = fixtures::Disk::act_with(b"not a small store".as_slice().into());
+    f.drain();
+    assert_eq!(f.stderr(), b"temper ctl: DIRECTORY's store cannot be read\n");
+    assert_eq!(f.exit(), Some(Exit::Code(1)));
+}
+#[test]
+fn sigterm_mid_act_keeps_its_record() {
+    let mut f = fixtures::Disk::act_with(fixtures::small_store(&[]));
+    f.answer_kept();
+    assert!(f.act_sent());
+    let kept = f.stored(b"store").expect("kept act").to_vec();
+    f.signal(ServiceSignal::Terminate);
+    assert_eq!(f.stored(b"store"), Some(kept.as_slice()));
+    assert_eq!(f.exit(), Some(Exit::Code(limits::TERMINATED)));
+}
+#[test]
+fn a_json_kept_line_is_unprefixed() {
+    let mut words = fixtures::CHAT.to_vec();
+    words.push(b"--json");
+    let mut f = fixtures::Disk::act_words_with(&words, fixtures::kept_chat());
+    f.answer_kept();
+    assert_eq!(f.stderr(), b"{\"operation\":\"chat\",\"outcome\":{\"done\":{\"owner\":{\"created\":{\"first\":41,\"last\":41,\"given\":null}}}}}\n");
+    assert_eq!(f.stdout(), b"");
+}
+#[test]
+fn a_chat_answer_waits_for_its_erase() {
+    let mut f = fixtures::Disk::act_with(fixtures::small_store(&[]));
+    f.answer_new_act();
+    assert!(f.act_sent());
+    assert_eq!(f.exit(), None);
+    assert_eq!(f.stdout(), b"");
+    f.store_erase();
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+    assert_eq!(f.stdout(), b"done: task 41, chat\n");
+}
