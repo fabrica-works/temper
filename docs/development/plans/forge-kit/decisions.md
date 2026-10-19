@@ -855,6 +855,13 @@ where its answer lands.
 
      Coverage gaps remain source fallbacks: skein3 partial files and8 intentionally hostile JSON parses, plus excluded docs/scripts/lock/binary artifacts; temper2 partial files and excluded docs/tools/scripts/lock/binary artifacts. Missing graph output proves no absence. No worktree index or kit move occurred. Keep ruling140's page-fixture correction and bounded check follow-up. Refresh any further reached symbol/copy using the actual source and record it in the implementation commit body.
 
+142. **Compatible landed smith in the temper repin** (cross-session scope, temper05.2's block of2026-10-19T09:41:21Z).
+     Authorize temper05.2's existing first repin commit to take the earliest compatible smith revision landed on origin/main when available, alongside the full skein update. Retain an already newer compatible smith source. This changes temper's Cargo.lock; decision13 still leaves smith's own skein pin to smith's next repin.
+
+     The failure is an upstream interface mismatch: smith-session-world's Event::Call initializer lacks call, and its Request match lacks Piece/Hold. Latest fetched smith f925b18034c344f314adad1e3ac5907188d2dc2c still has the old initializer; no compatible revision is certified here. Independent peer migration continues. If compatibility remains unavailable, report the owning upstream plan/Step trailer for the coordinator's existing cross-machine await. Preserve all assertions, bytes, budgets and the unrelated jig design question.
+
+     Keep one revision per git source and the full skein update. The existing workspace/all-target check and gate establish compatibility before the repin commit. Name old/new smith pins and the landed repair in that commit; refresh any further reached copy following that repair and list it in the body. Follow README's compatible smith source rule on subsequent temper repins; do not patch Cargo's dependency checkout.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

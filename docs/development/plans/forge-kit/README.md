@@ -220,6 +220,16 @@ chain.
   this rule authorizes no backward pin. The remaining tools steps add no
   wait to this repair. Refresh derived fixtures reached by the normal check
   and name further copies and repairs in the repin commit body.
+- **A compatible smith source during a temper repin:** if taking skein main
+  breaks the pinned smith source, the same temper repin may take the earliest
+  compatible smith revision landed on origin/main. Keep an already newer
+  compatible source; keep one revision per git source, the full skein update,
+  and the existing workspace/all-target check and gate. Name the old/new pins,
+  upstream repair and reached copies in the commit body. This changes temper's
+  lock only; decision13 still leaves smith's own skein pin to its next repin.
+  If no compatible repair has landed, continue independent work and report
+  the owning upstream step for the coordinator's trailer-based await. Never
+  patch Cargo's dependency checkout.
 - **Mechanical repairs during repins** belong to the existing repin commit.
   Follow landed upstream renames, paths, signatures and generated-version
   moves through their whole sweep, including source, tests, schema comments,

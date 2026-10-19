@@ -136,7 +136,8 @@ Removes: the three crates, 14,086 Rust lines (8,320 + 5,309 + 457; manifests asi
 Scope: fake-forge.md 5; testing.md 2.4, 2.5 and 4.2; decisions 15 and 26, answer 32.
 Needs: 05.1; skein 05.5.
 Files, at the base:
-  - Repin first (commit 1).
+  - Repin first (commit 1). Follow README's compatible smith source rule if
+    the new skein interface breaks pinned smith; retain all existing checks.
   - `testing/temper-fake-git/{Cargo.toml, src/lib.rs, src/transport.rs,
     src/fixtures.rs}`; `tests/one-process/{Cargo.toml, src/lib.rs, src/world.rs,
     src/fixtures.rs, src/stories.rs, src/referee.rs, src/referee/forge.rs,
