@@ -230,10 +230,13 @@ Shape:
 - **A task's parts.**
   - `--tree` watches `Subject::Tree { task, window: 32 }`; `--run` watches `Subject::Run { task, turn: None, offset: 0 }`.
     Each is unwatched at its first delivery.
-  - `--activity K` reads `Read::Activity` and prints its K latest lines (K at most 32). `run N` is `--run` alone.
+  - `--activity K` reads `Read::Activity` and prints its K latest lines (K at most 32); one that cuts a page prints
+    `read with: activity N` (decisions.md, For the user, P, decided by the director, temper 37c08b325). `run N` is `--run`
+    alone.
 - **The conversation.**
   - `chat N` pages through `jig_client::thread::Thread` (`older`, `accept`, `parts`).
-  - `activity N` reads `Read::Activity`, `--limit K` at most 32.
+  - `activity N` reads `Read::Activity`, `--limit K` at most 32. A page that `--limit K` cuts reads on with the same read
+    without `--limit` (P): the page whole, its K rows again, then jig's `before`; the printed cursor stays jig's.
   - Provisional text prints only where `client.text` gives it.
 - **Turns.**
   - A line whose turn is `TurnProblem::TooLarge` prints `turn A.T · S KB · read with: turn N A.T`.
@@ -249,6 +252,7 @@ Test shape: in `src/tests/jig/{lists,turn}.rs`, on the root harness, each under 
 `an_inbox_cursor_of_another_group_than_its_kind_exits_1`,
 `task_with_tree_activity_and_run_answers_once_and_unwatches`,
 `a_turn_too_large_for_a_page_prints_by_its_size_and_its_call`,
+`a_limited_activity_reads_on_with_its_page_whole`,
 `a_turns_part_past_16_kib_is_cut_with_the_call_that_reads_on`, `a_turn_past_the_read_bound_exits_0_past_the_limit`,
 `read_table_and_document_limits_exit_1`, `chat_prints_no_provisional_text_where_the_host_gives_none`, `a_path_is_never_cut`.
 Reference tests, one per new file (`lists.rs`, then `turn.rs`):
@@ -272,7 +276,7 @@ fn a_turn_past_the_read_bound_exits_0_past_the_limit() {
 Proof: unit, `heavy cargo nextest run -p temper-client-tools -E 'test(/turn/)'` (under 1 s). It shows 5.2's three turn
 forms. The next plan's story "a turn too large for a page read whole" connects it.
 Don't: keep a watch past its first delivery; print more than 32 rows; cut a path.
-Size: at most 360 lines, with the inbox's cursor and first page (decisions.md, N and O).
+Size: at most 380 lines, with the inbox's cursor and first page and a limited activity's reads-on (decisions.md, N, O and P).
 Removes: nothing.
 
 ### 03.4 jig's acts under their keys

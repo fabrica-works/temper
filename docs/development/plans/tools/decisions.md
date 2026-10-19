@@ -695,6 +695,20 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
          248:`an_inbox_page_whose_updates_do_not_fit_reads_on_at_the_start_of_updates`,
          275:Size: at most 360 lines, with the inbox's cursor and first page (decisions.md, N and O).
 
+134. **temper 03.3: a limited activity's call that reads on** (decision P, for temper 03.3's block of 2026-10-19 09:33:47 UTC).
+     The director decided P (decisions.md, For the user, P, temper 37c08b325), the default: a page that `activity N --limit K` cuts reads on with the same read without `--limit`, which prints the page whole, its K rows again, then reads on at jig's `before`; `task N --activity K` that cuts a page prints `read with: activity N`; the printed cursor stays jig's. temper 03.3's Shape says so under "A task's parts" and "The conversation", its Test shape adds `a_limited_activity_reads_on_with_its_page_whole`, its Size is at most 380 lines, and later.md's row for tools.md 5.2 carries P. temper 03.3 lands once its reads-on do this; ruling 132's wait ends.
+
+     ## Checked
+     - `git -C ~/src/rust/temper show 37c08b325:docs/development/plans/tools/decisions.md | sed -n 929,932p`:
+           Decision: the default, by director, 2026-10-19: a page cut by `--limit
+           K` reads on with the same read without `--limit`, which prints the page
+           whole, its K rows again, then reads on at jig's `before`. `task N
+           --activity K` that cuts a page prints `read with: activity N`. The
+     - `grep -n 'read with: activity N\|without `--limit`\|a_limited_activity' docs/development/plans/tools/temper/03-tools-root.md`:
+         234:    `read with: activity N` (decisions.md, For the user, P, decided by the director, temper 37c08b325). `run N` is `--run`
+         239:    without `--limit` (P): the page whole, its K rows again, then jig's `before`; the printed cursor stays jig's.
+         255:`a_limited_activity_reads_on_with_its_page_whole`,
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
