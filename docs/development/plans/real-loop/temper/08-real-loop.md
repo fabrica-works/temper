@@ -412,9 +412,9 @@ pub struct ServiceHost { /* path, signal pipe, held forge listener, service, lin
 - **08.2's median wall time,** whatever it is: to the supervisor, for the
   README's aim and the user's decision (development.md, 5.3). A story
   over 1 s: profiled, then raised with what it waits on, before any
-  merge or fuzzy move. The stories together past 4 s with the other
-  worlds below the domain (testing.md, 6.1) hold no story within its
-  1 s (README, Rules, "The worlds' sum").
+  merge or fuzzy move. The real loop's stories together past
+  testing.md 6.1's 6 s hold no story within its 1 s (README, Rules, "The
+  worlds' sums").
 - **The held forge stalls the service:** startup, the link, the chat or
   the drain waits on the unanswered forge address. Raise it with the
   times; never a fixed port, never skein's forge peer before temper 13

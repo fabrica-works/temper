@@ -367,9 +367,11 @@ Removes: nothing.
 
 Each test's cost: the crate's focused tests take 0.79 s together at
 the base (median), about 20 ms each (this plan's `findings/base-times.md`); the
-14 new ones should add 0.3 to 0.6 s to the worlds' sum below the
-domain, 3.91 s at the base against testing.md 6.1's 4 s, which holds
-no test within its guide (README, Rules, "The worlds' sum").
+14 new ones should add 0.3 to 0.6 s to the sum of the worlds below
+the domain other than the real loop, against testing.md 6.1's 4 s: the
+seven worlds took 3.91 s at the base, the real loop 0.09 to 0.10 s of
+it. The sum holds no test within its guide (README, Rules, "The worlds'
+sums").
 
 ## Interface sketches
 
@@ -437,9 +439,9 @@ pub fn turn_row_costs(front: &Joint, task: u64) -> (u64, u64);
 - **`release` not in `task D`'s acts:** follow the printed act where it
   is printed (`task G --tree`); raise it if nowhere.
 - **A test over 0.5 s:** profiled, then made cheaper or moved to
-  fuzzy, with the times; never merged. The worlds below the domain past
-  4 s together hold no test within its guide (README, Rules, "The
-  worlds' sum").
+  fuzzy, with the times; never merged. The worlds below the domain
+  other than the real loop past 4 s together hold no test within its
+  guide (README, Rules, "The worlds' sums").
 
 ## Done when
 

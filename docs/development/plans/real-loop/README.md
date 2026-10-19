@@ -139,18 +139,26 @@ plan's own.
   three times, and gives the median wall time in its commit body. A story
   over its 1 s aim is made cheaper or moved to the fuzzy profile, never
   merged with another and never excepted; what it waits on is named.
-- **The worlds' sum below the domain holds no step** (testing.md 6.1, as
-  the designer's answer of 2026-10-19 restates it). It is the packages
-  `temper-client-shell-terminal`, `temper-client-world`,
-  `temper-engine-protocol-forge-world`,
-  `temper-forge-setup-reconcile-world`, `temper-one-process-world`,
-  `temper-real-loop-world` and `temper-worker-protocol-git-world`, each
-  test's own time, idle (`--profile measure -j 1` through `heavy
-  --gate`): 3.91 s at `94df159d3`, with 08.2, against 6.1's 4 s. This
-  plan's stories pass it; a test within its own guide lands, and no test
-  is moved, cut or merged for the sum until the user decides how 6.1
-  counts the real loop (decisions.md, For the user, L). Done when 5
-  gives it at the end.
+- **The worlds' sums below the domain hold no step** (testing.md 6.1, as
+  the user's decision sets it, decisions.md, For the user, L: "the real
+  loop is counted apart, with a standing ceiling of 6 s for its sum, in
+  place of an aim per plan, and each story at most 1 s. The other worlds
+  below the domain keep 4 s"). Each sum adds each test's own time, idle
+  (`--profile measure -j 1` through `heavy --gate`), the median of
+  three runs:
+  - the packages `temper-client-shell-terminal`, `temper-client-world`,
+    `temper-engine-protocol-forge-world`,
+    `temper-forge-setup-reconcile-world`, `temper-one-process-world` and
+    `temper-worker-protocol-git-world` together, against 6.1's 4 s;
+  - `temper-real-loop-world` alone, against 6.1's 6 s, with each story
+    at its 1 s.
+
+  At `94df159d3`, with 08.2, the seven took 3.91 s, the real loop 0.09
+  to 0.10 s of it (ruling 112's answer, point 1). A test within its own
+  guide lands whatever the sums. A test is made cheaper or moved to the
+  fuzzy suite for a sum only by a step the supervisor names (6.1: "by
+  steps a plan names"), such as temper-13.s1, never by a session's own
+  move, cut or merge. Done when 5 gives both sums at the end.
 - **A world failure's cause, within a budget** (ruling 110;
   implementer.md, 8.7 and 8.8). A focused world test that fails with a
   symptom its three diagnostic runs did not name gets eight more runs
@@ -289,7 +297,10 @@ what its Proof bounds sum to (development.md, 5.6):
   - temper 06's 14 client stories, each under 0.5 s: 7 s.
   - temper 08.1's and 13.1's five world tests, each under 0.5 s: 2.5 s.
   - Sixteen real-loop stories (08.2 to 08.4, 09, 13.2, 13.4, 13.5),
-    each at its 1 s aim (testing.md, 6.1): 16 s.
+    each at its 1 s aim (testing.md, 6.1): 16 s, their Proof bounds
+    summed; 6.1 guides their idle sum to 6 s (Rules, "The worlds'
+    sums"), and this aim stays as C set it (decisions.md, For the
+    user).
 
   Expected: about half. The one-process world's nearest stories take
   0.25 s to 0.9 s.
@@ -350,16 +361,22 @@ says.
    for k in focused fuzzy; do for i in 1 2 3; do sed -nE 's/^ *PASS \[ *([0-9.]+)s\] \([^)]*\) ([^: ]+)[: ].*/\1 \2/p' $k-$i.log | awk -v run=$k-$i '$2 ~ /^temper(-client-tools|-client-world|-engine-domain-world|-client-shell-cli|-real-loop-world)?$/ {s += $1} END {printf "%s %.2f\n", run, s}'; done; done
    ```
 
-   Then the worlds' sum below the domain (testing.md 6.1; Rules, "The
-   worlds' sum"), four runs after one build, the last three counted,
-   against its 3.91 s at the base, with the real loop's part apart and
-   the three slowest of those tests by name in decisions.md's rulings,
-   for the user:
+   Then the worlds' sums below the domain (testing.md 6.1; Rules, "The
+   worlds' sums"), four runs after one build, the last three counted:
+   the median of the other worlds' sums against 4 s, the median of the
+   real loop's against 6 s, and each real-loop story against its 1 s: a
+   story the third command names as past its 1 s in two of the three runs
+   is past it. A sum past its guide, or a story past its 1 s, is recorded
+   with the three slowest of those tests by name in decisions.md's
+   rulings, for the user; a real-loop median at 6 s or past it puts the
+   ceiling to the user (6.1). The run is done either way. A run's line of
+   the third command fails, and says so, when it reads no test of either
+   part:
 
    ```
    P='-p temper-client-shell-terminal -p temper-client-world -p temper-engine-protocol-forge-world -p temper-forge-setup-reconcile-world -p temper-one-process-world -p temper-real-loop-world -p temper-worker-protocol-git-world'
    heavy -- sh -c "cargo nextest run $P --no-run" && heavy --gate -- sh -c "export NEXTEST_DOUBLE_SPAWN=0; for i in 1 2 3 4; do cargo nextest run $P --profile measure -j 1 >below-\$i.log 2>&1; done"
-   for i in 2 3 4; do sed -nE 's/^ *PASS \[ *([0-9.]+)s\] \([^)]*\) ([^: ]+)[: ].*/\1 \2/p' below-$i.log | awk -v run=below-$i '{s += $1} $2 == "temper-real-loop-world" {r += $1} END {printf "%s %.2f, the real loop %.2f\n", run, s, r}'; done
+   for i in 2 3 4; do sed -nE 's/^ *PASS \[ *([0-9.]+)s\] \([^)]*\) ([^ ]+) ([^ ]+).*/\1 \2 \3/p' below-$i.log | awk -v run=below-$i '{split($2, b, ":")} b[1] != "temper-real-loop-world" {o += $1; n++; next} {r += $1; m++} $1 > 1 {printf "%s: %s %s %.2f s, past its 1 s\n", run, $2, $3, $1} END {if (!n || !m) {print run ": no test read of the other worlds or of the real loop"; exit 1} printf "%s: the other worlds %.2f s against 4 s, the real loop %.2f s against 6 s\n", run, o, r}'; done
    ```
 
 6. Nothing outside these items is checked.

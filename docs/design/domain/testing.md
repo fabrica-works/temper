@@ -876,25 +876,40 @@ by the commands in `docs/development/workflow.md`. In temper:
   settles each random world under every invariant, and reaches every
   ending among them.
 - **Budgets.** The suites' 15 s and 60 s are rules, which nextest
-  enforces. Within them, guides: the worlds below the domain (the
-  protocol, machine, client, one-process, reconcile and real-loop worlds)
-  together at most 4 s of the default suite and 25 s of the fuzzy suite;
-  a focused protocol-world test at most 0.5 s, and a one-process or
-  real-loop story at most 1 s.
+  enforces. Within them, guides:
+  - the worlds below the domain other than the real loop (the protocol,
+    machine, client, one-process and reconcile worlds) together at most
+    4 s of the default suite;
+  - the real-loop world's tests, its stories included, together at
+    most 6 s of the default suite: a standing ceiling, the
+    same for each plan, sized to the smoke
+    that 2.4 keeps the real loop to ("one end-to-end path per feature,
+    and each behaviour and corner case tested in the lower world that
+    owns it, never here"), which the user revisits when the sum reaches
+    it;
+  - the worlds below the domain, the real loop included, together at
+    most 25 s of the fuzzy suite;
+  - a focused protocol-world test at most 0.5 s, and a one-process or
+    real-loop story at most 1 s.
+
   A test that misses its guide is made cheaper or moved to the fuzzy
   suite, never merged with another and never named as an exception: a
   real-loop story with CI and webhooks (2.4) is held to the 1 s as any
   other.
-- **The worlds' sum is measured as the suites' rules are:** each test's
+- **The worlds' sums are measured as the suites' rules are:** each test's
   own time, run alone on the idle development machine (testing-strategy.md,
   section 8), with `--profile measure -j 1` through `heavy --gate`, the
   median of three runs. Beside another task, it measures that task.
-- **The sum is the worlds' guide, never a landing's.** A test within its
-  own guide lands. A plan that adds to these worlds gives the sum at its
-  base and at its end, with the real loop's part apart. When the worlds
-  together pass the sum, their slowest tests are profiled, then made
-  cheaper at the cause the profile shows or moved to the fuzzy suite, by
-  steps a plan names.
+- **The sums are the worlds' guides, never a landing's.** A test within
+  its own guide lands. A plan that adds to these worlds gives both
+  default-suite sums at its base and at its end: the other worlds'
+  against 4 s, the real loop's against 6 s. When the other worlds
+  together pass 4 s, or the real-loop world 6 s, their slowest tests
+  are profiled, then made cheaper at the cause the profile shows or moved
+  to the fuzzy suite, by steps a plan names. A plan whose end finds the
+  real loop's sum at 6 s or past it puts the ceiling to the user, as
+  skein's `development.md`, 10.4, "What goes to the user", says; until
+  the user moves it, the 6 s stands.
 - **Outside both suites:** the process tier's binary `process` and the
   live tier's binary `live`, which both suites' filters leave out, run
   under the nextest profiles `process` and `live` by
