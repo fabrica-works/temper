@@ -291,32 +291,46 @@ where its answer lands.
 
 - 1: the fakes, the conformance and the worlds take five sessions
   (05 to 09).
+  Decision: accepted, by director, 2026-10-19.
 - 2: skein copies temper's code only after temper uses skein's crates,
   so the two repositories alternate on the critical path.
+  Decision: accepted, by director, 2026-10-19.
 - 9 and 10: where the fake's memory tests and the dialect's document
   tests live.
+  Decision: accepted, by director, 2026-10-19.
 - 11: the four `fuzzy_machine` tests move at 7.5 to 7.7 s each, over
   the 5 s aim. Making them cheaper is later work.
+  Decision: accepted, by director, 2026-10-19: the report names each test's cost and why; making them cheaper goes to later.md.
 - 13: only temper repins. smith, jig and hearth keep their pins of
   skein until their next repin (`later.md`).
+  Decision: accepted, by director, 2026-10-19.
 - 16: the actions transcripts are recorded again, on the pinned
   binaries, to mask their UUIDs and times.
+  Decision: accepted, by director, 2026-10-19.
 - 18: the aims, +1.5 s and +6 s on skein's suites.
+  Decision: accepted, by director, 2026-10-19.
 - 22: the protocol world's tests of temper's connector, change and issue
   engines stay temper's.
+  Decision: accepted, by director, 2026-10-19.
 - 23: the component's worlds are two sessions of their own, skein 08
   and 09.
+  Decision: accepted, by director, 2026-10-19.
 - 24: the measure lands whole in skein 02.2, changing skein-forge too.
+  Decision: accepted, by director, 2026-10-19.
 - 25: the Host leaves off ports 443 and 80 whatever the transport.
+  Decision: accepted, by director, 2026-10-19.
 - 26: skein's forge peer is built from the base host, with its delivery
   new in skein 05.5, rather than waiting for the tools plan's next part
   to move the host; that part then builds its real loop on skein's peer.
+  Decision: accepted, by director, 2026-10-19: the tools plan's next part builds its real loop on skein's forge peer.
 - 27: temper 06.2 to 06.4 put the conformance on skein-json before
   skein 06.2 copies it; 06.3's reads, about 350 lines rewritten in
   place, count as moved and stay one increment.
+  Decision: accepted, by director, 2026-10-19.
 - 28: skein-forge's plan tests and the settled differences are a session
   of their own, skein 10, beside the critical path.
 
+  Decision: accepted, by director, 2026-10-19.
 ## Answers received
 
 - **The director,** 2026-10-19: the questions went to the forge kit's
