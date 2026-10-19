@@ -62,11 +62,8 @@ landing. Its counts are measured; whether the tests then pass is not.
 - **T6: temper names no transcript version.** `tests/client`'s `codec`
   is built with `jig_protocol_transcript::Limits::new`, which takes
   smith's ceilings from the version jig decodes. The `smith-transcript`
-  dev-dependency of `tests/client` then goes. If jig 01's landing has no
-  `Limits::new(bytes, turn)`, the literal names
-  `smith_transcript::v5::CEILINGS`, as jig's
-  `tests/client/src/joint/fixture.rs`, `seeded_world_with_receiving`,
-  does at that landing.
+  dependency of `tests/client` then goes. jig's `main` has
+  `Limits::new(bytes, turn)` already; a JIG01 without it is a question.
 - **Locks stay impossible.** temper takes its first lock in the next
   plan's host (`temper ctl`).
 - **One unit test** pins agent.md 4.3's rule for a job (4.4's step
@@ -136,12 +133,14 @@ hotspot):
 - T2: `crates/temper-service/src/accounts.rs` (`file_owner`);
 - T3: `crates/temper/src/lib.rs` (`errno`);
 - T4: `crates/temper-engine-smith/src/finish.rs` (`turn`),
-  `crates/temper-engine-smith/src/tests.rs`;
+  `crates/temper-engine-smith/src/tests.rs` (`turn` joins its
+  `use crate::{…}`);
 - T5: `tests/worker/domain/src/protocol.rs` (`session_turn`),
   `crates/temper-worker-domain/src/tests/fixtures.rs` (`turn`);
-- T6: `tests/client/src/fixtures.rs` (`codec`);
+- T6: `tests/client/src/fixtures.rs` (`codec`), `tests/client/Cargo.toml`
+  (its `smith-transcript` line), and so `Cargo.lock`;
 - only if step 7 is reached: `crates/temper/tests/support/configuration.rs`
-  (`documents`).
+  (`documents`) and `docs/examples/owned/agent.json`.
 None of these is in the fake forge, the forge client, the forge
 component, the fake LLM or the providers. `testing/temper-fake-git`
 stays in temper under temper's `draft/forge-kit.md`, section 2.
@@ -177,13 +176,16 @@ Shape, in this order:
    literals. T6: `codec` returns
    `jig_protocol_transcript::Limits::new(32768,
    jig_client::contract::TurnLimits { messages: 32, blocks: 32, text: 8192 })`,
-   and `smith-transcript` leaves `tests/client/Cargo.toml`. This is the
-   fallback of Choices if jig 01's landing has no such `new`.
+   and `smith-transcript` leaves `tests/client/Cargo.toml`. jig's `main`
+   has that `new` already; a JIG01 without it is a question.
 7. The runtime. Run the focused and fuzzy suites, then the Proof. If
    `temper serve`'s start (the startup world in `crates/temper/tests`),
    or `temper agent`'s start (the process proof), refuses the agent
    document because its worst case passes `memory`, then `documents`'
-   `"memory"` becomes `2_214_592_512`. That is the change smith
+   `"memory"` becomes `2_214_592_512`, and so does
+   `docs/examples/owned/agent.json`'s, which the owned deployment tests
+   load (`SHIPPED`, `crates/temper/tests/support/owned.rs`). That is the
+   change smith
    `99356013` made to its shipped memory; jig 01 drops its tests'
    declared memory instead (01.3), so it names no value for temper.
    Any other failure follows the 5.7 rule.
