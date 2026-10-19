@@ -2,6 +2,14 @@
 use skein_world::domain::heap::Counting;
 #[global_allocator]
 static HEAP: Counting = Counting;
+// Each story signs in first; a chat, when present, is the next call.
+const SIGN_IN: usize = 0;
+const CHAT: usize = 1;
+// The replied wait follows the chat; the running ended wait precedes close.
+const WAIT: usize = 3;
+const CLOSE: usize = 4;
+// Each story needs at most one chat's scripted model turn.
+const CHATS: usize = 1;
 #[test]
 fn a_signed_in_chat_shows_its_reply_only_once_committed() {
     use temper_real_loop_world::{
@@ -10,10 +18,10 @@ fn a_signed_in_chat_shows_its_reply_only_once_committed() {
         fixtures, run, scripts,
     };
     let ran = run(
-        || scripts::chat_scripts(1),
+        || scripts::chat_scripts(CHATS),
         || {
             let mut steps = fixtures::signed_chat("first");
-            steps.push(until(D1, argv!["chat", task(1)], scripts::REPLY, scripts::EARLY));
+            steps.push(until(D1, argv!["chat", task(CHAT)], scripts::REPLY, scripts::EARLY));
             steps
         },
     );
@@ -34,8 +42,13 @@ fn a_signed_in_directory_is_private_to_its_user() {
         calls::{D1, sign_in},
         fixtures, run, scripts,
     };
-    let ran = run(|| scripts::chat_scripts(1), || vec![sign_in(D1)]);
-    assert_eq!(ran.calls()[0].exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&ran.calls()[0].stderr));
+    let ran = run(|| scripts::chat_scripts(CHATS), || vec![sign_in(D1)]);
+    assert_eq!(
+        ran.calls()[SIGN_IN].exit,
+        Some(Exit::Code(0)),
+        "{}",
+        String::from_utf8_lossy(&ran.calls()[SIGN_IN].stderr)
+    );
     let directory = fixtures::directory(ran.path(), D1);
     for (path, mode) in
         [(directory.clone(), 0o700), (directory.join("token"), 0o600), (directory.join("address"), 0o600)]
@@ -58,20 +71,20 @@ fn another_clients_close_meets_a_running_wait() {
         fixtures, run, scripts,
     };
     let ran = run(
-        || scripts::chat_scripts(1),
+        || scripts::chat_scripts(CHATS),
         || {
             let mut steps = fixtures::signed_chat("waiting");
             steps.extend([
-                call(D1, argv!["wait", "task", task(1), "--until", "replied"]),
-                start(D1, argv!["wait", "task", task(1), "--until", "ended"]),
-                watching(3),
-                call(D1, argv!["close", task(1), "--key", "close-waiting"]),
-                join(3),
+                call(D1, argv!["wait", "task", task(CHAT), "--until", "replied"]),
+                start(D1, argv!["wait", "task", task(CHAT), "--until", "ended"]),
+                watching(WAIT),
+                call(D1, argv!["close", task(CHAT), "--key", "close-waiting"]),
+                join(WAIT),
             ]);
             steps
         },
     );
-    let (wait, close) = (&ran.calls()[3], &ran.calls()[4]);
+    let (wait, close) = (&ran.calls()[WAIT], &ran.calls()[CLOSE]);
     assert_eq!([wait.exit, close.exit], [Some(Exit::Code(0)); 2], "{}", String::from_utf8_lossy(&wait.stderr));
     assert!(wait.ended > close.spawned, "the wait ended at {:?}, before the close", wait.ended);
 }

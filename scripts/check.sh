@@ -6,6 +6,11 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
+if grep -rnE '\b(task|watching|join|number)\([0-9]+\)|calls\(\)\[[0-9]+\]' tests/real-loop/tests; then
+    echo 'A setup written once, and rows carry data: name real-loop call positions.' >&2
+    exit 1
+fi
+
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
 # The browser's client crates (client/browser.md, 4.3).
