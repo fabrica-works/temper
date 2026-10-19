@@ -393,6 +393,14 @@ pass:
 120. **The coordinator checks no tests; the next check follows up the test rule** (process, the coordinator's block of 2026-10-19T15:16:33Z).
      The coordinator does not check any landing's tests. That sentence of the steer's point 1 is withdrawn: the coordinator reads no code. The supervisor's next hourly check verifies the rule against the tests that landed since (development.md, 10.3: "The supervisor follows up. The next check verifies each point."). The rest of point 1 stands: the rule passed on to the sessions that write tests.
 
+121. **temper 06.2: an ended task reads as its historical task** (plan defect, temper 06's block of 2026-10-19T15:09:06Z).
+     Plan defect, the proposal adopted. tools.md 5.4 answers it: "`ended` is met by a delivery that shows the subject ended, or by its watch's end because it ended. For `task N`, the answer is then the task as a read of it gives it once ended, so it says how it ended." jig gives an ended task's read as `ReadValue::Historical`, whose `OwnerHistoricalValue::Task { document, result }` holds the task's `contract::Task` and its `Result`; the tools read only `ReadValue::Task`, so the ended wait, like `task N` on an ended task, prints the tools' bug. 06.2 is the first step to read an ended task.
+
+     - **`crates/temper-client-tools/src/jig/wait.rs`** (the finishing arm that reads `ReadValue::Task`) and **`jig/render.rs`** (`render::read`, and `Part::read`, which lists `Historical` as unsupported) take a `ReadValue::Historical` whose value is `OwnerHistoricalValue::Task { document, result }` and that `matches` the task read: the task `document`, printed as a `ReadValue::Task` is, and how it ended from `result`, through the printer's existing result and ending encoders (`render/document/outcomes.rs`, `endings.rs`). A historical of another kind stays the tools' bug.
+     - **06.2's Files** gain those two files; its Size, ~30 lines by part 1's count. Its proof is the close story, `a_chat_the_agent_closes_ends`, met with `done: task T, close` and the ended task printed; a tools-crate test is not required.
+     - **The close story** begins its wait before the fixture's `Finished` report, as the report says: a wait begun after it reads an ended chat's watch as unknown. That needs no question.
+     - A further `ReadValue::Task` arm in the tools that an ended task reaches takes the same historical task; list each in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

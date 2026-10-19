@@ -195,7 +195,8 @@ Scope: 11.2's reply waited for, message and close, with 5.4's `replied`
 and `ended`.
 Needs: 06.1's agent.
 Files: `tests/client/tests/agent.rs`; `tests/client/src/front.rs`
-(`park_runs`, ruling 113).
+(`park_runs`, ruling 113); `crates/temper-client-tools/src/jig/wait.rs`
+and `jig/render.rs` (an ended task's historical read, ruling 121).
 Shape: as `stories.rs`'s answered chat, each test begins with
 `world.front().engine.hello(Token::new(7))` and `park_runs = true`
 (ruling 113): `Joint.park_runs`, beside `answer_runs`, answers each
@@ -218,8 +219,8 @@ each call's status and `done: task T, <operation>`.
 Proof: joint, no higher than its test (06.1).
 Don't: commit a turn but the one that reads an assignment's messages,
 or decode its body; the run's park is the reply (rulings 113, 115).
-Size: at most ~20 lines of `tests/client/src`, by the same command; 0
-by part 1's count.
+Size: at most ~20 lines of `tests/client/src`, by the same command;
+~30 by part 1's count (ruling 121).
 Removes: nothing.
 
 ### 06.3 A turn too large for a page, read whole
