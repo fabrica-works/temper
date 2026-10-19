@@ -20,7 +20,12 @@ pub(crate) fn encode(part: &Part<'_>, limits: &Limits, printed: bool, out: &mut 
     }
     encode_as(part, limits, digest, out);
 }
-fn encode_as(part: &Part<'_>, limits: &Limits, digest: Option<crate::jig::digest::Digest>, out: &mut Encoder) {
+pub(crate) fn encode_as(
+    part: &Part<'_>,
+    limits: &Limits,
+    digest: Option<crate::jig::digest::Digest>,
+    out: &mut Encoder,
+) {
     let mut cut =
         Cut { room: usize::try_from(limits.text).expect("text fits"), left: 0, turn: None, subject: true, digest };
     match part {

@@ -224,7 +224,7 @@ fn group_cursor(group: u8, after: Option<&c::Cursor>) -> c::Cursor {
     bytes.put(after).expect("whole cursor");
     c::Cursor::new(bytes.finish(), u32::MAX).expect("bounded cursor")
 }
-fn object(key: c::ObjectKey, out: &mut Text) {
+pub(super) fn object(key: c::ObjectKey, out: &mut Text) {
     match key {
         c::ObjectKey::Task(task) => {
             out.number(task);

@@ -14,3 +14,5 @@ pub use runner::Printed;
 pub mod conditions;
 pub mod digest;
 pub mod help;
+
+pub mod wait;

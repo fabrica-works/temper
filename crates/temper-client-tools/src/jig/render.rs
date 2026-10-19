@@ -322,3 +322,23 @@ fn check_selected(tool: u8, local: u32, value: &ReadValue) -> Result<(), ()> {
         _ => Err(()),
     }
 }
+
+#[must_use]
+pub(crate) fn waiting(
+    mut wait: document::waiting::Waiting<'_>,
+    json: bool,
+    limits: &Limits,
+    owner_part: fn(&contract::OwnerPart, &mut Text),
+) -> Printed {
+    if wait.digest.is_none()
+        && let Some(delivery) = wait.delivery
+    {
+        wait.digest = Some(crate::jig::digest::part(&Part::delivery(delivery).expect("subject form"), limits));
+    }
+    let met = wait.met;
+    let mut printed = document::print(document::Document::Wait(wait), json, limits, owner_part);
+    if printed.status == 0 && !met {
+        printed.status = 3;
+    }
+    printed
+}

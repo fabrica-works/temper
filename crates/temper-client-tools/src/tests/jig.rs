@@ -6,3 +6,5 @@ mod acts;
 mod conditions;
 
 mod digest;
+
+mod wait;

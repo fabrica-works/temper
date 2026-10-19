@@ -333,6 +333,9 @@ impl Harness {
         };
         let mut out = Queue::with_capacity(OUTPUTS);
         root::step(&mut self.root, &env, event, &mut out);
+        self.outputs(out);
+    }
+    pub(crate) fn outputs(&mut self, mut out: Queue<root::Request>) {
         for _ in 0..out.len() {
             match out.pop().expect("counted root output") {
                 root::Request::Client {

@@ -1,5 +1,5 @@
 //! Calls share an asker and partition their local numbers (tools contract, 4).
-use crate::jig::{call::Call, render};
+use crate::jig::{call::Call, render, wait};
 use alloc::{boxed::Box, collections::BTreeMap};
 use jig_client::{
     Asker, Client, Event, Handle, Latest, State, Told, Watchable,
@@ -17,9 +17,10 @@ pub struct Printed {
 }
 #[derive(Debug)]
 pub struct Runner {
-    asker: Asker,
+    pub(crate) asker: Asker,
     waiting: BTreeMap<u32, Called>,
     active: BTreeMap<u32, reads::Reading>,
+    pub(crate) waits: BTreeMap<u32, wait::Wait>,
     salt: &'static [u8],
     acts: BTreeMap<u32, acts::Reading>,
     sent: BTreeMap<jig_client::Key, acts::Sent>,
@@ -27,7 +28,7 @@ pub struct Runner {
     kept_json: bool,
     ready: bool,
     watching: bool,
-    owner_part: Option<fn(&jig_client::contract::OwnerPart, &mut render::Text)>,
+    pub(crate) owner_part: Option<fn(&jig_client::contract::OwnerPart, &mut render::Text)>,
 }
 #[derive(Debug)]
 pub struct Called {
@@ -50,6 +51,7 @@ impl Runner {
             asker,
             waiting: BTreeMap::new(),
             active: BTreeMap::new(),
+            waits: BTreeMap::new(),
             salt,
             acts: BTreeMap::new(),
             sent: BTreeMap::new(),
@@ -72,7 +74,7 @@ impl Runner {
     pub(crate) fn kept(&self, client: &Client) -> u32 {
         recovery::count(self, client)
     }
-    fn me(&self) -> Handle {
+    pub(crate) fn me(&self) -> Handle {
         Handle { asker: self.asker, number: 0 }
     }
     pub(crate) fn start(&mut self, out: &mut Queue<Out>) {
@@ -89,6 +91,8 @@ pub fn call(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>,
         .checked_add(runner.active.len())
         .expect("bounded calls")
         .checked_add(runner.acts.len())
+        .expect("bounded calls")
+        .checked_add(runner.waits.len())
         .expect("bounded calls")
         .checked_add(runner.sent.len())
         .expect("bounded calls");
@@ -116,6 +120,7 @@ fn run(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, call
         }
         1..=7 => reads::start(runner, client, env, called, out),
         8..=15 => acts::start(runner, client, env, called, out),
+        16 => wait::start(runner, client, env, called, out),
         _ => {
             let printed = render::failure(b"call not supported", called.json, 1);
             finish(called, printed, out);
@@ -123,6 +128,7 @@ fn run(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, call
     }
 }
 pub fn told(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, told: Told, out: &mut Queue<Out>) {
+    wait::told(runner, client, env, &told, out);
     match told {
         Told::Changed { handle } if handle == runner.me() => {
             if live(runner, client) {
@@ -153,6 +159,6 @@ pub fn told(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>,
         Told::Link { .. } | Told::Pending { .. } => {}
     }
 }
-fn finish(called: Called, printed: Printed, out: &mut Queue<Out>) {
+pub(crate) fn finish(called: Called, printed: Printed, out: &mut Queue<Out>) {
     out.push(Out::Printed { number: called.number, printed });
 }

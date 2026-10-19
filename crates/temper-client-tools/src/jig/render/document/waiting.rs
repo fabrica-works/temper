@@ -1,0 +1,94 @@
+//! A wait's result envelope is outside its subject's common digest.
+use super::{Limits, Text};
+use crate::jig::render::Part;
+use jig_client::contract as c;
+use skein_json::writer::Encoder;
+use skein_ui::phrases::Phrasebook;
+#[derive(Debug)]
+pub(crate) struct Waiting<'a> {
+    pub digest: Option<crate::jig::digest::Digest>,
+    pub delivery: Option<&'a c::Delivery>,
+    pub me: Option<&'a c::Me>,
+    pub name: &'a [u8],
+    pub met: bool,
+    pub why: &'a [u8],
+}
+pub(super) fn encode(wait: &Waiting<'_>, limits: &Limits, out: &mut Encoder) {
+    out.object_start();
+    out.key(wait.name);
+    match wait.delivery {
+        Some(delivery) => {
+            super::subjects::encode_as(&Part::delivery(delivery).expect("subject form"), limits, wait.digest, out);
+        }
+        None => out.null(),
+    }
+    if !wait.met {
+        out.key(b"why");
+        out.string(wait.why);
+    }
+    out.key(b"met");
+    out.boolean(wait.met);
+    out.object_end();
+}
+pub(super) fn text(
+    wait: &Waiting<'_>,
+    book: &Phrasebook,
+    limits: &Limits,
+    owner_part: fn(&c::OwnerPart, &mut Text),
+    out: &mut Text,
+) {
+    let most = usize::try_from(limits.rows).expect("rows fit");
+    if let Some(delivery) = wait.delivery {
+        match delivery {
+            c::Delivery::Me(me) => super::me_text(me, book, out),
+            c::Delivery::Task(task) => super::task_text(task, wait.me, book, owner_part, out),
+            c::Delivery::Tree(_) | c::Delivery::OwnerTree(_) => super::super::lists::tree(delivery, book, out),
+            c::Delivery::Tasks(tasks) => {
+                for row in tasks.rows.as_slice().iter().take(most) {
+                    super::super::lists::chip(&row.chip, book, out);
+                }
+            }
+            c::Delivery::Inbox(inbox) => {
+                for row in inbox.entries.as_slice().iter().take(most) {
+                    super::super::lists::object(row.object, out);
+                }
+            }
+            c::Delivery::OwnerInbox(inbox) => {
+                for row in inbox.needs.as_slice().iter().chain(inbox.updates.as_slice()).take(most) {
+                    super::super::lists::object(row.card_key(), out);
+                }
+            }
+            c::Delivery::Run(_) => super::super::activity::run(delivery, None, out),
+            c::Delivery::RunState(run) => super::super::activity::run(delivery, run.writing.as_ref(), out),
+            c::Delivery::OwnerProject(_)
+            | c::Delivery::OwnerProposal(_)
+            | c::Delivery::Chips(_)
+            | c::Delivery::Deployment(_)
+            | c::Delivery::OwnerDeployment(_) => unreachable!("wait subject"),
+        }
+        let part = Part::delivery(delivery).expect("subject form");
+        let list = match part {
+            Part::Inbox(_) | Part::OwnerInbox(_) | Part::Tasks(_) => true,
+            Part::Me(_)
+            | Part::Task(_)
+            | Part::Tree(_)
+            | Part::OwnerTree(_)
+            | Part::Run(_)
+            | Part::RunState(_)
+            | Part::InboxPage(_)
+            | Part::OwnerInboxPage(_)
+            | Part::TaskPage(_) => false,
+        };
+        if list {
+            out.put(if part.more() || part.rows() > most { b"more\n" } else { b"no more\n" });
+        }
+        super::subjects::text_digest(wait.name, &part, limits, out);
+    }
+    if wait.met {
+        out.put(b"met\n");
+    } else {
+        out.put(b"not met: ");
+        out.put(wait.why);
+        out.put(b"\n");
+    }
+}

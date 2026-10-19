@@ -13,6 +13,7 @@ pub(crate) enum Document<'a> {
     Me(&'a Me),
     Task(&'a Task, Option<&'a Me>),
     ReadSet(&'a crate::jig::runner::reads::Reading, Option<&'a Me>),
+    Wait(waiting::Waiting<'a>),
     SizedTurn { task: u64, name: jig_client::contract::TurnName, bytes: u64 },
 }
 #[must_use]
@@ -54,6 +55,7 @@ fn text(
     out: &mut Text,
 ) {
     match document {
+        Document::Wait(wait) => waiting::text(wait, book, limits, owner_part, out),
         Document::Me(me) => me_text(me, book, out),
         Document::Task(task, me) => task_text(task, *me, book, owner_part, out),
         Document::ReadSet(reading, me) => read_sets::text(reading, *me, book, limits, owner_part, out),
@@ -62,7 +64,7 @@ fn text(
     match document {
         Document::Me(me) => subjects::text_digest(b"me", &super::Part::Me(me), limits, out),
         Document::Task(task, _) => subjects::text_digest(b"task", &super::Part::Task(task), limits, out),
-        Document::ReadSet(..) | Document::SizedTurn { .. } => {}
+        Document::ReadSet(..) | Document::SizedTurn { .. } | Document::Wait(_) => {}
     }
 }
 pub(crate) fn phrasebook(text: u32) -> Phrasebook {
@@ -326,6 +328,7 @@ fn encode(document: &Document<'_>, limits: &Limits, out: &mut Encoder) {
         digest: None,
     };
     match document {
+        Document::Wait(wait) => waiting::encode(wait, limits, out),
         Document::Me(me) => subjects::encode(&super::Part::Me(me), limits, true, out),
         Document::Task(task, _) => subjects::encode(&super::Part::Task(task), limits, true, out),
         Document::ReadSet(reading, _) => read_sets::encode(reading, limits, out, &mut cut),
@@ -483,3 +486,5 @@ fn subject_end(digest: Option<crate::jig::digest::Digest>, out: &mut Encoder) {
     }
     out.object_end();
 }
+
+pub(crate) mod waiting;

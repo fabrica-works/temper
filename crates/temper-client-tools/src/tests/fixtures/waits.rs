@@ -149,3 +149,225 @@ pub(crate) fn chip_phase(latest: &mut client::Latest, phase: c::OwnerChipPhase) 
     let c::ChipPhase::Owner { phase: current, .. } = task.chip.details.as_mut() else { panic!("owner chip") };
     *current = phase;
 }
+
+pub(crate) const WAIT_TASK: &[&str] = &["wait", TASK_CALL[0], TASK_CALL[1]];
+pub(crate) const WAIT_TREE: &[&str] = &[WAIT_TASK[0], "tree", TASK_CALL[1]];
+pub(crate) const WAIT_RUN: &[&str] = &[WAIT_TASK[0], RUN_CALL[0], TASK_CALL[1]];
+pub(crate) const WAIT_ME: &[&str] = &[WAIT_TASK[0], "me"];
+pub(crate) const WAIT_INBOX: &[&str] = &[WAIT_TASK[0], INBOX_CALL[0]];
+pub(crate) const WAIT_TASKS: &[&str] = &[WAIT_TASK[0], TASKS_CALL[0], TASKS_CALL[1], TASKS_CALL[2]];
+/// One second exposes before/at deadline behavior without any real-time wait.
+pub(crate) const WAIT_SPAN: skein_lib::Duration = skein_lib::Duration::from_secs(1);
+pub(crate) const SHORT_TIMEOUT: &[&str] = &["--timeout", "1s"];
+/// The shared me remains open after releasing every handle owned by a call.
+pub(crate) const SHARED_WATCHES: usize = 1;
+/// Two callers exercise independent handles on the same client watch.
+pub(crate) const TWO_CALLERS: usize = 2;
+pub(crate) fn task_watch() -> client::Watchable {
+    client::Watchable::Jig(c::Subject::Task { task: TASK })
+}
+pub(crate) fn waiting_call(argv: &[&str], flags: &[&str]) -> (Harness, u32) {
+    let mut root = signed_in(PARTY);
+    let argv = extended(argv, flags);
+    let argv = extended(argv.as_slice(), &["--json"]);
+    let call = root.submit(argv.as_slice());
+    (root, call)
+}
+pub(crate) fn delivery(latest: client::Latest) -> c::Delivery {
+    let client::Latest::Jig(delivery) = latest else { panic!("jig fixture") };
+    delivery
+}
+pub(crate) fn parked() -> c::Delivery {
+    delivery(chat_at(TASK, c::RunStage::Idle, None))
+}
+pub(crate) fn writing_chat() -> c::Delivery {
+    delivery(chat_at(TASK, c::RunStage::Running { attempt: ATTEMPT }, Some(c::OwnerChipWork::Writing)))
+}
+pub(crate) fn task_digest(delivery: &c::Delivery) -> crate::jig::digest::Digest {
+    crate::jig::digest::part(&crate::jig::render::Part::delivery(delivery).expect("subject"), &limits())
+}
+pub(crate) fn json_has(printed: &crate::jig::Printed, expected: &[u8]) -> bool {
+    skein_lib::bytes::find(&printed.stdout, expected).is_some()
+}
+impl Harness {
+    pub(crate) fn fire(&mut self) {
+        let env = Env {
+            now: self.now,
+            wall: self.wall,
+            limits: root::Limits { domain: self.limits.domain, tools: self.limits.tools },
+        };
+        let mut out = Queue::with_capacity(OUTPUTS);
+        root::fire(&mut self.root, &env, &mut out);
+        self.outputs(out);
+    }
+    pub(crate) fn watch_event(&mut self, wanted: &client::Watchable, event: c::WatchEvent) {
+        let mut found = None;
+        for (token, subject) in &self.watches {
+            if subject == wanted {
+                found = Some(*token);
+                break;
+            }
+        }
+        let token = found.expect("open subject");
+        self.client(client::Event::Up { up: client::Up::Watched { watch: token, event } });
+    }
+}
+impl Harness {
+    pub(crate) fn wait_since(&mut self, argv: &[&str], flags: &[&str], digest: &[u8]) -> u32 {
+        let argv = extended(argv, flags);
+        let mut words = List::with_capacity(WORDS);
+        for word in &argv {
+            words.push(word.as_bytes()).expect("wait words");
+        }
+        for word in [b"--since".as_slice(), digest, b"--json".as_slice()] {
+            words.push(word).expect("since words");
+        }
+        let crate::jig::call::Parsed::Call { call, json } = crate::table::parse(words.as_slice()).expect("wait call")
+        else {
+            panic!("parsed wait")
+        };
+        self.submit_call(call, json)
+    }
+}
+pub(crate) struct WaitCase {
+    pub argv: &'static [&'static str],
+    pub watch: client::Watchable,
+    pub delivery: c::Delivery,
+    pub read_digest: Box<[u8]>,
+}
+/// Each of the six generic subjects has its own common document form.
+const WAIT_SUBJECTS: usize = 6;
+pub(crate) fn wait_cases(root: &mut Harness) -> [WaitCase; WAIT_SUBJECTS] {
+    let call = root.submit(ME_JSON_CALL);
+    let me = root.answer(call).expect("shared me read");
+    let (_, inbox) = inbox_first_window(OVER_WINDOW);
+    let argv = extended(INBOX_CALL, &["--json"]);
+    let call = root.submit(argv.as_slice());
+    root.serve(call, inbox_rows(c::InboxReadGroup::Needs, SHORT_WINDOW, false));
+    root.serve(call, inbox_rows(c::InboxReadGroup::Updates, WINDOW_UPDATES, false));
+    let inbox_read = root.answer(call).expect("inbox read");
+    let (tasks, watched) = tasks_first_window(OVER_WINDOW, true);
+    let task = goal(TASK, waiting_on_me());
+    let argv = extended(TASKS_CALL, &["--json"]);
+    let call = root.submit(argv.as_slice());
+    root.serve(call, c::ReadResult::Value(c::ReadValue::Tasks(Box::new(tasks))));
+    let tasks_read = root.answer(call).expect("tasks read");
+    let argv = extended(TASK_CALL, &["--tree", "--json"]);
+    let call = root.submit(argv.as_slice());
+    root.serve(call, task_result(task.clone()));
+    root.deliver_subject(
+        &client::Watchable::Jig(c::Subject::Tree { task: TASK, window: crate::limits::ROWS }),
+        c::Delivery::Tree(Box::new(composite_tree())),
+    );
+    let tree_read = root.answer(call).expect("composite read");
+    let argv = extended(RUN_CALL, &["--json"]);
+    let call = root.submit(argv.as_slice());
+    root.deliver_run(no_provisional());
+    let run_read = root.answer(call).expect("run read");
+    let query = crate::jig::runner::reads::task_query(&call_of(TASKS_CALL), &super::me(PARTY)).expect("task query");
+    [
+        WaitCase {
+            argv: WAIT_ME,
+            watch: client::Watchable::Jig(c::Subject::Me),
+            delivery: c::Delivery::Me(Box::new(super::me(PARTY))),
+            read_digest: last_digest(&me.stdout),
+        },
+        WaitCase {
+            argv: WAIT_INBOX,
+            watch: client::Watchable::Jig(c::Subject::Inbox { window: crate::limits::ROWS }),
+            delivery: c::Delivery::Inbox(Box::new(inbox)),
+            read_digest: last_digest(&inbox_read.stdout),
+        },
+        WaitCase {
+            argv: WAIT_TASKS,
+            watch: client::Watchable::Jig(c::Subject::Tasks { query, window: crate::limits::ROWS }),
+            delivery: c::Delivery::Tasks(Box::new(watched)),
+            read_digest: last_digest(&tasks_read.stdout),
+        },
+        WaitCase {
+            argv: WAIT_TASK,
+            watch: task_watch(),
+            delivery: c::Delivery::Task(Box::new(task.clone())),
+            read_digest: first_digest(&tree_read.stdout),
+        },
+        WaitCase {
+            argv: WAIT_TREE,
+            watch: client::Watchable::Jig(c::Subject::Tree { task: TASK, window: crate::limits::ROWS }),
+            delivery: c::Delivery::Tree(Box::new(composite_tree())),
+            read_digest: last_digest(&tree_read.stdout),
+        },
+        WaitCase {
+            argv: WAIT_RUN,
+            watch: client::Watchable::Jig(c::Subject::Run { task: TASK, turn: None, offset: 0 }),
+            delivery: no_provisional(),
+            read_digest: last_digest(&run_read.stdout),
+        },
+    ]
+}
+fn call_of(argv: &[&str]) -> crate::jig::call::Call {
+    let crate::jig::call::Parsed::Call { call, .. } = parse(argv).expect("fixture call") else { panic!("call") };
+    call
+}
+pub(crate) fn changed_delivery(mut delivery: c::Delivery) -> c::Delivery {
+    match &mut delivery {
+        c::Delivery::Me(me) => me.needs_total = me.needs_total.checked_add(ONE_NEED).expect("new need"),
+        c::Delivery::Inbox(inbox) => {
+            inbox.entries = List::with_capacity(EMPTY);
+            inbox.more = false;
+        }
+        c::Delivery::Tasks(tasks) => {
+            tasks.rows = List::with_capacity(EMPTY);
+            tasks.more = false;
+        }
+        c::Delivery::Task(task) => task.chip.title = document_text(b"changed"),
+        c::Delivery::Tree(tree) => tree.held_below = ONE_NEED,
+        c::Delivery::RunState(run) => run.committed_turn = TURN.checked_add(ONE_NEED).expect("next turn"),
+        c::Delivery::OwnerProject(_)
+        | c::Delivery::OwnerProposal(_)
+        | c::Delivery::OwnerTree(_)
+        | c::Delivery::Chips(_)
+        | c::Delivery::OwnerInbox(_)
+        | c::Delivery::Run(_)
+        | c::Delivery::Deployment(_)
+        | c::Delivery::OwnerDeployment(_) => panic!("fixture subject"),
+    }
+    delivery
+}
+
+/// Digest fields are sixteen hex digits; smaller would omit part of the hash.
+const DIGEST_DIGITS: usize = 16;
+pub(crate) fn last_digest(bytes: &[u8]) -> Box<[u8]> {
+    let field = b"\"digest\":\"";
+    let mut start = None;
+    for (at, window) in bytes.windows(field.len()).enumerate() {
+        if window == field {
+            start = Some(at.checked_add(field.len()).expect("field range"));
+        }
+    }
+    let start = start.expect("read's subject digest");
+    bytes[start..start.checked_add(DIGEST_DIGITS).expect("digest range")].into()
+}
+
+fn first_digest(bytes: &[u8]) -> Box<[u8]> {
+    let field = b"\"digest\":\"";
+    let start =
+        skein_lib::bytes::find(bytes, field).expect("task part digest").checked_add(field.len()).expect("field range");
+    bytes[start..start.checked_add(DIGEST_DIGITS).expect("digest range")].into()
+}
+
+pub(crate) fn plain_wait(flags: &[&str]) -> (Harness, u32) {
+    let mut root = signed_in(PARTY);
+    let argv = extended(WAIT_TASK, flags);
+    let call = root.submit(argv.as_slice());
+    (root, call)
+}
+pub(crate) fn appended(bytes: &[u8], line: &[u8]) -> Box<[u8]> {
+    let mut out = skein_lib::Writer::new(bytes.len().checked_add(line.len()).expect("expected text fits"));
+    out.put(bytes).expect("subject text");
+    out.put(line).expect("wait line");
+    out.finish()
+}
+pub(crate) fn parked_task() -> c::Task {
+    let c::Delivery::Task(task) = parked() else { panic!("parked task") };
+    *task
+}

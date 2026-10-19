@@ -53,35 +53,14 @@ pub(super) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, cal
         2 => {
             let Some(document) = client.document(runner.me()) else { return };
             let Some(Latest::Jig(c::Delivery::Me(me))) = document.latest else { return };
-            let Some(project) = project(&reading.called.call, me) else {
+            let Some(_) = project(&reading.called.call, me) else {
                 let printed = render::failure(b"unknown project", reading.called.json, 1);
                 finish(reading.called, printed, out);
                 return;
             };
             let call = &reading.called.call;
             let ended = value(call, 4).is_some();
-            let query = c::TaskQuery {
-                project: Some(project),
-                requester: if value(call, 3).is_some() {
-                    Some(c::OwnerRequester::Person(me.party.number))
-                } else {
-                    None
-                },
-                root: None,
-                parent: None,
-                label: match value(call, 1) {
-                    Some(Value::Word(0)) => Some(jig_client::shapes::CHAT),
-                    Some(Value::Word(1)) => Some(jig_client::shapes::GOAL),
-                    _ => None,
-                },
-                phase: if ended { Some(c::PhaseClass::Ended) } else { None },
-                executor: None,
-                tracked: if value(call, 2).is_some() { Some(true) } else { None },
-                order: match value(call, 5) {
-                    Some(Value::Order(order)) => *order,
-                    _ => c::QueryOrder::Number,
-                },
-            };
+            let query = task_query(call, me).expect("resolved project");
             let after = cursor(call, 6);
             let (live, ended) = if ended { (None, after) } else { (after, None) };
             read(runner, &mut reading, 1, c::Read::Tasks { query, live, ended }, out);
@@ -287,4 +266,27 @@ fn inbox(runner: &Runner, client: &Client, reading: &mut Reading, out: &mut Queu
     let what = c::Read::Inbox { group, project, kind, goal, after: cursor };
     read(runner, reading, if group == c::InboxReadGroup::Needs { 1 } else { 5 }, what, out);
     true
+}
+
+pub(crate) fn task_query(call: &Call, me: &c::Me) -> Option<c::TaskQuery> {
+    let project = project(call, me)?;
+    let ended = value(call, 4).is_some();
+    Some(c::TaskQuery {
+        project: Some(project),
+        requester: if value(call, 3).is_some() { Some(c::OwnerRequester::Person(me.party.number)) } else { None },
+        root: None,
+        parent: None,
+        label: match value(call, 1) {
+            Some(Value::Word(0)) => Some(jig_client::shapes::CHAT),
+            Some(Value::Word(1)) => Some(jig_client::shapes::GOAL),
+            _ => None,
+        },
+        phase: if ended { Some(c::PhaseClass::Ended) } else { None },
+        executor: None,
+        tracked: if value(call, 2).is_some() { Some(true) } else { None },
+        order: match value(call, 5) {
+            Some(Value::Order(order)) => *order,
+            _ => c::QueryOrder::Number,
+        },
+    })
 }

@@ -181,10 +181,12 @@ pub fn fire(root: &mut Root, env: &Env<Limits>, out: &mut Queue<Request>) {
     let mut child = Queue::with_capacity(env.limits.tools.rows.checked_mul(2).expect("tools outputs fit"));
     root.client.fire(env.now, env.wall, &mut client);
     drain(root, env, &mut client, &mut child, out);
+    jig::wait::fire(&mut root.runner, &root.client, &tools_env(env), &mut child);
+    drain(root, env, &mut client, &mut child, out);
 }
 #[must_use]
 pub fn next_deadline(root: &Root) -> Option<Time> {
-    root.client.next_deadline()
+    root.client.next_deadline().into_iter().chain(jig::wait::next_deadline(&root.runner)).min()
 }
 
 #[cfg(test)]
