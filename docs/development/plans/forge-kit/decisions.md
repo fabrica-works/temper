@@ -387,6 +387,15 @@ where its answer lands.
 
      The README now makes mechanical repin repairs a standing rule. Implementer 8.2 already permits “a removed or renamed name replaced by its successor” and “a version's move with its whole sweep”. Follow those landed upstream changes through source, tests, comments, copies and derived fixtures within the existing repin; no further scope block is needed for a straightforward rename. Report structural or behavioural differences beyond the landed change. Refresh any further copy and list every further user and repair in the commit body. Tools temper 03.1's remaining work keeps the director's existing hotspot/rebase ordering.
 
+106. **skein 04's Shapes against main** (ready check of skein-04.1).
+     Amends: skein/04-setup.md 04.2 Files and temper's side. Reverses: nothing.
+
+     The ready check found a downstream fixture omitted from the strengthened org admission repair. Add temper-forge-setup-shell/tests/support/mod.rs::settings to the next temper repin's repair scope; populate its Entry::orgs with `Box::new([b"acme".as_slice().into()])`. Keep the shell stories and assertions. Refresh further copies and derived expectations reached by this repair and name them in the commit body.
+
+     Checked skein 0db7b1fc7307aa50980ce75637e686e384adc4e4 and temper c4f89032047e4980b9f946ce8abf1c2c81653ba8. `settings` at that temper commit supplies `orgs: Box::new([])`; 04.2's new admission refuses zero orgs before any clone/need. The check searched files, symbols, copies and derived values across all five repositories and found no other mismatch. Missing future APIs/tests remain declared dependencies.
+
+     The corrected scratch fixture passes clippy for temper-forge-setup, its shell and reconcile world; their focused suite passes 145 tests in 1.377 s and fuzzy passes 1 in 1.126 s. Skein's declaration sketch passes clippy; skein-forge plus sketch pass 86 tests, with no fuzzy/browser tests selected. Runtime Given and future 17/33/54-test proofs await their implementations. Evidence: pump/ready-skein-04.md and scratch-ready-skein-04/temper/.ready-check/fixture.patch.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

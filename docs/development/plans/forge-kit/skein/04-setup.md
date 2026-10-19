@@ -230,6 +230,8 @@ Scope: forge-setup 4.1, 4.3–4.4 and 7, the settled answers 24–28.
 Needs: 04.1's machine on Given and Item; no additional cross-session dependency.
 Files: `crates/skein-forge-setup/src/{given,limits,reconcile}.rs`,
   `src/reconcile/{tokens,hooks}.rs`, `src/tests/{given,reconcile,fixtures}.rs`.
+  Temper repin repair: `crates/temper-forge-setup-shell/tests/support/mod.rs`
+  (`settings`), alongside the existing affected caller expectations.
 Shape: no new public signature. Against the base, retained through 04.1:
   `Reconcile::id` uses `bytes::find` alone, accepting any substring; now the
   whole `<word>:bot` needs both edges: start or a preceding byte outside
@@ -252,6 +254,10 @@ Shape: no new public signature. Against the base, retained through 04.1:
   and world `src/world.rs` retain checked construction; setup `src/check.rs::checked`
   runs the strengthened check. The next temper repin repairs affected
   refusal/marker/empty-item/token-status expectations as these tests do.
+  Its shell-test `support::settings` must give `Entry::orgs` one valid org,
+  `Box::new([b"acme".as_slice().into()])`, so shell stories reach HTTP after
+  strengthened admission. Refresh further copies/derived expectations reached
+  by that repair and list them in the repin commit body.
 Test shape: **0 moved, 16 new**, 33 total; shared 04.1 fixtures, all <20 ms.
   In `tests/given.rs`: `no_org_is_refused_before_the_machine_starts` (0),
   `an_org_count_at_the_bound_is_accepted` (PROFILE_ORGS = 8),
