@@ -677,6 +677,9 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
 131. **temper 03.3: the inbox's first page, interim** (design, temper 03.3's block of 2026-10-19 09:25:20 UTC).
      Interim, until decisions.md, For the user, O, is decided: which rows the first `inbox` call prints, and where its call that reads on goes, within tools.md section 12's 32 rows for "a list's page", is a design gap, and waits (jig's `Read::Inbox` takes no row bound, and under N the call that reads on stays in needs while needs has more); it goes to the user as O, as no designer is joined. It replaces ruling 129's "`inbox`'s first answer, needs then updates, each `Read::Inbox` with `after: None`": until O is decided, temper 03.3 builds the inbox's group byte, its `--kind` and `--after` checks and the call that reads on in needs, as ruling 130 says, with `an_inbox_reads_on_in_needs_while_needs_has_more` and `an_inbox_cursor_of_another_group_than_its_kind_exits_1`; whether a page prints updates once needs ends on it, `inbox_prints_what_needs_the_party_then_updates` and `an_inbox_reads_on_in_updates_once_needs_ends` wait on O. The rest of 03.3 goes on, and 03.3 lands once its inbox follows O.
 
+132. **temper 03.3: a limited activity's call that reads on, interim** (design, temper 03.3's block of 2026-10-19 09:33:47 UTC).
+     Interim, until decisions.md, For the user, P, is decided: where the call that reads on goes after a page that `activity N --limit K` or `task N --activity K` cut is a design gap, and waits (jig's `Read::Activity { task, before }` takes no row count, and its page's `before` is older than the whole page; tools.md section 12 gives the rest of a window's cut "by its cursor", so no row is skipped); it goes to the user as P, as no designer is joined. temper 03.3 goes on with everything else, `activity N` without `--limit` and with `--limit` at or above the page's rows included; the call that reads on after a cut page, and its tests, wait on P, and 03.3 lands once they follow P and O.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
@@ -904,3 +907,22 @@ and the user, or the director, may veto it before the run:
   not, the call that reads on starts updates (group byte 1, no jig
   cursor). No page passes 32 rows, and no update is read twice. tools.md,
   5.2, says so at the designer's next pass, beside N.
+- **P. A limited activity's call that reads on** (question.md in the run's
+  directory, from temper 03.3's block of 09:33:47Z; no designer is joined
+  to answer it): tools.md, 5.2, has `activity N [--before C] [--limit K]`
+  answer "a page from its end", and `task N --activity K` its "K latest
+  activity lines"; section 12 gives the rest of what the tools' window
+  cuts "by its cursor". jig's `Read::Activity { task, before }` takes no
+  row count: a page is up to 32 rows, with one `before` cursor older than
+  the whole page, so printing K latest of its rows and reading on at
+  `before` skips the rest of the page. Default: a page cut by `--limit
+  K` reads on with the same read without `--limit` (`activity N`, or
+  `activity N --before C` with the C it was given), which prints the
+  page whole, its K rows again, then reads on at jig's `before`; `task N
+  --activity K` that cuts a page prints `read with: activity N`; the
+  printed cursor stays jig's. Or: the printed cursor wraps jig's with
+  the count of rows printed, and reads on exactly where the page stopped
+  (a cursor of the tools' own); or a designer joins the run (`plan join
+  designer`, in a design session) and answers question.md. temper 03.3's
+  `--limit` and `--activity K` calls that read on wait on it; the rest of
+  03.3 goes on.
