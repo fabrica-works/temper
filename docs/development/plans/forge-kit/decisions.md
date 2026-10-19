@@ -1181,6 +1181,19 @@ where its answer lands.
 
      Checked graph/source locators: search_graph found skein connection.rs::start_backoff_doubles_to_its_maximum, jig documents/small.rs::text, smith service.rs::lost_live_bytes, hearth lib.rs::Builder and temper system.rs::startup_worst_case; exact rg checks confirmed lines506,10,753,23,532. pump/hourly07-graph-locators.json retains results. Pinned plan supports ruling --text and ring at scripts/dev/plan671/669. Pass the refreshed input bounds to running/resumed sessions without repeating completed suites for metadata changes.
 
+164. **Scope hourly07 connection test-shape corrections** (hourly07 follow-up of 2026-10-19T13:10Z).
+     Reverses: nothing. Amends README’s Rules/Sessions/closing-repin prerequisite, skein03’s final count and test-shape handoff; adds skein/03.s1-connection-shapes.md and findings/connection-shapes.md.
+
+     Add skein03.s1 for hourly07’s two sampled shape findings. testing-strategy.md10’s “One behaviour per test” separates backoff progression from terminal immutability; “Named fixtures and sizes” puts the sampled capacities beside their premises. Preserve19 assertion sites/83 evaluations, every input/outcome/wire value and inherited test. The scoped AST recurrence check follows development.md14.4 and preserves all landed checker modes/controls.
+
+     This authorizes a plan step and its normal readiness, not implementation before readiness. The preparatory checker/controls passed; its final package correction is uncompiled, and default/fuzzy/browser remain unchecked after three attempts. A fresh ready check gets at most20 minutes/two pinned-heavy explicit-bash attempts to resolve these. No process, recording, live run or extra downstream compatibility rebuild is in that readiness scope.
+
+     Checked: `rg -n 'fn (each_listing_uses_its_largest_answer_row|start_backoff_doubles_to_its_maximum|an_idle_connection_is_reassigned_to_another_forge)'` on frozen skein sources finds the three sampled functions; graph locators were checked against those sources. `assertion-audit.txt` reports19 sites/83 evaluations, six→seven identities. `changed-files.txt` lists exactly the six scoped files, including new connection_shapes.rs. The new terminal function/constants belong to this supplement.
+     Checked: hourly07-followups commands/results identify each of three heavy attempts; checker controls passed, package clippy failed before the final source-only correction. Bounded five-repository consumer audit found no sampled-test copies; temper’s112 inherited identities/deletion delta−107 stay. Ledger shows forge-kit/temper-repin waiting, so no additional closing repin is needed.
+     Checked: pinned kit plan dispatch contains ruling/ready/bg at671/672/685; heavy and explicit-bash commands are retained in the three attempt scripts. No mutable Cargo, production or dependency source edit belongs to this supplement.
+
+     Instructions: coordinator adds skein-03.s1 in check with its new session file after skein-03.3; normal readiness precedes implementation. Closing forge-kit/temper-repin also waits for it after its existing prerequisites. Preserve historical increment counts; final connection count gains relative+1. Refresh further reached copies/derived counts and name each in the commit body. Existing starts and temper’s deletion proof remain unheld.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

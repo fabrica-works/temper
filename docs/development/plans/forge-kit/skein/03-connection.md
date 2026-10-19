@@ -444,7 +444,8 @@ fn limits_check_admits_one_largest_row_of_every_listing() {
   an_idle_connection_is_reassigned_to_another_forge: calls=connections=1,
   ready forges 1/2; idle forge 1 closes, forge 2 connects and answers once.
   start_backoff_doubles_to_its_maximum: failed start waits 1,2,4,8,8 s;
-  before each deadline no connect, at it one; Ready/Stopped ignore later heard.
+  before each deadline no connect, at it one. The original terminal-state matrix
+  is separated by03.s1, preserving its inputs and assertions.
 Proof: world, `heavy cargo nextest run -p skein-forge-connection`: 128 passed,
   <0.5 s total, new units <20 ms; Component/HTTP harness proves calls and
   eviction over bytes. skein 08.1 connects the separate machine world after
@@ -457,9 +458,10 @@ Removes: largest_row's target-layout-dependent size_of row pricing.
 
 Run once from skein's root; base forms and outputs are in base-skein-03.md.
 
-- `heavy cargo nextest run -p skein-forge-connection` prints 128 passed:
-  112 inherited component test identities +16 new (3+7+6), within the bounds
-  above. Pure host vectors belong to skein 01.4; world tests to skein 08.
+- `heavy cargo nextest run -p skein-forge-connection` prints the03.3 count
+  plus03.s1’s relative+1: 129 at the checked source, 112 inherited identities
+  +16 original additions (3+7+6) +1 separated terminal test, within the bounds
+  above. Recount unrelated additions at start; historical128 proofs stay historical. Pure host vectors belong to skein 01.4; world tests to skein 08.
 - `heavy cargo clippy -p skein-forge-connection --all-targets -- -D warnings`
   exits 0 without warnings.
 - `heavy rg -n -i temper crates/skein-forge-connection` prints nothing

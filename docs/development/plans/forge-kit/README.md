@@ -57,6 +57,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `skein/02.s1-contract-tests.md` | skein 02.s1: contract-test shapes, paired row bounds and source checks | skein 02.4 | |
 | `skein/02.s2-recovery-tests.md` | skein02.s2: recovery test shapes, paired restore bounds and scoped AST checks | skein02.s1 | |
 | `skein/03-connection.md` | skein 03: `skein-forge-connection`: the component moved, on plain numbers, the owner's values and the transport's name; the head check counts the user agent; the checks at their bounds; page sizes on the measure | temper 01.4 | 03.3: skein 02.2 |
+| `skein/03.s1-connection-shapes.md` | skein03.s1: independent backoff and terminal checks, named page/eviction capacities and scoped AST recurrence controls | skein03.3; normal ready check | |
 | `skein/04-setup.md` | skein 04: `skein-forge-setup`: reconcile's machine moved, on the owner's given values and the kit's item; the design's differences; section 7's step tests | temper 01.2 | 04.1: skein 01.3 |
 | `skein/05-fakes.md` | skein 05: the fake forge's domain and protocol layer moved, with their tests; the forge peer in `skein-fake-peers` | temper 01.2 | 05.4: temper 05.1 |
 | `skein/06-conformance.md` | skein 06: the throwaway Forgejo on skein's HTTP client; the conformance on the kit, with its transcripts, and its script; the dialect's document tests on the transcripts | temper 01.2 | 06.2: temper 03.1, temper 06.4 |
@@ -87,7 +88,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `temper/06-throwaway.md` | temper 06: temper's process tier, tools and conformance on skein's throwaway; temper's deleted; the conformance on skein-json (decision 27) | skein 06.1 | 06.2: skein06.s1 |
 | `temper/07-worlds.md` | temper 07: the moved worlds, the dialect's tests and the conformance with its transcripts deleted from temper; the protocol world keeps temper's own tests (decision 22) | skein 06.3; temper 06.1 | the client's world: skein 07.1; setup's: skein 07.3; the component's: skein 08.1 and 09.1; 07.1: temper 05.2 |
 
-17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2,06.s1,10.s1,10.s2 and jig01.s1,01.s2. The brief's fifth step, the fakes and
+17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2,06.s1,03.s1,10.s1,10.s2 and jig01.s1,01.s2. The brief's fifth step, the fakes and
 the conformance, is skein 05 to 09 and temper 05 to 07, by size. The
 increments per session are in each file.
 
@@ -124,6 +125,8 @@ also waits for temper 05.2, behind skein 05.5 (decision 26): a shorter
 chain.
 
 ## Rules of this plan
+
+- **Connection component test shape:** skein03.s1 owns hourly07’s sampled corrections after03.3: separate backoff progression from terminal-state immutability and derive named capacities from the two-row page and sequential single-resource eviction premises. Preserve the assertion mapping in findings/connection-shapes.md, inherited tests, wire values, inputs, outcomes, limits and timing budgets. Add only the scoped connection-shapes AST recurrence mode to the existing checker/gate under development.md14.4; preserve recovery, plan-shapes and any already-landed listing mode/controls. Normal readiness precedes implementation. Serialize shared checker/gate edits without holding existing starts; closing temper-repin also waits for03.s1. Final connection counts gain relative+1; historical increment proofs keep their original counts.
 
 - **The director’s Cargo org cutover:** the GitHub org is now `fabrig-dev`; remotes already use it and old URLs redirect. The director moves smith’s, jig’s and temper’s `Cargo.toml` and `Cargo.lock` source URLs together, in one change after temper’s tools part 1 ends, with pins unchanged. Until that landing every Cargo source line stays `forgetic`; afterward every source line uses `fabrig-dev`. A step adding a dependency copies the URL its `Cargo.toml` already uses; this rule governs the plans’ older literal URL examples. If a rebase conflicts on a source line in either Cargo file, take main’s file and rerun the step’s authorized repin. A gate error naming two skein sources identifies a remaining `forgetic` line: rename it. Preserve the existing checks and one source per upstream; the GitHub redirect does not unify Cargo source identities.
 
@@ -374,7 +377,7 @@ and fail naming the one that is unset (decisions.md, Design questions
 ## Repin
 
 temper's, in each temper increment that needs a new skein step (Rules),
-and the closing `temper-repin` once every skein step, including10.s2, and jig01.s1/01.s2 have
+and the closing `temper-repin` once every skein step, including03.s1 and10.s2, and jig01.s1/01.s2 have
 landed, dropped or split (development.md, 5.7): temper 07.1's repin may land
 before skein's last tests do. skein's changes are new crates, a module
 of `skein-fake-peers` and new test crates, so nothing of smith, jig or
