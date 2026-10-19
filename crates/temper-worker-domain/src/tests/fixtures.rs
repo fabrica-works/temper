@@ -227,6 +227,7 @@ pub fn start(run: Token, source: &host::Start) -> agent::Start {
         answered: Box::new([]),
         directories: Box::new([]),
         grants: grants.into_boxed(),
+        live: None,
     }
 }
 

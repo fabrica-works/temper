@@ -125,6 +125,7 @@ impl ForgeHost {
                         &mut connection.above,
                         &mut connection.below,
                     );
+                    let _ = connection.server.take_head();
                 }
             }
             io::Event::Closed { owner } => {
@@ -164,6 +165,7 @@ impl ForgeHost {
                 &mut connection.above,
                 &mut connection.below,
             );
+            let _ = connection.server.take_head();
             while let Some(event) = connection.above.pop() {
                 match event {
                     protocol::Event::Domain(event) => {

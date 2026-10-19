@@ -158,6 +158,7 @@ pub fn decode(run: Token, source: host::Start, limits: &agent::Limits) -> Result
         answered: answered.into_boxed_slice(),
         directories: Box::new([]),
         grants: grants.into_boxed_slice(),
+        live: None,
     }))
 }
 

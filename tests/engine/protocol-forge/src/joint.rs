@@ -182,6 +182,7 @@ impl Joint {
         for owner in owners {
             let peer = self.peers.get_mut(&owner).expect("peer");
             protocol::resume(&mut peer.server, &mut self.service, &self.protocol_env, &mut peer.above, &mut peer.below);
+            let _ = peer.server.take_head();
             while let Some(down) = peer.below.pop() {
                 peer.pipe.server_down(down);
             }
@@ -194,6 +195,7 @@ impl Joint {
                     &mut peer.above,
                     &mut peer.below,
                 );
+                let _ = peer.server.take_head();
             }
             let client_up = peer.pipe.client_up();
             if let Some(up) = client_up {
