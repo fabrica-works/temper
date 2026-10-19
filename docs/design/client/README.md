@@ -1,6 +1,6 @@
 # temper's client
 
-Provisional, 2026-10-14, revised 2026-10-18. temper's client: temper's
+Provisional, 2026-10-14, revised 2026-10-19. temper's client: temper's
 own presentation on jig's client, `jig-client`. Its crates; its client
 root, which holds `jig-client` and temper's pages; the forge's client
 family, its words and its one form; its view, on skein's UI kit; the
@@ -829,6 +829,16 @@ as `temper open` makes it, in a unit test (section 10). What temper
 decides is in its domain and its view, both step code; golden text
 fixes how temper's pages print (section 10).
 
+### 6.9 While a run's text streams
+
+The terminal is chiefly the real loop's test surface (`../testing.md`,
+2.4): people use the browser, or a later full-screen terminal. While a
+run's text streams, the terminal reprints the whole page at each print
+interval (6.3), as skein's text shell does, with the chat's provisional
+turn as the page draws it (section 3.5); the print interval is the only
+pace it keeps. No rule of skein's text shell is added for streaming.
+A command typed while text streams is done as at any time (6.5).
+
 ## 7. Signing in and the small store
 
 How jig signs a client in, and how a native client keeps its credential
@@ -985,6 +995,12 @@ own tests:
   simulator: the same stories through jig's default HTTP mapping and
   `temper-client-protocol-wire`, killed and restarted with an adoption
   pending.
+- **The real loop's terminal** (`../testing.md`, 2.4): temper's client
+  root and view under skein's text shell, over jig's native transport,
+  in the same loop as the service, driven by a typist that types
+  commands and reads printed pages, with a fake LLM, forge and git. Its
+  live-text story: a reply held after its first piece is read printed
+  under "Writing…", then replaced by the committed turn.
 - **The process tier** (`../testing.md`, 2.6): the real `temper`
   binary; skein's fake person through temper's client signs in by the
   printed link and adopts a repository on an owned Forgejo

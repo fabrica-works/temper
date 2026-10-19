@@ -1,6 +1,6 @@
 # Testing temper
 
-Provisional, 2026-10-03, revised 2026-10-18. How temper is tested. The
+Provisional, 2026-10-03, revised 2026-10-19. How temper is tested. The
 strategy is skein's `docs/foundation/testing-strategy.md`: the tiers,
 faults, what every fake shares, what every world checks, scenarios and
 the referee, the two suites, and where a failure is fixed. This document
@@ -187,6 +187,40 @@ on the real kernel in the focused suite, within its existing budget.
   `poll_max` and `slow`).
   A story that misses its time guide (6.1) is made cheaper or moved to
   the fuzzy suite, never named as an exception.
+- **The person's terminal client.** The real loop also hosts temper's
+  terminal client, in the loop as the service is: temper's client root
+  and view under skein's text shell, over jig's native transport to the
+  service's clients' listener, on a loopback port the kernel assigned.
+  It is a general part of the tier, not of one story: a story that
+  needs a person at a client in the real loop has one.
+  - **The typist** stands where a person sits. It types whole commands
+    to the shell's input, as the person would (client/README.md,
+    section 6.5), and reads the pages the shell prints at its print
+    interval (client/README.md, section 6.3): what it knows of the
+    system is what the pages say. It is ordinary Rust in the test
+    process, with the process tier's typist as its model
+    (`crates/temper/tests/support/terminal.rs`) and no terminal device;
+    the shell's input and output are the harness's pipes in the loop.
+    It waits by the loop's deadlines, never by sleeping, and reads the
+    page after the print that follows its command.
+  - **The peers are fakes:** skein's fake LLM, the fake forge and the
+    fake git program (4.1 to 4.3), as for the tier's other stories.
+  - **The terminal is the real loop's test surface.** People use the
+    browser, or a later full-screen terminal; the terminal client is the
+    way a real-loop story reads what a person would see
+    (client/README.md, section 6.9). The process tier's `temper open`
+    tests stay smokes (2.6), outside the gate.
+  - **A run's live text is one of its stories.** A person's message
+    starts a chat turn, and the fake LLM plays a reply in pieces and
+    holds it after its first piece (skein's `fake-llm.md`, section 2.2).
+    The typist reads a printed page that shows that piece under
+    "Writing…", before the turn commits. The story releases the hold;
+    the reply completes, the turn commits, and the next printed page has
+    the committed turn and no provisional text. A page printed while the
+    reply is held shows the same piece or a longer one, never a shorter
+    one; the story asserts that a piece it read is a prefix of the
+    committed turn's text. Waits for the live-text plan (STATUS.md,
+    section 3).
 
 Most behavioural cases remain in the domain and system worlds. This
 tier keeps a few stories of transport, persistence and lifecycle, within
@@ -440,7 +474,9 @@ the worker's agents are smith's (protocol/llm.md, section 2). The fake is skein'
   inside: it answers each call after a drawn latency, by a world's script
   or at random (failures by configured chance, a number of tool rounds,
   then a final answer), and rejects conversations a real provider would
-  reject. Its scripts cue on content (5.1).
+  reject. Its scripts cue on content (5.1); a scripted reply can come
+  in pieces, with a hold after a piece, so a world observes the reply
+  partway (skein's `fake-llm.md`, section 2.2).
 - **Its peer,** in `skein-fake-peers`: the server side of each provider
   API smith's agents speak, over HTTP and server-sent events, which the
   one-process and real-loop worlds host and the process tier runs as a
@@ -613,7 +649,9 @@ drawn from the seed.
   acting on it, with jig's client test kit's faults and check (jig's
   `client/domain/testing.md`), in `tests/client`; and the same person in
   front of temper's terminal client (client/README.md, section 2), in the
-  one-process world and the process tier (client/README.md, section 10).
+  one-process world and the process tier (client/README.md, section 10);
+  in the real loop (2.4) a typist takes its place: ordinary Rust that
+  types commands and reads the printed pages.
   temper has no fake person of its own (client/README.md, section 2).
 
 In the engine's worlds people are scripted, ordinary Rust rather than a
@@ -811,6 +849,15 @@ scripted engine before it or beside it (client/README.md, section 10).
   done when its stories pass there.
 - **The agents' tools** run there too: their root, as a scripted agent
   beside the fake person (tools.md, 11.2).
+- **A run's live text** has its story there, with a scripted host in
+  place of an agent: the host sends a run's text in pieces, held after
+  the first (jig's `protocol/channel.md`, 6.4), and the fake person
+  reads the chat's provisional "Writing…" turn with that piece, then the
+  rest of the held text, and then the committed turn, which replaces it.
+  Retries, gaps and cuts are jig's views' to test (jig's
+  `domain/engine.md`, section 11); this story checks temper's wiring
+  from the engine's root to the chat's page. The same story over real
+  agents runs in the real loop (2.4).
 
 ## 7. Layout
 

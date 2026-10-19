@@ -118,10 +118,15 @@ order of its pages, not contract (`client/README.md`, 3.5).
   (`domain/root.md`, 7.4): the root reports a permanent preparation's
   repository and reason as a fact of the attempt; people read them on
   the task's page once jig's core keeps an attempt's failure detail.
-- **A run's live text in the client** (jig's `protocol/channel.md`, 6.4):
-  waits for smith's channel to carry it (jig's `STATUS.md`, "What jig
-  asks of smith, later"); until then runs show their activity, and
-  their words as each turn commits.
+- **A run's live text in the client** (jig's `protocol/channel.md`, 6.4;
+  `testing.md`, 2.4 and 6.3; `client/README.md`, 6.9): designed
+  through smith, jig and skein, and waits for the live-text plan
+  (`docs/development/plans/live-text/`), after the tools plan and the
+  LLM accounts work. Not planned (live text): the agent processes' text
+  up smith's channel, the conversation's ask, the worker wire's piece,
+  the engine keeping it, the real loop's terminal client and its
+  story, and the joint world's story. Until then runs show their
+  activity, and their words as each turn commits.
 - **jig's charter and tools translations** (`protocol/llm.md`, section
   7): temper's routing keeps `temper-engine-smith` for the charter, host
   tools and results. Waits for the root's tools to be reconciled with
