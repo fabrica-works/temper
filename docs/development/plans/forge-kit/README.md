@@ -112,6 +112,10 @@ chain.
 
 ## Rules of this plan
 
+- **Hourly-02 follow-up graph refresh:** do not use the code graph for skein; search with `rg` until the supervisor refreshes the primary index after skein 04.1 and lifts this rule. Temper keeps its refreshed graph with worktree verification; its intervening landing changed excluded documentation only.
+
+- **Wait discipline:** follow development.md 7.4. Prefer completion notifications; use supported work-completion waits of at least 300 seconds and identify tool-imposed exceptions instead of repeatedly polling on expiry. This does not delay handling messages or required operational checks.
+
 - **The hourly test supplement:** new tests follow testing-strategy.md 10.
   Only `skein/01.s1-test-shapes.md` may split its five named preserved tests,
   after the source moves; it retains every assertion case with an old/new

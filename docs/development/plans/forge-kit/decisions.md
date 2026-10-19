@@ -568,6 +568,18 @@ where its answer lands.
 
      Instructions: coordinator lifts the temporary instruction in running sessions and passes the exact primary-project/worktree-verification rule word for word. Future sessions use the README's remaining graph rule. Hourly-02's other findings are still being checked.
 
+123. **Refresh later skein source and wait by notification** (hourly check of 2026-10-19T07:15:01Z).
+     Reverses: ruling 122 of 2026-10-19T07:19:58Z and its lifting steer only for skein, whose source advanced after the refresh. Temper's graph permission remains.
+     Amends: README Rules, temporary skein-only graph restriction and wait-discipline rule.
+
+     Refresh skein's primary graph after its later source landing. Until verified, do not use the code graph for skein; search with rg. Temper retains the refreshed graph with worktree verification: its only intervening commit is ruling122, excluded Markdown. This is development.md14.1's current-source check, not a claim that a newer index contains an unindexed later source commit.
+
+     Apply development.md7.4's wait discipline to running and future implementers: prefer completion notifications; use supported work-completion waits of at least300 seconds, and identify tool-imposed exceptions instead of repeated expiry/polling. Incoming messages and required operational checks remain prompt. The hourly pulse reports29 short session waits; coordinator count iszero. No proof or implementation-budget change.
+
+     Checked: hourly-02 index/source comparison gives skein refreshed07:17:38Z (artifact07:17:53Z), later origin/main4c0895d676c9c80ebc5e95c1f03d686f076e0b0c at07:22:31Z. Temper's index07:18:49Z predates only0ece5ea545b923e16ed3c5f4ecedc9c2810c2ad8 at07:19:58Z, the supervisor's Markdown ruling122. Its changed paths are plan README/decisions. The run kit has plan ruling/ring/bg and heavy's supported pueue wait; the development7.4 rule names300000ms wait_agent. Actual tool limits must be reported, never guessed.
+
+     Instructions: coordinator passes both README rules to running implementers. Supervisor refreshes only primary skein, then removes its temporary rule with a verified lifting steer. Hourly-02 findings2–6 have a bounded scratch follow-up for a concrete test-only supplement and detectable gate checks; those corrections remain pending, not waived.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
