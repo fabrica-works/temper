@@ -380,6 +380,16 @@ pass:
        - `tests/real-loop/tests/lifecycle.rs` and `tests/peers.rs` call `chat_scripts(1)`: run both with the changed script. Refresh any further user, and list it in the commit body.
      - **Meanwhile, the session may do work that does not rest on the answer:** the FILE root's story, the scaffolding, and those two suites.
 
+119. **05.6 lands without a FILE named inside a --call call, pending the designer** (design question, temper 05's block of 2026-10-19T15:08:06Z).
+     An interim. Whether a call that `--call` reads may name a FILE of its own, and from where it is read, is a design question. It is now with the designer, in question.md's second heading, of 2026-10-19T15:15:12Z:
+     - tools.md, 8.1, gives "`--call FILE` reads one call as JSON" and "`sign-in FILE|-` … read from FILE or stdin", and says nothing of the two together.
+     - tools.md, 5.6, limits only nested stdin: "A call takes at most one `-`, and none with `--call -`".
+
+     Until the answer:
+     - 05.6 goes on with all else of its Shape: waits, `help`, TEXT `-`, `--call` FILE or stdin decoded by `jig::json::call`, and `ctl::run` with `file_parent` by `arguments::file_root` of the argv's call. It may land with that.
+     - A `--call` whose decoded call names a FILE gets no code path and no test of its own: no new `Startup` field, no decoding before the loop, no root opened in the host.
+     - The answer's unblock says what the case does, and names the step that adds it.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
