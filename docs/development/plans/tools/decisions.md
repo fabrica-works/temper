@@ -674,6 +674,9 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
      - `grep -n -- '--text' ../kit/scripts/dev/plan | head -1`:
          21:#   plan ruling [--text FILE] TITLE SOURCE  land a ruling in decisions.md, once
 
+131. **temper 03.3: the inbox's first page, interim** (design, temper 03.3's block of 2026-10-19 09:25:20 UTC).
+     Interim, until decisions.md, For the user, O, is decided: which rows the first `inbox` call prints, and where its call that reads on goes, within tools.md section 12's 32 rows for "a list's page", is a design gap, and waits (jig's `Read::Inbox` takes no row bound, and under N the call that reads on stays in needs while needs has more); it goes to the user as O, as no designer is joined. It replaces ruling 129's "`inbox`'s first answer, needs then updates, each `Read::Inbox` with `after: None`": until O is decided, temper 03.3 builds the inbox's group byte, its `--kind` and `--after` checks and the call that reads on in needs, as ruling 130 says, with `an_inbox_reads_on_in_needs_while_needs_has_more` and `an_inbox_cursor_of_another_group_than_its_kind_exits_1`; whether a page prints updates once needs ends on it, `inbox_prints_what_needs_the_party_then_updates` and `an_inbox_reads_on_in_updates_once_needs_ends` wait on O. The rest of 03.3 goes on, and 03.3 lands once its inbox follows O.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
@@ -877,3 +880,21 @@ and the user, or the director, may veto it before the run:
   tools.md, 5.2, gives it, "what needs the party, then updates"; the
   cursor stays opaque to the agent. tools.md, 5.2, says so at the
   designer's next pass, after this plan.
+- **O. The inbox's first page** (question.md in the run's directory,
+  from temper 03.3's block of 09:25:20Z; no designer is joined to answer
+  it): tools.md, 5.2, has `inbox` answer "what needs the party, then
+  updates", and section 12 bounds "a list's page" at 32 rows. jig's
+  `Read::Inbox` takes no row bound and answers one `InboxReadGroup` a
+  call, each page up to the client's 32 rows; under N, the call that
+  reads on stays in needs while needs has more. A first call that prints
+  both groups' pages may print 64 rows, and while needs has more, the
+  updates it printed are read again later. Default: a call reads needs
+  first; while needs has more, its page is needs alone and reads on in
+  needs; once needs ends on the page, the same call reads updates' first
+  page and prints it after needs' rows when the two fit in 32 rows, and
+  when they do not, prints needs' rows alone, its call that reads on
+  starting updates (the group byte 1, with no jig cursor after it). Or:
+  the call reads needs alone, and updates start at the next call (an
+  empty needs prints no rows and that call); or a designer joins the run
+  (`plan join designer`, in a design session) and answers question.md.
+  temper 03.3's first inbox page waits on it; the rest of 03.3 goes on.
