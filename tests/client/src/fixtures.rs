@@ -734,3 +734,20 @@ pub fn printed_act(stdout: &[u8], act: &[u8]) -> Vec<Box<[u8]>> {
         .expect("printed act");
     line.split_ascii_whitespace().map(|word| Box::from(word.as_bytes())).collect()
 }
+
+/// Cut the answer after application, before the client's first retry.
+pub fn cut(world: &mut World<Temper, Joint>, agent: jig_client_world::harness::ClientId, words: &[&[u8]]) {
+    use jig_client_world::harness::Until;
+    world.fault(FrontFault::NoAnswer);
+    give(world, agent, words);
+    let start = world.now();
+    let first_retry = start.saturating_add(temper_client_tools::limits::client().client.domain.requests.first);
+    for _ in 0..ANSWER_STEPS {
+        world.run(Until::Steps(2));
+        if world.front().answers_to_lose() == 0 {
+            assert!(start <= world.now() && world.now() < first_retry, "answer cut before first retry");
+            return;
+        }
+    }
+    panic!("answer was not cut");
+}

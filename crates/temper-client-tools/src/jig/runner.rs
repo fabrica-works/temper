@@ -156,6 +156,11 @@ pub fn told(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>,
             }
         }
         Told::Changed { handle } | Told::Text { handle } => reads::changed(runner, client, env, handle, out),
+        Told::Ended { handle, why: jig_client::Why::SignedOut } if handle == runner.me() => {
+            runner.ready = false;
+            runner.watching = false;
+            runner.start(out);
+        }
         Told::Ended { handle, why } => reads::ended(runner, handle, why, out),
         Told::Kept { key, request } => recovery::kept(runner, key, &request, client),
         Told::Dropped { count } => recovery::dropped(runner, count, out),

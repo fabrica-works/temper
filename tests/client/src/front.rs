@@ -30,6 +30,7 @@ pub struct Joint {
     due: Option<Time>,
     observed: Vec<Observed>,
     lose_answers: u32,
+    hosting: BTreeMap<u64, u64>,
     seed: u64,
     now: Time,
     last_commit: u64,
@@ -44,6 +45,10 @@ fn engine_limits() -> engine::Limits {
     limits
 }
 impl Joint {
+    #[must_use]
+    pub fn answers_to_lose(&self) -> u32 {
+        self.lose_answers
+    }
     #[must_use]
     pub fn engine_adopted(&self, forge: u16, repository: u32) -> bool {
         use temper_engine_domain_forge::{Key, Role, Stored};
@@ -199,6 +204,7 @@ impl Joint {
             due: None,
             observed: vec![Observed::Reachable { live: true }],
             lose_answers: 0,
+            hosting: BTreeMap::new(),
             seed,
             now: Time::ZERO,
             last_commit,
@@ -410,6 +416,7 @@ impl Joint {
             if let engine::Delivery::Link { channel, down: jig_domain_host::LinkDown::Cancel { run, attempt } } =
                 &delivery
             {
+                self.hosting.remove(&run.raw());
                 self.engine.answer(
                     *channel,
                     run.raw(),
@@ -442,6 +449,11 @@ impl Joint {
                     jig_domain_tasks::End::Parked,
                     engine::Parts::none(),
                 );
+            }
+            if !self.answer_runs
+                && let engine::Delivery::Assigned { assignment, .. } = &delivery
+            {
+                self.hosting.insert(assignment.task, assignment.attempt);
             }
             if self.answer_runs
                 && let engine::Delivery::Assigned { assignment, .. } = &delivery
@@ -552,13 +564,22 @@ impl Front<Temper> for Joint {
         self.advance(now);
         match fault {
             FrontFault::Restart { offline } => {
+                let limits = self.engine.env.limits;
+                let hosting = self
+                    .hosting
+                    .iter()
+                    .map(|(task, attempt)| {
+                        temper_engine_domain_world::protocol::hosting(*task, *attempt, jig_domain_host::Phase::Active)
+                    })
+                    .collect();
                 let store = std::mem::replace(&mut self.engine.store, Store::new());
-                self.engine = Driver::with_repositories(
-                    store,
-                    walking::config(self.seed),
-                    &engine_limits(),
-                    fixtures::REPOSITORIES,
-                );
+                self.engine =
+                    Driver::with_repositories(store, walking::config(self.seed), &limits, fixtures::REPOSITORIES);
+                self.engine.send(temper_engine_domain_world::protocol::hello_slots(
+                    fixtures::QUESTION_WORKER,
+                    limits.fleet.slots,
+                    hosting,
+                ));
                 self.engine.settle();
                 self.reads = 0;
                 self.read_loads.clear();
