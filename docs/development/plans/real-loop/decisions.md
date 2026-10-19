@@ -409,6 +409,81 @@ pass:
      - **Restart's re-hello of the hosted assignments** stays within `front.rs`, which 06.5's Files name. It needs no question.
      - The four stories that pass land with the fifth; there is no split.
 
+123. **temper 08.3 and 05.6: a peer's end ends its call, and a --call call names no FILE** (design answer, temper 08's block of 2026-10-19T15:07:13Z and temper 05's of 2026-10-19T15:08:06Z).
+     Design answer, landed in jig bfc3a82fc and temper 200916de5; the steps it asks for are temper-08.s1 (`08.s1-peer-end.md`) and temper-05.s2 (`05.s2-call-file-usage.md`).
+
+
+     ### temper 08.3, what frees an ended one-shot call's stream
+
+     (a), at the connection's owner: temper-service. Landed: jig bfc3a82fc
+     (`protocol/client.md`, 17.4; STATUS.md), temper 200916de5
+     (`client/README.md`, 8; `tools.md`, 8.2; 08-real-loop.md, 08.3;
+     later.md; STATUS.md).
+     - jig 17.4, "A peer's end is the call's end": "the application's
+       server, which reads each connection's events below skein's server,
+       ends a connection whose peer ends while a call it handed the engine
+       end is unfinished, and tells the engine end the call's connection
+       closed, as it does when a connection fails. The engine end takes that
+       as the call's end, and a stream's as its connection's end,
+       `StreamGone` (4.2)".
+     - temper's `client/README.md`, 8: "When the peer ends a connection
+       before its call is finished, it aborts the connection, as it does one
+       that fails, and the call's owner hears the connection closed".
+     - `tools.md`, 8.2: "a call holds one of the engine's streams, which its
+       profile bounds …, only while its process runs, and calls that run one
+       after another never wait on their predecessors' streams. A read or a
+       wait sends no stream gone itself (8.3)."
+     - The code: in `crates/temper-service/src/server.rs`'s
+       `io::Event::Stream` arm, an `Up::End` on a connection whose `call` is
+       `Some` goes to `http::up` as now, then `end(connection, false, out)`,
+       the `io::Event::Failed` arm's abort. The `io::Event::Closed` arm then
+       sends `Routed::Http { call, event: http::Event::Closed }`, from which
+       jig 149970b's mount sends `StreamGone`. No skein or jig code, no pin.
+     - The step: temper-service is outside 08.3's Files, and ruling 118's
+       interim forbids editing it for the 409s; this answer lifts that for
+       this change alone. A supervisor's step before 08.3 lands, about 15
+       lines. Its Files: `server.rs` and one temper-service test file. Its
+       test: on the small profile's two streams, three clients, one after
+       another, each open the stream, read the hello and end their side; the
+       third's stream opens with no virtual time past a heartbeat. Its proof:
+       08.3's story as written, aiming at 1 s.
+     - Unchanged from ruling 118: no bound raised (`CALLS_AT_ONCE`, the
+       profile's streams), no heartbeat shortened, no wait or retry in the
+       caller, nothing in skein or jig. 08.3's Don't now says so.
+     - Deferred: jig-test-service's same gap. It is a row in later.md and
+       jig's STATUS.md, not planned.
+
+     ### temper 05.6, where a FILE named inside a `--call` call is read from
+
+     (a). Landed in temper 200916de5 (`tools.md`, 8.1; 05-ctl.md, 05.6's
+     Shape).
+     - `tools.md`, 8.1: "**A call `--call` reads gives no argument of the
+       type a file** (5.1), a path or `-`: one that does is a usage error,
+       exit 1, once the call is decoded and before DIRECTORY opens. So
+       `sign-in`, and each tool of areas 3 to 5 that reads or writes a FILE,
+       is called from its arguments. A call opens a FILE only beneath a root
+       its start opened before the loop, the directory of the FILE its
+       arguments name, and `--call`'s call is decoded on the loop, from FILE
+       or from stdin alike."
+     - It extends 5.6's "A call takes at most one `-`, and none with `--call
+       -`" to every file argument and both sources. Ruling 111's
+       `Startup.file_parent` stands as it is.
+     - The code: in `crates/temper-client-shell-cli/src/host/input.rs`'s
+       `prepare_progress`, once `jig::json::call` returns `Ok(call)`, a call
+       holding a `Kind::File` argument (its `Value::File`, or `Value::Stdin`
+       in a file slot) fails as the decode's `Err` arm does, `usage: temper
+       ctl DIRECTORY TOOL [ARGUMENT...]`, which `fail` exits 1, before
+       `directory.start`. There is no new `Startup` field, no decoding
+       before the loop, and no new root.
+     - On main (d6c01573f), `sign-in FILE` under `--call PATH` reads FILE's
+       last name from PATH's directory (`directory.rs`'s `load_link`). Under
+       `--call -` it fails "link file has no parent". Neither is the design.
+     - The step: 05.6 landed without the check (ruling 119). A supervisor's
+       step after 05.6 adds it, with `a_call_that_names_a_file_is_usage`:
+       `sign-in FILE` by `--call FILE` and by `--call -`, each exiting 1 and
+       leaving no DIRECTORY. 05.6's Shape now names that step. Nothing is
+       deferred, so there is no later.md row.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

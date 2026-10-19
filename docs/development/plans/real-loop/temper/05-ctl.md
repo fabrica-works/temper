@@ -347,8 +347,8 @@ Shape:
   DIRECTORY opens. A decoded call that gives an argument of the type a
   file, a path or `-` (`sign-in`'s), is usage too, and opens no root
   (tools.md, 8.1, from the designer's answer of 2026-10-19): 05.6
-  landed without it (ruling 119), and the supervisor's step after 05.6
-  adds it, with `a_call_that_names_a_file_is_usage` (`--call` FILE and
+  landed without it (ruling 119), and temper-05.s2, after 05.6
+  (ruling 123), adds it, with `a_call_that_names_a_file_is_usage` (`--call` FILE and
   `-`).
 - `help [TOOL]` and `DIRECTORY help`: `help::text`; `help TOOL --json`:
   `jig::json::write_tool`. No DIRECTORY, client or lock.

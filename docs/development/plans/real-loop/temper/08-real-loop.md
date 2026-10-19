@@ -235,8 +235,8 @@ Needs: temper 05's reads (decisions.md, 5), its `sign-in` and its `chat`
 act (05.2 to 05.4), temper-05.s1's FILE root (ruling 111), and
 `temper-service` taking a peer's end, during a call it handed jig's
 engine end, as the call's end (`client/README.md`, section 8, from the
-designer's answer of 2026-10-19): the supervisor's step before 08.3
-lands. Each call's stream is then free once its process exits, so the
+designer's answer of 2026-10-19): temper-08.s1, before 08.3
+(ruling 123). Each call's stream is then free once its process exits, so the
 story's calls, one after another, stay within the small profile's two
 streams.
 Files: `tests/real-loop/src/{calls.rs, world.rs, fixtures.rs, lib.rs}`,
