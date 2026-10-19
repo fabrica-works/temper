@@ -5,7 +5,11 @@ use jig_client_shell_web::adapter::{Asked, Heard};
 use skein_lib::{Env, List, Queue, Secret, Time, Token, Wall};
 use skein_ui::{Act, NodeId, Patch};
 use std::collections::BTreeMap;
-use temper_client_domain::{self as root, Address, Event, Place, Request, address::Filter};
+use temper_client_domain::{
+    self as root, Action, Address, Event, Place, Request,
+    address::{Filter, parse, print},
+    forge, pages,
+};
 use temper_client_view as view;
 
 pub struct Host {
@@ -19,6 +23,7 @@ pub struct Host {
     stream: jig_client_protocol_http::Stream,
     tickets: BTreeMap<u32, Token>,
     next: u32,
+    pub show: Option<(Box<[u8]>, bool)>,
 }
 impl Host {
     pub fn new(seed: u64, now: Time, wall: Wall) -> Self {
@@ -36,6 +41,7 @@ impl Host {
             stream: jig_client_protocol_http::Stream::new(&limits::stream().expect("stream bounds")),
             tickets: BTreeMap::new(),
             next: 0,
+            show: None,
         }
     }
     pub fn start(&mut self, path: &[u8], records: Vec<skein_ui_web::store::Record>, secret: Option<Box<[u8]>>) {
@@ -45,16 +51,38 @@ impl Host {
                 kept.push(record).expect("counted store");
             }
         }
-        self.address = match root::address::parse(path) {
-            Place::Address(address) => address,
-            Place::Missing => Address::Inbox { filter: Filter::ALL },
-        };
+        self.address = self.opened(path);
         self.event(Event::Start { address: self.address.clone(), kept });
         let with = match secret {
             Some(bytes) => jig_client::With::Link(Secret::new(bytes)),
             None => jig_client::With::Transport,
         };
         self.client(jig_client::Event::SignIn { with });
+    }
+    // The page a path names; a path that prints otherwise is replaced by the printed one.
+    fn opened(&mut self, path: &[u8]) -> Address {
+        let address = match parse(path) {
+            Place::Address(address) => address,
+            Place::Missing => Address::Inbox { filter: Filter::ALL },
+        };
+        let printed = print(&address);
+        if *printed != *path {
+            self.show = Some((printed, true));
+        }
+        address
+    }
+    pub fn went(&mut self, path: &[u8]) {
+        self.address = self.opened(path);
+        self.event(Event::Went { place: Place::Address(self.address.clone()) });
+    }
+    pub fn href(&mut self, node: NodeId) -> Option<Box<[u8]>> {
+        match view::act(&mut self.view, node, Act::Press)? {
+            Action::Pages(pages::Act::Go { address }) => Some(print(&address)),
+            Action::Forge(forge::Act::Go { address: forge::Address::Adopt { project } }) => {
+                Some(print(&Address::Adopt { project }))
+            }
+            Action::Pages(_) | Action::Forge(_) => None,
+        }
     }
     pub fn clocks(&mut self, now: Time, wall: Wall) {
         self.env.now = now;
@@ -126,8 +154,12 @@ impl Host {
         while let Some(request) = self.out.pop() {
             match request {
                 Request::Client { request } => self.carry(request, &mut asked),
-                Request::Show { address, .. } => {
+                Request::Show { address, replace } => {
                     if address != self.address {
+                        let path = print(&address);
+                        if path != print(&self.address) {
+                            self.show = Some((path, replace));
+                        }
                         self.address = address.clone();
                         self.event(Event::Went { place: Place::Address(address) });
                     }
