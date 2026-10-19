@@ -297,6 +297,14 @@ pass:
      - **06.1 finds why the agent's link is not shown `Live` by 0.5 s,** within that budget, from now. Where to look first, in this order: whether `root.client().link().state` ever leaves `SignedOut`/`Starting` after `StartUnlinked` and `SignIn { with: With::Transport }` (the person's arm also steps `domain::Event::Start` after them, the agent's `Event::Start` only those two); whether the agent's requests reach the `Joint` as the person's do (`duty` of its `Request::Client`, the front's bind for its `ClientId` and party); whether `build` emits patches when the state changes (the world shows a tree only then, after `take`, in each callback).
      - A fix within 06.1's Files and rulings 103, 107 and 108 lands without a question. Past the budget, or for a fix outside them (jig, the tools' crate beyond `Root::unlinked`), raise it with the cause found, or each run's finding.
 
+111. **temper 08.3: sign-in reads FILE as given** (plan defect, temper 08's block of 2026-10-19T14:35:28Z).
+     Plan defect: tools.md 8.1 says `sign-in` reads the link "from FILE", and a FILE given to a command is the path as given, absolute or relative to the working directory; 05.3's Shape read it by the directory's `FileIo`, whose only root is DIRECTORY's parent, and the kernel resolves every path beneath its root, refusing an absolute one with `Escape`. The fix is session 05's, as the block proposes.
+
+     - **A new step, `temper-05.s1`,** `temper/05.s1-file-root.md`: `arguments::file_root` names the directory of the FILE a call reads; the entry point opens it, as `Startup.file_parent`; the host adopts it as a second root of the directory's `FileIo` and loads FILE's leaf beneath it. It runs in session 05 after 05.4; its proof is a unit test, and an absolute FILE on the real kernel is 08.3's sign-in story.
+     - **08.3 waits for it,** its Shape kept: `sign-in <scratch>/link`, absolute. Its world gives a call that names a FILE a second startup root, `file_parent`, from `arguments::file_root`; its README Needs and order name the step.
+     - **05.6 reads `--call FILE` the same way,** beneath `file_parent`, and `ctl::run` opens it by `skein_shell::open_root`.
+     - Any further place that builds `Startup` or loads a FILE argument beneath DIRECTORY's parent takes `file_parent` the same way: list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

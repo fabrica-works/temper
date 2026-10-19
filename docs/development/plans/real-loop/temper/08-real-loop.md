@@ -230,13 +230,15 @@ Scope: `temper ctl`'s host hosted per call: a sign-in, a `chat` act
 whose task runs on a hosted agent, then reads until the reply, with no
 provisional text before it (tools.md, 5.2, 5.3, 5.6, 8.1, 11.3).
 Needs: temper 05's reads (decisions.md, 5), its `sign-in` and its `chat`
-act (05.2 to 05.4).
+act (05.2 to 05.4), and temper-05.s1's FILE root (ruling 111).
 Files: `tests/real-loop/src/{calls.rs, world.rs, fixtures.rs, lib.rs}`,
 `tests/real-loop/tests/tools.rs`, `tests/real-loop/Cargo.toml`.
 Shape:
 - `fixtures::CTL` hosted with `host_roots`: the root `parent` is
-  DIRECTORY's parent, from the call's argv; the factory makes
-  `Startup { parent, stdin, stdout, stderr, signals, user:
+  DIRECTORY's parent, from the call's argv, and for a call that names
+  a FILE, the root `file_parent` is `arguments::file_root(..)`
+  (temper-05.s1, ruling 111); the factory makes
+  `Startup { parent, file_parent, stdin, stdout, stderr, signals, user:
   skein_shell::effective_user(), seed: fixtures::SEED }` from the
   inherited pipes and signal, `Invocation { directory: DIRECTORY's leaf,
   parsed: arguments::parse(..) }`, then `OneShot::new`. The host opens

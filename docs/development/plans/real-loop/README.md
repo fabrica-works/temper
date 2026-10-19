@@ -81,7 +81,7 @@ plan's own.
 | `temper/14-fuzzy-walking.md` | temper 14: the fuzzy walking story in eight shards, its cause named, until the state digest, the next plan | nothing | |
 | `temper/05-ctl.md` | temper 05: `temper ctl`'s one-shot host, `temper-client-shell-cli`: DIRECTORY and its lock, the transport and a read, `sign-in FILE`, the `chat` act first; then the other acts, `sign-out`, `sign-in -`, `pending`, the waits, `help` and the executable | nothing | |
 | `temper/06-client-stories.md` | temper 06: the client stories over the tools, in `tests/client`: an agent beside the person, a chat's life, a turn too large for a page, an adoption and a released task, cut calls made once | nothing | |
-| `temper/08-real-loop.md` | temper 08: the real-loop world, `tests/real-loop`: the scripted LLM peer, the standalone service checked and drained, the meeting point (a sign-in and a chat to its reply), another client's act meeting a running wait | nothing | 08.3: temper 05's `chat` act (05.4); 08.4: temper 05 |
+| `temper/08-real-loop.md` | temper 08: the real-loop world, `tests/real-loop`: the scripted LLM peer, the standalone service checked and drained, the meeting point (a sign-in and a chat to its reply), another client's act meeting a running wait | nothing | 08.3: temper 05's `chat` act (05.4) and temper-05.s1 (ruling 111); 08.4: temper 05 |
 | `temper/09-loop-stories.md` | temper 09: the real loop's stories over more than one call: a restart, a lost answer, DIRECTORY's lock, a record these tools cannot read | temper 08 | |
 | `temper/13-landing.md` | temper 13: the landing through the real loop, over skein's forge peer and temper's fake git, unchecked (decisions.md, design question 4) | temper 08; forge-kit's skein-05.5 and temper-05.2 (`plan await coordinator forge-kit/skein-05.5 forge-kit/temper-05.2`) | |
 | `temper/10-process.md` | temper 10: the process tier: `temper ctl`'s fixture and its paths through `main`, an adopt cut by a termination signal and made once | temper 05 | |
@@ -92,7 +92,8 @@ plan's own.
   more than four ready together, under the coordinator's eight.
 - **At the start,** the four that need nothing: temper 14, temper 05,
   temper 08 (08.1 and 08.2) and temper 06.
-- **Then,** as each lands: temper 08.3 once temper 05.4 has, temper 08.4
+- **Then,** as each lands: temper 08.3 once temper 05.4 and
+  temper-05.s1 (ruling 111) have, temper 08.4
   once temper 05 has; temper 10 once temper 05 has; temper 09 once temper
   08 has; temper 13 once temper 08 and forge-kit's temper-05.2 have.
 - **When slots are short,** start first: temper 05, temper 08, temper

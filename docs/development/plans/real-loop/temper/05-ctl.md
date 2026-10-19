@@ -340,7 +340,9 @@ Files: `src/{arguments,host,tests}.rs`, `src/tests/fixtures.rs`; new
 `crates/temper/src/ctl.rs`;
 `crates/temper/src/{lib,tests}.rs`, `crates/temper/Cargo.toml`.
 Shape:
-- `Parsed::File`: FILE or stdin, then `jig::json::call`. TEXT `-`
+- `Parsed::File`: FILE, beneath `Startup.file_parent` as temper-05.s1
+  reads sign-in's (ruling 111; `arguments::file_root` names its
+  directory), or stdin, then `jig::json::call`. TEXT `-`
   reads stdin within `ask_bytes`; a second `-` is usage. All before
   DIRECTORY opens.
 - `help [TOOL]` and `DIRECTORY help`: `help::text`; `help TOOL --json`:
@@ -349,7 +351,8 @@ Shape:
   offline engine cannot extend `DEADLINE`; 0, 2, 3 from `Printed`.
 - `Command::Ctl { arguments }`, `configure`'s `"ctl"`, `run` and
   `USAGE`; `ctl::run(&arguments, &Clock) -> u8` builds `Startup`
-  (`seed()`, `effective_user()`, `open_termination_signals()`), drives
+  (`seed()`, `effective_user()`, `open_termination_signals()`, and
+  `file_parent` by `skein_shell::open_root` of `arguments::file_root`), drives
   `OneShot` with `Kernel` and converts its `Exit`, as `open::run`.
 Test shape: `src/tests.rs`; `crates/temper/src/tests.rs` (`configure`,
 `USAGE`).
@@ -385,7 +388,10 @@ second open of `parent`. `exit` ends the call, whatever ended it.
 use skein_io::kernel::Fd;
 /// What `ctl::run` (or a world) opened; `parent` is DIRECTORY's parent.
 pub struct Startup {
-    pub parent: Option<Fd>, pub stdin: Fd, pub stdout: Fd, pub stderr: Fd,
+    pub parent: Option<Fd>,
+    /// The directory of the FILE the call reads (temper-05.s1, ruling 111).
+    pub file_parent: Option<Fd>,
+    pub stdin: Fd, pub stdout: Fd, pub stderr: Fd,
     pub signals: Fd, pub user: u32, pub seed: u64,
 }
 /// One parsed call; `directory` is DIRECTORY's leaf, `None` for help.
