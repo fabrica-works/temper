@@ -24,6 +24,7 @@ const ROOM: u32 = (limits::EXCHANGES + 1) * 128; // Two bounded socket bursts pl
 #[derive(Clone, Copy)]
 pub struct Startup {
     pub parent: Option<Fd>,
+    pub file_parent: Option<Fd>,
     pub stdin: Fd,
     pub stdout: Fd,
     pub stderr: Fd,
@@ -79,7 +80,7 @@ impl OneShot {
         let stdin = Some(io.adopt_read_pipe(startup.stdin).expect("stdin slot"));
         let signals = Some(io.adopt_signals(startup.signals).expect("signal slot"));
         let memory = io::worst_case(&limits.io).expect("io envelope")
-            + FileIo::worst_case(4, limits::LINK, 1, limits::LINK).expect("file envelope")
+            + FileIo::worst_case(5, limits::LINK, 1, limits::LINK).expect("file envelope")
             + Queue::<Complete>::worst_case(ROOM).expect("completions")
             + Queue::<Submit>::worst_case(ROOM).expect("submissions") * 3
             + Queue::<io::Event>::worst_case(ROOM).expect("io events")
@@ -96,6 +97,7 @@ impl OneShot {
         let mut host = Self {
             directory: Directory::new(
                 startup.parent,
+                startup.file_parent,
                 call.directory.unwrap_or_default(),
                 class,
                 startup.user,
@@ -194,7 +196,7 @@ impl OneShot {
                 }
             } else if let Some(Parsed::Call { call, json }) = self.call.take() {
                 if let Some(Some(Values::One(Value::File(path)))) = call.values.first() {
-                    self.directory.load_link(path.clone());
+                    self.directory.load_link(path);
                     let Parsed::Call { call, .. } = arguments::parse(&[b"me"]).expect("me call") else {
                         unreachable!()
                     };

@@ -25,6 +25,7 @@ enum Stage {
 pub(crate) struct Directory {
     io: FileIo,
     root: Option<Token>,
+    file_root: Option<Token>,
     private: Option<Token>,
     check: Option<Token>,
     leaf: Box<[u8]>,
@@ -44,13 +45,22 @@ pub(crate) struct Directory {
     pub(crate) submissions: Queue<Submit>,
 }
 impl Directory {
-    pub(crate) fn new(parent: Option<Fd>, leaf: Box<[u8]>, class: Class, user: u32, seed: u64) -> Self {
-        let mut io = FileIo::new(4, limits::LINK, 1, Duration::from_secs(30)).with_effective_user(user);
+    pub(crate) fn new(
+        parent: Option<Fd>,
+        file_parent: Option<Fd>,
+        leaf: Box<[u8]>,
+        class: Class,
+        user: u32,
+        seed: u64,
+    ) -> Self {
+        let mut io = FileIo::new(5, limits::LINK, 1, Duration::from_secs(30)).with_effective_user(user);
         io.seed_randomness(seed);
         let root = parent.map(|fd| io.adopt_root(fd).expect("parent slot"));
+        let file_root = file_parent.map(|fd| io.adopt_root(fd).expect("file parent slot"));
         Self {
             io,
             root,
+            file_root,
             private: None,
             check: None,
             leaf,
@@ -187,7 +197,13 @@ impl Directory {
             return;
         }
         if self.closing {
-            if let Some(file) = self.check.take().or_else(|| self.private.take()).or_else(|| self.root.take()) {
+            if let Some(file) = self
+                .check
+                .take()
+                .or_else(|| self.private.take())
+                .or_else(|| self.file_root.take())
+                .or_else(|| self.root.take())
+            {
                 self.stage = Stage::Closing;
                 self.request(now, file::Request::Close { owner: OWNER, file });
             }
@@ -226,7 +242,7 @@ impl Directory {
             }
             Stage::Link => file::Request::Load {
                 owner: OWNER,
-                root,
+                root: self.file_root.expect("FILE's parent"),
                 path: self.link_path.take().expect("link file"),
                 max: limits::LINK,
                 no_follow: true,
@@ -258,8 +274,13 @@ impl Directory {
     pub(crate) fn leaf(&self) -> Box<[u8]> {
         self.leaf.clone()
     }
-    pub(crate) fn load_link(&mut self, path: Box<[u8]>) {
-        self.link_path = Some(path);
+    pub(crate) fn load_link(&mut self, path: &[u8]) {
+        if self.file_root.is_none() {
+            self.fail(b"DIRECTORY could not be read: link file has no parent");
+            return;
+        }
+        let start = path.iter().rposition(|byte| *byte == b'/').map_or(0, |at| at + 1);
+        self.link_path = Some(path[start..].into());
         self.stage = Stage::Link;
     }
     pub(crate) fn store_address(&mut self, now: Time, bytes: Box<[u8]>) {

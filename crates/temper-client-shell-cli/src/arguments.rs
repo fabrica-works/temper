@@ -2,7 +2,7 @@
 use temper_client_tools::{
     jig::{
         argv::Usage,
-        call::{Call, Parsed},
+        call::{Call, Parsed, Value, Values},
         rows,
         table::Keyed,
     },
@@ -29,6 +29,28 @@ impl Class {
 /// Returns the table's usage error unchanged.
 pub fn parse(words: &[&[u8]]) -> Result<Parsed, Usage> {
     table::parse(words)
+}
+/// The parent of the FILE this invocation reads, opened separately from DIRECTORY.
+#[must_use]
+pub fn file_root(parsed: &Parsed) -> Option<Box<[u8]>> {
+    let Parsed::Call { call, .. } = parsed else { return None };
+    if class(call) == Class::Help {
+        return None;
+    }
+    let path = call.values.iter().find_map(|values| {
+        if let Some(Values::One(Value::File(path))) = values { Some(path.as_ref()) } else { None }
+    })?;
+    if path == b"-" {
+        return None;
+    }
+    Some(
+        match path.iter().rposition(|byte| *byte == b'/') {
+            Some(0) => b"/".as_slice(),
+            Some(at) => &path[..at],
+            None => b".",
+        }
+        .into(),
+    )
 }
 #[must_use]
 pub fn class(call: &Call) -> Class {

@@ -304,3 +304,20 @@ fn a_chat_answer_waits_for_its_erase() {
     assert_eq!(f.exit(), Some(Exit::Code(0)));
     assert_eq!(f.stdout(), b"done: task 41, chat\n");
 }
+#[test]
+fn sign_in_reads_its_file_beneath_the_file_root() {
+    let mut f = fixtures::Disk::act(&[b"sign-in", b"/elsewhere/link"]);
+    f.answer_sign_in_then_me();
+    assert_eq!(f.link_root, Some(fixtures::FILE_PARENT));
+    assert_eq!(f.link_leaf.as_deref(), Some(b"link".as_slice()));
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+}
+#[test]
+fn file_root_splits_a_file_argument() {
+    for (path, parent) in
+        [(b"/link".as_slice(), Some(b"/".as_slice())), (b"a/b/link", Some(b"a/b")), (b"link", Some(b".")), (b"-", None)]
+    {
+        let parsed = crate::arguments::parse(&[b"sign-in", path]).expect("file call");
+        assert_eq!(crate::arguments::file_root(&parsed).as_deref(), parent, "{path:?}");
+    }
+}

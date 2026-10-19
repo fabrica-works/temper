@@ -19,6 +19,7 @@ mod recovery;
 pub use recovery::{dropped, kept_chat, other_party, small_store};
 pub const LINK: &[u8] = b"http://127.0.0.1:4000/jig/v1/sign-in/link?secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const LINK_FILE: Fd = Fd::new(23);
+pub const FILE_PARENT: Fd = Fd::new(6);
 pub const CHAT: &[&[u8]] = &[b"chat", b"hello", b"--project", b"shop", b"--key", b"start-chat"];
 const DIRECTORY: Fd = Fd::new(20);
 const ADDRESS: Fd = Fd::new(21);
@@ -30,6 +31,8 @@ pub const PARTIAL: usize = 3; // More than one short write is needed for every h
 pub struct Frame {
     pub host: OneShot,
     pub link: &'static [u8],
+    pub link_root: Option<Fd>,
+    pub link_leaf: Option<Box<[u8]>>,
     pub refuse_link: Option<()>,
     hold_stores: Option<()>,
     store: Option<Box<[u8]>>,
@@ -68,13 +71,13 @@ pub struct Frame {
 }
 impl Frame {
     pub fn act(words: &[&[u8]]) -> Self {
+        let parsed = arguments::parse(words).expect("fixture call");
+        let file_parent = arguments::file_root(&parsed).map(|_| FILE_PARENT);
         let host = OneShot::new(
-            Invocation {
-                directory: Some(b"directory".as_slice().into()),
-                parsed: arguments::parse(words).expect("fixture call"),
-            },
+            Invocation { directory: Some(b"directory".as_slice().into()), parsed },
             Startup {
                 parent: Some(Fd::new(1)),
+                file_parent,
                 stdin: Fd::new(2),
                 stdout: Fd::new(4),
                 stderr: STDERR,
@@ -87,6 +90,8 @@ impl Frame {
         Self {
             host,
             link: LINK,
+            link_root: None,
+            link_leaf: None,
             refuse_link: None,
             hold_stores: None,
             store: None,
@@ -262,7 +267,7 @@ impl Frame {
         buf[..count].copy_from_slice(&bytes[start..start + count]);
         Done::Count(u32::try_from(count).expect("fixture count"))
     }
-    fn open_file(&mut self, path: &[u8], how: OpenHow) -> Result<Done, Error> {
+    fn open_file(&mut self, root: Fd, path: &[u8], how: OpenHow) -> Result<Done, Error> {
         self.opened.push(path.into());
         if matches!(how, OpenHow::Create { .. } | OpenHow::CreateNoFollow { .. }) {
             let fd = Fd::new(self.next_socket);
@@ -271,7 +276,9 @@ impl Frame {
             self.names.insert(path.into(), fd);
             return Ok(Done::Fd(fd));
         }
-        if path == b"link-file" {
+        if path == b"link-file" || path == b"link" {
+            self.link_root = Some(root);
+            self.link_leaf = Some(path.into());
             return Ok(Done::Fd(LINK_FILE));
         }
         if path == b"store" {
@@ -297,7 +304,7 @@ impl Frame {
     }
     fn answer(&mut self, kind: &mut Op) -> Result<Done, Error> {
         match kind {
-            Op::Open { path, how, .. } => self.open_file(path, *how),
+            Op::Open { root, path, how } => self.open_file(*root, path, *how),
             Op::Write { fd, bytes, from, at } => {
                 let start = usize::try_from(*from).expect("write offset");
                 let at = usize::try_from(*at).expect("file offset");
