@@ -1,9 +1,14 @@
 //! Checks across standalone's parts before any service is made.
 use super::{Problems, What};
 use crate::{limits, settings};
+use alloc::boxed::Box;
+use jig_domain_fleet as fleet;
 use jig_protocol_config::{self as config, Path, Segment};
 use skein_io::Addr;
+use skein_lib::{List, Map};
+use temper_engine_domain as domain;
 use temper_protocol_worker_wire as payload;
+use temper_worker_domain as worker_domain;
 
 fn at(index: usize, path: Path) -> Path {
     path.child(Segment::Index(u32::try_from(index).expect("bounded configuration")))
@@ -61,6 +66,41 @@ pub fn standalone(
             if !value.starts_with(b"/") {
                 problems.push(path.member(b"agent").member(name), What::Absolute);
             }
+        }
+    }
+}
+/// The root has no hub child: the engine runs no slot, and every charter's
+/// runs are placed on the workers (domain/root.md, 2).
+pub fn hub(engine: &config::Engine, problems: &mut Problems) {
+    let path = Path::root().member(b"engine");
+    if engine.limits.core.fleet.engine_slots != 0 {
+        problems.push(path.member(b"limits").member(b"overrides").member(b"fleet.engine_slots"), What::NoHub);
+    }
+    for (index, charter) in engine.charters.iter().enumerate() {
+        match charter.hosts {
+            fleet::Kinds::Workers => {}
+            fleet::Kinds::Engine | fleet::Kinds::Both => {
+                problems.push(at(index, path.member(b"charters")).member(b"hosts"), What::NoHub);
+            }
+        }
+    }
+}
+/// Each git identity's number is one both the engine's and the worker's
+/// accounts tables hold.
+pub fn credentials(
+    engine: &config::Engine,
+    workers: &[config::Worker],
+    identities: &[super::Identity],
+    problems: &mut Problems,
+) {
+    let mut bound = engine.limits.core.accounts.credentials;
+    for worker in workers {
+        bound = bound.min(worker.limits.core.accounts.credentials);
+    }
+    for (index, identity) in identities.iter().enumerate() {
+        if identity.number == 0 || identity.number > bound {
+            let path = at(index, Path::root().member(b"application").member(b"identities"));
+            problems.push(path.member(b"number"), What::Credentials);
         }
     }
 }
@@ -195,7 +235,9 @@ pub fn channel(
     problems: &mut Problems,
 ) {
     names(longest_remote(forges, limits.forge.name_bytes), limits, problems);
-    let repository_shape = engine.repositories <= worker.repositories;
+    // A worker's hello names its checkout's repositories, and the engine
+    // admits only a worker whose bound is its own (channel.md, 8).
+    let repository_shape = engine.repositories == worker.repositories;
     let engine = bounded(engine, true, problems);
     let worker = bounded(worker, false, problems);
     let ceilings = jig_protocol_worker_wire::CEILINGS;
@@ -242,6 +284,132 @@ pub fn identities(identities: &[settings::Identity], limits: &payload::v1::Limit
             }
             Err(_) => problems.push(path, What::Jig(config::What::Bound)),
         }
+    }
+}
+fn worker_limit(member: &[u8]) -> Path {
+    at(0, Path::root().member(b"workers")).member(b"limits").member(b"overrides").member(member)
+}
+/// The worker's rules against the agent's configuration, each naming both
+/// limits (temper-worker-domain's `worst_case`).
+pub fn worker(limits: &worker_domain::Limits, problems: &mut Problems) {
+    use worker_domain::Unfit;
+    let worker = at(0, Path::root().member(b"workers"));
+    for unfit in &worker_domain::unfit(limits) {
+        let (path, other): (Path, &'static [u8]) = match unfit {
+            Unfit::Agent | Unfit::Unacknowledged => {
+                problems.push(worker.member(b"agent").member(b"configuration"), What::Jig(config::What::Bound));
+                continue;
+            }
+            Unfit::Directories => (own(b"checkout.repositories"), b"the agent's directories"),
+            Unfit::Conflicts => (own(b"checkout.conflicts"), b"the agent's conflicts"),
+            Unfit::Paths => (own(b"checkout.path_bytes"), b"the agent's path_bytes"),
+            Unfit::Names => (own(b"checkout.name_bytes"), b"the agent's name_bytes"),
+            Unfit::Key => (own(b"checkout.name_bytes"), b"a workstream's 8-byte key"),
+            Unfit::Accounts => (worker_limit(b"hub.accounts"), b"the agent's accounts"),
+            Unfit::Workspaces => (worker.member(b"slots"), b"checkout.workspaces"),
+            Unfit::Agents => (worker.member(b"slots"), b"the agent's agents"),
+            Unfit::Turns => (worker_limit(b"hub.turns"), b"the agent's turns"),
+            Unfit::TurnQueue => (worker_limit(b"hub.turn_queue_bytes"), b"the agent's turns * hub.turn_bytes"),
+            Unfit::Calls => (worker_limit(b"hub.run_calls"), b"the agent's calls"),
+            Unfit::Events => {
+                (worker_limit(b"hub.event_bytes"), b"the agent's message_bytes less smith's 2-byte separator")
+            }
+            Unfit::Held => (worker_limit(b"hub.held"), b"the agent's messages"),
+            Unfit::Inbox => (worker_limit(b"hub.inbox"), b"the agent's messages"),
+            Unfit::CallBytes => (own(b"checkout.message_bytes"), b"the agent's call_bytes"),
+            Unfit::Saved => (own(b"checkout.message_bytes"), b"the save's commit message"),
+            Unfit::BoundsInbox => (worker_limit(b"hub.inbox"), b"the agent's hello's inbox"),
+            Unfit::BoundsMessage => (worker_limit(b"hub.event_bytes"), b"the agent's hello's message_bytes"),
+        };
+        problems.push(path, What::Against { other });
+    }
+}
+/// The landing rules' limits, one of which a refused rule breaks.
+const LANDING: &[u8] =
+    b"root.journal.transcript_bytes, authority.requirements, forge.judge_criteria and forge.change_policy.gates";
+/// The index of `number` in a list of numbered entries, which a check found there.
+fn index_of(numbers: &[u32], number: u32) -> usize {
+    let mut index = 0;
+    for (at, listed) in numbers.iter().enumerate() {
+        if *listed == number {
+            index = at;
+        }
+    }
+    index
+}
+/// What the root's construction asserts, refused before it is made, each
+/// naming the configuration that breaks it (domain/root.md, 6).
+pub fn root(
+    engine: &settings::Engine,
+    seeds: &settings::Seeds,
+    landing_projects: &[u32],
+    limits: &domain::Limits,
+    problems: &mut Problems,
+) {
+    let mut core = config::core(&engine.jig, seeds.deployment, seeds.seed);
+    for charter in &mut core.settings.charters {
+        if let Some(contents) = engine.files.contents(&charter.policy.instructions) {
+            charter.policy.instructions = Box::from(contents);
+        }
+    }
+    let mut projects = Map::with_capacity(engine.landing.projects.capacity());
+    for (&project, rules) in &engine.landing.projects {
+        projects.insert(project, rules.clone()).expect("the same capacity");
+    }
+    let landing = domain::LandingPolicy { deployment: engine.landing.deployment.clone(), projects };
+    let (forge, identities) = crate::forge::config(engine, seeds.deployment);
+    let config = domain::Config { core, landing, forge, identities, forge_charter: engine.charter };
+    let mut numbers = List::with_capacity(engine.jig.limits.core.authority.projects);
+    for project in &engine.jig.projects {
+        numbers.push(project.number).expect("bounded projects");
+    }
+    let numbers = numbers.into_boxed();
+    let engine_path = Path::root().member(b"engine");
+    let landing_path = Path::root().member(b"application").member(b"landing");
+    for refused in domain::refused(config, limits) {
+        let (path, what) = match refused {
+            domain::Refused::Run { charter, bytes } => (
+                at(charter, engine_path.member(b"charters")),
+                match bytes {
+                    Some(bytes) => What::Past { bytes, bound: u64::from(limits.journal.run_bytes) },
+                    None => What::Jig(config::What::Bound),
+                },
+            ),
+            domain::Refused::Resume => (
+                engine_path.member(b"limits").member(b"overrides").member(b"core.resume_bytes"),
+                What::Against { other: b"root.journal.transcript_bytes, above 0" },
+            ),
+            domain::Refused::JudgeProjects => {
+                (own(b"forge.judge_projects"), What::Against { other: b"authority.projects in engine.limits" })
+            }
+            domain::Refused::JudgeCriteria => {
+                (own(b"forge.judge_criteria"), What::Against { other: b"authority.requirements in engine.limits" })
+            }
+            domain::Refused::Escalation { project } => (
+                at(index_of(&numbers, project), engine_path.member(b"projects"))
+                    .member(b"policy")
+                    .member(b"escalation_role"),
+                What::Escalation,
+            ),
+            domain::Refused::Permissions { project, bytes } => (
+                at(index_of(&numbers, project), engine_path.member(b"projects")).member(b"roles"),
+                match bytes {
+                    Some(bytes) => What::Past { bytes, bound: u64::from(limits.journal.transcript_bytes) },
+                    None => What::Jig(config::What::Bound),
+                },
+            ),
+            domain::Refused::Landing { project: None } => {
+                (landing_path.member(b"deployment"), What::Against { other: LANDING })
+            }
+            domain::Refused::Landing { project: Some(project) } => (
+                at(index_of(landing_projects, project), landing_path.member(b"projects")).member(b"rules"),
+                What::Against { other: LANDING },
+            ),
+            domain::Refused::Forges => {
+                (Path::root().member(b"application").member(b"forges"), What::Against { other: b"forge.repositories" })
+            }
+        };
+        problems.push(path, what);
     }
 }
 /// Endpoint names and accounts, and every charter model, agree with the agent.

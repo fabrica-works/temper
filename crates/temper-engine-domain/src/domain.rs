@@ -19,7 +19,7 @@ use jig_domain_fleet as fleet;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use jig_domain_views as views;
-use skein_lib::{Env, Id, Map, Queue, ReplyTo, Slab, Token};
+use skein_lib::{Env, Id, List, Map, Queue, ReplyTo, Slab, Token};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_change as forge_change;
 use temper_engine_domain_forge_client as forge_client;
@@ -698,6 +698,192 @@ fn released_into(domain: &mut Domain, _env: &Env<Limits>, released: Released, ou
         | Delivery::Refuse { .. }
         | Delivery::TurnBusy { .. }
         | Delivery::Result { .. }) => out.push(crate::boundary::delivery_output(delivery)),
+    }
+}
+
+/// Configuration `Domain::new` asserts against, refused at start before the
+/// root is made (domain/root.md, 6), each naming the part that breaks it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Refused {
+    /// The charter at this index: its run policy's bytes, `None` past `u64`,
+    /// beyond `journal.run_bytes`.
+    Run { charter: usize, bytes: Option<u64> },
+    /// The core's resume limit is 0 or beyond `journal.transcript_bytes`.
+    Resume,
+    /// The forge's judges hold fewer projects than the authority's policies.
+    JudgeProjects,
+    /// The forge's judges hold fewer criteria than the authority's requirements.
+    JudgeCriteria,
+    /// A seeded owner's project names no escalation role from 0 to 3.
+    Escalation { project: u32 },
+    /// The deployment's landing rules (`None`) or a project's: beyond
+    /// `journal.transcript_bytes`, the authority's requirements, or the
+    /// forge's judges and gate templates.
+    Landing { project: Option<u32> },
+    /// A project's permission mappings, `None` past `u64`, beyond
+    /// `journal.transcript_bytes`.
+    Permissions { project: u32, bytes: Option<u64> },
+    /// The forges' writers or git identities beyond the forge's repositories.
+    Forges,
+}
+
+/// Hold the configuration to the root's limits as `Domain::new` does, and
+/// return each part it would assert on; empty, the root can be made.
+#[must_use]
+#[expect(clippy::too_many_lines, reason = "one pass mirrors the root's construction step by step")]
+pub fn refused(mut config: Config, limits: &Limits) -> Box<[Refused]> {
+    let room = u32::try_from(config.core.settings.charters.len().saturating_add(config.core.owners.len()))
+        .expect("bounded configuration")
+        .saturating_add(config.core.permission_roles.len())
+        .saturating_add(config.landing.projects.len())
+        .saturating_add(6);
+    let mut refused = List::with_capacity(room);
+    for (charter, configured) in config.core.settings.charters.iter().enumerate() {
+        let bytes = run_policy_bound(&configured.policy, limits);
+        let fits = match bytes {
+            Some(bytes) => bytes <= u64::from(limits.journal.run_bytes),
+            None => false,
+        };
+        if !fits {
+            refused.push(Refused::Run { charter, bytes }).expect("counted refusals");
+        }
+    }
+    let resume = config.core.settings.resume_bytes;
+    if resume == 0 || resume > limits.journal.transcript_bytes {
+        refused.push(Refused::Resume).expect("counted refusals");
+    }
+    if limits.forge.judge_projects < limits.authority.projects {
+        refused.push(Refused::JudgeProjects).expect("counted refusals");
+    }
+    if limits.forge.judge_criteria < limits.authority.requirements {
+        refused.push(Refused::JudgeCriteria).expect("counted refusals");
+    }
+    for (&project, mappings) in &config.core.permission_roles {
+        let bytes = u64::try_from(mappings.len())
+            .expect("usize fits u64")
+            .checked_mul(u64::try_from(size_of::<people::PermissionRole>()).expect("type size fits u64"));
+        let fits = match bytes {
+            Some(bytes) => bytes <= u64::from(limits.journal.transcript_bytes),
+            None => false,
+        };
+        if !fits {
+            refused.push(Refused::Permissions { project, bytes }).expect("counted refusals");
+        }
+    }
+    for (index, owner) in config.core.owners.iter().enumerate() {
+        let mut named = false;
+        for earlier in config.core.owners.iter().take(index) {
+            named |= earlier.project == owner.project;
+        }
+        let escalates = match config.core.authority.policy(owner.project) {
+            Some(policy) => match policy.escalation_role {
+                Some(role) => role <= 3,
+                None => false,
+            },
+            None => false,
+        };
+        if !named && !escalates {
+            refused.push(Refused::Escalation { project: owner.project }).expect("counted refusals");
+        }
+    }
+    let Some(&connector) = config.core.connectors.first() else {
+        return refused.into_boxed();
+    };
+    let mut forge_config =
+        core::mem::replace(&mut config.forge, forge_client::Config { namespace: Box::new([]), writers: Box::new([]) });
+    forge_config.namespace = Box::from(config.core.deployment);
+    let Ok(mut forge) = forge::Domain::new(&limits.forge, config.core.seed, forge_config, &config.identities) else {
+        refused.push(Refused::Forges).expect("counted refusals");
+        return refused.into_boxed();
+    };
+    let deployment = match policy_translate::build_landing(
+        &config.landing.deployment,
+        false,
+        limits.authority.requirements,
+        connector,
+    ) {
+        Some(built) => {
+            landing_within(&config.landing.deployment, limits.journal.transcript_bytes)
+                && config.core.authority.add_configured_requirements(&built.requirements)
+                && forge.deployment_judges(built.criteria)
+                && gates_fit(&mut forge, &config.landing.deployment, false, limits)
+        }
+        None => false,
+    };
+    if !deployment {
+        refused.push(Refused::Landing { project: None }).expect("counted refusals");
+    }
+    for (&project, rules) in &config.landing.projects {
+        let joined = landing_project(
+            &mut config.core.authority,
+            &mut forge,
+            (project, rules, &config.landing.deployment),
+            connector,
+            limits,
+        );
+        if !joined {
+            refused.push(Refused::Landing { project: Some(project) }).expect("counted refusals");
+        }
+    }
+    let gates = match policy_translate::gate_policy(
+        &config.landing,
+        limits.authority.requirements,
+        limits.forge.change_policy.gates,
+    ) {
+        Some(gates) => forge.gate_policy(gates, &limits.forge),
+        None => false,
+    };
+    if !gates && refused.is_empty() {
+        refused.push(Refused::Landing { project: None }).expect("counted refusals");
+    }
+    refused.into_boxed()
+}
+
+/// One project's landing rules joined to its policy, as `Domain::new` joins them.
+fn landing_project(
+    policies: &mut authority::Domain,
+    forge: &mut forge::Domain,
+    (project, rules, deployment): (u32, &[LandingRule], &[LandingRule]),
+    connector: u16,
+    limits: &Limits,
+) -> bool {
+    if !landing_within(rules, limits.journal.transcript_bytes) {
+        return false;
+    }
+    let Some(built) = policy_translate::build_landing(rules, true, limits.authority.requirements, connector) else {
+        return false;
+    };
+    let Some(policy) = policies.policy(project) else { return false };
+    let mut policy = policy.clone();
+    if !policy_translate::landing_roles(&policy, deployment) || !policy_translate::landing_roles(&policy, rules) {
+        return false;
+    }
+    let Some(combined) = policy_translate::combine_requirements(
+        &policy.requirements,
+        &built.requirements,
+        limits.authority.requirements,
+    ) else {
+        return false;
+    };
+    policy.requirements = combined;
+    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    authority::step(policies, authority::Event::Policy { project, policy }, &mut facts);
+    facts.pop() == Some(authority::PolicyFact::Changed { project })
+        && forge.project_judges(project, built.criteria)
+        && gates_fit(forge, rules, true, limits)
+}
+
+/// One set of rules' gate templates within the forge's, alone.
+fn gates_fit(forge: &mut forge::Domain, rules: &[LandingRule], project: bool, limits: &Limits) -> bool {
+    match policy_translate::gate_templates(
+        rules,
+        project,
+        limits.authority.requirements,
+        limits.forge.change_policy.gates,
+    ) {
+        Some(templates) => forge
+            .gate_policy(forge::GatePolicy { deployment: templates, projects: Map::with_capacity(0) }, &limits.forge),
+        None => false,
     }
 }
 

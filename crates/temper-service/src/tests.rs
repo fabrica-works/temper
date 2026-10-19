@@ -21,6 +21,7 @@ mod worker_git;
 
 mod checks;
 mod family;
+mod root_checks;
 mod startup;
 mod system;
 

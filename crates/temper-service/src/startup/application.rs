@@ -15,6 +15,8 @@ pub struct Members {
     pub forges: Box<[Forge]>,
     pub identities: Box<[Identity]>,
     pub landing: temper_engine_domain::LandingPolicy,
+    /// The landing's projects in the document's order, which names a refused one's path.
+    pub landing_projects: Box<[u32]>,
     pub charter: u32,
     pub limits: limits::Limits,
     pub overrides: Box<[(Box<[u8]>, u64)]>,
@@ -511,6 +513,7 @@ pub fn parse(document: &Document, at: u32, jig: &config::Engine, problems: &mut 
     if !problems.is_empty() {
         return None;
     }
+    let (landing, landing_projects) = landing?;
     Some(Members {
         clients: clients?,
         webhooks,
@@ -520,7 +523,8 @@ pub fn parse(document: &Document, at: u32, jig: &config::Engine, problems: &mut 
         charter: charter?,
         limits: limits?,
         overrides: overrides.into_boxed(),
-        landing: landing?,
+        landing,
+        landing_projects,
     })
 }
 pub fn files(members: &Members, api_token_bytes: u32, token_bytes: u32) -> Box<[config::File]> {

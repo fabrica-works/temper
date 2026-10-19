@@ -150,7 +150,7 @@ pub(crate) fn gate_policy(
     }
     Some(forge::GatePolicy { deployment, projects })
 }
-fn gate_templates(
+pub(crate) fn gate_templates(
     rules: &[LandingRule],
     project: bool,
     rules_limit: u32,

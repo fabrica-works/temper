@@ -177,7 +177,7 @@ pub(super) fn parse(
     jig: &config::Engine,
     limits: &limits::Limits,
     problems: &mut Problems,
-) -> Option<engine::LandingPolicy> {
+) -> Option<(engine::LandingPolicy, Box<[u32]>)> {
     let path = Path::root().member(b"application").member(b"landing");
     let mut object = read::object(document, at, &path, problems)?;
     let deployment_ats =
@@ -187,6 +187,7 @@ pub(super) fn parse(
     read::finish(object, document, &path, problems);
     let deployment = rules(document, deployment_ats?, &path.member(b"deployment"), jig, limits, None, problems);
     let mut projects = Map::with_capacity(jig.limits.core.authority.projects);
+    let mut order = List::with_capacity(jig.limits.core.authority.projects);
     if let Some(ats) = project_ats {
         for (index, at) in ats.iter().enumerate() {
             let path = read::index(&path.member(b"projects"), index);
@@ -212,8 +213,9 @@ pub(super) fn parse(
                 }
                 let rules = rules(document, ats, &path.member(b"rules"), jig, limits, Some(project), problems);
                 projects.insert(project, rules).expect("bounded projects");
+                order.push(project).expect("bounded projects");
             }
         }
     }
-    Some(engine::LandingPolicy { deployment, projects })
+    Some((engine::LandingPolicy { deployment, projects }, order.into_boxed()))
 }

@@ -22,12 +22,12 @@ development.md, section 3.3).
 |---|---|---|
 | `README.md` | partly | 2, steps 6 and 7 of the first milestone: a change's result and why it stopped, in the client in the forge's words: not planned (`client/forge.md`, 2.5) |
 | `domain/README.md` | yes | nothing; its decisions stand in the code |
-| `domain/root.md` | partly | 6: a change's delegates' commits as text, in lowercase hexadecimal: client-api (`temper-repin`); 7.1: a saved-work branch named in an assignment (the root names none, so no run saves): not planned; 5.3: the forge's documents and reads, answered as unknown: not planned (`client/forge.md`); 6: the configuration the root's construction asserts (the escalation role, the resume limit against a row's bytes, each charter's run against its bytes, the landing rules' and permission mappings' bytes, the judges' tables) refused at start rather than asserted, and a start refusing `fleet.engine_slots` above 0 or a charter not placed on the workers (2): not planned |
+| `domain/root.md` | partly | 6: a change's delegates' commits as text, in lowercase hexadecimal: client-api (`temper-repin`); 7.1: a saved-work branch named in an assignment (the root names none, so no run saves): not planned; 5.3: the forge's documents and reads, answered as unknown: not planned (`client/forge.md`) |
 | `domain/forge.md` | partly | 5, 6: the client on skein's `skein-forge-client` (skein's `forge-client.md`): forge-kit; 8.3: a change's own gates as its parameters, amended while live; person gates (`GateKind::Person` is never made); a review's lens and a change's own charters (every forge task runs under the forge's one charter); a gate's verdict posted as a commit status: not planned; 8.1: a change's own bounds (every change takes `forge.change_policy`'s): not planned; 8.5: a release that retargets a pull request back: not planned; 4: a repository of an org a setup names adopted with no collaborator step: not planned; 12: findings' state in the store: not planned; 13 and 14 beyond the `Fork` role and participation news: not planned |
 | `domain/worker.md` | partly | 4.2, 5: the worker creating no branch (the checkout still creates a missing base branch): not planned; 4.1: an assignment naming an expected head (the engine names none): not planned; 5: saved work, which waits for the root to name a saved-work branch (`domain/root.md`, 7.1): not planned; 9: agents in contained process trees: not planned (after standalone) |
 | `domain/agent.md` | partly | 4.3: `delegate`'s answer naming each spec's revision and what an `AsAllowed` budget was given; `decide`, `withdraw` and `decide_escalation` saying how they decided; 4.4: a verdict's follow-ups; a chat's `deliver` before its end; 5: a message's sender labelled by name: not planned |
 | `protocol/README.md` | partly | 3 to 5: `temper-client-tools`: tools; `temper ctl` and `temper-client-shell-cli`: not planned (the tools plan's `later.md`, its next part); 5: `jig-client-view` no longer a dependency of the client crates and the binary: client-api; 14: between hosts: not planned (after standalone) |
-| `protocol/configuration.md` | partly | 7: the worker's check against the agent naming both limits (it names `workers[0].limits` alone): not planned (forge-setup's `later.md`); 7: a start refusing `forge.resources_per_task` below `checkout.repositories`: not planned (forge-setup's `later.md`); 3: a git identity's number held within jig's `accounts.credentials` at start (a grant past it is dropped on the worker): not planned; 11: `small`'s worst cases within a person's machine: not planned (forge-setup's `later.md`); 3, 8: `application.clients` (the listener), `templates` in place of `chats`, 7: the example's bounds on a name's segments, `documents.lines` for short lists alone, an authority's lists carried whole and held to temper's client's entries, the engine's watch rooms, 16 a party and 16 a stream, held to temper's client's watches: client-api |
+| `protocol/configuration.md` | partly | 11: `small`'s worst cases within a person's machine: not planned (forge-setup's `later.md`); 3, 8: `application.clients` (the listener), `templates` in place of `chats`, 7: the example's bounds on a name's segments, `documents.lines` for short lists alone, an authority's lists carried whole and held to temper's client's entries, the engine's watch rooms, 16 a party and 16 a stream, held to temper's client's watches: client-api |
 | `protocol/credentials.md` | partly | 6: the terminal's credential kept by its host and given back with `Held`: client-api; 8: the forge as people's sign-in provider: not planned |
 | `protocol/llm.md` | yes | nothing but its open questions |
 | `protocol/channel.md` | yes | nothing but its open questions |
@@ -129,13 +129,6 @@ order of its pages, not contract (`client/README.md`, 3.5).
 - **A calendar for periods** (`protocol/configuration.md`, section 11):
   one period per project at the first start until a calendar child is
   designed.
-- **The start's checks** (`protocol/configuration.md`, sections 3 and 7;
-  `domain/root.md`, section 6; forge-setup's `later.md`): the worker's
-  check against the agent naming both limits, `forge.resources_per_task`
-  below `checkout.repositories` refused, a git identity's number held
-  within jig's `accounts.credentials`, the engine given no slots and its
-  charters placed on the workers, and the configuration the root's
-  construction asserts refused at start instead.
 - **The owned example sized for a person's machine**
   (`protocol/configuration.md`, section 11; `protocol/setup.md`, 8.1 and
   section 16): `small`'s worst cases, and the example's agent, against

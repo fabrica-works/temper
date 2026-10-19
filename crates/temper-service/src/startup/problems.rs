@@ -17,6 +17,9 @@ pub enum What {
     Against { other: &'static [u8] },
     Past { bytes: u64, bound: u64 },
     Agent,
+    NoHub,
+    Credentials,
+    Escalation,
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Problem {
@@ -78,6 +81,9 @@ fn words(what: What) -> &'static [u8] {
         What::Against { .. } => b"must agree with ",
         What::Past { .. } => b"",
         What::Agent => b"not in the agent's configuration under the same name and account",
+        What::NoHub => b"the root has no hub, so the fleet must place every run on a worker",
+        What::Credentials => b"must be from 1 to accounts.credentials, in engine.limits and in the worker's limits",
+        What::Escalation => b"an owner's project must name an escalation role from 0 to 3",
         What::Jig(what) => match what {
             config::What::Json => b"invalid JSON",
             config::What::Unknown => b"unknown member",
@@ -179,7 +185,10 @@ fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
             | What::NoWebhooks
             | What::Profile
             | What::Override(_)
-            | What::Agent => {}
+            | What::Agent
+            | What::NoHub
+            | What::Credentials
+            | What::Escalation => {}
         }
         put(writer, &mut length, measuring, b"\n");
     }

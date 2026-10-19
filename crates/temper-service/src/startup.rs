@@ -108,6 +108,13 @@ fn parse(input: &[u8]) -> Result<Parsed, Problems> {
     if workers.len() != application.workers.len() {
         problems.push(root.member(b"application").member(b"workers"), What::Jig(config::What::Bound));
     }
+    checks::hub(engine.as_ref().expect("required engine checked"), &mut problems);
+    checks::credentials(
+        engine.as_ref().expect("required engine checked"),
+        &workers,
+        &application.identities,
+        &mut problems,
+    );
     checks::webhooks(&application, &mut problems);
     checks::limits(&application.limits, &application.limits.git_component, &mut problems);
     let mut base = 0;
@@ -227,6 +234,10 @@ pub fn startup(
     let worker = parsed.workers.into_iter().next().expect("one worker checked");
     let own = parsed.application.workers.into_iter().next().expect("one application worker checked");
     let worker = settings::Worker { jig: worker, root: own.root, git: own.git };
+    checks::worker(&crate::worker_settings::root_limits(&worker, agent, &parsed.application.limits), &mut problems);
+    if !problems.is_empty() {
+        return Err(problems);
+    }
     if let Err(found) = crate::worker_settings::prepare(&worker, agent, &parsed.application.limits) {
         return Err(Problems::jig(found, &Path::root()));
     }
@@ -247,6 +258,10 @@ pub fn startup(
     };
     let root = crate::limits::engine(&engine.jig.limits, &engine.limits)
         .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Jig(config::What::Bound)))?;
+    checks::root(&engine, seeds, &parsed.application.landing_projects, &root, &mut problems);
+    if !problems.is_empty() {
+        return Err(problems);
+    }
     let store = crate::store::limits(&root, &engine.jig.limits.core, &root.forge, &engine.jig.limits.store)
         .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Jig(config::What::Bound)))?;
     let io = checks::process_io(&engine.jig.limits.io, Some(&worker.jig.limits.io)).ok_or(problem(

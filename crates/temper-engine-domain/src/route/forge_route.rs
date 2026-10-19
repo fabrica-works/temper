@@ -109,9 +109,7 @@ fn append(out: &mut List<u8>, bytes: &[u8]) {
 
 fn append_hex(out: &mut List<u8>, bytes: &[u8]) {
     for byte in bytes {
-        let high = *b"0123456789abcdef".get(usize::from(byte >> 4_u8)).expect("high nibble is hexadecimal");
-        let low = *b"0123456789abcdef".get(usize::from(byte & 15_u8)).expect("low nibble is hexadecimal");
-        append(out, &[high, low]);
+        append(out, &forge::hex(*byte));
     }
 }
 

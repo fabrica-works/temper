@@ -77,11 +77,17 @@ pub(crate) fn append(out: &mut BriefWords, bytes: &[u8]) {
     }
 }
 
+/// One byte's two lowercase hexadecimal digits, the high nibble first.
+#[must_use]
+pub fn hex(byte: u8) -> [u8; 2] {
+    let high = *b"0123456789abcdef".get(usize::from(byte >> 4_u8)).expect("high nibble is hexadecimal");
+    let low = *b"0123456789abcdef".get(usize::from(byte & 15_u8)).expect("low nibble is hexadecimal");
+    [high, low]
+}
+
 fn append_hex(out: &mut BriefWords, bytes: &[u8]) {
     for byte in bytes {
-        let high = *b"0123456789abcdef".get(usize::from(byte >> 4_u8)).expect("high nibble is hexadecimal");
-        let low = *b"0123456789abcdef".get(usize::from(byte & 15_u8)).expect("low nibble is hexadecimal");
-        append(out, &[high, low]);
+        append(out, &hex(*byte));
     }
 }
 

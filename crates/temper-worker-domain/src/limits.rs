@@ -5,7 +5,7 @@ use core::mem::size_of;
 
 use crate::wire;
 use jig_domain_host as host;
-use skein_lib::{Duration, Id, Map, Queue, Slab, Token};
+use skein_lib::{Duration, Id, List, Map, Queue, Slab, Token};
 use smith_host_domain as agent;
 use temper_worker_domain_checkout as checkout;
 
@@ -41,6 +41,100 @@ pub const SEPARATOR: u64 = 2;
 /// The bytes of a workstream key: the holding task's number, big-endian.
 const KEY: u32 = 8;
 
+/// A rule of [`worst_case`] that `limits` break, so that a start names the
+/// limits on both its sides.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Unfit {
+    /// smith's own check of the agent's limits.
+    Agent,
+    /// The checkout's repositories past smith's directories, or the agent's.
+    Directories,
+    /// The checkout's conflicts past the agent's.
+    Conflicts,
+    /// The checkout's paths past the agent's.
+    Paths,
+    /// The checkout's names past the agent's.
+    Names,
+    /// A workstream's key past the checkout's names.
+    Key,
+    /// The hub's accounts past the agent's.
+    Accounts,
+    /// The host's slots past the checkout's workspaces.
+    Workspaces,
+    /// The host's slots past the agent's processes.
+    Agents,
+    /// The agent's turns past the hub's.
+    Turns,
+    /// The agent's turns, each of the hub's turn bytes, past the hub's turn queue.
+    TurnQueue,
+    /// The agent's calls past the hub's run's.
+    Calls,
+    /// The hub's event with smith's separator past the agent's message.
+    Events,
+    /// The hub's held events past the agent's messages.
+    Held,
+    /// The hub's inbox past the agent's messages.
+    Inbox,
+    /// The agent's call past the checkout's commit message.
+    CallBytes,
+    /// The save's message past the checkout's commit message.
+    Saved,
+    /// The hello's inbox past the hub's.
+    BoundsInbox,
+    /// The hello's message past the hub's event.
+    BoundsMessage,
+    /// The hello's unacknowledged turns past the agent's.
+    Unacknowledged,
+}
+
+/// Each rule [`worst_case`] holds `limits` to beyond the memory it counts
+/// that they break, in its order; empty, they fit.
+#[must_use]
+pub fn unfit(limits: &Limits) -> List<Unfit> {
+    let Limits { host: host_limits, checkout: checkout_limits, agent: agent_limits, .. } = limits;
+    let turn_queue = match u64::from(agent_limits.turns).checked_mul(host_limits.turn_bytes) {
+        Some(bytes) => bytes <= host_limits.turn_queue_bytes,
+        None => false,
+    };
+    let events = match host_limits.event_bytes.checked_add(SEPARATOR) {
+        Some(bytes) => bytes <= agent_limits.message_bytes,
+        None => false,
+    };
+    let mut broken = List::with_capacity(UNFIT);
+    for (fits, unfit) in [
+        (agent::check(agent_limits).is_ok(), Unfit::Agent),
+        (
+            checkout_limits.repositories <= agent::MAX_DIRECTORIES
+                && checkout_limits.repositories <= agent_limits.directories,
+            Unfit::Directories,
+        ),
+        (checkout_limits.conflicts <= agent_limits.conflicts, Unfit::Conflicts),
+        (checkout_limits.path_bytes <= agent_limits.path_bytes, Unfit::Paths),
+        (checkout_limits.name_bytes <= agent_limits.name_bytes, Unfit::Names),
+        (KEY <= checkout_limits.name_bytes, Unfit::Key),
+        (host_limits.accounts <= agent_limits.accounts, Unfit::Accounts),
+        (host_limits.slots <= checkout_limits.workspaces, Unfit::Workspaces),
+        (host_limits.slots <= agent_limits.agents, Unfit::Agents),
+        (agent_limits.turns <= host_limits.turns, Unfit::Turns),
+        (turn_queue, Unfit::TurnQueue),
+        (agent_limits.calls <= host_limits.run_calls, Unfit::Calls),
+        (events, Unfit::Events),
+        (host_limits.held <= agent_limits.messages, Unfit::Held),
+        (host_limits.inbox <= agent_limits.messages, Unfit::Inbox),
+        (agent_limits.call_bytes <= u64::from(checkout_limits.message_bytes), Unfit::CallBytes),
+        (len(SAVED) <= u64::from(checkout_limits.message_bytes), Unfit::Saved),
+        (limits.bounds.inbox <= host_limits.inbox, Unfit::BoundsInbox),
+        (u64::from(limits.bounds.message_bytes) <= host_limits.event_bytes, Unfit::BoundsMessage),
+        (limits.bounds.unacknowledged <= agent_limits.turns, Unfit::Unacknowledged),
+    ] {
+        if !fits {
+            broken.push(unfit).expect("one entry per rule");
+        }
+    }
+    broken
+}
+const UNFIT: u32 = 20;
+
 /// The most memory the domain holds under `limits`, in bytes (6.3), or `None`
 /// if it does not fit a `u64` or the limits cannot be honoured: the child
 /// domains' own, or limits under which one child domain would refuse what
@@ -68,28 +162,7 @@ const KEY: u32 = 8;
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     let Limits { host: host_limits, checkout: checkout_limits, agent: agent_limits, .. } = limits;
-    let fits = agent::check(agent_limits).is_ok()
-        && checkout_limits.repositories <= agent::MAX_DIRECTORIES
-        && checkout_limits.repositories <= agent_limits.directories
-        && checkout_limits.conflicts <= agent_limits.conflicts
-        && checkout_limits.path_bytes <= agent_limits.path_bytes
-        && checkout_limits.name_bytes <= agent_limits.name_bytes
-        && KEY <= checkout_limits.name_bytes
-        && host_limits.accounts <= agent_limits.accounts
-        && host_limits.slots <= checkout_limits.workspaces
-        && host_limits.slots <= agent_limits.agents
-        && agent_limits.turns <= host_limits.turns
-        && u64::from(agent_limits.turns).checked_mul(host_limits.turn_bytes)? <= host_limits.turn_queue_bytes
-        && agent_limits.calls <= host_limits.run_calls
-        && host_limits.event_bytes.checked_add(SEPARATOR)? <= agent_limits.message_bytes
-        && host_limits.held <= agent_limits.messages
-        && host_limits.inbox <= agent_limits.messages
-        && agent_limits.call_bytes <= u64::from(checkout_limits.message_bytes)
-        && len(SAVED) <= u64::from(checkout_limits.message_bytes)
-        && limits.bounds.inbox <= host_limits.inbox
-        && u64::from(limits.bounds.message_bytes) <= host_limits.event_bytes
-        && limits.bounds.unacknowledged <= agent_limits.turns;
-    if !fits {
+    if !unfit(limits).is_empty() {
         return None;
     }
     let counts = counts(limits)?;
