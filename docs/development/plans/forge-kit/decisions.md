@@ -238,10 +238,6 @@ be the user's (development.md, 10.4).
     has moved that test to skein, where 10.5 repairs it; temper's next
     repin repairs temper's copy while temper still has it.
 
-## Rulings
-
-None yet.
-
 ## Design questions
 
 The inbox's questions (`~/src/tmp/director/inbox/forge-kit-planner.md`,
@@ -286,6 +282,8 @@ where its answer lands.
 | 34 | forge.md 4.2: a plan's end and its cost | the component counts the cost, as forge-connection.md and the base do; 4.2's sentence amended | skein 01.3 | answered: as recommended; the component counts one per request whose first byte it wrote; `Done` carries only the result; forge.md 4.2 says the plan counts nothing, and the plans' step tests drop the cost |
 | 35 | a 429 on Merge's read after the merge | `Timeout`, as forge.md 5.4 now says (the base's `failure::classify` says RateLimited) | skein 10.3 | answered: the designer's open item in its second answers |
 | 36 | forge-connection.md 10: the requests the fake served against the costs reported, when a cut falls inside a request head | A: the requests whose first byte reached the fake equal the costs, counted at the world's pipe; the fake's served count at most that | skein 09.4 | answered: A, made exact: in every run the costs equal the requests whose first byte the component wrote, counted at the world's streams, and the fake served those less the ones cut inside their head |
+
+## Rulings
 
 101. **Start beside tools; retain its first-repin dependency** (director's order at the claim).
      Reverses: nothing.
