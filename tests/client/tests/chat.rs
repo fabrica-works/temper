@@ -60,9 +60,12 @@ fn prepared_chat_answer_reaches_the_pages_task_watch() {
             Temper::step(&mut root, &env, event, &mut out);
         }
     }
-    let chat = root.pages().chat().expect("chat page");
+    let chat = root.person().pages().chat().expect("chat page");
     assert!(front.engine.task(task).is_none(), "the answer ends the real run");
-    assert_eq!(chat.task(root.client()).expect("task document").chip.phase, jig_client::contract::Phase::Ended);
+    assert_eq!(
+        chat.task(root.person().client()).expect("task document").chip.phase,
+        jig_client::contract::Phase::Ended
+    );
 }
 const PAST_CLOSE_GRACE: skein_lib::Duration = skein_lib::Duration::from_secs(6);
 #[test]
@@ -198,7 +201,10 @@ fn a_goal_proposed_in_a_chat_accepted_in_the_inbox_leaves_the_chat() {
         ],
     );
     assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);
-    assert!(world.root(chat).pages().chat().expect("chat").cards.is_empty(), "decided card left the live chat");
+    assert!(
+        world.root(chat).person().pages().chat().expect("chat").cards.is_empty(),
+        "decided card left the live chat"
+    );
     assert!(
         world.front().engine.store.rows.values().any(|record| matches!(record,
             temper_engine_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Live(row)))
@@ -221,7 +227,7 @@ fn the_proposal_fixture_admits_both_chat_and_inbox_clients() {
     }
 }
 
-type Probe = (temper_client_domain::Domain, skein_lib::Queue<temper_client_domain::Request>);
+type Probe = (temper_client_world::app::Root, skein_lib::Queue<temper_client_domain::Request>);
 const PROBE_ROUNDS: usize = 24;
 fn probe(address: temper_client_domain::Address) -> Probe {
     use jig_client_world::harness::App;
@@ -259,7 +265,7 @@ fn pump(front: &mut temper_client_world::front::Joint, probes: &mut [Probe]) {
 }
 #[test]
 fn accepting_the_goal_with_chat_and_inbox_watches_settles_the_engine() {
-    use jig_client_world::harness::Front;
+    use jig_client_world::harness::{App, Front};
     use temper_client_domain::{Action, Event, pages::Act};
     let mut front = temper_client_world::front::Joint::new(fixtures::SEED, fixtures::domain_limits());
     let task = proposed_goal(&mut front);
@@ -270,6 +276,7 @@ fn accepting_the_goal_with_chat_and_inbox_watches_settles_the_engine() {
     pump(&mut front, &mut probes);
     let object = probes[1]
         .0
+        .person()
         .pages()
         .inbox()
         .expect("inbox")
@@ -281,8 +288,13 @@ fn accepting_the_goal_with_chat_and_inbox_watches_settles_the_engine() {
         .object;
     let env = skein_lib::Env { now: DIAGNOSTIC_NOW, wall: DIAGNOSTIC_WALL, limits: fixtures::domain_limits() };
     for act in [Act::Decide { object, revision: None, act: jig_client::contract::ActKind::Accept }, Act::Confirm] {
-        temper_client_domain::step(&mut probes[1].0, &env, Event::Act { action: Action::Pages(act) }, &mut probes[1].1);
+        temper_client_world::app::Temper::step(
+            &mut probes[1].0,
+            &env,
+            Event::Act { action: Action::Pages(act) }.into(),
+            &mut probes[1].1,
+        );
         pump(&mut front, &mut probes);
     }
-    assert!(probes[0].0.pages().chat().expect("chat").cards.is_empty());
+    assert!(probes[0].0.person().pages().chat().expect("chat").cards.is_empty());
 }

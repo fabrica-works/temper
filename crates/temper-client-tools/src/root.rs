@@ -36,6 +36,11 @@ impl Root {
     pub fn new(limits: &Limits, seed: u64) -> Result<Self, jig_client::Unusable> {
         Ok(Self::with_client(Client::new(&limits.domain.client, seed)?))
     }
+    /// # Errors
+    /// Refuses client limits that cannot be represented.
+    pub fn unlinked(limits: &Limits, seed: u64) -> Result<Self, jig_client::Unusable> {
+        Ok(Self::with_client(Client::unlinked(&limits.domain.client, seed)?))
+    }
     pub(crate) fn with_client(client: Client) -> Self {
         let mut runner = runner::Runner::new(RUNNER.asker(), crate::key::TOOLS);
         runner.parts(owner_part);

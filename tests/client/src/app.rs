@@ -9,13 +9,41 @@ use temper_client_domain::{self as domain, Action, Address, Request};
 use temper_client_view as view;
 
 use crate::fixtures;
+pub const LIVE: &[u8] = b"Live";
+pub const OFFLINE: &[u8] = b"Offline";
 
 /// temper's root and view on jig's common client world kit.
 pub struct Temper;
+/// Either the person's pages or the tools' scripted root.
+pub enum Root {
+    Person(Box<domain::Domain>),
+    Agent(Box<crate::agent::Agent>),
+}
+impl Root {
+    #[must_use]
+    pub fn person(&self) -> &domain::Domain {
+        match self {
+            Self::Person(root) => root,
+            Self::Agent(_) => panic!("agent has no person root"),
+        }
+    }
+    #[must_use]
+    pub fn agent(&self) -> &crate::agent::Agent {
+        match self {
+            Self::Agent(root) => root,
+            Self::Person(_) => panic!("person has no agent root"),
+        }
+    }
+}
+pub enum View {
+    Person(Box<view::View>),
+    Agent { render: skein_ui::View, limits: skein_ui::Limits },
+}
 /// The shell world's Start carries its unlinked client's own typed records.
 #[derive(Debug)]
 pub enum Event {
     Root(domain::Event),
+    Call { number: u32, call: temper_client_tools::jig::call::Call, json: bool },
     Start { address: Address, kept: List<skein_lib::RequestRecord<jig_client::Held>> },
 }
 impl From<domain::Event> for Event {
@@ -28,7 +56,7 @@ impl Event {
     pub fn root(&self) -> Option<&domain::Event> {
         match self {
             Self::Root(event) => Some(event),
-            Self::Start { .. } => None,
+            Self::Start { .. } | Self::Call { .. } => None,
         }
     }
 }
@@ -39,8 +67,8 @@ pub fn limits() -> domain::Limits {
     fixtures::domain_limits()
 }
 impl App for Temper {
-    type Root = domain::Domain;
-    type View = view::View;
+    type Root = Root;
+    type View = View;
     type Limits = domain::Limits;
     type Event = Event;
     type Request = Request;
@@ -55,10 +83,16 @@ impl App for Temper {
         let forge = fixtures::phrasebooks(&limits);
         let bounds = fixtures::view_bounds(&limits, &forge);
         let root = domain::unlinked(&limits, seed);
-        (root, view::View::new(&bounds, &limits, forge, fixtures::FORGE))
+        (
+            Root::Person(Box::new(root)),
+            View::Person(Box::new(view::View::new(&bounds, &limits, forge, fixtures::FORGE))),
+        )
     }
     fn view_limits(view: &Self::View) -> skein_ui::Limits {
-        view.limits().tree
+        match view {
+            View::Person(view) => view.limits().tree,
+            View::Agent { limits, .. } => *limits,
+        }
     }
     fn start(address: Address, kept: Vec<Self::Record>, _offset: i32) -> Event {
         let mut records = List::with_capacity(u32::try_from(kept.len()).expect("small store count"));
@@ -71,7 +105,13 @@ impl App for Temper {
         domain::Event::Went { place: domain::Place::Address(address) }.into()
     }
     fn step(root: &mut Self::Root, env: &Env<Self::Limits>, event: Event, out: &mut Queue<Request>) {
+        let Root::Person(root) = root else {
+            let Root::Agent(agent) = root else { unreachable!() };
+            crate::agent::step(agent, env, event, out);
+            return;
+        };
         match event {
+            Event::Call { .. } => panic!("person received agent call"),
             Event::Root(event) => domain::step(root, env, event, out),
             Event::Start { address, kept } => {
                 domain::step(
@@ -91,22 +131,40 @@ impl App for Temper {
         }
     }
     fn fire(root: &mut Self::Root, env: &Env<Self::Limits>, out: &mut Queue<Request>) {
-        domain::fire(root, env, out);
+        match root {
+            Root::Person(root) => domain::fire(root, env, out),
+            Root::Agent(agent) => crate::agent::fire(agent, env, out),
+        }
     }
     fn take(root: &mut Self::Root, env: &Env<Self::Limits>, out: &mut Queue<Request>) {
-        domain::take(root, env, out);
+        if let Root::Person(root) = root {
+            domain::take(root, env, out);
+        }
     }
     fn next_deadline(root: &Self::Root) -> Option<Time> {
-        domain::next_deadline(root)
+        match root {
+            Root::Person(root) => domain::next_deadline(root),
+            Root::Agent(agent) => crate::agent::next_deadline(agent),
+        }
     }
     fn build(view: &mut Self::View, root: &Self::Root, patches: &mut Queue<Patch>) {
-        view::build(view, root, patches);
+        match (view, root) {
+            (View::Person(view), Root::Person(root)) => view::build(view, root, patches),
+            (View::Agent { render, .. }, Root::Agent(agent)) => agent.build(render, patches),
+            _ => panic!("root and view must belong to the same client"),
+        }
     }
     fn tree(view: &Self::View) -> &Tree {
-        view.tree()
+        match view {
+            View::Person(view) => view.tree(),
+            View::Agent { render, .. } => render.tree(),
+        }
     }
     fn act(view: &mut Self::View, node: NodeId, act: Act) -> Option<Event> {
-        view::act(view, node, act).map(|action| domain::Event::Act { action }.into())
+        match view {
+            View::Person(view) => view::act(view, node, act).map(|action| domain::Event::Act { action }.into()),
+            View::Agent { .. } => None,
+        }
     }
     fn duty(request: Request) -> Duty<Self> {
         match request {
@@ -168,16 +226,17 @@ impl App for Temper {
         Some(domain::Event::Client { event }.into())
     }
     fn max_out(limits: &Self::Limits) -> u32 {
-        domain::max_out(limits)
+        domain::max_out(limits) + 2 * temper_client_tools::limits::tools().rows
     }
     fn patch_limit(view: &Self::View) -> u32 {
-        view.limits().tree.patches
+        Self::view_limits(view).patches
     }
     fn worst_case(limits: &Self::Limits) -> u64 {
-        let forge = fixtures::phrasebooks(limits);
-        let bounds = fixtures::view_bounds(limits, &forge);
+        let presentation = fixtures::domain_limits();
+        let forge = fixtures::phrasebooks(&presentation);
+        let bounds = fixtures::view_bounds(&presentation, &forge);
         domain::worst_case(limits).expect("root bound")
-            + 2 * view::worst_case(&bounds, limits, &forge).expect("shell model projection bound")
+            + 2 * view::worst_case(&bounds, &presentation, &forge).expect("shell model projection bound")
     }
     fn window_changed(event: &Event) -> bool {
         match event.root() {
@@ -206,8 +265,8 @@ impl App for Temper {
             for node in &tree.nodes()[index..end] {
                 if node.role == skein_ui::Role::Status {
                     match node.name.as_deref() {
-                        Some(b"Live") => seen.push(Seen::Link { live: true }),
-                        Some(b"Offline") => seen.push(Seen::Link { live: false }),
+                        Some(LIVE) => seen.push(Seen::Link { live: true }),
+                        Some(OFFLINE) => seen.push(Seen::Link { live: false }),
                         _ => {}
                     }
                 }
@@ -270,7 +329,13 @@ impl App for Temper {
         }
     }
     fn received(event: &Event) -> Vec<Receipt> {
-        let Some(event) = event.root() else { return vec![Receipt::Started] };
+        let Some(event) = event.root() else {
+            return match event {
+                Event::Start { .. } => vec![Receipt::Started],
+                Event::Call { .. } => vec![],
+                Event::Root(_) => unreachable!(),
+            };
+        };
         match event {
             domain::Event::Client { event: jig_client::Event::Up { up } } => {
                 let mut receipts = observe::up_received(up);

@@ -13,13 +13,13 @@ fn an_authenticated_reload_routes_the_restored_person_frame() {
     front.bind(CLIENT, fixtures::PARTY);
     let (mut root, _) = Temper::new(fixtures::SEED);
     settle_root(&mut front, &mut root, &limits, Vec::new());
-    assert_eq!(root.client().link().state, jig_client::Link::Live);
+    assert_eq!(root.person().client().link().state, jig_client::Link::Live);
     let kept = pending_adoption(&mut front, &mut root, &limits);
     front.reload(CLIENT, front.now);
     let (mut restored, mut view) = Temper::new(1102);
     settle_root(&mut front, &mut restored, &limits, kept);
-    assert_eq!(restored.client().link().state, jig_client::Link::Live);
-    assert_eq!(restored.client().link().party, Some(fixtures::PARTY));
+    assert_eq!(restored.person().client().link().state, jig_client::Link::Live);
+    assert_eq!(restored.person().client().link().party, Some(fixtures::PARTY));
     let mut patches = Queue::with_capacity(Temper::patch_limit(&view));
     Temper::build(&mut view, &restored, &mut patches);
     assert!(Temper::tree(&view).nodes().iter().any(|node| node.name.as_deref() == Some(b"Person")));
@@ -27,7 +27,7 @@ fn an_authenticated_reload_routes_the_restored_person_frame() {
 
 fn settle_root(
     front: &mut Joint,
-    root: &mut client::Domain,
+    root: &mut crate::app::Root,
     limits: &client::Limits,
     kept: Vec<skein_lib::RequestRecord<jig_client::Held>>,
 ) {
@@ -51,7 +51,7 @@ fn settle_root(
     panic!("root/front did not settle");
 }
 
-fn flush(front: &mut Joint, root: &mut client::Domain, env: &Env<client::Limits>, out: &mut Queue<Request>) -> u32 {
+fn flush(front: &mut Joint, root: &mut crate::app::Root, env: &Env<client::Limits>, out: &mut Queue<Request>) -> u32 {
     let mut frames = 0;
     Temper::take(root, env, out);
     while let Some(request) = out.pop() {
@@ -77,7 +77,7 @@ fn flush(front: &mut Joint, root: &mut client::Domain, env: &Env<client::Limits>
 
 fn pending_adoption(
     front: &mut Joint,
-    root: &mut client::Domain,
+    root: &mut crate::app::Root,
     limits: &client::Limits,
 ) -> Vec<skein_lib::RequestRecord<jig_client::Held>> {
     use client::forge::{Act, Text, Typed};

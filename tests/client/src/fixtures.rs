@@ -525,3 +525,69 @@ fn adopt_goal_repository(driver: &mut Driver) {
     }));
     driver.settle();
 }
+
+/// Guard on one-step answer waits, never a client limit.
+const ANSWER_STEPS: u32 = 4096;
+#[must_use]
+pub fn agent(world: &mut World<Temper, Joint>) -> jig_client_world::harness::ClientId {
+    let limits = temper_client_tools::limits::client();
+    world.front().next_client_limits(limits);
+    world.client_with(PARTY, inbox(), limits, crate::agent::new)
+}
+#[must_use]
+pub fn call(words: &[&[u8]]) -> crate::app::Event {
+    match temper_client_tools::table::parse(words).unwrap_or_else(|error| panic!("agent call usage: {error:?}")) {
+        temper_client_tools::jig::call::Parsed::Call { call, json } => {
+            crate::app::Event::Call { number: 0, call, json }
+        }
+        temper_client_tools::jig::call::Parsed::File { .. } => panic!("agent call is a file"),
+    }
+}
+pub fn give(world: &mut World<Temper, Joint>, agent: jig_client_world::harness::ClientId, words: &[&[u8]]) -> u32 {
+    use jig_client_world::harness::Until;
+    let start = world.now();
+    for _ in 0..ANSWER_STEPS {
+        if world.root(agent).agent().ready() && world.root(agent).agent().kept() == 0 {
+            break;
+        }
+        world.run(Until::Steps(2));
+    }
+    assert!(world.now() <= start.saturating_add(WITHIN), "agent ready within world time");
+    assert!(world.root(agent).agent().ready() && world.root(agent).agent().kept() == 0, "agent ready before call");
+    let number = world.root(agent).agent().calls() + 1;
+    let crate::app::Event::Call { call, json, .. } = call(words) else { unreachable!() };
+    world.event(agent, crate::app::Event::Call { number, call, json });
+    number
+}
+pub fn answered(
+    world: &mut World<Temper, Joint>,
+    agent: jig_client_world::harness::ClientId,
+    number: u32,
+) -> temper_client_tools::jig::Printed {
+    use jig_client_world::harness::Until;
+    let start = world.now();
+    for _ in 0..ANSWER_STEPS {
+        let outcome = world.run(Until::Steps(2));
+        if let Some(printed) = world.root(agent).agent().printed(number) {
+            assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
+            assert!(world.now() <= start.saturating_add(WITHIN), "agent answered within world time");
+            return temper_client_tools::jig::Printed {
+                status: printed.status,
+                stdout: printed.stdout.clone(),
+                stderr: printed.stderr.clone(),
+            };
+        }
+    }
+    panic!("agent call {number} was not answered");
+}
+#[must_use]
+pub fn done_task(printed: &temper_client_tools::jig::Printed) -> u64 {
+    let stdout = std::str::from_utf8(&printed.stdout).expect("printed UTF-8");
+    stdout
+        .strip_prefix("done: task ")
+        .and_then(|value| value.split_once(", "))
+        .expect("done task outcome")
+        .0
+        .parse()
+        .expect("task number")
+}

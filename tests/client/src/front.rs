@@ -21,6 +21,8 @@ pub struct Joint {
     read_loads: BTreeSet<Token>,
     transport: Transport,
     limits: client::Limits,
+    client_limits: BTreeMap<ClientId, client::Limits>,
+    next_limits: Option<client::Limits>,
     callbacks: Vec<(ClientId, Event)>,
     parked: BTreeMap<ClientId, Vec<Request>>,
     offline_until: Option<Time>,
@@ -32,6 +34,13 @@ pub struct Joint {
     last_commit: u64,
     sign_outs: BTreeMap<ClientId, VecDeque<Option<u64>>>,
     truth: jig_client_world::joint::truth::Truth,
+}
+fn engine_limits() -> engine::Limits {
+    let mut limits = temper_engine_domain_world::fixtures::forge_limits();
+    let tools = temper_client_tools::limits::client().client.domain;
+    // Frame project allocations must also fit the smaller tools project bound.
+    limits.documents.lines = limits.documents.lines.min(tools.projects);
+    limits
 }
 impl Joint {
     #[must_use]
@@ -57,12 +66,8 @@ impl Joint {
     }
     #[must_use]
     pub fn new(seed: u64, limits: client::Limits) -> Joint {
-        let engine = Driver::with_repositories(
-            Store::new(),
-            walking::config(seed),
-            &temper_engine_domain_world::fixtures::forge_limits(),
-            fixtures::REPOSITORIES,
-        );
+        let engine =
+            Driver::with_repositories(Store::new(), walking::config(seed), &engine_limits(), fixtures::REPOSITORIES);
         Self::with_engine(seed, &limits, engine, 1)
     }
     /// A chat's allotment leaves pool funding for the goal it proposes.
@@ -78,7 +83,7 @@ impl Joint {
         jig_domain_authority::step(&mut domain, jig_domain_authority::Event::Policy { project: 1, policy }, &mut out);
         assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
         config.core.authority = domain;
-        let mut engine_limits = temper_engine_domain_world::fixtures::forge_limits();
+        let mut engine_limits = engine_limits();
         engine_limits.people.sign_ins = 3;
         engine_limits.fleet.slots = 2;
         engine_limits.fleet.attempts = 4;
@@ -105,7 +110,7 @@ impl Joint {
         );
         assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: fixtures::QUESTION_PROJECT }));
         config.core.authority = domain;
-        let mut engine_limits = temper_engine_domain_world::fixtures::forge_limits();
+        let mut engine_limits = engine_limits();
         engine_limits.tasks.inbox_bytes = 512;
         engine_limits.fleet.slots = 2;
         engine_limits.fleet.attempts = 4;
@@ -142,7 +147,7 @@ impl Joint {
         a::step(&mut domain, a::Event::Policy { project: PROJECT, policy }, &mut out);
         assert_eq!(out.pop(), Some(a::PolicyFact::Added { project: PROJECT }));
         config.core.authority = domain;
-        let mut engine_limits = temper_engine_domain_world::fixtures::forge_limits();
+        let mut engine_limits = engine_limits();
         engine_limits.authority = authority_limits;
         let engine = Driver::with_repositories(Store::new(), config, &engine_limits, fixtures::REPOSITORIES);
         Self::with_engine(seed, limits, engine, SLOTS)
@@ -166,6 +171,8 @@ impl Joint {
                 last: jig_client_protocol_wire::VERSION,
             }),
             limits: *limits,
+            client_limits: BTreeMap::new(),
+            next_limits: None,
             callbacks: Vec::new(),
             parked: BTreeMap::new(),
             offline_until: None,
@@ -178,6 +185,9 @@ impl Joint {
             truth,
             sign_outs: BTreeMap::new(),
         }
+    }
+    pub fn next_client_limits(&mut self, limits: client::Limits) {
+        self.next_limits = Some(limits);
     }
     fn hello(&mut self, who: ClientId) {
         self.callbacks.push((
@@ -213,7 +223,11 @@ impl Joint {
             engine::fire(&mut self.engine.root, &self.engine.env);
         }
     }
-    fn send(&mut self, event: engine::Event) {
+    fn send(&mut self, mut event: engine::Event) {
+        // The deployment front serves a window within the engine's configured page bound.
+        if let engine::Event::Party(engine::PartyInput::Watch { window, .. }) = &mut event {
+            window.rows = window.rows.min(self.engine.env.limits.documents.rows);
+        }
         if matches!(event, engine::Event::Party(engine::PartyInput::SignedIn { .. })) {
             self.sign_ins += 1;
         }
@@ -247,7 +261,7 @@ impl Joint {
             ));
             return;
         }
-        for event in translate::request(&mut self.transport, who, &request, &self.limits.client.domain) {
+        for event in translate::request(&mut self.transport, who, &request, &self.client_limits[&who].client.domain) {
             self.send(event);
         }
     }
@@ -293,7 +307,37 @@ impl Joint {
             }
             Ok(None) => {}
             Err(request) => {
-                if let Some(packet) = translate::incoming(&mut self.transport, *request, &self.limits.client.domain) {
+                let mut who = None;
+                if let engine::Request::Party(engine::PartyRequest::Deliver(
+                    engine::Delivery::WebReply { to, .. } | engine::Delivery::Read { reply: to, .. },
+                )) = request.as_ref()
+                {
+                    who = self
+                        .transport
+                        .reply_tokens()
+                        .into_iter()
+                        .find(|token| *to == skein_lib::ReplyTo::new(*token))
+                        .and_then(|token| self.transport.reply(token))
+                        .map(|reply| match reply {
+                            jig_client_world::joint::transport::Reply::SignIn { client }
+                            | jig_client_world::joint::transport::Reply::SignOut { client, .. }
+                            | jig_client_world::joint::transport::Reply::Keyed { client, .. }
+                            | jig_client_world::joint::transport::Reply::Read { client, .. }
+                            | jig_client_world::joint::transport::Reply::ApplicationRead { client, .. } => *client,
+                        });
+                }
+                if let engine::Request::Party(
+                    engine::PartyRequest::Deliver(
+                        engine::Delivery::Document { watcher, .. } | engine::Delivery::WatchEnded { watcher, .. },
+                    )
+                    | engine::PartyRequest::WatchRefused { watcher, .. }
+                    | engine::PartyRequest::RunText { watcher, .. },
+                ) = request.as_ref()
+                {
+                    who = self.transport.watch(*watcher).map(|watch| watch.client);
+                }
+                let limits = who.map_or(self.limits, |who| self.client_limits[&who]);
+                if let Some(packet) = translate::incoming(&mut self.transport, *request, &limits.client.domain) {
                     self.incoming(packet);
                 }
             }
@@ -394,6 +438,7 @@ impl Joint {
 }
 impl Front<Temper> for Joint {
     fn bind(&mut self, who: ClientId, party: u64) {
+        self.client_limits.insert(who, self.next_limits.take().unwrap_or(self.limits));
         assert_eq!(party, fixtures::PARTY, "the configured deployment owner");
         self.transport.bind(
             who,
@@ -464,7 +509,7 @@ impl Front<Temper> for Joint {
                 self.engine = Driver::with_repositories(
                     store,
                     walking::config(self.seed),
-                    &temper_engine_domain_world::fixtures::forge_limits(),
+                    &engine_limits(),
                     fixtures::REPOSITORIES,
                 );
                 self.engine.settle();

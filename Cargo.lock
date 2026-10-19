@@ -1999,6 +1999,7 @@ dependencies = [
  "skein-world",
  "temper-client-domain",
  "temper-client-protocol-wire",
+ "temper-client-tools",
  "temper-client-view",
  "temper-engine-domain",
  "temper-engine-domain-forge",

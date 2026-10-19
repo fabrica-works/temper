@@ -300,8 +300,7 @@ pub(crate) fn started_with_limits(
     json: bool,
     limits: root::Limits,
 ) -> Harness {
-    let mut root =
-        root::Root::with_client(client::Client::unlinked(&limits.domain.client, seed).expect("shipped client limits"));
+    let mut root = root::Root::unlinked(&limits, seed).expect("shipped client limits");
     root.kept_json(json);
     let mut harness = Harness {
         root,
