@@ -416,6 +416,17 @@ where its answer lands.
 
      The corrected scratch probe passes clippy for the throwaway/conformance/codecs and skein-forge/http packages. Sequential suites pass: temper 98 focused (1 skipped), 6 fuzzy; the existing opt-in throwaway test passes (13 skipped); skein forge/http/world pass 384 focused and 10 fuzzy, no browser tests selected. The initial future-mask sketch predictably fails against today's masker: 06.4 already owns that implementation; its sketch compiles, and baseline suites pass after restoring it. No new design question is exposed. Future attached fixtures, recorder/document conversion proofs, five boundary tables and generated fuzzy sweep remain unrun until their declared implementations. Evidence: pump/ready-skein-06.md and scratch-ready-skein-06/.
 
+109. **skein 05's Shapes against main** (ready check of skein-05.1).
+     Amends: skein/05-fakes.md 05.1 Shape and 05.4 Files/temper's side. Reverses: nothing.
+
+     The ready check found two lint adaptations and omitted accounting/compatibility users. The domain's moved tests/memory.rs adds `#![cfg(test)]` and explicitly typed u32 ranges in Measured::call and fill. This preserves the no-exception lint rule and existing memory algorithms, limits and assertions.
+
+     Include skein-fake-forge-protocol/src/service.rs::worst_case in 05.4's snapshot accounting. Expand the next temper repin's compatibility scope to testing/temper-fake-git/Cargo.toml (skein-fake-peers dependency), its already named source users, and tests/one-process/src/stories.rs::{forge,prepare_merge_branch} plus src/referee/forge.rs::green. They follow skein_fake_peers::forge::Forge and its constructor; prepare_merge_branch uses Forge::next_reply and reserves bounded pending Queue room before stepping/firing. Preserve story inputs and assertions. Refresh further copies and derived values and list further users/repairs in the commit body. Temper 05.2 retains its peer migration and deletions.
+
+     Checked starting skein 0db7b1fc7307aa50980ce75637e686e384adc4e4 and temper c4f89032047e4980b9f946ce8abf1c2c81653ba8; downstream searches cover smith, jig and hearth. Verified memory's untyped ranges, protocol service::worst_case, fake-git's manifest, the stories' Forge constructor/pending pushes, and green's temper_fake_git::Forge parameter against that source. No further missed consumer was found.
+
+     Corrected scratch clippy passes for skein-fake-forge-domain, protocol and peers. Sequential focused suites pass 100 domain tests (including 3 memory), 58 protocol probe tests and 8 existing peer tests; fuzzy/browser select zero in those packages. The probe confirms the written accounting values 4_645_153, 4_663_809 and 4_663_949. Full interface A, remaining future protocol units, peer capture/sharing/delivery, and downstream migrations remain unrun until declared implementations; temper 01.2 is the expected prerequisite. Evidence: pump/ready-skein-05.md and scratch-ready-skein-05/suite-results.tsv.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

@@ -71,7 +71,9 @@ with bounded `Writer` fills; `name` replaces slice/copy_from_slice with
 checked lengths and `Writer::put`. `names`/`tree` replace map/collect
 with bounded `List` loops; `fill`'s collected dependencies use capacity 2,
 and the filled-forge test's `Vec::new` uses `List` of LIMITS.repositories.
-Use checked arithmetic/access; keep algorithms, allocator, limits, assertions.
+Add `#![cfg(test)]` to the moved `tests/memory.rs`; explicitly type the
+numeric ranges in `Measured::call` and `fill` as `u32` to satisfy numeric-fallback
+lints. Use checked arithmetic/access; keep algorithms, allocator, limits, assertions.
 No downstream production dependency, test lint exception or lint relaxation.
 Test shape: 96 unit tests plus 3 memory tests move with their names:
 `a_forge_filled_to_its_limits_stays_within_its_worst_case`,
@@ -213,8 +215,12 @@ Files: copy temper's host, `tests/one-process/src/forge.rs` (268 lines at the ba
 26), and `testing/temper-fake-git/src/transport.rs::Forge` into
 `testing/skein-fake-peers/src/forge.rs`, `src/forge/{shared,observe}.rs`. Change peer
 `src/lib.rs`, `Cargo.toml`, root `Cargo.lock`. New `tests/forge.rs`, `tests/forge/fixtures.rs`;
-reuse `tests/support/mod.rs`. Change protocol `src/server.rs`, `src/tests/http.rs`,
-`tests/fixtures.rs`.
+reuse `tests/support/mod.rs`. Change protocol `src/server.rs`, `src/service.rs`
+(`worst_case`, snapshot accounting), `src/tests/http.rs`, `tests/fixtures.rs`.
+Temper repin compatibility files: `testing/temper-fake-git/{Cargo.toml,
+src/lib.rs,src/transport.rs,src/fixtures.rs}`, `tests/one-process/src/forge.rs`,
+`src/stories.rs::{forge,prepare_merge_branch}` and `src/referee/forge.rs::green`
+(the latter paths under `tests/one-process`).
 Shape: copy the host's admission and the shared handle; the base host delivers nothing, and 05.5
 adds delivery. `Forge` becomes the shared type; pending becomes bounded Queue, reserved before
 stepping; `next_reply` owns the disjoint external token range. `Forge.hooks` starts None, and
@@ -237,7 +243,13 @@ temper's side: `temper_fake_git::Forge` becomes `skein_fake_peers::forge::Forge`
 `testing/temper-fake-git/src/fixtures.rs`'s `Forge::new(domain, CONFIG)` imports the new type.
 In `src/transport.rs`, Forge's field/new and Transport::call's serial/token/pending operations
 use Queue reservation/push and next_reply; the host's Shared/pending drain use Forge/Queue. Next
-temper repin repairs all; temper 05.2 deletes the copies.
+temper repin repairs all; temper 05.2 deletes the copies. Add `skein-fake-peers`
+to `testing/temper-fake-git/Cargo.toml`. The one-process `stories::{forge,
+prepare_merge_branch}` and `referee::forge::green` follow the new Forge type and
+constructor; `prepare_merge_branch` uses `Forge::next_reply` and reserves pending
+Queue room before stepping/firing. Keep story inputs and assertions. Refresh
+further copies and derived values reached by these repairs and list further
+users in the repin commit body.
 Test shape: keep 8 peer tests (0.046 s); the base host has no test of its own. New
 `tests/forge/fixtures.rs` copies `tests/llm.rs::limits`' values (2 connections, queue 64), not
 its private helper; seed 23, skein_sim::Config::calm, 05.2's config, checked by Peer::new; Sim
