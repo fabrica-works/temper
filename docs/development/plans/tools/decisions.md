@@ -620,6 +620,9 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
            computed over its tree (jig's `domain/tasks.md`, section 3), so a
            question or a proposal below for the party meets it on `task N`, and
 
+126. **temper 03.2: offered acts with no tool, interim** (design, temper 03.2's block of 2026-10-19 08:58:21 UTC).
+     Interim, until decisions.md, For the user, M, is decided: what `task N`'s text prints for an offered act with no tool in tools.md, 5.3 (Take, HandBack, Amend, Move, Reorder, Seen, EditNote, DeleteNote, ChangePolicy, SetRoles, MakeService, SetPool, Withdraw) is a design gap, and waits; it goes to the user as M, as no designer is joined. temper 03.2 goes on with everything else: the root, the runner, routing, `me`, JSON, the exits, and every offered act that has a tool, printed as its Shape says (Message, Answer, Accept, Reject, PassUp, LeaveHeld, Release, Stop, Cancel, Adopt). Its tests and goldens use documents whose offered acts all have tools; the arm for an act with no tool is the one part that waits, and no call names a tool that 5.3 lacks. 03.2 does not land before the ruling on M reaches it. A further act kind with no tool: treat it as these, and list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
@@ -770,3 +773,22 @@ and the user, or the director, may veto it before the run:
   `--ended`. Its help reads "Only ended tasks". An agent that wants both
   makes two calls; the printed cursor stays jig's, with no group byte.
   tools.md, 5.2, says so at the designer's next pass, after this plan.
+- **M. Offered acts with no tool** (question.md in the run's directory,
+  from temper 03.2's block of 08:58:21Z; no designer is joined to answer
+  it): tools.md, 6.1, prints "Acts as calls", and an agent "copies them
+  from the acts a result printed" (5.3); temper 03.2 prints "one call per
+  offered act in the document's order". jig's task documents offer 23
+  kinds of act (`ActKind`), and 5.3's table has tools for Message,
+  Answer, Accept, Reject, PassUp, LeaveHeld (`decide`), Release, Stop,
+  Cancel and Adopt; Take, HandBack, Amend, Move, Reorder, Seen,
+  EditNote, DeleteNote, ChangePolicy, SetRoles, MakeService, SetPool and
+  Withdraw have none, so a call for them would name a tool that does not
+  exist. Default: an offered act with no tool prints, in the document's
+  order, its name in the tools' words and ` (no tool)`, and no call, as a
+  refused act prints no call; its admission is not printed; JSON prints
+  the document's offers as 03.2 says; tools.md, 6.1, says so at the
+  designer's next pass, after this plan. Or: `acts:` leaves out an act
+  with no tool; or the tools gain those acts (5.3 rows and table forms,
+  a plan of their own); or a designer joins the run (`plan join
+  designer`, in a design session) and answers question.md. temper 03.2's
+  landing waits on it; the rest of 03.2 goes on.
