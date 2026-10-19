@@ -284,6 +284,13 @@ pass:
      - **Size:** ~285 lines of `tests/client/src`, the link tree's ~25 added.
      - If the link tree breaks the heap check, or `Online` is still unmet with it, raise it with the peak or the referee's line. Refresh any further copy of the empty agent tree or of `Steps(1)` in these fixtures, and list it in the commit body.
 
+109. **temper 08.2: lands while the 4 s aggregate goes to the designer** (design gap, interim, temper 08's block of 2026-10-19T14:19:53Z).
+     Interim, a design gap: the question has gone to the designer (`question.md`), whether testing.md 6.1's "the worlds below the domain … together at most 4 s of the default suite" binds this plan, now that `main` misses it before 08.2, and which steps aim at it.
+
+     - **08.2 lands now.** Its story is 0.072 s (median of three), within its 1 s guide ("a one-process or real-loop story at most 1 s"), and the aggregate is missed without it (4.973 s of 5.059 s), so no answer would move or cut it. 08's Question ("raised … before any merge") is met by this raise.
+     - **Every later step goes on** within its own guide and Proof bound, and gives its measures as its session file says. A step that would move a test to the fuzzy suite, or make an existing one cheaper, for the aggregate's sake, waits for the answer: that is the answer's to name.
+     - Size: 08.2's 458 lines against ~300 land without asking (development.md, 8.6's rule: within its Files and ruling 104's edit).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
