@@ -681,6 +681,27 @@ where its answer lands.
 
      Lift only the temporary graph hold in running sessions; retain the README rule, exact primary project identities, worktree verification and source fallbacks. Temper06.2's bounded diagnostic authorization remains unchanged.
 
+130. **Permit the two shared Comments setup substitutions** (ready check of skein-01.s1).
+     Reverses: rulings118 of2026-10-19T06:46:02Z and119 of2026-10-19T06:47:11Z only insofar as their preservation clauses prohibited the two named Comments setup substitutions; their five split exceptions, assertions and fixture audit remain.
+     Amends: skein/01.s1-test-shapes.md Test shape/Don't.
+
+     ## Decision
+
+     Permit the two named test callers, `forgejo/tests.rs::{a_comment_at_or_below_after_is_skipped_body_unread,a_cut_thread_counts_the_comments_it_skipped}`, to replace their repeated Comments construction with the supplement's `fixtures::{repository,comments}` helpers. Preserve their names, request/input bytes and assertions. This makes its required shared setup possible; it authorizes no additional test split or general preserved-body rewrite. Other permitted boundary-fixture selections and the20minute/3run audit budget stand. Refresh any further helper copy reached by this substitution and list it in the commit body, retaining the same inputs/outcomes.
+
+     The corrected scratch sketch retains36assertion cases in five tests split into21 (+16); snapshot package102->118. Keep the plan's relative accounting against the actual post01.4 inventory rather than replacing it with that snapshot total. No smaller default is established by this ready check; perform the existing caller/boundary audit before lowering one.
+
+     ## Checked
+
+     - ready-skein-01s1 checked all named files/callers and downstream snapshots: skein5aaba05472924164e6fb6f07ea779036dbe4c153, temper e83e552e4591ad6f73d35a615f27c10085d98e17; smith e79b9a6b, jig01b53884, hearth d0a552d8. Missing fixtures belong to this supplement;01.4 remains its prerequisite.
+     - Exact-primary search_graph finds both callers in crates/skein-forge/src/forgejo/tests.rs; rg confirms identical Request::Comments blocks with fixture/specimen and number3. repository/comments helpers are new additions of this supplement, not missing upstream APIs.
+     - Two heavy attempts: first found a scratch u64/u32 sketch error, corrected clippy passes; nextest skein-forge118pass0.056s; fuzzy/browser zero selected with --no-tests=pass. Source/mapping/logs retained in scratch-ready-skein-01s1; no primary edits or targets remain.
+     - Existing session file requires shared Comments setup but previously restricted other preserved bodies to boundary-fixture selection; the two names are within its existing Files. Pinned plan ruling/ready commands exist, kit d6d4abe unchanged.
+
+     ## Instructions
+
+     Mark skein-01.s1 ready with the recorded skein/temper commits. At its actual post01.4 start retain all existing audit/proof obligations, preserve every original assertion case and report the relative count. No other session waits for this ready check.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
