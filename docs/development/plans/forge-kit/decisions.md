@@ -520,6 +520,14 @@ where its answer lands.
 
      Instructions: register skein-01.s1 from skein/01.s1-test-shapes.md, after skein-01.4, as a separate supplement session 01.s1. Its first step undergoes the normal ready check. Make the existing waiting temper-repin depend on it as well as all original skein steps. No additional closing repin step is required because none has landed. Pass the README rule to running skein test implementers; they keep the named preserved rewrites for this supplement.
 
+119. **Include sampled fixture callers** (hourly check of 2026-10-19T06:09:28Z).
+     Reverses: ruling 118 only insofar as its Files/Don't prevented necessary explicit boundary-fixture selection in other callers; its preservation and audit requirements stand.
+     Amends: skein/01.s1-test-shapes.md, Files, Test shape and Don't.
+
+     The fixture-limit audit also reaches skein-forge/src/forgejo/tests/{tokens,hooks,orgs,delivery,accounts}.rs. Permit those callers only to select a justified explicit boundary fixture when reducing a shared default requires it. Keep their test names, input bytes, assertions and outcomes. This does not expand the five-test split exception. Refresh further callers and derived fixture bounds found by the audit and list them in the commit body.
+
+     Checked with rg -l 'fixtures::(limits|small)|fixtures::\*|fixtures::\{' /srv/data/git/runner/src/skein/crates/skein-forge/src/forgejo -g '*.rs': tests.rs and precisely those five modules are direct fixture users. The ready check must verify any additional aliases or newer users against its own snapshots. The audit's bounded scope and proofs remain as ruling 118.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
