@@ -269,6 +269,13 @@ pass:
 
      The check compiled 09.4's `unread::record()` and `Unread` sketch and 09.1's landed names under clippy (clean) and ran `rdeps(temper-real-loop-world)`: 3 passed. 09's stories cannot compile before 08.2 to 08.4 and temper 05. Refresh any further copy of these names, and list it in the commit body.
 
+107. **temper 06.1: the tools root built unlinked** (plan defect, temper 06's block of 2026-10-19T14:05:56Z).
+     Plan defect: 06.1's Shape builds the agent by `root::Root::new(&agent::limits(), seed)`, and Choice 1 steps `StartUnlinked { kept }`, then `SignIn { with: With::Transport }`; but `Root::new` is `with_client(Client::new(..))`, whose client holds a link, and jig-client refuses `StartUnlinked` on it ("Up and StartUnlinked require an unlinked client"). The proposal is adopted.
+
+     - `crates/temper-client-tools/src/root.rs` gains `pub fn unlinked(limits: &Limits, seed: u64) -> Result<Self, jig_client::Unusable>`, `Root::new` on `Client::unlinked(&limits.domain.client, seed)`, with `new`'s `# Errors`. `with_client` stays `pub(crate)`; the root gains nothing else (06.1's Don't: no `worst_case`).
+     - `agent::new` calls `Root::unlinked`. The tools' unit fixture (`src/tests/fixtures.rs`, `Root::with_client(Client::unlinked(..))`) may take it; refresh any further copy of that construction, and list it in the commit body.
+     - No other session edits `root.rs`; no upstream change and no pin moves.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

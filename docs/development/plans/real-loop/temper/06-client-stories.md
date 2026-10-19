@@ -134,12 +134,15 @@ Needs: nothing outside this session.
 Files: `tests/client/Cargo.toml` (`temper-client-tools.workspace =
 true`; the root entry exists, so only `Cargo.lock` changes: hotspot,
 forge kit); `tests/client/src/{app.rs, agent.rs (new), lib.rs, front.rs,
-fixtures.rs}`; `tests/client/tests/chat.rs` (`world.root(..).person()`,
+fixtures.rs}`; `crates/temper-client-tools/src/root.rs` (`Root::unlinked`,
+ruling 107); `tests/client/tests/chat.rs` (`world.root(..).person()`,
 `Probe` holds `app::Root`); `tests/client/tests/agent.rs` (new).
 Shape:
 - `agent::Agent` holds `root::Root`, `ready`, the kept lines, `Printed`
-  by number and `calls`; `agent::new` builds it by `root::Root::new(
-  &agent::limits(), seed)`.
+  by number and `calls`; `agent::new` builds it by `root::Root::unlinked(
+  &agent::limits(), seed)`: `Root::new`'s `Client::new` holds a link,
+  which `StartUnlinked` refuses. `Root::unlinked` is `Root::new` on
+  `Client::unlinked`, its errors the same (ruling 107).
 - `Joint` keeps a `BTreeMap<ClientId, client::Limits>`:
   `next_client_limits` sets what the next `bind` takes, other clients
   keep `self.limits`; `request` and `packet` pass that client's
