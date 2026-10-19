@@ -549,7 +549,7 @@ where its answer lands.
      Instructions: mark skein-03.1 ready after this ruling, retaining its checked commits; normal prerequisites still govern its start. Future declarations are required implementation work, with complete worst-case and relative test-count proofs. The kit's plan ready/ruling/ring dispatch is present.
 
 121. **Refresh hourly graph indexes** (hourly check of 2026-10-19T07:15:01Z).
-     Reverses: ruling 113 of 2026-10-19T06:26:42Z only as to permission to use stale graph indexes; its primary-project identity and worktree verification rules stand.
+     Reverses: ruling 113 of 2026-10-19T06:26:26Z only as to permission to use stale graph indexes; its primary-project identity and worktree verification rules stand.
      Amends: README Rules of this plan, temporary hourly-02 graph restriction.
 
      Both primary indexes are older than origin/main. Until refreshed, do not use the code graph for skein or temper; search with rg. This follows development.md 14.1 step 2. The supervisor refreshes the primary checkout indexes and lands the lifting rule after checking the result. Worktree source remains authoritative; empty/stale graphs prove no absence.
@@ -557,6 +557,16 @@ where its answer lands.
      Checked: index_status reports srv-data-git-runner-src-skein at /srv/data/git/runner/src/skein indexed 2026-10-19T06:22:53Z and srv-data-git-runner-src-temper at /srv/data/git/runner/src/temper indexed 2026-10-19T06:25:11Z. git log -1 origin/main reports skein 283a7ec9144a4db7ffed00aedeaf0871cde12aca at 07:06:15Z and temper ab7ef9b9403f4f7041f6c678c8ea7e483dbbbece at 07:06:22Z, both later. The known hostile JSON parse gaps remain source-search cases. Kit plan ruling/ring dispatch is present; no kit move is authorized.
 
      Instructions: coordinator passes the README restriction word for word to all running implementers; new sessions read it there. Continue implementation using source searches. The supervisor's refresh does not hold a ready/start check or any session.
+
+122. **Use refreshed primary graphs** (hourly check of 2026-10-19T07:15:01Z).
+     Reverses: ruling 121 of 2026-10-19T07:16:00Z and steer of 2026-10-19T07:16:38Z, only their temporary graph restriction.
+     Amends: README Rules, removes the temporary hourly-02 graph restriction; decisions.md ruling 121 metadata corrects ruling 113's time to its verified 06:26:26Z commit time.
+
+     The primary skein and temper indexes have been refreshed. Resume code-graph discovery for exact projects srv-data-git-runner-src-skein and srv-data-git-runner-src-temper, verifying each name in the actual worktree before relying on it. Use source searches for newer worktree changes and declared coverage gaps. The restriction is lifted; no kit move or proof-budget change.
+
+     Checked: index_repository fast completed on /srv/data/git/runner/src/skein and /srv/data/git/runner/src/temper. index_status reports ready at 2026-10-19T07:17:38Z (26381 nodes) and 2026-10-19T07:18:49Z (24063 nodes). git rev-parse HEAD origin/main agrees in skein at 283a7ec9144a4db7ffed00aedeaf0871cde12aca and temper at eab32d2657fcd3de16520a0ffcc97250a7145d23. The index's partial/hostile JSON and excluded files remain source-search cases, not evidence of absent symbols. git show -s --format=%cI 774074daac99c7c10f52d516e747476bccf391f4 reports 2026-10-19T07:26:26+01:00, correcting the earlier typed timestamp. The kit's plan ring/ruling dispatch is present.
+
+     Instructions: coordinator lifts the temporary instruction in running sessions and passes the exact primary-project/worktree-verification rule word for word. Future sessions use the README's remaining graph rule. Hourly-02's other findings are still being checked.
 
 ## For the user
 
