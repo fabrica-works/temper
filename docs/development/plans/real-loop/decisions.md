@@ -355,6 +355,14 @@ pass:
      - **Don't**, now: commit a turn other than the one that reads an assignment's messages, or decode its body.
      - **The `request limit` fix** in `crates/temper-client-tools/src/root.rs` is on `main` already: 05.4's 4445f2d9a adds `client.reclaim` after each routing drain, the same two lines. Rebase 06.2 onto `origin/main` and drop its own copy.
 
+116. **kit 31ae5ab** (kit fix).
+     Kit fix: the run's kit moves from skein 2bd29bd to 31ae5ab, "plan wake starts a fresh designer when none joined". The run met its defect at 2026-10-19T14:27:04Z: the first design question found "no designer recorded" (supervision.md, "Question, … no designer to wake"). `<run>/kit/scripts/dev/test-plan` passed at 31ae5ab.
+
+     It brings 15 earlier skein commits. Those that change what the run's roles meet:
+     - ebf24d5: `land` refuses a branch that adds a test function named with `_and_`. The README's Done when 3 already says no test this plan adds is so named; the plan's `_and_` names (10's `a_persons_change_lands_on_the_forge_and_is_found_after_a_restart`, 13.s1's three stories) name tests already on `main`, which no step renames.
+     - 4134983: `plan check` refuses an adopted retrospective proposal not yet applied; the run is past its check.
+     - 2cedfab, e002687, 0b006b8, baaebb7: the pulse and the metrics read the run differently; no role acts on them during the run.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
