@@ -4,13 +4,15 @@ use skein_io as io;
 use skein_lib::{Decimal, Reader, Time, Token, Wall, Writer};
 const REQUEST_AT: Time = Time::from_nanos(1);
 const REQUEST_WALL: Wall = Wall::from_nanos(1);
-const SOCKET: Token = Token::new(100);
+pub const SOCKET: Token = Token::new(100);
 const LISTENER: Token = Token::new(99);
 
 pub struct Peer {
     wire: skein_world::stream::Wire,
+    socket: Token,
     owner: Option<Token>,
     closed: u32,
+    body_demand: bool,
 }
 impl Peer {
     pub fn new(engine: &mut Engine, method: &[u8], path: &[u8], body: &[u8], bearer: Option<&[u8]>) -> Self {
@@ -61,22 +63,40 @@ impl Peer {
         Self::raw(engine, &bytes.finish())
     }
     pub fn raw(engine: &mut Engine, bytes: &[u8]) -> Self {
+        Self::raw_on(engine, bytes, SOCKET)
+    }
+    pub fn raw_on(engine: &mut Engine, bytes: &[u8], socket: Token) -> Self {
         let mut wire = skein_world::stream::Wire::new(7);
         wire.write(bytes);
         assert!(engine.clients.up(io::Event::Accepted {
             owner: Token::new(crate::tokens::SERVER),
-            socket: SOCKET,
+            socket,
             peer: address(),
         }));
-        Self { wire, owner: None, closed: 0 }
+        Self { wire, socket, owner: None, closed: 0, body_demand: false }
+    }
+    /// Stop once the held request head has caused a demand for its withheld body.
+    pub fn hold_body(&mut self, engine: &mut Engine) {
+        self.pump_until(engine, false, REQUEST_AT, REQUEST_WALL, |peer, _| peer.body_demand);
+        assert!(self.body_demand, "the mounted call asks for its withheld body");
+    }
+    pub fn handoff(&mut self, engine: &mut Engine) {
+        self.pump_until(engine, false, REQUEST_AT, REQUEST_WALL, |_, engine| !engine.clients.early.is_empty());
     }
     pub fn pump(&mut self, engine: &mut Engine, decide: bool) {
         self.pump_at(engine, decide, REQUEST_AT, REQUEST_WALL);
     }
     pub fn pump_at(&mut self, engine: &mut Engine, decide: bool, now: Time, wall: Wall) {
-        self.pump_until(engine, decide, now, wall, Self::streaming);
+        self.pump_until(engine, decide, now, wall, |peer, _| peer.streaming());
     }
-    fn pump_until(&mut self, engine: &mut Engine, decide: bool, now: Time, wall: Wall, ready: fn(&Self) -> bool) {
+    fn pump_until(
+        &mut self,
+        engine: &mut Engine,
+        decide: bool,
+        now: Time,
+        wall: Wall,
+        ready: fn(&Self, &Engine) -> bool,
+    ) {
         for _ in 0_u32..256 {
             if decide {
                 crate::engine::iterate(engine, now, wall);
@@ -90,11 +110,17 @@ impl Peer {
                         assert!(engine.clients.up(io::Event::Listening { owner, listener: LISTENER, addr }));
                     }
                     io::Request::Bind { socket, owner } => {
-                        assert_eq!(socket, SOCKET);
+                        assert_eq!(socket, self.socket);
                         self.owner = Some(owner);
                     }
                     io::Request::Stream { stream, down } => {
-                        assert_eq!(stream, SOCKET);
+                        assert_eq!(stream, self.socket);
+                        self.body_demand = match &down {
+                            skein_lib::stream::Down::Demand { read: skein_lib::stream::Read::Fill(_), .. } => true,
+                            skein_lib::stream::Down::Demand { .. }
+                            | skein_lib::stream::Down::Send(_)
+                            | skein_lib::stream::Down::Finish => false,
+                        };
                         self.wire.take(down);
                     }
                     io::Request::Close { .. } | io::Request::Abort { .. } => {
@@ -110,7 +136,7 @@ impl Peer {
                     | io::Request::Window { .. } => panic!("unexpected client io"),
                 }
             }
-            if self.closed > 0 || ready(self) {
+            if self.closed > 0 || ready(self, engine) {
                 break;
             }
             if let Some(owner) = self.owner
@@ -122,7 +148,7 @@ impl Peer {
     }
     pub fn read_hello(&mut self, engine: &mut Engine) -> bool {
         // Keep the clock at REQUEST_AT: no predecessor waits out a heartbeat.
-        self.pump_until(engine, false, REQUEST_AT, REQUEST_WALL, |peer| peer.event_data().is_some());
+        self.pump_until(engine, false, REQUEST_AT, REQUEST_WALL, |peer, _| peer.event_data().is_some());
         let Some(data) = self.event_data() else { return false };
         let record =
             skein_lib::base64::decode(skein_lib::base64::Alphabet::Standard, data, u32::try_from(data.len()).unwrap())
@@ -142,7 +168,15 @@ impl Peer {
     }
     pub fn end(&mut self, engine: &mut Engine) {
         engine.clients.up(io::Event::Stream { owner: self.owner.expect("bound peer"), up: skein_lib::stream::Up::End });
-        self.pump_until(engine, false, REQUEST_AT, REQUEST_WALL, |_| false);
+        self.pump_until(engine, false, REQUEST_AT, REQUEST_WALL, |_, _| false);
+    }
+    pub fn close(&mut self, engine: &mut Engine) {
+        assert!(engine.clients.up(io::Event::Closed { owner: self.owner.expect("bound peer") }));
+        self.closed = self.closed.checked_add(1).unwrap();
+        self.pump(engine, false);
+    }
+    pub fn closed(&self) -> u32 {
+        self.closed
     }
     pub fn received(&self) -> &[u8] {
         &self.wire.received

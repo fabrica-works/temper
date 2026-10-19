@@ -77,6 +77,7 @@ pub(crate) enum Answer {
     Root,
     NotFound,
     NotAllowed,
+    Busy,
 }
 /// An answer on its way: what it is, the path it serves and how much of its body is sent.
 #[derive(Debug)]
@@ -114,7 +115,7 @@ impl Bundle {
         match reply.answer {
             Answer::File | Answer::Root => &self.file(&reply.path).expect("routed file").bytes,
             Answer::Page => &self.page,
-            Answer::NotModified | Answer::NotFound | Answer::NotAllowed => b"",
+            Answer::NotModified | Answer::NotFound | Answer::NotAllowed | Answer::Busy => b"",
         }
     }
 }
@@ -169,8 +170,8 @@ fn field(headers: &mut List<Header>, name: &[u8], value: &[u8]) {
 }
 impl Clients {
     /// Answers a call the mapping does not claim, and holds the answer until it is sent.
-    pub(super) fn serve_call(&mut self, call: Token, head: &http::Call) {
-        let answer = route(self.bundle.as_ref(), head);
+    pub(super) fn serve_call(&mut self, call: Token, head: &http::Call, busy: bool) {
+        let answer = if busy { Answer::Busy } else { route(self.bundle.as_ref(), head) };
         let reply = Reply { answer, path: bytes::copy_of(target(head)), offset: 0 };
         let mut headers = List::with_capacity(3);
         let mut length = 0;
@@ -180,7 +181,9 @@ impl Clients {
                 let kind = match answer {
                     Answer::File | Answer::Root => bundle.file(&reply.path).expect("routed file").kind,
                     Answer::Page => b"text/html; charset=utf-8",
-                    Answer::NotModified | Answer::NotFound | Answer::NotAllowed => unreachable!("content answer"),
+                    Answer::NotModified | Answer::NotFound | Answer::NotAllowed | Answer::Busy => {
+                        unreachable!("content answer")
+                    }
                 };
                 field(&mut headers, b"Content-Type", kind);
                 length = bundle.content(&reply).len();
@@ -189,6 +192,7 @@ impl Clients {
             Answer::NotModified => 304,
             Answer::NotFound => 404,
             Answer::NotAllowed => 405,
+            Answer::Busy => 503,
         };
         match answer {
             Answer::File => field(&mut headers, b"Cache-Control", b"public, max-age=31536000, immutable"),
@@ -196,17 +200,17 @@ impl Clients {
                 field(&mut headers, b"Cache-Control", b"no-cache");
                 field(&mut headers, b"ETag", &self.bundle.as_ref().expect("revalidated bundle").etag);
             }
-            Answer::NotFound | Answer::NotAllowed => {}
+            Answer::NotFound | Answer::NotAllowed | Answer::Busy => {}
         }
         let response = http::Response {
             status,
             headers: headers.into_boxed(),
-            body: if status == 304 {
+            body: if status == 304 || busy {
                 http::Body::None
             } else {
                 http::Body::Length(u64::try_from(length).expect("bounded file"))
             },
-            close: false,
+            close: busy,
         };
         self.server.answer(call, http::Request::Discard, &mut self.server_out);
         self.server.answer(call, http::Request::Respond(response), &mut self.server_out);
@@ -217,6 +221,17 @@ impl Clients {
     }
     /// Takes one event of a call being answered: room for a chunk, or the answer's end.
     pub(super) fn serve_event(&mut self, call: Token, event: http::Event) {
+        if self.replies.get(&call).expect("own reply").answer == Answer::Busy {
+            match event {
+                http::Event::Done(_) | http::Event::Failed(_) | http::Event::Closed => {
+                    self.replies.remove(&call);
+                    self.server.done(call, &mut self.server_out);
+                }
+                http::Event::Ended | http::Event::Refused(_) | http::Event::Reply(_) | http::Event::Body(_) => {}
+                http::Event::Call(_) => unreachable!("a head is routed, not an event"),
+            }
+            return;
+        }
         match event {
             http::Event::Reply(Up::Room) => self.chunk(call),
             http::Event::Done(_)

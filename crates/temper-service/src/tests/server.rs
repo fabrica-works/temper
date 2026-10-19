@@ -221,3 +221,36 @@ fn the_policy_keeps_a_field_the_answer_already_holds() {
     assert_eq!(held, 1);
     assert_eq!(response.headers.len(), 5);
 }
+
+// A one-byte read body is deliberately withheld to retain each mounted call.
+const HELD_READ_HEAD: &[u8] = b"POST /jig/v1/read HTTP/1.1\r\nHost: 127.0.0.1:7100\r\nContent-Type: application/octet-stream\r\nContent-Length: 1\r\n\r\n";
+// Refuse an empty request too: it still needs Discard before its response.
+const EMPTY_READ_HEAD: &[u8] = b"POST /jig/v1/read HTTP/1.1\r\nHost: 127.0.0.1:7100\r\nContent-Type: application/octet-stream\r\nContent-Length: 0\r\n\r\n";
+#[test]
+fn a_call_past_the_mounts_room_is_answered_busy() {
+    let mut service = fixtures::started();
+    fixtures::listening(&mut service);
+    let capacity = fixtures::engine().jig.limits.clients_http.calls;
+    let mut peers = skein_lib::List::with_capacity(capacity);
+    for number in 0..capacity {
+        let socket = Token::new(fixtures::http::SOCKET.raw().checked_add(u64::from(number)).unwrap());
+        let mut peer = fixtures::http::Peer::raw_on(&mut service.engine, HELD_READ_HEAD, socket);
+        peer.hold_body(&mut service.engine);
+        assert!(peers.push(peer).is_ok(), "one peer per mounted call");
+    }
+    let busy_socket = Token::new(fixtures::http::SOCKET.raw().checked_add(u64::from(capacity)).unwrap());
+    let mut busy = fixtures::http::Peer::raw_on(&mut service.engine, EMPTY_READ_HEAD, busy_socket);
+    let (status, _) = fixtures::answered(&mut service, &mut busy);
+    assert_eq!(status, 503);
+    let body = skein_lib::bytes::find(busy.received(), b"\r\n\r\n").unwrap().checked_add(4).unwrap();
+    assert_eq!(busy.received().get(body..), Some(b"".as_slice()));
+    assert_eq!(service.engine.clients.early.len(), 0, "nothing reached the root");
+    // Only handling the HTTP terminal and retiring its call with server.done closes this socket.
+    assert_eq!(busy.closed(), 1);
+    peers.get_mut(0).unwrap().close(&mut service.engine);
+    let link = service.engine.clients.links.pop().expect("printed link");
+    let body = fixtures::http::link_body(&service.engine, &link);
+    let mut admitted = fixtures::http::Peer::new(&mut service.engine, b"POST", b"/jig/v1/sign-in/link", &body, None);
+    admitted.handoff(&mut service.engine);
+    assert_eq!(service.engine.clients.early.len(), 1, "the released slot mounts another call");
+}

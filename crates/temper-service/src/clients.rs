@@ -252,10 +252,11 @@ impl Clients {
             match self.server_out.pop().expect("server requests") {
                 crate::server::Routed::Io(request) => self.io.push(tag(request)),
                 crate::server::Routed::Call { call, head } => {
-                    if http::claims(&http_settings(), &head) {
+                    let claimed = http::claims(&http_settings(), &head);
+                    if claimed && self.mount.room() > 0 {
                         self.mount.down(&self.mount_env, http::Event::Call { call, head }, &mut self.mount_out);
                     } else {
-                        self.serve_call(call, &head);
+                        self.serve_call(call, &head, claimed);
                     }
                 }
                 crate::server::Routed::Http { call, event } => {
