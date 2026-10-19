@@ -58,7 +58,9 @@ repairs what they break (02.1, Shape).
 ### 02.1 The repin, the purposes, the client's users, the deletion
 
 Scope: forge-client 7.1 and forge 2.3, 3.7; domain/forge 5 and 6.
-Needs: skein 02.2 and temper 01.3 on `origin/main` (README). Skein 02.3's `bind_deployment`
+Needs: skein 02.2 and temper 01.3 on `origin/main` (README); for its naming
+  proof and its landing, jig's boundary check repaired on jig's `origin/main`
+  (README, Rules: the boundary check's jig repair). Skein 02.3's `bind_deployment`
   guard and 02.4's frame checks may be on it; if they are, the repin commit
   repairs the two places below.
 Files: Cargo.toml (root: delete the member `crates/temper-engine-domain-forge-client`
@@ -78,6 +80,8 @@ Shape: four commits, each builds and passes its crates' tests.
      since the last repin (at the base the check fails on `Op::Lock` and jig's
      `Event::Locked`, which the tools plan's first repin, landed before this
      plan's first, repairs: findings).
+     It also takes jig's boundary-check repair (README, Rules); a commit 1
+     made before that repair landed is amended to take it.
      If skein 02.3 is on `origin/main`, `bind_deployment`
      answers false once a Restore, Keep, Make or Remake was taken: the one
      caller, `restart.rs`'s deployment row (via `domain.rs`'s wrapper), already
@@ -192,7 +196,8 @@ Proof: joint; `heavy --gate scripts/check.sh`: origin/main's focused count at th
   step's start less 71 (the client's 76 out, 5 in: 1808 from the base's 1879) and
   its fuzzy count unchanged (50 at the base; 3.754 s and 16.803 s), clean
   clippy and format, focused <15 s, fuzzy <60 s.
-Don't: add an alias, a re-export or a `mod client`; change a tag, a field's
+Don't: add an alias, a re-export or a `mod client`; change
+  `tests/client/tests/names.rs` or exempt a crate there; change a tag, a field's
   order or width, or any key at rest; change an admission bound, a limit or a
   test's value to pass, beyond skein 02.2's three; write `temper` into skein; move `EffectPurpose` into
   skein or give the kit a purpose; touch jig's own, different

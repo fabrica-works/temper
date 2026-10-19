@@ -3,7 +3,8 @@
 2026-10-19. Start commits: skein `d120820` ("The forge kit: five designs
 from draft/forge.md"), temper `27995fb75` ("Point temper's forge
 documents to skein's forge kit"); jig `b2d920e43` and smith `a277e922`
-are read only. Every command of this plan ran once at these commits
+are read only, but for jig's boundary check (Rules: the boundary check's
+jig repair). Every command of this plan ran once at these commits
 (`findings/base-runs.md`, and each session's `findings/base-<session>.md`);
 each session starts from its repository's `origin/main`.
 
@@ -71,7 +72,7 @@ more says so in its row and its file. Dependencies are by capability:
 | File | Session | Needs at start | Increments that need more |
 |---|---|---|---|
 | `temper/01-forge.md` | temper 01: temper on `skein-forge`: the vocabulary's and the dialect's users moved, temper-forge-forgejo deleted, the component on skein's plans and start reads, temper's word handed | skein 01.1; the tools plan's first repin (Rules) | 01.2: skein 01.2; 01.3: skein 01.3; 01.4: skein 01.4 |
-| `temper/02-client.md` | temper 02: temper on `skein-forge-client` and the measure; temper's client deleted; effects' purposes in temper's connector | skein 02.2, temper 01.3 | |
+| `temper/02-client.md` | temper 02: temper on `skein-forge-client` and the measure; temper's client deleted; effects' purposes in temper's connector | skein 02.2, temper 01.3 | 02.1's naming proof and landing: jig's boundary check repaired (Rules) |
 | `temper/03-connection.md` | temper 03: temper on `skein-forge-connection`; the component's crate deleted; temper-service hands the word, the user agent, the transport's name and the limits; the new refusals mapped | skein 03.1, temper 02.1 | 03.2: skein 03.3 |
 | `temper/04-setup.md` | temper 04: temper on `skein-forge-setup`; reconcile's modules deleted; temper's setup hands its values | skein 04.1 | |
 | `temper/05-fakes.md` | temper 05: temper on skein's fakes, temper's deleted; the one-process world on skein's forge peer | skein 05.2 | 05.2: skein 05.5 |
@@ -221,6 +222,26 @@ chain.
   this rule authorizes no backward pin. The remaining tools steps add no
   wait to this repair. Refresh derived fixtures reached by the normal check
   and name further copies and repairs in the repin commit body.
+- **The boundary check's jig repair** (temper 02.1): jig's `README.md`,
+  section 15, as jig `9e9c350` amended it, says how `jig-boundary` finds
+  client crates. A dependency's name counts only under a client prefix of
+  jig's or of the checked project, the project by its whole name, less the
+  records both ends read, or as one of skein's UI kit's crates, by name; a
+  `-client` in any other namespace, `skein-forge-client`'s among them,
+  counts for nothing. Until `tests/boundary/src/client_names.rs` does so
+  on jig's `origin/main`, the crates 02.1 moves onto `skein-forge-client`
+  read as client crates, and `tests/client`'s
+  `client_crates_carry_the_client_prefix` fails. The repair is this plan's
+  one jig change, a step the supervisor adds: the diagnosis's candidate
+  (`client_names.rs` and its eight fixtures) is its evidence, with no
+  system or forge word in jig and `breaches`' signature kept. temper 02.1
+  takes it in its repin, with `heavy cargo update -p jig-boundary --precise
+  <the repair's commit>`: one jig revision per source, a newer compatible
+  jig kept, no backward pin. Its migration, deletion and clippy go on
+  meanwhile; its naming proof and its landing wait. `tests/client/tests/names.rs`
+  does not change: its empty `breaches` and its two exempted crates
+  (`temper`, `temper-one-process-world`) stay, and no crate is exempted
+  for using a capability's client.
 - **A compatible smith source during a temper repin:** if taking skein main
   breaks the pinned smith source, the same temper repin may take the earliest
   compatible smith revision landed on origin/main. Keep an already newer
