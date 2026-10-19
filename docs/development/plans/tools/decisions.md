@@ -531,6 +531,95 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
        170:      let mut root = fixtures::signed_in(fixtures::PARTY);
        192:      let mut root = fixtures::signed_in(fixtures::PARTY);
 
+125. **temper 04's Shapes against main** (ready check of temper-04.1).
+     temper 04's ready check (skein 6e2907921, smith 137a1cb48, jig 872bfb7c, temper e10aa299f) built the sketches into `temper-client-tools`: clippy clean once corrected, nextest 1690/1690, fuzzy 50/50; the boundary test (`no_file_under_jig_names_temper_or_an_item_outside_jig`) failed with the sketch's path comments copied as text. temper/04-waits.md now says: the fixtures' limits are `fixtures::limits()`, a function returning `limits::tools()`, which is no `const fn`, and a fixture neither 02 nor 03 adds (`PARTY`, `me`) joins the module in 04; 04's chat builder is `fixtures::chat_at(task, stage, work)`, returning a `Latest`, beside 03's `fixtures::chat(task, acts)`; `Facts` is built as a struct literal, `Facts { subject, me }`; `holds` reads a task condition from `Latest::Jig(Delivery::Task(task))`, its `waits_on`, `project` and `chip`, and gives None for another form; `waits_on_me` copies jig's private `reader` (owner 0, maintainer 1, member 2, observer 3, a policy role its own), since `chat_status`'s `WaitingForYou` comes only under an active chip, after held, closing and ended, while tools.md's `waiting-on-me` reads what the task waits on, and the commit body names the copy; `deliver`'s subject is temper's table `Subject::Task(41)`, or 03's form if its harness takes another; a run's delivery brings both `Told::Changed` and `Told::Text`, and each compares the subject's digest of its current document, so the second answers nothing; `Part` has a variant for each form a subject's read or delivery brings (`Inbox`, `OwnerInbox`, `InboxPage`, `OwnerInboxPage`, `Tasks`, `TaskPage`, `Tree`, `OwnerTree`, `RunState` beside the others; jig reads no tree page); each function returning a value is `#[must_use]`; the sketches' path comments name files and are not their text; "(temper 02)" in the digest's doc becomes "the table's"; `answers` takes a `match`, not `is_some_and`, which clippy.toml disallows. A further copy of a name or form this ruling changes: change it as the Shape now says, and list it in the commit body.
+
+     ## Checked
+
+     - `git -C temper grep -n 'pub fn tools()' origin/main -- crates/temper-client-tools/src/limits.rs`:
+         origin/main:crates/temper-client-tools/src/limits.rs:57:pub fn tools() -> crate::jig::Limits {
+     - `git -C temper grep -n -E 'LIMITS|PARTY|fn chat|fn limits' origin/main -- crates/temper-client-tools/src/tests/fixtures.rs`:
+         (nothing)
+     - `git -C temper grep -n 'is_some_and' origin/main -- clippy.toml`:
+         origin/main:clippy.toml:114:    { path = "core::option::Option::is_some_and", reason = "no closures: match" },
+     - `git -C temper grep -n -E '^    Task\(u64\)' origin/main -- crates/temper-client-tools/src/jig/subject.rs`:
+         origin/main:crates/temper-client-tools/src/jig/subject.rs:9:    Task(u64),
+     - `git -C temper grep -n 'fn no_file_under_jig' origin/main -- crates/temper-client-tools/src/tests/boundary.rs`:
+         origin/main:crates/temper-client-tools/src/tests/boundary.rs:3:fn no_file_under_jig_names_temper_or_an_item_outside_jig() {
+     - `git -C jig grep -n -E '^pub fn chat_status|^fn reader' origin/main -- crates/jig-client/src/facts.rs`:
+         origin/main:crates/jig-client/src/facts.rs:28:pub fn chat_status(chip: &Chip, waits_on: &WaitsOn, project: u32, me: &Me) -> ChatStatus {
+         origin/main:crates/jig-client/src/facts.rs:93:fn reader(whom: Whom, project: u32, me: &Me) -> bool {
+     - `git -C jig show origin/main:crates/jig-client/src/facts.rs | sed -n 28,40p`:
+         pub fn chat_status(chip: &Chip, waits_on: &WaitsOn, project: u32, me: &Me) -> ChatStatus {
+             match chip.details.as_ref() {
+                 ChipPhase::Owner { phase, details } => match phase {
+                     OwnerChipPhase::Held { reason, .. } => ChatStatus::Held(*reason),
+                     OwnerChipPhase::Closing(_) => ChatStatus::Closing,
+                     OwnerChipPhase::Ended => ChatStatus::Ended { at: details.ended_at.expect("ended chip has its end time") },
+                     OwnerChipPhase::Active(stage) => {
+                         if let Some(waiting) = waiting(waits_on, project, me) {
+                             return waiting;
+                         }
+                         active(*stage, details)
+                     }
+                     OwnerChipPhase::Waiting { .. } | OwnerChipPhase::Person { .. } => ChatStatus::Starting,
+     - `git -C jig show origin/main:crates/jig-client-domain/src/contract/watches.rs | sed -n '/^pub enum Delivery/,/^}/p' | grep -E '^    [A-Z]'`:
+             OwnerProject(Box<super::OwnerProject>),
+             Me(Box<Me>),
+             Task(Box<Task>),
+             OwnerProposal(Box<super::OwnerProposal>),
+             Tree(Box<Tree>),
+             OwnerTree(Box<super::OwnerTree>),
+             Chips(List<Chip>),
+             Inbox(Box<Inbox>),
+             OwnerInbox(Box<super::OwnerInbox>),
+             Tasks(Box<super::Tasks>),
+             Run(Box<RunText>),
+             RunState(Box<RunState>),
+             Deployment(Box<Deployment>),
+             OwnerDeployment(Box<super::OwnerDeployment>),
+     - `git -C jig show origin/main:crates/jig-client-domain/src/contract/reads.rs | sed -n '/^pub enum ReadValue/,/^}/p' | grep -E '^    [A-Z]'`:
+             Tasks(Box<super::TaskPage>),
+             OwnerProject(Box<super::OwnerProject>),
+             Historical(Box<super::OwnerHistorical>),
+             Me(Box<Me>),
+             Turn(Box<super::ArchivedTurn>),
+             Task(Box<Task>),
+             Proposal(Box<Proposal>),
+             OwnerProposal(Box<super::OwnerProposal>),
+             Escalation(Box<Escalation>),
+             OwnerEscalation(Box<super::OwnerEscalation>),
+             Question(Box<Question>),
+             PersonTask(Box<PersonTask>),
+             OwnerPersonTask(Box<super::OwnerPersonTask>),
+             Result(Box<Result>),
+             Ended(Box<ObjectPage>),
+             OwnerEnded(Box<super::OwnerEndedPage>),
+             History(Box<HistoryPage>),
+             Activity(Box<ActivityPage>),
+             Inbox(Box<InboxPage>),
+             OwnerInbox(Box<super::OwnerInboxPage>),
+             Spend(Box<SpendPage>),
+             OwnerSpend(Box<super::OwnerSpendPage>),
+             Project(Box<Project>),
+             Notes(Box<NotePage>),
+             Deployment(Box<Deployment>),
+             OwnerDeployment(Box<super::OwnerDeployment>),
+     - `git -C jig show origin/main:crates/jig-client-domain/src/boundary.rs | sed -n '/^pub enum Told/,/^}/p' | grep -E '^    [A-Z]'`:
+             Link { link: Link },
+             Pending { key: Key },
+             Answered { key: Key, outcome: Outcome },
+             Kept { key: Key, request: Ask },
+             Dropped { count: u32 },
+             Changed { handle: Handle },
+             Text { handle: Handle },
+             Ended { handle: Handle, why: Why },
+             Page { handle: Handle, page: Readout },
+     - `git -C temper show origin/main:docs/design/tools.md | sed -n 309,311p`:
+         - **`waiting-on-me`** covers task N's tree: what a task waits on is
+           computed over its tree (jig's `domain/tasks.md`, section 3), so a
+           question or a proposal below for the party meets it on `task N`, and
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

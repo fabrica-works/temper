@@ -100,8 +100,11 @@ real-loop stories, once those drivers exist.
 - Step code reads no clock and performs no I/O. No design, STATUS or profile
   edits; no optimized tests. No forge, fake forge, fake LLM or provider files.
 - Extend the one fixtures module, `src/tests/fixtures.rs` (temper 02, 03),
-  using shipped limits (`fixtures::LIMITS` is `limits::tools()`); these tests
-  are in `src/tests/jig/`. Unit tests take under 20 ms, with virtual time for
+  using shipped limits (`fixtures::limits()`, a function returning
+  `limits::tools()`, which is no `const fn`); these tests are in
+  `src/tests/jig/`. A fixture this file uses that neither temper 02 nor 03
+  adds (`PARTY` and `me`, unless 03's harness has them, as its sketches
+  use `PARTY`) joins the module here. Unit tests take under 20 ms, with virtual time for
   deadlines; the next plan's stories carry them.
 
 ## Increments
@@ -125,13 +128,13 @@ Shape:
   no cursor in JSON rows used for hashing. Retain read continuations outside it.
 - All eligible parts gain a digest; pages and filtered non-subject reads do not.
 Test shape: `src/tests/jig/digest.rs`, on the shared document fixtures and
-`fixtures::LIMITS`. Add builders for inbox needs/updates and a tasks page/window pair.
+`fixtures::limits()`. Add builders for inbox needs/updates and a tasks page/window pair.
 ```rust
 #[test]
 fn a_read_and_a_watch_window_digest_the_same_rows() {
     let (read, watched) = fixtures::inbox_first_window(33);
-    assert_eq!(digest::part(&read, &fixtures::LIMITS),
-               digest::part(&watched, &fixtures::LIMITS));
+    assert_eq!(digest::part(&read, &fixtures::limits()),
+               digest::part(&watched, &fixtures::limits()));
     assert_eq!(read.rows(), 32);
     assert!(read.more());
 }
@@ -175,17 +178,26 @@ Shape:
   Run ended waits for 04.4's watch end.
 - `waits_on_me(waits_on, project, me)` follows client.md 19's party/role
   rule; `facts::reader` is private. Reuse `chat_status` for replied.
+  `waits_on_me` copies `reader`'s role numbers (owner 0, maintainer 1,
+  member 2, observer 3, a policy role its own) over `WaitsOn::Party`'s
+  `whom`; `chat_status`'s `WaitingForYou` would not serve, as it puts
+  held, closing and ended first, and tools.md's `waiting-on-me` reads what
+  the task waits on. Name the copy in the commit body.
+- `holds` reads a task condition from `Latest::Jig(Delivery::Task(task))`,
+  its `waits_on`, `project` and `chip`, and gives None for another form.
   Tree has no waiting-on-me predicate and needs no root-task handle.
 Test shape: `src/tests/jig/conditions.rs`, shared fixtures extended with a
 chat's RunStage/OwnerChipWork, an ended chip's `ended_at`, and party/role waits.
+`fixtures::chat_at(task, stage, work)` returns the delivered task as a
+`Latest`; temper 03's `fixtures::chat(task, acts)` is another builder.
 ```rust
 #[test]
 fn replied_holds_once_a_chat_is_parked_and_not_while_it_writes() {
     let me = fixtures::me(fixtures::PARTY);
-    let writing = fixtures::chat(41, RunStage::Running { attempt: 1 }, Some(OwnerChipWork::Writing));
-    let parked = fixtures::chat(41, RunStage::Idle, None);
-    assert_eq!(conditions::holds(&Condition::Replied, &Facts::task(&writing, Some(&me))), Some(false));
-    assert_eq!(conditions::holds(&Condition::Replied, &Facts::task(&parked, Some(&me))), Some(true));
+    let writing = fixtures::chat_at(41, RunStage::Running { attempt: 1 }, Some(OwnerChipWork::Writing));
+    let parked = fixtures::chat_at(41, RunStage::Idle, None);
+    assert_eq!(conditions::holds(&Condition::Replied, &Facts { subject: &writing, me: Some(&me) }), Some(false));
+    assert_eq!(conditions::holds(&Condition::Replied, &Facts { subject: &parked, me: Some(&me) }), Some(true));
 }
 ```
 Others, each under 20 ms: `each_live_phase_holds_only_for_its_chip_phase`,
@@ -219,6 +231,9 @@ Shape:
   subject: window `limits.rows`, no continuation; Run turn None, offset 0.
   Resolve task queries as temper 03's reads do. A tree opens no task watch.
 - Compare live documents on `Told::Changed`, and run text on `Told::Text`.
+  A run's delivery brings both: each compares the subject's digest of its
+  current document, so the second finds the first's digest and answers
+  nothing.
   A live me change may re-evaluate a task condition; the digest remains the
   subject's. Behind/Opening are not deliveries. Keep no queue of old deliveries.
 - Arm the checked timeout from `env.now`; default/cap are already 02's
@@ -226,12 +241,15 @@ Shape:
   before releasing handles; render met/why outside its digest.
 Test shape: `src/tests/jig/wait.rs` (the waiting; 02.3's syntax tests are in
 `src/tests/subject.rs`), temper 03's signed-in root harness: `submit`, `deliver`, `answer`, extended for virtual time and handle inspection.
+`deliver`'s subject is temper's `jig::subject::Subject`, the table's
+(`Task(u64)`), not jig's `contract::Subject`; where 03's `deliver` takes
+another form, use 03's, and say so in the commit body.
 ```rust
 #[test]
 fn a_wait_until_replied_answers_at_the_parked_delivery_with_its_digest() {
     let mut root = fixtures::signed_in(fixtures::PARTY);
     let call = root.submit(&["wait", "task", "41", "--until", "replied", "--json"]);
-    root.deliver(call, Subject::Task { task: 41 }, fixtures::chat(41, RunStage::Idle, None));
+    root.deliver(call, Subject::Task(41), fixtures::chat_at(41, RunStage::Idle, None));
     let answer = root.answer(call).expect("met on the first parked delivery");
     assert_eq!(answer.status, 0);
     assert!(answer.stdout.ends_with(b",\"met\":true}\n"));
@@ -302,6 +320,10 @@ Removes: nothing.
 
 ## Interface sketches
 
+Each function that returns a value is `#[must_use]` (clippy's
+`must_use_candidate`). The path comments name the files and are not
+their text: no file under `src/jig/` names temper (`tests::boundary`).
+
 ```rust
 // crates/temper-client-tools/src/jig/digest.rs (04.1)
 /// First eight SHA-256 bytes of the common subject form, owned by the caller.
@@ -314,11 +336,15 @@ impl Digest {
     pub fn from_bytes(bytes: [u8; 8]) -> Self;
 }
 /// Part is the renderer's borrowed subject form; the digest excludes its envelope.
-/// `jig::Limits` (temper 02) carries the rows the digest reads.
+/// `jig::Limits`, the table's, carries the rows the digest reads.
 pub fn part(part: &Part<'_>, limits: &crate::jig::Limits) -> Digest;
 // crates/temper-client-tools/src/jig/render.rs (04.1); not 03's `Parts`, which words owner parts
 /// A subject's contract value, borrowed from the delivery or the read (inbox: either form).
-pub enum Part<'a> { Me(&'a Me), Inbox(&'a Inbox), Tasks(&'a Tasks), Task(&'a Task), Tree(&'a Tree), Run(&'a RunText) }
+pub enum Part<'a> {
+    Me(&'a Me), Inbox(&'a Inbox), OwnerInbox(&'a OwnerInbox), InboxPage(&'a InboxPage),
+    OwnerInboxPage(&'a OwnerInboxPage), Tasks(&'a Tasks), Task(&'a Task), Tree(&'a Tree),
+    TaskPage(&'a TaskPage), OwnerTree(&'a OwnerTree), Run(&'a RunText), RunState(&'a RunState),
+}
 impl Part<'_> { pub fn rows(&self) -> usize; pub fn more(&self) -> bool; }
 // crates/temper-client-tools/src/jig/conditions.rs (04.2)
 use crate::jig::subject::Condition; // the table's checked type
@@ -335,7 +361,10 @@ digest. Terminal watch ends take 04.4's rule. No comparison uses the engine mark
 ```rust
 // crates/temper-client-tools/src/jig/wait.rs (04.3)
 fn answers(&self, digest: Digest, holds: Option<bool>) -> bool {
-    let differs = self.since.or(self.first).is_some_and(|old| old != digest);
+    let differs = match self.since.or(self.first) {
+        Some(old) => old != digest,
+        None => false,
+    };
     match (&self.until, self.since) {
         (Some(_), Some(_)) => differs && holds == Some(true),
         (Some(_), None) => holds == Some(true),
