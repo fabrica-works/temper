@@ -1011,6 +1011,22 @@ where its answer lands.
 
      Instructions: register skein-10.s2 (skein session10.s2) in check for skein/10.s2-plan-contracts.md, Needs skein-10.4, before implementation; add it to existing closing temper-repin dependencies. Request its normal ready check immediately. Pass on the README rule and the landed assertion map to skein10 and the supplement implementer; refresh the yielded skein10 handoff’s future count and shared-file ownership. Keep existing10.5/10.s1 prerequisites and budgets. No extra repin step or kit move.
 
+152. **Skein10.s2 standalone checker readiness** (ready check of skein-10.s2).
+     Reverses: only ruling151 and its steer of2026-10-19T10:52:58Z insofar as they unconditionally require listing mode/controls before10.s1 lands. No other finding, scope, assertion, ordering or count changes.
+     Amends: README Plan contracts and repository matches rule; skein/10.s2-plan-contracts.md Gate/Controls/Proof/ordering; reciprocal mode preservation in skein/10.s1-named-page-fixtures.md.
+
+     Skein10.s2 stays independent after10.4. It adds only its named Files and plan-shapes mode, preserving actual landed recovery. Preserve and re-run listing mode/controls only when present from10.s1; do not introduce listing_sizes.rs or --listing-sizes as a prerequisite or extra implementation. When10.s1 later edits the dispatcher/gate, preserve and run any present plan-shapes mode/controls. Serialize those shared files and rebase retaining every present mode. Preserve the README rule, assertion map, exhaustive repository matches, historical41/48 proofs, relative+2 and final50, all ceilings and closing-repin dependency.
+
+     Checked: primary skein origin/main5c8ae967570b8cfc33f10c83cdfc5495e3b42e99; git show origin/main:scripts/recovery-shape/src/main.rs | rg -n 'fn controls|fn main|--controls|listing|plan_shapes' prints controls148/main162/--controls165 only. git show origin/main:scripts/check.sh | rg -n 'recovery-shape|listing|plan-shapes' prints only the recovery invocation14. listing module/mode are10.s1 additions; plan_shapes mode/module, the two contract tests and reads::Plan::check_repository_document are10.s2 additions.
+
+     The fresh ready check checked all of this single increment at skein5c8ae967570b8cfc33f10c83cdfc5495e3b42e99, smithe2b9f45afb4687125fabef12a8cd280f7ba25fe4 (then53b9d6db52ff6cbe999212160e49056cb8ded44e; bounded source delta contained no reached copy), jigc415911cc6e73d2359a30db896dc87e00d28b202, hearth3dfe544d686f263d3c346a745a31507ef6ba1a95, temperbb1f788ddc7cff37f4d63c578dbec8a0ad9eb928. The agent verified graph locators in scratch; adopted prior unchanged assertion mapping/source searches, not the combined-driver executable result.
+
+     Checked proof: scratch-ready-skein-10s2/report.txt and plan-amendments.patch retain the precise correction. Its one new pinned-heavy attempt824,20261019T105444-824.log, PASS (0s queued/3s run) used standalone actual recovery plus only10.s2 Files, with no listing module/dispatch or manifest/lock change. Rustfmt and checker/package all-target clippy -D warnings PASS. Corrected plan-shapes PASS;6 positive/6 negative controls PASS; original exactly2 violations; recovery6 positive/7 negative/2 decoys PASS. Sequential package default170/170,0.052s, fuzzy/browser0 selected PASS with --no-tests=pass; maximum11ms. Four existing Q12 tests passed freshly. No future10.5, full gate/process/live/recording/downstream proof claimed. Worker ended before own target cleanup.
+
+     Checked run: ledger has skein-10.s2 in check and temper-repin waiting with10.s2 dependency; coordinator acknowledged all four151 points at2026-10-19T10:52:58Z. The later smith move was not a readiness input for this source correction; it creates no new smith compatibility claim. Kit/scripts/dev/plan lines22/669/671/672 supply ready/ring/ruling. No kit move or duplicate gate.
+
+     Mark skein-10.s2 ready at these checked snapshots immediately after this ruling. Send the reciprocal dispatch/controls instruction to coordinator, skein10 and supplement implementer, and refresh the skein10 checkpoint's future-count/ownership notes. Closing temper-repin dependency remains; no repeat repin. Refresh reached copies/count consumers and list them in the implementation commit body. Preserve historical base findings and unchanged10.5/10.s1 Needs.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
