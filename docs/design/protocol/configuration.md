@@ -219,11 +219,13 @@ under; it must be the `number` of one of `engine.charters`. Feeds
 `Config.forge_charter`.
 
 **`clients`:** the clients' listener, which `temper-service` owns
-(`../client/README.md`, section 8):
+(`../client/README.md`, section 8), and the browser's bundle it serves
+(`../client/browser.md`, 2.2):
 
 | Member | Type | Bounds | Feeds |
 |---|---|---|---|
 | `listener` | an address, jig's format | a socket address; on loopback (in `127.0.0.0/8`, or `::1`) in standalone, and wherever `engine.clients` enables the printed link (jig's `protocol/service.md`, section 3) | the listener on which jig's clients' component is mounted with jig's default HTTP mapping, under `/jig`; the mapping's Host allow-list; and the address of the sign-in links `temper serve` prints (`../client/README.md`, section 7) |
+| `bundle` | a directory, or `null` | a bundle of skein's bundler: its page and its digest's directory, its files within `clients.bundle_files` and `clients.bundle_bytes` (section 7) | the browser's page and bundle, read at start and served on the clients' listener (`../client/browser.md`, 2.2); `null` serves no browser |
 
 **`limits`:** temper's profile and overrides (section 7).
 
@@ -397,11 +399,13 @@ top-level `workers`, in the same order; standalone has one. Each:
   | `git_component.` | the git component's (git.md, section 8) |
   | `setup.` | `temper-forge-setup`'s `Limits`: reconcile's (setup.md, section 5) |
   | `box.` | `temper-box`'s `Limits`: the box's restarts and stop (setup.md, 7.2) |
+  | `clients.` | `temper-service`'s clients' server's `Limits`: the browser's bundle (`../client/browser.md`, 2.2) |
 
   For example `forge.repositories`, `forge.client.calls`,
   `checkout.remote_timeout_ms`.
-- **The webhooks', the keep's settling, the setup's and the box's
-  limits,** whose numbers are `small`'s constants, as every other's:
+- **The webhooks', the keep's settling, the setup's, the box's and the
+  bundle's limits,** whose numbers are `small`'s constants, as every
+  other's:
 
   | Name | Bounds |
   |---|---|
@@ -417,6 +421,8 @@ top-level `workers`, in the same order; standalone has one. Each:
   | `box.backoff_ms`, `box.backoff_max_ms` | a long step restarted, doubling |
   | `box.restarts`, `box.window_ms` | a long step's exits within the window past which the box gives up; `box.restarts` at most 64; the backoff counted from the exits within the window (setup.md, 7.2) |
   | `box.grace_ms` | a long step's grace, after each of its stop's two signals (setup.md, 7.2) |
+  | `clients.bundle_files` | the bundle's files, its page among them |
+  | `clients.bundle_bytes` | the bundle's files' bytes in all, held in memory while `temper serve` runs |
 - **Limits checked against each other at start,** each failure naming
   both limits:
   - the forge component's: its connections equal the forge client's
@@ -430,6 +436,8 @@ top-level `workers`, in the same order; standalone has one. Each:
   - the setup's and the box's: each backoff at most its maximum;
     `setup.backoff_max_ms` below `setup.deadline_ms`; `box.backoff_max_ms`
     below `box.window_ms`;
+  - the bundle's: `clients.bundle_files` and `clients.bundle_bytes`
+    above 0;
   - the webhooks' listener's: each of its limits above 0;
     `hook_secret_bytes` at least 32; `hook_head_bytes` at most the
     HTTP server's largest read within io's intake; `hooks` within the
@@ -681,7 +689,7 @@ one worker, complete:
     }]
   },
   "charter": 2,
-  "clients": {"listener": {"socket": "127.0.0.1:7100"}},
+  "clients": {"listener": {"socket": "127.0.0.1:7100"}, "bundle": null},
   "webhooks": null,
   "setup": [],
   "limits": {"profile": "small", "overrides": {}},

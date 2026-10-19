@@ -45,8 +45,9 @@ section 14.
   agent`); a person's client reaches the engine on loopback; the forge is
   polled, and hinted by its webhooks on loopback when they are
   configured (section 8; forge.md, section 5). Hosts apart, webhooks from
-  another host, the forge as a sign-in provider, the forge's client
-  documents and the browser come after (section 14).
+  another host, the forge as a sign-in provider and the forge's client
+  documents come after (section 14). The browser is a person's client
+  on loopback too (`../client/browser.md`).
 - **One binary:** `serve`, `agent`, `open`, `program-login`, the forge's
   setup's `forge prepare`, `forge run`, `forge reconcile` and `box`, and
   the agents' `ctl`, which `../tools.md` designs (section 4).
@@ -94,8 +95,8 @@ section 14.
     clients' listener of temper's server; then **`../tools.md`**, `temper
     ctl`, the agents' tools.
 12. **`../testing.md`:** the tiers below the domain.
-13. **`../client/browser.md`:** the browser, a later shell of temper's
-    client.
+13. **`../client/browser.md`:** the browser, the second shell of
+    temper's client.
 
 ## 3. Names
 
@@ -121,6 +122,8 @@ binary (`jig-test`).
 | the API token | a forge's token for its API, the engine's protocol layer's only (credentials.md, section 5) |
 | the forge's client family | temper's client side of the forge connector: its words, and the adoption form (`../client/README.md`, section 4) |
 | the terminal shell | `temper-client-shell-terminal` (`../client/README.md`, section 6) |
+| the browser shell | `temper-client-shell-web` (`../client/browser.md`, 2.1) |
+| the bundle | the browser shell's module, glue and stylesheets, skein's bundler's output, which the clients' listener serves (`../client/browser.md`, 2.2) |
 | the tools | the agents' interface to temper, `temper ctl`: `temper-client-tools` and `temper-client-shell-cli` (`../tools.md`, section 4) |
 | the clients' listener | `temper-service`'s listener for clients, on which jig's clients' component is mounted with jig's default HTTP mapping, under `/jig` (`../client/README.md`, section 8) |
 | the fake git program | `testing/temper-fake-git` (`../testing.md`, 4.3) |
@@ -237,14 +240,16 @@ commands, each a child of its own (setup.md, 7.1).
 | `jig-protocol-engine-clients-http` | engine | jig's default HTTP mapping, its engine end, with its example guards, mounted on temper's clients' listener under `/jig` |
 | `jig-client` | client | the client temper's client root holds: the link, watches by handle, the request table, kept work, families; jig's helpers (`../client/README.md`, section 3) |
 | `jig-client-protocol-link` | client | `jig-client`'s half toward its transport: jig's messages and the small store's records as bytes (jig's `protocol/client.md`, 4.3) |
-| `jig-client-protocol-http` | client | jig's default HTTP mapping, its client end, under `jig-client-shell-native` |
+| `jig-client-protocol-http` | client | jig's default HTTP mapping, its client end, under `jig-client-shell-native` and `jig-client-shell-web` |
+| `jig-client-shell-web` | client | the browser shell's adapter over skein's fetch, and the printed link's sign-in part (`../client/browser.md`, 2.1) |
 | `jig-protocol-transcript` | client | turns' bytes, decoded below `jig-client` |
 | `jig-client-shell-native` | client | `temper open`'s and `temper ctl`'s transport: HTTP on io, the credential `jig-client` holds sent as a bearer, the small store's file in its directory |
 
 temper does not use `jig-protocol-charter` or `jig-protocol-tools`: its
 root takes its own `Tool` vocabulary, translated by `temper-engine-smith`
 (llm.md, sections 4 and 5). Nor does it use jig's reference UI
-(`jig-client-view`, `jig-client-shell-web`): temper's pages are its own,
+(`jig-client-view`, `jig-client-test-shell-web`, nor the look of
+`jig-client-shell-web`): temper's pages are its own,
 on skein's UI kit (`../client/README.md`, section 5).
 
 **smith's:** `smith-host-domain`, the worker root's agent child;
@@ -280,7 +285,7 @@ box's host:
 
 | Crate | Kind | Holds | Depends on |
 |---|---|---|---|
-| `crates/temper-service` | services | the engine's and the worker's services and their one-process composition, in an engine, a worker and a system module, as jig's reference service is: each `iterate`, the routing, the clients' listener with jig's clients' component and its default HTTP mapping mounted, startup from configuration's bytes, start and end; temper's profile `small` | the roots, `temper-engine-smith`, jig's components, smith's host half and codecs, temper's codec crates and components, `skein-forge-connection`, `skein-io`, `skein-json` |
+| `crates/temper-service` | services | the engine's and the worker's services and their one-process composition, in an engine, a worker and a system module, as jig's reference service is: each `iterate`, the routing, the clients' listener with jig's clients' component and its default HTTP mapping mounted, and the browser's page and bundle served (`../client/browser.md`, 2.2), startup from configuration's bytes, start and end; temper's profile `small` | the roots, `temper-engine-smith`, jig's components, smith's host half and codecs, temper's codec crates and components, `skein-forge-connection`, `skein-io`, `skein-json` |
 | `crates/temper` | binary | the commands of section 4, copied from jig's reference binary; for each that reads the document, `temper-service`'s startup, with `setup` and the setup's and the box's limits checked by their own crates (configuration.md, section 2) | `temper-service`, `skein-shell`, `smith-agent-shell`, `smith-local-service`'s profile, `skein-oauth-accounts`, `jig-client-shell-native`, the client crates, `temper-forge-setup-shell`, `temper-box` |
 | `crates/temper-forge-setup` | step code | the forge's setup, but for reconcile, which is skein's (`skein-forge-setup`): its types and checks, and the setup mapped onto reconcile's given values, with the kit's check of them; the preparation's machine; `app.ini` and the runner's files; the processes' specs; the configuration's steps, `steps` and `Step`. Names no host | setup.md, section 11 |
 | `crates/temper-forge-setup-shell` | hosts | ordinary Rust: the hosts of `temper forge prepare`, `run` and `reconcile`: commands, files, the forge's locks and the exec (setup.md, 6.4); HTTP on skein-http over skein-io | setup.md, section 11 |
@@ -293,6 +298,7 @@ box's host:
 | `crates/temper-client-domain` | client root | `jig-client` held, temper's pages, the forge's client side (`../client/README.md`, section 3) | `../client/README.md`, section 2 |
 | `crates/temper-client-view` | view | temper's pages as skein-ui's tree, with the forge's view (`../client/README.md`, section 5) | `../client/README.md`, section 2 |
 | `crates/temper-client-shell-terminal` | shell | the terminal: its host ordinary Rust, over skein's text shell and jig's native transport (`../client/README.md`, section 6) | `../client/README.md`, section 2 |
+| `crates/temper-client-shell-web` | shell | the browser: a `cdylib` for wasm32, ordinary Rust, over skein's browser parts and jig's browser adapter (`../client/browser.md`, 2.1) | `../client/README.md`, section 2 |
 | `crates/temper-client-tools` | client root, rendering | the agents' tools: the table, the runner, marks and conditions, the rendering, the tools' root (`../tools.md`, section 4) | `../tools.md`, section 4 |
 | `crates/temper-client-shell-cli` | shell | `temper ctl`: its host ordinary Rust, one call per process over jig's native transport (`../tools.md`, section 8) | `../tools.md`, section 4 |
 
@@ -617,6 +623,5 @@ Each document keeps its own; these cross them:
   contained process trees, a process with a worker only (jig's
   `protocol/README.md`, section 10); the forge as people's sign-in
   provider (credentials.md, section 8); the forge's client documents and
-  panels (`../client/forge.md`); the browser
-  (`../client/browser.md`); and what the forge's setup leaves for later
+  panels (`../client/forge.md`); and what the forge's setup leaves for later
   (setup.md, section 15). Default: standalone.

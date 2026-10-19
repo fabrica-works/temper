@@ -73,8 +73,8 @@ open is listed in section 11.
   (section 8).
 - **One view, every shell.** `temper-client-view` builds temper's pages
   as skein-ui's tree (skein's `ui.md`); the terminal prints that tree
-  with skein's text shell (skein's `ui-text.md`); the browser, a later
-  shell, maps it with skein's browser parts (`browser.md`).
+  with skein's text shell (skein's `ui-text.md`); the browser, its
+  second shell, maps it with skein's browser parts (`browser.md`).
 - **A terminal first.** `temper open` runs temper's client, its view and
   skein's text shell over `jig-client-shell-native`, jig's native
   transport (section 6).
@@ -109,6 +109,9 @@ temper-client-shell-terminal    the terminal: temper's host, its settings and li
 ├── skein-ui-text               skein's text shell: the renderer, the command reader, the terminal
 └── jig-client-shell-native     jig's native transport: skein's HTTP client with jig-client-protocol-http; the small store's file and the credential's
 temper                          the binary; `temper open` runs the terminal (../protocol/README.md, section 4)
+temper-client-shell-web         the browser: temper's shell, built for wasm32, its host ordinary Rust (browser.md, 2.1)
+├── skein-ui-web                skein's browser parts: the page, the DOM, history, fetch, session storage
+└── jig-client-shell-web        jig's client adapter over skein's fetch, and the printed link's sign-in part
 
 for agents
 temper-client-tools             the agents' tools on jig-client, beside the view (../tools.md, section 4)
@@ -119,6 +122,8 @@ skein-fake-person               the person, on skein-ui's tree (../testing.md, 4
 jig-client-test-kit             jig's check, and the faults of jig's client worlds (jig's `client/domain/testing.md`, 6.2 and section 7)
 jig-client-fake-person-browser  jig's attack stories (jig's `protocol/browser.md`, section 15)
 temper-client-world             tests/client: temper's client joined to temper's engine root (section 10)
+skein-fake-person-browser       the person in Chromium, through skein-browser (browser.md, section 4)
+temper-client-browser-world     tests/client-browser: the browser tier (browser.md, section 4)
 ```
 
 - **The crate graph.** `temper-client-domain` depends on skein-lib,
@@ -147,8 +152,8 @@ temper-client-world             tests/client: temper's client joined to temper's
     terminal (section 10);
   - `limits`: the client's limits and their sum.
 - **Step code under the subset:** the domain, the forge's side, the
-  view and the wire. **Ordinary Rust:** the terminal's host, as a shell
-  is (skein's `ui.md`, section 2).
+  view and the wire. **Ordinary Rust:** the terminal's host and the
+  browser's shell, as a shell is (skein's `ui.md`, section 2).
 - **The client's limits** are constants of
   `temper-client-shell-terminal`: `jig-client`'s, from jig's small
   profile with the overrides temper's configuration gives the engine's
@@ -245,7 +250,8 @@ credential.
   the terminal says so in a line of its own (6.6).
 - **temper's pages keep no record of their own:** a client closed on
   any page opens at the inbox, and a composer's words not sent, or a
-  form's values, are not kept across a restart (section 11).
+  form's values, are not kept across a restart (section 11). A browser
+  opens at its address (`browser.md`, 2.3).
 
 ### 3.5 Its pages
 
@@ -610,7 +616,10 @@ client's errors to these reasons (section 8).
   temper's name and the link's state alone, no navigation is offered,
   and the main, in place of the page at the address, is one paragraph
   of temper's words with no heading:
-  - *signed out:* "Signed out." (6.6);
+  - *signed out:* in the shell's words, which the view takes at
+    construction: the terminal's "Signed out." (6.6); the browser's
+    "Signed out. To sign in, open a sign-in link `temper serve`
+    printed." (`browser.md`, 2.4);
   - *out of date,* the engine serving no version of jig's records that
     this client speaks: "This temper is out of date: run the temper the
     engine runs." What is pending stays in the small store (jig's
@@ -631,7 +640,10 @@ client's errors to these reasons (section 8).
   said by style alone (skein's `ui.md`, section 8).
 - **The look:** the mockups' (`mockups/style.css`, reference material),
   as style tokens each shell interprets or ignores; the terminal prints
-  none.
+  none, and the browser's stylesheet draws them (`browser.md`, 2.5).
+  The composers are text areas that submit on Enter (skein-ui's
+  `SubmitsOnEnter`), for the browser, and whose words may hold line
+  breaks, counted within their bounds (5.4; `browser.md`, 2.5).
 
 ### 5.2 The forge's view
 
@@ -1014,13 +1026,14 @@ does for the client:
   clients' component (`jig-protocol-engine-clients`) with jig's default
   HTTP mapping's engine end (`jig-protocol-engine-clients-http`) under
   the prefix `/jig` (jig's `protocol/service.md`, section 2). Every
-  other path is answered not found, the browser's page and bundle aside
-  (`browser.md`).
+  other path is answered not found, the browser's page and bundle aside,
+  when the configuration names a bundle (`browser.md`, 2.2).
 - **The printed link opened in a browser:** a `GET` of the link's route
   spends nothing, and the mapping leaves it to the application's page
-  (jig's `protocol/browser.md`, section 11). Where temper serves no
-  page, its server answers it not found, with `Referrer-Policy:
-  no-referrer`; the link is `temper open`'s (6.1).
+  (jig's `protocol/browser.md`, section 11). With a bundle, temper's
+  server answers it with the page, which signs the browser in by it
+  (`browser.md`, 2.4); with none, not found, with `Referrer-Policy:
+  no-referrer`, and the link is `temper open`'s alone (6.1).
 - **jig's example guards, as they are** (jig's `protocol/browser.md`,
   12.2), the Host allow-list holding the listener's own address. The
   terminal sends its credential as a bearer token; the cookie is the

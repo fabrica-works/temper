@@ -120,7 +120,7 @@ forge     Forgejo and its runner: polled, hinted by its webhooks (domain/forge.m
   the engine only through the tools their host relays (jig's
   `domain/hosts.md`).
 - **People reach temper through its client:** temper's pages on jig's
-  client, `jig-client`, in a terminal, and later in a browser
+  client, `jig-client`, in a terminal and in a browser
   (`client/README.md`; `client/browser.md`).
 - **Standalone first.** Hosts apart, webhooks from another host, TLS on
   the engine's listeners and contained process trees come with a
@@ -176,7 +176,7 @@ forge, temper adds:
 - **`client/`:** temper's client on `jig-client`. Its `README.md` is the
   client: its client root and pages, the forge's client family, its view,
   the terminal, signing in, and the clients' listener; `forge.md` is the
-  forge's part of the client, `browser.md` the later browser shell, and
+  forge's part of the client, `browser.md` the browser shell, and
   `mockups/` the pages' look (reference material, not contract).
 - **`tools.md`:** `temper ctl`, temper for agents: reads, jig's
   operations and waits, from a command line.

@@ -68,8 +68,10 @@ testing-strategy.md, 2.2, since with no state there is no sequence for a
 world to drive.
 
 The tiers in the two suites keep the budgets of 6.1; the process and the
-live tiers, outside them, keep their own (2.6, 2.7). A browser tier
-comes with temper's browser shell (section 9; client/browser.md).
+live tiers, outside them, keep their own (2.6, 2.7). The browser tier,
+a suite of its own that temper's gate runs, proves only what a browser
+alone shows; temper's stories stay in the worlds and the real loop
+(client/browser.md, section 4).
 
 ### 2.1 System worlds
 
@@ -1060,9 +1062,12 @@ By tier:
 - **The setup's tiers:** its step tests and the host's tests
   (protocol/setup.md, 13.1 and 13.2); reconcile's world is skein's
   (`forge-setup.md`, section 7).
-- **The browser tier,** with temper's browser shell: temper's bundle,
-  its pages and signing in, in Chromium, a suite of its own outside the
-  focused and fuzzy suites (client/browser.md, section 4).
+- **The browser tier,** with temper's browser shell: what a browser
+  alone shows (the bundle under its policy, signing in by the link and
+  the cookie, addresses, the composer's keys, jig's attack stories that
+  need a browser), in Chromium, a suite of its own outside the focused
+  and fuzzy suites, run by temper's gate (client/browser.md, section
+  4).
 - **Containment's checks,** which wait for skein's contained process
   trees.
 - **The referee** in the worlds that still check their scenarios inline,
