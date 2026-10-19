@@ -9,7 +9,6 @@ use std::collections::{BTreeMap, VecDeque};
 use temper_engine_domain as engine;
 use temper_engine_domain::{Delivery, Key, Record};
 use temper_engine_domain_forge as forge_top;
-use temper_engine_domain_forge_client as client;
 use temper_engine_domain_world::protocol::{self, Protocol};
 use temper_engine_domain_world::{store::Store, walking};
 use temper_engine_forge_world::{self as forge_world, translate};
@@ -25,7 +24,7 @@ struct World {
     fake: fake::Domain,
     fake_env: Env<fake::Config>,
     fake_out: Queue<fake::Request>,
-    pending: BTreeMap<Token, client::api::Op>,
+    pending: BTreeMap<Token, skein_forge::api::Op>,
     adopted: Vec<forge_top::ApplicationOutcome>,
     signed_in: Option<u64>,
     assigned: Vec<engine::Assignment>,
@@ -344,7 +343,7 @@ impl World {
                         name
                     } else if repository == forge_world::REPO {
                         b"org/repo"
-                    } else if repository == (client::api::Repository { forge: 1, repository: 3 }) {
+                    } else if repository == (skein_forge::api::Repository { forge: 1, repository: 3 }) {
                         b"org/extra"
                     } else {
                         panic!("unknown test repository {repository:?}");

@@ -13,7 +13,6 @@ use jig_domain_tasks as tasks;
 use jig_domain_views as views;
 use skein_lib::{List, ReplyTo, Token, Wall};
 use temper_engine_domain_forge as forge;
-use temper_engine_domain_forge_client as forge_client;
 
 /// A complete claim's assignment, root to worker after durability; its
 /// brief sections are bounded by brief limits (domain/root.md, 7.1 and 7.2).
@@ -87,14 +86,14 @@ pub enum ForgeStart {
     Base(Box<[u8]>),
     Branch(Box<[u8]>),
     Saved(Box<[u8]>),
-    Merge { branch: Box<[u8]>, base: forge_client::api::Commit },
+    Merge { branch: Box<[u8]>, base: skein_forge::api::Commit },
 }
 
 /// One adopted repository translated for the worker's workspace.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ForgeRepository {
     pub tag: u32,
-    pub provider: forge_client::api::Repository,
+    pub provider: skein_forge::api::Repository,
     pub name: Box<[u8]>,
     pub host: Box<[u8]>,
     pub owner: Box<[u8]>,
@@ -119,13 +118,9 @@ pub enum Tool {
     /// Read one bounded page of notes by name or description.
     Recall { by: jig_domain_notes::Recall, page: u32 },
     /// Queue one checked forge write with a root-derived idempotency key.
-    EffectForge {
-        repository: forge_client::api::Repository,
-        resource: forge::What,
-        write: Box<forge_client::api::Write>,
-    },
+    EffectForge { repository: skein_forge::api::Repository, resource: forge::What, write: Box<skein_forge::api::Write> },
     /// Read one adopted forge resource through the connector's bounded fresh lane.
-    ReadForge { repository: forge_client::api::Repository, read: forge_client::api::Read },
+    ReadForge { repository: skein_forge::api::Repository, read: skein_forge::api::Read },
     /// Ask a covering ancestor or person to carry one action the caller cannot take alone.
     Propose { action: ProposedAction, reason: Box<[u8]>, as_holder: bool },
     /// Decide one pending proposal currently addressed to this task.
@@ -170,7 +165,7 @@ pub enum Tool {
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[expect(clippy::large_enum_variant, reason = "the worker boundary carries jig's bounded amendment whole")]
 pub enum ProposedAction {
-    Effect { repository: forge_client::api::Repository, resource: forge::What, write: Box<forge_client::api::Write> },
+    Effect { repository: skein_forge::api::Repository, resource: forge::What, write: Box<skein_forge::api::Write> },
     Batch(Box<[Delegate]>),
     Amend { task: u64, revision: u64, amendment: tasks::Amendment },
     Widen { task: u64, authority: tasks::Authority },
@@ -432,8 +427,8 @@ pub enum Request {
     Party(PartyRequest),
     Forge {
         call: Token,
-        repository: forge_client::api::Repository,
-        op: forge_client::api::Op,
+        repository: skein_forge::api::Repository,
+        op: skein_forge::api::Op,
     },
     Account(
         /// Fixed-size accounts request/notice; token values are filled only by the protocol and

@@ -1,10 +1,9 @@
 //! Volatile evidence of Forgejo settling, beside the change's persisted push.
 use skein_lib::{Duration, Env, Wall};
 use temper_engine_domain_forge_change as change;
-use temper_engine_domain_forge_client as client;
 
 use crate::{ChangeRow, Domain, Limits};
-type Commit = client::api::Commit;
+type Commit = skein_forge::api::Commit;
 
 /// Hints and fresh reads, retained only for this incarnation of a task.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -45,23 +44,23 @@ impl Settle {
 }
 
 /// Only a named branch move or this head's job end advances the start.
-pub(crate) fn hinted(d: &mut Domain, env: &Env<Limits>, hint: &client::api::Hint, tasks: &[u64]) {
+pub(crate) fn hinted(d: &mut Domain, env: &Env<Limits>, hint: &skein_forge::api::Hint, tasks: &[u64]) {
     for task in tasks {
         let row = d.changes.get(task).expect("a change the hint wakes");
         let job = match &hint.change {
-            client::api::Change::Commit(head) => {
+            skein_forge::api::Change::Commit(head) => {
                 if row.change.last_head != Some(*head) {
                     continue;
                 }
                 true
             }
-            client::api::Change::Branch(branch) | client::api::Change::BranchMoved { branch, .. } => {
+            skein_forge::api::Change::Branch(branch) | skein_forge::api::Change::BranchMoved { branch, .. } => {
                 if *row.branch != **branch && *row.base != **branch {
                     continue;
                 }
                 false
             }
-            client::api::Change::Item(_) => continue,
+            skein_forge::api::Change::Item(_) => continue,
         };
         let mut settle = d.settling.get(task).copied().unwrap_or(Settle::NEW);
         settle.since = Some(env.wall);
@@ -75,12 +74,12 @@ pub(crate) fn observe(
     d: &mut Domain,
     env: &Env<Limits>,
     row: &ChangeRow,
-    pull: Option<&client::api::Pull>,
+    pull: Option<&skein_forge::api::Pull>,
     ci: change::Status,
 ) {
     let (moving, base) = match pull {
         Some(pull) => {
-            (pull.state == client::api::State::Open && pull.merged.is_none() && !pull.mergeable, pull.base_commit)
+            (pull.state == skein_forge::api::State::Open && pull.merged.is_none() && !pull.mergeable, pull.base_commit)
         }
         None => (false, None),
     };

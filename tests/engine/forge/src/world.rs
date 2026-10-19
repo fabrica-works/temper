@@ -4,7 +4,7 @@ use temper_engine_domain_forge as top;
 use temper_engine_domain_forge_client as client;
 use temper_fake_forge_domain::{self as forge, api as raw};
 
-pub const REPO: client::api::Repository = client::api::Repository { forge: 1, repository: 2 };
+pub const REPO: skein_forge::api::Repository = skein_forge::api::Repository { forge: 1, repository: 2 };
 const CLIENT: client::Limits = client::Limits {
     pending: 4,
     calls: 2,
@@ -76,7 +76,7 @@ pub const LIMITS: top::Limits = top::Limits {
 #[derive(Debug)]
 struct Pending {
     client: Token,
-    op: client::api::Op,
+    op: skein_forge::api::Op,
     generation: u64,
 }
 
@@ -98,7 +98,7 @@ pub struct World {
     seed: u64,
     writes: u32,
     calls: u32,
-    hints: Vec<client::api::Hint>,
+    hints: Vec<skein_forge::api::Hint>,
 }
 
 impl World {
@@ -181,7 +181,7 @@ impl World {
     }
 
     #[must_use]
-    pub fn hints(&self) -> &[client::api::Hint] {
+    pub fn hints(&self) -> &[skein_forge::api::Hint] {
         &self.hints
     }
 
@@ -555,11 +555,11 @@ impl World {
         }
     }
 
-    fn submit(&mut self, call: Token, repository: client::api::Repository, op: client::api::Op) {
+    fn submit(&mut self, call: Token, repository: skein_forge::api::Repository, op: skein_forge::api::Op) {
         assert_eq!(repository.forge, REPO.forge);
         assert!(repository.repository == REPO.repository || repository.repository == 0);
         self.calls += 1;
-        if let client::api::Op::Write(_) = op {
+        if let skein_forge::api::Op::Write(_) = op {
             self.writes += 1;
         }
         self.serial += 1;

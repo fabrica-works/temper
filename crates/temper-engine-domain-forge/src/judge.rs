@@ -7,7 +7,6 @@
 use alloc::boxed::Box;
 
 use temper_engine_domain_forge_change as change;
-use temper_engine_domain_forge_client as client;
 
 use crate::{ChangeEvidence, Repository};
 
@@ -49,8 +48,8 @@ pub enum Verdict {
 pub struct Reviewer {
     pub person: u64,
     pub role: u32,
-    pub head: client::api::Commit,
-    pub verdict: client::api::Verdict,
+    pub head: skein_forge::api::Commit,
+    pub verdict: skein_forge::api::Verdict,
 }
 
 /// Connector-owned configuration for requirements named by authority policy.
@@ -86,9 +85,9 @@ fn status(value: change::Status) -> Verdict {
 }
 
 fn valid(
-    report: client::api::Commit,
-    head: client::api::Commit,
-    clean: &[client::api::Commit],
+    report: skein_forge::api::Commit,
+    head: skein_forge::api::Commit,
+    clean: &[skein_forge::api::Commit],
     freshness: Freshness,
 ) -> bool {
     if report == head {
@@ -103,8 +102,8 @@ fn valid(
 fn gate(
     number: u32,
     freshness: Freshness,
-    head: client::api::Commit,
-    clean: &[client::api::Commit],
+    head: skein_forge::api::Commit,
+    clean: &[skein_forge::api::Commit],
     evidence: &ChangeEvidence,
 ) -> Verdict {
     let mut met = false;
@@ -126,8 +125,8 @@ fn approval(
     role: u32,
     people: u32,
     freshness: Freshness,
-    head: client::api::Commit,
-    clean: &[client::api::Commit],
+    head: skein_forge::api::Commit,
+    clean: &[skein_forge::api::Commit],
     reviewers: &[Reviewer],
     complete: bool,
 ) -> Verdict {
@@ -140,9 +139,9 @@ fn approval(
             continue;
         }
         match reviewer.verdict {
-            client::api::Verdict::RequestChanges => return Verdict::Refuse,
-            client::api::Verdict::Comment => {}
-            client::api::Verdict::Approve => {
+            skein_forge::api::Verdict::RequestChanges => return Verdict::Refuse,
+            skein_forge::api::Verdict::Comment => {}
+            skein_forge::api::Verdict::Approve => {
                 let mut duplicate = false;
                 let mut conflicting = false;
                 for other in reviewers {
@@ -151,8 +150,10 @@ fn approval(
                         && valid(other.head, head, clean, freshness)
                     {
                         match other.verdict {
-                            client::api::Verdict::Approve => {}
-                            client::api::Verdict::RequestChanges | client::api::Verdict::Comment => conflicting = true,
+                            skein_forge::api::Verdict::Approve => {}
+                            skein_forge::api::Verdict::RequestChanges | skein_forge::api::Verdict::Comment => {
+                                conflicting = true;
+                            }
                         }
                     }
                 }
@@ -160,7 +161,7 @@ fn approval(
                     duplicate |= earlier.person == reviewer.person
                         && earlier.role == role
                         && valid(earlier.head, head, clean, freshness)
-                        && earlier.verdict == client::api::Verdict::Approve;
+                        && earlier.verdict == skein_forge::api::Verdict::Approve;
                 }
                 if !duplicate && !conflicting {
                     have = have.checked_add(1).expect("admitted reviewer bound fits u32");
@@ -176,8 +177,8 @@ fn approval(
 pub fn judge(
     criterion: Criterion,
     repository: &Repository,
-    head: client::api::Commit,
-    clean: &[client::api::Commit],
+    head: skein_forge::api::Commit,
+    clean: &[skein_forge::api::Commit],
     evidence: &ChangeEvidence,
     reviewers: &[Reviewer],
 ) -> Verdict {
@@ -213,7 +214,7 @@ pub fn judge(
 #[cfg(test)]
 mod tests {
     use super::{Freshness, Reviewer, Verdict, approval};
-    use temper_engine_domain_forge_client::api;
+    use skein_forge::api;
 
     #[test]
     fn approvals_count_distinct_people_at_the_named_head() {

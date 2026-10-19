@@ -88,7 +88,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         .checked_add(criteria.checked_mul(u64::from(l.judge_projects).checked_add(1)?)?)?;
     crate::adoption::worst_case(l)?
         .checked_add(client::worst_case(&l.client)?)?
-        .checked_add(Map::<client::api::Repository, Repository>::worst_case(l.repositories)?)?
+        .checked_add(Map::<skein_forge::api::Repository, Repository>::worst_case(l.repositories)?)?
         // Each forge's writer and git identity.
         .checked_add(Map::<u16, u64>::worst_case(l.repositories)?)?
         .checked_add(Map::<u16, u32>::worst_case(l.repositories)?)?
@@ -105,7 +105,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         .checked_add(Map::<(u64, Topic), Subscriber>::worst_case(l.subscriptions)?)?
         .checked_add(Map::<Name, BranchHead>::worst_case(l.client.resources)?)?
         .checked_add(Map::<Name, PullState>::worst_case(l.client.resources)?)?
-        .checked_add(Map::<(client::api::Repository, client::api::Commit), crate::CiState>::worst_case(
+        .checked_add(Map::<(skein_forge::api::Repository, skein_forge::api::Commit), crate::CiState>::worst_case(
             l.subscriptions,
         )?)?
         .checked_add(Map::<skein_lib::Token, crate::domain::PendingCi>::worst_case(l.subscriptions)?)?
@@ -118,7 +118,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         .checked_add(
             u64::from(l.tasks).checked_mul(u64::from(l.client.op_bytes).checked_add(u64::from(l.name_bytes))?)?,
         )?
-        .checked_add(Map::<client::api::Commit, u64>::worst_case(l.landings)?)?
+        .checked_add(Map::<skein_forge::api::Commit, u64>::worst_case(l.landings)?)?
         .checked_add(Map::<skein_lib::Token, crate::domain::PendingLanding>::worst_case(l.landings)?)?
         .checked_add(Map::<skein_lib::Token, crate::domain::PendingLost>::worst_case(l.holds)?)?
         .checked_add(Map::<u64, crate::ChangeRow>::worst_case(l.changes)?)?

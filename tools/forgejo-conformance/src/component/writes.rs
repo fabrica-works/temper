@@ -8,7 +8,7 @@ use crate::{
     fixture::{Fixture, R},
 };
 use serde_json::json;
-use temper_engine_domain_forge_client::api::{self, Answer, Read, Write};
+use skein_forge::api::{self, Answer, Read, Write};
 pub(super) fn run(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Result<()> {
     let repo = repository(f)?;
     let issue = h.call(

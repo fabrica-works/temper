@@ -194,9 +194,9 @@ fn an_external_move_of_a_held_branch_is_reported_as_drift() {
     let (name, pushed) = held_branch(&mut world);
     world.push(b"temper/51", b"outside");
     world.event(top::Event::Hint {
-        hint: client::api::Hint {
+        hint: skein_forge::api::Hint {
             repository: REPO,
-            change: client::api::Change::Branch(Box::from(&b"temper/51"[..])),
+            change: skein_forge::api::Change::Branch(Box::from(&b"temper/51"[..])),
             key: None,
         },
     });
@@ -273,7 +273,7 @@ fn a_busy_pass_lists_at_most_changed_items_over_the_page_plus_one() {
     let before = world.tally().routes.get(&Route::Issues).copied().unwrap_or(0);
     let first = world.listing_passes().len();
     world.event(top::Event::Hint {
-        hint: client::api::Hint { repository: REPO, change: client::api::Change::Item(1), key: None },
+        hint: skein_forge::api::Hint { repository: REPO, change: skein_forge::api::Change::Item(1), key: None },
     });
     world.run_for(2);
     let pages = world.tally().routes.get(&Route::Issues).copied().unwrap_or(0) - before;
@@ -410,14 +410,14 @@ fn opened_change() -> Protocol {
     world
 }
 
-fn enqueue_merge(world: &mut Protocol, pull: u64, head: client::api::Commit) {
+fn enqueue_merge(world: &mut Protocol, pull: u64, head: skein_forge::api::Commit) {
     world.event(top::Event::Enqueue {
         entry: client::Entry {
             number: 1,
             task: 51,
             repository: REPO,
             effect: client::Effect {
-                write: client::api::Write::Merge { number: pull, head },
+                write: skein_forge::api::Write::Merge { number: pull, head },
                 condition: client::Condition::Merge { base: Box::from(&b"main"[..]) },
             },
             start: None,
@@ -427,7 +427,7 @@ fn enqueue_merge(world: &mut Protocol, pull: u64, head: client::api::Commit) {
     });
 }
 
-fn held_branch(world: &mut Protocol) -> (top::Name, client::api::Commit) {
+fn held_branch(world: &mut Protocol) -> (top::Name, skein_forge::api::Commit) {
     let name = top::Name {
         forge: REPO.forge,
         repository: REPO.repository,

@@ -78,7 +78,7 @@ fn a_proposed_effect_round_trips_unchanged() {
         number: 1,
         resource: forge::What::Branch(Box::new([Box::new([0_u8, 255])])),
         entry: fixtures::entry(
-            temper_engine_domain_forge_client::api::Write::Merge { number: 2, head: [3; 32] },
+            skein_forge::api::Write::Merge { number: 2, head: [3; 32] },
             temper_engine_domain_forge_client::Condition::Merge { base: Box::new([4]) },
         ),
     });
@@ -87,7 +87,8 @@ fn a_proposed_effect_round_trips_unchanged() {
 }
 #[test]
 fn outbox_decoding_refuses_fields_past_their_bounds() {
-    use temper_engine_domain_forge_client::{Condition, api::Write};
+    use skein_forge::api::Write;
+    use temper_engine_domain_forge_client::Condition;
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
     let rows = [
         ("reviewer count", Write::SetReviewers { number: 1, reviewers: Box::new([1; 9]) }),
@@ -123,7 +124,7 @@ fn error_tags_are_numbered_as_the_schema_lists_them() {
 }
 #[test]
 fn an_answer_piece_past_its_limit_fails_to_decode() {
-    let answer = temper_engine_domain_forge_client::api::Answer::Branches(Box::new([Box::new([0_u8; 4125])]));
+    let answer = skein_forge::api::Answer::Branches(Box::new([Box::new([0_u8; 4125])]));
     let row = fixtures::named_call(forge::CallPayload::Read(Box::new(Ok(answer))));
     let bytes = records::encode(&row);
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
@@ -136,7 +137,7 @@ fn a_full_answer_at_the_fixture_limits_fits_its_pieces() {
         let branch: Box<[u8]> = Box::new([0_u8; 496]);
         branches.push(branch).expect("fixture rows");
     }
-    let answer = temper_engine_domain_forge_client::api::Answer::Branches(branches.into_boxed());
+    let answer = skein_forge::api::Answer::Branches(branches.into_boxed());
     let row = fixtures::named_call(forge::CallPayload::Read(Box::new(Ok(answer))));
     let bytes = records::encode(&row);
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
@@ -171,11 +172,8 @@ fn answer_item_counts_past_rows_fail_to_decode() {
     for _ in 0_u32..9 {
         items.push(fixtures::summary()).expect("fixture room");
     }
-    let answer = temper_engine_domain_forge_client::api::Answer::Items {
-        items: items.into_boxed(),
-        more: false,
-        now: skein_lib::Time::from_nanos(1),
-    };
+    let answer =
+        skein_forge::api::Answer::Items { items: items.into_boxed(), more: false, now: skein_lib::Time::from_nanos(1) };
     let row = fixtures::named_call(forge::CallPayload::Read(Box::new(Ok(answer))));
     let bytes = records::encode(&row);
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
@@ -193,7 +191,7 @@ fn each_remaining_answer_round_trips_unchanged() {
 }
 #[test]
 fn fixed_answer_lists_past_their_counts_fail_to_decode() {
-    use temper_engine_domain_forge_client::api::{Answer, Collaborator, Permission};
+    use skein_forge::api::{Answer, Collaborator, Permission};
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
     let mut collaborators = skein_lib::List::with_capacity(9);
     for user in 0_u64..9 {
@@ -346,13 +344,11 @@ fn an_issue_row_with_its_desired_view_round_trips_unchanged() {
 }
 #[test]
 fn every_family_encodes_and_decodes_to_itself() {
-    use temper_engine_domain_forge_client::{Condition, Stored, What, api::Write};
+    use skein_forge::api::Write;
+    use temper_engine_domain_forge_client::{Condition, Stored, What};
     let entry = fixtures::entry(Write::Post { number: 1, key: Box::new([2]), body: Box::new([3]) }, Condition::None);
     let remaining = [
-        (
-            "call",
-            fixtures::named_call(forge::CallPayload::Refused(temper_engine_domain_forge_client::api::Error::Busy)),
-        ),
+        ("call", fixtures::named_call(forge::CallPayload::Refused(skein_forge::api::Error::Busy))),
         (
             "proposal",
             forge::Stored::ProposedEffect(forge::ProposedEffect {
@@ -573,7 +569,7 @@ fn application_outcomes() -> Box<[forge::ApplicationOutcome]> {
     for protection in [
         forge::Protection::Unknown,
         forge::Protection::Absent,
-        forge::Protection::Rule(temper_engine_domain_forge_client::api::Protection {
+        forge::Protection::Rule(skein_forge::api::Protection {
             branch: Box::from(b"main".as_slice()),
             contexts: Box::new([Box::from(b"check".as_slice())]),
             approvals: 2,
@@ -647,7 +643,7 @@ fn an_application_adopted_name_past_its_bound_fails_to_decode() {
 
 #[test]
 fn a_job_steps_name_past_its_limit_fails_to_decode() {
-    use temper_engine_domain_forge_client::api::{Answer, JobAttempt, Step};
+    use skein_forge::api::{Answer, JobAttempt, Step};
     let answer = Answer::Job {
         attempt: JobAttempt { head: [1; 32], run: 7, job: 8, attempt: 2 },
         step: Some(Step { number: 1, name: Box::new([b'x'; 4097]) }),

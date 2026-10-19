@@ -91,7 +91,7 @@ pub struct Repository {
     pub project: u32,
     /// This project's selected repository for goal issue projections and chats' saved work.
     pub home: bool,
-    pub provider: client::api::Repository,
+    pub provider: skein_forge::api::Repository,
     pub host: Box<[u8]>,
     pub owner: Box<[u8]>,
     pub name: Box<[u8]>,
@@ -103,7 +103,7 @@ pub struct Repository {
     pub checks: Box<[u32]>,
     pub kinds: Kinds,
     pub protection: Protection,
-    pub settings: client::api::Settings,
+    pub settings: skein_forge::api::Settings,
 }
 /// The git identity a forge's repositories are pushed and fetched with: an
 /// application credential numbered by the deployment's configuration
@@ -121,7 +121,7 @@ pub enum Protection {
     /// No applicable rule exists.
     Absent,
     /// An applicable rule was read.
-    Rule(client::api::Protection),
+    Rule(skein_forge::api::Protection),
 }
 /// The caller's request to adopt an existing repository.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -143,7 +143,7 @@ pub struct Adoption {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Adopted {
     pub repository: Repository,
-    pub collaborators: Box<[client::api::Collaborator]>,
+    pub collaborators: Box<[skein_forge::api::Collaborator]>,
 }
 /// The connector's outcome, kept under the people child's application token.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -155,7 +155,7 @@ pub enum ApplicationOutcome {
 /// The repository facts shown by the adoption's terminal (client/README.md, 4.6).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AdoptedRepository {
-    pub repository: client::api::Repository,
+    pub repository: skein_forge::api::Repository,
     pub owner: Box<[u8]>,
     pub name: Box<[u8]>,
     pub role: Role,
@@ -177,25 +177,25 @@ pub enum AdoptionRefusal {
 }
 /// Project a forge call's refusal into the adoption's terminal reason.
 #[must_use]
-pub const fn reason(error: client::api::Error) -> AdoptionRefusal {
+pub const fn reason(error: skein_forge::api::Error) -> AdoptionRefusal {
     match error {
-        client::api::Error::Missing => AdoptionRefusal::NotFound,
-        client::api::Error::Forbidden => AdoptionRefusal::NoAccess,
-        client::api::Error::Refused => AdoptionRefusal::Refused,
-        client::api::Error::Busy => AdoptionRefusal::InFlight,
-        client::api::Error::TooLarge | client::api::Error::Full => AdoptionRefusal::TooLarge,
-        client::api::Error::Unavailable | client::api::Error::Timeout | client::api::Error::RateLimited { .. } => {
-            AdoptionRefusal::Unreachable
-        }
-        client::api::Error::MissingJob
-        | client::api::Error::Empty
-        | client::api::Error::Exists
-        | client::api::Error::NothingToMerge
-        | client::api::Error::Closed
-        | client::api::Error::Stale
-        | client::api::Error::Conflict
-        | client::api::Error::Protected
-        | client::api::Error::InvalidAnswer => AdoptionRefusal::InvalidAnswer,
+        skein_forge::api::Error::Missing => AdoptionRefusal::NotFound,
+        skein_forge::api::Error::Forbidden => AdoptionRefusal::NoAccess,
+        skein_forge::api::Error::Refused => AdoptionRefusal::Refused,
+        skein_forge::api::Error::Busy => AdoptionRefusal::InFlight,
+        skein_forge::api::Error::TooLarge | skein_forge::api::Error::Full => AdoptionRefusal::TooLarge,
+        skein_forge::api::Error::Unavailable
+        | skein_forge::api::Error::Timeout
+        | skein_forge::api::Error::RateLimited { .. } => AdoptionRefusal::Unreachable,
+        skein_forge::api::Error::MissingJob
+        | skein_forge::api::Error::Empty
+        | skein_forge::api::Error::Exists
+        | skein_forge::api::Error::NothingToMerge
+        | skein_forge::api::Error::Closed
+        | skein_forge::api::Error::Stale
+        | skein_forge::api::Error::Conflict
+        | skein_forge::api::Error::Protected
+        | skein_forge::api::Error::InvalidAnswer => AdoptionRefusal::InvalidAnswer,
     }
 }
 /// Exclusive write hold and its current writer.
@@ -216,7 +216,7 @@ pub struct Drift {
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum DriftChange {
-    Branch { expected: client::api::Commit, observed: Option<client::api::Commit> },
+    Branch { expected: skein_forge::api::Commit, observed: Option<skein_forge::api::Commit> },
     PullClosed { number: u64 },
     Retargeted { number: u64, before: Box<[u8]>, after: Box<[u8]> },
 }
@@ -248,7 +248,7 @@ pub enum ReleaseEnding {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Pushed {
     pub tag: u32,
-    pub commit: client::api::Commit,
+    pub commit: skein_forge::api::Commit,
 }
 /// A run or connector effect occupying one writer slot.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -264,13 +264,13 @@ pub enum Writer {
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Topic {
     /// A branch's tip moved.
-    Landings { repository: client::api::Repository, branch: Box<[u8]> },
+    Landings { repository: skein_forge::api::Repository, branch: Box<[u8]> },
     /// CI changed on one commit.
-    Ci { repository: client::api::Repository, head: client::api::Commit },
+    Ci { repository: skein_forge::api::Repository, head: skein_forge::api::Commit },
     /// A pull's state changed.
-    Pull { repository: client::api::Repository, number: u64 },
+    Pull { repository: skein_forge::api::Repository, number: u64 },
     /// A participant wrote on an object.
-    Participation { repository: client::api::Repository, number: u64 },
+    Participation { repository: skein_forge::api::Repository, number: u64 },
 }
 /// A subscriber's classification of observed news.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -286,9 +286,9 @@ pub enum Class {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum News {
     /// A branch moved; overlap is decided from bounded file facts.
-    Landing { before: client::api::Commit, after: client::api::Commit, files: Option<Box<[Box<[u8]>]>> },
+    Landing { before: skein_forge::api::Commit, after: skein_forge::api::Commit, files: Option<Box<[Box<[u8]>]>> },
     /// The combined CI state changed at its head.
-    Ci { head: client::api::Commit, status: client::api::Ci },
+    Ci { head: skein_forge::api::Commit, status: skein_forge::api::Ci },
     /// A pull or participating object's state changed.
     Changed { number: u64 },
 }
@@ -308,7 +308,7 @@ pub struct Subscriber {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct BranchHead {
     pub name: Name,
-    pub commit: client::api::Commit,
+    pub commit: skein_forge::api::Commit,
     /// The store has confirmed this branch was left by our writer.
     pub owned: bool,
 }
@@ -316,22 +316,22 @@ pub struct BranchHead {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PullState {
     pub name: Name,
-    pub head: client::api::Commit,
-    pub ci: client::api::Ci,
-    pub state: client::api::State,
+    pub head: skein_forge::api::Commit,
+    pub ci: skein_forge::api::Ci,
+    pub state: skein_forge::api::State,
 }
 /// Last CI verdict published to subscribers of one commit.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct CiState {
-    pub repository: client::api::Repository,
-    pub head: client::api::Commit,
-    pub status: client::api::Ci,
+    pub repository: skein_forge::api::Repository,
+    pub head: skein_forge::api::Commit,
+    pub status: skein_forge::api::Ci,
 }
 /// A goal's issue projection, including an in-flight write and created issue.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct IssueRow {
     pub goal: u64,
-    pub repository: client::api::Repository,
+    pub repository: skein_forge::api::Repository,
     pub state: issues::Projected,
     pub number: Option<u64>,
     pub pending: Option<u64>,
@@ -344,7 +344,7 @@ pub struct IssueRow {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ChangeRow {
     pub task: u64,
-    pub repository: client::api::Repository,
+    pub repository: skein_forge::api::Repository,
     pub branch: Box<[u8]>,
     pub base: Box<[u8]>,
     pub title: Box<[u8]>,
@@ -373,7 +373,7 @@ pub struct ChangeRow {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct GateRemark {
     pub number: u64,
-    pub head: client::api::Commit,
+    pub head: skein_forge::api::Commit,
     pub words: Box<[u8]>,
 }
 /// Coherent provider facts used by the root to check a change effect before
@@ -382,12 +382,12 @@ pub struct GateRemark {
 pub struct ChangeEvidence {
     /// State to restore if the root does not authorize this effect.
     pub prior: change::Change,
-    pub head: Option<client::api::Commit>,
-    pub base_tip: client::api::Commit,
+    pub head: Option<skein_forge::api::Commit>,
+    pub base_tip: skein_forge::api::Commit,
     pub contains_base: change::Status,
     pub ci: change::Status,
     pub gates: Box<[change::GateReport]>,
-    pub reviews: Box<[client::api::Review]>,
+    pub reviews: Box<[skein_forge::api::Review]>,
     pub reviews_complete: bool,
 }
 /// Identity supplied by the named-call owner, interpreted only for lookup.
@@ -403,8 +403,8 @@ pub struct NamedCall {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum CallPayload {
     Effect { entry: u64, deadline: skein_lib::Wall, outcome: Option<client::Outcome> },
-    Refused(client::api::Error),
-    Read(Box<Result<client::api::Answer, client::api::Error>>),
+    Refused(skein_forge::api::Error),
+    Read(Box<Result<skein_forge::api::Answer, skein_forge::api::Error>>),
 }
 
 /// The connector's durable records, wrapped by the root store.
@@ -435,7 +435,7 @@ pub enum Stored {
     Ci(CiState),
     /// A merge made by this deployment, for own-change news classification.
     Landed {
-        commit: client::api::Commit,
+        commit: skein_forge::api::Commit,
         task: u64,
     },
     /// An unsettled outbox entry. A held one is out of the client's outbox,
@@ -472,14 +472,14 @@ pub struct ProposedEffect {
 pub enum Key {
     Call(NamedCall),
     ProposedEffect(u64),
-    Repository(client::api::Repository),
+    Repository(skein_forge::api::Repository),
     Hold(Name),
     Names(u64),
     Subscription { task: u64, topic: Topic },
     BranchHead(Name),
     PullState(Name),
-    Ci { repository: client::api::Repository, head: client::api::Commit },
-    Landed(client::api::Commit),
+    Ci { repository: skein_forge::api::Repository, head: skein_forge::api::Commit },
+    Landed(skein_forge::api::Commit),
     Entry(u64),
     Client(client::Key),
     Change(u64),
@@ -523,7 +523,7 @@ pub enum Event {
     /// Read current permissions, settings, protection and collaborators.
     Adopt { request: Token },
     /// Withdraw a just-adopted repository when its parent cannot commit the role seed.
-    ForgetAdoption { repository: client::api::Repository, restore: Option<Repository> },
+    ForgetAdoption { repository: skein_forge::api::Repository, restore: Option<Repository> },
     /// Replace the resources this live task names.
     Names { task: u64, resources: Box<[Name]> },
     /// Remove all resources and subscriptions of an ended task.
@@ -533,7 +533,7 @@ pub enum Event {
     /// Claim writer slots for one task's attempt.
     Claim { task: u64, attempt: u64, writes: Box<[Name]>, holders: Box<[u64]> },
     /// Release slots and confirm any pushed heads.
-    Answered { task: u64, attempt: u64, pushed: Box<[(Name, client::api::Commit)]> },
+    Answered { task: u64, attempt: u64, pushed: Box<[(Name, skein_forge::api::Commit)]> },
     /// Read a lost writer's resource afresh before making its slot available.
     Lost { task: u64, attempt: u64 },
     /// Retain an explicitly proposed agent effect without making it.
@@ -545,7 +545,7 @@ pub enum Event {
     /// Keep a projection candidate after core admission.
     KeepProjection { row: IssueRow, entry: client::Entry },
     /// Describe the next write for a goal projection.
-    Project { entry: u64, repository: client::api::Repository, view: issues::GoalView },
+    Project { entry: u64, repository: skein_forge::api::Repository, view: issues::GoalView },
     /// Continue the latest authorized snapshot after an outbox outcome or interval.
     ProjectDesired { entry: u64, goal: u64 },
     /// Register one activated change task with its held branch.
@@ -590,7 +590,7 @@ pub enum Event {
     /// Unsubscribe a task from a topic.
     Unsubscribe { task: u64, topic: Topic },
     /// One provider hint passed from the protocol.
-    Hint { hint: client::api::Hint },
+    Hint { hint: skein_forge::api::Hint },
     /// A client event returned after an earlier connector request.
     Client(client::Event),
     /// Restore one durable connector record.
@@ -608,7 +608,7 @@ pub enum Request {
     ApplicationPart {
         request: Token,
         adoption: Adoption,
-        repository: client::api::Repository,
+        repository: skein_forge::api::Repository,
     },
     ApplicationDone {
         request: Token,
@@ -662,7 +662,7 @@ pub enum Request {
     /// Terminal result of a repository adoption, for the root's person route.
     Adopted {
         reply_to: Token,
-        result: Result<Adopted, client::api::Error>,
+        result: Result<Adopted, skein_forge::api::Error>,
     },
     /// Save one record atomically with the current decision, carrying the
     /// owner's post-commit entry and read-afresh handoffs without inspecting it.
@@ -760,13 +760,13 @@ pub enum Request {
     /// A bounded provider call, released after preceding progress commits.
     Call {
         call: Token,
-        repository: client::api::Repository,
-        op: client::api::Op,
+        repository: skein_forge::api::Repository,
+        op: skein_forge::api::Op,
     },
     /// One bounded fresh connector read for a root worker tool.
     Read {
         owner: Token,
-        result: Result<client::api::Answer, client::api::Error>,
+        result: Result<skein_forge::api::Answer, skein_forge::api::Error>,
     },
     /// The requested restart phase finished; the root may request the next.
     RestartDone {

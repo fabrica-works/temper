@@ -69,8 +69,8 @@ pub enum Delivery {
     /// One bounded connector call after all preceding progress commits.
     ForgeCall {
         call: Token,
-        repository: temper_engine_domain_forge_client::api::Repository,
-        op: temper_engine_domain_forge_client::api::Op,
+        repository: skein_forge::api::Repository,
+        op: skein_forge::api::Op,
     },
     /// Committed request to the connector that owns a procedure task. The owner steps against
     /// current facts and returns the fenced decision through the root.

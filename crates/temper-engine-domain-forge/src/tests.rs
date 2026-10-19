@@ -5,7 +5,7 @@ use alloc::boxed::Box;
 use skein_lib::{Duration, Env, Queue, Time, Token, Wall};
 use temper_engine_domain_forge_client as client;
 
-const REPO: client::api::Repository = client::api::Repository { forge: 1, repository: 2 };
+const REPO: skein_forge::api::Repository = skein_forge::api::Repository { forge: 1, repository: 2 };
 const CLIENT: client::Limits = client::Limits {
     pending: 4,
     calls: 2,
@@ -131,7 +131,7 @@ fn adopted() -> Repository {
             branch: true,
         },
         protection: Protection::Absent,
-        settings: client::api::Settings {
+        settings: skein_forge::api::Settings {
             default_branch: Box::from(&b"main"[..]),
             merge: true,
             squash: true,
@@ -146,10 +146,10 @@ fn status(number: u64, task: u64) -> client::Entry {
         task,
         repository: REPO,
         effect: client::Effect {
-            write: client::api::Write::Status {
+            write: skein_forge::api::Write::Status {
                 commit: [3; 32],
                 context: Box::from(&b"test"[..]),
-                check: client::api::Check::Passed,
+                check: skein_forge::api::Check::Passed,
             },
             condition: client::Condition::None,
         },
@@ -292,20 +292,20 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::ApplicationAgain { .. }
         | Request::RestartDone { .. } => panic!("permission call"),
     };
-    assert_eq!(op, client::api::Op::Read(client::api::Read::Permission { user: 7 }));
+    assert_eq!(op, skein_forge::api::Op::Read(skein_forge::api::Read::Permission { user: 7 }));
     let result = outputs(
         &mut d,
         Event::Client(client::Event::Answered {
             call,
             cost: 1,
-            result: Ok(client::api::Answer::Permission(client::api::Permission::Write)),
+            result: Ok(skein_forge::api::Answer::Permission(skein_forge::api::Permission::Write)),
         }),
     );
     assert!(result.is_empty());
     let next = ready(&mut d);
     assert_eq!(next.len(), 1);
     let branches = match &next[0] {
-        Request::Call { call, op: client::api::Op::Read(client::api::Read::Branches), .. } => *call,
+        Request::Call { call, op: skein_forge::api::Op::Read(skein_forge::api::Read::Branches), .. } => *call,
         Request::Call { .. }
         | Request::Resource { .. }
         | Request::Adopted { .. }
@@ -346,14 +346,14 @@ fn adoption_reads_permission_before_committing_its_role() {
             Event::Client(client::Event::Answered {
                 call: branches,
                 cost: 1,
-                result: Ok(client::api::Answer::Branches(Box::new([Box::from(&b"main"[..])]))),
+                result: Ok(skein_forge::api::Answer::Branches(Box::new([Box::from(&b"main"[..])]))),
             })
         )
         .is_empty()
     );
     let next = ready(&mut d);
     match &next[0] {
-        Request::Call { op: client::api::Op::Read(client::api::Read::Settings), .. } => {}
+        Request::Call { op: skein_forge::api::Op::Read(skein_forge::api::Read::Settings), .. } => {}
         Request::Call { .. }
         | Request::Resource { .. }
         | Request::Adopted { .. }
@@ -408,7 +408,7 @@ fn adoption_without_ci_refuses_an_empty_check_policy() {
     };
     assert_eq!(
         fixtures::begin_adoption(&mut d, Token::new(5), request).as_ref(),
-        &[Request::Adopted { reply_to: Token::new(5), result: Err(client::api::Error::Refused) }]
+        &[Request::Adopted { reply_to: Token::new(5), result: Err(skein_forge::api::Error::Refused) }]
     );
     assert!(ready(&mut d).is_empty());
 }
@@ -437,7 +437,8 @@ fn restored_ci_subscriptions_are_read_in_the_fresh_step_and_delay_its_completion
     let fresh = outputs(&mut d, Event::ReadAfresh);
     assert!(fresh.is_empty(), "the subscription read is scheduled before completion");
     let calls = ready(&mut d);
-    let Request::Call { call, op: client::api::Op::Read(client::api::Read::Statuses { commit, .. }), .. } = &calls[0]
+    let Request::Call { call, op: skein_forge::api::Op::Read(skein_forge::api::Read::Statuses { commit, .. }), .. } =
+        &calls[0]
     else {
         panic!("CI statuses requested in fresh step")
     };
@@ -447,8 +448,8 @@ fn restored_ci_subscriptions_are_read_in_the_fresh_step_and_delay_its_completion
         Event::Client(client::Event::Answered {
             call: *call,
             cost: 1,
-            result: Ok(client::api::Answer::Statuses {
-                ci: client::api::Ci::Passed,
+            result: Ok(skein_forge::api::Answer::Statuses {
+                ci: skein_forge::api::Ci::Passed,
                 statuses: Box::new([]),
                 more: false,
             }),
@@ -525,7 +526,7 @@ fn named_resource_reports_distinguish_private_branches_context_and_shared_landin
 
 #[test]
 fn native_effect_rows_keep_the_clients_recovery_promises() {
-    use client::api::Write;
+    use skein_forge::api::Write;
     let empty = || Box::<[u8]>::default();
     let writes = [
         (3, EffectForm::Creation, Write::OpenPull { title: empty(), body: empty(), head: empty(), base: empty() }),
@@ -537,10 +538,14 @@ fn native_effect_rows_keep_the_clients_recovery_promises() {
         (
             5,
             EffectForm::Creation,
-            Write::Review { number: 1, key: empty(), verdict: client::api::Verdict::Approve, body: empty() },
+            Write::Review { number: 1, key: empty(), verdict: skein_forge::api::Verdict::Approve, body: empty() },
         ),
         (7, EffectForm::Creation, Write::Post { number: 1, key: empty(), body: empty() }),
-        (6, EffectForm::Set, Write::Status { commit: [1; 32], context: empty(), check: client::api::Check::Passed }),
+        (
+            6,
+            EffectForm::Set,
+            Write::Status { commit: [1; 32], context: empty(), check: skein_forge::api::Check::Passed },
+        ),
         (8, EffectForm::Creation, Write::CreateIssue { key: empty(), title: empty(), body: empty() }),
         (13, EffectForm::Set, Write::Edit { number: 1, title: None, body: None }),
         (13, EffectForm::Set, Write::Close { number: 1 }),
@@ -570,7 +575,7 @@ fn held_issue() -> client::Entry {
         task: 7,
         repository: REPO,
         effect: client::Effect {
-            write: client::api::Write::CreateIssue {
+            write: skein_forge::api::Write::CreateIssue {
                 key: Box::from(&b"k"[..]),
                 title: Box::from(&b"Finding"[..]),
                 body: Box::from(&b"Fix"[..]),
@@ -652,10 +657,10 @@ fn a_held_effect_asked_again_is_looked_for_first_even_with_an_otherwise_full_out
         &[Request::Call {
             call: Token::new(1),
             repository: REPO,
-            op: client::api::Op::Read(client::api::Read::Items {
+            op: skein_forge::api::Op::Read(skein_forge::api::Read::Items {
                 since: Time::from_nanos(1),
                 page: 1,
-                kind: Some(client::api::Kind::Issue),
+                kind: Some(skein_forge::api::Kind::Issue),
             }),
         }]
     );
@@ -728,7 +733,7 @@ fn four_writers() -> Domain {
 
 /// The forge's answer to client call `call`: the branch is at `commit`.
 fn branch_at(d: &mut Domain, call: u64, commit: u8) -> Box<[Request]> {
-    let result = Ok(client::api::Answer::Commit([commit; 32]));
+    let result = Ok(skein_forge::api::Answer::Commit([commit; 32]));
     let answered = outputs(d, Event::Client(client::Event::Answered { call: Token::new(call), cost: 1, result }));
     d.reclaim();
     answered
@@ -755,7 +760,7 @@ fn a_lost_writers_read_refused_for_room_is_asked_again_when_room_frees() {
         &[Request::Call {
             call: Token::new(5),
             repository: REPO,
-            op: client::api::Op::Read(client::api::Read::Compare { before: [2; 32], after: [4; 32] }),
+            op: skein_forge::api::Op::Read(skein_forge::api::Read::Compare { before: [2; 32], after: [4; 32] }),
         }]
     );
 }

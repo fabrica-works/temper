@@ -11,7 +11,6 @@ use jig_domain_host as host;
 use jig_domain_tasks as tasks;
 use skein_lib::{Decimal, List, Token, Writer};
 use temper_engine_domain_forge as forge;
-use temper_engine_domain_forge_client as forge_client;
 impl Domain {
     /// The unique resource pushed under this fenced answer's authentic writer claim.
     #[must_use]
@@ -32,7 +31,7 @@ impl Domain {
     }
 }
 
-pub(crate) fn settled_resource(heads: &[(forge::Name, forge_client::api::Commit)]) -> Option<u64> {
+pub(crate) fn settled_resource(heads: &[(forge::Name, skein_forge::api::Commit)]) -> Option<u64> {
     let [(name, _)] = heads else { return None };
     Some(u64::from(name.repository))
 }

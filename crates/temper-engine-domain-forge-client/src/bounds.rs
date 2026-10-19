@@ -4,8 +4,8 @@
 //! retained request before admission; `answer` checks returned allocations
 //! before an answer can affect the working set or a caller.
 use crate::Limits;
-use crate::api::{Answer, File, Op, Read, Summary, Write};
 use alloc::boxed::Box;
+use skein_forge::api::{Answer, File, Op, Read, Summary, Write};
 
 fn bytes(value: &[u8]) -> Option<u64> {
     u64::try_from(value.len()).ok()
@@ -43,7 +43,7 @@ pub(crate) fn op(value: &Op, l: &Limits) -> bool {
 }
 pub(crate) fn read(value: &Read) -> Option<u64> {
     match value {
-        Read::Locate { owner, name } => crate::locate::bytes(owner, name),
+        Read::Locate { owner, name } => skein_forge::locate::bytes(owner, name),
         Read::File { path, .. } => {
             if path.is_empty() {
                 None
@@ -124,8 +124,8 @@ fn answer_heap(value: &Answer, limit: u32) -> Option<u64> {
             Some(held)
         }
         Answer::Item { item, comments, .. } => {
-            let mut held =
-                rows(comments.len(), size_of::<crate::api::Comment>(), limit)?.checked_add(summary(item, limit)?)?;
+            let mut held = rows(comments.len(), size_of::<skein_forge::api::Comment>(), limit)?
+                .checked_add(summary(item, limit)?)?;
             for comment in comments {
                 held = held.checked_add(optional(comment.key.as_deref())?)?.checked_add(bytes(&comment.body)?)?;
             }
@@ -133,14 +133,14 @@ fn answer_heap(value: &Answer, limit: u32) -> Option<u64> {
         }
         Answer::Pull(value) => pull(value, limit),
         Answer::Reviews { reviews, .. } => {
-            let mut held = rows(reviews.len(), size_of::<crate::api::Review>(), limit)?;
+            let mut held = rows(reviews.len(), size_of::<skein_forge::api::Review>(), limit)?;
             for review in reviews {
                 held = held.checked_add(optional(review.key.as_deref())?)?.checked_add(bytes(&review.body)?)?;
             }
             Some(held)
         }
         Answer::Statuses { statuses, .. } | Answer::Checks(statuses) => {
-            let mut held = rows(statuses.len(), size_of::<crate::api::Status>(), limit)?;
+            let mut held = rows(statuses.len(), size_of::<skein_forge::api::Status>(), limit)?;
             for status in statuses {
                 held = held
                     .checked_add(bytes(&status.context)?)?
@@ -155,7 +155,7 @@ fn answer_heap(value: &Answer, limit: u32) -> Option<u64> {
         }),
         Answer::File { path, bytes: value, .. } => bytes(path)?.checked_add(bytes(value)?),
         Answer::Remarks { remarks, .. } => {
-            let mut held = rows(remarks.len(), size_of::<crate::api::Remark>(), limit)?;
+            let mut held = rows(remarks.len(), size_of::<skein_forge::api::Remark>(), limit)?;
             for remark in remarks {
                 held = held.checked_add(bytes(&remark.path)?)?.checked_add(bytes(&remark.body)?)?;
             }
@@ -163,7 +163,7 @@ fn answer_heap(value: &Answer, limit: u32) -> Option<u64> {
         }
         Answer::PullFiles { files: values, .. } => files(values, limit),
         Answer::Compare { files: values, commits, .. } => {
-            files(values, limit)?.checked_add(rows(commits.len(), size_of::<crate::api::Commit>(), limit)?)
+            files(values, limit)?.checked_add(rows(commits.len(), size_of::<skein_forge::api::Commit>(), limit)?)
         }
         Answer::Protection(value) => match value {
             Some(value) => {
@@ -178,7 +178,7 @@ fn answer_heap(value: &Answer, limit: u32) -> Option<u64> {
         },
         Answer::Settings(value) => bytes(&value.default_branch),
         Answer::Collaborators { collaborators, .. } => {
-            rows(collaborators.len(), size_of::<crate::api::Collaborator>(), limit)
+            rows(collaborators.len(), size_of::<skein_forge::api::Collaborator>(), limit)
         }
         Answer::Branches(branches) => {
             let mut held = rows(branches.len(), size_of::<Box<[u8]>>(), limit)?;
@@ -206,7 +206,7 @@ pub(crate) fn answer_bytes_unbounded(value: &Answer) -> Option<u64> {
     answer_heap(value, u32::MAX)
 }
 
-fn pull(value: &crate::api::Pull, limit: u32) -> Option<u64> {
+fn pull(value: &skein_forge::api::Pull, limit: u32) -> Option<u64> {
     rows(value.reviewers.len(), size_of::<u64>(), limit)?
         .checked_add(bytes(&value.head)?)?
         .checked_add(bytes(&value.base)?)

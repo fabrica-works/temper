@@ -1,9 +1,9 @@
 use super::names::{decode_name, decode_repository, encode_name, encode_repository};
 use super::{Bounds, FITS, Undecodable, w};
 use alloc::boxed::Box;
+use skein_forge::api;
 use skein_lib::List;
 use temper_engine_domain_forge as d;
-use temper_engine_domain_forge_client::api;
 
 fn encode_topic(value: &d::Topic) -> w::Topic {
     match value {

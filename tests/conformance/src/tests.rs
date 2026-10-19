@@ -2,7 +2,7 @@ use super::*;
 
 const TASK: u64 = 1;
 const ATTEMPT: u64 = 2;
-const HEAD: temper_engine_domain_forge_client::api::Commit = [7; 32];
+const HEAD: skein_forge::api::Commit = [7; 32];
 const RESTART: Clock = Clock { now: 1 };
 
 #[test]

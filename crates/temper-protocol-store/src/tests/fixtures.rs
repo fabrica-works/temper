@@ -1,7 +1,7 @@
 use skein_lib::{Duration, List, Rng};
 use temper_engine_domain_forge as top;
 use temper_engine_domain_forge_client as client;
-pub const REPO: client::api::Repository = client::api::Repository { forge: 1, repository: 2 };
+pub const REPO: skein_forge::api::Repository = skein_forge::api::Repository { forge: 1, repository: 2 };
 
 const CLIENT: client::Limits = client::Limits {
     pending: 4,
@@ -86,13 +86,13 @@ fn random_bytes(random: &mut Rng) -> Box<[u8]> {
     }
     bytes.into_boxed()
 }
-fn repository(random: &mut Rng) -> client::api::Repository {
-    client::api::Repository {
+fn repository(random: &mut Rng) -> skein_forge::api::Repository {
+    skein_forge::api::Repository {
         forge: u16::try_from(random.below(65_536)).expect("u16"),
         repository: u32::try_from(random.below(4_294_967_296)).expect("u32"),
     }
 }
-fn commit(random: &mut Rng) -> client::api::Commit {
+fn commit(random: &mut Rng) -> skein_forge::api::Commit {
     let mut commit = [0; 32];
     for byte in &mut commit {
         *byte = u8::try_from(random.below(256)).expect("byte");
@@ -206,7 +206,7 @@ pub fn adopted(protection: top::Protection) -> top::Stored {
             branch: true,
         },
         protection,
-        settings: client::api::Settings {
+        settings: skein_forge::api::Settings {
             default_branch: Box::from(b"main".as_slice()),
             merge: true,
             squash: true,
@@ -220,7 +220,7 @@ fn initial_rows(name: &top::Name) -> [(&'static str, top::Stored); 8] {
         ("repository absent", adopted(top::Protection::Absent)),
         (
             "repository rule",
-            adopted(top::Protection::Rule(client::api::Protection {
+            adopted(top::Protection::Rule(skein_forge::api::Protection {
                 branch: Box::from(b"main".as_slice()),
                 contexts: Box::new([Box::from(b"test".as_slice()), Box::from(b"build".as_slice())]),
                 approvals: 2,
@@ -248,11 +248,14 @@ fn initial_rows(name: &top::Name) -> [(&'static str, top::Stored); 8] {
             top::Stored::PullState(top::PullState {
                 name: name.clone(),
                 head: [255; 32],
-                ci: client::api::Ci::Passed,
-                state: client::api::State::Closed,
+                ci: skein_forge::api::Ci::Passed,
+                state: skein_forge::api::State::Closed,
             }),
         ),
-        ("ci", top::Stored::Ci(top::CiState { repository: REPO, head: [255; 32], status: client::api::Ci::Failed })),
+        (
+            "ci",
+            top::Stored::Ci(top::CiState { repository: REPO, head: [255; 32], status: skein_forge::api::Ci::Failed }),
+        ),
         ("landed", top::Stored::Landed { commit: [255; 32], task: u64::MAX }),
     ]
 }
@@ -346,7 +349,7 @@ pub fn names_holds_and_topics() -> Box<[(&'static str, top::Stored)]> {
     rows.into_boxed()
 }
 
-pub fn entry(write: client::api::Write, condition: client::Condition) -> client::Entry {
+pub fn entry(write: skein_forge::api::Write, condition: client::Condition) -> client::Entry {
     client::Entry {
         number: 3,
         task: 4,
@@ -362,8 +365,8 @@ pub fn entry(write: client::api::Write, condition: client::Condition) -> client:
         failures: 19,
     }
 }
-pub fn writes() -> [(&'static str, client::api::Write); 13] {
-    use client::api::{Check, Verdict, Write};
+pub fn writes() -> [(&'static str, skein_forge::api::Write); 13] {
+    use skein_forge::api::{Check, Verdict, Write};
     [
         ("issue", Write::CreateIssue { key: Box::new([0, 1]), title: Box::new([2]), body: Box::new([3]) }),
         (
@@ -395,8 +398,8 @@ pub fn conditions() -> [client::Condition; 4] {
     ]
 }
 
-pub fn errors() -> [(client::api::Error, u8); 18] {
-    use client::api::Error;
+pub fn errors() -> [(skein_forge::api::Error, u8); 18] {
+    use skein_forge::api::Error;
     [
         (Error::Unavailable, 0),
         (Error::Timeout, 1),
@@ -436,10 +439,10 @@ pub fn payloads() -> List<top::CallPayload> {
         for found in [false, true] {
             rows.push(payload(Some(Outcome::Made { made, found }))).expect("fixture room");
         }
-        rows.push(payload(Some(Outcome::Raced { made, why: client::api::Error::Stale }))).expect("fixture room");
+        rows.push(payload(Some(Outcome::Raced { made, why: skein_forge::api::Error::Stale }))).expect("fixture room");
     }
     for outcome in [
-        Some(Outcome::Failed(client::api::Error::Timeout)),
+        Some(Outcome::Failed(skein_forge::api::Error::Timeout)),
         Some(Outcome::Uncertain),
         Some(Outcome::Held),
         Some(Outcome::Withdrawn),
@@ -456,15 +459,15 @@ pub fn payloads() -> List<top::CallPayload> {
 fn payload(outcome: Option<client::Outcome>) -> top::CallPayload {
     top::CallPayload::Effect { entry: 8, deadline: skein_lib::Wall::from_nanos(123), outcome }
 }
-pub fn answers_without_item_pieces() -> [client::api::Answer; 19] {
-    use client::api::{Answer, BranchCreation, JobAttempt, Permission, Protection, Settings};
+pub fn answers_without_item_pieces() -> [skein_forge::api::Answer; 19] {
+    use skein_forge::api::{Answer, BranchCreation, JobAttempt, Permission, Protection, Settings};
     [
         Answer::Pull(pull()),
         Answer::Commit([9; 32]),
         Answer::Branches(Box::new([Box::new([0, 255]), Box::new([1])])),
         Answer::Job {
             attempt: JobAttempt { head: [10; 32], run: 11, job: 12, attempt: 13 },
-            step: Some(client::api::Step { number: 21, name: Box::new([22]) }),
+            step: Some(skein_forge::api::Step { number: 21, name: Box::new([22]) }),
             log: Box::new([14]),
             truncated: true,
         },
@@ -501,12 +504,12 @@ pub fn encoded(value: &crate::v2::Error) -> Box<[u8]> {
     writer.finish()
 }
 
-pub fn summary() -> client::api::Summary {
-    client::api::Summary {
+pub fn summary() -> skein_forge::api::Summary {
+    skein_forge::api::Summary {
         labels: Box::new([Box::new([0, 255]), Box::new([1])]),
         number: 2,
-        kind: client::api::Kind::Pull,
-        state: client::api::State::Closed,
+        kind: skein_forge::api::Kind::Pull,
+        state: skein_forge::api::State::Closed,
         author: 3,
         key: Some(Box::new([4])),
         title: Box::new([5]),
@@ -514,10 +517,10 @@ pub fn summary() -> client::api::Summary {
         updated: skein_lib::Time::from_nanos(7),
     }
 }
-pub fn comment() -> client::api::Comment {
-    client::api::Comment {
+pub fn comment() -> skein_forge::api::Comment {
+    skein_forge::api::Comment {
         id: 1,
-        provenance: client::api::Provenance::Revised,
+        provenance: skein_forge::api::Provenance::Revised,
         author: 2,
         created: skein_lib::Time::from_nanos(3),
         revision: 4,
@@ -525,13 +528,13 @@ pub fn comment() -> client::api::Comment {
         body: Box::new([6]),
     }
 }
-pub fn review() -> client::api::Review {
-    client::api::Review {
+pub fn review() -> skein_forge::api::Review {
+    skein_forge::api::Review {
         id: 1,
-        provenance: client::api::Provenance::Unknown,
+        provenance: skein_forge::api::Provenance::Unknown,
         revision: 2,
         author: 3,
-        verdict: client::api::Verdict::Comment,
+        verdict: skein_forge::api::Verdict::Comment,
         commit: [4; 32],
         key: Some(Box::new([5])),
         body: Box::new([6]),
@@ -539,8 +542,8 @@ pub fn review() -> client::api::Review {
         official: true,
     }
 }
-pub fn item_answers() -> [client::api::Answer; 3] {
-    use client::api::Answer;
+pub fn item_answers() -> [skein_forge::api::Answer; 3] {
+    use skein_forge::api::Answer;
     [
         Answer::Items { items: Box::new([summary(), summary()]), more: true, now: skein_lib::Time::from_nanos(9) },
         Answer::Item { item: summary(), comments: Box::new([comment(), comment()]), more: true },
@@ -568,21 +571,21 @@ pub fn item_piece_row(items: Box<[u8]>) -> crate::v2::Row {
     w::Row::new(&w::CEILINGS, w::RowParts { value }).expect("row ceiling")
 }
 
-pub fn status() -> client::api::Status {
-    client::api::Status {
+pub fn status() -> skein_forge::api::Status {
+    skein_forge::api::Status {
         at: skein_lib::Time::from_nanos(2),
         context: Box::new([3]),
-        check: client::api::Check::Passed,
+        check: skein_forge::api::Check::Passed,
         description: Box::new([4]),
         url: Box::new([5]),
-        job: Some(client::api::JobAttempt { head: [6; 32], run: 7, job: 8, attempt: 9 }),
+        job: Some(skein_forge::api::JobAttempt { head: [6; 32], run: 7, job: 8, attempt: 9 }),
     }
 }
-pub fn file() -> client::api::File {
-    client::api::File { path: Box::new([1]), before: Some(Box::new([2])), after: Some(Box::new([3])) }
+pub fn file() -> skein_forge::api::File {
+    skein_forge::api::File { path: Box::new([1]), before: Some(Box::new([2])), after: Some(Box::new([3])) }
 }
-pub fn remaining_answers() -> [client::api::Answer; 6] {
-    use client::api::{Answer, Ci, Collaborator, Permission, Remark};
+pub fn remaining_answers() -> [skein_forge::api::Answer; 6] {
+    use skein_forge::api::{Answer, Ci, Collaborator, Permission, Remark};
     [
         Answer::Statuses { ci: Ci::Failed, statuses: Box::new([status(), status()]), more: true },
         Answer::Remarks {
@@ -593,7 +596,7 @@ pub fn remaining_answers() -> [client::api::Answer; 6] {
             head: [6; 32],
             files: Box::new([
                 file(),
-                client::api::File { path: Box::new([7]), before: None, after: Some(Box::new([8])) },
+                skein_forge::api::File { path: Box::new([7]), before: None, after: Some(Box::new([8])) },
             ]),
             more: true,
         },
@@ -603,11 +606,11 @@ pub fn remaining_answers() -> [client::api::Answer; 6] {
             contains_before: true,
             files: Box::new([
                 file(),
-                client::api::File { path: Box::new([11]), before: Some(Box::new([12])), after: None },
+                skein_forge::api::File { path: Box::new([11]), before: Some(Box::new([12])), after: None },
             ]),
             commits: Box::new([[13; 32], [14; 32]]),
         },
-        Answer::Checks(Box::new([status(), client::api::Status { job: None, ..status() }])),
+        Answer::Checks(Box::new([status(), skein_forge::api::Status { job: None, ..status() }])),
         Answer::Collaborators {
             collaborators: Box::new([
                 Collaborator { user: 15, permission: Permission::Read },
@@ -618,9 +621,9 @@ pub fn remaining_answers() -> [client::api::Answer; 6] {
     ]
 }
 
-pub fn pull() -> client::api::Pull {
-    use client::api::{Ci, State};
-    client::api::Pull {
+pub fn pull() -> skein_forge::api::Pull {
+    use skein_forge::api::{Ci, State};
+    skein_forge::api::Pull {
         reviewers: Box::new([1, 2]),
         number: 3,
         state: State::Closed,
@@ -637,7 +640,7 @@ pub fn pull() -> client::api::Pull {
 pub fn live(what: client::What) -> client::LiveRecord {
     client::LiveRecord {
         watch: client::Watch { resource: client::Resource { repository: REPO, what }, participating: true },
-        position: entry(client::api::Write::Close { number: 1 }, client::Condition::None)
+        position: entry(skein_forge::api::Write::Close { number: 1 }, client::Condition::None)
             .start
             .expect("fixture position"),
         listed: skein_lib::Time::from_nanos(2),

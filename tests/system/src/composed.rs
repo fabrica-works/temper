@@ -546,12 +546,7 @@ impl World {
         Ok(vec![engine::Event::Worker(event)])
     }
 
-    fn forge(
-        &mut self,
-        call: Token,
-        repository: temper_engine_domain_forge_client::api::Repository,
-        op: &temper_engine_domain_forge_client::api::Op,
-    ) {
+    fn forge(&mut self, call: Token, repository: skein_forge::api::Repository, op: &skein_forge::api::Op) {
         assert_eq!(repository.forge, temper_engine_forge_world::REPO.forge);
         assert!(repository.repository == 0 || repository == temper_engine_forge_world::REPO);
         self.forge.at(self.env.now);

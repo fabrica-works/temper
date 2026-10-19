@@ -1,7 +1,7 @@
 //! Verified delivery fields mapped to the forge client's hints (protocol/forge.md, 5).
 use crate::marker;
+use skein_forge::api;
 use skein_lib::bytes;
-use temper_engine_domain_forge_client::api;
 use temper_forge_forgejo::{delivery::Delivery, document::Body};
 
 pub(crate) fn hint(forge: u16, delivery: &Delivery) -> Option<api::Hint> {

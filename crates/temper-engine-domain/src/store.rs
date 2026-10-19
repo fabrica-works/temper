@@ -28,15 +28,13 @@ pub enum CallAnswer {
     /// A forge write joined the named call's decision; later attempts can reask for its settled result.
     ForgeEffect { entry: u64, deadline: skein_lib::Wall, outcome: Option<temper_engine_domain_forge_client::Outcome> },
     /// A forge write was refused before an outbox entry existed.
-    ForgeEffectRefused(temper_engine_domain_forge_client::api::Error),
+    ForgeEffectRefused(skein_forge::api::Error),
     /// The pure policy check declined a forge write, retaining its bounded reasons.
     ForgeEffectDenied { answer: jig_domain_authority::Answer, findings: Box<[jig_domain_authority::Finding]> },
     /// An engine tool was refused with the authority findings.
     ToolDenied { answer: jig_domain_authority::Answer, findings: Box<[jig_domain_authority::Finding]> },
     /// One fresh bounded forge read, retained for named-call replay.
-    ForgeRead(
-        Box<Result<temper_engine_domain_forge_client::api::Answer, temper_engine_domain_forge_client::api::Error>>,
-    ),
+    ForgeRead(Box<Result<skein_forge::api::Answer, skein_forge::api::Error>>),
     /// One held descendant decision reached its semantic terminal.
     EscalationDecided { task: u64, revision: u64, outcome: jig_domain_tasks::EscalationOutcome },
     /// A task holder's held-decision call was refused before mutation.

@@ -1,5 +1,6 @@
 //! Scripted HTTP responses, seeded streams and the forge component's io.
 use crate::{fixtures, peer::Peer};
+use skein_forge::api;
 use skein_lib::{
     Duration, Env, Queue, Time, Token, Wall,
     stream::{Down, Fault, Up},
@@ -9,7 +10,6 @@ use std::{
     fs,
     path::Path,
 };
-use temper_engine_domain_forge_client::api;
 use temper_engine_protocol_forge::{Answered, Component, Event, Limits, Request, Settings, Stopped};
 /// The request's `METHOD target` and its scripted response.
 #[derive(Debug)]

@@ -1,8 +1,9 @@
 //! Assertions are independent of client state: planned effects authorize
 //! emitted writes; fake observations prove keyed creations happened once.
 use crate::translate;
+use skein_forge::api;
 use skein_lib::Map;
-use temper_engine_domain_forge_client::{Entry, api};
+use temper_engine_domain_forge_client::Entry;
 use temper_fake_forge_domain::Observation;
 #[derive(Debug)]
 pub(crate) struct Referee {

@@ -2,7 +2,6 @@ use super::fixtures;
 use crate::{End, Stop, forge, limits};
 use skein_lib::{Duration, Time, Token};
 use temper_engine_domain as root;
-use temper_engine_domain_forge_client as client;
 use temper_engine_protocol_forge::{self as kit, StartRead, Stopped};
 #[test]
 fn a_refused_start_check_stops_the_engine_naming_the_forge() {
@@ -30,8 +29,8 @@ fn a_forge_call_waiting_past_its_deadline_reaches_the_root_unavailable() {
         &mut service.engine,
         root::Request::Forge {
             call,
-            repository: client::api::Repository { forge: 1, repository: 2 },
-            op: client::api::Op::Read(client::api::Read::Settings),
+            repository: skein_forge::api::Repository { forge: 1, repository: 2 },
+            op: skein_forge::api::Op::Read(skein_forge::api::Read::Settings),
         },
     );
     service.engine.forge.env.now = Time::from_nanos(11_000_000_000);
@@ -41,7 +40,7 @@ fn a_forge_call_waiting_past_its_deadline_reaches_the_root_unavailable() {
         &mut service.engine.forge.io,
     );
     let Some(kit::Event::Answered(answer)) = service.engine.forge.above.pop() else { panic!("call terminal") };
-    assert_eq!(answer, kit::Answered { call, cost: 0, result: Err(client::api::Error::Unavailable) });
+    assert_eq!(answer, kit::Answered { call, cost: 0, result: Err(skein_forge::api::Error::Unavailable) });
     let root::Event::Forge(event) = forge::event(answer) else {
         panic!("forge event");
     };
@@ -56,7 +55,7 @@ fn an_answer_the_root_cannot_take_is_offered_again_next_pass() {
             break;
         }
     }
-    let answer = kit::Answered { call: Token::new(7), cost: 0, result: Err(client::api::Error::Unavailable) };
+    let answer = kit::Answered { call: Token::new(7), cost: 0, result: Err(skein_forge::api::Error::Unavailable) };
     assert!(root::try_step(&mut service.engine.domain, &service.engine.env, forge::event(answer.clone())).is_err());
     service.engine.forge.above.push(kit::Event::Answered(answer.clone()));
     crate::engine::forge_pass(&mut service.engine);
@@ -71,7 +70,7 @@ fn an_answer_returned_in_the_drain_is_never_offered_again() {
     service.shutdown();
     fixtures::ForgeFace::returned(
         &mut service,
-        kit::Answered { call: Token::new(7), cost: 0, result: Err(client::api::Error::Unavailable) },
+        kit::Answered { call: Token::new(7), cost: 0, result: Err(skein_forge::api::Error::Unavailable) },
     );
     for _ in 0_u32..4 {
         service.engine.forge.down(kit::Request::Offer);

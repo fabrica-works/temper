@@ -1,5 +1,5 @@
 //! Locating a repository by owner and name (domain/forge.md, 4; protocol/forge.md, 12).
-use temper_engine_domain_forge_client::api;
+use skein_forge::api;
 use temper_engine_forge_client_world::{Settings, World};
 
 #[test]

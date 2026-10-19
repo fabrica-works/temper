@@ -181,9 +181,9 @@ fn an_effect_proposal_decodes_its_connector_payload_and_rejects_an_unknown_resou
             completion: 2, position: 1,
             tool: engine::Tool::Propose {
                 action: engine::ProposedAction::Effect {
-                    repository: temper_engine_domain_forge_client::api::Repository { forge: 1, repository: 2 },
+                    repository: skein_forge::api::Repository { forge: 1, repository: 2 },
                     resource: temper_engine_domain_forge::What::Repository,
-                    write: Box::new(temper_engine_domain_forge_client::api::Write::Close { number: 3 }),
+                    write: Box::new(skein_forge::api::Write::Close { number: 3 }),
                 },
                 reason: b"x".as_slice().into(), as_holder: false,
             },
@@ -287,7 +287,7 @@ fn a_charter_resumes_when_its_policy_does_and_turns_are_kept() {
 
 #[test]
 fn a_job_answer_names_its_failed_step_before_its_log() {
-    use temper_engine_domain_forge_client::api;
+    use skein_forge::api;
     let attempt = api::JobAttempt { head: [1; 32], run: 7, job: 8, attempt: 2 };
     let step = Some(api::Step { number: 1, name: Box::from(&b"build"[..]) });
     let read = api::Answer::Job { attempt, step, log: Box::from(&b"failing check build 3\n"[..]), truncated: true };
@@ -298,7 +298,7 @@ fn a_job_answer_names_its_failed_step_before_its_log() {
 
 #[test]
 fn a_job_answer_with_no_failed_step_says_none_failed() {
-    use temper_engine_domain_forge_client::api;
+    use skein_forge::api;
     let attempt = api::JobAttempt { head: [1; 32], run: 7, job: 8, attempt: 2 };
     let step = None;
     let read = api::Answer::Job { attempt, step, log: Box::from(&b"failing check build 3\n"[..]), truncated: false };
@@ -309,7 +309,7 @@ fn a_job_answer_with_no_failed_step_says_none_failed() {
 
 #[test]
 fn a_job_answer_with_an_empty_step_name_names_its_number_alone() {
-    use temper_engine_domain_forge_client::api;
+    use skein_forge::api;
     let attempt = api::JobAttempt { head: [1; 32], run: 7, job: 8, attempt: 2 };
     let step = Some(api::Step { number: 1, name: Box::new([]) });
     let read = api::Answer::Job { attempt, step, log: Box::from(&b"failing check build 3\n"[..]), truncated: false };

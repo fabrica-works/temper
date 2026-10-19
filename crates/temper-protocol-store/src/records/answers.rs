@@ -1,8 +1,8 @@
 use super::api;
 use super::{Bounds, FITS, Undecodable, names, topics, w};
 use alloc::boxed::Box;
+use skein_forge::api as d;
 use skein_lib::{List, Reader, Writer};
-use temper_engine_domain_forge_client::api as d;
 pub(super) fn encode_permission(value: d::Permission) -> w::Permission {
     match value {
         d::Permission::None => w::Permission::None,

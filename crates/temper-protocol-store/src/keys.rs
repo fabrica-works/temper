@@ -172,16 +172,16 @@ pub fn decode(bytes: &[u8], limits: &forge::Limits) -> Option<forge::Key> {
     Some(key)
 }
 
-fn write_repository(writer: &mut KeyWriter, repository: client::api::Repository) {
+fn write_repository(writer: &mut KeyWriter, repository: skein_forge::api::Repository) {
     writer.u64(u64::from(repository.forge)).u64(u64::from(repository.repository));
 }
-fn read_repository(reader: &mut KeyReader<'_>) -> Option<client::api::Repository> {
-    Some(client::api::Repository {
+fn read_repository(reader: &mut KeyReader<'_>) -> Option<skein_forge::api::Repository> {
+    Some(skein_forge::api::Repository {
         forge: u16::try_from(reader.u64()?).ok()?,
         repository: u32::try_from(reader.u64()?).ok()?,
     })
 }
-fn read_commit(reader: &mut KeyReader<'_>) -> Option<client::api::Commit> {
+fn read_commit(reader: &mut KeyReader<'_>) -> Option<skein_forge::api::Commit> {
     reader.bytes()?.as_ref().try_into().ok()
 }
 fn read_branch(reader: &mut KeyReader<'_>, limits: &forge::Limits) -> Option<Box<[u8]>> {

@@ -1,6 +1,6 @@
 //! Forge component boundary (protocol/forge.md, sections 2, 3.5, 7 and 8).
+use skein_forge::api;
 use skein_lib::Token;
-use temper_engine_domain_forge_client::api;
 
 /// One call's terminal, the forge client's `Event::Answered` field for field. The
 /// component makes it; the routing hands it to the root as `Event::Forge`, and hands

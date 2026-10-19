@@ -1,4 +1,4 @@
-use temper_engine_domain_forge_client::api as client;
+use skein_forge::api as client;
 use temper_engine_forge_world::{World, translate};
 
 #[test]

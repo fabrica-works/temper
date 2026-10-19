@@ -37,10 +37,7 @@ impl Joint {
     #[must_use]
     pub fn engine_adopted(&self, forge: u16, repository: u32) -> bool {
         use temper_engine_domain_forge::{Key, Role, Stored};
-        let key = engine::Key::Forge(Key::Repository(temper_engine_domain_forge_client::api::Repository {
-            forge,
-            repository,
-        }));
+        let key = engine::Key::Forge(Key::Repository(skein_forge::api::Repository { forge, repository }));
         let Some(engine::Record::Forge { row }) = self.engine.store.rows.get(&key) else { return false };
         matches!(row.as_ref(), Stored::Repository(value) if value.project == 1 && value.role == Role::Owned)
     }

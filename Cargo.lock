@@ -79,6 +79,7 @@ name = "forgejo-conformance"
 version = "0.0.0"
 dependencies = [
  "serde_json",
+ "skein-forge",
  "skein-io",
  "skein-lib",
  "skein-shell",
@@ -1105,6 +1106,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "skein-forge"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#0db7b1fc7307aa50980ce75637e686e384adc4e4"
+dependencies = [
+ "skein-json",
+ "skein-lib",
+]
+
+[[package]]
 name = "skein-heap"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/skein.git#0db7b1fc7307aa50980ce75637e686e384adc4e4"
@@ -1908,6 +1918,7 @@ dependencies = [
  "jig-protocol-transcript",
  "jig-test-domain",
  "skein-fake-person",
+ "skein-forge",
  "skein-io",
  "skein-lib",
  "skein-ui",
@@ -1958,6 +1969,7 @@ dependencies = [
  "jig-domain-tasks",
  "jig-fake-workers",
  "jig-test-system",
+ "skein-forge",
  "skein-lib",
  "temper-engine-domain",
  "temper-engine-domain-forge",
@@ -1982,6 +1994,7 @@ dependencies = [
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-domain-views",
+ "skein-forge",
  "skein-lib",
  "temper-engine-domain-forge",
  "temper-engine-domain-forge-change",
@@ -1994,6 +2007,7 @@ name = "temper-engine-domain-forge"
 version = "0.0.0"
 dependencies = [
  "jig-domain-people",
+ "skein-forge",
  "skein-lib",
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-client",
@@ -2011,6 +2025,7 @@ dependencies = [
 name = "temper-engine-domain-forge-client"
 version = "0.0.0"
 dependencies = [
+ "skein-forge",
  "skein-lib",
 ]
 
@@ -2043,6 +2058,7 @@ dependencies = [
  "jig-protocol-store",
  "jig-tasks-world",
  "jig-test-store-files",
+ "skein-forge",
  "skein-kv",
  "skein-lib",
  "skein-world",
@@ -2064,6 +2080,7 @@ dependencies = [
 name = "temper-engine-forge-client-world"
 version = "0.0.0"
 dependencies = [
+ "skein-forge",
  "skein-lib",
  "skein-world",
  "temper-engine-domain-forge-client",
@@ -2075,6 +2092,7 @@ name = "temper-engine-forge-world"
 version = "0.0.0"
 dependencies = [
  "jig-domain-people",
+ "skein-forge",
  "skein-lib",
  "skein-world",
  "temper-engine-domain-forge",
@@ -2088,6 +2106,7 @@ dependencies = [
 name = "temper-engine-protocol-forge"
 version = "0.0.0"
 dependencies = [
+ "skein-forge",
  "skein-http",
  "skein-io",
  "skein-json",
@@ -2103,6 +2122,7 @@ name = "temper-engine-protocol-forge-world"
 version = "0.0.0"
 dependencies = [
  "jig-domain-people",
+ "skein-forge",
  "skein-http",
  "skein-io",
  "skein-json",
@@ -2132,6 +2152,7 @@ dependencies = [
  "jig-domain-notes",
  "jig-domain-people",
  "jig-domain-tasks",
+ "skein-forge",
  "skein-json",
  "skein-lib",
  "smith-domain",
@@ -2308,6 +2329,7 @@ dependencies = [
  "jig-domain-tasks",
  "jig-protocol-store",
  "skein-codec",
+ "skein-forge",
  "skein-kv",
  "skein-lib",
  "temper-engine-domain",
@@ -2349,6 +2371,7 @@ dependencies = [
  "jig-protocol-worker-wire",
  "skein-channel",
  "skein-codec",
+ "skein-forge",
  "skein-http",
  "skein-io",
  "skein-json",
@@ -2398,6 +2421,7 @@ dependencies = [
  "jig-protocol-config",
  "skein-fake-checkout",
  "skein-fake-llm-domain",
+ "skein-forge",
  "skein-lib",
  "smith-agent-world",
  "smith-channel",

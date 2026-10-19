@@ -11,17 +11,17 @@ pub(crate) struct BriefFetch {
     owner: Token,
     item: BriefItem,
     head: BriefCommit,
-    repository: client::api::Repository,
+    repository: skein_forge::api::Repository,
     parts: u32,
     bytes: u32,
     stage: BriefStage,
     mode: PullMode,
-    base: Option<client::api::Commit>,
-    comparison: Option<(client::api::Commit, client::api::Commit)>,
+    base: Option<skein_forge::api::Commit>,
+    comparison: Option<(skein_forge::api::Commit, skein_forge::api::Commit)>,
     changed: Box<[Box<[u8]>]>,
     review_ids: Box<[u64]>,
     next_review: u32,
-    checks: Box<[client::api::Status]>,
+    checks: Box<[skein_forge::api::Status]>,
     next_check: u32,
     max_job_bytes: u32,
     words: BriefWords,
@@ -55,8 +55,8 @@ enum BriefStage {
 #[derive(Clone, Copy, Debug)]
 enum PullMode {
     Review,
-    Conflict(client::api::Commit),
-    Semantic(Option<client::api::Commit>),
+    Conflict(skein_forge::api::Commit),
+    Semantic(Option<skein_forge::api::Commit>),
     Other,
 }
 
@@ -164,7 +164,7 @@ pub(super) fn brief_pull(
         event: client::Event::Read {
             owner: call,
             repository,
-            read: client::api::Read::Item { number: item.number, after: 0 },
+            read: skein_forge::api::Read::Item { number: item.number, after: 0 },
         },
     });
     // The brief child waits for the connector's bounded answer.
@@ -175,12 +175,12 @@ pub(super) fn brief_pull(
 pub(crate) fn brief_answer(
     domain: &mut Domain,
     owner: Token,
-    result: Result<client::api::Answer, client::api::Error>,
+    result: Result<skein_forge::api::Answer, skein_forge::api::Error>,
     out: &mut Queue<Request>,
 ) -> bool {
     let Some(mut fetch) = domain.brief_fetches.remove(&owner) else { return false };
     let next = match result {
-        Ok(client::api::Answer::Item { item, .. })
+        Ok(skein_forge::api::Answer::Item { item, .. })
             if fetch.stage == BriefStage::Item && item.number == fetch.item.number =>
         {
             match fetch.mode {
@@ -195,14 +195,14 @@ pub(crate) fn brief_answer(
             append(&mut fetch.words, &item.body);
             append(&mut fetch.words, b"\n");
             fetch.stage = BriefStage::Pull;
-            Some(client::api::Read::Pull { number: fetch.item.number })
+            Some(skein_forge::api::Read::Pull { number: fetch.item.number })
         }
-        Ok(client::api::Answer::Pull(pull)) if fetch.stage == BriefStage::Pull && pull.commit == fetch.head.0 => {
+        Ok(skein_forge::api::Answer::Pull(pull)) if fetch.stage == BriefStage::Pull && pull.commit == fetch.head.0 => {
             fetch.base = pull.base_commit;
             fetch.stage = BriefStage::Files;
-            Some(client::api::Read::PullFiles { number: fetch.item.number, head: fetch.head.0, page: 1 })
+            Some(skein_forge::api::Read::PullFiles { number: fetch.item.number, head: fetch.head.0, page: 1 })
         }
-        Ok(client::api::Answer::PullFiles { head, files, .. })
+        Ok(skein_forge::api::Answer::PullFiles { head, files, .. })
             if fetch.stage == BriefStage::Files && head == fetch.head.0 =>
         {
             append(&mut fetch.words, b"Files and diff:\n");
@@ -237,12 +237,12 @@ pub(crate) fn brief_answer(
             match comparison {
                 Some((before, after)) => {
                     fetch.stage = BriefStage::Compare;
-                    Some(client::api::Read::Compare { before, after })
+                    Some(skein_forge::api::Read::Compare { before, after })
                 }
                 None => None,
             }
         }
-        Ok(client::api::Answer::Compare { before, after, files, commits, .. })
+        Ok(skein_forge::api::Answer::Compare { before, after, files, commits, .. })
             if fetch.stage == BriefStage::Compare && Some((before, after)) == fetch.comparison =>
         {
             match fetch.mode {
@@ -280,7 +280,7 @@ pub(crate) fn brief_answer(
             }
             None
         }
-        Ok(client::api::Answer::Reviews { reviews, .. }) if fetch.stage == BriefStage::Reviews => {
+        Ok(skein_forge::api::Answer::Reviews { reviews, .. }) if fetch.stage == BriefStage::Reviews => {
             let mut ids = List::with_capacity(u32::try_from(reviews.len()).expect("bounded review list"));
             for review in reviews {
                 if review.commit == fetch.head.0 {
@@ -293,7 +293,7 @@ pub(crate) fn brief_answer(
             fetch.review_ids = ids.into_boxed();
             next_remarks(&mut fetch)
         }
-        Ok(client::api::Answer::Remarks { remarks, .. }) if fetch.stage == BriefStage::Remarks => {
+        Ok(skein_forge::api::Answer::Remarks { remarks, .. }) if fetch.stage == BriefStage::Remarks => {
             for remark in remarks {
                 append(&mut fetch.words, b"Remark at ");
                 append(&mut fetch.words, &remark.path);
@@ -305,7 +305,7 @@ pub(crate) fn brief_answer(
             }
             next_remarks(&mut fetch)
         }
-        Ok(client::api::Answer::Checks(checks)) if fetch.stage == BriefStage::Checks => {
+        Ok(skein_forge::api::Answer::Checks(checks)) if fetch.stage == BriefStage::Checks => {
             fetch.checks = checks;
             let next = next_failed_job(&mut fetch);
             if next.is_none() {
@@ -315,8 +315,8 @@ pub(crate) fn brief_answer(
         }
         answer if fetch.stage == BriefStage::Job => {
             match answer {
-                Ok(client::api::Answer::Job { attempt, step, log, truncated }) if attempt.head == fetch.head.0 => {
-                    if let Some(client::api::Step { number, name }) = step {
+                Ok(skein_forge::api::Answer::Job { attempt, step, log, truncated }) if attempt.head == fetch.head.0 => {
+                    if let Some(skein_forge::api::Step { number, name }) = step {
                         append(&mut fetch.words, b"Failed step: ");
                         append(&mut fetch.words, &decimal(u64::from(number)));
                         if !name.is_empty() {
@@ -384,21 +384,21 @@ pub(crate) fn gather(
     }
 }
 
-fn next_remarks(fetch: &mut BriefFetch) -> Option<client::api::Read> {
+fn next_remarks(fetch: &mut BriefFetch) -> Option<skein_forge::api::Read> {
     let index = usize::try_from(fetch.next_review).expect("u32 fits usize");
     let review = *fetch.review_ids.get(index)?;
     fetch.next_review = fetch.next_review.checked_add(1).expect("bounded review count");
     fetch.stage = BriefStage::Remarks;
-    Some(client::api::Read::Remarks { number: fetch.item.number, review, page: 1 })
+    Some(skein_forge::api::Read::Remarks { number: fetch.item.number, review, page: 1 })
 }
 
 /// Append each failed status before asking for its pinned attempt's log.
-fn next_failed_job(fetch: &mut BriefFetch) -> Option<client::api::Read> {
+fn next_failed_job(fetch: &mut BriefFetch) -> Option<skein_forge::api::Read> {
     let total = u32::try_from(fetch.checks.len()).expect("bounded check list");
     for index in fetch.next_check..total {
         let status = fetch.checks.get(usize::try_from(index).expect("u32 fits usize")).expect("index in check list");
         fetch.next_check = index.checked_add(1).expect("bounded check count");
-        if status.check != client::api::Check::Failed {
+        if status.check != skein_forge::api::Check::Failed {
             continue;
         }
         append(&mut fetch.words, b"Failed check: ");
@@ -418,7 +418,7 @@ fn next_failed_job(fetch: &mut BriefFetch) -> Option<client::api::Read> {
                     .expect("positive check count")
                     .checked_div(2)
                     .expect("positive divisor");
-                return Some(client::api::Read::Job { attempt, max_bytes: share.max(1).min(fetch.max_job_bytes) });
+                return Some(skein_forge::api::Read::Job { attempt, max_bytes: share.max(1).min(fetch.max_job_bytes) });
             }
             Some(_) | None => append(&mut fetch.words, b"[no pinned job log for this head]\n"),
         }
@@ -478,7 +478,7 @@ pub(super) fn brief_reviews(
         event: client::Event::Read {
             owner: call,
             repository,
-            read: client::api::Read::Reviews { number: item.number, page: 1 },
+            read: skein_forge::api::Read::Reviews { number: item.number, page: 1 },
         },
     });
     None
@@ -548,7 +548,7 @@ pub(super) fn brief_ci(
     };
     domain.brief_fetches.insert(call, fetch).expect("brief read room checked");
     out.push(Request::BriefClient {
-        event: client::Event::Read { owner: call, repository, read: client::api::Read::Checks { commit: head.0 } },
+        event: client::Event::Read { owner: call, repository, read: skein_forge::api::Read::Checks { commit: head.0 } },
     });
     None
 }

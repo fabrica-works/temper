@@ -16,10 +16,10 @@ fn an_adoption_locates_its_repository_before_any_other_read() {
     );
     let sent = ready(&mut d);
     let [Request::Call { repository, op, .. }] = sent.as_ref() else { panic!("one locate call") };
-    assert_eq!(*repository, client::api::Repository { forge: 1, repository: 0 });
+    assert_eq!(*repository, skein_forge::api::Repository { forge: 1, repository: 0 });
     assert_eq!(
         *op,
-        client::api::Op::Read(client::api::Read::Locate {
+        skein_forge::api::Op::Read(skein_forge::api::Read::Locate {
             owner: Box::from(&b"org"[..]),
             name: Box::from(&b"repo"[..]),
         })

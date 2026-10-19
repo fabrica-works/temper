@@ -1,7 +1,7 @@
 //! Repository paths and user logins, evicted by least recent use (protocol/forge.md, 3.5).
 use alloc::boxed::Box;
+use skein_forge::api;
 use skein_lib::Map;
-use temper_engine_domain_forge_client::api;
 use temper_forge_forgejo::{document::MergeStyle, id::ObjectFormat};
 /// The repository fields needed to address calls and read their answers.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

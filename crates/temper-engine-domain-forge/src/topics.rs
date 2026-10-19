@@ -14,7 +14,7 @@ use temper_engine_domain_forge_client as client;
 /// One bounded file list pinned to an open pull's head.
 #[derive(Debug)]
 pub(crate) struct Files {
-    pub head: client::api::Commit,
+    pub head: skein_forge::api::Commit,
     pub paths: Option<Box<[Box<[u8]>]>>,
 }
 #[derive(Clone, Copy, Debug)]
@@ -27,9 +27,9 @@ enum Stage {
 #[derive(Debug)]
 pub(crate) struct Pending {
     task: u64,
-    repository: client::api::Repository,
+    repository: skein_forge::api::Repository,
     pull: u64,
-    head: client::api::Commit,
+    head: skein_forge::api::Commit,
     stage: Stage,
     paths: List<Box<[u8]>>,
 }
@@ -156,7 +156,7 @@ pub(crate) fn refresh(d: &mut Domain, env: &Env<Limits>, task: u64, out: &mut Qu
     domain::child(
         d,
         env,
-        client::Event::Read { owner, repository, read: client::api::Read::Pull { number: pull } },
+        client::Event::Read { owner, repository, read: skein_forge::api::Read::Pull { number: pull } },
         out,
     );
 }
@@ -165,24 +165,24 @@ pub(crate) fn answer(
     d: &mut Domain,
     env: &Env<Limits>,
     owner: Token,
-    result: Result<client::api::Answer, client::api::Error>,
+    result: Result<skein_forge::api::Answer, skein_forge::api::Error>,
     out: &mut Queue<Request>,
 ) {
     let Some(mut pending) = d.goal_file_reads.remove(&owner) else { return };
     let next = match pending.stage {
         Stage::Before => match result {
-            Ok(client::api::Answer::Pull(pull))
+            Ok(skein_forge::api::Answer::Pull(pull))
                 if pull.number == pending.pull
                     && pull.commit == pending.head
-                    && pull.state == client::api::State::Open =>
+                    && pull.state == skein_forge::api::State::Open =>
             {
                 pending.stage = Stage::Page(1);
-                Some(client::api::Read::PullFiles { number: pending.pull, head: pending.head, page: 1 })
+                Some(skein_forge::api::Read::PullFiles { number: pending.pull, head: pending.head, page: 1 })
             }
             Ok(_) | Err(_) => None,
         },
         Stage::Page(page) => match result {
-            Ok(client::api::Answer::PullFiles { head, files, more }) if head == pending.head => {
+            Ok(skein_forge::api::Answer::PullFiles { head, files, more }) if head == pending.head => {
                 let empty = files.is_empty();
                 for file in files {
                     if file.path.len() > usize::try_from(env.limits.name_bytes).expect("u32 fits usize")
@@ -202,20 +202,20 @@ pub(crate) fn answer(
                         return;
                     };
                     pending.stage = Stage::Page(page);
-                    Some(client::api::Read::PullFiles { number: pending.pull, head, page })
+                    Some(skein_forge::api::Read::PullFiles { number: pending.pull, head, page })
                 } else {
                     pending.stage = Stage::After;
-                    Some(client::api::Read::Pull { number: pending.pull })
+                    Some(skein_forge::api::Read::Pull { number: pending.pull })
                 }
             }
             Ok(_) | Err(_) => None,
         },
         Stage::After => {
             let paths = match result {
-                Ok(client::api::Answer::Pull(pull))
+                Ok(skein_forge::api::Answer::Pull(pull))
                     if pull.number == pending.pull
                         && pull.commit == pending.head
-                        && pull.state == client::api::State::Open =>
+                        && pull.state == skein_forge::api::State::Open =>
                 {
                     Some(core::mem::replace(&mut pending.paths, List::with_capacity(0)).into_boxed())
                 }

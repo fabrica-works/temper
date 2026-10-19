@@ -6,9 +6,9 @@
 //! Queued → Out → Closed on success or permanent failure; a transient
 //! failure moves Out → Waiting → Queued. A rate refusal holds every class
 //! until reset without completing the logical read twice.
-use crate::api::{Answer, Error, Op, Repository};
 use crate::domain::{Alarm, Domain};
 use crate::{Fact, Limits, Priority, Request, bounds};
+use skein_forge::api::{Answer, Error, Op, Repository};
 use skein_lib::{Env, Id, Map, Queue, Slab, Time, Token};
 
 #[derive(Debug)]

@@ -41,7 +41,7 @@ pub(crate) fn saved_tags(resources: &[tasks::SavedResource], connector: u16) -> 
 #[must_use]
 pub fn adopt_repository_ask(
     adoption: forge::Adoption,
-    repository: forge_client::api::Repository,
+    repository: skein_forge::api::Repository,
     connector: u16,
 ) -> Option<people::Ask> {
     let role = match adoption.role {
@@ -78,17 +78,17 @@ pub fn adopt_repository_ask(
     })
 }
 
-fn permission_number(permission: forge_client::api::Permission) -> u16 {
+fn permission_number(permission: skein_forge::api::Permission) -> u16 {
     match permission {
-        forge_client::api::Permission::None => 0,
-        forge_client::api::Permission::Read => 1,
-        forge_client::api::Permission::Write => 2,
-        forge_client::api::Permission::Admin => 3,
+        skein_forge::api::Permission::None => 0,
+        skein_forge::api::Permission::Read => 1,
+        skein_forge::api::Permission::Write => 2,
+        skein_forge::api::Permission::Admin => 3,
     }
 }
 
 /// The project's role for a collaborator's forge permission (domain/forge.md, 4).
-fn seeded_role(domain: &Domain, project: u32, permission: forge_client::api::Permission) -> Option<people::Role> {
+fn seeded_role(domain: &Domain, project: u32, permission: skein_forge::api::Permission) -> Option<people::Role> {
     let number = permission_number(permission);
     let mappings = domain.core.permission_roles.get(&project)?;
     for mapping in mappings.as_ref() {
@@ -115,7 +115,7 @@ fn append_hex(out: &mut List<u8>, bytes: &[u8]) {
     }
 }
 
-fn commit_text(commit: &forge_client::api::Commit) -> Box<[u8]> {
+fn commit_text(commit: &skein_forge::api::Commit) -> Box<[u8]> {
     let mut length = 20;
     for byte in &commit[20..] {
         if *byte != 0 {
@@ -140,10 +140,10 @@ fn news_words(news: &forge::News, limit: u32) -> Box<[u8]> {
         forge::News::Ci { head, status } => {
             append(&mut out, b"forge ci ");
             let label: &[u8] = match status {
-                forge_client::api::Ci::None => b"none",
-                forge_client::api::Ci::Pending => b"pending",
-                forge_client::api::Ci::Passed => b"passed",
-                forge_client::api::Ci::Failed => b"failed",
+                skein_forge::api::Ci::None => b"none",
+                skein_forge::api::Ci::Pending => b"pending",
+                skein_forge::api::Ci::Passed => b"passed",
+                skein_forge::api::Ci::Failed => b"failed",
             };
             append(&mut out, label);
             append(&mut out, b" at ");
@@ -239,32 +239,32 @@ fn decimal(number: u64) -> Box<[u8]> {
     forward.into_boxed()
 }
 
-fn read_name(repository: &forge::Repository, read: &forge_client::api::Read, limit: u32) -> Option<authority::Name> {
+fn read_name(repository: &forge::Repository, read: &skein_forge::api::Read, limit: u32) -> Option<authority::Name> {
     let mut segments = List::with_capacity(limit);
     for segment in [b"forge".as_slice(), &repository.host, &repository.owner, &repository.name] {
         segments.push(Box::from(segment)).ok()?;
     }
     let what = match read {
-        forge_client::api::Read::Pull { number }
-        | forge_client::api::Read::Reviews { number, .. }
-        | forge_client::api::Read::Remarks { number, .. }
-        | forge_client::api::Read::PullFiles { number, .. } => Some((b"pull".as_slice(), Some(decimal(*number)))),
-        forge_client::api::Read::Item { number, .. } => Some((b"issue".as_slice(), Some(decimal(*number)))),
-        forge_client::api::Read::Branch { branch } | forge_client::api::Read::Protection { branch } => {
+        skein_forge::api::Read::Pull { number }
+        | skein_forge::api::Read::Reviews { number, .. }
+        | skein_forge::api::Read::Remarks { number, .. }
+        | skein_forge::api::Read::PullFiles { number, .. } => Some((b"pull".as_slice(), Some(decimal(*number)))),
+        skein_forge::api::Read::Item { number, .. } => Some((b"issue".as_slice(), Some(decimal(*number)))),
+        skein_forge::api::Read::Branch { branch } | skein_forge::api::Read::Protection { branch } => {
             Some((b"branch".as_slice(), Some(branch.clone())))
         }
-        forge_client::api::Read::Locate { .. }
-        | forge_client::api::Read::File { .. }
-        | forge_client::api::Read::Items { .. }
-        | forge_client::api::Read::PullFor { .. }
-        | forge_client::api::Read::Statuses { .. }
-        | forge_client::api::Read::Compare { .. }
-        | forge_client::api::Read::Checks { .. }
-        | forge_client::api::Read::Job { .. }
-        | forge_client::api::Read::Branches
-        | forge_client::api::Read::Settings
-        | forge_client::api::Read::Collaborators { .. }
-        | forge_client::api::Read::Permission { .. } => None,
+        skein_forge::api::Read::Locate { .. }
+        | skein_forge::api::Read::File { .. }
+        | skein_forge::api::Read::Items { .. }
+        | skein_forge::api::Read::PullFor { .. }
+        | skein_forge::api::Read::Statuses { .. }
+        | skein_forge::api::Read::Compare { .. }
+        | skein_forge::api::Read::Checks { .. }
+        | skein_forge::api::Read::Job { .. }
+        | skein_forge::api::Read::Branches
+        | skein_forge::api::Read::Settings
+        | skein_forge::api::Read::Collaborators { .. }
+        | skein_forge::api::Read::Permission { .. } => None,
     };
     if let Some((kind, part)) = what {
         segments.push(Box::from(kind)).ok()?;
@@ -343,15 +343,15 @@ pub(crate) fn effect_call(
     decision: &mut Decision,
     to: ReplyTo,
     key: CallKey,
-    repository: forge_client::api::Repository,
+    repository: skein_forge::api::Repository,
     resource: forge::What,
-    write: forge_client::api::Write,
+    write: skein_forge::api::Write,
     proposal: Option<(Box<[u8]>, bool)>,
 ) {
     let owner = effect_owner(domain);
     let flight = match describe_agent(domain, env, key, repository, resource, write) {
         Ok(flight) => flight,
-        Err(forge_client::api::Error::Busy) => {
+        Err(skein_forge::api::Error::Busy) => {
             super::relay_call(domain, &env.limits, decision, to, CallAnswer::Unavailable);
             return;
         }
@@ -380,10 +380,10 @@ fn describe_agent(
     domain: &Domain,
     env: &Env<Limits>,
     key: CallKey,
-    repository: forge_client::api::Repository,
+    repository: skein_forge::api::Repository,
     resource: forge::What,
-    write: forge_client::api::Write,
-) -> Result<EffectFlight, forge_client::api::Error> {
+    write: skein_forge::api::Write,
+) -> Result<EffectFlight, skein_forge::api::Error> {
     let mut staged = 0_u32;
     for (_, flight) in &domain.forge_effects {
         match flight {
@@ -392,11 +392,11 @@ fn describe_agent(
         }
     }
     if !domain.forge.effect_room(&env.limits.forge, staged) {
-        return Err(forge_client::api::Error::Busy);
+        return Err(skein_forge::api::Error::Busy);
     }
-    let adopted = domain.forge.repository(repository).ok_or(forge_client::api::Error::Missing)?;
+    let adopted = domain.forge.repository(repository).ok_or(skein_forge::api::Error::Missing)?;
     if !domain.core.connector_project(key.task, adopted.project) {
-        return Err(forge_client::api::Error::Forbidden);
+        return Err(skein_forge::api::Error::Forbidden);
     }
     let described = match forge::describe_agent_effect(
         adopted,
@@ -411,7 +411,7 @@ fn describe_agent(
         }
     };
     let name =
-        resource_name(adopted, &resource, env.limits.authority.segments).ok_or(forge_client::api::Error::TooLarge)?;
+        resource_name(adopted, &resource, env.limits.authority.segments).ok_or(skein_forge::api::Error::TooLarge)?;
     let form = match described.form {
         forge::EffectForm::Creation => EffectForm::Creation,
         forge::EffectForm::Transition => EffectForm::Transition,
@@ -448,21 +448,21 @@ pub(crate) fn read_call(
     _decision: &mut Decision,
     to: ReplyTo,
     key: CallKey,
-    repository: forge_client::api::Repository,
-    read: forge_client::api::Read,
+    repository: skein_forge::api::Repository,
+    read: skein_forge::api::Read,
 ) {
     let Some(adopted) = domain.forge.repository(repository) else {
         return super::host_route::read(
             domain,
             to,
-            CallAnswer::ForgeRead(Box::new(Err(forge_client::api::Error::Missing))),
+            CallAnswer::ForgeRead(Box::new(Err(skein_forge::api::Error::Missing))),
         );
     };
     let Some(context) = domain.core.tasks.delegation(key.task) else {
         return super::host_route::read(
             domain,
             to,
-            CallAnswer::ForgeRead(Box::new(Err(forge_client::api::Error::Forbidden))),
+            CallAnswer::ForgeRead(Box::new(Err(skein_forge::api::Error::Forbidden))),
         );
     };
     let name = read_name(adopted, &read, env.limits.authority.segments);
@@ -491,21 +491,21 @@ pub(crate) fn read_call(
         return super::host_route::read(
             domain,
             to,
-            CallAnswer::ForgeRead(Box::new(Err(forge_client::api::Error::Forbidden))),
+            CallAnswer::ForgeRead(Box::new(Err(skein_forge::api::Error::Forbidden))),
         );
     }
     let Some(serial) = domain.next_effect_owner.checked_add(1) else {
         return super::host_route::read(
             domain,
             to,
-            CallAnswer::ForgeRead(Box::new(Err(forge_client::api::Error::Busy))),
+            CallAnswer::ForgeRead(Box::new(Err(skein_forge::api::Error::Busy))),
         );
     };
     if serial >= 1_u64 << 61_u32 {
         return super::host_route::read(
             domain,
             to,
-            CallAnswer::ForgeRead(Box::new(Err(forge_client::api::Error::Busy))),
+            CallAnswer::ForgeRead(Box::new(Err(skein_forge::api::Error::Busy))),
         );
     }
     domain.next_effect_owner = serial;
@@ -2011,10 +2011,10 @@ pub(crate) fn outputs(
                 save(decision, &env.limits, Write::Erase(Key::Forge(key)));
             }
             forge::Request::Call { call, repository, op } => match op {
-                op @ forge_client::api::Op::Read(_) => {
+                op @ skein_forge::api::Op::Read(_) => {
                     assert!(super::now(domain, Request::Forge { call, repository, op }), "forge read door reserved");
                 }
-                op @ forge_client::api::Op::Write(_) => {
+                op @ skein_forge::api::Op::Write(_) => {
                     emit(decision, &env.limits, Delivery::ForgeCall { call, repository, op });
                 }
             },
@@ -2069,35 +2069,35 @@ pub(crate) fn outputs(
                     Err(error) => {
                         // The forge's adoption errors as jig's facts (brief D12).
                         let outcome = match error {
-                            forge_client::api::Error::Busy
-                            | forge_client::api::Error::Unavailable
-                            | forge_client::api::Error::Timeout
-                            | forge_client::api::Error::RateLimited { .. } => {
+                            skein_forge::api::Error::Busy
+                            | skein_forge::api::Error::Unavailable
+                            | skein_forge::api::Error::Timeout
+                            | skein_forge::api::Error::RateLimited { .. } => {
                                 people::Outcome::Again(people::Again::Busy)
                             }
-                            forge_client::api::Error::TooLarge | forge_client::api::Error::Full => {
+                            skein_forge::api::Error::TooLarge | skein_forge::api::Error::Full => {
                                 people::Outcome::Refused(people::Refusal::Limit { which: people::LimitKind::Resource })
                             }
-                            forge_client::api::Error::Forbidden
-                            | forge_client::api::Error::Protected
-                            | forge_client::api::Error::Refused => {
+                            skein_forge::api::Error::Forbidden
+                            | skein_forge::api::Error::Protected
+                            | skein_forge::api::Error::Refused => {
                                 people::Outcome::Refused(people::Refusal::Authority {
                                     lacking: people::Lack::ResourceAccess,
                                     proposable: None,
                                 })
                             }
-                            forge_client::api::Error::Missing => people::Outcome::Refused(people::Refusal::Authority {
+                            skein_forge::api::Error::Missing => people::Outcome::Refused(people::Refusal::Authority {
                                 lacking: people::Lack::ResourceUnavailable,
                                 proposable: None,
                             }),
-                            forge_client::api::Error::MissingJob
-                            | forge_client::api::Error::Empty
-                            | forge_client::api::Error::Exists
-                            | forge_client::api::Error::NothingToMerge
-                            | forge_client::api::Error::Closed
-                            | forge_client::api::Error::Stale
-                            | forge_client::api::Error::Conflict
-                            | forge_client::api::Error::InvalidAnswer => {
+                            skein_forge::api::Error::MissingJob
+                            | skein_forge::api::Error::Empty
+                            | skein_forge::api::Error::Exists
+                            | skein_forge::api::Error::NothingToMerge
+                            | skein_forge::api::Error::Closed
+                            | skein_forge::api::Error::Stale
+                            | skein_forge::api::Error::Conflict
+                            | skein_forge::api::Error::InvalidAnswer => {
                                 people::Outcome::Refused(people::Refusal::Unknown)
                             }
                         };
@@ -2135,7 +2135,7 @@ pub(crate) fn outputs(
                 }
                 if let Some(entry) = failed {
                     let (_, key) = domain.forge_effecting.remove(&entry).expect("effect awaiting connector admission");
-                    domain.forge.named_outcome(entry, forge_client::Outcome::Failed(forge_client::api::Error::Busy));
+                    domain.forge.named_outcome(entry, forge_client::Outcome::Failed(skein_forge::api::Error::Busy));
                     domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(
                         jig_domain_core::connector::Event::Outbox {
                             connector: domain.config.forge_connector,
@@ -2346,7 +2346,7 @@ pub(crate) fn outputs(
 pub(crate) enum EffectFlight {
     Call {
         description: Box<EffectDescription>,
-        repository: forge_client::api::Repository,
+        repository: skein_forge::api::Repository,
         effect: forge_client::Effect,
         key: CallKey,
         resource: forge::What,
@@ -2458,7 +2458,7 @@ pub(crate) fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, as
                         row.entry.effect.write.clone(),
                     )
                 }
-                None => Err(forge_client::api::Error::Missing),
+                None => Err(skein_forge::api::Error::Missing),
             };
             match flight {
                 Ok(flight) => {
@@ -2466,7 +2466,7 @@ pub(crate) fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, as
                     effect_ask(domain, env, number, jig_domain_core::connector::Ask::Describe { owner });
                 }
                 Err(why) => domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(
-                    if why == forge_client::api::Error::Busy {
+                    if why == skein_forge::api::Error::Busy {
                         jig_domain_core::connector::Event::DescribeBusy { owner }
                     } else {
                         jig_domain_core::connector::Event::DescribeRefused { owner }

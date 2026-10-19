@@ -1,5 +1,5 @@
+use skein_forge::api::{Answer, Error, Op, Read, Write};
 use skein_lib::{Duration, Time};
-use temper_engine_domain_forge_client::api::{Answer, Error, Op, Read, Write};
 use temper_engine_protocol_forge_world::joint::{Joint, REPO};
 use temper_fake_forge_protocol::Route;
 #[test]
@@ -88,7 +88,7 @@ fn a_failed_job_read_names_its_failed_step_and_reads_its_log() {
     joint.run_for(Duration::from_secs(1));
     let answered = joint.answered(2).expect("Job answer");
     assert_eq!(answered.cost, 3, "Run, job, the step log");
-    let step = Some(temper_engine_domain_forge_client::api::Step { number: 1, name: Box::from(BUILD_STEP_NAME) });
+    let step = Some(skein_forge::api::Step { number: 1, name: Box::from(BUILD_STEP_NAME) });
     assert_eq!(answered.result, Ok(Answer::Job { attempt, step, log: Box::from(BUILD_STEP_LOG), truncated: false }));
 }
 
@@ -108,6 +108,6 @@ fn a_failed_jobs_log_end_comes_through_a_suffix_range() {
     joint.run_for(Duration::from_secs(1));
     let answered = joint.answered(2).expect("Job answer");
     assert_eq!(answered.cost, 3, "Run, job, the step log");
-    let step = Some(temper_engine_domain_forge_client::api::Step { number: 1, name: Box::from(BUILD_STEP_NAME) });
+    let step = Some(skein_forge::api::Step { number: 1, name: Box::from(BUILD_STEP_NAME) });
     assert_eq!(answered.result, Ok(Answer::Job { attempt, step, log: Box::from(&b"build 3\n"[..]), truncated: true }));
 }

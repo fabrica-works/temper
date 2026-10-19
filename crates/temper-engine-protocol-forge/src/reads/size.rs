@@ -1,6 +1,6 @@
 //! The client's allocation measure, accumulated as rows arrive.
 use alloc::boxed::Box;
-use temper_engine_domain_forge_client::api;
+use skein_forge::api;
 fn length(bytes: &[u8]) -> u64 {
     u64::try_from(bytes.len()).expect("bounded allocation")
 }

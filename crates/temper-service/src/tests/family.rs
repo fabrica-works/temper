@@ -224,7 +224,7 @@ fn a_core_refusal_uses_jigs_refusal_record() {
 }
 fn adopted(protection: forge::Protection) -> forge::ApplicationOutcome {
     forge::ApplicationOutcome::Adopted(forge::AdoptedRepository {
-        repository: temper_engine_domain_forge_client::api::Repository { forge: 1, repository: 42 },
+        repository: skein_forge::api::Repository { forge: 1, repository: 42 },
         owner: b"acme".as_slice().into(),
         name: b"shop".as_slice().into(),
         role: forge::Role::Fork,
@@ -258,7 +258,7 @@ fn an_adopted_repository_keeps_its_facts_in_the_answer() {
 }
 #[test]
 fn an_adopted_repository_keeps_its_protection_rule() {
-    let outcome = adopted(forge::Protection::Rule(temper_engine_domain_forge_client::api::Protection {
+    let outcome = adopted(forge::Protection::Rule(skein_forge::api::Protection {
         branch: b"main".as_slice().into(),
         contexts: Box::new([b"ci/build".as_slice().into()]),
         approvals: 2,

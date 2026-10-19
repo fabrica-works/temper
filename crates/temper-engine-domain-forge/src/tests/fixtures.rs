@@ -26,7 +26,7 @@ pub fn begin_adoption(d: &mut Domain, request: Token, adoption: Adoption) -> Box
         Event::Client(client::Event::Answered {
             call: *call,
             cost: 1,
-            result: Ok(client::api::Answer::Located { repository: REPO.repository }),
+            result: Ok(skein_forge::api::Answer::Located { repository: REPO.repository }),
         }),
     );
     outputs(d, Event::Adopt { request })

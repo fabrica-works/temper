@@ -4,9 +4,9 @@
 //! the top keeps durable outbox entries. It never knows tasks beyond numbers.
 //! `Event::Make` starts or recovers an entry after its commit; `Progress`
 //! updates the top's copy before a write call; `Outcome` settles it.
-use crate::api::{Answer, Error, Op, Read, Repository};
-use crate::api::{Commit, Write};
 use alloc::boxed::Box;
+use skein_forge::api::{Answer, Error, Op, Read, Repository};
+use skein_forge::api::{Commit, Write};
 use skein_lib::{Time, Token, Wall};
 /// The effect's own conditions, beyond the checks the raw API supports.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -179,8 +179,8 @@ pub struct RepositoryRecord {
 /// The latest bounded values read for a live resource.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Cached {
-    pub item: Option<crate::api::Summary>,
-    pub pull: Option<crate::api::Pull>,
+    pub item: Option<skein_forge::api::Summary>,
+    pub pull: Option<skein_forge::api::Pull>,
     pub tip: Option<Commit>,
 }
 /// A durable client working-set record saved by the parent.
@@ -240,7 +240,7 @@ pub enum Event {
     /// atomic; the top owns naming and task references.
     Keep { owner: Token, watches: Box<[Watch]> },
     /// Read sooner after a provider hint.
-    Hint { hint: crate::api::Hint },
+    Hint { hint: skein_forge::api::Hint },
     /// Mark whether a writer slot is taken.
     Writer { resource: Resource, taken: bool },
     /// Record a head pushed by a task’s run.

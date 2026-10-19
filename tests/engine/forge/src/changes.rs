@@ -3,7 +3,6 @@ use crate::{REPO, World};
 use skein_lib::Wall;
 use temper_engine_domain_forge as top;
 use temper_engine_domain_forge_change as change;
-use temper_engine_domain_forge_client as client;
 
 #[must_use]
 pub fn change_row() -> top::ChangeRow {
@@ -96,7 +95,7 @@ pub fn change_step_task(
 }
 
 #[must_use]
-pub fn reviewed_change(queued: bool, freshness: change::Freshness) -> (World, client::api::Commit) {
+pub fn reviewed_change(queued: bool, freshness: change::Freshness) -> (World, skein_forge::api::Commit) {
     let mut world = World::new(17);
     world.adopt();
     world.produce(b"temper/51");

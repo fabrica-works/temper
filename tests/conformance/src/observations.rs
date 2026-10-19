@@ -22,39 +22,39 @@ pub fn repository() -> r::Name {
     }
 }
 #[expect(clippy::wildcard_enum_match_arm, reason = "unexpected native writes fail this scenario binding explicitly")]
-pub fn parts(write: &client::api::Write) -> (u16, Vec<r::Name>, Option<u64>, u64, u64) {
+pub fn parts(write: &skein_forge::api::Write) -> (u16, Vec<r::Name>, Option<u64>, u64, u64) {
     let mut name = repository();
     let (kind, condition, target, state) = match write {
-        client::api::Write::Status { commit, context, check } => {
+        skein_forge::api::Write::Status { commit, context, check } => {
             (6, None, value(format!("{context:?}:{check:?}").as_bytes()), value(commit))
         }
-        client::api::Write::CreateIssue { title, body, .. } => {
+        skein_forge::api::Write::CreateIssue { title, body, .. } => {
             (8, None, value(format!("{title:?}:{body:?}").as_bytes()), 0)
         }
-        client::api::Write::Post { number, body, .. } => {
+        skein_forge::api::Write::Post { number, body, .. } => {
             name.path.extend([b"issue".to_vec(), number.to_string().into_bytes()]);
             (7, None, value(body), 0)
         }
-        client::api::Write::Edit { number, title, body } => {
+        skein_forge::api::Write::Edit { number, title, body } => {
             name.path.extend([b"issue".to_vec(), number.to_string().into_bytes()]);
             (13, None, value(format!("{title:?}:{body:?}").as_bytes()), 0)
         }
-        client::api::Write::Close { number } => {
+        skein_forge::api::Write::Close { number } => {
             name.path.extend([b"issue".to_vec(), number.to_string().into_bytes()]);
             (13, None, 1, 0)
         }
-        client::api::Write::Merge { number, head } => {
+        skein_forge::api::Write::Merge { number, head } => {
             name.path.extend([b"branch".to_vec(), b"main".to_vec()]);
             (4, Some(value(head)), *number, value(head))
         }
-        client::api::Write::OpenPull { title, body, head, base } => {
+        skein_forge::api::Write::OpenPull { title, body, head, base } => {
             (3, None, value(format!("{title:?}:{body:?}:{head:?}:{base:?}").as_bytes()), 0)
         }
-        client::api::Write::CreateBranch { branch, commit } => {
+        skein_forge::api::Write::CreateBranch { branch, commit } => {
             name.path.extend([b"branch".to_vec(), branch.to_vec()]);
             (9, None, value(commit), 0)
         }
-        client::api::Write::DeleteBranch { branch } => {
+        skein_forge::api::Write::DeleteBranch { branch } => {
             name.path.push(b"branch".to_vec());
             name.path.extend(branch.split(|byte| *byte == b'/').map(<[u8]>::to_vec));
             (15, None, 0, 0)

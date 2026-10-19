@@ -1,7 +1,7 @@
 //! Forgejo's documents in the forge client's vocabulary (protocol/forge.md, 3.2 and 3.3).
 use alloc::boxed::Box;
+use skein_forge::api;
 use skein_lib::{Time, Wall, Writer, bytes};
-use temper_engine_domain_forge_client::api;
 use temper_forge_forgejo::{
     document as d,
     id::{ObjectFormat, ObjectId},

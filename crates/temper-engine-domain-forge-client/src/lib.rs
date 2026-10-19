@@ -9,7 +9,7 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
-pub mod api;
+mod api;
 mod boundary;
 mod bounds;
 mod calls;
@@ -18,7 +18,6 @@ mod facts;
 mod identity;
 mod keep;
 mod limits;
-mod locate;
 mod outbox;
 #[cfg(test)]
 mod tests;
@@ -42,11 +41,11 @@ pub fn effect_bytes(effect: &Effect) -> Option<u64> {
 }
 /// Checked deep payload bytes of one typed provider answer.
 #[must_use]
-pub fn answer_bytes(answer: &api::Answer, limits: &Limits) -> Option<u64> {
+pub fn answer_bytes(answer: &skein_forge::api::Answer, limits: &Limits) -> Option<u64> {
     bounds::answer_bytes(answer, limits)
 }
 /// Checked deep answer payload bytes before caller-specific admission limits.
 #[must_use]
-pub fn answer_bytes_unbounded(answer: &api::Answer) -> Option<u64> {
+pub fn answer_bytes_unbounded(answer: &skein_forge::api::Answer) -> Option<u64> {
     bounds::answer_bytes_unbounded(answer)
 }

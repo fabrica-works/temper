@@ -21,7 +21,7 @@ fn a_partys_own_adopt_ask_is_refused_as_not_offered() {
     let mut driver = driver();
     let ask = engine::adopt_repository_ask(
         fixtures::adoption(1),
-        temper_engine_domain_forge_client::api::Repository { forge: 1, repository: 2 },
+        skein_forge::api::Repository { forge: 1, repository: 2 },
         0,
     )
     .expect("adoption");
@@ -146,7 +146,7 @@ fn an_adoption_on_a_configured_forge_is_adopted_with_what_temper_may_do() {
     assert_eq!(
         outcomes(&driver),
         [&Some(forge::ApplicationOutcome::Adopted(forge::AdoptedRepository {
-            repository: temper_engine_domain_forge_client::api::Repository { forge: 1, repository: 2 },
+            repository: skein_forge::api::Repository { forge: 1, repository: 2 },
             owner: Box::from(&b"org"[..]),
             name: Box::from(&b"repo"[..]),
             role: forge::Role::Owned,

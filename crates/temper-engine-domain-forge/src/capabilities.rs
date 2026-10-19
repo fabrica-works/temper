@@ -1,8 +1,9 @@
 //! Capability refusals invalidate the adopted facts before another decision
 //! can use them (jig's domain/connectors.md, section 12).
 use crate::{Domain, Kinds, Limits, Protection, Request, Role, Stored};
+use skein_forge::api;
 use skein_lib::{Env, Queue, Token};
-use temper_engine_domain_forge_client::{self as client, api};
+use temper_engine_domain_forge_client::{self as client};
 
 #[derive(Debug)]
 pub(crate) enum Stage {

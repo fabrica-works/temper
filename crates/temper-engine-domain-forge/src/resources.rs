@@ -15,10 +15,8 @@ impl Domain {
     /// Report each named resource from adopted repository facts.
     #[must_use]
     pub fn resource_facts(&self, name: &Name) -> Option<(Access, HoldKind)> {
-        let repository = self.repository(temper_engine_domain_forge_client::api::Repository {
-            forge: name.forge,
-            repository: name.repository,
-        })?;
+        let repository =
+            self.repository(skein_forge::api::Repository { forge: name.forge, repository: name.repository })?;
         if !repository.kinds.read {
             return Some((Access::Unavailable, HoldKind::Shared));
         }

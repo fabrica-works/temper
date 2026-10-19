@@ -6,8 +6,9 @@
 //! `resume` sends one eligible call. The parent commits emitted progress
 //! before releasing any call from that decision.
 use crate::{Event, Fact, Limits, Priority, Request, Resource, Stored, outbox};
-use crate::{api, bounds, calls, keep};
+use crate::{bounds, calls, keep};
 use alloc::boxed::Box;
+use skein_forge::api;
 use skein_lib::{Deadlines, Env, Id, Queue, Rng, Time};
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub(crate) enum Alarm {

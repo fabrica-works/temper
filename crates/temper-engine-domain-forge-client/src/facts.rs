@@ -2,7 +2,7 @@
 //!
 //! Facts are bounded observations, not durable decisions. This module keeps
 //! no state, knows no task content, and exposes only diagnostic value types.
-use crate::api::Error;
+use skein_forge::api::Error;
 use skein_lib::Time;
 /// The request-budget class of a forge call.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

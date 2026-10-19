@@ -539,7 +539,7 @@ pub fn wire_limits() -> temper_protocol_worker_wire::v1::Limits {
 pub fn repository(tag: u32, owner: &[u8], name: &[u8]) -> temper_engine_domain::ForgeRepository {
     temper_engine_domain::ForgeRepository {
         tag,
-        provider: temper_engine_domain_forge_client::api::Repository { forge: 1, repository: tag },
+        provider: skein_forge::api::Repository { forge: 1, repository: tag },
         name: name.into(),
         host: b"forge.example".as_slice().into(),
         owner: owner.into(),

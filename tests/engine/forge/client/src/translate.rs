@@ -1,8 +1,9 @@
 //! Independent typed-protocol projection. Keys live in hexadecimal body
 //! markers; fake counts stand in for full commit IDs. Paging is applied to
 //! the fake's bounded snapshots; comparisons remain whole responses.
+use skein_forge::api as client;
 use skein_lib::{List, Time};
-use temper_engine_domain_forge_client::{Limits, api as client};
+use temper_engine_domain_forge_client::Limits;
 use temper_fake_forge_domain::api as forge;
 const KEY: &[u8] = b"<!-- temper:key ";
 const END: &[u8] = b" -->\n";

@@ -94,43 +94,43 @@ pub struct AgentEffect {
 pub fn describe_agent_effect(
     repository: &Repository,
     resource: &What,
-    write: temper_engine_domain_forge_client::api::Write,
+    write: skein_forge::api::Write,
     key: Box<[u8]>,
     op_bytes: u32,
-) -> Result<AgentEffect, temper_engine_domain_forge_client::api::Error> {
+) -> Result<AgentEffect, skein_forge::api::Error> {
     use temper_engine_domain_forge_client as client;
     let (write, kind, state, form, valid_resource) = match write {
-        client::api::Write::CreateIssue { title, body, .. } => (
-            client::api::Write::CreateIssue { key, title, body },
+        skein_forge::api::Write::CreateIssue { title, body, .. } => (
+            skein_forge::api::Write::CreateIssue { key, title, body },
             8,
             [0; 32],
             EffectForm::Creation,
             *resource == What::Repository,
         ),
-        client::api::Write::Post { number, body, .. } => (
-            client::api::Write::Post { number, key, body },
+        skein_forge::api::Write::Post { number, body, .. } => (
+            skein_forge::api::Write::Post { number, key, body },
             7,
             [0; 32],
             EffectForm::Creation,
             *resource == What::Issue(number) || *resource == What::Pull(number),
         ),
-        client::api::Write::Status { commit, context, check } => (
-            client::api::Write::Status { commit, context, check },
+        skein_forge::api::Write::Status { commit, context, check } => (
+            skein_forge::api::Write::Status { commit, context, check },
             6,
             commit,
             EffectForm::Set,
             *resource == What::Repository,
         ),
-        client::api::Write::OpenPull { .. }
-        | client::api::Write::Review { .. }
-        | client::api::Write::Edit { .. }
-        | client::api::Write::SetReviewers { .. }
-        | client::api::Write::Close { .. }
-        | client::api::Write::Reopen { .. }
-        | client::api::Write::Merge { .. }
-        | client::api::Write::Update { .. }
-        | client::api::Write::CreateBranch { .. }
-        | client::api::Write::DeleteBranch { .. } => return Err(client::api::Error::Forbidden),
+        skein_forge::api::Write::OpenPull { .. }
+        | skein_forge::api::Write::Review { .. }
+        | skein_forge::api::Write::Edit { .. }
+        | skein_forge::api::Write::SetReviewers { .. }
+        | skein_forge::api::Write::Close { .. }
+        | skein_forge::api::Write::Reopen { .. }
+        | skein_forge::api::Write::Merge { .. }
+        | skein_forge::api::Write::Update { .. }
+        | skein_forge::api::Write::CreateBranch { .. }
+        | skein_forge::api::Write::DeleteBranch { .. } => return Err(skein_forge::api::Error::Forbidden),
     };
     let access = effect_access(repository, resource, kind);
     let available = match access {
@@ -138,7 +138,7 @@ pub fn describe_agent_effect(
         Access::Context | Access::Unavailable => false,
     };
     if !valid_resource || !available {
-        return Err(client::api::Error::Forbidden);
+        return Err(skein_forge::api::Error::Forbidden);
     }
     let effect = client::Effect { write, condition: client::Condition::None };
     let recovery = match client::recovery(&effect.write) {
@@ -149,7 +149,7 @@ pub fn describe_agent_effect(
     };
     match client::effect_bytes(&effect) {
         Some(bytes) if bytes <= u64::from(op_bytes) => {}
-        Some(_) | None => return Err(client::api::Error::Forbidden),
+        Some(_) | None => return Err(skein_forge::api::Error::Forbidden),
     }
     Ok(AgentEffect { effect, kind, state, form, recovery })
 }
@@ -444,24 +444,24 @@ pub struct ProjectionEffect {
 #[must_use]
 pub fn describe_projection_effect(
     repository: &Repository,
-    write: &temper_engine_domain_forge_client::api::Write,
+    write: &skein_forge::api::Write,
 ) -> Option<ProjectionEffect> {
     use temper_engine_domain_forge_client as client;
     let (resource, kind, form) = match write {
-        client::api::Write::CreateIssue { .. } => (What::Repository, 8, EffectForm::Creation),
-        client::api::Write::Edit { number, .. } | client::api::Write::Close { number } => {
+        skein_forge::api::Write::CreateIssue { .. } => (What::Repository, 8, EffectForm::Creation),
+        skein_forge::api::Write::Edit { number, .. } | skein_forge::api::Write::Close { number } => {
             (What::Issue(*number), 13, EffectForm::Set)
         }
-        client::api::Write::Post { number, .. } => (What::Issue(*number), 7, EffectForm::Creation),
-        client::api::Write::Status { .. }
-        | client::api::Write::OpenPull { .. }
-        | client::api::Write::Review { .. }
-        | client::api::Write::SetReviewers { .. }
-        | client::api::Write::Reopen { .. }
-        | client::api::Write::Merge { .. }
-        | client::api::Write::Update { .. }
-        | client::api::Write::CreateBranch { .. }
-        | client::api::Write::DeleteBranch { .. } => return None,
+        skein_forge::api::Write::Post { number, .. } => (What::Issue(*number), 7, EffectForm::Creation),
+        skein_forge::api::Write::Status { .. }
+        | skein_forge::api::Write::OpenPull { .. }
+        | skein_forge::api::Write::Review { .. }
+        | skein_forge::api::Write::SetReviewers { .. }
+        | skein_forge::api::Write::Reopen { .. }
+        | skein_forge::api::Write::Merge { .. }
+        | skein_forge::api::Write::Update { .. }
+        | skein_forge::api::Write::CreateBranch { .. }
+        | skein_forge::api::Write::DeleteBranch { .. } => return None,
     };
     let recovery = match client::recovery(write) {
         client::Recovery::Keyed => Recovery::Keyed,

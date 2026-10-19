@@ -1,6 +1,6 @@
 use crate::link::settled_resource;
+use skein_forge::api::Commit;
 use temper_engine_domain_forge::{Name, What};
-use temper_engine_domain_forge_client::api::Commit;
 
 fn settled_head(repository: u32) -> (Name, Commit) {
     (Name { forge: 1, repository, what: What::Branch(Box::new([b"temper/change".as_slice().into()])) }, [7; 32])

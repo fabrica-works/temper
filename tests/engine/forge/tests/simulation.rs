@@ -32,10 +32,10 @@ fn a_repository_with_another_deployments_branch_prefix_is_refused() {
     world.produce(b"temper/other");
     world.adopt();
     assert!(
-        world
-            .seen()
-            .iter()
-            .any(|request| matches!(request, top::Request::Adopted { result: Err(client::api::Error::Refused), .. }))
+        world.seen().iter().any(|request| matches!(
+            request,
+            top::Request::Adopted { result: Err(skein_forge::api::Error::Refused), .. }
+        ))
     );
     assert!(world.stored().get(&top::Key::Repository(REPO)).is_none());
 }
@@ -65,10 +65,10 @@ fn a_later_adoption_rechecks_the_prefix_and_accepts_only_recorded_writer_branche
     drop(world.take_seen());
     world.adopt();
     assert!(
-        world
-            .seen()
-            .iter()
-            .any(|request| matches!(request, top::Request::Adopted { result: Err(client::api::Error::Refused), .. }))
+        world.seen().iter().any(|request| matches!(
+            request,
+            top::Request::Adopted { result: Err(skein_forge::api::Error::Refused), .. }
+        ))
     );
 }
 
@@ -82,7 +82,7 @@ fn a_context_repository_cannot_receive_a_write() {
             task: 9,
             repository: REPO,
             effect: client::Effect {
-                write: client::api::Write::CreateIssue {
+                write: skein_forge::api::Write::CreateIssue {
                     key: Box::from(&b"context"[..]),
                     title: Box::from(&b"No"[..]),
                     body: Box::from(&b"write"[..]),
@@ -110,10 +110,10 @@ fn a_permission_refusal_rereads_capabilities_and_narrows_later_writes() {
         task: 9,
         repository: REPO,
         effect: client::Effect {
-            write: client::api::Write::Status {
+            write: skein_forge::api::Write::Status {
                 commit: translate::commit(1),
                 context: Box::from(&b"build"[..]),
-                check: client::api::Check::Passed,
+                check: skein_forge::api::Check::Passed,
             },
             condition: client::Condition::None,
         },
@@ -126,7 +126,7 @@ fn a_permission_refusal_rereads_capabilities_and_narrows_later_writes() {
     world.run_for(5);
     assert!(world.seen().iter().any(|request| matches!(
         request,
-        top::Request::Outcome { outcome: client::Outcome::Failed(client::api::Error::Forbidden), .. }
+        top::Request::Outcome { outcome: client::Outcome::Failed(skein_forge::api::Error::Forbidden), .. }
     )));
     let Some(top::Stored::Repository(repository)) = world.stored().get(&top::Key::Repository(REPO)) else {
         panic!("repository");
@@ -846,7 +846,7 @@ fn a_restored_write_waits_for_the_fresh_repository_read() {
             task: 51,
             repository: REPO,
             effect: client::Effect {
-                write: client::api::Write::CreateIssue {
+                write: skein_forge::api::Write::CreateIssue {
                     key: Box::from(&b"restart-read"[..]),
                     title: Box::from(&b"Restart read"[..]),
                     body: Box::from(&b"after fresh repository state"[..]),
@@ -890,7 +890,7 @@ fn a_merge_with_its_answer_lost_is_found_after_restart_without_merging_twice() {
             task: 51,
             repository: REPO,
             effect: client::Effect {
-                write: client::api::Write::Merge { number: pull, head },
+                write: skein_forge::api::Write::Merge { number: pull, head },
                 condition: client::Condition::Merge { base: Box::from(&b"main"[..]) },
             },
             start: None,
@@ -925,7 +925,7 @@ fn a_merge_decided_for_an_old_head_cannot_land_the_new_head() {
             task: 51,
             repository: REPO,
             effect: client::Effect {
-                write: client::api::Write::Merge { number: pull, head: old_head },
+                write: skein_forge::api::Write::Merge { number: pull, head: old_head },
                 condition: client::Condition::Merge { base: Box::from(&b"main"[..]) },
             },
             start: None,
@@ -957,9 +957,9 @@ fn a_reported_worker_push_is_not_taken_for_outside_drift() {
     world.run_for(1);
     world.take_seen();
     world.event(top::Event::Hint {
-        hint: client::api::Hint {
+        hint: skein_forge::api::Hint {
             repository: REPO,
-            change: client::api::Change::Branch(Box::from(&b"temper/51"[..])),
+            change: skein_forge::api::Change::Branch(Box::from(&b"temper/51"[..])),
             key: None,
         },
     });
@@ -1041,7 +1041,7 @@ fn prior_effects_settle_before_cleanup_can_delete_a_held_resource() {
             task: 51,
             repository: REPO,
             effect: client::Effect {
-                write: client::api::Write::CreateIssue {
+                write: skein_forge::api::Write::CreateIssue {
                     key: Box::from(&b"prior"[..]),
                     title: Box::from(&b"Prior effect"[..]),
                     body: Box::from(&b"settles first"[..]),
@@ -1067,7 +1067,10 @@ fn prior_effects_settle_before_cleanup_can_delete_a_held_resource() {
     assert!(matches!(
         world.stored().get(&top::Key::Entry(11)),
         Some(top::Stored::Entry {
-            entry: client::Entry { effect: client::Effect { write: client::api::Write::DeleteBranch { .. }, .. }, .. },
+            entry: client::Entry {
+                effect: client::Effect { write: skein_forge::api::Write::DeleteBranch { .. }, .. },
+                ..
+            },
             held: false,
         })
     ));
@@ -1083,7 +1086,7 @@ fn cancelling_withdraws_a_prior_effect_that_never_went_out() {
             task: 51,
             repository: REPO,
             effect: client::Effect {
-                write: client::api::Write::CreateIssue {
+                write: skein_forge::api::Write::CreateIssue {
                     key: Box::from(&b"unsent"[..]),
                     title: Box::from(&b"Unsent"[..]),
                     body: Box::from(&b"no effect"[..]),
@@ -1162,16 +1165,16 @@ fn a_ci_subscription_reads_its_head_and_restarts_without_repeating_old_news() {
     );
     world.status(b"temper/51", temper_fake_forge_domain::api::Check::Failed);
     world.event(top::Event::Hint {
-        hint: client::api::Hint { repository: REPO, change: client::api::Change::Commit(head), key: None },
+        hint: skein_forge::api::Hint { repository: REPO, change: skein_forge::api::Change::Commit(head), key: None },
     });
     world.run_for(2);
     assert!(world.seen().iter().any(|request| matches!(
         request,
-        top::Request::News { task: 51, news: top::News::Ci { status: client::api::Ci::Failed, .. }, .. }
+        top::Request::News { task: 51, news: top::News::Ci { status: skein_forge::api::Ci::Failed, .. }, .. }
     )));
     assert!(matches!(
         world.stored().get(&top::Key::Ci { repository: REPO, head }),
-        Some(top::Stored::Ci(top::CiState { status: client::api::Ci::Failed, .. }))
+        Some(top::Stored::Ci(top::CiState { status: skein_forge::api::Ci::Failed, .. }))
     ));
 }
 
@@ -1193,7 +1196,7 @@ fn cancelling_a_change_closes_its_pull_before_deleting_its_branch() {
     world.take_seen();
     world.event(top::Event::Release { task: 51, root: 51, ending: top::ReleaseEnding::Cancelled, entry: 10 });
     assert!(
-        matches!(world.stored().get(&top::Key::Entry(10)), Some(top::Stored::Entry { entry: client::Entry { effect: client::Effect { write: client::api::Write::Close { number }, .. }, .. }, held: false }) if *number == pull)
+        matches!(world.stored().get(&top::Key::Entry(10)), Some(top::Stored::Entry { entry: client::Entry { effect: client::Effect { write: skein_forge::api::Write::Close { number }, .. }, .. }, held: false }) if *number == pull)
     );
     world.event(top::Event::Committed { entry: 10 });
     world.run_for(5);
@@ -1201,7 +1204,10 @@ fn cancelling_a_change_closes_its_pull_before_deleting_its_branch() {
     assert!(matches!(
         world.stored().get(&top::Key::Entry(11)),
         Some(top::Stored::Entry {
-            entry: client::Entry { effect: client::Effect { write: client::api::Write::DeleteBranch { .. }, .. }, .. },
+            entry: client::Entry {
+                effect: client::Effect { write: skein_forge::api::Write::DeleteBranch { .. }, .. },
+                ..
+            },
             held: false,
         })
     ));
@@ -1233,9 +1239,9 @@ fn an_external_move_of_a_held_branch_is_reported_as_drift() {
     world.take_seen();
     world.push(b"temper/51", b"outside");
     world.event(top::Event::Hint {
-        hint: client::api::Hint {
+        hint: skein_forge::api::Hint {
             repository: REPO,
-            change: client::api::Change::Branch(Box::from(&b"temper/51"[..])),
+            change: skein_forge::api::Change::Branch(Box::from(&b"temper/51"[..])),
             key: None,
         },
     });
@@ -1357,9 +1363,9 @@ fn a_landing_wakes_overlapping_work_and_keeps_unrelated_news() {
     world.take_seen();
     world.push(b"main", b"landed");
     world.event(top::Event::Hint {
-        hint: client::api::Hint {
+        hint: skein_forge::api::Hint {
             repository: REPO,
-            change: client::api::Change::Branch(Box::from(&b"main"[..])),
+            change: skein_forge::api::Change::Branch(Box::from(&b"main"[..])),
             key: None,
         },
     });
@@ -1387,9 +1393,9 @@ fn a_landing_wakes_overlapping_work_and_keeps_unrelated_news() {
     world.take_seen();
     for _ in 0..2 {
         world.event(top::Event::Hint {
-            hint: client::api::Hint {
+            hint: skein_forge::api::Hint {
                 repository: REPO,
-                change: client::api::Change::Branch(Box::from(&b"main"[..])),
+                change: skein_forge::api::Change::Branch(Box::from(&b"main"[..])),
                 key: None,
             },
         });
@@ -1489,8 +1495,11 @@ fn goals_classify_landings_from_their_subtree_heads_and_planned_paths_after_rest
     world.run_for(3);
     world.take_seen();
     world.push(b"main", b"landing");
-    let hint =
-        client::api::Hint { repository: REPO, change: client::api::Change::Branch(Box::from(&b"main"[..])), key: None };
+    let hint = skein_forge::api::Hint {
+        repository: REPO,
+        change: skein_forge::api::Change::Branch(Box::from(&b"main"[..])),
+        key: None,
+    };
     world.event(top::Event::Hint { hint: hint.clone() });
     world.run_for(5);
     for (task, expected) in [(42, top::Class::Wakes), (43, top::Class::Kept), (44, top::Class::Wakes)] {
@@ -1547,9 +1556,13 @@ fn an_outside_push_during_a_worker_slot_holds_the_task_with_evidence() {
     world.push_as(b"temper/51", b"file", b"outside", 2);
     let after = temper_engine_forge_world::translate::commit(world.branch(b"temper/51"));
     world.event(top::Event::Hint {
-        hint: client::api::Hint {
+        hint: skein_forge::api::Hint {
             repository: REPO,
-            change: client::api::Change::BranchMoved { branch: Box::from(&b"temper/51"[..]), head: after, actor: 2 },
+            change: skein_forge::api::Change::BranchMoved {
+                branch: Box::from(&b"temper/51"[..]),
+                head: after,
+                actor: 2,
+            },
             key: None,
         },
     });

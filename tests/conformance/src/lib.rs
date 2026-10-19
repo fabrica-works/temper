@@ -130,8 +130,8 @@ pub struct Peers {
     lifecycle: scenarios::lifecycle::State,
     query: scenarios::queries::State,
     pub branches: Vec<Box<[u8]>>,
-    pub produced: std::collections::BTreeMap<u64, temper_engine_domain_forge_client::api::Commit>,
-    pub reported: std::collections::BTreeMap<u64, temper_engine_domain_forge_client::api::Commit>,
+    pub produced: std::collections::BTreeMap<u64, skein_forge::api::Commit>,
+    pub reported: std::collections::BTreeMap<u64, skein_forge::api::Commit>,
     /// Calls by name, kept by the worker until their answers are relayed.
     calls: std::collections::BTreeMap<u64, (u64, u64, engine::Call)>,
     retries: std::collections::BTreeMap<u64, u64>,

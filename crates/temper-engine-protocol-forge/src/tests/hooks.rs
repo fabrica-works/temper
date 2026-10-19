@@ -64,8 +64,8 @@ fn each_delivery_becomes_the_hint_forge_md_5_names() {
     for (delivery, change, key) in hint_rows() {
         assert_eq!(
             crate::hooks::hint::hint(1, &delivery),
-            Some(temper_engine_domain_forge_client::api::Hint {
-                repository: temper_engine_domain_forge_client::api::Repository { forge: 1, repository: 2 },
+            Some(skein_forge::api::Hint {
+                repository: skein_forge::api::Repository { forge: 1, repository: 2 },
                 change,
                 key,
             }),
@@ -73,11 +73,10 @@ fn each_delivery_becomes_the_hint_forge_md_5_names() {
         );
     }
 }
-type HintRow =
-    (temper_forge_forgejo::delivery::Delivery, temper_engine_domain_forge_client::api::Change, Option<Box<[u8]>>);
+type HintRow = (temper_forge_forgejo::delivery::Delivery, skein_forge::api::Change, Option<Box<[u8]>>);
 fn hint_rows() -> [HintRow; 7] {
     use fixtures::{HOOK_HEAD as HEAD, HOOK_NUMBER as NUMBER, HOOK_REPOSITORY as REPOSITORY};
-    use temper_engine_domain_forge_client::api::Change;
+    use skein_forge::api::Change;
     use temper_forge_forgejo::{
         delivery::{Delivery, JobEnd},
         request::ReviewEvent,

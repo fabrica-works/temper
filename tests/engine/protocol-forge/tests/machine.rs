@@ -1,5 +1,5 @@
+use skein_forge::api::{Answer as ResultAnswer, Error, Op, Read};
 use skein_lib::Duration;
-use temper_engine_domain_forge_client::api::{Answer as ResultAnswer, Error, Op, Read};
 use temper_engine_protocol_forge::{StartRead, Stopped};
 use temper_engine_protocol_forge_world::{
     fixtures,
@@ -242,7 +242,7 @@ fn a_write_body_is_read_before_its_scripted_response() {
     world.call(
         1,
         fixtures::REPO,
-        Op::Write(temper_engine_domain_forge_client::api::Write::CreateIssue {
+        Op::Write(skein_forge::api::Write::CreateIssue {
             key: Box::from([0xab]),
             title: Box::from(*b"title"),
             body: Box::from(*b"body"),

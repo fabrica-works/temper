@@ -31,7 +31,7 @@ struct World {
     fake: fake::Domain,
     fake_env: Env<fake::Config>,
     fake_out: Queue<fake::Request>,
-    pending: BTreeMap<Token, client::api::Op>,
+    pending: BTreeMap<Token, skein_forge::api::Op>,
     forge_calls: u32,
     adopted: Vec<forge_top::ApplicationOutcome>,
     signed_in: Option<u64>,
@@ -444,13 +444,15 @@ impl World {
                 }
                 engine::Request::Forge { call, repository, op } => {
                     self.forge_calls += 1;
-                    if self.fail_job_reads && matches!(op, client::api::Op::Read(client::api::Read::Job { .. })) {
+                    if self.fail_job_reads
+                        && matches!(op, skein_forge::api::Op::Read(skein_forge::api::Read::Job { .. }))
+                    {
                         self.events.push_back(engine::Event::Forge(Box::new(
                             temper_engine_domain_forge::Event::Client(
                                 temper_engine_domain_forge_client::Event::Answered {
                                     call,
                                     cost: 1,
-                                    result: Err(client::api::Error::MissingJob),
+                                    result: Err(skein_forge::api::Error::MissingJob),
                                 },
                             ),
                         )));
@@ -461,13 +463,13 @@ impl World {
                         name
                     } else if repository == forge_world::REPO {
                         b"org/repo"
-                    } else if repository == (client::api::Repository { forge: 1, repository: 3 }) {
+                    } else if repository == (skein_forge::api::Repository { forge: 1, repository: 3 }) {
                         b"org/extra"
                     } else {
                         panic!("unknown test repository {repository:?}");
                     };
-                    let slow =
-                        self.slow_brief_reads && matches!(op, client::api::Op::Read(client::api::Read::Job { .. }));
+                    let slow = self.slow_brief_reads
+                        && matches!(op, skein_forge::api::Op::Read(skein_forge::api::Read::Job { .. }));
                     let raw = translate::op(&op, &self.env.limits.forge.client);
                     self.pending.insert(call, op);
                     let mut limits = self.fake_env.limits;
@@ -1418,7 +1420,10 @@ fn an_amendment_while_gathering_discards_the_old_brief_without_claiming() {
                 && row.number != producer
                 && matches!(row.executor, tasks::Executor::Agent { .. })
                 && row.phase == tasks::Phase::Active(tasks::Active::Preparing)
-                && world.pending.values().any(|op| matches!(op, client::api::Op::Read(client::api::Read::Job { .. })))
+                && world
+                    .pending
+                    .values()
+                    .any(|op| matches!(op, skein_forge::api::Op::Read(skein_forge::api::Read::Job { .. })))
             {
                 repair = Some(row.number);
                 break;
@@ -1665,9 +1670,9 @@ fn an_approval_carries_over_a_clean_update_and_is_asked_again_after_a_repair() {
     let moved = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", b"main", b"other", b"unrelated", 1)
         .expect("base advanced cleanly");
     world.send(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Hint {
-        hint: client::api::Hint {
+        hint: skein_forge::api::Hint {
             repository: forge_world::REPO,
-            change: client::api::Change::Branch(Box::from(&b"main"[..])),
+            change: skein_forge::api::Change::Branch(Box::from(&b"main"[..])),
             key: None,
         },
     })));
@@ -1810,7 +1815,11 @@ fn an_approval_carries_over_a_clean_update_and_is_asked_again_after_a_repair() {
         raw::Answer::Reviewed(_)
     ));
     world.send(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Hint {
-        hint: client::api::Hint { repository: forge_world::REPO, change: client::api::Change::Item(pull), key: None },
+        hint: skein_forge::api::Hint {
+            repository: forge_world::REPO,
+            change: skein_forge::api::Change::Item(pull),
+            key: None,
+        },
     })));
     for _ in 0..200 {
         world.tick();
@@ -2209,9 +2218,9 @@ fn a_goal_subscription_receives_the_connectors_landing_news() {
     let result = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", b"main", b"file", b"changed", 1);
     assert!(result.is_ok(), "external landing in the fake forge");
     world.send(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Hint {
-        hint: client::api::Hint {
+        hint: skein_forge::api::Hint {
             repository: forge_world::REPO,
-            change: client::api::Change::Branch(Box::from(&b"main"[..])),
+            change: skein_forge::api::Change::Branch(Box::from(&b"main"[..])),
             key: None,
         },
     })));
@@ -2307,7 +2316,11 @@ fn a_pull_subscription_receives_the_connectors_state_news() {
     let before = news_count(&world, task);
     assert!(matches!(world.external(2, raw::Op::Write(raw::Write::Close { number: pull })), raw::Answer::Done));
     world.send(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Hint {
-        hint: client::api::Hint { repository: forge_world::REPO, change: client::api::Change::Item(pull), key: None },
+        hint: skein_forge::api::Hint {
+            repository: forge_world::REPO,
+            change: skein_forge::api::Change::Item(pull),
+            key: None,
+        },
     })));
     await_new_forge_news(&mut world, task, before);
 }
@@ -2360,9 +2373,9 @@ fn ci_subscription_story(restart: bool) {
         raw::Answer::Done
     ));
     world.send(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Hint {
-        hint: client::api::Hint {
+        hint: skein_forge::api::Hint {
             repository: forge_world::REPO,
-            change: client::api::Change::Commit(translate::commit(head)),
+            change: skein_forge::api::Change::Commit(translate::commit(head)),
             key: None,
         },
     })));
@@ -2411,7 +2424,11 @@ fn a_participation_subscription_receives_the_connectors_comment_news() {
         raw::Answer::Commented(_)
     ));
     world.send(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Hint {
-        hint: client::api::Hint { repository: forge_world::REPO, change: client::api::Change::Item(pull), key: None },
+        hint: skein_forge::api::Hint {
+            repository: forge_world::REPO,
+            change: skein_forge::api::Change::Item(pull),
+            key: None,
+        },
     })));
     await_new_forge_news(&mut world, task, before);
 }
@@ -2437,7 +2454,7 @@ fn an_authorized_forge_read_returns_a_bounded_typed_answer() {
         engine::Call {
             completion: 1,
             position: 1,
-            tool: engine::Tool::ReadForge { repository: forge_world::REPO, read: client::api::Read::Branches },
+            tool: engine::Tool::ReadForge { repository: forge_world::REPO, read: skein_forge::api::Read::Branches },
         },
     );
     world.send(event);
@@ -2460,7 +2477,7 @@ fn an_authorized_forge_read_returns_a_bounded_typed_answer() {
             position: 1,
             tool: engine::Tool::ReadForge {
                 repository: forge_world::REPO,
-                read: client::api::Read::File {
+                read: skein_forge::api::Read::File {
                     head: translate::commit(file_head),
                     path: Box::from(&b"file"[..]),
                     max_bytes: 2,
@@ -2473,7 +2490,7 @@ fn an_authorized_forge_read_returns_a_bounded_typed_answer() {
     assert!(world.store.pending.is_empty(), "an agent read crosses the door without a commit");
     world.until(Until::Read);
     assert!(matches!(world.answers.as_slice(), [temper_engine_domain::CallAnswer::ForgeRead(result)]
-        if matches!(result.as_ref(), Ok(client::api::Answer::File { head, bytes, truncated: true, .. })
+        if matches!(result.as_ref(), Ok(skein_forge::api::Answer::File { head, bytes, truncated: true, .. })
             if *head == translate::commit(file_head) && bytes.len() == 2)));
     for completion in [1, 2] {
         let key = temper_engine_domain::CallKey {
@@ -2514,7 +2531,7 @@ fn a_named_forge_effect_is_committed_before_its_write_and_made_once() {
             tool: engine::Tool::EffectForge {
                 repository: forge_world::REPO,
                 resource: forge_top::What::Repository,
-                write: Box::new(client::api::Write::CreateIssue {
+                write: Box::new(skein_forge::api::Write::CreateIssue {
                     key: Box::new([]),
                     title: Box::from(&b"Small finding"[..]),
                     body: Box::from(&b"Fix this"[..]),
@@ -2553,7 +2570,7 @@ fn a_named_forge_effect_is_committed_before_its_write_and_made_once() {
             tool: engine::Tool::EffectForge {
                 repository: forge_world::REPO,
                 resource: forge_top::What::Repository,
-                write: Box::new(client::api::Write::CreateIssue {
+                write: Box::new(skein_forge::api::Write::CreateIssue {
                     key: Box::new([]),
                     title: Box::from(&b"Small finding"[..]),
                     body: Box::from(&b"Fix this"[..]),
@@ -2595,7 +2612,7 @@ fn an_explicit_forge_effect_proposal_is_retained_until_its_holder_accepts() {
                 action: engine::ProposedAction::Effect {
                     repository: forge_world::REPO,
                     resource: forge_top::What::Repository,
-                    write: Box::new(client::api::Write::CreateIssue {
+                    write: Box::new(skein_forge::api::Write::CreateIssue {
                         key: Box::new([]),
                         title: b"Proposed finding".as_slice().into(),
                         body: b"Fix this".as_slice().into(),
@@ -2661,7 +2678,7 @@ fn issue_effect_call(world: &mut World, assignment: &engine::Assignment) -> engi
             tool: engine::Tool::EffectForge {
                 repository: forge_world::REPO,
                 resource: forge_top::What::Repository,
-                write: Box::new(client::api::Write::CreateIssue {
+                write: Box::new(skein_forge::api::Write::CreateIssue {
                     key: Box::new([]),
                     title: Box::from(&b"Small finding"[..]),
                     body: Box::from(&b"Fix this"[..]),
@@ -2759,7 +2776,7 @@ fn effect_survives_each_commit_and_outbox_cut_without_a_second_issue() {
                             engine::Event::Forge(event) if matches!(event.as_ref(),
                                 temper_engine_domain_forge::Event::Client(
                                     temper_engine_domain_forge_client::Event::Answered {
-                                        result: Ok(client::api::Answer::Created(_)), ..
+                                        result: Ok(skein_forge::api::Answer::Created(_)), ..
                                     }
                                 ))
                         )
@@ -2786,7 +2803,7 @@ fn effect_survives_each_commit_and_outbox_cut_without_a_second_issue() {
                                 engine::Event::Forge(event) if matches!(event.as_ref(),
                                     temper_engine_domain_forge::Event::Client(
                                         temper_engine_domain_forge_client::Event::Answered {
-                                            result: Ok(client::api::Answer::Created(_)), ..
+                                            result: Ok(skein_forge::api::Answer::Created(_)), ..
                                         }
                                     ))
                             )

@@ -2,9 +2,9 @@
 mod keep;
 mod locate;
 mod outbox;
-use crate::api::{self, Answer, Error, Op, Read, Repository, Write};
 use crate::{Domain, Event, Fact, Limits, Priority, Request, calls, fire, resume, step, worst_case};
 use alloc::boxed::Box;
+use skein_forge::api::{self, Answer, Error, Op, Read, Repository, Write};
 use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
 
 const LIMITS: Limits = Limits {
@@ -509,12 +509,12 @@ fn a_rate_refusal_does_not_spend_a_fresh_reads_retry_attempt() {
 #[test]
 fn confirmed_write_terminals_do_not_invent_update_commits_or_branch_success() {
     let update = Op::Write(Write::Update { number: 1 });
-    assert!(api::accepts(&update, &Answer::Done));
-    assert!(!api::accepts(&update, &Answer::Merged([1; 32])));
+    assert!(crate::api::accepts(&update, &Answer::Done));
+    assert!(!crate::api::accepts(&update, &Answer::Merged([1; 32])));
     let branch = Op::Write(Write::CreateBranch { branch: Box::from(&b"topic"[..]), commit: [1; 32] });
-    assert!(api::accepts(&branch, &Answer::Branch(api::BranchCreation::Created)));
-    assert!(api::accepts(&branch, &Answer::Branch(api::BranchCreation::Exists)));
-    assert!(!api::accepts(&branch, &Answer::Done));
+    assert!(crate::api::accepts(&branch, &Answer::Branch(api::BranchCreation::Created)));
+    assert!(crate::api::accepts(&branch, &Answer::Branch(api::BranchCreation::Exists)));
+    assert!(!crate::api::accepts(&branch, &Answer::Done));
     let edit = Op::Write(Write::Edit { number: 1, title: None, body: Some(Box::from(&b"body"[..])) });
     assert!(crate::bounds::op(&edit, &Limits { op_bytes: 4, ..LIMITS }));
     assert!(!crate::bounds::op(&edit, &Limits { op_bytes: 3, ..LIMITS }));
@@ -540,7 +540,7 @@ fn protection_nested_contexts_and_checks_provider_details_are_bounded() {
         job: None,
     };
     let checks = Answer::Checks(Box::new([status]));
-    assert!(api::accepts(&Op::Read(Read::Checks { commit: [1; 32] }), &checks));
+    assert!(crate::api::accepts(&Op::Read(Read::Checks { commit: [1; 32] }), &checks));
     assert!(crate::bounds::answer(&checks, &LIMITS));
     assert!(!crate::bounds::answer(&checks, &Limits { rows: 0, ..LIMITS }));
 }

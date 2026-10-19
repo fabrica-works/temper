@@ -444,14 +444,14 @@ impl Protocol {
         }
     }
 
-    fn submit(&mut self, call: Token, repository: client::api::Repository, op: client::api::Op) {
+    fn submit(&mut self, call: Token, repository: skein_forge::api::Repository, op: skein_forge::api::Op) {
         self.calls += 1;
-        if matches!(op, client::api::Op::Write(_)) {
+        if matches!(op, skein_forge::api::Op::Write(_)) {
             self.writes += 1;
         }
         self.serial += 1;
-        let items = matches!(op, client::api::Op::Read(client::api::Read::Items { .. }));
-        if matches!(op, client::api::Op::Read(client::api::Read::Items { page: 1, .. })) {
+        let items = matches!(op, skein_forge::api::Op::Read(skein_forge::api::Read::Items { .. }));
+        if matches!(op, skein_forge::api::Op::Read(skein_forge::api::Read::Items { page: 1, .. })) {
             self.item_start = self.tally().routes.get(&Route::Issues).copied().unwrap_or(0);
             self.item_pages.push(0);
         }

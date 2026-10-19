@@ -1,6 +1,7 @@
 use super::{FITS, w};
+use skein_forge::api as d;
 use skein_lib::List;
-use temper_engine_domain_forge_client::{self as client, api as d};
+use temper_engine_domain_forge_client::{self as client};
 
 fn encode_verdict(value: d::Verdict) -> w::Verdict {
     match value {
