@@ -390,6 +390,9 @@ pass:
      - A `--call` whose decoded call names a FILE gets no code path and no test of its own: no new `Startup` field, no decoding before the loop, no root opened in the host.
      - The answer's unblock says what the case does, and names the step that adds it.
 
+120. **The coordinator checks no tests; the next check follows up the test rule** (process, the coordinator's block of 2026-10-19T15:16:33Z).
+     The coordinator does not check any landing's tests. That sentence of the steer's point 1 is withdrawn: the coordinator reads no code. The supervisor's next hourly check verifies the rule against the tests that landed since (development.md, 10.3: "The supervisor follows up. The next check verifies each point."). The rest of point 1 stands: the rule passed on to the sessions that write tests.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
