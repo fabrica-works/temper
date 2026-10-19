@@ -169,7 +169,7 @@ The files of this plan they would also touch:
 | `tests/client/{Cargo.toml, src/front.rs, src/fixtures.rs, src/translate.rs}` | 06.1, 06.3 to 06.5 | **forge kit**'s temper-02.1, not landed at the start: the later landing rebases |
 | `crates/temper/tests/support/configuration.rs`, copied by 08.2 into `tests/real-loop/src/` | 08.2 (the copy); 10.1 and 13.3 read it | **browser-1**'s 01.1 adds `"bundle": null` to every configuration fixture: whichever lands later carries the field into the world's copy |
 | `crates/temper/tests/support/{forgejo.rs, mod.rs}`, `crates/temper/tests/process.rs` | 10.1, 10.2, 13.3 | within the plan: 10.2 and 13.3 on disjoint lines; the second to land rebases, neither waits (temper 13.3) |
-| `crates/temper/{Cargo.toml, src/lib.rs, src/tests.rs}` | 05.6; 13.3 `Cargo.toml` alone | within the plan |
+| `crates/temper/{Cargo.toml, src/lib.rs, src/tests.rs}` | 05.6; 08.2 `src/{lib.rs, tests.rs}` (`envelope_in`, ruling 104); 13.3 `Cargo.toml` alone | within the plan: the second to land rebases |
 | `tests/real-loop/src/` | 08, 09, 13 | within the plan: 08 owns the world's fixtures, 09 and 13 add to them (`code-organization.md`) |
 | skein's fake LLM (`skein-fake-peers`, its domain and protocol) | none: read only (08.1's `llm::scripted`) | **live text**, **LLM accounts** (each a smith repin); this plan moves no pin |
 

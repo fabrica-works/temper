@@ -244,6 +244,13 @@ pass:
      - The agent's root, its `Joint` limits and its codec stay the tools' preset (Choice 2); the Don't's "the person's limits for the agent" means those. No tools-root `worst_case`, no upstream change.
      - If `domain::worst_case` refuses the tools' preset, or the heap check fails, raise it with the error or the peak (06's Questions). Refresh any further copy of the presentation allowance computed at the supplied limits, and list it in the commit body.
 
+104. **temper 08.2: ServiceHost admitted with preparation's envelope** (plan defect, temper 08's block of 2026-10-19T14:01:41Z).
+     Plan defect: the Choice admits `ServiceHost` before the caller and prepares it once the referee hands it the peer's address, but the checked world records a root's `worst_case` right after its spawn closure and collects its `operations` before the first turn, and no public builder gives the service's envelope before preparation (`startup_worst_case` is `pub(crate)`, `startup_operations` private). The envelope is preparation's own, taken before the address, since the documents' limits do not name it.
+
+     - `crates/temper` gains `pub fn envelope_in(directory: &Path, config: &[u8]) -> Result<(u64, u32), String>`: `prepare` of `config` in `directory`, as `prepare_in` runs it, then the service's `worst_case()` and `operations()`, the service dropped and every descriptor `prepare` opened closed. Its unit test in `src/tests.rs`: equal to a prepared service's on the same documents, nothing left open. This is the one edit to `crates/temper` (the Rules' exception), beside 05.6's in the Hotspots.
+     - `ServiceHost`'s spawn closure writes the documents with the held forge listener's address standing in for the peer's, takes `envelope_in`, and its `Host::worst_case` and `operations` return those two throughout. Once handed the peer's address, it writes the documents again and calls `prepare_in`, as the Shape says, and asserts the prepared service's `worst_case()` and `operations()` equal the admitted ones.
+     - Nothing typed, no check switched off, no upstream edit, no copy of startup. If the two differ, if `prepare` refuses the stand-in address, or if dropping a prepared service leaves a descriptor open, raise it with the values or the descriptor. Refresh any further copy of the admission envelope, and list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

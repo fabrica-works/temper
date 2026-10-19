@@ -62,7 +62,12 @@ Steps: `temper-08.1`, `temper-08.2`, `temper-08.3`, `temper-08.4`.
   world, admitted before the caller (`spawn_signals`), waits until the
   referee hands it the peer's bound address, then writes the scratch's
   files and calls `temper::prepare_in`, as `temper serve` does, and
-  adopts its signal pipe (`Service::adopt_signals`). Termination is the
+  adopts its signal pipe (`Service::adopt_signals`). It is admitted
+  with the envelope that preparation gives (ruling 104): its spawn
+  closure writes the documents with the held forge listener's address
+  standing in for the peer's, and takes `temper::envelope_in`'s
+  `worst_case` and `operations`, which its `Host` methods return
+  throughout; the prepared service's own must equal them. Termination is the
   referee's `Controls::signal(.., ServiceSignal::Terminate)` on that
   pipe; the signal from the OS is the process tier's
   (`temper_serve_prints_its_link_and_drains_on_a_signal`).
@@ -95,7 +100,8 @@ Steps: `temper-08.1`, `temper-08.2`, `temper-08.3`, `temper-08.4`.
 ## Rules that bind it
 
 - **Nothing upstream, nothing of `tests/one-process`:** followed, never
-  edited or depended on (README, Hotspots); no edit to `crates/temper`.
+  edited or depended on (README, Hotspots); no edit to `crates/temper`
+  but 08.2's `envelope_in` (ruling 104).
 - **Limits from the builders:** the peer's from smith's `fake::limits`
   and skein-llm-world's `fake::limits`; the agent's operations from the
   shipped profile's builder, as one-process's `agent_limits`; `ctl`'s
@@ -166,8 +172,14 @@ agent.rs, calls.rs, lib.rs}`, `tests/real-loop/tests/lifecycle.rs`,
 `tests/real-loop/Cargo.toml` (`temper`, `temper-service`,
 `skein-scratch`, `skein-{io,lib,shell}`, `smith-agent-shell`,
 `serde_json`); root `Cargo.toml` (workspace entries `temper` and
-`skein-scratch`), `Cargo.lock`.
+`skein-scratch`), `Cargo.lock`; `crates/temper/src/{lib.rs,
+tests.rs}` (`envelope_in`, ruling 104).
 Shape:
+- `temper::envelope_in(directory, config) -> Result<(u64, u32),
+  String>`: `prepare` of `config` in `directory`, as `prepare_in` runs
+  it, then the service's `worst_case()` and `operations()`, the service
+  dropped and every descriptor `prepare` opened closed. A unit test in
+  `src/tests.rs`: equal to a prepared service's, nothing left open.
 - `run_on(scratch, recipe, steps)`: `new_controlled_checked` with the
   story's referee; spawns `Proc::Llm`, `Proc::Service` and
   `Proc::Caller`; `run(&Clock, PATIENCE)`. `run` is `run_on` on a new
