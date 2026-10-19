@@ -28,6 +28,7 @@ fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], ac
 }
 pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32, text_limit: u32) {
     b.open(Role::Main);
+    b.style(crate::look::MAIN);
     if let Some(chat) = root.pages().chat()
         && let Some(task) = chat.task(root.client())
     {
@@ -37,12 +38,14 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         conversation(b, &chat.thread, words, rows, text_limit);
         for card in &chat.cards {
             b.open(Role::Item);
+            b.style(crate::look::CARD);
             b.key(super::inbox::card_key(card.object));
             crate::confirm::card(b, root, card, words, bindings, rows);
             b.close();
         }
         for object in chat.departures() {
             b.open(Role::Item);
+            b.style(crate::look::CARD);
             b.key(super::inbox::card_key(*object));
             words.status(b, P::CardLeft, &[]);
             b.close();
@@ -98,6 +101,7 @@ fn composer(b: &mut Builder, chat: &Chat, task: &c::Task, words: &Words, binding
         b.open(Role::TextArea);
         b.name(&words.say(Word::Message, &[]));
         b.state(State::SubmitsOnEnter);
+        b.style(crate::look::COMPOSER);
         b.value(&chat.words, shown);
         b.bind(bindings.insert(Act::MessageWords { words: Box::default() }));
         b.close();
@@ -119,6 +123,7 @@ pub(crate) fn conversation(b: &mut Builder, thread: &Thread, words: &Words, rows
     b.name(&words.say_card(P::ConversationLog, &[]));
     for line in thread.lines().into_boxed() {
         b.open(Role::Region);
+        b.style(crate::look::TURN);
         match line {
             Line::Words { by, words: message, state } => {
                 if let Some(by) = by {

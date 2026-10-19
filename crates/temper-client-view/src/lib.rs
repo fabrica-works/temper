@@ -7,6 +7,7 @@ mod confirm;
 pub mod forge;
 pub mod frame;
 pub mod limits;
+pub mod look;
 pub mod pages;
 mod root;
 pub mod words;

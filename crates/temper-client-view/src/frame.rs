@@ -3,7 +3,7 @@ use skein_lib::{List, Token};
 use skein_ui::{Binding, Builder, Region, Role};
 use temper_client_domain::{Address, Domain, pages::Act};
 #[must_use]
-pub fn owner() -> skein_ui::Owner {
+pub const fn owner() -> skein_ui::Owner {
     skein_ui::Owner { number: temper_client_domain::owner::Owner::Pages.asker().0 }
 }
 #[must_use]
@@ -79,6 +79,7 @@ pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words:
     let pages = root.pages();
     let me = pages.me(root.client());
     builder.open(Role::Banner);
+    builder.style(crate::look::BANNER);
     text(builder, Role::Paragraph, &words.say(crate::words::Word::Brand, &[]));
     if let Some(word) = unavailable(root) {
         builder.open(Role::Region);
@@ -156,6 +157,7 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
         }))],
     );
     builder.open(Role::Navigation);
+    builder.style(crate::look::NAVIGATION);
     action(
         builder,
         Role::Link,

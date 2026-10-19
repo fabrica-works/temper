@@ -734,6 +734,16 @@ pub fn type_into(root: &mut temper_client_domain::Domain, name: &[u8], words: &[
     }
     panic!("text area");
 }
+/// The styles of each node of `role`, in tree order.
+pub fn styles(tree: &skein_ui::Tree, role: skein_ui::Role) -> Box<[Box<[skein_ui::Style]>]> {
+    let mut found = List::with_capacity(u32::try_from(tree.nodes().len()).expect("nodes fit"));
+    for node in tree.nodes() {
+        if node.role == role {
+            found.push(Box::from(node.styles.as_slice())).expect("a node per style list");
+        }
+    }
+    found.into_boxed()
+}
 /// Build a page once for the status-only page tests.
 pub fn page_view(root: &temper_client_domain::Domain) -> crate::View {
     let mut view = view();

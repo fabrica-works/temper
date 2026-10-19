@@ -21,3 +21,14 @@
 }
 body { background: var(--temper-canvas); color: var(--temper-ink); font: 14px/1.5 ui-monospace, monospace; }
 button, input, textarea, select { font: inherit; }
+/* mockups/style.css .topbar: the banner and the navigation, each a compact row under a quiet border. */
+.temper-banner, .temper-navigation { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--temper-line); }
+/* .page: the main's width, centred. */
+.temper-main { width: min(1120px, calc(100% - 72px)); margin: 0 auto; padding: 30px 0 85px; }
+/* .card: the chats' rows and a chat's cards. */
+.temper-card { background: var(--temper-paper); border: 1px solid var(--temper-line); border-radius: 14px; box-shadow: var(--temper-shadow); padding: 12px 16px; }
+/* skein-ui.css sets no white-space: a turn's line break must show. */
+.temper-turn { white-space: pre-wrap; }
+/* .composer textarea: one line growing to 120px, a fixed 120px that scrolls where field-sizing is missing. */
+.temper-composer { field-sizing: content; min-height: 1lh; max-height: 120px; resize: none; overflow-y: auto; }
+@supports not (field-sizing: content) { .temper-composer { height: 120px; } }

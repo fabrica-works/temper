@@ -23,6 +23,7 @@ fn region(b: &mut Builder, word: Word, words: &Words) {
 }
 pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32) {
     b.open(Role::Main);
+    b.style(crate::look::MAIN);
     if let Some(page) = root.pages().task()
         && let Some(task) = page.document(root.client())
     {

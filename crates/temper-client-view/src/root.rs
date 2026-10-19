@@ -39,6 +39,7 @@ impl View {
         let Some(form) = root.forge().form() else { return };
         let project = crate::pages::project_name(root.pages(), root.client(), form.project);
         b.open(Role::Main);
+        b.style(crate::look::MAIN);
         forge::page::page(b, form, project, &self.forge_words, &mut self.forge, self.limits.tree.text_per_node);
         b.close();
     }
@@ -64,6 +65,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     crate::frame::navigation(&mut builder, root, &view.forge_words, &mut view.pages);
     if let Some(word) = crate::frame::unavailable(root) {
         builder.open(Role::Main);
+        builder.style(crate::look::MAIN);
         builder.open(Role::Paragraph);
         view.forge_words.text(
             &mut builder,

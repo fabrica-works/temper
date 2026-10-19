@@ -21,12 +21,14 @@ fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], ac
 }
 pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, text_limit: u32) {
     b.open(Role::Main);
+    b.style(crate::look::MAIN);
     text(b, Role::Heading { level: 1 }, &words.say(Word::Chats, &[]));
     if let Some(chats) = root.pages().chats() {
         if root.pages().me(root.client()).is_some() && root.pages().project().is_some() {
             b.open(Role::TextArea);
             b.name(&words.say(Word::StartChat, &[]));
             b.state(State::SubmitsOnEnter);
+            b.style(crate::look::COMPOSER);
             b.value(&chats.words, temper_client_domain::pages::shown(root.pages()));
             b.bind(bindings.insert(Act::ChatWords { words: Box::default() }));
             b.close();
@@ -60,6 +62,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
 }
 pub(crate) fn row(b: &mut Builder, root: &Domain, line: &TaskLine, words: &Words, bindings: &mut Bindings) {
     b.open(Role::Item);
+    b.style(crate::look::CARD);
     b.key(skein_ui::Key { owner: crate::frame::owner(), kind: 10, a: line.chip.task, b: 0 });
     control(
         b,

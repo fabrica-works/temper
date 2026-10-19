@@ -25,6 +25,7 @@ fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], ac
 }
 pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32) {
     b.open(Role::Main);
+    b.style(crate::look::MAIN);
     text(b, Role::Heading { level: 1 }, &words.say(Word::InboxTitle, &[]));
     let Some(inbox) = root.pages().inbox() else {
         b.close();

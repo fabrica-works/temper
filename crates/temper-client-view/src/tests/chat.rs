@@ -196,3 +196,19 @@ fn enter_in_a_cards_reason_does_nothing() {
     let reason = fixtures::find(view.tree(), Role::TextArea, b"Reason").expect("reason");
     assert_eq!(crate::act(&mut view, reason, skein_ui::Act::Submit), None);
 }
+#[test]
+fn a_chats_card_carries_the_card_token() {
+    let view = fixtures::page_view(&proposal_root());
+    let cards = fixtures::styles(view.tree(), Role::Item);
+    assert!(!cards.is_empty());
+    for card in &cards {
+        assert_eq!(card.as_ref(), [crate::look::CARD]);
+    }
+}
+#[test]
+fn each_turn_carries_the_turn_token() {
+    let tree = tree(&provisional());
+    let turns = fixtures::styles(&tree, Role::Region);
+    assert_eq!(turns.len(), 1);
+    assert_eq!(turns.as_ref(), [Box::from([crate::look::TURN])]);
+}

@@ -6,19 +6,24 @@ pub enum Owner {
     Forge,
     Runner,
 }
+/// A wire number as an asker's, as jig's `Owner::opaque` widens it: `u32::from` is not `const`.
+const fn wide(number: u16) -> u32 {
+    let [low, high] = number.to_le_bytes();
+    u32::from_le_bytes([low, high, 0, 0])
+}
 impl Owner {
     #[must_use]
-    pub fn asker(self) -> jig_client::Asker {
+    pub const fn asker(self) -> jig_client::Asker {
         match self {
-            Self::Pages => jig_client::Asker(u32::from(temper_client_protocol_wire::number(
-                temper_client_protocol_wire::Owner::Pages,
-            ))),
-            Self::Runner => jig_client::Asker(u32::from(temper_client_protocol_wire::number(
-                temper_client_protocol_wire::Owner::Runner,
-            ))),
-            Self::Forge => jig_client::Asker(u32::from(temper_client_protocol_wire::number(
-                temper_client_protocol_wire::Owner::Forge,
-            ))),
+            Self::Pages => {
+                jig_client::Asker(wide(temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Pages)))
+            }
+            Self::Runner => {
+                jig_client::Asker(wide(temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Runner)))
+            }
+            Self::Forge => {
+                jig_client::Asker(wide(temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Forge)))
+            }
         }
     }
     #[must_use]

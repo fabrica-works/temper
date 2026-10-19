@@ -61,7 +61,13 @@ pub fn start() {
     let mut host = host::Host::new(facts.seed, facts.now, facts.wall);
     host.start(path.as_bytes(), store.read_all(&platform), secret);
     let page = Rc::new(RefCell::new(Page::new(
-        Look { names: &[], pictures: &[], draw: |_, _, _, _, _| false, components: &[], elements: &[] },
+        Look {
+            names: &[temper_client_view::look::NAMES],
+            pictures: &[],
+            draw: |_, _, _, _, _| false,
+            components: &[],
+            elements: &[],
+        },
         &host.bounds.tree,
         b"temper",
         facts.primary,

@@ -143,3 +143,8 @@ fn a_line_break_in_the_start_composer_is_kept() {
     let mut root = fixtures::chats_root();
     assert_eq!(&*fixtures::type_into(&mut root, b"Start a chat", b"Hello\nthere"), b"Hello\nthere");
 }
+#[test]
+fn a_chats_row_carries_the_card_token() {
+    let (tree, _) = tree(&line());
+    assert_eq!(fixtures::styles(&tree, Role::Item).as_ref(), [Box::from([crate::look::CARD])]);
+}
