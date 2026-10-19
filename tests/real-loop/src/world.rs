@@ -11,7 +11,8 @@ use skein_world::{
 pub(crate) enum Proc {
     Llm(Box<skein_fake_peers::llm::Peer>),
     Service(Box<ServiceHost>),
-    Caller(Caller),
+    Caller(Box<Caller>),
+    Ctl(Box<temper_client_shell_cli::host::OneShot>),
     Agent(Box<skein_world::PipeHost<smith_agent_shell::Agent>>),
 }
 impl Proc {
@@ -19,7 +20,8 @@ impl Proc {
         match self {
             Self::Llm(h) => h.as_ref(),
             Self::Service(h) => h.as_ref(),
-            Self::Caller(h) => h,
+            Self::Caller(h) => h.as_ref(),
+            Self::Ctl(h) => h.as_ref(),
             Self::Agent(h) => h.as_ref(),
         }
     }
@@ -27,7 +29,8 @@ impl Proc {
         match self {
             Self::Llm(h) => h.as_mut(),
             Self::Service(h) => h.as_mut(),
-            Self::Caller(h) => h,
+            Self::Caller(h) => h.as_mut(),
+            Self::Ctl(h) => h.as_mut(),
             Self::Agent(h) => h.as_mut(),
         }
     }
@@ -76,7 +79,18 @@ pub(crate) fn run(
         World::new_controlled_checked(|controls| Judge { controls, stopping: false, finished: false, wake: None });
     world.spawn(|| Proc::Llm(Box::new(llm::peer(recipe()).expect("independent LLM peer"))));
     world.spawn_signals(|signals| Proc::Service(Box::new(ServiceHost::new(scratch.path().into(), signals))));
-    world.spawn(|| Proc::Caller(Caller::new(steps())));
+    let root = skein_shell::open_root(scratch.path()).expect("caller launch root");
+    world.spawn_with_fds(vec![root], || Proc::Caller(Box::new(Caller::new(steps(), scratch.path().into(), root))));
+    let limits = temper_client_shell_cli::limits::native();
+    world.host_roots(
+        HostedProgram {
+            program: fixtures::CTL.into(),
+            make: fixtures::ctl,
+            instances: fixtures::CALLS_AT_ONCE,
+            operations: skein_io::operations(&limits.io).expect("tools operations") * 2 + 5,
+        },
+        fixtures::ctl_roots,
+    );
     let configuration =
         smith_agent_shell::config::read(&scratch.path().join("agent.json")).expect("agent operation bound");
     world.host_roots(
@@ -106,7 +120,7 @@ impl Referee<Proc> for Judge {
         if !service.link.is_empty() {
             caller.released = true;
         }
-        if caller.released && !self.stopping {
+        if caller.is_empty() && !self.stopping {
             self.controls.signal(1, ServiceSignal::Terminate);
             self.stopping = true;
         }
@@ -121,6 +135,7 @@ impl Referee<Proc> for Judge {
         };
         if (peer.address().is_some() && service.address.is_none())
             || (!service.link.is_empty() && !caller.released)
+            || (caller.is_empty() && !self.stopping)
             || (service.is_empty() && !self.finished)
         {
             self.wake = Some(now);

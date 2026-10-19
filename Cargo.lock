@@ -2413,6 +2413,7 @@ dependencies = [
  "smith-agent-process-world",
  "smith-agent-shell",
  "temper",
+ "temper-client-shell-cli",
  "temper-service",
 ]
 

@@ -32,6 +32,8 @@ pub fn documents(directory: &Path, llm: SocketAddr, forge: SocketAddr) -> (serde
     value["workers"][0]["agent"]["arguments"] = serde_json::json!(["agent", directory.join("agent.json")]);
     value["workers"][0]["limits"]["overrides"]["hub.accounts"] = 4.into();
     value["workers"][0]["limits"]["overrides"]["hub.event_bytes"] = 598.into();
+    // A minimal positive wait parks the scripted run and settles its withheld turn.
+    value["engine"]["charters"][0]["waiting_ms"] = 1.into();
     value["engine"]["hosts"]["listener"] = serde_json::json!([{"in_process":"workers"}]);
     value["engine"]["connectors"] = serde_json::json!([1]);
     value["engine"]["llm"]["endpoints"][0]["address"] = serde_json::json!({"socket":llm.to_string()});
@@ -81,4 +83,60 @@ pub fn write(directory: &Path, llm: SocketAddr, forge: SocketAddr) -> std::io::R
 }
 pub(crate) fn private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(path)?.write_all(bytes)
+}
+
+/// The tools' executable is hosted once per call, with two concurrent slots.
+pub const CTL: &[u8] = b"/real-loop/temper-ctl";
+pub const CALLS_AT_ONCE: u32 = 2;
+#[must_use]
+pub fn directory(scratch: &Path, at: crate::calls::Dir) -> std::path::PathBuf {
+    scratch.join("clients").join(format!("client-{}", at.0))
+}
+pub(crate) fn ctl_roots(spawn: &skein_io::kernel::Spawn) -> Vec<skein_world::StartupRoot> {
+    use std::os::unix::ffi::OsStrExt;
+    let directory = Path::new(std::ffi::OsStr::from_bytes(&spawn.args[0]));
+    let mut roots = vec![skein_world::StartupRoot {
+        name: b"parent".as_slice().into(),
+        path: directory.parent().expect("client parent").as_os_str().as_bytes().into(),
+    }];
+    let parsed =
+        temper_client_shell_cli::arguments::parse(&spawn.args[1..].iter().map(AsRef::as_ref).collect::<Vec<_>>())
+            .expect("story arguments");
+    if let Some(path) = temper_client_shell_cli::arguments::file_root(&parsed) {
+        roots.push(skein_world::StartupRoot { name: b"file_parent".as_slice().into(), path });
+    }
+    roots
+}
+pub(crate) fn ctl(spawn: &skein_io::kernel::Spawn, inherited: &skein_world::Inherited) -> crate::world::Proc {
+    use std::os::unix::ffi::OsStrExt;
+    use temper_client_shell_cli::{
+        arguments,
+        host::{Invocation, OneShot, Startup},
+    };
+    let directory = Path::new(std::ffi::OsStr::from_bytes(&spawn.args[0]));
+    let pipe = |child| inherited.pipes.iter().find(|(number, _)| *number == child).expect("standard pipe").1;
+    crate::world::Proc::Ctl(Box::new(
+        OneShot::new(
+            Invocation {
+                directory: Some(directory.file_name().expect("directory leaf").as_bytes().into()),
+                parsed: arguments::parse(&spawn.args[1..].iter().map(AsRef::as_ref).collect::<Vec<_>>())
+                    .expect("story arguments"),
+            },
+            Startup {
+                parent: Some(inherited.roots[0].1),
+                file_parent: inherited
+                    .roots
+                    .iter()
+                    .find(|(name, _)| name.as_ref() == b"file_parent")
+                    .map(|(_, fd)| *fd),
+                stdin: pipe(0),
+                stdout: pipe(1),
+                stderr: pipe(2),
+                signals: inherited.signal,
+                user: skein_shell::effective_user(),
+                seed: SEED,
+            },
+        )
+        .expect("shipped tools limits"),
+    ))
 }

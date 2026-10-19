@@ -22,6 +22,11 @@ pub struct Ran {
     scratch: Scratch,
 }
 impl Ran {
+    #[must_use]
+    pub fn calls(&self) -> &[calls::Called] {
+        let world::Proc::Caller(caller) = &self.outcome.procs[2] else { panic!("caller root") };
+        &caller.calls
+    }
     fn service(&self) -> &service::ServiceHost {
         let world::Proc::Service(service) = &self.outcome.procs[1] else { panic!("service root") };
         service
