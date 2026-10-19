@@ -740,6 +740,46 @@ pass:
      on jig's `Files::close`, which only sets `closing`. Also amended: 05-ctl.md's "held to
      the end", and 09's 8.3 line. STATUS.md is unchanged, and there is no `later.md` row.
 
+136. **For the user L in testing.md 6.1** (design answer, the user's L of temper 08e91e24a).
+     Ruling 136, the designer's landing of the user's L (temper 08e91e24a) in temper bab11df83 ("Count the real loop apart in testing.md 6.1, with a standing 6 s"); its decision follows.
+
+
+     Landed: temper `bab11df83` (testing.md 6.1; README, Rules and Done when
+     5; the Pulse's real-loop bullet; 06, 08, 09, 13 and 13.s1; later.md's
+     6.1 row). It takes L as decided: "the real loop is counted apart, with
+     a standing ceiling of 6 s for its sum, in place of an aim per plan, and
+     each story at most 1 s. The other worlds below the domain keep 4 s."
+
+     - **testing.md 6.1** now reads: "the worlds below the domain other than
+       the real loop (the protocol, machine, client, one-process and
+       reconcile worlds) together at most 4 s of the default suite; the
+       real-loop world's tests, its stories included, together at most 6 s of
+       the default suite: a standing ceiling, the same for each plan, sized
+       to the smoke that 2.4 keeps the real loop to …, which the user revisits
+       when the sum reaches it". The fuzzy 25 s keeps the real loop in, and
+       the 0.5 s and 1 s per test stay. Past either sum, the rule stands:
+       "their slowest tests are profiled, then made cheaper at the cause the profile
+       shows or moved to the fuzzy suite, by steps a plan names." Added: "A
+       plan whose end finds the real loop's sum at 6 s or past it puts the
+       ceiling to the user … until the user moves it, the 6 s stands."
+     - **README, Rules, "The worlds' sums below the domain hold no step":**
+       the six packages against 4 s, `temper-real-loop-world` against 6 s,
+       each story at 1 s. "No test is moved, cut or merged for the sum until
+       the user decides" is replaced by: "A test is made cheaper or moved to
+       the fuzzy suite for a sum only by a step the supervisor names (6.1: "by
+       steps a plan names"), such as temper-13.s1, never by a session's own
+       move, cut or merge." The base names the real loop's part: 0.09 to
+       0.10 s of the 3.91 s (ruling 112's answer, point 1).
+     - **Done when 5, second part:** the medians of the last three runs
+       against 4 s and 6 s; a story the third command names past 1 s in two
+       of the three runs is past it. Each run's line fails, and says so, when
+       it reads no test of either part. A miss is recorded for the user, and
+       the run is done either way, as before.
+     - **Unchanged:** the Pulse aims (`aims: temper 37 22 …`), as C set
+       them; the bullet now says 6.1 guides the real loop's idle sum to 6 s.
+     - **No step waits on this.** later.md's row keeps what is left: the
+       other worlds' 4 s, if temper 06's client stories pass it.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
