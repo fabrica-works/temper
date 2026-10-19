@@ -709,6 +709,9 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
          239:    without `--limit` (P): the page whole, its K rows again, then jig's `before`; the printed cursor stays jig's.
          255:`a_limited_activity_reads_on_with_its_page_whole`,
 
+135. **temper 03.4: a restored proposal's recipient, interim** (design, temper 03.4's block of 2026-10-19 10:01:22 UTC).
+     Interim, until decisions.md, For the user, Q, is decided: how a kept line of a restored proposal prints, when jig's `Outcome::Proposed { proposal }` keeps no recipient and tools.md, 6.1, has a kept line print "its outcome as an act's prints" (`proposed: p3/17, to maintainers`), is a design gap, and waits; it goes to the user as Q, as no designer is joined. temper 03.4 goes on with everything else, a new call's `Proposed` outcome with its offered recipient included; the kept line of a restored proposal, and its test, wait on Q, and never print a recipient the kept request does not hold. 03.4 lands once they follow Q.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
@@ -961,3 +964,19 @@ and the user, or the director, may veto it before the run:
   --activity K` that cuts a page prints `read with: activity N`. The
   printed cursor stays jig's. At most a page's rows repeat, and no row is
   skipped. tools.md, 5.2, says so at the designer's next pass.
+- **Q. A restored proposal's recipient** (question.md in the run's
+  directory, from temper 03.4's block of 10:01:22Z; no designer is joined
+  to answer it): tools.md, 6.1, has an act's outcome print `proposed:
+  p3/17, to maintainers`, and a kept line (8.2, step 4) print `kept: `,
+  the operation, "then its outcome as an act's prints". jig's
+  `Outcome::Proposed { proposal: ProposalKey }` keeps no recipient, and
+  `OwnerOutcome::Proposed` only its number; the recipient comes with the
+  live offer (`Admission::Proposed { to }`), which a restored request no
+  longer has, and may have changed since. Default: a kept line of a
+  restored proposal prints its identity alone (`kept: chat, proposed:
+  t3/17`), with no `to`; a new call's outcome keeps `, to <recipient>`.
+  Or: the kept line reads the proposal and prints its present recipient,
+  labelled as such (`, now waiting on <recipient>`); or a designer joins
+  the run (`plan join designer`, in a design session) and answers
+  question.md. temper 03.4's kept line of a restored proposal, and its
+  test, wait on it; the rest of 03.4 goes on.
