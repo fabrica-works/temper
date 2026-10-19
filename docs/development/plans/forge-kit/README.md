@@ -76,6 +76,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `jig/01.s1-client-names.md` | jig01.s1: boundary naming seeds and whole project prefixes under the designer's answer | jig design9e9c350; normal ready check | |
 | `jig/01.s2-smith-adapters.md` | jig01.s2: settled channel-v3 and no-live smith compatibility adapters | live-text/smith-02.1, jig01.s1; normal ready check | |
 | `jig/01.s3-http-room.md` | jig01.s3: HTTP mount room and application busy refusal | jig01.s2, jig design8922bfa; normal ready check | temper02.1 commit7 and closing temper-repin wait |
+| `jig/01.s4-busy-test-shape.md` | jig01.s4: extract busy-test socket drainage while retaining visible assertions | landed jig01.s3; normal ready check | existing closing temper-repin waits; other starts unheld |
 
 ### temper
 
@@ -89,7 +90,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `temper/06-throwaway.md` | temper 06: temper's process tier, tools and conformance on skein's throwaway; temper's deleted; the conformance on skein-json (decision 27) | skein 06.1 | 06.2: skein06.s1 |
 | `temper/07-worlds.md` | temper 07: the moved worlds, the dialect's tests and the conformance with its transcripts deleted from temper; the protocol world keeps temper's own tests (decision 22) | skein 06.3; temper 06.1 | the client's world: skein 07.1; setup's: skein 07.3; the component's: skein 08.1 and 09.1; 07.1: temper 05.2 |
 
-17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2,06.s1,03.s1,10.s1,10.s2 and jig01.s1,01.s2,01.s3. The brief's fifth step, the fakes and
+17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2,06.s1,03.s1,10.s1,10.s2 and jig01.s1,01.s2,01.s3,01.s4. The brief's fifth step, the fakes and
 the conformance, is skein 05 to 09 and temper 05 to 07, by size. The
 increments per session are in each file.
 
@@ -144,6 +145,8 @@ chain.
 - **Plan contracts and repository matches:** skein10.s2 owns hourly05’s three sampled corrections after10.4: separate the literal subscription contract from delivery mapping, keep word-validity assertions separate from marker round trips, and match repository Documents exhaustively under programming-model.md10.2. Preserve every mapped assertion, outcome and ordering. Add only the scoped plan-shapes AST gate mode under development.md14.4; preserve landed recovery controls, and listing mode/controls only when present from10.s1. 10.s2 must neither add nor require10.s1 files; later10.s1 preserves plan-shapes mode/controls. Normal readiness precedes implementation; serialize shared checker/gate edits with10.s1 without holding existing starts. Closing temper-repin waits for10.s2. Final calls/edges counts include its relative +2; historical increment proofs retain their original counts.
 
 - **Graph freshness:** the supervisor refreshes only the primary checkout indexes. Use the exact primary project names and check each result in the actual worktree. Until a stale index's refresh is reported, use source searches for that repository; a missing graph result proves no absence. A refresh applies through its reported source commit; later source landings require a fresh comparison. Source search remains available throughout.
+
+- **Busy admission test shape:** jig01.s4 extracts only the reference busy test’s typed socket-drain plumbing into its existing server fixtures. Keep all eight assertions visible and ordered in the single test, with the same calls, queued ends, retirement, fixture values and budgets. No runtime, pin, accounting, gate or test-count change; normal readiness comes first. The existing closing temper-repin also waits for01.s4; Temper02.1 and Accounts retain independent ownership, and other starts stay unheld. Refresh further reached copies within this test-only scope and list users in the commit body.
 
 - **Readiness proof preparation:** preflight explicit shell scripts and any source generator before submitting a bounded heavy attempt. Verify the clean candidate first; keep temporary accounting diagnostics in a separate scratch copy so a diagnostic setup defect cannot prevent its compile, clippy and existing-profile proof. Reuse an executed baseline only after source, test-identity and count verification. Setup failures still consume attempts; a new budget needs a supervisor ruling. Use isolated owned sources/targets, retain provenance and remove only completed owned targets; no global cache or dependency-code changes.
 
@@ -438,7 +441,7 @@ and fail naming the one that is unset (decisions.md, Design questions
 ## Repin
 
 temper's, in each temper increment that needs a new skein step (Rules),
-and the closing `temper-repin` once every skein step, including03.s1 and10.s2, and jig01.s1/01.s2/01.s3 have
+and the closing `temper-repin` once every skein step, including03.s1 and10.s2, and jig01.s1/01.s2/01.s3/01.s4 have
 landed, dropped or split (development.md, 5.7): temper 07.1's repin may land
 before skein's last tests do. skein's changes are new crates, a module
 of `skein-fake-peers` and new test crates, so nothing of smith, jig or
