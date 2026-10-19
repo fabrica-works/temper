@@ -396,6 +396,14 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
      - `.config/nextest.toml`: `[profile.default]` `global-timeout = "15s"`, `[profile.fuzzy]` `global-timeout = "60s"`.
      - `git show origin/main:crates/jig-protocol-store/src/transcripts/read.rs | wc -l`: 752.
 
+113. **temper 02's Shapes against main** (re-check of temper-02.1).
+     temper 02's re-check (skein 0db7b1fc, smith 538ef49a, jig 31aae420, temper a2fd8e86; scratch with temper's pins, jig 719bd70d) corrected temper/02-tools-table.md: the `takes` doc comment of the Interface sketches backticks `Ended`, `WaitingOnMe`, `Task` and `Phase`, which clippy's `doc_markdown` refuses bare under `-D warnings`; 02.1's Test shape reads `src/jig.rs` and `src/jig/**` under `env!("CARGO_MANIFEST_DIR")`, since temper-box's boundary test walks a relative `src`. The rows (`limits::ROWS`, 50 against jig's wire ceiling of 32) are decisions.md, For the user, K, and stay as they are until it is decided: with them at 32, the check passed 6 of 6 in `temper-client-tools` and 94 of 94 across it, `temper-client-domain` and `temper-client-shell-terminal`, clippy clean. jig main's `Held` and named send are temper 03.1's, at its repin, as temper/03 says. A further sketch comment that clippy refuses: backtick its names, and list it in the commit body.
+
+     Checked:
+     - temper/02-tools-table.md, before: `/// tree/run: Ended only; WaitingOnMe: Task only; Phase: ten live phases only.`
+     - `git -C ~/src/rust/temper grep -n '"src' origin/main -- crates/temper-box/src/tests/boundary.rs`: 53 `pending.push(std::path::PathBuf::from("src"))`.
+     - temper/03-*.md:3 "temper repins onto jig's named send, turn read and deadline spans (03.1)"; :17 names `Held`.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

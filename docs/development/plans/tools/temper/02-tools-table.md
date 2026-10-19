@@ -128,7 +128,7 @@ Shape:
   `key::TOOLS` and `key::engine` use it.
 Test shape: `src/tests/{boundary,limits,key}.rs`; fixtures `name(&[u8])`
 and `sources()`, reading `src/jig.rs` and `src/jig/**` under
-`CARGO_MANIFEST_DIR`, as temper-box's boundary test does. Reference tests:
+`env!("CARGO_MANIFEST_DIR")` (temper-box's boundary test walks a relative `src` instead). Reference tests:
 ```rust
 #[test]
 fn each_ceiling_is_within_the_client_limit_it_reads_from() {
@@ -378,7 +378,7 @@ pub enum Subject { Me, Inbox, Task(u64), Tree(u64), Run(u64), Tasks(Box<Call>) }
 pub enum Condition { Waiting, Updates, Ended, WaitingOnMe, Held, Replied, Phase(Phase) }
 /// Parse 5.4's condition for its subject; terminal phases name `--until ended`.
 pub fn condition(subject: &Subject, word: &[u8]) -> Result<Condition, Usage>;
-/// tree/run: Ended only; WaitingOnMe: Task only; Phase: ten live phases only.
+/// tree/run: `Ended` only; `WaitingOnMe`: `Task` only; `Phase`: ten live phases only.
 pub fn takes(subject: &Subject, condition: &Condition) -> bool;
 pub fn phase(word: &[u8]) -> Option<Phase>; pub fn phase_word(phase: Phase) -> &'static [u8];
 // crates/temper-client-tools/src/jig/key.rs
