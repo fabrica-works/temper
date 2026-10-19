@@ -680,6 +680,21 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
 132. **temper 03.3: a limited activity's call that reads on, interim** (design, temper 03.3's block of 2026-10-19 09:33:47 UTC).
      Interim, until decisions.md, For the user, P, is decided: where the call that reads on goes after a page that `activity N --limit K` or `task N --activity K` cut is a design gap, and waits (jig's `Read::Activity { task, before }` takes no row count, and its page's `before` is older than the whole page; tools.md section 12 gives the rest of a window's cut "by its cursor", so no row is skipped); it goes to the user as P, as no designer is joined. temper 03.3 goes on with everything else, `activity N` without `--limit` and with `--limit` at or above the page's rows included; the call that reads on after a cut page, and its tests, wait on P, and 03.3 lands once they follow P and O.
 
+133. **temper 03.3: the inbox's first page** (decision O, for temper 03.3's block of 2026-10-19 09:25:20 UTC).
+     decisions.md, For the user, O, decided by the director for the user (temper 0ecb23bf6), the default, ruled into temper 03.3: `inbox` reads needs first; while needs has more, a page is needs alone; once needs ends on a page, updates' first page follows it when both fit in 32 rows, and when they do not, the call that reads on starts updates (group byte 1, no jig cursor), so no page passes 32 rows and no update is read twice. This ends ruling 131's wait; ruling 132's stands. temper/03-tools-root.md, 03.3's Shape, has it under Lists in place of "once per `InboxReadGroup`, needs first", with the test `an_inbox_page_whose_updates_do_not_fit_reads_on_at_the_start_of_updates` and a Size of at most 360 lines; later.md's row for N adds O for tools.md, 5.2. Any further copy of the first page's old shape (a fixture, a golden, a help line): refresh it as this says, and list it in the commit body.
+
+     ## Checked
+
+     - `git -C ~/src/rust/temper show 0ecb23bf6:docs/development/plans/tools/decisions.md | grep -n -A3 'Decision: the default, by director, 2026-10-19: needs come first'`:
+         901:  Decision: the default, by director, 2026-10-19: needs come first, and
+         902-  while needs has more, a page is needs alone. Once needs ends on a page,
+         903-  updates' first page follows it when both fit in 32 rows. When they do
+         904-  not, the call that reads on starts updates (group byte 1, no jig
+     - `grep -n -F -e 'reads needs first' -e 'whose_updates_do_not_fit' -e 'at most 360' docs/docs/development/plans/tools/temper/03-tools-root.md | cut -c1-120`:
+         218:  - `inbox` reads needs first (decisions.md, For the user, O, decided by the director, temper 0ecb23bf6): while need
+         248:`an_inbox_page_whose_updates_do_not_fit_reads_on_at_the_start_of_updates`,
+         275:Size: at most 360 lines, with the inbox's cursor and first page (decisions.md, N and O).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

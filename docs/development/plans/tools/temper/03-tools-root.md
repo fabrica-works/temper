@@ -215,7 +215,9 @@ Files: under `crates/temper-client-tools/`, `src/jig/render/{lists,activity,turn
 `src/tests/jig.rs`, `src/tests/jig/{lists,turn}.rs` (new), `src/tests/fixtures.rs`, goldens.
 Shape:
 - **Lists.**
-  - `inbox` reads `Read::Inbox` once per `InboxReadGroup`, needs first. `tasks` reads `Read::Tasks`, one group per call
+  - `inbox` reads needs first (decisions.md, For the user, O, decided by the director, temper 0ecb23bf6): while needs has
+    more, a page is needs alone; once needs ends on a page, updates' first page follows it when both fit in 32 rows, and
+    when they do not, the call that reads on starts updates (group byte 1, no jig cursor). `tasks` reads `Read::Tasks`, one group per call
     (decisions.md, For the user, L, decided by the director, temper 09cfaca18): without `--ended`, the live group, `--after C` its `live`;
     with it, the ended group alone, as jig's view reads it (`query.phase = Some(PhaseClass::Ended)`, `live: None`,
     `--after C` its `ended`), the call that reads on keeping `--ended`; `rows.rs`'s `--ended` help reads
@@ -243,6 +245,7 @@ Shape:
 Test shape: in `src/tests/jig/{lists,turn}.rs`, on the root harness, each under 20 ms:
 `a_list_prints_a_row_a_line_then_the_call_that_reads_on`, `inbox_prints_what_needs_the_party_then_updates`,
 `an_inbox_reads_on_in_needs_while_needs_has_more`, `an_inbox_reads_on_in_updates_once_needs_ends`,
+`an_inbox_page_whose_updates_do_not_fit_reads_on_at_the_start_of_updates`,
 `an_inbox_cursor_of_another_group_than_its_kind_exits_1`,
 `task_with_tree_activity_and_run_answers_once_and_unwatches`,
 `a_turn_too_large_for_a_page_prints_by_its_size_and_its_call`,
@@ -269,7 +272,7 @@ fn a_turn_past_the_read_bound_exits_0_past_the_limit() {
 Proof: unit, `heavy cargo nextest run -p temper-client-tools -E 'test(/turn/)'` (under 1 s). It shows 5.2's three turn
 forms. The next plan's story "a turn too large for a page read whole" connects it.
 Don't: keep a watch past its first delivery; print more than 32 rows; cut a path.
-Size: at most 340 lines, with the inbox's cursor (decisions.md, N).
+Size: at most 360 lines, with the inbox's cursor and first page (decisions.md, N and O).
 Removes: nothing.
 
 ### 03.4 jig's acts under their keys
