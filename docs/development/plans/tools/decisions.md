@@ -482,6 +482,55 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
      - `git log a6f34f6af..origin/main -- Cargo.lock` (temper): 9c8e5a2f8 "Repin skein before moving temper's fake forge users", Plan: forge-kit, Step: temper-05.1.
      - `git diff 590015b4 origin/main -- crates/jig-client/src/shapes.rs` (jig): `chat(me, project, words)`, `set_goal(me, project, draft, reason)`, `fall(creating, draft, deadline)`; `git grep -nE 'set_goal\(|shapes::fall|\bfall\('` in temper's crates, tests, testing: none; `shapes::chat` at `crates/temper-client-domain/src/pages/chats.rs` only.
 
+124. **temper 11's Shapes against main** (ready check of temper-11.1).
+     temper 11's ready check (skein 6e2907921, smith 137a1cb48, jig 872bfb7c, temper e10aa299f) compiled the corrected 11.1 and 11.2 sketches under clippy and passed nextest 1689/1689 and fuzzy 50/50. temper/11-tools-forge.md now says: the domain's `Resource` derives `Clone, Copy, Debug, PartialEq, Eq`, as the view's does, and `resource`, `owner`, `joined` and `full_name` are `#[must_use]`; `forge::answer` gives `Some(Answer::Unknown)` for jig's `Done` and each outcome `told` takes as unknown, and `None` only when the family record or the limits cannot be decoded, as `told` does today; 11.1 also moves the pure mappings to `Word` (from `page.rs`'s `broken`, `kinds` and `outcome`'s role, and `path_text`'s resource, with `most` passed in) into domain `forge::words`, which the view's functions call, keeping their names and output, and which 11.2's Parts, marks and outcomes call, so that the tools copy none of them: the sketches' preamble already gives the domain the pure conversions; `Unshowable` (id 24) stays in the view's words; the tools' `skein-ui` dependency is temper 03.2's, in its Files, so 11.2 adds none. The 11.2 fixtures the check did not find on `main` (`signed_in`, `PARTY`, `golden` and the others) are temper 03's: its Fixtures rule names the harness, and its tests' sketches use `fixtures::PARTY`. A further copy of a moved mapping: call the domain's, and list it in the commit body.
+
+     ## Checked
+
+     - `git grep -n "Unshowable" origin/main -- crates/temper-client-view/src`:
+       crates/temper-client-view/src/words.rs:123:    Unshowable,
+       crates/temper-client-view/src/words.rs:234:    Word::Unshowable,
+       crates/temper-client-view/src/words.rs:350:            Self::Unshowable => 24,
+       crates/temper-client-view/src/words.rs:586:        Word::Unshowable => (&[b"Cannot show this part."], &[]),
+     - `git show origin/main:crates/temper-client-view/src/forge.rs | grep -n -B1 "pub enum Resource\|fn joined\|fn full_name\|fn path_text"`:
+       10-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+       11:pub enum Resource<'a> {
+       --
+       40-}
+       41:fn joined(segments: &[Box<[u8]>], most: u32) -> Box<[u8]> {
+       --
+       71-}
+       72:fn full_name(owner: &[u8], name: &[u8]) -> Box<[u8]> {
+       --
+       80-}
+       81:fn path_text(builder: &mut Builder, path: &[Box<[u8]>], words: &Words) {
+     - `git show origin/main:crates/temper-client-view/src/forge/page.rs | grep -n "^fn broken\|^fn kinds\|^fn outcome\|forge::Role::"`:
+       35:        (forge::Role::Owned, Word::OwnedChoice),
+       36:        (forge::Role::Fork, Word::ForkChoice),
+       37:        (forge::Role::Context, Word::ContextChoice),
+       124:fn broken(builder: &mut Builder, broken: Option<forge::Broken>, words: &Words) {
+       139:fn kinds(kinds: forge::Kinds, words: &Words) -> Box<[u8]> {
+       173:fn outcome(builder: &mut Builder, form: &forge::Form, answer: &forge::Answer, words: &Words, text_limit: u32) {
+       177:                forge::Role::Owned => Word::Owned,
+       178:                forge::Role::Adopted => Word::AdoptedRole,
+       179:                forge::Role::Fork => Word::Fork,
+       180:                forge::Role::Context => Word::Context,
+     - `git show origin/main:crates/temper-client-domain/src/forge.rs | grep -n "Answer::Done\|Answer::Unknown\|family::answer"`:
+       98:                        draft.outcome = Some(Answer::Unknown);
+       121:                    Answer::CoreRefused(_) | Answer::ForgeRefused(_) | Answer::EntranceRefused(_) | Answer::Unknown => {
+       258:                    family::answer(&record, &wire_limits(&limits.forge)?, &link)?
+       264:                Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Done(_)))
+       269:                | Outcome::Unconfirmed => Answer::Unknown,
+     - `grep -n "skein-ui" docs/development/plans/tools/temper/03-tools-root.md (docs worktree)`:
+       59:  Use jig's phrases through `skein-ui`; decimal KB rounded up, text times UTC HH:MM, dated off the step's day.
+       139:Files: `crates/temper-client-tools/src/root.rs` (new), `src/lib.rs`, `Cargo.toml` (`skein-ui`);
+     - `git show origin/main:crates/temper-client-tools/Cargo.toml | grep -n "skein-ui"`:
+       (none)
+     - `grep -n "PARTY\|signed_in" 03-tools-root.md` (docs worktree):
+       61:- **Fixtures:** one module, temper 02's `src/tests/fixtures.rs`, extended here with the root harness `signed_in`, `submit`, `serve`,
+       170:      let mut root = fixtures::signed_in(fixtures::PARTY);
+       192:      let mut root = fixtures::signed_in(fixtures::PARTY);
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

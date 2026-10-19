@@ -169,8 +169,20 @@ Shape:
   The view's unrelated words and overrides remain its own.
 - Keep `say`, `text`, `capacity`, `path_text`, `drawn`, `owner_part` in
   the view; they call the domain's phrase IDs and resource helpers.
-  `forge/page.rs` keeps its Broken-to-Word mapping and imports the shared Word.
   `Words::english` composes the domain's rows. No old-path aliases.
+- Move the pure mappings to `Word` into domain `forge::words` too, each a
+  `#[must_use]` function of domain values, with no `Builder` or view
+  `Words`: a `Broken` to its Word, `Long`'s bound its Number hole
+  (`page.rs`'s `broken`); `Kinds` to its kind Words in 4.7's order, read,
+  push, open, land, review, status, comment, issue, branch (`kinds`); a
+  `Role` to Owned, AdoptedRole, Fork or Context (`outcome`'s); a path to
+  its `Resource`'s Word and holes, the bound passed as `most`
+  (`path_text`'s). The view's `broken`, `kinds`, `outcome` and `path_text`
+  keep their names and output and call them; 11.2's Parts and outcomes
+  call the same, so the tools copy none. Their lines count as moved.
+- `Unshowable` (id 24, "Cannot show this part.") stays in the view's
+  words: it is the view's word for any part it cannot show, not a forge
+  word, though `ALL` lists it after `Shown`.
 - Update `root.rs` and `tests/client/src/app.rs`, the external callers
   of `forge::bindings::owner`, to domain `forge::words::owner`;
   bindings and words use that same function. No phrase is renumbered.
@@ -205,6 +217,7 @@ Files: forge hotspots, every path:
 - `crates/temper-client-tools/src/tests/golden/adopt_adopted.txt` (new);
 - `crates/temper-client-tools/src/tests/golden/adopt_refused.txt` (new);
 - `crates/temper-client-tools/src/tests/golden/forge_part.txt` (new).
+The tools' `skein-ui` dependency is temper 03.2's (its Files); 11.2 adds none.
 Shape:
 - Fill the form from Call, each text through `forge::write`: Forge with
   `Typed::Forge`, Checks with `Typed::Checks`, the others `Typed::Bytes`.
@@ -232,7 +245,8 @@ Shape:
   O/N was adopted.” Client-own outcomes follow Choices before decoding.
   JSON is `{"adopted":{...}}`, or the outcome's snake-case name and fields;
   this is also the kept object's `outcome`, without inventing a name.
-- Parts uses the shared resource, pattern and kind words. Other forge
+- Parts uses the shared resource, pattern and kind words, through 11.1's
+  mappings in domain `forge::words`, as do the marks and outcomes above. Other forge
   parts say “Shown on the forge.” No family read/watch; paths stay whole.
 Test shape: `src/tests/adopt.rs`, on `src/tests/fixtures.rs`'s root
 harness and shipped limits. Extend `adoption_answer`, `sent_name`,
@@ -287,7 +301,9 @@ RUNNER's. The engine name is a separate Send field, not that number.
 // crates/temper-client-domain/src/forge.rs (11.2)
 /// The validated adoption as the existing project-scoped family ask.
 pub fn ask(adoption: &Adoption, limits: &Limits) -> Option<jig_client::Ask>;
-/// A family or entrance answer; None means it cannot be decoded here.
+/// A family or entrance answer, as `told` maps it: jig's `Done`, and each
+/// outcome `told` takes as unknown, give `Some(Answer::Unknown)`; `None`
+/// only when the family record or the limits cannot be decoded.
 pub fn answer(limits: &crate::Limits, answered: &jig_client::Answered) -> Option<Answer>;
 // crates/temper-client-domain/src/forge/form.rs (11.2), exported as forge::write
 /// The form's bounded write; a long value leaves its mark and retained text.
@@ -295,6 +311,7 @@ pub fn write(form: &mut Form, text: Text, value: Box<[u8]>, typed: Typed, bound:
 
 // crates/temper-client-domain/src/forge/words.rs (11.1)
 /// Shared resource vocabulary; fields unchanged from the view's Resource.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Resource<'a> {
     /// Repository path, decoded without another read.
     Repository { host: &'a [u8], owner: &'a [u8], name: &'a [u8] },
@@ -309,9 +326,13 @@ pub enum Resource<'a> {
     /// Unrecognised path: render its segments joined by slash.
     Other,
 }
+#[must_use]
 pub fn resource(path: &[Box<[u8]>]) -> Resource<'_>;
+#[must_use]
 pub fn owner(connector: u16) -> skein_ui::Owner;
+#[must_use]
 pub fn joined(segments: &[Box<[u8]>], most: u32) -> Box<[u8]>;
+#[must_use]
 pub fn full_name(owner: &[u8], name: &[u8]) -> Box<[u8]>;
 ```
 
