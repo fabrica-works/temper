@@ -37,8 +37,8 @@ kept: create done: task 41, chat
 A kept JSON notice has only operation and outcome, one object per stderr line, never a request name or key.
 pending reads only the store, with no lock, client or send. Each row gives operation,
 party N and first sending in wall-time words, or not sent. For example:
-create, party 3, not sent
-JSON: {"pending":[{"operation":"create","party":3,"first_sent":null}],"unread":2}
+chat, party 3, not sent
+JSON: {"pending":[{"operation":"chat","party":3,"first_sent":null}],"unread":2}
 2 kept records these tools cannot read; a call that sends drops them
 Unsupported store versions or undeclared family owners/versions are counted, never listed (exit 0).
 An invalid store fails: DIRECTORY's store cannot be read (exit 1).
@@ -58,8 +58,8 @@ Tools:
 /// The local pending tool's result, without opening a client.
 pub const PENDING: &[u8] = br#"Reads only the store: no lock, client or send.
 Rows: operation, party N, first sending in wall-time words or not sent.
-create, party 3, not sent
-{"pending":[{"operation":"create","party":3,"first_sent":null}],"unread":2}
+chat, party 3, not sent
+{"pending":[{"operation":"chat","party":3,"first_sent":null}],"unread":2}
 2 kept records these tools cannot read; a call that sends drops them
 Unread records are counted, never listed; exit 0.
 An invalid store: DIRECTORY's store cannot be read (exit 1).

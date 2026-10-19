@@ -15,6 +15,7 @@ macro_rules! encode {
         writer.finish()
     }};
 }
+pub mod local;
 mod recovery;
 pub use recovery::{dropped, kept_chat, other_party, small_store};
 pub const LINK: &[u8] = b"http://127.0.0.1:4000/jig/v1/sign-in/link?secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
@@ -31,6 +32,7 @@ pub const PARTIAL: usize = 3; // More than one short write is needed for every h
 pub struct Frame {
     pub host: OneShot,
     pub link: &'static [u8],
+    pub input: &'static [u8],
     pub link_root: Option<Fd>,
     pub link_leaf: Option<Box<[u8]>>,
     pub refuse_link: Option<()>,
@@ -90,6 +92,7 @@ impl Frame {
         Self {
             host,
             link: LINK,
+            input: b"",
             link_root: None,
             link_leaf: None,
             refuse_link: None,
@@ -379,7 +382,12 @@ impl Frame {
                 self.host.completions().push(Complete { op, kind, result: Err(Error::Cancelled) });
                 Ok(Done::Nothing)
             }
-            Op::PipeRead { .. } => Ok(Done::Count(0)),
+            Op::PipeRead { buf, .. } => {
+                let count = buf.len().min(self.input.len());
+                buf[..count].copy_from_slice(&self.input[..count]);
+                self.input = &self.input[count..];
+                Ok(Done::Count(u32::try_from(count).expect("input count")))
+            }
             Op::Bind { .. }
             | Op::Listen { .. }
             | Op::Accept { .. }
@@ -446,28 +454,7 @@ impl Frame {
                 socket.reply.extend(format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", body.len()).bytes());
                 socket.reply.extend(body.iter().copied());
             }
-            b"/jig/v1/stream" => {
-                self.stream = Some(fd);
-                socket.reply.extend(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n");
-                let mut served = skein_lib::List::with_capacity(1);
-                served
-                    .push(
-                        w::Served::new(
-                            &w::CEILINGS,
-                            w::ServedParts { owner: w::Owner::Jig, first: w::VERSION, last: w::VERSION },
-                        )
-                        .expect("served version"),
-                    )
-                    .expect("one family");
-                let hello = w::StreamEvent::Hello(
-                    w::Hello::new(
-                        &w::CEILINGS,
-                        w::HelloParts { stream: [1; 16], served, heartbeat: Duration::from_secs(60) },
-                    )
-                    .expect("hello"),
-                );
-                socket.reply.extend(sse(&hello));
-            }
+            b"/jig/v1/stream" => self.hello(fd),
             b"/jig/v1/watch" => {
                 let open = w::Open::decode(&w::CEILINGS, &mut skein_lib::Reader::new(&socket.request[end + 4..]))
                     .expect("watch record");
@@ -485,6 +472,11 @@ impl Frame {
             b"/jig/v1/request" => {
                 let body = socket.request[end + 4..].to_vec();
                 self.act_reply(fd, &body);
+            }
+            b"/jig/v1/read" => self.read_task(fd),
+            b"/jig/v1/sign-out" => {
+                self.hold_stores = Some(());
+                self.reply(fd, &encode!(w::SignOutAnswer::SignedOut));
             }
             b"/jig/v1/stream-gone" => self.reply(fd, &[]),
             _ => panic!("unexpected HTTP route"),

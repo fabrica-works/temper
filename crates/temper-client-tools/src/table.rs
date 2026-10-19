@@ -1,4 +1,4 @@
-//! The tools available to this host (tools.md, 5).
+//! The tools available to this host (client/tools.md, 5).
 use crate::jig::{
     argv::{self, Usage},
     call::Parsed,

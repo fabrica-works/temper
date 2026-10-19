@@ -78,6 +78,7 @@ skein-shell = { git = "https://github.com/fabrig-dev/skein.git" }
 temper-client-shell-terminal = { path = "crates/temper-client-shell-terminal" }
 temper-client-shell-cli = { path = "crates/temper-client-shell-cli" }
 jig-client = { git = "https://github.com/fabrig-dev/jig.git" }
+jig-client-domain = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-client-protocol-http = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-client-test-records = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-client-protocol-link = { git = "https://github.com/fabrig-dev/jig.git" }

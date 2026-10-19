@@ -114,7 +114,7 @@ const WAIT_BAD: &[(&str, Option<&str>)] = &[
     ("task 41", Some("phase:cancelled")),
     ("task 41", Some("phase:ended")),
 ];
-// tools.md 5.4: timeout at its maximum and one second past it; zero is immediate.
+// client/tools.md 5.4: timeout at its maximum and one second past it; zero is immediate.
 const TIMEOUTS: &[(&[u8], bool)] = &[
     (br#"{"tool":"wait","arguments":{"subject":"me","timeout":0}}"#, true),
     (br#"{"tool":"wait","arguments":{"subject":"me","timeout":3600}}"#, true),

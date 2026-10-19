@@ -108,7 +108,7 @@ pub const SIGN_IN: Tool = Tool {
 };
 pub const SIGN_OUT: Tool = Tool {
     name: b"sign-out",
-    line: b"End sign-in and erase the token",
+    line: b"End sign-in and leave the token empty",
     result: b"sign_out",
     forms: &[&[]],
     keyed: Keyed::Never,

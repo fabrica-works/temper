@@ -4,6 +4,7 @@ pub mod acts;
 pub mod document;
 mod lists;
 pub(crate) mod outcome;
+pub mod pending;
 mod turn;
 use crate::jig::{Limits, runner::Printed};
 use alloc::boxed::Box;

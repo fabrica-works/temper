@@ -7,4 +7,5 @@ mod conditions;
 
 mod digest;
 
+mod pending;
 mod wait;

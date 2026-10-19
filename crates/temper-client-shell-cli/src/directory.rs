@@ -236,7 +236,7 @@ impl Directory {
                 self.retry = None;
                 file::Request::Lock { owner: OWNER, root: self.private.expect("private directory") }
             }
-            Stage::Address if self.class == Class::SignIn => {
+            Stage::Address if matches!(self.class, Class::SignIn | Class::Pending) => {
                 self.stage = Stage::Ready;
                 return;
             }

@@ -321,3 +321,105 @@ fn file_root_splits_a_file_argument() {
         assert_eq!(crate::arguments::file_root(&parsed).as_deref(), parent, "{path:?}");
     }
 }
+#[test]
+fn pending_lists_each_kept_request() {
+    let mut f = fixtures::local::pending(false, false, false);
+    f.drain();
+    assert_eq!(f.stdout(), b"chat, party 73, not sent\n");
+    assert_eq!((f.locks, f.requests()), (0, 0));
+    assert_eq!(f.store_count(), 0);
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+}
+#[test]
+fn pending_counts_unread_records_in_its_line() {
+    let mut f = fixtures::local::pending(true, false, false);
+    f.drain();
+    assert_eq!(
+        f.stdout(),
+        b"chat, party 73, not sent\n1 kept records these tools cannot read; a call that sends drops them\n"
+    );
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+}
+#[test]
+fn pending_skips_the_stream_record() {
+    let mut f = fixtures::local::pending(false, true, false);
+    f.drain();
+    assert_eq!(f.stdout(), b"chat, party 73, not sent\n");
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+}
+#[test]
+fn pending_json_carries_its_rows_with_unread() {
+    let mut f = fixtures::local::pending(true, false, true);
+    f.drain();
+    assert_eq!(f.stdout(), br#"{"pending":[{"operation":"chat","party":73,"first_sent":null}],"unread":1}"#);
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+}
+#[test]
+fn a_file_that_is_no_store_cannot_be_read() {
+    let mut f = fixtures::Disk::act_words_with(&[b"pending"], b"not a store".as_slice().into());
+    f.drain();
+    assert_eq!(f.stderr(), b"temper ctl: DIRECTORY's store cannot be read\n");
+    assert_eq!(f.exit(), Some(Exit::Code(1)));
+}
+#[test]
+fn sign_out_waits_for_the_empty_token_stored() {
+    let mut f = fixtures::Disk::act(&[b"sign-out"]);
+    f.sign_in_then_deliver_me();
+    assert_eq!(f.exit(), None);
+    f.store_token_with_address();
+    assert_eq!(f.stored(b"token"), Some(b"".as_slice()));
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+}
+#[test]
+fn sign_in_dash_reads_stdin() {
+    let mut f = fixtures::Disk::act(&[b"sign-in", b"-"]);
+    f.input = fixtures::LINK;
+    f.answer_sign_in_then_me();
+    assert_eq!(f.stored(b"token"), Some(fixtures::TOKEN_BYTES));
+    assert_eq!(f.link_leaf, None);
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+}
+#[test]
+fn close_kept_line() {
+    let mut f = fixtures::Disk::act_with(fixtures::local::kept_close());
+    f.answer_kept();
+    assert_eq!(f.stderr(), b"kept: close, done: task 41, close\n");
+    assert_eq!(f.stdout(), b"");
+}
+
+#[test]
+fn a_drawn_key_is_resent_from_directory() {
+    let words = &[b"stop".as_slice(), b"7"];
+    let mut first = fixtures::Disk::act_words_with(words, fixtures::small_store(&[]));
+    first.sign_in_then_deliver_me();
+    first.advance_past(crate::limits::DEADLINE);
+    let mut next = fixtures::Disk::act_words_with(words, first.store_snapshot());
+    next.sign_in_then_deliver_me();
+    assert_eq!(next.act_keys(), first.act_keys());
+    assert_eq!(next.act_keys().len(), fixtures::local::ONE_REQUEST);
+}
+#[test]
+fn adopt_is_an_act() {
+    let mut f = fixtures::Disk::act_words_with(
+        &[
+            b"adopt",
+            b"--project",
+            b"shop",
+            b"--owner",
+            b"o",
+            b"--name",
+            b"n",
+            b"--landing",
+            b"main",
+            b"--key",
+            b"adopt-repo",
+        ],
+        fixtures::small_store(&[]),
+    );
+    f.sign_in_then_deliver_me();
+    f.advance_past(crate::limits::DEADLINE);
+    assert_eq!(f.stderr(), b"temper ctl: the engine at http://127.0.0.1:4000 did not answer within 30 s\n");
+    assert_eq!(f.kept_records(), fixtures::local::ACT_WITH_STREAM);
+    assert_eq!(f.locks, 1);
+    assert_eq!(f.exit(), Some(Exit::Code(1)));
+}

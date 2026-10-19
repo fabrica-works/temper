@@ -14,7 +14,10 @@ use skein_io::{
     file_layer::FileIo,
     kernel::{Complete, Exit, Fd, Op, ServiceSignal, Submit},
 };
-use skein_lib::{Env, Queue, Time, Token, Wall};
+use skein_lib::{
+    Env, Queue, Time, Token, Wall,
+    stream::{Down, Read, Up},
+};
 use skein_shell::Host;
 use temper_client_tools::{jig::call::Parsed, root};
 const TAG: u64 = 1 << 61;
@@ -56,6 +59,7 @@ pub struct OneShot {
     output: Output,
     signals: Option<Token>,
     stdin: Option<Token>,
+    input: Option<Vec<u8>>,
     complete: Queue<Complete>,
     submit: Queue<Submit>,
     raw: Queue<Submit>,
@@ -119,6 +123,7 @@ impl OneShot {
             output,
             signals,
             stdin,
+            input: None,
             complete: Queue::with_capacity(ROOM),
             submit: Queue::with_capacity(ROOM),
             raw: Queue::with_capacity(ROOM),
@@ -173,12 +178,13 @@ impl OneShot {
     fn root_event(&mut self, event: jig_client::Event) {
         root::step(&mut self.root, &self.root_env, root::Event::Client { event }, &mut self.requests);
     }
+
     fn signing_start(&mut self) {
         use temper_client_tools::jig::call::{Value, Values};
         if self.class != Class::SignIn {
             return;
         }
-        if self.signing.is_none() && self.directory.ready() {
+        if self.signing.is_none() && self.directory.ready() && self.input.is_none() {
             if let Some(bytes) = self.directory.link.take() {
                 match Signing::new(
                     &bytes,
@@ -195,15 +201,19 @@ impl OneShot {
                     Err(error) => self.fail(error),
                 }
             } else if let Some(Parsed::Call { call, json }) = self.call.take() {
-                if let Some(Some(Values::One(Value::File(path)))) = call.values.first() {
-                    self.directory.load_link(path);
-                    let Parsed::Call { call, .. } = arguments::parse(&[b"me"]).expect("me call") else {
-                        unreachable!()
-                    };
-                    self.call = Some(Parsed::Call { call, json });
-                } else {
-                    self.fail(b"a sign-in file is required");
+                match call.values.first() {
+                    Some(Some(Values::One(Value::Stdin))) => {
+                        self.input = Some(Vec::new());
+                        self.read_input();
+                    }
+                    Some(Some(Values::One(Value::File(path)))) => self.directory.load_link(path),
+                    _ => {
+                        self.fail(b"a sign-in file is required");
+                        return;
+                    }
                 }
+                let Parsed::Call { call, .. } = arguments::parse(&[b"me"]).expect("me call") else { unreachable!() };
+                self.call = Some(Parsed::Call { call, json });
             }
         }
         let Some(signing) = &mut self.signing else { return };
@@ -251,6 +261,87 @@ impl OneShot {
             self.finish(0, false);
         }
     }
+    fn read_input(&mut self) {
+        self.request(io::Request::Stream {
+            stream: self.stdin.expect("stdin"),
+            down: Down::Demand { read: Read::Arrived { max: limits::LINK + 1 }, room: 0 },
+        });
+    }
+    fn input_event(&mut self, up: Up) {
+        match up {
+            Up::Bytes(bytes) => {
+                let input = self.input.as_mut().expect("reading input");
+                if input.len() + bytes.len() > limits::LINK as usize {
+                    self.fail(b"the sign-in link is too large");
+                    return;
+                }
+                input.extend_from_slice(&bytes);
+                self.read_input();
+            }
+            Up::End => {
+                self.directory.link = self.input.take().map(Vec::into_boxed_slice);
+            }
+            Up::Failed(_) => self.fail(b"the sign-in link could not be read"),
+            Up::Room => unreachable!("stdin never writes"),
+        }
+    }
+    fn local_start(&mut self) {
+        if !matches!(self.class, Class::Pending | Class::SignOut) || !self.directory.ready() || self.recovery.loaded {
+            return;
+        }
+        if self.signing.is_none() {
+            let engine =
+                self.directory.engine.unwrap_or_else(|| skein_io::Addr::Ip("127.0.0.1:0".parse().expect("loopback")));
+            self.signing = Some(Signing::held(
+                engine,
+                self.directory.parent(),
+                self.directory.leaf(),
+                self.startup,
+                &mut self.submit,
+            ));
+            return;
+        }
+        let signing = self.signing.as_mut().expect("local shell");
+        let Some(shell) = &mut signing.shell else {
+            self.fail(b"DIRECTORY's store cannot be read");
+            return;
+        };
+        if let Some((token, records)) = shell.loaded() {
+            self.recovery.loaded = true;
+            if self.class == Class::Pending {
+                let json = matches!(self.call, Some(Parsed::Call { json: true, .. }));
+                let printed = crate::pending::print(records, json);
+                self.output.push(false, printed.stdout);
+                self.finish(printed.status, false);
+            } else if let Some(token) = token {
+                self.root_event(jig_client::Event::Start { kept: skein_lib::List::with_capacity(0) });
+                self.root_event(jig_client::Event::SignIn { with: jig_client::With::Held(token) });
+                self.until = Some(self.env.now.saturating_add(limits::DEADLINE));
+            } else {
+                self.fail(b"DIRECTORY is not signed in");
+            }
+        } else if self.recovery.unreadable(signing.opening, shell, self.env.now) {
+            self.fail(b"DIRECTORY's store cannot be read");
+        }
+    }
+    fn sign_out_keep(&mut self) {
+        if self.class != Class::SignOut || self.call.is_some() {
+            return;
+        }
+        let signing = self.signing.as_mut().expect("sign-out shell");
+        let shell = signing.shell.as_mut().expect("loaded shell");
+        if signing.credential == Credential::New && self.root.client().link().state == jig_client::Link::SignedOut {
+            shell.keep(None);
+            signing.credential = Credential::Writing;
+        }
+        if let Some(kept) = shell.kept() {
+            if kept {
+                self.finish(0, false);
+            } else {
+                self.fail(b"the sign-out token could not be kept");
+            }
+        }
+    }
     fn client_events(&mut self) {
         loop {
             let event = if let Some(transport) = &mut self.transport {
@@ -292,6 +383,10 @@ impl OneShot {
         }
         self.signing_start();
         self.recovery_start();
+        self.local_start();
+        if self.class == Class::Pending {
+            return;
+        }
         if self.status.is_some() {
             return;
         }
@@ -338,6 +433,7 @@ impl OneShot {
                 self.finish(printed.status, false);
             }
         }
+        self.sign_out_keep();
         self.signing_keep();
         if self.status.is_some() {
             return;
@@ -352,7 +448,9 @@ impl OneShot {
             self.link = link;
         }
         match link {
-            jig_client::Link::SignedOut if self.signing.as_ref().is_some_and(|s| s.credential == Credential::New) => {}
+            jig_client::Link::SignedOut
+                if self.class == Class::SignOut
+                    || self.signing.as_ref().is_some_and(|s| s.credential == Credential::New) => {}
             jig_client::Link::SignedOut => self.fail(b"signed out"),
             jig_client::Link::OutOfDate => self.fail(b"client is out of date"),
             jig_client::Link::Starting | jig_client::Link::Live | jig_client::Link::Offline => {}
@@ -384,6 +482,12 @@ impl OneShot {
                 root::Request::Ready => {
                     self.recovery.ready = true;
                     if self.class == Class::Act {
+                        continue;
+                    }
+                    if self.class == Class::SignOut {
+                        self.call = None;
+                        self.signing.as_mut().expect("sign-out shell").credential = Credential::New;
+                        self.root_event(jig_client::Event::SignOut);
                         continue;
                     }
                     if let Some(Parsed::Call { call, json }) = self.call.take() {
@@ -563,6 +667,10 @@ impl Host for OneShot {
                     true,
                 ),
                 io::Event::Stream { owner, up } => {
+                    if Some(owner) == self.stdin && self.input.is_some() {
+                        self.input_event(up);
+                        continue;
+                    }
                     if !self.closed
                         && let Some(request) = self.output.event(owner, &up)
                     {

@@ -1,4 +1,4 @@
-//! The tools' shared client and exhaustive owner routing (tools.md, 4).
+//! The tools' shared client and exhaustive owner routing (client/tools.md, 4).
 use crate::jig::{self, runner};
 use alloc::boxed::Box;
 use jig_client::{Client, Told};

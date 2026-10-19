@@ -6,7 +6,7 @@ const PARTY: u64 = 7;
 const PROJECT: u32 = 3;
 const BUDGET: u64 = 7; // Fits the shared authority's spend, exposing an admitted chat.
 const ONE: u32 = 1; // One template and one membership are sufficient to offer chat.
-const TABLE_VERSION: u16 = 2; // The pinned request-table version, also read by pending.
+use jig_client_domain::TABLE_VERSION;
 fn link_limits() -> Limits {
     let limits = crate::limits::native().root.domain.client;
     Limits::new(limits.domain, limits.exchanges).expect("native link limits")
@@ -97,7 +97,7 @@ pub fn chat_me() -> w::Me {
     parts.retention = Duration::from_secs(3600);
     w::Me::new(&lim, parts).expect("chat frame")
 }
-fn record(party: u64) -> jig_client::Record {
+pub(super) fn record(party: u64) -> jig_client::Record {
     let lim = link_limits();
     let me = translate::documents::frame(chat_me(), &lim).expect("chat me");
     let request = jig_client::shapes::chat(
@@ -107,6 +107,10 @@ fn record(party: u64) -> jig_client::Record {
             .expect("words"),
     )
     .expect("chat shape");
+    stored_request(party, jig_client::Ask::Jig(Box::new(request)))
+}
+pub(super) fn stored_request(party: u64, request: jig_client::Ask) -> jig_client::Record {
+    let lim = link_limits();
     let table = translate::store::table(
         &RequestRecord {
             key: KEPT_KEY,
@@ -114,7 +118,7 @@ fn record(party: u64) -> jig_client::Record {
             first_sent: None,
             request: jig_client::Held {
                 key: jig_client::Key { asker: temper_client_tools::root::RUNNER.asker(), number: 9 << 32 | 1 },
-                request: jig_client::Ask::Jig(Box::new(request)),
+                request,
             },
         },
         &lim,

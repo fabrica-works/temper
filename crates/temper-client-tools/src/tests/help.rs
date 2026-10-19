@@ -26,7 +26,7 @@ fn the_help_prints_as_its_golden_files() {
         assert_eq!(fixtures::help(*tool), fixtures::golden(name), "{name}");
     }
 }
-// tools.md 5.2--5.6, with the plan's typed proposals and close reason.
+// client/tools.md 5.2--5.6, with the plan's typed proposals and close reason.
 const USAGES: &[&[u8]] = &[
     b"me\n",
     b"inbox [--project P] [--kind K] [--root N] [--after C]\n",
@@ -144,8 +144,8 @@ fn the_guide_shows_kept_work() {
 #[test]
 fn the_guide_shows_pending_work() {
     fixtures::guide_golden_has(&[
-        b"create, party 3, not sent",
-        br#"{"pending":[{"operation":"create","party":3,"first_sent":null}],"unread":2}"#,
+        b"chat, party 3, not sent",
+        br#"{"pending":[{"operation":"chat","party":3,"first_sent":null}],"unread":2}"#,
         b"2 kept records these tools cannot read; a call that sends drops them",
     ]);
 }
