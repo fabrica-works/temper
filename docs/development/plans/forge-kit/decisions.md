@@ -883,6 +883,18 @@ where its answer lands.
 
      Independent peer and JSON work/checkpoints remain authorized while the repair is pending. Required recordings wait for compatibility and retain their fresh scratch/facts/transcript proof. No duplicate upstream supplement is assigned because the live-text step owns the exact sites.
 
+145. **Skein10.s1 Shapes against main** (ready check of skein-10.s1).
+     Reverses: ruling143 of2026-10-19T09:26:37Z only the proposed SINGLE_ROW_PAGE/checked_sub prescription; retain the landed fixture and every other scope/dependency.
+     Amends: skein/10.s1-named-page-fixtures.md Shape, names/derivation retained from landed calls.rs.
+
+     The normal ready check found ruling140's fixture correction already landed with ONE_ROW_PAGE=PAGE_SIZE.saturating_sub(1) and page_rows/one_row usize::try_from conversions. Preserve those symbols and derivation; do not introduce SINGLE_ROW_PAGE, rename the fixture or alter either function's bytes. The supplement adds only the absent listing_sizes module, main dispatch and gate invocation unless a fresh reached-copy audit names a further user. All27 assertion cases (24 listing plus3 remarks), test identities, wire bytes and counts remain.
+
+     Checked: git show b985f45b6226e0e285282f190d3f6ffd006df6c8:crates/skein-forge/src/forgejo/plans/tests/calls.rs filtered by ONE_ROW_PAGE/PAGE_SIZE/page_rows/one_row and the two test names confirms the actual constant and conversions. The read-only checker saw no executable downstream copies in smith/jig/hearth/temper; reached temper plan/count consumers are recorded in scratch-ready-skein-10s1/copies-and-counts.txt. New listing_sizes module/mode remain10.s1 additions; later10.3–10.5 behavior remains owned by its increments.
+
+     Ready snapshots: skeinb985f45b6226e0e285282f190d3f6ffd006df6c8, temper2fffea684c940b9edf612c4a170ae6f559cb58e7; kitd6d4abeb22ae0c3a5e12e3c7a8978a30bdfb6421 unchanged. Pinned-heavy825 one attempt, wait1s/run4s: rustfmt and package/checker all-target clippy -D warnings PASS; listing mode7 negative/4 positive controls PASS, preserved original source rejected exactly4 scoped violations, current source accepted; recovery6 positive/7 negative/2 decoys PASS. Package144 default tests PASS0.073s, fuzzy/browser0 successful sequentially. Named existing tests8ms/4ms. Calls source remained byte-identical. Evidence, mappings, negative fixture, patch and logs retained under scratch-ready-skein-10s1; own worker ended/reaped, only own completed target removed.
+
+     Mark skein-10.s1 ready at these snapshots immediately; its existing skein-10.5 and closing temper-repin dependencies remain. Proof reaches checker/package only: no future increment behavior, full gate, process/live or downstream build is claimed. Relative N->N and historical counts keep their meaning. Re-resolve any later moved inputs/copies at start, refresh further reached copies and list them in the implementation commit body. Kit plan's ruling/ready commands are supported; no kit move or extra gate run is required by this readiness ruling.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
