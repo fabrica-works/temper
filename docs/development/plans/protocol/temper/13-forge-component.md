@@ -777,7 +777,7 @@ Removes: nothing.
 ### 13.5 The machine world
 
 Scope: `tests/engine/protocol-forge` (package
-`temper-engine-protocol-forge-world`, testing.md 7; forge.md 10, "The
+`temper-engine-protocol-forge-world`, domain/testing.md 7; forge.md 10, "The
 machine world"): the component against a scripted HTTP peer over
 `skein_world::stream::Wire`s, the world playing io (connects made or
 refused, stream demands and sends, resets, closes, after skein's

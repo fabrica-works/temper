@@ -15,7 +15,7 @@ serving (13.2). Needs at start: temper 12.2, 10.1 and 10.2 (`tier_configuration`
 - **Design:** setup.md 7.1 to 7.3 (what the box runs, does and names), 8
   (what `temper box` checks and does not read), 6.3 (a later preparation
   takes Forgejo's lock alone), 13.4 (the process tier's `temper box`
-  bullet); testing.md 2.6 (its fifth test); configuration.md 2 and 8
+  bullet); domain/testing.md 2.6 (its fifth test); configuration.md 2 and 8
   (every command that reads the document checks it, the box's limits
   among it); protocol.md 4 (stdout carries sign-in links only).
 - **Decisions:** 5 (the `box.` values), 6 (how the setup is checked), 9
@@ -56,7 +56,7 @@ serving (13.2). Needs at start: temper 12.2, 10.1 and 10.2 (`tier_configuration`
 - **7.2's streams:** `temper serve`'s stdout, as it is, is the box's;
   every other line goes to the box's stderr, prefixed `<step>: ` or, the
   box's own, `box: `.
-- **13.4, testing.md 2.6:** the box's test: the link on stdout; Forgejo
+- **13.4, domain/testing.md 2.6:** the box's test: the link on stdout; Forgejo
   killed and restarted, the engine still serving; a stop that leaves no
   process the box started.
 
@@ -72,10 +72,10 @@ serving (13.2). Needs at start: temper 12.2, 10.1 and 10.2 (`tier_configuration`
   checks into it, and accepts `box.` overrides from then on.
 - **Two process tests, not the design's one,** so that 13.1 proves itself
   (it has the command, not the kill) and each test shows one behaviour
-  (the Don't list): their sum is testing.md 2.6's fifth test. Cost: a
+  (the Don't list): their sum is domain/testing.md 2.6's fifth test. Cost: a
   second box start, about 30 s of the process tier (an estimate: nothing
   times a box start yet).
-- **The tier's owned configuration, not the example.** testing.md 2.6 says
+- **The tier's owned configuration, not the example.** domain/testing.md 2.6 says
   "on the owned example", which is temper 14's, after this session: the
   tests run on 10.2's `tier_configuration`, and 14.1 moves its writer onto
   the example, so that both tests run on it from then.
@@ -229,7 +229,7 @@ Size: at most 120 lines of production code.
 Removes: nothing.
 
 ### 13.2 The box restarts a killed Forgejo
-Scope: the middle of testing.md 2.6's box test: Forgejo killed and restarted by the
+Scope: the middle of domain/testing.md 2.6's box test: Forgejo killed and restarted by the
 box, the engine still serving. The restart works because a later preparation takes
 Forgejo's lock alone while the runner holds its own (setup.md 6.3); a box that gives up
 at the preparation (exit 1, naming it) is a defect to fix here, not a question.

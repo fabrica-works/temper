@@ -1,4 +1,4 @@
-# Trace: the fakes and the kit's tests (fake-forge.md 2, 4-8; forge.md 11; testing.md; temper testing.md 2.4, 4.2)
+# Trace: the fakes and the kit's tests (fake-forge.md 2, 4-8; forge.md 11; testing.md; temper domain/testing.md 2.4, 4.2)
 
 Read only, 2026-10-19; paths under /srv/data/git/runner/src. Code equals the survey bases (skein b4cc6eb, temper
 62d50e0b8). Every name below was re-checked with `rg`.
@@ -90,7 +90,7 @@ rendered. Say so, or list them as later.
   `heavy --gate cargo run ...` becomes the "script that runs it"; clippy.toml moves; a focused test that no
   committed transcript holds an unmasked UUID or unquoted time (section 2).
 - **T07:** tools/git-transcripts (lib.rs:76 `Forgejo::from_env()`; cases.rs uses `Account`, `Init`, `Instance`,
-  `Outgoing`) moves to skein's throwaway (temper testing.md 2.4 keeps it in temper); crates/temper's process
+  `Outgoing`) moves to skein's throwaway (temper domain/testing.md 2.4 keeps it in temper); crates/temper's process
   support (owned.rs:289-290,460,472-473) reads TEMPER_FORGEJO and TEMPER_FORGEJO_RUNNER and hands `from_path`.
 
 ## 2. The surveys' "not verified" findings (survey-05, section "Not checked")
@@ -138,13 +138,13 @@ rendered. Say so, or list them as later.
    scripted HTTP peer, with their worst case under the counting allocator (forge-connection.md 10); the fake
    forge's memory tests do not belong there (B4). No increment creates that world: S06 lists protocol, client,
    setup only; it is temper's tests/engine/protocol-forge machine.rs and `fuzzy_machine` (four tests near 7 s).
-2. **T07 omits tools/git-transcripts** (temper testing.md 2.4 and the layout keep it in temper, on skein's
+2. **T07 omits tools/git-transcripts** (temper domain/testing.md 2.4 and the layout keep it in temper, on skein's
    throwaway) and the crates/temper tests that read TEMPER_FORGEJO.
 3. **Order.** S06 needs S02-S05 and T05.1, not S07, yet 06.1 and the codecs tests read the transcripts and
    deliveries, which the outline lands with the conformance in S07.2. The data must reach skein by S01.1 (B1).
 4. **Design against code.** fake-forge.md 4 says each route is one domain call; `response::follow()` makes a second
    domain Read after write routes (observable in `domain_calls`). The code moves unchanged: the designer fixes the sentence.
-5. **temper testing.md 4.2 vs 2.4.** 4.2: CI "runs its checks in the shell subset"; 2.4 and fake-forge.md 2: the cue
+5. **temper domain/testing.md 4.2 vs 2.4.** 4.2: CI "runs its checks in the shell subset"; 2.4 and fake-forge.md 2: the cue
    marker, sh later. Designer's fix; no plan work.
 6. **Collision.** T05.2 and the tools plan both change tests/one-process/src/{forge,world,fixtures}.rs and
    testing/temper-fake-git/src/transport.rs (survey-05 f): one lands first.

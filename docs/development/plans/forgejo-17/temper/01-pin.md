@@ -22,7 +22,7 @@ renamed repository's old path, appended as the last case,
   ("Observed on Forgejo v17.0", and the git item of "To check on
   v17.0"); `docs/design/git.md`, sections 4.8 (the push's table), 9
   ("Transcripts", "The fake git program") and 10 ("A renamed
-  repository's remote"); `docs/design/testing.md`, 2.6 ("The throwaway
+  repository's remote"); `docs/design/domain/testing.md`, 2.6 ("The throwaway
   Forgejo", "No CI there", "Outside the suites").
 - The plan: `decisions.md` 2, 5 and 10; `code-organization.md` 2
   ("Versions"), 5 and 6; `findings/tools.md`, sections 1 to 4, read
@@ -54,7 +54,7 @@ renamed repository's old path, appended as the last case,
   it the tool reports those facts unchecked."
 - **What a re-recording may change** (forge.md, 10): "Ids, times, counts
   and text vary; keys, nesting, types and status lines must match."
-- **The throwaway Forgejo** (testing.md, 2.6): "v17.0, the binary
+- **The throwaway Forgejo** (domain/testing.md, 2.6): "v17.0, the binary
   `TEMPER_FORGEJO` names ... It refuses to run without `TEMPER_FORGEJO`,
   or with a binary other than the pinned patch release (forge.md,
   section 10), naming it. ... `tools/forgejo-conformance` and
@@ -153,7 +153,7 @@ throwaway crate. The conformance tool's runner check uses
 `RUNNER_VERSION`. The fixtures, doc comments and READMEs of
 `findings/tools.md`, 1 follow. The conformance's plain and component
 modes are recorded again on v17, and the codecs world's literals follow
-them (forge.md, 1, 10 and 13; testing.md, 2.6).
+them (forge.md, 1, 10 and 13; domain/testing.md, 2.6).
 Needs: nothing.
 Files:
 - `testing/temper-throwaway-forgejo/src/binary.rs`: `:8` (`VERSION`),
@@ -291,8 +291,8 @@ command runs once, from the worktree's root:
    `scripts/proof-one-process.sh`, `6 tests run: 6 passed`, is the proof
    of the step that lands the fix. This shows the real `temper` binary
    on the throwaway Forgejo 17.0.0: it lands a change pushed by real
-   git, found after a restart (testing.md, 2.6). It aims at 3
-   minutes (testing.md, 2.6); the `process` profile's `global-timeout`
+   git, found after a restart (domain/testing.md, 2.6). It aims at 3
+   minutes (domain/testing.md, 2.6); the `process` profile's `global-timeout`
    stops it at 10 minutes (`.config/nextest.toml:32`). The landing's
    report gives the log's path.
 

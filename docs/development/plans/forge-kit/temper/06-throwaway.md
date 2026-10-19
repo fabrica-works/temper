@@ -23,7 +23,7 @@ line, `component.rs` and `component/hosted.rs`, and may land before or after
 
 ## Read first
 
-- skein `docs/design/fake-forge.md` 6; temper `docs/design/testing.md` 2.6
+- skein `docs/design/fake-forge.md` 6; temper `docs/design/domain/testing.md` 2.6
   and `protocol/git.md` 9 (the transcripts tool).
 - skein `docs/foundation/testing-strategy.md` 2.1, 8, 10 and
   `development.md` 5.5-5.7.
@@ -62,7 +62,7 @@ as it stands at the step's start, where temper 01.2 has repointed the pin lines.
 - The pin's names come from `skein_forge::forgejo::pin` since temper 01.2,
   `registration.rs`'s `RUNNER_VERSION` and `owned.rs`'s included; nothing in
   temper uses the kit's designed re-export of them (skein 06.1, "temper's side").
-- testing.md 2.6's refusal without `TEMPER_FORGEJO` is the process tier's own:
+- domain/testing.md 2.6's refusal without `TEMPER_FORGEJO` is the process tier's own:
   `owned.rs`'s `expect`s naming the variable (in `prepared_processes`,
   `reconcile_configuration` and `binaries`) stay unchanged and keep meeting it; this step adds the tools' refusal.
 - `tools/git-transcripts` reads `TEMPER_FORGEJO` itself and gives the path to
@@ -189,7 +189,7 @@ Proof:
 - process: once, `TEMPER_FORGEJO=$WS/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-linux-amd64
   TEMPER_FORGEJO_RUNNER=$WS/tmp/temper/forgejo/runner-v13.2.0/forgejo-runner-13.2.0-linux-amd64
   heavy --gate scripts/proof-one-process.sh`: its count at the step's start passed (19 at
-  the base), exit 0, about 146 s (145.2 s here, 145.7 s in base-runs.md), inside testing.md 2.6's aim of 3
+  the base), exit 0, about 146 s (145.2 s here, 145.7 s in base-runs.md), inside domain/testing.md 2.6's aim of 3
   minutes; a failure, or a run past it, is reported with its test and never
   retried silently (another base run failed at test 6, `base-temper-01.md`).
 - process: the recording, before the repin commit and after the last, on one

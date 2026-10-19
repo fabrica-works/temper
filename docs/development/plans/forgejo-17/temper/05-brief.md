@@ -27,7 +27,7 @@ they are.
 - `docs/design/domain/engine.md`, 9 (the sentences "what does not fit is
   cut in its kind's order and says how much" and "A section is loaded or
   read as it is cut, asking for no more than it keeps").
-- `docs/design/testing.md`, 2.1 (system worlds).
+- `docs/design/domain/testing.md`, 2.1 (system worlds).
 - The plan: `decisions.md` 6, 9 and 10; `code-organization.md` 2 ("The
   answer", "The fake's failing step"), 3 (the row "the brief's words for
   the failed step") and 6; `findings/fake-forge-and-brief.md`, sections

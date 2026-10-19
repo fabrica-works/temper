@@ -88,7 +88,7 @@ document says what temper adds. What is open is listed in section 11.
 - **jig's reference fixtures** are a complete example of jig's parts: the
   reference binary's test configuration (`jig-test`'s
   `tests/support/mod.rs`, made from jig's channel world's `fixtures.rs`).
-  temper's process tier writes its own the same way (`../testing.md`,
+  temper's process tier writes its own the same way (`../domain/testing.md`,
   2.6), and the owned example is a whole document (setup.md, 8.1).
 - **What standalone requires of jig's parts,** each checked at start, a
   failure naming its path:
@@ -596,7 +596,7 @@ top-level `workers`, in the same order; standalone has one. Each:
 - **`temper open DIRECTORY LINK_OR_ADDRESS`** takes no configuration
   file: its two arguments are `../client/README.md`, 6.1's, and its limits are
   constants of temper's client (`../client/README.md`, section 2).
-- **`temper ctl DIRECTORY ...`** takes none either (`../tools.md`,
+- **`temper ctl DIRECTORY ...`** takes none either (`../client/tools.md`,
   section 8).
 - **`temper program-login CONFIG.json NAME`** reads the same document as
   `temper serve`, and the agent's configuration it names (credentials.md,

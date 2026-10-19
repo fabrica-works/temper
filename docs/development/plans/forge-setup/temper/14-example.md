@@ -9,7 +9,7 @@ and follows it on x1 by a script, up to an adopted repository: no person's login
 ## Read first
 
 - Design: setup.md 8 (last bullet), 12, 13.4, 6.5, 16 (`temper box init`: default none); configuration.md 10, 3
-  (`webhooks`, `setup`), 5, 6, 7, 8; credentials.md 3; draft/mvp.md 5.1 and 7; testing.md 2.6, 2.7. decisions.md 5, 14,
+  (`webhooks`, `setup`), 5, 6, 7, 8; credentials.md 3; draft/mvp.md 5.1 and 7; domain/testing.md 2.6, 2.7. decisions.md 5, 14,
   16, 20, 21; `findings/configuration-and-binary.md` 3, G6; `findings/forgejo-tokens.md` row 10. skein's
   `testing-strategy.md`: 2.9 and 8.
 - Code: `crates/temper/tests/support/{mod.rs:15-18, 19-41, 28-31, 52; configuration.rs:4-46; live.rs:46-69}`,
@@ -27,7 +27,7 @@ and follows it on x1 by a script, up to an adopted repository: no person's login
 
 - configuration.md 10 and setup.md 8: the owned example is a file, `docs/examples/owned.json`, a whole document; the
   files it names that hold no secret are in `docs/examples/owned/`; the worker's secret and digest and the LLM account's
-  file are never shipped, and the setup document says how each is made. 14.1; testing.md 2.6 and setup.md 13.4 have the
+  file are never shipped, and the setup document says how each is made. 14.1; domain/testing.md 2.6 and setup.md 13.4 have the
   tier's configuration "written from" it and the process tier's test of `temper box` run it.
 - setup.md 12, mvp.md 5.1: the walk 14.2 writes and follows; the dogfood run is mvp.md 5.1's second bullet, not ours.
 
@@ -186,9 +186,9 @@ Shape:
    three identity headers written out. No credential. Each charter is a short text a person edits (setup.md 12): a line
    or two of what the charter does.
 3. `support::owned` (Interface sketches). `application` sets `charter` 1 and, unless `review`, the rule's `gates` to
-   `[]` (testing.md 2.6: CI alone); addresses and binaries are replaced everywhere they occur as text, the runner's path
+   `[]` (domain/testing.md 2.6: CI alone); addresses and binaries are replaced everywhere they occur as text, the runner's path
    before Forgejo's. `Owned::tier()` reads the binaries through 10.2's `binaries()`, which panics naming the missing
-   variable (testing.md 2.6), so a box test refuses at once, not at a prepare 120 s later. `tier_configuration` assigns
+   variable (domain/testing.md 2.6), so a box test refuses at once, not at a prepare 120 s later. `tier_configuration` assigns
    `value["application"] = owned::application(&Owned::tier())` and keeps writing the engine's side of the forge. The
    box's tests call `tier`, `lay` and write `example_document` (not 08.1's `document`, which takes a `Value` and
    `Names`).

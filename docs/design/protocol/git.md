@@ -571,7 +571,7 @@ and io's close timeout bounds the end of a killed invocation.
 
 ## 9. Testing
 
-The tiers, their budgets and the fakes are `../testing.md`'s. What
+The tiers, their budgets and the fakes are `../domain/testing.md`'s. What
 checks this document's contract:
 
 - **Step tests** in `temper-worker-protocol-git`:
@@ -592,7 +592,7 @@ checks this document's contract:
   failure of section 6 (a missing repository, branch and commit, a wrong
   token, no permission, a protected branch, a refused connection),
   against skein's throwaway Forgejo (`fake-forge.md`, section 6;
-  `../testing.md`, 2.6). Each keeps the argument vector,
+  `../domain/testing.md`, 2.6). Each keeps the argument vector,
   exit status, stdout and stderr, masked: object ids, ports, paths and
   times. No credential is ever written. The facts this document relies
   on, named in sections 3 and 4.8, are in `tools/git-transcripts/facts.txt`
@@ -611,14 +611,14 @@ checks this document's contract:
   credential in an argument; memory within `worst_case`. Its scripted
   outputs are the transcripts.
 - **The fake git program,** `testing/temper-fake-git`
-  (`../testing.md`, 4.3), answers this document's invocations as real
+  (`../domain/testing.md`, 4.3), answers this document's invocations as real
   git does, and is checked against the same transcripts: each
   transcript's arguments and environment, run on the fake over the
   equivalent fixture, give the same exit status, the same stdout once
   masked, and stderr lines that classify alike.
 - **The process tier** runs the machine's git, 2.41 or later, against
   its owned Forgejo: clone, fetch, create, check out, commit, push, in
-  its story (`../testing.md`, 2.6).
+  its story (`../domain/testing.md`, 2.6).
 
 ## 10. Open questions
 

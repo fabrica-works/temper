@@ -1,6 +1,6 @@
 # Session 17: the fake git program and the one-process world
 
-temper's simulated world (testing.md, 2.5): `temper-service`'s one
+temper's simulated world (domain/testing.md, 2.5): `temper-service`'s one
 process, started from configuration's bytes as `temper serve` starts it,
 on skein's simulator and fake machine, with smith's agent processes over
 skein's fake LLM peer, the fake forge as a service, a person through
@@ -17,7 +17,7 @@ their referee.
 
 ## Read first
 
-- `testing.md`, sections 2.5, 3.2, 4.2, 4.3, 5.2, 6 and 6.1;
+- `domain/testing.md`, sections 2.5, 3.2, 4.2, 4.3, 5.2, 6 and 6.1;
   `protocol.md`, section 8; `git.md`, sections 3 to 6 and 9;
   `forge.md`, section 9 ("A commit the fake counts is a 40-digit id");
   `credentials.md`, section 7.
@@ -50,7 +50,7 @@ their referee.
 
 ## What the design asks
 
-- **What runs** (testing.md, 2.5): "`temper-service`'s system module, the
+- **What runs** (domain/testing.md, 2.5): "`temper-service`'s system module, the
   engine's and one worker's services in one `iterate`, started from
   configuration's bytes as `temper serve` starts them, joined by the
   in-process name `workers`; the store, jig's store component on
@@ -301,16 +301,16 @@ Removes: nothing.
 
 ### 17.3 An adoption and a pushed change; a merge pushed with both parents
 
-Scope: two stories (testing.md, 2.5): a repository adopted through
+Scope: two stories (domain/testing.md, 2.5): a repository adopted through
 temper's client (the person on 15.1's forge page) and a goal's change
 prepared, committed and pushed on the fake forge through the fake git
 program; and a merge in progress (the base moved under the branch,
 conflicting in one file) resolved by the agent and pushed with both
 parents. The referee gains the engine's checks over the fake forge's
-observations (testing.md, 5.2): nothing lands on a default branch
+observations (domain/testing.md, 5.2): nothing lands on a default branch
 without green CI, and a pushed commit's tree is the tree the agent left.
 The fake LLM's scripts write their edits and resolutions in the shell
-subset (testing.md, 4.3).
+subset (domain/testing.md, 4.3).
 Needs: 15.1's forge page and form.
 Files: `tests/one-process/{src/world.rs, src/referee.rs,
 src/fixtures.rs, src/stories.rs (new), tests/one_process.rs}`.

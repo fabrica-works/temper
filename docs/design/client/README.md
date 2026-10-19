@@ -1,19 +1,18 @@
 # temper's client
 
-Provisional, 2026-10-14, revised 2026-10-19. temper's client: temper's
-own presentation on jig's client, `jig-client`. Its crates; its client
-root, which holds `jig-client` and temper's pages, the LLM accounts'
-among them; the forge's client family, its words and its one form; its
-view, on skein's UI kit; the
-terminal that `temper open` runs, on skein's text shell; signing in and
-the small store; what temper's server does for it; and how it is
-tested. jig's client is jig's `client/domain/client.md`, its API jig's
-`client/domain/contract.md` and its protocol jig's
+Provisional, 2026-10-14, revised 2026-10-19. temper's client: temper's own
+presentation on jig's client, `jig-client`. Its crates; its client root,
+which holds `jig-client` and temper's pages, the LLM accounts' among them;
+the forge's client family, its words and its one form; its view, on
+skein's UI kit; the terminal that `temper open` runs, on skein's text
+shell; signing in and the small store; what temper's server does for it;
+and how it is tested. jig's client is jig's `client/domain/client.md`, its
+API jig's `client/domain/contract.md` and its protocol jig's
 `protocol/client.md`: this document takes them as given and cites them.
-The forge's parts of the client are `forge.md`, the browser
-`browser.md`. The mockups (`mockups/`) are reference material for the
-pages' look and the order of their parts, not contract. What is still
-open is listed in section 11.
+The forge's parts of the client are `forge.md`, the browser `browser.md`,
+and the agents' tools, `temper ctl`, `tools.md`. The mockups (`mockups/`)
+are reference material for the pages' look and the order of their parts,
+not contract. What is still open is listed in section 11.
 
 ## 1. In one page
 
@@ -88,7 +87,7 @@ open is listed in section 11.
 - **Joined to the engine from the start.** `tests/client`
   (`temper-client-world`) runs temper's client and view, with skein's
   fake person, against temper's engine root (section 10;
-  `../testing.md`, 6.3).
+  `../domain/testing.md`, 6.3).
 
 ## 2. The client's crates
 
@@ -114,11 +113,11 @@ temper-client-shell-web         the browser: temper's shell, built for wasm32, i
 └── jig-client-shell-web        jig's client adapter over skein's fetch, and the printed link's sign-in part
 
 for agents
-temper-client-tools             the agents' tools on jig-client, beside the view (../tools.md, section 4)
-temper-client-shell-cli         `temper ctl`, over jig-client-shell-native (../tools.md, section 8)
+temper-client-tools             the agents' tools on jig-client, beside the view (tools.md, section 4)
+temper-client-shell-cli         `temper ctl`, over jig-client-shell-native (tools.md, section 8)
 
 for tests
-skein-fake-person               the person, on skein-ui's tree (../testing.md, 4.4)
+skein-fake-person               the person, on skein-ui's tree (../domain/testing.md, 4.4)
 jig-client-test-kit             jig's check, and the faults of jig's client worlds (jig's `client/domain/testing.md`, 6.2 and section 7)
 jig-client-fake-person-browser  jig's attack stories (jig's `protocol/browser.md`, section 15)
 temper-client-world             tests/client: temper's client joined to temper's engine root (section 10)
@@ -356,7 +355,7 @@ keeps (`../protocol/configuration.md`, section 2).
   the key again; the person's second send keeps the first's name, so
   that a request the engine made answers with its first answer, and no
   second account is made. A key empty or past 4 KiB (the bound of
-  `../tools.md`, section 12) is refused before it is sent; one the
+  `tools.md`, section 12) is refused before it is sent; one the
   engine refuses is answered with its refusal.
 
 ## 4. The forge's client family
@@ -893,7 +892,7 @@ command.
   command `n KEY` writes it (skein's `ui-text.md`, sections 5 and 6);
   the terminal's line editing echoes the key as it is typed, which
   skein's text shell cannot turn off (skein's `ui-text.md`, section 9).
-  `temper ctl add-key` reads a key from a file instead (`../tools.md`,
+  `temper ctl add-key` reads a key from a file instead (`tools.md`,
   5.5, area 5).
 
 ### 6.6 The link, signing out and closing
@@ -966,7 +965,7 @@ fixes how temper's pages print (section 10).
 
 ### 6.9 While a run's text streams
 
-The terminal is chiefly the real loop's test surface (`../testing.md`,
+The terminal is chiefly the real loop's test surface (`../domain/testing.md`,
 2.4): people use the browser, or a later full-screen terminal. While a
 run's text streams, the terminal reprints the whole page at each print
 interval (6.3), as skein's text shell does, with the chat's provisional
@@ -1082,7 +1081,7 @@ does for the client:
 
 ## 10. Testing
 
-The tiers, the fakes and the budgets are `../testing.md`'s (sections 2,
+The tiers, the fakes and the budgets are `../domain/testing.md`'s (sections 2,
 4 and 6.1); the client's joint world is its 2.1 and 6.3. The client's
 own tests:
 
@@ -1105,14 +1104,14 @@ own tests:
   sign-in's address, a key's field written, and an account in each
   state of 5.5.
 - **The terminal's machine world,** in `temper-client-shell-terminal`'s
-  own tests (`../testing.md`, section 7): the host against a scripted
+  own tests (`../domain/testing.md`, section 7): the host against a scripted
   stdin and stdout and a scripted transport: signing in by the link and
   by a kept token, a page printed after an act, the end of stdin, an
   interrupt, `q` drained. And, in a unit test, the terminal made from
   `limits::native()`'s limits, as `temper open` makes it, so the gate
   meets a refusal of temper's own limits before the process tier does.
 - **`tests/client`** (`temper-client-world`), the joint world
-  (`../testing.md`, 2.1 and 6.3): temper's client root and view, with
+  (`../domain/testing.md`, 2.1 and 6.3): temper's client root and view, with
   skein's fake person acting on the tree, joined to temper's engine
   root through jig's clients' component, with no transport between,
   with jig's client worlds' faults and jig's check (jig's
@@ -1135,19 +1134,19 @@ own tests:
   pending, kept work), each request made once. jig's check holds in
   every story, said in temper's phrasebook, which temper's world gives
   jig's referee (jig's `client/domain/testing.md`, 6.2).
-- **The one-process world** (`../testing.md`, 2.5): skein's fake person
+- **The one-process world** (`../domain/testing.md`, 2.5): skein's fake person
   in front of temper's terminal client (its client root, view and
   transport), joined through bytes to `temper-service` on skein's
   simulator: the same stories through jig's default HTTP mapping and
   `temper-client-protocol-wire`, killed and restarted with an adoption
   pending.
-- **The real loop's terminal** (`../testing.md`, 2.4): temper's client
+- **The real loop's terminal** (`../domain/testing.md`, 2.4): temper's client
   root and view under skein's text shell, over jig's native transport,
   in the same loop as the service, driven by a typist that types
   commands and reads printed pages, with a fake LLM, forge and git. Its
   live-text story: a reply held after its first piece is read printed
   under "Writing…", then replaced by the committed turn.
-- **The process tier** (`../testing.md`, 2.6): the real `temper`
+- **The process tier** (`../domain/testing.md`, 2.6): the real `temper`
   binary; skein's fake person through temper's client signs in by the
   printed link, adds the deployment's key on the accounts page, and
   adopts a repository on an owned Forgejo
@@ -1197,13 +1196,13 @@ own tests:
   opens at the inbox.
 - **Clients that are not a person's:** a command run once and a
   service acting as a party are the agents' tools, `temper ctl`
-  (`../tools.md`). A bot (`../draft/factory.md`): none, until the
+  (`tools.md`). A bot (`../draft/factory.md`): none, until the
   factory's lab or run side needs one.
 - **Several terminals:** each `temper open` with its own DIRECTORY is a
   client of its own. Two on one DIRECTORY share its token and write its
   small store whole over each other. Default: not supported and not
   detected; a lock on DIRECTORY is the candidate, which `temper ctl`
-  takes for its own calls (`../tools.md`, 8.3).
+  takes for its own calls (`tools.md`, 8.3).
 - **A fresh link from the client:** default: the person runs `temper
   open` with the last link, whose refusal makes `temper serve` print a
   fresh one.

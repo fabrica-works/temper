@@ -24,7 +24,7 @@ jig's real store (store/README.md, section 6). It changes temper only.
 - **The design,** on temper's `main`: `protocol.md` first (its sections
   5, 12 and 13), then `configuration.md`, `credentials.md`, `llm.md`,
   `channel.md`, `git.md`, `forge.md`, `store/README.md`, `client.md`,
-  `testing.md`, `performance.md`, `domain/*.md` and `STATUS.md`; jig's,
+  `domain/testing.md`, `performance.md`, `domain/*.md` and `STATUS.md`; jig's,
   smith's and skein's documents they cite, at the pins.
 - **skein's foundation:** `development.md` (this plan follows it),
   `programming-model.md`, `testing-strategy.md`.
@@ -238,14 +238,14 @@ them wait on them.
 ## Live services
 
 - **An LLM provider, through the user's Codex login,** for the live tier
-  only (15.4; testing.md, 2.7). Borrowed read only: `tools/live-login`,
+  only (15.4; domain/testing.md, 2.7). Borrowed read only: `tools/live-login`,
   run by `scripts/proof-live.sh`, reads the access token, its expiry and
   the account's id from `~/.codex/auth.json` and writes them, and
   nothing else, to a private file under `$TEMPER_RUN_LOGS`, removed at
   exit. It refuses a token that expires within 20 minutes. Nobody signs
   in, nothing refreshes the token, nothing writes `~/.codex`.
   - **Budget per run:** at most 25 completions and 15 minutes, the
-    design's (testing.md, 2.7); the test fails past 25, the script stops
+    design's (domain/testing.md, 2.7); the test fails past 25, the script stops
     the run at 15 minutes. development.md, 5.5's "at most about 5
     minutes" is a guide this tier's design bound replaces.
   - **Budget for the plan:** at most 3 runs and 50 completions. 15.4's

@@ -5,7 +5,7 @@ below the protocol: the person, as a step machine with a tree face; the
 client's own world, with a scripted engine; the joint world, with the
 real engine root; what their referees watch; the faults; the budgets.
 `architecture.md`, section 7 is the design, skein's
-`testing-strategy.md` the strategy, `docs/design/testing.md` how temper
+`testing-strategy.md` the strategy, `docs/design/domain/testing.md` how temper
 applies it. Step tests are in 01-domain.md, section 10 and 02-view.md,
 section 10. Overview: README.md.
 
@@ -26,7 +26,7 @@ section 10. Overview: README.md.
 - **The joint world is the check.** The same person and scenarios against
   the real engine root, translated as the protocol layer would, for the
   stories the root's routes can tell, more as they land.
-- **Joined from the first increment** (`docs/design/testing.md`, 6.3):
+- **Joined from the first increment** (`docs/design/domain/testing.md`, 6.3):
   the translation grows with every increment on either side, a thin
   story runs end to end from the start, and the scripted engine's
   scenarios run against the real root too.

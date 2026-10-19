@@ -14,7 +14,7 @@ still open is listed in section 10, where QA lives among it, which
 - **Aimed past the worlds.** temper's domain is checked in its worlds,
   with fakes, faults drawn from every seed, a crash at every commit and
   a referee (`testing-strategy.md`, sections 3 and 7; jig's `README.md`,
-  6.6; `../testing.md`). QA on a running build would not find domain
+  6.6; `../domain/testing.md`). QA on a running build would not find domain
   bugs faster than the fuzzy suite does. It is for what the worlds
   cannot reach: the fakes' fidelity, the layers below the domain, the
   agents' quality, the experience of using it, and long horizons
@@ -31,7 +31,7 @@ still open is listed in section 10, where QA lives among it, which
   are all in temper's or jig's design already (section 3).
 - **What is new** is small:
   - an environments connector, whose first kind is temper in a box;
-  - for temper, its agents' tools as the driver (`../tools.md`); for
+  - for temper, its agents' tools as the driver (`../client/tools.md`); for
     other products, drivers of their own;
   - oracles beyond an agent's opinion;
   - findings as state of their own;
@@ -106,7 +106,7 @@ kin of `ops`'s infrastructure connector (jig's `examples.md`, 3.2).
   seed state (an owner, repositories to adopt, accounts).
 - **Two levels of LLM:**
   - *scripted:* skein's fake LLM peer, over the providers' real
-    protocols (`../testing.md`, 4.1), cheap and deterministic, for the
+    protocols (`../domain/testing.md`, 4.1), cheap and deterministic, for the
     plumbing (section 2, items 1, 2 and 5);
   - *real:* models at their prices, for evals and use (items 3 and 4),
     on credentials of their own, capped.
@@ -125,15 +125,15 @@ kin of `ops`'s infrastructure connector (jig's `examples.md`, 3.2).
 
 How an agent uses the product as a person does.
 
-- **For temper,** its agents' tools (`../tools.md`): jig's reads,
+- **For temper,** its agents' tools (`../client/tools.md`): jig's reads,
   operations and waits, and the forge's family, through `temper ctl`,
   never the pages. The pages are the fake person's, in the worlds; the
   browser's QA drives the browser.
 - **A path an explorer found** is written down as a story: a tool's
-  calls transcribe into the worlds' calls (`../tools.md`, 11.6), the
+  calls transcribe into the worlds' calls (`../client/tools.md`, 11.6), the
   finding's regression test.
 - **For any application on jig,** the same tools once they are jig's
-  (`../tools.md`, section 14).
+  (`../client/tools.md`, section 14).
 - **Other products** need other drivers: a browser, HTTP, a command
   line (section 10).
 
@@ -290,7 +290,7 @@ If it were split:
    protocol depends on them.
 2. **Temper in a box** with skein's fake LLM peer, and a few scripted
    paths through `temper ctl` (adopt a repository, ask a chat for a
-   small fix, see it land: `../tools.md`, 5.5, area 1). They may start
+   small fix, see it land: `../client/tools.md`, 5.5, area 1). They may start
    outside temper, as a scheduled job, written so that their scripts
    and charters carry over.
 3. **Once a release is trusted:** the QA deployment (6.1), its
@@ -305,7 +305,7 @@ If it were split:
   root or grown from the forge's issues; the charters.
 - **jig:** whether a connector's crate may be shared by applications
   (6.2); the agents' tools as jig's, for applications other than temper
-  (`../tools.md`, section 14).
+  (`../client/tools.md`, section 14).
 
 ## 10. Open questions
 

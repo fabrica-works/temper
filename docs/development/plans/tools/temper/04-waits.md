@@ -9,8 +9,8 @@ real-loop stories, once those drivers exist.
 
 ## Read first
 
-- temper `docs/design/tools.md`: 4, 5.2, 5.4, 6.1 to 6.4, 8.3, 11.1 to 11.3, 12;
-  `docs/design/testing.md`: 2.4. Use tools.md at `fe0ec316`: answers 21 to 24
+- temper `docs/design/client/tools.md`: 4, 5.2, 5.4, 6.1 to 6.4, 8.3, 11.1 to 11.3, 12;
+  `docs/design/domain/testing.md`: 2.4. Use client/tools.md at `fe0ec316`: answers 21 to 24
   are in 5.4 and 6.3; corrected 29 and 33 govern the surrounding output.
 - jig `docs/design/client/domain/client.md`: 8.1 (Dropped is not ended), 8.3,
   19 (`facts`); `docs/design/client/domain/contract.md`: 5.1, 6, 7.1 to 7.3;
@@ -110,7 +110,7 @@ real-loop stories, once those drivers exist.
 ## Increments
 
 ### 04.1 Digests, and the reads that print one
-Scope: tools.md 5.4's common subject form, digest and eligible reads; three
+Scope: client/tools.md 5.4's common subject form, digest and eligible reads; three
 separate digests for `task N --tree --run`.
 Needs: nothing beyond the session's start.
 Files: new `crates/temper-client-tools/src/jig/digest.rs`,
@@ -130,7 +130,7 @@ Shape:
   prints O's page and digests the watch's first window all the same (ruling
   137): its needs, then the first rows of the updates' page it read, to 32
   rows, and whether more follow, through `digest::part` and the one JSON
-  renderer (tools.md 5.4, "The read makes that form from its own rows"). Its
+  renderer (client/tools.md 5.4, "The read makes that form from its own rows"). Its
   printed rows are then fewer than the digested; no second renderer, no other
   form.
 - All eligible parts gain a digest; pages and filtered non-subject reads do not.
@@ -173,7 +173,7 @@ Size: at most 220 production lines; tests and goldens aside.
 Removes: nothing.
 
 ### 04.2 The checked conditions' meaning
-Scope: tools.md 5.4's conditions as facts over live documents, with `me`
+Scope: client/tools.md 5.4's conditions as facts over live documents, with `me`
 where the condition says “you”. The table's checked values are the inputs.
 Needs: nothing beyond the session's start; may land before 04.1.
 Files: new `crates/temper-client-tools/src/jig/conditions.rs`,
@@ -192,7 +192,7 @@ Shape:
   `waits_on_me` copies `reader`'s role numbers (owner 0, maintainer 1,
   member 2, observer 3, a policy role its own) over `WaitsOn::Party`'s
   `whom`; `chat_status`'s `WaitingForYou` would not serve, as it puts
-  held, closing and ended first, and tools.md's `waiting-on-me` reads what
+  held, closing and ended first, and client/tools.md's `waiting-on-me` reads what
   the task waits on. Name the copy in the commit body.
 - `holds` reads a task condition from `Latest::Jig(Delivery::Task(task))`,
   its `waits_on`, `project` and `chip`, and gives None for another form.
@@ -228,7 +228,7 @@ Size: at most 180 production lines.
 Removes: nothing.
 
 ### 04.3 The wait, answered or timed out
-Scope: tools.md 5.4's checked wait call; deliveries, the answer rule below,
+Scope: client/tools.md 5.4's checked wait call; deliveries, the answer rule below,
 its timeout and cleanup. Met exits 0, timeout exits 3 with the document/digest.
 Needs: the common digest (temper 04.1); checked conditions' meaning (temper 04.2).
 Files: new `crates/temper-client-tools/src/jig/wait.rs`, `src/tests/jig/wait.rs`;
@@ -284,7 +284,7 @@ Size: at most 260 production lines.
 Removes: nothing.
 
 ### 04.4 A watch's end, and the task's final read
-Scope: tools.md 5.4/6.3's watch ends and final task document.
+Scope: client/tools.md 5.4/6.3's watch ends and final task document.
 Needs: the wait's deliveries and timeout (temper 04.3).
 Files: `crates/temper-client-tools/src/jig/{wait,runner}.rs`;
 `src/tests/jig/wait.rs`, `src/tests/fixtures.rs` and goldens.

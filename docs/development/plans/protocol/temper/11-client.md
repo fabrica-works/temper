@@ -17,7 +17,7 @@ world.
 
 ## Read first
 
-- `docs/design/client.md`, sections 1 to 5, 9 and 10; `docs/design/testing.md`,
+- `docs/design/client.md`, sections 1 to 5, 9 and 10; `docs/design/domain/testing.md`,
   6.1 and 6.3.
 - jig at the pin (`~/.cargo/git/checkouts/jig-aba39083bf77fefe/d91a89c`):
   `docs/design/client/domain/root.md` (all: sections 3 to 10 are the
@@ -83,7 +83,7 @@ world.
   navigation slot from the forge's view ... A slot no owner fills says,
   in the forge's words, that it cannot be shown." `act`: "resolved in
   the last tree to its binding, and decoded by its owner's bindings".
-- **Joined from the start** (testing.md, 6.3): "`tests/client` is that
+- **Joined from the start** (domain/testing.md, 6.3): "`tests/client` is that
   joint world itself: there is no client world of temper's on a scripted
   engine before it or beside it"; "The translation ... is written with
   the first types on both sides, exhaustive both ways"; "One thin story
@@ -95,7 +95,7 @@ world.
   still apply (signing in, a new chat answered, a held chat's escalation
   decided) are written again as stories of `tests/client`, on jig's
   pages."
-- **Budgets** (testing.md, 6.1): the worlds below the domain "together
+- **Budgets** (domain/testing.md, 6.1): the worlds below the domain "together
   at most 4 s of the default suite and 25 s of the fuzzy suite";
   `tests/client`'s share is 1.0 s and 5 s (code-organization.md, 5).
 
@@ -352,7 +352,7 @@ temper's engine root on the engine domain world's direct driver (after
 `tests/ops/src/joint/front.rs`); `translate.rs`, the translation between
 jig's contract (through the kit's `joint::{transport, packets, requests,
 wire}`) and the root's party vocabulary, exhaustive both ways; the first
-story: the deployment's owner signs in and sees the inbox (testing.md,
+story: the deployment's owner signs in and sees the inbox (domain/testing.md,
 6.3).
 Needs: nothing beyond 11.2.
 Files: `tests/client/{Cargo.toml, src/{lib.rs, app.rs, front.rs,
@@ -468,7 +468,7 @@ Proof: joint, `heavy cargo nextest run -p temper-client-world -E
 person sees the link live, their name and jig's inbox, built by temper's
 view root from temper's engine root's deliveries, with jig's referee
 passing; under 0.5 s.
-Don't: script an engine (testing.md, 6.3); copy the kit's `joint`
+Don't: script an engine (domain/testing.md, 6.3); copy the kit's `joint`
 modules (depend on them); route a client output around `translate.rs`;
 start a thread.
 Size: world code; production 0.

@@ -20,7 +20,7 @@ code.
 
 - `docs/design/store/README.md`, section 6 ("The real store in the domain
   worlds") and section 5 (the restart, the cursor).
-- `docs/design/testing.md`, 4.5 (temper's own components; the composed
+- `docs/design/domain/testing.md`, 4.5 (temper's own components; the composed
   system world "jig's store component over skein-kv's in-memory mode, in
   place of jig's fake store").
 - `docs/design/channel.md`, section 7 (the translations' table, and "The
@@ -58,7 +58,7 @@ code.
   interval. Faults come from the world: it holds commits between the
   root and the store, delays them, fails one to stop the engine, and a
   crash keeps what reached the store."
-- **The system world** (testing.md, 4.5): "jig's store component over
+- **The system world** (domain/testing.md, 4.5): "jig's store component over
   skein-kv's in-memory mode, in place of jig's fake store once temper's
   families have their codecs".
 - **One translation** (channel.md, 7): "The composed system world
@@ -131,7 +131,7 @@ code.
 
 ### 18.1 The engine's domain world and the system world on jig's store
 
-Scope: store/README.md, 6; testing.md, 4.5. `tests/engine/domain/src/store.rs`'s
+Scope: store/README.md, 6; domain/testing.md, 4.5. `tests/engine/domain/src/store.rs`'s
 `Store` becomes the driver (the sketch below): jig's
 `jig_protocol_store::Store::over(&limits, temper_protocol_store::application(&forge_limits),
 Stores { store: skein_kv::Store::memory(..), secrets: skein_kv::Store::memory(..) })`,

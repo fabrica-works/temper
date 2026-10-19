@@ -313,7 +313,7 @@ Held by skein's `fake-forge.md`, section 4.
 
 ## 10. Testing
 
-The tiers, the fakes and the layout are `../testing.md`'s (sections 2,
+The tiers, the fakes and the layout are `../domain/testing.md`'s (sections 2,
 4.2 and 7). The kit's own tests are skein's. The forge's, in temper:
 
 - **Step tests** of the documents, the encoders and decoders, the call
@@ -349,7 +349,7 @@ The tiers, the fakes and the layout are `../testing.md`'s (sections 2,
     equal the sum of the costs the answers reported, the forges' starts'
     reads aside.
 - **The real Forgejo check,** its transcripts, its facts and the
-  throwaway Forgejo it runs against (`../testing.md`, 2.6): skein's
+  throwaway Forgejo it runs against (`../domain/testing.md`, 2.6): skein's
   `fake-forge.md`, sections 6 and 7.
 - **The pin** is skein's (`forge.md`, 4.3): one patch release of Forgejo
   v17.0 and one of forgejo-runner v13.2, constants the throwaway
@@ -357,7 +357,7 @@ The tiers, the fakes and the layout are `../testing.md`'s (sections 2,
   binary of another release is refused, naming it. A later patch changes
   skein's constants and records, and not this document.
 - **The process tier** runs the forge component's start, polling and
-  webhooks against an owned Forgejo (`../testing.md`, 2.6; setup.md,
+  webhooks against an owned Forgejo (`../domain/testing.md`, 2.6; setup.md,
   13.4).
 
 ## 12. What others owe

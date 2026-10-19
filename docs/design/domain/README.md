@@ -1,12 +1,12 @@
 # temper's domain
 
-Provisional, 2026-10-04, revised 2026-10-18. The design of temper's
-domain layer: its root, which composes jig's core with the forge
-connector; the forge connector; the worker; and what temper fills in of
-smith's agent. temper as a whole is `../README.md`; the domain temper
-composes is jig's, whose design is jig's `domain/README.md`. The
-mechanics are those of skein's `programming-model.md`. What is open
-across the documents is listed in section 6.
+Provisional, 2026-10-04, revised 2026-10-19. The design of temper's domain
+layer: its root, which composes jig's core with the forge connector; the
+forge connector; the worker; and what temper fills in of smith's agent;
+and how temper is tested. temper as a whole is `../README.md`; the domain
+temper composes is jig's, whose design is jig's `domain/README.md`. The
+mechanics are those of skein's `programming-model.md`. What is open across
+the documents is listed in section 6.
 
 ## 1. Reading order
 
@@ -27,6 +27,9 @@ all. Then temper's:
    checkout.
 4. **agent.md:** what temper fills in of smith's agent: the charter, the
    host tools, result contracts, conventions and the agents temper runs.
+5. **testing.md:** how temper is tested, on skein's testing strategy
+   and jig's worlds: its tiers, its neighbours' fakes, its scenarios and
+   referee, what its worlds check, and its layout.
 
 ## 2. Structure
 
@@ -62,7 +65,7 @@ temper-worker-domain                       the worker's root (worker.md)
 - **A bare file name** names a document of this directory: `forge.md`
   is `domain/forge.md`. temper's other documents are named by their
   relative path: `../protocol/forge.md`, `../client/README.md`,
-  `../testing.md`, `../README.md`.
+  `../README.md`.
 - **jig's documents** are named with jig's name and their path from
   jig's `docs/design/`, with jig's section numbers: jig's
   `domain/connectors.md`, 12; jig's `protocol/channel.md`, 6.4. Never a

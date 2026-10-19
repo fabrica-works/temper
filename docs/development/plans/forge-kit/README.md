@@ -28,7 +28,7 @@ gaps the designer named: the head check counts the user agent (skein
   `forge-setup.md` (2 to 4, 6 to 8), `fake-forge.md` (2, 4 to 8);
   `testing-strategy.md`, 8.
 - **temper's design,** at `b4cfb999`: `protocol/forge.md`,
-  `protocol/setup.md`, `domain/forge.md`, `testing.md` (what stays
+  `protocol/setup.md`, `domain/forge.md`, `domain/testing.md` (what stays
   temper's: the owner's values, the connector, the stories);
   `draft/forge-kit.md` (the connector's neutral top, later).
 - **`decisions.md`:** the plan's decisions, what the user may veto, and
@@ -184,7 +184,7 @@ chain.
     `testing/temper-fake-forge-host` with delivery). skein 05.4 copies the
     base host into skein's forge peer, skein 05.5 adds delivery there,
     and temper 05.2 deletes the host (decision 26), so that the next
-    part's real loop hosts skein's peer (testing.md 4.2). From skein
+    part's real loop hosts skein's peer (domain/testing.md 4.2). From skein
     05.4's start to temper 05.2's landing a change to the host waits.
   - For the next part, when it is planned: its drafts also change
     `testing/temper-throwaway-forgejo` and

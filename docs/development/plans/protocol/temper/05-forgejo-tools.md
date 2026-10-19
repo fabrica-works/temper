@@ -22,7 +22,7 @@ the transcripts as files.
 
 - forge.md, sections 3 (all), 10 ("The real Forgejo check") and 13.
 - git.md, sections 3 to 6 and 9.
-- testing.md, 2.6 (the throwaway Forgejo, "the test's support").
+- domain/testing.md, 2.6 (the throwaway Forgejo, "the test's support").
 - findings/temper-misc.md, section 3 (what `run.py` and `next_domain.py`
   do: app.ini, users, tokens, the runner's registration and
   configuration; where they and the design disagree).
@@ -38,11 +38,11 @@ the transcripts as files.
 ## What the design asks
 
 - **The binary, and only it** (forge.md, 10): "Its binary is the one
-  `TEMPER_FORGEJO` names, as the process tier's is (testing.md, 2.6): the
+  `TEMPER_FORGEJO` names, as the process tier's is (domain/testing.md, 2.6): the
   tool names no path of its own, refuses to run without the variable,
   and refuses a binary whose `--version` is not v16.0.5, naming it; it
   records the binary's digest with what it captured."
-- **The instance** (forge.md, 10; testing.md, 2.6): "SQLite in a scratch
+- **The instance** (forge.md, 10; domain/testing.md, 2.6): "SQLite in a scratch
   directory, loopback, a small `MAX_RESPONSE_ITEMS` so paging shows ...;
   the tool makes its admin user and tokens; never an existing Forgejo."
   The process tier's support "starts it, makes the admin user, temper's
@@ -187,7 +187,7 @@ the transcripts as files.
 
 ### 05.1 `temper-throwaway-forgejo`: the binary checked, an instance started, provisioned and removed
 
-Scope: `testing/temper-throwaway-forgejo`, ordinary Rust (testing.md,
+Scope: `testing/temper-throwaway-forgejo`, ordinary Rust (domain/testing.md,
 2.6; forge.md, 10): `Forgejo::from_env()` and `Forgejo::from_path(path)`
 (the version check and the digest, as "Choices" says); `Forgejo::start(scratch,
 &Settings)` (app.ini, `migrate`, the admin `fixture` and its token,
@@ -409,7 +409,7 @@ updates), each checked by the case or the requests named:
   `updated-stays-on-comment-edit`, `updated-stays-on-comment-delete`,
   `updated-moves-on-review`, `updated-moves-on-head-push`,
   `updated-stays-on-head-status`, `updated-stays-on-base-push`,
-  `updated-moves-on-close`, `updated-moves-on-reopen` (testing.md, 4.2's
+  `updated-moves-on-close`, `updated-moves-on-reopen` (domain/testing.md, 4.2's
   rule, which the fake keeps);
 - bodies and times: `unedited-comment-updated-equals-created`,
   `unedited-review-updated-equals-submitted`, `edit-moves-comment-updated`,

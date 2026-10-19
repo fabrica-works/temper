@@ -1009,9 +1009,9 @@ read once.
 ## 18. The world
 
 The connector's world, `tests/engine/forge`, runs its subtree with the
-fake forge below it (`../testing.md`, 4.2) and the root scripted above
+fake forge below it (`testing.md`, 4.2) and the root scripted above
 it; the tiers that run it through bytes and on a real Forgejo are
-`../testing.md`, section 2. Its stories: a change produced, opened,
+`testing.md`, section 2. Its stories: a change produced, opened,
 checked, gated, queued and landed; CI failing, repaired; a gate asking
 for changes, repaired, its verdict given again; a gate added while
 queued; two changes into one branch, the second updated cleanly and its

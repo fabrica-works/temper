@@ -35,7 +35,8 @@ documentation in this sense: they are code, and clippy checks them.
 ## 2. The two test suites
 
 The suites are those of skein's `docs/foundation/testing-strategy.md`
-(section 8); `docs/design/testing.md` (6.1) says what they hold in temper.
+(section 8); `docs/design/domain/testing.md` (6.1) says what they hold
+in temper.
 
 - **The default suite** is every crate's unit tests and each world's
   focused tests (`tests/<component>/<world>/tests/*.rs`): focused tests of

@@ -22,7 +22,7 @@ the process tier.
 - `docs/design/client.md`, section 6 (all), 7 and 10;
   `docs/design/credentials.md`, sections 3 and 7;
   `docs/design/protocol.md`, section 4; `docs/design/configuration.md`,
-  sections 2 and 9; `docs/design/testing.md`, 2.6 and 6.1.
+  sections 2 and 9; `docs/design/domain/testing.md`, 2.6 and 6.1.
 - `findings/jig-client.md`, sections 4 and 6, Discrepancies 2 to 5, 12,
   15, 17; `findings/skein-smith.md`, sections C, D and E.
 - `decisions.md`, 6, 13 and 17; `code-organization.md`, sections 2, 5
@@ -103,7 +103,7 @@ the process tier.
   taken, the record kept, exit 0; a handed-in account and a
   confidential client refused; a running engine lending the new record
   at its next grant."
-- **The process tier's terminal test** (testing.md, 2.6): "`temper open
+- **The process tier's terminal test** (domain/testing.md, 2.6): "`temper open
   DIRECTORY LINK` with stdin and stdout piped signs in by the link
   `temper serve` printed, prints the inbox, adopts a repository as above
   by commands ..., and exits 0 on `q` after a drained close"; "In the
@@ -164,7 +164,7 @@ the process tier.
 - **The terminal's process test comes in two increments:** 16.4 signs in,
   prints the inbox and exits 0 on `q` as soon as 10.4's process support
   exists; 16.6 adds the adoption by commands once 15.3 has the forge
-  wired and the throwaway Forgejo in the process support (testing.md,
+  wired and the throwaway Forgejo in the process support (domain/testing.md,
   2.6's order of building).
 
 ## Rules that bind it
@@ -715,7 +715,7 @@ Scope: the adoption form's golden pages, each state of client.md, 4.4
 and 4.7 (6.8), and the process tier's terminal test's adoption: the
 form's fields written with `n words`, "It runs CI" toggled off and one
 check named, `Adopt` pressed with `n`, the outcome printed, `q`, exit
-0 (testing.md, 2.6). The project's page its link opens is not waited
+0 (domain/testing.md, 2.6). The project's page its link opens is not waited
 for: the process configuration's landing rule names the forge's
 patterns, which the native client takes no page of at temper's pin
 (client.md, 5.4); nor the repository on it (client.md, 4.3).

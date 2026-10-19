@@ -3,7 +3,7 @@
 `temper serve` and `temper ctl` as processes on their own scratch directory:
 argv through `main`, printed output, OS exits and signals, stdin sign-in,
 and one change landed on the owned Forgejo with real git, CI and the agent
-executable (tools.md, 11.4; testing.md, 2.6). The harness signs the person
+executable (client/tools.md, 11.4; domain/testing.md, 2.6). The harness signs the person
 in on Forgejo's web, changes `person_password` and makes a read token,
 replacing its `admin_token` read handle. The real loop carries the lock,
 DIRECTORY's files, concurrent waits, the lost answer and fake-git landings.
@@ -12,10 +12,10 @@ Needs at start: nothing. Steps: `temper-10.1` through `temper-10.4`.
 
 ## Read first
 
-- temper's `docs/design/tools.md`, at fe0ec316: 5.3, 5.4, 5.6, 6.1 to
+- temper's `docs/design/client/tools.md`, at fe0ec316: 5.3, 5.4, 5.6, 6.1 to
   6.3, 7, 8.1 to 8.3, 9, 10, 11.3 to 11.5 (calls, output, recovery,
   the person on Forgejo and the split between testing tiers).
-- temper's `docs/design/testing.md`: 2.4 (agent launch) and 2.6
+- temper's `docs/design/domain/testing.md`: 2.4 (agent launch) and 2.6
   (credentials, referee, story form, 3-minute aim and process command).
 - temper's `docs/design/protocol/setup.md`: 6.3, 6.5, 9, 13.3, 13.4
   and 16 (the person's account and web token; reconcile's admin token).
@@ -46,13 +46,13 @@ Needs at start: nothing. Steps: `temper-10.1` through `temper-10.4`.
   stays in the small store, and the next call that sends sends it again
   under its key; the same name gets the first answer (7). No signal is
   caught; the OS's status is not 0 (6.3). 10.4.
-- **11.4; testing.md 2.4, 2.6:** one landing against real git and CI,
+- **11.4; domain/testing.md 2.4, 2.6:** one landing against real git and CI,
   the worker launching `temper agent`, the forge's state read by API. 10.4.
 - **10, the person on Forgejo:** signed in on the web with
   `person_password`, changed; the repository made in the org; a token
   with `read:repository`, `read:issue`, `read:organization`, `read:user`
   made as a person makes one (setup.md, 16); never `admin_token`, which
-  reconcile alone reads (setup.md, 9; testing.md, 2.6). 10.1, 10.2.
+  reconcile alone reads (setup.md, 9; domain/testing.md, 2.6). 10.1, 10.2.
 
 ## Choices this plan makes
 
@@ -61,7 +61,7 @@ Needs at start: nothing. Steps: `temper-10.1` through `temper-10.4`.
 - **The person's writes use `Instance::exchange_basic`:** acme/widget
   and the hook story's push use the changed password. The read token
   serves `Instance`, `merged_pull`, `job_state`, `main_readme` and
-  `assert_converged`; `person_token`'s admin calls go (testing.md, 2.6).
+  `assert_converged`; `person_token`'s admin calls go (domain/testing.md, 2.6).
 - **One host runs the calls in one `real::World` with serve:** each
   `Binary` starts when the previous step settles; its descriptors are
   admitted as in `run_story`, stdin written then closed, stdout read to
@@ -88,7 +88,7 @@ Needs at start: nothing. Steps: `temper-10.1` through `temper-10.4`.
   - `sign-in -`, then `me --json` (10.3): the real loop does not join the executables' stdout and stdin or observe their printed JSON bytes.
   - Wait timeout (10.3): the hosted exit does not prove the executable returns OS exit 3 with the last document and digest.
   - Interrupted adopt (10.4): the real loop kills a hosted root; it cannot prove uncaught SIGTERM ends the executable, then its rerun succeeds once.
-  - Landing (10.4): real git, Forgejo CI and the worker's spawn of `temper agent` are absent from the real loop (testing.md, 2.4).
+  - Landing (10.4): real git, Forgejo CI and the worker's spawn of `temper agent` are absent from the real loop (domain/testing.md, 2.4).
 
 ## Rules that bind it
 
@@ -178,7 +178,7 @@ Removes: `Instance::attach`'s "temper-admin".
 
 Scope: `owned::attach` signs in, changes the password and attaches with
 the person's read token; repository and push use their password;
-`person_token` goes (tools.md, 10; testing.md, 2.6).
+`person_token` goes (client/tools.md, 10; domain/testing.md, 2.6).
 Needs: the throwaway Forgejo's web sign-in and person's token (10.1).
 Files (forge-kit support hotspot): `crates/temper/tests/support/{owned.rs, forgejo.rs}`;
 `crates/temper/tests/process.rs` (the reconcile test's call of `attach`).
@@ -187,7 +187,7 @@ Shape:
   `/api/v1/version` (`await_answer`), reads `forge-1/person_password`,
   calls `Web::sign_in(port, "ada", ..)`, `change_password` with a fresh
   32-hex secret, `token("person-read", READ)` with `READ` the four
-  scopes of tools.md, 10, then `Instance::attach` with that token.
+  scopes of client/tools.md, 10, then `Instance::attach` with that token.
 - `Throwaway` keeps the `Person`; `repository` and `push` send by
   `exchange_basic` with the new password; `get` and the referee's reads
   by the instance's token; `person_token` goes.
@@ -217,7 +217,7 @@ Removes: `forgejo.rs`'s `person_token`; `owned.rs`'s `forge-1/admin_token` read.
 
 Scope: `support::ctl`, a host that runs a story's ctl calls in sequence
 beside serve; the help, a usage error, `sign-in -` with `me --json`, and
-a wait past its timeout, each as the OS reports it (tools.md, 5.6, 6.3,
+a wait past its timeout, each as the OS reports it (client/tools.md, 5.6, 6.3,
 8.1, 8.2, 11.4).
 Needs: `temper ctl`; the tools' help.
 Files: `crates/temper/tests/support/ctl.rs` (new);
@@ -266,7 +266,7 @@ Removes: nothing.
 Scope: one story on the owned Forgejo: `adopt` held by a paused
 Forgejo, cut by uncaught `SIGTERM`, kept, rerun under its name with its
 first answer and one adoption; then a chat landing with real git and CI, the agent a
-`temper agent` process (tools.md, 7, 8.2, 11.4; testing.md, 2.4, 2.6).
+`temper agent` process (client/tools.md, 7, 8.2, 11.4; domain/testing.md, 2.4, 2.6).
 Needs: the person's read handle (10.2); the ctl fixture (10.3);
 the tools' adopt.
 Files: `crates/temper/tests/support/ctl.rs`;
@@ -284,7 +284,7 @@ Poll `pending` for `adopt`; a row is operation, `party N`, and first sending
 in temper's wall-time words or `not sent`, no name or key (5.6). Check its
 JSON: `pending` rows of `operation`, `party`, `first_sent` (integer or null), and `unread`.
 The rerun's kept JSON is only `operation`, `outcome`; text: `kept: ` + operation + outcome (6.1/6.2).
-Test shape: one test, the story form of testing.md, 2.6; the fake LLM
+Test shape: one test, the story form of domain/testing.md, 2.6; the fake LLM
 `landing_scripts(ANSWER, &forgejo)`.
 ```rust
 #[test]
@@ -334,7 +334,7 @@ Proof: process, one story, both binaries exported: `heavy sh -c 'cargo build
 once on `origin/main`, with both exports; report the tier's time.
 Don't: change `landing_scripts`, the fake LLM or the terminal's landing
 stories; add a test for agent launch alone; assert an exit status for
-the cut call beyond "not 0" (tools.md, 6.3 names none).
+the cut call beyond "not 0" (client/tools.md, 6.3 names none).
 Size: at most 130 production lines.
 Removes: nothing.
 
@@ -354,7 +354,7 @@ impl Web {
 
 // crates/temper/tests/support/owned.rs (10.2)
 pub const READ: [&str; 4] = ["read:repository", "read:issue", "read:organization", "read:user"];
-/// The person as the harness plays them (tools.md, 10).
+/// The person as the harness plays them (client/tools.md, 10).
 pub struct Person { pub instance: temper_throwaway_forgejo::Instance, pub login: String, pub(super) password: String }
 pub fn attach(directory: &Path, port: u16, running: Running) -> Person;
 
@@ -389,7 +389,7 @@ pub fn alone(directory: &Path, call: Call) -> super::Ended;
   raise both documents before choosing another timeout subject.
 - If `TEMPER_FORGEJO` or `TEMPER_FORGEJO_RUNNER` is absent, raise it
   before its process Proof; no download. Report the whole tier's time
-  at 10.4: the existing landings already exceed testing.md, 2.6's 3-minute aim.
+  at 10.4: the existing landings already exceed domain/testing.md, 2.6's 3-minute aim.
 
 ## Done when
 

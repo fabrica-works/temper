@@ -382,7 +382,7 @@ table and the git component.
 ## 10. The world
 
 The worker's worlds run the domain against neighbours that share none of
-its types (testing-strategy.md, section 4). `../testing.md` places them
+its types (testing-strategy.md, section 4). `testing.md` places them
 among temper's tiers and keeps their fakes.
 
 - **The checkout's world** (`tests/worker/checkout`): the checkout, the
@@ -409,7 +409,7 @@ among temper's tiers and keeps their fakes.
   started from saved work; turns surviving busy, reconnects and crossed
   acknowledgements; a worker shutting down past the grace giving up what
   it keeps, and a channel reopened in time getting every turn. Its
-  runtime world's referee checks the whole boundary (`../testing.md`,
+  runtime world's referee checks the whole boundary (`testing.md`,
   6.2).
 - **The system world** (`tests/system`): the engine's and the worker's
   roots, smith's real agent domain over skein's fake LLM, jig's fake
@@ -422,7 +422,7 @@ among temper's tiers and keeps their fakes.
   through both roots; a withheld commit holding the assignment.
 - **The one-process world** (`tests/one-process`): temper's services on
   skein's simulator, the worker's agents smith's processes over skein's
-  fake LLM (`../testing.md`, 2.5).
+  fake LLM (`testing.md`, 2.5).
 
 Across them, each world checks what is its: that the engine commits each
 attempt's turns and answer once and acknowledges them in time; that each

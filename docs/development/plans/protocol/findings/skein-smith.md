@@ -193,7 +193,7 @@ versioned record Kept { at: duration }
 - **channel.md §6** writes `record Identity { token: secret  login: text ... }` with no bounds. The parser refuses that; it must be `secret N` / `text N`.
 - **channel.md §6** says "The record's `Debug` shows lengths only (skein-lib's `Secret`)". Only the `secret` field hides its bytes (secret.rs:30-34). The `text` fields (login, name, email) are `Box<[u8]>` with derived `Debug`, so they print in full.
 - **protocol.md §5** says crate `temper` holds "the four commands of section 4, copied from jig's reference binary". jig's only binary, `jig-test`, has just `serve | agent` (J testing/jig-test/src/lib.rs:17). `open` and `sign-in` have no jig binary to copy from.
-- **testing.md §4.1** says the process tier runs the fake peer "as a process". At the pin it is a `Host` in `skein_world::real::World` on the test thread, not an OS binary, and it uses fixed port 34443.
+- **domain/testing.md §4.1** says the process tier runs the fake peer "as a process". At the pin it is a `Host` in `skein_world::real::World` on the test thread, not an OS binary, and it uses fixed port 34443.
 - **protocol.md §11** says "the fake git program, on skein's fake machine". The fake machine only answers files and fixed fixtures; a fake git needs a `HostedProgram` registered with skein-world.
 - **Regeneration:** jig's worker-wire drift test has no `SKEIN_CODEGEN_WRITE` mode; client-wire's and store-codecs' do. Copy the client-wire pattern.
 - Present and correct: `skein_shell::open_root` (ring.rs:1595), `Io::adopt_read_pipe` / `adopt_write_pipe` (layer.rs:158/167), and `skein_lib::Intake` (intake.rs:25: allocated once at its cap, never grows).

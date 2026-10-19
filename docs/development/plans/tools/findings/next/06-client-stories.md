@@ -1,7 +1,7 @@
 # Session 06: the agent's area 1 stories in `tests/client`
 
 `temper-client-world` runs the tools' root against temper's engine root,
-beside the fake person, as a scripted agent making calls (`tools.md`,
+beside the fake person, as a scripted agent making calls (`client/tools.md`,
 11.2). jig's `World` holds one `App` type, and temper's `Temper` is a
 client root read by the fake person through temper-client-view's tree.
 So 06.1 gives `Temper` a second kind of client: the tools' root
@@ -15,12 +15,12 @@ session starts on the tools' root; only 06.5 needs the tools' waits.
 
 ## Read first
 
-- temper's `docs/design/tools.md`: 4 (the root and its asker per
+- temper's `docs/design/client/tools.md`: 4 (the root and its asker per
   call), 5.2 (a turn too large for a page; `turn`), 5.3, 5.4
   (`replied`), 6.1 to 6.3, 7, 8.2 (steps 3 to 6), 11.2, 12;
-  `testing.md`: 6.1 (the budgets) and 6.3; `client.md`: 10 (the
-  `tests/client` bullet); `STATUS.md`, the rows `testing.md` and
-  `tools.md`.
+  `domain/testing.md`: 6.1 (the budgets) and 6.3; `client.md`: 10 (the
+  `tests/client` bullet); `STATUS.md`, the rows `domain/testing.md` and
+  `client/tools.md`.
 - jig's `docs/design/client/domain/client.md`: 6 (keyed requests,
   `Held`), 11 and 20 (one-shot); `client/domain/testing.md`: 5, 6.2
   (jig's check), 7 and 8.
@@ -35,7 +35,7 @@ session starts on the tools' root; only 06.5 needs the tools' waits.
 
 ## What the design asks
 
-- **`tools.md`, 11.2:** the stories, the profile's turn bound past its
+- **`client/tools.md`, 11.2:** the stories, the profile's turn bound past its
   page bound, and the world's faults with each call made once.
 - **4:** the root has no page or view; each call is an asker of its
   own, so several calls may be in flight.
@@ -46,11 +46,11 @@ session starts on the tools' root; only 06.5 needs the tools' waits.
   its own call, prints and exits.
 - **5.2, 5.4, 6.1 to 6.3:** the large turn's line and `turn`'s parts;
   `--until replied`; the printed results and exits.
-- **`testing.md`, 6.3; `client.md`, 10:** `tests/client` is the joint
+- **`domain/testing.md`, 6.3; `client.md`, 10:** `tests/client` is the joint
   world: jig's faults, each request made once, jig's check. jig's
   `client/domain/testing.md`, 8: stories through the client's surface
   where it has no tree.
-- **`testing.md`, 6.1:** a story past its guide is made cheaper or moved
+- **`domain/testing.md`, 6.1:** a story past its guide is made cheaper or moved
   to fuzzy, never merged.
 
 ## Choices this plan makes
@@ -80,11 +80,11 @@ session starts on the tools' root; only 06.5 needs the tools' waits.
    `forge_limits()`) past it: the one deviation from the shipped
    profile, named beside it with 11.2's reason.
 6. **The proofs are joint.** `tests/client` is the joint layer
-   (development.md, 5.5; `testing.md`, 6.3): the outline's "world
+   (development.md, 5.5; `domain/testing.md`, 6.3): the outline's "world
    proofs". The real loop's tools stories are temper 08's and 09's;
    nothing here goes to the process tier.
 7. **`Held` is met in one root.** Two calls under one name, the second
-   given while the first is in flight (tools.md, 4). ctl's host gives
+   given while the first is in flight (client/tools.md, 4). ctl's host gives
    one call, and 8.2's step 4 keeps a kept record from meeting it.
 8. **The agent copies acts.** A story runs the act a result printed,
    such as `release H --hold R` from `task G --tree` (5.3), and never
@@ -108,7 +108,7 @@ session starts on the tools' root; only 06.5 needs the tools' waits.
 
 Scope: the driver of Choices 1 to 4, and a thin story. The agent starts
 a chat under its key, and the fake person of the same party sees it on
-the chat's page (tools.md, 4, 5.3, 6.1, 8.2; 11.2).
+the chat's page (client/tools.md, 4, 5.3, 6.1, 8.2; 11.2).
 Needs: nothing beyond the session's start (the tools' root).
 Files: `tests/client/Cargo.toml` (`temper-client-tools`);
 `tests/client/src/{app.rs, agent.rs (new), lib.rs, front.rs,
@@ -207,7 +207,7 @@ Removes: the single codec bound for every client's reads.
 ### 06.3 A repository adopted
 
 Scope: `adopt`, a forge-facing increment of its own: adopted exits 0
-with 4.7's sentence, a repository the forge lacks exits 2 (tools.md,
+with 4.7's sentence, a repository the forge lacks exits 2 (client/tools.md,
 5.3, 6.3; `client.md`, 4.4, 4.7; 11.2).
 Needs: 06.1.
 Files: `tests/client/tests/agent.rs`. No hotspot: the forge family goes
@@ -239,7 +239,7 @@ Scope: 11.2's faults through the tools.
 - A chat cut by an engine restart (`FrontFault::Restart`) is asked
   again from another DIRECTORY and gets the first answer.
 - Two calls in one root under one name: the second is told `Held` and
-  exits 1, with nothing sent (tools.md, 7, 8.2; jig's
+  exits 1, with nothing sent (client/tools.md, 7, 8.2; jig's
   `client/domain/client.md`, 6).
 Needs: 06.1.
 Files: `tests/client/src/fixtures.rs`; `tests/client/tests/agent.rs`.
@@ -284,7 +284,7 @@ Removes: nothing.
 Scope: `wait task N --until replied` after `chat`, the front answering
 runs; `message N TEXT --key K`, then the wait again (5.4's example);
 `close N --key K`, then `wait task N --until ended`; a held task
-released by the act `task G --tree` printed (tools.md, 5.2 to 5.4;
+released by the act `task G --tree` printed (client/tools.md, 5.2 to 5.4;
 11.2); the STATUS rows.
 Needs: 06.1; the tools' waits.
 Files: `tests/client/tests/agent.rs`; `tests/client/src/fixtures.rs`
@@ -292,9 +292,9 @@ Files: `tests/client/tests/agent.rs`; `tests/client/src/fixtures.rs`
 Shape:
 - `fixtures::printed_act(&Answer, tool: &str) -> Vec<String>`, the
   first act line naming `tool`.
-- STATUS: the `testing.md` row's "stand" list gains "the agents' tools'
+- STATUS: the `domain/testing.md` row's "stand" list gains "the agents' tools'
   area 1 stories in `tests/client` (6.3)", and its clause on the agents'
-  tools' stories keeps 2.6 alone, as the plan's landing left it. The `tools.md` row says "11.2: area 1's stories in
+  tools' stories keeps 2.6 alone, as the plan's landing left it. The `client/tools.md` row says "11.2: area 1's stories in
   `tests/client` stand".
 Test shape: in `tests/client/tests/agent.rs`, of 06.1's kind, with
 `world.front().answer_runs = true` (as `tests/client/tests/chat.rs`):
@@ -316,7 +316,7 @@ under jig's check. Nothing higher: Choice 6.
 Don't: build the release's revision from the engine's state; wait on
 `chat`, `activity` or `turn`, which are pages, not subjects (5.4).
 Size: at most 40 lines in `tests/client/src`.
-Removes: "6.3" from the `testing.md` row's "not planned" clause.
+Removes: "6.3" from the `domain/testing.md` row's "not planned" clause.
 
 ## Interface sketches
 
@@ -331,7 +331,7 @@ its client. A reload builds a new one from `agent::new`.
 pub enum Root {
     /// temper's client root, read through the view by the fake person.
     Person(domain::Domain),
-    /// The tools' root (tools.md, 4), given calls by the story.
+    /// The tools' root (client/tools.md, 4), given calls by the story.
     Agent(Box<crate::agent::Agent>),
 }
 /// A client's view: the person's, or an empty tree no one reads.
@@ -349,7 +349,7 @@ impl Root {
 // tests/client/src/agent.rs (06.1)
 /// The tools' root, and what it printed, call by call.
 pub struct Agent { root: temper_client_tools::Root, answers: Vec<Option<Answer>>, kept: Vec<Box<[u8]>> }
-/// One call's printed result (tools.md, 6): stdout, stderr and the exit.
+/// One call's printed result (client/tools.md, 6): stdout, stderr and the exit.
 #[derive(Debug)]
 pub struct Answer { pub status: u8, pub out: Box<[u8]>, pub err: Box<[u8]> }
 /// The constructor `World::client_with` takes, under ctl's preset.
@@ -384,7 +384,7 @@ pub fn call(world: &mut World<Temper, Joint>, agent: ClientId, argv: &[&str]) ->
 - If the engine answers the chat within the step that takes it, no
   restart can fall between the two. Raise it with the trace.
 - If the session's stories, measured, put the worlds below the domain
-  past 4 s of the default suite (`testing.md`, 6.1), raise it with the
+  past 4 s of the default suite (`domain/testing.md`, 6.1), raise it with the
   times.
 
 ## Done when

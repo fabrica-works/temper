@@ -19,7 +19,7 @@ and draining on a signal. 12.2 then runs the first story through it.
 
 - `configuration.md` (all); `protocol.md`, sections 4 and 8;
   `credentials.md`, section 3; `channel.md`, section 8; `git.md`,
-  section 8; `testing.md`, 2.6 and 6.1.
+  section 8; `domain/testing.md`, 2.6 and 6.1.
 - `decisions.md`, 5, 8, 9 and 13; `code-organization.md`, sections 1 to
   8.
 - `findings/jig-service.md`, sections 1 ("Payload version", "Where
@@ -97,7 +97,7 @@ and draining on a signal. 12.2 then runs the first story through it.
   carries only the sign-in links"; "A first termination signal drains it
   ...; a second turns the drain into an abort"; exit 0 after a drained
   shutdown, 1 on any failure, "the reason on stderr".
-- **The process tier** (testing.md, 2.6): "the real `temper` binary,
+- **The process tier** (domain/testing.md, 2.6): "the real `temper` binary,
   `temper serve` on a scratch directory, with a configuration the test
   writes"; skein's fake LLM peer on loopback; "nextest profile `process`,
   run by `scripts/proof-one-process.sh`, which builds the binary first".
@@ -921,7 +921,7 @@ impl skein_shell::Host for Host { /* iterate, queues, deadlines, exit, drain: ji
 
 ```sh
 #!/bin/sh
-# The process tier (testing.md, 2.6): the binary built first, then
+# The process tier (domain/testing.md, 2.6): the binary built first, then
 # nextest's process profile, once. Run through `heavy --gate`.
 set -eu
 cd "$(dirname "$0")/.."

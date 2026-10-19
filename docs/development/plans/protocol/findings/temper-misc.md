@@ -27,7 +27,7 @@ Sizes, every file counted:
 - **Docs that cite them by path:**
   - `docs/design/client.md:44-45` and `:828-833`
   - `docs/design/protocol.md:261-263` and `:555-557`
-  - `docs/design/testing.md:532-534` and `:758-761`
+  - `docs/design/domain/testing.md:532-534` and `:758-761`
   - `docs/design/STATUS.md:11` (the web-implementation plan row) and `:57`
   - The superseded plan, `docs/plans/web-implementation/`:
     - `README.md:24,27,94-105,182-186`
@@ -129,13 +129,13 @@ What `next_domain.py` adds (runner registration):
 - The runner path is hardcoded to `/home/free/.local/bin/forgejo-runner` (v3.5.1).
 
 **Where the tool and the design disagree** (the Rust replacement should follow the design):
-- The tool pins v15 by a `/tmp` path plus digest. `docs/design/forge.md:733-745` and `testing.md:195-203` require v16.0.5 named by `TEMPER_FORGEJO`, refusing without it or on another version, and recording the digest.
+- The tool pins v15 by a `/tmp` path plus digest. `docs/design/forge.md:733-745` and `domain/testing.md:195-203` require v16.0.5 named by `TEMPER_FORGEJO`, refusing without it or on another version, and recording the digest.
 - The runner should come from `TEMPER_FORGEJO_RUNNER`; without it the Actions facts are reported as unchecked.
-- The process tier runs no runner (`testing.md:204`).
+- The process tier runs no runner (`domain/testing.md:204`).
 
 Docs that cite the tool or the throwaway Forgejo:
 - `forge.md:692,733-745`
-- `testing.md:195-203,741,771`
+- `domain/testing.md:195-203,741,771`
 - `git.md:578-579`
 - `protocol.md:112,236-239,505-506,536-537,575`
 - `domain/forge.md:856,866`
@@ -176,7 +176,7 @@ Measurements:
   - `fuzzy_escalation fifteen_small…`, 2.651 s
   - `fuzzy_walking terminal…`, 2.156 s
 - **The web crates' share:** 74 focused tests (32 + 13 + 2 + 27), each ≤ 0.005 s, and 2 fuzzy (0.777 s and 0.776 s). Retiring them leaves 608 focused and 29 fuzzy.
-- **Budgets:** `.config/nextest.toml` sets default `not binary(/^fuzzy_/)` at 15 s with a 3 s slow flag, fuzzy at 60 s with a 20 s slow flag, and a `measure` profile with no limit. `testing.md:658-663` adds guides: worlds below the domain (protocol, machine, client, one-process) ≤ 4 s focused and ≤ 25 s fuzzy, a focused protocol-world test ≤ 0.5 s, a one-process story ≤ 1 s. `scripts/check.sh` runs fmt, clippy `-D warnings`, nextest, then nextest with the fuzzy profile, with `NEXTEST_DOUBLE_SPAWN=0`.
+- **Budgets:** `.config/nextest.toml` sets default `not binary(/^fuzzy_/)` at 15 s with a 3 s slow flag, fuzzy at 60 s with a 20 s slow flag, and a `measure` profile with no limit. `domain/testing.md:658-663` adds guides: worlds below the domain (protocol, machine, client, one-process) ≤ 4 s focused and ≤ 25 s fuzzy, a focused protocol-world test ≤ 0.5 s, a one-process story ≤ 1 s. `scripts/check.sh` runs fmt, clippy `-D warnings`, nextest, then nextest with the fuzzy profile, with `NEXTEST_DOUBLE_SPAWN=0`.
 
 **5. Lints and crate kinds**
 
@@ -187,7 +187,7 @@ Measurements:
   - jig's `testing/jig-fake-person` instead sets `disallowed_types/methods/macros = "allow"` in its `[lints.clippy]`.
 - **One lints table per crate:** a mixed crate (`protocol.md:225`: the terminal's loop is ordinary Rust, its renderer and reader are step code) can't have both. It is either two crates or the subset enforced by review.
 - **`unsafe`:** step crates add `#![forbid(unsafe_code)]` at the root (the workspace table only denies it); world crates forbid it in Cargo and put no `#!` attributes in `lib.rs`.
-- **Layout:** unit tests go in `src/tests.rs` (`tests_outside_test_module` is denied); world tests in `tests/*.rs`, fuzzy ones in `tests/fuzzy_*.rs`; world packages are named `temper-<component>[-<child>]-world` (`testing.md:723-743`).
+- **Layout:** unit tests go in `src/tests.rs` (`tests_outside_test_module` is denied); world tests in `tests/*.rs`, fuzzy ones in `tests/fuzzy_*.rs`; world packages are named `temper-<component>[-<child>]-world` (`domain/testing.md:723-743`).
 
 Step crate example (`crates/temper-engine-domain-forge-change`):
 ```toml
@@ -261,7 +261,7 @@ Its `lib.rs` is a `//!` doc, then `mod …; pub use …;` with no `#!` attribute
   - 41 `llm.md`
   - 42 `performance.md`
   - 43 `protocol.md`
-  - 44 `testing.md`
+  - 44 `domain/testing.md`
   - 51 `domain/engine.md`
   - 52 `domain/forge.md`
   - 53 `domain/people.md`

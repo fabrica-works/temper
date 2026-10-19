@@ -300,7 +300,7 @@ the routing in the step that routes the record:
 
 ## 9. Testing
 
-Within the suites' budgets (`../testing.md`, section 2):
+Within the suites' budgets (`../domain/testing.md`, section 2):
 
 - **Step tests in `temper-protocol-worker-wire`,** those skein's
   `codec.md`, section 6 generates for each record, and `Identity`'s
@@ -317,7 +317,7 @@ Within the suites' budgets (`../testing.md`, section 2):
   arbitrary bytes and on mutated golden bytes.
 - **Through bytes,** the one-process world carries every part on jig's
   channel joined in process: each story that prepares a workspace,
-  pushes, saves or fails to prepare (`../testing.md`, 2.5). jig's channel
+  pushes, saves or fails to prepare (`../domain/testing.md`, 2.5). jig's channel
   worlds carry them as opaque bytes, and need nothing of temper's.
 - **Without bytes,** the composed system world runs the same functions
   (section 7).

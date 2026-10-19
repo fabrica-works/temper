@@ -116,7 +116,7 @@ be the user's (development.md, 10.4).
     rebinds the engine's address, both are given one constant,
     `fixtures::FORGE`, and the referee asserts `address()` is `Some(FORGE)`
     once the peer listens; the kernel-assigned address is handed over in
-    the real loop (temper's testing.md 4.2).
+    the real loop (temper's domain/testing.md 4.2).
 
 16. **The conformance's masks are made whole, in two steps.** The
     actions transcripts hold four stale UUID occurrences and 9 unquoted
@@ -204,7 +204,7 @@ be the user's (development.md, 10.4).
     delivery in skein's peer (about 520 new lines in the two, from
     `findings/base-skein-05.md`); temper 05.2, which needs 05.5, deletes
     the host. The next part, planned after this, hosts its real loop on
-    skein's forge peer (testing.md 4.2) and drops its draft 07's host
+    skein's forge peer (domain/testing.md 4.2) and drops its draft 07's host
     move. The alternative, waiting for that host before skein 05.4, would
     hold this plan's last steps (skein 05.4, temper 05.2, temper 07) on a
     plan not yet written.

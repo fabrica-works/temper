@@ -12,14 +12,14 @@ outcome, the out-of-date page, and its page, bindings and navigation
 link in the view. The joint world `tests/client` runs the adoption's
 stories against temper's engine root. The process tier then lands a
 change on the throwaway Forgejo with real git, kills the binary and
-finds the work after a restart (testing.md, 2.6); and the live tier runs
+finds the work after a restart (domain/testing.md, 2.6); and the live tier runs
 the chat and a small change with a real model, once, within the
-README's budget (testing.md, 2.7).
+README's budget (domain/testing.md, 2.7).
 
 ## Read first
 
 - `client.md`, sections 3.1, 3.3, 4 (all), 5.2, 5.3, 8 and 10;
-  `testing.md`, 2.6 and 2.7; `llm.md`, section 6; `credentials.md`,
+  `domain/testing.md`, 2.6 and 2.7; `llm.md`, section 6; `credentials.md`,
   sections 3 and 7; `domain/forge.md`, section 4.
 - jig's `docs/design/protocol/client.md`, sections 5, 9, 10 and 11, and
   `client/domain/root.md`, sections 4 and 6, at the pin.
@@ -91,7 +91,7 @@ README's budget (testing.md, 2.7).
   "lists there only the roles a live task's resources narrowed, and
   never an owned one", so no story looks for the repository on the
   project's page.
-- **The process tier's story** (testing.md, 2.6, steps 3 to 6): "a
+- **The process tier's story** (domain/testing.md, 2.6, steps 3 to 6): "a
   repository is adopted through temper's client" with "It runs CI"
   unchecked and one check; "a goal is given whose change, its check
   passed, lands on the throwaway Forgejo, pushed by real git"; "the
@@ -101,7 +101,7 @@ README's budget (testing.md, 2.7).
   throwaway Forgejo's API, shows the change; nothing the person saw
   before the kill is lost after it; no process the binary started
   outlives it."
-- **The live tier** (testing.md, 2.7): the borrowed login "read-only",
+- **The live tier** (domain/testing.md, 2.7): the borrowed login "read-only",
   written "to a private file in the run's log directory, removed at
   exit"; "the process tier's chat, answered by the real model; and one
   small change ... pushed by real git"; "at most 25 completions and 15
@@ -161,12 +161,12 @@ README's budget (testing.md, 2.7).
   from the world's forge base, the digest as `Joint` digests jig's
   requests), and
   `Delivery::Application` back to `forge::Answer`.
-- **The process tier's change** (testing.md, 2.6): the throwaway Forgejo
+- **The process tier's change** (domain/testing.md, 2.6): the throwaway Forgejo
   (05.1's `Settings::small()` with `actions: false`), users `acme` and
   `temper-bot`, a repository `acme/widget` made with `Init::Readme`,
   `temper-bot` its collaborator with `write`; the forge's API token and
   the identity's token both `temper-bot`'s; the landing rule of
-  testing.md, 2.6 (`"ci": false, "gates": [], "approvals": []`) on
+  domain/testing.md, 2.6 (`"ci": false, "gates": [], "approvals": []`) on
   `branch main` of `acme/widget`; the person adopts `acme/widget` with "It
   runs CI" unchecked and checks `1`; the person's chat cues the fake
   LLM's chat script delegating the coding procedure on the adopted
@@ -478,7 +478,7 @@ Removes: nothing.
 
 ### 15.3 A change landed on the throwaway Forgejo, killed and found
 
-Scope: the process tier's story (testing.md, 2.6, steps 1 to 6):
+Scope: the process tier's story (domain/testing.md, 2.6, steps 1 to 6):
 `tests/support/forgejo.rs` (the throwaway Forgejo started with
 `temper_throwaway_forgejo::Forgejo::from_env()` (refused without
 `TEMPER_FORGEJO`, naming it), provisioned as Choices say, stopped at the
@@ -491,7 +491,7 @@ merged, starting it again on the same directory, then checking the
 forge's state and the second person's script. 12.2's test becomes this
 story (its steps 1 and 2 kept as the first). At temper's pin of jig the
 native client shows no page of a task that holds or is granted the
-forge's resources (client.md, 5.4; testing.md, 2.6), so the person's
+forge's resources (client.md, 5.4; domain/testing.md, 2.6), so the person's
 scripts read no such page: `adopt_and_change` gives the goal in a chat,
 then waits in the inbox for that chat's entry to count a reply (its
 `replies_unread`, or its `last_reply` moving), not for the reply's words
@@ -1208,7 +1208,7 @@ struct Account { access_token: String, expires_at: u64, account_id: String }
 
 ```sh
 #!/bin/sh
-# The live tier (testing.md, 2.7): a borrowed Codex login, read only;
+# The live tier (domain/testing.md, 2.7): a borrowed Codex login, read only;
 # at most 25 completions (the test) and 15 minutes (the timeout).
 set -eu
 cd "$(dirname "$0")/.."
@@ -1231,7 +1231,7 @@ exit "$status"
 
 ## Questions to raise when reached
 
-- **The check's gate in the process tier** (15.3). testing.md, 2.6: "a
+- **The check's gate in the process tier** (15.3). domain/testing.md, 2.6: "a
   gate run as an agent task whose verdict the fake LLM's script gives".
   Default: the gate's agent runs under `application.charter` and its
   script finishes with a passing verdict as `temper-engine-smith` reads

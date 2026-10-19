@@ -196,7 +196,7 @@ section 7).
 
 ## 6. Testing
 
-Within the suites' budgets (`../testing.md`, section 2):
+Within the suites' budgets (`../domain/testing.md`, section 2):
 
 - **Step tests** in `temper-protocol-store`: each family's key encoder
   against the derived order, and its decoder against its encoder; the
@@ -212,7 +212,7 @@ Within the suites' budgets (`../testing.md`, section 2):
   `temper-protocol-store`, so every story runs the real keys, codecs and
   interval, with the world's faults: commits held, delayed, one failed
   to stop the engine, and a crash keeping what reached the store.
-- **The one-process world** (`tests/one-process`, `../testing.md`, 2.5):
+- **The one-process world** (`tests/one-process`, `../domain/testing.md`, 2.5):
   the store on skein's crashing disk, the process killed and restarted
   at drawn moments; after each restart the forge's records are those of
   the last acknowledged commit, or of that and one whole uncertain one,

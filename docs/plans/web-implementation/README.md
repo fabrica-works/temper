@@ -14,7 +14,7 @@ document of its own beside this one.
 `docs/design/web/`; the domain's documents by their directory
 (`domain/people.md`); skein's foundation documents by file name
 (`programming-model.md`, `testing-strategy.md`); temper's testing as
-`docs/design/testing.md`.
+`docs/design/domain/testing.md`.
 
 ## 1. Scope
 

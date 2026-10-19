@@ -30,7 +30,7 @@ gives skein's browser harness what jig's attack stories need.
   `examples.md`.
 - **temper's design,** at `c7095516`: `docs/design/STATUS.md`, "temper
   on jig's client API" and its rows; `client.md`, `protocol.md`,
-  `configuration.md`, `credentials.md`, `testing.md`, by the sections
+  `configuration.md`, `credentials.md`, `domain/testing.md`, by the sections
   each temper session names.
 - **skein's design:** `ui-web.md`, 14.2 (skein 01).
 - **The workflows:** jig's and temper's `docs/development/workflow.md`,

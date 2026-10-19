@@ -109,11 +109,11 @@ skein-ui's `later.md` rows for temper's next repin.
 - 3.5: at least Inbox, Chats, Chat, Task (a held task released) and
   Adopt, the pages the stories of `tests/client`, the one-process world
   and the process tier use.
-- `testing.md` 2.5, 2.6 and 6.3: the worlds on `jig-client-world` and
+- `domain/testing.md` 2.5, 2.6 and 6.3: the worlds on `jig-client-world` and
   skein's fake person.
 
 Can wait: Board (and reordering), Changes, the agent's task page,
-confirmations no story uses, the rebound-Host story (testing.md, 2.6),
+confirmations no story uses, the rebound-Host story (domain/testing.md, 2.6),
 the browser, `Mint` and the forge as a sign-in provider.
 
 temper cannot keep its present pages on jig's helpers without

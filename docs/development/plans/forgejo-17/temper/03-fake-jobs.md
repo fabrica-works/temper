@@ -22,7 +22,7 @@ highest layer that runs it.
   `Read::Job` and the note "A failed job's log is its failed step's
   end"); 13 (the bullets on a job and a job's plaintext log, under "From
   Forgejo v17.0's API description" and under "To check on v17.0").
-- `docs/design/testing.md`: 4.2 (the rule "Forgejo-shaped, not better
+- `docs/design/domain/testing.md`: 4.2 (the rule "Forgejo-shaped, not better
   than Forgejo", and "Then a service").
 - This plan: `decisions.md` 7, 8 and 9; `code-organization.md` sections
   2 ("The fake's failing step"), 3, 4, 5 and 6;
@@ -69,9 +69,9 @@ highest layer that runs it.
   `Content-Range: bytes 0-111/112`, the whole slice"; over an empty
   slice, `bytes=-10` "**`206` with `Content-Range: bytes 0--1/0`** and
   an empty body", and `bytes=0-10` "`200`, empty, no `Content-Range`".
-- **Not better than Forgejo** (testing.md, 4.2): "It refuses what
+- **Not better than Forgejo** (domain/testing.md, 4.2): "It refuses what
   Forgejo refuses ..., and keeps what Forgejo keeps and no more."
-- **Faults move down** (forge.md, 9, testing.md, 4.2): "a call refused
+- **Faults move down** (forge.md, 9, domain/testing.md, 4.2): "a call refused
   for the rate is a `429` with `Retry-After`; one failed before it is
   made is a refused connect or a reset before the request is read; one
   made and then timed out is a `5xx` or a dropped connection after the

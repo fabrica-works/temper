@@ -9,7 +9,7 @@ binary under it, and replaces itself by `forgejo web` or `forgejo-runner daemon`
 ## Read first
 
 - Design: setup.md 3, 6.1, 6.3, 6.4, 8 (what a forge's members equal), 11, 13.1, 13.4; configuration.md 8;
-  testing.md 2.6. Plan: decisions.md 6, 7, 17; `findings/skein-io.md` 1, 3-5; `forge-and-tiers.md` 2, 4.
+  domain/testing.md 2.6. Plan: decisions.md 6, 7, 17; `findings/skein-io.md` 1, 3-5; `forge-and-tiers.md` 2, 4.
 - skein: `programming-model.md` 2.1, 3; `io.md` 6; `shell.md` 12-13; `testing-strategy.md` 2.1, 8; temper `workflow.md` 2.
 - temper 07, `temper/07-prepare.md`, by name: `setup::{Setup, Entry, Mode, Owned}`, `place::{Place, File}`,
   `state::State`, `spec::{Command, Spec, Which, command, version}`, `prepare::{Prepare, step, Event, Found, Ran, Exit,
@@ -30,7 +30,7 @@ binary under it, and replaces itself by `forgejo web` or `forgejo-runner daemon`
   forge` command checks the document and reads no file but its own part's.
 - **6.4, 6.1:** `run` checks `state` and the binary's first `--version` line against the pins, takes the lock without
   waiting, hands it on as standard input, and `execve`s with the spec's arguments and environment alone (answer 24); the
-  lock and the exec are std's, in one module. **13.4, testing.md 2.6:** the tier's Forgejo is owned (no runner, no CI).
+  lock and the exec are std's, in one module. **13.4, domain/testing.md 2.6:** the tier's Forgejo is owned (no runner, no CI).
 
 ## Choices this plan makes
 

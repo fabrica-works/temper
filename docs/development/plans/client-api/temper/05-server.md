@@ -26,7 +26,7 @@ reach the engine through the mapping from the first increment on.
   `clients` member is what jig's clients' component takes; the clients'
   listener is temper's"), 3 (`clients`, and the last paragraph: "the
   clients' listener takes `clients.listener`").
-- temper's `docs/design/testing.md`: 2.5 ("the same stories through
+- temper's `docs/design/domain/testing.md`: 2.5 ("the same stories through
   jig's default HTTP mapping"), 2.6 (the bullet "The server's guards":
   its rebound-Host story is `later.md`'s, not this session's).
 - jig's `docs/design/protocol/client.md`: 17 (17.1, 17.4).

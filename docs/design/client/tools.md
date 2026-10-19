@@ -5,7 +5,7 @@ they read what it holds, act through jig's operations and wait for what
 changes, with `temper ctl`, a command line. It serves the agents
 (smith's) that QA and develop temper's core: they drive a throwaway
 deployment on coding tasks of growing size, then on temper's features,
-until the first milestone (`README.md`, section 2) is usable for real
+until the first milestone (`../README.md`, section 2) is usable for real
 tasks. Their QA loop extends the tools area by area (5.5). Their bounds
 are section 12, and what they take of jig section 13; an MCP endpoint
 and the tools' extraction into jig are later (section 14). What is
@@ -37,7 +37,7 @@ still open is listed in section 15.
 - **Thin command line.** `temper ctl DIRECTORY TOOL ...` makes one call
   per process, in `jig-client`'s one-shot mode, over jig's native
   transport, and prints its result (section 8).
-- **The deployment under test is a box** (`protocol/setup.md`, section
+- **The deployment under test is a box** (`../protocol/setup.md`, section
   7): the agent's harness starts it, signs in by its printed link, adds
   the deployment's LLM key, and throws it away (section 10).
 - **LLM accounts are an area of their own** (5.5, area 5): a sign-in
@@ -60,13 +60,13 @@ still open is listed in section 15.
   service of a project acting as a party, uses the same tools; MCP gives
   them to agents that have no shell (section 14).
 - **Not the person's pages.** temper's pages are the person's, proven by
-  the fake person's stories in `tests/client` (`client/README.md`, section 10).
+  the fake person's stories in `tests/client` (`README.md`, section 10).
   No tool waits for a page: a tool reads jig's documents, so no page is
   a tool's prerequisite.
 - **Not the browser.** Once temper has one, its QA is agents driving the
   browser as a person does. These tools are no way around it.
 - **Not the deployment.** Starting temper with a forge, a runner and a
-  model is `protocol/setup.md`'s; resetting it is the harness's, never a
+  model is `../protocol/setup.md`'s; resetting it is the harness's, never a
   tool's (section 10).
 
 ## 3. Why the plumbing, not the pages
@@ -75,7 +75,7 @@ still open is listed in section 15.
   that change between prints, the banner and navigation cost an agent's
   context on every read, and a page shows only what its mockup chose. So
   the text view is no agent's driver; these tools are, for temper
-  (`draft/qa.md`, 4.2).
+  (`../draft/qa.md`, 4.2).
 - **jig's client was made for this.** It is presentation-agnostic: "a
   browser, a terminal, a chat bot, a one-shot command and a service with
   no presentation hold the same client" (jig's `client/domain/client.md`,
@@ -95,8 +95,8 @@ still open is listed in section 15.
 temper-client-tools          the table, a call, the runner, digests and conditions, the rendering (text,
 │                            JSON), the argv parser and help, the guide, the limits; the tools' root
 ├── jig-client               jig's client and its helpers (shapes, facts, thread, words)
-├── temper-client-domain     the forge's client side and its words (client/README.md, 3.1, section 4, 4.1 and 4.7)
-├── temper-client-protocol-wire  the forge family's records (client/README.md, 4.6)
+├── temper-client-domain     the forge's client side and its words (README.md, 3.1, section 4, 4.1 and 4.7)
+├── temper-client-protocol-wire  the forge family's records (README.md, 4.6)
 ├── skein-ui                 phrases: jig's words and the tools' own, rendered as text
 └── skein-json               the JSON writer and tokenizer
 temper-client-shell-cli      the host: argv to a call, the one-shot host over jig-client-shell-native,
@@ -122,14 +122,14 @@ temper                       the binary: `temper ctl` runs the host
   each an owner and an asker, the runner and the forge's side; routing
   by asker. It holds no page and no view, as a service's root holds
   none (jig's `client/domain/root.md`, section 11). The runner is one
-  owner, `Runner`, 3 (`client/README.md`, 4.6), and so one asker (jig's
+  owner, `Runner`, 3 (`README.md`, 4.6), and so one asker (jig's
   `client/domain/root.md`, section 15). Each handle and key it gives
   the client carries its call's number in the high 32 bits of its
   number, calls numbered from one past the highest among the keys
   kept at `Start`: several calls in flight need nothing new of the
   root, and a new key never meets a kept one.
 - **Words:** jig's for jig's enums (`jig-client`'s `words`) and the
-  forge's of `client/README.md`, 4.1 and 4.7, so an agent and a person name
+  forge's of `README.md`, 4.1 and 4.7, so an agent and a person name
   things alike. The view's overrides for its mockups stay the view's.
 - **Step code under the subset:** the runner, the rendering, the table,
   the tools' root. **Ordinary Rust:** the host.
@@ -185,7 +185,7 @@ watch's subject, its digest (5.4). It needs no key.
   given a guessed one, so that a call's command line parses back to
   that call (6.1).
 - **Provisional text is the run's host's.** An agent process gives none
-  (`protocol/llm.md`, section 7), and `chat` and `run` then print none:
+  (`../protocol/llm.md`, section 7), and `chat` and `run` then print none:
   a run shows by its activity, and its words as each turn commits.
 - **A turn too large for a page** comes in a page by its size in place
   of its bytes (jig's `client/domain/contract.md`, 5.1).
@@ -200,8 +200,8 @@ watch's subject, its digest (5.4). It needs no key.
 - **The forge's changes are read on the forge,** with its API or `git`,
   as a person reads them there. A part of the forge's that the engine
   does not serve prints "Shown on the forge.", with the resource in the
-  forge's words (`client/README.md`, 4.1 and 4.2). The forge's read family
-  (`client/forge.md`, section 9) joins the table as tools of its own
+  forge's words (`README.md`, 4.1 and 4.2). The forge's read family
+  (`forge.md`, section 9) joins the table as tools of its own
   (section 14).
 
 ### 5.3 Acts
@@ -215,7 +215,7 @@ agent must name.
 | `chat --project P TEXT` | starts a chat | `shapes::chat`, a `Create` | yes |
 | `message N TEXT` | words to a task | `Message` | yes |
 | `close N [--move D]... [--reason TEXT]` | closes a chat: its live delegates cancelled, or moved to the party where named; the reason empty unless given, as jig's reference UI sends it | `shapes::close_chat`, a compound request | yes |
-| `adopt --project P [--forge F] --owner O --name N --landing B [--role owned\|fork\|context] [--prefix X] [--no-home] [--no-ci] [--check G]...` | adopts a repository | the forge family's request (`client/README.md`, 4.4) | yes |
+| `adopt --project P [--forge F] --owner O --name N --landing B [--role owned\|fork\|context] [--prefix X] [--no-home] [--no-ci] [--check G]...` | adopts a repository | the forge family's request (`README.md`, 4.4) | yes |
 | `answer N M TEXT` | answers question M of task N | `Answer` | |
 | `decide P/K accept\|reject\|pass-up [REASON]` | decides a proposal: P is `tN` for task N's, `pN` for party N's | `Decide` | |
 | `decide N --hold R release\|leave\|pass-up [REASON]` | decides an escalation | `Decide` | |
@@ -230,7 +230,7 @@ agent must name.
   escalation and a release by the hold's revision. An agent copies them
   from the acts a result printed (6.1); it never has to know which an
   act needs.
-- **`adopt` takes the adoption form's fields and defaults** (`client/README.md`,
+- **`adopt` takes the adoption form's fields and defaults** (`README.md`,
   4.4): forge 1, role `owned`, prefix `temper/`, the home and CI on.
   `--landing` names the landing branch. A context repository is never
   the home: `--role context` turns the home off. `--no-ci` needs at
@@ -238,7 +238,7 @@ agent must name.
   checks are the parser's: a call that fails one exits 1 before
   anything is sent.
 - **No confirmation.** The person's client says what an act will do
-  before sending it (`client/README.md`, 3.6); an agent reads it in the
+  before sending it (`README.md`, 3.6); an agent reads it in the
   document's acts and their effects, and the revision is its promise.
 - **A draft beyond the party's bounds** is compared with the bounds the
   document gives, as the person's client does (jig's
@@ -354,7 +354,7 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
   `wait task N --until ended`.
 - **On a box,** the forge's webhooks make the engine's documents move
   soon after the forge does; with polling alone, the same waits answer
-  later (`protocol/setup.md`, section 10).
+  later (`../protocol/setup.md`, section 10).
 
 ### 5.5 Areas
 
@@ -362,7 +362,7 @@ The table grows in the order the QA loop reaches temper's surface. Each
 area lands with its stories (section 11).
 
 1. **A chat to a landed change** (the first QA loop, the milestone's
-   story, `README.md`, section 2): the host's tools of 5.6; every read
+   story, `../README.md`, section 2): the host's tools of 5.6; every read
    of 5.2; `wait`; every act of 5.3.
 2. **Goals and plans:** `goal --project P [--priority I] [--budget A |
    --as-allowed] [--deadline T] TEXT` (`shapes::set_goal`, keyed),
@@ -377,7 +377,7 @@ area lands with its stories (section 11).
    FILE`, a batch, a proposal or a compound request as JSON (keyed).
 5. **LLM accounts** (jig's `domain/accounts.md`, section 5): the party's
    accounts and, for an owner, the deployment's, as temper's accounts
-   page shows them (`client/README.md`, 3.5). Each act is one of jig's
+   page shows them (`README.md`, 3.5). Each act is one of jig's
    requests for accounts (jig's `client/domain/contract.md`, 3.2).
 
    | Tool | What it does | jig's | K |
@@ -389,7 +389,7 @@ area lands with its stories (section 11).
    | `add-key PROVIDER FILE [--account A] [--deployment]` | adds a key read from FILE: to account A, or as a new key-only account; the deployment's with `--deployment`, by an owner | add a key | yes |
    | `replace-key ACCOUNT FILE` | replaces the account's key with the one read from FILE | replace a key | |
    | `forget ACCOUNT [--source S]` | removes a source, or the account with every source, each signed out as `disconnect` does | remove | |
-   | `declare PROVIDER ADAPTER NAME [--account A]` | declares a program's login under the source's NAME (1 to 32 of `a` to `z`, `0` to `9` and `-`): a new account, or a source of account A; the answer names the command to run on each host, `temper program-login CONFIG.json NAME` (`protocol/credentials.md`, section 3) | declare a program's login | yes |
+   | `declare PROVIDER ADAPTER NAME [--account A]` | declares a program's login under the source's NAME (1 to 32 of `a` to `z`, `0` to `9` and `-`): a new account, or a source of account A; the answer names the command to run on each host, `temper program-login CONFIG.json NAME` (`../protocol/credentials.md`, section 3) | declare a program's login | yes |
    | `verify ACCOUNT [--source S]` | has each host check a program source's login now; answered once asked, then `wait accounts --until settled` | check | |
    | `rank ACCOUNT POSITION [--source S]` | the account's place among its holder's accounts of its LLM provider, from 1; with `--source`, the source's place in the account's order | order | |
    | `retry ACCOUNT [--source S]` | resumes a limited source, so that the runs it holds start again | resume | |
@@ -404,12 +404,12 @@ area lands with its stories (section 11).
      settled` follows it (5.4). It never opens a browser, and the
      provider's redirect reaches the engine's loopback, so the browser
      that approves runs on the engine's machine
-     (`protocol/credentials.md`, section 3). `verify` alike: asked, then
+     (`../protocol/credentials.md`, section 3). `verify` alike: asked, then
      waited for.
    - **A key is read from FILE,** never an argument and never printed:
      a private file, the user's own with no group or other bits and not
      reached through a link, as the engine reads a secret's file
-     (`protocol/configuration.md`, section 6); its bytes, less a final
+     (`../protocol/configuration.md`, section 6); its bytes, less a final
      newline, within the bound of section 12. The tool reads it, sends
      it once, and keeps no copy (section 7).
    - **`PROVIDER` is an LLM provider's number,** as `models` and
@@ -421,7 +421,7 @@ area lands with its stories (section 11).
    - **A program's login is never the tools'.** `declare` makes the
      source; the person, or the harness, runs `temper program-login` on
      each host, outside `temper ctl`, since it hands the terminal to the
-     program's own sign-in (`protocol/credentials.md`, section 3).
+     program's own sign-in (`../protocol/credentials.md`, section 3).
    - **The task's model** is chosen with this area: `chat` and area 2's
      `goal` take `--model M [--effort E]`, the task's LLM choice, the
      charter's default without them (jig's `domain/tasks.md`, section
@@ -498,7 +498,7 @@ digest: task 7c1e09a2b44f0d13
   for the next page, or that there is none.
 - **An act's outcome** prints what was made or decided and its numbers:
   `done: task 41, chat`; `proposed: p3/17, to maintainers`; `decided
-  first: by ada, accepted, 14:02`; for `adopt`, `client/README.md`, 4.7's
+  first: by ada, accepted, 14:02`; for `adopt`, `README.md`, 4.7's
   words.
 - **What a call sends first** (8.2, step 4) prints on stderr, a line
   each: `kept: `, the request's operation, jig's or the forge's (`stop`,
@@ -549,7 +549,7 @@ may change with them.
 - **A call whose link stays down** past its deadline exits 1, and what
   it sent stays in the small store, for the next call that sends (8.2).
 - **`adopt`:** adopted exits 0, with branch protection unknown or not
-  (`client/README.md`, 4.7, prints "Branch protection could not be read."
+  (`README.md`, 4.7, prints "Branch protection could not be read."
   then); unknown past the retention exits 1; each other outcome there,
   not found, no access and refused among them, exits 2, in its words.
 
@@ -634,7 +634,7 @@ temper ctl help [TOOL]
 ```
 
 - **DIRECTORY** is the client's private directory, as for `temper open`
-  (`client/README.md`, 6.1): its credential, `token`, its small store, `store`,
+  (`README.md`, 6.1): its credential, `token`, its small store, `store`,
   and the engine's address, `address`, all `jig-client-shell-native`'s
   or beside them, `0o700` and refused unless the user's own. A
   DIRECTORY is `temper ctl`'s or `temper open`'s, never both's (section 15).
@@ -646,7 +646,7 @@ temper ctl help [TOOL]
 - **`sign-in FILE|-`** signs in by the link `temper serve` printed, read
   from FILE or stdin and never an argument (section 9), on loopback, and
   writes the token and the address the link names, as `temper open`
-  does (`client/README.md`, section 7). `sign-out` ends the sign-in and erases
+  does (`README.md`, section 7). `sign-out` ends the sign-in and erases
   the token. Every other tool signs in with the token DIRECTORY holds
   (`SignIn { with: Held }`).
 - **Loopback only,** as `temper open`, until the clients' listener
@@ -730,7 +730,7 @@ An agent runs a `wait` while it acts, or several agents share a party.
 - **The agent's LLM is not the deployment's.** The LLM the agent itself
   runs on, to drive `temper ctl`, is its harness's. The deployment's
   runs are paid by jig's LLM accounts, added from the client
-  (`protocol/credentials.md`, section 3): on a box, by the deployment's
+  (`../protocol/credentials.md`, section 3): on a box, by the deployment's
   key the harness adds (section 10), which pays for every party's runs
   (jig's `domain/accounts.md`, 4.2). An agent acting for a person
   connects that person's own accounts with area 5's tools, as the
@@ -739,32 +739,32 @@ An agent runs a `wait` while it acts, or several agents share a party.
 ## 10. The box
 
 The deployment an agent drives is an owned setup run by `temper box`
-(`protocol/setup.md`, section 7), in a scratch directory of the QA
+(`../protocol/setup.md`, section 7), in a scratch directory of the QA
 harness's:
 
 - **Started:** `temper box CONFIG.json`; its stdout carries `temper
   serve`'s sign-in links, and the harness passes the first to `temper
   ctl DIRECTORY sign-in -` on stdin.
 - **The deployment's LLM key:** a fresh box has no LLM account, so no
-  run starts (`protocol/credentials.md`, section 3). Once signed in, the
+  run starts (`../protocol/credentials.md`, section 3). Once signed in, the
   harness adds one before the agent's first act: `add-key PROVIDER FILE
   --deployment --key box-llm`, from a private file of its own, then
   `wait accounts --until usable` (5.4). The key is QA's own, with limits
-  of its own (`draft/qa.md`, section 7); the agent is never handed its
+  of its own (`../draft/qa.md`, section 7); the agent is never handed its
   file, and the harness removes the file with the box. On the process
   tier and in the real loop, it is a key skein's fake LLM peer accepts
-  (`testing.md`, 2.4 and 2.6).
+  (`../domain/testing.md`, 2.4 and 2.6).
 - **The person on Forgejo:** the harness plays the person of
-  `protocol/setup.md`, 6.5: it signs in on Forgejo's web with
+  `../protocol/setup.md`, 6.5: it signs in on Forgejo's web with
   `person_password` and changes it, and makes the repository to adopt
   in an org, which the agent adopts with `adopt` as the first act of
   area 1.
 - **The forge read directly:** its API and `git` on `owned.listen`, with
   a token the harness makes for the person, as a person makes one
-  (`protocol/setup.md`, section 16), whose scopes are reads alone:
+  (`../protocol/setup.md`, section 16), whose scopes are reads alone:
   `read:repository`, `read:issue`, `read:organization` and `read:user`.
   The agent is handed that token, never the preparation's
-  `admin_token`, which reconcile alone reads (`protocol/setup.md`,
+  `admin_token`, which reconcile alone reads (`../protocol/setup.md`,
   section 9). Forgejo refuses the agent's writes with it; the agent
   changes the forge only through temper, and the guide says so (11.5).
 - **Logs:** the engine's and the worker's in the box's stderr, each line
@@ -790,8 +790,8 @@ harness's:
 ### 11.2 `tests/client`
 
 `temper-client-world` runs the tools' root against temper's engine root,
-beside the fake person, as a scripted agent making calls (`client/README.md`,
-section 10; `testing.md`, 6.3). Area 1's stories: a chat started, its
+beside the fake person, as a scripted agent making calls (`README.md`,
+section 10; `../domain/testing.md`, 6.3). Area 1's stories: a chat started, its
 reply waited for, a message, a turn too large for a page read whole,
 the chat closed; a repository adopted; a held task released. A turn
 too large for a page exists only where the engine's bound on a turn
@@ -815,30 +815,30 @@ reports.
 `tests/real-loop` hosts the tools' root over jig's native transport,
 the standalone engine and worker, smith's agents on skein's fake LLM
 peer's scripted turns, the fake forge's host, and the fake git program
-over the fake forge, on one thread and one real ring (`testing.md`,
+over the fake forge, on one thread and one real ring (`../domain/testing.md`,
 2.4). Agents are hosted in that loop and joined to their worker by real
 pipes. The store and client credentials use a scratch directory on the
 real filesystem.
 
-Its stories sign in, start a chat and wait for its reply, and
-satisfy one client's wait by another client's act; each drains with
-everything settled. Then a service restart retains the work. A call
-whose answer was lost is made once: the tools' root is dropped once
-the engine holds its request, before its answer, and a fresh one, on
-another DIRECTORY signed in as the same party, asks under the same name
-and is answered the first answer; the party has one chat. A
-DIRECTORY whose store holds a record of a store version the tools do
-not read: `pending` counts it, and the next call that sends says it
-dropped it. One signed in again as another party: the first party's
-kept request stays unsent, and the call goes on. The forge's
-stories adopt a repository, and clone, push and land through the fake
-git program on the shared in-memory fake forge, with CI by the fake
+Its stories sign in, start a chat and wait for its reply, and satisfy one
+client's wait by another client's act; each drains with everything
+settled. Then a service restart retains the work. A call whose answer was
+lost is made once: the tools' root is dropped once the engine holds its
+request, before its answer, and a fresh one, on another DIRECTORY signed
+in as the same party, asks under the same name and is answered the first
+answer; the party has one chat. A DIRECTORY whose store holds a record of
+a store version the tools do not read: `pending` counts it, and the next
+call that sends says it dropped it. One signed in again as another party:
+the first party's kept request stays unsent, and the call goes on. The
+forge's stories adopt a repository, and clone, push and land through the
+fake git program on the shared in-memory fake forge, with CI by the fake
 forge's content marker and its webhooks delivered to the engine
-(`testing.md`, 2.4). Real git meets a forge in the process tier (11.4).
+(`../domain/testing.md`, 2.4). Real git meets a forge in the process tier
+(11.4).
 
 Every story first adds a key the fake LLM peer accepts, `add-key` from
 a scratch file, as section 10's harness does, and waits for `usable`.
-Area 5's stories (`testing.md`, 2.4):
+Area 5's stories (`../domain/testing.md`, 2.4):
 
 - **A sign-in:** `connect` against skein's fake issuer, the browser's
   visit and the redirect to the engine's loopback listener driven by the
@@ -876,16 +876,15 @@ where possible; its seed does not replay the kernel's schedule.
 ### 11.4 The process tier
 
 `temper serve` and `temper ctl` as processes over skein's fake LLM peer
-(`testing.md`, 2.6), on a scratch directory of their own, for what
-needs the executable: argv through `main`, printed output, the OS's
+(`../domain/testing.md`, 2.6), on a scratch directory of their own, for
+what needs the executable: argv through `main`, printed output, the OS's
 exit statuses, the printed link read on stdin (`sign-in -`), the
-deployment's key added from a private file as the first act (section
-10), a key's file refused when it is not private, an act cut
-by a termination signal, its status not 0, then asked again under its
-key, made once, and
+deployment's key added from a private file as the first act (section 10),
+a key's file refused when it is not private, an act cut by a termination
+signal, its status not 0, then asked again under its key, made once, and
 agent process launch. One landing on the owned Forgejo proves a change
-against real git and CI (`testing.md`, 2.6). The lock, DIRECTORY's files
-and a call's exit are the real loop's (11.3).
+against real git and CI (`../domain/testing.md`, 2.6). The lock,
+DIRECTORY's files and a call's exit are the real loop's (11.3).
 
 ### 11.5 The agents' guide
 
@@ -902,7 +901,7 @@ test fails when it names a tool the table lacks.
 Each bug an agent finds through the tools ends as a story in
 the lowest tier that shows it, before its fix lands: a domain world,
 `tests/client`, the simulated world, the real loop or the process tier
-(`draft/qa.md`, section 1). A story's calls are the tools' calls, so an
+(`../draft/qa.md`, section 1). A story's calls are the tools' calls, so an
 agent's history of `temper ctl` commands transcribes into one.
 
 ## 12. The bounds
@@ -933,13 +932,13 @@ terminal's, whose window shows two rows:
 | a result's text | 32 KiB |
 | a turn's part | 16 KiB |
 | one document, the client's `document_bytes` | 1 MiB |
-| a path's segments; an authority's entries | 9; 12, as the terminal's (`client/README.md`, 5.4) |
+| a path's segments; an authority's entries | 9; 12, as the terminal's (`README.md`, 5.4) |
 | the link's deadline: the engine unreachable, or a call's request or answer unheard | 30 s |
 | the lock's wait | 60 s, tried every 100 ms |
 | a key's file, less a final newline (5.5, area 5) | 4 KiB; past it, or empty, exit 1 with nothing sent; a key the engine refuses is its refusal, exit 2 |
 | a wait's timeout | 300 s by default, at most 3600 (5.4) |
 
-The client's other limits are the terminal's (`client/README.md`, section 2).
+The client's other limits are the terminal's (`README.md`, section 2).
 
 ## 13. What it takes of jig
 
@@ -992,7 +991,7 @@ Each is named here and designed when it comes.
 - **Extraction into jig,** `temper-client-tools`' module `jig` moved to
   `jig-client-tools`, when a second application wants the tools.
 - **The forge's read family's tools,** as the engine serves each of the
-  forge's parts (`client/forge.md`, section 9).
+  forge's parts (`forge.md`, section 9).
 - **A service's credential reissued, or a service removed** (jig's
   `domain/people.md`, section 3): tools of area 3.
 - **An account moved,** `export ACCOUNT FILE` and `import FILE` (keyed),
@@ -1006,7 +1005,7 @@ Each is named here and designed when it comes.
 ## 15. Open questions
 
 - **`temper open` and `temper ctl` on one DIRECTORY:** not supported and
-  not detected (`client/README.md`, section 11). Default: the lock of 8.3 is
+  not detected (`README.md`, section 11). Default: the lock of 8.3 is
   `temper ctl`'s alone, until `temper open` takes it.
 - **The one-shot host's place:** temper's, in `temper-client-shell-cli`.
   Default: it moves into `jig-client-shell-native` with the extraction

@@ -28,4 +28,4 @@ the planner's audit found (`findings/README.md`).
 | temper's `domain/` as an application of jig's | `STATUS.md`, "Not planned" | once jig's boundary settles |
 | Performance's measurements: the allocator, the byte budget | `performance.md`, sections 5 and 6 | once `temper serve` runs a real load |
 | Repinning jig, smith and skein | `STATUS.md`, "Not planned" | after jig's test-budgets and smith's reliability plans end |
-| An adopted repository listed on the project's resources | `client.md`, 4.3 and 11; `testing.md`, 2.6 | after jig's core lists adopted resources, owned included, and temper repins jig (decisions.md, "For the user") |
+| An adopted repository listed on the project's resources | `client.md`, 4.3 and 11; `domain/testing.md`, 2.6 | after jig's core lists adopted resources, owned included, and temper repins jig (decisions.md, "For the user") |

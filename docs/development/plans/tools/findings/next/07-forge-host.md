@@ -3,7 +3,7 @@
 The one-process world's `ForgeHost` (`tests/one-process/src/forge.rs`)
 becomes a crate of the fake forge's family, `testing/temper-fake-forge-host`,
 that names no engine or worker type, so that the forge kit can move it
-with the fake forge (testing.md, 2.4 and 7). It takes everything from its
+with the fake forge (domain/testing.md, 2.4 and 7). It takes everything from its
 world: the shared in-memory forge, the protocol's tables and limits, the
 seed and the address to listen on. With port 0 it listens where the
 kernel says, writes that address into its documents' base, and tells it
@@ -16,7 +16,7 @@ Every increment is a forge-kit hotspot: it changes the fake forge.
 
 ## Read first
 
-- temper's `docs/design/testing.md`: 2.4 (the bullets "What runs", whose
+- temper's `docs/design/domain/testing.md`: 2.4 (the bullets "What runs", whose
   rule on listeners is the real loop's, "The forge and git", "The forge
   host" and "CI and webhooks"), 2.5, 4.2 (the protocol layer: "For each
   of the domain's webhooks ... a signed delivery, which the world
@@ -119,7 +119,7 @@ Scope: `testing/temper-fake-forge-host`, a crate of ordinary Rust
 fake-git's `Forge`, moved: the host built from `Settings` and the shared
 forge in place of one-process's fixtures and thread-local; one-process,
 temper-fake-git and their users onto it, with no re-export left behind
-(testing.md, 2.4, 7).
+(domain/testing.md, 2.4, 7).
 Needs: nothing beyond the session's start.
 Files (forge-kit hotspot, the fake forge; each named exactly):
 `testing/temper-fake-forge-host/{Cargo.toml, clippy.toml, src/lib.rs,
@@ -194,7 +194,7 @@ Scope: the host listens at its settings' address, port 0 included; once
 `Listening`, it builds its `Service` with the tables' `base` written as
 `http://` and the bound address, and tells the address on the shared
 forge, cleared when its listener closes; one-process names its address
-once, `fixtures::FORGE` (testing.md, 2.4).
+once, `fixtures::FORGE` (domain/testing.md, 2.4).
 Needs: 07.1.
 Files (forge-kit hotspot, the fake forge): `testing/temper-fake-forge-host/src/{forge.rs,
 host.rs}`, `tests/{host.rs, support/mod.rs}`;
@@ -245,7 +245,7 @@ Scope: each `domain::Request::Hook` the host takes from the shared
 forge's `pending` (`Service::target` hands it back) is rendered by
 `Service::delivery` and written on a connection of its own to the
 listener `Forge::deliver_to` names, then closed; a hook with nowhere to
-go is dropped (testing.md, 2.4, 4.2; protocol/forge.md, 5, 9).
+go is dropped (domain/testing.md, 2.4, 4.2; protocol/forge.md, 5, 9).
 Needs: 07.1; after 07.2 (the same files).
 Files (forge-kit hotspot, the fake forge): `testing/temper-fake-forge-host/src/{forge.rs,
 host.rs}`, `tests/{host.rs, support/mod.rs}`.
@@ -308,7 +308,7 @@ world owns the shared forge, and each of its hosts holds a clone of the
 
 ```rust
 // testing/temper-fake-forge-host/src/forge.rs
-/// The one in-memory forge the host and the fake git program share (testing.md, 2.4).
+/// The one in-memory forge the host and the fake git program share (domain/testing.md, 2.4).
 pub struct Forge {
     pub domain: temper_fake_forge_domain::Domain,
     pub config: temper_fake_forge_domain::Config,

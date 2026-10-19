@@ -6,7 +6,7 @@ root, held and offered again when the root's admission cannot take them,
 kept through the drain, its start check stopping the engine (exit 1,
 naming the forge), its limits checked among startup's; 08.2's
 `Unavailable` answers go. The fake forge then becomes a service
-(testing.md, 4.2): its domain grows the reads its routes need (Actions'
+(domain/testing.md, 4.2): its domain grows the reads its routes need (Actions'
 runs and jobs, an item's thread, the reviewer routes, a pull's merge
 base, Forgejo's default order), and `testing/temper-fake-forge-protocol`
 serves Forgejo's API over it on skein's HTTP server, from session 06's
@@ -22,7 +22,7 @@ facts as the component sees them.
 
 - forge.md, sections 2 ("Room, and the drain"), 3.5, 9, 10 and 13;
   protocol.md, section 6 (the forge component, "A forge's start check");
-  credentials.md, section 5; configuration.md, section 7; testing.md,
+  credentials.md, section 5; configuration.md, section 7; domain/testing.md,
   2.2 and 4.2; findings/temper-engine.md, 6.
 - `temper/13-forge-component.md`: "Choices this plan makes" (the profile's
   values), the interface sketches, 13.5's machine world.
@@ -111,7 +111,7 @@ facts as the component sees them.
   then timed out is a `5xx` or a dropped connection after the request was
   read; a late answer is a slow one." "Requests are counted, by route,
   by user and in total."
-- **The protocol world** (forge.md, 10; testing.md, 2.2): "the engine's
+- **The protocol world** (forge.md, 10; domain/testing.md, 2.2): "the engine's
   forge component and the fake forge's protocol layer, joined by
   in-memory streams cut at random, running the forge connector world's
   stories ... through bytes: what the engine's domain asked is what the
@@ -328,7 +328,7 @@ Removes: 08.2's arm that answers `Request::Forge` with
 
 ### 14.2 The fake forge domain grows its routes' reads
 
-Scope: forge.md 9 and testing.md 4.2 in `testing/temper-fake-forge-domain`:
+Scope: forge.md 9 and domain/testing.md 4.2 in `testing/temper-fake-forge-domain`:
 Actions runs and jobs (`src/actions.rs`): a run per commit CI starts on
 in a repository (`ci::start`), its id from a counter across the forge
 and its number from its repository's counter, both from 1; a job per
@@ -1020,7 +1020,7 @@ pub mod temper_fake_forge_protocol {
         pub protected: Option<Box<[u8]>>,
     }
 
-    /// Faults moved down (forge.md, 9; testing.md, 4.2), each a chance in 1,000 per request,
+    /// Faults moved down (forge.md, 9; domain/testing.md, 4.2), each a chance in 1,000 per request,
     /// drawn by the layer; the fake's own `unavailable` and `timeouts` are 0 under it.
     #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
     pub struct Faults {

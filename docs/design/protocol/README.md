@@ -50,7 +50,7 @@ section 14.
   on loopback too (`../client/browser.md`).
 - **One binary:** `serve`, `agent`, `open`, `program-login`, the forge's
   setup's `forge prepare`, `forge run`, `forge reconcile` and `box`, and
-  the agents' `ctl`, which `../tools.md` designs (section 4).
+  the agents' `ctl`, which `../client/tools.md` designs (section 4).
 - **No retries below the domain.** A call goes out once and ends once,
   with the failure the domain's vocabulary defines (section 5).
 - **The forge's load follows its changes.** The calls a pass makes grow
@@ -67,7 +67,7 @@ section 14.
   worlds of their own; temper's client joined to the engine's root; the
   one-process world on skein's simulator; the real binary with an owned
   Forgejo, its runner and real git; a live tier with a real model
-  (section 13; `../testing.md`).
+  (section 13; `../domain/testing.md`).
 
 ## 2. Reading order
 
@@ -92,9 +92,9 @@ section 14.
     `temper box`.
 11. **`../client/README.md`:** temper's client: its client root on `jig-client`,
     its pages, the forge's client family, its view, the terminal, and the
-    clients' listener of temper's server; then **`../tools.md`**, `temper
+    clients' listener of temper's server; then **`../client/tools.md`**, `temper
     ctl`, the agents' tools.
-12. **`../testing.md`:** the tiers below the domain.
+12. **`../domain/testing.md`:** the tiers below the domain.
 13. **`../client/browser.md`:** the browser, the second shell of
     temper's client.
 
@@ -124,10 +124,10 @@ binary (`jig-test`).
 | the terminal shell | `temper-client-shell-terminal` (`../client/README.md`, section 6) |
 | the browser shell | `temper-client-shell-web` (`../client/browser.md`, 2.1) |
 | the bundle | the browser shell's module, glue and stylesheets, skein's bundler's output, which the clients' listener serves (`../client/browser.md`, 2.2) |
-| the tools | the agents' interface to temper, `temper ctl`: `temper-client-tools` and `temper-client-shell-cli` (`../tools.md`, section 4) |
+| the tools | the agents' interface to temper, `temper ctl`: `temper-client-tools` and `temper-client-shell-cli` (`../client/tools.md`, section 4) |
 | the clients' listener | `temper-service`'s listener for clients, on which jig's clients' component is mounted with jig's default HTTP mapping, under `/jig` (`../client/README.md`, section 8) |
-| the fake git program | `testing/temper-fake-git` (`../testing.md`, 4.3) |
-| the throwaway Forgejo | a Forgejo started by a test script on loopback, with SQLite in a scratch directory, removed after (`../testing.md`, 2.6) |
+| the fake git program | `testing/temper-fake-git` (`../domain/testing.md`, 4.3) |
+| the throwaway Forgejo | a Forgejo started by a test script on loopback, with SQLite in a scratch directory, removed after (`../domain/testing.md`, 2.6) |
 | locate | the forge connector's read of a repository's id by owner and name (skein's `forge.md`, 5.2) |
 | the webhooks' listener | the forge component's own listener for Forgejo's signed deliveries, plaintext on loopback, one path per forge (skein's `forge-connection.md`, section 6; forge.md, section 5) |
 
@@ -139,7 +139,7 @@ the pin (6.1), the preparation (6.3), the box and its steps (section 7).
 
 One binary, `temper` (`crates/temper`), ordinary Rust: a shell, copied
 from jig's reference binary. Its commands, `temper ctl`'s as
-`../tools.md` designs them:
+`../client/tools.md` designs them:
 
 ```
 temper serve CONFIG.json
@@ -174,7 +174,7 @@ temper box CONFIG.json
   (`../client/README.md`, 6.1). It reads no configuration file.
 - **`temper ctl DIRECTORY ...`:** the agents' tools, one call per
   process, over the same native transport as `temper open`
-  (`../tools.md`, section 8). It reads no configuration file.
+  (`../client/tools.md`, section 8). It reads no configuration file.
 - **`temper program-login CONFIG.json NAME`:** a program's login for
   the program source NAME, on this host: it checks the document and the
   agent's configuration, makes the source's configuration directory, and
@@ -200,7 +200,7 @@ temper box CONFIG.json
   any failure (a refused start, a usage error, a failed commit, an
   abort, a failed step of the setup, the box giving up), the reason on
   stderr. smith's agent shell exits 0 or 1 the same way; `temper ctl`'s
-  statuses are `../tools.md`, 6.3; `temper forge run`'s is Forgejo's or
+  statuses are `../client/tools.md`, 6.3; `temper forge run`'s is Forgejo's or
   the runner's own, and `temper program-login`'s the program's sign-in's
   once it has replaced itself.
 
@@ -299,10 +299,10 @@ box's host:
 | `crates/temper-client-view` | view | temper's pages as skein-ui's tree, with the forge's view (`../client/README.md`, section 5) | `../client/README.md`, section 2 |
 | `crates/temper-client-shell-terminal` | shell | the terminal: its host ordinary Rust, over skein's text shell and jig's native transport (`../client/README.md`, section 6) | `../client/README.md`, section 2 |
 | `crates/temper-client-shell-web` | shell | the browser: a `cdylib` for wasm32, ordinary Rust, over skein's browser parts and jig's browser adapter (`../client/browser.md`, 2.1) | `../client/README.md`, section 2 |
-| `crates/temper-client-tools` | client root, rendering | the agents' tools: the table, the runner, marks and conditions, the rendering, the tools' root (`../tools.md`, section 4) | `../tools.md`, section 4 |
-| `crates/temper-client-shell-cli` | shell | `temper ctl`: its host ordinary Rust, one call per process over jig's native transport (`../tools.md`, section 8) | `../tools.md`, section 4 |
+| `crates/temper-client-tools` | client root, rendering | the agents' tools: the table, the runner, marks and conditions, the rendering, the tools' root (`../client/tools.md`, section 4) | `../client/tools.md`, section 4 |
+| `crates/temper-client-shell-cli` | shell | `temper ctl`: its host ordinary Rust, one call per process over jig's native transport (`../client/tools.md`, section 8) | `../client/tools.md`, section 4 |
 
-**temper's test crates, worlds and tiers** are `../testing.md`'s
+**temper's test crates, worlds and tiers** are `../domain/testing.md`'s
 (sections 2, 4 and 7): the fake git program, the worlds below the
 domain, the process and live tiers, and the tool that records git's
 transcripts (git.md, section 9). The fake forge's protocol layer, the
@@ -480,7 +480,7 @@ Standalone is jig's one process (jig's `protocol/service.md`, section 10):
   and git invocations' groups killed as io closes them. No worker
   outlives the engine, so the next start settles the worker's claims at
   once (jig's `domain/engine.md`, section 6; `../domain/root.md`, 9.1).
-- **Its world** is `tests/one-process` (`../testing.md`, 2.5).
+- **Its world** is `tests/one-process` (`../domain/testing.md`, 2.5).
 
 ## 9. Versions
 
@@ -560,7 +560,7 @@ revisions temper's `Cargo.lock` pins.
 
 ## 13. Testing
 
-`../testing.md` applies skein's strategy (testing-strategy.md) to
+`../domain/testing.md` applies skein's strategy (testing-strategy.md) to
 temper: its tiers, fakes, layout and budgets. What checks this layer:
 
 - **Step tests:** every codec against golden bytes, at its bounds and by
@@ -577,17 +577,17 @@ temper: its tiers, fakes, layout and budgets. What checks this layer:
   scripted stdin and stdout.
 - **The forge's protocol world,** `tests/engine/protocol-forge`: the
   forge connector world's stories through bytes, over in-memory streams
-  cut at random, with the cost checks by HTTP request (`../testing.md`,
+  cut at random, with the cost checks by HTTP request (`../domain/testing.md`,
   2.2).
 - **The client's joined world,** `tests/client`: temper's client root
   and view, with skein's fake person and jig's check, joined to temper's
-  engine root (`../testing.md`, 2.1 and 6.3).
+  engine root (`../domain/testing.md`, 2.1 and 6.3).
 - **The one-process world,** `tests/one-process`: `temper-service` on
   skein's simulator, killed and restarted at drawn moments, drained by a
   shutdown. Its referee: nothing a party, the worker or the forge saw
   depended on a lost commit; a drained shutdown ends with nothing
   waiting for a commit; no secret's value in a domain's state, a store
-  record or an agent process's environment (`../testing.md`, 2.5).
+  record or an agent process's environment (`../domain/testing.md`, 2.5).
 - **Reconcile's world** is skein's: reconcile against the fake forge's
   protocol layer, serving the setup's routes (skein's `forge-setup.md`,
   section 7; setup.md, 13.2).
@@ -595,7 +595,7 @@ temper: its tiers, fakes, layout and budgets. What checks this layer:
   outside the two suites: a chat answered, a change landed on an owned
   Forgejo with CI and webhooks, the binary killed and restarted, `temper
   box`, `temper program-login` over smith's fake `claude`; then a real
-  model (`../testing.md`, 2.6 and 2.7; setup.md, 13.4).
+  model (`../domain/testing.md`, 2.6 and 2.7; setup.md, 13.4).
 
 ## 14. Open questions
 

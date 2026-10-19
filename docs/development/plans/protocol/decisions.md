@@ -10,7 +10,7 @@ the user's delegation (development.md, 2.2 and 10.4).
 1. **One plan, temper only, the design's thirteen steps.** It builds
    protocol.md, section 12, steps 1 to 13, and the domain changes of its
    section 5 ("Kept"), and moves the engine worlds onto jig's real store
-   (store/README.md, section 6; testing.md, 4.5). It changes no other
+   (store/README.md, section 6; domain/testing.md, 4.5). It changes no other
    repository: the design needs nothing upstream (protocol.md, section
    11), and jig's test-budgets plan moves jig's, smith's and skein's
    mains on another machine. temper keeps its pins, jig `d91a89c4`,
@@ -122,7 +122,7 @@ the user's delegation (development.md, 2.2 and 10.4).
     paths temper needs (`findings/jig-client.md`, Discrepancies 1 to 3).
 18. **The new worlds' shares of the suites** are code-organization.md,
     section 5's guides, summing to 3.8 s of the focused suite and 24 s
-    of the fuzzy one, within testing.md, 6.1's 4 s and 25 s. The base
+    of the fuzzy one, within domain/testing.md, 6.1's 4 s and 25 s. The base
     gate ran 682 focused tests in 1.236 s and 31 fuzzy in 7.849 s
     (`heavy --gate ./scripts/check.sh` at `cc2697cf`, 2026-10-14).
 19. **Sizes:** every increment lands within 1.5 times its Size without
@@ -1458,7 +1458,7 @@ with.
   (`jig-domain-core/src/resources.rs:170-182` keeps narrowings, not
   adoptions), though jig's `domain/core.md`, 6.1 and
   `client/domain/pages.md`, 6.5 ask for every adopted resource. temper's
-  client.md, 4.3 and 10 and testing.md, 2.6 now say so, and its tests
+  client.md, 4.3 and 10 and domain/testing.md, 2.6 now say so, and its tests
   check the outcome's sentence and the engine's record of the adoption
   in place of the listing. The fix is jig's core's (keep each adoption's
   role, owned included, and list it), then a repin of jig in temper; the

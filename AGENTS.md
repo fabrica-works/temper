@@ -19,7 +19,7 @@
   - `notes.md`: the questions still open, and why the memory strategy is
     what it is.
 - temper's own design documents are in `docs/design/`, whose `README.md`
-  comes first and says where each part lives; `testing.md` is how the
+  comes first and says where each part lives; `domain/testing.md` is how the
   testing strategy applies to temper. Code cites a design document by its
   path from `docs/design/`: `domain/forge.md, 8.2`, `protocol/forge.md, 3.2`.
 - jig, the kit temper is built on, is its own repository

@@ -11,7 +11,7 @@ steps are `temper-11.1` and `temper-11.2`.
 
 ## Read first
 
-- temper `docs/design/tools.md` at `fe0ec316`: 4, 5.2 (forge parts),
+- temper `docs/design/client/tools.md` at `fe0ec316`: 4, 5.2 (forge parts),
   5.3 (`adopt` and its defaults), 5.6, 6.1 to 6.3, 7, 8.2, 11.1 to 11.3, 12;
   `docs/design/client/README.md`: 4.1, 4.2, 4.4 to 4.7, 5.2.
 - jig `docs/design/client/domain/client.md`: 4, 6, 11;
@@ -38,7 +38,7 @@ steps are `temper-11.1` and `temper-11.2`.
 
 ## What the design asks
 
-- **tools.md 4:** reuse the forge's adoption ask, owner and words, with
+- **client/tools.md 4:** reuse the forge's adoption ask, owner and words, with
   no page or view in the tools. jig's words say jig's refusals; the
   forge's words say client/README.md 4.1's resources and 4.7's outcomes.
 - **5.3, client/README.md 4.4:** the form's fields and defaults: forge 1, owned,
@@ -118,7 +118,7 @@ steps are `temper-11.1` and `temper-11.2`.
   counted only, exit 0; an unreadable small-store file exits 1 (5.6).
 - **Whole paths:** the moved `joined` keeps the view's truncation
   behaviour. The tools pass a bound computed from all bounded segments,
-  so it never truncates their resource paths (tools.md 6.4, 12).
+  so it never truncates their resource paths (client/tools.md 6.4, 12).
 - **Proofs:** unchanged terminal goldens prove the move; a unit step
   proof drives adopt through the real jig client. The new tools' joint
   driver is the next plan's, so it is not a start dependency. That plan's
@@ -142,7 +142,7 @@ steps are `temper-11.1` and `temper-11.2`.
 ## Increments
 
 ### 11.1 The forge's words in `temper-client-domain`
-Scope: move client/README.md 4.1, 4.4 and 4.7's words to the domain, as tools.md
+Scope: move client/README.md 4.1, 4.4 and 4.7's words to the domain, as client/tools.md
 4 places them; keep phrase IDs, bounds, text and view behaviour; step `temper-11.1`.
 Needs: nothing beyond the session's start (the tools' root).
 Files: forge hotspots, every path:
@@ -201,8 +201,8 @@ by file, with no behaviour hidden in the move.
 Removes: the view's moved rows and helpers, including bindings' owner.
 
 ### 11.2 `adopt`, and the forge's parts in reads
-Scope: tools.md 5.3's checked adopt, named send and outcomes; 5.2's
-forge parts through Parts; client/README.md 4.7's words and tools.md 6.3's exits;
+Scope: client/tools.md 5.3's checked adopt, named send and outcomes; 5.2's
+forge parts through Parts; client/README.md 4.7's words and client/tools.md 6.3's exits;
 6.1, 6.2 and 8.2's restored adopts; step `temper-11.2`.
 Needs: nothing beyond the session's start; follows 11.1's word move.
 Files: forge hotspots, every path:

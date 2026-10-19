@@ -19,7 +19,7 @@ temper's, and the goldens are recorded again by hand (`client.md`, 3.5,
   parts"), 3.6, 4.2 to 4.5, 5.2, 5.3, 6.6 (signing out), 9, 10 (the
   stories "a held task released from a goal's plan" and "a repository
   adopted from the navigation's link"; "Golden text").
-- temper's `docs/design/web/mockups/task.html`; `docs/design/testing.md`,
+- temper's `docs/design/web/mockups/task.html`; `docs/design/domain/testing.md`,
   2.5 (the one-process world's stories) and 2.6 (the process tier's).
 - jig's `docs/design/client/domain/contract.md`, 5.1 (a task, a tree),
   5.2 (revisions), 5.4; `client/domain/client.md`, 8.2 (the link's
@@ -117,7 +117,7 @@ temper's, and the goldens are recorded again by hand (`client.md`, 3.5,
   prints nothing.
 - **The meeting point:** each page's story runs in `tests/client`
   against temper's engine root in the increment that builds it, with
-  jig's check (README, Rules; temper's `testing.md`, 6.3).
+  jig's check (README, Rules; temper's `domain/testing.md`, 6.3).
 - **No repin in this session,** as in temper 06: an increment rebased on
   a repin of temper 05's repairs what breaks in at most 20 lines,
   counted with `git diff --numstat origin/main...HEAD -- <the changed

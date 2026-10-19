@@ -59,17 +59,17 @@ under `tests/` is, with `tests/clippy.toml`.
 | `crates/temper-client-view` | same | step | the view root and the forge's view (client.md, section 5) | 11.2 |
 | `crates/temper-shell-terminal` | same | ordinary, precedent jig's `crates/jig-shell-native/clippy.toml`; its modules `route`, `render`, `command` and `limits` are step code (client.md, section 2), held to the subset as section 6 below says | the native client, the client's routing, the terminal | 12.1 |
 | `crates/temper` | same, binary `temper` | ordinary, precedent jig's `testing/jig-test/{Cargo.toml,clippy.toml}` | the four commands (protocol.md, section 4); the process and live tiers in `tests/` | 10.3 |
-| `testing/temper-throwaway-forgejo` | same | ordinary, precedent `tests/clippy.toml` | starting, provisioning and removing the throwaway Forgejo, for the tools and the process tier (testing.md, 2.6) | 05.1 |
+| `testing/temper-throwaway-forgejo` | same | ordinary, precedent `tests/clippy.toml` | starting, provisioning and removing the throwaway Forgejo, for the tools and the process tier (domain/testing.md, 2.6) | 05.1 |
 | `testing/temper-fake-forge-protocol` | same | step | the fake forge's protocol layer over its domain (forge.md, section 9) | 14.3 |
-| `testing/temper-fake-git` | same | ordinary, precedent `tests/clippy.toml` | the fake git program, a skein-world hosted program on the fake machine's files (testing.md, 4.3) | 17.1 |
+| `testing/temper-fake-git` | same | ordinary, precedent `tests/clippy.toml` | the fake git program, a skein-world hosted program on the fake machine's files (domain/testing.md, 4.3) | 17.1 |
 | `tools/forgejo-conformance` | same, binary | ordinary, precedent `tests/clippy.toml` | Forgejo's transcripts and facts (forge.md, section 10); replaces the Python tool | 05.2 |
 | `tools/git-transcripts` | same, binary | ordinary, precedent `tests/clippy.toml`, `[lints]` as 05.1's | git's transcripts (git.md, section 9) | 05.4 |
-| `tools/live-login` | same, binary | ordinary | reads the borrowed Codex login for `scripts/proof-live.sh` (testing.md, 2.7) | 15.4 |
+| `tools/live-login` | same, binary | ordinary | reads the borrowed Codex login for `scripts/proof-live.sh` (domain/testing.md, 2.7) | 15.4 |
 | `tests/codecs` | `temper-codecs-world` | world | drift and fuzzy tests of the three codec crates and of `temper-forge-forgejo`'s decoders | 03.1 |
 | `tests/worker/protocol-git` | `temper-worker-protocol-git-world` | world | the transcripts' tests of git's builders and parsers (07.2) and the git component's machine world (07.4) (git.md, section 9) | 07.2 |
 | `tests/engine/protocol-forge` | `temper-engine-protocol-forge-world` | world | the forge component's machine world (13.5) and the forge's protocol world (14.4) | 13.5 |
-| `tests/client` | `temper-client-world` | world | temper's client joined to temper's engine root (testing.md, 6.3) | 11.3 |
-| `tests/one-process` | `temper-one-process-world` | world | the one-process world (testing.md, 2.5) | 17.2 |
+| `tests/client` | `temper-client-world` | world | temper's client joined to temper's engine root (domain/testing.md, 6.3) | 11.3 |
+| `tests/one-process` | `temper-one-process-world` | world | the one-process world (domain/testing.md, 2.5) | 17.2 |
 
 **Data, not crates:** `tools/forgejo-conformance/transcripts/` and
 `facts.txt` (05.2, 05.3); `tools/git-transcripts/transcripts/` (05.4);
@@ -188,7 +188,7 @@ design asks for the change.
   5 s; generated codec tests 200 ms. The process tier's tests aim at 5
   minutes together, under the `process` profile's 10-minute timeout;
   the live tier's at most 15 minutes.
-- **The new worlds' share of the suites** (testing.md, 6.1: "together at
+- **The new worlds' share of the suites** (domain/testing.md, 6.1: "together at
   most 4 s of the default suite and 25 s of the fuzzy suite"), as guides
   on the summed time of their tests, focused and fuzzy:
   `tests/client` 1.0 s and 5 s; `tests/engine/protocol-forge` 1.0 s and

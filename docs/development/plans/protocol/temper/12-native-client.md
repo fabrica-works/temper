@@ -18,7 +18,7 @@ family's records in `route` are 15.1a's.
 
 ## Read first
 
-- `client.md`, sections 2, 3.3, 3.4, 6.2, 6.6, 6.7 and 7; `testing.md`,
+- `client.md`, sections 2, 3.3, 3.4, 6.2, 6.6, 6.7 and 7; `domain/testing.md`,
   2.6; `protocol.md`, section 12, steps 4 and 5.
 - jig's `docs/design/protocol/client.md`, sections 8, 10 and 11, at the
   pin.
@@ -235,7 +235,7 @@ Removes: nothing.
 ### 12.2 A chat answered by the real binary
 
 Scope: the process tier's first story (protocol.md, 12, step 5;
-testing.md, 2.6, steps 1 and 2): `crates/temper/tests/support/person.rs`
+domain/testing.md, 2.6, steps 1 and 2): `crates/temper/tests/support/person.rs`
 (the person's host: the native client made from the printed link, as
 Choices say, a `Script` of `jig_fake_person::Step`s, its tree handed to
 the person each iteration, the person's `Act` through `NativeClient::act`,

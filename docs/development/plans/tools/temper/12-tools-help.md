@@ -13,7 +13,7 @@ Capability: the tools' help.
 
 ## Read first
 
-- temper's `docs/design/tools.md`: 4, 5.1 to 5.4, 5.6, 6.1 to 6.3, 7,
+- temper's `docs/design/client/tools.md`: 4, 5.1 to 5.4, 5.6, 6.1 to 6.3, 7,
   8.1, 8.2, 10, 11.1, 11.3, 11.5 and 12, including `fe0ec316`'s
   kept, pending, dropped and unsent output; `docs/design/client/README.md`, 4.4.
 - `temper/02-tools-table.md`: `Tool`, `Argument`, `Call`, `Parsed`,

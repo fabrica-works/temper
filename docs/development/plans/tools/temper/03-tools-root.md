@@ -7,7 +7,7 @@ are temper 11's, **the tools' adopt**. temper 04 adds waits; the next plan hosts
 
 ## Read first
 
-- temper `docs/design/tools.md`: 4, 5.2, 5.3, 6.1 to 6.4, 7, 8.2 (steps 3 to 6), 11.1, 12, 13; `docs/design/client/README.md`: 3.1, 4.6.
+- temper `docs/design/client/tools.md`: 4, 5.2, 5.3, 6.1 to 6.4, 7, 8.2 (steps 3 to 6), 11.1, 12, 13; `docs/design/client/README.md`: 3.1, 4.6.
 - jig `docs/design/client/domain/client.md`: 4, 6, 7, 8.1, 19, 20; `docs/design/client/domain/root.md`: 3, 5, 15; `docs/design/client/domain/contract.md`: 3.1, 5.2, 5.3, 6.
 - This plan's `temper/{02-tools-table,04-waits,11-tools-forge,12-tools-help}.md`;
   `jig/{02-named-send,03-turn-read,05-deadline-spans}.md` and their landing bodies; `findings/temper-area-1.md` 3 and 4, `findings/jig-section-13.md` 2 and 3.
@@ -21,7 +21,7 @@ are temper 11's, **the tools' adopt**. temper 04 adds waits; the next plan hosts
 
 ## What the design asks
 
-- **tools.md 4, client.md 4.6:** a root holding `jig_client::Client`, routing by asker to runner (`Owner::Runner`, 3) and forge;
+- **client/tools.md 4, client.md 4.6:** a root holding `jig_client::Client`, routing by asker to runner (`Owner::Runner`, 3) and forge;
   one asker per owner, call numbers in keys' and handles' high 32 bits; no page/view or temper item under `src/jig/`.
 - **5.2:** every read; provisional text only where supplied; large turns by size and a `turn N A.T` call; parts cut with `--part K --from B`.
   A turn past either read bound prints its size and “past the limit; report it”, exit 0.
@@ -134,7 +134,7 @@ Removes: temper's jig pin at the step's start, its skein pin where SKEIN01 repla
 ### 03.2 The root and the runner, with `me` and `task N`
 Scope: root Start/sign-in/me live; runner call numbers and handles; text and JSON through
 `skein_json::writer::Encoder` (measure then write), cut at 32 KiB with what remains;
-`me`, `task N` with acts as calls, and read exits (tools.md 4, 5.2, 6); step `temper-03.2`.
+`me`, `task N` with acts as calls, and read exits (client/tools.md 4, 5.2, 6); step `temper-03.2`.
 Needs: temper on jig's named send, turn read and spans.
 Files: `crates/temper-client-tools/src/root.rs` (new), `src/lib.rs`, `Cargo.toml` (`skein-ui`);
 `src/jig/{runner,render}.rs`, `src/jig/render/{document,acts}.rs` (new), `src/jig.rs` (`pub use runner::Printed`);
@@ -156,11 +156,11 @@ Shape:
   - Allowed: its call. A keyed tool's call ends ` --key NAME`.
   - Proposed: the call, then ` (proposed to <recipient>)`.
   - Refused: the act's name and why, in jig's words, with no call.
-  - No tool in tools.md, 5.3 (decisions.md, M): its name in the tools' words, then ` (no tool)`, with no call and no
+  - No tool in client/tools.md, 5.3 (decisions.md, M): its name in the tools' words, then ` (no tool)`, with no call and no
     admission. JSON prints the document's offers as this Shape says.
   - Bounded (ruling 119; jig's `Admission::Bounded { within: Bounds, beyond: Beyond }`): its call, then the bounds a draft is
-    compared with (`within`, printed whole, as tools.md, 6.4, prints an authority), then beyond them ` (proposed to <recipient>)` for
-    `Beyond::Proposed`, or `refused beyond them: <why>`, in jig's words, for `Beyond::Refused`. tools.md, 4: "each act made,
+    compared with (`within`, printed whole, as client/tools.md, 6.4, prints an authority), then beyond them ` (proposed to <recipient>)` for
+    `Beyond::Proposed`, or `refused beyond them: <why>`, in jig's words, for `Beyond::Refused`. client/tools.md, 4: "each act made,
     proposable (to whom) or refused (why), with the bounds a draft is compared with".
 - **Exits.** `Readout`/`ReadNone` follow Choices; expose `client` and `kept_json` for the next plan's host before Start.
 - **JSON** prints the document's fields by jig's names, in snake case. A cursor prints as lower-case hex (temper 02).
@@ -208,7 +208,7 @@ Removes: nothing.
 
 ### 03.3 The other reads
 Scope: `inbox`, `tasks`, `activity N`, `run N`, `chat N`, `turn N A.T`; `task N --tree --activity K --run` in one answer;
-turns by their size; cuts with their calls (tools.md 5.2, 6.4, 12); step `temper-03.3`.
+turns by their size; cuts with their calls (client/tools.md 5.2, 6.4, 12); step `temper-03.3`.
 Needs: temper on jig's named send, turn read and spans.
 Files: under `crates/temper-client-tools/`, `src/jig/render/{lists,activity,turn}.rs` (new), `src/jig/runner.rs`,
 `src/jig/rows.rs` (`--ended`'s help, ruling 119), with any help golden that prints it,
@@ -281,7 +281,7 @@ Removes: nothing.
 
 ### 03.4 jig's acts under their keys
 Scope: `chat`, `message`, `close`, `answer`, both `decide` forms, `release`, `stop`, `cancel`; named/drawn keys,
-drafts against bounds, outcomes, kept lines and exits (tools.md 5.3, 6, 7); step `temper-03.4`.
+drafts against bounds, outcomes, kept lines and exits (client/tools.md 5.3, 6, 7); step `temper-03.4`.
 Needs: temper on jig's named send, turn read and spans.
 Files: under `crates/temper-client-tools/`, `src/jig/runner.rs`, `src/jig/render/outcome.rs` (new), `src/root.rs`, `src/tests/jig.rs`, `src/tests/jig/acts.rs` (new), `src/tests/fixtures.rs`, goldens.
 Shape:

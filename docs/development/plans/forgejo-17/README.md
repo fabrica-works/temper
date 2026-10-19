@@ -21,7 +21,7 @@ record their transcripts and facts again on v17, with the facts
   attempts", "A failed job's log is its failed step's end",
   "Comparisons ask for what they keep"), 3.4, 9, 10 and 13;
   `domain/forge.md`, sections 2 ("Tools", "Brief sections"), 8.4 and
-  20.1; `git.md`, sections 9 and 10; `testing.md`, 2.6.
+  20.1; `git.md`, sections 9 and 10; `domain/testing.md`, 2.6.
 - **The workflow:** temper's `docs/development/workflow.md`, sections 1
   and 2.
 - **`decisions.md`:** the plan's decisions, and what the user may veto.

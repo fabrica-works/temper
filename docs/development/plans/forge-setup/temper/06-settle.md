@@ -11,7 +11,7 @@ window's end; past it, not mergeable is a conflict. The hinted story (temper 11.
 ## Read first
 
 - Design: `domain/forge.md` 5.2 ("What Forgejo settles", "The window is its own wait"), 8.2 (item 6), 8.4, 16; `forge.md` 5 (the table), 13
-  (last bullet); `setup.md` 10; `configuration.md` 7 (row `forge.client.settle_ms`); `testing.md` 4.2.
+  (last bullet); `setup.md` 10; `configuration.md` 7 (row `forge.client.settle_ms`); `domain/testing.md` 4.2.
 - `decisions.md` 5 (30000; the stall stays 30 s), 13, 15, 16; `findings/webhooks.md` 2 and 4; `forge-and-tiers.md`
   1 (`mergeable` is a bool on the wire: `document.rs:151`, `reading.rs:244`); temper 04.1's
   `tools/forgejo-conformance/facts.txt` (the timing pairs).

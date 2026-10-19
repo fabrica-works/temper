@@ -9,7 +9,7 @@ the setup's routes: 09.1 the frame, the admin and the bot (unit); 09.2 the bot's
 
 ## Read first
 
-- setup.md: 3, 5, 6.5, 8, 9, 11, 13.1, 13.2. credentials.md: 2, 5. forge.md: 5, 9. testing.md: 2.2, 4.2, 6, 6.1, 7.
+- setup.md: 3, 5, 6.5, 8, 9, 11, 13.1, 13.2. credentials.md: 2, 5. forge.md: 5, 9. domain/testing.md: 2.2, 4.2, 6, 6.1, 7.
 - This plan: `decisions.md` 5, 13 and 19; `findings/forge-and-tiers.md` 1 and 3; `findings/configuration-and-binary.md` 2 and 6.
 - temper 01 (`UserOf`, `CreateUser`, `Tokens`, `CreateToken`, `DeleteToken`; `User`, `AccessToken`), 02 (`Org`, `CreateOrg`,
   `Teams`, `CreateTeam`, `EditTeam`, `TeamMembers`, `AddMember`, `OrgHooks`, `CreateOrgHook`, `EditOrgHook`, `DeleteOrgHook`;
@@ -24,7 +24,7 @@ the setup's routes: 09.1 the frame, the admin and the bot (unit); 09.2 the bot's
   listings paged with the forge's page cap; a failure names its step. Takes: the machine.
 - **Setup.md 3, 8, 9; credentials.md 2, 5:** the files, `user` in decimal; the bot never a site admin, its password drawn,
   used once, never kept; no secret in an argument, a URL or a log. Takes: `Failure`, and 07.2's `place::File`.
-- **Setup.md 11, 13.1, 13.2; testing.md 2.2, 4.2; forge.md 5:** step tests from answers, a protocol world through bytes with
+- **Setup.md 11, 13.1, 13.2; domain/testing.md 2.2, 4.2; forge.md 5:** step tests from answers, a protocol world through bytes with
   the fake serving the setup's routes, the hook's URL. Takes: the tests, the world, `hook_url`.
 
 ## Choices this plan makes
@@ -116,7 +116,7 @@ Removes: nothing.
 
 ### 09.2 The bot's tokens, the fake's users and tokens, and the world
 Scope: setup.md 5 step 3 in the machine; the fake serves admin users, the admin's token routes and the tokens' sign-in by
-token (testing.md 4.2); the world `tests/forge-setup/reconcile` with its first story, an empty forge given its bot and tokens.
+token (domain/testing.md 4.2); the world `tests/forge-setup/reconcile` with its first story, an empty forge given its bot and tokens.
 Needs: 09.1; temper 01.3 (the bot's tokens on the admin's routes: list, make with scopes, delete by the listed id; both sides). 01.2 and
 01.3 leave arms in the fake's exhaustive matches (routes.rs `repository` :66, `op` :143, `write` :235; tally.rs `route` :48;
 server.rs `table` :474) that answer `Error::Refused` "until temper 09.2": this increment replaces them with the real answers.

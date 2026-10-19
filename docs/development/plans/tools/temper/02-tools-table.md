@@ -1,6 +1,6 @@
 # Session 02: the tools' table
 
-A new crate, `temper-client-tools` (tools.md, 4), holds area 1's table, each tool
+A new crate, `temper-client-tools` (client/tools.md, 4), holds area 1's table, each tool
 of 5.2, 5.3, 5.4 and 5.6 a record. It parses argv into a call and prints it back,
 checks usage and TEXT `-`, derives the named key (7), and supplies section 12's
 bounds and the tools' preset of jig-client's `Limits`. Its module `jig` names no
@@ -13,7 +13,7 @@ Capability: the tools' table.
 
 ## Read first
 
-- temper's `docs/design/tools.md`: 4, 5 (5.5: area 1 only), 6.2, 6.3,
+- temper's `docs/design/client/tools.md`: 4, 5 (5.5: area 1 only), 6.2, 6.3,
   7, 8.1, 11.1, 12 and 13; `docs/design/client/README.md`, 4.4.
 - jig's `docs/design/client/domain/contract.md`: 3.1, 6.1 and 7.1;
   `client/domain/client.md`: 14 and 20; skein's `docs/design/lib.md`, 6.2.
@@ -73,15 +73,15 @@ Capability: the tools' table.
   a word after `--` is positional.
 - **Proposal names:** `tN/K` is `Proposer::Task(N)`, `pN/K` is
   `Proposer::Party(N)`, with proposal K; no bare `N/K`. Parse and print
-  alike, including temper 03's reads (tools.md, 5.3 and 6.1).
+  alike, including temper 03's reads (client/tools.md, 5.3 and 6.1).
 - **Close's reason:** `close N [--move D]... [--reason TEXT]`, empty by default (5.3).
 - **Wait's terminal phases:** `phase:done|failed|cancelled|ended` give
-  `Usage::Condition`, exit 1, naming `--until ended` (tools.md, 5.4). All
+  `Usage::Condition`, exit 1, naming `--until ended` (client/tools.md, 5.4). All
   14 phase words round-trip; `--until` admits only the ten live phases.
 - **Watch arguments:** `inbox` takes no subject flag; `tasks` takes its
   read arguments except `--after` and `--ended`. Other arguments are
   usage errors, exit 1. `tree N` and `run N` take `ended` alone as a
-  condition, `tasks` none; `waiting-on-me` is `task N`'s alone (tools.md, 5.4).
+  condition, `tasks` none; `waiting-on-me` is `task N`'s alone (client/tools.md, 5.4).
 - **Bounded inputs:** TEXT and temper 12's JSON take at most `ask_bytes`; past it is a usage error.
 - **The preset is written out,** and a test compares it with the
   terminal's `native().client`, `rows` and `text` aside, through a dev-dependency.
@@ -120,7 +120,7 @@ Shape:
   and `DOCUMENT: u64 = 1_048_576`; the `skein_lib::Duration`s `DEADLINE`
   (30 s), `LOCK` (60 s), `LOCK_TRY` (100 ms), `WAIT` (300 s) and
   `WAIT_MOST` (3600 s). `client()` writes out `native`'s numbers, with
-  `rows: ROWS`, `text: TEXT` and `document_bytes: DOCUMENT` (tools.md, 12: a result's text, 32 KiB, is the client's); `tools()` reads from it, with
+  `rows: ROWS`, `text: TEXT` and `document_bytes: DOCUMENT` (client/tools.md, 12: a result's text, 32 KiB, is the client's); `tools()` reads from it, with
   `TEXT`, `PART`, `WAIT` and `WAIT_MOST`, into `jig::table::Limits`, defined
   here and re-exported as `jig::Limits`: all that argv, 03's runner and 04's digest read.
 - `jig::key::named` feeds the salt, a zero byte and the name to
@@ -330,7 +330,7 @@ then reads an ended task to say how it ended (5.4). It takes
 
 temper 03 supplies `Owner::Runner` = 3: a call's number in each key's and
 handle's high 32 bits, allocated above the highest call among Start's kept
-keys (tools.md, 4). A kept line prints no name and no key: `kept: ` + the
+keys (client/tools.md, 4). A kept line prints no name and no key: `kept: ` + the
 operation + the outcome; its JSON has exactly `operation` and `outcome`
 (6.1, 6.2). Unconfirmed and a client key conflict are tools bugs, exit 1,
 reported as findings by temper 12's guide; client-own answers exit 1 (6.3).

@@ -1,6 +1,6 @@
 # Findings: where the configuration's new members and the binary's new commands go
 Read at temper `main` 0ff45022e (graph project home-free-src-rust-temper, indexed 11:28Z; `open.rs` changed since, not relied on). Paths are under `~/src/rust/temper/`; docs under `docs/design/`.
-Design read: setup.md 3, 7.3, 8, 11 (and 5, 6, 10, 13, 14); configuration.md 2-7, 8-10; forge.md 7; protocol.md 3-5; testing.md 2.2, 2.6.
+Design read: setup.md 3, 7.3, 8, 11 (and 5, 6, 10, 13, 14); configuration.md 2-7, 8-10; forge.md 7; protocol.md 3-5; domain/testing.md 2.2, 2.6.
 
 ## 1. The decode and the checks (one document, read whole)
 - **Flow:** `temper_service::named(bytes)` (`crates/temper-service/src/startup.rs:142`) = `parse` (:35-114) then `all_files` (:116). `parse` reads `engine`, `workers`, `application` with jig's readers, then runs `checks::standalone` (`startup/checks.rs:24`), `checks::limits` (:63), `names`, `sockets`. `startup()` (:164) re-parses, `check_files` (:152), `application::resolve`, then the checks that need file contents: `checks::channel`, `identities`, `agent`, `memory` (:198-248).
@@ -40,7 +40,7 @@ Design read: setup.md 3, 7.3, 8, 11 (and 5, 6, 10, 13, 14); configuration.md 2-7
 - **External crates:** step code is skein-only. In the workspace: `sha2 =0.10.9` (one step crate, `temper-engine-domain-forge-issues`), `serde_json =1.0.154` (the binary's dev-deps, tests, tools, throwaway). setup.md 11: no serde in production; skein-json for JSON. Dependencies point upstream only (`AGENTS.md` of ~/src/rust).
 - **Pin:** `temper_throwaway_forgejo::{VERSION,RUNNER_VERSION}` (`testing/temper-throwaway-forgejo/src/binary.rs:9,11`), a test crate; forgejo-17's rule (`code-organization.md` 2, 5) lets nothing else name a version, but protocol.md 129, 277 and setup.md 6.1 put "the pin" in `temper-forge-forgejo`. A production crate cannot use the test crate: G3.
 - **Gate:** `scripts/check.sh`: `cargo fmt --check`; `cargo clippy --workspace --all-targets -- -D warnings`; `cargo nextest run --workspace`; same `--profile fuzzy` (workflow.md 1). Budgets 15 s default, 60 s fuzzy, enforced by `.config/nextest.toml` `global-timeout`; the default filter drops `fuzzy_*` and the `process`/`live` binaries (workflow.md 2). A new test binary named other than `process` joins the 15 s suite: put the box's test in `process`.
-- **Tests live** in `tests/<component>/<world>/tests/*.rs` (focused) and `tests/fuzzy_*.rs`; reconcile's world is named `tests/forge-setup/reconcile` (testing.md :101); step tests in each crate's `src/tests*`.
+- **Tests live** in `tests/<component>/<world>/tests/*.rs` (focused) and `tests/fuzzy_*.rs`; reconcile's world is named `tests/forge-setup/reconcile` (domain/testing.md :101); step tests in each crate's `src/tests*`.
 - **Count command** (`docs/development/plans/forgejo-17/code-organization.md` section 6, :139-150): `git diff -M --numstat origin/main...HEAD -- crates testing tools ':!*/tests.rs' ':!*/tests/*' ':!*/generated/*' ':!*/golden/*' ':!*/schema/*' ':!tools/*/transcripts/*' ':!tools/*/facts.txt' | awk '{a+=$1} END {print a}'`. Also: files over 800 lines grow by at most 40 per increment (:128-138).
 
 ## Gaps (design vs code), for the planner

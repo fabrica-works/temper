@@ -53,7 +53,7 @@ section 8.
   machine; `temper open` is the person's terminal; `temper agent` is
   smith's agent, one process per run; `temper forge` and `temper box`
   set a forge up and run it (`protocol/setup.md`).
-- **Tested at every tier** (`testing.md`): domains and fakes in worlds,
+- **Tested at every tier** (`domain/testing.md`): domains and fakes in worlds,
   then through bytes, then the standalone service, hosted agents and
   fake peers on one real ring, then the real binary with an owned
   Forgejo, its runner and real git, then a real model.
@@ -164,9 +164,10 @@ forge, temper adds:
 ## 6. Documents
 
 - **`domain/`:** temper's domain layer on jig's: its root, the forge
-  connector, the worker, and what temper fills in of smith's agent. Its
-  `README.md` gives the reading order, the structure, the names and the
-  decisions.
+  connector, the worker, and what temper fills in of smith's agent; and
+  `testing.md`, temper's tiers, its fakes, its scenarios and its layout,
+  on skein's testing strategy and jig's worlds. Its `README.md` gives the
+  reading order, the structure, the names and the decisions.
 - **`protocol/`:** temper's protocol layer on jig's: the processes and
   the binary, the configuration, the credentials, temper's parts on the
   workers' channel, its families in the store, the host tools and LLM
@@ -176,12 +177,10 @@ forge, temper adds:
 - **`client/`:** temper's client on `jig-client`. Its `README.md` is the
   client: its client root and pages, the forge's client family, its view,
   the terminal, signing in, and the clients' listener; `forge.md` is the
-  forge's part of the client, `browser.md` the browser shell, and
-  `mockups/` the pages' look (reference material, not contract).
-- **`tools.md`:** `temper ctl`, temper for agents: reads, jig's
-  operations and waits, from a command line.
-- **`testing.md`:** temper's tiers, its fakes, its scenarios and its
-  layout, on skein's testing strategy and jig's worlds.
+  forge's part of the client, `browser.md` the browser shell, `tools.md`
+  `temper ctl`, temper for agents (reads, jig's operations and waits,
+  from a command line), and `mockups/` the pages' look (reference
+  material, not contract).
 - **`draft/`:** drafts, not contract.
 - **`STATUS.md`:** how far the code is from this design, and which plans
   take it there.
@@ -253,4 +252,4 @@ temper's side before the layer:
 kits are named by their kind (`testing/temper-fake-git`); the forge's are
 skein's (`testing/skein-fake-forge-domain`,
 `testing/skein-throwaway-forgejo`), and the worlds live in `tests/`
-(`testing.md`, section 7).
+(`domain/testing.md`, section 7).

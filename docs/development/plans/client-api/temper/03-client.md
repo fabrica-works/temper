@@ -24,7 +24,7 @@ stays joined to temper's engine root throughout.
 - temper's `docs/design/client.md`: 2, 3 (3.1 to 3.4), 4.5, 4.6, 6
   (6.1 to 6.3, 6.6, 6.7), 7, 10 (the bullets "`tests/client`" and "The
   one-process world").
-- temper's `docs/design/credentials.md`, 6; `docs/design/testing.md`,
+- temper's `docs/design/credentials.md`, 6; `docs/design/domain/testing.md`,
   2.5 (the person "in front of temper's terminal client") and 6.3.
 - skein's `docs/design/ui-text.md`, 7 (its loop).
 - jig's `docs/design/client/domain/client.md`: 1, 4, 12;
@@ -69,7 +69,7 @@ stays joined to temper's engine root throughout.
   once signed in by a link, given back as held at the next `temper open
   DIRECTORY ADDRESS`, erased when signed out; never printed, never in
   the small store.
-- **The joint world** (10; `testing.md`, 6.3): "temper's client root and
+- **The joint world** (10; `domain/testing.md`, 6.3): "temper's client root and
   view, with skein's fake person acting on the tree, joined to temper's
   engine root ..., with jig's client worlds' faults and jig's check".
 
@@ -701,7 +701,7 @@ its own for its party and the link, in place of the by-value hand-offs
 `jig-client-view`'s pages (transitional, decisions.md, 7, ended by
 temper 07.4); `tests/client` on jig 21's `jig-client-world`, with
 skein's fake person and the world's referee, jig's check
-(`client.md`, 3.1, 10; `testing.md`, 6.3).
+(`client.md`, 3.1, 10; `domain/testing.md`, 6.3).
 Needs: jig 21.4 (21.3's `Ui` among it).
 Files: `crates/temper-client-domain/src/{domain.rs, route.rs,
 boundary.rs, forge.rs (`Event::Confirmed` gives way to its `me`

@@ -1,6 +1,6 @@
 # Session 08: the real-loop world
 
-`tests/real-loop` starts testing.md 2.4's general layer: one thread and ring, scratch files,
+`tests/real-loop` starts domain/testing.md 2.4's general layer: one thread and ring, scratch files,
 the standalone service and worker, hosted smith agents, native clients and fake peers. The
 first stories sign in, ask a chat and wait for its reply, and meet a wait with another
 client's act. Each drains. The forge host meets the engine's webhook listener here; temper
@@ -11,8 +11,8 @@ through `temper-08.6`.
 
 ## Read first
 
-- temper's `docs/design/testing.md`: 2.4, 4.1 to 4.3, 5.2, 6.1, 7, 10;
-  `docs/design/tools.md`: 8.1 to 8.3, 11.3, 11.4; `docs/design/client/README.md`: 7;
+- temper's `docs/design/domain/testing.md`: 2.4, 4.1 to 4.3, 5.2, 6.1, 7, 10;
+  `docs/design/client/tools.md`: 8.1 to 8.3, 11.3, 11.4; `docs/design/client/README.md`: 7;
   `docs/design/protocol/forge.md`: 5, 8, 9; `docs/design/protocol/configuration.md`: 3 and
   7.
 - This plan's `decisions.md` (real-loop first, the hosted cli, seams), `later.md`,
@@ -32,11 +32,11 @@ through `temper-08.6`.
 
 ## What the design asks
 
-- **testing.md 2.4:** the assembled stack over one ring, kernel-assigned ports,
+- **domain/testing.md 2.4:** the assembled stack over one ring, kernel-assigned ports,
   ownership/operation/descriptor checks and retained failure traces.
-- **tools.md 11.3:** real files, locks, hosted call exits, the three first stories and
+- **client/tools.md 11.3:** real files, locks, hosted call exits, the three first stories and
   drained shutdown; **11.4:** executable paths elsewhere.
-- **testing.md 2.4, 4.2:** signed webhooks, polling as backstop.
+- **domain/testing.md 2.4, 4.2:** signed webhooks, polling as backstop.
 - **6.1:** each focused story within 1 s, the lower worlds within 4 s, the focused suite
   within 15 s; no time-guide exception.
 
@@ -81,7 +81,7 @@ through `temper-08.6`.
   edit, no behaviour from drafts.
 - Use shipped profile builders, with each capacity or pace override named beside its source
   and reason. Keep lock retry, link deadline, idle and teardown times as shipped. Short
-  forge polling is the explicit exception designed in testing.md 2.4, not a way to end a
+  forge polling is the explicit exception designed in domain/testing.md 2.4, not a way to end a
   client.
 - A peer stays available until its clients settle. A story past 1 s is profiled and made
   cheaper or moved to `fuzzy_*`; no optimized builds, sleeps for readiness, additional ring
@@ -90,7 +90,7 @@ through `temper-08.6`.
 ## Increments
 
 ### 08.1 Tell the webhook listener's bound address
-Scope: testing.md 2.4's listener rule, behind the existing component.
+Scope: domain/testing.md 2.4's listener rule, behind the existing component.
 Needs: nothing beyond the session's start.
 Files (forge-component hotspot; each named exactly):
 `crates/temper-engine-protocol-forge/src/hooks.rs`,
@@ -116,7 +116,7 @@ Size: at most 50 production lines.
 Removes: the loss of `Listening.addr` in `Hooks::up`.
 
 ### 08.2 The scripted LLM peer on its bound address
-Scope: testing.md 2.4 and 4.1, fake-LLM wiring in its own increment.
+Scope: domain/testing.md 2.4 and 4.1, fake-LLM wiring in its own increment.
 Needs: nothing beyond the session's start.
 Files (fake LLM hotspot; each named exactly): `tests/real-loop/src/llm.rs`,
 `tests/real-loop/src/scripts.rs`, `tests/real-loop/src/lib.rs`,
@@ -150,7 +150,7 @@ Size: at most 220 lines of harness; no production change.
 Removes: nothing.
 
 ### 08.3 Scratch, the service and hosted agents, checked as they run
-Scope: testing.md 2.4's general harness, startup and drained shutdown.
+Scope: domain/testing.md 2.4's general harness, startup and drained shutdown.
 Needs: the scripted LLM peer (08.2).
 Files: `tests/real-loop/src/{lib.rs,fixtures.rs,scratch.rs,world.rs,
 service.rs,agent.rs,check.rs}`; `tests/real-loop/tests/lifecycle.rs`;
@@ -196,7 +196,7 @@ Size: at most 300 lines of harness; no production change.
 Removes: nothing.
 
 ### 08.4 One hosted program per call, from sign-in to a chat reply
-Scope: tools.md 8 and 11.3, including the first agent turn.
+Scope: client/tools.md 8 and 11.3, including the first agent turn.
 Needs: the checked service and agent hosts (08.3).
 Files: `tests/real-loop/src/{calls.rs,lib.rs,world.rs,fixtures.rs}`;
 `tests/real-loop/tests/tools.rs`; `tests/real-loop/Cargo.toml`.
@@ -239,7 +239,7 @@ Size: at most 300 lines of harness; no production change.
 Removes: nothing.
 
 ### 08.5 The forge host's delivery meets the engine's listener
-Scope: testing.md 2.4; the first joint proof of temper 07.3.
+Scope: domain/testing.md 2.4; the first joint proof of temper 07.3.
 Needs: the webhook address (08.1); the hosted calls (08.4).
 Files (forge wiring, no fake implementation change): `tests/real-loop/src/forge.rs`,
 `tests/real-loop/src/lib.rs`, `tests/real-loop/src/fixtures.rs`,
@@ -284,7 +284,7 @@ Size: at most 230 lines of harness; no production change.
 Removes: nothing.
 
 ### 08.6 Another client's act satisfies a running wait
-Scope: tools.md 11.3's concurrent clients; finish the reusable caller.
+Scope: client/tools.md 11.3's concurrent clients; finish the reusable caller.
 Needs: the hosted calls (08.4); the tools' waits.
 Files: `tests/real-loop/src/{calls.rs,service.rs,lib.rs}`; `tests/real-loop/tests/tools.rs`.
 Shape: `Start`, `Watching` and `Join` let a call remain in flight. `Watching` waits for the

@@ -103,7 +103,7 @@ agent    every LLM call: smith's agent shell, over skein's LLM client
   Code is the one program, through smith's program backend. temper
   keeps no provider's dialect, no program's adapter and no fake provider
   of its own: the tiers use skein's fake LLM peer and smith's fake
-  `claude`, and the live tier a real model (`../testing.md`, 2.6 and
+  `claude`, and the live tier a real model (`../domain/testing.md`, 2.6 and
   2.7).
 
 ## 4. Host tools
@@ -179,7 +179,7 @@ agent    every LLM call: smith's agent shell, over skein's LLM client
 
 ## 6. Testing
 
-Within the suites' budgets (`../testing.md`, section 2):
+Within the suites' budgets (`../domain/testing.md`, section 2):
 
 - **Step tests of `temper-engine-smith`:** each tool's least input
   decoded and a wrong shape refused; each `Problem`; each answer rendered
@@ -194,17 +194,17 @@ Within the suites' budgets (`../testing.md`, section 2):
   once, with no commit and no record.
 - **Through bytes:** smith's agent processes over skein's fake LLM,
   calling host tools through bytes, in the one-process world
-  (`../testing.md`, 2.5); the process and live tiers (`../testing.md`,
-  2.6 and 2.7).
+  (`../domain/testing.md`, 2.5); the process and live tiers
+  (`../domain/testing.md`, 2.6 and 2.7).
 - **The program backend,** in the real loop: a run on a program's source
   through smith's fake `claude`, calling host tools that the engine
   decides as a direct run's, its result read the same way; and a limit
-  the fake program reports making the source limited (`../testing.md`,
+  the fake program reports making the source limited (`../domain/testing.md`,
   2.4).
 - **Notices:** a limited, refused and unauthorized notice from a run,
   each scripted on skein's fake LLM peer, reaching the accounts child
   fenced by its attempt, and one of a fenced attempt dropped
-  (`../testing.md`, 2.4).
+  (`../domain/testing.md`, 2.4).
 - **No token across a domain boundary** (credentials.md, section 7).
 
 ## 7. Open questions

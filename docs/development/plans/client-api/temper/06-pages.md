@@ -23,7 +23,7 @@ temper's frame until temper 07.
   `index.html` (a chat), `style.css` for the order of each page's parts;
   `docs/design/web/ux/README.md`, 4 (links by number) and 5.3 (said
   before it is sent).
-- temper's `docs/design/testing.md`, 6.3.
+- temper's `docs/design/domain/testing.md`, 6.3.
 - jig's `docs/design/client/domain/client.md`, 4 and 19;
   `client/domain/root.md`, 3, 5 and 15; `client/domain/contract.md`, 3.4
   to 3.6, 5.1 to 5.4, 6.1, 7.1; `client/domain/view.md`, 4.1 (the
@@ -118,9 +118,9 @@ temper's frame until temper 07.
 - **The meeting point:** each page's story runs in `tests/client`, the
   joint world, against temper's engine root, in the increment that
   builds the page; none runs only against `jig-client-scripted-engine`
-  (README, Rules, "The meeting point"; temper's `testing.md`, 6.3).
+  (README, Rules, "The meeting point"; temper's `domain/testing.md`, 6.3).
 - **jig's check holds in the stories of `tests/client`** (`client.md`,
-  10; temper's `testing.md`, 6.3): jig 15.5's check from
+  10; temper's `domain/testing.md`, 6.3): jig 15.5's check from
   `jig-client-test-kit` runs in the world's referee from 06.1 on, beside
   `jig-client-world`'s own rules, and no story turns it off; its verdict
   is the story's.

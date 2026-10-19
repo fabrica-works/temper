@@ -10,7 +10,7 @@ alone.
 
 ## Read first
 
-- **Design:** setup.md 10 (the waits; "Checked"), 13.4, 5 (step 6), 6.2, 8; testing.md 2.6; forge.md 5, 7; configuration.md
+- **Design:** setup.md 10 (the waits; "Checked"), 13.4, 5 (step 6), 6.2, 8; domain/testing.md 2.6; forge.md 5, 7; configuration.md
   6 (a secret file's final line feed), 7 (the keep's paces, the hooks' limits); skein's testing-strategy.md 2.9 and 9;
   workflow.md 2; development.md 5.5, 5.6.
 - **Plan:** decisions.md 5, 12, 16, 19; findings/webhooks.md 6, forge-and-tiers.md 4, measurements.md 3; temper 05.3
@@ -22,7 +22,7 @@ alone.
 
 ## What the design asks
 
-- **setup.md 10, 13.4, testing.md 2.6:** "Checked" is the hinted story: a test of its own on the owned Forgejo with CI
+- **setup.md 10, 13.4, domain/testing.md 2.6:** "Checked" is the hinted story: a test of its own on the owned Forgejo with CI
   and webhooks on, `poll`, `poll_max`, `slow` and `stall` raised past its budget, its job outlasting `settle`, no
   conflict resolved. It checks the table's third row, CI on a head; the landing's other waits end on temper's own writes,
   and the other rows are checked from hints in the worlds (the designer's answer to Q2, 2026-10-18). The tier aims at 3
@@ -46,7 +46,7 @@ alone.
 ## Rules that bind it
 
 - The tier needs `TEMPER_FORGEJO` and `TEMPER_FORGEJO_RUNNER`, runs by `heavy --gate` (README), never in `scripts/check.sh`
-  (workflow.md 2), and a test refuses to run without either, naming it (testing.md 2.6). The exports, run before any
+  (workflow.md 2), and a test refuses to run without either, naming it (domain/testing.md 2.6). The exports, run before any
   command here that needs the binaries:
   ```sh
   export TEMPER_FORGEJO=$HOME/src/rust/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-linux-amd64 \
@@ -154,7 +154,7 @@ Removes: nothing.
 
 ### 11.2 The hinted story
 Amended by the designer's answer to Q2 (2026-10-18; setup.md 10, "Checked"): the fourth limit, `stall`, and the slow job.
-Scope: setup.md 13.4's hinted story, the fourth test of testing.md 2.6: the landing story with `poll`, `poll_max`, `slow`
+Scope: setup.md 13.4's hinted story, the fourth test of domain/testing.md 2.6: the landing story with `poll`, `poll_max`, `slow`
 and the change's `stall` raised past its budget, and its CI's job outlasting `settle`, so it lands within the budget only
 if the job's end is delivered and the reads after it: CI on its head is the one wait it meets that the forge ends. Its
 changes never conflict (one edit of `README.md`; the person's `slow` lands on `main` before the goal), so none is

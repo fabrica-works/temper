@@ -12,8 +12,8 @@ the other's stories. Shared files are `tests/real-loop/Cargo.toml` and
 
 ## Read first
 
-- temper at 4e14c2b5: `docs/design/tools.md` 5.4, 6, 7, 8.1 to 8.3,
-  11.3 and 11.4; `docs/design/testing.md` 2.4 and 6.1;
+- temper at 4e14c2b5: `docs/design/client/tools.md` 5.4, 6, 7, 8.1 to 8.3,
+  11.3 and 11.4; `docs/design/domain/testing.md` 2.4 and 6.1;
   `docs/design/client/README.md` 7 (the first owner's printed sign-in link).
 - jig: `docs/design/client/domain/contract.md` 3.1 (answered once
   durable); `docs/design/protocol/store.md` 4.4 (answered keys).
@@ -38,7 +38,7 @@ the other's stories. Shared files are `tests/real-loop/Cargo.toml` and
 
 ## What the design asks
 
-- **tools.md 11.3:** the restarted service retains the work; a fresh
+- **client/tools.md 11.3:** the restarted service retains the work; a fresh
   caller on another DIRECTORY, signed in as the same party, gets the
   lost answer under its name, with one chat; concurrent acts serialize.
 - **8.1 to 8.3:** DIRECTORY and its private files belong to the host;
@@ -51,7 +51,7 @@ the other's stories. Shared files are `tests/real-loop/Cargo.toml` and
   never 0. Exit 2 is the engine's answer alone; client answers, Held
   among them, exit 1. **5.4:** stopping the engine ends no watch;
   the client reopens it and eventually fails at the link deadline, 1.
-- **testing.md 2.4, 6.1:** real files and descriptors, checked ownership
+- **domain/testing.md 2.4, 6.1:** real files and descriptors, checked ownership
   and teardown, one second per focused story, retained failure traces.
 
 ## Choices this plan makes
@@ -103,7 +103,7 @@ the other's stories. Shared files are `tests/real-loop/Cargo.toml` and
 
 ### 09.1 A service restarted on its directory keeps the work
 
-Scope: tools.md 11.3's service restart, using 08's existing `run_on`.
+Scope: client/tools.md 11.3's service restart, using 08's existing `run_on`.
 Needs: nothing beyond the session's start.
 Files: `tests/real-loop/tests/calls.rs` (new);
 `tests/real-loop/Cargo.toml` (the `calls` binary).
@@ -146,7 +146,7 @@ Removes: nothing.
 
 ### 09.2 The lost answer, made once by its name
 
-Scope: tools.md 7, 8.2 and 11.3's dropped caller, recovery and lock release.
+Scope: client/tools.md 7, 8.2 and 11.3's dropped caller, recovery and lock release.
 Needs: nothing beyond the session's start.
 Files: `tests/real-loop/src/cue.rs` (new);
 `tests/real-loop/src/{calls.rs,service.rs,lib.rs,fixtures.rs}`;
@@ -200,7 +200,7 @@ Removes: nothing.
 
 ### 09.3 Two acts at once on one DIRECTORY, serialized by the lock
 
-Scope: tools.md 8.3 and 11.3, contention and recovery after a killed holder.
+Scope: client/tools.md 8.3 and 11.3, contention and recovery after a killed holder.
 Needs: the durable cue and lock observations (09.2).
 Files: `tests/real-loop/src/{calls.rs,fixtures.rs}`;
 `tests/real-loop/tests/calls.rs`.

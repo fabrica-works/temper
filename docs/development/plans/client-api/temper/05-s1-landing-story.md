@@ -3,7 +3,7 @@
 Added by ruling 347 (the director's request of 2026-10-18, for
 forge-setup's step 11.1 and its Done when 4). Read first: temper's
 `AGENTS.md`, `docs/development/workflow.md`; this plan's README, "Rules
-of this plan" and "Pins"; temper's `docs/design/testing.md`, 2.6.
+of this plan" and "Pins"; temper's `docs/design/domain/testing.md`, 2.6.
 
 Scope: `a_persons_change_lands_on_the_forge_and_is_found_after_a_restart`
 (`crates/temper/tests/process.rs:68-89`) passes again on `main`. It

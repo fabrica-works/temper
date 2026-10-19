@@ -46,7 +46,7 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   mapping's cookie, and a reload signs in again by it (2.4).
 - **Browser tests only for what a browser alone shows.** temper's
   stories are the worlds' and the real loop's, through the terminal
-  shell (`../testing.md`, 2.1, 2.4 and 6.3). The browser tier proves
+  shell (`../domain/testing.md`, 2.1, 2.4 and 6.3). The browser tier proves
   the bundle under its policy, signing in by the link and the cookie,
   addresses, the composer's keys and jig's attack stories that need a
   browser, and nothing a world can show (section 4).
@@ -242,15 +242,15 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
 - **What it runs against:** `temper serve`, a child of the harness's
   loop, on a scratch directory, from a configuration the test writes
   with the bundle named, its forge the fake forge, hosted on loopback in
-  that loop by skein's forge peer (`../testing.md`, 4.2), and its LLM
-  skein's fake LLM peer, as the process tier has it (`../testing.md`,
+  that loop by skein's forge peer (`../domain/testing.md`, 4.2), and its LLM
+  skein's fake LLM peer, as the process tier has it (`../domain/testing.md`,
   2.6): no Forgejo, no runner. The stories need no answer of the LLM's
   or the forge's.
 - **Only what a browser alone shows.** temper's stories (what a page
   shows, what an act sends, a chat answered, a proposal accepted, a
   repository adopted, a run's live text) are the joint world's
-  (`tests/client`; `../testing.md`, 6.3) and the real loop's, through
-  the terminal shell (`../testing.md`, 2.4); they never run again in a
+  (`tests/client`; `../domain/testing.md`, 6.3) and the real loop's, through
+  the terminal shell (`../domain/testing.md`, 2.4); they never run again in a
   browser. A story is in this tier only when no world can show it: the
   bundle, the browser's platform (the address, history, the cookie,
   keys) or an attack that needs a browser. Each names what only the
@@ -301,7 +301,7 @@ that opens a tab of its own.
 ### 4.3 Its budget and the gate
 
 - **A suite of its own,** outside the focused and fuzzy suites
-  (`../testing.md`, section 2), in its own crate
+  (`../domain/testing.md`, section 2), in its own crate
   (`tests/client-browser`, `temper-client-browser-world`), run by
   temper's gate with a nextest profile `browser`, one test at a time,
   on the bundle the gate builds once, with the dev profile.

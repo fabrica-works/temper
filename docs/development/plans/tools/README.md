@@ -6,14 +6,14 @@ design and STATUS marks), smith `a277e922`, jig `6ad8bb40`, temper
 `1c918a77c`; each session starts from its repository's `origin/main`.
 smith changes only by its closing repin.
 
-temper's tools (`docs/design/tools.md`), area 1, are planned in two
+temper's tools (`docs/design/client/tools.md`), area 1, are planned in two
 consecutive plans (decisions.md, 16): the whole of area 1 had a longest
 chain of about 31 steps. This plan, the first, builds section 13 and the
 tools as a library. skein's request table takes a key given by the asker
 (skein 01). jig moves to skein's and smith's main (jig 01), sends under a
 named key (jig 02), reads one turn (jig 03), and takes a deadline as a
 span that the engine makes a wall (jig 05), which a named request sent
-again needs (tools.md 7). temper moves to them (temper 01, 03.1) and
+again needs (client/tools.md 7). temper moves to them (temper 01, 03.1) and
 builds `temper-client-tools`: the table and a call's argv (temper 02),
 the root and the runner with the reads and acts (temper 03), the waits
 (temper 04), the forge's parts and `adopt` (temper 11), help and a
@@ -29,10 +29,10 @@ plan.
 
 ## Inputs
 
-- **temper's design,** at `1c918a77c`: `docs/design/tools.md` (area 1's
+- **temper's design,** at `1c918a77c`: `docs/design/client/tools.md` (area 1's
   tools as 5.5 lists them: 4, 5.1 to 5.4, 6, 7, 8.2, 11.1, 11.5, 12,
   13; 5.6, 8, 11.2 to 11.4 and 15 for the next plan), `docs/design/client/README.md` (3.1, 4.1 to 4.7, 5.2),
-  `docs/design/STATUS.md` ("tools"), and `docs/design/testing.md` (2.4,
+  `docs/design/STATUS.md` ("tools"), and `docs/design/domain/testing.md` (2.4,
   the real loop, for the next plan).
 - **jig's design,** at `6ad8bb40`: `docs/design/client/domain/client.md`
   (4.1, 4.6, 6, 7, 8.1, 10, 11, 19, 20),

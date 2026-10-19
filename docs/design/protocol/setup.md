@@ -471,7 +471,7 @@ Each needs nothing below the commands to change:
 - **QA's environments** (`../draft/qa.md`, 4.1), whose "temper in a box" is
   an owned setup with a scripted LLM, made by its own host from the same
   commands, its LLM key added from the client once signed in
-  (`../tools.md`, section 10);
+  (`../client/tools.md`, section 10);
 - **a container image** whose entry point is `temper box`.
 
 ## 8. The configuration
@@ -725,7 +725,7 @@ that they cover what its work waits on.
 
   The first two rows, moved by someone else's push or edit, and the
   others, comments, reviews, issues and drift, are checked from hints
-  in the worlds (`../testing.md`, 2.2 and 6.3).
+  in the worlds (`../domain/testing.md`, 2.2 and 6.3).
 
 ## 11. The crates
 
@@ -781,7 +781,7 @@ temper                       the binary: temper forge prepare|run|reconcile, tem
   a copy of the owned example (8.1), its CI Actions on the owned runner.
   `docs/guide/box.md` is its walk, from the binaries to a change asked
   for.
-- **The process tier** (`../testing.md`, 2.6), on owned mode in place of
+- **The process tier** (`../domain/testing.md`, 2.6), on owned mode in place of
   its own provisioning, with CI and webhooks (13.4).
 - **QA's environments** (`../draft/qa.md`, 4.1), each an owned setup made
   from the same commands (7.4): a box an agent starts, drives through
@@ -790,7 +790,7 @@ temper                       the binary: temper forge prepare|run|reconcile, tem
 
 ## 13. Testing
 
-The tiers, their budgets, the fakes and the layout are `../testing.md`'s;
+The tiers, their budgets, the fakes and the layout are `../domain/testing.md`'s;
 this section names what checks this document's contract, and what it
 relies on.
 
@@ -888,7 +888,7 @@ the preparation relies on stays here:
 
 ### 13.4 The process tier
 
-The tier, its budget and its referee are `../testing.md`'s (2.6). What
+The tier, its budget and its referee are `../domain/testing.md`'s (2.6). What
 it checks of this document:
 
 - **Owned in place of the test's support:** the test runs `temper forge
@@ -952,7 +952,7 @@ Each is intended; what it needs is named with it.
 - **A token for the person's scripts and agents.** Default: none; the
   person makes one on Forgejo's web, with the scopes they choose. A QA
   harness playing the person makes one so, with read scopes alone, for
-  the agent it runs (`../tools.md`, section 10); never the preparation's
+  the agent it runs (`../client/tools.md`, section 10); never the preparation's
   `admin_token`, which reconcile alone reads (section 9).
 - **Backups beyond an upgrade's.** Default: the person's, of the forge's
   directory and the store, with the box stopped.

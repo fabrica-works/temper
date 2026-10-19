@@ -32,21 +32,21 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
    application key, another ask, a restored record), the client answers a new `Outcome::Held` at
    once, keeping and sending nothing, until the holder's record is erased. The assert stays for the
    same application key with another request. Family asks are covered. jig f50c3f63.
-3. **A rerun in a fresh process.** tools.md 7, 8.2, 13. Open: the kept request settling first, or
+3. **A rerun in a fresh process.** client/tools.md 7, 8.2, 13. Open: the kept request settling first, or
    still parked and colliding with the call, and a repeat past the retention.
-   Answer: tools.md 7, 8.2: step 4 ends only once each kept request is answered and erased, so a
+   Answer: client/tools.md 7, 8.2: step 4 ends only once each kept request is answered and erased, so a
    call never meets its own name held, and a rerun under a kept name gets the engine's first answer;
    there is no "kept: pending". A link down past 30 s at step 3, 4 or 5 exits 1 and the records stay
    kept. Past the retention `me` gives, the name is free. temper a7a67b05b.
 4. **The turn read.** contract.md 5.1, 6, 7.1; store.md 7.3, 8.3. Open: its row, subject and wire
    shape; its answers (decoded, undecodable, not found); a turn too large for one read, which lost
-   its size; tools.md 5.2's "412 KB".
+   its size; client/tools.md 5.2's "412 KB".
    Answer: jig contract.md 6: `turn{n,attempt,turn}` is a read, never a subject, with
    `activity{n}`'s access. Its answers are Unknown, Gone (past the transcript horizon), Busy,
    Malformed and `TooLarge{bytes}` (the engine's, past one read's bound; the client's, past
    `document_bytes`). Pages keep wire bytes: `TurnProblem::TooLarge{bytes}`. The 412 KB example
-   needs a profile whose turn bound passes the page bound (tools.md 11.2). jig f50c3f63.
-5. **jig STATUS.md on the one-shot mode.** It lists client.md 20 as "not planned" while tools.md 13
+   needs a profile whose turn bound passes the page bound (client/tools.md 11.2). jig f50c3f63.
+5. **jig STATUS.md on the one-shot mode.** It lists client.md 20 as "not planned" while client/tools.md 13
    treats it as designed.
    Answer: jig STATUS.md: the one-shot mode is designed and `temper ctl` is its first host, in this
    plan. The service mode and the one-shot client's story stay unplanned. jig f50c3f63.
@@ -58,14 +58,14 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
    "started as job N", never "is running". jig-protocol-transcript follows v5; `Turn.jobs` is not
    shown. Both STATUS files say this plan moves the pins. jig f50c3f63, temper a7a67b05b.
 7. **`adopt` cannot build its record.** client.md 4.4, 4.6 and forge.md 4 need landing, prefix, CI
-   or checks, and home; tools.md 5.3 has no flags.
-   Answer: tools.md 5.3: `adopt --project P [--forge F] --owner O --name N --landing B`, then
+   or checks, and home; client/tools.md 5.3 has no flags.
+   Answer: client/tools.md 5.3: `adopt --project P [--forge F] --owner O --name N --landing B`, then
    `[--role owned|fork|context] [--prefix X] [--no-home] [--no-ci] [--check G]...`, with the form's
    defaults. `--role context` turns home off; `--no-ci` without `--check` is a usage error. temper
    a7a67b05b.
-8. **Marks.** tools.md 5.4. Open: which bytes are digested, which reads print a mark, and what a
+8. **Marks.** client/tools.md 5.4. Open: which bytes are digested, which reads print a mark, and what a
    composite read digests.
-   Answer: tools.md 5.4: "mark" is renamed DIGEST (`--since DIGEST`, a `digest:` line): SHA-256 over
+   Answer: client/tools.md 5.4: "mark" is renamed DIGEST (`--since DIGEST`, a `digest:` line): SHA-256 over
    the subject's document as `--json` prints it, without the digest field, 16 hex. Only watch
    subjects print one: `me`; `inbox` and `tasks` without a cursor; `task N` (one per subject with
    `--tree` or `--run`); `run N`. `chat`, `activity`, `turn` and `--activity` lines print none. With
@@ -73,49 +73,49 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
    condition. temper a7a67b05b.
 9. **Waiting for a chat's reply.** No condition names it, a chat never ends, and the `phase:` words
    are unlisted.
-   Answer: tools.md 5.4: `--until replied` (on `task N`, a chat) is met when the chat's status is
+   Answer: client/tools.md 5.4: `--until replied` (on `task N`, a chat) is met when the chat's status is
    parked, waiting for you, waiting for them, held, closing or ended. A chat wakes on its person's
    words (jig tasks.md 8.3), so a wait begun after `message` is not met by an earlier reply.
    `phase:` takes the client's 14 phases, lower-case and hyphenated. temper a7a67b05b.
 10. **Provisional text.** Agent processes give none (llm.md 7), but 5.2's `chat` and `run` rows do
     not say so.
-    Answer: tools.md 5.2: the rows give provisional text only where the run's host gives it; an
+    Answer: client/tools.md 5.2: the rows give provisional text only where the run's host gives it; an
     agent process gives none and nothing is printed. temper a7a67b05b.
-11. **The three turn bounds.** tools.md 5.2, 6.4, 6.3: the page bound, the client's limit and the
+11. **The three turn bounds.** client/tools.md 5.2, 6.4, 6.3: the page bound, the client's limit and the
     tools' window. Open: their values, which one wins, and the exit status past the client's limit.
-    Answer: the new tools.md section 12, "The bounds", names the page bound (engine), one read's
+    Answer: the new client/tools.md section 12, "The bounds", names the page bound (engine), one read's
     bound (engine), the client's `document_bytes` and the tools' window: 50 rows; 32 KiB result
     text; 16 KiB turn part; 1 MiB document; 30 s link deadline; 60 s lock wait at 100 ms. A turn
     past the read bound exits 0 with its size and "past the limit; report it". The step test keeps
     each tools' ceiling within the client limit. temper a7a67b05b.
 12. **Missing rows and formats.** Rows for `sign-in`, `sign-out`, `pending` and `help`; the JSON
     field names; the two `decide` forms in `--call`; the `kept:` line; TEXT from stdin.
-    Answer: tools.md 5.6: `sign-in FILE|-` (the link is never an argument), `sign-out`, `pending`
-    (reads the store file only: no lock, no client, nothing sent) and `help [TOOL]`. tools.md 6.2:
+    Answer: client/tools.md 5.6: `sign-in FILE|-` (the link is never an argument), `sign-out`, `pending`
+    (reads the store file only: no lock, no client, nothing sent) and `help [TOOL]`. client/tools.md 6.2:
     JSON is one object in snake case; `help TOOL --json` prints the table's record; `decide` takes
     the proposal, or the task and hold, then outcome and reason; `kept:` lines are one JSON object
     per line on stderr. TEXT `-` reads stdin, once per call, not with `--call -`. temper a7a67b05b
     (29 and 33 changed `kept:` and `pending`).
 13. **Open exit statuses.** An act whose link stays down, a client-side key conflict, a watch that
     ends mid-wait, and `adopt`'s refusals.
-    Answer: tools.md 6.3: 1 is a link down past the deadline (record kept), `Held`, an address off
+    Answer: client/tools.md 6.3: 1 is a link down past the deadline (record kept), `Held`, an address off
     loopback, a lock busy past 60 s, a watch ended by sign-out. 2 is an engine key conflict, or a
     wait's subject no longer visible. 3 is a timeout, or a watch ended with its condition unmet.
     `adopt`: adopted 0; unknown past the retention 1; every other 4.7 outcome 2. Questions 24 and 30
     amended two rows. temper a7a67b05b.
-14. **The lock.** tools.md 8.3; client.md 11. Open: the mechanism, the wait and exit status under
+14. **The lock.** client/tools.md 8.3; client.md 11. Open: the mechanism, the wait and exit status under
     contention, and which tools take it. The planner recommended `Op::Lock` on the store.
-    Answer: tools.md 8.3: skein's `Lock` on DIRECTORY itself, not the store (renamed on write),
+    Answer: client/tools.md 8.3: skein's `Lock` on DIRECTORY itself, not the store (renamed on write),
     tried every 100 ms; past 60 s exit 1, "DIRECTORY is busy with another call". Acts, `sign-in` and
     `sign-out` take it; `pending`, `help`, reads and waits do not. Reads and waits use an empty
     in-memory store, never DIRECTORY's. temper a7a67b05b.
-15. **The address.** tools.md 8.2 keeps an address file in DIRECTORY; client.md 6.1 passes it as an
+15. **The address.** client/tools.md 8.2 keeps an address file in DIRECTORY; client.md 6.1 passes it as an
     argument. Open: name, format, loopback check.
-    Answer: tools.md 8.1: `address` is temper-client-shell-cli's: one line, `http://HOST:PORT`, mode
+    Answer: client/tools.md 8.1: `address` is temper-client-shell-cli's: one line, `http://HOST:PORT`, mode
     0o600, written by `sign-in`. Every call checks 127.0.0.0/8 or [::1] before sending the token,
     else exit 1, "the engine's address must be on loopback". temper a7a67b05b.
-16. **Which jig-client limits `temper ctl` sets.** client.md 5.4 against tools.md 6.4.
-    Answer: tools.md 12: `ctl` has its own `Limits` preset in temper-client-tools' limits, not the
+16. **Which jig-client limits `temper ctl` sets.** client.md 5.4 against client/tools.md 6.4.
+    Answer: client/tools.md 12: `ctl` has its own `Limits` preset in temper-client-tools' limits, not the
     terminal's: rows 50, document 1 MiB, segments 9, authority 12, the rest as the terminal's.
     temper a7a67b05b.
 17. **The agent's credentials.** How `ctl` signs in on the box (link and password, setup.md 6.5, or
@@ -123,10 +123,10 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
     Answer: `ctl` signs in by the box's printed link on stdin (`sign-in -`). The harness plays the
     person (setup.md 6.5): it signs in on Forgejo's web, changes the password, makes the repository
     to adopt in an org, and makes a person token with read-only scopes (setup.md 16). The agent
-    reads the forge with that token, never `admin_token` (setup.md 9; testing.md 2.6).
+    reads the forge with that token, never `admin_token` (setup.md 9; domain/testing.md 2.6).
     `tests/support/owned.rs` still reads admin_token as the proofs' read handle: a plan that touches
     it moves it. temper a7a67b05b.
-18. **The real loop to a landed change.** testing.md 2.4, 10; tools.md 11.3. No tier lands a change
+18. **The real loop to a landed change.** domain/testing.md 2.4, 10; client/tools.md 11.3. No tier lands a change
     through the HTTP fake forge, the real engine and worker, and an agent on a real kernel. Open:
     (a) the bridge, fake git on the shared in-memory forge or real bare repositories, (b) authority
     and merging if the latter, (c) CI, (d) timing, (e) the tools' root, (f) a lost answer on a real
@@ -141,10 +141,10 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
     smith agent on the fake LLM's scripted turns. (h) In this plan: `tests/real-loop`, its fixtures,
     and the hosted service, worker, agent, fake LLM, forge host, fake git and tools' root; later:
     real git, sh CI, faults, several workers. The forge host moves to
-    `testing/temper-fake-forge-host` (testing.md 7). temper aeff31a (tools.md 11.3, 11.4; testing.md
+    `testing/temper-fake-forge-host` (domain/testing.md 7). temper aeff31a (client/tools.md 11.3, 11.4; domain/testing.md
     2.4, 4.2, 9, 10).
-19. **tools.md has no section 12.** Cosmetic.
-    Answer: answered with question 11: tools.md section 12, "The bounds", now exists. temper
+19. **client/tools.md has no section 12.** Cosmetic.
+    Answer: answered with question 11: client/tools.md section 12, "The bounds", now exists. temper
     a7a67b05b.
 20. **jig's test builds at opt-level 2.** Can they take their dependencies at
     `[profile.dev.package."*"] opt-level = 2`, given testing-strategy.md 8? The planner recommended
@@ -154,80 +154,80 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
     hidden": test builds stay unoptimized, dependencies included; a slow test's cause is found with
     a profile and fixed; a per-crate override is for one hot leaf crate only, with a profile and
     sign-off cited beside it. jig 04 becomes a profiling pass, then restores 15 s.
-21. **Digests of `inbox` and `tasks`.** tools.md 5.4: jig's watches deliver a document unlike the
+21. **Digests of `inbox` and `tasks`.** client/tools.md 5.4: jig's watches deliver a document unlike the
     read's (no cursor), so a read's digest cannot equal the wait's and `--since DIGEST` breaks.
-    Answer: accepted. tools.md 5.4: a read and a wait digest one form, the watch's document: for
+    Answer: accepted. client/tools.md 5.4: a read and a wait digest one form, the watch's document: for
     `inbox` and `tasks`, the rows of the first window, in its order, plus whether more follow,
     within the tools' page of rows. The read prints its cursor outside the digest. A subject takes
     only what its watch takes (`inbox` with no flag; `tasks` without `--after` or `--ended`); else a
     usage error, exit 1. temper 4e14c2b5.
-22. **`phase:` conditions never met.** tools.md 5.4: the engine ends a task watch when the task
+22. **`phase:` conditions never met.** client/tools.md 5.4: the engine ends a task watch when the task
     ends, and a chip's phase is never done, failed or cancelled.
-    Answer: accepted. tools.md 5.4: `phase:ended|done|failed|cancelled` are usage errors, exit 1,
+    Answer: accepted. client/tools.md 5.4: `phase:ended|done|failed|cancelled` are usage errors, exit 1,
     naming `--until ended`. `ended` is met by a delivery showing the subject ended, or by its
     watch's end; for `task N` the answer is the task as a read gives it once ended, so it says how
     it ended. temper 4e14c2b5.
-23. **`tree N --until waiting-on-me`.** tools.md 5.4: tree nodes carry no "waits on". The planner
+23. **`tree N --until waiting-on-me`.** client/tools.md 5.4: tree nodes carry no "waits on". The planner
     recommended reading task N's own watch, a second watch kept beside the tree's.
     Answer: the designer differs from the planner. `tree N` takes `ended` only; `waiting-on-me` is
     dropped there, with no second watch. A task's waits-on is computed over its tree (jig
-    domain/tasks.md 3), so `wait task N --until waiting-on-me` covers the tree. tools.md 5.4. temper
+    domain/tasks.md 3), so `wait task N --until waiting-on-me` covers the tree. client/tools.md 5.4. temper
     4e14c2b5.
-24. **Exit 1 for "watch ended by the engine's stop".** tools.md 6.3: jig reopens a watch the engine
+24. **Exit 1 for "watch ended by the engine's stop".** client/tools.md 6.3: jig reopens a watch the engine
     dropped, so no `Ended` arrives.
     Answer: accepted. An engine that stops ends no watch: jig's client reopens what it dropped
     (client.md 8.1). The wait goes on and fails as a link down past its deadline, exit 1; "the
-    engine's stop" leaves the exit table. tools.md 5.4, 6.3. temper 4e14c2b5.
-25. **A call cut by a signal.** tools.md 6.3 gives no status.
+    engine's stop" leaves the exit table. client/tools.md 5.4, 6.3. temper 4e14c2b5.
+25. **A call cut by a signal.** client/tools.md 6.3 gives no status.
     Answer: accepted. The tools catch no signal: a cut call's status is the OS's, never 0, and a
     rerun under its name gets its first answer. The process tier asserts "not 0", then makes the
-    rerun once. tools.md 6.3, 8.2, 11.4. temper 4e14c2b5.
+    rerun once. client/tools.md 6.3, 8.2, 11.4. temper 4e14c2b5.
 26. **The runner's asker.** jig client.md 4.6 gives the tools' runner none, and temper root.md 15
     reads "one asker per owner, all in one enum, never reused". The planner recommended one asker
     for the runner, each call's number in the application key's high bits.
     Answer: accepted, except on the owner, where the designer differs in part from the planner
     ("Owner gains no variant" in the draft): temper's `Owner` gains `Runner` = 3 (jig client.md
     4.6). The call's number goes in the high 32 bits of each key's and handle's number; calls are
-    numbered from one past the highest among the keys kept at `Start`. tools.md 4. temper 4e14c2b5.
-27. **A named rerun and the wall clock.** tools.md 7: `shapes::chat` takes the clock, so a rerun in
+    numbered from one past the highest among the keys kept at `Start`. client/tools.md 4. temper 4e14c2b5.
+27. **A named rerun and the wall clock.** client/tools.md 7: `shapes::chat` takes the clock, so a rerun in
     a fresh process builds other bytes and jig answers a key conflict, not the first answer.
     Answer: accepted, in jig's domain (jig 62bcf71e, design only; its STATUS rows say "the
     downstream repository's tools plan"). A deadline given as a span means "this long after the task
     is made": the engine makes it a wall from the wall time of the decision that makes the task (a
     `Create`'s admission, or the acceptance of the proposal that asks for it); a proposal keeps the
     span until accepted (jig contract.md 3.1, 3.2, 3.6; client.md 19, where `shapes::chat` takes no
-    clock; authority.md 7; tasks.md 4; engine.md 4). temper tools.md 7: a named request is built
+    clock; authority.md 7; tasks.md 4; engine.md 4). temper client/tools.md 7: a named request is built
     from the call and `me` alone; a rerun after `me` changed what it is built from is another ask, a
     key conflict. temper 4e14c2b5.
-28. **`close` takes no REASON.** tools.md 5.3, but `shapes::close_chat` needs one.
-    Answer: accepted. tools.md 5.3: `close N [--move D]... [--reason TEXT]`, the reason empty unless
+28. **`close` takes no REASON.** client/tools.md 5.3, but `shapes::close_chat` needs one.
+    Answer: accepted. client/tools.md 5.3: `close N [--move D]... [--reason TEXT]`, the reason empty unless
     given, as jig's reference UI sends it. temper 4e14c2b5.
-29. **What a `kept:` line names.** tools.md 6.2: jig-client exposes no engine key. The planner
+29. **What a `kept:` line names.** client/tools.md 6.2: jig-client exposes no engine key. The planner
     recommended the name when the call has one, and the application key always.
     Answer: the designer differs from the planner, and corrected a first answer (temper fe0ec316). A
     kept line prints no name and no key: a request's record keeps its engine key, for a named
     request the name's digest (first 16 bytes of SHA-256), never the name (jig protocol/client.md
     10; client.md 11). Text: `kept: ` + the operation (jig's, or the forge's stop or adopt) + the
     outcome as an act prints. JSON: `operation`, `outcome`, no `name`. The runner keeps no records
-    of its own. tools.md 6.1, 6.2.
-30. **A refusal by jig's client itself.** tools.md 6.3: Unconfirmed, a client-side key conflict, a
+    of its own. client/tools.md 6.1, 6.2.
+30. **A refusal by jig's client itself.** client/tools.md 6.3: Unconfirmed, a client-side key conflict, a
     limit. The planner recommended exit 2, as the engine's key conflict.
     Answer: the designer differs from the planner. Exit 2 is the engine's answer alone. The client's
     own answers exit 1: not kept, held, unknown past the retention, a read past its limits.
     Unconfirmed and the client-side key conflict never reach a call (the runner sends nothing before
     `me` is live; each call's keys are its own): either is the tools' bug, exit 1, to be reported as
     a finding (11.5). The plan's draft 03 ("a client limit exits 2") becomes exit 1, except the
-    sized turn, which stays 0. tools.md 6.3. temper 4e14c2b5.
-31. **`decide P/K`.** tools.md 5.3: jig's `ProposalKey.proposer` is `Task(u64)` or `Party(u64)`.
+    sized turn, which stays 0. client/tools.md 6.3. temper 4e14c2b5.
+31. **`decide P/K`.** client/tools.md 5.3: jig's `ProposalKey.proposer` is `Task(u64)` or `Party(u64)`.
     Answer: accepted. `decide P/K`, P as `tN` or `pN`: `t41/3`, `p3/17`. 6.1's example reads
-    `proposed: p3/17, to maintainers`. tools.md 5.3, 6.1. temper 4e14c2b5.
-32. **The forge's words, and skein-ui in the crate list.** Cosmetic, tools.md 4.
-    Answer: skein-ui is added to tools.md 4's crate list. The forge's words moving to
+    `proposed: p3/17, to maintainers`. client/tools.md 5.3, 6.1. temper 4e14c2b5.
+32. **The forge's words, and skein-ui in the crate list.** Cosmetic, client/tools.md 4.
+    Answer: skein-ui is added to client/tools.md 4's crate list. The forge's words moving to
     temper-client-domain is temper 11; the design already says so. temper 4e14c2b5.
-33. **What `pending` prints, and records the tools cannot read.** tools.md 5.6: with 29, a pending
+33. **What `pending` prints, and records the tools cannot read.** client/tools.md 5.6: with 29, a pending
     row has no key or name; and a kept record of another store version, or of a family or owner the
     tools do not declare, had no defined output.
-    Answer: tools.md 5.6, 6.1, 6.2, 6.3, 7, 8.2, 11.3. A row prints the operation, `party N`, and
+    Answer: client/tools.md 5.6, 6.1, 6.2, 6.3, 7, 8.2, 11.3. A row prints the operation, `party N`, and
     the first sending or `not sent`; JSON `{"pending": [...], "unread": N}`, a row having
     `operation`, `party`, `first_sent`. A record the tools cannot read is counted, never listed
     (jig's client drops it at start and gives only `Dropped { count }`): `pending` prints after the
@@ -267,9 +267,9 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
 4. **The named send changes no wire:** the name is the engine key the
    wire carries already. jig 02 changes no wire version.
 5. **For the next plan:** `temper ctl`'s one-shot host answers the
-   client's Save and Erase in memory for reads and waits (tools.md 8.3)
+   client's Save and Erase in memory for reads and waits (client/tools.md 8.3)
    and drops the loaded records; jig's native Shell is not changed (it
-   has no memory store; tools.md 15 keeps the host temper's). This
+   has no memory store; client/tools.md 15 keeps the host temper's). This
    plan's library therefore leaves the store to its host: the root and
    the runner take the kept records they are given and touch no file.
 6. **For the next plan:** temper-client-shell-cli's host is a skein host
@@ -277,7 +277,7 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
    call, so that DIRECTORY's lock and files and a call's exit run on the
    real kernel (`findings/next/05-ctl.md`, `08-real-loop.md`).
 7. **Proofs by tier.** The user's direction of 10-18 22Z puts area 1's
-   stories in the real loop (testing.md 2.4) wherever it can carry them.
+   stories in the real loop (domain/testing.md 2.4) wherever it can carry them.
    The real loop is the next plan's (16), so this plan proves the tools
    as a library, in `temper-client-tools`' unit tests, and jig's changes
    in jig's worlds and joint stories; the process tier carries only the
@@ -304,7 +304,7 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
     focused budget back to 15 s) once jig 01 has landed, so the time is
     measured at the pins the plan keeps, and the 15 s binds jig 02, 03
     and 05.
-12. **Areas 2 to 4, the MCP endpoint and the tools in jig** (tools.md 14)
+12. **Areas 2 to 4, the MCP endpoint and the tools in jig** (client/tools.md 14)
     are in `later.md`; the QA loop is not in this plan.
 13. **A named send under the same application key with another name is
     a key conflict,** loud as today's (the assert kept and extended): one
@@ -314,7 +314,7 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
 14. **jig 05, deadline spans, is in this plan:** jig `62bcf71e`'s design
     (a deadline given as a span, made a wall by the engine; shapes read
     no clock) names "the downstream repository's tools plan" in its
-    STATUS rows, and tools.md 7's named requests need it (a name sent
+    STATUS rows, and client/tools.md 7's named requests need it (a name sent
     again makes the same ask; question 27). Question 34's answer fixes
     the engine's checks (the decision's wall, the span at each check).
 15. **Sessions over section 5's 400 lines are split,** the new halves
@@ -329,7 +329,7 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
     38 steps and 4 closing repins, with a longest chain of 21 (jig 01,
     03, 05.2 to 05.5, temper 03, 04, temper-repin): section 13, and the
     tools as a library. The next plan starts from this one's `main`:
-    `temper ctl`'s host (tools.md 5.5, 8), the client stories, the fake
+    `temper ctl`'s host (client/tools.md 5.5, 8), the client stories, the fake
     forge's host, the real-loop world and its stories, and the process
     tier; `later.md`'s first row names it, and its drafts are in
     `findings/next/`, with their numbers (temper 05 to 10, 13), as its
@@ -373,14 +373,14 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
      jig 05's re-check of jig-05.1 (skein 93052c6b, smith d56bbe3c, jig aa3e661c, temper 6f8ee6665; read only, nothing compiled, the queue paused behind jig-04's exclusive gate): 05.2's Files now name the unit, world and scripted fixtures that build `people::Member`, `tasks::New` or `ProposedTask` literals outside the directories it named, found by `git grep -l -E '(\b|::)(Member|New|NewTask|ProposedTask) \{' origin/main -- '*.rs'` at jig `aa3e661c`: `crates/jig-domain-core/src/{tests,tests/fixtures}.rs`, `crates/jig-domain-people/src/tests/fixtures.rs`, `crates/jig-domain-tasks/src/tests/{last_batch,revisions,revisions/text}.rs`, `crates/jig-protocol-store/src/tests/fixtures.rs`, `testing/jig-client-scripted-engine/src/{owner_history/tests,owner_proposal/tests,tests/fixtures,tests/recurring}.rs`, `tests/client/src/{stories,joint/engine_stories,joint/wire/history,joint/wire/historical/tests,joint/wire/projects/tests}.rs` and `tests/ops/src/conformance/mod.rs`; a listed file with no such literal is left unchanged. 05.2 and 05.3 also name `crates/jig-protocol-store/src/sizes.rs` and `src/tests/format.rs`: `largest` takes `tasks_v4::Row::worst_case_bytes` and `people_v4::Row::worst_case_bytes` (jig-05.1, `f392967c`), so `format.rs`'s 81_241, 81_353, 17_499 and 34_998 follow the grown rows, refreshed by the 5.7 rule. The check's worry that the Done-when grep for `Deadline::Span` in `codec/people` is vacuous does not hold: with `-w`, `TemplateDeadline::Span` does not match, and `git grep -n -w -F 'Deadline::Span' origin/main -- crates/jig-protocol-store/src/codec/people crates/jig-protocol-store/src/codec/tasks` prints nothing at `aa3e661c`. temper's own users of these types (`temper-client-domain` `pages/chats.rs`, `temper-service` `tests/fixtures.rs`, `temper-client-view` `cards/proposal.rs`, `temper-protocol-store` `records/{application,application/refusal}.rs` and `tests/records.rs`) are temper's repin's. A further literal the compiler names outside these Files: give it the selector as its step says, and list it in the commit body.
 
 108. **temper 02's Shapes against main** (ready check of temper-02.1).
-     temper 02's ready check (skein 93052c6b, smith d56bbe3c, jig aa3e661c, temper 482d5fefe; read only, nothing compiled, the queue paused behind jig-04's exclusive gate). temper/02-tools-table.md now says: `client()` writes `text: TEXT` beside `rows: ROWS` and `document_bytes: DOCUMENT`, and the preset test sets `rows` and `text` aside, because tools.md, 12, gives "a result's text | 32 KiB" among the bounds of "the tools' own preset of `jig-client`'s `Limits`, not the terminal's", and jig bounds a received document's text by it (`crates/jig-client-protocol-link/src/limits.rs` `wire`: `wire.document_text_bytes = client.text`), where native's `text: 128` would refuse a result of 129 bytes or more; `each_ceiling_is_within_the_client_limit_it_reads_from` also asserts `limits::TEXT == client.text`; if `the_tools_preset_has_a_worst_case` refuses the preset at 50 rows and 32 KiB, that is a block for the designer, not a smaller bound. `jig::table::Limits`'s doc comment says "from the host's preset", not temper's `limits::tools()`, which `no_file_under_jig_names_temper_or_an_item_outside_jig` and the Done-when's grep under `src/jig` would refuse. The Done-when's tool-name grep matches `name: b"<tool>"`, since `b"me"`, `b"task"` and `b"run"` also occur as words of the rows' sets. temper's `clippy.toml` bans `alloc::vec::Vec`, `alloc::string::String`, `core::matches` and `core::iter::Iterator::all` in tests too: `fixtures::sources()`, `Name::new` and the boundary test's body are written within it, as `temper-box/src/tests/boundary.rs` reads its sources. Interim, on `--order`: jig's `QueryOrder` has five variants (`Number`, `Changed`, `Activity`, `Priority`, `Ended`, `crates/jig-client-domain/src/contract/queries.rs`) and `TaskQuery.order` is no `Option`, while tools.md, 4, gives `tasks … [--ended] [--order activity|priority]` and names no order for a call without `--order`; that goes to the designer (question.md). 02.1 goes on; in 02.2, `--order`'s default and `back`'s words for `Number`, `Changed` and `Ended` wait for the answer, and the rest of 02.2 does not. A further copy of a bound or a tool name found later: change it as its step says, and list it in the commit body.
+     temper 02's ready check (skein 93052c6b, smith d56bbe3c, jig aa3e661c, temper 482d5fefe; read only, nothing compiled, the queue paused behind jig-04's exclusive gate). temper/02-tools-table.md now says: `client()` writes `text: TEXT` beside `rows: ROWS` and `document_bytes: DOCUMENT`, and the preset test sets `rows` and `text` aside, because client/tools.md, 12, gives "a result's text | 32 KiB" among the bounds of "the tools' own preset of `jig-client`'s `Limits`, not the terminal's", and jig bounds a received document's text by it (`crates/jig-client-protocol-link/src/limits.rs` `wire`: `wire.document_text_bytes = client.text`), where native's `text: 128` would refuse a result of 129 bytes or more; `each_ceiling_is_within_the_client_limit_it_reads_from` also asserts `limits::TEXT == client.text`; if `the_tools_preset_has_a_worst_case` refuses the preset at 50 rows and 32 KiB, that is a block for the designer, not a smaller bound. `jig::table::Limits`'s doc comment says "from the host's preset", not temper's `limits::tools()`, which `no_file_under_jig_names_temper_or_an_item_outside_jig` and the Done-when's grep under `src/jig` would refuse. The Done-when's tool-name grep matches `name: b"<tool>"`, since `b"me"`, `b"task"` and `b"run"` also occur as words of the rows' sets. temper's `clippy.toml` bans `alloc::vec::Vec`, `alloc::string::String`, `core::matches` and `core::iter::Iterator::all` in tests too: `fixtures::sources()`, `Name::new` and the boundary test's body are written within it, as `temper-box/src/tests/boundary.rs` reads its sources. Interim, on `--order`: jig's `QueryOrder` has five variants (`Number`, `Changed`, `Activity`, `Priority`, `Ended`, `crates/jig-client-domain/src/contract/queries.rs`) and `TaskQuery.order` is no `Option`, while client/tools.md, 4, gives `tasks … [--ended] [--order activity|priority]` and names no order for a call without `--order`; that goes to the designer (question.md). 02.1 goes on; in 02.2, `--order`'s default and `back`'s words for `Number`, `Changed` and `Ended` wait for the answer, and the rest of 02.2 does not. A further copy of a bound or a tool name found later: change it as its step says, and list it in the commit body.
 
 109. **temper 01.1's owned example bounds and runner** (plan defect and infrastructure, temper 01's block of 2026-10-19T04:58:22Z).
      Ruling 109. 1. The owned example's bounds. setup.md, 8.1, says it in its own words: "Its `memory_bytes` hold its worst cases wherever a person lays it and whatever its forge's files hold". `docs/examples/owned.json`'s `engine.memory_bytes` and `workers[0].memory_bytes` are those worst cases, measured by `serve_prepares_once_on_the_owned_example` at the bounds of what a copy changes, as forge-setup's `temper-14.s2` raised them; they are no input the Don't list guards. So each refused number rises by the N of its refusal, "the worst case passes memory_bytes by N bytes": the engine's by 264, the worker's by 366,843,064,659, or by what the test says on the final tree. Nothing else in the example, no worst case and no other test changes. The commit body gives each refusal before the raise, and the test passes after it. temper/01-repin.md's Files, Shape step 7 and Don't now say this. setup.md's figures for them are the designer's: later.md has the row. A further copy of either number: refresh it, and list it in the commit body.
      2. The runner. forgejo-runner 13.2.0, the pinned build (sha256 fadaec89…fcad1), is at `/home/free/.local/opt/forgejo-runner-13.2.0/forgejo-runner`, and `~/.profile`, which each `bash -lc` reads, exports `TEMPER_FORGEJO_RUNNER` with that path beside `TEMPER_FORGEJO`. Run 01.1's process proof as the plan gives it, with both set; it lands no Proof "unavailable". A command whose environment lacks either is a shell started before 05:13Z: start it again from a login shell.
 
 110. **temper 02.2's order of tasks** (steer of 2026-10-19T05:25:37Z).
-     temper 02.2's order of `tasks`, from decisions.md, J, decided by the director for the user (temper d3704b9d6): "without `--order`, `tasks` reads by `QueryOrder::Number`, ascending, and `--ended` changes no order. The tools never send `Changed` or `Ended`, so `jig::argv::back` answers that a call with either order has no argv form, a refusal and never a guess, and `parse(back(call)) == call` holds over every call `parse` makes." temper/02-tools-table.md now says so: Choices' argv forms, 02.2's Shape on `--order` and on `back`, with its Test shape's three cases, and the sketch's `back`, which returns `Result<(), Unwritten>`, `enum Unwritten { Overflow(Overflow), NoForm }` (`Overflow`, skein-lib's `writer.rs`). This ends ruling 108's interim wait on `--order`; the rest of ruling 108 stands. tools.md, 5.2, says it at the designer's next pass, after this plan: later.md has the row. A further user of `back`'s error that the compiler names: give it `Unwritten`, and list it in the commit body.
+     temper 02.2's order of `tasks`, from decisions.md, J, decided by the director for the user (temper d3704b9d6): "without `--order`, `tasks` reads by `QueryOrder::Number`, ascending, and `--ended` changes no order. The tools never send `Changed` or `Ended`, so `jig::argv::back` answers that a call with either order has no argv form, a refusal and never a guess, and `parse(back(call)) == call` holds over every call `parse` makes." temper/02-tools-table.md now says so: Choices' argv forms, 02.2's Shape on `--order` and on `back`, with its Test shape's three cases, and the sketch's `back`, which returns `Result<(), Unwritten>`, `enum Unwritten { Overflow(Overflow), NoForm }` (`Overflow`, skein-lib's `writer.rs`). This ends ruling 108's interim wait on `--order`; the rest of ruling 108 stands. client/tools.md, 5.2, says it at the designer's next pass, after this plan: later.md has the row. A further user of `back`'s error that the compiler names: give it `Unwritten`, and list it in the commit body.
 
 111. **temper 02.1's worktree** (process, temper 02.1's block of 2026-10-19 05:26:05 UTC).
      `wt/temper-02` was the supervisor's: ruling 111's premise is that temper 02's ready check, behind ruling 108, added it as its scratch worktree at `origin/main` 482d5fefe, at 04:40Z, and left its sketch of `crates/temper-client-tools/` there. It held no implementer's work. The supervisor removed it, and `wt/temper-01r`, a re-check's that was not restarted. Run `plan worktree temper 02` again and start 02.1 from temper/02-tools-table.md as landed: it includes ruling 110, J's order of `tasks` without `--order`, which ends ruling 108's interim wait on `--order`; the rest of ruling 108 stands. The supervisor's scratch worktrees are named `<repository>-<NN>r` from now, as `jig-02r`, `jig-03r` and `jig-05r` are: a worktree under `wt/` with a session's own name that the ledger gives no implementer is a block, as this one was.
@@ -405,7 +405,7 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
      - temper/03-*.md:3 "temper repins onto jig's named send, turn read and deadline spans (03.1)"; :17 names `Held`.
 
 114. **temper 02.1's rows** (design gap, temper 02.1's block of 2026-10-19 05:31:30 UTC).
-     decisions.md, For the user, K, decided by the director (temper 724865e25): the tools' rows are 32, jig's client wire ceiling, wherever tools.md, 12, and the plan say 50; jig's wire stays as it is. `limits::ROWS: u32 = 32` in temper 02.1; the plan now says 32 for every page, window and `--limit` that read it: temper 02.2's `READS` row `activity 41 --limit 32` and `a_value_outside_its_kind_or_rows_is_a_usage_error` with `--limit 33`; temper 03's pages (`at most 32 rows`, `Subject::Tree { task, window: 32 }`, `--activity K` and `--limit K` at most 32); temper 04's windows (`fixtures::inbox_first_window(33)`, `read.rows()` 32, the 31/32/33-row cases); the Done-when grep, `ROWS: u32 = 32`. `the_tools_preset_has_a_worst_case` stays as the plan gives it: with `ROWS = 32`, temper 02's re-check passed it, 6 of 6 in `temper-client-tools`. tools.md, 12, says so at the designer's next pass (later.md). Any further 50 that is the tools' rows, or 49 or 51 beside it: make it 32, 31 or 33, and list it in the commit body.
+     decisions.md, For the user, K, decided by the director (temper 724865e25): the tools' rows are 32, jig's client wire ceiling, wherever client/tools.md, 12, and the plan say 50; jig's wire stays as it is. `limits::ROWS: u32 = 32` in temper 02.1; the plan now says 32 for every page, window and `--limit` that read it: temper 02.2's `READS` row `activity 41 --limit 32` and `a_value_outside_its_kind_or_rows_is_a_usage_error` with `--limit 33`; temper 03's pages (`at most 32 rows`, `Subject::Tree { task, window: 32 }`, `--activity K` and `--limit K` at most 32); temper 04's windows (`fixtures::inbox_first_window(33)`, `read.rows()` 32, the 31/32/33-row cases); the Done-when grep, `ROWS: u32 = 32`. `the_tools_preset_has_a_worst_case` stays as the plan gives it: with `ROWS = 32`, temper 02's re-check passed it, 6 of 6 in `temper-client-tools`. client/tools.md, 12, says so at the designer's next pass (later.md). Any further 50 that is the tools' rows, or 49 or 51 beside it: make it 32, 31 or 33, and list it in the commit body.
 
 115. **temper 12's Shapes against main** (ready check of temper-12.1).
      temper 12's ready check (skein 0db7b1fc7, smith 538ef49a5, jig f67d51c78, temper 1ceb21697; temper's pins skein b4c6241, jig 719bd70) corrected temper/12-tools-help.md: `jig::json::Refusal` derives `Clone, Copy, PartialEq, Eq, Debug`, which the reference test's comparison and the workspace's `missing_debug_implementations` need, and gains `Refusal::Text`: `skein_json::writer::Encoder::measured` refuses with `TooLong`, `TooDeep`, `Text` or `Number`, and argv's `Value::Text` and `File` carry bytes that need not be UTF-8, so `write_call` and `write_tool` match `TooLong | TooDeep` to `Long` and `Text | Number` to `Text`, with a match, since clippy.toml bans `map_err`; help measures into `skein_lib::Writer::new(text)` (`usize::try_from(limits::TEXT)`) and writes into a `Writer` of the measured `written()` length, since a `Writer` is exact-length and `finish` asserts it full, and `the_help_fits_the_tools_window` asserts on the measured length; 12.2 needs temper 03.2, whose `fixtures::golden(name)` its goldens read; `a_document_past_ask_bytes_is_a_usage_error` expects `Usage::Json`, the length checked against the u64 `ask_bytes` before the u32-length tokenizer. A further refusal or writer the compiler or clippy names: handle it the same way, and list it in the commit body.
@@ -426,11 +426,11 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
      - testing-strategy.md, 10: "Rows carry data" (546), "A setup written once" (555), "Named fixtures and sizes" (561), "A bound's two sides" (573).
 
 117. **temper 12.2's Shapes against main** (re-check of temper-12.1).
-     temper 12's re-check after its start (temper 1e089afb5; 12.1 landed there, so only 12.2 is corrected) found 12.2's usage rule short of the rows temper 02 landed. temper/12-tools-help.md, 12.2, now says: a switch is `[--name]`, read by its place before its kind; a repeated flag is `[--name SHOWN]...`; a positional's `Kind::Word` set shows its words joined by `|`; `Kind::Order` shows `activity|priority`; `src/jig/rows.rs` joins the Files and takes tools.md 5.3's order (`CHAT_CREATE`'s `project` before `text`, `CANCEL`'s `grace` before `reason`, `DECIDE`'s escalation form `hold` after `task`); help gives every row named `chat`, `help::text(Some(i))` row `i` and each later row of its name; `subject::live` becomes `pub(crate)` (`src/jig/subject.rs` joins the Files) with one const of every `Phase`; the guide's reference test and `fixtures::parse_line` are `for` loops over `GUIDE.get(at)`, since clippy.toml bans `Vec`, `slice::split`, `filter_map`, `collect` and `Option::is_none_or`; the help sketches import `skein_lib::{Overflow, Writer}`. Where a row's `shown` or order still differs from 5.2's to 5.6's line, the row changes to the line's, with each test whose expected text follows the rows' order: list each in the commit body.
+     temper 12's re-check after its start (temper 1e089afb5; 12.1 landed there, so only 12.2 is corrected) found 12.2's usage rule short of the rows temper 02 landed. temper/12-tools-help.md, 12.2, now says: a switch is `[--name]`, read by its place before its kind; a repeated flag is `[--name SHOWN]...`; a positional's `Kind::Word` set shows its words joined by `|`; `Kind::Order` shows `activity|priority`; `src/jig/rows.rs` joins the Files and takes client/tools.md 5.3's order (`CHAT_CREATE`'s `project` before `text`, `CANCEL`'s `grace` before `reason`, `DECIDE`'s escalation form `hold` after `task`); help gives every row named `chat`, `help::text(Some(i))` row `i` and each later row of its name; `subject::live` becomes `pub(crate)` (`src/jig/subject.rs` joins the Files) with one const of every `Phase`; the guide's reference test and `fixtures::parse_line` are `for` loops over `GUIDE.get(at)`, since clippy.toml bans `Vec`, `slice::split`, `filter_map`, `collect` and `Option::is_none_or`; the help sketches import `skein_lib::{Overflow, Writer}`. Where a row's `shown` or order still differs from 5.2's to 5.6's line, the row changes to the line's, with each test whose expected text follows the rows' order: list each in the commit body.
 
      Checked:
      - `git show origin/main:crates/temper-client-tools/src/jig/rows.rs`: `CHAT_CREATE` lists `positional(b"text", …)` then `flag(b"project", …)`; `CANCEL` `reason` then `flag(b"grace", …)`; `DECIDE`'s second form ends `flag(b"hold", b"R", …)`; `TASKS` has `flag(b"order", b"O", Kind::Order, …)`.
-     - `git grep -n -E 'chat --project|cancel N|--hold R|--order' origin/main -- docs/design/tools.md`: 197 `chat --project P TEXT`; 206 `cancel N [--grace D] REASON`; 203 `decide N --hold R release|leave|pass-up [REASON]`; 162 `[--order activity|priority]`.
+     - `git grep -n -E 'chat --project|cancel N|--hold R|--order' origin/main -- docs/design/client/tools.md`: 197 `chat --project P TEXT`; 206 `cancel N [--grace D] REASON`; 203 `decide N --hold R release|leave|pass-up [REASON]`; 162 `[--order activity|priority]`.
      - `jig/table.rs:91`: `switch` builds `shown: b"", kind: Kind::Word { set: &[] }, … place: Place::Switch`.
      - `jig/argv.rs:92`: `fn tool_index` returns the first row whose `name == word`; `table.rs:13,17`: `&rows::CHAT`, `&rows::CHAT_CREATE`.
      - `jig/subject.rs:97`: `fn live(phase: Phase) -> bool` (private); `:79` `pub fn phase_word`.
@@ -441,7 +441,7 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
      Take the accounting repair the report proposes: in `crates/jig-protocol-config/src/profile/small.rs`, `STORE_KV`'s `value` 1_303_207, `chunk` 1_305_306 and `page.bytes` 1_305_286 (each +8); in `profile/standard.rs`, `value` 10_396_367, `chunk` 10_398_466 and `page.bytes` 10_398_446 (each +24); and the rows of `testing/jig-test-service/src/tests.rs`'s `both_jig_profiles_have_a_bounded_service` follow them (`value` only: `commit`, `ops` and `queued` stay as they are). These bounds are accounting that follows the encoded rows: no design text names them, and 05.2's Don't, "change … template configuration", is about templates, "the application's definition of a shape of work, numbered data in its configuration" (jig's `client/domain/README.md`), not a store profile's bounds. The session's question rule was kept: the report gave needs and has (Small needs 1_303_207, has 1_303_199; Standard 10_396_367 against 10_396_343). Both files join 05.2's Files, and 05.3's, whose Span carries a `Duration` and grows the rows again: there, too, a profile whose `value` a grown row passes takes the growth, needs minus has, in `value`, `chunk` and `page.bytes` alike, and the service test's row follows, listed in the commit body. A need in `commit`, `ops`, `queued` or memory is still a question. Nothing downstream copies these values: temper's own sums, as `docs/examples/owned.json`'s `engine.memory_bytes`, follow the jig that temper 03.1 pins, in that step. A further copy of a changed bound: change it by the same growth, and list it in the commit body.
 
 119. **temper 03's Shapes against main** (ready check of temper-03.1).
-     temper 03's ready check (skein c551a66, smith c241a7a4, jig 590015b4, temper a6f34f6af; scratch with the corrections, through heavy: default 1857 passed and 1 skipped, fuzzy 50 passed, clippy and fmt clean) corrected temper/03-tools-root.md. 03.1: the skein pin stays where temper's own descends from SKEIN01, and moves to it where not; smith's packages share one revision, the newest temper's `Cargo.lock` holds at the step's start; the store families are at v4 on main already; no match of `ReadNone` needs an arm, and the terminal fixtures' `read_value` gains `Read::Turn { .. } => None`; `docs/examples/owned.json`'s `engine.memory_bytes` rises by needs minus has, as `serve_prepares_once_on_the_owned_example` reports it (Shape 6). 03.2: `task N` prints `Admission::Bounded` as tools.md, 4 and 6.4, say; `a_request_under_the_pages_owner_is_answered_undecodable` takes `Owner::Runner` too; the Don't is `src/tests/boundary.rs`'s rule, any case, comments and strings included; the sketches take `#[must_use]` and `call` takes a `Called`. 03.3: `tasks` reads one group per call, the default of decisions.md, For the user, L, and builds the rest first until L is decided; `rows.rs` joins its Files. 03.4: the runner asks `Client::pending(key)` before each named send, since jig's client panics on a key held for another request. A further user of a value these change: change it as its step says, and list it in the commit body.
+     temper 03's ready check (skein c551a66, smith c241a7a4, jig 590015b4, temper a6f34f6af; scratch with the corrections, through heavy: default 1857 passed and 1 skipped, fuzzy 50 passed, clippy and fmt clean) corrected temper/03-tools-root.md. 03.1: the skein pin stays where temper's own descends from SKEIN01, and moves to it where not; smith's packages share one revision, the newest temper's `Cargo.lock` holds at the step's start; the store families are at v4 on main already; no match of `ReadNone` needs an arm, and the terminal fixtures' `read_value` gains `Read::Turn { .. } => None`; `docs/examples/owned.json`'s `engine.memory_bytes` rises by needs minus has, as `serve_prepares_once_on_the_owned_example` reports it (Shape 6). 03.2: `task N` prints `Admission::Bounded` as client/tools.md, 4 and 6.4, say; `a_request_under_the_pages_owner_is_answered_undecodable` takes `Owner::Runner` too; the Don't is `src/tests/boundary.rs`'s rule, any case, comments and strings included; the sketches take `#[must_use]` and `call` takes a `Called`. 03.3: `tasks` reads one group per call, the default of decisions.md, For the user, L, and builds the rest first until L is decided; `rows.rs` joins its Files. 03.4: the runner asks `Client::pending(key)` before each named send, since jig's client panics on a key held for another request. A further user of a value these change: change it as its step says, and list it in the commit body.
 
      Checked:
      - `git -C temper show a6f34f6af:Cargo.lock | grep -o 'git+…forgetic/[a-z]*.git#[0-9a-f]*' | sort | uniq -c`: skein `0db7b1fc` (30); smith `538ef49a` (19) and `a277e922` (9).
@@ -460,10 +460,10 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
      - The kit's testing-strategy.md, 10: line 540 "One behaviour per test", line 561 "Named fixtures and sizes".
 
 121. **L into temper 03.3** (For the user, L, decided by the director).
-     decisions.md, For the user, L, decided by the director (temper 09cfaca18): the default. temper/03-tools-root.md, 03.3's Lists, now names that decision: `tasks` reads one group per call, the live group without `--ended` and the ended group alone with it, as jig's view reads it; the call that reads on keeps `--ended`, its help reads "Only ended tasks", and an agent that wants both makes two calls, the printed cursor jig's, with no group byte. 03.3 no longer waits on L. later.md has its row for tools.md, 5.2, at the designer's next pass. Any further text that reads `--ended` as "include": make it "only", and list it in the commit body.
+     decisions.md, For the user, L, decided by the director (temper 09cfaca18): the default. temper/03-tools-root.md, 03.3's Lists, now names that decision: `tasks` reads one group per call, the live group without `--ended` and the ended group alone with it, as jig's view reads it; the call that reads on keeps `--ended`, its help reads "Only ended tasks", and an agent that wants both makes two calls, the printed cursor jig's, with no group byte. 03.3 no longer waits on L. later.md has its row for client/tools.md, 5.2, at the designer's next pass. Any further text that reads `--ended` as "include": make it "only", and list it in the commit body.
 
      Checked:
-     - `git -C ~/src/rust/temper show 09cfaca18 --stat`: `Decide the tools plan's item L: one group of tasks per call`; decisions.md's L ends "the printed cursor stays jig's, with no group byte. tools.md, 5.2, says so at the designer's next pass, after this plan."
+     - `git -C ~/src/rust/temper show 09cfaca18 --stat`: `Decide the tools plan's item L: one group of tasks per call`; decisions.md's L ends "the printed cursor stays jig's, with no group byte. client/tools.md, 5.2, says so at the designer's next pass, after this plan."
      - `awk -F'\t' '$1 ~ /^temper-03/' ledger.tsv`: temper-03.1 ready, 03.2 to 03.4 waiting; no temper 03 session has started.
 
 122. **deadline_spans.rs mended where next edited** (steer of 08:18).
@@ -532,7 +532,7 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
        192:      let mut root = fixtures::signed_in(fixtures::PARTY);
 
 125. **temper 04's Shapes against main** (ready check of temper-04.1).
-     temper 04's ready check (skein 6e2907921, smith 137a1cb48, jig 872bfb7c, temper e10aa299f) built the sketches into `temper-client-tools`: clippy clean once corrected, nextest 1690/1690, fuzzy 50/50; the boundary test (`no_file_under_jig_names_temper_or_an_item_outside_jig`) failed with the sketch's path comments copied as text. temper/04-waits.md now says: the fixtures' limits are `fixtures::limits()`, a function returning `limits::tools()`, which is no `const fn`, and a fixture neither 02 nor 03 adds (`PARTY`, `me`) joins the module in 04; 04's chat builder is `fixtures::chat_at(task, stage, work)`, returning a `Latest`, beside 03's `fixtures::chat(task, acts)`; `Facts` is built as a struct literal, `Facts { subject, me }`; `holds` reads a task condition from `Latest::Jig(Delivery::Task(task))`, its `waits_on`, `project` and `chip`, and gives None for another form; `waits_on_me` copies jig's private `reader` (owner 0, maintainer 1, member 2, observer 3, a policy role its own), since `chat_status`'s `WaitingForYou` comes only under an active chip, after held, closing and ended, while tools.md's `waiting-on-me` reads what the task waits on, and the commit body names the copy; `deliver`'s subject is temper's table `Subject::Task(41)`, or 03's form if its harness takes another; a run's delivery brings both `Told::Changed` and `Told::Text`, and each compares the subject's digest of its current document, so the second answers nothing; `Part` has a variant for each form a subject's read or delivery brings (`Inbox`, `OwnerInbox`, `InboxPage`, `OwnerInboxPage`, `Tasks`, `TaskPage`, `Tree`, `OwnerTree`, `RunState` beside the others; jig reads no tree page); each function returning a value is `#[must_use]`; the sketches' path comments name files and are not their text; "(temper 02)" in the digest's doc becomes "the table's"; `answers` takes a `match`, not `is_some_and`, which clippy.toml disallows. A further copy of a name or form this ruling changes: change it as the Shape now says, and list it in the commit body.
+     temper 04's ready check (skein 6e2907921, smith 137a1cb48, jig 872bfb7c, temper e10aa299f) built the sketches into `temper-client-tools`: clippy clean once corrected, nextest 1690/1690, fuzzy 50/50; the boundary test (`no_file_under_jig_names_temper_or_an_item_outside_jig`) failed with the sketch's path comments copied as text. temper/04-waits.md now says: the fixtures' limits are `fixtures::limits()`, a function returning `limits::tools()`, which is no `const fn`, and a fixture neither 02 nor 03 adds (`PARTY`, `me`) joins the module in 04; 04's chat builder is `fixtures::chat_at(task, stage, work)`, returning a `Latest`, beside 03's `fixtures::chat(task, acts)`; `Facts` is built as a struct literal, `Facts { subject, me }`; `holds` reads a task condition from `Latest::Jig(Delivery::Task(task))`, its `waits_on`, `project` and `chip`, and gives None for another form; `waits_on_me` copies jig's private `reader` (owner 0, maintainer 1, member 2, observer 3, a policy role its own), since `chat_status`'s `WaitingForYou` comes only under an active chip, after held, closing and ended, while client/tools.md's `waiting-on-me` reads what the task waits on, and the commit body names the copy; `deliver`'s subject is temper's table `Subject::Task(41)`, or 03's form if its harness takes another; a run's delivery brings both `Told::Changed` and `Told::Text`, and each compares the subject's digest of its current document, so the second answers nothing; `Part` has a variant for each form a subject's read or delivery brings (`Inbox`, `OwnerInbox`, `InboxPage`, `OwnerInboxPage`, `Tasks`, `TaskPage`, `Tree`, `OwnerTree`, `RunState` beside the others; jig reads no tree page); each function returning a value is `#[must_use]`; the sketches' path comments name files and are not their text; "(temper 02)" in the digest's doc becomes "the table's"; `answers` takes a `match`, not `is_some_and`, which clippy.toml disallows. A further copy of a name or form this ruling changes: change it as the Shape now says, and list it in the commit body.
 
      ## Checked
 
@@ -615,16 +615,16 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
              Text { handle: Handle },
              Ended { handle: Handle, why: Why },
              Page { handle: Handle, page: Readout },
-     - `git -C temper show origin/main:docs/design/tools.md | sed -n 309,311p`:
+     - `git -C temper show origin/main:docs/design/client/tools.md | sed -n 309,311p`:
          - **`waiting-on-me`** covers task N's tree: what a task waits on is
            computed over its tree (jig's `domain/tasks.md`, section 3), so a
            question or a proposal below for the party meets it on `task N`, and
 
 126. **temper 03.2: offered acts with no tool, interim** (design, temper 03.2's block of 2026-10-19 08:58:21 UTC).
-     Interim, until decisions.md, For the user, M, is decided: what `task N`'s text prints for an offered act with no tool in tools.md, 5.3 (Take, HandBack, Amend, Move, Reorder, Seen, EditNote, DeleteNote, ChangePolicy, SetRoles, MakeService, SetPool, Withdraw) is a design gap, and waits; it goes to the user as M, as no designer is joined. temper 03.2 goes on with everything else: the root, the runner, routing, `me`, JSON, the exits, and every offered act that has a tool, printed as its Shape says (Message, Answer, Accept, Reject, PassUp, LeaveHeld, Release, Stop, Cancel, Adopt). Its tests and goldens use documents whose offered acts all have tools; the arm for an act with no tool is the one part that waits, and no call names a tool that 5.3 lacks. 03.2 does not land before the ruling on M reaches it. A further act kind with no tool: treat it as these, and list it in the commit body.
+     Interim, until decisions.md, For the user, M, is decided: what `task N`'s text prints for an offered act with no tool in client/tools.md, 5.3 (Take, HandBack, Amend, Move, Reorder, Seen, EditNote, DeleteNote, ChangePolicy, SetRoles, MakeService, SetPool, Withdraw) is a design gap, and waits; it goes to the user as M, as no designer is joined. temper 03.2 goes on with everything else: the root, the runner, routing, `me`, JSON, the exits, and every offered act that has a tool, printed as its Shape says (Message, Answer, Accept, Reject, PassUp, LeaveHeld, Release, Stop, Cancel, Adopt). Its tests and goldens use documents whose offered acts all have tools; the arm for an act with no tool is the one part that waits, and no call names a tool that 5.3 lacks. 03.2 does not land before the ruling on M reaches it. A further act kind with no tool: treat it as these, and list it in the commit body.
 
 127. **temper 03.2: offered acts with no tool** (decision M, for temper 03.2's block of 2026-10-19 08:58:21 UTC).
-     decisions.md, For the user, M, decided by the director for the user (temper 545b65a8a), the default, ruled into temper 03.2: `task N`'s `acts:` prints an offered act with no tool in tools.md, 5.3 (Take, HandBack, Amend, Move, Reorder, Seen, EditNote, DeleteNote, ChangePolicy, SetRoles, MakeService, SetPool, Withdraw) by its name in the tools' words, then ` (no tool)`, in the document's order, with no call and no admission; JSON prints the document's offers as 03.2's Shape says. temper/03-tools-root.md, 03.2's Shape, gains that bullet beside Refused, and its tests `an_act_with_no_tool_prints_its_name_and_no_call`; later.md gains tools.md, 6.1's sentence, for the designer's next pass. This ends ruling 126's wait: 03.2 lands once its arm does this. A further act kind with no tool prints the same way; list it in the commit body.
+     decisions.md, For the user, M, decided by the director for the user (temper 545b65a8a), the default, ruled into temper 03.2: `task N`'s `acts:` prints an offered act with no tool in client/tools.md, 5.3 (Take, HandBack, Amend, Move, Reorder, Seen, EditNote, DeleteNote, ChangePolicy, SetRoles, MakeService, SetPool, Withdraw) by its name in the tools' words, then ` (no tool)`, in the document's order, with no call and no admission; JSON prints the document's offers as 03.2's Shape says. temper/03-tools-root.md, 03.2's Shape, gains that bullet beside Refused, and its tests `an_act_with_no_tool_prints_its_name_and_no_call`; later.md gains client/tools.md, 6.1's sentence, for the designer's next pass. This ends ruling 126's wait: 03.2 lands once its arm does this. A further act kind with no tool prints the same way; list it in the commit body.
 
      ## Checked
 
@@ -635,7 +635,7 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
          798-  document's offers as 03.2 says. The agent learns the act exists and can
      - `git -C jig show origin/main:crates/jig-client-domain/src/contract/documents.rs | sed -n '/^pub enum ActKind/,/^}/p' | grep -E '^    [A-Z]' | tr -d ' \n'`:
          Message,Answer,Take,HandBack,Accept,Reject,PassUp,Release,LeaveHeld,Amend,Stop,Cancel,Move,Reorder,Seen,EditNote,DeleteNote,Adopt,ChangePolicy,SetRoles,MakeService,SetPool,Withdraw,
-     - `git -C temper show origin/main:docs/design/tools.md | sed -n '/^### 5.3/,/^### 5.4/p' | grep '^| `' | grep -o '`[A-Z][a-zA-Z]*`' | sort -u | tr '\n' ' '`:
+     - `git -C temper show origin/main:docs/design/client/tools.md | sed -n '/^### 5.3/,/^### 5.4/p' | grep '^| `' | grep -o '`[A-Z][a-zA-Z]*`' | sort -u | tr '\n' ' '`:
          `Answer` `Cancel` `Create` `Decide` `Message` `Release` `Stop` 
 
 128. **jig's deadline_spans.rs mends to later** (steer of 2026-10-19T09:14:01Z).
@@ -658,10 +658,10 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
          490:# Decision of unblock.draft.md, or with --text a file's. It becomes the next
 
 129. **temper 03.3: the inbox's call that reads on, interim** (design, temper 03.3's block of 2026-10-19 09:18:06 UTC).
-     Interim, until decisions.md, For the user, N, is decided: how the call that reads on after an `inbox` selects its group is a design gap, and waits (jig's `Read::Inbox` reads one `InboxReadGroup` a call, each with its own opaque cursor, and tools.md 5.2's table has no group selector); it goes to the user as N, as no designer is joined. temper 03.3 goes on with everything else: `tasks`, `task N --tree --activity K --run`, `activity N`, `run N`, `chat N`, `turn N A.T`, and `inbox`'s first answer, needs then updates, each `Read::Inbox` with `after: None`, as its Shape says. Its inbox tests and goldens use groups that end on their first page, printed with `no more`; the parse of `inbox --after C` and the printed call that reads on after an inbox are the one part that waits, and no inbox cursor is printed or parsed meanwhile. 03.3 does not land before the ruling on N reaches it. A further read whose cursor names no group: treat it as this one, and say so in the report.
+     Interim, until decisions.md, For the user, N, is decided: how the call that reads on after an `inbox` selects its group is a design gap, and waits (jig's `Read::Inbox` reads one `InboxReadGroup` a call, each with its own opaque cursor, and client/tools.md 5.2's table has no group selector); it goes to the user as N, as no designer is joined. temper 03.3 goes on with everything else: `tasks`, `task N --tree --activity K --run`, `activity N`, `run N`, `chat N`, `turn N A.T`, and `inbox`'s first answer, needs then updates, each `Read::Inbox` with `after: None`, as its Shape says. Its inbox tests and goldens use groups that end on their first page, printed with `no more`; the parse of `inbox --after C` and the printed call that reads on after an inbox are the one part that waits, and no inbox cursor is printed or parsed meanwhile. 03.3 does not land before the ruling on N reaches it. A further read whose cursor names no group: treat it as this one, and say so in the report.
 
 130. **temper 03.3: the inbox's call that reads on** (decision N, for temper 03.3's block of 2026-10-19 09:18:06 UTC).
-     decisions.md, For the user, N, decided by the director for the user (temper ad1b1f80f), the default, ruled into temper 03.3: an inbox's printed cursor is one group byte (0 needs, 1 updates), then jig's cursor, whole; the call that reads on stays in needs while needs has more, then moves to updates; `--after C` reads C's group, and with `--kind K` a C of the other group (`InboxReadGroup::of`) is a usage error, exit 1. temper/03-tools-root.md, 03.3's Shape, gains that bullet under Lists, its tests `an_inbox_reads_on_in_needs_while_needs_has_more`, `an_inbox_reads_on_in_updates_once_needs_ends` and `an_inbox_cursor_of_another_group_than_its_kind_exits_1`, and 40 lines of Size; later.md gains tools.md, 5.2's sentence, for the designer's next pass. This ends ruling 129's wait: 03.3 lands once its inbox call does this. A further read whose cursor names no group: treat it as this one, and list it in the commit body.
+     decisions.md, For the user, N, decided by the director for the user (temper ad1b1f80f), the default, ruled into temper 03.3: an inbox's printed cursor is one group byte (0 needs, 1 updates), then jig's cursor, whole; the call that reads on stays in needs while needs has more, then moves to updates; `--after C` reads C's group, and with `--kind K` a C of the other group (`InboxReadGroup::of`) is a usage error, exit 1. temper/03-tools-root.md, 03.3's Shape, gains that bullet under Lists, its tests `an_inbox_reads_on_in_needs_while_needs_has_more`, `an_inbox_reads_on_in_updates_once_needs_ends` and `an_inbox_cursor_of_another_group_than_its_kind_exits_1`, and 40 lines of Size; later.md gains client/tools.md, 5.2's sentence, for the designer's next pass. This ends ruling 129's wait: 03.3 lands once its inbox call does this. A further read whose cursor names no group: treat it as this one, and list it in the commit body.
 
      ## Checked
 
@@ -675,13 +675,13 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
          21:#   plan ruling [--text FILE] TITLE SOURCE  land a ruling in decisions.md, once
 
 131. **temper 03.3: the inbox's first page, interim** (design, temper 03.3's block of 2026-10-19 09:25:20 UTC).
-     Interim, until decisions.md, For the user, O, is decided: which rows the first `inbox` call prints, and where its call that reads on goes, within tools.md section 12's 32 rows for "a list's page", is a design gap, and waits (jig's `Read::Inbox` takes no row bound, and under N the call that reads on stays in needs while needs has more); it goes to the user as O, as no designer is joined. It replaces ruling 129's "`inbox`'s first answer, needs then updates, each `Read::Inbox` with `after: None`": until O is decided, temper 03.3 builds the inbox's group byte, its `--kind` and `--after` checks and the call that reads on in needs, as ruling 130 says, with `an_inbox_reads_on_in_needs_while_needs_has_more` and `an_inbox_cursor_of_another_group_than_its_kind_exits_1`; whether a page prints updates once needs ends on it, `inbox_prints_what_needs_the_party_then_updates` and `an_inbox_reads_on_in_updates_once_needs_ends` wait on O. The rest of 03.3 goes on, and 03.3 lands once its inbox follows O.
+     Interim, until decisions.md, For the user, O, is decided: which rows the first `inbox` call prints, and where its call that reads on goes, within client/tools.md section 12's 32 rows for "a list's page", is a design gap, and waits (jig's `Read::Inbox` takes no row bound, and under N the call that reads on stays in needs while needs has more); it goes to the user as O, as no designer is joined. It replaces ruling 129's "`inbox`'s first answer, needs then updates, each `Read::Inbox` with `after: None`": until O is decided, temper 03.3 builds the inbox's group byte, its `--kind` and `--after` checks and the call that reads on in needs, as ruling 130 says, with `an_inbox_reads_on_in_needs_while_needs_has_more` and `an_inbox_cursor_of_another_group_than_its_kind_exits_1`; whether a page prints updates once needs ends on it, `inbox_prints_what_needs_the_party_then_updates` and `an_inbox_reads_on_in_updates_once_needs_ends` wait on O. The rest of 03.3 goes on, and 03.3 lands once its inbox follows O.
 
 132. **temper 03.3: a limited activity's call that reads on, interim** (design, temper 03.3's block of 2026-10-19 09:33:47 UTC).
-     Interim, until decisions.md, For the user, P, is decided: where the call that reads on goes after a page that `activity N --limit K` or `task N --activity K` cut is a design gap, and waits (jig's `Read::Activity { task, before }` takes no row count, and its page's `before` is older than the whole page; tools.md section 12 gives the rest of a window's cut "by its cursor", so no row is skipped); it goes to the user as P, as no designer is joined. temper 03.3 goes on with everything else, `activity N` without `--limit` and with `--limit` at or above the page's rows included; the call that reads on after a cut page, and its tests, wait on P, and 03.3 lands once they follow P and O.
+     Interim, until decisions.md, For the user, P, is decided: where the call that reads on goes after a page that `activity N --limit K` or `task N --activity K` cut is a design gap, and waits (jig's `Read::Activity { task, before }` takes no row count, and its page's `before` is older than the whole page; client/tools.md section 12 gives the rest of a window's cut "by its cursor", so no row is skipped); it goes to the user as P, as no designer is joined. temper 03.3 goes on with everything else, `activity N` without `--limit` and with `--limit` at or above the page's rows included; the call that reads on after a cut page, and its tests, wait on P, and 03.3 lands once they follow P and O.
 
 133. **temper 03.3: the inbox's first page** (decision O, for temper 03.3's block of 2026-10-19 09:25:20 UTC).
-     decisions.md, For the user, O, decided by the director for the user (temper 0ecb23bf6), the default, ruled into temper 03.3: `inbox` reads needs first; while needs has more, a page is needs alone; once needs ends on a page, updates' first page follows it when both fit in 32 rows, and when they do not, the call that reads on starts updates (group byte 1, no jig cursor), so no page passes 32 rows and no update is read twice. This ends ruling 131's wait; ruling 132's stands. temper/03-tools-root.md, 03.3's Shape, has it under Lists in place of "once per `InboxReadGroup`, needs first", with the test `an_inbox_page_whose_updates_do_not_fit_reads_on_at_the_start_of_updates` and a Size of at most 360 lines; later.md's row for N adds O for tools.md, 5.2. Any further copy of the first page's old shape (a fixture, a golden, a help line): refresh it as this says, and list it in the commit body.
+     decisions.md, For the user, O, decided by the director for the user (temper 0ecb23bf6), the default, ruled into temper 03.3: `inbox` reads needs first; while needs has more, a page is needs alone; once needs ends on a page, updates' first page follows it when both fit in 32 rows, and when they do not, the call that reads on starts updates (group byte 1, no jig cursor), so no page passes 32 rows and no update is read twice. This ends ruling 131's wait; ruling 132's stands. temper/03-tools-root.md, 03.3's Shape, has it under Lists in place of "once per `InboxReadGroup`, needs first", with the test `an_inbox_page_whose_updates_do_not_fit_reads_on_at_the_start_of_updates` and a Size of at most 360 lines; later.md's row for N adds O for client/tools.md, 5.2. Any further copy of the first page's old shape (a fixture, a golden, a help line): refresh it as this says, and list it in the commit body.
 
      ## Checked
 
@@ -696,7 +696,7 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
          275:Size: at most 360 lines, with the inbox's cursor and first page (decisions.md, N and O).
 
 134. **temper 03.3: a limited activity's call that reads on** (decision P, for temper 03.3's block of 2026-10-19 09:33:47 UTC).
-     The director decided P (decisions.md, For the user, P, temper 37c08b325), the default: a page that `activity N --limit K` cuts reads on with the same read without `--limit`, which prints the page whole, its K rows again, then reads on at jig's `before`; `task N --activity K` that cuts a page prints `read with: activity N`; the printed cursor stays jig's. temper 03.3's Shape says so under "A task's parts" and "The conversation", its Test shape adds `a_limited_activity_reads_on_with_its_page_whole`, its Size is at most 380 lines, and later.md's row for tools.md 5.2 carries P. temper 03.3 lands once its reads-on do this; ruling 132's wait ends.
+     The director decided P (decisions.md, For the user, P, temper 37c08b325), the default: a page that `activity N --limit K` cuts reads on with the same read without `--limit`, which prints the page whole, its K rows again, then reads on at jig's `before`; `task N --activity K` that cuts a page prints `read with: activity N`; the printed cursor stays jig's. temper 03.3's Shape says so under "A task's parts" and "The conversation", its Test shape adds `a_limited_activity_reads_on_with_its_page_whole`, its Size is at most 380 lines, and later.md's row for client/tools.md 5.2 carries P. temper 03.3 lands once its reads-on do this; ruling 132's wait ends.
 
      ## Checked
      - `git -C ~/src/rust/temper show 37c08b325:docs/development/plans/tools/decisions.md | sed -n 929,932p`:
@@ -710,10 +710,10 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
          255:`a_limited_activity_reads_on_with_its_page_whole`,
 
 135. **temper 03.4: a restored proposal's recipient, interim** (design, temper 03.4's block of 2026-10-19 10:01:22 UTC).
-     Interim, until decisions.md, For the user, Q, is decided: how a kept line of a restored proposal prints, when jig's `Outcome::Proposed { proposal }` keeps no recipient and tools.md, 6.1, has a kept line print "its outcome as an act's prints" (`proposed: p3/17, to maintainers`), is a design gap, and waits; it goes to the user as Q, as no designer is joined. temper 03.4 goes on with everything else, a new call's `Proposed` outcome with its offered recipient included; the kept line of a restored proposal, and its test, wait on Q, and never print a recipient the kept request does not hold. 03.4 lands once they follow Q.
+     Interim, until decisions.md, For the user, Q, is decided: how a kept line of a restored proposal prints, when jig's `Outcome::Proposed { proposal }` keeps no recipient and client/tools.md, 6.1, has a kept line print "its outcome as an act's prints" (`proposed: p3/17, to maintainers`), is a design gap, and waits; it goes to the user as Q, as no designer is joined. temper 03.4 goes on with everything else, a new call's `Proposed` outcome with its offered recipient included; the kept line of a restored proposal, and its test, wait on Q, and never print a recipient the kept request does not hold. 03.4 lands once they follow Q.
 
 136. **temper 03.4: a restored proposal's recipient** (decision Q, for temper 03.4's block of 2026-10-19 10:01:22 UTC).
-     The director decided Q (decisions.md, For the user, Q, temper 37849f0b0), the default: a kept line of a restored proposal prints its identity alone (`kept: chat, proposed: t3/17`), with no `to`, as jig's `Outcome::Proposed { proposal }` keeps no recipient; a new call's outcome keeps `, to <recipient>`. temper 03.4's Shape says so under its outcomes, its Test shape adds `a_restored_proposals_kept_line_prints_its_identity_without_a_recipient`, its Size is at most 310 lines, and later.md has a row for tools.md 6.1 and 8.2. This ends ruling 135's wait; temper 03.4 lands once its kept line does this. Any further copy of a restored proposal's kept line (a fixture, a golden): refresh it as this says, and list it in the commit body.
+     The director decided Q (decisions.md, For the user, Q, temper 37849f0b0), the default: a kept line of a restored proposal prints its identity alone (`kept: chat, proposed: t3/17`), with no `to`, as jig's `Outcome::Proposed { proposal }` keeps no recipient; a new call's outcome keeps `, to <recipient>`. temper 03.4's Shape says so under its outcomes, its Test shape adds `a_restored_proposals_kept_line_prints_its_identity_without_a_recipient`, its Size is at most 310 lines, and later.md has a row for client/tools.md 6.1 and 8.2. This ends ruling 135's wait; temper 03.4 lands once its kept line does this. Any further copy of a restored proposal's kept line (a fixture, a golden): refresh it as this says, and list it in the commit body.
 
      ## Checked
 
@@ -726,7 +726,7 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
          332:  `a_restored_proposals_kept_line_prints_its_identity_without_a_recipient` (Q),
 
 137. **temper 04.1: an inbox read's digest when updates do not fit** (design, temper 04.1's block of 2026-10-19 10:32:17 UTC).
-     Not a design gap: tools.md 5.4 answers it, and ruling 133 (decision O) stands. A digest is of "the subject's document as `--json` prints it", and "a read and a wait digest one form, the watch's document: for `inbox` and `tasks` ... the rows the watch's first window holds, in its order, and whether more follow, within the tools' page of rows. The read makes that form from its own rows and prints its cursor beside it, outside the digest"; 04's Choices has the read assemble "the watch's first window: needs before updates, each in its supplied order, at most 32 rows across both". So an inbox read that O's first page cuts before updates (31 needs and 2 updates) prints O's page, 31 needs, and digests the watch's first window all the same: its needs, then the first rows of the updates' page it read (`updates_fit` reads both pages), to 32 rows, and whether more follow, through `digest::part` and the one JSON renderer. The bytes digested are what a wait's first delivery prints, so a wait `--since` that digest does not answer at once; the read's printed rows are then fewer than the digested, which is not a second renderer or a hidden document. temper/04-waits.md, 04.1, says so in its Shape and adds `an_inbox_read_cut_before_updates_digests_the_watchs_first_window`; `the_printed_part_without_digest_is_the_bytes_digested` holds for each delivery and for a read whose page is the window. temper 04.1 goes on whole, inbox included.
+     Not a design gap: client/tools.md 5.4 answers it, and ruling 133 (decision O) stands. A digest is of "the subject's document as `--json` prints it", and "a read and a wait digest one form, the watch's document: for `inbox` and `tasks` ... the rows the watch's first window holds, in its order, and whether more follow, within the tools' page of rows. The read makes that form from its own rows and prints its cursor beside it, outside the digest"; 04's Choices has the read assemble "the watch's first window: needs before updates, each in its supplied order, at most 32 rows across both". So an inbox read that O's first page cuts before updates (31 needs and 2 updates) prints O's page, 31 needs, and digests the watch's first window all the same: its needs, then the first rows of the updates' page it read (`updates_fit` reads both pages), to 32 rows, and whether more follow, through `digest::part` and the one JSON renderer. The bytes digested are what a wait's first delivery prints, so a wait `--since` that digest does not answer at once; the read's printed rows are then fewer than the digested, which is not a second renderer or a hidden document. temper/04-waits.md, 04.1, says so in its Shape and adds `an_inbox_read_cut_before_updates_digests_the_watchs_first_window`; `the_printed_part_without_digest_is_the_bytes_digested` holds for each delivery and for a read whose page is the window. temper 04.1 goes on whole, inbox included.
 
 138. **temper repin: jig repinned again past live-text's smith** (design, temper-repin's block of 2026-10-19 11:25:37 UTC).
      Not a question for the user: smith's live-text plan settles it (its README, "Repin": "jig and temper take this plan's skein and smith at the tools plan's closing jig-repin and temper-repin, with `live: None` in the start, an ignored `OpenEvent::Live`, and jig's four `smith_channel::v3` paths", from its decisions.md, answer 4, and "For the user" 9). Our `jig-repin` landed (jig 2f9c5f00, 08:28:45Z) before live-text's smith did (smith f925b180, 09:34:54Z, "Carry the host's live ask over channel version three", to cd76fb64), so jig's `main` pins smith 137a1cb4 and does not build at smith's `origin/main`. The supervisor adds a step, `jig-repin.s1` (development.md, 5.7, "The supervisor may add one earlier"): in a jig worktree at `origin/main`, it moves jig's skein and smith, together, to their `origin/main` (`heavy cargo update -p smith-channel`, then the skein package), runs `heavy cargo check --workspace --all-targets` and repairs what breaks the way live-text's own commits repaired smith's: `smith_channel::v2` becomes `smith_channel::v3` in `testing/jig-test-service/src/tests/fixtures.rs`, `tests/core/src/agents_tools.rs`, `tests/core/src/protocol.rs` and `tests/ops/src/conformance/scripts.rs`; each start takes `live: None`; `OpenEvent::Live` is ignored in `testing/jig-test-service/src/worker_route.rs`'s two matches, as `Opened` is. It lands with jig's gate, within 5.7's 200 lines and no change of design; a break past that is a question. `temper-repin` then starts again from temper's `origin/main`, moves skein, smith and jig to their `origin/main`, and makes the same two adaptations in temper (`crates/temper-service/src/worker_route.rs`, and each start). Refresh any further copy that the check names, and list it in the commit body.
@@ -779,8 +779,8 @@ and the user, or the director, may veto it before the run:
 - **B. Two plans, and the real loop in the second** (7, 16). This plan
   builds section 13 and the tools as a library, proven by unit tests in
   temper and by jig's worlds and joint stories; `temper ctl`, the client
-  stories, the fake forge's host, the real-loop world (testing.md 2.4,
-  tools.md 11.3) and its stories, and the process tier are the next
+  stories, the fake forge's host, the real-loop world (domain/testing.md 2.4,
+  client/tools.md 11.3) and its stories, and the process tier are the next
   plan's, drafted in `findings/next/`. The real loop, as the general
   layer the user asked for, is built there whole: its world, the hosted
   service, worker and agent, the scripted fake LLM, the fake forge's
@@ -806,11 +806,11 @@ and the user, or the director, may veto it before the run:
   - tool names: area 1's are plain verbs; the accounts tools may want
     `remove`, `order`, `check` or `resume`, and area 1 takes none;
   - a secret never rides in a kept request: the token is a file of its
-    own, never in the store (tools.md 8.1, the next plan's);
+    own, never in the store (client/tools.md 8.1, the next plan's);
   - a call prints one result; a sign-in that waits for a browser (the
     drafts' OAuth on port 1455) would be a wait tool, not a change to
     that rule;
-  - no config file (tools.md 8.1);
+  - no config file (client/tools.md 8.1);
   - the named key (SHA-256 of `"temper-tools"`, a zero byte, the name)
     is generic: keyed account acts can reuse it.
   Decision: accepted, by director, 2026-10-19.
@@ -841,7 +841,7 @@ and the user, or the director, may veto it before the run:
   Decision: accepted, by director, 2026-10-19. The run goes on debian-16gb-hel1-1.
 - **J. The order of `tasks` without `--order`** (question.md in the run's
   directory, from temper 02.1's ready check; no designer is joined to
-  answer it): tools.md, 5.2, gives `tasks … [--ended] [--order
+  answer it): client/tools.md, 5.2, gives `tasks … [--ended] [--order
   activity|priority]` and no default, and jig's task query has no
   unordered form (`TaskQuery.order` is a `QueryOrder`: `Number`,
   `Changed`, `Activity`, `Priority` or `Ended`). Default: without
@@ -855,11 +855,11 @@ and the user, or the director, may veto it before the run:
   changes no order. The tools never send `Changed` or `Ended`, so
   `jig::argv::back` answers that a call with either order has no argv
   form, a refusal and never a guess, and `parse(back(call)) == call`
-  holds over every call `parse` makes. tools.md, 5.2, says so at the
-  designer's next pass over tools.md, after this plan.
+  holds over every call `parse` makes. client/tools.md, 5.2, says so at the
+  designer's next pass over client/tools.md, after this plan.
 - **K. The tools' rows pass jig's wire ceiling** (question.md in the run's
   directory, from temper 02.1's block of 05:31:30Z; no designer is
-  joined to answer it): tools.md, 12, gives 50 rows, "a list's page, the
+  joined to answer it): client/tools.md, 12, gives 50 rows, "a list's page, the
   activity lines `task` adds, a conversation's page; the client's rows
   per window", in the tools' own preset of `jig-client`'s `Limits`.
   jig's client wire (v8 and v9, `CEILINGS`) admits at most 32 in each of
@@ -867,23 +867,23 @@ and the user, or the director, may veto it before the run:
   case (`temper_client_domain::worst_case` is `None`, and
   `jig_client::max_out` panics on it); at 32 rows it is
   `Some(91854289240)`. Default: the tools' rows are 32, the wire's
-  ceiling, wherever tools.md, 12, and the plan say 50 (`limits::ROWS`,
-  and the sessions that read it: temper 02, 03, 04 and 11), and tools.md
+  ceiling, wherever client/tools.md, 12, and the plan say 50 (`limits::ROWS`,
+  and the sessions that read it: temper 02, 03, 04 and 11), and client/tools.md
   says so at the designer's next pass, after this plan. Or: jig's wire
   admits 50 rows, a jig step and wire version this plan does not hold;
   or a designer joins the run (`plan join designer`, in a design
   session) and answers question.md. temper 02.1 waits on it, and 02.2,
   02.3 and temper 03 behind it.
   Decision: the default, by director, 2026-10-19: the tools' rows are 32,
-  jig's client wire ceiling, wherever tools.md, 12, and the plan say 50
+  jig's client wire ceiling, wherever client/tools.md, 12, and the plan say 50
   (`limits::ROWS` and the sessions that read it: temper 02, 03, 04 and
   11). A page of 32 rows serves the tools as well as 50, and changes
-  later without a wire version; jig's wire stays as it is. tools.md, 12,
+  later without a wire version; jig's wire stays as it is. client/tools.md, 12,
   says so at the designer's next pass, after this plan.
 - **L. One group of tasks per call** (question.md in the run's directory,
   from temper 03.1's ready check; no designer is joined to answer it):
-  tools.md, 5.2, gives `tasks … [--ended]`, and "a read answers with a
-  document, or a page and its cursor" (tools.md, 5); jig's tasks are
+  client/tools.md, 5.2, gives `tasks … [--ended]`, and "a read answers with a
+  document, or a page and its cursor" (client/tools.md, 5); jig's tasks are
   "live first, then ended, in two groups, each with its own cursor"
   (jig's client/domain/contract.md, 6.1), read as `Read::Tasks { query,
   live: Option<Cursor>, ended: Option<Cursor> }`, and temper 02's help
@@ -893,7 +893,7 @@ and the user, or the director, may veto it before the run:
   ended group alone, as jig's view reads it (`query.phase =
   Some(PhaseClass::Ended)`, `live: None`, `--after C` its `ended`); the
   call that reads on keeps `--ended`, and its help reads "Only ended
-  tasks"; tools.md, 5.2, says so at the designer's next pass, after this
+  tasks"; client/tools.md, 5.2, says so at the designer's next pass, after this
   plan. Or: `--ended` keeps "include", and the printed cursor carries a
   group byte beside jig's; or a designer joins the run (`plan join
   designer`, in a design session) and answers question.md. temper 03.3's
@@ -904,10 +904,10 @@ and the user, or the director, may veto it before the run:
   `--after C` its `ended` cursor, and the call that reads on keeps
   `--ended`. Its help reads "Only ended tasks". An agent that wants both
   makes two calls; the printed cursor stays jig's, with no group byte.
-  tools.md, 5.2, says so at the designer's next pass, after this plan.
+  client/tools.md, 5.2, says so at the designer's next pass, after this plan.
 - **M. Offered acts with no tool** (question.md in the run's directory,
   from temper 03.2's block of 08:58:21Z; no designer is joined to answer
-  it): tools.md, 6.1, prints "Acts as calls", and an agent "copies them
+  it): client/tools.md, 6.1, prints "Acts as calls", and an agent "copies them
   from the acts a result printed" (5.3); temper 03.2 prints "one call per
   offered act in the document's order". jig's task documents offer 23
   kinds of act (`ActKind`), and 5.3's table has tools for Message,
@@ -918,7 +918,7 @@ and the user, or the director, may veto it before the run:
   exist. Default: an offered act with no tool prints, in the document's
   order, its name in the tools' words and ` (no tool)`, and no call, as a
   refused act prints no call; its admission is not printed; JSON prints
-  the document's offers as 03.2 says; tools.md, 6.1, says so at the
+  the document's offers as 03.2 says; client/tools.md, 6.1, says so at the
   designer's next pass, after this plan. Or: `acts:` leaves out an act
   with no tool; or the tools gain those acts (5.3 rows and table forms,
   a plan of their own); or a designer joins the run (`plan join
@@ -928,11 +928,11 @@ and the user, or the director, may veto it before the run:
   tool prints its name in the tools' words and ` (no tool)`, in the
   document's order, with no call and no admission. JSON prints the
   document's offers as 03.2 says. The agent learns the act exists and can
-  hand it to a person; no call names a missing tool. tools.md, 6.1, says
+  hand it to a person; no call names a missing tool. client/tools.md, 6.1, says
   so at the designer's next pass, after this plan.
 - **N. The inbox's call that reads on** (question.md in the run's
   directory, from temper 03.3's block of 09:18:06Z; no designer is joined
-  to answer it): tools.md, 5.2, has `inbox [--project P] [--kind K]
+  to answer it): client/tools.md, 5.2, has `inbox [--project P] [--kind K]
   [--root N] [--after C]` answer "what needs the party, then updates",
   and lists print "the cursor for the next page" (6.1). jig reads the
   inbox one group a call (`Read::Inbox { group: InboxReadGroup, .. }`):
@@ -944,7 +944,7 @@ and the user, or the director, may veto it before the run:
   updates), then jig's cursor bytes, kept whole; the call that reads on
   goes on where the page stopped, in needs while needs has more, then in
   updates; `--after C` reads C's group, and with `--kind K` a C of the
-  other group is a usage error, exit 1; tools.md, 5.2, says so at the
+  other group is a usage error, exit 1; client/tools.md, 5.2, says so at the
   designer's next pass, after this plan. Or: `inbox` reads one group a
   call, as `tasks` does (L), with a flag for updates (a table change); or
   a designer joins the run (`plan join designer`, in a design session)
@@ -955,12 +955,12 @@ and the user, or the director, may veto it before the run:
   call that reads on stays in needs while needs has more, then moves to
   updates. `--after C` reads C's group, and with `--kind K` a C of the
   other group is a usage error, exit 1. The inbox stays the one call
-  tools.md, 5.2, gives it, "what needs the party, then updates"; the
-  cursor stays opaque to the agent. tools.md, 5.2, says so at the
+  client/tools.md, 5.2, gives it, "what needs the party, then updates"; the
+  cursor stays opaque to the agent. client/tools.md, 5.2, says so at the
   designer's next pass, after this plan.
 - **O. The inbox's first page** (question.md in the run's directory,
   from temper 03.3's block of 09:25:20Z; no designer is joined to answer
-  it): tools.md, 5.2, has `inbox` answer "what needs the party, then
+  it): client/tools.md, 5.2, has `inbox` answer "what needs the party, then
   updates", and section 12 bounds "a list's page" at 32 rows. jig's
   `Read::Inbox` takes no row bound and answers one `InboxReadGroup` a
   call, each page up to the client's 32 rows; under N, the call that
@@ -980,11 +980,11 @@ and the user, or the director, may veto it before the run:
   while needs has more, a page is needs alone. Once needs ends on a page,
   updates' first page follows it when both fit in 32 rows. When they do
   not, the call that reads on starts updates (group byte 1, no jig
-  cursor). No page passes 32 rows, and no update is read twice. tools.md,
+  cursor). No page passes 32 rows, and no update is read twice. client/tools.md,
   5.2, says so at the designer's next pass, beside N.
 - **P. A limited activity's call that reads on** (question.md in the run's
   directory, from temper 03.3's block of 09:33:47Z; no designer is joined
-  to answer it): tools.md, 5.2, has `activity N [--before C] [--limit K]`
+  to answer it): client/tools.md, 5.2, has `activity N [--before C] [--limit K]`
   answer "a page from its end", and `task N --activity K` its "K latest
   activity lines"; section 12 gives the rest of what the tools' window
   cuts "by its cursor". jig's `Read::Activity { task, before }` takes no
@@ -1006,10 +1006,10 @@ and the user, or the director, may veto it before the run:
   whole, its K rows again, then reads on at jig's `before`. `task N
   --activity K` that cuts a page prints `read with: activity N`. The
   printed cursor stays jig's. At most a page's rows repeat, and no row is
-  skipped. tools.md, 5.2, says so at the designer's next pass.
+  skipped. client/tools.md, 5.2, says so at the designer's next pass.
 - **Q. A restored proposal's recipient** (question.md in the run's
   directory, from temper 03.4's block of 10:01:22Z; no designer is joined
-  to answer it): tools.md, 6.1, has an act's outcome print `proposed:
+  to answer it): client/tools.md, 6.1, has an act's outcome print `proposed:
   p3/17, to maintainers`, and a kept line (8.2, step 4) print `kept: `,
   the operation, "then its outcome as an act's prints". jig's
   `Outcome::Proposed { proposal: ProposalKey }` keeps no recipient, and
@@ -1027,5 +1027,5 @@ and the user, or the director, may veto it before the run:
   restored proposal prints its identity alone (`kept: chat, proposed:
   t3/17`), with no `to`. A new call's outcome keeps `, to <recipient>`.
   The kept line prints only what jig keeps, so it is never stale, and an
-  agent reads the proposal for its present recipient. tools.md, 6.1 and
+  agent reads the proposal for its present recipient. client/tools.md, 6.1 and
   8.2, says so at the designer's next pass.

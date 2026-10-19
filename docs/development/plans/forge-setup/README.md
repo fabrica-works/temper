@@ -21,7 +21,7 @@ join it (decisions.md, 1).
 
 - **temper's design,** at the start commit: `setup.md` (the whole, in
   its section 14's order); `forge.md`, sections 5, 7, 9 and 13;
-  `configuration.md`, sections 3, 6, 7 and 10; `testing.md`, 2.6;
+  `configuration.md`, sections 3, 6, 7 and 10; `domain/testing.md`, 2.6;
   `domain/forge.md`, 5.2 and 8.2; `credentials.md`, 2 and 5;
   `protocol.md`, 5; `draft/mvp.md`, 5.1.
 - **skein's design:** `lib.md`, 6.2 and 10.
@@ -264,7 +264,7 @@ sessions grow is read as "at least".
    ```
 
    exits 0, within 180 s
-   (testing.md, 2.6; decisions.md, 12), the hinted story (temper 11.2),
+   (domain/testing.md, 2.6; decisions.md, 12), the hinted story (temper 11.2),
    the box's tests (temper 13) and the upgrade's (temper 15) among its
    tests. The session files' process-tier items read this run.
 5. The conformance's facts: `git show

@@ -23,7 +23,7 @@ this session (README, Repin).
 
 - skein `docs/design/forge.md` 2.3 and 11, `forge-connection.md` 10,
   `forge-client.md` 10, `forge-setup.md` 7, `fake-forge.md` 7; temper
-  `docs/design/testing.md` 2.2 and 7.
+  `docs/design/domain/testing.md` 2.2 and 7.
 - skein `docs/foundation/testing-strategy.md` 8 and `development.md` 5.5-5.7.
 - README (sessions, Rules, Repin, Done when); code-organization 1; decisions
   11, 22 and 23; designer `tmp/director/forge-kit-answers-1.md`.
@@ -40,9 +40,9 @@ this session (README, Repin).
 - forge-client.md 10 and forge-setup.md 7: the client's world and reconcile's
   world are skein's. fake-forge.md 7: the conformance is skein's,
   `tests/forge/conformance`, outside the suites.
-- testing.md 2.2 and 7: temper keeps `tests/engine/protocol-forge`, "over
+- domain/testing.md 2.2 and 7: temper keeps `tests/engine/protocol-forge`, "over
   skein's crates", for what translation adds in temper.
-- testing.md 2.2 also asks that world to take the fake forge's deliveries to
+- domain/testing.md 2.2 also asks that world to take the fake forge's deliveries to
   the engine's listener, signed, late, out of order or never: unbuilt at the
   base (`tests/protocol.rs` injects `Event::Hint`) and here (`later.md`).
 

@@ -10,11 +10,11 @@ Needs at start: **skein 05.2** on skein's `origin/main`
 Increment 05.2 also needs **skein 05.5** (`skein_fake_peers::forge`, with its
 delivery), after skein 05.4, which needs temper 05.1 (decision 26). These are
 the README table's; the code shows no other. Design built: skein `fake-forge.md` 2, 4 and 5; temper
-`docs/design/testing.md` 2.4 and 4.2.
+`docs/design/domain/testing.md` 2.4 and 4.2.
 
 ## Read first
 
-- skein `docs/design/fake-forge.md` 2, 4 and 5; temper `docs/design/testing.md`
+- skein `docs/design/fake-forge.md` 2, 4 and 5; temper `docs/design/domain/testing.md`
   2.4, 2.5 and 4.2.
 - This plan's README (sessions; Rules: the repin and the tools plan's
   hotspots; Done when 4 and 6), `code-organization.md` (the fakes' rows),
@@ -29,7 +29,7 @@ the README table's; the code shows no other. Design built: skein `fake-forge.md`
   hands it; `address()` is known after io's listening event; it delivers a
   hooked repository's hooks to the endpoint's `host`, which an owner whose
   listener binds port 0 sets once known; delivery is best effort.
-- testing.md 2.4 and 4.2: the one-process world and the real loop both host
+- domain/testing.md 2.4 and 4.2: the one-process world and the real loop both host
   the one peer; the real loop's listeners are on kernel-assigned ports passed
   to their clients once bound, and a story never uses a fixed port.
 - Decision 15: the one-process world hands the peer's `address()` to the engine.
@@ -45,7 +45,7 @@ the README table's; the code shows no other. Design built: skein `fake-forge.md`
   gives peer and engine one constant, `fixtures::FORGE` (127.0.0.1:3000, the
   base's value, now written once), and the referee asserts that `address()`
   is `Some(FORGE)` once the peer listens. The kernel-assigned hand-over is the
-  real loop's (testing.md 4.2), as decision 15 says.
+  real loop's (domain/testing.md 4.2), as decision 15 says.
 - Port-0 binds work in the sim, so the engine's webhooks listener binds
   `127.0.0.1:0`. `ServiceHost` records its bound address; the referee's `act`
   (between passes) sets `Forge.hooks` when it first appears and when a restart
@@ -133,7 +133,7 @@ Removes: the three crates, 14,086 Rust lines (8,320 + 5,309 + 457; manifests asi
   and 154 tests; 3 workspace members; 2 path entries.
 
 ### 05.2 The one-process world on the forge peer
-Scope: fake-forge.md 5; testing.md 2.4, 2.5 and 4.2; decisions 15 and 26, answer 32.
+Scope: fake-forge.md 5; domain/testing.md 2.4, 2.5 and 4.2; decisions 15 and 26, answer 32.
 Needs: 05.1; skein 05.5. For the shared compatibility block, jig01.s2 and temper02.1 must land before this repin resumes; rebase their settled adapters, preserving the independent peer checkpoint and every proof.
 Files, at the base:
   - Repin first (commit 1). Follow README's compatible smith source rule if

@@ -1,4 +1,4 @@
-# What temper has and lacks for tools.md, area 1 (5.5, `temper ctl`)
+# What temper has and lacks for client/tools.md, area 1 (5.5, `temper ctl`)
 
 Date: 2026-10-18. Facts for the tools plan (development.md, 5.4 "a code audit"); no plan. Base: temper's worktree `tmp/temper/tools-plan` at 4735d1852 (`T`); skein `origin/main` 49e7eb6 in section 8; jig and skein read only. The graph was not used (temper's index is stale, jig is not indexed): every name was checked with `rg`. Commands run from `T` unless a line says `~/src/rust`. Code is named by path and symbol. "not verified" marks what no command here shows. Pins:
 ```
@@ -10,7 +10,7 @@ git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c09
 
 ## 1. `Command` and `USAGE` have no `ctl`
 - `crates/temper/src/lib.rs`: `pub enum Command` is `Serve`, `Box`, `Agent` (each with `configuration`) and `Open`, `SignIn`, `Forge` (each with `arguments`); `run` matches all six, `Forge`, `Open` and `SignIn` returning `forge::run`, `open::run`, `sign_in::run`. `USAGE` names serve, agent, open, sign-in, forge prepare|run|reconcile and box.
-- `temper sign-in CONFIG.json ACCOUNT` (`crates/temper/src/sign_in.rs`) is the OAuth account's sign-in, not the `sign-in` tool of tools.md, 5.5.
+- `temper sign-in CONFIG.json ACCOUNT` (`crates/temper/src/sign_in.rs`) is the OAuth account's sign-in, not the `sign-in` tool of client/tools.md, 5.5.
 - `ctl` is in no code, script or config; it is in the design only.
 ```
 $ rg --no-line-number -o 'temper (serve|agent|open|sign-in|forge|box|ctl)\b' crates/temper/src/lib.rs | sort | uniq -c
@@ -23,7 +23,7 @@ $ rg --no-line-number -o 'temper (serve|agent|open|sign-in|forge|box|ctl)\b' cra
 $ rg -c '\bctl\b' crates tests scripts .config Cargo.toml || echo none
 none
 $ rg -c '\bctl\b' docs/design | sort | paste -sd' '
-docs/design/README.md:1 docs/design/STATUS.md:3 docs/design/client.md:3 docs/design/draft/llm-setup.md:3 docs/design/draft/qa.md:2 docs/design/protocol/README.md:13 docs/design/protocol/configuration.md:1 docs/design/testing.md:1 docs/design/tools.md:17
+docs/design/README.md:1 docs/design/STATUS.md:3 docs/design/client.md:3 docs/design/draft/llm-setup.md:3 docs/design/draft/qa.md:2 docs/design/protocol/README.md:13 docs/design/protocol/configuration.md:1 docs/design/domain/testing.md:1 docs/design/client/tools.md:17
 ```
 
 ## 2. The crates and the world that do not exist
@@ -72,7 +72,7 @@ fn new(seed: u64) -> (Self::Root, Self::View);fn build(view: &mut Self::View, ro
 
 ## 5. The process tier
 - `crates/temper/Cargo.toml` names two test binaries, `process` (`tests/process.rs`) and `live` (`tests/live.rs`); `configuration.rs`, `forge.rs` and `startup.rs` are found by cargo. Test counts: process 19, forge 22, startup 24, configuration 2, live 1; `support/` has `boxed, configuration, forgejo, live, mod, owned, person, sign_in, terminal, webhooks`.
-- `process.rs` runs the shipped binary (`env!("CARGO_BIN_EXE_temper")` in `support/mod.rs`, `owned.rs`, `terminal.rs`) with `support::fake_llm` and `chat_script`; its tests are `temper serve` (link, drain on a signal, webhook deliveries), `temper open` (`support::terminal::{open, Typist}`), `temper sign-in`, the forge commands, `temper box`, and one native chat to the fake model. None runs `temper ctl`; tools.md, 11.4 puts `ctl` there.
+- `process.rs` runs the shipped binary (`env!("CARGO_BIN_EXE_temper")` in `support/mod.rs`, `owned.rs`, `terminal.rs`) with `support::fake_llm` and `chat_script`; its tests are `temper serve` (link, drain on a signal, webhook deliveries), `temper open` (`support::terminal::{open, Typist}`), `temper sign-in`, the forge commands, `temper box`, and one native chat to the fake model. None runs `temper ctl`; client/tools.md, 11.4 puts `ctl` there.
 - `forge.rs` spawns the binary too (`Command::new(env!("CARGO_BIN_EXE_temper"))`), and no profile filter excludes `forge`, `startup` or `configuration`: they run in the gate. How `startup.rs` starts temper: not verified (no `Command::new` in it).
 - Landing: the nextest `default` and `fuzzy` profiles exclude the `process` and `live` binaries; `scripts/proof-one-process.sh` builds the binary and runs `cargo nextest run -p temper --profile process`, "run once through heavy --gate"; `scripts/proof-live.sh` needs `TEMPER_RUN_LOGS` and `live-login` and wraps `--profile live` in `timeout 900s`. The protocol plan's README: "The process and live tiers run only where a Proof line or 'Done when' says, through `heavy --gate`, once; never in the gate"; its Done-when 8 runs `TEMPER_FORGEJO=... heavy --gate scripts/proof-one-process.sh` and wants its log to name each test of `process.rs` passed.
 ```
@@ -88,7 +88,7 @@ process.rs:19 forge.rs:22 startup.rs:24 live.rs:1 configuration.rs:2
 ```
 
 ## 6. The real loop
-- tests/real-loop is absent (section 2). `docs/design/testing.md`, 2.4 designs it on `skein-world`'s real harness; `docs/design/STATUS.md`: "The real-loop world ... Waits for a plan of its own." and "The agents' tools, `temper ctl` ... waits for jig's named key and its read of one turn".
+- tests/real-loop is absent (section 2). `docs/design/domain/testing.md`, 2.4 designs it on `skein-world`'s real harness; `docs/design/STATUS.md`: "The real-loop world ... Waits for a plan of its own." and "The agents' tools, `temper ctl` ... waits for jig's named key and its read of one turn".
 - `skein_world::real` exists at the pin (`testing/skein-world/src/real.rs`, 30 `pub` lines at 8a51e10). Its only user in smith, jig and temper is smith's `tests/machine/src/jobs.rs` (`skein_world::real::World::new(referee)`). Crates here that depend on `skein-world`: `temper-service`, `temper`, `temper-engine-protocol-forge`, `tests/{client,fake-forge,one-process}`; none uses `real`.
 ```
 $ rg -l 'skein_world::real|world::real::' tmp/temper/tools-plan smith jig --glob '*.rs'   # ~/src/rust
@@ -115,7 +115,7 @@ default-filter = "binary(/^(process|live)$/) & not binary(=process)"
 - io.md (`origin/main`), "Locking": `Lock` on a root, exclusive, without waiting; `Locked` when taken or held through this root, `Busy` when another open of the directory holds it; the lock lasts as long as the root's descriptor (until `Close` for a root `OpenDirectory` made, until the process ends for one the shell opened); no unlock; a spawned child never holds it.
 - Directories naming `Op::Lock` or `file::Request::Lock` at `origin/main` are listed below (skein-io's file layer and kernel, the shell's ring, the simulator, the worlds, tests); jig names it nowhere, smith in four files, temper only in `temper-forge-setup`'s own `Request::Lock` (below); hearth is not checked out here, not searched. Whether any caller outside skein-io constructs one: not verified.
 - temper's own locks: `temper-forge-setup` has its own `Request::Lock(File)` ("Take the runner's lock without waiting"; `File::ForgejoLock` and `File::RunnerLock` are `forgejo.lock` and `runner.lock`), served in `temper-forge-setup-shell/src/prepare.rs`; `process.rs` calls std `file.try_lock()`. Neither locks a client DIRECTORY.
-- `open.rs` opens DIRECTORY's parent as the root (`skein_shell::open_root(parent)`) and the shell opens DIRECTORY by name with `OpenPrivate { owner, root, path }`. Which token a `Lock` on DIRECTORY would take, and whether `OpenPrivate` gives one `Lock` accepts: not verified. tools.md, 15: "`temper open` and `temper ctl` on one DIRECTORY: not supported and not detected".
+- `open.rs` opens DIRECTORY's parent as the root (`skein_shell::open_root(parent)`) and the shell opens DIRECTORY by name with `OpenPrivate { owner, root, path }`. Which token a `Lock` on DIRECTORY would take, and whether `OpenPrivate` gives one `Lock` accepts: not verified. client/tools.md, 15: "`temper open` and `temper ctl` on one DIRECTORY: not supported and not detected".
 ```
 $ git -C skein grep -l -E 'Op::Lock|Request::Lock' origin/main -- '*.rs' | sed 's|origin/main:||' | xargs -n1 dirname | sort -u | paste -sd' '   # ~/src/rust
 crates/skein-io/src crates/skein-io/src/file_layer crates/skein-io/src/tests crates/skein-oauth-accounts/src crates/skein-shell/src crates/skein-sim/src crates/skein-sim/src/sim examples/echo/service/src testing/skein-conformance/src testing/skein-echo-client/src testing/skein-world/src tests/io/src tests/io/tests tests/ring/src tests/sim/tests
@@ -143,5 +143,5 @@ crates/temper-forge-setup-shell/src/prepare.rs:            Request::Lock(file) =
 ```
 
 ## 9. `docs/design/STATUS.md`
-- `tools.md`: "no", "all: not planned. jig's named key and its read of one turn come first (section 13); then area 1 (5.5), `temper ctl` for a chat to a landed change; areas 2 to 4 as the QA loop reaches them".
-- `protocol/README.md` (partly): "3 to 5: `temper ctl`, `temper-client-tools` and `temper-client-shell-cli`: not planned (`tools.md`)".
+- `client/tools.md`: "no", "all: not planned. jig's named key and its read of one turn come first (section 13); then area 1 (5.5), `temper ctl` for a chat to a landed change; areas 2 to 4 as the QA loop reaches them".
+- `protocol/README.md` (partly): "3 to 5: `temper ctl`, `temper-client-tools` and `temper-client-shell-cli`: not planned (`client/tools.md`)".

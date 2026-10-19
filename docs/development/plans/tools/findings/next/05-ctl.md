@@ -9,8 +9,8 @@ Needs at start: **the tools' root**. Steps are `temper-05.1` through
 
 ## Read first
 
-- temper's `docs/design/tools.md`: 4, 5.6, 6.2, 6.3, 7 to 9, 11.1,
-  11.3 to 11.5, 12, 15; `client.md`: 6.1, 6.6, 7; `testing.md`: 2.4, 2.6, 6.1.
+- temper's `docs/design/client/tools.md`: 4, 5.6, 6.2, 6.3, 7 to 9, 11.1,
+  11.3 to 11.5, 12, 15; `client.md`: 6.1, 6.6, 7; `domain/testing.md`: 2.4, 2.6, 6.1.
 - jig's `docs/design/client/domain/client.md`: 4, 6, 8.2, 11, 12, 16, 20;
   `docs/design/protocol/client.md`: 8, 10, 12.
 - skein's `docs/design/io.md`, 5; `kernel.md`, 6.1, 6.2; `shell.md`, 12, 13;
@@ -36,7 +36,7 @@ Needs at start: **the tools' root**. Steps are `temper-05.1` through
   60 s; reads/waits never load its store; pending/help take no lock either.
 - **6.2, 6.3, 12:** one result, the root's status, kept lines on stderr,
   a 30 s link deadline including an unheard request or answer.
-- **11.3, testing.md 2.4:** files, lock and exit proven on the real kernel;
+- **11.3, domain/testing.md 2.4:** files, lock and exit proven on the real kernel;
   **11.4:** the executable's paths belong to temper 10.
 
 ## Choices this plan makes

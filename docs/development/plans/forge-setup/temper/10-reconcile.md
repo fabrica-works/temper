@@ -11,7 +11,7 @@ on polling. `forges[].user` as a file is temper 07.3's. The session Needs, at it
 ## Read first
 
 - **Design:** setup.md 5, 6.5, 9, 13.2 (the host's part), 13.4; configuration.md 3 (rows `api`, `transport`), 6, 7 (the
-  `setup.` limits); credentials.md 5; testing.md 2.6. `decisions.md` 5, 12 (180 s), 20 (the person's token), 22 (support
+  `setup.` limits); credentials.md 5; domain/testing.md 2.6. `decisions.md` 5, 12 (180 s), 20 (the person's token), 22 (support
   Sizes), 23 (`attach`), 25 (the job's token).
 - **Findings:** `configuration-and-binary.md` 1, 4, 6; `skein-io.md` 7; `forge-and-tiers.md` 4; `client-api.md` 2;
   `measurements.md` (the tier at the base: 51 s, the story 31 s). **skein:** programming-model.md 2.1, 9, 10.3;
@@ -26,7 +26,7 @@ on polling. `forges[].user` as a file is temper 07.3's. The session Needs, at it
 - **setup.md 5, 6.5, 9:** reconcile writes only where it differs, waits for the forge within `setup.deadline_ms`, stops
   with status 1 naming the step and leaving every file whole, speaks plaintext to loopback alone, sends every request
   under the admin's token, alone reads `admin_token`; no secret in an argument, a URL or a message (10.1). **13.4,
-  testing.md 2.6:** the process tier runs the commands in the box's order; the person, a site admin, makes the repository
+  domain/testing.md 2.6:** the process tier runs the commands in the box's order; the person, a site admin, makes the repository
   in the org with Actions and a workflow running its check on the owned runner (10.2).
 
 ## Choices this plan makes
@@ -180,7 +180,7 @@ Size: 250 lines.
 Removes: nothing.
 
 ### 10.2 The process tier on the owned Forgejo, with CI
-Scope: setup.md 13.4, testing.md 2.6, decisions 12 and 20. The throwaway's provisioning leaves the process tier: after
+Scope: setup.md 13.4, domain/testing.md 2.6, decisions 12 and 20. The throwaway's provisioning leaves the process tier: after
 10.1's `owned::start`, the test starts `run runner`, runs `temper forge reconcile`, makes the person's token, and as the
 person makes `acme/widget` in the org with Actions, `check.sh` and a workflow. The adoption leaves "It runs CI" checked,
 the landing rule asks for it, and the change lands once the owned runner has passed its job.

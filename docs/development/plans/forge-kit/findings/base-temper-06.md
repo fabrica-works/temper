@@ -227,8 +227,8 @@ dir: /srv/data/git/runner/src/tmp/planning/skein-base, /srv/data/git/runner/src/
 ```
 $ heavy bash -c 'rg -n "temper-throwaway-forgejo|temper_throwaway_forgejo|throwaway" docs/design docs/foundation AGENTS.md scripts .config'
 dir: temper-base
-only prose naming `skein-throwaway-forgejo` or "the throwaway Forgejo" (docs/design/testing.md,
-protocol/{setup,README,forge}.md, tools.md); no live document names the temper crate.
+only prose naming `skein-throwaway-forgejo` or "the throwaway Forgejo" (docs/design/domain/testing.md,
+protocol/{setup,README,forge}.md, client/tools.md); no live document names the temper crate.
 docs/development/plans/** (landed plans) name it: history, not edited.
 ```
 

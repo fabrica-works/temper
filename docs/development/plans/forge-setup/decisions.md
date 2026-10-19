@@ -69,7 +69,7 @@ run are appended after "For the user".
 11. **Facts are named by group:** `setup-…` (admin routes, tokens, orgs,
     teams, hooks), `cli-…` (Forgejo's command line), `runner-…`,
     `delivery-…`, so "Done when" counts each group.
-12. **The process tier aims at 180 s whole** (testing.md 2.6;
+12. **The process tier aims at 180 s whole** (domain/testing.md 2.6;
     setup.md 13.4), CI, webhooks, the box and the upgrade included. If it
     goes past, the slowest story becomes a test of its own, or the aim
     moves, by a ruling for the user.
@@ -780,7 +780,7 @@ run are appended after "For the user".
        as they are: 14.1 changes no `startup.rs`.
 
 144. **11.2's hinted story, the designer's answer** (design gap, ready check of temper-11.2).
-     Ruling 144, the designer's answer to Q2 of temper 11.2: temper 3a323b3b2 (setup.md 10 and 13.4, testing.md 2.6, `temper/11-hinted.md`, `later.md`).
+     Ruling 144, the designer's answer to Q2 of temper 11.2: temper 3a323b3b2 (setup.md 10 and 13.4, domain/testing.md 2.6, `temper/11-hinted.md`, `later.md`).
 
 
      1. **The hinted story proves one wait: CI on a head, row 3.** setup.md 10, "Checked", now says: "the process tier's

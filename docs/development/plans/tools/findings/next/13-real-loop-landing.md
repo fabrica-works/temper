@@ -15,8 +15,8 @@ coordinate their registrations on rebase, without a session-wide fence.
 
 ## Read first
 
-- temper at 4e14c2b5: `docs/design/tools.md` 5.3, 5.4, 6, 8, 11.3;
-  `docs/design/testing.md` 2.4, 4.1 to 4.3, 6.1, 7, 10;
+- temper at 4e14c2b5: `docs/design/client/tools.md` 5.3, 5.4, 6, 8, 11.3;
+  `docs/design/domain/testing.md` 2.4, 4.1 to 4.3, 6.1, 7, 10;
   `docs/design/client/README.md` 4.4 to 4.7 (adoption).
 - This plan: `temper/08-real-loop.md` (the crate, `run_forge`,
   `forge::Fixture`, `Seen`, owner checks and deferred LLM construction);
@@ -42,21 +42,21 @@ coordinate their registrations on rebase, without a session-wide fence.
 
 ## What the design asks
 
-- **tools.md 11.3, testing.md 2.4:** adopt, clone, edit, push and land
+- **client/tools.md 11.3, domain/testing.md 2.4:** adopt, clone, edit, push and land
   through the fake git program and shared in-memory forge; hosted
   smith agents use real pipes and the fake LLM's scripted turns.
-- **testing.md 4.3 and 10:** measure fake git on the real ring's files
+- **domain/testing.md 4.3 and 10:** measure fake git on the real ring's files
   before relying on it. The real-git bridge and sh-based CI are later.
 - **2.4 and 4.2:** content decides CI; hooked repositories deliver
   signed webhooks, with short configured polling as a backstop.
-- **tools.md 6:** adopted and successful reads/acts/waits exit 0;
+- **client/tools.md 6:** adopted and successful reads/acts/waits exit 0;
   only engine answers exit 2. Client failures, Held included, exit 1.
   A cut call's status is the OS's, nonzero, with no caught signal.
   Kept lines carry name, operation and outcome, never either key;
   JSON has `name` (or null), `operation`, `outcome` on stderr.
 - **5.4, 6.3:** an engine stop ends no watch. A disconnected wait
   fails only past its link deadline, exit 1; it cannot stand in for
-  `--until ended`. **testing.md 6.1:** a focused story stays within 1 s.
+  `--until ended`. **domain/testing.md 6.1:** a focused story stays within 1 s.
 
 ## Choices this plan makes
 
@@ -102,7 +102,7 @@ coordinate their registrations on rebase, without a session-wide fence.
 
 ### 13.1 The fake git program on the real filesystem, measured
 
-Scope: testing.md 2.4, 4.3 and 10's prerequisite measurement.
+Scope: domain/testing.md 2.4, 4.3 and 10's prerequisite measurement.
 Needs: nothing beyond the session's start.
 Files (forge/git wiring; exact paths): `tests/real-loop/src/git.rs`
 (new), `tests/real-loop/src/world.rs`, `tests/real-loop/src/check.rs`,
@@ -158,7 +158,7 @@ Removes: nothing.
 
 ### 13.2 The landing's fake-LLM scripts
 
-Scope: testing.md 2.4's scripted landing, in its own LLM increment.
+Scope: domain/testing.md 2.4's scripted landing, in its own LLM increment.
 Needs: nothing beyond the session's start.
 Files (LLM-accounts hotspot; exact paths):
 `tests/real-loop/src/landing.rs` (new), `tests/real-loop/src/lib.rs`
@@ -200,7 +200,7 @@ Removes: nothing.
 
 ### 13.3 A chat to a landed change
 
-Scope: tools.md 11.3: adopt, chat, delegate, clone, edit, push, CI, review, land.
+Scope: client/tools.md 11.3: adopt, chat, delegate, clone, edit, push, CI, review, land.
 Needs: the measured fake git host (13.1); the landing scripts (13.2);
 **the tools' adopt**.
 Files (forge fixture wiring, behind the existing API):

@@ -74,7 +74,7 @@ jig's, as jig has them (jig's `domain/accounts.md`): each an LLM
 provider's account, held by a person or by the deployment, with its
 sources in its holder's order. temper configures the LLM providers
 (configuration.md, section 2), shows and makes accounts from its client
-(`../client/README.md`, 3.5; `../tools.md`, 5.5, area 5), and adds
+(`../client/README.md`, 3.5; `../client/tools.md`, 5.5, area 5), and adds
 `temper program-login`, below.
 
 - **Made from the client, never configured.** Configuration names LLM
@@ -278,7 +278,7 @@ sources in its holder's order. temper configures the LLM providers
   forge's protocol world search every root's events and requests, every
   fact and every store record for the values their fakes issued (LLM
   access tokens and keys, identities' tokens, API tokens, webhooks'
-  secrets), and fail on any (`../testing.md`, 2.5).
+  secrets), and fail on any (`../domain/testing.md`, 2.5).
 - **The identities' table:** step tests of its filling at start, a value
   filled into a grant and taken out on the worker, and two generations.
 - **Git's environment:** step tests of its builder: the header's bytes,
@@ -296,15 +296,15 @@ sources in its holder's order. temper configures the LLM providers
   caller's kept, `CLAUDE_CONFIG_DIR` the source's directory, the
   program's credential variables removed. The process tier execs smith's
   fake `claude` (smith's `protocol/programs.md`, section 8) and finds its
-  login in the source's directory (`../testing.md`, 2.6).
-- **LLM accounts' stories** in the real loop (`../testing.md`, 2.4): a
+  login in the source's directory (`../domain/testing.md`, 2.6).
+- **LLM accounts' stories** in the real loop (`../domain/testing.md`, 2.4): a
   key added, a sign-in against skein's fake issuer with a redirect the
   test drives, and a program's source over smith's fake `claude`; after
   each, no value in temper's store, a fact, a request, an answer or the
   client's small store.
 - **The live tier** runs on a program's login on its machine, which
   temper never reads, or on a sign-in or a key added per run
-  (`../testing.md`, 2.7).
+  (`../domain/testing.md`, 2.7).
 
 ## 8. Open questions
 
