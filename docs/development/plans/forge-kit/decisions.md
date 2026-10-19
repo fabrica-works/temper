@@ -819,6 +819,11 @@ where its answer lands.
 
      Mark skein-06.s1 ready immediately with the checked full commits. Start its fresh upstream implementation under134's bounded diagnostic scope; feasibility sketches do not spend or enlarge its diagnostic probe allowance. Temper06.2 remains waiting for the evidenced landed repair before its repin/recording proof. Retain closing temper-repin dependency and all existing case/budget limits.
 
+138. **Validate the corrected signed-number fixture** (process, skein01.s1 block of2026-10-19T09:02:55Z).
+     Authorize final validation of the corrected two-byte numeric fixture under ruling 138. The plan requires preserving every input and expected assertion case; the existing signed-id input -1 has two bytes and must reach Malformed::Range { field: b"id" }. Task916 instead returned Json(NumberTooLong) with the one-byte fixture. The corrected NUMBER_BYTES=2 is a test-fixture derivation from that preserved input; its success remains unproved.
+
+     The existing audit is complete and its three targeted runs are spent. Allow each of the four existing Proof commands once in the prescribed order: package clippy, then default, fuzzy and browser package nextest profiles. Stop on failure and report it; this grants no additional fixture investigation or iterative retry. The extension permits 15 minutes of command execution, excluding queue waiting. Continue the normal dependent checks and landing gate once these pass. Keep all36 mapped assertion cases, relative+16 count, shared-fixture ownership and existing per-test/suite ceilings; record any newly reached fixture caller or derived bound and its preservation in the commit body. Production and shipped profiles remain outside this test-only correction.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
