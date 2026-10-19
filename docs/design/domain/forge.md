@@ -536,7 +536,8 @@ producing ─► opening ─► checking ─► gating ─► queued ─► firs
    style, automatically: what more a landing needs is a landing rule's,
    which the core checks at the merge (8.7). Merged, the change is
    **landed**: its result is the landing (the pull request, the merge
-   commit), and it closes, its branch deleted as its hold is released
+   commit, whose id in hexadecimal is the result's words: `root.md`,
+   section 6), and it closes, its branch deleted as its hold is released
    (section 11).
 
 Lazy, too, for runs: before a repair or a resolution is created, the

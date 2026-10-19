@@ -60,7 +60,8 @@ repairs what they break (02.1, Shape).
 
 ### 02.1 The repin, the purposes, the client's users, the deletion
 
-Scope: forge-client 7.1 and forge 2.3, 3.7; domain/forge 5 and 6.
+Scope: forge-client 7.1 and forge 2.3, 3.7; domain/forge 5 and 6; domain/root 6
+  (a landed change's words).
 Needs: skein 02.2 and temper 01.3 on `origin/main` (README); for its naming
   proof and its landing, jig01.s1's boundary check repair on jig's `origin/main`
   (README, Rules: the boundary check's jig repair). Skein 02.3's `bind_deployment`
@@ -88,7 +89,7 @@ Derived fixture Files: `docs/examples/owned.json`; existing regression in
   whose body stays unchanged. Its consumers are `crates/temper/tests/support/owned.rs`
   (`EXAMPLE`), `tests/{startup,configuration,process}.rs` under that crate,
   and the copy command in `docs/guide/box.md`; preserve them and their assertions.
-Shape: four commits, each builds and passes its crates' tests.
+Shape: five commits, each builds and passes its crates' tests.
   1. **The repin**: update and check; repair there what skein's steps broke
      since the last repin (at the base the check fails on `Op::Lock` and jig's
      `Event::Locked`, which the tools plan's first repin, landed before this
@@ -170,6 +171,23 @@ Shape: four commits, each builds and passes its crates' tests.
      rather than applying a stale delta. Refresh any further reached copy or
      derived value and list every user in the commit body.
   4. **The deletion**: the crate's directory, its member and its path entry.
+  5. **The landing's words** (design `domain/root.md`, 6: "its words the
+     merge commit's id as text: in lowercase hexadecimal, as a delegate's
+     commits are (below), shortened to its first digits, as a short id is,
+     when the task's contract bounds its words under the id's 40 or 64"), the
+     repair the diagnostic exception below returned for, made on the
+     preserved four-commit checkpoint. In
+     `crates/temper-engine-domain/src/route/forge_route.rs`, `change_decision`'s
+     `Decision::Finish { merge }` result takes `words: landing_words(&merge,
+     bound)` in place of `Box::from(&merge[..])` (the padded commit's 32
+     raw bytes, which jig's `documents/small.rs::text` asserts are UTF-8);
+     `bound` is the `words` of the task's own `tasks::Contract::Change`,
+     read as `link.rs:26` reads a task's contract
+     (`domain.core.tasks.task(task)`), 0 for any other contract. The new
+     `fn landing_words(merge: &skein_forge::api::Commit, bound: u32) -> Box<[u8]>`
+     beside `commit_text` keeps `commit_text(merge)`'s first
+     `min(bound, its digits)` digits. `commit_text`, its parameter callers,
+     every contract and bound, and jig stay as they are.
   Diagnostic exception for the pinned Jig UTF-8 panic: investigate the retained
   failed retry in run `logs/temper-02/process-attempt2/process`, comparing the
   failing four-commit tree and its actual pins with the last passing source.
@@ -210,7 +228,18 @@ Shape: four commits, each builds and passes its crates' tests.
       5, 1, 0,0,0,0,0,0,0,1, 0,0,0,0,0,0,0,2, 0,0,0,0,0,0,0,3 ];
   ```
   The vectors are the base client's bytes (checked in the scratch against
-  the base `effect_key`, all five tags). No other test changes name or value but the three below.
+  the base `effect_key`, all five tags). Commit 5 adds one unit, <20 ms, in
+  `crates/temper-engine-domain/src/route/forge_route/tests.rs` (1 at the base),
+  `landing_words_are_the_merge_id_cut_to_the_contract_bound`, on that file's
+  `SHA1` and `SHA256`: (`SHA1`, 64) and (`SHA1`, 40) give its 40 digits;
+  (`SHA256`, 512) and (`SHA256`, 64) its 64; (`SHA256`, 32) its first 32;
+  (`SHA1`, 7) `abcdef0`; (`SHA1`, 0) nothing. It also tightens one assertion:
+  `tests/engine/domain/tests/forge_routes.rs`'s
+  `a_worker_frozen_past_its_grace_resumes_with_a_push_in_hand_and_lands_nothing_twice`,
+  whose delegate's contract bounds words at 32 (`change_world_in`, line 834),
+  asserts that its one Done result's words are the first 32 lowercase
+  hexadecimal digits of the stored change's `State::Landed { merge }`, besides
+  "one result after recovery". No other test changes name or value but the three below.
   skein 02.2 puts the plans' `reads::size::answer` on the measure's widths
   (decision 24), and its "temper's side" names the three component tests
   that follow: `the_running_answer_size_agrees_with_the_clients_measure`
@@ -229,6 +258,8 @@ Proof: unit; `heavy cargo test --locked --offline -p temper --test startup
 Proof: unit; `heavy cargo nextest run -p temper-engine-domain-forge tests::purpose`:
   5 passed, each <20 ms (0.002 to 0.003 s in the scratch; the two moved
   ones took 0.004 s and 0.006 s at the base).
+Proof: unit; `heavy cargo nextest run -p temper-engine-domain forge_route::tests`:
+  its count at the step's start plus 1 (2 from the base's 1), each <20 ms.
 Proof: unit; `heavy cargo nextest run -p temper-engine-domain-forge`: origin/main's
   count at the step's start plus 5 (27 from the base's 22, 0.015 s), <1 s.
 Proof: joint; `heavy cargo nextest run -p temper-engine-domain-forge
@@ -237,8 +268,9 @@ Proof: joint; `heavy cargo nextest run -p temper-engine-domain-forge
   -p temper-engine-protocol-forge -p temper-engine-protocol-forge-world
   -p temper-engine-domain-world -p temper-conformance-world -p temper-codecs-world
   -p temper-client-world -p temper-system-world -p forgejo-conformance`: the
-  set's count at the step's start plus 5 (926 from the base's 921, 4.823 s; the
-  client's 76 are not in it): the five purpose tests are the only change; <15 s. A failure of a profile, limits or
+  set's count at the step's start plus 6 (927 from the base's 921, 4.823 s; the
+  client's 76 are not in it): the five purpose tests and commit 5's unit are
+  the only change; <15 s. A failure of a profile, limits or
   size test after the measure is a design question: return it, change no bound,
   except for the fully traced derived owned-example allowance correction
   explicitly authorized above. An unexplained difference still returns.
@@ -250,7 +282,7 @@ Proof: process; `TEMPER_FORGEJO=$WS/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-li
   start passed (19 at the base), <5 minutes (145.694 s in `base-runs.md`, 149.083 s alone here). Once: the keys
   at rest and the engine's calls go through the new client.
 Proof: joint; `heavy --gate scripts/check.sh`: origin/main's focused count at the
-  step's start less 71 (the client's 76 out, 5 in: 1808 from the base's 1879) and
+  step's start less 70 (the client's 76 out, 6 in: 1809 from the base's 1879) and
   its fuzzy count unchanged (50 at the base; 3.754 s and 16.803 s), clean
   clippy and format, focused <15 s, fuzzy <60 s.
 Don't: add an alias, a re-export or a `mod client`; change
@@ -260,12 +292,17 @@ Don't: add an alias, a re-export or a `mod client`; change
   allowance correction above; write `temper` into skein; move `EffectPurpose` into
   skein or give the kit a purpose; touch jig's own, different
   `jig_domain_core::EffectPurpose` (`forge_route.rs` names it as an effect's
-  `origin`).
+  `origin`); give a landing's words more digits than its contract's bound,
+  raise a contract's words bound (the tests' 32 stay) or refuse a bound
+  under the id's digits; relax jig's UTF-8 assertion, or rewrite, migrate or
+  delete the run's retained failed artifacts (`logs/temper-02/`): their
+  stores keep the raw words, test artifacts that no fixed tree restores.
 Size: about 680 lines moved (changed callers counted as moved: 561 lines
   of client state in 48 files, the callers among them; 88 of the purposes' encoding, the client's
   `identity.rs`; 31 of the two moved tests), 90 new (the three new tests and
   their vectors about 72, `key` and the module's lines about 15, the manifest
-  and root entries about 3). Under 300: no 02.2.
+  and root entries about 3; commit 5 about 35: `landing_words` and its use
+  about 15, its unit about 15, the tightened assertion about 5). Under 300: no 02.2.
 Removes: `crates/temper-engine-domain-forge-client/`, 7,209 lines at the base
   (4,913 source, 2,283 test, 13 manifest; about 6,757 after 01.1 took the
   vocabulary and `locate.rs`): its 74 other tests live in skein; its

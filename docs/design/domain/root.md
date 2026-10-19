@@ -349,7 +349,7 @@ exhaustively with no `_` arm (jig's `domain/root.md`, section 6).
 
   | The change decides | The core hears |
   |---|---|
-  | finished, merged | its result: the change, its pull request and the merge |
+  | finished, merged | its result: the change and its pull request, the merge's id its words (below) |
   | a delegate: producing, a repair (CI, a semantic conflict, a gate's remarks), a resolution, a gate | a batch of one delegate (below); the step waits |
   | ready; a wait | a wait; ready steps it again |
   | a queue repair | the repair started (5.4) and a wait, or, when it cannot start, held for its effects |
@@ -358,6 +358,16 @@ exhaustively with no `_` arm (jig's `domain/root.md`, section 6).
   | held: past its repairs, resolutions or updates | held by its procedure |
   | held: a delegate or an effect failed for good; an approval declined | held, an effect failed |
 
+- **A landed change's result** is a change of the forge's connector and
+  kind, its resource the pull request, and its words the merge commit's
+  id as text: in lowercase hexadecimal, as a delegate's commits are
+  (below), shortened to its first digits, as a short id is, when the
+  task's contract bounds its words under the id's 40 or 64. A result's
+  words are text that summarises it (jig's `domain/tasks.md`, section 3,
+  and `client/domain/contract.md`, 5.3), never the commit's bytes; the
+  whole id stays the change's and its pull request's (`forge.md`, 8.2).
+  The short id keeps any bound the task's creator chose: a bound under
+  the id's digits is not refused, and the result never passes it.
 - **A change's delegates,** in the core's terms: an agent task under the
   forge's charter for producing, repairs, resolutions, and agents' and
   checks' gates; a person task for the project's maintainers for a
