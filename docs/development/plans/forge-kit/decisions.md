@@ -403,6 +403,19 @@ where its answer lands.
 
      Checked skein 0db7b1fc7307aa50980ce75637e686e384adc4e4 and temper c4f89032047e4980b9f946ce8abf1c2c81653ba8. The Read enum has exactly those six page fields; the check searched all increments and downstream repositories. Other absent names belong to declared future increments. The corrected scratch table compiles under clippy and passes within the 78-test temper client suite (0.159 s); client world passes 29 focused tests (0.041 s) and 2 fuzzy (0.329 s). Skein-forge passes clippy and 86 tests (0.148 s); client fuzzy selects no tests. Future opaque-key, measure, echo and 81/84/90/114-test proofs await their APIs. Evidence: pump/ready-skein-02.md.
 
+108. **skein 06's Shapes against main** (ready check of skein-06.1).
+     Amends: skein/06-conformance.md 06.1 Shape, 06.2 Proof, 06.3 Shape, 06.4 Proof and Done when. Reverses: nothing.
+
+     The ready check corrects five plan details. In moved throwaway `http.rs::request`, absent bodies use skein-http `Body::None`; `Body::Length(0)` emits Content-Length and changes the existing GET golden. Present bodies retain Length(n).
+
+     Moved skein-forge integration targets need test configuration under skein's lint policy: `#![cfg(test)]`, scoped and reasoned test-harness `#[expect]` attributes, and `common` exposed within test targets for shared helpers. Adapt redundant qualifications in `tests/common/forgejo.rs::{decode_refusal,decode_body,transcript_cases}` and `tests/forgejo_setup.rs::OrgAnswer::request` to their imports. Keep production lints and test assertions. Also replace `tests/forgejo_deliveries.rs::shipped`'s temper-service lookup with `common::forgejo::profile_limits`; the existing delivery fuzzy test uses the same helper. Refresh further copies and derived values and list them and lint adaptations in the commit body.
+
+     The committed corpus contains 218 facts, with 55 setup facts and 40 component facts, all holding. Correct the three “36 setup” references to 55; retain the stable-outcome digest and timing comparison unchanged.
+
+     Checked skein 0db7b1fc7307aa50980ce75637e686e384adc4e4 and temper c4f89032047e4980b9f946ce8abf1c2c81653ba8. Verified Body::{None,Length} in skein-http/src/client/request.rs, the temper profile lookup in tests/codecs/tests/forgejo_deliveries.rs::shipped, and counted setup/component prefixes in tools/forgejo-conformance/facts.txt. All-increment symbol/copy/derived-value searches across five repositories found no further consumers.
+
+     The corrected scratch probe passes clippy for the throwaway/conformance/codecs and skein-forge/http packages. Sequential suites pass: temper 98 focused (1 skipped), 6 fuzzy; the existing opt-in throwaway test passes (13 skipped); skein forge/http/world pass 384 focused and 10 fuzzy, no browser tests selected. The initial future-mask sketch predictably fails against today's masker: 06.4 already owns that implementation; its sketch compiles, and baseline suites pass after restoring it. No new design question is exposed. Future attached fixtures, recorder/document conversion proofs, five boundary tables and generated fuzzy sweep remain unrun until their declared implementations. Evidence: pump/ready-skein-06.md and scratch-ready-skein-06/.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

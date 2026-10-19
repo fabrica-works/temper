@@ -71,8 +71,10 @@ Shape:
   keeps its signature. Capture receive bytes through the first CRLFCRLF, retaining the head through
   its last CRLF, before feeding skein-http: `Response` loses the reason phrase, so never synthesize
   a status line. The HTTP decoder alone supplies status and unframed body. Build the client's Call
-  with ordered Host, Authorization, Content-Type, Range; Body::Length and close=true let it write
-  Content-Length/Connection. Capture its sends, replacing only credentials for `sent`.
+  with ordered Host, Authorization, Content-Type, Range. In `http.rs::request`, use
+  `Body::None` when the body is absent and `Body::Length(n)` for a present body;
+  `Length(0)` adds Content-Length and changes the absent-body GET golden. Keep
+  close=true for Connection. Capture its sends, replacing only credentials for `sent`.
   No credential reaches the retained capture. A private one-shot Host drives
   skein-http over skein-io using `skein_shell::drive`: close admission at the answer/error, drain
   all completions, then return. Keep 100 ms connect, 10 s exchange and the 16 MiB
@@ -206,7 +208,7 @@ Test shape: move all 33 tests unchanged in name (the base's 25 and temper 06.2 t
 Proof: unit; `heavy cargo nextest run -p forgejo-conformance`
   prints 33 passed, 0 skipped (the base's 25 in 0.114 s), preserving that workload/time.
 Proof: process; `heavy --gate scripts/proof-forgejo-conformance.sh --forgejo "$WS/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-linux-amd64" --runner "$WS/tmp/temper/forgejo/runner-v13.2.0/forgejo-runner-13.2.0-linux-amd64" --scratch target/forgejo-conformance --out tests/forge/conformance`
-  once: exits 0; 218 facts, all 36 setup and 40 component facts hold. Then compare, as part of this
+  once: exits 0; 218 facts, all 55 setup and 40 component facts hold. Then compare, as part of this
   Proof (no second recording):
   `heavy bash -o pipefail -c 'set -eu; digest=$(awk '\''BEGIN { split("merge-old-head-is-409-head-out-of-date delivery-pull-reads-not-mergeable-while-checked delivery-pull-is-settled-when-its-push-is-delivered delivery-pull-is-checking-when-its-push-is-delivered webhook-deliveries", a); for (i in a) timing[a[i]]=1 } /^#/ || NF==0 { next } { name=$2; sub(/:.*/, "", name); if (seen[name]++ || $1 !~ /^(holds|fails)$/) exit 1; n++;   if (name in timing) { t++; print "timing " $0 > "/dev/stderr" }   else { s++; h+=($1=="holds"); f+=($1=="fails"); print $1, name } } END { if (n!=218 || s!=213 || h!=207 || f!=6 || t!=5) exit 1;   print "facts=218 stable=213 holds=207 fails=6 timing=5 unchecked=0" > "/dev/stderr" }'\'' "$1" | LC_ALL=C sort | sha256sum); printf "%s\n" "$digest"; test "$digest" = "d1f7ba2bb323b8944e05d2e05bc1c83396fb7bfffadbcefea4faad64ec18347d  -"' sh tests/forge/conformance/facts.txt`
   prints five `timing <holds|fails> <name>[: reason]` lines, then `facts=218 stable=213 holds=207
@@ -244,6 +246,12 @@ Files: temper `tests/codecs/tests/{forgejo_*.rs,fuzzy_forgejo.rs,fixtures.rs}` -
   admitted limits and values by test-source inclusion, adjusting its imports for both harnesses if
   needed (changed). No production fixture export.
 Shape:
+- The moved integration targets inherit skein's step-code lints. Add `#![cfg(test)]`
+  to test targets and use scoped, reasoned test-harness `#[expect]` attributes where
+  the copied harness needs them. Expose `common` within each test target so shared
+  helpers do not trigger unused-helper errors; keep production lints intact.
+  Shorten redundant qualifications in `common/forgejo.rs::{decode_refusal,decode_body,
+  transcript_cases}` and `forgejo_setup.rs::OrgAnswer::request` for their new imports.
 - Keep helpers' public signatures and all 58 moved test names. Import `skein_forge::forgejo`; the
   transcript helper reads `../../tests/forge/conformance/{transcripts,deliveries}` relative to
   CARGO_MANIFEST_DIR. Production dialect code still performs no io.
@@ -256,7 +264,10 @@ Shape:
   test source, reached by the existing helper: plain values from the shipped Small profile:
   tokenizer depth 16, string 16,384, number 32, chunk 4,096, length 16,777,216; writer depth 16,
   length 16,777,216; string_bytes 512, body_bytes 16,384, inner 32, target_bytes 4,096. The delivery
-  fuzzy test uses this same helper.
+  fuzzy test uses this same helper. `forgejo_deliveries.rs::shipped` also calls
+  `common::forgejo::profile_limits`, replacing its temper-service profile lookup.
+  Refresh further copies and derived values reached by these repairs, and list
+  further users and lint adaptations in the commit body.
 Test shape: 55 focused + 3 fuzzy move. Add six table tests in `forgejo_bounds.rs`, reusing
   common::forgejo's limits/decoders and the moved seven case tables (share the tables, not copies):
 - `limits_accept_the_profile_and_reject_each_problem`: reference below; all eight zero fields, both
@@ -364,7 +375,7 @@ fn unquoted_log_times_keep_fraction_width_offset_and_identity() {
 Proof: process; `heavy --gate scripts/proof-forgejo-conformance.sh --forgejo "$WS/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-linux-amd64" --runner "$WS/tmp/temper/forgejo/runner-v13.2.0/forgejo-runner-13.2.0-linux-amd64" --scratch target/forgejo-conformance --out tests/forge/conformance`
   records again on both pinned binaries, once, in <=5 minutes of execution. Run 06.2's exact
   comparison after recording: 213 stable outcomes match digest d1f7ba2b…18347d; five timing
-  outcomes/reasons print, each holds or fails. Total 218; no unchecked; all 36 setup and 40
+  outcomes/reasons print, each holds or fails. Total 218; no unchecked; all 55 setup and 40
   component facts hold.
 Proof: unit; `heavy cargo nextest run -p forgejo-conformance` prints
   35 passed (33 at the step's start, the base's 25 in 0.114 s; each new test <20 ms).
@@ -393,6 +404,6 @@ Removes: the gap for unquoted times, through recording; quoted behavior stays.
 - `heavy bash -o pipefail -c 'set -eu; digest=$(awk '\''BEGIN { split("merge-old-head-is-409-head-out-of-date delivery-pull-reads-not-mergeable-while-checked delivery-pull-is-settled-when-its-push-is-delivered delivery-pull-is-checking-when-its-push-is-delivered webhook-deliveries", a); for (i in a) timing[a[i]]=1 } /^#/ || NF==0 { next } { name=$2; sub(/:.*/, "", name); if (seen[name]++ || $1 !~ /^(holds|fails)$/) exit 1; n++;   if (name in timing) { t++; print "timing " $0 > "/dev/stderr" }   else { s++; h+=($1=="holds"); f+=($1=="fails"); print $1, name } } END { if (n!=218 || s!=213 || h!=207 || f!=6 || t!=5) exit 1;   print "facts=218 stable=213 holds=207 fails=6 timing=5 unchecked=0" > "/dev/stderr" }'\'' "$1" | LC_ALL=C sort | sha256sum); printf "%s\n" "$digest"; test "$digest" = "d1f7ba2bb323b8944e05d2e05bc1c83396fb7bfffadbcefea4faad64ec18347d  -"' sh tests/forge/conformance/facts.txt`
   prints the five timing outcomes/reasons and `facts=218 stable=213 holds=207 fails=6 timing=5
   unchecked=0`, then `d1f7ba2bb323b8944e05d2e05bc1c83396fb7bfffadbcefea4faad64ec18347d  -`. It reads
-  committed facts; no final recording. All 36 setup and 40 component facts hold, covered by the
+  committed facts; no final recording. All 55 setup and 40 component facts hold, covered by the
   digest.
 
