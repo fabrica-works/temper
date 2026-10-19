@@ -1099,6 +1099,16 @@ where its answer lands.
 
      Accept the check with this plan correction and mark jig01.s2 ready using its recorded snapshots. The full repository gate stays at implementation landing; process/live/recordings, wasm/browser application tier and downstream temper compilation were not run or claimed. All checker workers ended before its own14GB target was removed. Other sessions' gates/proofs, checkpoints and154 dependency order remain unchanged.
 
+157. **Hourly06 primary graph refresh** (hourly check of 2026-10-19T11:37:40Z).
+     Reverses: nothing; temporary application of the README Graph freshness rule to newly stale source and a missing index.
+     Amends: README Rules, Graph freshness, until the hourly06 refresh is reported.
+
+     Hourly06 compares each exact primary root with its graph coverage. Do not use the code graph for skein, smith, jig, hearth or temper; search with rg until the supervisor reports refreshed coverage. Existing starts and all proof/limit/ownership requirements continue. The supervisor refreshes only these primary repositories, never worktrees or dependency checkouts; later source still needs verification in the actual worktree.
+
+     Checked: pump/hourly06-graph-pre.json retains list_projects pages0–500 matching exact absolute roots and index_status diagnostics. Four required primary-name indexes exist: skein/temper indexed10:35, jig10:36, smith2026-10-13; primary origin/main source has moved since. No index matches the hearth primary root, and its exact primary project returns not indexed. Alias indexes for some other primary roots do not replace the workspace's exact project names. pump/hourly06-graph-snapshots.json records clean primary HEADs lagging their origin/main and exact paths. Pinned plan-check.sh27–40 authorizes fast-forwarding a clean main that is only behind; development9.6 forbids moving backwards. Before indexing, apply only that clean ancestry-checked fast-forward to existing origin/main and record the commit indexed; never discard local work or create a source commit. If cleanliness/ancestry fails, leave that checkout unchanged and retain source fallback.
+
+     Use supported index_repository on the resolved primary roots, explicitly preserving project names srv-data-git-runner-src-{skein,smith,jig,hearth,temper}; report readiness, gaps and pre/post HEADs. No kit or source behavior changes. Hourly/process checks continue independently and no extra suite is justified by index metadata updates.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
