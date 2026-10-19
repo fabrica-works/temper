@@ -462,7 +462,7 @@ area lands with its stories (section 11).
 | Tool | What it does |
 |---|---|
 | `sign-in FILE\|-` | signs in by the link `temper serve` printed, read from FILE, or from stdin for `-`; writes `token` and `address` (8.1) |
-| `sign-out` | ends the sign-in and erases the token |
+| `sign-out` | ends the sign-in and leaves `token` empty, zero bytes, read as signed out (8.1) |
 | `pending` | lists what DIRECTORY's store keeps: each request's operation, its party and when it was first sent, and how many records these tools cannot read |
 | `help [TOOL]` | the guide, then the tools (11.5); with TOOL, its record of the table |
 
@@ -689,9 +689,10 @@ temper ctl help [TOOL]
 - **`sign-in FILE|-`** signs in by the link `temper serve` printed, read
   from FILE or stdin and never an argument (section 9), on loopback, and
   writes the token and the address the link names, as `temper open`
-  does (`README.md`, section 7). `sign-out` ends the sign-in and erases
-  the token. Every other tool signs in with the token DIRECTORY holds
-  (`SignIn { with: Held }`).
+  does (`README.md`, section 7). `sign-out` ends the sign-in, and jig's
+  native shell, keeping none, leaves `token` a zero-byte file, which a
+  call reads as no token. Every other tool signs in with the token
+  DIRECTORY holds (`SignIn { with: Held }`).
 - **Loopback only,** as `temper open`, until the clients' listener
   serves TLS: a call checks that `address` is on loopback, `127.0.0.0/8`
   or `[::1]`, before it sends the token, and otherwise exits 1, "the
@@ -860,11 +861,11 @@ reports.
 
 `tests/real-loop` hosts the tools' root over jig's native transport,
 the standalone engine and worker, smith's agents on skein's fake LLM
-peer's scripted turns, the fake forge's host, and the fake git program
-over the fake forge, on one thread and one real ring (`../domain/testing.md`,
-2.4). Agents are hosted in that loop and joined to their worker by real
-pipes. The store and client credentials use a scratch directory on the
-real filesystem.
+peer's scripted turns, skein's forge peer hosting the fake forge, and
+the fake git program over that forge, on one thread and one real ring
+(`../domain/testing.md`, 2.4). Agents are hosted in that loop and
+joined to their worker by real pipes. The store and client credentials
+use a scratch directory on the real filesystem.
 
 Its stories sign in, start a chat and wait for its reply, and satisfy one
 client's wait by another client's act; each drains with everything

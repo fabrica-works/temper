@@ -137,14 +137,16 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   6. any other `GET`, the printed link's route among them: the page,
      with its ETag and `no-cache`, and `304` on a matching
      `If-None-Match` (skein's `ui-web.md`, 4.4).
-- **The page's policy,** on every answer: jig's reference policy as it
-  stands (jig's `protocol/browser.md`, 12.1): `default-src 'none';
+- **The page's policy,** on every answer temper gives: jig's reference
+  policy as it stands (jig's `protocol/browser.md`, 12.1): `default-src 'none';
   script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src
   'self'; font-src 'self'; connect-src 'self'; base-uri 'none';
   form-action 'none'; frame-ancestors 'none'`, with `nosniff`,
   `Cross-Origin-Opener-Policy: same-origin`,
   `Cross-Origin-Resource-Policy: same-origin` and `Referrer-Policy:
-  no-referrer`. temper adds no origin: no font, picture or script from
+  no-referrer`. skein-http's own refusals, `400`, `413` and `431`, given
+  before temper sees the request, carry none: they hold no page to frame
+  or sniff. temper adds no origin: no font, picture or script from
   elsewhere. The mockups' optional web font is not used; the look takes
   the system's monospaced font.
 - **jig's example guards, as they are** (`README.md`, section 8): the

@@ -215,7 +215,7 @@ on the real kernel in the focused suite, within its budgets (6.1).
   delivers a hooked repository's webhooks to the engine's webhooks'
   listener (../protocol/forge.md, section 5), and polling stays the
   backstop, at paces the stories' configuration sets short (`poll`,
-  `poll_max` and `slow`).
+  `poll_max`, `slow` and `hinted`, the read a delivery re-arms).
 - **The person's terminal client.** The real loop also hosts temper's
   terminal client, in the loop as the service is: temper's client root
   and view under skein's text shell, over jig's native transport to the

@@ -901,13 +901,14 @@ command.
   the tree, so the page is printed again.
 - **Signing out** is the banner's "Sign out": the domain asks it, and
   the host gives `jig-client` `SignOut`, which sends jig's sign-out.
-  Signed out: the host has the native shell keep none, which erases
-  DIRECTORY's token; the main says "Signed out." (5.1), the first line
-  reads `== temper == Signed out` (skein's `ui-text.md`, section 5:
-  TITLE is "the shell's name when there is none"), and temper prints
-  `temper: signed out; to sign in again, run temper open DIRECTORY
-  LINK with a link temper serve printed`. A sign-out that did not reach
-  the engine leaves the person signed in (jig's
+  Signed out: the host has the native shell keep none, which leaves
+  DIRECTORY's token a zero-byte file, read as none; the main says
+  "Signed out." (5.1), the first line reads `== temper == Signed out`
+  (skein's `ui-text.md`, section 5: TITLE is "the shell's name when
+  there is none"), and temper prints `temper: signed out; to sign in
+  again, run temper open DIRECTORY LINK with a link temper serve
+  printed`. A sign-out that did not reach the engine leaves the person
+  signed in (jig's
   `client/domain/client.md`, section 12): the banner says "Sign out did
   not reach the engine." and offers "Sign out" again.
 - **Another party's kept work:** while the small store holds requests
