@@ -141,8 +141,10 @@ Shape:
 - `llm::bound(recipe)`: the peer alone in a checked world; its
   `address()` once io reports it listening, then `shutdown()`.
 - `scripts::chat_scripts(n)`: n scripts, each jig's `one_chat(WORDS)`
-  answered as one-process's `provider` answers it, through
-  `provider_turns`, copied (nothing of `tests/one-process` is depended on); `WORDS`, `REPLY`, `EARLY` (REPLY's first word).
+  answered as one-process's `read_then_wait_provider` answers it, a
+  turn of `Text(REPLY)` then `wait({})`, so that the chat stays open for
+  its reads (tools.md, 5.4; ruling 118), copied (nothing of
+  `tests/one-process` is depended on); `WORDS`, `REPLY`, `EARLY` (REPLY's first word).
 Test shape: `tests/peers.rs`, skein-world's `domain::heap::Counting` as
 its global allocator; under 0.5 s.
 ```rust

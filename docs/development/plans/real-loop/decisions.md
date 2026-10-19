@@ -366,6 +366,20 @@ pass:
 117. **One behaviour per test: act once, assert after it, bounds named** (steer of 2026-10-19T14:50:52Z).
      Steer of the check of 2026-10-19T14:50:52Z, point 1: the README's rule "One behaviour per test" now also says that a test sets up, acts once, then asserts that behaviour; that nothing is asserted on the way to the step under test; and that a bound has both sides, from named constants. Seen in 05.4's `crates/temper-client-shell-cli/src/tests.rs` (4445f2d9a): `two_writes_get_two_ordered_terminals` asserts `!f.act_sent()` before the step it waits for and then `f.store_count() >= first + 2`, a bound with one side computed by the test; `host_bounds_cover_its_holders` asserts `* 2 + 5` with both numbers unnamed. It applies to the tests each session adds or edits from its next increment. Landed tests are unchanged.
 
+118. **08.3 waits on what frees an ended call's stream; its chat script keeps the chat open** (plan defect and design question, temper 08's block of 2026-10-19T15:07:13Z).
+     An interim. What frees an ended one-shot call's stream is a design question, and it is now with the designer (question.md of 2026-10-19T15:11:41Z):
+     - tools.md, 8.3, says that a read and a wait "hold their client's store in memory, empty, never DIRECTORY's file". So jig's `protocol/client.md`, section 4, "The predecessor's stream is sent gone", does not free their streams.
+     - skein's `lib.md`, 7, lets a stream "still send to a peer that only half-closed". So the engine sees the connection's end only at a failed write.
+     - What ends the stream, and whose code ends it, is the designer's to decide.
+
+     Until the answer:
+     - **08.3's chat story waits.** 08.3 keeps its WIP (d2aeab866) and its target. Nothing is landed for the 409s: no stream bound raised in the world's profile, no heartbeat shortened, no wait or retry in the caller, and no edit to skein, jig or `temper-service` for them.
+     - **08.3's chat script stays as the session wrote it:** a turn of `Text(REPLY)`, then `wait({})`, as one-process's `read_then_wait_provider` answers it.
+       - Why: the copied `provider` reports, which finishes the chat ("`Finished` ends the chat and drops it from the reads", tools.md, 5.4), so the read ended "watch ended".
+       - 08.1's `chat_scripts` line now says so (ruling 118).
+       - `tests/real-loop/tests/lifecycle.rs` and `tests/peers.rs` call `chat_scripts(1)`: run both with the changed script. Refresh any further user, and list it in the commit body.
+     - **Meanwhile, the session may do work that does not rest on the answer:** the FILE root's story, the scaffolding, and those two suites.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
