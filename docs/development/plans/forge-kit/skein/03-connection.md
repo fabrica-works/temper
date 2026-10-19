@@ -12,8 +12,9 @@ tests, without counting skein-forge's tests again.
 ## Read first
 
 - skein `docs/design/forge-connection.md` 2, 3, 5, 6, 7, 8, 10;
-  `forge.md` 3.7, 4, 5.1, 6, 8, 11; the designer's answers 1–6, 13 and 14
-  (`tmp/director/forge-kit-answers-{1,2}.md`, copied into decisions.md).
+  `forge.md` 3.7, 4, 5.1, 6, 8, 11; `tls.md` 2, 3.4; the designer's answers
+  1–6, 13 and 14 (`tmp/director/forge-kit-answers-{1,2}.md`, copied into
+  decisions.md), and the TLS name answer (skein 1908a365).
 - skein `docs/foundation/programming-model.md` 4.2, 5.2–5.4, 6.2–6.3, 7,
   9, 10; `testing-strategy.md` 2.1, 2.4–2.5, 3, 4.4, 6–8, 10.
 - README (sessions, Rules, Done when), code-organization.md; decisions.md
@@ -24,7 +25,8 @@ tests, without counting skein-forge's tests again.
 ## What the design asks
 
 - 2–5: owner-routed calls, bounded starts, private credentials and caches;
-  the transport's name supplies Host; no component dependency on the client.
+  the transport's name supplies Host, a TLS name read by `Name::server`;
+  no component dependency on the client.
 - 6: signed deliveries, response before hint, listener failures and bounds.
 - 7: each start check; page sizes use forge.md 3.7's fixed-width measure.
 - 8, 10: step coverage here; TLS, faults, deadlines, close and allocator
@@ -65,6 +67,8 @@ Files: temper `crates/temper-engine-protocol-forge/` -> skein
   boundary,settings}.rs; src/tests.rs and src/tests/*.rs. Remove the residual
   conventions.rs. Plans, tables, marker, hooks/hint, Fields/Heard/Body/Failure,
   start's exchange mapping and host already belong to skein 01: import them.
+  skein `crates/skein-tls/src/{config,lib}.rs` and `src/tests/config.rs`:
+  `Name::server` and `Server` (tls.md 3.4).
   Shared hotspots: skein Cargo.toml's workspace dependency and Cargo.lock;
   crates/* supplies the member. Temper consumer paths are inventoried below.
 Shape: retain Component entry points, Request/Event, MAX_OUT (16/16), Limits
@@ -109,10 +113,21 @@ Word,
 PlaintextName { forge: u16 },
 ```
   No Forge.host or separate token/kind fields. skein-forge's pure
-  host(address, name), from 01.4, derives Host for both check and send: name,
-  else IP (IPv6 bracketed), :port only when neither 443 nor 80 (decision 25). TLS supplies
-  its server name; plaintext its optional name. conventions::host was deleted
-  by temper 01.4. Remove USER_AGENT; send Settings.user_agent on every request.
+  host(address, name), from 01.4, unchanged, derives Host for both check and
+  send: name, else IP (IPv6 bracketed), :port only when neither 443 nor 80
+  (decision 25). Plaintext supplies its optional name. TLS supplies its
+  server name, read by skein-tls's new `Name::server(&self) -> Server<'_>`
+  (`Server::Dns(&str)`, the text as given; `Server::Ip(core::net::IpAddr)`;
+  tls.md 3.4): Dns -> host(address, Some(text)); Ip ->
+  host(SocketAddr::new(ip, port), None), with the address's port: the
+  name's IP even when it differs from the address's (forge-connection 3.1).
+  One private function makes Host for check and send; a TLS name is never
+  refused. rustls's ServerName is non_exhaustive: Name keeps which of the
+  two it holds, set by new, so that server is total with no unreachable arm;
+  build core's IpAddr from pki-types' octets (AsRef<[u8; 4]>,
+  AsRef<[u8; 16]>), whose std conversions skein-tls lacks. Never
+  ServerName::to_str. conventions::host was deleted by temper 01.4. Remove
+  USER_AGENT; send Settings.user_agent on every request.
   Render the owner's Credential through the dialect; pass word to its plans.
   Word and PlaintextName refusals are forced by the new home's owner-value
   boundary: the owner now hands the word and transport, so neither can rely
@@ -128,8 +143,10 @@ PlaintextName { forge: u16 },
   body_bytes:1045 becomes 1042 for kit. Other fixture limits stay unchanged.
   Reuse skein 01.3's table storage sizing; price changed Settings/Forge holders
   in worst_case and report the complete fixture sum now and after each change.
-  Price retained owner bytes explicitly: Settings.word, Settings.user_agent and
-  plaintext name boxes have no size input in worst_case(l,s,forges). In 03.1,
+  Price retained owner bytes explicitly: Settings.word, Settings.user_agent,
+  plaintext name boxes and each TLS DNS name's text (Server::Dns's length; an
+  IP name holds none; forge-connection 7.5) have no size input in
+  worst_case(l,s,forges). In 03.1,
   add checked settings::owned_bytes(&Settings) for the newly retained owner
   byte slices and pass that byte count into
   worst_case; thread it through check and every caller, including temper's
@@ -156,7 +173,9 @@ PlaintextName { forge: u16 },
   crates/temper/src/lib.rs::forges also imports the runtime transport; its
   plaintext-name construction belongs to temper03.1's next repin (temper
   01.4 retained the unit Plaintext variant); its component crate path changes
-  at that repin. Verify
+  at that repin. Temper hands TLS's server_name as now and reads no name back;
+  a TLS forge's Host now follows that name, not the API address's host name
+  that temper-service's forge.rs passes to host today (forge.md 5.1). Verify
   tests/system/src/composed/link.rs::assignment too: its settings::Transport
   is temper's configuration enum, not the component enum. Preserve that seam.
 Test shape: 112 inherited component test identities: root 12, connection 20, hooks 12,
@@ -167,7 +186,13 @@ Test shape: 112 inherited component test identities: root 12, connection 20, hoo
   wiring check: capture each sent Host for TLS/named plaintext, IPv4/v6 and
   default/custom ports; include TLS on 80 and plaintext on 443, both omitted.
   Assert literal forge.example, forge.example:3000, 127.0.0.1 and
-  [0:0:0:0:0:0:0:1] as applicable.
+  [0:0:0:0:0:0:0:1] as applicable. Add TLS IP names that differ from the
+  address: name 192.0.2.7 on 127.0.0.1:3000 -> 192.0.2.7:3000; name
+  2001:db8::7 on 127.0.0.1:443 -> [2001:db8:0:0:0:0:0:7]; and name ::1 on
+  [::1]:443 -> [0:0:0:0:0:0:0:1], never ::1.
+  Extend skein-tls's a_name_is_a_dns_name_or_an_ip_address: skein.test ->
+  Server::Dns("skein.test"), Skein.Test keeps its case; 127.0.0.1 and ::1
+  -> Server::Ip of core's IpAddr. No new test name.
   Extend unusable_forge_settings_name_the_forge: None is Ok; empty, NUL, tab,
   0x1f, space, DEL, 0x80, 0xff and each /:[] -> PlaintextName{forge:1};
   !, ~ and adjacent . 0 9 ; Z \\ ^ -> Ok. Check and construction agree.
@@ -198,12 +223,13 @@ fn body_room_includes_the_owner_word() {
 }
 ```
 Proof: world, `heavy cargo nextest run -p skein-forge-connection`: 115 passed,
-  <0.5 s total, new units <20 ms; includes
+  <0.5 s total, new units <20 ms; `heavy cargo nextest run -p skein-tls`: all
+  pass, count unchanged; includes
   creations_carry_the_key_marker_at_the_head_of_their_body through Component
   and HTTP. This is the highest caller until temper 03.1 connects the crate.
 Don't: fix head size, signature or start-policy gaps; move tables twice;
   edit temper's consumers here (its next repin repairs them).
-Size: about 2,850 production lines moved, 240 new; about 3,100 test lines moved.
+Size: about 2,850 production lines moved, 270 new; about 3,100 test lines moved.
 Removes: residual conventions/USER_AGENT, Forge.host/token, Shared.client in
   the copy; nothing from temper.
 
@@ -259,8 +285,9 @@ Test shape: seven new tests, using fixtures::{limits,shared,settings,hook_settin
   Keep both names; these extensions replace the draft's two new limit tables.
   New src/tests.rs tests:
   request_head_counts_user_agent: pad only agent to REQUEST_ROOM minus
-  target/derived Host/token/192; bound -> Ok, +1 -> Request{forge:1}; TLS and
-  named plaintext, with nondefault ports included in Host's measured length.
+  target/derived Host/token/192; bound -> Ok, +1 -> Request{forge:1}; TLS DNS,
+  TLS IP (2001:db8::7, bracketed and uncompressed) and named plaintext, with
+  nondefault ports included in Host's measured length.
   header_controls_are_refused_before_io: for credential and agent separately,
   empty, NUL/CR/LF/0x1f/0x7f -> Token{forge:1}/Request{forge:1};
   tab/space/0x7e/0x80/0xff -> Ok; user 0/1 -> User{forge:1}/Ok.
