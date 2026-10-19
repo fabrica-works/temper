@@ -75,6 +75,7 @@ more says so in its row and its file. Dependencies are by capability:
 |---|---|---|---|
 | `jig/01.s1-client-names.md` | jig01.s1: boundary naming seeds and whole project prefixes under the designer's answer | jig design9e9c350; normal ready check | |
 | `jig/01.s2-smith-adapters.md` | jig01.s2: settled channel-v3 and no-live smith compatibility adapters | live-text/smith-02.1, jig01.s1; normal ready check | |
+| `jig/01.s3-http-room.md` | jig01.s3: HTTP mount room and application busy refusal | jig01.s2, jig design8922bfa; normal ready check | temper02.1 commit7 and closing temper-repin wait |
 
 ### temper
 
@@ -88,7 +89,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `temper/06-throwaway.md` | temper 06: temper's process tier, tools and conformance on skein's throwaway; temper's deleted; the conformance on skein-json (decision 27) | skein 06.1 | 06.2: skein06.s1 |
 | `temper/07-worlds.md` | temper 07: the moved worlds, the dialect's tests and the conformance with its transcripts deleted from temper; the protocol world keeps temper's own tests (decision 22) | skein 06.3; temper 06.1 | the client's world: skein 07.1; setup's: skein 07.3; the component's: skein 08.1 and 09.1; 07.1: temper 05.2 |
 
-17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2,06.s1,03.s1,10.s1,10.s2 and jig01.s1,01.s2. The brief's fifth step, the fakes and
+17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2,06.s1,03.s1,10.s1,10.s2 and jig01.s1,01.s2,01.s3. The brief's fifth step, the fakes and
 the conformance, is skein 05 to 09 and temper 05 to 07, by size. The
 increments per session are in each file.
 

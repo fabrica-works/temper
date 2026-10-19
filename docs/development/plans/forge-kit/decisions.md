@@ -1342,6 +1342,47 @@ where its answer lands.
      step stays held until the report and a further scope ruling; use a fresh
      continuation after W49's114K checkpoint when implementation is authorized.
 
+172. **HTTP mount room: the designer's answer** (design gap, temper02.1 question of 2026-10-19T14:19:24Z).
+     Apply the designer’s landed answer, jig8922bfa45c36fbcf3cb145501e76483437a45ffa and temper e674a3e22686013660618c809f6af2c02caa233c:
+
+     Landed with `land --docs`: jig 8922bfa45c36fbcf3cb145501e76483437a45ffa
+     (protocol/client.md 17.4, STATUS.md) and temper
+     e674a3e22686013660618c809f6af2c02caa233c (client/README.md 1, STATUS.md;
+     plan README Rules, temper/02-client.md 02.1).
+
+     1. One owner per bound, no handshake. The mount owns its calls in flight:
+        jig 17.4, "The engine end's room": "It holds a call from its head until
+        it has handled the call's end, even once the server has let the call's
+        connection go: until then the call takes room, and nothing tells the
+        server it has let the call go. The application asks for its room
+        before it hands the engine end a call, and answers a call under the
+        prefix that finds none itself, as it answers a call no route claims:
+        `503`, with no body, closing the connection, with nothing of the
+        engine end's set aside." The server owns its connections, "never by
+        the engine end's room". The client takes the 503 as lost or dropped and
+        retries after its backoffs (no client change, no `Retry-After`).
+     2. Kept: 8 and 16 connections, Small's 4 calls and 2 streams, and the
+        mount's insertion assertion, now the application's contract: "a call
+        handed with no room is the application's bug, asserted". The overlap
+        and the five withheld bodies each become a 503, not a panic.
+     3. jig's repair is jig01.s3, a step the supervisor adds (README, "The HTTP
+        mount's room"). It adds `Mount::room`, counting a call whose end is
+        heard but not handled. `jig-test-service`'s `clients.rs` refuses as
+        temper's does, holding refused calls in a `Map<Token, ()>` at the
+        server's connections, so its `clients::worst_case` and
+        `limits::worst_case` must be re-derived. Every other `Event::Call`
+        caller in jig asks first. Each seam gets a test. The closing temper
+        repin waits for jig01.s3.
+     4. temper's repair is 02.1's commit 7, "The mount's room", once jig01.s3
+        lands. It repins with `cargo update -p jig-protocol-engine-clients-http
+        --precise`. `server_requests` mounts a claimed call only while
+        `mount.room()` is not 0. Otherwise the call goes to `unclaimed` and is
+        answered `503`, `close: true`. Test `a_call_past_the_mounts_room_is_answered_busy`;
+        joint plus 7 (928), check.sh less 69 (1810). No temper sum changes:
+        `unclaimed` is already counted at connections. A story stalled on 503s
+        is a call the mount never lets go, jig01.s3's finding, never a bound
+        to raise. Nothing is deferred.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
