@@ -967,6 +967,16 @@ where its answer lands.
 
      Instructions: mark temper-03.1 ready with these checked hashes after this ruling lands. Readiness does not waive its skein03.1/temper02.1 needs, the already assigned compatible smith repair/pin, jig01.s1 naming/landing prerequisite, or the unanswered TLS Name/IP Host design contract. Normal implementation retains every proof and budget; no fourth supervisor attempt or upstream dependency-source patch is authorized.
 
+149. **hourly05 graph refresh pending** (hourly check of 2026-10-19T10:32:03Z).
+     Reverses: nothing; the permanent Graph freshness rule and all existing implementation prerequisites remain.
+     Amends: README Rules, temporary Graph refresh pending (hourly05).
+
+     The primary graph indexes precede newer main source. Until the supervisor reports their refreshed commits, do not use the code graph for skein, temper or jig; search with rg and verify in the actual worktree. The supervisor refreshes only the exact primary roots, not session or scratch worktrees. The temporary rule changes no step dependency, proof, budget or kit.
+
+     Checked: index_status for srv-data-git-runner-src-skein reports root /srv/data/git/runner/src/skein, ready, indexed2026-10-19T09:35:55Z; temper reports its matching primary root, ready,09:36:44Z; jig reports its matching root, ready,2026-10-14T15:14:39Z. The last reported covered source commits were skeinf1a62194 and temperb0bce454. Scoped git rev-parse HEAD origin/main and git status --short show clean main checkouts with equal pairs: skein5c8ae967570b8cfc33f10c83cdfc5495e3b42e99, temperb9d0ebaedd32856d99067b396369483a687bec9e, jigc415911cc6e73d2359a30db896dc87e00d28b202. Since the last report, moved source includes the plans tests, temper owner adapters and landed jig classifier repair. Current index diagnostics retain partial/excluded-file fallbacks. Kit scripts/dev/plan exposes ruling --text and ring; no kit move.
+
+     Instructions: pass the README temporary source-search rule to the coordinator and any resumed implementer until the supervisor reports its removal. The hourly checker already uses source fallback for later source; no additional test, gate or executable attempt follows from this rule.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
