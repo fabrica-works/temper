@@ -145,7 +145,13 @@ Files: `crates/jig-client-domain/src/contract/{operations,documents}.rs`; `crate
 Also `testing/jig-client-scripted-engine/src/{payload,payload/operations}.rs`, `tests/client/src/joint/wire/asks/create.rs`
 and proposal/history adapters; all constructors in the surveyed unit/world fixtures, notably `testing/jig-test-service/src/tests/fixtures.rs`,
 `tests/{core,people,tasks,conformance,channel,client-browser,client-protocol}/` and `crates/jig-client-view/src/tests/`;
-`tests/client/tests/stories.rs` (its `NewTask`); `tests/client-wire/tests/fuzzy_client_wire.rs`, whose hand-listed wire
+`tests/client/tests/stories.rs` (its `NewTask`); the unit, world and scripted fixtures that build these literals outside
+those directories: `crates/jig-domain-core/src/{tests,tests/fixtures}.rs`, `crates/jig-domain-people/src/tests/fixtures.rs`,
+`crates/jig-domain-tasks/src/tests/{last_batch,revisions,revisions/text}.rs`, `crates/jig-protocol-store/src/tests/fixtures.rs`,
+`testing/jig-client-scripted-engine/src/{owner_history/tests,owner_proposal/tests,tests/fixtures,tests/recurring}.rs`,
+`tests/client/src/{stories,joint/engine_stories,joint/wire/history,joint/wire/historical/tests,joint/wire/projects/tests}.rs`
+and `tests/ops/src/conformance/mod.rs`; `crates/jig-protocol-store/src/sizes.rs` and `src/tests/format.rs`, whose
+worst-case sizes (81_241, 81_353, 17_499, 34_998) follow the grown rows; `tests/client-wire/tests/fuzzy_client_wire.rs`, whose hand-listed wire
 types gain `NewDeadline` here and `DeadlineSpan` in 05.3.
 Shape: add the selector field and ONLY Named, as sketched below, to the existing types. Every producer supplies Named,
 every translation matches it exhaustively; made tasks' stored Authority stays wall-only. ProposedTask carries the selector
@@ -172,7 +178,7 @@ Files: 05.2's enums, schemas and translations; `crates/jig-domain-authority/src/
 (`acts::request` calls `admit`), `src/routing/{create,propose,party_decisions,parties,people,tasks,runs,procedure_steps,views}.rs`,
 `src/documents{,/objects,/offers,/deployment,/task_tree,/project_note}.rs`, `src/reads{,/rows}.rs` and core test callers;
 new `crates/jig-domain-core/src/routing/deadlines.rs` declared in `routing/mod.rs`;
-`crates/jig-domain-tasks/src/{batch,stored}.rs`;
+`crates/jig-domain-tasks/src/{batch,stored}.rs`; `crates/jig-protocol-store/src/sizes.rs` and `src/tests/format.rs`, as in 05.2;
 `crates/jig-client-view/src/{cards/proposal,proposed_task,proposed_task_words}.rs` and their existing tests;
 `testing/jig-client-scripted-engine/src/{requests,requests/creating,payload/operations}.rs`;
 new `tests/core/tests/deadline_spans.rs`; `tests/client-protocol/src/client/operations.rs`,
