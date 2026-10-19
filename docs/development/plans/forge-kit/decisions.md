@@ -1066,6 +1066,17 @@ where its answer lands.
         on :443 -> `[2001:db8:0:0:0:0:0:7]`, ::1 -> `[0:0:0:0:0:0:0:1]`.
         Nothing is deferred.
 
+154. **Settled smith adapters at the next compatible repin** (shared cross-session scope, temper02.1/05.2/06.2 blocks of2026-10-19T10:57:10Z–10:58:25Z).
+     The three reports expose one already settled contract. Smith's live-text decisions2.2 says "Those paths become v3 in jig's repin". Its Design questions4 accepts "live: None and an arm that ignores pieces", answered(a) by the director on2026-10-19; For the user9 confirms that choice. Its later.md assigns these exact adapters to the tools closing repins "or their next repin of smith". Channel design3 says an absent ask "asks for nothing, and nothing is sent"; host design2 keeps live content outside the domain. No new live policy or design question is needed.
+
+     Add forge-kit/jig-01.s2, jig/01.s2-smith-adapters.md, with normal readiness before implementation. It is jig's next compatibility repin, after the already-landed tools/jig-repin: move smith and skein together to compatible landed sources, one revision each, retaining a newer compatible source. Repair the four channel-v2 consumer files to v3, both Start literals to live:None, and worker_route::{process,channel} to explicitly ignore only OpenEvent::Live alongside the existing ignored variants. Keep fields, cases, assertions and limits; refresh only upstream-version framing/codec-derived values that the landed contract requires. Its complete Files, proofs and copy rule are in the supplement.
+
+     Assign temper's same next-repin share once, to the existing temper02.1 repin commit: its three Start literals, worker_route::{process,channel}, and the service encode_start-derived proof, as named in README and02.1 Files. This uses the existing next-repin assignment rather than waiting for tools/temper-repin or adding another temper supplement. Retain live-text/smith-02.1's compatible repair, the full skein update, jig01.s1 naming repair, one revision per source and every existing proof. No live display, persistence or domain forwarding is implemented.
+
+     Temper02.1's first compatible repin waits for jig01.s2. Temper05.2 and06.2 retain their independent peer/JSON checkpoints and wait for both jig01.s2 and temper02.1, then rebase the single landed adapter sweep before their own all-target checks and required proofs. The schema/path changes in this ruling authorize no bounds increase, omitted assertion, bypassed gate, or suppression of another event. A further structural/design difference returns a scoped report.
+
+     The closing temper-repin is still waiting and also needs jig01.s2; no completed closing repin of this run requires repetition. The tools run's future closing temper repin observes the source landing and avoids duplicating this sweep. Existing live-display deferrals in live-text/later.md stay; this ruling defers no new work.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

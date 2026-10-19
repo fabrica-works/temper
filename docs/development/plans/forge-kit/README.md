@@ -73,20 +73,21 @@ more says so in its row and its file. Dependencies are by capability:
 | File | Session | Needs at start | Increments that need more |
 |---|---|---|---|
 | `jig/01.s1-client-names.md` | jig01.s1: boundary naming seeds and whole project prefixes under the designer's answer | jig design9e9c350; normal ready check | |
+| `jig/01.s2-smith-adapters.md` | jig01.s2: settled channel-v3 and no-live smith compatibility adapters | live-text/smith-02.1, jig01.s1; normal ready check | |
 
 ### temper
 
 | File | Session | Needs at start | Increments that need more |
 |---|---|---|---|
 | `temper/01-forge.md` | temper 01: temper on `skein-forge`: the vocabulary's and the dialect's users moved, temper-forge-forgejo deleted, the component on skein's plans and start reads, temper's word handed | skein 01.1; the tools plan's first repin (Rules) | 01.2: skein 01.2; 01.3: skein 01.3; 01.4: skein 01.4 |
-| `temper/02-client.md` | temper 02: temper on `skein-forge-client` and the measure; temper's client deleted; effects' purposes in temper's connector | skein 02.2, temper 01.3 | 02.1's naming proof and landing: jig01.s1 (Rules) |
+| `temper/02-client.md` | temper 02: temper on `skein-forge-client` and the measure; temper's client deleted; effects' purposes in temper's connector | skein 02.2, temper 01.3 | 02.1's naming proof and landing: jig01.s1; compatible repin: jig01.s2 (Rules) |
 | `temper/03-connection.md` | temper 03: temper on `skein-forge-connection`; the component's crate deleted; temper-service hands the word, the user agent, the transport's name and the limits; the new refusals mapped | skein 03.1, temper 02.1 | 03.2: skein 03.3 |
 | `temper/04-setup.md` | temper 04: temper on `skein-forge-setup`; reconcile's modules deleted; temper's setup hands its values | skein 04.1 | |
 | `temper/05-fakes.md` | temper 05: temper on skein's fakes, temper's deleted; the one-process world on skein's forge peer | skein 05.2 | 05.2: skein 05.5 |
 | `temper/06-throwaway.md` | temper 06: temper's process tier, tools and conformance on skein's throwaway; temper's deleted; the conformance on skein-json (decision 27) | skein 06.1 | 06.2: skein06.s1 |
 | `temper/07-worlds.md` | temper 07: the moved worlds, the dialect's tests and the conformance with its transcripts deleted from temper; the protocol world keeps temper's own tests (decision 22) | skein 06.3; temper 06.1 | the client's world: skein 07.1; setup's: skein 07.3; the component's: skein 08.1 and 09.1; 07.1: temper 05.2 |
 
-17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2,06.s1,10.s1,10.s2 and jig01.s1. The brief's fifth step, the fakes and
+17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2,06.s1,10.s1,10.s2 and jig01.s1,01.s2. The brief's fifth step, the fakes and
 the conformance, is skein 05 to 09 and temper 05 to 07, by size. The
 increments per session are in each file.
 
@@ -240,8 +241,7 @@ chain.
   counts for nothing. Until `tests/boundary/src/client_names.rs` does so
   on jig's `origin/main`, the crates 02.1 moves onto `skein-forge-client`
   read as client crates, and `tests/client`'s
-  `client_crates_carry_the_client_prefix` fails. The repair is this plan's
-  one jig change, jig01.s1 (`jig/01.s1-client-names.md`), with normal
+  `client_crates_carry_the_client_prefix` fails. The boundary-check repair is jig01.s1 (`jig/01.s1-client-names.md`), with normal
   readiness before implementation: the diagnosis's candidate
   (`client_names.rs` and its eight fixtures) is its evidence, with no
   system or forge word in jig and `breaches`' signature kept. temper 02.1
@@ -262,9 +262,32 @@ chain.
   If no compatible repair has landed, continue independent work and report
   the owning upstream step for the coordinator's trailer-based await. Never
   patch Cargo's dependency checkout.
-  The current fake-LLM Event::Call.call / Request::Piece,Hold repair is
-  owned by live-text/smith-02.1; await its trailer before taking the
-  compatible source, then establish compatibility with the normal checks.
+  The fake-LLM Event::Call.call / Request::Piece,Hold repair landed in
+  live-text/smith-02.1 at53b9d6db52ff6cbe999212160e49056cb8ded44e. Taking it
+  also reaches the explicitly settled channel-v3/no-live adapters below;
+  establish compatibility with the normal checks, rather than treating
+  that landed trailer as proof of downstream compatibility.
+- **Settled smith adapters at the next repin:** smith's live-text
+  decisions2.2/answer4 and For the user9 settle v3 paths, `live: None`
+  and ignored `OpenEvent::Live`; its later.md expressly assigns them to
+  the closing repins "or their next repin of smith". This plan's
+  jig01.s2 supplies jig's next repin because tools/jig-repin already
+  landed before live-text. Normal readiness precedes its implementation.
+  Temper02.1 owns the corresponding first compatible temper repin:
+  `crates/temper-service/src/worker_route.rs::{decode,process,channel}`,
+  `crates/temper-worker-domain/src/tests/fixtures.rs::start`,
+  `tests/worker/domain/src/protocol.rs`'s Start construction, and
+  `crates/temper-service/src/tests/worker.rs`'s derived `encode_start` proof.
+  Set the three Start literals to no ask and ignore only Live in the
+  two worker_route matches; use the landed codec for derived sizes.
+  This is the director's recorded policy, not live-display implementation.
+  Temper05.2 and06.2 retain their checkpoints and wait for jig01.s2 and
+  temper02.1, then rebase onto the adapter landing and keep every own proof.
+  Other runs' next repins reuse the landing instead of redoing its sweep;
+  no tools/temper-repin wait is added. Keep one revision per upstream source,
+  newer compatible pins, the full skein update, all assertions and limits.
+  Refresh any further reached copy or derived value and name it in the
+  commit body; a further structural/design difference returns a report.
 - **Mechanical repairs during repins** belong to the existing repin commit.
   Follow landed upstream renames, paths, signatures and generated-version
   moves through their whole sweep, including source, tests, schema comments,
@@ -333,7 +356,7 @@ and fail naming the one that is unset (decisions.md, Design questions
 ## Repin
 
 temper's, in each temper increment that needs a new skein step (Rules),
-and the closing `temper-repin` once every skein step, including10.s2, and jig01.s1 have
+and the closing `temper-repin` once every skein step, including10.s2, and jig01.s1/01.s2 have
 landed, dropped or split (development.md, 5.7): temper 07.1's repin may land
 before skein's last tests do. skein's changes are new crates, a module
 of `skein-fake-peers` and new test crates, so nothing of smith, jig or
