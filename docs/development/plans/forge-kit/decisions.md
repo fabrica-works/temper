@@ -1301,6 +1301,13 @@ where its answer lands.
         a healthy leader, change a stop's expectation, or add a backstop or
         time. Nothing is deferred.
 
+169. **Hourly08 graph source fallback** (hourly check of 2026-10-19T13:50:58Z).
+     Hourly08's fresh comparison found all five recorded graph inputs older than fetched origin/main. Until the supervisor refreshes the exact primary indexes, do not use the code graph for skein, smith, jig, hearth or temper; search with rg. The temporary README rule records this fallback for running and future sessions. This does not hold implementation or alter proof requirements.
+
+     Checked: hourly08-graph-preflight.json records git rev-parse HEAD/origin/main, git status --porcelain, the previous recorded index inputs and git diff --name-only for each repository. All five primary checkouts are clean main branches and can fast-forward to the fetched origin/main. index_status confirms each exact project's primary root; its live head_sha is not treated as the index's input. The pinned plan script provides ruling --text and ring.
+
+     The root supervisor owns refresh and removal of the temporary rule; implementers retain source verification for every graph locator and any further reached copy.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
