@@ -1149,6 +1149,16 @@ where its answer lands.
 
      The scratch proof changed only that JSON value and the existing regression passed in 0.07s. Its users are the owned support helper, startup/configuration/process tests and box guide's copy command; no additional executable numeric copy was found across the five repositories. Keep their behavior and assertions. Complete remaining reverse dependents, process preparation/proof and gate before landing. No proof is waived: the 986 originally unrun reverse-dependent cases and full gate/process remain unproved by this diagnosis. Rulings148's later owner accounting and158's director-owned Cargo cutover remain separate and unchanged.
 
+161. **Refresh hourly07 primary graph coverage** (hourly07 graph comparison of 2026-10-19T12:43:08Z).
+     Reverses: nothing; the standing Graph freshness rule applies to new source movement after ruling159's recorded inputs.
+     Amends: README Rules, Graph freshness, with a temporary hourly07 source-search requirement.
+
+     All five primary repositories have advanced beyond ruling159's recorded index inputs. Until the supervisor reports their refreshed coverage, do not use the code graph for skein, smith, jig, hearth or temper; search with rg. Existing starts, proof requirements, limits and ownership continue. Refresh only the primary checkout indexes, preserving their exact project names; never index a worktree or dependency checkout. Verify every later locator against the actual worktree, and use source searches for gaps or later changes.
+
+     Checked: pump/hourly07-graph-pre.json records exact-root index_status diagnostics; its git.head_sha is the current checkout, not proof of index coverage. Ruling159 records the last actual refreshed source inputs. Fresh origin/main heads are skein9d444e33d1997003b6f2935f86fbd27622f12643, smith7ec31926b1d7f7ce45a344e73545d9d7f03073ef, jig149970b999bf2ffb639c2e3398b842084525afab, hearth5efba43e0a036628119cb5892fe5c6de2a2eb319 and temperfc728645e8ba82502d4e2150147631d7967252be; all primary checkouts are clean main and ancestors of those heads. Before each refresh, recheck cleanliness/ancestry and apply only the supported fast-forward in pinned scripts/dev/plan-check.sh27–40; record the exact indexed commit. Preserve local work if any check fails.
+
+     Use index_repository on the resolved primary roots with names srv-data-git-runner-src-{skein,smith,jig,hearth,temper}. Report readiness and known parser/coverage gaps, with pre/post commits. No kit move or production change follows from metadata maintenance, and no extra suite is justified by it. Pinned plan supports ruling --text and ring at scripts/dev/plan671/669.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
