@@ -50,8 +50,11 @@ repairs what they break (02.1, Shape).
 - The repin is the first commit: `heavy cargo update -p skein-lib`, then
   `heavy cargo check --workspace --all-targets`. A Cargo.lock conflict takes
   `origin/main`'s and runs the update again, never a hand merge.
-- No behaviour change, no raised bound, no loosened assertion. Moved tests
-  keep their names. New units under 20 ms, worlds under 0.5 s, unoptimized.
+- No behaviour change, no raised bound, no loosened assertion. The sole
+  allowance exception is the derived owned-example `engine.memory_bytes`
+  correction below (README, Derived owned-example memory); operational
+  admission caps and limits stay unchanged. Moved tests keep their names.
+  New units under 20 ms, worlds under 0.5 s, unoptimized.
 
 ## Increments
 
@@ -80,6 +83,11 @@ Repin compatibility Files (README): `crates/temper-service/src/{worker_route.rs,
   `tests/worker/domain/src/protocol.rs`. Set the three Start literals to
   `live: None`; in worker_route::{process,channel}, explicitly ignore only
   `OpenEvent::Live` beside existing ignored variants; refresh codec-derived values.
+Derived fixture Files: `docs/examples/owned.json`; existing regression in
+  `crates/temper/tests/startup.rs::serve_prepares_once_on_the_owned_example`,
+  whose body stays unchanged. Its consumers are `crates/temper/tests/support/owned.rs`
+  (`EXAMPLE`), `tests/{startup,configuration,process}.rs` under that crate,
+  and the copy command in `docs/guide/box.md`; preserve them and their assertions.
 Shape: four commits, each builds and passes its crates' tests.
   1. **The repin**: update and check; repair there what skein's steps broke
      since the last repin (at the base the check fails on `Op::Lock` and jig's
@@ -94,7 +102,8 @@ Shape: four commits, each builds and passes its crates' tests.
      refresh the derived encode_start proof with the landed codec. This
      follows live-text's director decision and next-repin assignment.
      Refresh reached copies/derived values and name them in the commit
-     body; keep all bounds, assertions and existing proofs.
+     body; keep all bounds, assertions and existing proofs, subject only to
+     the derived owned-example allowance correction in commit 3 below.
      If skein 02.3 is on `origin/main`, `bind_deployment`
      answers false once a Restore, Keep, Make or Remake was taken: the one
      caller, `restart.rs`'s deployment row (via `domain.rs`'s wrapper), already
@@ -151,6 +160,15 @@ Shape: four commits, each builds and passes its crates' tests.
      measure is `Some(b)` with `b <= answer_bytes`, else `Err(answer)` as at the base
      (an `Err` or a non-`Read` payload stays admitted). If an earlier repin already
      repaired these (`rg` for the old names finds none), only the users move.
+     The complete users cutover also refreshes the owned example's derived
+     `engine.memory_bytes` from `system::startup_worst_case`, with all inputs
+     and operational limits unchanged (README, Derived owned-example memory).
+     Skein02.3's `Domain::identity_used` grows the inline client from 592 to 600 bytes,
+     carried once by `system::memory`'s `size_of::<Service>()`: complete sum
+     78,675,187,547,016 becomes 78,675,187,547,024 on the checked tree. Record
+     both complete sums and this cause; after a rebase rederive the whole sum,
+     rather than applying a stale delta. Refresh any further reached copy or
+     derived value and list every user in the commit body.
   4. **The deletion**: the crate's directory, its member and its path entry.
 Test shape: **2 tests move, 74 leave with the crate.** `cargo nextest list -p
   temper-engine-domain-forge-client` shows 76 at the base (0.084 s); the two
@@ -181,9 +199,15 @@ Test shape: **2 tests move, 74 leave with the crate.** `cargo nextest list -p
   (`tests/reads.rs`) passes unchanged; `contents_sizes_agree_with_the_clients_measure`
   (`tests/contents.rs`) expects pull files 68 and comparison 100 (52, 84), and
   `raw_sides_at_the_answer_bound_fit_and_one_byte_more_is_too_large` sides of
-  4031 and 4032 (4047, 4048). Those are the only values that change. If a side
+  4031 and 4032 (4047, 4048). Those are the only component-test values that change. If a side
   disagrees otherwise, stop and return the question; never loosen an
   assertion, drop a row or raise a bound.
+Proof: unit; `heavy cargo test --locked --offline -p temper --test startup
+  serve_prepares_once_on_the_owned_example -- --exact --nocapture`: the same
+  existing regression passes with only the derived allowance correction,
+  no new test or assertion change. Complete the required reverse dependents
+  and all remaining joint/process/gate proofs; the scratch diagnostic is not
+  a substitute for them.
 Proof: unit; `heavy cargo nextest run -p temper-engine-domain-forge tests::purpose`:
   5 passed, each <20 ms (0.002 to 0.003 s in the scratch; the two moved
   ones took 0.004 s and 0.006 s at the base).
@@ -197,7 +221,9 @@ Proof: joint; `heavy cargo nextest run -p temper-engine-domain-forge
   -p temper-client-world -p temper-system-world -p forgejo-conformance`: the
   set's count at the step's start plus 5 (926 from the base's 921, 4.823 s; the
   client's 76 are not in it): the five purpose tests are the only change; <15 s. A failure of a profile, limits or
-  size test after the measure is a design question: return it, change no bound.
+  size test after the measure is a design question: return it, change no bound,
+  except for the fully traced derived owned-example allowance correction
+  explicitly authorized above. An unexplained difference still returns.
 Proof: joint; the same command with `--profile fuzzy`: its count at the step's
   start, unchanged (39 at the base, 20.410 s, its slowest `fuzzy_walking` 20.4 s); <60 s.
 Proof: process; `TEMPER_FORGEJO=$WS/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-linux-amd64
@@ -212,7 +238,8 @@ Proof: joint; `heavy --gate scripts/check.sh`: origin/main's focused count at th
 Don't: add an alias, a re-export or a `mod client`; change
   `tests/client/tests/names.rs` or exempt a crate there; change a tag, a field's
   order or width, or any key at rest; change an admission bound, a limit or a
-  test's value to pass, beyond skein 02.2's three; write `temper` into skein; move `EffectPurpose` into
+  test's value to pass, beyond skein 02.2's three and the derived owned-example
+  allowance correction above; write `temper` into skein; move `EffectPurpose` into
   skein or give the kit a purpose; touch jig's own, different
   `jig_domain_core::EffectPurpose` (`forge_route.rs` names it as an effect's
   `origin`).

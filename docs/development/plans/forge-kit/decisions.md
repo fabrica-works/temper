@@ -1140,6 +1140,15 @@ where its answer lands.
 
      Pinned plan still supports ruling --text and ring (scripts/dev/plan21/499 and19/669). The coordinator passes the refreshed input bounds and fallback rule to running/resumed sessions; no extra suites or repeated completed checks follow from index metadata alone.
 
+160. **Derive temper02 owned-example memory from the complete migrated service** (plan scope, temper 02.1 block of 2026-10-19T12:24:09Z).
+     Authorize the derived owned-example correction in temper02.1's existing users commit. This is a plan-scope conflict, resolved by the design's explicit definition: setup.md8.1 says “Its `memory_bytes` hold its worst cases wherever a person lays it and whatever its forge's files hold”, with each variable string at its bound. Configuration.md7 requires the complete service sum to fit and refuses the start otherwise. The example allowance must follow that sum; operational limits and their refusal checks stay.
+
+     The checked cause is skein02.3's landed `Domain::identity_used` field, implementing deployment binding. On switching client implementations, the inline client grows from 592 to 600 bytes; the containing Service grows from 29,920 to 29,928. `system::memory` counts that holder once. At identical startup inputs the complete `startup_worst_case` sum is 78,675,187,547,016 before the users cutover and 78,675,187,547,024 after it. The payload and all subsequent terms are unchanged. This is a traced representation change, with no accounting duplication or client regression found.
+
+     Add `docs/examples/owned.json` and the unchanged `serve_prepares_once_on_the_owned_example` regression to 02.1's coverage. Change only the derived `engine.memory_bytes` allowance to the freshly calculated complete sum; do not change operational caps, settings, assertions, accounting code or test identities. If rebasing changes the calculation, rederive the complete sum and explain its changed terms rather than adding a stale eight-byte delta. The README makes this evidence requirement standing; an unexplained size/profile difference remains a question. Record old/new full sums and cause in the users commit; refresh further reached copies/derived values and list every user in its body.
+
+     The scratch proof changed only that JSON value and the existing regression passed in 0.07s. Its users are the owned support helper, startup/configuration/process tests and box guide's copy command; no additional executable numeric copy was found across the five repositories. Keep their behavior and assertions. Complete remaining reverse dependents, process preparation/proof and gate before landing. No proof is waived: the 986 originally unrun reverse-dependent cases and full gate/process remain unproved by this diagnosis. Rulings148's later owner accounting and158's director-owned Cargo cutover remain separate and unchanged.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

@@ -304,6 +304,22 @@ chain.
   in `schema/store-v2.schema` (all under that crate). This brings forward
   only the tools plan's temper 03.1 store-family name repair; its remaining
   work follows the existing hotspot/rebase rule.
+- **Derived owned-example memory:** setup.md, 8.1 says the example's
+  `memory_bytes` hold its worst cases, with the variable strings at their
+  documented bounds; configuration.md, 7 requires the complete service sum
+  to fit. When an authorized change of retained state changes that sum,
+  refresh `docs/examples/owned.json`'s derived allowance from the complete
+  `system::startup_worst_case` calculation at those unchanged inputs. First
+  identify and measure the changed accounting term; keep operational limits,
+  settings, test names and assertions. Record the old/new complete sums,
+  cause and further reached copies in the commit body, and run the unchanged
+  owned-example startup regression and the increment's remaining proofs.
+  This does not authorize changing an admission cap or hiding an unexplained
+  size/profile failure. For temper02.1 the checked client migration adds
+  eight inline bytes and only `engine.memory_bytes` changes, from
+  78,675,187,547,016 to 78,675,187,547,024 on the checked tree; rederive the
+  complete sum if a rebase changes its inputs. Refresh further reached copies
+  and list every user; later increments keep their own accounting scope.
 - **A move copies files and renames paths** (code-organization.md, 6):
   besides that, it changes only what its new home forces, each named in
   the increment's Shape: temper's names out of skein's code (the owner
