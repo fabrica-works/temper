@@ -77,7 +77,7 @@ fn an_owned_forge_makes_a_missing_org_for_its_person() {
 }
 #[test]
 fn a_managed_forge_missing_an_org_is_refused_naming_it() {
-    use temper_forge_setup::reconcile::{Failure, Stage, Why};
+    use skein_forge_setup::reconcile::{Failure, Stage, Why};
     let mut world = World::managed(7);
     world.missing_org(b"absent");
     assert_eq!(
@@ -245,7 +245,7 @@ fn a_team_edited_by_a_person_is_repaired() {
 }
 #[test]
 fn a_person_under_the_bots_login_is_refused() {
-    use temper_forge_setup::reconcile::{Failure, Stage, Why};
+    use skein_forge_setup::reconcile::{Failure, Stage, Why};
     let mut world = World::owned(7);
     world.store_mut().account(b"temper", false, b"A person");
     assert_eq!(
@@ -257,7 +257,7 @@ fn a_person_under_the_bots_login_is_refused() {
 }
 #[test]
 fn no_secret_is_in_any_failure_debug_or_trace() {
-    use temper_forge_setup::reconcile::{Failure, Stage, Why};
+    use skein_forge_setup::reconcile::{Failure, Stage, Why};
     let mut world = World::owned(7);
     fixtures::bot_tokens(&mut world);
     world.put(File::AdminToken, fixtures::secret(b"unrecognized-admin-token"));

@@ -59,8 +59,25 @@ pub fn settings(address: std::net::SocketAddr) -> temper_forge_setup_shell::reco
         .expect("admin token");
     let io = io();
     let profile = temper_service::limits::profile(temper_service::limits::Profile::Small).forge_component;
-    temper_forge_setup_shell::reconcile::Settings {
+    let entry = Entry {
         forge: 1,
+        directory: Box::new([]),
+        bot: Account { login: b"temper-bot".as_slice().into(), email: b"bot@example.invalid".as_slice().into() },
+        orgs: Box::new([b"acme".as_slice().into()]),
+        mode: Mode::Owned(Owned {
+            forgejo: Box::new([]),
+            runner: None,
+            listen: address,
+            person: Account { login: b"ada".as_slice().into(), email: b"ada@example.invalid".as_slice().into() },
+        }),
+    };
+    let mut limits = temper_forge_setup::limits::small();
+    limits.deadline = skein_lib::Duration::from_secs(2);
+    limits.backoff = skein_lib::Duration::from_millis(50);
+    limits.backoff_max = skein_lib::Duration::from_millis(100);
+    temper_forge_setup_shell::reconcile::Settings {
+        setup_index: 0,
+        given: temper_forge_setup::given::values(&entry, None, &limits),
         address,
         host: address.to_string().into_bytes().into_boxed_slice(),
         user_agent: "test",
@@ -68,25 +85,9 @@ pub fn settings(address: std::net::SocketAddr) -> temper_forge_setup_shell::reco
         admin_token: scratch.path().join("admin_token"),
         token_bytes: profile.token_bytes,
         hook_secret_bytes: profile.hook_secret_bytes,
-        deadline: skein_lib::Duration::from_secs(2),
-        backoff: skein_lib::Duration::from_millis(50),
-        backoff_max: skein_lib::Duration::from_millis(100),
         http: temper_engine_protocol_forge::limits::http(&profile, false, &io),
         documents: temper_engine_protocol_forge::limits::documents(&profile),
         io,
-        entry: Entry {
-            forge: 1,
-            directory: Box::new([]),
-            bot: Account { login: b"temper-bot".as_slice().into(), email: b"bot@example.invalid".as_slice().into() },
-            orgs: Box::new([]),
-            mode: Mode::Owned(Owned {
-                forgejo: Box::new([]),
-                runner: None,
-                listen: address,
-                person: Account { login: b"ada".as_slice().into(), email: b"ada@example.invalid".as_slice().into() },
-            }),
-        },
-        listener: None,
     }
 }
 pub struct Peer {

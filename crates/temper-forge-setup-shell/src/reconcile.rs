@@ -1,5 +1,6 @@
 //! Reconcile's bounded host: one machine, one connection at a time.
 use crate::exchange::{Exchange, pause};
+use skein_forge_setup::reconcile::{self, Event, Failure, Need, Reconcile, Reply, Stage, Why};
 use skein_io::{
     Io, Request,
     kernel::{Complete, Submit},
@@ -8,13 +9,14 @@ use skein_lib::{Duration, Env, Queue, Secret, Time, Token, Wall};
 use skein_shell::{Clock, Config, Host, Kernel};
 use std::{net::SocketAddr, os::unix::ffi::OsStrExt, path::PathBuf};
 use temper_forge_setup::{
-    place::{File, Place},
-    reconcile::{self, Event, Failure, Need, Reconcile, Reply, Stage, Why},
-    setup::{Entry, Mode},
+    given,
+    place::{self, File, Place},
+    problem::{self, Problems},
 };
 /// Checked command settings, including the bounds supplied by the profile.
 pub struct Settings {
-    pub forge: u16,
+    pub setup_index: u32,
+    pub given: skein_forge_setup::given::Given,
     pub address: SocketAddr,
     pub host: Box<[u8]>,
     pub user_agent: &'static str,
@@ -22,14 +24,9 @@ pub struct Settings {
     pub admin_token: PathBuf,
     pub token_bytes: u32,
     pub hook_secret_bytes: u32,
-    pub deadline: Duration,
-    pub backoff: Duration,
-    pub backoff_max: Duration,
     pub http: skein_http::client::Limits,
     pub documents: skein_forge::forgejo::limits::Limits,
     pub io: skein_io::Limits,
-    pub entry: Entry,
-    pub listener: Option<SocketAddr>,
 }
 /// Why the command did not converge; credentials are never retained here.
 #[derive(Debug, PartialEq, Eq)]
@@ -38,12 +35,19 @@ pub enum Refused {
     Limits { forge: u16, name: &'static str },
     File { forge: u16, file: File, why: String },
     Stopped(Failure),
+    Setup { forge: u16, problems: Problems },
 }
 impl Refused {
     /// One diagnostic line for the command's standard error.
     #[must_use]
     pub fn line(&self) -> String {
         let (forge, words) = match self {
+            Self::Setup { forge, problems } => {
+                return format!(
+                    "temper forge reconcile: forge {forge}: {}",
+                    String::from_utf8_lossy(&problem::lines(problems))
+                );
+            }
             Self::Unanswered { forge, deadline } => {
                 (*forge, format!("Forgejo did not answer within {} ms", deadline.as_nanos() / 1_000_000))
             }
@@ -96,7 +100,7 @@ fn file_name(file: File) -> String {
     String::from_utf8_lossy(&place.path(file)).trim_start_matches('/').into()
 }
 fn file_path(settings: &Settings, file: File) -> PathBuf {
-    if file == File::AdminToken && matches!(settings.entry.mode, Mode::Managed { .. }) {
+    if file == File::AdminToken {
         return settings.admin_token.clone();
     }
     let place = Place { directory: settings.directory.as_os_str().as_bytes().into(), user: Box::new([]) };
@@ -139,7 +143,7 @@ impl Running {
         skein_io::down(&mut self.io, env, request, &mut self.subs);
     }
     fn file_error(&self, file: File, why: String) -> Refused {
-        Refused::File { forge: self.settings.forge, file, why }
+        Refused::File { forge: self.settings.given.forge, file, why }
     }
     fn local(&mut self, need: Need, now: Time, wall: Wall) {
         match need {
@@ -147,7 +151,8 @@ impl Running {
                 self.pending = Some((request, token));
                 self.begin(now, wall);
             }
-            Need::Read(file) => {
+            Need::Read(item) => {
+                let file = place::item(item);
                 match skein_shell::read_private_file(
                     &file_path(&self.settings, file),
                     bound(&self.settings, file),
@@ -162,7 +167,8 @@ impl Running {
                     Err(why) => self.result = Some(Err(self.file_error(file, unread(why)))),
                 }
             }
-            Need::Write { file, bytes } => {
+            Need::Write { item, bytes } => {
+                let file = place::item(item);
                 match crate::files::write_private(&file_path(&self.settings, file), bytes.expose()) {
                     Ok(()) => self.event = Some(Event::Written),
                     Err(_) => self.result = Some(Err(self.file_error(file, "could not write whole".into()))),
@@ -195,9 +201,9 @@ impl Running {
         self.exchange = None;
         if self.first && matches!(reply, Reply::Down | Reply::Status(500..=599)) {
             if let Some(wait) = pause(
-                self.settings.backoff,
-                self.settings.backoff_max,
-                self.settings.deadline,
+                self.settings.given.limits.backoff,
+                self.settings.given.limits.backoff_max,
+                self.settings.given.limits.deadline,
                 self.attempt,
                 self.began,
                 now,
@@ -205,8 +211,10 @@ impl Running {
                 self.attempt = self.attempt.saturating_add(1);
                 self.retry = Some(now.saturating_add(wait));
             } else {
-                self.result =
-                    Some(Err(Refused::Unanswered { forge: self.settings.forge, deadline: self.settings.deadline }));
+                self.result = Some(Err(Refused::Unanswered {
+                    forge: self.settings.given.forge,
+                    deadline: self.settings.given.limits.deadline,
+                }));
             }
         } else {
             self.first = false;
@@ -267,8 +275,10 @@ impl Host for Running {
         if self.result.is_none() && now >= self.end {
             self.retry = None;
             if self.first {
-                self.result =
-                    Some(Err(Refused::Unanswered { forge: self.settings.forge, deadline: self.settings.deadline }));
+                self.result = Some(Err(Refused::Unanswered {
+                    forge: self.settings.given.forge,
+                    deadline: self.settings.given.limits.deadline,
+                }));
                 self.exchange = None;
             } else if self.exchange.is_some() {
                 self.answered(Reply::Down, now);
@@ -351,25 +361,29 @@ impl Host for Running {
 }
 /// Runs one reconcile machine to completion on its own kernel and loop.
 pub fn reconcile(settings: Settings, clock: &Clock) -> Result<(), Refused> {
+    let machine = Reconcile::new(&settings.given).map_err(|why| Refused::Setup {
+        forge: settings.given.forge,
+        problems: given::refusal(settings.setup_index, why),
+    })?;
     for (name, enough) in [
         ("intake", settings.io.intake >= skein_http::client::largest_read(&settings.http)),
         ("output", settings.io.output >= skein_http::client::largest_room(&settings.http)),
     ] {
         if !enough {
-            return Err(Refused::Limits { forge: settings.forge, name });
+            return Err(Refused::Limits { forge: settings.given.forge, name });
         }
     }
     let operations = skein_io::operations(&settings.io).expect("usable io limits");
     let mut kernel = Kernel::open(Config { operations }).map_err(|_| Refused::File {
-        forge: settings.forge,
+        forge: settings.given.forge,
         file: File::AdminToken,
         why: "kernel unavailable".into(),
     })?;
     let began = clock.now().now;
     let mut running = Running {
-        machine: Reconcile::new(&settings.entry, settings.listener),
+        machine,
         io: Io::new(&settings.io),
-        end: began.saturating_add(settings.deadline),
+        end: began.saturating_add(settings.given.limits.deadline),
         settings,
         needs: Queue::with_capacity(reconcile::MAX_OUT),
         event: Some(Event::Begin),

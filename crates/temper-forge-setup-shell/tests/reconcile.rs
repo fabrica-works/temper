@@ -25,7 +25,7 @@ fn the_admins_token_is_sent_as_a_token_header() {
 fn a_run_ends_at_its_deadline_when_nothing_answers() {
     let peer = Peer::reserve();
     let mut settings = support::settings(peer.address());
-    settings.deadline = Duration::from_millis(300); // A short wait keeps the host test focused.
+    settings.given.limits.deadline = Duration::from_millis(300); // A short wait keeps the host test focused.
     let refused = reconcile(settings, &Clock::new()).expect_err("no peer");
     assert_eq!(refused.line(), "temper forge reconcile: forge 1: Forgejo did not answer within 300 ms\n");
 }
@@ -33,7 +33,7 @@ fn a_run_ends_at_its_deadline_when_nothing_answers() {
 fn a_forge_that_goes_silent_after_its_answer_ends_the_run_at_the_deadline() {
     let peer = Peer::reserve();
     let mut settings = support::settings(peer.address());
-    settings.deadline = Duration::from_millis(200); // The whole run, including its second request, is bounded.
+    settings.given.limits.deadline = Duration::from_millis(200); // The whole run, including its second request, is bounded.
     let clock = Clock::new();
     let began = clock.now().now;
     let heard = std::thread::scope(|scope| {
@@ -113,4 +113,18 @@ fn io_short_of_the_http_output_is_refused_before_any_request() {
     settings.io.output = skein_http::client::largest_room(&settings.http) - 1;
     let refused = reconcile(settings, &Clock::new()).expect_err("short output");
     assert_eq!(refused.line(), "temper forge reconcile: forge 1: io.output: below the http client's largest read\n");
+}
+
+#[test]
+fn invalid_given_values_are_refused_before_io() {
+    let peer = Peer::reserve();
+    let mut settings = support::settings(peer.address());
+    settings.given.bot_login = Box::new([]);
+    settings.io.output = 0;
+    let refused = reconcile(settings, &Clock::new()).expect_err("invalid given");
+    assert_eq!(refused.line(), "temper forge reconcile: forge 1: application.setup[0].bot.login: invalid form\n");
+    let temper_forge_setup_shell::reconcile::Refused::Setup { forge, .. } = refused else {
+        panic!("setup refused before io");
+    };
+    assert_eq!(forge, 1);
 }

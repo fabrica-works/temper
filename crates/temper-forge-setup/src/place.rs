@@ -69,3 +69,16 @@ impl Place {
         joined(&[&self.directory, b"/forgejo"])
     }
 }
+
+/// Maps the kit's retained item to its private file in temper.
+#[must_use]
+pub fn item(item: skein_forge_setup::item::Item) -> File {
+    use skein_forge_setup::item::Item;
+    match item {
+        Item::AdminToken => File::AdminToken,
+        Item::ApiToken => File::ApiToken,
+        Item::GitToken => File::GitToken,
+        Item::User => File::User,
+        Item::WebhookSecret => File::WebhookSecret,
+    }
+}

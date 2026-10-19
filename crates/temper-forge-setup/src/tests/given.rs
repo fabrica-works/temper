@@ -99,3 +99,18 @@ fn a_refused_limit_pair_keeps_its_order_and_is_printed_once() {
         );
     }
 }
+
+#[test]
+fn each_kit_item_names_its_temper_file() {
+    use crate::place::{self, File};
+    use skein_forge_setup::item::Item;
+    for (item, expected) in [
+        (Item::AdminToken, File::AdminToken),
+        (Item::ApiToken, File::ApiToken),
+        (Item::GitToken, File::GitToken),
+        (Item::User, File::User),
+        (Item::WebhookSecret, File::WebhookSecret),
+    ] {
+        assert_eq!(place::item(item), expected, "{item:?}");
+    }
+}

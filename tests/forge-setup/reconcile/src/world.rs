@@ -1,21 +1,20 @@
 use crate::{exchange, fixtures};
 use skein_fake_forge_protocol::{Service, Tally, setup::Store};
 use skein_forge::forgejo::{document::Document, request::Request};
+use skein_forge_setup::{
+    given::Given,
+    reconcile::{self, Event, Failure, Need, Reconcile, Reply},
+};
 use skein_lib::{Env, Queue, Rng, Secret, Time, Wall};
 use std::net::SocketAddr;
-use temper_forge_setup::{
-    place::File,
-    reconcile::{self, Event, Failure, Need, Reconcile, Reply},
-    setup::Entry,
-};
+use temper_forge_setup::place::{self, File};
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Ended {
     Done,
     Stop(Failure),
 }
 pub struct World {
-    entry: Entry,
-    listener: Option<SocketAddr>,
+    given: Given,
     service: Service,
     env: Env<skein_fake_forge_protocol::Limits>,
     files: Vec<(File, Secret)>,
@@ -45,8 +44,7 @@ impl World {
             service.setup_mut().org(b"work", b"temper-admin");
         }
         Self {
-            entry: fixtures::entry(owned),
-            listener: None,
+            given: fixtures::given(owned),
             service,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             files: vec![(File::AdminToken, fixtures::secret(fixtures::ADMIN))],
@@ -57,10 +55,10 @@ impl World {
         }
     }
     pub fn missing_org(&mut self, name: &[u8]) {
-        self.entry.orgs = Box::new([name.into()]);
+        self.given.orgs = Box::new([name.into()]);
     }
     pub fn listening(&mut self, address: SocketAddr) {
-        self.listener = Some(address);
+        self.given.listener = Some(address);
     }
     #[must_use]
     pub fn file(&self, file: File) -> Option<&Secret> {
@@ -112,10 +110,10 @@ impl World {
     }
     pub fn reconcile(&mut self) -> Ended {
         self.secrets.extend(self.service.setup().issued().iter().map(|token| token.secret.clone()));
-        for org in &self.entry.orgs {
+        for org in &self.given.orgs {
             self.secrets.extend(self.service.setup().subscriptions(org).map(|hook| hook.secret.clone()));
         }
-        let mut machine = Reconcile::new(&self.entry, self.listener);
+        let mut machine = Reconcile::new(&self.given).expect("fixture admitted");
         let mut out = Queue::with_capacity(reconcile::MAX_OUT);
         let mut event = Event::Begin;
         for _ in 0..4096 {
@@ -138,9 +136,9 @@ impl World {
                     }
                     Event::Reply(reply)
                 }
-                Need::Read(file) => Event::Read(self.file(file).cloned()),
-                Need::Write { file, bytes } => {
-                    self.put(file, bytes);
+                Need::Read(item) => Event::Read(self.file(place::item(item)).cloned()),
+                Need::Write { item, bytes } => {
+                    self.put(place::item(item), bytes);
                     Event::Written
                 }
                 Need::Draw(count) => {

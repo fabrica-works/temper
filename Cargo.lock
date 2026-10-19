@@ -2251,6 +2251,7 @@ dependencies = [
  "jig-protocol-config",
  "skein-fake-forge-protocol",
  "skein-forge",
+ "skein-forge-setup",
  "skein-http",
  "skein-lib",
  "temper-codecs-world",
@@ -2264,6 +2265,7 @@ version = "0.0.0"
 dependencies = [
  "jig-protocol-config",
  "skein-forge",
+ "skein-forge-setup",
  "skein-http",
  "skein-io",
  "skein-json",

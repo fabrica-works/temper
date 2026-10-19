@@ -252,8 +252,10 @@ pub fn reconcile_settings(
         }
     }
     let io = jig_protocol_config::profile(jig_protocol_config::Profile::Small).io;
+    let setup_index = checked.setup.entries.iter().position(|entry| entry.forge == number).expect("checked entry");
     Ok(temper_forge_setup_shell::reconcile::Settings {
-        forge: number,
+        setup_index: u32::try_from(setup_index).expect("bounded setup entries"),
+        given: temper_forge_setup::given::values(entry, webhook_listener(named)?, &checked.limits),
         address,
         host: conventions::host(address, None).expect("checked address"),
         user_agent: conventions::USER_AGENT,
@@ -261,14 +263,9 @@ pub fn reconcile_settings(
         admin_token,
         token_bytes: profile.forge_component.token_bytes,
         hook_secret_bytes: profile.forge_component.hook_secret_bytes,
-        deadline: checked.limits.deadline,
-        backoff: checked.limits.backoff,
-        backoff_max: checked.limits.backoff_max,
         http: limits::http(&profile.forge_component, false, &io),
         documents: limits::documents(&profile.forge_component),
         io,
-        entry: entry.clone(),
-        listener: webhook_listener(named)?,
     })
 }
 

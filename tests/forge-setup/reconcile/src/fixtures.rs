@@ -1,24 +1,21 @@
 //! Configuration and credentials shared by the world's stories.
 use skein_fake_forge_protocol::{Config, Faults};
 use skein_lib::{List, Secret};
-use temper_forge_setup::{Setup, limits, problem::Problems, setup::Entry};
+use temper_forge_setup::{Setup, limits, problem::Problems};
 pub const ADMIN: &[u8] = b"admin-token-for-the-setup-world";
 pub const API: &[u8] = b"api-token-issued-to-the-bot";
 pub const GIT: &[u8] = b"git-token-issued-to-the-bot";
 const MANAGED: &[u8] = br#"[{"forge":1,"directory":"forge-1","bot":{"login":"temper","email":"temper@example.invalid"},"orgs":["acme","work"],"mode":{"managed":{"admin_token":"admin_token"}}}]"#;
 const OWNED: &[u8] = br#"[{"forge":1,"directory":"forge-1","bot":{"login":"temper","email":"temper@example.invalid"},"orgs":["acme","work"],"mode":{"owned":{"forgejo":"/opt/forgejo","runner":null,"listen":{"socket":"127.0.0.1:3000"},"person":{"login":"ada","email":"ada@example.invalid"}}}}]"#;
 #[must_use]
-pub fn entry(owned: bool) -> Entry {
+pub fn given(owned: bool) -> skein_forge_setup::given::Given {
     let document = jig_protocol_config::document(
         if owned { OWNED } else { MANAGED },
         &jig_protocol_config::DocumentLimits { bytes: 4096, tokens: 256, depth: 16 },
     )
     .expect("world setup document");
-    Setup::read(&document, 0, &limits::small(), &mut Problems::empty())
-        .expect("world setup")
-        .entry(1)
-        .expect("forge 1")
-        .clone()
+    let setup = Setup::read(&document, 0, &limits::small(), &mut Problems::empty()).expect("world setup");
+    temper_forge_setup::given::values(setup.entry(1).expect("forge 1"), None, &limits::small())
 }
 #[must_use]
 pub fn config() -> Config {

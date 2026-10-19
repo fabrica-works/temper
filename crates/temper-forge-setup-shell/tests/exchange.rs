@@ -50,5 +50,5 @@ fn a_listing_ends_as_the_rows_it_gathered_in_order() {
         ));
     }
     let Next::Reply(reply) = gather.take(Step::Done(Document::Listed { skipped: 0 })) else { panic!("listing reply") };
-    assert_eq!(reply, temper_forge_setup::reconcile::Reply::Rows(Box::new([Row::Commit(first), Row::Commit(second)])));
+    assert_eq!(reply, skein_forge_setup::reconcile::Reply::Rows(Box::new([Row::Commit(first), Row::Commit(second)])));
 }
