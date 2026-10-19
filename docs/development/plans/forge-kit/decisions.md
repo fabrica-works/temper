@@ -1260,6 +1260,47 @@ where its answer lands.
      - Scoped `rg -n 'Cargo\.toml|\[package\]|new crate|new package|[Mm]anifest'` over all forge-kit skein session files, reconciled with `ledger.tsv`, finds the five remaining member additions above; later increments edit those existing packages. The checker remains a standalone excluded workspace, not a new workspace member.
      - `git -C <supervisor docs worktree> diff --check` exits 0; only README and the four session documents change before this ruling. Markdown-only landings use `land --docs` under temper’s workflow1; no Rust invocation is required for these plan edits.
 
+168. **Apply the designed healthy-stop and whole-tree crash endings** (designer answer to process tier question of 2026-10-19T13:27:18Z).
+     Apply designer commits skein f4dc2e8b88dd0b3deb71ae1145008f114d5c86b7 and temper e7f32d1253932c5e7ebf10bfe6a3f1024033f89d through ruling 168.
+
+     Written fresh: the Q3 answer was consumed with its question. Landed with
+     `land --docs`: skein f4dc2e8b88dd0b3deb71ae1145008f114d5c86b7 (shell.md 13,
+     examples.md 6) and temper e7f32d1253932c5e7ebf10bfe6a3f1024033f89d
+     (domain/testing.md 2.6, protocol/setup.md 7.4, STATUS.md; plan temper/02-client.md 02.1).
+
+     1. Two endings. The restart is a **whole owned-tree crash**, not a leader
+        crash. testing.md 2.6 step 5: "the binary crashes: its whole tree is
+        killed at once, as a supervisor ends a crashed service's (skein's
+        `shell.md`, 13), and once nothing of it runs, it is started again on the
+        same directory". Every other end is a healthy stop: "the test sends
+        `Terminate`, the engine drains (`root.md`, 9.2), the service closes what
+        it started, and the binary exits 0 with none of its tree running."
+     2. Why whole: production cannot end a crashed leader's children (no
+        parent-death signal). skein shell.md 13: "A crash closes nothing … A
+        supervisor that restarts a crashed service first ends its whole tree".
+     3. Descendants and verdicts. At a stopped exit, none may run
+        (`EndsWithBinary`). A leftover is temper's failure, in its shutdown (the
+        drain, the worker's end, io's group close). After the crash, examples.md 6:
+        "A process its kill leaves keeps the tree from settling and fails the
+        test at its deadline, the kit's failure, not the binary's". No-orphans
+        stays whole: "none runs at a stopped binary's exit, and none of the
+        crashed tree when the binary starts again" (2.6, the referee).
+     4. Seams: the harness, `crates/temper/tests/support`. 02.1 gains commit 6,
+        "The stories' endings", on the five-commit checkpoint. `run_story` takes
+        `Ending::{Stop, Crash}`: `run` stops, `run_until_landed` crashes.
+        `ChatJudge::act` sends `Signal::Terminate` (mod.rs:396), and `observe`
+        asserts `Exit::Code(0)`. The crash starts with
+        `Binary::start_with_tree(…, Expectation::Supervise, false)`, sends
+        `signal_tree(Signal::Kill)`, and asserts `!stderr_overflowed()` and
+        `counts()` before the restart. `sign_in.rs:257` sends the engine
+        Terminate. No test is added or renamed. This authorizes exactly that
+        tree signal, that expectation and that substitution.
+     5. Proof: 02.1's process proof as before (19 pass), plus a Done-when:
+        `heavy rg -n '\.signal\(Signal::Kill\)' crates/temper/tests` prints
+        nothing. A stopped leftover is a finding, never rerun as load. Don't kill
+        a healthy leader, change a stop's expectation, or add a backstop or
+        time. Nothing is deferred.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
