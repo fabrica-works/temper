@@ -2,8 +2,9 @@
 
 Provisional, 2026-10-14, revised 2026-10-19. temper's client: temper's
 own presentation on jig's client, `jig-client`. Its crates; its client
-root, which holds `jig-client` and temper's pages; the forge's client
-family, its words and its one form; its view, on skein's UI kit; the
+root, which holds `jig-client` and temper's pages, the LLM accounts'
+among them; the forge's client family, its words and its one form; its
+view, on skein's UI kit; the
 terminal that `temper open` runs, on skein's text shell; signing in and
 the small store; what temper's server does for it; and how it is
 tested. jig's client is jig's `client/domain/client.md`, its API jig's
@@ -27,9 +28,9 @@ open is listed in section 11.
   jig's.
 - **Its pages,** on jig's (jig's `client/domain/pages.md`): the inbox
   (home), the chats, a chat, a project's board, a task's page, the
-  changes, and the forge's adoption form (3.5). The mockups give their
-  look and the order of their parts. What no page shows is open
-  (section 11).
+  changes, the forge's adoption form, and the LLM accounts (3.5). The
+  mockups give their look and the order of their parts. What no page
+  shows is open (section 11).
 - **Its cards are its own.** A proposal, a question, a held task, a
   person task, a result, an entry of activity, an outcome and each
   confirmation are temper's nodes, drawn from the object's document as
@@ -39,7 +40,8 @@ open is listed in section 11.
   calls no renderer of jig's reference UI, and copies none of its
   modules, functions or phrase tables.
 - **On jig's API alone.** What a page shows, it watches through jig's
-  subjects (`me`, `inbox`, `tasks{query}`, `task`, `tree`, `run`) or
+  subjects (`me`, `inbox`, `tasks{query}`, `task`, `tree`, `run`,
+  `accounts`) or
   reads (`activity`, `proposal`; jig's `client/domain/contract.md`,
   sections 6 and 7); what a person does is jig's operations (jig's
   `client/domain/contract.md`, section 3), through jig's helpers where
@@ -48,6 +50,14 @@ open is listed in section 11.
   what it will do before it is sent, from the facts jig's documents
   give, and every deciding act names the revision the person was shown
   (3.6).
+- **LLM accounts, made from the client.** On the accounts page a person
+  signs in with an LLM provider, declares a program's login, or adds a
+  key, pasted once and never kept (3.5, 3.6); while no account their
+  work may use is usable, a banner on every page says so and offers the
+  three (5.5). A chat's composer and a task's page name the account and
+  model the work runs on. The terminal prints a sign-in's address and
+  opens no browser (6.5). The accounts are jig's, kept by its engine
+  (`../protocol/credentials.md`, section 3).
 - **The forge's family.** Its words for the connector, a repository, a
   branch, a pull request and each kind of write need no document (4.1).
   Its other parts are documents its client side reads, with requests of
@@ -255,6 +265,7 @@ keeps (`../protocol/configuration.md`, section 2).
 | `Task { task }` | `task.html`, `agent-task.html` | a goal: its header, what was asked, its plan as a tree, its latest activity and history, its budget and authority, with Amend, Stop and Cancel; an agent's task: its transcript and a composer, with Amend and Stop | `task`, `tree`, `activity`; `run` while one is live | amend, stop, cancel, release a held task of the plan, message an agent's task |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
 | `Adopt { project }` | none: 4.4 | the adoption form | nothing but `me` | adopt a repository (4.4) |
+| `Accounts` | none: 5.5 | the person's LLM accounts, then, for an owner, the deployment's: each with its LLM provider and display name, its holder, its sources in order, each with its state in words and, for a program's, on which hosts (5.5), the runs using it and the tasks waiting for it; the sign-ins and checks under way, and how the last ended; the three ways to add one | `accounts` (jig's `client/domain/contract.md`, 7.1); `me`'s LLM providers | sign in with an LLM provider; sign a source out; add a key, to an account or as one of its own; replace a key; remove a source or an account; declare a program's login; check it again; move an account, or a source, up or down; resume a limited source |
 
 - **Words and facts:** a chat's status from jig's facts (jig's
   `client/domain/client.md`, section 19), in jig's words, with temper's
@@ -273,6 +284,28 @@ keeps (`../protocol/configuration.md`, section 2).
 - **Links are by number:** a chip, an entry or a line naming a task
   opens its page, from any page (jig's `client/domain/pages.md`,
   section 2).
+- **The accounts page** is jig's reference UI's accounts, on a page of
+  temper's own (jig's `client/domain/pages.md`, sections 7 and 11),
+  with temper's words (5.5). It shows no value. Its acts are jig's
+  accounts' requests (jig's `client/domain/contract.md`, 3.2), each
+  sent as 3.6 says; a sign-in's answer is the address to open, shown
+  as an external link (6.5), and its end is read on the `accounts`
+  watch. Declaring a program's login asks its name, 1 to 32 of `a` to
+  `z`, `0` to `9` and `-`, `claude-` and the person's first name by
+  default (`claude-alice`), and shows the command to run
+  on each host, `temper program-login CONFIG.json NAME`
+  (`../protocol/credentials.md`, section 3).
+- **The work's account and model.** A chat's composer names the
+  account and model its next run takes, and offers the models `me`
+  serves for the project (jig's `client/domain/contract.md`, 5.3), each
+  with its efforts, and "needs an account" beside an LLM provider no
+  usable account of the person's work serves; a choice is the task's
+  LLM choice, from the chat's next run (jig's `domain/tasks.md`, section
+  3). Setting a goal names its planner's model and effort, the
+  template's by default. A task's page shows its model, effort and
+  account, changed by amending the task; a task waiting for its account
+  says so, with the account's acts (5.5; jig's `domain/authority.md`,
+  8.3).
 
 ### 3.6 Requests and confirmations
 
@@ -307,6 +340,18 @@ keeps (`../protocol/configuration.md`, section 2).
 - **Answered:** the card shows the outcome, or the refusal in jig's
   words with what fits (look again, change what was asked); unknown,
   past the engine's retention, it says so.
+- **A key is pasted once, never kept.** Its field is a secret (skein's
+  `ui.md`, 3.2 and 3.4), and adding or replacing a key is a request
+  carrying a value (jig's `client/domain/client.md`, section 6; jig's
+  `protocol/client.md`, section 10): sent once under a name, never in
+  the small store, never parked, never sent again by the client. The
+  field is emptied as the request leaves, and the key is shown nowhere,
+  then or after. Answered unsent or lost, the card says so and asks for
+  the key again; the person's second send keeps the first's name, so
+  that a request the engine made answers with its first answer, and no
+  second account is made. A key empty or past 4 KiB (the bound of
+  `../tools.md`, section 12) is refused before it is sent; one the
+  engine refuses is answered with its refusal.
 
 ## 4. The forge's client family
 
@@ -551,6 +596,10 @@ client's errors to these reasons (section 8).
     starting, "Live", "Offline", "Out of date"), and "Behind" while a
     page's watch reopens; the person's name and "Sign out";
   - *the navigation* (5.3);
+  - *the accounts' banner,* while no account the person's work may use
+    is usable (the `accounts` watch; jig's
+    `client/domain/contract.md`, 7.1): its words and three buttons
+    (5.5), on every page but the accounts page;
   - *the main:* the page at the address (3.5), its title its level-1
     heading.
 
@@ -612,8 +661,9 @@ client's errors to these reasons (section 8).
 In the mockups' top bar's order: "Inbox", with the count of what needs
 the person from `me`; "Chats"; then, for the project the person is in,
 "Board" and "Changes"; and after them "Adopt a repository", to
-`Adopt { project }`. With no project chosen, the project's entries are
-not offered. The mockups' fifth entry, "Tasks", a list of a project's
+`Adopt { project }`; last, "Accounts", to `Accounts`, whatever the
+project. With no project chosen, the project's entries are not
+offered. The mockups' fifth entry, "Tasks", a list of a project's
 tasks, is not in the client (section 11). "Adopt a repository" is
 offered whatever the person's role: the engine judges it, and a refusal
 says why, since the client never computes what a party may do.
@@ -646,6 +696,65 @@ refused for its authority, nor an amendment drafted from part of one.
 Each of an authority's lists shows at most the rows per window, then
 jig's mark (jig's `client/domain/view.md`, section 7), which adds
 nothing to the view's limits.
+
+### 5.5 LLM accounts' words
+
+temper's phrasebook words what jig's accounts document holds (jig's
+`client/domain/contract.md`, 7.1; jig's `domain/accounts.md`, 3.5 and
+section 5); the providers' names and their plans' are the
+configuration's, OpenAI's and ChatGPT's in the owned example
+(`../protocol/setup.md`, 8.1):
+
+- **The banner:** "Agents need an LLM account to run." and "Continue
+  with ChatGPT", "Use your Claude subscription", "Use an API key", one
+  for each source an LLM provider offers. A chat may be started
+  meanwhile; its page says "Starting: waiting for an account".
+- **An account** is its provider and display name, "ChatGPT ·
+  alice@example.com"; a key-only account, "OpenAI API key"; a program's,
+  "Claude subscription · claude-alice".
+- **The composer's line:** "Using ChatGPT plan · MODEL · Manage usage";
+  "Using your Claude subscription, through Claude Code · MODEL"; "Using
+  your OpenAI API key · MODEL"; "Manage usage" an external link to the
+  provider's manage-usage address, where the document gives one.
+- **Each state,** with its acts:
+
+  | State | Words | Acts |
+  |---|---|---|
+  | usable | "Ready" | — |
+  | limited, a plan's | "temper reached its usage limit on your ChatGPT plan. Tasks on it wait." | "Manage usage", "Resume" |
+  | limited, with the reset the provider gave | "Limited by OpenAI until 14:00. Tasks on it wait." | "Resume" |
+  | refused: plan usage declined | "You signed in without plan usage." | "Continue with ChatGPT", "Use an API key" |
+  | refused: not eligible | "This ChatGPT account can't be used for plan usage in temper. Plan usage needs an eligible ChatGPT plan." | "Use an API key", "Sign in to another account" |
+  | needs sign-in | "Signed out of ChatGPT." | "Continue with ChatGPT" |
+  | needs sign-in, a program's, on a host | "Claude Code isn't signed in for 'claude-alice' on HOST." and the command to run there | "Check again" |
+  | misconfigured | "OpenAI refused temper's sign-in. Check the configuration's registration." | — |
+  | unloaded | "Can't be used on HOST: WHY." | — |
+
+  Never a reset the provider did not give, and never "your plan is
+  empty" (jig's `domain/providers.md`, 2.5). A limit may be the
+  person's own cap for temper, which "Manage usage" reaches. A limited
+  account's tasks wait for it, and temper never moves them to another
+  account (jig's `domain/accounts.md`, 4.3).
+- **A sign-in:** "Open this address in a browser on the engine's
+  machine:" and the address, as an external link (6.5); then "Signed in
+  to ChatGPT as alice@example.com", or, for a subject the person
+  already has, "That's alice@example.com again. To add another account,
+  sign out of ChatGPT in your browser first, then Continue with
+  ChatGPT."; or why it was refused.
+- **A plan's first use:** a card in the conversation of the run that
+  first used it, from the document's fact (jig's `domain/accounts.md`,
+  section 5): "You're using your ChatGPT plan. Eligible requests from
+  temper use your plan's included usage. You can see it, and set a
+  weekly cap for temper, in ChatGPT's settings." and "Manage usage". It
+  is part of the conversation, so nothing is kept to dismiss it
+  (section 11).
+- **Signing out:** "Signed out of ChatGPT." once the revocation is
+  confirmed; "temper removed its tokens, but ChatGPT didn't confirm.
+  Disconnect temper in ChatGPT's settings, under Apps." otherwise; for a
+  program's login, "Signed out on every machine.", or the hosts that did
+  not.
+- **Plain words:** temper says that it runs Claude Code, and names no
+  page, button or feature after it (jig's `domain/providers.md`, 3.2).
 
 ## 6. The terminal shell
 
@@ -761,6 +870,20 @@ and so on to `[20] Adopt`.
 skein's text shell's (skein's `ui-text.md`, section 6). temper adds no
 command.
 
+- **A sign-in's address** is an external link (skein's `ui.md`, 6.2),
+  which the terminal prints as `TEXT <URL>`, with no number (skein's
+  `ui-text.md`, section 5), and never opens: it starts no browser and
+  no program. The person opens the address in a browser on the
+  engine's machine, where the provider's redirect reaches the engine
+  (`../protocol/credentials.md`, section 3); the page shows the sign-in's
+  end when the `accounts` watch tells it.
+- **A key's field,** a secret, prints `(hidden)` once written, and the
+  command `n KEY` writes it (skein's `ui-text.md`, sections 5 and 6);
+  the terminal's line editing echoes the key as it is typed, which
+  skein's text shell cannot turn off (skein's `ui-text.md`, section 9).
+  `temper ctl add-key` reads a key from a file instead (`../tools.md`,
+  5.5, area 5).
+
 ### 6.6 The link, signing out and closing
 
 - **The link's state** is the first line's (6.4). Its change changes
@@ -871,7 +994,9 @@ temper's:
 - **The small store** is `DIRECTORY/store`, `jig-client-shell-native`'s
   file, holding `jig-client`'s records alone: the requests it keeps,
   jig's and the forge's adoptions, pending. temper's pages keep none
-  (3.4).
+  (3.4). It never holds an LLM account's key, token or record: a request
+  carrying a key is never kept (3.6), and a sign-in's record is the
+  engine's alone.
 - **Loopback only** in standalone (`../protocol/configuration.md`,
   section 2; 6.1), so a bearer token never crosses a network in
   plaintext. Clients between hosts, over TLS, come after standalone.
@@ -962,8 +1087,10 @@ own tests:
   kept as files beside the tests and changed only by hand: the inbox
   with entries of each kind, the chats, a chat with its conversation and
   a proposal in place, a board, a goal's page with its plan, an agent's
-  task, the changes, the adoption form in each state of 4.4 and 4.7, and
-  signed out.
+  task, the changes, the adoption form in each state of 4.4 and 4.7,
+  signed out, the accounts' banner, and the accounts page with a
+  sign-in's address, a key's field written, and an account in each
+  state of 5.5.
 - **The terminal's machine world,** in `temper-client-shell-terminal`'s
   own tests (`../testing.md`, section 7): the host against a scripted
   stdin and stdout and a scripted transport: signing in by the link and
@@ -984,7 +1111,13 @@ own tests:
   held task released from a goal's plan; a repository adopted from the
   navigation's link, its outcome read and the engine holding it;
   refused: not found, a second home, a field the form refuses; a part
-  of the forge's saying "Shown on the forge."; with jig's faults (drops,
+  of the forge's saying "Shown on the forge."; the banner with no
+  account, a key added on the accounts page and the banner gone, and
+  the key in no record of the small store; a key's request lost and
+  sent again by the person, making one account; a sign-in started, its
+  address shown, and its end read on the `accounts` watch; a program's
+  login declared and its command shown; a limited account's words, and
+  its task waiting; with jig's faults (drops,
   the engine restarting, a double press, a reload with an adoption
   pending, kept work), each request made once. jig's check holds in
   every story, said in temper's phrasebook, which temper's world gives
@@ -1003,7 +1136,8 @@ own tests:
   under "Writing…", then replaced by the committed turn.
 - **The process tier** (`../testing.md`, 2.6): the real `temper`
   binary; skein's fake person through temper's client signs in by the
-  printed link and adopts a repository on an owned Forgejo
+  printed link, adds the deployment's key on the accounts page, and
+  adopts a repository on an owned Forgejo
   (`../protocol/setup.md`, section 2), with "It runs CI" checked, since
   its runner runs Actions. And `temper open` itself, stdin and stdout
   piped: it signs in by the printed link, prints the inbox, adopts a
@@ -1020,7 +1154,8 @@ own tests:
 - **Pages the mockups do not show:** a project's page with its
   resources, findings, notes and settings (policy, people and roles,
   spend; jig's `client/domain/pages.md`, section 6, and the forge's
-  parts in `forge.md`, 5.3 and 7.3); the deployment's page; the "Tasks"
+  parts in `forge.md`, 5.3 and 7.3); the deployment's page but its LLM
+  accounts, which the accounts page shows an owner (3.5); the "Tasks"
   list of a project; a procedure's task and a person task beyond a
   tracked task's header and plan; making a service and showing its
   credential once; another party's kept work. Default: not in temper's
@@ -1061,3 +1196,15 @@ own tests:
   fresh one.
 - **The person's time zone:** default universal time (an offset of 0)
   for every time the view says.
+- **A browser on another machine.** A sign-in's redirect reaches the
+  engine on loopback, so a person who reaches temper through a tunnel
+  opens the address on the engine's machine, or, later, moves an
+  account in (jig's `domain/accounts.md`, section 6), until a client
+  relays the redirect. Default: the engine's machine.
+- **The first use of a plan,** in the terminal: a card in the
+  conversation, or a card that waits to be dismissed, which needs a
+  dismissal kept by the engine, as jig's seen is. Default: a card in
+  the conversation (5.5), with nothing to dismiss.
+- **A key typed in the terminal** is echoed by its line editing (6.5).
+  Default: accepted on one person's machine; `temper ctl add-key` reads
+  one from a file.

@@ -1,12 +1,12 @@
 # Configuration
 
-Provisional, 2026-10-14, revised 2026-10-18. What temper's processes
+Provisional, 2026-10-14, revised 2026-10-19. What temper's processes
 are told when they start: the one JSON document `temper serve` reads,
 and the forge's setup's commands with it, with jig's parts as jig
 defines them and temper's own members beside them; the private files it
 names; the agent's configuration; what `temper open` and `temper
-sign-in` are given; limits; what holds at a first start and at every
-start; and the formats an operator writes.
+program-login` are given; limits; what holds at a first start and at
+every start; and the formats an operator writes.
 jig's shape and rules are jig's `protocol/configuration.md`; this
 document says what temper adds. What is open is listed in section 11.
 
@@ -35,6 +35,10 @@ document says what temper adds. What is open is listed in section 11.
   the forge writer's identity, which comes from each forge's `user`.
 - **No secret in the document.** Each secret is a private file the
   document names, read at start (section 6).
+- **LLM providers, never accounts.** jig's `engine.llm` names the LLM
+  providers, written out whole: their endpoints, models and prices, and
+  the sources each offers. Accounts are made at runtime from the client,
+  and jig keeps them (section 2; credentials.md, section 3).
 - **One format rule** for temper's typed members: member names are the
   Rust field names, and the parser follows the types (section 10).
 - **Standalone shape:** exactly one worker, joined to the engine by the
@@ -58,6 +62,26 @@ document says what temper adds. What is open is listed in section 11.
   section 3), in jig's formats (its section 10). Its `clients` member is
   what jig's clients' component takes; the clients' listener is temper's
   (section 3).
+- **`engine.llm`** is jig's LLM providers (jig's
+  `protocol/configuration.md`, section 3), written out whole, never
+  implied: each with its endpoints and the models they serve, each
+  model's window, output, efforts, prices and what it is good at; the
+  sources it offers, a sign-in with its public registration, keys, a
+  program, or none; and the facts its terms ask temper to show. It holds
+  no account, key or record: accounts are made from the client
+  (credentials.md, section 3). temper adds no member; the registration's
+  name hint is `temper` in every deployment (jig's `domain/providers.md`,
+  2.2). The owned example writes out OpenAI, with ChatGPT's sign-in and
+  keys, and Anthropic, with Claude Code as a program and keys (setup.md,
+  8.1); a provider temper does not ship is another entry, such as a
+  local model's endpoint on loopback with no source to hold.
+- **A sign-in's redirect** binds a loopback listener on an ephemeral
+  port for each sign-in, unless the LLM provider's registration fixes a
+  port (jig's `protocol/configuration.md`, section 3; skein's
+  `oauth.md`, 6.5). A fixed port is checked at start against the
+  deployment's own listeners: the clients' and the webhooks', and an
+  owned forge's `listen` (setup.md, section 8), whose ports it must not
+  share on loopback.
 - **`workers`** is a list of jig's worker parts (jig's
   `protocol/configuration.md`, section 4).
 - **`application`** holds temper's members (sections 3 and 4).
@@ -273,12 +297,24 @@ top-level `workers`, in the same order; standalone has one. Each:
   reads it; and by each agent process as it starts.
 - **It holds no credential:** an agent's grants come over smith's
   channel (credentials.md, section 3).
+- **`programs`** (smith's `protocol/agent.md`, section 4): each program
+  the agent may run as a backend, by its adapter, with the program's
+  absolute path and its programs directory, which holds a configuration
+  directory for each program source, `<directory>/NAME`
+  (credentials.md, section 3). The owned example's agent configures
+  Claude Code's (setup.md, 8.1). A programs directory need not exist
+  until `temper program-login` makes it; one that exists must be a
+  directory of the user's own with no group or other bits, not reached
+  through a link, or the start is refused, naming it. temper reads
+  nothing inside it.
 - **The same names as the engine's** (jig's `protocol/configuration.md`,
-  section 4), checked at start: every endpoint of `engine.llm.endpoints`
-  must be in the agent's configuration under the same name with the same
-  account, and every model a charter names must be declared there, or
-  the start is refused, naming it. One process reads both, so a mismatch
-  that would fail every run's charter is caught before the loop.
+  section 4), checked at start: every endpoint of `engine.llm`'s
+  providers must be in the agent's configuration under the same name,
+  every model a charter allows must be declared there, and every
+  program an LLM provider offers must be among the agent's `programs`,
+  or the start is refused, naming it. One process reads both, so a
+  mismatch that would fail every run's charter is caught before the
+  loop.
 
 ## 6. Secrets' files
 
@@ -289,7 +325,7 @@ top-level `workers`, in the same order; standalone has one. Each:
 | a forge's webhooks' secret | `application.forges[].webhook_secret` | the secret's bytes | the forge component's webhooks' listener |
 | a git identity's token | `application.identities[].token` | the token's bytes | the identities' table |
 | a managed forge's admin's token | `application.setup[].mode.managed.admin_token` | the token's bytes | `temper forge reconcile` alone (setup.md, section 5) |
-| a worker's secret, its digest, a handed-in LLM account's file, the accounts' records' directory, an LLM account's client secret | jig's parts | jig's formats (jig's `protocol/configuration.md`, sections 7 and 10) | jig's components |
+| a worker's secret, its digest | jig's parts | jig's formats (jig's `protocol/configuration.md`, sections 7 and 10) | jig's components |
 
 - **A secret file holds its bytes and nothing else** but a final
   newline, which is not part of the secret (jig's
@@ -313,6 +349,9 @@ top-level `workers`, in the same order; standalone has one. Each:
   replaces any other and restarts (credentials.md, sections 4 and 5).
 - **No temper secret in jig's secrets' store** (credentials.md, section
   2).
+- **No LLM account's file.** LLM accounts' records and keys are in
+  jig's secrets' store, and a program's login is in its configuration
+  directory, which temper never reads (credentials.md, section 3).
 
 ## 7. Limits
 
@@ -492,16 +531,17 @@ top-level `workers`, in the same order; standalone has one. Each:
 ## 8. First start and every start
 
 - **Every command that reads the document checks it.** `temper serve`
-  checks it whole, as section 2 says. `temper sign-in`, every `temper
-  forge` command and `temper box` check its structure, its members, the
-  limits and `setup`, and none of the checks that need a private file
-  read, since a set-up forge's files do not exist before reconcile makes
-  them (setup.md, section 8). Each reads the private files its own part
-  needs alone: a `temper forge` command its forge's, by setup.md,
-  sections 5 and 6; `temper box` none; `temper serve` every one the
-  document names but those that only `setup` names. A set-up forge's
-  files that its members name, which the commands before it made, are
-  among the ones it reads.
+  checks it whole, as section 2 says. `temper program-login`, every
+  `temper forge` command and `temper box` check its structure, its
+  members, the limits and `setup`, and none of the checks that need a
+  private file read, since a set-up forge's files do not exist before
+  reconcile makes them (setup.md, section 8). Each reads the private
+  files its own part needs alone: a `temper forge` command its forge's,
+  by setup.md, sections 5 and 6; `temper box` and `temper program-login`
+  none, the latter reading the agent's configuration besides (section
+  5); `temper serve` every one the document names but those that only
+  `setup` names. A set-up forge's files that its members name, which the
+  commands before it made, are among the ones it reads.
 - **A deployment's first start** is jig's (jig's
   `protocol/configuration.md`, section 8): the first with an empty store,
   whose owners and projects the core seeds from `engine`. temper adds:
@@ -550,8 +590,9 @@ top-level `workers`, in the same order; standalone has one. Each:
   constants of temper's client (`../client/README.md`, section 2).
 - **`temper ctl DIRECTORY ...`** takes none either (`../tools.md`,
   section 8).
-- **`temper sign-in CONFIG.json ACCOUNT`** reads the same document as
-  `temper serve` (credentials.md, section 3).
+- **`temper program-login CONFIG.json NAME`** reads the same document as
+  `temper serve`, and the agent's configuration it names (credentials.md,
+  section 3).
 - **`temper agent AGENT.json`** reads smith's agent configuration
   (section 5).
 - **`temper forge prepare|run|reconcile CONFIG.json FORGE`** and
@@ -586,9 +627,9 @@ feed:
 
 **jig's formats,** by citation (jig's `protocol/configuration.md`, section
 10): an address (`{"socket": ...}`, `{"host": ..., "port": ...}`,
-`{"in_process": ...}`); a secret file; a digest file; a handed-in
-account's file. A forge's `transport` offers the choices jig's LLM
-endpoints and accounts offer (plaintext to a loopback socket address
+`{"in_process": ...}`); a secret file; a digest file. A forge's
+`transport` offers the choices jig's LLM endpoints offer (plaintext to
+a loopback socket address
 only; TLS with a server name and a trust file, or the machine's roots),
 written by the format rule as one member of temper's own type, where
 jig's endpoints spell them as sibling members (`"transport": "tls"`,

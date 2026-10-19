@@ -23,9 +23,11 @@ what is not built yet (section 9), and what is still open (section 10).
   simulator; the real-loop world on one ring; reconcile's world; the
   process tier, the real binary with an owned Forgejo, its runner and
   real git; and the live tier, with a real model.
-- **Peers across a wire, the machine beneath.** LLM providers and the
-  forge are peers, whose fakes grow into services and meet temper at the
-  wire; people use temper's client, and their fake is skein's fake
+- **Peers across a wire, the machine beneath.** LLM providers, their
+  sign-in's issuers and the forge are peers, whose fakes grow into
+  services and meet temper at the wire; Claude Code, the program smith's
+  agent runs on a program's login, is faked by smith's fake `claude`
+  (4.1); people use temper's client, and their fake is skein's fake
   person, in front of it. The machine (files, processes, and the
   programs they run: git, rg, sh, temper's own) stays one set of state
   machines, with a face for each layer of temper it can sit under.
@@ -134,15 +136,17 @@ on the real kernel in the focused suite, within its existing budget.
 - **What runs:** `temper-service`'s system module, with the engine,
   store and one worker as standalone runs them; smith's agent hosts;
   the tools' root over jig's native client transport; and skein's fake
-  LLM peer on loopback. skein's forge peer joins stories that need
-  the forge. Configuration, the store and client credentials live in a
-  scratch directory on the real filesystem. Listeners are on loopback,
-  on a port the kernel assigns, passed to their clients once bound. A
-  story never uses a fixed port.
+  LLM peer on loopback, latency zero. skein's fake issuer joins
+  stories that sign in to an LLM provider, and skein's forge peer
+  stories that need the forge. Configuration, the store and client
+  credentials live in a scratch directory on the real filesystem.
+  Listeners are on loopback, on a port the kernel assigns, passed to
+  their clients once bound. A story never uses a fixed port.
 - **Agents share the loop.** The harness answers the worker's spawn
   with a hosted smith agent, joined by real pipes, and drives its
   `iterate` in the same loop. The agent's LLM is skein's fake peer,
-  which plays the story's scripted turns. git is the fake git program
+  which plays the story's scripted turns, or, on a program's source,
+  smith's fake `claude` (4.1). git is the fake git program
   (4.3); other external programs, such as sh, run as real child
   processes. Launching the `temper agent` executable, with its own
   loop and ring, is checked by the process tier (2.6).
@@ -158,6 +162,34 @@ on the real kernel in the focused suite, within its existing budget.
   (tools.md, 11.3). The named-key story waits for jig's contract
   (tools.md, section 13). Forge API stories follow, then stories that
   clone, push or land, on the fake git program (below).
+- **An account first.** A story whose agents run adds a key the fake
+  LLM peer accepts, from the client, before its first task, and waits
+  for its account to be usable: a key needs no sign-in to drive (jig's
+  `domain/accounts.md`, 3.4; tools.md, 11.3).
+- **LLM accounts' stories** (protocol/credentials.md, section 7),
+  each scripted on the fake peers, never by chance:
+  - **a sign-in:** on skein's fake issuer, the engine's redirect
+    listener on a port the kernel assigns, and the redirect driven by
+    the test, as a browser would; the account usable, then a run whose
+    credential the fake LLM peer observes as that account's, by its
+    scheme, never its value; a sign-in refused, and one past its
+    deadline, each settled with no account usable;
+  - **limited, refused and unauthorized:** a scripted turn answering
+    with the provider's failure (exhausted with a reset and without,
+    refused, unauthorized), the run's notice reaching jig's accounts
+    child, and the account's state following (jig's
+    `domain/accounts.md`, 3.5); the next task waits for its account
+    (jig's `domain/authority.md`, 8.3) and runs once the reset passes,
+    or once `retry` is asked; a notice of a fenced attempt dropped;
+  - **a program's source:** declared from the client, smith's fake
+    `claude` scripted signed in, the source verified, and a run through
+    smith's program backend calling host tools the engine decides as a
+    direct run's; a usage limit the fake reports making the source
+    limited, and a login lost making it need sign-in (smith's
+    `protocol/programs.md`, 5.6);
+  - **after each:** no key, token or record's value in the engine's
+    store, a fact, a request, an answer, a trace, the client's small
+    store or a printed page (protocol/credentials.md, section 7).
 - **Checks between iterations:** the harness checks memory ownership,
   operations and descriptor release, and the teardown invariant of
   testing-strategy.md, section 6; the referee checks the same outside
@@ -292,7 +324,9 @@ and 10).
     test writes from the owned example (protocol/setup.md, 8.1);
   - skein's fake LLM peer, a process of its own on loopback, over TLS
     with a test root the agent's configuration trusts, scripted for the
-    stories;
+    stories, accepting a key the test makes; the owned example's LLM
+    providers' endpoints are written at its address, and Claude Code's
+    path at smith's fake `claude` (4.1);
   - an owned Forgejo and its runner (below);
   - real git, the machine's, at the absolute path configuration gives it
     (protocol/configuration.md, section 4; protocol/git.md, section 3);
@@ -321,7 +355,9 @@ and 10).
   the owned runner, has passed on its head. The webhooks' listener is
   configured, and the org's hook reaches it.
 - **The story,** one test:
-  1. the person signs in by the link the binary prints;
+  1. the person signs in by the link the binary prints, and adds the
+     test's key as the deployment's on the accounts page
+     (client/README.md, 3.6), which shows its account usable;
   2. a chat is answered;
   3. a repository is adopted through temper's client, as above;
   4. a goal is given whose change, its CI passed, lands on the owned
@@ -358,6 +394,17 @@ and 10).
   (protocol/setup.md, 13.4): `temper box` on the owned example prints the sign-in
   link on its stdout; Forgejo killed is restarted by the box, with the
   engine still serving; a stop leaves no process the box started.
+- **`temper program-login`,** a sixth test, on a scratch directory of
+  its own (protocol/credentials.md, section 3): on the owned example
+  with Claude Code's path at smith's fake `claude`, `temper
+  program-login CONFIG.json live` makes the programs directory and
+  `live` in it, each `0o700`, and replaces itself with the fake's `auth
+  login`, which observes `CLAUDE_CONFIG_DIR` at that directory and none
+  of the program's credential variables, and writes its login there;
+  the command's exit status is the fake's. A name out of bounds, and a
+  programs directory readable by another user, are each refused, exit
+  1, with nothing made. A deployment started after it, its program
+  source declared as `live`, finds the source signed in.
 - **The throwaway Forgejo** is skein's (`fake-forge.md`, section 6):
   `testing/skein-throwaway-forgejo`, on the release and the runner that
   skein-forge's pin names (skein's `forge.md`, section 4.3), with SQLite
@@ -375,11 +422,15 @@ and 10).
   forge's state, read through Forgejo's API, shows the change; nothing
   the person saw before the kill is lost after it; no process the binary
   or the test started outlives it.
-- **Credentials:** none borrowed. The fake LLM peer takes the account the
-  test configures in a private file; the forge's API token, its user and
-  the git identity's token are reconcile's, in the forge's directory,
-  and the admin's token the preparation's, read by reconcile alone
-  (protocol/setup.md, sections 3 and 9).
+- **Credentials:** none borrowed. The fake LLM peer accepts a key the
+  test makes; the person adds it from the client once signed in, as the
+  deployment's, and the agents' tools' test with `temper ctl add-key`
+  (tools.md, 11.4); it is kept in jig's secrets' store, and no file the
+  configuration names holds an LLM account (protocol/credentials.md,
+  section 3). The forge's API token, its user and the git identity's
+  token are reconcile's, in the forge's directory, and the admin's token
+  the preparation's, read by reconcile alone (protocol/setup.md,
+  sections 3 and 9).
 - **Outside the suites:** nextest profile `process`, run by
   `scripts/proof-one-process.sh`, which builds the binary first. It aims
   at 3 minutes; if CI takes it past, the story with CI becomes a test of
@@ -391,29 +442,62 @@ and 10).
 section 8; testing-strategy.md, 2.9).
 
 - **What runs:** the process tier's binary, owned Forgejo, real git and
-  person, with a real model: the agent's endpoint is the provider's,
-  reached through a borrowed Codex login.
-- **The borrowed login:** `scripts/proof-live.sh` reads the access token,
-  its expiry and the account's id from `~/.codex/auth.json`, read-only,
-  and writes them, and nothing else, to a private file in the run's log
-  directory, removed at exit. It refuses to start when the token expires
-  within the run's span. The configuration hands that file in as the
-  account's source (jig's `protocol/llm.md`, 5.4): the token is never
-  refreshed, the refresh token is never copied, and neither an agent nor
-  `temper sign-in` signs in.
+  person, with a real model: the live configuration, `live.json`, is
+  the owned example's (protocol/setup.md, 8.1), its LLM providers'
+  endpoints the providers' own and Claude Code's path the machine's
+  `claude`. Each run is a fresh deployment, with no LLM account until
+  the script adds one, in place of the process tier's key (2.6, step
+  1), with `temper ctl` signed in by a link the binary
+  prints (tools.md, section 10); the script's argument says which
+  account, Claude Code's login by default, since it needs nobody.
+- **Claude Code, unattended** (the default). The live configuration's
+  programs directory is `~/.local/state/temper/live/programs`. The
+  developer runs `temper program-login live.json live` once on each
+  machine that runs the tier, and signs in as Claude Code asks
+  (protocol/credentials.md, section 3). Each run's deployment declares
+  the program source `live` (`temper ctl DIRECTORY declare 2 claude_code
+  live --key live-program`, tools.md, 5.5, area 5), then waits with
+  `wait accounts --until usable`: the name, not the account's number,
+  ties the source to the login, which the worker finds signed in.
+  Claude Code renews its own login; temper never reads it, and the run
+  needs nobody. Its runs are on smith's program backend (protocol/llm.md,
+  section 2).
+- **ChatGPT, signed in as the run starts.** `scripts/proof-live.sh`
+  runs `temper ctl DIRECTORY connect 1 --key live-sign-in`, prints its
+  address, and runs `wait accounts --until settled`, within the
+  sign-in's deadline, while the developer approves it in a browser on
+  the same machine. The account is the run's deployment's, and goes
+  with it; its runs are on smith's direct backend.
+- **A key, when neither is at hand:** `add-key PROVIDER FILE
+  --deployment --key live-key`, from a private file the script's
+  argument names, then `wait accounts --until usable`.
+- **Nothing borrowed:** no other program's login is read (no
+  `~/.codex`), no record or key is in a file the configuration names,
+  and the script copies no credential; an account added for a run is in
+  its deployment's store, removed with its scratch directory.
 - **The stories:** the process tier's chat, answered by the real model;
   and one small change, made by the model in a repository of the owned
   Forgejo, adopted as in 2.6, and pushed by real git. The story
   ends once the change's branch on the forge is at the run's commit; it
   does not wait for the change to land. A story also ends at its task's
   first terminal failure, which fails the test at once, naming it: it
-  never waits out the run's 15 minutes after its task has ended.
+  never waits out the run's 15 minutes after its task has ended. An
+  account limited, refused or needing sign-in fails the test the same
+  way, naming the account's state and its reset, since its task would
+  wait for it (jig's `domain/authority.md`, 8.3).
 - **Its referee:** the process tier's, without the restart; and the
-  completions, counted from the engine's transcripts.
+  completions, counted from the engine's transcripts. Each completion is
+  a turn of main's conversation on either backend: on the program
+  backend, each assistant message the program writes (smith's
+  `protocol/programs.md`, 5.5), so the count holds for Claude Code's
+  runs as for direct ones.
 - **Budget:** at most 25 completions and 15 minutes in all. The live
   configuration's charters bound each run's turns so the two stories
-  together make at most 25 completions, the script stops the run at 15
-  minutes, and the test fails when the transcripts count more than 25.
+  together make at most 25 completions, which smith's agent holds on
+  either backend (on the program backend with `--max-turns` behind its
+  own count; smith's `protocol/programs.md`, 5.7), the script stops the
+  run at 15 minutes, and the test fails when the transcripts count more
+  than 25.
   Each run's summary, a failed run's included, records its completions
   and its wall time, which a plan totals (skein's development.md, 5.5).
 - **Outside the suites:** nextest profile `live`, run only by
@@ -480,9 +564,33 @@ the worker's agents are smith's (protocol/llm.md, section 2). The fake is skein'
 - **Its peer,** in `skein-fake-peers`: the server side of each provider
   API smith's agents speak, over HTTP and server-sent events, which the
   one-process and real-loop worlds host and the process tier runs as a
-  process; with skein's fake issuer (`skein-fake-oauth`) for
-  `temper sign-in`. Its faults move down with it: a stream cut mid-event or between events, a
-  malformed event, a slow trickle, a stall with pings only.
+  process. Its faults move down with it: a stream cut mid-event or
+  between events, a malformed event, a slow trickle, a stall with pings
+  only. It accepts several credentials, each with its scheme, so one
+  peer serves several accounts (`Peer::accept`); a scripted turn answers
+  with a provider's failure (exhausted with a reset or without, refused,
+  unsupported naming a field, unauthorized), so a story drives an
+  account's state, the configured chances staying for runs at random;
+  and its observations (`Observation::Credential`) record the route, the
+  scheme and which accepted credential a call used, never a value.
+- **Its issuer,** skein's fake issuer (`skein-fake-oauth`; skein's
+  `oauth.md`, section 5), for sign-ins with an LLM provider: the
+  registration, revocation, an ID token signed with a test key, granted
+  scopes and its errors, each scriptable and observed; the test drives
+  the redirect to the engine's loopback listener as a browser would
+  (2.4).
+- **Claude Code** is smith's fake `claude` (smith's
+  `protocol/programs.md`, section 8), a program at the path the agent's
+  configuration gives: its sign-in, its status and its runs, scripted
+  per story, with usage limits and a login lost, and observations of
+  its arguments and its environment's names, never a value. The real
+  loop runs it under smith's agent hosts, and the process tier under
+  `temper agent` and `temper program-login` (2.6).
+- **What they gain,** for temper's stories, is skein's and smith's to
+  build (skein's `fake-llm.md`, and `oauth.md`, section 5; smith's
+  `protocol/programs.md`, section 8); temper's stories code against the
+  fake LLM's script as it stands (`Script`, `Turn`, `Line`,
+  `Observation`) and the additions.
 
 ### 4.2 The forge
 
@@ -940,12 +1048,15 @@ By tier:
   (protocol/store.md, section 6).
 - **The real-loop world** (2.4): the hosted service, agents and clients,
   the fake peers, the forge peer, the first stories and their checks,
-  and repository stories on the fake git program over the shared forge.
+  the LLM accounts' stories, and repository stories on the fake git
+  program over the shared forge.
   The one-process world, its fake forge service and fake git program are
   built.
 - **The process tier and the live tier,** with their scripts; the
-  process tier on owned mode, with CI, webhooks, the hinted story and
-  `temper box`'s test (protocol/setup.md, 13.4).
+  process tier on owned mode, with CI, webhooks, the hinted story,
+  `temper box`'s test (protocol/setup.md, 13.4) and `temper
+  program-login`'s; the live tier on a program's login, a sign-in or a
+  key added per run.
 - **The setup's tiers:** its step tests and the host's tests
   (protocol/setup.md, 13.1 and 13.2); reconcile's world is skein's
   (`forge-setup.md`, section 7).
@@ -972,6 +1083,9 @@ By fake:
   GitHub's API comes later (protocol/forge.md, section 14).
 - **Machine:** rg and sh as programs with command-line faces; the shell
   subset.
+- **LLM providers:** the fake LLM peer's scripted failures, several
+  credentials and its public route, and the fake issuer's additions,
+  skein's; the fake `claude`, smith's (4.1).
 - **People:** none of temper's: skein's fake person, in front of
   temper's view and of temper's terminal client.
 

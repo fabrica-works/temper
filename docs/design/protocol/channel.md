@@ -1,6 +1,6 @@
 # temper's parts on jig's channel
 
-Provisional, 2026-10-03, revised 2026-10-18. What temper carries on the
+Provisional, 2026-10-03, revised 2026-10-19. What temper carries on the
 channel between its engine and a worker: its parts inside jig's records,
 under its payload version, and a git identity's value inside a credential
 grant. The channel is jig's (jig's `protocol/channel.md`), and this
@@ -277,7 +277,7 @@ the routing in the step that routes the record:
   | `saved` | `Saved` | the checkout's `repositories`, `conflicts` and `path_bytes`, and `PushDiagnostic::CAPACITY` |
   | `resource` | `Preparation` | fixed |
   | `evidence` | smith's delivery reply | smith's channel limits, as the hub's `delivery_evidence_bytes` takes them |
-  | `grant` | the larger of an LLM account's value and the largest `Identity` | jig's accounts; configuration's identities |
+  | `grant` | the larger of an LLM grant's (a credential's value, or a program source's name) and the largest `Identity` | jig's accounts (jig's `protocol/llm.md`, section 6); configuration's identities |
   | `credentials` | the number of git identities | configuration (configuration.md, section 3) |
 
 - **Within jig's ceilings.** Each must fit the ceiling jig's schema gives

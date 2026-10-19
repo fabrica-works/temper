@@ -1,8 +1,9 @@
 # temper's design
 
-Provisional, 2026-10-18. What temper is, what it is built from, and where
-each part of its design lives. This document comes first; the documents
-it lists in section 6 go deeper into each part. temper is an application
+Provisional, 2026-10-18, revised 2026-10-19. What temper is, what it is
+built from, and where each part of its design lives. This document
+comes first; the documents it lists in section 6 go deeper into each
+part. temper is an application
 of jig, the kit for agentic applications: jig's design is jig's own
 (jig's `README.md`), and temper's documents say what temper adds,
 decides or chooses, citing jig for the rest. The mechanics are those of
@@ -69,13 +70,16 @@ One story:
 
 1. `temper serve CONFIG.json` runs on a deployment's directory,
    configured for one Forgejo (with Actions, or with project checks), one
-   git identity, one worker and one LLM account, handed in or signed in
-   by `temper sign-in` (`protocol/configuration.md`;
-   `protocol/credentials.md`, sections 3 and 4).
-   The forge is connected, managed, or owned on a box
+   git identity, one worker and its LLM providers, never an account
+   (`protocol/configuration.md`; `protocol/credentials.md`, sections 3
+   and 4). The forge is connected, managed, or owned on a box
    (`protocol/setup.md`).
 2. `temper open DIRECTORY LINK` signs the person in by the printed link
-   and shows their inbox (`client/README.md`, sections 6 and 7).
+   and shows their inbox (`client/README.md`, sections 6 and 7). With
+   no LLM account yet, a banner offers the ways to add one: a sign-in
+   with an LLM provider, a Claude Code login made with `temper
+   program-login`, or a key; the person adds one on the accounts page
+   (`client/README.md`, 3.5 and 5.5).
 3. The person adopts a repository into the configured project, through
    the adoption form (`client/README.md`, 4.4).
 4. The person starts a chat and asks for a change; the chat makes a

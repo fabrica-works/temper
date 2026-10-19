@@ -1,6 +1,6 @@
 # The forge's setup
 
-Provisional, 2026-10-16, revised 2026-10-18. How a forge comes to be
+Provisional, 2026-10-16, revised 2026-10-19. How a forge comes to be
 ready for temper, in three modes: connected, where a person runs and sets
 up Forgejo and gives temper only what it strictly needs; managed, where a
 person runs it and gives temper a site admin's token, with which temper
@@ -470,15 +470,16 @@ Each needs nothing below the commands to change:
 - **the process tier** (section 13.4), which runs the commands itself;
 - **QA's environments** (`../draft/qa.md`, 4.1), whose "temper in a box" is
   an owned setup with a scripted LLM, made by its own host from the same
-  commands;
+  commands, its LLM key added from the client once signed in
+  (`../tools.md`, section 10);
 - **a container image** whose entry point is `temper box`.
 
 ## 8. The configuration
 
 - **One document,** `temper serve`'s (configuration.md, section 2).
   Every `temper forge` command and `temper box` read it whole, check it
-  as `temper sign-in` does, `setup` among it, and act on their part
-  (configuration.md, section 8): they read no file but their own part's,
+  as configuration.md, section 8 says, `setup` among it, and act on
+  their part: they read no file but their own part's,
   since a set-up forge's files do not exist before reconcile makes
   them.
 - **`application.setup`,** a list, at most one entry per forge:
@@ -539,12 +540,13 @@ Each needs nothing below the commands to change:
 
 `docs/examples/owned.json` is a whole document, `engine`, `workers` and
 `application`, for one owned forge with a runner, webhooks, one git
-identity, one worker and one LLM account handed in (credentials.md,
-section 3). The files it names that hold no secret are beside it, in
-`docs/examples/owned/`: the agent's configuration and the charters,
-short texts a person edits. The files that hold a secret, the worker's
-secret and its digest and the LLM account's file, are never shipped:
-`docs/guide/box.md` says how each is made. A person, a test or QA's host
+identity, one worker and two LLM providers, with no LLM account: a
+person adds one from the client once the deployment has started
+(credentials.md, section 3). The files it names that hold no secret are
+beside it, in `docs/examples/owned/`: the agent's configuration and the
+charters, short texts a person edits. The files that hold a secret, the
+worker's secret and its digest, are never shipped: `docs/guide/box.md`
+says how each is made. A person, a test or QA's host
 starts from a copy, and `temper box CONFIG.json` runs it (section 7).
 
 - **Its forge,** forge 1, is owned, in `forge-1`, with a runner whose
@@ -565,11 +567,20 @@ starts from a copy, and `temper box CONFIG.json` runs it (section 7).
   read, push, open a pull request, merge, comment, create an issue, edit
   a pull request, update it from its base, close or reopen it, and edit,
   close or reopen an issue; 10, as the process tier's owner holds them.
+- **Its LLM providers** (configuration.md, section 2), written out
+  whole: 1, OpenAI, with ChatGPT's sign-in, its registration public and
+  its redirect's port ephemeral, and keys; and 2, Anthropic, with Claude
+  Code as a program, and keys. Each with its endpoint, its models and
+  their prices. The charters allow each provider's models in order, the
+  default the first whose LLM provider has a usable account (llm.md,
+  section 5; jig's `domain/tasks.md`, section 3).
 - **Its agent's configuration** (configuration.md, section 5),
-  `owned/agent.json`, takes the process tier's profile, the sizes its
-  live tier runs a real model with: smith's `standard`, with `declared`
-  `memory` 2,147,483,648, `tool_payload` 600, `read_window` 256,
-  `conversations` 1 and `calls_per_response` 1, and `policy`
+  `owned/agent.json`, declares both providers' endpoints and models, and
+  Claude Code's program, its path and its programs directory, a
+  directory the person names; and takes the process tier's profile, the
+  sizes its live tier runs a real model with: smith's `standard`, with
+  `declared` `memory` 2,147,483,648, `tool_payload` 600, `read_window`
+  256, `conversations` 1 and `calls_per_response` 1, and `policy`
   `max_turns` 5, `group_stop` 10, `inbox` 8 and `unacknowledged` 8. Its
   messages are then 600 bytes, and its largest call 4,096 bytes, its
   `outcome_bytes` (configuration.md, section 7, `small` against the
@@ -617,10 +628,13 @@ starts from a copy, and `temper box CONFIG.json` runs it (section 7).
     address and a port, `http://127.255.255.254:65535`, 28 bytes.
   - The worker's counts its agent's `program` and the configuration's
     path among its `arguments`, two bytes for each of theirs with the
-    example's one slot: each at Linux's `PATH_MAX`, 4,096 bytes.
+    example's one slot: each at Linux's `PATH_MAX`, 4,096 bytes; and
+    Claude Code's path and programs directory, which the host's half
+    holds to check a program's login (smith's `protocol/programs.md`,
+    section 4), each at the same bound.
   - Nothing else a copy changes moves either: its directory but for that
     path, its other addresses and secrets, its logins, emails, binaries
-    and charters, the account handed in.
+    and charters, its LLM providers, whose sizes jig's limits bound.
 
   A test starts the example with those strings at their bounds, so that
   the example starts from a person's directory, with Forgejo's tokens,

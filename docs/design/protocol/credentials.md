@@ -1,16 +1,17 @@
 # Credentials
 
-Provisional, 2026-10-03, revised 2026-10-18. temper's credentials: which
+Provisional, 2026-10-03, revised 2026-10-19. temper's credentials: which
 secrets temper's processes hold, where each comes from, who may use it,
 and how it reaches the process that does. LLM accounts, workers' secrets
 and people's sign-ins are jig's (jig's `protocol/README.md`, section 8;
-jig's `protocol/llm.md`, sections 5 and 6); temper's own are its git
-identities, the forges' API tokens and their webhooks' secrets. The files
-they come from are configuration.md's (section 6); a git identity's value
-on the channel is channel.md's (section 6); git's use of it is git.md's
-(section 5); the credentials of the forge's setup, which `temper serve`
-never holds, are setup.md's (section 9). What is open is listed in
-section 8.
+jig's `domain/accounts.md`; jig's `protocol/llm.md`, sections 5 and 6),
+and temper adds `temper program-login` (section 3); temper's own are
+its git identities, the forges' API tokens and their webhooks' secrets.
+The files they come from are configuration.md's (section 6); a git
+identity's value on the channel is channel.md's (section 6); git's use
+of it is git.md's (section 5); the credentials of the forge's setup,
+which `temper serve` never holds, are setup.md's (section 9). What is
+open is listed in section 8.
 
 ## 1. In one page
 
@@ -19,9 +20,10 @@ section 8.
   so no trace, snapshot, record or log of a domain can leak one. Values
   live in the protocol layer's tables, filled in as a record is encoded
   and taken out as it is decoded.
-- **LLM accounts are jig's,** on skein's accounts driver; temper writes
-  no OAuth exchange, and adds `temper sign-in`, an account's sign-in at a
-  terminal (section 3).
+- **LLM accounts are jig's,** made from the client: a sign-in with the
+  LLM provider, a key, or a program's login. temper writes no OAuth
+  exchange and configures no account, and adds `temper program-login`,
+  which signs a program's login in on a host (section 3).
 - **Git identities are temper's application credentials,** one per
   forge: a forge token, a login and an author, read from a private file
   at start, granted with each assignment that needs one. Each
@@ -49,7 +51,7 @@ section 8.
 
 | Credential | Owner | Kind | Source | Held by | Used by | Changes |
 |---|---|---|---|---|---|---|
-| an LLM account | jig | an OAuth record (refresh token, access token, expiry), or a handed-in access token | `temper sign-in`, or a private file another program's login fills | skein's accounts driver; the access tokens lent, jig's accounts' table | the worker's agent processes, through grants | the driver refreshes a signed-in one; a handed-in one is replaced by hand, then read at the next start |
+| an LLM account's source | jig | a signed-in record (refresh token, access token, expiry), a key, or a program's login | a sign-in or a key from the client; a program's login, `temper program-login` on each host (section 3) | jig's secrets' store, lent by skein's accounts driver, the access tokens and keys in jig's accounts' table; a program's login, the program, in the source's configuration directory | the worker's agent processes, through grants | the driver refreshes a signed-in record; a key's holder replaces it from the client; the program renews its own login |
 | a git identity | temper | a forge token, a login, an author | a private token file per identity, the person's, or reconcile's when its forge is managed or owned (setup.md, section 5), and the identity's members | the identities' table on the engine, and on the worker from grants | the git component's invocations | an operator replaces the file and restarts; reconcile makes it again at a start when its file does not answer as the bot |
 | a forge's API token | temper | a forge token | a private file per forge, the person's, or reconcile's when the forge is managed or owned (setup.md, section 5) | the forge component | that forge's API requests | an operator replaces the file and restarts; reconcile makes it again at a start when its file does not answer as the bot |
 | a worker's secret | jig | a shared secret | the worker's secret file; the engine's digest file | the worker; the engine, its digest | the link's opening | an operator replaces both |
@@ -58,7 +60,8 @@ section 8.
 
 - **No temper secret in jig's secrets' store** in standalone: every
   temper secret is a file read at start. jig keeps sign-ins' and
-  services' digests there (jig's `protocol/store.md`, section 9).
+  services' digests there, and LLM accounts' records and keys (jig's
+  `protocol/store.md`, section 9).
 - **The forge's setup's credentials** (a site admin's token, the bot's
   and temper's admin's passwords, the person's first password on an
   owned Forgejo, the runner's secret, Forgejo's own secrets) are
@@ -67,53 +70,102 @@ section 8.
 
 ## 3. LLM accounts
 
-jig's, as jig has them: configured in jig's `engine.llm` (jig's
-`protocol/configuration.md`, section 3), held on skein's accounts driver
-and lent by `jig-protocol-accounts` (jig's `protocol/llm.md`, section 5),
-granted with each assignment and pushed to every live attempt (jig's
-`protocol/llm.md`, section 6). temper adds no member, and:
+jig's, as jig has them (jig's `domain/accounts.md`): each an LLM
+provider's account, held by a person or by the deployment, with its
+sources in its holder's order. temper configures the LLM providers
+(configuration.md, section 2), shows and makes accounts from its client
+(`../client/README.md`, 3.5; `../tools.md`, 5.5, area 5), and adds
+`temper program-login`, below.
 
+- **Made from the client, never configured.** Configuration names LLM
+  providers, never an account (jig's `protocol/configuration.md`, section
+  3). A fresh deployment has no account but a *none* source's, so no run
+  on another LLM provider starts until a person adds one, and the client
+  says so (`../client/README.md`, 5.1).
+- **Kept by jig:** a signed-in record and a key in jig's secrets' store
+  (jig's `protocol/store.md`, section 9), lent by skein's accounts driver
+  through `jig-protocol-accounts` (jig's `protocol/llm.md`, section 5);
+  never in a root, temper's records, a fact, a request or an answer. A
+  key reaches the engine in a request the client sends once and never
+  keeps (jig's `domain/accounts.md`, section 5).
+- **The sources** (jig's `domain/accounts.md`, 3.4):
+  - **signed in:** the person's sign-in with the LLM provider, asked
+    from the client. The engine binds a loopback listener for each
+    sign-in, on an ephemeral port unless the LLM provider's
+    configuration fixes one (jig's `protocol/llm.md`, section 5; skein's
+    `oauth.md`, 6.5), so the browser that approves must run on the
+    engine's machine. The client shows the address to open; the terminal
+    prints it and opens no browser (`../client/README.md`, 6.5);
+  - **a key:** pasted on the accounts page, or read by `temper ctl` from
+    a private file;
+  - **a program's login:** declared from the client under its name, then
+    signed in on each host by `temper program-login` (below). The login
+    is the program's own, in the source's configuration directory,
+    `<directory>/NAME` under the agent's programs directory
+    (configuration.md, section 5), and temper never reads it;
+  - **none:** an LLM provider whose endpoint takes no credential, such
+    as a local model's on loopback; its one account is the deployment's.
 - **The engine makes no LLM call** (llm.md, section 2): only agent
-  processes use an account's tokens.
-- **On the worker,** the routing puts each value in smith's form (jig's
-  `protocol/llm.md`, 5.3) and hands it to smith's host half, which fills
-  it into the agent's start and grants. Rejected and exhausted travel
-  back from the agent through smith's host half, the hub and the link to
-  the accounts child, fenced by attempt.
-- **An account's first record,** one of two (jig's `protocol/llm.md`,
-  5.4):
-  - **handed in:** a private file in jig's format, which the driver
-    lends until it lapses, never refreshing it and never writing its
-    source. The live tier hands in a borrowed Codex login's access token
-    so (`../testing.md`, 2.7);
-  - **signed in:** by `temper sign-in`, below.
-- **`temper sign-in CONFIG.json ACCOUNT`:**
-  - `ACCOUNT` is the `number` of one of `engine.llm.accounts`.
+  processes use an account's values.
+- **On the worker,** the routing puts each grant in smith's form (jig's
+  `protocol/llm.md`, section 6) and hands it to smith's host half, which
+  fills it into the agent's start and grants: a credential's value with
+  its scheme, a bearer or a key; or a program's source by its name, by
+  which the agent finds its configuration directory (smith's
+  `protocol/programs.md`, section 3). Limited, refused and unauthorized
+  travel back from the agent as notices, through smith's host half, the
+  hub and the link, to the accounts child, fenced by attempt (jig's
+  `domain/accounts.md`, 3.5).
+- **A host that keeps a person's program logins** runs only that
+  person's work, until a run's process tree is contained from the
+  programs directory (jig's `domain/accounts.md`, 3.4): a run can read
+  every login kept on its host. A standalone deployment's one worker,
+  on its person's machine, keeps that person's logins alone, and is
+  unaffected.
+- **`temper program-login CONFIG.json NAME`:**
+  - `NAME` is a program source's name, 1 to 32 of `a` to `z`, `0` to `9`
+    and `-` (jig's `domain/accounts.md`, 3.4), as the accounts page and
+    `temper ctl declare` give it with this command.
   - It reads and checks `CONFIG.json` as `temper serve` does
-    (configuration.md, section 8), reading no secret file but the
-    account's own; it opens no store and starts no service. The engine
-    need not run.
-  - It refuses, before anything else and naming the account: a number no
-    account has; a handed-in account; and an account whose registration
-    has a client secret, since a sign-in at a terminal serves a public
-    client only (jig's `protocol/llm.md`, 5.4).
-  - It runs skein's accounts driver's sign-in (skein's `oauth.md`,
-    sections 2 and 6): it prints the visit's URL on stdout, one line;
-    waits for the provider's redirect on the registration's loopback
-    listener, within the driver's sign-in deadline (skein's `oauth.md`,
-    section 3); exchanges the code; keeps the record in the account's
-    private file; and exits 0.
-  - It never opens a browser, and prints no secret.
-  - It exits 1 on any failure (a refusal, the deadline passed, the
-    provider's error, a record not kept), the reason on stderr.
-  - A running engine loads the new file at its next grant of the
-    account, since its driver loads an account's file again whenever it
-    holds no record of it (jig's `protocol/llm.md`, 5.4): no restart.
-  - It is copied from smith's local shell's sign-in (smith's `shell.md`,
-    4.5 and section 7), on the same driver.
-- **What temper does not do:** refresh an account itself, keep an
-  account's record in its store, or sign an account in through the
-  client (jig's `protocol/llm.md`, section 10).
+    (configuration.md, section 8), and the agent's configuration it
+    names, reading no secret file; it opens no store, starts no service
+    and sends nothing to the engine, which need not run.
+  - It refuses, exit 1, before it makes anything: a name out of its
+    bounds; an agent's configuration with no program (smith's
+    `protocol/agent.md`, section 4); a programs directory, or a
+    `<directory>/NAME`, that exists and is not a directory of the
+    user's own with no group or other bits, or is reached through a link
+    (skein's `io.md`, 5.3).
+  - It makes the programs directory and `<directory>/NAME`, each
+    `0o700`, when missing, then replaces itself with the program's own
+    sign-in, `claude auth login`, at the configured path. The
+    environment is the caller's, so that the program's sign-in has the
+    person's terminal and browser, with `CLAUDE_CONFIG_DIR` the source's
+    directory and the program's credential variables removed, as every
+    command of a program source's is (smith's `protocol/programs.md`,
+    4.2): `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`,
+    `CLAUDE_CODE_OAUTH_TOKEN` and the cloud providers' variables, which
+    would win over the login (jig's `domain/providers.md`, 3.3). The
+    forge's commands clear the environment before they exec (setup.md,
+    6.4); a sign-in cannot.
+  - Its exit status is the program's. A failure before the exec exits
+    1, its reason on stderr, one line beginning `temper program-login:`.
+  - It reads nothing of the login. The host's half checks it (smith's
+    `protocol/programs.md`, section 3; smith's `protocol/hosts.md`,
+    section 2) at its hello, when told of a new source, on its holder's
+    check and at its interval (jig's `domain/accounts.md`, 3.4), and the
+    accounts page shows the state.
+  - Its name says what it does, never a provider's product (jig's
+    `domain/providers.md`, 3.2).
+  - A worker on another host is signed in on that host, with that host's
+    configuration.
+- **A program's sign-out** is the host's half's, on each host, by the
+  program's own (smith's `protocol/hosts.md`, section 2; jig's
+  `domain/accounts.md`, 3.4), when its holder signs the source out or
+  removes it from the client.
+- **What temper does not do:** configure an account, sign one in at a
+  terminal of its own, keep a record or a key in its own store or a
+  file, refresh an account, or read a program's login.
 
 ## 4. Git identities
 
@@ -168,8 +220,8 @@ granted with each assignment and pushed to every live attempt (jig's
 - **A forge that refuses the identity** fails the workspace, never the
   credential: a preparation it refuses is `Preparation::Refused`
   (`../domain/worker.md`, 4.3), a push `Landing::Refused`
-  (`../domain/worker.md`, section 5). Rejected and exhausted are LLM
-  accounts' only (jig's `domain/engine.md`, 12.1).
+  (`../domain/worker.md`, section 5). Limited, refused and unauthorized
+  are LLM accounts' notices only (jig's `domain/accounts.md`, 3.5).
 - **Replaced** by an operator, who replaces the token file and restarts;
   the new start grants generation 1 again. In standalone no worker
   outlives the engine, since the worker is in its process, so no holder
@@ -225,8 +277,8 @@ granted with each assignment and pushed to every live attempt (jig's
 - **No value across a domain boundary:** the one-process world and the
   forge's protocol world search every root's events and requests, every
   fact and every store record for the values their fakes issued (LLM
-  access tokens, identities' tokens, API tokens, webhooks' secrets), and
-  fail on any (`../testing.md`, 2.5).
+  access tokens and keys, identities' tokens, API tokens, webhooks'
+  secrets), and fail on any (`../testing.md`, 2.5).
 - **The identities' table:** step tests of its filling at start, a value
   filled into a grant and taken out on the worker, and two generations.
 - **Git's environment:** step tests of its builder: the header's bytes,
@@ -237,12 +289,22 @@ granted with each assignment and pushed to every live attempt (jig's
   answered; an unanswered check is made again.
 - **Startup:** a secret file readable by another user, or reached
   through a link, refuses the start, naming it.
-- **`temper sign-in`,** against skein's fake issuer (skein's `oauth.md`,
-  section 5): the visit printed, the redirect taken, the record kept,
-  exit 0; a handed-in account and a confidential client refused; a
-  running engine lending the new record at its next grant.
-- **The live tier** borrows a Codex login's access token read-only,
-  never refreshes it and never writes its file (`../testing.md`, 2.7).
+- **`temper program-login`,** step tests: each refusal (a name out of
+  its bounds, no program configured, a directory not private or reached
+  through a link), each before anything is made; the directory made
+  `0o700`; and the exec's program, arguments and environment: the
+  caller's kept, `CLAUDE_CONFIG_DIR` the source's directory, the
+  program's credential variables removed. The process tier execs smith's
+  fake `claude` (smith's `protocol/programs.md`, section 8) and finds its
+  login in the source's directory (`../testing.md`, 2.6).
+- **LLM accounts' stories** in the real loop (`../testing.md`, 2.4): a
+  key added, a sign-in against skein's fake issuer with a redirect the
+  test drives, and a program's source over smith's fake `claude`; after
+  each, no value in temper's store, a fact, a request, an answer or the
+  client's small store.
+- **The live tier** runs on a program's login on its machine, which
+  temper never reads, or on a sign-in or a key added per run
+  (`../testing.md`, 2.7).
 
 ## 8. Open questions
 
@@ -263,9 +325,9 @@ granted with each assignment and pushed to every live attempt (jig's
   would make a git identity's source an exchange the protocol layer
   refreshes, announcing each new generation (jig's `domain/engine.md`,
   12.1). Default: static tokens only.
-- **A handed-in account read again while the engine runs** (jig's
-  `protocol/llm.md`, section 10). Default: a newer file is read at the
-  next start.
+- **A second program.** `temper program-login` signs in the agent's
+  one program, Claude Code. Default: it takes `--program ADAPTER` once
+  smith's agent adapts a second (smith's `protocol/programs.md`).
 - **The forge as people's sign-in provider,** for a deployment with more
   than one person: routes of temper's on its clients' listener run the
   forge's OAuth flow, read who the person is, and ask jig's clients'

@@ -1,6 +1,6 @@
 # Tools: temper for agents
 
-Provisional, 2026-10-17, revised 2026-10-18. How agents drive temper:
+Provisional, 2026-10-17, revised 2026-10-19. How agents drive temper:
 they read what it holds, act through jig's operations and wait for what
 changes, with `temper ctl`, a command line. It serves the agents
 (smith's) that QA and develop temper's core: they drive a throwaway
@@ -39,11 +39,15 @@ listed in section 15.
   per process, in `jig-client`'s one-shot mode, over jig's native
   transport, and prints its result (section 8).
 - **The deployment under test is a box** (`protocol/setup.md`, section
-  7): the agent's harness starts it, signs in by its printed link, and
-  throws it away (section 10).
-- **Grown by areas,** the first designed in full, the others named
-  (5.5); **later, named:** the MCP endpoint and the extraction into
-  `jig-client-tools` (section 14).
+  7): the agent's harness starts it, signs in by its printed link, adds
+  the deployment's LLM key, and throws it away (section 10).
+- **LLM accounts are an area of their own** (5.5, area 5): a sign-in
+  prints the address to open and returns, and the agent follows it with
+  `wait accounts`; a key is read from a private file and sent in a
+  request that is never kept (section 7).
+- **Grown by areas,** the first and the fifth designed in full, the
+  others named (5.5); **later, named:** the MCP endpoint and the
+  extraction into `jig-client-tools` (section 14).
 
 ## 2. What it is for, and what not
 
@@ -236,8 +240,9 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
 ```
 
 - **The subject** is a watch's (jig's `client/domain/contract.md`, 7.1):
-  `me`, `inbox`, `task N`, `tree N`, `run N`, or a task query as `tasks`
-  takes it, with what its watch takes alone: `inbox` with no flag, the
+  `me`, `inbox`, `task N`, `tree N`, `run N`, `accounts` (area 5 of
+  5.5), or a task query as `tasks` takes it, with what its watch takes
+  alone: `inbox` with no flag, the
   inbox's watch being the party's whole inbox; `tasks` without
   `--after` or `--ended`, `tasks{query}` following live tasks. Any
   other is a usage error, exit 1.
@@ -259,7 +264,7 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
   `client/domain/contract.md`, 7.2), which no tool prints.
 - **Which reads print one:** a read whose arguments are a watch's
   subject, with every wait's answer: `me`; `inbox` and `tasks` with the
-  arguments a wait takes (above); `task N`; `run N`.
+  arguments a wait takes (above); `task N`; `run N`; `accounts`.
   `task N --tree --run` prints one for each subject, `task N`, `tree N`
   and `run N`, each over its own part of the result. `--activity`'s
   lines, `chat`, `activity` and `turn` are pages, not subjects, and
@@ -279,6 +284,7 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
   | `task N` | `ended`; `waiting-on-me`; `held`; `replied` (a chat's run done for now); `phase:<phase>` |
   | `tree N` | `ended` |
   | `run N` | `ended` |
+  | `accounts` | `usable` (an account the party's work may use has a source usable on a host); `settled` (no sign-in or check the party asked is in progress) |
 
 - **`replied`** holds while a chat's status (jig's
   `client/domain/client.md`, section 19, its facts) is parked, waiting
@@ -298,6 +304,18 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
   `client/domain/contract.md`, 7.2), so a delivery may never show one.
   `--until phase:done` and its kin are usage errors, exit 1, naming
   `--until ended`.
+- **`settled`** follows a sign-in or a check to its end. A sign-in is in
+  progress from its request's answer until it ends: made, renewed,
+  refused, or past the sign-in's deadline (skein's `oauth.md`, section
+  3); a check, until each host it asks has reported (jig's
+  `domain/accounts.md`, 3.4). So a wait begun once `connect` or `verify`
+  has answered is not met before them: `connect 1 --key chatgpt`, then
+  `wait accounts --until settled`, then the account's state in its
+  answer.
+- **`usable`** counts the party's own accounts, those whose uses name
+  the party, and the deployment's (jig's `domain/accounts.md`, 4.3), on
+  any host: the box's harness waits on it once it has added the
+  deployment's key (section 10).
 - **`ended`** is met by a delivery that shows the subject ended, or by
   its watch's end because it ended. For `task N`, the answer is then the
   task as a read of it gives it once ended, so it says how it ended.
@@ -343,11 +361,66 @@ area lands with its stories (section 11).
    `policy`, `role`, `pool` (jig's `domain/people.md`, 5.2).
 4. **jig's plumbing whole:** `create`, `propose`, `compound --project P
    FILE`, a batch, a proposal or a compound request as JSON (keyed).
+5. **LLM accounts** (jig's `domain/accounts.md`, section 5): the party's
+   accounts and, for an owner, the deployment's, as temper's accounts
+   page shows them (`client/README.md`, 3.5). Each act is one of jig's
+   requests for accounts (jig's `client/domain/contract.md`, 3.2).
 
-- **Area 1 is designed here in full.** Areas 2 to 4 name their tools and
-  jig's operations; each area's arguments are checked against jig's
-  operations as they stand when the QA loop reaches it, by a design
-  pass (`development.md`, section 4), and land with it.
+   | Tool | What it does | jig's | K |
+   |---|---|---|---|
+   | `accounts` | the party's accounts, then, for an owner, the deployment's: each with its number, LLM provider, display name and holder; its sources in order, each with its kind, its name for a program's, and its state, per host for a program's, with the reset where the provider gave one; the runs on it and the tasks waiting for it; the sign-ins and checks in progress; its acts | the `accounts` watch (5.4) | |
+   | `models [--project P]` | the models the party may use, by LLM provider: each with its efforts, what it is good at and its prices, and "needs an account" beside a provider no account of the party's work serves | `me`'s models, with the `accounts` watch's states | |
+   | `connect PROVIDER` | starts a sign-in with an LLM provider: prints the address to open in a browser on the engine's machine, and the call that follows it, `wait accounts --until settled`; exits 0 once the request is durable | sign in | yes |
+   | `disconnect ACCOUNT [--source S]` | signs a source out: a signed-in source's record revoked at the provider, a program's login signed out on each host; the source removed. Unconfirmed, the answer says to disconnect temper in the provider's settings, or names the hosts that did not sign out | sign out | |
+   | `add-key PROVIDER FILE [--account A] [--deployment]` | adds a key read from FILE: to account A, or as a new key-only account; the deployment's with `--deployment`, by an owner | add a key | yes |
+   | `replace-key ACCOUNT FILE` | replaces the account's key with the one read from FILE | replace a key | |
+   | `forget ACCOUNT [--source S]` | removes a source, or the account with every source, each signed out as `disconnect` does | remove | |
+   | `declare PROVIDER ADAPTER NAME [--account A]` | declares a program's login under the source's NAME (1 to 32 of `a` to `z`, `0` to `9` and `-`): a new account, or a source of account A; the answer names the command to run on each host, `temper program-login CONFIG.json NAME` (`protocol/credentials.md`, section 3) | declare a program's login | yes |
+   | `verify ACCOUNT [--source S]` | has each host check a program source's login now; answered once asked, then `wait accounts --until settled` | check | |
+   | `rank ACCOUNT POSITION [--source S]` | the account's place among its holder's accounts of its LLM provider, from 1; with `--source`, the source's place in the account's order | order | |
+   | `retry ACCOUNT [--source S]` | resumes a limited source, so that the runs it holds start again | resume | |
+
+   - **The names are plain verbs, and reads nouns,** as the other
+     tools' are. Six are not jig's words: `sign-in` and `sign-out` are
+     the host's (5.6), so a sign-in with a provider is `connect` and its
+     end `disconnect`; `forget`, `rank`, `verify` and `retry` are
+     jig's remove, order, check and resume.
+   - **One result per call.** `connect` prints the address and returns;
+     the sign-in goes on at the engine, and `wait accounts --until
+     settled` follows it (5.4). It never opens a browser, and the
+     provider's redirect reaches the engine's loopback, so the browser
+     that approves runs on the engine's machine
+     (`protocol/credentials.md`, section 3). `verify` alike: asked, then
+     waited for.
+   - **A key is read from FILE,** never an argument and never printed:
+     a private file, the user's own with no group or other bits and not
+     reached through a link, as the engine reads a secret's file
+     (`protocol/configuration.md`, section 6); its bytes, less a final
+     newline, within the bound of section 12. The tool reads it, sends
+     it once, and keeps no copy (section 7).
+   - **`PROVIDER` is an LLM provider's number,** as `models` and
+     `accounts` print it (jig's `protocol/configuration.md`, section 3);
+     `ADAPTER` is the program's name in smith's agent configuration,
+     `claude_code` (smith's `protocol/agent.md`, section 4).
+   - **`S` names one of the account's sources** by its kind, `sign_in`,
+     `key` or `program`, as `accounts` prints it (section 15).
+   - **A program's login is never the tools'.** `declare` makes the
+     source; the person, or the harness, runs `temper program-login` on
+     each host, outside `temper ctl`, since it hands the terminal to the
+     program's own sign-in (`protocol/credentials.md`, section 3).
+   - **The task's model** is chosen with this area: `chat` and area 2's
+     `goal` take `--model M [--effort E]`, the task's LLM choice, the
+     charter's default without them (jig's `domain/tasks.md`, section
+     3), and area 2's `amend` changes it.
+   - **An account's uses** have no tool: each takes jig's default (jig's
+     `domain/accounts.md`, 4.2) until the QA loop asks for one (section
+     15).
+
+- **Areas 1 and 5 are designed here in full.** Areas 2 to 4 name their
+  tools and jig's operations; each area's arguments are checked against
+  jig's operations as they stand when the QA loop reaches it, by a
+  design pass (`development.md`, section 4), and land with it. Area 5's
+  are checked so against jig's requests for accounts once jig has them.
 - **The QA loop may ask for a tool no area names.** It goes to the
   designer as a design question, and joins the table as a row of an
   area.
@@ -483,10 +556,10 @@ may change with them.
 
 ## 7. Requests: once, and named
 
-- **Through jig's request table.** Every act is a keyed request:
-  `jig-client` keeps it before sending it, sends it again under its key
-  until its answer is durable, and answers it once (jig's
-  `client/domain/client.md`, section 6).
+- **Through jig's request table.** Every act but one that carries a
+  value (below) is a keyed request: `jig-client` keeps it before sending
+  it, sends it again under its key until its answer is durable, and
+  answers it once (jig's `client/domain/client.md`, section 6).
 - **The agent names the key** of every tool marked `K`: `--key NAME`, a
   word of 1 to 64 bytes of `a` to `z`, `0` to `9` and `-`, such as
   `health-chat`. A call without it is refused as a usage error, before
@@ -522,6 +595,21 @@ may change with them.
 - **The other acts** (`stop`, `cancel`, `decide`, ...) take `--key`
   optionally; without it the table draws one, which the small store
   keeps until answered (8.2).
+- **A request carrying a value,** `add-key`'s and `replace-key`'s (5.5,
+  area 5), is sent once and never kept: `jig-client` writes no record of
+  it to DIRECTORY's store and never sends it again (jig's
+  `client/domain/client.md`, section 6; jig's `protocol/client.md`,
+  section 10), and the engine takes the value out as it decodes the
+  request, so no committed request or answer holds it (jig's
+  `domain/accounts.md`, section 5). The client's own answers *unsent*
+  (the engine did not make it) and *lost* (it may have) exit 1 with
+  nothing kept, as a call cut or a link down before its answer does, and
+  `pending` lists nothing of it. The agent asks again with the same
+  `--key` and the same FILE: within the engine's retention, `add-key`
+  gets the first answer, never a second account. `replace-key` takes
+  `--key` optionally, as the other acts do, but the name it draws is not
+  kept, so only a name the agent gives can be asked again; a rerun
+  without one replaces the key again.
 
 ## 8. The command line: `temper ctl`
 
@@ -627,9 +715,14 @@ An agent runs a `wait` while it acts, or several agents share a party.
   role's authority and pool. QA plays several parties this way.
 - **Credentials are files,** private, never arguments, never printed;
   the printed link too, which `sign-in` reads from a file or stdin.
-- **The agent's LLM account is not the tools'.** The deployment's model
-  account is handed in by its configuration, as the owned example has
-  it (`protocol/setup.md`, 8.1; `protocol/credentials.md`, section 3).
+- **The agent's LLM is not the deployment's.** The LLM the agent itself
+  runs on, to drive `temper ctl`, is its harness's. The deployment's
+  runs are paid by jig's LLM accounts, added from the client
+  (`protocol/credentials.md`, section 3): on a box, by the deployment's
+  key the harness adds (section 10), which pays for every party's runs
+  (jig's `domain/accounts.md`, 4.2). An agent acting for a person
+  connects that person's own accounts with area 5's tools, as the
+  person would on the accounts page.
 
 ## 10. The box
 
@@ -640,6 +733,15 @@ harness's:
 - **Started:** `temper box CONFIG.json`; its stdout carries `temper
   serve`'s sign-in links, and the harness passes the first to `temper
   ctl DIRECTORY sign-in -` on stdin.
+- **The deployment's LLM key:** a fresh box has no LLM account, so no
+  run starts (`protocol/credentials.md`, section 3). Once signed in, the
+  harness adds one before the agent's first act: `add-key PROVIDER FILE
+  --deployment --key box-llm`, from a private file of its own, then
+  `wait accounts --until usable` (5.4). The key is QA's own, with limits
+  of its own (`draft/qa.md`, section 7); the agent is never handed its
+  file, and the harness removes the file with the box. On the process
+  tier and in the real loop, it is a key skein's fake LLM peer accepts
+  (`testing.md`, 2.4 and 2.6).
 - **The person on Forgejo:** the harness plays the person of
   `protocol/setup.md`, 6.5: it signs in on Forgejo's web with
   `person_password` and changes it, and makes the repository to adopt
@@ -684,7 +786,17 @@ too large for a page exists only where the engine's bound on a turn
 passes its page bound, so the world's profile sets it so. The world's
 faults hold: a call cut by a link drop or an engine restart, asked
 again under its named key, is made once. Each later area adds its
-stories.
+stories. Area 5's, over the engine root's accounts child with each
+source's mechanism scripted: a key added, then the deployment's,
+`accounts` showing both with no value in DIRECTORY's store or in any
+document the tools print; an `add-key` cut before its answer and asked
+again with its key and file, one account made; a sign-in started, its
+answer scripted made, refused and past its deadline, each meeting
+`wait accounts --until settled`; a limited notice, the next task
+waiting for its account and `task N` saying why, then `retry` and the
+run started; `rank` and
+`forget`; a program source declared, and `verify` answered as each host
+reports.
 
 ### 11.3 The real loop
 
@@ -713,6 +825,27 @@ forge's content marker and its webhooks delivered to the engine
 (`testing.md`, 2.4). Real git waits for the real-git bridge (`testing.md`,
 section 10).
 
+Every story first adds a key the fake LLM peer accepts, `add-key` from
+a scratch file, as section 10's harness does, and waits for `usable`.
+Area 5's stories (`testing.md`, 2.4):
+
+- **A sign-in:** `connect` against skein's fake issuer, the browser's
+  visit and the redirect to the engine's loopback listener driven by the
+  test, then `wait accounts --until settled`, the account usable, and a
+  run on it whose request the peer observes with its bearer.
+- **A limit:** a scripted turn answering with the provider's exhausted,
+  with a reset, makes the source limited, and the next task waits for
+  its account (jig's `domain/authority.md`, 8.3); `retry`, then `wait
+  task N --until phase:running`.
+- **A program's login:** `declare`, with smith's fake `claude` as the
+  agent's program, its login signed in in the source's directory under
+  the agent's programs directory; `verify`, then `wait accounts --until
+  settled`, the source usable on the worker's host, and a run on it
+  through the program backend.
+- **No value kept:** after each, neither DIRECTORY's store nor the
+  engine's store holds a key's or a record's value in a request, an
+  answer or a fact; the secrets' store alone does.
+
 Each call of `temper ctl` in these stories is its host,
 `temper-client-shell-cli`'s, hosted as a program of the real world, one
 per call, on its DIRECTORY: the lock, DIRECTORY's files and the call's
@@ -734,7 +867,9 @@ where possible; its seed does not replay the kernel's schedule.
 `temper serve` and `temper ctl` as processes over skein's fake LLM peer
 (`testing.md`, 2.6), on a scratch directory of their own, for what
 needs the executable: argv through `main`, printed output, the OS's
-exit statuses, the printed link read on stdin (`sign-in -`), an act cut
+exit statuses, the printed link read on stdin (`sign-in -`), the
+deployment's key added from a private file as the first act (section
+10), a key's file refused when it is not private, an act cut
 by a termination signal, its status not 0, then asked again under its
 key, made once, and
 agent process launch. One landing on the owned Forgejo proves a change
@@ -746,7 +881,9 @@ and a call's exit are the real loop's (11.3).
 `temper ctl help` prints a short guide, then the tools from the table:
 how to sign in, the loop of 5.4, naming keys and their prefix, reading
 acts, the exit statuses, reading the forge and never changing it but
-through temper (section 10). The guide is text of `temper-client-tools`; a
+through temper (section 10), and an LLM account's key read from a
+private file, never typed, with a sign-in followed by `wait accounts`
+(5.5, area 5). The guide is text of `temper-client-tools`; a
 test fails when it names a tool the table lacks.
 
 ### 11.6 Findings into stories
@@ -788,6 +925,7 @@ terminal's, whose window shows two rows:
 | a path's segments; an authority's entries | 9; 12, as the terminal's (`client/README.md`, 5.4) |
 | the link's deadline: the engine unreachable, or a call's request or answer unheard | 30 s |
 | the lock's wait | 60 s, tried every 100 ms |
+| a key's file, less a final newline (5.5, area 5) | 4 KiB; past it, or empty, exit 1 with nothing sent; a key the engine refuses is its refusal, exit 2 |
 | a wait's timeout | 300 s by default, at most 3600 (5.4) |
 
 The client's other limits are the terminal's (`client/README.md`, section 2).
@@ -813,6 +951,30 @@ around:
   for one document, and with its size in its place past either; on a
   page, a turn past the page's bound keeps its size as the client
   decodes it.
+
+Area 5 needs four more of jig, which its accounts design brings (jig's
+`domain/accounts.md`, section 5):
+
+- **The accounts' requests,** each of section 5's as a request of the
+  contract (jig's `client/domain/contract.md`, 3.2), with a key as the
+  others. A key's bytes are held to the tools' own bound (section 12);
+  the engine's refusal past its own, if it has one, is exit 2.
+- **A watch of a party's accounts,** `accounts` (jig's
+  `client/domain/contract.md`, 7.1): the accounts that pay for the
+  party's work, their own and the deployment's where its uses cover the
+  party, each with its sources' states, the sign-ins the party asked
+  that are in progress, the checks the party asked that are in progress
+  and how the last of each ended, and the runs and tasks waiting on
+  each. The `deployment` subject is for a deployment role alone and
+  holds no sign-in or check.
+- **The models a party may use** in `me` (jig's
+  `client/domain/contract.md`, 5.3), with each model's efforts and
+  prices, and the LLM choice in a task's request (jig's
+  `domain/tasks.md`, section 3).
+- **A request carrying a value,** sent once and never kept nor resent
+  (jig's `client/domain/client.md`, section 6; jig's
+  `protocol/client.md`, section 10), answered under its key as any
+  other within the engine's retention.
 
 Everything else the tools use is jig's as designed: its helpers
 (`shapes`, `facts`, `thread`, `words`), the documents' acts and `me`'s
@@ -840,6 +1002,13 @@ Each is named here and designed when it comes.
   forge's parts (`client/forge.md`, section 9).
 - **A service's credential reissued, or a service removed** (jig's
   `domain/people.md`, section 3): tools of area 3.
+- **An account moved,** `export ACCOUNT FILE` and `import FILE` (keyed),
+  of area 5, with jig's move (jig's `domain/accounts.md`, section 6): the
+  record written to a private file, refused if the file exists, and read
+  back from one, `import`'s request never kept (section 7). `move` and
+  `take` are area 3's names.
+- **An account's uses** set, as a tool of area 5, when the QA loop asks
+  for one (section 15).
 
 ## 15. Open questions
 
@@ -849,3 +1018,10 @@ Each is named here and designed when it comes.
 - **The one-shot host's place:** temper's, in `temper-client-shell-cli`.
   Default: it moves into `jig-client-shell-native` with the extraction
   (section 14), if jig wants one.
+- **Naming a source** in area 5's `--source S`: by its kind, which
+  names one source while an account holds one of each kind. Default:
+  by kind, and by a program source's name once an account may hold two
+  of a kind.
+- **An account's uses:** no tool, each account taking jig's defaults
+  (jig's `domain/accounts.md`, 4.2). Default: a tool of area 5 once the
+  QA loop plays a service paid by a person's account (section 14).

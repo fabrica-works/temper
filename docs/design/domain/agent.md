@@ -1,6 +1,6 @@
 # The agent
 
-Provisional, 2026-10-05, revised 2026-10-18. temper's agent is smith's:
+Provisional, 2026-10-05, revised 2026-10-19. temper's agent is smith's:
 the standard agent built from smith, the kit for LLM agents, on skein
 like temper. smith's design is its own (smith's `domain/run.md`,
 `domain/session.md`, `domain/tools.md`, `domain/host.md`), and how a
@@ -72,9 +72,13 @@ agent    smith: LLM work, one run per process, reporting to its worker
   shell (`../protocol/README.md`, section 5).
 - **In the worlds:** smith's agent domain over skein's fake LLM, its
   agent processes, and its codecs (section 9).
-- **LLM accounts are jig's,** on skein's accounts driver; their tokens
-  reach a run as grants, through its worker and smith's host half
-  (`../protocol/credentials.md`, section 3).
+- **LLM accounts are jig's,** made from the client, on skein's accounts
+  driver. A run's grants reach it through its worker and smith's host
+  half: for each LLM provider it uses, a credential with its scheme, or
+  a program source's name, whose login the host checks and the program
+  reads (`../protocol/credentials.md`, section 3; jig's
+  `protocol/llm.md`, section 6). The agent runs the loop itself, or
+  through the program (smith's `protocol/programs.md`, section 2).
 
 ## 4. temper's charter
 
@@ -211,10 +215,15 @@ Checks at `.temper/pre-pr`, guides at `AGENTS.md` (smith's
   reserved at its claim, in the deployment's unit (jig's
   `domain/hosts.md`, section 8).
 - **Models:** the main session's and those its sub-agents may use, each
-  with its endpoint, account, window, output and prices
-  (`../protocol/llm.md`, section 3). Their credentials come to the agent
-  as grants through the worker (`../protocol/credentials.md`,
-  section 3).
+  with its endpoint, window, output and prices (`../protocol/llm.md`,
+  section 3): the task's LLM choice among those its charter allows,
+  without one the charter's first whose LLM provider has an account
+  usable for the payer (jig's `domain/tasks.md`, section 3),
+  and the account the run's claim chose for each LLM provider (jig's
+  `domain/accounts.md`, 4.3). Their credentials, or a program source's
+  name, come to the agent as grants through the worker
+  (`../protocol/credentials.md`, section 3). A run on a program has no
+  sub-agents (smith's `protocol/programs.md`, section 2).
 - **Waiting and resuming:** the waiting time is the charter's; a
   coordinator's is zero. A chat resumes its transcript, and a
   coordinator starts fresh from its brief (jig's `domain/engine.md`,
