@@ -41,13 +41,20 @@ impl fmt::Debug for Event {
 }
 pub(crate) type History = Rc<RefCell<Vec<(u32, Event)>>>;
 pub(crate) fn saved(history: &History) -> std::collections::BTreeSet<[u8; 16]> {
-    let mut saved = std::collections::BTreeSet::new();
-    for (_, event) in history.borrow().iter() {
-        if let Event::Sync { directory: true, table } = event {
-            saved = table.iter().map(|entry| entry.key).collect();
-        }
-    }
-    saved
+    // Each directory sync records the complete table; only the latest one
+    // determines the saved keys, including when that table is empty.
+    history
+        .borrow()
+        .iter()
+        .rev()
+        .find_map(|(_, event)| match event {
+            Event::Sync { directory: true, table } => Some(table.iter().map(|entry| entry.key).collect()),
+            Event::Write { .. }
+            | Event::Sync { directory: false, .. }
+            | Event::Rename { .. }
+            | Event::Restored { .. } => None,
+        })
+        .unwrap_or_default()
 }
 pub(crate) struct Cache {
     names: BTreeMap<i32, Vec<u8>>,

@@ -46,6 +46,7 @@ pub(crate) struct Referee {
     acknowledged: restart::Records,
     uncertain: Option<restart::Records>,
     applied: u64,
+    settled_at: Option<u64>,
     committed: Store,
     agent_seen: usize,
     client_seen: usize,
@@ -125,6 +126,7 @@ impl Referee {
             acknowledged: restart::forge(&committed.rows),
             uncertain: None,
             applied,
+            settled_at: None,
             committed,
             agent_seen: 0,
             client_seen: 0,
@@ -240,6 +242,7 @@ impl skein_world::Referee<Proc> for Referee {
                     .map(|pending| restart::next(&self.committed.rows, &pending.writes));
                 self.say(now, rules::Observed::Restart);
                 self.store.borrow_mut().recovering();
+                self.settled_at = None;
                 self.cold = Some(());
                 self.handed = false;
                 self.agent_seen = 0;
@@ -272,7 +275,7 @@ impl skein_world::Referee<Proc> for Referee {
             crate::world::Phase::Drain => {
                 snapshot(&self.store.borrow()).receipts.contains(&rules::Receipt::Turn(1, 1, 1))
             }
-            crate::world::Phase::Restart => settled(&self.store.borrow()) > 0 && self.cold.is_none(),
+            crate::world::Phase::Restart => self.run.borrow().settled > 0 && self.cold.is_none(),
             crate::world::Phase::Fault { .. } => {
                 self.run.borrow().restarts > 0
                     && self.cold.is_none()
@@ -350,7 +353,14 @@ impl skein_world::Referee<Proc> for Referee {
             self.say(now, rules::Observed::ColdStore { receipts });
             self.cold = None;
         }
-        self.run.borrow_mut().settled = settled(&self.store.borrow());
+        // Only durable commits change these rows. Preserve the check at each
+        // observation without scanning the same map again between commits.
+        let store = self.store.borrow();
+        if self.settled_at != Some(store.applied) {
+            self.run.borrow_mut().settled = settled(&store);
+            self.settled_at = Some(store.applied);
+        }
+        drop(store);
         for event in &service.wire.events[self.agent_seen..] {
             self.say(now, event.clone());
         }
@@ -401,9 +411,6 @@ impl skein_world::Referee<Proc> for Referee {
             self.say(now, rules::Observed::Drained { at: self.applied });
             self.drained = Some(());
             self.run.borrow_mut().drained = true;
-        }
-        if self.cold.is_none() {
-            self.run.borrow_mut().settled = settled(&self.store.borrow());
         }
         self.say(now, rules::Observed::Tick);
     }
