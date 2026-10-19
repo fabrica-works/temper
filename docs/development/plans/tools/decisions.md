@@ -416,6 +416,15 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
      - `git -C ~/src/rust/temper grep -n map_err origin/main -- clippy.toml`: 120 `{ path = "core::result::Result::map_err", reason = "no closures: match" }`.
      - temper/03-tools-root.md:62: `golden(name)` (reads `src/tests/golden/NAME.txt`), in 03.2's `src/tests/fixtures.rs`; temper/02-tools-table.md:369: `Usage` has `Json`.
 
+116. **The check of 05:45: setups, rows and lint exceptions** (steer of 2026-10-19T05:45:56Z).
+     The check of 2026-10-19T05:45:56Z adds two rules to the README's "Rules of this plan": "A setup written once, and rows carry data", for each test an increment adds or edits, with jig's `read_activity.rs` and `requests.rs` mended by the first increment that edits them; and "No lint exception for a plan's words". temper/02-tools-table.md, 02.1's Test shape, now reads the sources by relative paths, as temper-box's boundary test does: ruling 113's `env!("CARGO_MANIFEST_DIR")` is a call clippy.toml bans, and temper 02.1 landed it under `#[expect(clippy::disallowed_macros)]`; the next temper 02 increment removes both. Reverses: ruling 113 of 2026-10-19T05:41:43Z, its `CARGO_MANIFEST_DIR` sentence.
+
+     Checked:
+     - `git -C ~/src/rust/temper grep -n core::env origin/main -- clippy.toml`: 94 `{ path = "core::env", reason = "behaviour does not depend on the build environment" }`.
+     - `git -C ~/src/rust/temper show 72a96c022:crates/temper-client-tools/src/tests/fixtures.rs`: `#[expect(clippy::disallowed_macros, reason = "the boundary fixture reads this crate's source tree")]` above `pub(super) fn sources()`, `Path::new(env!("CARGO_MANIFEST_DIR"))`.
+     - `git -C ~/src/rust/temper grep -n '"src' origin/main -- crates/temper-box/src/tests/boundary.rs`: 53 `pending.push(std::path::PathBuf::from("src"))`.
+     - testing-strategy.md, 10: "Rows carry data" (546), "A setup written once" (555), "Named fixtures and sizes" (561), "A bound's two sides" (573).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

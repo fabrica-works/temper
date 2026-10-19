@@ -128,7 +128,8 @@ Shape:
   `key::TOOLS` and `key::engine` use it.
 Test shape: `src/tests/{boundary,limits,key}.rs`; fixtures `name(&[u8])`
 and `sources()`, reading `src/jig.rs` and `src/jig/**` under
-`env!("CARGO_MANIFEST_DIR")` (temper-box's boundary test walks a relative `src` instead). Reference tests:
+relative paths, as temper-box's boundary test walks a relative `src`: cargo runs a test from its package's root, and
+clippy.toml bans `core::env`, so no `env!` and no lint exception. Reference tests:
 ```rust
 #[test]
 fn each_ceiling_is_within_the_client_limit_it_reads_from() {

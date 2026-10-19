@@ -197,6 +197,24 @@ should move the pin and repair nothing (findings/base-repin.md).
   named const with a line on how its number is derived. The first
   increment that edits `stories/job_stories.rs` moves its own `turn`,
   `call` and `result` (jig-01.2) there too.
+- **A setup written once, and rows carry data** (testing-strategy.md,
+  10: "Rows carry data", "A setup written once", "Named fixtures and
+  sizes", "A bound's two sides"). An opener or destructuring two tests of
+  a file share is one helper of its fixtures; a size an assertion reads
+  is a named const; a table's row carries the value it varies (a
+  `load_bytes: u32`), never a flag that switches the setup; a bound is
+  tested on both sides. It holds for each test an increment adds or
+  edits. jig's `crates/jig-domain-core/src/tests/read_activity.rs` (its
+  `tiny` row and its three-line opener) and
+  `crates/jig-client-domain/src/tests/requests.rs` (its save-then-send
+  destructuring) are mended by the first increment that edits them,
+  said in its commit body.
+- **No lint exception for a plan's words.** A Shape or sketch that needs
+  a call clippy.toml bans is a question, raised before any `#[expect]`;
+  each new `#[expect]` or `#[allow]` is named in the report. temper's
+  `crates/temper-client-tools/src/tests/fixtures.rs` `sources()` drops
+  its `#[expect(clippy::disallowed_macros)]` and `env!` for relative
+  paths in the next temper 02 increment, said in its commit body.
 
 ## Hotspots
 
