@@ -156,6 +156,8 @@ Shape:
   - Allowed: its call. A keyed tool's call ends ` --key NAME`.
   - Proposed: the call, then ` (proposed to <recipient>)`.
   - Refused: the act's name and why, in jig's words, with no call.
+  - No tool in tools.md, 5.3 (decisions.md, M): its name in the tools' words, then ` (no tool)`, with no call and no
+    admission. JSON prints the document's offers as this Shape says.
   - Bounded (ruling 119; jig's `Admission::Bounded { within: Bounds, beyond: Beyond }`): its call, then the bounds a draft is
     compared with (`within`, printed whole, as tools.md, 6.4, prints an authority), then beyond them ` (proposed to <recipient>)` for
     `Beyond::Proposed`, or `refused beyond them: <why>`, in jig's words, for `Beyond::Refused`. tools.md, 4: "each act made,
@@ -176,7 +178,7 @@ Test shape:
   ```
 - Tests, each under 20 ms:
   - `a_task_read_prints_its_header_fields_and_acts_as_calls`, `a_proposable_act_says_to_whom_and_a_refused_one_why`,
-    `a_keyed_acts_call_ends_with_key_name`, `me_prints_the_live_frame_in_text_and_json`,
+    `a_keyed_acts_call_ends_with_key_name`, `an_act_with_no_tool_prints_its_name_and_no_call`, `me_prints_the_live_frame_in_text_and_json`,
     `no_call_runs_before_me_is_live`, `each_read_none_exits_as_the_table_says`,
     `a_result_past_the_text_limit_says_how_much_is_left`;
   - in `src/tests/root.rs`, with the same shipped limits: `the_root_routes_by_asker_and_tells_no_child_of_an_unknown_one`,

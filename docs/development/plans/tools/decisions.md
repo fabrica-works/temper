@@ -623,6 +623,21 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
 126. **temper 03.2: offered acts with no tool, interim** (design, temper 03.2's block of 2026-10-19 08:58:21 UTC).
      Interim, until decisions.md, For the user, M, is decided: what `task N`'s text prints for an offered act with no tool in tools.md, 5.3 (Take, HandBack, Amend, Move, Reorder, Seen, EditNote, DeleteNote, ChangePolicy, SetRoles, MakeService, SetPool, Withdraw) is a design gap, and waits; it goes to the user as M, as no designer is joined. temper 03.2 goes on with everything else: the root, the runner, routing, `me`, JSON, the exits, and every offered act that has a tool, printed as its Shape says (Message, Answer, Accept, Reject, PassUp, LeaveHeld, Release, Stop, Cancel, Adopt). Its tests and goldens use documents whose offered acts all have tools; the arm for an act with no tool is the one part that waits, and no call names a tool that 5.3 lacks. 03.2 does not land before the ruling on M reaches it. A further act kind with no tool: treat it as these, and list it in the commit body.
 
+127. **temper 03.2: offered acts with no tool** (decision M, for temper 03.2's block of 2026-10-19 08:58:21 UTC).
+     decisions.md, For the user, M, decided by the director for the user (temper 545b65a8a), the default, ruled into temper 03.2: `task N`'s `acts:` prints an offered act with no tool in tools.md, 5.3 (Take, HandBack, Amend, Move, Reorder, Seen, EditNote, DeleteNote, ChangePolicy, SetRoles, MakeService, SetPool, Withdraw) by its name in the tools' words, then ` (no tool)`, in the document's order, with no call and no admission; JSON prints the document's offers as 03.2's Shape says. temper/03-tools-root.md, 03.2's Shape, gains that bullet beside Refused, and its tests `an_act_with_no_tool_prints_its_name_and_no_call`; later.md gains tools.md, 6.1's sentence, for the designer's next pass. This ends ruling 126's wait: 03.2 lands once its arm does this. A further act kind with no tool prints the same way; list it in the commit body.
+
+     ## Checked
+
+     - `git -C ~/src/rust/temper show 545b65a8a:docs/development/plans/tools/decisions.md | grep -n -A3 'Decision: the default, by director, 2026-10-19: an offered act'`:
+         795:  Decision: the default, by director, 2026-10-19: an offered act with no
+         796-  tool prints its name in the tools' words and ` (no tool)`, in the
+         797-  document's order, with no call and no admission. JSON prints the
+         798-  document's offers as 03.2 says. The agent learns the act exists and can
+     - `git -C jig show origin/main:crates/jig-client-domain/src/contract/documents.rs | sed -n '/^pub enum ActKind/,/^}/p' | grep -E '^    [A-Z]' | tr -d ' \n'`:
+         Message,Answer,Take,HandBack,Accept,Reject,PassUp,Release,LeaveHeld,Amend,Stop,Cancel,Move,Reorder,Seen,EditNote,DeleteNote,Adopt,ChangePolicy,SetRoles,MakeService,SetPool,Withdraw,
+     - `git -C temper show origin/main:docs/design/tools.md | sed -n '/^### 5.3/,/^### 5.4/p' | grep '^| `' | grep -o '`[A-Z][a-zA-Z]*`' | sort -u | tr '\n' ' '`:
+         `Answer` `Cancel` `Create` `Decide` `Message` `Release` `Stop` 
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
