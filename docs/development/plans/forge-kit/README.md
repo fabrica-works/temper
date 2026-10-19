@@ -51,6 +51,7 @@ more says so in its row and its file. Dependencies are by capability:
 | File | Session | Needs at start | Increments that need more |
 |---|---|---|---|
 | `skein/01-forge.md` | skein 01: `skein-forge`: the vocabulary, Forgejo's dialect, its call plans on plain bounds with keys' markers on the owner's word, the start's two reads, credentials' kinds and `host` | nothing | 01.3: temper 01.1, 01.2; 01.4: temper 01.3 |
+| `skein/01.s1-test-shapes.md` | skein 01.s1: sampled unit test shapes and fixture costs (ruling 118) | skein 01.4 | |
 | `skein/02-client.md` | skein 02: `skein-forge-client`: the client moved, effects' keys on the owner's namespace; the measure, the dialect's and the client's (decision 24); the design's differences; the tests section 10 asks for | temper 01.1 | 02.2: skein 01.3 |
 | `skein/03-connection.md` | skein 03: `skein-forge-connection`: the component moved, on plain numbers, the owner's values and the transport's name; the head check counts the user agent; the checks at their bounds; page sizes on the measure | temper 01.4 | 03.3: skein 02.2 |
 | `skein/04-setup.md` | skein 04: `skein-forge-setup`: reconcile's machine moved, on the owner's given values and the kit's item; the design's differences; section 7's step tests | temper 01.2 | 04.1: skein 01.3 |
@@ -73,7 +74,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `temper/06-throwaway.md` | temper 06: temper's process tier, tools and conformance on skein's throwaway; temper's deleted; the conformance on skein-json (decision 27) | skein 06.1 | |
 | `temper/07-worlds.md` | temper 07: the moved worlds, the dialect's tests and the conformance with its transcripts deleted from temper; the protocol world keeps temper's own tests (decision 22) | skein 06.3; temper 06.1 | the client's world: skein 07.1; setup's: skein 07.3; the component's: skein 08.1 and 09.1; 07.1: temper 05.2 |
 
-17 sessions: skein 10, temper 7. The brief's fifth step, the fakes and
+17 original sessions: skein 10, temper 7; plus the test supplement skein 01.s1. The brief's fifth step, the fakes and
 the conformance, is skein 05 to 09 and temper 05 to 07, by size. The
 increments per session are in each file.
 
@@ -110,6 +111,13 @@ also waits for temper 05.2, behind skein 05.5 (decision 26): a shorter
 chain.
 
 ## Rules of this plan
+
+- **The hourly test supplement:** new tests follow testing-strategy.md 10.
+  Only `skein/01.s1-test-shapes.md` may split its five named preserved tests,
+  after the source moves; it retains every assertion case with an old/new
+  mapping. Its fixture-limit audit governs those sampled unit defaults;
+  shipped/profile values and boundary coverage stay. All other move-preservation
+  rules remain. The closing temper repin also waits for skein 01.s1.
 
 
 
