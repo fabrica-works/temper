@@ -291,6 +291,12 @@ pass:
      - **Every later step goes on** within its own guide and Proof bound, and gives its measures as its session file says. A step that would move a test to the fuzzy suite, or make an existing one cheaper, for the aggregate's sake, waits for the answer: that is the answer's to name.
      - Size: 08.2's 458 lines against ~300 land without asking (development.md, 8.6's rule: within its Files and ruling 104's edit).
 
+110. **temper 06.1: a budget to find why Online is unmet** (plan defect, temper 06's block of 2026-10-19T14:25:21Z).
+     Plan defect: ruling 108 told 06.1 to raise an unmet `Online` rather than find its cause, and implementer.md, 8.7 allows a failing test "at most three times for it, or within the budget a step to find a cause names": 06.1's three runs went to the `Steps(1)` stall. The same block twice (`Online(ClientId(0))` unmet, 14:17:55Z and 14:25:21Z) becomes the README's rule "A world failure's cause, within a budget": eight more runs and 40 minutes per unnamed symptom, in its world through `heavy`, diagnostics removed before the commit; a fix within the step's Files and rulings needs no question.
+
+     - **06.1 finds why the agent's link is not shown `Live` by 0.5 s,** within that budget, from now. Where to look first, in this order: whether `root.client().link().state` ever leaves `SignedOut`/`Starting` after `StartUnlinked` and `SignIn { with: With::Transport }` (the person's arm also steps `domain::Event::Start` after them, the agent's `Event::Start` only those two); whether the agent's requests reach the `Joint` as the person's do (`duty` of its `Request::Client`, the front's bind for its `ClientId` and party); whether `build` emits patches when the state changes (the world shows a tree only then, after `take`, in each callback).
+     - A fix within 06.1's Files and rulings 103, 107 and 108 lands without a question. Past the budget, or for a fix outside them (jig, the tools' crate beyond `Root::unlinked`), raise it with the cause found, or each run's finding.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

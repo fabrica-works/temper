@@ -130,6 +130,13 @@ plan's own.
   three times, and gives the median wall time in its commit body. A story
   over its 1 s aim is made cheaper or moved to the fuzzy profile, never
   merged with another and never excepted; what it waits on is named.
+- **A world failure's cause, within a budget** (ruling 110;
+  implementer.md, 8.7 and 8.8). A focused world test that fails with a
+  symptom its three diagnostic runs did not name gets eight more runs
+  and 40 minutes for that symptom, reproduced in its world through
+  `heavy`, diagnostics removed before the commit. A fix within the step's
+  Files and rulings needs no question; past the budget, or for a fix
+  outside them, raise it with the cause found, or each run's finding.
 - **No optimized test builds and no change to Cargo's `[profile.*]`**
   (testing-strategy.md, 8). A slow test is profiled and fixed in the
   code or the test.
