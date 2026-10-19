@@ -99,10 +99,11 @@ Shape:
    - JIG_TOOLS is the ledger's landing commit containing every `jig-02.*`, `jig-03.*` and `jig-05.*` step and proof; the three final landings are its ancestors.
    - `git -C ~/src/rust/jig show JIG_TOOLS:Cargo.lock` names one skein, SKEIN01.
    - Through `heavy`: `cargo update -p jig-domain-core --precise JIG_TOOLS`.
-   - skein (ruling 119): temper's own pin at the step's start stays where it descends from SKEIN01 (at temper a6f34f6af,
-     `0db7b1fc7307aa50980ce75637e686e384adc4e4`, a descendant of jig 590015b4's `93052c6b`): where the jig update moved it,
+   - skein (ruling 119): temper's own pin at the step's start stays where it descends from SKEIN01 (at temper e10aa299f,
+     `378fd8cfdeb2af90261b8710b60fc91d70131792`, 33 packages, where forge-kit's temper-05.1 moved it from `0db7b1fc`; a
+     descendant of SKEIN01, jig 872bfb7c's `93052c6b`): where the jig update moved it,
      `cargo update -p skein-lib --precise <that full hash>`. Where it does not descend, `--precise SKEIN01`.
-   - smith (ruling 119): one revision, the newest temper's `Cargo.lock` holds at the step's start (at temper a6f34f6af,
+   - smith (ruling 119): one revision, the newest temper's `Cargo.lock` holds at the step's start (at temper e10aa299f,
      `538ef49a574bbaf02d57a85cc2b02d0abf1d4e3b`, 19 packages, beside `a277e922`'s 9; the two differ in nothing under
      `crates/`): `cargo update -p smith-domain --precise <that full hash>`; where cargo calls the name ambiguous, use the
      package spec its error lists.

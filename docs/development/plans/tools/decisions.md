@@ -472,6 +472,16 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
      Checked:
      - `git -C ~/src/rust/jig grep -n -E 'fn an_aged_span_is_beyond_its_accepter_and_passed_up|fn a_resolved_span_beyond_the_creator_is_refused|const SPAN|const CREATED' origin/main -- tests/core` (jig c0142dc2): `tests/deadline_spans.rs:66` and `:79`, the two tests; `src/fixtures/deadlines.rs:9` `pub const SPAN`, `:42` `pub const CREATED: u64 = 2`.
 
+123. **temper-03.1's re-check against main** (re-check of temper-03.1, started 08:21:53Z).
+     temper 03.1, started at 08:21:53Z, re-checked against what moved since its check (skein c551a66, smith c241a7a4, jig 590015b4, temper a6f34f6af): its Shape stands but for step 1's skein hash. forge-kit's temper-05.1 moved temper's skein pin from `0db7b1fc` to `378fd8cfdeb2af90261b8710b60fc91d70131792` (33 packages), a descendant of SKEIN01 (`93052c6b`, the one skein of jig 872bfb7c's `Cargo.lock`, the landing of jig-05.5). Step 1's rule, keep temper's own pin where it descends from SKEIN01, now keeps `378fd8cf`: where the jig update moves it, `heavy cargo update -p skein-lib --precise 378fd8cfdeb2af90261b8710b60fc91d70131792`, never `0db7b1fc`, the pin before forge-kit's repin. temper/03-tools-root.md, 03.1, step 1, names it. smith's `538ef49a` stands. jig 05.4 took `now` from `shapes::chat` and `shapes::set_goal` and gave `shapes::fall` a `deadline`; temper calls only `chat`, in `Chats::start`, as step 5 has it. A further copy of the old hash: replace it with `378fd8cf`, and list it in the commit body.
+
+     ## Checked
+
+     - `git show <temper>:Cargo.lock | grep -o 'git+…forgetic/[a-z]*.git#[0-9a-f]*' | sort | uniq -c`: at a6f34f6af skein `0db7b1fc…` ×30; at origin/main (e10aa299f) skein `378fd8cf…` ×33; smith `538ef49a…` ×19 and `a277e922…` ×9 at both.
+     - `git merge-base --is-ancestor 93052c6b 378fd8cf` (skein): true. jig origin/main 872bfb7c's lock: skein `93052c6b…` ×34 only.
+     - `git log a6f34f6af..origin/main -- Cargo.lock` (temper): 9c8e5a2f8 "Repin skein before moving temper's fake forge users", Plan: forge-kit, Step: temper-05.1.
+     - `git diff 590015b4 origin/main -- crates/jig-client/src/shapes.rs` (jig): `chat(me, project, words)`, `set_goal(me, project, draft, reason)`, `fall(creating, draft, deadline)`; `git grep -nE 'set_goal\(|shapes::fall|\bfall\('` in temper's crates, tests, testing: none; `shapes::chat` at `crates/temper-client-domain/src/pages/chats.rs` only.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
