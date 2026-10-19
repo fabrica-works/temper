@@ -444,6 +444,16 @@ where its answer lands.
 
      Checked with codebase-memory-mcp index_status: srv-data-git-runner-src-skein indexed_at 2026-10-19T05:04:07Z; srv-data-git-runner-src-temper indexed_at 2026-10-19T05:04:37Z, both ready at their exact primary roots. git log -1 --format='%H %cI' origin/main gives skein 7436461f0fce6d0178c483f3b631e1a4db5fc343 at 2026-10-19T06:11:49Z, temper 037991de0b1b14a1e474bc9ca2766f4d49befcd6 at 2026-10-19T06:20:59Z. Both postdate their indexes. Commands plan ruling/ring are present in kit/scripts/dev/plan, dispatch lines 669 and 671.
 
+112. **temper 02's Shapes against main** (ready check of temper-02.1).
+     Reverses: nothing.
+     Amends: temper/02-client.md Needs at start and 02.1 Needs; README's temper 02 session row.
+
+     Temper 02.1 requires temper 01.3 as well as skein 02.2. The measure cutover in its repin changes protocol size expectations only after temper's component uses skein's call plans. Retain the existing three expectation changes, bounds, assertions and four-commit shape. Refresh further dependency copies if found and list them in the commit body.
+
+     Checked skein 0db7b1fc7307aa50980ce75637e686e384adc4e4 and temper 2a141e6d5d33a527be329a0aa0f8a9f771948023. git show temper origin/main:crates/temper-engine-protocol-forge/src/reads/size.rs shows files_size using size_of::<api::File>(); contents.rs::Plan::row likewise accumulates the local file width. The existing temper/01-forge.md 01.3 deletes those local plan modules and imports skein_forge::forgejo::plans::plan::{Plan,Step,Bounds}. That prerequisite supplies the plans changed by skein 02.2; it introduces no dependency cycle. Searches across all five repositories found no additional consumer correction.
+
+     The scratch planned-value probe reproduces the absent prerequisite: two contents assertions fail, 52 versus 68, and the 4032-byte side remains accepted. Restored protocol baseline passes 117 focused tests; fuzzy selects none. Clippy passes for four reached packages, and the client/connector/client-world suites pass 130 focused and 2 fuzzy tests. Future key/measure implementations, actual migration/deletion, full joint/process/gate/browser proofs remain unrun until their declared steps. Evidence: pump/ready-temper-02.md and scratch-ready-temper-02/evidence/report.txt. This check does not hold any already running session.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

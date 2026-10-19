@@ -8,8 +8,8 @@ the repin, the purposes, the client's users and the deletion land together,
 in four commits.
 
 **Needs at start:** **skein 02.2** on skein's `origin/main` (README): the
-client with `effect_key` (02.1) and the measure (02.2, decision 24); skein
-02 needs temper 01.1. Skein 02.3 and 02.4 may or may not have landed; the repin
+client with `effect_key` (02.1) and the measure (02.2, decision 24); and
+**temper 01.3**, the component on skein's call plans. Skein 02 needs temper 01.1. Skein 02.3 and 02.4 may or may not have landed; the repin
 repairs what they break (02.1, Shape).
 
 ## Read first
@@ -58,7 +58,7 @@ repairs what they break (02.1, Shape).
 ### 02.1 The repin, the purposes, the client's users, the deletion
 
 Scope: forge-client 7.1 and forge 2.3, 3.7; domain/forge 5 and 6.
-Needs: skein 02.2 on `origin/main` (README). Skein 02.3's `bind_deployment`
+Needs: skein 02.2 and temper 01.3 on `origin/main` (README). Skein 02.3's `bind_deployment`
   guard and 02.4's frame checks may be on it; if they are, the repin commit
   repairs the two places below.
 Files: Cargo.toml (root: delete the member `crates/temper-engine-domain-forge-client`

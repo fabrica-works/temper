@@ -66,7 +66,7 @@ more says so in its row and its file. Dependencies are by capability:
 | File | Session | Needs at start | Increments that need more |
 |---|---|---|---|
 | `temper/01-forge.md` | temper 01: temper on `skein-forge`: the vocabulary's and the dialect's users moved, temper-forge-forgejo deleted, the component on skein's plans and start reads, temper's word handed | skein 01.1; the tools plan's first repin (Rules) | 01.2: skein 01.2; 01.3: skein 01.3; 01.4: skein 01.4 |
-| `temper/02-client.md` | temper 02: temper on `skein-forge-client` and the measure; temper's client deleted; effects' purposes in temper's connector | skein 02.2 | |
+| `temper/02-client.md` | temper 02: temper on `skein-forge-client` and the measure; temper's client deleted; effects' purposes in temper's connector | skein 02.2, temper 01.3 | |
 | `temper/03-connection.md` | temper 03: temper on `skein-forge-connection`; the component's crate deleted; temper-service hands the word, the user agent, the transport's name and the limits; the new refusals mapped | skein 03.1, temper 02.1 | 03.2: skein 03.3 |
 | `temper/04-setup.md` | temper 04: temper on `skein-forge-setup`; reconcile's modules deleted; temper's setup hands its values | skein 04.1 | |
 | `temper/05-fakes.md` | temper 05: temper on skein's fakes, temper's deleted; the one-process world on skein's forge peer | skein 05.2 | 05.2: skein 05.5 |
