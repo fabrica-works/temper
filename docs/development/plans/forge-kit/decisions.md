@@ -462,6 +462,16 @@ where its answer lands.
 
      Checked codebase-memory-mcp index_status: srv-data-git-runner-src-skein is ready, root /srv/data/git/runner/src/skein, indexed_at 2026-10-19T06:22:53Z; srv-data-git-runner-src-temper is ready, root /srv/data/git/runner/src/temper, indexed_at 2026-10-19T06:25:11Z. git -C /srv/data/git/runner/src/skein log -1 --format='%H %cI' origin/main gives 7436461f0fce6d0178c483f3b631e1a4db5fc343 at 06:11:49Z; the same command for temper gives 280efe4fc91554f5fb226ea3c0b85090cb90b47b at 06:23:32Z. Both HEADs equal those origin/main commits; git diff --name-only HEAD origin/main -- crates testing tests tools Cargo.toml Cargo.lock prints nothing in both. Indexing postdates those snapshots. Preserve source searches for documented parser gaps and later worktree changes. The kit remains d6d4abe.
 
+114. **temper 04's Shapes against main** (ready check of temper-04.1).
+     Reverses: nothing.
+     Amends: temper/04-setup.md, sketch A, temper_forge_setup_shell::reconcile::Settings::documents.
+
+     Correct the sketch's documents field to skein_forge::forgejo::limits::Limits. Temper 01.2 has deleted the old dialect crate; the landed shell already uses that skein type. No other field, behavior, bound, assertion or prerequisite changes. Refresh any further copy and list it in the commit body.
+
+     Checked skein 7436461f0fce6d0178c483f3b631e1a4db5fc343 and temper 52eba416314f30a384bdf24902ec31cb08c00ad5. Graph search_graph(project=srv-data-git-runner-src-temper,name_pattern=documents,file_pattern=*reconcile.rs) locates Settings::documents in crates/temper-forge-setup-shell/src/reconcile.rs. rg -n 'documents|limits::Limits' there confirms `pub documents: skein_forge::forgejo::limits::Limits`. The all-increment name/copy/derived-value search across five repositories found no omitted consumer. Missing setup APIs belong to declared skein 04.1 or temper 04.1–04.3 additions.
+
+     Scratch exact-commit repin and workspace/all-target check pass without source repairs. Corrected fragment and five reached packages pass clippy; sequential suites pass 237 focused and 1 fuzzy, 0.887/0.579 s; the seven-command startup test passes in 0.242 s in the exclusive lane. Future behavior, complete cutovers, full gate and process/live proofs remain unrun. Evidence: pump/ready-temper-04.md and scratch-ready-temper-04/report.txt. Scratch source/logs remain; completed targets were released.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

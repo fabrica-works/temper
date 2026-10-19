@@ -311,7 +311,7 @@ pub struct Settings {
     pub directory: PathBuf, pub admin_token: PathBuf,
     pub token_bytes: u32, pub hook_secret_bytes: u32,
     pub http: skein_http::client::Limits,
-    pub documents: temper_forge_forgejo::limits::Limits, pub io: skein_io::Limits,
+    pub documents: skein_forge::forgejo::limits::Limits, pub io: skein_io::Limits,
 }
 /// Terminal host refusals, sent to the command's diagnostic renderer.
 pub enum Refused {
