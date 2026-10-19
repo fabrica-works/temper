@@ -11,4 +11,5 @@ pub mod runner;
 pub mod subject;
 pub use runner::Printed;
 
+pub mod conditions;
 pub mod help;
