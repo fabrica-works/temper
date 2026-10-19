@@ -232,7 +232,8 @@ Files: new `crates/temper-service/src/clients/policy.rs` (`pub(crate) mod policy
 users of the terminal's limits, which read `native()`: `crates/temper/src/open.rs`, `tests/one-process/src/fixtures.rs`
 and `stories.rs` (`client_limits`), `tests/one-process/src/referee/client.rs`, `crates/temper/tests/support/person.rs`,
 `crates/temper/tests/configuration.rs`, `crates/temper-client-tools/src/tests/limits.rs`. Unchanged users of the CLI's:
-its `host.rs` (`native()`, `transport`), `signing.rs` (`settings`), `src/tests.rs` and `src/tests/fixtures/recovery.rs`.
+its `host.rs` (`native()`, `transport`), `signing.rs` (`settings`), `src/tests.rs` and `src/tests/fixtures/recovery.rs`,
+and `pending.rs` and `src/tests/fixtures/local.rs`, which read the domain's limits alone (temper `fa7c66141`).
 Neither shell has a unit test that reads `headers`, so neither gains one.
 Shape: `policy.rs` copies jig's `policy.rs`, cited: `FIELDS` and `add`, which appends each field the response lacks, its
 name compared ignoring case. `Server::answer` takes `mut request` and calls `crate::clients::policy::add` on a
