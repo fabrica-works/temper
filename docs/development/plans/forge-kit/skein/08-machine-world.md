@@ -47,7 +47,9 @@ Files: at the base, temper `tests/engine/protocol-forge/src/{machine,hooks,peer,
   Copy the used fixtures.rs parts and `tests/engine/forge/src/world.rs::fake_config` into its sole
   src/fixtures.rs. New Cargo.toml/lib.rs; shared hotspots: skein Cargo.toml (member/dependency) and
   Cargo.lock.
-Shape: package `skein-forge-machine-world`; retain Machine, Listener, Joint, Peer, Pipe, Cut,
+Shape: set `license.workspace = true` in the new Cargo.toml's `[package]`, beside its other
+  workspace-inherited fields (README, Workspace license inheritance).
+  Package `skein-forge-machine-world`; retain Machine, Listener, Joint, Peer, Pipe, Cut,
   Answer/Response/Connect, signatures and algorithms. Public modules fixtures, machine, hooks, pipe, joint;
   peer stays private. Keep `Pipe::new(seed: u64, cut: Cut) -> Self`, `fake_limits() ->
   skein_fake_forge_protocol::Limits` and `fake_config() -> skein_fake_forge_domain::Config` available to

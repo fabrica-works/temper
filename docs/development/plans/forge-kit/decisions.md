@@ -1247,6 +1247,19 @@ where its answer lands.
         contract does not admit wherever the tasks child admits a result"; its check
         has a later.md row and jig STATUS.md's.
 
+167. **Require inherited licenses in new workspace members** (director instruction, 2026-10-19).
+     The director’s 2026-10-19 instruction requires every new skein or smith workspace member to put `license.workspace = true` in `[package]`, beside its other workspace-inherited fields. This applies to moved crates as well as newly written crates; no gate checks it yet. Jig and temper follow when accounts licenses their workspaces.
+
+     Add README’s standing **Workspace license inheritance** rule and state the manifest requirement in every remaining member-adding increment: skein06.2 (`tests/forge/conformance/Cargo.toml`), 07.1 (`tests/forge/client/Cargo.toml`), 07.3 (`tests/forge/setup/Cargo.toml`), 08.1 (`tests/forge/machine/Cargo.toml`) and 09.1 (`tests/forge/protocol/Cargo.toml`). Forge-kit adds no smith member. The already-landed skein members were included in the director’s license change; their historical creation steps need no replay. Preserve inherited metadata when refreshing a destination manifest, refresh any further reached member and list it in the commit body.
+
+     This is plan metadata scope only: no new step, gate, repin, runtime behavior, proof count, budget or start hold. Existing Cargo source rules, independent proof obligations and the unanswered process-tree question remain in force.
+
+     Checked:
+     - `git -C skein show --format=fuller --no-patch 1222e7b` identifies `1222e7b73ff33d446e68cd364b8370a6df5207a9`, “License the workspace and all members under MIT”, with `Plan: accounts`, `Step: skein-01.1`; `git -C skein merge-base --is-ancestor 1222e7b origin/main` exits 0.
+     - `git -C skein grep -n -E '^\[workspace.package\]|^license = ' 1222e7b -- Cargo.toml` prints `59:[workspace.package]`, `60:license = "MIT"`. `git -C skein show 1222e7b:crates/skein-forge/Cargo.toml` shows `[package]` with `license.workspace = true` beside version/edition/rust-version/publish inheritance.
+     - Scoped `rg -n 'Cargo\.toml|\[package\]|new crate|new package|[Mm]anifest'` over all forge-kit skein session files, reconciled with `ledger.tsv`, finds the five remaining member additions above; later increments edit those existing packages. The checker remains a standalone excluded workspace, not a new workspace member.
+     - `git -C <supervisor docs worktree> diff --check` exits 0; only README and the four session documents change before this ruling. Markdown-only landings use `land --docs` under temper’s workflow1; no Rust invocation is required for these plan edits.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

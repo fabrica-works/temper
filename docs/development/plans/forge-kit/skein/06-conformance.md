@@ -149,6 +149,8 @@ Files: temper `tools/forgejo-conformance/` -> skein `tests/forge/conformance/`, 
   New `scripts/proof-forgejo-conformance.sh`; shared root Cargo.toml (explicit member), Cargo.lock.
   The script is a thin shell invocation of Rust.
 Shape:
+- Set `license.workspace = true` in the destination Cargo.toml's `[package]`, beside its other
+  workspace-inherited fields (README, Workspace license inheritance).
 - Keep `Fixture`, `Mask`, `Secrets`, `Fact`, `Outcome`, `Hosted` and the cases, provisioning order,
   leak scans and fact names. Preserve each measured outcome; the comparison below separates five
   known races. The source already names the kit after Needs; no client/component edge is added. Do

@@ -48,7 +48,9 @@ Files: temper tests/engine/protocol-forge/tests/fake_protocol.rs -> skein
   member/dependencies), Cargo.lock. Manifest dependencies: skein-forge, skein-lib,
   skein-forge-machine-world (path ../machine), skein-forge-client-world (path ../client),
   skein-fake-forge-domain (raw operations for direct), skein-fake-forge-protocol (Route).
-Shape: package skein-forge-protocol-world; import Joint directly from skein_forge_machine_world::joint, api
+Shape: set `license.workspace = true` in the new Cargo.toml's `[package]`, beside its other
+  workspace-inherited fields (README, Workspace license inheritance).
+  Package skein-forge-protocol-world; import Joint directly from skein_forge_machine_world::joint, api
   from skein-forge, and commit from skein_forge_client_world::translate. No copied driver or translation.
   Retain Joint::new/failing(seed: u64) -> Self, call(&mut self,u64,Repository,Op), answered(&self,u64) ->
   Option<&Answered>, skein_forge_machine_world::joint::REPO ({forge:1,repository:2}),

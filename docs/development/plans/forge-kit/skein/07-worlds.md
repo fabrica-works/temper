@@ -67,7 +67,9 @@ Files: at the base, temper `tests/engine/forge/client/{Cargo.toml,
   job_answer,fuzzy_simulation}.rs}` -> skein `tests/forge/client/`.
   Change skein's shared `Cargo.toml` (member and workspace dependency),
   `Cargo.lock`; package `skein-forge-client-world`.
-Shape: keep the public `World`, `Settings`, `Stats`, `translate`, `LIMITS`,
+Shape: set `license.workspace = true` in the destination Cargo.toml's `[package]`,
+  beside its other workspace-inherited fields (README, Workspace license inheritance).
+  Keep the public `World`, `Settings`, `Stats`, `translate`, `LIMITS`,
   `REPO` and `World::{new,restart,make}`, with their signatures.
   `world` and `referee` stay private modules; `referee::Referee` stays
   `pub(crate)`. The world types and constants remain at the crate root.
@@ -189,7 +191,9 @@ Files: at the base, `tests/forge-setup/reconcile/{Cargo.toml,
   skein-fake-forge-protocol and skein-forge-machine-world; the last is
   08.1's workspace dependency at `tests/forge/machine`. Drop the source's
   jig-protocol-config and temper-codecs-world dependencies.
-Shape: keep `World::{managed,owned,reconcile,missing_org,listening,put,
+Shape: set `license.workspace = true` in the destination Cargo.toml's `[package]`,
+  beside its other workspace-inherited fields (README, Workspace license inheritance).
+  Keep `World::{managed,owned,reconcile,missing_org,listening,put,
   file,store,store_mut,tally,requests,trace,secrets_absent}`, `Ended`,
   `exchange::send`. Relative to the base, temper 04.1 adapts the world to
   skein 04.1's `given::Given`, `given::Refused` and `item::Item`; copy those

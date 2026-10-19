@@ -126,6 +126,16 @@ chain.
 
 ## Rules of this plan
 
+- **Workspace license inheritance:** every new workspace member in skein or smith carries
+  `license.workspace = true` in `[package]`, beside its other workspace-inherited fields.
+  This includes a crate moved into either workspace: set the destination manifest explicitly;
+  the gate does not check it yet. Skein's workspace and existing members were licensed MIT in
+  `1222e7b73ff33d446e68cd364b8370a6df5207a9`; smith's license landing belongs to accounts.
+  Each crate-adding step states this requirement. In this plan, the remaining additions are
+  skein06.2, 07.1, 07.3, 08.1 and 09.1. Jig and temper follow only when accounts licenses their
+  workspaces. Keep inherited metadata when refreshing or copying a destination manifest;
+  list any further reached member in the commit body. This rule adds no gate or repin.
+
 - **Connection component test shape:** skein03.s1 owns hourly07’s sampled corrections after03.3: separate backoff progression from terminal-state immutability and derive named capacities from the two-row page and sequential single-resource eviction premises. Preserve the assertion mapping in findings/connection-shapes.md, inherited tests, wire values, inputs, outcomes, limits and timing budgets. Add only the scoped connection-shapes AST recurrence mode to the existing checker/gate under development.md14.4; preserve recovery, plan-shapes and any already-landed listing mode/controls. Normal readiness precedes implementation. Serialize shared checker/gate edits without holding existing starts; closing temper-repin also waits for03.s1. Final connection counts gain relative+1; historical increment proofs keep their original counts.
 
 - **The director’s Cargo org cutover:** the GitHub org is now `fabrig-dev`; remotes already use it and old URLs redirect. The director moves smith’s, jig’s and temper’s `Cargo.toml` and `Cargo.lock` source URLs together, in one change after temper’s tools part 1 ends, with pins unchanged. Until that landing every Cargo source line stays `forgetic`; afterward every source line uses `fabrig-dev`. A step adding a dependency copies the URL its `Cargo.toml` already uses; this rule governs the plans’ older literal URL examples. If a rebase conflicts on a source line in either Cargo file, take main’s file and rerun the step’s authorized repin. A gate error naming two skein sources identifies a remaining `forgetic` line: rename it. Preserve the existing checks and one source per upstream; the GitHub redirect does not unify Cargo source identities.
