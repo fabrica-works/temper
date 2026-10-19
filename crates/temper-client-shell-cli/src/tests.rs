@@ -286,6 +286,19 @@ fn sigterm_mid_act_keeps_its_record() {
     assert_eq!(f.exit(), Some(Exit::Code(limits::TERMINATED)));
 }
 #[test]
+fn the_lock_outlasts_a_store_write_in_flight() {
+    let mut f = fixtures::Disk::act_with(fixtures::small_store(&[]));
+    f.answer_new_act();
+    assert_eq!(f.exit(), None);
+    f.signal(ServiceSignal::Terminate);
+    assert_eq!(f.released_after, None, "DIRECTORY's lock ended with a store write in flight");
+    let before = f.store_count();
+    f.store_erase();
+    assert_eq!(f.exit(), Some(Exit::Code(limits::TERMINATED)));
+    assert!(f.store_count() > before);
+    assert_eq!(f.released_after, Some(f.store_count()));
+}
+#[test]
 fn a_json_kept_line_is_unprefixed() {
     let mut words = fixtures::CHAT.to_vec();
     words.push(b"--json");

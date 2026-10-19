@@ -44,6 +44,9 @@ pub fn documents(directory: &Path, llm: SocketAddr, forge: SocketAddr) -> (serde
     value["engine"]["limits"]["overrides"]["documents.lines"] = 2.into();
     value["engine"]["limits"]["overrides"]["documents.text_bytes"] = 128.into();
     value["engine"]["limits"]["overrides"]["people.sign_ins"] = 2.into();
+    // Two concurrent acts each need one task and half the project purse.
+    value["engine"]["limits"]["overrides"]["tasks.project_tasks"] = 2.into();
+    value["engine"]["templates"][0]["budget"] = serde_json::json!({"as_allowed":50});
     value["engine"]["limits"]["overrides"]["views.watchers"] = 16.into();
     value["engine"]["limits"]["overrides"]["views.watchers_per_party"] = 16.into();
     value["application"] = serde_json::json!({
@@ -117,7 +120,7 @@ pub(crate) fn ctl(spawn: &skein_io::kernel::Spawn, inherited: &skein_world::Inhe
     };
     let directory = Path::new(std::ffi::OsStr::from_bytes(&spawn.args[0]));
     let pipe = |child| inherited.pipes.iter().find(|(number, _)| *number == child).expect("standard pipe").1;
-    crate::world::Proc::Ctl(Box::new(
+    crate::world::Proc::Ctl(Box::new(crate::calls::Recorded::new(
         OneShot::new(
             Invocation {
                 directory: Some(directory.file_name().expect("directory leaf").as_bytes().into()),
@@ -140,7 +143,11 @@ pub(crate) fn ctl(spawn: &skein_io::kernel::Spawn, inherited: &skein_world::Inhe
             },
         )
         .expect("shipped tools limits"),
-    ))
+        std::str::from_utf8(spawn.env[0].strip_prefix(b"CALL=").expect("call binding"))
+            .expect("call index")
+            .parse()
+            .expect("call index"),
+    )))
 }
 
 /// The project supplied by the standalone engine fixture.

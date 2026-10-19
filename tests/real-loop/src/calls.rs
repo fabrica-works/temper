@@ -1,6 +1,6 @@
 //! Hosted commands observed through their pipes, exit and a service watch cue.
 use crate::fixtures;
-use skein_io::kernel::{Complete, Done, Exit, Fd, Op, Pipe, Signal, Spawn, Submit, Way};
+use skein_io::kernel::{Complete, Done, Exit, Fd, Op, OpenHow, Pipe, Signal, Spawn, Submit, Way};
 use skein_lib::{Queue, Time, Token, Wall};
 use skein_shell::Host;
 use std::{cell::Cell, collections::BTreeMap, os::unix::ffi::OsStrExt, path::PathBuf};
@@ -22,6 +22,9 @@ pub struct Argv(pub Vec<Arg>);
 #[macro_export]
 macro_rules! argv { ($($word:expr),* $(,)?) => { $crate::calls::Argv(vec![$($crate::calls::Arg::from($word)),*]) }; }
 pub enum Step {
+    Probe { at: Dir },
+    Release { at: Dir },
+    Contended { calls: &'static [usize] },
     SignIn { at: Dir },
     SameParty { at: Dir },
     Held { name: &'static [u8] },
@@ -31,6 +34,18 @@ pub enum Step {
     Join { call: usize },
     Watching { call: usize },
     Until { at: Dir, argv: Argv, holds: &'static [u8], early: &'static [u8] },
+}
+#[must_use]
+pub fn probe(at: Dir) -> Step {
+    Step::Probe { at }
+}
+#[must_use]
+pub fn release(at: Dir) -> Step {
+    Step::Release { at }
+}
+#[must_use]
+pub fn contended(calls: &'static [usize]) -> Step {
+    Step::Contended { calls }
 }
 #[must_use]
 pub fn sign_in(at: Dir) -> Step {
@@ -101,6 +116,9 @@ pub(crate) fn task_number(stdout: &[u8]) -> u64 {
         .expect("created task number")
 }
 pub struct Called {
+    pub locked: Option<Time>,
+    pub released: Option<Time>,
+    pub busy: u32,
     pub exit: Option<Exit>,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
@@ -131,6 +149,8 @@ pub(crate) struct Caller {
     scratch: PathBuf,
     root: Option<Fd>,
     current: Option<usize>,
+    probe: Option<(Dir, Fd)>,
+    probing: bool,
     running: Vec<Option<Running>>,
     owners: BTreeMap<Token, usize>,
     pub(crate) watching: Option<usize>,
@@ -151,7 +171,10 @@ impl Caller {
             | Step::Start { .. }
             | Step::Join { .. }
             | Step::Watching { .. }
-            | Step::Until { .. } => None,
+            | Step::Until { .. }
+            | Step::Probe { .. }
+            | Step::Release { .. }
+            | Step::Contended { .. } => None,
         })
     }
     pub(crate) fn held_index(&self) -> usize {
@@ -176,6 +199,8 @@ impl Caller {
             scratch,
             root: Some(root),
             current: None,
+            probe: None,
+            probing: false,
             running: Vec::with_capacity(count),
             owners: BTreeMap::new(),
             watching: None,
@@ -207,7 +232,13 @@ impl Caller {
                 ];
             }
             Step::Call { at, argv } | Step::Start { at, argv } | Step::Until { at, argv, .. } => (at, argv),
-            Step::Join { .. } | Step::Watching { .. } | Step::Held { .. } | Step::Kill { .. } => panic!("command step"),
+            Step::Join { .. }
+            | Step::Watching { .. }
+            | Step::Held { .. }
+            | Step::Kill { .. }
+            | Step::Probe { .. }
+            | Step::Release { .. }
+            | Step::Contended { .. } => panic!("command step"),
         };
         let mut words = vec![fixtures::directory(&self.scratch, *at).as_os_str().as_bytes().into()];
         for arg in &argv.0 {
@@ -226,6 +257,9 @@ impl Caller {
         }
         if self.calls.len() == index {
             self.calls.push(Called {
+                locked: None,
+                released: None,
+                busy: 0,
                 exit: None,
                 stdout: Vec::new(),
                 stderr: Vec::new(),
@@ -254,7 +288,7 @@ impl Caller {
                 spawn: Box::new(Spawn {
                     program: fixtures::CTL.into(),
                     args,
-                    env: Box::new([]),
+                    env: vec![format!("CALL={index}").into_bytes().into_boxed_slice()].into_boxed_slice(),
                     root: self.root.expect("launch root"),
                     dir: Box::new([]),
                     pipes: [(0, Way::In), (1, Way::Out), (2, Way::Out)]
@@ -267,8 +301,16 @@ impl Caller {
     fn complete(&mut self, complete: Complete, now: Time) {
         let index = self.owners.remove(&complete.op).expect("operation owner");
         if index == usize::MAX {
-            assert!(matches!(complete.kind, Op::Close { .. }));
-            complete.result.expect("root close");
+            match (complete.kind, complete.result.expect("probe operation")) {
+                (Op::Open { .. }, Done::Fd(fd)) => {
+                    let Step::Probe { at } = self.steps[self.next] else { panic!("probe step") };
+                    self.probe = Some((at, fd));
+                    self.submit(usize::MAX, Op::Lock { fd });
+                    return;
+                }
+                (Op::Lock { .. } | Op::Close { .. }, Done::Nothing) => self.probing = false,
+                (kind, done) => panic!("probe completion {kind:?}: {done:?}"),
+            }
             return;
         }
         self.running[index].as_mut().expect("running command").pending -= 1;
@@ -337,6 +379,31 @@ impl Caller {
             }
         }
     }
+    fn acquire_probe(&mut self, at: Dir) -> bool {
+        if self.probing {
+            return false;
+        }
+        if self.probe.is_none() {
+            let path = fixtures::directory(&self.scratch, at);
+            let path = path.strip_prefix(&self.scratch).expect("beneath scratch").as_os_str().as_bytes().into();
+            self.probing = true;
+            self.submit(usize::MAX, Op::Open { root: self.root.expect("launch root"), path, how: OpenHow::Directory });
+            return false;
+        }
+        true
+    }
+    fn release_probe(&mut self, at: Dir) -> bool {
+        if self.probing {
+            return false;
+        }
+        if let Some((held, fd)) = self.probe.take() {
+            assert_eq!(held.0, at.0, "release probed directory");
+            self.probing = true;
+            self.submit(usize::MAX, Op::Close { fd });
+            return false;
+        }
+        true
+    }
     fn advance(&mut self, now: Time) {
         if matches!(self.steps.get(self.next), Some(Step::Held { .. })) && self.held.get() {
             // Issue the following kill in this pass, before the hosted caller's next turn.
@@ -364,6 +431,21 @@ impl Caller {
                     return;
                 }
                 self.current = None;
+            }
+            Step::Probe { at } => {
+                if !self.acquire_probe(*at) {
+                    return;
+                }
+            }
+            Step::Release { at } => {
+                if !self.release_probe(*at) {
+                    return;
+                }
+            }
+            Step::Contended { calls } => {
+                if calls.iter().any(|call| self.calls[*call].busy == 0) {
+                    return;
+                }
             }
             Step::Watching { call } => {
                 assert!(self.running[*call].as_ref().is_some_and(|r| r.started), "started watch call");
@@ -427,6 +509,8 @@ impl Caller {
             Some(Step::SameParty { .. }) if self.retry_link.is_some() => {
                 self.retry_link.is_some_and(|link| self.links.get() > link)
             }
+            Some(Step::Probe { .. } | Step::Release { .. }) => !self.probing,
+            Some(Step::Contended { calls }) => calls.iter().all(|call| self.calls[*call].busy != 0),
             Some(Step::Watching { .. }) => self.watched || self.watching.is_none(),
             Some(Step::Join { call }) => self.running[*call].is_none(),
             Some(Step::Start { .. }) => {
@@ -463,7 +547,7 @@ impl Host for Caller {
         None
     }
     fn is_empty(&self) -> bool {
-        self.released && self.root.is_none() && self.owners.is_empty()
+        self.released && self.root.is_none() && self.probe.is_none() && self.owners.is_empty()
     }
     fn worst_case(&self) -> u64 {
         self.memory
@@ -472,3 +556,6 @@ impl Host for Caller {
         ROOM
     }
 }
+
+mod recorded;
+pub(crate) use recorded::Recorded;

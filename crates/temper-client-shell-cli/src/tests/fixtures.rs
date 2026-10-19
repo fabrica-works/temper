@@ -68,6 +68,8 @@ pub struct Frame {
     pub address: &'static [u8],
     pub token: &'static [u8],
     pub locks: u32,
+    locked: Option<()>,
+    pub released_after: Option<u32>,
     pub token_reads: u32,
     pub private_opens: u32,
     stderr: Vec<u8>,
@@ -130,6 +132,8 @@ impl Frame {
             address: b"http://127.0.0.1:4000\n",
             token: TOKEN_BYTES,
             locks: 0,
+            locked: None,
+            released_after: None,
             token_reads: 0,
             private_opens: 0,
             stderr: Vec::new(),
@@ -310,6 +314,16 @@ impl Frame {
             Ok(Done::Fd(Fd::new(19)))
         }
     }
+    fn lock_directory(&mut self, fd: Fd) -> Result<Done, Error> {
+        assert_eq!(fd, DIRECTORY);
+        self.locks += 1;
+        if self.busy {
+            Err(Error::Busy)
+        } else {
+            self.locked = Some(());
+            Ok(Done::Nothing)
+        }
+    }
     fn answer(&mut self, kind: &mut Op) -> Result<Done, Error> {
         match kind {
             Op::Open { root, path, how } => self.open_file(*root, path, *how),
@@ -332,11 +346,7 @@ impl Frame {
             }
             Op::Stat { fd } => Ok(self.stat(*fd)),
             Op::Read { fd, buf, at } => Ok(self.read_file(*fd, buf, *at)),
-            Op::Lock { fd } => {
-                assert_eq!(*fd, DIRECTORY);
-                self.locks += 1;
-                if self.busy { Err(Error::Busy) } else { Ok(Done::Nothing) }
-            }
+            Op::Lock { fd } => self.lock_directory(*fd),
             Op::PipeWrite { fd, bytes, from } => {
                 assert!([STDERR, Fd::new(4)].contains(fd));
                 let start = usize::try_from(*from).expect("fixture offset");
@@ -356,6 +366,10 @@ impl Frame {
                 Ok(Done::Fd(fd))
             }
             Op::Sync { .. } if self.fail_store.is_some() => Err(Error::Permission),
+            Op::Close { fd } if *fd == DIRECTORY && self.locked.is_some() => {
+                self.released_after = Some(self.store_count());
+                Ok(Done::Nothing)
+            }
             Op::Sync { .. } | Op::Remove { .. } | Op::Connect { .. } | Op::Shutdown { .. } | Op::Close { .. } => {
                 Ok(Done::Nothing)
             }

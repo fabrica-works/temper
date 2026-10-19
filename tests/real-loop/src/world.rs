@@ -12,7 +12,7 @@ pub(crate) enum Proc {
     Llm(Box<skein_fake_peers::llm::Peer>),
     Service(Box<ServiceHost>),
     Caller(Box<Caller>),
-    Ctl(Box<temper_client_shell_cli::host::OneShot>),
+    Ctl(Box<crate::calls::Recorded>),
     Agent(Box<skein_world::PipeHost<smith_agent_shell::Agent>>),
 }
 impl Proc {
@@ -119,7 +119,8 @@ struct Judge {
 impl Referee<Proc> for Judge {
     fn act(&mut self, _now: Time, procs: &mut [Proc]) {
         self.wake = None;
-        let [Proc::Llm(peer), Proc::Service(service), Proc::Caller(caller), ..] = procs else {
+        let (roots, children) = procs.split_at_mut(3);
+        let [Proc::Llm(peer), Proc::Service(service), Proc::Caller(caller)] = roots else {
             panic!("root admission order")
         };
         if !self.armed {
@@ -128,6 +129,14 @@ impl Referee<Proc> for Judge {
                 service.arm(temper_client_tools::key::engine(&name));
             }
             self.armed = true;
+        }
+        for proc in children {
+            if let Proc::Ctl(recorded) = proc {
+                let result = &mut caller.calls[recorded.call];
+                result.locked = recorded.locked;
+                result.released = recorded.released;
+                result.busy = recorded.busy;
+            }
         }
         service.address = peer.address();
         if service.links() != 0 {
@@ -152,7 +161,16 @@ impl Referee<Proc> for Judge {
         };
         caller.held.set(service.held_at(caller.held_index()));
         caller.links.set(service.links());
-        if (peer.address().is_some() && service.address.is_none())
+        let lock_changed = procs[3..].iter().any(|proc| match proc {
+            Proc::Ctl(recorded) => {
+                caller.calls[recorded.call].busy != recorded.busy
+                    || caller.calls[recorded.call].locked != recorded.locked
+                    || caller.calls[recorded.call].released != recorded.released
+            }
+            Proc::Llm(_) | Proc::Service(_) | Proc::Caller(_) | Proc::Agent(_) => false,
+        });
+        if lock_changed
+            || (peer.address().is_some() && service.address.is_none())
             || (service.links() != 0 && !caller.released)
             || (caller.watching.is_some() && (!service.watching() || service.delivered() && !caller.watched))
             || (caller.is_empty() && !self.stopping)
