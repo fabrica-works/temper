@@ -176,13 +176,17 @@ plan's own.
   10). An opener or helper two tests share, in one file or two, is one
   helper of the crate's fixtures: before defining one, `rg 'fn <name>'
   <crate>/tests <crate>/src/tests`, and move a sibling file's there. A
-  size an assertion reads is a named const with a line on what a smaller
-  value would miss; a story's parties, tasks, projects and tokens, and so its
+  size or a count an assertion reads (a call's `tries`, a number of
+  chats) is a named const with a line on what a smaller value would miss
+  (ruling 137); a story's parties, tasks, projects and tokens, and so its
   calls' positions, are named consts with a line on their value, as
   `tests/real-loop/tests/restart.rs`'s `CHAT`, `READ` and `CHATS` are:
   no integer literal is the argument of `task(`, `watching(`, `join(` or
   `number(`, nor an index of `calls()`, in a test body, and the gate
-  refuses one (temper-09.s2, ruling 133); a case that extends a fixture is built from it, never
+  refuses one (temper-09.s2, ruling 133); a story's calls are read by
+  those consts (`ran.calls()[AGAIN]`, as `tests/lock.rs` does), never
+  bound by a slice pattern over `calls()` with `_` for the calls it
+  skips (ruling 137); a case that extends a fixture is built from it, never
   retyped. A table's body checks every row alike and never branches on a
   row: rows that expect different outcomes are tests of their own
   (ruling 126).

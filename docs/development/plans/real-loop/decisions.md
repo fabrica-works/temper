@@ -780,6 +780,15 @@ pass:
      - **No step waits on this.** later.md's row keeps what is left: the
        other worlds' 4 s, if temper 06's client stories pass it.
 
+137. **Counts and call bindings by named consts** (steer of 2026-10-19T17:57:46Z).
+     Ruling 137, from the hourly check of 2026-10-19T17:57:46Z: the README's "A setup written once, and rows carry data" now says:
+     - a size or a count an assertion reads (a call's `tries`, a number of chats) is a named const, with a line on what a smaller value would miss;
+     - a story's calls are read by their named consts (`ran.calls()[AGAIN]`, as `tests/lock.rs` reads `ran.calls()[FIRST]`), never bound by a slice pattern over `calls()` with `_` for the calls it skips.
+
+     Seen on origin/main: `tests/real-loop/tests/lost.rs:30: let [_, lost, signed, again, _, tasks] = ran.calls() else { panic!("six calls") };` and `lost.rs:36: assert_eq!(signed.tries, 2, …)`. The first slips past temper-09.s2's gate grep, which matches only `calls()[<integer>]`. A pattern that binds every call (`tools.rs:28`, `let [signed, chat, read]`) skips none, and stays.
+
+     It applies from each session's next increment. Landed tests change only when a step touches them: refresh any further copy you meet in a file your step changes, and list it in the commit body. If the `_` form is seen once more, a step will add it to the gate.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
