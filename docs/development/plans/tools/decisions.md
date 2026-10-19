@@ -898,3 +898,9 @@ and the user, or the director, may veto it before the run:
   empty needs prints no rows and that call); or a designer joins the run
   (`plan join designer`, in a design session) and answers question.md.
   temper 03.3's first inbox page waits on it; the rest of 03.3 goes on.
+  Decision: the default, by director, 2026-10-19: needs come first, and
+  while needs has more, a page is needs alone. Once needs ends on a page,
+  updates' first page follows it when both fit in 32 rows. When they do
+  not, the call that reads on starts updates (group byte 1, no jig
+  cursor). No page passes 32 rows, and no update is read twice. tools.md,
+  5.2, says so at the designer's next pass, beside N.
