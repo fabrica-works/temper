@@ -1673,6 +1673,18 @@ where its answer lands.
      recording/digest proofs remain. Skein06.2carries the helper/caller with the move;
      refresh further reached copies/proof scripts and list changed users in the commit.
 
+201. **Accept corpus-equal merge requests in strict conformance comparisons** (plan defect, temper06.4 block of 2026-10-20T03:03:23Z).
+     Accept the completed06.4recordings: both merge requests match corpus byte for byte,
+     while exactly the four prescribed Content-Length:0additions remain. The plan's
+     byte-equality proof allows equality; it must not require historical masking variants
+     to recur. Each merge request may equal corpus or differ only by the prior masked
+     head_commit_id:39leading zero hex digits followed by e→a for conflict,d→e for stale.
+     Require all four exact framing paths and byte additions, no other path/byte change,
+     unchanged corpus and stable-fact digest. Use raw comparisons, never normalization.
+     Refresh reached proof-script copies and list users in their owning commits.
+     The retained recordings satisfy this check without another recording/process attempt;
+     all pending normal gate and actual-tree obligations remain.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

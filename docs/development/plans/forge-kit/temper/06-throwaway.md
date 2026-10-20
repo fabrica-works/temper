@@ -256,7 +256,7 @@ Proof: process; both recordings, with `T` a fresh directory under `$WS/tmp` and 
   --out $T/out`, exit 0, about 100 s (98 s alone at the base), then the same with `--component
   --scratch $T/component`, exit 0, about 30 s (28 s). Then the stable-fact line (the recording's checks) on
   `$T/out/facts.txt` prints the counts and the digest, and the transcripts diff (the same) names
-  the six exact request files listed in The recording's checks below, with only the
+  the four framing files and optional merge-ID variants in The recording's checks below, with only the
   four prescribed empty-body header additions beyond the original two. The leaves `hooks::body` and the
   registration read run only live.
 Apply README's compatible smith source and Settled smith adapters rules. live-text/smith-02.1 is landed; shared compatibility now waits for jig01.s2 and temper02.1. Rebase their adapter landing before this repin's all-target check and both required recordings; retain the completed JSON checkpoint and every facts/transcript proof.
@@ -307,8 +307,8 @@ Test shape: two new unit tests. `a_diagnostic_is_the_bodys_bytes_cut_at_its_boun
   expected values. Conformance tests: 32.
 Proof: unit; `heavy cargo nextest run -p forgejo-conformance`: 32 passed, <1 s.
 Proof: process; 06.2's two recordings, exit 0, the stable-fact line and the transcripts diff: the same
-  counts, digest and six exact request files, including the four header-only differences
-  in The recording's checks. Any other difference, or a changed digest, is a question: the
+  counts and digest, and only the four framing differences plus optional masked
+  merge-ID variants in The recording's checks. Any other difference, or a changed digest, is a question: the
   diagnostics print only on a failure.
 Proof: joint; `heavy --gate scripts/check.sh`: the focused count plus 2, fuzzy unchanged.
 Don't: add a `Value`-shaped accessor (`Index`), a macro, or a second tree; change a fact's text, its
@@ -396,8 +396,8 @@ The conformance owns its `json` module until skein 06.2 copies it.
 
 ## Questions to raise
 
-- A recording that differs beyond the six exact request files or the four permitted
-  header-only changes in The recording's checks, or a changed digest (06.2 to 06.4):
+- A recording that differs beyond the four required framing changes or the two exact optional
+  masked merge-ID variants in The recording's checks, or a changed digest (06.2 to 06.4):
   never edit a transcript.
 
 ## The recording's checks
@@ -412,16 +412,21 @@ temper 07 deletes the conformance, and skein 06.4 keeps the stable-fact line.
   heavy bash -o pipefail -c 'set -eu; digest=$(awk '\''BEGIN { split("merge-old-head-is-409-head-out-of-date delivery-pull-reads-not-mergeable-while-checked delivery-pull-is-settled-when-its-push-is-delivered delivery-pull-is-checking-when-its-push-is-delivered webhook-deliveries", a); for (i in a) timing[a[i]]=1 } /^#/ || NF==0 { next } { name=$2; sub(/:.*/, "", name); if (seen[name]++ || $1 !~ /^(holds|fails)$/) exit 1; n++;   if (name in timing) { t++; print "timing " $0 > "/dev/stderr" }   else { s++; h+=($1=="holds"); f+=($1=="fails"); print $1, name } } END { if (n!=218 || s!=213 || h!=207 || f!=6 || t!=5) exit 1;   print "facts=218 stable=213 holds=207 fails=6 timing=5 unchecked=0" > "/dev/stderr" }'\'' "$1" | LC_ALL=C sort | sha256sum); printf "%s\n" "$digest"; test "$digest" = "d1f7ba2bb323b8944e05d2e05bc1c83396fb7bfffadbcefea4faad64ec18347d  -"' sh tools/forgejo-conformance/facts.txt
   ```
 - The transcripts diff, `heavy sh -c 'cd tools/forgejo-conformance && diff -rq --exclude=response
-  transcripts "$1"/transcripts; echo "diff exit $?"' sh $T/out`, prints six `Files ... differ` lines:
-  `merge-conflict/request`, `merge-stale-head/request`, `setup-team-member-added/request`,
-  `setup-team-member-missing-user/request`, `update-conflict/request` and `update-pull/request`,
-  then `diff exit 1`. Preserve the original two merge differences. For each of the four
-  additional files, inspect the full byte diff: the sole addition is `Content-Length: 0`
-  before `Connection: close`, with no body or other byte change. These are empty PUT
-  (team member) and POST (pull update) requests; skein's `http.md`3.1 explicitly requires
-  this header. Do not strip headers from the comparison, change captured bytes, re-record
-  the committed corpus or accept another difference. Refresh every further reached proof
-  script/copy within its owning increment and name it in the commit body.
+  transcripts "$1"/transcripts; echo "diff exit $?"' sh $T/out`, prints four required
+  `Files ... differ` lines: `setup-team-member-added/request`,
+  `setup-team-member-missing-user/request`, `update-conflict/request` and `update-pull/request`.
+  `merge-conflict/request` and `merge-stale-head/request` may each be byte-identical to
+  corpus, as in06.4's retained recording; if different, only the prior06.3masked
+  `head_commit_id` replacement is allowed:40hex digits with39leading zeros, conflict
+  ending `e` to `a`, stale ending `d` to `e`, and every other byte unchanged.
+  Thus4to6paths differ and `diff exit 1`. For each required framing file,
+  inspect the full byte diff: the sole addition is `Content-Length: 0`
+  before `Connection: close`, with no body or other byte change. These empty PUT
+  (team member) and POST (pull update) requests require the header under skein
+  `http.md`3.1. Do not strip headers, normalize bodies, change captured bytes,
+  re-record the corpus or accept another difference. Refresh every reached proof
+  script/copy within its owning increment and list users in the commit body.
+
 
 ## Done when
 

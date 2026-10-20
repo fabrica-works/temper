@@ -169,7 +169,18 @@ chain.
 
 - **World migration fixture copies:** Skein07 retains every assertion and identity suffix when changing namespace frames to `kit`, including simulation issue/post and fuzzy seeds. Its branch recovery watch is nonparticipating; the durable Writer claim and recovery outcomes stay. Setup's direct `fixtures::given` and every Item parameter, including `fixtures::seed_token`, follow landed types; preserve limits and the independent decoder. Refresh any further reached fixture or derived copy and list users in the owning commit body. A scratch correction without execution stays unproved; remaining setup validation is supervisor-owned and does not hold unrelated starts.
 
-- **Empty-body recording framing:** Temper06.2–06.4 keep the stable-fact digest and committed corpus unchanged. Their transcript proof expects exactly the six request paths in temper/06-throwaway.md's Recording checks: the original two merge differences plus the four named empty POST/PUT requests, each adding only `Content-Length: 0` before Connection. This is skein http.md3.1's required framing, not a general transcript exemption or normalization. Reject every other byte/path difference; refresh further reached proof-script copies and list them in the owning commit body. Existing recordings meeting this exact check need no repeat; all uncompleted gate/increment proofs remain required.
+- **Empty-body recording framing:** Temper06.2–06.4 keep the stable-fact
+  digest and committed corpus unchanged. Exactly four request paths must differ
+  by only `Content-Length: 0` before Connection: `setup-team-member-added`,
+  `setup-team-member-missing-user`, `update-conflict`, `update-pull` (each `/request`).
+  `merge-conflict/request` and `merge-stale-head/request` may each equal the corpus;
+  their only alternative is the already-recorded masked `head_commit_id` variant:
+  conflict's40hex digits ending `e` become `a`, stale's ending `d` become `e`,
+  with all39leading zeros and every other byte unchanged. Thus4to6paths differ;
+  no other path or byte is allowed. This is a raw byte comparison, never header
+  stripping, body normalization or a new corpus. Refresh reached proof-script
+  copies and list them in the owning commit. Completed recordings satisfying
+  this exact rule need no repeat; all pending gate/increment proofs remain.
 
 - **Readiness proof preparation:** preflight explicit shell scripts and any source generator before submitting a bounded heavy attempt. Verify the clean candidate first; keep temporary accounting diagnostics in a separate scratch copy so a diagnostic setup defect cannot prevent its compile, clippy and existing-profile proof. Reuse an executed baseline only after source, test-identity and count verification. Setup failures still consume attempts; a new budget needs a supervisor ruling. Use isolated owned sources/targets, retain provenance and remove only completed owned targets; no global cache or dependency-code changes.
 
