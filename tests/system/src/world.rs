@@ -65,6 +65,8 @@ pub fn config(seed: u64) -> engine::Config {
     let charter = charter();
     // The charter's model is a configured one, as jig's core world sets it (tests/core charters.rs).
     config.core.settings.models = Box::new([charter.policy.model.clone()]);
+    config.core.settings.llm_providers.providers.first_mut().expect("walking fixture's provider").models =
+        Box::new([charter.policy.model.name.clone()]);
     config.core.settings.charters = Box::new([charter]);
     config.core.settings.resume_bytes = 8192;
     config
