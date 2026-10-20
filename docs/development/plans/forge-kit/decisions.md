@@ -1843,6 +1843,17 @@ where its answer lands.
 
      Keep Temper07 and every dependency-ready session independent at full capacity. Preserve compatible pins, external compatibility custody, kitd6d4abe/local adapter,08.s1/08.3 assertions, W52 artifacts and all failed evidence. No new design semantics are chosen:08.4 already requires independently counted writes/cost/terminals/Closed for every cut and its exact before/after-write errors. The owner must demonstrate those existing obligations.
 
+216. **Hourly19 immutable scripts and downstream diagnostic custody** (hourly check of 2026-10-20T07:54:03Z).
+     Reverses: nothing. Amends README Readiness proof preparation and New Accounts-2 interfaces; no repair, execution or kit scope is added.
+
+     Freeze and hash each absolute Bash wrapper after bash-n preflight and before submission. Never rewrite a queued or running script; establish deadline/watchdog handling before launch. A correction needs a new immutable script and an already authorized remaining attempt. Hourly19 task748's rewritten timed-jig.sh caused a trailing Bash exit2 after210.007s; the underlying complete compile result is unavailable. Retain its exact partial Grant diagnostics, scripts, hashes and locks as an incomplete check. Its attempt is spent, with no retry and no compatibility proof. This process rule also becomes a retrospective proposal; no pinned tooling changes.
+
+     Extend199/205/207/210 custody by exactly six frozen Temper sites: engine-domain route/applications.rs Event::Application.carried, route/held.rs Held::CarriedUnused, store.rs Ask::AccountSignIn/AccountSignOut; client-domain forge.rs Outcome::Unsent/Lost and tests/form.rs Down::Send.value/link::Event::Send.value. These are inventory only under the existing Accounts-2/smith-sources routing. The director still supplies the actual downstream owner/disposition and repair Step; smith-sources/smith-01 is an introducing step, not invented repair authority. Keep every earlier diagnostic/lock and assigned Hearth Interrupt owner. No guessed mapping/default, forced pin, dependency patch, repair, extra diagnosis or adapter sweep is authorized. The eventual owner refreshes reached copies and proves the actual tree.
+
+     Hourly19's Close expected-row and fixture-name findings are being code-checked independently for an explicit shape-only supplement after08.4, preserving all cases/assertions/counts/caps. No correction scope is assigned to the current TLS allowance or Temper07 by this inventory/process ruling. Current ready capacity,215's fixed bounded continuation, all normal proof duties and five195 drops remain. Root reconciles advanced exact-primary graph inputs under existing189/Graph freshness, with bounded source fallback and no start hold. Kitd6d4abe/local adapter stays fixed.
+
+     Checked: scratch-hourly-19/jig-wrapper-failure.json and task748 log identify the wrapper rewrite, trailing syntax error/exit2 and unavailable underlying completion; command-manifest.json preserves the submitted hash. Root validated each new compiler site against git show e6486e20:path, exact line text and full source SHA256, recorded in pump/hourly19-custody-premises.json. Six messages/source lines are retained in pump/hourly19-new-custody-sites.json and the full original inventory. The current plan already names separate downstream custody and immutable-proof preparation inputs; pinned plan provides ruling --text/ring. No code interface is changed or inferred.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

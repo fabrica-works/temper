@@ -206,6 +206,7 @@ chain.
   this exact rule need no repeat; all pending gate/increment proofs remain.
 
 - **Readiness proof preparation:** preflight explicit shell scripts and any source generator before submitting a bounded heavy attempt. Verify the clean candidate first; keep temporary accounting diagnostics in a separate scratch copy so a diagnostic setup defect cannot prevent its compile, clippy and existing-profile proof. Reuse an executed baseline only after source, test-identity and count verification. Setup failures still consume attempts; a new budget needs a supervisor ruling. Use isolated owned sources/targets, retain provenance and remove only completed owned targets; no global cache or dependency-code changes.
+  Freeze and hash each absolute Bash wrapper after bash-n preflight and before submission. Never rewrite a queued or running script. Establish deadline/watchdog handling before launch; any correction uses a new immutable script and only an already authorized remaining attempt. A checker-caused wrapper failure consumes its attempt and leaves the underlying result incomplete, with original commands, diagnostics and locks retained.
 
 - **Diagnostic process attempts:** before spending an authorized process probe, select a fresh run-owned instance path and the harness for its process tier; verify prerequisites and the exact request comparison before execution. Preserve earlier evidence instead of reusing a nonempty instance. Setup failures still consume attempts. Exhausting a diagnostic budget requires a report and a new ruling before another attempt; it does not expand unit-suite time limits or authorize retries.
 
@@ -450,6 +451,18 @@ chain.
   pending owner/disposition; choose no persistence, key or match behavior
   from the compiler's missing-arm suggestion. Refresh further reached
   copies in the eventual owning repair and list users.
+  Hourly19 additionally reaches six Temper sites: engine-domain
+  `route/applications.rs` (`Event::Application.carried`), `route/held.rs`
+  (`Held::CarriedUnused`), `store.rs` (`Ask::AccountSignIn/AccountSignOut`);
+  client-domain `forge.rs` (`Outcome::Unsent/Lost`) and `tests/form.rs`
+  (`Down::Send.value` and `link::Event::Send.value`). These extend only
+  the same Accounts-2/smith-sources inventory. Retain exact source hashes,
+  compiler messages and locks from scratch-hourly-19/diagnostic-custody.json.
+  Await the director's actual downstream owner/disposition and repair Step;
+  no defaults, forced pins, dependency patches, new diagnosis or repeated
+  adapter audit. The eventual owner refreshes reached copies and proves
+  its actual tree. This inventory is no newer-head compatibility proof.
+
 - **Host grant forms:** Smith `a26eadcf50888eee56f5d4b453bbedd83981c5de`
   (smith-sources/smith-01) adds `Grant.form`. Its newly reached Jig users are
   `testing/jig-test-worker/src/translate.rs::grant` and `src/tests.rs`'s
