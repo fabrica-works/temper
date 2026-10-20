@@ -66,7 +66,7 @@ enum Condition { none, merge: MergeCondition, update: UpdateCondition, review: C
 record Effect { write: Write condition: Condition }
 record Position { at: u64 comment: u64 review: u64 review_page: u32 }
 record Attempt { sent: u64 deadline: u64 wall: u64 expires: u64 }
-record Entry { number: u64 task: u64 repository: Repository effect: Effect start: option Position attempt: option Attempt failures: u32 }
+record Entry { number: u64 task: u64 repository: Repository effect: Effect start: option Position attempt: option Attempt failures: u32 queued: bool }
 record EntryRow { entry: Entry held: bool }
 record ProposedEffect { number: u64 resource: What entry: Entry }
 
@@ -77,7 +77,7 @@ record ErrorValue { error: Error }
 enum Made { created: Number, commented: Number, reviewed: Number, merged: Commit, updated: Commit, branch: Commit, set }
 record OutcomeMade { made: Made found: bool }
 record OutcomeRaced { made: Made why: Error }
-enum Outcome { made: OutcomeMade, failed: ErrorValue, raced: OutcomeRaced, uncertain, held, withdrawn }
+enum Outcome { made: OutcomeMade, failed: ErrorValue, raced: OutcomeRaced, uncertain, held, withdrawn, queued }
 enum Permission { none, read, write, admin }
 enum BranchCreation { created, exists }
 record Pull { reviewers: list 65536 u64 number: u64 state: ItemState head: bytes 1048576 base: bytes 1048576 commit: fixed 32 base_commit: option fixed 32 merged: option fixed 32 mergeable: bool ci: Ci }
@@ -112,7 +112,7 @@ record CompareAnswer { before: fixed 32 after: fixed 32 contains_before: bool fi
 record ChecksAnswer { statuses: bytes 2097152 }
 record CollaboratorsAnswer { collaborators: list 65536 Collaborator more: bool }
 record Located { repository: u32 }
-enum Answer { items: ItemsAnswer, item: ItemAnswer, pull: Pull, reviews: ReviewsAnswer, statuses: StatusesAnswer, remarks: RemarksAnswer, commit: Commit, branches: BranchesAnswer, pull_files: PullFilesAnswer, compare: CompareAnswer, checks: ChecksAnswer, job: JobAnswer, file: FileAnswer, protection: ProtectionAnswer, settings: Settings, collaborators: CollaboratorsAnswer, permission: PermissionValue, created: Number, commented: Number, reviewed: Number, merged: Commit, branch: BranchCreationValue, done, located: Located }
+enum Answer { items: ItemsAnswer, item: ItemAnswer, pull: Pull, reviews: ReviewsAnswer, statuses: StatusesAnswer, remarks: RemarksAnswer, commit: Commit, branches: BranchesAnswer, pull_files: PullFilesAnswer, compare: CompareAnswer, checks: ChecksAnswer, job: JobAnswer, file: FileAnswer, protection: ProtectionAnswer, settings: Settings, collaborators: CollaboratorsAnswer, permission: PermissionValue, created: Number, commented: Number, reviewed: Number, merged: Commit, branch: BranchCreationValue, done, located: Located, queued }
 record AnswerValue { answer: Answer }
 enum ReadResult { answer: boxed AnswerValue, error: ErrorValue }
 record CallRead { result: ReadResult }

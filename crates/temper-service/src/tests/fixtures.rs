@@ -671,7 +671,11 @@ pub fn settle_root(
                 request @ (root::Request::Store(_) | root::Request::Account(_) | root::Request::ToChild(_)) => {
                     crate::route::request(engine, request);
                 }
-                root::Request::Forge { .. } | root::Request::Busy(_) | root::Request::Drained | root::Request::Stop => {
+                root::Request::Setup { .. }
+                | root::Request::Forge { .. }
+                | root::Request::Busy(_)
+                | root::Request::Drained
+                | root::Request::Stop => {
                     panic!("unexpected chat request")
                 }
             }

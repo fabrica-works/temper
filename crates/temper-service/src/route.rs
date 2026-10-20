@@ -4,6 +4,7 @@ use temper_engine_domain as root;
 
 pub(crate) fn request(engine: &mut Engine, request: root::Request) {
     match request {
+        root::Request::Setup { run } => crate::setup::request(engine, run),
         root::Request::Store(request) => {
             if let root::StoreRequest::Commit { number, writes } = &request {
                 engine.clients.commit(*number, writes);

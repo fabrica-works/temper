@@ -45,6 +45,7 @@ pub fn try_step(domain: &mut Domain, env: &Env<Limits>, event: Event) -> Result<
         | Event::Account(_)
         | Event::Credential { .. }
         | Event::Forge(_)
+        | Event::Setup { .. }
         | Event::Restart
         | Event::Stop) => {
             if !admits(domain, &env.limits) {

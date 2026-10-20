@@ -192,13 +192,14 @@ pub(super) fn encode(value: &d::Answer) -> w::Answer {
             )
             .expect(FITS),
         ),
-        d::Answer::Queued => unreachable!("temper-12 stores merge queue answers"),
+        d::Answer::Queued => w::Answer::Queued,
         d::Answer::Done => w::Answer::Done,
     }
 }
 #[expect(clippy::manual_map, reason = "Step translations use explicit matches without closures")]
 pub(super) fn decode(value: w::Answer, bounds: &Bounds) -> Result<d::Answer, Undecodable> {
     Ok(match value {
+        w::Answer::Queued => d::Answer::Queued,
         w::Answer::Located(value) => d::Answer::Located { repository: value.into_parts().repository },
         w::Answer::Statuses(value) => {
             let w::StatusesAnswerParts { ci, statuses, more } = value.into_parts();

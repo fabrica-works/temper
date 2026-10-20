@@ -9,6 +9,13 @@ fn duration(value: u64) -> Result<Duration, Refused> {
 }
 #[expect(clippy::too_many_lines, reason = "one exhaustive table of scalar dotted field paths")]
 pub(super) fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), Refused> {
+    if name.starts_with(b"setup.") {
+        return match temper_forge_setup::limits::apply_host(&mut limits.setup, name, value) {
+            Ok(()) => Ok(()),
+            Err(temper_forge_setup::limits::Refused::Unknown) => Err(Refused::Unknown),
+            Err(temper_forge_setup::limits::Refused::Range) => Err(Refused::Range),
+        };
+    }
     match name {
         b"root.journal.commits" => limits.root.journal.commits = u32::try_from(value).or(Err(Refused::Range))?,
         b"root.journal.held" => limits.root.journal.held = u32::try_from(value).or(Err(Refused::Range))?,

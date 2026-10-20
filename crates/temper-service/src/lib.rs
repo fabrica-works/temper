@@ -34,6 +34,7 @@ pub mod workers;
 pub use accounts::AccountsRuntime;
 mod engine;
 mod route;
+mod setup;
 mod stop;
 mod tools;
 /// How the service ended (protocol/README.md, 6).

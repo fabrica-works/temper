@@ -11,6 +11,7 @@ pub(crate) struct Engine {
     pub(crate) accounts: Option<crate::accounts::Accounts>,
     pub(crate) workers: crate::workers::Workers,
     pub(crate) clients: crate::clients::Clients,
+    pub(crate) setup: crate::setup::Layer,
     pub(crate) forge: crate::forge::Layer,
     pub(crate) forge_records: crate::forge::records::Loader,
     pub(crate) admission: Option<skein_lib::Token>,
@@ -34,6 +35,7 @@ pub(crate) struct Children {
     pub(crate) accounts: Option<crate::accounts::Accounts>,
     pub(crate) workers: crate::workers::Workers,
     pub(crate) clients: crate::clients::Clients,
+    pub(crate) setup: crate::setup::Layer,
     pub(crate) forge: crate::forge::Layer,
     pub(crate) limits: crate::limits::Limits,
     pub(crate) notes: Queue<crate::Note>,
@@ -48,7 +50,7 @@ impl Engine {
         first_periods: List<(u32, u64)>,
     ) -> Self {
         let forge_records = crate::forge::records::Loader::new(&children.limits);
-        let Children { accounts, workers, clients, forge, notes, limits: _ } = children;
+        let Children { accounts, workers, clients, forge, setup, notes, limits: _ } = children;
         let max_out = root::max_out(limits);
         let capacity = max_out.checked_mul(2).expect("root routing room");
         let mut credentials = List::with_capacity(values.identities.len());
@@ -64,6 +66,7 @@ impl Engine {
             workers,
             clients,
             forge,
+            setup,
             forge_records,
             admission: None,
             facts: 0,
@@ -83,7 +86,8 @@ impl Engine {
         }
     }
     pub(crate) fn room(&self) -> bool {
-        self.forge.room(self.max_out)
+        self.setup.batch_room(self.max_out)
+            && self.forge.room(self.max_out)
             && self.store.room()
             && self.workers.batch_room(self.max_out)
             && self.clients.room(self.max_out)
@@ -118,6 +122,7 @@ impl Engine {
             next = crate::accounts::earliest(next, self.domain.next_deadline(&self.env));
             next = crate::accounts::earliest(next, self.values.accounts.next_expiry());
         }
+        next = crate::accounts::earliest(next, self.setup.next_deadline());
         next = crate::accounts::earliest(next, self.clients.next_deadline());
         next = crate::accounts::earliest(next, self.forge.component.next_deadline());
         crate::accounts::earliest(
@@ -130,6 +135,7 @@ impl Engine {
     }
     pub(crate) fn work_pending(&self, now: Time) -> bool {
         let components = (self.store.opened || self.end.is_some()) && self.clients.work_pending(now)
+            || (self.store.opened || self.end.is_some()) && self.setup.work_pending(now)
             || self.store.work_pending(now)
             || (self.store.opened || self.end.is_some()) && self.forge.work_pending(now)
             || (self.store.opened || self.end.is_some()) && self.workers.work_pending(now)
@@ -156,6 +162,9 @@ impl Engine {
                             || self.domain.ready() && !self.first_periods.is_empty()))
     }
     pub(crate) fn abort_if_ended(&mut self) {
+        if self.end.is_some() {
+            self.setup.close();
+        }
         if self.end.is_some() && self.forge.room(1) {
             self.forge.down(skein_forge_connection::Request::Close);
         }
@@ -191,6 +200,7 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     if !engine.forge_records.loading() || engine.end.is_some() || engine.drain.is_some() {
         engine.forge.iterate(now, wall);
     }
+    crate::setup::advance(engine);
     forge_pass(engine);
     engine.workers.iterate(now, &mut engine.events);
     let open = !engine.begin && engine.domain.ready() && engine.first_periods.is_empty();
@@ -317,7 +327,7 @@ fn answer(engine: &mut Engine) {
         return;
     }
     for _ in 0..engine.store.above.len() {
-        if engine.store.routed.room() < jig_protocol_store::MAX_OUT_DOWN {
+        if !engine.setup.room() || engine.store.routed.room() < jig_protocol_store::MAX_OUT_DOWN {
             break;
         }
         let event = engine.store.above.pop().expect("store terminals");
@@ -339,6 +349,8 @@ fn answer(engine: &mut Engine) {
                     } else {
                         stop::unavailable(engine, b"forge records");
                     }
+                } else if crate::tokens::prefix(owner) == 11 {
+                    crate::setup::answer(engine, event);
                 } else if crate::accounts::owns(owner) {
                     engine.store.sources.push(event);
                 } else {
@@ -355,6 +367,10 @@ fn answer(engine: &mut Engine) {
             | jig_protocol_store::Event::Unread { .. }
             | jig_protocol_store::Event::Corrupt { .. }) => {
                 if let jig_protocol_store::Event::Corrupt { owner } = &event
+                    && crate::tokens::prefix(*owner) == 11
+                {
+                    crate::setup::answer(engine, event);
+                } else if let jig_protocol_store::Event::Corrupt { owner } = &event
                     && *owner == crate::forge::records::LOAD
                 {
                     stop::unavailable(engine, b"forge records");
@@ -416,6 +432,7 @@ fn watcher(event: &root::Event) -> Option<skein_lib::Token> {
         | root::Event::Forge(_)
         | root::Event::Released(_)
         | root::Event::Credential { .. }
+        | root::Event::Setup { .. }
         | root::Event::Restart
         | root::Event::Stop
         | root::Event::Resume => None,

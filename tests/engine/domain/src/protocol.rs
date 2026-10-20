@@ -251,6 +251,7 @@ impl Protocol {
             | engine::Request::Worker(_)
             | engine::Request::Party(_)
             | engine::Request::Forge { .. }
+            | engine::Request::Setup { .. }
             | engine::Request::ToChild(_)
             | engine::Request::Busy(_)
             | engine::Request::Drained

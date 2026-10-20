@@ -579,6 +579,7 @@ pub fn resume(journal: &mut Journal, out: &mut Queue<Output>) {
                 | crate::PartyRequest::RunText { .. },
             )
             | crate::Output::Store(_)
+            | crate::Output::Setup { .. }
             | crate::Output::Account(_)
             | crate::Output::Busy(_)
             | crate::Output::Drained

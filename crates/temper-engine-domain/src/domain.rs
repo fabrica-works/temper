@@ -452,6 +452,7 @@ pub(crate) fn stage_now(domain: &mut Domain, out: &mut Queue<Request>) {
             Request::Stop => domain.stop_pending = true,
             request @ (Request::Worker(_)
             | Request::Party(_)
+            | Request::Setup { .. }
             | Request::Forge { .. }
             | Request::Store(crate::StoreRequest::Load { .. } | crate::StoreRequest::Read { .. })
             | Request::ToChild(_)

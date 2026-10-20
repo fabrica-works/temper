@@ -177,6 +177,7 @@ pub fn incoming(
         | engine::Request::Worker(_)
         | engine::Request::Forge { .. }
         | engine::Request::Account(_)
+        | engine::Request::Setup { .. }
         | engine::Request::ToChild(_)
         | engine::Request::Busy(_)
         | engine::Request::Drained

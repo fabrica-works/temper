@@ -1,74 +1,11 @@
 //! Arbitrary and mutated durable rows and keys (protocol/store.md, section 6).
-use skein_lib::{Duration, Rng};
+use skein_lib::Rng;
 use temper_engine_domain_forge as forge;
 use temper_protocol_store::{Bounds, keys, records};
 
-const LIMITS: forge::Limits = forge::Limits {
-    repositories: 2,
-    tasks: 8,
-    holds: 8,
-    subscriptions: 8,
-    entries: 8,
-    named_calls: 16,
-    changes: 8,
-    issues: 8,
-    resources_per_task: 4,
-    paths_per_subscription: 4,
-    name_bytes: 128,
-    output: 80,
-    facts: 16,
-    adoptions: 2,
-    applications: 4,
-    collaborators: 8,
-    landings: 8,
-    judge_projects: 2,
-    judge_criteria: 8,
-    brief_sections: 32,
-    brief_bytes: 4096,
-    client: skein_forge_client::Limits {
-        pending: 4,
-        calls: 2,
-        rate: 100,
-        reserve: 0,
-        window: Duration::from_secs(10),
-        op_bytes: 512,
-        answer_bytes: 4096,
-        rows: 8,
-        inbox: 16,
-        read_attempts: 3,
-        backoff: Duration::from_secs(1),
-        backoff_max: Duration::from_secs(4),
-        entries: 8,
-        write_attempts: 3,
-        lifetime: Duration::from_secs(10),
-        clock_margin: Duration::from_secs(1),
-        resources: 8,
-        repositories: 2,
-        poll: Duration::from_secs(5),
-        poll_max: Duration::from_secs(30),
-        hinted: Duration::from_secs(1),
-        slow: Duration::from_secs(40),
-        settle: Duration::from_secs(30),
-        facts: 16,
-    },
-    issue_policy: temper_engine_domain_forge_issues::Limits {
-        plan_items: 8,
-        milestones: 8,
-        title_bytes: 128,
-        body_bytes: 512,
-        comment_bytes: 256,
-        interval: Duration::from_secs(5),
-    },
-    change_policy: temper_engine_domain_forge_change::Limits {
-        repairs: 3,
-        resolutions: 3,
-        updates: 3,
-        stall: Duration::from_secs(30),
-        gates: 8,
-        clean_heads: 8,
-    },
-    queue_window: Duration::from_secs(30),
-};
+#[path = "support/store.rs"]
+mod fixture;
+use fixture::LIMITS;
 
 fn record(bytes: &[u8], bounds: &Bounds) {
     if let Ok(row) = records::decode(bytes, bounds) {
@@ -109,6 +46,46 @@ fn store_decoders_never_panic_and_reencode_the_same() {
         let bytes = keys::encode(&forge::stored_key(&writer), u32::MAX).expect("writer key");
         key(&bytes);
         key(&temper_codecs_world::mutated(&mut rng, &bytes));
+    }
+    // Queue-bearing records are also fuzz seeds, with both queue flags.
+    for queued in [false, true] {
+        let row = forge::Stored::Entry {
+            entry: skein_forge_client::Entry {
+                number: 1,
+                task: 2,
+                repository: skein_forge::api::Repository { forge: 1, repository: 3 },
+                effect: skein_forge_client::Effect {
+                    write: skein_forge::api::Write::Merge { number: 4, head: [5; 32] },
+                    condition: skein_forge_client::Condition::None,
+                },
+                start: None,
+                attempt: None,
+                failures: 0,
+                queued,
+            },
+            held: false,
+        };
+        let bytes = records::encode(&row);
+        record(&bytes, &bounds);
+        for _ in 0..8 {
+            record(&temper_codecs_world::mutated(&mut rng, &bytes), &bounds);
+        }
+    }
+    for answer in [
+        forge::CallPayload::Effect {
+            entry: 1,
+            deadline: skein_lib::Wall::EPOCH,
+            outcome: Some(skein_forge_client::Outcome::Queued),
+        },
+        forge::CallPayload::Read(Box::new(Ok(skein_forge::api::Answer::Queued))),
+    ] {
+        let row =
+            forge::Stored::Call { key: forge::NamedCall { task: 1, attempt: 2, completion: 3, position: 4 }, answer };
+        let bytes = records::encode(&row);
+        record(&bytes, &bounds);
+        for _ in 0..8 {
+            record(&temper_codecs_world::mutated(&mut rng, &bytes), &bounds);
+        }
     }
     for bytes in &goldens {
         golden(bytes, &bounds);

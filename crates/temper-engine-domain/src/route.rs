@@ -65,6 +65,7 @@ pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, 
         }
     };
     match event {
+        Event::Setup { .. } => return, // temper-07 handles the requesting client.
         Event::Resume => {
             crate::domain::resume_routed(domain, env, out);
             return;
@@ -444,6 +445,7 @@ pub(crate) fn discard_after_stop(domain: &mut Domain, event: Event) {
         | Event::Party(_)
         | Event::Forge(_)
         | Event::Credential { .. }
+        | Event::Setup { .. }
         | Event::Restart
         | Event::Resume
         | Event::Stop

@@ -205,12 +205,29 @@ pub struct Call {
     pub tool: Tool,
 }
 
+/// A setup result contains no credential (protocol/credentials.md, 1).
+#[derive(Debug)]
+pub enum SetupOutcome {
+    Done,
+    Manifest { state: Box<[u8]> },
+    Install { state: Box<[u8]>, url: Box<[u8]> },
+}
+#[derive(Debug)]
+pub enum SetupEnd {
+    Done { forge: u16, outcome: SetupOutcome },
+    Stopped { forge: u16, reason: Box<[u8]> },
+}
 /// External inputs to the walking root (domain/root.md, 3). Admission is
 /// `try_step`'s: an input the journal cannot take returns to its owner, and
 /// store answers are always taken (jig's `domain/root.md`, 3).
 /// The input union, with one variant for each typed peer.
 #[derive(Debug)]
 pub enum Event {
+    /// Terminal of the protocol-owned plan named by `run`; temper-07 consumes it.
+    Setup {
+        run: Token,
+        end: SetupEnd,
+    },
     Store(StoreInput),
     Worker(WorkerInput),
     Party(PartyInput),
@@ -434,6 +451,10 @@ pub enum PartyInput {
 /// and 4). Every output crosses the journal door in its peer's vocabulary.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    /// Run the staged plan named by this token; credential values stay in routing.
+    Setup {
+        run: Token,
+    },
     Store(StoreRequest),
     Worker(WorkerRequest),
     Party(PartyRequest),

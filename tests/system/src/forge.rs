@@ -387,6 +387,7 @@ impl World {
                     _ => {}
                 },
                 engine::Request::Account(_)
+                | engine::Request::Setup { .. }
                 | engine::Request::Party(_)
                 | engine::Request::Store(_)
                 | engine::Request::Busy(_)

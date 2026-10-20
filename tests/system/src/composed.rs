@@ -509,6 +509,7 @@ impl World {
                 | engine::PartyRequest::RunText { .. },
             )
             | engine::Request::Account(_)
+            | engine::Request::Setup { .. }
             | engine::Request::Busy(_)
             | engine::Request::Drained
             | engine::Request::Stop) => panic!("unscripted engine output: {other:?}"),
@@ -540,6 +541,7 @@ impl World {
             | engine::Request::Party(_)
             | engine::Request::Forge { .. }
             | engine::Request::Account(_)
+            | engine::Request::Setup { .. }
             | engine::Request::ToChild(_)
             | engine::Request::Busy(_)
             | engine::Request::Drained

@@ -143,7 +143,10 @@ fn configured_limits(
                 Ok(value) => {
                     if limits::handed_on(name) {
                         handed.push((bytes::copy_of(name), value)).expect("bounded overrides");
-                    } else if let Err(what) = limits::apply(&mut limits, name, value) {
+                    }
+                    if (!limits::handed_on(name) || limits::host_setup(name))
+                        && let Err(what) = limits::apply(&mut limits, name, value)
+                    {
                         problems.push(path.member(name), What::Override(what));
                     }
                 }

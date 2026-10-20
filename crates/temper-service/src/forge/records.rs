@@ -8,7 +8,7 @@ pub(crate) const LOAD: Token = Token::new(crate::tokens::FORGE | 1);
 pub(crate) struct Loader {
     #[cfg(test)]
     pub(crate) inspected: List<u64>,
-    rows: Rows,
+    pub(crate) rows: Rows,
     phase: Phase,
     pub(crate) bounds: skein_forge_setup::item::Bounds,
     value_bytes: u32,
@@ -141,7 +141,6 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
                         Phase::Name { after: u32::from(number).checked_add(1).expect("u16 number") };
                 }
                 None => {
-                    engine.forge_records.rows = Rows::new();
                     engine.forge_records.phase = Phase::Done;
                 }
             }

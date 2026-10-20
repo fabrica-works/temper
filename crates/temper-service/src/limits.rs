@@ -27,6 +27,7 @@ pub struct Clients {
 /// Temper's domain limits, each under its owner's prefix.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
+    pub setup: temper_forge_setup::limits::Host,
     pub records: Records,
     pub forges: Forges,
     pub forge_component: skein_forge_connection::Limits,
@@ -279,6 +280,7 @@ pub const SOCKETS: u32 = 48;
 pub fn profile(profile: Profile) -> Limits {
     match profile {
         Profile::Small => Limits {
+            setup: temper_forge_setup::limits::host(),
             records: Records { value_bytes: 4096 },
             forges: Forges { installations: FORGE_INSTALLATIONS },
             forge_component: crate::forge::small(&FORGE),
@@ -334,7 +336,22 @@ const GIT: temper_worker_protocol_git::Limits = temper_worker_protocol_git::Limi
 /// Limits decoded by the setup and box owners, kept with their values.
 #[must_use]
 pub fn handed_on(name: &[u8]) -> bool {
-    name.starts_with(b"setup.") || name.starts_with(b"box.")
+    (name.starts_with(b"setup.") && name != b"setup.runs" && name != b"setup.states" && name != b"setup.state_life_ms")
+        || name.starts_with(b"box.")
+}
+/// Setup bounds also consumed by the engine's host; the old shell keeps its four overrides.
+#[must_use]
+pub fn host_setup(name: &[u8]) -> bool {
+    [
+        b"setup.orgs".as_slice(),
+        b"setup.deadline_ms",
+        b"setup.backoff_ms",
+        b"setup.backoff_max_ms",
+        b"setup.runs",
+        b"setup.states",
+        b"setup.state_life_ms",
+    ]
+    .contains(&name)
 }
 
 /// Server bounds follow jig's shipped small profile, with its HTTP intake bounds.

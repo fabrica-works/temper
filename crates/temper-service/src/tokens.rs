@@ -18,6 +18,8 @@ pub const GIT: u64 = 6_u64 << 60;
 pub const SERVER: u64 = 7_u64 << 60;
 /// Store file drivers' kernel operations, as jig's reference allocates them.
 pub const STORE: [u64; 3] = [8_u64 << 60, 9_u64 << 60, 10_u64 << 60];
+/// Setup host IO and durable-write terminals.
+pub const SETUP: u64 = 11_u64 << 60;
 /// Worker index's tokens; refuses an index that reaches the next nibble.
 #[must_use]
 pub fn worker(index: u32) -> Option<u64> {

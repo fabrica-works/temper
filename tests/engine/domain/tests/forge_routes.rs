@@ -421,6 +421,7 @@ impl World {
     }
 
     #[expect(clippy::wildcard_enum_match_arm, reason = "the world records only its scripted root deliveries")]
+    #[expect(clippy::too_many_lines, reason = "one exhaustive root output table")]
     fn collect(&mut self) {
         for _ in 0..self.out.len() {
             let request = self.out.pop().expect("counted root output");
@@ -518,6 +519,7 @@ impl World {
                     _ => {}
                 },
                 engine::Request::Account(_)
+                | engine::Request::Setup { .. }
                 | engine::Request::Party(_)
                 | engine::Request::Store(_)
                 | engine::Request::Busy(_)

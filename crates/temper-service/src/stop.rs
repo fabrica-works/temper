@@ -25,6 +25,7 @@ pub(crate) fn drained(engine: &mut Engine) {
         return;
     }
     drain.closing = true;
+    engine.setup.close();
     engine.forge.down(skein_forge_connection::Request::Close);
     engine.clients.down(jig_protocol_engine_clients::Event::Close);
     engine.workers.close(engine.env.now, &mut engine.events);
@@ -42,11 +43,14 @@ pub(crate) fn advance(engine: &mut Engine) {
     if !drain.closing {
         return;
     }
+    engine.setup.close();
     let closed = match &engine.accounts {
         Some(accounts) => accounts.is_empty(),
         None => true,
     };
     if closed
+        && engine.setup.closed
+        && engine.setup.io.is_empty()
         && engine.forge.closed
         && engine.forge.io.is_empty()
         && engine.workers.closed()

@@ -201,7 +201,8 @@ impl Rows {
     }
 }
 impl ForgeRows {
-    fn get(&self, item: Item) -> Result<&[u8], NotConnected> {
+    /// Read an item past temper's version byte; malformed rows are refused.
+    pub fn get(&self, item: Item) -> Result<&[u8], NotConnected> {
         let index = usize::from(item.code()).checked_sub(1).expect("positive item");
         value(self.values.get(index).expect("ten codes").as_ref().ok_or(NotConnected::Incomplete)?.expose())
             .or(Err(NotConnected::Unreadable))

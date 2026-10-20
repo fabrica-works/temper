@@ -39,3 +39,19 @@ fn an_unknown_zero_or_overflowing_limit_is_refused() {
         assert_eq!(limits::apply(&mut limits::small(), name, value), Err(expected));
     }
 }
+#[test]
+fn host_counts_are_owned_by_the_small_profile_and_overrides_refuse_zero() {
+    let mut host = limits::host();
+    assert_eq!((host.runs, host.states), (8, 8));
+    assert_eq!(host.plan(), limits::small());
+    for name in [b"setup.runs".as_slice(), b"setup.states"] {
+        for value in [0, u64::MAX] {
+            assert_eq!(limits::apply_host(&mut host, name, value), Err(limits::Refused::Range));
+        }
+        assert_eq!(limits::apply_host(&mut host, name, 2), Ok(()));
+    }
+    assert_eq!((host.runs, host.states), (2, 2));
+    for value in [0, 3_600_001, u64::MAX] {
+        assert_eq!(limits::apply_host(&mut host, b"setup.state_life_ms", value), Err(limits::Refused::Range));
+    }
+}

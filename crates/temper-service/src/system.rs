@@ -114,6 +114,12 @@ impl Service {
             .expect("client routing room");
         let clients =
             clients::Clients::new(&settings.jig, &settings.clients.listener, seeds, client_room, &limits.journal)?;
+        let setup = crate::setup::prepare(
+            &settings,
+            &forge_settings,
+            &seeds.crypto,
+            max.checked_add(2).expect("setup routing headroom"),
+        )?;
         let forge = crate::forge::Layer::new(
             forge_settings,
             settings.limits.forge_component,
@@ -140,7 +146,7 @@ impl Service {
                 config,
                 &limits,
                 store,
-                engine::Children { accounts, workers, clients, forge, notes, limits: settings.limits },
+                engine::Children { accounts, workers, clients, forge, setup, notes, limits: settings.limits },
                 values,
                 first_periods,
             ),
@@ -156,6 +162,11 @@ impl Service {
             bytes: bytes.checked_add(worker_bytes).ok_or(start_problem(b"memory_bytes", What::Bound))?,
             links: Queue::with_capacity(queue),
         })
+    }
+    /// A manifest page can be reloaded until its own setup clock or capacity ends it.
+    #[must_use]
+    pub fn setup_page(&self, forge: u16, state: &[u8], now: Time) -> Option<&[u8]> {
+        self.engine.setup.page(forge, state, now)
     }
     /// Adopt the binary's deployment directory.
     pub fn adopt_store(&mut self, root: Fd, effective_user: u32) -> Result<(), Fd> {
@@ -267,6 +278,9 @@ impl Service {
                 Some(worker) => worker.is_empty(),
                 None => true,
             }
+            && self.engine.setup.closed
+            && self.engine.setup.io.is_empty()
+            && self.engine.setup.above.is_empty()
             && self.engine.forge.closed
             && self.engine.forge.io.is_empty()
             && self.engine.forge.above.is_empty()
@@ -296,6 +310,13 @@ impl Service {
             self.raw_submissions.push(self.engine.store.submitted.pop().expect("store submissions"));
         }
         if self.engine.store.opened || self.engine.end.is_some() {
+            for _ in 0..self.engine.setup.io.len() {
+                if self.raw_submissions.room() < io::MAX_OUT_DOWN.submissions || !self.io.takes() {
+                    break;
+                }
+                let request = self.engine.setup.io.pop().expect("setup IO requests");
+                io::down(&mut self.io, &self.io_env, crate::setup::tag(request), &mut self.raw_submissions);
+            }
             for _ in 0..self.engine.forge.io.len() {
                 if self.raw_submissions.room() < io::MAX_OUT_DOWN.submissions || !self.io.takes() {
                     break;
@@ -483,7 +504,7 @@ fn route_events(service: &mut Service) {
         {
             break;
         }
-        if !service.engine.forge.room(1) {
+        if !service.engine.setup.room() || !service.engine.forge.room(1) {
             break;
         }
         if let Some(worker) = &service.worker
@@ -526,6 +547,10 @@ fn route_events(service: &mut Service) {
             && worker.accepts(&event)
         {
             worker.up(service.io_env.now, event);
+        } else if let Some(owner) = owner
+            && crate::tokens::prefix(owner) == 11
+        {
+            service.engine.setup.up(event);
         } else if let Some(owner) = owner
             && crate::tokens::prefix(owner) == 5
         {

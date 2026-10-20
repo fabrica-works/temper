@@ -20,6 +20,7 @@ pub(crate) fn defer(domain: &Domain, event: Event) -> Result<Event, Box<forge::E
         | Event::Account(_)
         | Event::Credential { .. }
         | Event::Released(_)
+        | Event::Setup { .. }
         | Event::Restart
         | Event::Resume
         | Event::Stop) => Ok(event),

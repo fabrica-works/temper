@@ -2885,6 +2885,7 @@ dependencies = [
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-issues",
  "temper-engine-smith",
+ "temper-forge-setup",
  "temper-protocol-records",
  "temper-protocol-store",
  "temper-protocol-worker-wire",

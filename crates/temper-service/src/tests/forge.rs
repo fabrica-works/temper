@@ -538,6 +538,7 @@ fn records_start_routes_two_pages_without_erasing_or_reading_carried_values() {
         face.turn(&mut service);
     }
     assert!(service.engine.forge_records.done());
+    assert!(service.engine.forge_records.rows.forge(2).is_some(), "setup retains the loaded rows");
     assert_eq!(service.engine.store.forge_loads.len(), 2);
     for cursor in &service.engine.store.forge_loads {
         assert!(cursor.is_none_or(|number| number < records::CARRIED));

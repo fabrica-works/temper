@@ -107,7 +107,7 @@ fn stopped_line(number: u16, why: skein_forge_connection::Stopped) -> String {
             };
             format!("temper serve: forge {number}: {member}: invalid\n")
         }
-        Stopped::KeyRefused => format!("temper serve: forge {number}: app key: refused\n"),
+        Stopped::KeyRefused => format!("temper serve: forge {number}: app_key: refused\n"),
         Stopped::TokenRefused { installation, status } => {
             format!("temper serve: forge {number}: /app/installations/{installation}/access_tokens: status {status}\n")
         }
@@ -131,7 +131,7 @@ fn stopped_line(number: u16, why: skein_forge_connection::Stopped) -> String {
 fn github_start_refusals_name_their_paths() {
     use skein_forge_connection::{StartRead, Stopped};
     for (why, words) in [
-        (Stopped::KeyRefused, "app key: refused"),
+        (Stopped::KeyRefused, "app_key: refused"),
         (Stopped::TokenRefused { installation: 7, status: 403 }, "/app/installations/7/access_tokens: status 403"),
         (Stopped::Refused { read: StartRead::Installations, status: 401 }, "/app/installations: status 401"),
         (Stopped::Refused { read: StartRead::Mint, status: 401 }, "/app/installations/{id}/access_tokens: status 401"),
