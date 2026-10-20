@@ -3,7 +3,7 @@
 | Item | Design | When |
 |---|---|---|
 | GitHub's setup in its three modes | setup.md 15 | GitHub's build |
-| The binaries' digests | setup.md 15 | a deployment that installs binaries it did not build or download |
+| The binaries' digests | setup.md 6.6 (from 15) | taken by first-run (`draft/first-run.md`, step 4) |
 | Webhooks from another host, over TLS | setup.md 15; forge.md 5 | skein's TLS server side |
 | CI's isolation (an owned runner's jobs as another user) | setup.md 15 | before an owned forge runs a stranger's pull request |
 | Provisioning at adoption | setup.md 15; domain/connectors.md 11 | a repository in a person's namespace |
