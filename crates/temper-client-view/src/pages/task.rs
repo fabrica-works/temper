@@ -122,10 +122,12 @@ pub(crate) fn asked(b: &mut Builder, task: &c::Task, words: &Words) {
     b.close();
 }
 fn chip(b: &mut Builder, chip: &c::Chip, words: &Words, bindings: &mut Bindings) {
+    let name = words.say(Word::Task, &[Hole::Number(chip.task)]);
     b.open(Role::TreeItem);
-    b.name(&words.say(Word::Task, &[Hole::Number(chip.task)]));
+    b.name(&name);
     b.open(Role::Link);
-    b.name(&words.say(Word::Task, &[Hole::Number(chip.task)]));
+    b.name(&name);
+    b.text(Run::Plain, &name);
     b.bind(bindings.insert(Act::Go { address: Address::Task { task: chip.task } }));
     b.close();
     text(b, Role::Paragraph, chip.title.bytes());

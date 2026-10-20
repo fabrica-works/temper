@@ -163,3 +163,18 @@ fn out_of_date_the_page_offers_no_navigation() {
         assert_ne!(node.role, Role::Navigation);
     }
 }
+#[test]
+fn each_link_shows_its_name_as_its_text() {
+    let view = fixtures::signed_in_with_project();
+    let mut links = 0_u32;
+    let nodes = view.tree().nodes();
+    for (index, node) in nodes.iter().enumerate() {
+        if node.role == Role::Link {
+            assert_eq!(node.size, 2, "a link holds one text");
+            let [run] = nodes[index + 1].text.as_slice() else { panic!("one run per link") };
+            assert_eq!(Some(run.text.as_ref()), node.name.as_deref());
+            links += 1;
+        }
+    }
+    assert_eq!(links, 3);
+}

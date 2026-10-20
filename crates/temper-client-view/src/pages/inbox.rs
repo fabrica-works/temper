@@ -20,6 +20,9 @@ fn text(b: &mut Builder, role: Role, value: &[u8]) {
 fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], act: Act) {
     b.open(role);
     b.name(name);
+    if role == Role::Link {
+        b.text(Run::Plain, name);
+    }
     b.bind(bindings.insert(act));
     b.close();
 }

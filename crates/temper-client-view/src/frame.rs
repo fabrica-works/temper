@@ -1,6 +1,6 @@
 //! temper's banner and navigation, in the mockups' order (client/README.md, 5).
 use skein_lib::{List, Token};
-use skein_ui::{Binding, Builder, Region, Role};
+use skein_ui::{Binding, Builder, Region, Role, Run};
 use temper_client_domain::{Address, Domain, pages::Act};
 #[must_use]
 pub const fn owner() -> skein_ui::Owner {
@@ -59,12 +59,15 @@ impl Bindings {
 fn text(builder: &mut Builder, role: Role, words: &[u8]) {
     builder.open(role);
     builder.name(words);
-    builder.text(skein_ui::Run::Plain, words);
+    builder.text(Run::Plain, words);
     builder.close();
 }
 fn action(builder: &mut Builder, role: Role, words: &[u8], act: Act, bindings: &mut Bindings) {
     builder.open(role);
     builder.name(words);
+    if role == Role::Link {
+        builder.text(Run::Plain, words);
+    }
     builder.bind(bindings.insert(act));
     builder.close();
 }
