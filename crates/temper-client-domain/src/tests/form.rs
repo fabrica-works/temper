@@ -183,7 +183,13 @@ fn an_adoption_is_the_forges_family_bytes_under_its_asker() {
     assert!(reader.is_empty());
     assert_eq!(
         (record.family, record.version, adoption.project, adoption.owner.as_ref(), adoption.name.as_ref()),
-        (1, 1, 1, b"acme".as_slice(), b"shop".as_slice())
+        (
+            temper_client_protocol_wire::FORGE,
+            temper_client_protocol_wire::CLIENT_VERSION,
+            fixtures::PROJECT,
+            b"acme".as_slice(),
+            b"shop".as_slice()
+        )
     );
 }
 #[test]
@@ -209,7 +215,7 @@ fn an_answer_under_the_forges_asker_reaches_the_form() {
 }
 #[test]
 fn a_kept_adoption_of_another_version_is_dropped_and_its_form_shows_none_pending() {
-    const OTHER_VERSION: u32 = 2;
+    const OTHER_VERSION: u32 = temper_client_protocol_wire::CLIENT_VERSION + 1;
     let limits = fixtures::limits();
     let mut root = fixtures::filled();
     let mut out = fixtures::form_act(&mut root, forge::Act::Adopt);

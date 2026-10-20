@@ -36,9 +36,30 @@ fn a_family_hello_outside_the_version_makes_the_side_out_of_date() {
     let mut root = crate::unlinked(&limits, fixtures::SEED);
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     for (name, versions, expected) in [
-        ("served", contract::VersionRange { first: 1, last: 1 }, forge::Served::Yes),
-        ("newer", contract::VersionRange { first: 2, last: 2 }, forge::Served::OutOfDate),
-        ("inverted", contract::VersionRange { first: 2, last: 1 }, forge::Served::OutOfDate),
+        (
+            "served",
+            contract::VersionRange {
+                first: temper_client_protocol_wire::CLIENT_VERSION,
+                last: temper_client_protocol_wire::CLIENT_VERSION,
+            },
+            forge::Served::Yes,
+        ),
+        (
+            "newer",
+            contract::VersionRange {
+                first: temper_client_protocol_wire::CLIENT_VERSION + 1,
+                last: temper_client_protocol_wire::CLIENT_VERSION + 1,
+            },
+            forge::Served::OutOfDate,
+        ),
+        (
+            "inverted",
+            contract::VersionRange {
+                first: temper_client_protocol_wire::CLIENT_VERSION + 1,
+                last: temper_client_protocol_wire::CLIENT_VERSION,
+            },
+            forge::Served::OutOfDate,
+        ),
     ] {
         crate::step(
             &mut root,

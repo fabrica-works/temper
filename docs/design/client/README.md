@@ -632,8 +632,9 @@ for its kind, its user's login and its installations. Its nodes:
   subjects, so no request, read or subject of their own reaches the
   engine.
 - **`CLIENT_VERSION`:** the version of every record below, 1 at first,
-  moved as `../protocol/README.md`, section 9 says: at most once in a
-  plan, at its first landing that changes one of these records, and
+  2 since the demo's read, moved as `../protocol/README.md`, section 9
+  says: at most once in a plan, at its first landing that changes one
+  of these records, and
   shared by plans that run at once. A request, an outcome or a field
   added to the family (the FORGE requests of section 8, the picker's
   ids in `Adopt`, the forge's kind in the adopted outcome, the demo's
@@ -685,7 +686,9 @@ for its kind, its user's login and its installations. Its nodes:
   its forge's number (u16); its model's LLM provider (u32); its
   repository's owner and name (byte strings, bounded as `Adopt`'s);
   and its cues, at most 8, each 1 to 256 bytes of text, in the
-  configuration's order (section 8).
+  configuration's order (section 8). On the wire it is `Reading`'s
+  `demo`, `Reading` naming which of the family's reads a read is, and
+  its answer `DemoAnswer`; none is the read's empty answer.
 - **The forge's documents' records:** its reads, subjects and
   documents, and its other requests, beside `Adopt` (`forge.md`,
   section 9).

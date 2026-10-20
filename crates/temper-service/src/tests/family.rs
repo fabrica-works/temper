@@ -87,10 +87,10 @@ fn an_adopt_naming_no_configured_forge_reaches_the_root_with_no_host() {
 #[test]
 fn an_adopt_of_another_version_is_answered_undecodable() {
     for (row, family, version, record, expected) in [
-        ("family", 2, 1, wire::adopt(&adopt()), REPLY),
-        ("version", 1, 2, wire::adopt(&adopt()), REPLY),
-        ("malformed", 1, 1, Box::new([]), REPLY),
-        ("trailing", 1, 1, trailing_adopt(), REPLY),
+        ("family", 2, wire::CLIENT_VERSION, wire::adopt(&adopt()), REPLY),
+        ("version", 1, wire::CLIENT_VERSION + 1, wire::adopt(&adopt()), REPLY),
+        ("malformed", 1, wire::CLIENT_VERSION, Box::new([]), REPLY),
+        ("trailing", 1, wire::CLIENT_VERSION, trailing_adopt(), REPLY),
     ] {
         let Err(answer) = family::to_root(exchange(family, version, record), &[], &w::CEILINGS) else {
             panic!("{row}: undecodable")
@@ -110,16 +110,32 @@ fn trailing_adopt() -> Box<[u8]> {
 }
 #[test]
 fn a_forge_family_read_is_unknown() {
-    for (row, family, version, expected) in
-        [("forge", wire::FORGE, 1, (REPLY, wire::FORGE, None)), ("other", 2, 3, (REPLY, 2, None))]
-    {
+    for (row, family, version, record, scope, expected) in [
+        (
+            "forge",
+            wire::FORGE,
+            wire::CLIENT_VERSION,
+            Box::<[u8]>::default(),
+            people::ApplicationScope::Project(7),
+            (REPLY, wire::FORGE, None),
+        ),
+        ("other", 2, 3, Box::new([]), people::ApplicationScope::Project(7), (REPLY, 2, None)),
+        (
+            "demo",
+            wire::FORGE,
+            wire::CLIENT_VERSION,
+            wire::reading(&w::Reading::new(&w::CEILINGS, w::ReadingParts { read: w::Read::Demo }).unwrap()),
+            people::ApplicationScope::Deployment,
+            (REPLY, wire::FORGE, None),
+        ),
+    ] {
         let input = kit::ToApplication::Read {
             reply: REPLY,
             sign_in: 3,
             family,
             version,
-            record: Box::new([]),
-            scope: people::ApplicationScope::Project(7),
+            record,
+            scope,
             window: jig_domain_core::documents::Window { rows: 2, after: None },
         };
         let Err(answer) = family::to_root(input, &[], &w::CEILINGS) else { panic!("{row}: unknown read") };
@@ -132,7 +148,7 @@ fn a_forge_family_read_is_unknown() {
 #[test]
 fn a_forge_family_watch_is_refused_unknown() {
     for (row, family, version, expected) in [
-        ("forge", wire::FORGE, 1, (Token::new(7), jig_domain_core::WatchRefusal::Unknown)),
+        ("forge", wire::FORGE, wire::CLIENT_VERSION, (Token::new(7), jig_domain_core::WatchRefusal::Unknown)),
         ("other", 2, 3, (Token::new(7), jig_domain_core::WatchRefusal::Unknown)),
     ] {
         let input = kit::ToApplication::Watch {

@@ -7,7 +7,8 @@ use skein_lib::{List, Reader};
 #[test]
 fn an_adopt_of_another_version_is_refused() {
     let mut bytes = crate::adopt(&fixtures::adopt());
-    *bytes.get_mut(1).expect("the record starts with a u16 version") = 2;
+    *bytes.get_mut(1).expect("the record starts with a u16 version") =
+        u8::try_from(crate::CLIENT_VERSION + 1).expect("test version fits");
     let problem =
         v1::Adopt::decode(&fixtures::limits(), &mut Reader::new(&bytes)).expect_err("another version is refused");
     assert_eq!(problem, v1::Problem { path: v1::Path::AdoptVersion, reason: skein_codec::Reason::Version });
@@ -52,6 +53,10 @@ fn limits_take_each_bound_from_its_source_field() {
     assert_eq!(
         fixtures::limits(),
         v1::Limits {
+            demo_answer_owner: 16,
+            demo_answer_name: 16,
+            demo_answer_cues: crate::CUES,
+            demo_answer_cues_item: crate::CUE_BYTES,
             adopt_owner: 16,
             adopt_name: 16,
             adopt_prefix: 16,
@@ -80,4 +85,32 @@ fn each_owner_round_trips_its_number() {
 #[test]
 fn an_unknown_owner_number_has_no_owner() {
     assert_eq!(crate::owner(65_535), None);
+}
+
+#[test]
+fn the_demo_read_and_answer_round_trip_with_nonempty_cues() {
+    let limits = fixtures::limits();
+    let reading = v1::Reading::new(&limits, v1::ReadingParts { read: v1::Read::Demo }).expect("demo read");
+    assert_eq!(crate::decode_reading(&crate::reading(&reading), &limits), Some(reading));
+    for (row, cue, accepted) in [("cue", "Change it", true), ("empty cue", "", false)] {
+        let mut cues = List::with_capacity(crate::CUES);
+        cues.push(cue.as_bytes().into()).expect("one cue");
+        let answer = v1::DemoAnswer::new(
+            &limits,
+            v1::DemoAnswerParts {
+                project: 7,
+                forge: crate::FORGE,
+                provider: 3,
+                owner: b"acme".as_slice().into(),
+                name: b"shop".as_slice().into(),
+                cues,
+            },
+        )
+        .expect("schema answer");
+        let back = crate::decode_demo_answer(&crate::demo_answer(&answer), &limits);
+        assert_eq!(back.is_some(), accepted, "{row}");
+        if accepted {
+            assert_eq!(back, Some(answer), "{row}");
+        }
+    }
 }
