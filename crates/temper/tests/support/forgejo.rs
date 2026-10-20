@@ -29,6 +29,11 @@ pub struct Throwaway {
 impl Throwaway {
     #[must_use]
     pub fn start(scratch: &Scratch) -> Self {
+        Self::start_with_job_sleep(scratch, 60)
+    }
+
+    #[must_use]
+    pub fn start_with_job_sleep(scratch: &Scratch, sleep_seconds: u64) -> Self {
         let address = owned::tier_configuration(scratch.path());
         let running = owned::start(scratch.path());
         let pid = running.id();
@@ -48,7 +53,7 @@ impl Throwaway {
         );
         stage("reconcile", began);
         let person = person_token(&instance);
-        let repository = repository(&instance, &person);
+        let repository = repository(&instance, &person, sleep_seconds);
         let config: Value =
             serde_json::from_slice(&fs::read(scratch.path().join("config.json")).expect("configuration"))
                 .expect("JSON");
@@ -393,7 +398,7 @@ fn person_token(instance: &Instance) -> Token {
     stage("person", began);
     Token::new(value["sha1"].as_str().expect("person token").into())
 }
-fn repository(instance: &Instance, person: &Token) -> u64 {
+fn repository(instance: &Instance, person: &Token, sleep_seconds: u64) -> u64 {
     let began = skein_shell::Clock::new().now().now;
     let value = request(
         instance,
@@ -404,11 +409,10 @@ fn repository(instance: &Instance, person: &Token) -> u64 {
         201,
     );
     request(instance, person, "PATCH", "/api/v1/repos/acme/widget", &json!({"has_actions":true}), 200);
-    // The hinted job outlasts temper-service's 30 s settle window
+    // The hinted job sleeps 8 s, outlasting its overridden 3 s settle window
     // (protocol/setup.md 13.4).
-    for (path, content) in
-        [("check.sh", "test ! -e slow || sleep 60\ntest -s README.md\n"), (".forgejo/workflows/check.yaml", WORKFLOW)]
-    {
+    let check = format!("test ! -e slow || sleep {sleep_seconds}\ntest -s README.md\n");
+    for (path, content) in [("check.sh", check.as_str()), (".forgejo/workflows/check.yaml", WORKFLOW)] {
         let length = skein_lib::base64::encoded_len(
             skein_lib::base64::Alphabet::Standard,
             u32::try_from(content.len()).expect("workflow length"),

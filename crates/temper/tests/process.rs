@@ -210,7 +210,11 @@ fn a_change_lands_by_deliveries_with_every_poll_raised() {
 /// The landing story; the hinted case raises four limits and pushes the slow job marker.
 fn landing(case: &str, raised: bool) {
     let scratch = support::Scratch::new(case);
-    let forgejo = support::forgejo::Throwaway::start(&scratch);
+    let forgejo = if raised {
+        support::forgejo::Throwaway::start_with_job_sleep(&scratch, 8)
+    } else {
+        support::forgejo::Throwaway::start(&scratch)
+    };
     if raised {
         forgejo.push("slow");
     }

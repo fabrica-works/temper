@@ -485,8 +485,10 @@ pub const LANDING: Duration = Duration::from_secs(180);
 /// Past `LANDING`: poll, `poll_max`, slow and stall ship at 5, 30, 40 and 30 s (temper-service limits.rs).
 pub const RAISED_MS: u64 = 600_000;
 const _: () = assert!(Duration::from_millis(RAISED_MS).as_nanos() > LANDING.as_nanos());
+// The hinted job's 8 s sleep outlasts settle (protocol/setup.md 10, 13.4).
+const HINTED_SETTLE_MS: u64 = 3000;
 
-/// Raises the three keep paces and the change's stall, retaining a private configuration.
+/// Raises the three keep paces and the change's stall, and shortens the hinted story's settle.
 pub fn raise_paces(directory: &Path) {
     let path = directory.join("config.json");
     let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
@@ -495,6 +497,7 @@ pub fn raise_paces(directory: &Path) {
     {
         value["application"]["limits"]["overrides"][name] = RAISED_MS.into();
     }
+    value["application"]["limits"]["overrides"]["forge.client.settle_ms"] = HINTED_SETTLE_MS.into();
     write_private(&path, &serde_json::to_vec(&value).expect("configuration JSON"));
 }
 #[must_use]
