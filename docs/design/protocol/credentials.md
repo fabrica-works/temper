@@ -145,7 +145,11 @@ setup.md's (section 9). What is open is listed in section 8.
   - `Accepted`: the installations' ids, each a `u64` little-endian,
     concatenated, ascending, distinct, at most `installations` of them,
     empty for none;
-  - `Origin`, temper's: `[kind u8][api as text]`.
+  - `Origin`, temper's: `[kind u8][api as text]`, the kind 1 for Forgejo
+    and 2 for GitHub, and the `api` address as `<host>:<port>`: a socket
+    address as Rust writes it (`[<ipv6>]:<port>` for IPv6), a host's
+    name as configured, and `api.github.com:443` for GitHub's `null`.
+    Equal bytes are the same forge; the text is shown as is.
 
   Each item has one total decoder, skein's (temper's for `Origin`); a
   change of an item's bytes is a new item, under a new code. temper keeps
