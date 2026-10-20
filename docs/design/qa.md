@@ -462,9 +462,12 @@ The experiment judges no promise of its own.
 - **Correction:** P′, P with `faults` and `planted` empty, is H's tree.
   Before P's first run the owner checks it: P's files are H's but
   `experiment.json`, and P's `experiment.json` with those two members
-  emptied has H's bytes. Each finding's fix is H's digest; its recheck,
-  H's key at that subject and class, judged pass, recorded as its
-  `rechecked` (skein's `lab.md`, 9.4). A P that drifted from H is fixed
+  emptied has H's bytes. For the planted stop finding classed
+  `experiment`, the fix is H's digest; its recheck is H's key at that
+  subject and class, judged pass, recorded as its `rechecked` (skein's
+  `lab.md`, 9.4). Other failures need their own cause, class, fix and
+  recheck (10.3); clearing the fault alone does not close them.
+  A P that drifted from H is fixed
   in P, never paid for with three new seeds.
 - **Detection stays:** P is kept, and a later run of it is an `occurred`
   on the closed findings.
