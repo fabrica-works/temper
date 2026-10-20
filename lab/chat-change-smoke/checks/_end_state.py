@@ -1,11 +1,11 @@
 """Private pure judgment for qa.md, 8.4; deliberately no wire adapter or CLI.
 
-The eventual adapter must select the LAST target Merged.commit and main
-Moved.to (including a later deletion), and supply complete objects from the
-private git `objects` route. Counts and byte trees match skein's actual
-Observation and Object domain, not a proposed observation JSON format.
+The observation projection reads the landed skein writer's JSON lines.
+The eventual adapter must supply an owner-confirmed flush/stop boundary and
+complete objects from the private git `objects` route.
 """
 
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import IntEnum
@@ -41,6 +41,95 @@ class _Verdict:
 
 def _count(value: object) -> bool:
     return type(value) is int and 0 < value <= (1 << 64) - 1
+
+
+def _observation_members(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("repeated observation member")
+        result[key] = value
+    return result
+
+
+def _observation_number(text):
+    value = int(text)
+    if text.startswith("-") or value >= 1 << 64:
+        raise ValueError("number is not a u64")
+    return value
+
+
+def _project_observations(data: bytes | None) -> dict:
+    """Pure end-state inputs for _judge; neither EOF nor a checkpoint proves flush.
+
+    Source: skein fbc771fde2a784d3b95e7a03460c4ccc56829c9d,
+    crates/skein-fake-forge-protocol/src/observations{.rs,/read.rs,/writer.rs},
+    fake-forge.md, 2.4. Validate the moved/deleted/merged records used here;
+    other official tags are ignored, without decoding their content or judging
+    promises. Content is base64, names UTF-8, numbers full u64 JSON integers.
+    """
+    complete = data is not None and data.endswith(b"\n")
+    checkpoint = False
+    losses = []
+    merged = moved = None
+    tags = {
+        "moved", "deleted", "opened", "closed", "reopened", "labelled",
+        "revised", "depends", "requested", "defined", "commented", "edited",
+        "removed", "reviewed", "reported", "merged", "enqueued", "group",
+        "dequeued", "refused", "rejected", "wiki",
+    }
+    fields = {
+        "moved": {"observation", "repository", "branch", "from", "to", "by", "forward"},
+        "deleted": {"observation", "repository", "branch", "at", "by"},
+        "merged": {"observation", "repository", "number", "base", "head", "commit", "by"},
+    }
+    try:
+        for line in (data or b"").split(b"\n")[:-1]:
+            checkpoint = False
+            # Explicit UTF-8 avoids json.loads(bytes)' UTF-16/32 auto-detection.
+            # int rejects fractional/exponent numbers and non-JSON constants.
+            record = json.loads(line.decode("utf-8"), object_pairs_hook=_observation_members,
+                                parse_int=_observation_number, parse_float=int, parse_constant=int)
+            if type(record) is not dict:
+                raise ValueError("observation is not an object")
+            if "observations_lost" in record:
+                loss = record["observations_lost"]
+                if set(record) != {"observations_lost"} or type(loss) is not int or not 0 <= loss < 1 << 64:
+                    raise ValueError("unknown loss")
+                losses.append(loss)
+                checkpoint = True
+                continue
+            tag = record.get("observation")
+            repository = record.get("repository")
+            if type(tag) is not str or tag not in tags or type(repository) is not str:
+                raise ValueError("unknown observation")
+            repository.encode("utf-8")
+            if tag not in fields:
+                continue
+            if set(record) != fields[tag]:
+                raise ValueError("malformed end-state observation")
+            branch = record["base" if tag == "merged" else "branch"]
+            if type(branch) is not str:
+                raise ValueError("branch is not a name")
+            branch.encode("utf-8")
+            numbers = {"merged": ("number", "head", "commit", "by"),
+                       "moved": ("to", "by"), "deleted": ("at", "by")}[tag]
+            if tag == "moved":
+                if record["from"] is not None:
+                    numbers += ("from",)
+                if record["forward"] is not None and type(record["forward"]) is not bool:
+                    raise ValueError("forward is not a flag")
+            if any(type(record[key]) is not int or not 0 <= record[key] < 1 << 64 for key in numbers):
+                raise ValueError("count is not a u64")
+            if repository == "fake/widget" and branch == "main":
+                if tag == "merged":
+                    merged = record["commit"]
+                else:
+                    moved = record["to"] if tag == "moved" else None
+    except (ValueError, UnicodeError, RecursionError):
+        complete = False
+    return dict(complete_lines=complete and checkpoint, loss_counts=tuple(losses),
+                last_merged=merged, last_moved=moved)
 
 
 def _tree_valid(tree: Mapping[bytes, bytes] | None) -> bool:

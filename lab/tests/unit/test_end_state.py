@@ -1,12 +1,13 @@
-"""Known byte trees, not observations in a guessed external encoding."""
+"""Known byte trees and the landed skein observation writer's JSON lines."""
 
+import json
 import sys
 import unittest
 from pathlib import Path
 
 EXPERIMENT = Path(__file__).resolve().parents[2] / "chat-change-smoke"
 sys.path.insert(0, str(EXPERIMENT / "checks"))
-from _end_state import _CHANGED, _CONTENT, _NOT_LANDED, _Object, _Status, _judge
+from _end_state import _CHANGED, _CONTENT, _NOT_LANDED, _Object, _Status, _judge, _project_observations
 
 NOTICE = b"Maintained by temper.\n"
 PARENT = {b"README.md": b"widget\n", b"src/a": b"\x00\xff\n"}
@@ -121,6 +122,75 @@ class EndStateTests(unittest.TestCase):
         for count in ("12", True, -1, 0, 1 << 64):
             with self.subTest(count=count):
                 self.assertEqual(judge(last_merged=count, last_moved=count).status, _Status.UNDECIDED)
+
+    def test_writer_projection_needs_whole_lossless_observations_and_owner_boundary(self):
+        commit = (1 << 64) - 1  # Distinct integers above 2**53 must not round together.
+        merge = dict(observation="merged", repository="fake/widget", number=1,
+                     base="main", head=commit - 1, commit=commit, by=2)
+        move = dict(observation="moved", repository="fake/widget", branch="main",
+                    **{"from": commit - 2, "to": commit, "by": 2, "forward": True})
+        delete = dict(observation="deleted", repository="fake/widget", branch="main", at=commit, by=2)
+        zero = {"observations_lost": 0}
+        objects = {commit - 2: _Object(None, None, PARENT),
+                   commit: _Object(commit - 2, None, CURRENT)}
+
+        def wire(records):
+            return b"".join((json.dumps(r, ensure_ascii=False) + "\n").encode("utf-8") for r in records)
+
+        story = [dict(merge, commit=commit - 1), dict(move, to=commit - 1), zero, merge, move]
+        complete = wire(story + [zero])
+        ignored = [dict(move, repository="別/widget", to=1), dict(delete, branch="topic"),
+                   dict(merge, base="other", commit=1),
+                   dict(observation="commented", repository="fake/widget", number=1, id=1,
+                        body="AP8K", by=2)]  # Opaque base64 content, never a text/tree substitute.
+        cases = [
+            ("last target, repeated checkpoints", complete + wire([zero]), _Status.PASS, commit, commit),
+            ("other repository/branch and content", wire(story + ignored + [zero]), _Status.PASS, commit, commit),
+            ("delete", wire(story + [delete, zero]), _Status.FAIL, commit, None),
+            ("recreate", wire(story + [delete, dict(move, **{"from": None}), zero]), _Status.PASS, commit, commit),
+            ("moved away", wire(story + [dict(move, to=commit - 1), zero]), _Status.FAIL, commit, commit - 1),
+            ("merge does not imply move", wire([merge, zero]), _Status.FAIL, commit, None),
+            ("loss is sticky", complete + wire([{"observations_lost": 2}, zero]), _Status.UNDECIDED, commit, commit),
+        ]
+        for name, data, status, merged, moved in cases:
+            with self.subTest(name=name):
+                facts = _project_observations(data)
+                self.assertEqual((facts["last_merged"], facts["last_moved"]), (merged, moved))
+                self.assertEqual(_judge(**facts, flushed=True, objects=objects, notice=NOTICE).status, status)
+
+        malformed = [
+            None, b"", wire(story), complete.rstrip(b"\n"), complete + b'{"observations_lost":',
+            complete + b"\n", complete + b"[]\n", complete + b"{bad}\n",
+            complete + b'{"observation":"new_tag","repository":"fake/widget"}\n' + wire([zero]),
+            complete + b'{"observations_lost":0,"observations_lost":0}\n',
+            complete + b'{"observations_lost":0,"extra":1}\n',
+            complete + b'{"observations_lost":NaN}\n',
+            complete + b'{"observations_lost":-0}\n',
+            complete + b'{"observations_lost":1e0}\n',
+            complete + b'{"observations_lost":0.0}\n',
+            complete + wire([dict(move, forward=1), zero]),
+            complete + wire([{k: v for k, v in merge.items() if k != "head"}, zero]),
+            complete + wire([dict(delete, at=True), zero]),
+            complete + wire([dict(merge, commit="12"), zero]),
+            complete + wire([dict(move, to=1 << 64), zero]),
+            complete + wire([dict(move, **{"from": -1}), zero]),
+            complete + wire([dict(move, extra=1), zero]),
+            complete + b'{"observations_lost":false}\n',
+            complete + b'{"observations_lost":null}\n',
+            complete + b'{"observations_lost":18446744073709551616}\n',
+            complete + b'{"observation":"moved","repository":"\xff"}\n',
+            complete + wire([dict(move, branch="surrogate"), zero]).replace(b"surrogate", b"\\ud800"),
+        ]
+        for index, data in enumerate(malformed):
+            with self.subTest(malformed=index):
+                self.assertEqual(_judge(**_project_observations(data), flushed=True,
+                                        objects=objects, notice=NOTICE).status, _Status.UNDECIDED)
+        for boundary in (None, False, 1):
+            with self.subTest(boundary=boundary):
+                self.assertEqual(_judge(**_project_observations(complete), flushed=boundary,
+                                        objects=objects, notice=NOTICE).status, _Status.UNDECIDED)
+        self.assertEqual(_judge(**_project_observations(complete), flushed=True,
+                                objects=None, notice=NOTICE).status, _Status.UNDECIDED)
 
 
 if __name__ == "__main__":
