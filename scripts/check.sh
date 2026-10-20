@@ -11,6 +11,11 @@ if grep -rnE '\b(task|watching|join|number|delegate|digest)\([0-9]+\)|calls\(\)\
     exit 1
 fi
 
+if grep -rnE 'assert_eq!\(\([a-z_]+\.exit, [a-z_]+\.exit|\.len\(\), [0-9]+[,)]' tests/real-loop/tests; then
+    echo 'One behaviour per test: assert the act, and name real-loop sizes.' >&2
+    exit 1
+fi
+
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
 # The browser's client crates (client/browser.md, 4.3).
