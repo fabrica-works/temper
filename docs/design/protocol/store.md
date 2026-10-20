@@ -17,8 +17,8 @@ a second store. temper's part is the crate `temper-protocol-store`
   under the application's tag, in the same commits (jig's
   `protocol/store.md`, section 12).
 - **One family per forge record.** Each variant of the forge connector's
-  `Stored` is a family, a keyed adoption's outcome and each forge's
-  writer among them. Nothing
+  `Stored` is a family, a keyed adoption's or forge outcome and each
+  forge's writer among them. Nothing
   else of temper's is in the main store: temper has no index of its own
   and no secret record there, its forges' records being in jig's
   secrets' store (credentials.md, 2.1); the core's records, people's and
@@ -77,12 +77,12 @@ section 7).
 | 7 | `PullState` | `PullState(Name)` | a pull request's last published state | the client's `resources` |
 | 8 | `Ci` | `Ci { repository, head }` | the last CI verdict published for a commit | `subscriptions` |
 | 9 | `Landed` | `Landed(Commit)` | a merge temper made, and its task | `landings` |
-| 10 | `Entry` | `Entry(u64)`: the entry's number | an unsettled outbox entry, held or not | `entries` |
+| 10 | `Entry` | `Entry(u64)`: the entry's number | an unsettled outbox entry, held or not, and whether the forge's merge queue holds its merge (`queued`, skein's `forge-client.md`, 7.7) | `entries` |
 | 11 | `Client` | `Client(client::Key)`: `Live(Resource)` or `Repository(Repository)` | the client's working set: a live resource's row, or a repository's listing mark | the client's `resources` and `repositories` |
 | 12 | `Change` | `Change(u64)`: the task | a change procedure's state | `changes` |
 | 13 | `Issue` | `Issue(u64)`: the goal | a goal's issue projection | `issues` |
 | 14 | `Release` | `Release(u64)`: the task | a closing task's release | `tasks` |
-| 15 | `Application` | `Application(u64)`: the people child's token for the request | a keyed adoption's outcome, kept until its retention ends (jig's `domain/connectors.md`, 5.5: a connector keeps its keyed requests' outcomes durably) | `applications` |
+| 15 | `Application` | `Application(u64)`: the people child's token for the request | a keyed adoption's outcome, or a keyed outcome of the FORGE family, kept until its retention ends (jig's `domain/connectors.md`, 5.5: a connector keeps its keyed requests' outcomes durably); an outcome carrying a link is kept in memory alone, until its state's life ends (`setup.state_life_ms` after `Done`; `../client/README.md`, section 8) | `applications` |
 | 16 | `Writer` | `Writer(forge)`: the forge's number | the forge's writer, given at runtime from its connect's user (skein's `forge-client.md`, 7.1; credentials.md, section 5), restored at start so that restored effects never meet `Forbidden` | the configured `forges` |
 
 - **Loaded:** every family at the forge's restart step, and never
@@ -150,7 +150,9 @@ section 7).
   runtime, kept by skein's forge client as its own record (skein's
   `forge-client.md`, 7.1), and not secret (credentials.md, 2.1). The
   move from 2 to 3 breaks the stored format: a store written at 2
-  refuses to open, saying so (jig's `protocol/store.md`, 5.3).
+  refuses to open, saying so (jig's `protocol/store.md`, 5.3). Tag 15's
+  outcome, which also holds the FORGE family's keyed outcomes and
+  whose adoption carries the forge's kind, is that move's, in place.
   Pre-release, nothing is translated; upgrades stay open (section 7).
   Another owner's move in the same window is this one: the version
   moves once (`README.md`, section 9).

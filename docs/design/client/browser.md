@@ -366,7 +366,10 @@ tests 4.1's stories take and 4.2's story, the tier reaches its 12.
   `/forges/N/github/manifest?state=S` and presses its one button. The
   form posts to `WEB/settings/apps/new?state=S`, the fake's. The test
   ends once the fake's GitHub layer has taken the post, its `manifest`
-  field the page's and its state S, with no policy violation.
+  field the page's and its state S, with no policy violation. The post
+  is answered `200` with a page holding one link, `Create GitHub App`
+  (id `create`); the test does not follow it, and the later steps are
+  the real loop's (`../domain/testing.md`, 2.4).
 - **No github.com:** `web` is the fake's, and the page's policy lets
   its form post nowhere else. No test of the tier holds a real
   credential.

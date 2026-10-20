@@ -324,10 +324,10 @@ keeps (`../protocol/configuration.md`, section 2).
 - **The forges' page** is the forge's part of the deployment's
   connectors (jig's `client/domain/pages.md`, section 7), on a page of
   temper's own (`forge.md`, 5.4). It is read for a person whose role
-  holds the deployment's connectors, in standalone the deployment's
-  owner; any other's read is refused, and the page says so in jig's
-  words, and a request the root refuses for the role says "Your role
-  does not hold the deployment's forges." Its acts are the FORGE
+  on project 0 is `Owner`, in standalone the deployment's owner; any
+  other's read is refused, and the page says so in jig's words, and a
+  request the root refuses for the role says "Your role does not hold
+  the deployment's forges." Its acts are the FORGE
   requests (section 8), each sent as 3.6
   says; a pasted key or token is a secret field (3.6), and a connect's
   or an install's link is shown as an external link (6.5). How a
@@ -518,7 +518,7 @@ for its kind, its user's login and its installations. Its nodes:
 
 | Node, named | Shows | Acts |
 |---|---|---|
-| choice group "Account", GitHub alone | "All accounts", then a choice per installation the forge's read names, its account's login, followed by ", selected repositories" where its installation selects them and ", suspended" where GitHub suspends it | a choice reads that account's first page |
+| choice group "Account", GitHub alone | a choice per accepted installation the forge's read names, its account's login, followed by ", selected repositories" where its installation selects them and ", suspended" where GitHub suspends it; the first is chosen when the forge's number is written | a choice reads that installation's first page, the request's `installation` its id |
 | list "Repositories" | an item per row holding a button named "OWNER/NAME", or "OWNER/NAME, private" where the forge says it is private; at most the answer's rows, `picker.page` (`../protocol/configuration.md`, its limits) clipped to the forge's own page cap, within the client's limit on a page's rows | a row fills "Owner" and "Name" and keeps the row's ids for the request (4.6) |
 | buttons "Next" and "First page" | "Next" while the answer says more follow (`more`, set when the page is full); "First page" past the first | the page after the one shown, by its number, or page 1 again |
 | a status under the list | "Reading forge F's repositories…" while the request is pending; "None reachable." for an empty first page; a refusal, below | — |
@@ -546,7 +546,7 @@ for its kind, its user's login and its installations. Its nodes:
   None of these empties the fields.
 - **One page at a time.** The form holds the last page read, its
   number and whether more follow, never earlier pages; a page answered
-  after the person chose another forge, account or page is dropped. A
+  after the person chose another forge, installation or page is dropped. A
   page past the last answers no rows, as "Next" after a last page that
   came back full does, or one asked after the list shrank, and the form
   says "No more repositories." with "First page".
@@ -590,9 +590,9 @@ for its kind, its user's login and its installations. Its nodes:
 - **State:** each field's text and the domain's count of its own
   writes; the pending request's key and progress, at most one; the last
   outcome; the version range the engine serves for the forge's records;
-  the picker's account chosen, its last page (its number, its rows and
-  whether more follow) or refusal, its pending `Reachable` key, at most
-  one, and the chosen row's ids. Bounded by its limits: the field
+  the picker's installation chosen, its last page (its number, its rows
+  and whether more follow) or refusal, its pending `Reachable` key, at
+  most one, and the chosen row's ids. Bounded by its limits: the field
   bytes, the checks, a page's rows.
 - **Records:** none of its own; its pending adoption is `jig-client`'s
   kept request (4.6).
@@ -620,11 +620,12 @@ for its kind, its user's login and its installations. Its nodes:
   plan, at its first landing that changes one of these records, and
   shared by plans that run at once. A request, an outcome or a field
   added to the family (the FORGE requests of section 8, the picker's
-  ids in `Adopt`) changes them, so it is such a move, never a second
-  version served beside the first. The engine serves exactly one
-  version (jig's `protocol/client.md`, section 9): a client of another
-  is out of date for the forge (4.4), and its kept adoption is dropped
-  as kept work at start (6.6; jig's `protocol/client.md`, section 10).
+  ids in `Adopt`, the forge's kind in the adopted outcome) changes
+  them, so it is such a move, never a second version served beside the
+  first. The engine serves exactly one version (jig's
+  `protocol/client.md`, section 9): a client of another is out of date
+  for the forge (4.4), and its kept adoption is dropped as kept work at
+  start (6.6; jig's `protocol/client.md`, section 10).
 - **The request, `Adopt`:** the project (u32); the forge's number
   (u16); the owner, the name, the prefix and the landing branch (byte
   strings); the role (owned, fork or context); home and ci (booleans);
@@ -633,7 +634,7 @@ for its kind, its user's login and its installations. Its nodes:
   each, both or neither).
 - **Its outcome:**
   - *adopted,* with the repository as the forge connector recorded it:
-    its forge's number and its id; its owner and name; its role;
+    its forge's number, its kind and its id; its owner and name; its role;
     whether it is the project's home; what temper may do there (the
     forge's `Kinds`: read, push, open, land, review, status, comment,
     issue, branch); whether branch protection was read (unknown,
@@ -672,7 +673,7 @@ for its kind, its user's login and its installations. Its nodes:
 
 | Outcome | The form says |
 |---|---|
-| adopted | "Adopted OWNER/NAME on forge F as ROLE." then "It is the project's home." if so; "temper may: KINDS." in the forge's words; "Branch protection could not be read." if unknown; "It merges by STYLE."; then each rule as `forge.md`, 5.1 words it |
+| adopted | "Adopted OWNER/NAME on forge F as ROLE." then "It is the project's home." if so; "temper may: KINDS." in the forge's words; on GitHub, "Commit statuses stay temper's own: GitHub's rules cannot require them."; "Branch protection could not be read." if unknown; "It merges by STYLE."; then each rule as `forge.md`, 5.1 words it, on Forgejo its branch protection alone |
 | refused by the core | jig's words for its refusal |
 | no such forge | "No forge F is configured." |
 | not connected | "Forge F is not connected.", linked to the forges' page (3.5) |
@@ -784,7 +785,7 @@ shown as external links and never opened by the client (6.5).
   value a secret field (3.6), a link an external link (6.5), and a
   connect's or an action's status under its button.
 - **Bindings:** writing a field, choosing a role, toggling home or ci,
-  choosing a picker's account or row, its "Next" and "First page",
+  choosing a picker's installation or row, its "Next" and "First page",
   pressing Adopt, each of the forges' page's actions, and going to
   either page from its navigation entry.
   Typed input is made here: the forge number's digits become a number,
@@ -991,8 +992,8 @@ left out:
 …
 [9] Forge number: 1
 Account:
-  [10] (*) All accounts
-  [11] ( ) acme, selected repositories
+  [10] (*) acme, selected repositories
+  [11] ( ) acme-labs
 Repositories:
   - [12] acme/shop, private
   - [13] acme/docs
@@ -1196,10 +1197,10 @@ does for the client:
   headers, their `302`s and their refused pages are `forge.md`, 9.1's.
   The state is their only authenticator: 128 bits or more, good once,
   for its life (`setup.state_life_ms`), for that forge alone; they take no
-  cookie and no credential of jig's. A query past `routes.query_bytes`
-  is refused, a method other than `GET` is answered `405`, and a forge
-  not configured or not GitHub `404`. No client of temper's calls them:
-  GitHub sends the person's browser there.
+  cookie and no credential of jig's. A query malformed or past
+  `routes.query_bytes` is answered `400`, a method other than `GET`
+  `405`, and a forge not configured or not GitHub `404`. No client of
+  temper's calls them: GitHub sends the person's browser there.
 - **A client's leaving, on the listener.** `temper-service` reads each
   connection's events below skein's server. When the peer ends a
   connection before its call is finished, it aborts the connection, as
@@ -1243,23 +1244,25 @@ does for the client:
 
   | Request | The value it carries | What the engine does | Its outcome |
   |---|---|---|---|
-  | `Connect { forge, how: GitHubManifest { org? } }` | none | the setup's host's `Manifest` run, for the person's account or the organization `org` names | a link, the manifest's page on the clients' listener for a fresh state (the routes, above) |
+  | `Connect { forge, how: GitHubManifest { org? } }` | none | the setup's host's `Manifest` run, for the person's account or the organization `org` names, ending `Done(Manifest { state, page })` | a link, the manifest's page on the clients' listener for a fresh state (the routes, above) |
   | `Connect { forge, how: GitHubApp { id, key } }` | `key`, the App's private key, PEM as GitHub gives it; `id` rides in the request | `Paste`: the key decoded and matched to the App `id` names, the App's user found, its hook pointed at `https://SLUG.invalid/` (no webhook secret on GitHub: changes are heard from the App's delivery log), its permissions and events checked | connecting |
   | `Connect { forge, how: ForgejoTokens { api, git, webhook_secret? } }` | one bundle: the API token, the git token and, where the person made hooks to temper's listener, their secret | `Check`: both tokens answer as one user | connecting |
   | `Connect { forge, how: ForgejoAdmin { admin_token } }` | the site admin's token | `Reconcile`; the forge becomes managed | connecting |
   | `Install { forge }` | none | `Install`, GitHub alone | a link, the install page for a fresh state |
   | `Replace { forge, value }` | a new App key, or a new API token, git token or both | `Paste` with the kept App id, or `Check` against the kept user: it must answer as the forge's user; the old is erased once the new is kept | connecting |
   | `Forget { forge }` | none | the admin's token erased; a managed forge becomes connected (`../protocol/credentials.md`) | forgotten |
-  | `Reachable { forge, account?, page }` | none | on GitHub and a connected Forgejo, the connector's fresh reads, through the forge's request budget (`../domain/forge.md`, what the picker offers), GitHub's `GET /installation/repositories` paged by number; on a managed or owned Forgejo, the setup's host's `Reachable { forge, page }` plan (skein's `forge-setup.md`, 4.8), every repository the site admin can see by id ascending, read on the admin's token, which stays the setup's host's (`../protocol/forge.md`, the setup's host) | a page, `{ rows, more }`: at most `picker.page` rows on every forge, clipped to the forge's own page cap, each the repository's id, its owner's id and login, its name and whether it is private; `more` set when the page is full |
+  | `Reachable { forge, installation?, page }` | none | on every kind, the setup's host's `Reachable { forge, installation?, page }` plan (skein's `forge-setup.md`, 4.8; `../domain/forge.md`, what the picker offers): on GitHub one accepted installation's repositories, `GET /installation/repositories` paged by number on a token minted for the page; on a connected Forgejo what the API token can push to; on a managed or owned Forgejo every repository the site admin can see by id ascending, read on the admin's token, which stays the setup's host's (`../protocol/forge.md`, the setup's host) | a page, `{ rows, more }`: at most `picker.page` rows on every forge, clipped to the forge's own page cap, each the repository's id, its owner's id and login, its name and whether it is private; `more` set when the page is full |
 
   Names in a carried value's braces are its bundle's items
   (`../protocol/credentials.md`, pasted values), never fields of the
   record, which holds the forge, the kind of connect, and a GitHub App's
-  id. `account` is an installation's id, GitHub alone; `page` a page's
+  id. `installation` is an accepted installation's id, GitHub alone: one
+  the forge has not accepted, or one given for a Forgejo, stops the plan
+  (`Installation`, `Missing` or `Unexpected`); `page` a page's
   number, from 1, and the picker's "Next" asks for the shown page's
   number plus one; after a last page that came back full, it answers no
-  rows. On a managed or owned Forgejo, the plan's `reachable` limit is
-  given from `picker.page`. The request names no project (section 11).
+  rows. The plan's `reachable` limit is given from `picker.page`. The
+  request names no project (section 11).
   The forge's kind, mode, user and installations are the deployment
   part's, never the page's; an installation's page there is built by the
   engine from the forge's configured `web` address (`forge.md`, 5.5).
@@ -1274,8 +1277,8 @@ does for the client:
   core leaves unused, its request refused, replayed, joined to another
   or cut by a stop, is named in one output of the core's, which temper's
   root forwards to jig's clients' component to erase.
-- **Who may:** a person whose role holds the deployment's connectors;
-  in standalone, the deployment's owner. jig admits each by key and
+- **Who may:** a person whose role on project 0 is `Owner`; in
+  standalone, the deployment's owner. jig admits each by key and
   refuses at admission as for any request, in jig's words; the root
   refuses any other party's, before a forge is called or a run starts,
   as the outcome refused (role).
@@ -1288,7 +1291,9 @@ does for the client:
   permissions or events, each named (the setup's host's `Lacking`;
   `forge.md`, 5.5), and after a restart "interrupted; paste again" are
   said there. The outcomes:
-  - *connecting:* the run started;
+  - *connecting:* the run started; a `Manifest` or an `Install` that
+    stops, other than busy, answers it too, and its failure is said on
+    the forge's row as the last connect's end, never in the answer;
   - *a link:* the address to open, printed and never opened (6.5);
   - *forgotten:* the admin's token erased;
   - *a page:* the picker's (4.4);
@@ -1298,10 +1303,11 @@ does for the client:
     one writing plan, a connect, an install or a reconcile, and one
     `Reachable` beside it, and a second of either kind is refused, as is
     one past `setup.runs`, which counts both; or, for `Reachable`, the
-    forge's reason below, and on a managed or owned Forgejo the admin's
-    token's, missing (`Missing`) or not a site admin's (`NotAdmin`), as
-    the plan's first step has them (skein's `forge-setup.md`, 4.3 and
-    4.8).
+    forge's reason below, an installation the forge has not accepted or
+    one given for a Forgejo (the plan's `Installation` stop), and on a
+    managed or owned Forgejo the admin's token's, missing (`Missing`) or
+    not a site admin's (`NotAdmin`), as the plan's first step has them
+    (skein's `forge-setup.md`, 4.3 and 4.8).
 - **The root routes an adoption** (`../domain/forge.md`, section 4;
   `../domain/root.md`, 5.4): jig's people child admits it by key, and
   refuses at admission as jig's answer; admitted, it goes to the forge
@@ -1322,11 +1328,17 @@ does for the client:
   otherwise; `Forbidden` is no access; `Refused` is refused; `Busy` is
   in flight; `TooLarge` and `Full` are too large; `Unavailable`,
   `Timeout` and `RateLimited` are unreachable; any other is an invalid
-  answer. A `Reachable` refused by the forge carries the same reasons.
+  answer. A `Reachable` whose plan stops on the forge's error carries the
+  same reasons.
 - **The outcome, encoded** by `temper-client-protocol-wire`, goes back
   as the family's answer to jig's clients' component, an adoption's and
   every other FORGE request's alike, kept under the request's key for
-  the retention.
+  the retention, as an adoption's is, at the store's tag 15
+  (`../protocol/store.md`), a refusal among them. An outcome that
+  carries a link is kept in memory alone, until its state's life ends
+  (`setup.state_life_ms` after `Done`): the same key sent again while it
+  lives answers the same link and starts no run; after its end, or a
+  restart, the key is unknown, as one past the retention is.
 - **The forge's reads and watches** are decoded by
   `temper-client-protocol-wire` the same way and go to the root
   (`../domain/root.md`, 5.3; `forge.md`, section 9). One the wire has
@@ -1396,7 +1408,7 @@ own tests:
   address shown, and its end read on the `accounts` watch; a program's
   login declared and its command shown; a limited account's words, and
   its task waiting; on the fake forge's GitHub, the picker's pages by
-  account, a row chosen and adopted, its ids in the request, a
+  installation, a row chosen and adopted, its ids in the request, a
   repository of a selected installation not granted and "Not listed"
   saying so with the installation's page, and a forge not connected
   offering none; on the fake forge's Forgejo, a forge connected from the
@@ -1511,9 +1523,9 @@ own tests:
   project's role may make is the candidate.
 - **The picker's page as a read:** a page could be a read of the forge's
   family rather than a keyed request. Default: a request, since its
-  answer is a fresh call to the forge within its request budget; kept
-  as any keyed request, and its answer to a form that has closed
-  dropped.
+  answer is a fresh read of the forge by the setup's host's plan; keyed
+  as any request, and its answer to a
+  form that has closed dropped.
 - **What the picker's ids do at adoption:** `Adopt` carries the row's
   repository id and owner id (4.6), while the forge connector locates a
   repository by owner and name (`../domain/forge.md`, section 4).

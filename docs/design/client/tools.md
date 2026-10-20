@@ -483,7 +483,7 @@ area lands with its stories (section 11).
    | `forge-install F` | prints a fresh link to install temper's App on another account, GitHub alone; the installation shows on `forges` once the person's browser comes back | `Install { forge }` | |
    | `forge-replace F FILE` | replaces what a person pasted: on GitHub, FILE the App's new key; on a connected Forgejo, a tokens file naming `api`, `git` or both; it must answer as the forge's user, and the old is erased once the new is kept | `Replace { forge, value }` | |
    | `forge-forget F` | erases a managed forge's admin's token; the forge is connected, its bot and tokens kept | `Forget { forge }` | |
-   | `repositories F [--account I] [--page N]` | the picker's page N, from 1 (`README.md`, 4.4): a line per row, `OWNER/NAME`, `private` where it is, and `R/U`, its repository id and owner id for `adopt --ids`; then the call that reads page N plus one while more follow, or that none do. `--account I` is an installation's id, as `forges` prints it, GitHub alone | `Reachable { forge, account?, page }` | |
+   | `repositories F [--installation I] [--page N]` | the picker's page N, from 1 (`README.md`, 4.4): a line per row, `OWNER/NAME`, `private` where it is, and `R/U`, its repository id and owner id for `adopt --ids`; then the call that reads page N plus one while more follow, or that none do. `--installation I` is an accepted installation's id, as `forges` prints it, GitHub alone | `Reachable { forge, installation?, page }` | |
 
    - **The names are the forge's and the page's.** A `forge-` prefix
      keeps them apart from area 5's `connect`, `forget` and
@@ -1053,9 +1053,11 @@ stories (`../domain/testing.md`, 2.4):
   answer or a fact; the secrets' store alone does.
 
 Area 6's stories reach the forge through the tools, on skein's fake
-forge, whose browser pages are plain-HTTP redirects (skein's
-`fake-forge.md`, section 10), so the test drives a browser's steps as
-plain requests and no story calls github.com:
+forge, whose browser pages are plain HTTP: its manifest post answers
+`200` with a page holding one link, `Create GitHub App` (id `create`),
+and its install page `302` (skein's `fake-forge.md`, 10.1), so the test
+drives a browser's steps as plain requests, following the link as a
+person clicks it, and no story calls github.com:
 
 - **GitHub through the manifest:** `forge-connect F github`, the printed
   link followed as plain requests on the clients' listener and the

@@ -267,7 +267,7 @@ it, and nothing but the setup host writes what it makes.
 | `Adopt { forge, repository }` | Forgejo, managed or owned | an adoption, before its reads | 4.5 |
 | `Check { forge }` | Forgejo, connected | a connect; a replacement | 4.6 |
 | `TakeOver { forge, admin_token }` | Forgejo, owned | a start that finds the handover | 4.7 |
-| `Reachable { forge, page }` | Forgejo, managed or owned | the picker | 4.8 |
+| `Reachable { forge, installation?, page }` | every kind | the picker | 4.8 |
 | `Manifest { forge, target }` | GitHub | Connect, managed | 5.1 |
 | `Convert { forge, code, state }` | GitHub | the redirect back | 5.2 |
 | `Install { forge }` | GitHub | Install on another account | 5.4 |
@@ -278,16 +278,23 @@ it, and nothing but the setup host writes what it makes.
 - **What each does, and when the routing runs it,** is forge.md's (the
   setup's host); each plan's steps, its bounds and what it refuses are
   skein's.
-- **`Reachable`** runs on the admin's token, which stays the setup
-  host's, and is refused `Missing` or `NotAdmin` as reconcile's first
-  step is. It reads one page of the forge's repositories by id
-  ascending, pages counted from 1, at most `reachable` rows, which
-  temper gives from `picker.page` (configuration.md, section 7), and
-  ends `Done(Reachable { rows, more })`, `more` when the page is full;
-  it writes nothing.
-- **Outcomes:** `Done`; `Page`, the manifest page's bytes, which temper
-  holds with its state; `Link`, the install link; `Lacking`, done, with
-  each permission or event the App lacks named.
+- **`Reachable`** serves every kind, pages counted from 1, at most
+  `reachable` rows, which temper gives from `picker.page`
+  (configuration.md, section 7), and ends `Done(Reachable { rows, more
+  })`, `more` when the page is full; it writes nothing. On GitHub it
+  reads one accepted installation's repositories, `installation` its
+  id, on a token minted for the page and dropped; an id not in
+  `Accepted` stops it `Installation`, `Missing`. On a connected Forgejo
+  it reads what the API token can push to; an `installation` given
+  there stops it `Installation`, `Unexpected`. On a managed or owned
+  Forgejo it reads every repository the admin can see, by id ascending,
+  on the admin's token, which stays the setup host's, and is refused
+  `Missing` or `NotAdmin` as reconcile's first step is. Forgetting that
+  token makes the forge connected, and its picker with it.
+- **Outcomes:** `Done`; `Manifest { state, page }`, the state and the
+  manifest page's bytes, which temper holds with the state; `Link`, the
+  install link; `Lacking`, done, with each permission or event the App
+  lacks named.
 
 ### 5.3 Reconcile's given values, and its answers
 
@@ -1230,7 +1237,8 @@ listener's (`../client/forge.md`, the browser's steps).
    of `temper ctl`, for the person's account or an org they name
    (`Connect` with `GitHubManifest { org? }`). The setup host runs
    `Manifest { forge, target }` (skein's `forge-setup.md`, 5.1) for a
-   fresh state; its `Page` is held with the state. The client shows the
+   fresh state, ending `Done(Manifest { state, page })`; the page is
+   held with the state. The client shows the
    link, `http://<listener>/forges/<n>/github/manifest?state=<s>`, as
    text, and never opens it.
 2. **The manifest's page,** opened by the person: one form posting the
@@ -1260,7 +1268,8 @@ listener's (`../client/forge.md`, the browser's steps).
   forgets them all.
 - **The redirect and setup URLs** temper gives the plans are whole,
   built from the clients' listener's address (forge.md, the setup's
-  host).
+  host). The manifest's `url`, the App's homepage, is
+  `http://<listener>/`.
 
 ### 17.3 Connected: an App pasted
 

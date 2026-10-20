@@ -56,7 +56,9 @@ setup.md's (section 9). What is open is listed in section 8.
   engine's setup host holds a managed or owned Forgejo's only while a
   plan runs, for reconcile, for access at an adoption and for the
   picker's reads (a `Reachable` plan), and Forget erases it, making the
-  forge connected. A worker gets the git identity alone, never the
+  forge connected. The picker's read of any other forge takes its API
+  token, or on GitHub a token minted for the page, held while the plan
+  runs and dropped. A worker gets the git identity alone, never the
   forge's access.
 - **A forge's credential failing stops that forge, never the engine.** A
   credential the forge refuses, or records that do not fit the configured
@@ -73,7 +75,7 @@ setup.md's (section 9). What is open is listed in section 8.
 | a git identity | temper | a token with its login, and an author: on Forgejo the `GitToken` record; on GitHub the accepted installations' tokens | the forge's records and tokens, and the identity's members (section 4) | the identities' table on the engine, and on the worker from grants | the git component's invocations | a new generation at each change of value (section 4) |
 | a forge's API token | temper | a Forgejo token, the `ApiToken` record | pasted from the client at a connect, or made by the setup host's reconcile when the forge is managed or owned (setup.md, section 5) | jig's secrets' store; the forge component, in the forge's access | that forge's API requests | replaced from the client (section 5), or made again by reconcile when it does not answer as the bot |
 | a GitHub App's key | temper | an RSA private key, PKCS#1 DER, 2048 bits, the `AppKey` record beside `AppId` | the manifest's conversion; or pasted from the client as GitHub gives it, PEM, which the setup host decodes to DER | jig's secrets' store; the forge component, in the forge's access; the setup host, while a plan runs | signing the App's own requests, and minting its installations' tokens | replaced from the client with a key of the same App (section 5) |
-| an installation's token | temper | a GitHub token, expiring within the hour | minted by the forge component with the App's key, one per accepted installation (section 5) | the forge component; the forge's git identity; never kept | that installation's API requests; git's, through the identity | minted again `renew_before` ahead of its expiry |
+| an installation's token | temper | a GitHub token, expiring within the hour | minted by the forge component with the App's key, one per accepted installation (section 5); by the setup host, for a page of the picker | the forge component; the forge's git identity; the setup host, while a page is read; never kept | that installation's API requests; git's, through the identity; the picker's page | minted again `renew_before` ahead of its expiry; a picker's page's, dropped with the page |
 | a worker's secret | jig | a shared secret | the worker's secret file; the engine's digest file | the worker; the engine, its digest | the link's opening | an operator replaces both |
 | a sign-in's secret | jig | a bearer token | the printed link, then the sign-in | `jig-client` in `temper open`, which keeps it in its directory; the engine, its digest | each of the client's exchanges and its stream | the sign-in ends or expires |
 | a Forgejo forge's webhooks' secret | temper | a shared secret, the `WebhookSecret` record; a GitHub forge has none | pasted at a connected Forgejo's connect; or drawn by the setup host and set on a managed or owned Forgejo's hooks by reconcile | jig's secrets' store; the forge component's webhooks' listener, on loopback; the forge's hooks, which sign each delivery with it | checking each delivery's signature (forge.md, section 5) | replaced from the client with the forge's tokens; reconcile sets a managed or owned Forgejo's hooks' secret to the record's |
@@ -461,7 +463,8 @@ sources in its holder's order. temper configures the LLM providers
 - **Never granted, never stored elsewhere:** an access's values are in no
   grant, root, record of the main store, fact or log, and are never sent
   to another forge or another host. An installation's token is never
-  kept: a restart mints new ones.
+  kept: a restart mints new ones, and the one the setup host mints for a
+  page of the picker is dropped with the page.
 - **Its user, checked.** A connect's run finds the user its credentials
   answer as, and keeps its id (`User`) with the `Origin` the records
   were made for. A connected Forgejo's two pasted tokens must

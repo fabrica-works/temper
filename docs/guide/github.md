@@ -191,8 +191,10 @@ https://github.com/organizations/<org>/settings/installations/<id>
 ```
 
 Add the repository and save. GitHub brings your browser back to temper's
-setup route, and the adoption form's picker lists the repository. Or
-list the picker's pages with `temper ctl me repositories 2`.
+setup route, and the adoption form's picker lists the repository, under
+that installation's account. Or list its pages with `temper ctl me
+repositories 2 --installation <id>`, the installation's id as the
+forge's row shows it.
 
 - **A repository not granted** is said where you adopt it: "OWNER/NAME
   is not granted to temper's App.", linked to the installation's page;

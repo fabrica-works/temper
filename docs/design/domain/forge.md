@@ -42,9 +42,9 @@ makes each call to a forge and hears its deliveries, is
   adopts nothing. Its writer, given when it connects, is the forge
   client's own record, restored at start (4.1).
 - **Adoption picks from what temper can reach:** a GitHub App's
-  installations, what a connected Forgejo's user can write, or any
-  repository of a managed or owned Forgejo, where adoption first gives
-  temper's user its access (4.2, 4.3). What it reads of the landing
+  installations, what a connected Forgejo's API token can push to, or
+  any repository of a managed or owned Forgejo, where adoption first
+  gives temper's user its access (4.2, 4.3). What it reads of the landing
   branch's rules, and the merge style, it says in words (4.4).
 - **Updates are lazy and mechanical.** A change takes its base when it
   is first in line, or about to get a run, through the forge's own
@@ -322,28 +322,31 @@ temper-engine-domain-forge              the connector's top: resources and holds
 
 The adoption form lists, per connected forge, the repositories temper
 can reach, a page at a time, by number (`../client/README.md`, 4.4; the
-FORGE family's `Reachable { forge, account?, page }`, answered `{ rows,
-more }`). The request names no project, so the project's own
+FORGE family's `Reachable { forge, installation?, page }`, answered
+`{ rows, more }`). The request names no project, so the project's own
 repositories are among the rows, and adopting one it holds is refused
 as any adoption of it is. Each row is a repository's id, its owner's id
-and login, its name and whether it is private:
+and login, its name and whether it is private.
 
-- **GitHub:** each accepted installation's repositories (`GET
-  /installation/repositories`), by account, read by the forge client as
-  fresh reads, through the request budget (5.4). The document is
-  skein's (`forge-github.md`, 8.3); the client's call that reads it is
-  pending in skein's vocabulary.
-- **A connected Forgejo:** the repositories temper's user can write,
-  read by the forge client as GitHub's are.
-- **A managed or owned Forgejo:** every repository the admin can see,
-  since adoption gives temper's user its access (4.2). The connector
-  asks the root, which has the routing run the setup host's plan
-  `Reachable { forge, page }` (skein's `forge-setup.md`, 4.8;
-  `../protocol/forge.md`, 2.6): on the admin's token, by id ascending,
-  pages counted from 1, at most `reachable` rows (`picker.page`),
-  ending `Done(Reachable { rows, more })`. The
-  admin's token stays the setup host's, and the plan writes nothing, so
-  it runs beside the forge's one writing plan.
+Every kind is read the same way: the connector asks the root, which has
+the routing run the setup host's plan `Reachable { forge,
+installation?, page }` (skein's `forge-setup.md`, 4.8;
+`../protocol/forge.md`, 2.6; pending in skein's code), pages counted
+from 1, at most `reachable` rows (`picker.page`), ending
+`Done(Reachable { rows, more })`. The plan writes nothing, so it runs
+beside the forge's one writing plan, and no call of the forge client
+reads the picker:
+
+- **GitHub:** one accepted installation's repositories (`GET
+  /installation/repositories`), `installation` its id, read on a token
+  the host mints for the page and drops. An id the forge has not
+  accepted is refused. The document is skein's (`forge-github.md`, 8.3).
+- **A connected Forgejo:** the repositories temper's API token can push
+  to, read on that token (skein's `forge-setup.md`, 4.6).
+- **A managed or owned Forgejo:** every repository the admin can see, by
+  id ascending, since adoption gives temper's user its access (4.2). The
+  admin's token stays the setup host's. Forgetting it makes the forge
+  connected, and its picker with it.
 - **"Not listed":** any repository by owner and name, located as any
   adoption is (section 4), and, when it cannot be reached, what would
   make it reachable, in words.
@@ -362,16 +365,18 @@ What a refusal says:
 
 An installation's repositories changing, or its account renamed
 (`Repositories`, `Renamed`; `../protocol/forge.md`, 2.4), reaches the
-connector with no names: it reads that account's repositories again,
-shows the account's login as that read gives it, and marks each
-adoption whose repository left the installation; a later listing that
-has it unmarks it. An installation deleted marks every adoption on its
-account, and one suspended marks them until it is unsuspended. A marked
-repository is shown with what would make it reachable again
-(`../client/forge.md`, a
-repository's health). Its calls meet `Missing`, `NotInstalled` or
-`Forbidden`, which the connector takes there as access lacking, as
-`NotConnected` is (4.1): nothing is narrowed, and its changes wait.
+connector with no names: it lists that installation again, shows the
+account's login as that listing gives it, and marks each adoption whose
+repository left the installation; a later listing that has it unmarks
+it. Each `Connected` lists again every accepted installation that holds
+an adoption, so a change made while temper was away is found. An
+installation deleted marks every adoption on its account, and one
+suspended marks them until it is unsuspended. The marks are held in
+memory, never stored. A marked repository is shown with what would make
+it reachable again (`../client/forge.md`, a repository's health). Its
+calls meet `Missing`, `NotInstalled` or `Forbidden`, which the connector
+takes there as access lacking, as `NotConnected` is (4.1): nothing is
+narrowed, and its changes wait.
 
 ### 4.4 What adoption says of the branch's rules
 
@@ -405,9 +410,10 @@ repository's health). Its calls meet `Missing`, `NotInstalled` or
   guards, the queue merges by its own method, set in the branch's rules,
   and the adoption says so.
 - **Commit statuses on GitHub:** temper's App reads statuses and writes
-  none, so a project there that wants its gates' verdicts posted (8.3)
-  is told at adoption that they stay temper's own, and that GitHub's
-  rules cannot require them.
+  none: `status` is false in the kinds there from adoption on, and
+  nothing is held for it. Every adoption on GitHub says that the gates'
+  verdicts (8.3) stay temper's own, and that GitHub's rules cannot
+  require them.
 
 ## 5. What it holds, and keeping up
 
@@ -591,10 +597,13 @@ recovery are skein's `forge-client.md`, section 7. temper's effects:
   merged. It names the base too: the pull request is read afresh first,
   and one retargeted since the decision is not merged.
 - **A merge may be queued:** on a base the forge's merge queue guards,
-  the merge answers `Answer::Queued`, final for the call: neither a
-  merge nor a refusal. The entry is the client's until a read finds the
-  pull request merged or out of the queue (skein's `forge.md`, 3.3;
-  the client's part pending in skein's code), and what follows is 9.1's.
+  the merge answers `Answer::Queued`, final for the call and not for
+  the entry: neither a merge nor a refusal. The entry is the client's
+  until a read finds the pull request merged or out of the queue
+  (skein's `forge.md`, 3.3; `forge-client.md`, 7.7, pending in skein's
+  code): it is never sent
+  again, and it holds its lane, so a comment or a review on that pull
+  request waits until the queue decides. What follows is 9.1's.
   Forgejo never answers it.
 - **Failures:** a merge refused for a conflict, an update refused for a
   conflict, a pull request with nothing to merge, a protected branch and
@@ -779,10 +788,11 @@ starts from current code. It never updates only because its base moved.
 - **Posted, if the project wants:** a gate's verdict as a commit status,
   such as `temper/review/memory-safety`, which protection can require
   independently of temper. On GitHub, temper's App has `statuses: read`
-  and no more, so the post, `Write::Status`, is refused `Forbidden`
-  (skein's `forge-github.md`, 4.2): a project there that wants it is
-  told so at adoption (4.4), and the verdict stays temper's own; the
-  App asks for no more (`../protocol/setup.md`, 17.1).
+  and no more, so temper writes none: `status` is false in the kinds
+  there (4.4), the post, `Write::Status`, is refused at the connector,
+  and nothing waits for it (skein's `forge-github.md`, 4.2). Every
+  adoption there says so, and the verdict stays temper's own; the App
+  asks for no more (`../protocol/setup.md`, 17.1).
 - **When they run:** once CI passes on the head, by default, so a head
   CI fails costs no review; the change may ask to run them at once.
 
@@ -792,8 +802,8 @@ starts from current code. It never updates only because its base moved.
   change's branch, its brief carrying why: CI's failing output on the
   head; a gate's remarks; for a clean update whose CI then fails (a
   semantic conflict), the base merged in and what landed in it; or, for
-  a change the forge's merge queue ejected, the forge's reason and what
-  failed on the queue's group (9.1). It pushes a new head, and the
+  a change the forge's merge queue ejected, the forge's reason, the
+  pull request's `dequeued` (9.1). It pushes a new head, and the
   change is checked again.
   For each failed check, the brief carries its context, description and
   link, then the step that failed, by name, and the end of that step's
@@ -979,10 +989,11 @@ adoption says so, 4.4) lands through that queue. Forgejo keeps none.
 
 - **Entering is the merge.** The first's merge (kind 4) is made as any
   merge is: at exactly its head, its requirements judged at that head
-  (8.7). The forge answers `Answer::Queued`, final for the call: the
-  pull request is in the forge's queue at that head, neither landed nor
-  refused. temper names no other call for it: the forge's rules, not
-  temper, send the merge into its queue (skein's `forge.md`, 3.3).
+  (8.7). The forge answers `Answer::Queued`, final for the call and not
+  for the entry: the pull request is in the forge's queue at that head,
+  neither landed nor refused. temper names no other call for it: the
+  forge's rules, not temper, send the merge into its queue (skein's
+  `forge.md`, 3.3).
 - **temper's queue decides only what enters and when.** A change in
   the forge's queue leaves temper's turn, and the next ready change
   becomes first, and enters behind it when its own turn comes; the
@@ -993,8 +1004,8 @@ adoption says so, 4.4) lands through that queue. Forgejo keeps none.
   delivery or the delivery log (`../protocol/forge.md`, section 5 and
   5.1), and found by the client's read of the pull request: the merge's
   entry stays open in the client until that read finds the pull request
-  merged or out of the queue (skein's `forge.md`, 3.3; pending in
-  skein's code).
+  merged or out of the queue (skein's `forge.md`, 3.3;
+  `forge-client.md`, 7.7, pending in skein's code).
 - **Landed:** the change is landed (8.2), and its landing's commit is
   the queue's group's (`Pull.merged`), not the head temper saw: the
   forge merged that head onto the queue's base with the changes ahead
@@ -1002,9 +1013,9 @@ adoption says so, 4.4) lands through that queue. Forgejo keeps none.
 - **Ejected,** for any reason but its landing (its group's CI failed, a
   conflict with what entered before it, a person took it out): a
   repair, as a failed CI is (8.4), its brief carrying the forge's reason
-  and what failed on the group. The change takes its base before the
-  repair starts (8.2), so a conflict there is resolved. A head another
-  hand moved is drift, as ever (8.5).
+  alone, the pull request's `dequeued` (section 20). The change takes
+  its base before the repair starts (8.2), so a conflict there is
+  resolved. A head another hand moved is drift, as ever (8.5).
 - **Its place there,** `Pull.queued`, is read with the pull request and
   shown in the change's panel ("in GitHub's merge queue, n";
   `../client/forge.md`, a change's panel). The wait there is bounded by
@@ -1317,10 +1328,9 @@ then unmarked when it is listed again; an adoption on a branch whose
 rules want a merge queue and signatures, said in words with the one
 setting; a merge queued, landed at the group's commit, and another
 ejected and repaired; an update GitHub makes after it answers, found by
-the head read afresh; a gate's commit status refused as forbidden on
-GitHub, and nothing held for it. The forge below is skein's fake, its
-GitHub layer included: no example calls github.com or uses a real
-credential.
+the head read afresh; no commit status written on GitHub, and nothing
+held for it. The forge below is skein's fake, its GitHub layer
+included: no example calls github.com or uses a real credential.
 
 Its referee, beyond jig's for every connector (jig's
 `domain/connectors.md`, section 15): nothing lands without every
@@ -1394,6 +1404,11 @@ the group's commit.
   takes its base as any first does (section 10), though the queue merges
   the base itself. The alternative enters it as its head is, saving a CI
   run. Default: as any first.
+- **What failed on a queue's group** (8.4, 9.1): an ejection's repair
+  brief carries the forge's reason alone, the pull request's `dequeued`,
+  since skein's `Pull` names no commit of the group. The alternative
+  reads the group's CI and gives the repair its failing output.
+  Default: the reason alone.
 - **Taking a change out of a forge's merge queue** when it is cancelled:
   the vocabulary has no call for it. Default: none; the cancel waits for
   the landing or the ejection (9.1). The alternative is closing the

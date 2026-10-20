@@ -309,14 +309,24 @@ skein-io socket
     by reconcile after `setup.state_life_ms` (skein's `forge-setup.md`).
   - `Deleted`: the `Accepted` row is rewritten without it and kept, then
     `Request::Installations`. The git identity's value loses that
-    account's token (2.5).
-  - `Repositories` and `Renamed`: to the root. No names come with them:
-    the connector reads that account's repositories again, and marks
-    each adoption whose repository left the installation
+    account's token (2.5). Every adoption on the account is marked
     (`../domain/forge.md`, 4.3).
+  - `Repositories` and `Renamed`: to the root. No names come with them:
+    the connector lists that installation again, through the setup's
+    host's `Reachable` plan (2.6), and marks each adoption whose
+    repository left the installation (`../domain/forge.md`, 4.3). Each
+    `Connected` lists again every accepted installation that holds an
+    adoption, so a change made while temper was away is found. The marks
+    are held in memory, never stored.
   - `Suspended` and `Unsuspended`: to the root, shown on the deployment's
     page. A suspended installation's calls are answered `Forbidden`, and
-    its git token leaves the identity's value until it is unsuspended.
+    its git token leaves the identity's value until it is unsuspended;
+    its adoptions are marked until then.
+- **`Event::Fact { forge, fact }`** decides nothing: it is the
+  component's diagnostic for the owner's log (skein's
+  `forge-connection.md`, 2.1). `Fact::Unkept`, an installation's change
+  the component had no room for, and `Fact::Gap` (5.1) are logged only.
+  `Fact::Origin` (3.6) is kept as well, per forge in memory.
 - **A call on an account no accepted installation covers** is answered
   `NotInstalled` at once, at cost 0; one on a repository its account's
   installation did not select answers `Missing`, as GitHub's `404`
@@ -384,30 +394,34 @@ carries what passes between it, the root and the records.
 | `TakeOver { forge, admin_token }` | an owned forge's start, when the handover file `admin_token` exists | keeps the admin's token the box handed over; the file is removed after its `Done` |
 | `Adopt { forge, repository }` | a managed or owned forge's adoption, before its reads | gives the bot access to the repository (`../domain/forge.md`, 4.2) |
 | `Check { forge }` | a connected Forgejo's pasted tokens, and their replacement | both tokens answer as one user, and as the kept user on a replacement |
-| `Manifest { forge, target }` | GitHub's Connect, for `Personal` or `Org(login)` | the manifest's page (`Page`), for a fresh state |
+| `Manifest { forge, target }` | GitHub's Connect, for `Personal` or `Org(login)` | a fresh state and the manifest's page; it ends `Done(Manifest { state, page })` |
 | `Convert { forge, code, state }` | GitHub's redirect back | the code exchanged for the App's id, slug and key, the conversion's webhook secret and OAuth pair never kept; the bot user found; it writes `AppId`, `AppSlug`, `AppKey` and `User` |
 | `Install { forge }` | Install on another account | a fresh state, and the install link (`Link`) |
 | `Accept { forge, installation, state }` | the setup URL's visit | the installation checked, and added to `Accepted` |
 | `Paste { forge, app }` | a pasted App's Connect; Replace on GitHub, with the kept id | the pasted key (skein's `Pasted`, read once, never written) decoded to DER, `GET /app` matching the id, the bot user found, the App's hook set to `https://<slug>.invalid/`, the permissions and events checked as reconcile checks them; it writes `AppId`, `AppSlug`, `AppKey` and `User` |
 | `Reconcile { forge }` | after each GitHub `Connected` | the App's permissions, events, installations and key checked; it repairs only its hook's address (5.1) |
-| `Reachable { forge, page }` | the picker, on a managed or owned Forgejo | the repositories the admin's token sees, read by id ascending and paged by number from 1, at most `reachable` rows (temper's `picker.page`), `more` set when the page is full; refused `Missing` or `NotAdmin` as reconcile's first step; it ends `Done(Reachable { rows, more })`, each row the repository's id, its owner's `{ id, login }`, its name and whether it is private; it writes nothing (`../domain/forge.md`, 4.3) |
+| `Reachable { forge, installation?, page }` | the picker, on every kind | the repositories the picker lists, paged by number from 1, at most `reachable` rows (temper's `picker.page`), `more` set when the page is full: on GitHub one accepted installation's, `installation` its id; on a connected Forgejo what the API token can push to; on a managed or owned Forgejo every repository the admin's token sees, by id ascending, refused `Missing` or `NotAdmin` as reconcile's first step; an `installation` not in `Accepted` stops `Installation` (`Missing`), and one given for a Forgejo stops `Installation` (`Unexpected`); it ends `Done(Reachable { rows, more })`, each row the repository's id, its owner's `{ id, login }`, its name and whether it is private; it writes nothing (`../domain/forge.md`, 4.3) |
 
-- **`Reachable`** is skein's (`forge-setup.md`, 4.8). It runs on the admin's token,
-  which stays the setup host's; since it writes nothing, it runs beside
-  the forge's one writing plan.
+- **`Reachable`** is skein's (`forge-setup.md`, 4.8). On a managed or
+  owned Forgejo it runs on the admin's token, which stays the setup
+  host's; on a connected Forgejo, on the API token (skein's
+  `forge-setup.md`, 4.6); on GitHub, on a token minted for the page and
+  dropped. Since it writes nothing, it runs beside the forge's one
+  writing plan.
 - **Outcomes.** A run ends `Stop` with its failure, or `Done`, which
   carries what temper serves or shows (skein's `forge-setup.md`, 4.2):
-  `Reachable`'s page for that plan; `Page`, the manifest page's bytes,
-  at most `page_bytes`, which temper holds in memory with its state
-  while the state lives and serves on the clients' listener
-  (client/README.md, the routes); `Link`, the install link; or
-  `Lacking`, each permission or event the App lacks, shown on the
-  deployment's page and never refused (client/forge.md, the
-  deployment's page).
+  `Reachable`'s page for that plan; `Manifest { state, page }`, the
+  state and the manifest page's bytes, at most `page_bytes`, which
+  temper holds in memory with the state while it lives and serves on
+  the clients' listener (client/README.md, the routes); `Link`, the
+  install link; or `Lacking`, each permission or event the App lacks,
+  shown on the deployment's page and never refused (client/forge.md,
+  the deployment's page).
 - **The redirect and setup addresses** temper gives the plans are whole
   URLs, built from the clients' listener's address:
   `http://<listener>/forges/<n>/github/redirect` and
   `http://<listener>/forges/<n>/github/setup` (2.1, the fixed address).
+  The manifest's `url`, the App's homepage, is `http://<listener>/`.
 
 - **A run's needs.** `Need::Write { item, bytes }` is a `Keep` under the
   forge's family-1 number for that item, answered only on `Kept`.
@@ -523,10 +537,13 @@ temper sets one thing, where a job log may be read from:
   store GitHub's logs are served from; empty, no job log is fetched,
   and a check's failure is shown without its log.
 - **A redirect to any other origin** is answered `Unavailable`, and the
-  component's diagnostic names that origin once. The routing shows it
-  on the deployment's page, on that forge's row (client/forge.md, the
-  deployment's page), and in the log; the operator adds the origin to
-  `forges[].log_origins` and restarts (section 14).
+  component's `Fact::Origin` names that origin once for each connect
+  (2.4). The routing keeps it per forge in memory, at most
+  `forge_component.log_origins` of them, and forgets them at the forge's
+  next connect; it shows it on that forge's row (client/forge.md, the
+  deployment's page), and logs it once until a start names it; the
+  operator adds the origin to `forges[].log_origins` and restarts
+  (section 14).
 - **No document, example or test of temper's calls github.com:** GitHub's
   default addresses are named in the configuration, and every test points
   the forge at skein's fake (section 10).
@@ -934,8 +951,8 @@ temper's part:
 - **GitHub's dialect and setup's open questions** are skein's
   (`forge-github.md`; `forge-setup.md`, GitHub's plans). temper's:
   - **A job log's origin learned at runtime.** Default: `log_origins` is
-    resolved at start; another origin is named, and the operator adds it
-    and restarts (3.6).
+    resolved at start; another origin is named (`Fact::Origin`, 3.6),
+    and the operator adds it and restarts.
   - **A Forgejo secret with no listener.** Default: handed none, the
     forge polls alone, named once in the log (section 5).
   - **Rows of a forge the configuration does not name.** Default: left

@@ -104,9 +104,10 @@ faults and jig's check, and temper's engine root on the engine world's
 store, hosts and forge (../client/README.md, section 10). Section 6.3 says
 why it is joined. GitHub's three routes on the clients' listener (the
 manifest page, the redirect and the setup address; ../client/forge.md,
-9.1) are tested in temper's clients' world, as requests to the
-service's routes: each answer, its headers, and a state used, unknown
-or past its life refused.
+9.1) are not tested here: they are `temper-service`'s own tests, as
+requests through `fixtures::http::Peer` to the service's routes: each
+answer, its headers, and a state used, unknown or past its life
+refused.
 
 ### 2.2 Protocol worlds
 
@@ -310,13 +311,15 @@ in the lower world that owns it, never here.
     kernel assigns before the service starts, and names it in the
     configuration.
   - **No browser in the real loop.** The story stands in for it with
-    plain HTTP requests, following each `302` to the service's clients'
-    listener (skein's `fake-forge.md`, 10.1). It reads the manifest
-    page's form on the clients' listener and posts its `manifest` field
-    to `<web>/settings/apps/new?state=<s>`, which answers `302` to the
-    redirect address with the code and the state. temper's redirect
-    answers `302` to the install page, which the story asks,
-    `<web>/apps/<slug>/installations/new?state=<s>`, with
+    plain HTTP requests, following each `302` and the one link, to the
+    service's clients' listener (skein's `fake-forge.md`, 10.1). It
+    reads the manifest page's form on the clients' listener and posts
+    its `manifest` field to `<web>/settings/apps/new?state=<s>`, which
+    answers `200` with a small page holding one link, `Create GitHub
+    App` (id `create`), to the redirect address with the code and the
+    state; the story follows it as a person clicks GitHub's form.
+    temper's redirect answers `302` to the install page, which the
+    story asks, `<web>/apps/<slug>/installations/new?state=<s>`, with
     `account=<login>` and `repositories=all`, or
     `repository_ids=<a>,<b>`; it answers `302` to the setup address
     with `installation_id`, `setup_action=install` and the state.
@@ -345,9 +348,9 @@ in the lower world that owns it, never here.
   - **Each at most 0.5 s,** half the tier's 1 s story guide, and the
     tier's sum within its 6 s ceiling (6.1). Their cases are tested below:
     the records' and the identity's codecs in step tests, the routing
-    in `temper-service`'s own tests (../protocol/forge.md, section 10),
-    GitHub's routes on the clients'
-    listener and the connector's state, picker and queue in the system
+    and GitHub's routes on the clients' listener in `temper-service`'s
+    own tests (../protocol/forge.md, section 10; ../client/forge.md,
+    9.1), the connector's state, picker and queue in the system
     worlds (2.1).
 
 What only the real kernel shows is this tier's: transport, persistence

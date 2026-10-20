@@ -488,7 +488,7 @@ top-level `workers`, in the same order; standalone has one. Each:
   | `forges.installations` | the installations a GitHub forge accepts, its `Accepted` record's ids (credentials.md, 2.1) |
   | `forges.log_origins` | a forge's `log_origins`; at most 4 (section 3) |
   | `forge_component.installations` | the installations the component holds tokens for, per forge |
-  | `forge_component.log_origins` | the origins a job log's redirect may reach, per forge |
+  | `forge_component.log_origins` | the origins a job log's redirect may reach, per forge; as many origins said of other redirects are kept per forge (`Fact::Origin`, forge.md, 3.6) |
   | `forge_component.token_bytes` | a forge's token: an API token, a git token or a site admin's token (skein's `forge-connection.md`, 7.2) |
   | `forge_component.key_bytes` | a GitHub App's key |
   | `forge_component.renew_before_ms` | `renew_before`: how long before an installation's token expires it is minted again (credentials.md, section 5) |
@@ -503,7 +503,7 @@ top-level `workers`, in the same order; standalone has one. Each:
   | `setup.state_life_ms` | a state's life; at most an hour, the life of the manifest's conversion code |
   | `setup.runs` | the setup host's runs at once, a forge's one writing run and its one `Reachable` beside it both counted; a request past them, or a second of either kind on one forge, is refused busy |
   | `routes.query_bytes` | a forge route's query |
-  | `picker.page` | the repositories one read of the picker takes, within the forge's own page cap: GitHub's page, a connected Forgejo's, and the setup host's `Reachable` plan's `reachable` on a managed or owned Forgejo (skein's `forge-setup.md`, 4.8); at most 100, GitHub's largest page |
+  | `picker.page` | the repositories one read of the picker takes, the setup host's `Reachable` plan's `reachable` on every kind (skein's `forge-setup.md`, 4.8), within the forge's own page cap: GitHub's page, a connected Forgejo's; at most 100, GitHub's largest page |
   | `box.backoff_ms`, `box.backoff_max_ms` | a long step restarted, doubling |
   | `box.restarts`, `box.window_ms` | a long step's exits within the window past which the box gives up; `box.restarts` at most 64; the backoff counted from the exits within the window (setup.md, 7.2) |
   | `box.grace_ms` | a long step's grace, after each of its stop's two signals (setup.md, 7.2) |
@@ -629,9 +629,9 @@ top-level `workers`, in the same order; standalone has one. Each:
   the engine's bounds on an authority's lists to temper's client's.
 - **One worst case per service:** jig's sum (the root's, its components'
   and the journal's) and temper's (its domains', its components', the
-  identities' table, the routing's records and forges' accesses, the
-  setup host's states and runs) together must fit the memory jig's part
-  states, `engine.memory_bytes` for the engine's service and
+  identities' table, the routing's records, forges' accesses and origins
+  said, the setup host's states and runs) together must fit the memory
+  jig's part states, `engine.memory_bytes` for the engine's service and
   `memory_bytes` of the worker's part for the worker's, or the start is
   refused, saying by how much. The owned example's `engine.limits`, worker `limits` and
   `memory_bytes`, and why each holds, are setup.md, 8.1's.
