@@ -1,12 +1,10 @@
 use skein_fake_forge_protocol::Route;
+use skein_forge_machine_world::joint::REPO;
 use skein_lib::Wall;
 use temper_engine_domain_forge as top;
 use temper_engine_domain_forge_change as change;
 use temper_engine_domain_forge_issues as issues;
-use temper_engine_protocol_forge_world::{
-    fixtures,
-    protocol::{Protocol, REPO},
-};
+use temper_engine_protocol_forge_world::{fixtures, protocol::Protocol};
 fn change_row() -> top::ChangeRow {
     top::ChangeRow {
         task: 51,

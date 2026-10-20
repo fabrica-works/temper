@@ -33,14 +33,12 @@ pub fn limits() -> Limits {
 }
 
 use core::net::{Ipv4Addr, SocketAddr};
-use skein_forge::api;
 use skein_forge_connection::{
     Settings, Shared,
     settings::{Forge, Kind, Transport},
 };
 use skein_lib::{List, Secret};
 pub const FORGE: u16 = 1;
-pub const REPO: api::Repository = api::Repository { forge: 1, repository: 1 };
 pub const TOKEN: &[u8] = b"0123456789abcdef0123456789abcdef01234567";
 #[must_use]
 pub fn shared() -> Shared {
@@ -85,55 +83,6 @@ pub fn settings() -> Settings {
         webhooks: None,
         word: Box::from(b"temper".as_slice()),
         user_agent: Box::from(b"temper/0.0.0".as_slice()),
-    }
-}
-/// Makes a literal HTTP answer for scenarios independent of recorded cases.
-#[must_use]
-pub fn response(code: u16, body: &[u8]) -> Vec<u8> {
-    let mut bytes = format!("HTTP/1.1 {code} Answer\r\nContent-Length: {}\r\n\r\n", body.len()).into_bytes();
-    bytes.extend_from_slice(body);
-    bytes
-}
-/// An Items listing supplies the time of its own snapshot (forge.md, 5.3).
-#[must_use]
-pub fn dated_response(code: u16, body: &[u8]) -> Vec<u8> {
-    let mut bytes = format!(
-        "HTTP/1.1 {code} Answer\r\nDate: Thu, 01 Jan 2026 00:00:00 GMT\r\nContent-Length: {}\r\n\r\n",
-        body.len()
-    )
-    .into_bytes();
-    bytes.extend_from_slice(body);
-    bytes
-}
-/// One branch read after its repository resolution.
-#[must_use]
-pub fn branch() -> skein_forge::api::Op {
-    api::Op::Read(api::Read::Branch { branch: Box::from(*b"main") })
-}
-
-/// The fake's HTTP and document bounds, matching the service's small profile.
-#[must_use]
-pub fn fake_limits() -> skein_fake_forge_protocol::Limits {
-    skein_fake_forge_protocol::Limits {
-        calls: 4,
-        connections: 4,
-        raw_bytes: 4096,
-        http: skein_http::server::Limits {
-            head: 4096,
-            headers: 16,
-            body: 16384,
-            read: 1024,
-            response: 4096,
-            send: 1024,
-        },
-        documents: skein_forge::forgejo::limits::Limits {
-            json: skein_json::tokenizer::Limits { chunk: 1024, string: 16384, number: 32, depth: 16, length: 65536 },
-            writer: skein_json::writer::Limits { depth: 16, length: 65536 },
-            string_bytes: 512,
-            body_bytes: 16384,
-            inner: 32,
-            target_bytes: 4096,
-        },
     }
 }
 /// The token's writer is user 1; the scenario's repository is id 2.
@@ -200,55 +149,4 @@ pub fn token_absent(value: &impl core::fmt::Debug) -> bool {
     let text = format!("{value:?}");
     let bytes = format!("{TOKEN:?}");
     !text.as_bytes().windows(TOKEN.len()).any(|part| part == TOKEN) && !text.contains(&bytes[1..bytes.len() - 1])
-}
-
-/// Hook bounds are the shipped profile's five hook limits.
-#[must_use]
-pub fn hook_limits() -> Limits {
-    let profile = temper_service::limits::profile(temper_service::limits::Profile::Small).forge_component;
-    Limits {
-        hooks: profile.hooks,
-        hook_head_bytes: profile.hook_head_bytes,
-        hook_body_bytes: profile.hook_body_bytes,
-        hook_deadline: profile.hook_deadline,
-        hook_secret_bytes: profile.hook_secret_bytes,
-        ..limits()
-    }
-}
-pub const HOOK_SECRET: &[u8] = b"fixture-hook-secret";
-pub const PING: &[u8] = b"{\"zen\":\"a delivery of no row\"}";
-#[must_use]
-pub fn hook_settings() -> Settings {
-    let mut settings = settings();
-    let mut secrets = List::with_capacity(2);
-    secrets.push((FORGE, Secret::new(Box::from(HOOK_SECRET)))).expect("secret");
-    settings.webhooks = Some(skein_forge_connection::hooks::Webhooks {
-        listener: skein_io::Addr::Ip(([127, 0, 0, 1], 7200).into()),
-        secrets,
-    });
-    settings
-}
-#[must_use]
-pub fn hooked_protocol_config() -> skein_fake_forge_protocol::Config {
-    let mut config = protocol_config();
-    config.hooks = Some(skein_fake_forge_protocol::delivery::Endpoint {
-        forge: FORGE,
-        host: Box::from(b"127.0.0.1:7200".as_slice()),
-        secret: Secret::new(Box::from(HOOK_SECRET)),
-    });
-    config
-}
-#[must_use]
-pub fn push_hook(branch: &[u8], commit: u64) -> skein_fake_forge_domain::Request {
-    use skein_fake_forge_domain::{Request, api::Change};
-    Request::Hook {
-        repository: Box::from(b"org/repo".as_slice()),
-        change: Change::Push,
-        number: None,
-        branch: Some(Box::from(branch)),
-        commit: Some(commit),
-        by: Some(2),
-        body: None,
-        ended: None,
-    }
 }

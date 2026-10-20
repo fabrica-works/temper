@@ -1,9 +1,9 @@
 //! The forge connector and real component against the fake Forgejo through bytes.
-pub use crate::joint::REPO;
-use crate::{fixtures, joint::Joint};
+use crate::fixtures;
 use skein_fake_forge_domain::{self as forge, api as raw};
 use skein_fake_forge_protocol::{Faults, Route, Tally};
 use skein_forge_connection::Component;
+use skein_forge_machine_world::joint::{self, Joint, REPO};
 use skein_lib::{Duration, Env, List, Map, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::{BTreeMap, BTreeSet};
 use temper_engine_domain_forge as top;
@@ -49,7 +49,7 @@ impl Protocol {
                 fixtures::limits(),
                 fixtures::writer_settings(),
                 fixtures::protocol_shared(),
-                crate::joint::checks(1000),
+                joint::checks(1000),
             ),
             top_out: Queue::with_capacity(top::max_out(&LIMITS)),
             stored: Map::with_capacity(128),

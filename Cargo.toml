@@ -4,7 +4,6 @@
 resolver = "3"
 members = [
     "tests/real-loop",
-    "tests/forge-setup/reconcile",
     "crates/temper-box",
     "tools/live-login",
     "tests/one-process",
@@ -41,7 +40,6 @@ members = [
     "tests/engine/domain",
     "tests/system",
     "tests/conformance",
-    "tests/engine/forge/client",
     "tests/engine/forge",
     "tests/worker/checkout",
     "tests/worker/domain",
@@ -87,6 +85,7 @@ jig-client-shell-native = { git = "https://github.com/fabrig-dev/jig.git" }
 skein-tls = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-http = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-forge-connection = { git = "https://github.com/fabrig-dev/skein.git" }
+skein-forge-machine-world = { git = "https://github.com/fabrig-dev/skein.git" }
 jig-protocol-transcript = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-client-test-kit = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-client-world = { git = "https://github.com/fabrig-dev/jig.git" }

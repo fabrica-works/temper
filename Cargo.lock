@@ -1409,6 +1409,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "skein-forge-machine-world"
+version = "0.0.0"
+source = "git+https://github.com/fabrig-dev/skein.git#4d8068244f1e46c2e5acdc987248f1518a9dcb02"
+dependencies = [
+ "skein-fake-forge-domain",
+ "skein-fake-forge-protocol",
+ "skein-forge",
+ "skein-forge-connection",
+ "skein-http",
+ "skein-io",
+ "skein-json",
+ "skein-lib",
+ "skein-tls",
+ "skein-world",
+]
+
+[[package]]
 name = "skein-forge-setup"
 version = "0.0.0"
 source = "git+https://github.com/fabrig-dev/skein.git#4d8068244f1e46c2e5acdc987248f1518a9dcb02"
@@ -2504,17 +2521,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "temper-engine-forge-client-world"
-version = "0.0.0"
-dependencies = [
- "skein-fake-forge-domain",
- "skein-forge",
- "skein-forge-client",
- "skein-lib",
- "skein-world",
-]
-
-[[package]]
 name = "temper-engine-forge-world"
 version = "0.0.0"
 dependencies = [
@@ -2539,17 +2545,14 @@ dependencies = [
  "skein-forge",
  "skein-forge-client",
  "skein-forge-connection",
- "skein-http",
+ "skein-forge-machine-world",
  "skein-io",
- "skein-json",
  "skein-lib",
  "skein-tls",
- "skein-world",
  "temper-engine-domain-forge",
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-issues",
  "temper-engine-forge-world",
- "temper-service",
 ]
 
 [[package]]
@@ -2609,21 +2612,6 @@ dependencies = [
  "skein-forge-setup",
  "skein-json",
  "skein-lib",
-]
-
-[[package]]
-name = "temper-forge-setup-reconcile-world"
-version = "0.0.0"
-dependencies = [
- "jig-protocol-config",
- "skein-fake-forge-protocol",
- "skein-forge",
- "skein-forge-setup",
- "skein-http",
- "skein-lib",
- "temper-codecs-world",
- "temper-engine-protocol-forge-world",
- "temper-forge-setup",
 ]
 
 [[package]]
