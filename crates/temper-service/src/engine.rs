@@ -436,10 +436,18 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
                 engine.drain_facts();
             }
             // temper-02 gives runtime connection state meaning in the root.
-            skein_forge_connection::Event::Connected { forge: _ } => {}
+            // temper-02 gives installation and git-token events meaning in the root.
+            // Only Fact::Unkept exists at this pin, from GitHub's installations tracker alone
+            // (skein component.rs Kind::GitHub; installations.rs output). Temper configures
+            // Forgejo alone until temper-05, so none arrives; temper-01 logs forge and
+            // installation and adds the note it needs. This pass decides nothing.
+            skein_forge_connection::Event::Connected { forge: _ }
+            | skein_forge_connection::Event::Installation { .. }
+            | skein_forge_connection::Event::GitToken { .. }
+            | skein_forge_connection::Event::Fact { .. } => {}
             skein_forge_connection::Event::ListenerLost => stop::hooks(engine),
             skein_forge_connection::Event::Stopped { forge, why } => {
-                // Each forge stops once per connect. temper-02 must revisit
+                // At most once per connect generation, possibly after Connected. temper-02 revisits
                 // dropping a full queue when runtime reconnects are routed.
                 if engine.notes.room() > 0 {
                     engine.notes.push(crate::Note::ForgeStopped { number: forge, why });

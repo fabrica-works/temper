@@ -451,6 +451,7 @@ fn forge_error(text: &mut Text, error: api::Error) -> Result<(), Problem> {
         api::Error::Refused => text.add(b"refused"),
         api::Error::InvalidAnswer => text.add(b"invalid provider answer"),
         api::Error::Busy => text.add(b"busy"),
+        api::Error::NotInstalled => text.add(b"not installed"),
         api::Error::NotConnected => text.add(b"not connected"),
     }
 }

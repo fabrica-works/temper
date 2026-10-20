@@ -382,3 +382,15 @@ fn a_full_notes_queue_keeps_its_first_diagnostic_and_the_engine_running() {
     );
     assert!(service.notes().is_empty());
 }
+
+#[test]
+fn connected_then_token_refused_keeps_the_note_and_engine_running() {
+    let mut service = fixtures::ready();
+    let why = Stopped::TokenRefused { installation: 7, status: 401 };
+    service.engine.forge.above.push(skein_forge_connection::Event::Connected { forge: 1 });
+    service.engine.forge.above.push(skein_forge_connection::Event::Stopped { forge: 1, why });
+    crate::engine::forge_pass(&mut service.engine);
+    assert_eq!(service.notes().pop(), Some(crate::Note::ForgeStopped { number: 1, why }));
+    assert_eq!(service.end(), None);
+    assert!(service.engine.drain.is_none());
+}

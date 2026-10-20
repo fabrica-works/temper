@@ -56,6 +56,8 @@ impl Refused {
             Self::Stopped(failure) => {
                 let stage = match failure.step {
                     Stage::Installation => "installation",
+                    Stage::App => "app",
+                    Stage::State => "state",
                     Stage::Admin => "admin",
                     Stage::Bot => "bot",
                     Stage::Token => "token",
@@ -63,6 +65,9 @@ impl Refused {
                     Stage::Repository => "repository",
                 };
                 let why = match failure.why {
+                    Why::KeyForm => "key unusable".into(),
+                    Why::Unknown => "unknown, used or expired".into(),
+                    Why::OtherApp => "another app".into(),
                     Why::Missing => "missing".into(),
                     Why::Busy => "busy".into(),
                     Why::OtherUser => "another user".into(),
@@ -194,7 +199,14 @@ impl Running {
     }
     fn local(&mut self, need: Need, now: Time, wall: Wall) {
         match need {
-            Need::Send { request, token } => {
+            Need::Send { request, auth } => {
+                let (skein_forge_setup::call::Call::Forgejo(request), skein_forge_setup::call::Auth::Token(token)) =
+                    (request, auth)
+                else {
+                    unreachable!(
+                        "only in-process Forgejo Reconcile supplies needs; every Send is Forgejo with Token auth"
+                    )
+                };
                 self.pending = Some((request, token));
                 self.begin(now, wall);
             }

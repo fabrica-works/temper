@@ -167,7 +167,7 @@ fn encode_reviewers(values: &[u64]) -> List<u64> {
 
 pub(crate) fn encode_error(value: d::Error) -> w::Error {
     match value {
-        d::Error::NotConnected | d::Error::Unavailable => w::Error::Unavailable,
+        d::Error::NotInstalled | d::Error::NotConnected | d::Error::Unavailable => w::Error::Unavailable,
         d::Error::Timeout => w::Error::Timeout,
         d::Error::RateLimited { after } => {
             w::Error::RateLimited(w::RateLimited::new(&w::CEILINGS, w::RateLimitedParts { after }).expect(FITS))

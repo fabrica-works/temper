@@ -184,3 +184,17 @@ fn invalid_given_values_are_refused_before_io() {
     };
     assert_eq!(forge, 1);
 }
+
+#[test]
+fn github_refusals_name_the_stage_and_reason() {
+    use skein_forge_setup::reconcile::{Failure, Stage, Why};
+    use temper_forge_setup_shell::reconcile::Refused;
+    for (step, why, words) in [
+        (Stage::Installation, Why::KeyForm, "installation app: key unusable"),
+        (Stage::App, Why::Unknown, "app app: unknown, used or expired"),
+        (Stage::State, Why::OtherApp, "state app: another app"),
+    ] {
+        let refused = Refused::Stopped(Failure { forge: 1, step, subject: b"app".as_slice().into(), why });
+        assert_eq!(refused.line(), format!("temper forge reconcile: forge 1: {words}\n"));
+    }
+}

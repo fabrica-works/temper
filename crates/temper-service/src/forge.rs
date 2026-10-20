@@ -243,12 +243,10 @@ pub fn problems(unusable: skein_forge_connection::Unusable, found: &mut Problems
             b"forge_component.inner",
             b"forge.client.answer_bytes",
         ],
-        // temper configures Forgejo alone until temper-05 (runtime 30 precedent).
-        Unusable::GitHub { .. } => unreachable!("temper configures Forgejo alone until temper-05"),
         Unusable::KeyBytes { .. } => &[b"forge_component.key_bytes"],
         Unusable::AppDeadline { .. } => &[b"forge_component.deadline_ms"],
         Unusable::RenewBefore { .. } => &[b"forge_component.renew_before_ms", b"forge_component.deadline_ms"],
-        Unusable::Documents(_) => {
+        Unusable::Documents(_) | Unusable::GitHubDocuments(_) => {
             &[b"forge_component.depth", b"forge_component.body_bytes_in", b"forge_component.chunk"]
         }
         Unusable::Stack { stacked, .. } => match stacked {

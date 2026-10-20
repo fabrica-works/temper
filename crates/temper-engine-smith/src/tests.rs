@@ -510,3 +510,10 @@ fn queued_names_the_forge_outcome() {
     assert_eq!(rendered.text(), b"Forge effect 1: queued");
     assert!(!rendered.error());
 }
+
+#[test]
+fn not_installed_names_the_forge_refusal() {
+    let rendered = answer(&engine::CallAnswer::ForgeEffectRefused(skein_forge::api::Error::NotInstalled));
+    assert_eq!(rendered.text(), b"Forge effect refused: not installed");
+    assert!(rendered.error());
+}

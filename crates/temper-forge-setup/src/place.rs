@@ -75,6 +75,11 @@ impl Place {
 pub fn item(item: skein_forge_setup::item::Item) -> File {
     use skein_forge_setup::item::Item;
     match item {
+        Item::AppId | Item::AppSlug | Item::AppKey | Item::Accepted | Item::Pasted => {
+            unreachable!(
+                "items come only from in-process Forgejo Reconcile, never files, stores or peers; temper-01/13 take GitHub records"
+            )
+        }
         Item::AdminToken => File::AdminToken,
         Item::ApiToken => File::ApiToken,
         Item::GitToken => File::GitToken,

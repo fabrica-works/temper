@@ -63,29 +63,8 @@ impl skein_shell::Host for Host {
     }
     fn drain(&mut self) {
         while let Some(note) = self.service.notes().pop() {
-            use skein_forge_connection::{StartRead, Stopped, Value};
             let temper_service::Note::ForgeStopped { number, why } = note;
-            let lines = match why {
-                Stopped::Invalid { value } => {
-                    let member = match value {
-                        Value::Credential | Value::Token => "api_token",
-                        Value::User => "user",
-                        Value::Key => "app_key",
-                        Value::Secret => "webhook_secret",
-                    };
-                    format!("temper serve: forge {number}: {member}: invalid\n")
-                }
-                Stopped::OtherUser { user } => {
-                    format!("temper serve: forge {number}: start answered as user {user}\n")
-                }
-                Stopped::Refused { read, status } => {
-                    let path = match read {
-                        StartRead::User => "/api/v1/user",
-                        StartRead::ApiSettings => "/api/v1/settings/api",
-                    };
-                    format!("temper serve: forge {number}: {path}: status {status}\n")
-                }
-            };
+            let lines = stopped_line(number, why);
             eprint!("{lines}");
         }
         while let Some(link) = self.service.links().pop() {
@@ -100,5 +79,51 @@ impl skein_shell::Host for Host {
                 self.service.shutdown();
             }
         }
+    }
+}
+
+fn stopped_line(number: u16, why: skein_forge_connection::Stopped) -> String {
+    use skein_forge_connection::{StartRead, Stopped, Value};
+    match why {
+        Stopped::Invalid { value } => {
+            let member = match value {
+                Value::Credential | Value::Token => "api_token",
+                Value::User => "user",
+                Value::Key => "app_key",
+                Value::Secret => "webhook_secret",
+            };
+            format!("temper serve: forge {number}: {member}: invalid\n")
+        }
+        Stopped::KeyRefused => format!("temper serve: forge {number}: app key: refused\n"),
+        Stopped::TokenRefused { installation, status } => {
+            format!("temper serve: forge {number}: /app/installations/{installation}/access_tokens: status {status}\n")
+        }
+        Stopped::OtherUser { user } => {
+            format!("temper serve: forge {number}: start answered as user {user}\n")
+        }
+        Stopped::Refused { read, status } => {
+            let path = match read {
+                StartRead::Installations => "/app/installations",
+                StartRead::Mint => "/app/installations/{id}/access_tokens",
+                StartRead::Viewer => "/graphql viewer",
+                StartRead::User => "/api/v1/user",
+                StartRead::ApiSettings => "/api/v1/settings/api",
+            };
+            format!("temper serve: forge {number}: {path}: status {status}\n")
+        }
+    }
+}
+
+#[test]
+fn github_start_refusals_name_their_paths() {
+    use skein_forge_connection::{StartRead, Stopped};
+    for (why, words) in [
+        (Stopped::KeyRefused, "app key: refused"),
+        (Stopped::TokenRefused { installation: 7, status: 403 }, "/app/installations/7/access_tokens: status 403"),
+        (Stopped::Refused { read: StartRead::Installations, status: 401 }, "/app/installations: status 401"),
+        (Stopped::Refused { read: StartRead::Mint, status: 401 }, "/app/installations/{id}/access_tokens: status 401"),
+        (Stopped::Refused { read: StartRead::Viewer, status: 401 }, "/graphql viewer: status 401"),
+    ] {
+        assert_eq!(stopped_line(1, why), format!("temper serve: forge 1: {words}\n"));
     }
 }
