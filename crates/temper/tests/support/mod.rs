@@ -342,8 +342,8 @@ pub fn until_link_then(directory: &Path, signal: Signal, deadline: Duration) -> 
 }
 
 pub const ANSWER: &[u8] = b"Process answer";
-pub const EDIT: &[u8] = b"Changed by temper.\n";
 pub use forgejo::landing_scripts;
+pub use temper_real_loop_world::landing::EDIT;
 #[must_use]
 pub fn chat_script(answer: &[u8]) -> skein_fake_llm_domain::api::Script {
     use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};

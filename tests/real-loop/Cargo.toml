@@ -7,6 +7,10 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+jig-protocol-config.workspace = true
+jig-protocol-store.workspace = true
+temper-protocol-store.workspace = true
+temper-engine-domain.workspace = true
 temper.workspace = true
 temper-client-shell-cli.workspace = true
 temper-client-tools.workspace = true

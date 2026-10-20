@@ -4,6 +4,7 @@
 pub mod fixtures;
 pub mod forge;
 pub mod git;
+pub mod landing;
 pub mod llm;
 pub mod scripts;
 

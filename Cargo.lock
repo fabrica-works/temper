@@ -2199,6 +2199,7 @@ dependencies = [
  "temper-forge-setup",
  "temper-forge-setup-shell",
  "temper-protocol-store",
+ "temper-real-loop-world",
  "temper-service",
  "temper-worker-domain",
 ]
@@ -2719,6 +2720,8 @@ version = "0.0.0"
 dependencies = [
  "jig-channel-world",
  "jig-client-protocol-wire",
+ "jig-protocol-config",
+ "jig-protocol-store",
  "serde_json",
  "skein-fake-forge-domain",
  "skein-fake-forge-protocol",
@@ -2740,7 +2743,9 @@ dependencies = [
  "temper",
  "temper-client-shell-cli",
  "temper-client-tools",
+ "temper-engine-domain",
  "temper-fake-git",
+ "temper-protocol-store",
  "temper-service",
  "temper-worker-protocol-git",
 ]
