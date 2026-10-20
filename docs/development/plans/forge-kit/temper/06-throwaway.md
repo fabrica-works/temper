@@ -287,20 +287,36 @@ Shape: the family cannot split by module (every file calls `Fixture::api`), so i
   17, registration 15, cases 15, tokens 14, users 13, fixture 11, six files 19), and 146 lines of the
   `api` family in 14 files. `has_key` walks the document for a member at any depth and never matches
   a value that spells the key.
-Test shape: one new unit test, `a_key_is_found_at_any_depth_and_a_value_is_not_a_key`: over
+  Diagnostics (the designer's answer, as the director ruled): a whole body in a failure's text
+  (`facts.rs`: `initial(&defaults.to_string())`, `listing(&since.to_string())`, and `flags`'
+  `format!("Forward {}, reverse {}, verification {}", ..)`) is printed as the response's own bytes,
+  as received, the `body` its call site already holds: `facts.rs::diagnostic(body: &[u8]) -> String`
+  cuts them at `DIAGNOSTIC_BYTES` (4096, a failure a person reads), decodes them lossily as UTF-8,
+  and marks a cut with `… (N more bytes)`. JSON order and spacing may differ from today's
+  `Display`: a diagnostic is for a person reading a failure, not a fact. A scalar's diagnostic
+  prints the decoded value as Rust's escaped `{:?}`. `Json` keeps no bytes and gets no serializer:
+  the seam is the conformance's fact code, not skein-json. Fact names, outcomes, statuses, their
+  order and every assertion stay.
+Test shape: two new unit tests. `a_diagnostic_is_the_bodys_bytes_cut_at_its_bound_and_marked`: a
+  body of `DIAGNOSTIC_BYTES` bytes prints whole, and one byte more prints its first
+  `DIAGNOSTIC_BYTES` and `… (1 more bytes)`. `a_key_is_found_at_any_depth_and_a_value_is_not_a_key`: over
   `{"a":{"secret":1},"b":["x",{"c":"secret"}]}`, `has_key("secret")` is true and `has_key("c")` true,
   `has_key("x")` false (an item, not a key). `a_listed_runner_is_found_by_its_uuid` and
   `a_fact_read_from_a_case_compares_its_status_and_message` change their fixtures, not their names or
-  expected values. Conformance tests: 31.
-Proof: unit; `heavy cargo nextest run -p forgejo-conformance`: 31 passed, <1 s.
+  expected values. Conformance tests: 32.
+Proof: unit; `heavy cargo nextest run -p forgejo-conformance`: 32 passed, <1 s.
 Proof: process; 06.2's two recordings, exit 0, the stable-fact line and the transcripts diff: the same
   counts, digest and six exact request files, including the four header-only differences
-  in The recording's checks. Any other difference, or a changed digest, is a question.
-Proof: joint; `heavy --gate scripts/check.sh`: the focused count plus 1, fuzzy unchanged.
+  in The recording's checks. Any other difference, or a changed digest, is a question: the
+  diagnostics print only on a failure.
+Proof: joint; `heavy --gate scripts/check.sh`: the focused count plus 2, fuzzy unchanged.
 Don't: add a `Value`-shaped accessor (`Index`), a macro, or a second tree; change a fact's text, its
-  order or an expected value; turn a failing read into a `None` default that hides it.
+  order or an expected value; turn a failing read into a `None` default that hides it; give `Json`
+  retained bytes, a `Display` or a serializer, or print a body through a second parser or a
+  normalizer; change ruling 192's six-path recording proof or a bound.
 Size: about 350 lines moved (changed in place: each read keeps its meaning with another accessor),
-  about 55 new (`has_key` about 35, its test 12, the `Json` returns about 8). Counted as new it is
+  about 80 new (`has_key` about 35, its test 12, the `Json` returns about 8, `diagnostic` and its
+  test about 25). Counted as new it is
   about 400, and stays whole: a half-converted family holds two trees, which decision 27 forbids.
 Removes: nothing.
 
@@ -318,15 +334,15 @@ Shape: a flat object becomes `json::object(&[("key", &value), ..])` with its key
   refuses unsorted or repeated keys. A nested one becomes `json::write(|out| ..)`. `TEAM` is sent as
   its own bytes, unparsed (its keys are unsorted): the two recorded `r.send` POSTs already send them
   so, and the PATCH goes through `Fixture::api`, which records nothing.
-Test shape: three new unit tests, <20 ms (conformance tests: 34):
+Test shape: three new unit tests, <20 ms (conformance tests: 35):
   - `an_object_is_written_compact_in_sorted_key_order`: `object(&[("a", &1u64), ("b", &"x"), ("c",
     &true)])` writes `{"a":1,"b":"x","c":true}`.
   - `members_out_of_order_or_repeated_are_refused`: `("b", ..), ("a", ..)` and `("a", ..), ("a", ..)`
     are errors.
   - `a_string_is_escaped_to_the_bytes_the_base_wrote`: `"` `\` newline, tab and a control byte `\u0001`
     write `\"`, `\\`, `\n`, `\t` and `\u0001`; a non-ASCII letter is written as it is.
-Proof: unit; `heavy cargo nextest run -p forgejo-conformance`: 34 passed (the base's 25, 06.1's refusal
-  test and the 8 of 06.2 to 06.4), <1 s; `heavy rg -n 'serde_json|json!' tools/forgejo-conformance
+Proof: unit; `heavy cargo nextest run -p forgejo-conformance`: 35 passed (the base's 25, 06.1's refusal
+  test and the 9 of 06.2 to 06.4), <1 s; `heavy rg -n 'serde_json|json!' tools/forgejo-conformance
   -g '*.rs' -g Cargo.toml` prints nothing (96 lines in 18 files at the base).
 Proof: process; 06.2's two recordings, the stable-fact line and the transcripts diff, as 06.3: `api`
   builds the state the facts record, so equal counts, digest and files show the bodies unchanged.
