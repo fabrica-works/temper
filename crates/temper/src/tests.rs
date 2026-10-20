@@ -4,14 +4,14 @@ use super::configure;
 fn serve_without_a_configuration_path_is_a_usage_error() {
     assert_eq!(
         configure(["serve".into()].into_iter()),
-        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]\n".into())
+        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper program-login CONFIG.json NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]\n".into())
     );
 }
 #[test]
 fn an_unknown_command_prints_the_usage_line() {
     assert_eq!(
         configure(["unknown".into(), "config.json".into()].into_iter()),
-        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]\n".into())
+        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper program-login CONFIG.json NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]\n".into())
     );
 }
 
@@ -77,7 +77,7 @@ fn open_without_two_arguments_prints_its_usage() {
 }
 
 #[path = "../tests/support/configuration.rs"]
-mod configuration;
+pub(crate) mod configuration;
 #[test]
 fn forge_without_its_arguments_prints_its_usage() {
     assert_eq!(
@@ -96,12 +96,12 @@ fn box_with_one_path_is_the_box_command() {
 #[test]
 fn box_without_a_path_prints_the_usage() {
     assert_eq!(configure(["box".into()].into_iter()),
-        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]\n".into()));
+        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper program-login CONFIG.json NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]\n".into()));
 }
 #[test]
 fn box_with_two_paths_prints_the_usage() {
     assert_eq!(configure(["box".into(), "one.json".into(), "two.json".into()].into_iter()),
-        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]\n".into()));
+        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper program-login CONFIG.json NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]\n".into()));
 }
 
 #[test]
@@ -193,5 +193,24 @@ fn a_programs_owner_refusal_keeps_the_path_and_owner() {
     assert_eq!(
         why,
         format!("workers[0].agent.configuration: programs.claude_code.directory: /programs: owned by user {other}")
+    );
+}
+
+#[test]
+fn program_login_takes_exactly_a_configuration_and_source_name() {
+    for arguments in [
+        vec!["program-login"],
+        vec!["program-login", "config.json"],
+        vec!["program-login", "config.json", "source", "extra"],
+        vec!["sign-in", "config.json"],
+    ] {
+        assert_eq!(
+            configure(arguments.into_iter().map(Into::into)),
+            Err(format!("temper: invalid arguments\n{}\n", super::USAGE))
+        );
+    }
+    assert_eq!(
+        configure(["program-login", "config.json", "source"].into_iter().map(Into::into)),
+        Ok(super::Command::ProgramLogin { configuration: "config.json".into(), name: "source".into() })
     );
 }

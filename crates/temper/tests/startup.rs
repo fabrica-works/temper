@@ -563,3 +563,112 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     }
     scratch.remove();
 }
+
+#[test]
+fn program_login_refuses_invalid_input_before_creation() {
+    use support::program_login::{configuration, no_deployment_resources, refused};
+    for row in ["no-program", "malformed", "missing-members", "oversized", "bad-agent", "bad-name"] {
+        let scratch = support::Scratch::startup(&format!("login-{row}"));
+        let directory = scratch.path();
+        let programs = directory.join("programs");
+        configuration(
+            directory,
+            (row != "no-program").then_some(programs.as_path()),
+            std::path::Path::new("/nonexistent/claude"),
+        );
+        match row {
+            "malformed" => fs::write(directory.join("config.json"), b"{").expect("malformed JSON"),
+            "missing-members" => fs::write(directory.join("config.json"), b"{}").expect("missing members"),
+            "oversized" => fs::File::create(directory.join("config.json"))
+                .expect("configuration")
+                .set_len(1_048_577)
+                .expect("past bound"),
+            "bad-agent" => fs::write(directory.join("agent.json"), b"{}").expect("bad agent"),
+            _ => {}
+        }
+        let why = refused(directory, if row == "bad-name" { "../escape" } else { "source" }.as_ref());
+        assert!(why.starts_with("temper program-login: "), "{row}: {why}");
+        assert_eq!(why.lines().count(), 1, "{row}: {why}");
+        assert!(!why.contains("exec:"), "{row}: {why}");
+        if row == "no-program" {
+            assert!(why.contains("programs.claude_code: not configured"), "{why}");
+        }
+        if row == "oversized" {
+            assert!(why.contains("past 1048576 bytes"), "{why}");
+        }
+        if row == "bad-name" {
+            assert!(why.contains("source name must be"), "{why}");
+        }
+        assert!(!programs.exists());
+        no_deployment_resources(directory);
+        scratch.remove();
+    }
+}
+
+#[test]
+fn program_login_checks_both_directory_names_before_creating_anything() {
+    use support::program_login::{configuration, no_deployment_resources, refused};
+    for row in
+        ["program-link", "program-mode", "program-file", "source-link", "source-mode", "source-file", "source-dangling"]
+    {
+        let scratch = support::Scratch::startup(&format!("login-{row}"));
+        let directory = scratch.path();
+        let programs = directory.join("programs");
+        let source = programs.join("source");
+        if row.starts_with("source-") {
+            fs::create_dir(&programs).expect("programs");
+            fs::set_permissions(&programs, fs::Permissions::from_mode(0o700)).expect("private");
+        }
+        let target = if row.starts_with("source-") { &source } else { &programs };
+        let expected = if row.ends_with("link") || row.ends_with("dangling") {
+            symlink(directory.join("missing"), target).expect("linked leaf");
+            "symbolic link"
+        } else if row.ends_with("mode") {
+            fs::create_dir(target).expect("directory");
+            fs::set_permissions(target, fs::Permissions::from_mode(0o750)).expect("unsafe mode");
+            "nonprivate mode bits 0o50"
+        } else {
+            fs::write(target, b"file").expect("wrong kind");
+            "not a directory"
+        };
+        configuration(directory, Some(&programs), std::path::Path::new("/nonexistent/claude"));
+        let why = refused(directory, "source".as_ref());
+        assert!(why.contains(expected), "{row}: {why}");
+        assert!(why.contains(&target.display().to_string()), "{row}: {why}");
+        assert!(!directory.join("missing").exists(), "linked peer stays absent");
+        if row.starts_with("program-") {
+            assert!(fs::symlink_metadata(&source).is_err(), "missing source stays absent");
+        }
+        no_deployment_resources(directory);
+        scratch.remove();
+    }
+}
+
+#[test]
+fn program_login_creates_private_directories_and_accepts_linked_parents() {
+    use support::program_login::{configuration, no_deployment_resources, refused};
+    for row in ["missing", "private", "linked-parent"] {
+        let scratch = support::Scratch::startup(&format!("login-create-{row}"));
+        let directory = scratch.path();
+        let programs = directory.join("programs");
+        if row == "private" {
+            fs::create_dir(&programs).expect("programs");
+            fs::set_permissions(&programs, fs::Permissions::from_mode(0o700)).expect("private");
+        }
+        let configured = if row == "linked-parent" {
+            symlink(directory, directory.join("parent")).expect("linked parent");
+            directory.join("parent/programs")
+        } else {
+            programs.clone()
+        };
+        configuration(directory, Some(&configured), std::path::Path::new("/nonexistent/claude"));
+        let why = refused(directory, "source".as_ref());
+        assert!(why.starts_with("temper program-login: exec: "), "{row}: {why}");
+        assert_eq!(why.lines().count(), 1);
+        for path in [&programs, &programs.join("source")] {
+            assert_eq!(fs::metadata(path).expect("created directory").permissions().mode() & 0o777, 0o700);
+        }
+        no_deployment_resources(directory);
+        scratch.remove();
+    }
+}

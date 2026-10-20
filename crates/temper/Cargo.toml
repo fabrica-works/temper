@@ -35,11 +35,13 @@ skein-oauth.workspace = true
 smith-agent-service.workspace = true
 smith-local-domain.workspace = true
 smith-agent-shell.workspace = true
+smith-host-domain.workspace = true
 smith-local-service.workspace = true
 smith-host-protocol.workspace = true
 
 [dev-dependencies]
 temper-real-loop-world = { path = "../../tests/real-loop" }
+smith-fake-claude.workspace = true
 smith-local-process-world.workspace = true
 temper-engine-domain.workspace = true
 temper-protocol-store.workspace = true

@@ -22,15 +22,17 @@ pub mod ctl;
 pub mod forge;
 mod host;
 pub mod open;
+mod program_login;
 mod setup;
 pub use host::Host;
-pub const USAGE: &str = "usage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
+pub const USAGE: &str = "usage: temper serve CONFIG.json | temper agent AGENT.json | temper program-login CONFIG.json NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
 const CONFIG_BYTES: u32 = 1 << 20;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
     Serve { configuration: PathBuf },
     Box { configuration: PathBuf },
+    ProgramLogin { configuration: PathBuf, name: OsString },
     Agent { configuration: PathBuf },
     Open { arguments: Vec<OsString> },
     Ctl { arguments: Vec<OsString> },
@@ -59,6 +61,13 @@ pub fn configure(mut args: impl Iterator<Item = OsString>) -> Result<Command, St
         return Ok(Command::Open { arguments: args.collect() });
     }
     let configuration = args.next().ok_or_else(usage)?.into();
+    if command == "program-login" {
+        let name = args.next().ok_or_else(usage)?;
+        if args.next().is_some() {
+            return Err(usage());
+        }
+        return Ok(Command::ProgramLogin { configuration, name });
+    }
     if args.next().is_some() {
         return Err(usage());
     }
@@ -80,6 +89,10 @@ pub fn run(command: Command) -> Result<u8, String> {
         }
         Command::Agent { configuration } => smith_agent_shell::run(&configuration, Box::new(std::io::stderr()))
             .map_err(|why| prefixed("temper agent", &why))?,
+        Command::ProgramLogin { configuration, name } => {
+            return program_login::run(&configuration, &name)
+                .map_err(|why| prefixed("temper program-login", &why.lines().collect::<Vec<_>>().join("; ")));
+        }
         Command::Forge { arguments } => return Ok(forge::run(&arguments)),
         Command::Ctl { arguments } => return Ok(ctl::run(&arguments, &Clock::new())),
         Command::Open { arguments } => return Ok(open::run(&arguments, &Clock::new())),

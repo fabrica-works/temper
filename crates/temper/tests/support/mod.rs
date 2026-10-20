@@ -9,6 +9,7 @@ pub const WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(30);
 pub mod forgejo;
 pub mod live;
 pub mod person;
+pub mod program_login;
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
 pub enum Forge<'a> {

@@ -1809,6 +1809,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "smith-fake-claude"
+version = "0.0.0"
+source = "git+https://github.com/fabrig-dev/smith.git#6747e669ac3d94c8388e54839b2116fb1725ec88"
+dependencies = [
+ "serde",
+ "serde_json",
+ "skein-io",
+ "skein-lib",
+ "skein-shell",
+ "skein-world",
+]
+
+[[package]]
 name = "smith-host-domain"
 version = "0.0.0"
 source = "git+https://github.com/fabrig-dev/smith.git#6747e669ac3d94c8388e54839b2116fb1725ec88"
@@ -2186,6 +2199,8 @@ dependencies = [
  "smith-agent-process-world",
  "smith-agent-service",
  "smith-agent-shell",
+ "smith-fake-claude",
+ "smith-host-domain",
  "smith-host-protocol",
  "smith-local-domain",
  "smith-local-process-world",

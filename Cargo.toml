@@ -61,6 +61,7 @@ skein-llm = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-llm-world = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-fake-llm-protocol = { git = "https://github.com/fabrig-dev/skein.git" }
 smith-agent-process-world = { git = "https://github.com/fabrig-dev/smith.git" }
+smith-fake-claude = { git = "https://github.com/fabrig-dev/smith.git" }
 smith-agent-shell = { git = "https://github.com/fabrig-dev/smith.git" }
 smith-local-service = { git = "https://github.com/fabrig-dev/smith.git" }
 smith-local-process-world = { git = "https://github.com/fabrig-dev/smith.git" }
