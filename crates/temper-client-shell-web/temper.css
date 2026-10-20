@@ -216,17 +216,17 @@ a { color: inherit; text-decoration: none; }
 .temper-chat .temper-entry button:hover { background: #a8563e; }
 /* .terminal-dialog: the page's confirmation and proposal reason fields. */
 /* skein-ui-web's dialog is open, not modal: centred, with the backdrop drawn as a spread shadow. */
-.temper-chat dialog { position: fixed; inset: 0; z-index: 20; height: fit-content; margin: auto; width: min(420px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow-y: auto; border: 1px solid #dbd4ca; border-radius: 9px; background: #fffefd; color: var(--temper-ink); padding: 20px; box-shadow: 0 22px 70px rgba(35,30,25,.22), 0 0 0 100vmax rgba(30,26,22,.34); }
-.temper-chat dialog[open] { display: flex; flex-wrap: wrap; column-gap: 8px; }
-.temper-chat dialog[open] > :not(button) { flex: 0 0 100%; }
-.temper-chat dialog::backdrop { background: rgba(30,26,22,.34); }
-.temper-chat dialog h2 { font: 700 14px ui-monospace, monospace; margin-bottom: 9px; }
-.temper-chat dialog p { color: #756e65; font-size: 11px; margin: 0 0 1em; }
-.temper-chat dialog > p:first-child { margin-top: 1em; }
-.temper-chat .temper-card textarea { margin-top: 8px; }
-.temper-chat .temper-card textarea, .temper-chat dialog textarea { display: block; width: 100%; min-height: 75px; border: 1px solid #d8d0c5; border-radius: 5px; padding: 8px; resize: vertical; font: inherit; }
-.temper-chat dialog button { border: 1px solid #d8d0c5; background: #fffefd; border-radius: 5px; padding: 6px 10px; margin-top: 17px; font: 600 11px ui-monospace, monospace; }
-.temper-chat dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-accent); border-color: var(--temper-accent); color: #fff; }
+dialog { position: fixed; inset: 0; z-index: 20; height: fit-content; margin: auto; width: min(420px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow-y: auto; border: 1px solid #dbd4ca; border-radius: 9px; background: #fffefd; color: var(--temper-ink); padding: 20px; box-shadow: 0 22px 70px rgba(35,30,25,.22), 0 0 0 100vmax rgba(30,26,22,.34); }
+dialog[open] { display: flex; flex-wrap: wrap; column-gap: 8px; }
+dialog[open] > :not(button) { flex: 0 0 100%; }
+dialog::backdrop { background: rgba(30,26,22,.34); }
+dialog h2 { font: 700 14px ui-monospace, monospace; margin-bottom: 9px; }
+dialog p { color: #756e65; font-size: 11px; margin: 0 0 1em; }
+dialog > p:first-child { margin-top: 1em; }
+.temper-card textarea { margin-top: 8px; }
+.temper-card textarea, dialog textarea { display: block; width: 100%; min-height: 75px; border: 1px solid #d8d0c5; border-radius: 5px; padding: 8px; resize: vertical; font: inherit; }
+dialog button { border: 1px solid #d8d0c5; background: #fffefd; border-radius: 5px; padding: 6px 10px; margin-top: 17px; font: 600 11px ui-monospace, monospace; }
+dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-accent); border-color: var(--temper-accent); color: #fff; }
 /* .terminal-input-hint at 1100px. */
 @media (max-width: 1100px) {
   .temper-chat .temper-hint { display: none; }
@@ -260,4 +260,80 @@ a { color: inherit; text-decoration: none; }
   .temper-chat .temper-chatbar > div:first-child > p { flex: 1; max-width: max-content; }
   .temper-chat .temper-chatbar [role=status] { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
   .temper-chat .temper-entry textarea { font-size: 12px; }
+}
+
+/* .page and .topbar: the full-width list page and breadcrumb bar. */
+.temper-main.temper-page { width: 100%; margin: 0; padding: 0 0 58px; }
+.temper-page > :not(.temper-pagebar):not(dialog) { width: min(1160px, calc(100% - 48px)); margin-inline: auto; }
+.temper-pagebar { height: 37px; padding: 0 25px; background: #fcfbf8; border-bottom: 1px solid var(--temper-line); display: flex; align-items: center; }
+.temper-pagebar h1 { margin: 0; font: 700 11px/1.58 var(--temper-mono); letter-spacing: -.015em; }
+/* .section-heading and .filter-row: groups wrap together and retain their words. */
+.temper-page .temper-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 21px; margin-bottom: 9px; }
+.temper-pagebar + .temper-heading { margin-top: 22px; }
+.temper-heading h2 { flex: none; margin: 0; font-size: 14px; }
+.temper-filters, .temper-filters > div { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.temper-filters { justify-content: flex-end; min-width: 0; }
+.temper-filters > div { max-width: 100%; }
+/* .filter and .filter.active, including the Goal field's labelled box. */
+.temper-filters button, .temper-filters > div > div { border: 1px solid var(--temper-line); background: #f7f5f0; border-radius: 4px; min-height: 28px; padding: 5px 9px; font: 600 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--temper-muted); }
+.temper-filters button[aria-pressed=true] { background: #eae4d9; border-color: #eae4d9; color: var(--temper-ink); }
+.temper-filters > div > div { display: flex; align-items: center; gap: 7px; }
+.temper-filters > div > div::before { content: "Goal" / ""; }
+.temper-filters input { min-width: 0; width: 5ch; border: 0; border-radius: 0; background: transparent; padding: 0; color: var(--temper-ink); font: inherit; }
+.temper-heading > button { min-height: 28px; border: 0; background: transparent; padding: 5px 9px; color: var(--temper-muted); font: 600 11px/1.35 var(--temper-mono); }
+.temper-heading > button:hover { color: var(--temper-accent-dark); }
+/* .inbox-card: needs stay in their existing order, in one list. */
+.temper-page .temper-cards { list-style: none; padding: 0; margin-block: 0; }
+.temper-page .temper-card { min-width: 0; padding: 13px 17px; overflow-wrap: anywhere; }
+.temper-page .temper-card p, .temper-page .temper-card ul, .temper-page .temper-card ol, .temper-page .temper-card pre { font-size: 11px; color: #615f58; margin: 0 0 7px; }
+.temper-page .temper-card pre { overflow-x: auto; white-space: pre; overflow-wrap: normal; }
+.temper-page .temper-card code { font: inherit; }
+/* .meta-row and .tag: kind words and the supplied project and task path. */
+.temper-meta { display: flex; flex-wrap: wrap; gap: 7px 12px; align-items: center; color: var(--temper-muted); font-size: 11px; }
+.temper-meta h3 { display: inline-flex; align-items: center; white-space: nowrap; border-radius: 3px; padding: 2px 6px; margin: 0; background: #f3f1eb; color: #6d695f; font: 600 10px/1.58 var(--temper-mono); letter-spacing: -.015em; }
+.temper-page .temper-meta p { color: var(--temper-muted); margin: 0; }
+.temper-meta a::before { content: "›" / ""; margin-right: 7px; }
+.temper-meta a { margin-left: -5px; }
+.temper-kind-proposal > .temper-meta h3 { background: var(--temper-accent-pale); color: var(--temper-accent-dark); }
+.temper-kind-question > .temper-meta h3 { background: var(--temper-amber-pale); color: var(--temper-amber); }
+.temper-kind-held > .temper-meta h3 { background: var(--temper-red-pale); color: var(--temper-red); }
+.temper-kind-person-task > .temper-meta h3 { background: var(--temper-green-pale); color: var(--temper-green); }
+/* .inbox-card h3 and .proposal-items: a title paragraph and supplied facts. */
+.temper-page .temper-card .temper-title { font-size: 13px; font-weight: 700; line-height: 1.35; letter-spacing: -.025em; color: var(--temper-ink); margin: 6px 0; }
+.temper-page .temper-meta + p:not(.temper-title) { margin-top: 6px; }
+.temper-details { display: grid; gap: 8px; background: #faf8f4; border-radius: 3px; margin: 10px 0; padding: 9px 12px; font-size: 11px; }
+.temper-page .temper-details p { margin: 0; }
+.temper-details h3 { font: 700 12px/1.35 var(--temper-mono); letter-spacing: -.025em; margin: 0; }
+/* .button-row and .button: the first decision is primary, with full-width reason fields. */
+.temper-page .temper-card button { border: 1px solid #dcd5ca; border-radius: 4px; min-height: 28px; padding: 5px 9px; margin: 10px 8px 0 0; background: var(--temper-paper); color: var(--temper-ink); font: 600 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.temper-page .temper-card button:hover { border-color: #c9b7a8; background: #faf7f2; }
+.temper-page .temper-card button:first-of-type { background: var(--temper-accent); border-color: var(--temper-accent); color: white; }
+.temper-page .temper-card button:first-of-type:hover { background: #a8563e; }
+.temper-page .temper-card [role=status] { color: var(--temper-muted); font-size: 11px; }
+/* .updates-list, .update and .update-icon: two columns with decorative meaning icons. */
+.temper-page .temper-updates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.temper-page .temper-updates > .temper-card { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 12px; align-content: start; padding: 10px 13px; }
+.temper-updates > .temper-card::before { grid-column: 1; grid-row: 1 / span 99; border: 1px solid var(--temper-line); width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-size: 15px; }
+.temper-updates > .temper-card > * { grid-column: 2; min-width: 0; }
+.temper-kind-result::before { content: "✓" / ""; color: var(--temper-green); }
+.temper-kind-reply::before { content: "✳" / ""; color: var(--temper-accent); }
+.temper-page .temper-updates .temper-title { font-size: 11px; }
+.temper-page .temper-updates p { color: var(--temper-muted); margin: 4px 0 0; }
+.temper-page .temper-updates .temper-meta p { margin: 0; }
+/* .page at 850px. */
+@media (max-width: 850px) {
+  .temper-page > :not(.temper-pagebar):not(dialog) { width: calc(100% - 34px); }
+}
+/* .topbar, .page and .updates-list at 760px. */
+@media (max-width: 760px) {
+  .temper-main.temper-page { width: 100%; padding: 0 0 58px; }
+  .temper-pagebar { height: 35px; padding: 0 16px; }
+  .temper-page > :not(.temper-pagebar):not(dialog) { width: calc(100% - 28px); }
+  .temper-pagebar + .temper-heading { margin-top: 16px; }
+  .temper-page .temper-updates { grid-template-columns: 1fr; }
+}
+/* .section-heading at 600px: filters below the heading, all controls retained. */
+@media (max-width: 600px) {
+  .temper-page .temper-heading { display: block; }
+  .temper-heading .temper-filters { margin-top: 8px; justify-content: flex-start; }
 }
