@@ -1,8 +1,11 @@
 //! The machine on skein-io, with one bounded chunk per child pipe.
 use crate::{
+    layout::{self, Placed},
     limits::{Limits, Unfit},
     lines::{self, Lines},
-    machine::{Input, Machine, Order, Outcome},
+    machine::{Input, Machine, Order, Outcome, Said, Why},
+    pipe::{self, Command, Line, Reader},
+    records::Records,
     sink::Sink,
 };
 use alloc::boxed::Box;
@@ -14,13 +17,13 @@ use skein_lib::{
     Decimal, Duration, Env, List, Queue, Time, Token, Wall,
     stream::{Down, Read, Up},
 };
-use temper_forge_setup::Step;
+use temper_forge_setup::Steps;
 /// The descriptors and command inherited from the binary.
 #[derive(Debug)]
 pub struct Settings {
     pub program: Box<[u8]>,
     pub environment: Box<[Box<[u8]>]>,
-    pub plain: Box<[u8]>,
+    pub serve: Box<[u8]>,
     pub root: Fd,
     pub signals: Fd,
     pub stdout: Fd,
@@ -62,13 +65,27 @@ enum Root {
     Closing,
     Closed,
 }
+#[derive(Debug)]
+struct Control {
+    read: Token,
+    sink: Sink,
+    reader: Reader,
+    reading: bool,
+    ended: bool,
+    line: Option<Line>,
+}
 /// All io and policy state owned by one box process.
 #[derive(Debug)]
 pub struct Service {
     io: Io,
     env: Env<io::Limits>,
     machine: Machine,
-    steps: Box<[Step]>,
+    steps: Box<[Placed]>,
+    records: Records,
+    control: Option<Control>,
+    closing_control: [Option<Token>; 2],
+    line_bytes: u32,
+    reply_entries: u32,
     settings: Settings,
     children: Box<[Child]>,
     sinks: [Sink; 2],
@@ -86,14 +103,23 @@ pub struct Service {
 }
 impl Service {
     /// Checks the policy limits and adopts the binary's descriptors.
-    pub fn new(limits: &Limits, steps: Box<[Step]>, settings: Settings) -> Result<Self, Unfit> {
-        let placed = crate::layout::flatten(temper_forge_setup::Steps { always: steps.clone(), asked: Box::new([]) });
-        let machine = Machine::new(limits, &placed)?;
+    pub fn new(limits: &Limits, steps: Steps, settings: Settings) -> Result<Self, Unfit> {
+        let mut longest = 0;
+        for group in &steps.asked {
+            longest = longest.max(u32::try_from(group.steps.len()).expect("bounded group"));
+        }
+        let reply_entries = longest.saturating_add(2);
+        let steps = layout::flatten(steps);
+        let machine = Machine::new(limits, &steps)?;
+        let records = Records::new(&steps);
         let count = u32::try_from(steps.len()).expect("steps fit u32");
         let mut bounds = io_limits(count);
+        bounds.intake = bounds.intake.max(limits.line_bytes);
+        bounds.output = bounds.output.max(limits.line_bytes);
         let mut children = List::with_capacity(count);
-        let mut inputs = u64::try_from(settings.plain.len()).expect("plain name");
-        for step in &steps {
+        let mut inputs = u64::try_from(settings.serve.len()).expect("serve name");
+        for placed in &steps {
+            let step = &placed.step;
             bounds.output = bounds.output.max(
                 LINE_BYTES
                     .checked_add(u32::try_from(step.name().len()).expect("bounded name"))
@@ -105,7 +131,7 @@ impl Service {
                 .push(Child {
                     owner: None,
                     process: None,
-                    pipes: [Pipe::new(lines::route(&settings.plain, step.name(), 1)), Pipe::new(false)],
+                    pipes: [Pipe::new(lines::route(&settings.serve, step.name(), 1)), Pipe::new(false)],
                     spawn: false,
                 })
                 .expect("one child per step");
@@ -115,23 +141,7 @@ impl Service {
                 inputs = inputs.saturating_add(u64::try_from(argument.len()).expect("argument length"));
             }
         }
-        inputs = inputs.saturating_add(
-            u64::try_from(size_of_val(settings.environment.as_ref()))
-                .expect("environment slots")
-                .saturating_mul(u64::from(count).saturating_add(1)),
-        );
-        for value in &settings.environment {
-            inputs = inputs.saturating_add(
-                u64::try_from(value.len())
-                    .expect("environment length")
-                    .saturating_mul(u64::from(count).saturating_add(1)),
-            );
-        }
-        inputs = inputs.saturating_add(
-            u64::try_from(settings.program.len())
-                .expect("program length")
-                .saturating_mul(u64::from(count).saturating_add(1)),
-        );
+        inputs = inputs.saturating_add(inherited_bytes(&settings, count));
         let mut io = Io::new(&bounds);
         let signals = io.adopt_signals(settings.signals).expect("three adopted slots");
         let stdout = io.adopt_write_pipe(settings.stdout, None).expect("stdout slot");
@@ -142,7 +152,7 @@ impl Service {
         // case where every slot holds the largest launch and the largest chunk.
         let payload = inputs
             .saturating_add(u64::from(bounds.output))
-            .saturating_add(u64::try_from(size_of::<[kernel::Pipe; 2]>()).expect("pipe specs"));
+            .saturating_add(u64::try_from(size_of::<[kernel::Pipe; 4]>()).expect("pipe specs"));
         let queues = Queue::<Complete>::worst_case(capacity)
             .expect("completion queue")
             .saturating_add(Queue::<Submit>::worst_case(capacity).expect("submission queue"))
@@ -156,14 +166,22 @@ impl Service {
             .saturating_add(queues)
             .saturating_add(payload.saturating_mul(u64::from(capacity).saturating_mul(4)))
             .saturating_add(List::<Child>::worst_case(count).expect("child states"))
-            .saturating_add(List::<Step>::worst_case(count).expect("step states"))
+            .saturating_add(List::<Placed>::worst_case(count).expect("step states"))
             .saturating_add(u64::from(count).saturating_mul(u64::from(LINE_BYTES).saturating_mul(4)))
-            .saturating_add(Sink::worst_case(entries, bounds.output).saturating_mul(2));
+            .saturating_add(Sink::worst_case(entries, bounds.output).saturating_mul(2))
+            .saturating_add(Sink::worst_case(reply_entries, limits.line_bytes))
+            .saturating_add(u64::from(limits.line_bytes).saturating_mul(2))
+            .saturating_add(Records::worst_case(count));
         Ok(Self {
             io,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: bounds },
             machine,
             steps,
+            records,
+            control: None,
+            closing_control: [None, None],
+            line_bytes: limits.line_bytes,
+            reply_entries,
             settings,
             children: children.into_boxed(),
             sinks: [Sink::new(stdout, entries), Sink::new(stderr, entries)],
@@ -196,6 +214,16 @@ impl Service {
                         for (pipe, token) in state.pipes.iter_mut().zip(&pipes) {
                             pipe.token = Some(*token);
                         }
+                        if self.steps.get(step).expect("step").step.name() == self.settings.serve.as_ref() {
+                            self.control = Some(Control {
+                                read: *pipes.get(2).expect("serve fd 3"),
+                                sink: Sink::new(*pipes.get(3).expect("serve fd 4"), self.reply_entries),
+                                reader: Reader::new(self.line_bytes),
+                                reading: false,
+                                ended: false,
+                                line: None,
+                            });
+                        }
                         self.machine.input(self.env.now, Input::Started { step }, &mut self.orders);
                         break;
                     }
@@ -204,12 +232,33 @@ impl Service {
             Event::Exited { owner, exit } => {
                 for (step, state) in self.children.iter().enumerate() {
                     if state.owner == Some(owner) {
+                        if self.steps.get(step).expect("step").step.name() == self.settings.serve.as_ref()
+                            && let Some(control) = self.control.take()
+                        {
+                            self.closing_control = [Some(control.read), Some(control.sink.token)];
+                            self.requests.push(Request::Close { entity: control.read });
+                            self.requests.push(Request::Close { entity: control.sink.token });
+                        }
                         self.machine.input(self.env.now, Input::Exited { step, exit }, &mut self.orders);
                         break;
                     }
                 }
             }
             Event::Closed { owner } => {
+                for token in &mut self.closing_control {
+                    if *token == Some(owner) {
+                        *token = None;
+                    }
+                }
+                if let Some(control) = &mut self.control {
+                    if control.sink.token == owner {
+                        control.sink.closed();
+                    }
+                    if control.read == owner {
+                        control.ended = true;
+                        control.reading = false;
+                    }
+                }
                 for sink in &mut self.sinks {
                     if sink.token == owner {
                         sink.closed();
@@ -252,6 +301,28 @@ impl Service {
         }
     }
     fn stream(&mut self, owner: Token, up: Up) {
+        if let Some(control) = &mut self.control {
+            if control.sink.token == owner {
+                control.sink.up(up, &mut self.requests);
+                return;
+            }
+            if control.read == owner {
+                control.reading = false;
+                match up {
+                    Up::Bytes(bytes) => {
+                        assert_eq!(bytes.len(), 1, "one byte demand");
+                        assert!(control.line.is_none(), "one pending control line");
+                        control.line = control.reader.byte(*bytes.first().expect("one byte"));
+                    }
+                    Up::End | Up::Failed(_) => {
+                        control.ended = true;
+                        self.requests.push(Request::Close { entity: owner });
+                    }
+                    Up::Room => {}
+                }
+                return;
+            }
+        }
         for sink in &mut self.sinks {
             if sink.token == owner {
                 if sink.up(up, &mut self.requests) {
@@ -280,7 +351,36 @@ impl Service {
     }
     fn order(&mut self, order: Order) {
         match order {
-            Order::Record { .. } | Order::Say { .. } => {}
+            Order::Record { forge } => self.records.write(forge),
+            Order::Say { said } => {
+                if let Some(control) = &mut self.control {
+                    let line = match said {
+                        Said::Step { step } => {
+                            let asked = self.steps.get(step).expect("step").asked.expect("asked step");
+                            pipe::step(asked.forge, asked.stage)
+                        }
+                        Said::Started { forge } => pipe::started(forge),
+                        Said::Failed { forge, why } => {
+                            let why = match why {
+                                Why::Busy => skein_lib::bytes::copy_of(b"busy"),
+                                Why::NotAsked => skein_lib::bytes::copy_of(b"not asked"),
+                                Why::Stopping => skein_lib::bytes::copy_of(b"stopping"),
+                                Why::Exited { step, exit } => {
+                                    pipe::exited(self.steps.get(step).expect("step").step.name(), exit)
+                                }
+                                Why::NotStarted { step } => {
+                                    pipe::not_started(self.steps.get(step).expect("step").step.name())
+                                }
+                                Why::NotWritten => skein_lib::bytes::copy_of(pipe::not_written()),
+                            };
+                            pipe::failed(forge, &why, self.line_bytes)
+                        }
+                    };
+                    if control.sink.room() {
+                        control.sink.push(line).expect("reply room checked");
+                    }
+                }
+            }
             Order::Spawn { step } => self.children.get_mut(step).expect("machine step").spawn = true,
             Order::Signal { step } => {
                 if let Some(child) = self.children.get(step).expect("machine step").process {
@@ -292,6 +392,13 @@ impl Service {
                 }
             }
             Order::Close { step } => {
+                if self.steps.get(step).expect("step").step.name() == self.settings.serve.as_ref()
+                    && let Some(control) = self.control.take()
+                {
+                    self.closing_control = [Some(control.read), Some(control.sink.token)];
+                    self.requests.push(Request::Close { entity: control.read });
+                    self.requests.push(Request::Close { entity: control.sink.token });
+                }
                 if let Some(child) = self.children.get(step).expect("machine step").process {
                     self.requests.push(Request::Close { entity: child });
                 }
@@ -303,9 +410,9 @@ impl Service {
             if self.requests.room() < 6 {
                 break;
             }
-            let description = self.steps.get(step).expect("step state");
+            let description = &self.steps.get(step).expect("step state").step;
             for (fd, pipe) in state.pipes.iter_mut().enumerate() {
-                let plain = fd == 0 && lines::route(&self.settings.plain, description.name(), 1);
+                let plain = fd == 0 && lines::route(&self.settings.serve, description.name(), 1);
                 let sink = self.sinks.get_mut(usize::from(!plain)).expect("two sinks");
                 if sink.takes() {
                     if let Some(line) = pipe.lines.take(description.name()) {
@@ -331,13 +438,16 @@ impl Service {
             for pipe in &state.pipes {
                 settled &= pipe.settled();
             }
+            if description.name() == self.settings.serve.as_ref() {
+                settled &= self.closing_control == [None, None];
+            }
             if state.spawn && settled {
                 state.spawn = false;
                 self.serial = self.serial.checked_add(1).expect("spawn serial");
                 let owner = Token::new(self.serial);
                 state.owner = Some(owner);
                 for (fd, pipe) in state.pipes.iter_mut().enumerate() {
-                    *pipe = Pipe::new(fd == 0 && lines::route(&self.settings.plain, description.name(), 1));
+                    *pipe = Pipe::new(fd == 0 && lines::route(&self.settings.serve, description.name(), 1));
                 }
                 self.requests.push(Request::Spawn {
                     owner,
@@ -347,17 +457,107 @@ impl Service {
                         env: self.settings.environment.clone(),
                         root: self.settings.root,
                         dir: Box::new([]),
-                        pipes: Box::new([
-                            kernel::Pipe { child: 1, way: kernel::Way::Out, parent: None },
-                            kernel::Pipe { child: 2, way: kernel::Way::Out, parent: None },
-                        ]),
+                        pipes: if description.name() == self.settings.serve.as_ref() {
+                            Box::new([
+                                kernel::Pipe { child: 1, way: kernel::Way::Out, parent: None },
+                                kernel::Pipe { child: 2, way: kernel::Way::Out, parent: None },
+                                kernel::Pipe { child: 3, way: kernel::Way::Out, parent: None },
+                                kernel::Pipe { child: 4, way: kernel::Way::In, parent: None },
+                            ])
+                        } else {
+                            Box::new([
+                                kernel::Pipe { child: 1, way: kernel::Way::Out, parent: None },
+                                kernel::Pipe { child: 2, way: kernel::Way::Out, parent: None },
+                            ])
+                        },
                     },
                 });
             }
         }
     }
+    fn record_work(&mut self) {
+        if (self.sinks.get(1).expect("stderr").takes() || !self.sinks.get(1).expect("stderr").room())
+            && let Some(notice) = self.records.take_notice()
+        {
+            drop(self.sinks.get_mut(1).expect("stderr").push(notice));
+        }
+        if !self.records.has_notice()
+            && self.orders.room() >= self.machine.max_out()
+            && let Some(answer) = self.records.take_answer()
+        {
+            self.input(answer);
+        }
+        self.records.tick(self.settings.root, &mut self.submissions);
+    }
+    fn control_ready(&self) -> bool {
+        let Some(control) = &self.control else {
+            return false;
+        };
+        control.sink.drained()
+            && self.orders.is_empty()
+            && self.orders.room() >= self.machine.max_out()
+            && self.sinks.get(1).expect("stderr").takes()
+            && self.phase == Phase::Running
+    }
+    fn take_control_line(&mut self) {
+        if !self.control_ready() {
+            return;
+        }
+        let Some(line) = self.control.as_mut().expect("serve").line.take() else {
+            return;
+        };
+        match line {
+            Line::Whole(line) => match pipe::command(&line) {
+                Command::Start(forge) => self.input(Input::Ask { forge }),
+                Command::Unknown => {
+                    self.sinks
+                        .get_mut(1)
+                        .expect("stderr")
+                        .push(skein_lib::bytes::copy_of(b"box: serve: unknown pipe line\n"))
+                        .expect("diagnostic room");
+                }
+            },
+            Line::TooLong => {
+                self.sinks
+                    .get_mut(1)
+                    .expect("stderr")
+                    .push(skein_lib::bytes::copy_of(b"box: serve: pipe line too long\n"))
+                    .expect("diagnostic room");
+            }
+        }
+    }
+    fn can_read_control(&self) -> bool {
+        let Some(control) = &self.control else {
+            return false;
+        };
+        !control.ended
+            && !control.reading
+            && control.line.is_none()
+            && self.control_ready()
+            && self.orders.room() >= self.machine.max_out()
+            && self.sinks.get(1).expect("stderr").takes()
+            && self.phase == Phase::Running
+    }
+    fn control_work(&mut self) {
+        if self.requests.room() < 3 {
+            return;
+        }
+        self.take_control_line();
+        if self.can_read_control() {
+            let control = self.control.as_mut().expect("live serve");
+            self.requests.push(Request::Stream {
+                stream: control.read,
+                down: Down::Demand { read: Read::Arrived { max: 1 }, room: 0 },
+            });
+            control.reading = true;
+        }
+        if let Some(control) = &mut self.control {
+            control.sink.tick(false, &mut self.requests);
+            control.sink.flush(self.env.limits.output, &mut self.requests);
+        }
+    }
     fn finish(&mut self) {
-        if !self.machine.is_idle() {
+        if !self.machine.is_idle() || self.machine.outcome().is_none() || !self.records.ready() {
             return;
         }
         for state in &self.children {
@@ -381,7 +581,7 @@ impl Service {
                         let digits = Decimal::of(u64::from(restarts));
                         sink.push(lines::joined(&[
                             b"box: ",
-                            self.steps.get(step).expect("failed step").name(),
+                            self.steps.get(step).expect("failed step").step.name(),
                             b" gave up after ",
                             digits.as_bytes(),
                             b" restarts\n",
@@ -401,11 +601,31 @@ impl Service {
         }
     }
 }
-/// Three entities per step, and the three inherited streams; names extend output at construction.
+fn inherited_bytes(settings: &Settings, count: u32) -> u64 {
+    let mut inputs = 0_u64;
+    inputs = inputs.saturating_add(
+        u64::try_from(size_of_val(settings.environment.as_ref()))
+            .expect("environment slots")
+            .saturating_mul(u64::from(count).saturating_add(1)),
+    );
+    for value in &settings.environment {
+        inputs = inputs.saturating_add(
+            u64::try_from(value.len()).expect("environment length").saturating_mul(u64::from(count).saturating_add(1)),
+        );
+    }
+    inputs = inputs.saturating_add(
+        u64::try_from(settings.program.len())
+            .expect("program length")
+            .saturating_mul(u64::from(count).saturating_add(1)),
+    );
+    inputs
+}
+/// Three entities per step, three inherited streams and two serve control pipes.
+/// Names and the configured control line bound extend the byte limits at construction.
 #[must_use]
 pub fn io_limits(steps: u32) -> io::Limits {
     io::Limits {
-        sockets: steps.checked_mul(3).expect("bounded step count").checked_add(3).expect("inherited streams"),
+        sockets: steps.checked_mul(3).expect("bounded step count").checked_add(5).expect("inherited streams"),
         names: 0,
         refusals: steps.max(1),
         intake: LINE_BYTES,
@@ -434,7 +654,9 @@ impl skein_shell::Host for Service {
                     break;
                 }
                 let complete = self.completions.pop().expect("counted completion");
-                if complete.op == ROOT_CLOSE {
+                if Records::owns(complete.op) {
+                    self.records.complete(complete);
+                } else if complete.op == ROOT_CLOSE {
                     self.root = Root::Closed;
                 } else {
                     io::up(&mut self.io, &self.env, complete, &mut self.told, &mut self.submissions);
@@ -449,8 +671,9 @@ impl skein_shell::Host for Service {
                 }
             }
         }
-        if self.phase == Phase::New && self.orders.room() >= self.machine.max_out() {
-            self.machine.start(now, &[], &mut self.orders);
+        self.record_work();
+        if self.phase == Phase::New && self.records.ready() && self.orders.room() >= self.machine.max_out() {
+            self.machine.start(now, self.records.recorded(), &mut self.orders);
             self.phase = Phase::Running;
         }
         for _ in 0..self.told.len() {
@@ -464,13 +687,22 @@ impl skein_shell::Host for Service {
             self.machine.fire(now, &mut self.orders);
         }
         for _ in 0..self.orders.len() {
-            if self.requests.room() == 0 {
+            if self.requests.room() < 3 {
+                break;
+            }
+            if let Some(Order::Say { .. }) = self.orders.iter().next()
+                && let Some(control) = &self.control
+                && control.sink.room()
+                && !control.sink.takes()
+            {
                 break;
             }
             let order = self.orders.pop().expect("counted order");
             self.order(order);
         }
         self.children();
+        self.control_work();
+        self.record_work();
         self.finish();
         for sink in &mut self.sinks {
             if self.requests.room() > 0 {
@@ -508,15 +740,26 @@ impl skein_shell::Host for Service {
         {
             return true;
         }
+        if self.records.pending() && (!self.records.has_notice() || self.sinks.get(1).expect("stderr").takes()) {
+            return true;
+        }
+        if let Some(control) = &self.control
+            && (control.sink.pending()
+                || control.sink.needs_flush()
+                || self.can_read_control()
+                || (control.line.is_some() && self.control_ready()))
+        {
+            return true;
+        }
         for sink in &self.sinks {
             if sink.pending() {
                 return true;
             }
         }
         for (step, state) in self.children.iter().enumerate() {
-            let description = self.steps.get(step).expect("step state");
+            let description = &self.steps.get(step).expect("step state").step;
             for (fd, pipe) in state.pipes.iter().enumerate() {
-                let plain = fd == 0 && lines::route(&self.settings.plain, description.name(), 1);
+                let plain = fd == 0 && lines::route(&self.settings.serve, description.name(), 1);
                 let sink = self.sinks.get(usize::from(!plain)).expect("two sinks");
                 if (pipe.lines.ready() && (sink.takes() || !sink.room()))
                     || (pipe.lines.wants_read() && !pipe.reading && pipe.token.is_some() && sink.takes())
@@ -527,6 +770,9 @@ impl skein_shell::Host for Service {
             let mut settled = true;
             for pipe in &state.pipes {
                 settled &= pipe.settled();
+            }
+            if description.name() == self.settings.serve.as_ref() {
+                settled &= self.closing_control == [None, None];
             }
             if state.spawn && settled {
                 return true;
@@ -564,6 +810,6 @@ impl skein_shell::Host for Service {
         self.memory
     }
     fn operations(&self) -> u32 {
-        io::operations(&self.env.limits).expect("io operations").saturating_add(1)
+        io::operations(&self.env.limits).expect("io operations").saturating_add(2)
     }
 }

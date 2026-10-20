@@ -9,6 +9,7 @@ use skein_lib::{
 enum Phase {
     Idle,
     Waiting,
+    Flushing,
     Failed,
     Closing,
     Closed,
@@ -18,15 +19,16 @@ pub struct Sink {
     pub(crate) token: Token,
     queued: Queue<Box<[u8]>>,
     phase: Phase,
+    dirty: bool,
 }
 impl Sink {
     #[must_use]
     pub fn new(token: Token, entries: u32) -> Self {
-        Self { token, queued: Queue::with_capacity(entries), phase: Phase::Idle }
+        Self { token, queued: Queue::with_capacity(entries), phase: Phase::Idle, dirty: false }
     }
     #[must_use]
     pub fn room(&self) -> bool {
-        self.phase == Phase::Idle || self.phase == Phase::Waiting
+        self.phase == Phase::Idle || self.phase == Phase::Waiting || self.phase == Phase::Flushing
     }
     #[must_use]
     pub fn takes(&self) -> bool {
@@ -45,6 +47,10 @@ impl Sink {
                 if self.phase == Phase::Waiting {
                     let bytes = self.queued.pop().expect("demanded front line");
                     out.push(Request::Stream { stream: self.token, down: Down::Send(bytes) });
+                    self.dirty = true;
+                    self.phase = Phase::Idle;
+                } else if self.phase == Phase::Flushing {
+                    self.dirty = false;
                     self.phase = Phase::Idle;
                 }
             }
@@ -78,6 +84,21 @@ impl Sink {
     }
     pub fn closed(&mut self) {
         self.phase = Phase::Closed;
+    }
+    /// Demand the entire io output budget, so Room proves previous sends finished.
+    pub fn flush(&mut self, output: u32, out: &mut Queue<Request>) {
+        if self.needs_flush() {
+            out.push(Request::Stream { stream: self.token, down: Down::Demand { read: Read::Nothing, room: output } });
+            self.phase = Phase::Flushing;
+        }
+    }
+    #[must_use]
+    pub fn needs_flush(&self) -> bool {
+        self.phase == Phase::Idle && self.queued.is_empty() && self.dirty
+    }
+    #[must_use]
+    pub fn drained(&self) -> bool {
+        self.phase == Phase::Idle && self.queued.is_empty() && !self.dirty
     }
     pub(crate) fn worst_case(entries: u32, bytes: u32) -> u64 {
         Queue::<Box<[u8]>>::worst_case(entries)
