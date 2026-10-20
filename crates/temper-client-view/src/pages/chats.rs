@@ -26,6 +26,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
     b.open(Role::Main);
     b.style(crate::look::MAIN);
     text(b, Role::Heading { level: 1 }, &words.say(Word::Chats, &[]));
+    suggestions(b, root, words, bindings);
     if let Some(chats) = root.pages().chats() {
         if root.pages().me(root.client()).is_some() && root.pages().project().is_some() {
             b.open(Role::Slot);
@@ -41,7 +42,13 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             b.style(crate::look::HINT);
             words.text(b, Word::ChatHint, &[]);
             b.close();
-            control(b, bindings, Role::Button, &words.say(Word::Start, &[]), Act::StartChat);
+            b.open(Role::Button);
+            b.name(&words.say(Word::Start, &[]));
+            if chats.start.is_some() {
+                b.state(State::Disabled);
+            }
+            b.bind(bindings.insert(Act::StartChat));
+            b.close();
             b.close();
         }
         if chats.refusal.is_some() {
@@ -171,4 +178,35 @@ pub(crate) fn status(
     b.name(&name);
     b.text(Run::Plain, &name);
     b.close();
+}
+
+fn suggestions(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings) {
+    let Some((demo, halves)) = root.demo() else { return };
+    if !halves.model || root.pages().project() != Some(demo.project) {
+        return;
+    }
+    let Some(chats) = root.pages().chats() else { return };
+    text(b, Role::Heading { level: 2 }, &words.say(Word::DemoHeading, &[]));
+    text(
+        b,
+        Role::Paragraph,
+        &words.say(Word::DemoRequest, &[Hole::Name(demo.owner.clone()), Hole::Name(demo.name.clone())]),
+    );
+    b.open(Role::List);
+    b.name(&words.say(Word::SuggestedRequests, &[]));
+    b.style(crate::look::ROWS);
+    for (cue, value) in demo.cues.iter().enumerate() {
+        b.open(Role::Item);
+        b.style(crate::look::ROW);
+        b.open(Role::Button);
+        b.name(value);
+        if chats.start.is_some() {
+            b.state(State::Disabled);
+        }
+        b.bind(bindings.insert(Act::Suggest { cue: u8::try_from(cue).expect("eight cue indices fit") }));
+        b.close();
+        b.close();
+    }
+    b.close();
+    text(b, Role::Paragraph, &words.say(Word::DemoScript, &[]));
 }

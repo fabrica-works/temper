@@ -1,6 +1,8 @@
+use jig_client::contract as c;
 use jig_client::contract::{OwnerPart, OwnerPartKey, OwnerPartKind, Part};
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Token, Wall, Writer};
 use temper_client_domain::{Limits, forge};
+use temper_client_protocol_wire::{self as wire, v1 as w};
 pub const FORGE: u16 = temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Forge);
 pub const PROJECT: u32 = 1;
 pub const SECOND_PROJECT: u32 = 2;
@@ -198,9 +200,15 @@ fn root_at_full(
     limits: &Limits,
     project_name: &[u8],
 ) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>) {
-    use jig_client::contract::{
-        self, Delivery, DocumentText, HeldRole, Me, MeParty, MeProject, Needs, PartyKind, Subject, WatchEvent,
-    };
+    root_at_with_demo(address, limits, project_name, None)
+}
+fn root_at_with_demo(
+    address: temper_client_domain::Address,
+    limits: &Limits,
+    project_name: &[u8],
+    demo: Option<(u32, bool)>,
+) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>) {
+    use jig_client::contract::{Delivery, Subject, WatchEvent};
     use temper_client_domain::{Event, Request};
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
     let mut root = temper_client_domain::unlinked(limits, SEED);
@@ -236,24 +244,6 @@ fn root_at_full(
             }
         }
     }
-    let mut projects = List::with_capacity(2);
-    projects
-        .push(MeProject {
-            project: PROJECT,
-            name: Some(DocumentText::complete(
-                contract::Text::new(skein_lib::bytes::copy_of(project_name), 32).expect("name fits"),
-            )),
-            role: HeldRole::Policy { role: 1 },
-            pool: None,
-            templates: List::with_capacity(0),
-            creating: None,
-            models: List::with_capacity(0),
-        })
-        .expect("one project");
-    let mut second = projects.as_slice()[0].clone();
-    second.project = SECOND_PROJECT;
-    second.name = Some(DocumentText::complete(contract::Text::new(Box::from(*b"Second"), 32).expect("name fits")));
-    projects.push(second).expect("second project");
     temper_client_domain::step(
         &mut root,
         &env,
@@ -261,31 +251,33 @@ fn root_at_full(
             event: jig_client::Event::Up {
                 up: jig_client::Up::Watched {
                     watch: watch.expect("frame opened"),
-                    event: WatchEvent::Delivered(Delivery::Me(Box::new(Me {
-                        party: MeParty {
-                            number: 73,
-                            kind: PartyKind::Person,
-                            login: DocumentText::complete(
-                                contract::Text::new(Box::from(*b"pat"), 32).expect("login fits"),
-                            ),
-                            name: DocumentText::complete(
-                                contract::Text::new(Box::from(*b"Pat"), 32).expect("name fits"),
-                            ),
-                        },
-                        projects,
-                        needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
-                        needs_total: 0,
-                        updates: contract::Count { value: 0, limited: false },
-                        results_seen: 0,
-                        cut: false,
-                        retention: Duration::from_secs(1000),
-                        deployment_role: None,
-                    }))),
+                    event: WatchEvent::Delivered(Delivery::Me(Box::new(fixture_me(project_name)))),
                 },
             },
         },
         &mut out,
     );
+    if let Some((project, model)) = demo {
+        let mut read = None;
+        while let Some(request) = out.pop() {
+            if let Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down: jig_client::Down::Read { read: token, what: jig_client::Readable::Family { .. } },
+                    },
+            } = request
+            {
+                read = Some(token);
+            }
+        }
+        deliver_demo(
+            &mut root,
+            read.expect("live link reads demo"),
+            account_watch.expect("accounts watch"),
+            project,
+            model,
+        );
+    }
     (root, watch.expect("me opened"), inbox_watch, tree_watch, account_watch)
 }
 pub fn adoption_root() -> temper_client_domain::Domain {
@@ -771,4 +763,138 @@ pub fn browser_page_view(root: &temper_client_domain::Domain) -> crate::View {
     let mut view = view_of(browser_words());
     build(&mut view, root);
     view
+}
+
+fn fixture_me(project_name: &[u8]) -> c::Me {
+    use jig_client::contract::{self, DocumentText, HeldRole, Me, MeParty, MeProject, Needs, PartyKind};
+    let mut projects = List::with_capacity(2);
+    projects
+        .push(MeProject {
+            project: PROJECT,
+            name: Some(DocumentText::complete(
+                contract::Text::new(skein_lib::bytes::copy_of(project_name), 32).expect("name fits"),
+            )),
+            role: HeldRole::Policy { role: 1 },
+            pool: None,
+            templates: List::with_capacity(0),
+            creating: None,
+            models: List::with_capacity(0),
+        })
+        .expect("one project");
+    let mut second = projects.as_slice()[0].clone();
+    second.project = SECOND_PROJECT;
+    second.name = Some(DocumentText::complete(contract::Text::new(Box::from(*b"Second"), 32).expect("name fits")));
+    projects.push(second).expect("second project");
+    Me {
+        party: MeParty {
+            number: 73,
+            kind: PartyKind::Person,
+            login: DocumentText::complete(contract::Text::new(Box::from(*b"pat"), 32).expect("login fits")),
+            name: DocumentText::complete(contract::Text::new(Box::from(*b"Pat"), 32).expect("name fits")),
+        },
+        projects,
+        needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
+        needs_total: 0,
+        updates: contract::Count { value: 0, limited: false },
+        results_seen: 0,
+        cut: false,
+        retention: Duration::from_secs(1000),
+        deployment_role: None,
+    }
+}
+pub const DEMO_CUE: &[u8] = b"Change the title";
+pub const DEMO_OTHER_CUE: &[u8] = b"Add a test";
+pub fn demo_root(address: temper_client_domain::Address, project: u32, model: bool) -> temper_client_domain::Domain {
+    let (mut root, me_watch, _, _, _) =
+        root_at_with_demo(address, &domain_limits(), b"Project", Some((project, model)));
+    let template = chat::messaging_root();
+    let mut me = template.pages().me(template.client()).expect("chat template").clone();
+    let mut charters = List::with_capacity(1);
+    charters.push(1).expect("chat charter");
+    me.projects.get_mut(0).expect("demo project").creating = Some(c::Creating {
+        within: c::CreateBounds {
+            authority: Box::new(c::OwnerAuthorityDocument::complete(c::OwnerAuthority {
+                tools: 0,
+                grants: List::with_capacity(0),
+                delegation: c::OwnerDelegation { kinds: List::with_capacity(0), tasks: 1, depth: 2 },
+                spend: 100,
+                deadline: None,
+                notes: 0,
+                note_resources: List::with_capacity(0),
+            })),
+            pool_left: 100,
+            charters,
+            procedures: List::with_capacity(0),
+            latest: None,
+            budget: 100,
+            maximum_budget: 100,
+            maximum_deadline: None,
+        },
+        beyond: c::Beyond::Refused(c::Refusal::NotOffered),
+    });
+    root_event(
+        &mut root,
+        temper_client_domain::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch: me_watch,
+                    event: jig_client::contract::WatchEvent::Delivered(jig_client::contract::Delivery::Me(Box::new(
+                        me,
+                    ))),
+                },
+            },
+        },
+    );
+    root
+}
+
+fn deliver_demo(root: &mut temper_client_domain::Domain, read: Token, watch: Token, project: u32, model: bool) {
+    let mut cues = List::with_capacity(2);
+    cues.push(Box::from(DEMO_CUE)).expect("first cue");
+    cues.push(Box::from(DEMO_OTHER_CUE)).expect("second cue");
+    let answer = w::DemoAnswer::new(
+        &w::CEILINGS,
+        w::DemoAnswerParts {
+            project,
+            forge: wire::FORGE,
+            provider: 17,
+            owner: b"acme".as_slice().into(),
+            name: b"shop".as_slice().into(),
+            cues,
+        },
+    )
+    .expect("demo answer");
+    root_event(
+        root,
+        temper_client_domain::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::ReadDone {
+                    read,
+                    result: jig_client::Readout::Family {
+                        family: wire::FORGE,
+                        record: Some(wire::demo_answer(&answer)),
+                    },
+                },
+            },
+        },
+    );
+    let accounts = c::OwnerAccounts {
+        accounts: List::with_capacity(0),
+        signing: List::with_capacity(0),
+        last_end: None,
+        usable: false,
+        settled: true,
+        cut: !model,
+    };
+    root_event(
+        root,
+        temper_client_domain::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch,
+                    event: c::WatchEvent::Delivered(c::Delivery::OwnerAccounts(Box::new(accounts))),
+                },
+            },
+        },
+    );
 }

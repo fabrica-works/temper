@@ -215,3 +215,22 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
     );
     builder.close();
 }
+
+/// The model half's banner, after the frame and before the page's main.
+pub(crate) fn demo_banner(b: &mut Builder, root: &Domain, words: &crate::words::Words, bindings: &mut Bindings) {
+    if unavailable(root).is_some() || *root.pages().address() == Address::Accounts || root.demo().is_none() {
+        return;
+    }
+    b.open(Role::Region);
+    b.name(&words.say(crate::words::Word::Demo, &[]));
+    text(b, Role::Paragraph, &words.say(crate::words::Word::DemoModel, &[]), None);
+    action(
+        b,
+        Role::Link,
+        &words.say(crate::words::Word::ConnectModel, &[]),
+        Act::Go { address: Address::Accounts },
+        false,
+        bindings,
+    );
+    b.close();
+}

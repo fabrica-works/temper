@@ -56,6 +56,13 @@ pub enum Word {
     ChatTime,
     ChatHint,
     ChatSendHint,
+    Demo,
+    DemoModel,
+    ConnectModel,
+    DemoHeading,
+    DemoRequest,
+    SuggestedRequests,
+    DemoScript,
     Accept,
     Reject,
     Answer,
@@ -101,7 +108,7 @@ pub enum Word {
     SignOutLost,
     Unshowable,
 }
-const ALL: [Word; 88] = [
+const ALL: [Word; 95] = [
     Word::TaskHeader,
     Word::Asked,
     Word::Plan,
@@ -147,6 +154,13 @@ const ALL: [Word; 88] = [
     Word::ChatTime,
     Word::ChatHint,
     Word::ChatSendHint,
+    Word::Demo,
+    Word::DemoModel,
+    Word::ConnectModel,
+    Word::DemoHeading,
+    Word::DemoRequest,
+    Word::SuggestedRequests,
+    Word::DemoScript,
     Word::Accept,
     Word::Reject,
     Word::Answer,
@@ -244,6 +258,13 @@ impl Word {
             Self::ChatTime => 184,
             Self::ChatHint => 185,
             Self::ChatSendHint => 186,
+            Self::Demo => 187,
+            Self::DemoModel => 188,
+            Self::ConnectModel => 189,
+            Self::DemoHeading => 190,
+            Self::DemoRequest => 191,
+            Self::SuggestedRequests => 192,
+            Self::DemoScript => 193,
             Self::Accept => 125,
             Self::Reject => 126,
             Self::Answer => 127,
@@ -321,7 +342,16 @@ impl Words {
                 segments.push(Segment::Text(copy_of(literal))).expect("closed English segments fit");
                 if let Some(kind) = kinds.get(index) {
                     holes
-                        .push(HoleShape { kind: *kind, bytes: if *kind == HoleKind::Name { joined } else { 0 } })
+                        .push(HoleShape {
+                            kind: *kind,
+                            bytes: if word == Word::DemoRequest {
+                                1024
+                            } else if *kind == HoleKind::Name {
+                                joined
+                            } else {
+                                0
+                            },
+                        })
                         .expect("three holes fit");
                     segments
                         .push(Segment::Hole {
@@ -362,7 +392,7 @@ impl Words {
             holes: 3,
             segments: 1536,
             text_bytes: 24576,
-            hole_bytes: joined.max(513),
+            hole_bytes: joined.max(1024),
         };
         let book = Phrasebook::load(shapes.into_boxed(), Box::new([language]), &limits)?;
         Ok(Words { book, language: 0, connector })
@@ -410,6 +440,7 @@ impl Words {
         Some(most.max(crate::forge::words::capacity(self)?).max(crate::accounts::words::capacity(self)?))
     }
 }
+const DEMO_REQUEST: &[&[u8]] = &[b"Try a request in ", b"/", b". Follow the task from its branch to a landed change."];
 fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
@@ -457,6 +488,13 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::ChatDelegates => (&[b"Live delegates ", b""], &[Number]),
         Word::ChatTime => (&[b"", b""], &[Name]),
         Word::ChatSendHint => (&[b"Enter to send \xc2\xb7 Shift+Enter for a new line"], &[]),
+        Word::Demo => (&[b"Demo"], &[]),
+        Word::DemoModel => (&[b"This is a demo, running on a demo model."], &[]),
+        Word::ConnectModel => (&[b"Connect a model"], &[]),
+        Word::DemoHeading => (&[b"What shall we change?"], &[]),
+        Word::DemoRequest => (DEMO_REQUEST, &[Name, Name]),
+        Word::SuggestedRequests => (&[b"Suggested requests"], &[]),
+        Word::DemoScript => (&[b"The demo model plays these requests from a script."], &[]),
         Word::ChatHint => (&[b"Enter to start \xc2\xb7 Shift+Enter for a new line"], &[]),
         Word::Accept => (&[b"Accept"], &[]),
         Word::Reject => (&[b"Reject with reason"], &[]),

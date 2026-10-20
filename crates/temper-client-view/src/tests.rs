@@ -1,5 +1,6 @@
 mod chats;
 mod confirm;
+mod demo;
 mod fixtures;
 mod forge_page;
 mod frame;

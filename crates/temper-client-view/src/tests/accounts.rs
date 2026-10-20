@@ -322,7 +322,7 @@ fn account_bounds_have_a_literal_price() {
     let domain = fixtures::limits();
     let words = fixtures::words();
     let bounds = crate::Limits::of(&domain, &words).unwrap();
-    assert_eq!(crate::worst_case(&bounds, &domain, &words), Some(1_903_066_950));
+    assert_eq!(crate::worst_case(&bounds, &domain, &words), Some(4_420_462_083));
 }
 fn owner_root() -> (d::Domain, Token) {
     let limits = fixtures::limits();

@@ -144,7 +144,7 @@ fn the_printed_link_opened_again_signs_the_person_out() {
     let tier = Tier::new("qa-shell-spent");
     played(
         tier.setup(),
-        vec![see(live()), Step::Reopen, see(tier.states().signed_out), at(b"/"), gone(Find::text(b"Needs you"))],
+        vec![see(live()), Step::Reopen, see(tier.states().signed_out), at(b"/chats"), gone(Find::text(b"Needs you"))],
     );
 }
 
@@ -209,7 +209,10 @@ fn many_loads_in_a_row_each_hold_a_stream_of_their_own() {
 #[test]
 fn reloads_in_quick_succession_end_in_one_live_page() {
     let reload = || Step::Person(PersonStep::Reload);
-    play("qa-shell-quick", vec![see(live()), reload(), reload(), reload(), reload(), reload(), see(live()), at(b"/")]);
+    play(
+        "qa-shell-quick",
+        vec![see(live()), reload(), reload(), reload(), reload(), reload(), see(live()), at(b"/chats")],
+    );
 }
 
 /// browser.md 2.5, 4.1 (3): "Enter starts a chat with the words once, and Shift+Enter makes a new line":
