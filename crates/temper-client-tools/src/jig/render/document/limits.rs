@@ -24,6 +24,7 @@ pub(super) fn encode_lacking(value: &jig_client::contract::Lacking, out: &mut En
         }
         jig_client::contract::Lacking::Account => out.string(b"account"),
         jig_client::contract::Lacking::Writer => out.string(b"writer"),
+        jig_client::contract::Lacking::Models => out.string(b"models"),
         jig_client::contract::Lacking::Required { connector, kind } => {
             encode_lacking_required(*connector, *kind, out, budget);
         }

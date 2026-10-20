@@ -83,6 +83,7 @@ fn delegate_child(driver: &mut Driver, assignment: &engine::Assignment) {
             budget: tasks::Budget { spend: 10, deadline: None },
             notes: tasks::Scopes(0),
             note_resources: Box::new([]),
+            models: tasks::Models::NONE,
         },
         symbolic_grants: Box::new([]),
         dependencies: Box::new([]),

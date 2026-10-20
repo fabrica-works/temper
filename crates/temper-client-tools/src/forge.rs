@@ -245,6 +245,7 @@ fn print(adoption: &forge::Adoption, outcome: &Outcome, json: bool, kept: bool, 
     let answer = match outcome {
         Outcome::Unknown => Some(forge::Answer::Unknown),
         Outcome::Answered(answer) => forge::answer(&limits.domain, answer),
+        Outcome::Unsent | Outcome::Lost => unreachable!("temper's requests carry no value"),
         Outcome::Held | Outcome::Limit | Outcome::Unconfirmed | Outcome::NotKept => {
             let operation =
                 render::outcome::Operation::of(&forge::ask(adoption, &limits.domain.forge).expect("validated ask"));

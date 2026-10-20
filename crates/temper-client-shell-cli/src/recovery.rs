@@ -27,6 +27,7 @@ impl Recovery {
             | Event::Unwatch { .. }
             | Event::Read { .. }
             | Event::Send { .. }
+            | Event::Carry { .. }
             | Event::Reply { .. }
             | Event::Lost { .. }
             | Event::Streamed { .. }

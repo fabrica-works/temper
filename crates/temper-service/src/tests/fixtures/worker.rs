@@ -113,12 +113,12 @@ pub fn application_value(number: u32, generation: u64, token: &[u8]) -> jig_prot
     )
     .expect("identity record");
     jig_protocol_worker_link::Request::Value {
-        table: jig_domain_host::GrantTable::Application,
         account: number,
         generation,
         expires: skein_lib::Time::from_nanos(u64::MAX),
-        value: temper_protocol_worker_wire::identity(&record),
-        account_id: skein_lib::Secret::new(Box::new([])),
+        value: jig_protocol_worker_link::GrantValue::Application {
+            secret: temper_protocol_worker_wire::identity(&record),
+        },
     }
 }
 

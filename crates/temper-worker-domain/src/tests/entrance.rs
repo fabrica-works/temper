@@ -100,7 +100,10 @@ fn a_worker_told_to_shut_down_with_nothing_left_says_stop_once() {
 #[test]
 fn an_exhausted_account_stays_a_failure_of_its_own() {
     let exhausted = agent::ModelFault::Limited { account: ACCOUNT, reset: Some(ACCOUNT_RESET) };
-    assert_eq!(translate::run_failure(&agent::RunFailure::Model(exhausted)), host::RunFailure::Exhausted);
+    assert_eq!(
+        translate::run_failure(&agent::RunFailure::Model(exhausted)),
+        host::RunFailure::Limited { account: ACCOUNT, reset: Some(ACCOUNT_RESET) }
+    );
 }
 
 #[test]

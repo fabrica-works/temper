@@ -1,6 +1,6 @@
 //! Jig's complete refusal facts at its pinned people-store version.
 use jig_domain_people as p;
-use jig_protocol_store::people_v4 as w;
+use jig_protocol_store::people_v5 as w;
 use skein_lib::Wall;
 pub(super) fn encode_failure_class(value: p::FailureClass, _l: &w::Limits) -> w::FailureClass {
     match value {
@@ -177,6 +177,7 @@ pub(super) fn encode_lack(value: &p::Lack, l: &w::Limits) -> Result<w::Lack, w::
         p::Lack::Unguarded { connector, kind } => {
             w::Lack::Unguarded(w::LackUnguarded::new(l, w::LackUnguardedParts { connector: *connector, kind: *kind })?)
         }
+        p::Lack::Models => w::Lack::Models,
     })
 }
 pub(super) fn decode_lack(value: w::Lack) -> p::Lack {
@@ -204,6 +205,7 @@ pub(super) fn decode_lack(value: w::Lack) -> p::Lack {
         w::Lack::Required(value) => p::Lack::Required { connector: value.connector(), kind: value.kind() },
         w::Lack::Failed(value) => p::Lack::Failed { connector: value.connector(), kind: value.kind() },
         w::Lack::Unguarded(value) => p::Lack::Unguarded { connector: value.connector(), kind: value.kind() },
+        w::Lack::Models => p::Lack::Models,
     }
 }
 pub(super) fn encode_limit_kind(value: p::LimitKind, _l: &w::Limits) -> w::LimitKind {
@@ -243,6 +245,10 @@ pub(super) fn encode_limit_kind(value: p::LimitKind, _l: &w::Limits) -> w::Limit
         p::LimitKind::Policy => w::LimitKind::Policy,
         p::LimitKind::Resource => w::LimitKind::Resource,
         p::LimitKind::Service => w::LimitKind::Service,
+        p::LimitKind::Accounts => w::LimitKind::Accounts,
+        p::LimitKind::HolderAccounts => w::LimitKind::HolderAccounts,
+        p::LimitKind::Sources => w::LimitKind::Sources,
+        p::LimitKind::SignIns => w::LimitKind::SignIns,
         p::LimitKind::Operations => w::LimitKind::Operations,
         p::LimitKind::Grace => w::LimitKind::Grace,
         p::LimitKind::Goals => w::LimitKind::Goals,
@@ -285,6 +291,10 @@ pub(super) fn decode_limit_kind(value: w::LimitKind) -> p::LimitKind {
         w::LimitKind::Policy => p::LimitKind::Policy,
         w::LimitKind::Resource => p::LimitKind::Resource,
         w::LimitKind::Service => p::LimitKind::Service,
+        w::LimitKind::Accounts => p::LimitKind::Accounts,
+        w::LimitKind::HolderAccounts => p::LimitKind::HolderAccounts,
+        w::LimitKind::Sources => p::LimitKind::Sources,
+        w::LimitKind::SignIns => p::LimitKind::SignIns,
         w::LimitKind::Operations => p::LimitKind::Operations,
         w::LimitKind::Grace => p::LimitKind::Grace,
         w::LimitKind::Goals => p::LimitKind::Goals,
@@ -342,6 +352,9 @@ pub(super) fn encode_refusal(value: &p::Refusal, l: &w::Limits) -> Result<w::Ref
         p::Refusal::Unknown => w::Refusal::Unknown,
         p::Refusal::NotOffered => w::Refusal::NotOffered,
         p::Refusal::KeyConflict => w::Refusal::KeyConflict,
+        p::Refusal::Llm { model, why } => {
+            w::Refusal::Llm(w::RefusalLlm::new(l, w::RefusalLlmParts { model: *model, why: encode_llm_why(*why) })?)
+        }
     })
 }
 pub(super) fn decode_refusal(value: w::Refusal) -> p::Refusal {
@@ -382,6 +395,10 @@ pub(super) fn decode_refusal(value: w::Refusal) -> p::Refusal {
         w::Refusal::Unknown => p::Refusal::Unknown,
         w::Refusal::NotOffered => p::Refusal::NotOffered,
         w::Refusal::KeyConflict => p::Refusal::KeyConflict,
+        w::Refusal::Llm(value) => {
+            let w::RefusalLlmParts { model, why } = value.into_parts();
+            p::Refusal::Llm { model, why: decode_llm_why(why) }
+        }
     }
 }
 
@@ -451,5 +468,25 @@ fn decode_person_address(value: w::PersonAddress) -> p::PersonAddress {
             let w::PersonAddressRoleParts { value } = value.into_parts();
             p::PersonAddress::Role(value)
         }
+    }
+}
+fn encode_llm_why(value: p::LlmWhy) -> w::LlmWhy {
+    match value {
+        p::LlmWhy::Unconfigured => w::LlmWhy::Unconfigured,
+        p::LlmWhy::Effort => w::LlmWhy::Effort,
+        p::LlmWhy::Charter => w::LlmWhy::Charter,
+        p::LlmWhy::Authority => w::LlmWhy::Authority,
+        p::LlmWhy::Procedure => w::LlmWhy::Procedure,
+        p::LlmWhy::Repeated => w::LlmWhy::Repeated,
+    }
+}
+fn decode_llm_why(value: w::LlmWhy) -> p::LlmWhy {
+    match value {
+        w::LlmWhy::Unconfigured => p::LlmWhy::Unconfigured,
+        w::LlmWhy::Effort => p::LlmWhy::Effort,
+        w::LlmWhy::Charter => p::LlmWhy::Charter,
+        w::LlmWhy::Authority => p::LlmWhy::Authority,
+        w::LlmWhy::Procedure => p::LlmWhy::Procedure,
+        w::LlmWhy::Repeated => p::LlmWhy::Repeated,
     }
 }

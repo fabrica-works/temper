@@ -83,6 +83,7 @@ pub(crate) fn print(
         | Outcome::Limit
         | Outcome::Unconfirmed
         | Outcome::Held => 1,
+        Outcome::Unsent | Outcome::Lost => unreachable!("the tools' requests carry no value"),
     };
     let bytes = bytes(operation, outcome, json, me, limits, false);
     if status == 0 {
@@ -137,6 +138,7 @@ fn client_reason(outcome: &Outcome) -> Option<&'static [u8]> {
         Outcome::Unconfirmed => Some(b"tools' bug; unconfirmed request; report it as a finding"),
         Outcome::Answered(Answered::Family(_)) => Some(b"tools' bug; unexpected family answer; report it as a finding"),
         Outcome::Answered(Answered::Jig(_)) => None,
+        Outcome::Unsent | Outcome::Lost => unreachable!("the tools' requests carry no value"),
     }
 }
 fn text(operation: &Operation, outcome: &Outcome, me: Option<&c::Me>, limits: &Limits, kept: bool, out: &mut Text) {

@@ -1,7 +1,7 @@
 //! A forged chat over jig's `tests/client-browser/src/forgery.rs`, with the chat template's task
 //! (client/browser.md, 4.1 story 5; jig's protocol/browser.md, 15).
 use jig_client::contract as c;
-use jig_client_protocol_wire::v9 as w;
+use jig_client_protocol_wire::v10 as w;
 use skein_lib::{List, Writer};
 
 const PROJECT: u32 = 1;
@@ -37,6 +37,7 @@ fn task() -> c::NewTask {
         tracked: None,
         label: LABEL,
         flags: c::TaskFlags { conversation: true, listed: false, retention: c::Retention::Kept },
+        llm: None,
     }
 }
 
@@ -54,6 +55,7 @@ pub(super) fn request() -> Box<[u8]> {
             owner: w::Owner::Jig,
             version: jig_client_protocol_wire::VERSION,
             request: writer.finish(),
+            value: None,
         },
     )
     .expect("bounded keyed request");

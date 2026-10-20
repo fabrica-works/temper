@@ -50,8 +50,10 @@ pub fn prepare(worker: &settings::Worker, agent: &settings::Agent, own: &limits:
     let prefix = crate::tokens::worker(0).ok_or(problem(b"slots", What::Bound))?;
     worker.jig.slots.checked_mul(4).ok_or(problem(b"slots", What::Bound))?;
     worker.jig.limits.core.accounts.accounts.checked_add(1).ok_or(problem(b"limits", What::Bound))?;
-    if worker.jig.limits.token > agent.limits.bodies.withdrawn_value_bearer
-        || jig_protocol_accounts::ACCOUNT_ID_BYTES > agent.limits.bodies.withdrawn_value_id
+    let bodies = &agent.limits.bodies;
+    if worker.jig.limits.token > bodies.credential_value_bytes
+        || worker.jig.limits.token > bodies.withdrawn_value_bearer
+        || jig_protocol_accounts::ACCOUNT_ID_BYTES > bodies.withdrawn_value_id
     {
         return Err(problem(b"limits", What::Bound));
     }

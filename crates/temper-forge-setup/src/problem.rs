@@ -60,6 +60,8 @@ impl Problems {
                 | config::What::StopBound
                 | config::What::Memory { .. }
                 | config::What::Override
+                | config::What::Confidential
+                | config::What::NoProvider
                 | config::What::Unreadable => b"invalid form",
             };
             self.push(p.path.clone(), What::Reason(words));

@@ -230,6 +230,7 @@ impl NativeClient {
             | jig_client::Event::Unwatch { .. }
             | jig_client::Event::Read { .. }
             | jig_client::Event::Send { .. }
+            | jig_client::Event::Carry { .. }
             | jig_client::Event::Streamed { .. }
             | jig_client::Event::StreamGone
             | jig_client::Event::Stored
@@ -268,6 +269,7 @@ impl NativeClient {
             | jig_client::Event::Unwatch { .. }
             | jig_client::Event::Read { .. }
             | jig_client::Event::Send { .. }
+            | jig_client::Event::Carry { .. }
             | jig_client::Event::Streamed { .. }
             | jig_client::Event::StreamGone
             | jig_client::Event::Stored

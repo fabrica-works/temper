@@ -228,6 +228,7 @@ fn root_at_with_tree_named(
             pool: None,
             templates: List::with_capacity(0),
             creating: None,
+            models: List::with_capacity(0),
         })
         .expect("one project");
     let mut second = projects.as_slice()[0].clone();
@@ -590,6 +591,7 @@ pub mod chat {
                 flags: c::TaskFlags { conversation: true, listed: false, retention: c::Retention::Kept },
                 label: CHAT_LABEL,
                 grace: Some(CLOSE_GRACE),
+                llm: None,
             })
             .expect("template");
         let mut task = fixtures::task::document();

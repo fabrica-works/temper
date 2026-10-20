@@ -108,6 +108,7 @@ fn person_amendment(words: Option<&[u8]>, authority: Option<people::Authority>, 
         wake: None,
         dependencies: None,
         authority,
+        llm: None,
         reason: reason.into(),
     }
 }
@@ -481,6 +482,7 @@ fn wider_amendment() -> (Driver, u64, u64, u64, u64, people::Authority) {
         deadline: None,
         notes: 0,
         note_resources: Box::new([]),
+        models: 0,
     };
     (driver, maintainer_session, member_session, member, task, wider)
 }
@@ -1681,6 +1683,7 @@ fn a_recurring_procedure_uses_the_root_period_route() {
         executor: tasks::Executor::Agent { charter: 1 },
         spec: tasks::Spec { words: b"period work".as_slice().into(), parameters: Box::new([]), inputs: Box::new([]) },
         contract: tasks::Contract::Report { words: 16 },
+        llm: None,
         authority: report_delegate(b"template", Box::new([])).authority,
         numbers: tasks::Numbers { budget: 10, spent: 0, spent_below: 0, reserved: 0 },
         funder: tasks::Funder::Period { project: 1, period: 0 },
@@ -1696,6 +1699,9 @@ fn a_recurring_procedure_uses_the_root_period_route() {
     authority.delegation.tasks = 2;
     authority.delegation.depth = 1;
     authority.budget.spend = 30;
+    // The deployment's one model, which the template's members take
+    // (jig's domain/authority.md, section 5).
+    authority.models = tasks::Models(1);
     driver.send(engine::Event::Party(engine::PartyInput::StartRecurring {
         project: 1,
         authority,
@@ -2041,6 +2047,7 @@ fn plain_delegate(words: &[u8]) -> engine::Delegate {
             budget: tasks::Budget { spend: 10, deadline: None },
             notes: tasks::Scopes(0),
             note_resources: Box::new([]),
+            models: tasks::Models::NONE,
         },
         symbolic_grants: Box::new([]),
         dependencies: Box::new([]),
@@ -2991,6 +2998,7 @@ fn a_policy_change_applies_to_later_decisions_only() {
             deadline: None,
             notes: 0,
             note_resources: Box::new([]),
+            models: 0,
         },
         period_spend: 50,
         requests: 1 | 4 | 256,
@@ -3274,7 +3282,12 @@ fn read_only_role_stages_have_one_not_ready_terminal_and_empty_projects_need_no_
     oversized.people.holdings = oversized.journal.transcript_bytes;
     assert!(engine::worst_case(&oversized).is_none(), "one roster-bearing durable row must fit before any clone");
     let configured = limits();
-    let mut child = tasks::Domain::new(&configured.tasks, 9312, Box::new([1]));
+    let mut child = tasks::Domain::new(
+        &configured.tasks,
+        9312,
+        Box::new([tasks::CharterModels { number: 1, models: Box::new([0]) }]),
+        Box::new([0]),
+    );
     let environment = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: configured.tasks };
     let mut out = Queue::with_capacity(tasks::max_out(&configured.tasks));
     let right = |request| ReplyTo::new(Token::new(request));

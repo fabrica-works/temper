@@ -287,7 +287,7 @@ fn version_refused() -> (crate::Domain, jig_client::Key) {
     };
     let stable = record.request.key;
     let Some(Request::Client {
-        request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, key, request: ask } },
+        request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, key, request: ask, value } },
     }) = out.pop()
     else {
         panic!("adoption sent")
@@ -296,7 +296,7 @@ fn version_refused() -> (crate::Domain, jig_client::Key) {
     let bounds = link::Limits::new(limits.client.domain, limits.client.exchanges).unwrap();
     let mut link = link::Link::new(&bounds).unwrap();
     let mut sent = Queue::with_capacity(link.max_out());
-    link.step(skein_lib::Time::ZERO, link::Event::Send { attempt, key, ask }, &mut sent);
+    link.step(skein_lib::Time::ZERO, link::Event::Send { attempt, key, ask, value }, &mut sent);
     let Some(link::Request::Exchange { exchange, .. }) = sent.pop() else { panic!("keyed exchange") };
     link.step(skein_lib::Time::ZERO, link::Event::Reply { exchange, message: version_answer(&bounds) }, &mut sent);
     while let Some(request) = sent.pop() {

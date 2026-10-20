@@ -105,6 +105,7 @@ pub(crate) fn outcome_text(b: &mut Builder, words: &Words, outcome: &jig_client:
         Outcome::Limit => words.status(b, P::RequestsInFlight, &[]),
         Outcome::Unconfirmed => words.status(b, P::RequestUnconfirmed, &[]),
         Outcome::Answered(Answered::Family(_)) => {}
+        Outcome::Unsent | Outcome::Lost => unreachable!("temper's requests carry no value"),
     }
 }
 

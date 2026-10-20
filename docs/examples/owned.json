@@ -60,8 +60,7 @@
             }
           }
         }
-      ],
-      "records": "accounts/records"
+      ]
     },
     "hosts": {
       "workers": [
@@ -138,7 +137,8 @@
         "listed": false,
         "retention": "kept",
         "label": 1,
-        "grace_ms": 5000
+        "grace_ms": 5000,
+        "llm": null
       },
       {
         "number": 2,
@@ -159,7 +159,8 @@
         "listed": true,
         "retention": "kept",
         "label": 2,
-        "grace_ms": null
+        "grace_ms": null,
+        "llm": null
       }
     ],
     "clients": {
@@ -189,7 +190,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 78675217658115,
+    "memory_bytes": 79537995154677,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -822,7 +823,7 @@
           "hub.event_bytes": 598
         }
       },
-      "memory_bytes": 2466461737474
+      "memory_bytes": 2466461744144
     }
   ],
   "application": {

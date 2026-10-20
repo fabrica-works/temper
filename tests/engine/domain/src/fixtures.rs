@@ -44,12 +44,14 @@ pub fn report_delegate(words: &[u8], dependencies: Box<[engine::Dependency]>) ->
         contract: tasks::Contract::Report { words: 128 },
         authority: tasks::Authority {
             tools: tasks::Tools(1023),
+            models: tasks::Models::NONE,
             grants: Box::new([]),
             delegation: tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
             budget: tasks::Budget { spend: 10, deadline: None },
             notes: tasks::Scopes(0),
             note_resources: Box::new([]),
         },
+        llm: None,
         symbolic_grants: Box::new([]),
         dependencies,
         wake: tasks::WakePolicy::DEFAULT,
@@ -75,6 +77,7 @@ pub fn task_amendment(words: Option<&[u8]>, authority: Option<tasks::Authority>,
         wake: None,
         dependencies: None,
         authority,
+        llm: None,
         reason: reason.into(),
     }
 }
@@ -129,6 +132,7 @@ pub fn templates() -> Box<[jig_domain_core::Template]> {
             flags: Flags { conversation: true, listed: false, retention: Retention::Kept },
             label: 1,
             grace: Some(skein_lib::Duration::from_millis(5000)),
+            llm: None,
         },
         jig_domain_core::Template {
             number: 2,
@@ -142,6 +146,7 @@ pub fn templates() -> Box<[jig_domain_core::Template]> {
             flags: Flags { conversation: false, listed: true, retention: Retention::Kept },
             label: 2,
             grace: None,
+            llm: None,
         },
     ])
 }

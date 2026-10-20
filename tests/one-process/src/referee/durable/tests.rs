@@ -22,7 +22,7 @@ fn a_torn_log_write_recovers_the_durable_prefix() {
     let mut store = Store::new();
     let mut events =
         vec![Observed::Bytes { path: fixture::LOG.to_vec(), at: 0, bytes }, Observed::Recovered(fixture::LOG.to_vec())];
-    assert_eq!(store.observe(&mut events, &fixtures::codec(), &fixture::bounds()).len(), 1);
+    assert_eq!(store.observe(&mut events, &fixtures::codec(), fixtures::store_names(), &fixture::bounds()).len(), 1);
     assert_eq!(store.applied, 1);
     assert_eq!(store.rows.get(&fixture::row().key()), Some(&fixture::row()));
 }
@@ -42,7 +42,9 @@ fn a_repair_snapshot_write_yields_no_commit_frames() {
     });
     capture.complete(&Complete { op: SYNC, kind: Op::Sync { fd: Fd::new(1) }, result: Ok(Done::Nothing) });
     let mut store = Store::new();
-    assert!(store.observe(&mut capture.events, &fixtures::codec(), &fixture::bounds()).is_empty());
+    assert!(
+        store.observe(&mut capture.events, &fixtures::codec(), fixtures::store_names(), &fixture::bounds()).is_empty()
+    );
     assert_eq!(store.applied, 0);
 }
 
@@ -58,7 +60,10 @@ fn a_repair_snapshot_read_restores_the_durable_rows() {
         kind: Op::Read { fd: Fd::new(1), buf: bytes.clone().into(), at: 0 },
         result: Ok(Done::Count(u32::try_from(bytes.len()).expect("snapshot length"))),
     });
-    assert_eq!(store.observe(&mut capture.events, &fixtures::codec(), &fixture::bounds()).len(), 1);
+    assert_eq!(
+        store.observe(&mut capture.events, &fixtures::codec(), fixtures::store_names(), &fixture::bounds()).len(),
+        1
+    );
     assert_eq!(store.applied, 1);
     assert_eq!(store.recovered, [1].into());
     assert_eq!(store.rows.get(&fixture::row().key()), Some(&fixture::row()));

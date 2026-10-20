@@ -493,6 +493,7 @@ impl World {
             sign_in: self.signed_in.expect("signed in"),
             key: [91; 16],
             digest: [5; 32],
+            carried: None,
             request: forge_top::Adoption {
                 project: 1,
                 home: true,

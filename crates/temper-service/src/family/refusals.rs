@@ -1,6 +1,6 @@
 //! Sparse entrance facts without invented names, words or bounds (jig's
 //! client/domain/contract.md, 4).
-use jig_client_protocol_wire::v9 as w;
+use jig_client_protocol_wire::v10 as w;
 use jig_domain_people as p;
 use skein_lib::Writer;
 pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusal, w::Problem> {
@@ -51,6 +51,11 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
         p::Refusal::NotOffered => w::Refusal::NotOffered,
         p::Refusal::NoEscalationHolder => w::Refusal::NoEscalationHolder,
         p::Refusal::KeyConflict => w::Refusal::KeyConflict,
+        // As jig's entrance facts: only a made or amended task's refusal names a model, by the
+        // configured models, which a fact here has none of.
+        p::Refusal::Llm { .. } => {
+            return Err(w::Problem { path: w::Path::RefusalLlmModel, reason: skein_codec::Reason::Bound });
+        }
     })
 }
 fn role(value: p::Role, limits: &w::Limits) -> Result<w::HeldRole, w::Problem> {
@@ -76,6 +81,7 @@ fn lack(value: p::Lack, limits: &w::Limits) -> Result<w::Lacking, w::Problem> {
         p::Lack::Shape => w::Lacking::Shape,
         p::Lack::Account => w::Lacking::Account,
         p::Lack::Writer => w::Lacking::Writer,
+        p::Lack::Models => w::Lacking::Models,
         p::Lack::Budget { needs, left } => {
             w::Lacking::Budget(w::LackingBudget::new(limits, w::LackingBudgetParts { needed: needs, left })?)
         }
@@ -149,6 +155,9 @@ pub(super) fn limit(value: p::LimitKind) -> w::AdmissionLimit {
         p::LimitKind::Policy => w::AdmissionLimit::Policy,
         p::LimitKind::Resource => w::AdmissionLimit::Resource,
         p::LimitKind::Service => w::AdmissionLimit::Service,
+        p::LimitKind::Accounts | p::LimitKind::HolderAccounts | p::LimitKind::Sources | p::LimitKind::SignIns => {
+            unreachable!("an application asks for no account")
+        }
     }
 }
 fn moved(value: p::Moved, limits: &w::Limits) -> Result<w::Refusal, w::Problem> {

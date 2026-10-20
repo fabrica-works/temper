@@ -273,7 +273,7 @@ pub fn channel(
                     (b"work_left_some", largest.left, ceilings.work_left_some),
                     (b"work_saved_some", largest.saved, ceilings.work_saved_some),
                     (b"resource_resource_some", largest.resource, ceilings.resource_resource_some),
-                    (b"grant_value", largest.grant, ceilings.grant_value),
+                    (b"application_value_secret", largest.grant, ceilings.application_value_secret),
                 ] {
                     if bytes > bound {
                         let prefix: &[u8] = if index == 0 { b"engine" } else { b"workers" };
@@ -299,7 +299,7 @@ pub fn identities(identities: &[settings::Identity], limits: &payload::v1::Limit
         match crate::translate::identity(identity, limits) {
             Ok(value) => {
                 let bytes = u64::try_from(value.expose().len()).expect("bounded identity");
-                let bound = u64::from(jig_protocol_worker_wire::CEILINGS.grant_value);
+                let bound = u64::from(jig_protocol_worker_wire::CEILINGS.application_value_secret);
                 if bytes > bound {
                     problems.push(path, What::Past { bytes, bound });
                 }

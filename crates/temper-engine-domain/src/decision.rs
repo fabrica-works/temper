@@ -113,6 +113,12 @@ pub enum Delivery {
         to: ReplyTo,
         reply: people::Reply,
     },
+    /// Root to the clients' component: a request's carried value the core
+    /// left unused, erased there before the request's answer (jig's
+    /// `protocol/store.md`, 9).
+    CarriedUnused {
+        number: u64,
+    },
     /// One authenticated read's answer, after every preceding commit.
     Read {
         reply: ReplyTo,
@@ -283,7 +289,8 @@ impl Decision {
                         | jig_domain_core::CoreKey::Projection(_),
                     )
                     | jig_domain_core::Key::Tasks(_)
-                    | jig_domain_core::Key::People(_),
+                    | jig_domain_core::Key::People(_)
+                    | jig_domain_core::Key::Accounts(_),
                 )
                 | Key::Forge(_),
             ) => true,
@@ -317,7 +324,8 @@ impl Decision {
                         | jig_domain_core::CoreRecord::Terminal(_),
                     )
                     | jig_domain_core::Record::People(_)
-                    | jig_domain_core::Record::Notes(_),
+                    | jig_domain_core::Record::Notes(_)
+                    | jig_domain_core::Record::Accounts(_),
                 )
                 | Record::Forge { .. },
             ) => match crate::store::owned_bytes(&write) {
@@ -377,6 +385,7 @@ impl Decision {
             | Delivery::Procedure { .. }
             | Delivery::Application { .. }
             | Delivery::WebReply { .. }
+            | Delivery::CarriedUnused { .. }
             | Delivery::Read { .. }
             | Delivery::ReadLoad { .. }
             | Delivery::Document { .. }
@@ -632,8 +641,9 @@ fn fleet_delivery_within(event: &jig_domain_fleet::Event) -> bool {
         | Event::Adopt { .. }
         | Event::Loaded
         | Event::Grant { .. }
-        | Event::Rejected { .. }
-        | Event::Exhausted { .. }
+        | Event::Unauthorized { .. }
+        | Event::Limited { .. }
+        | Event::AccountRefused { .. }
         | Event::Hello { .. }
         | Event::Lost { .. }
         | Event::Answer { .. }

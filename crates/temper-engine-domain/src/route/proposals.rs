@@ -70,6 +70,7 @@ pub(crate) fn historical_loaded(domain: &mut Domain, waiter: Token, rows: Box<[s
                 )
                 | jig_domain_core::Record::Tasks(_)
                 | jig_domain_core::Record::People(_)
+                | jig_domain_core::Record::Accounts(_)
                 | jig_domain_core::Record::Notes(_),
             )
             | super::Record::Forge { .. } => None,

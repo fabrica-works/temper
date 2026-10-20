@@ -65,7 +65,7 @@ pub fn documents(directory: &Path, llm: SocketAddr, forge: SocketAddr) -> (serde
 
 /// Create the standalone tree; every private directory and file has its final mode.
 pub fn write(directory: &Path, llm: SocketAddr, forge: SocketAddr) -> std::io::Result<()> {
-    for name in ["", "accounts", "accounts/records", "secrets", "charters", "state", "clients"] {
+    for name in ["", "accounts", "secrets", "charters", "state", "clients"] {
         std::fs::create_dir_all(directory.join(name))?;
         std::fs::set_permissions(directory.join(name), std::fs::Permissions::from_mode(0o700))?;
     }

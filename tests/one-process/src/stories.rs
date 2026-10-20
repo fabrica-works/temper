@@ -105,7 +105,7 @@ pub(crate) fn provider(story: Story) -> skein_fake_peers::llm::Peer {
     } else {
         vec![call(b"shell", br#"{"command":"echo fixed > conflict.txt"}"#), finish.clone()]
     };
-    smith_agent_process_world::fake::configured(
+    jig_channel_world::fixtures::provider(
         Box::new([
             Script {
                 cue: b"@plan".as_slice().into(),
@@ -117,8 +117,10 @@ pub(crate) fn provider(story: Story) -> skein_fake_peers::llm::Peer {
                 turns: Box::new([call(b"shell", br#"{"command":"echo fixed > conflict.txt"}"#), finish]),
             },
         ]),
-        skein_llm::Credential::codex(jig_channel_world::fixtures::TOKEN.into(), b"acc".as_slice().into()),
+        skein_llm::Credential::bearer(jig_channel_world::fixtures::TOKEN.into()),
         Duration::ZERO,
+        skein_fake_peers::Transport::Plaintext,
+        skein_fake_llm_protocol::documents::Provider::OpenAi,
     )
 }
 pub(crate) fn forge(story: Story) -> temper_fake_git::Transport {

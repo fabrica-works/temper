@@ -179,8 +179,9 @@ impl World {
             host::LinkUp::Activity { run, attempt, .. } => assert_eq!((*run, *attempt), (RUN, ATTEMPT)),
             host::LinkUp::Turn { .. }
             | host::LinkUp::Call { .. }
-            | host::LinkUp::Rejected { .. }
-            | host::LinkUp::Exhausted { .. }
+            | host::LinkUp::Unauthorized { .. }
+            | host::LinkUp::Limited { .. }
+            | host::LinkUp::AccountRefused { .. }
             | host::LinkUp::Answer { .. } => panic!("unscripted link record: {up:?}"),
         }
     }

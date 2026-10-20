@@ -689,6 +689,7 @@ fn released_into(domain: &mut Domain, _env: &Env<Limits>, released: Released, ou
         | Delivery::Assigned { .. }
         | Delivery::Application { .. }
         | Delivery::WebReply { .. }
+        | Delivery::CarriedUnused { .. }
         | Delivery::Read { .. }
         | Delivery::ReadLoad { .. }
         | Delivery::Document { .. }

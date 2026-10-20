@@ -420,6 +420,7 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
                 }),
                 dependencies: None,
                 authority: None,
+                llm: None,
                 reason: b"Gather three updates".as_slice().into(),
             },
         },

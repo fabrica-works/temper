@@ -44,6 +44,8 @@ pub fn charter() -> engine::Charter {
         cache_write_price: None,
         output_price: 1,
         price_unit: 1_000_000,
+        efforts: Box::new([]),
+        effort: None,
     };
     charter.policy.turns = 64;
     charter.policy.time = Duration::from_secs(3600);
@@ -60,7 +62,10 @@ pub const CHECKS: Duration = Duration::from_secs(60);
 #[must_use]
 pub fn config(seed: u64) -> engine::Config {
     let mut config = walking::config(seed);
-    config.core.settings.charters = Box::new([charter()]);
+    let charter = charter();
+    // The charter's model is a configured one, as jig's core world sets it (tests/core charters.rs).
+    config.core.settings.models = Box::new([charter.policy.model.clone()]);
+    config.core.settings.charters = Box::new([charter]);
     config.core.settings.resume_bytes = 8192;
     config
 }

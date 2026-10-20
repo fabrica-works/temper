@@ -2,19 +2,19 @@ use super::fixtures;
 use jig_domain_core as core;
 use jig_domain_host as host;
 use jig_domain_tasks as tasks;
+use jig_protocol_engine_workers::GrantValue;
 use skein_lib::Time;
 use skein_lib::Token;
 #[test]
 fn each_repositorys_grant_carries_its_identitys_value() {
     let values = fixtures::values_with_identity(1, b"forge-token-1234");
     let filled = values.grants(&[fixtures::application_grant(1, 1)], Time::ZERO);
-    let [Some(value)] = filled.as_ref() else { panic!("one value for one grant") };
-    let identity = fixtures::decoded_identity(&value.value);
+    let [Some(GrantValue::Application { secret })] = filled.as_ref() else { panic!("one application value") };
+    let identity = fixtures::decoded_identity(secret);
     assert_eq!(identity.token().expose(), b"forge-token-1234");
     assert_eq!(identity.login(), b"temper");
     assert_eq!(identity.name(), b"temper");
     assert_eq!(identity.email(), b"temper@forge.example");
-    assert_eq!(value.account_id.expose(), b"");
 }
 #[test]
 fn a_missing_identity_or_generation_keeps_its_grant_slot_empty() {
@@ -50,7 +50,9 @@ fn an_accounts_grant_uses_the_lent_generation_until_it_expires() {
             2,
             jig_protocol_accounts::table::Value {
                 token: skein_lib::Secret::new(b"account-token".as_slice().into()),
-                account_id: skein_lib::Secret::new(b"account-id".as_slice().into()),
+                scheme: jig_protocol_accounts::table::Scheme::Withdrawn {
+                    id: skein_lib::Secret::new(b"account-id".as_slice().into()),
+                },
             },
             Time::from_nanos(9),
         )
@@ -62,8 +64,9 @@ fn an_accounts_grant_uses_the_lent_generation_until_it_expires() {
         let filled = values.grants(&[grant], Time::from_nanos(now));
         assert_eq!(filled[0].is_some(), expected, "{now} {generation}");
         if let Some(value) = &filled[0] {
-            assert_eq!(value.value.expose(), b"account-token", "{now} {generation}");
-            assert_eq!(value.account_id.expose(), b"account-id", "{now} {generation}");
+            let GrantValue::Withdrawn { id, bearer } = value else { panic!("a withdrawn grant") };
+            assert_eq!(bearer.expose(), b"account-token", "{now} {generation}");
+            assert_eq!(id.expose(), b"account-id", "{now} {generation}");
         }
     }
 }
@@ -113,7 +116,8 @@ fn an_assignment_carries_its_items_encoded_charter_and_identity_value() {
     assert_eq!(items.repositories().get(0).unwrap().remote(), b"https://forge.example/acme/shop.git");
     let charter = decoded_charter(&assignment.assignment.charter);
     assert!(charter.resume());
-    let value = fixtures::decoded_identity(&values[0].as_ref().unwrap().value);
+    let Some(GrantValue::Application { secret }) = &values[0] else { panic!("an application value") };
+    let value = fixtures::decoded_identity(secret);
     assert_eq!(value.token().expose(), b"forge-token-1234");
 }
 #[test]

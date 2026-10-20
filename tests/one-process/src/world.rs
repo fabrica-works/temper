@@ -93,7 +93,12 @@ impl Host for ServiceHost {
             self.capture.complete(complete);
             self.wire.complete(complete);
         }
-        self.commits.extend(self.store.borrow_mut().observe(&mut self.capture.events, &self.codec, &self.families));
+        self.commits.extend(self.store.borrow_mut().observe(
+            &mut self.capture.events,
+            &self.codec,
+            fixtures::store_names(),
+            &self.families,
+        ));
         temper_service::iterate(&mut self.service, now, wall);
         for submit in self.service.submissions().iter() {
             self.capture.pending(&submit.kind);

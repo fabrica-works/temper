@@ -34,6 +34,7 @@ pub(super) fn request(owner: skein_lib::Token, flight: &Flight) -> Option<store:
         Range::Census(census) => store::Restore::Jig(Box::new([core::RestoreRange::Census(census.clone())])),
         Range::Core(range) => match range {
             CoreRange::Deployment => store::Restore::Jig(Box::new([core::RestoreRange::Deployment])),
+            CoreRange::Accounts => store::Restore::Jig(Box::new([core::RestoreRange::Accounts])),
             CoreRange::People => store::Restore::Jig(Box::new([core::RestoreRange::People])),
             CoreRange::Tasks => store::Restore::Jig(Box::new([core::RestoreRange::Core, core::RestoreRange::Tasks])),
             CoreRange::Calls | CoreRange::RunProofs => store::Restore::Jig(Box::new([core::RestoreRange::Core])),

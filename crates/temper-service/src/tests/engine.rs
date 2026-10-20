@@ -48,7 +48,7 @@ fn the_restart_asks_one_load_at_a_time() {
     let mut service = fixtures::started();
     for _ in 0_u32..16 {
         fixtures::turn(&mut service);
-        if !service.engine.store.above.is_empty() {
+        if store_answered(&service) {
             break;
         }
     }
@@ -71,6 +71,18 @@ fn the_restart_asks_one_load_at_a_time() {
     assert_eq!(service.end(), None);
     assert_eq!(service.engine.store.above.len(), 1, "one next store operation");
     fixtures::restart(&mut service);
+}
+/// Whether the store has answered the engine. The accounts' answers, as
+/// their handed-in record kept (jig's protocol/store.md, 9), are taken on
+/// the next turn.
+fn store_answered(service: &crate::Service) -> bool {
+    for event in &service.engine.store.above {
+        let jig_protocol_store::Event::Kept { owner } = event else { return true };
+        if !crate::accounts::owns(*owner) {
+            return true;
+        }
+    }
+    false
 }
 #[test]
 fn a_store_answer_is_taken_with_the_journal_full() {
@@ -130,31 +142,26 @@ fn an_engine_that_cannot_fit_its_memory_is_refused_before_start() {
     assert_eq!(problem.path, jig_protocol_config::Path::root().member(b"engine").member(b"memory_bytes"));
 }
 #[test]
-fn kernel_operation_numbers_do_not_mix_account_files_and_io() {
-    use skein_io::kernel::{Complete, Done, Fd, Op, Submit};
+fn kernel_operations_are_routed_back_to_their_owner() {
+    use skein_io::kernel::{Complete, Done, Error, Fd, Op, Submit};
     use skein_lib::{Queue, Token};
     let mut kernel = crate::accounts::Kernel::new(4);
-    let mut submissions = Queue::with_capacity(4);
-    let mut source = Queue::with_capacity(1);
-    let original = Token::new(7);
-    for files in [false, true] {
-        source.push(Submit { op: original, kind: Op::Close { fd: Fd::new(7) } });
-        kernel.publish(files, &mut source, &mut submissions);
-    }
-    let first = submissions.pop().unwrap();
-    let second = submissions.pop().unwrap();
-    assert_ne!(first.op, second.op);
-    for (submit, expected_files) in [(first, false), (second, true)] {
-        let external = submit.op;
-        let (files, complete) = kernel.complete(
-            Complete { op: external, kind: submit.kind, result: Ok(Done::Nothing) },
-            &source,
-            Some(&source),
-        );
-        assert_eq!(files, expected_files, "operation {external:?}");
-        assert_eq!(complete.op, original, "operation {external:?}");
-    }
-    assert!(kernel.is_empty());
+    let mut sockets = Queue::with_capacity(2);
+    sockets.push(Submit { op: Token::new(1), kind: Op::Close { fd: Fd::new(6) } });
+    let mut output = Queue::with_capacity(4);
+    kernel.publish(&mut sockets, &mut output);
+    let request = output.pop().expect("socket operation");
+    sockets.push(Submit { op: Token::new(2), kind: Op::Cancel { target: Token::new(1) } });
+    let complete =
+        kernel.complete(Complete { op: request.op, kind: request.kind, result: Ok(Done::Nothing) }, &sockets);
+    assert_eq!(complete.op, Token::new(1));
+    kernel.publish(&mut sockets, &mut output);
+    let cancel = output.pop().expect("cancel after target completion");
+    assert_eq!(cancel.kind, Op::Cancel { target: request.op });
+    let complete =
+        kernel.complete(Complete { op: cancel.op, kind: cancel.kind, result: Err(Error::TooLate) }, &sockets);
+    assert_eq!(complete.op, Token::new(2));
+    assert_eq!(complete.kind, Op::Cancel { target: Token::new(1) });
 }
 #[test]
 fn an_io_listener_failure_stops_the_engine() {

@@ -14,7 +14,7 @@ pub fn to_root(
     limits: &w::Limits,
 ) -> Result<root::Event, Box<kit::Event>> {
     match exchange {
-        kit::ToApplication::Request { reply_to, sign_in, key, family, version, record, digest, scope } => {
+        kit::ToApplication::Request { reply_to, sign_in, key, family, version, record, digest, scope, carried } => {
             let mut reader = Reader::new(&record);
             let request = match wire::owner(family) {
                 Some(wire::Owner::Forge) if version == wire::CLIENT_VERSION => {
@@ -55,6 +55,7 @@ pub fn to_root(
                     ci: a.ci,
                     checks: a.checks.into_boxed(),
                 },
+                carried,
             }))
         }
         kit::ToApplication::Read { reply, family, .. } => {
@@ -104,7 +105,7 @@ fn encoded_role(role: forge::Role) -> w::Role {
 pub fn answer(
     outcome: Option<forge::ApplicationOutcome>,
     limits: &w::Limits,
-    jig: &jig_client_protocol_wire::v9::Limits,
+    jig: &jig_client_protocol_wire::v10::Limits,
 ) -> Option<Box<[u8]>> {
     let outcome = match outcome {
         Some(forge::ApplicationOutcome::Adopted(a)) => w::Outcome::Adopted(

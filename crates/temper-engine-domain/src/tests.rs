@@ -371,6 +371,8 @@ fn held_assignment_checks_owned_bytes_and_section_backing_before_acceptance() {
                     cache_write_price: None,
                     output_price: 1,
                     price_unit: 1,
+                    efforts: Box::new([]),
+                    effort: None,
                 },
                 alternatives: Box::new([]),
                 inspect: false,
@@ -382,6 +384,7 @@ fn held_assignment_checks_owned_bytes_and_section_backing_before_acceptance() {
             contract: jig_domain_tasks::Contract::Report { words: 1 },
             authority: jig_domain_tasks::Authority {
                 tools: jig_domain_tasks::Tools(0),
+                models: jig_domain_tasks::Models::NONE,
                 grants: Box::new([]),
                 delegation: jig_domain_tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
                 budget: jig_domain_tasks::Budget { spend: 1, deadline: None },

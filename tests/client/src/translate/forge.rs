@@ -161,6 +161,7 @@ pub fn request(
         sign_in,
         key,
         digest: digest(&value),
+        carried: None,
         request: adoption(&value, crate::fixtures::FORGE_HOST),
     })
 }
@@ -235,16 +236,21 @@ pub fn incoming(
         | Delivery::Load { .. }
         | Delivery::Read { .. }
         | Delivery::Document { .. }
-        | Delivery::WatchEnded { .. }) => {
+        | Delivery::WatchEnded { .. }
+        | Delivery::CarriedUnused { .. }) => {
             return Err(Box::new(engine::Request::Party(PartyRequest::Deliver(delivery))));
         }
     };
     let Some(route) = transport.take_reply(to.into_token()) else { return Ok(None) };
-    let Reply::Keyed { client, attempt, owner: KeyedOwner::Application { connector }, .. } = route else {
+    Ok(Some(answered(&route, body)))
+}
+/// The application's outcome, answered on its keyed route as the forge family's bytes.
+fn answered(route: &Reply, body: Option<owner::ApplicationOutcome>) -> (ClientId, client::Event) {
+    let Reply::Keyed { client, attempt, owner: KeyedOwner::Application { connector }, .. } = *route else {
         panic!("application reply route")
     };
     assert_eq!(connector, crate::fixtures::FORGE);
-    Ok(Some((
+    (
         client,
         client::Event::Client {
             event: jig_client::Event::Up {
@@ -270,5 +276,5 @@ pub fn incoming(
                 },
             },
         },
-    )))
+    )
 }

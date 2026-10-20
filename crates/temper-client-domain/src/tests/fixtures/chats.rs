@@ -27,6 +27,7 @@ pub fn me() -> Me {
             flags: TaskFlags { conversation: true, listed: false, retention: Retention::Kept },
             label: LABEL,
             grace: Some(GRACE),
+            llm: None,
         })
         .expect("one template");
     let ReadValue::Escalation(held) = acts::held(ActKind::Release) else { panic!("held") };
@@ -56,6 +57,7 @@ pub fn me() -> Me {
             pool: None,
             templates,
             creating: Some(creating),
+            models: List::with_capacity(EMPTY),
         })
         .expect("project");
     me

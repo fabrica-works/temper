@@ -44,6 +44,7 @@ pub fn chat_me() -> w::Me {
             .expect("flags"),
             label: jig_client::shapes::CHAT,
             grace: None,
+            llm: None,
         },
     )
     .expect("chat template");
@@ -89,6 +90,7 @@ pub fn chat_me() -> w::Me {
             pool: None,
             templates: piece(&encode!(template)),
             creating: Some(creating),
+            models: List::with_capacity(0),
         },
     )
     .expect("membership");

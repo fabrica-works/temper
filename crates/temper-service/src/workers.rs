@@ -397,8 +397,9 @@ pub fn parts(up: &host::LinkUp, parts: &[Part], limits: &wire::Limits) -> Option
             host::Ending::Refused(_) => (None, None),
         },
         host::LinkUp::Activity { .. }
-        | host::LinkUp::Rejected { .. }
-        | host::LinkUp::Exhausted { .. }
+        | host::LinkUp::Unauthorized { .. }
+        | host::LinkUp::Limited { .. }
+        | host::LinkUp::AccountRefused { .. }
         | host::LinkUp::Turn { .. }
         | host::LinkUp::Call { .. } => (None, None),
     };

@@ -69,6 +69,7 @@ fn chat(call: &Call, me: &c::Me, limits: &Limits) -> Prepared {
         budget: task.authority.spend,
         deadline: task.authority.deadline,
         priority: task.tracked,
+        llm: task.llm.clone(),
     };
     match shapes::fall(creating, &draft, task.deadline) {
         shapes::Fall::Within => Ok((ask, None)),

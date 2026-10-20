@@ -57,6 +57,7 @@ pub(crate) fn request_load(
         Range::Core(
             crate::CoreRange::Calls
             | crate::CoreRange::Tasks
+            | crate::CoreRange::Accounts
             | crate::CoreRange::People
             | crate::CoreRange::RunProofs
             | crate::CoreRange::Turns { .. }
@@ -82,6 +83,7 @@ pub(crate) fn request_load(
                 | crate::CoreRange::Deployment
                 | crate::CoreRange::Tasks
                 | crate::CoreRange::RunProofs
+                | crate::CoreRange::Accounts
                 | crate::CoreRange::People
                 | crate::CoreRange::TaskResult { .. }
                 | crate::CoreRange::EndedRead { .. }
@@ -107,6 +109,7 @@ pub(crate) fn request_load(
                 crate::CoreRange::Calls
                 | crate::CoreRange::Deployment
                 | crate::CoreRange::Tasks
+                | crate::CoreRange::Accounts
                 | crate::CoreRange::People
                 | crate::CoreRange::RunProofs
                 | crate::CoreRange::Turns { .. }
@@ -223,7 +226,7 @@ pub(crate) fn startup_page(
         close(domain, env, decision, out);
         let following = match next {
             Some(after) => (range, Some(after)),
-            None => (Range::Core(crate::CoreRange::People), None),
+            None => (Range::Core(crate::CoreRange::Accounts), None),
         };
         domain.startup_range = Some(following.0.clone());
         request_load(domain, Token::new(u64::MAX), following.0, following.1, out);
@@ -235,7 +238,8 @@ pub(crate) fn startup_page(
         return;
     }
     let following = match range {
-        Range::Core(crate::CoreRange::Deployment) => Some(Range::Core(crate::CoreRange::People)),
+        Range::Core(crate::CoreRange::Deployment) => Some(Range::Core(crate::CoreRange::Accounts)),
+        Range::Core(crate::CoreRange::Accounts) => Some(Range::Core(crate::CoreRange::People)),
         Range::Core(crate::CoreRange::People) => Some(Range::Core(crate::CoreRange::Tasks)),
         Range::Core(crate::CoreRange::Tasks) => Some(Range::Core(crate::CoreRange::RunProofs)),
         Range::Forge | Range::Census(_) | Range::Core(crate::CoreRange::Calls) => None,
@@ -295,10 +299,6 @@ pub(crate) fn restart_request(
         jig_domain_core::RestartRequest::Refused { .. } => domain.stop_pending = true,
         jig_domain_core::RestartRequest::Step(step) => match step {
             jig_domain_core::RestartStep::LoadCore => {
-                // Every configured account is wanted from the restart's first
-                // step (jig's `domain/engine.md`, 12).
-                let routed = jig_domain_core::want_accounts(&mut domain.core, &environment_core(env));
-                route_core_requests(domain, env, decision, routed);
                 domain.startup_range = Some(Range::Core(crate::CoreRange::Deployment));
                 emit(
                     decision,
@@ -311,6 +311,11 @@ pub(crate) fn restart_request(
                 );
             }
             jig_domain_core::RestartStep::LoadInbox => {
+                // The accounts' records came with the core's ranges: want each
+                // configured account once they are restored (jig's
+                // `examples/ops/domain/src/restart.rs`).
+                let routed = jig_domain_core::want_accounts(&mut domain.core, &environment_core(env));
+                route_core_requests(domain, env, decision, routed);
                 let census = domain.core.census(&core_limits(&env.limits));
                 let range = Range::Census(census);
                 domain.startup_range = Some(range.clone());
@@ -380,6 +385,22 @@ pub(crate) fn connector_restarting(domain: &Domain) -> bool {
     }
 }
 
+/// A record breaking the accounts child's rules is counted there and dropped
+/// (jig's `examples/ops/domain/src/restart.rs`).
+fn restore_account(domain: &mut Domain, env: &Env<Limits>, record: jig_domain_accounts::Stored) {
+    let limits = core_limits(&env.limits).accounts;
+    let mut out = Queue::with_capacity(jig_domain_accounts::max_out(&limits));
+    jig_domain_accounts::step(
+        &mut domain.core.accounts,
+        &Env { now: env.now, wall: env.wall, limits },
+        jig_domain_accounts::Event::Restore { record },
+        &mut out,
+    );
+    if !out.is_empty() {
+        let _refused = domain.core.restart_refuse();
+    }
+}
+
 /// Reject unsupported root shapes and identities above durable high-water marks before child
 /// restoration. Proof rows consume exact transient live-row correlations and never load archive
 /// history into the live map.
@@ -427,6 +448,7 @@ pub(crate) fn restore_page_row(domain: &mut Domain, env: &Env<Limits>, row: Reco
         Record::Core(jig_domain_core::Record::People(record)) => {
             domain.work.push(Work::People(people::Event::Restore { record }));
         }
+        Record::Core(jig_domain_core::Record::Accounts(record)) => restore_account(domain, env, record),
         Record::Forge { row } => {
             domain.work.push(Work::Forge(forge::Event::Restore { record: *row }));
         }

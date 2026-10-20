@@ -5,19 +5,22 @@ use jig_domain_core as core;
 use jig_domain_people as people;
 use skein_lib::{Duration, ReplyTo, Token};
 
-pub(super) fn start(
-    domain: &mut Domain,
-    reply_to: ReplyTo,
-    sign_in: u64,
-    key: [u8; 16],
-    digest: [u8; 32],
-    scope: people::ApplicationScope,
-    request: forge::Adoption,
-) {
+/// The application's admission as the core decides it, before its owner is named.
+pub(super) struct Admission {
+    pub(super) reply_to: ReplyTo,
+    pub(super) sign_in: u64,
+    pub(super) key: [u8; 16],
+    pub(super) digest: [u8; 32],
+    pub(super) scope: people::ApplicationScope,
+    pub(super) carried: Option<core::Carried>,
+}
+
+pub(super) fn start(domain: &mut Domain, admission: Admission, request: forge::Adoption) {
     assert!(domain.application.is_none(), "one application admission value");
     let owner = Token::new(domain.next_application_owner);
     domain.next_application_owner = domain.next_application_owner.checked_add(1).expect("application owner counter");
     domain.application = Some((owner, request));
+    let Admission { reply_to, sign_in, key, digest, scope, carried } = admission;
     domain.work.push(Work::Core(core::Event::Application {
         reply_to,
         sign_in,
@@ -26,6 +29,7 @@ pub(super) fn start(
         connector: domain.config.forge_connector,
         digest,
         owner,
+        carried,
     }));
 }
 

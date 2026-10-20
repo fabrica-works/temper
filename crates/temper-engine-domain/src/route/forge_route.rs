@@ -1782,6 +1782,7 @@ fn change_delegate(
         symbolic_grants: Box::new([]),
         dependencies: Box::new([]),
         wake: tasks::WakePolicy::DEFAULT,
+        llm: None,
     })
 }
 

@@ -30,10 +30,15 @@ pub struct Store {
     pub(crate) above: Queue<protocol::Event>,
     pub(crate) routed: Queue<Up>,
     pub(crate) secrets: Queue<protocol::Event>,
+    /// The answers to the accounts' records' loads and writes (jig's store.md 9).
+    pub(crate) sources: Queue<protocol::Event>,
     below: protocol::Below,
     drivers: [Driver; 3],
     pub(crate) submitted: Queue<Submit>,
     pub(crate) opened: bool,
+    /// The installation's identifier: the drawn one until the store opens,
+    /// then the one it keeps (jig's store.md 4.4).
+    pub(crate) installation: [u8; 16],
     adopted: bool,
     root: Option<Fd>,
     closing: bool,
@@ -79,7 +84,12 @@ pub fn limits(
 }
 impl Store {
     #[must_use]
-    pub fn new(application: &root::Limits, limits: &protocol::Limits) -> Self {
+    pub fn new(
+        application: &root::Limits,
+        limits: &protocol::Limits,
+        models: &[jig_domain_core::Model],
+        installation: [u8; 16],
+    ) -> Self {
         let room = root::max_out(application).max(protocol::MAX_OUT_DOWN).checked_mul(2).expect("store route room");
         let routes = route::Routes::new(
             application.loads.loads,
@@ -90,12 +100,14 @@ impl Store {
             component: protocol::Store::on_directory(
                 limits,
                 temper_protocol_store::application(&application.forge).expect("checked application sizes"),
+                models,
             ),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
             routes,
             above: Queue::with_capacity(room),
             routed: Queue::with_capacity(room),
             secrets: Queue::with_capacity(room),
+            sources: Queue::with_capacity(room),
             below: protocol::Below {
                 store: Queue::with_capacity(room),
                 secrets: Queue::with_capacity(room),
@@ -104,6 +116,7 @@ impl Store {
             drivers: [driver(limits, room), driver(limits, room), driver(limits, room)],
             submitted: Queue::with_capacity(room),
             opened: false,
+            installation,
             adopted: false,
             root: None,
             closing: false,
@@ -173,8 +186,11 @@ impl Store {
     /// Get answers stay in this pass; secret writes' terminals are handed to their owner.
     pub fn secrets(&mut self, owner: Token, request: protocol::Secrets) -> Option<protocol::Event> {
         let immediate = match &request {
-            protocol::Secrets::Get { .. } => true,
-            protocol::Secrets::Keep { .. } | protocol::Secrets::Erase { .. } | protocol::Secrets::Load { .. } => false,
+            protocol::Secrets::Get { .. } | protocol::Secrets::Load { .. } => true,
+            protocol::Secrets::Keep { .. }
+            | protocol::Secrets::Replace { .. }
+            | protocol::Secrets::Erase { .. }
+            | protocol::Secrets::Carry { .. } => false,
         };
         protocol::down(
             &mut self.component,
@@ -187,7 +203,8 @@ impl Store {
         if immediate {
             for _ in 0..self.above.len() {
                 let event = self.above.pop().expect("store terminals");
-                if let protocol::Event::Secret { owner: found, .. } = &event
+                if let protocol::Event::Secret { owner: found, .. }
+                | protocol::Event::SecretsLoaded { owner: found, .. } = &event
                     && *found == owner
                 {
                     answer = Some(event);
@@ -201,6 +218,7 @@ impl Store {
     #[must_use]
     pub fn room(&self) -> bool {
         self.secrets.room() >= protocol::MAX_OUT_DOWN
+            && self.sources.room() >= protocol::MAX_OUT_DOWN
             && self.above.room() >= protocol::MAX_OUT_DOWN
             && self.routed.room() >= protocol::MAX_OUT_DOWN
             && self.below.store.room() >= protocol::MAX_OUT_DOWN
@@ -221,7 +239,12 @@ impl Store {
     }
     #[must_use]
     pub fn work_pending(&self, now: Time) -> bool {
-        if !self.secrets.is_empty() || !self.above.is_empty() || !self.routed.is_empty() || !self.submitted.is_empty() {
+        if !self.secrets.is_empty()
+            || !self.sources.is_empty()
+            || !self.above.is_empty()
+            || !self.routed.is_empty()
+            || !self.submitted.is_empty()
+        {
             return true;
         }
         for index in 0..3 {
@@ -254,6 +277,7 @@ impl Store {
     pub fn idle(&self) -> bool {
         (self.closing || self.routes.idle())
             && self.secrets.is_empty()
+            && self.sources.is_empty()
             && self.above.is_empty()
             && self.routed.is_empty()
             && self.submitted.is_empty()
@@ -273,6 +297,9 @@ impl Store {
         }
         for _ in 0..self.secrets.len() {
             let _terminal = self.secrets.pop();
+        }
+        for _ in 0..self.sources.len() {
+            let _terminal = self.sources.pop();
         }
         for index in 0..3 {
             for _ in 0..self.queue(index).len() {
@@ -378,6 +405,7 @@ impl Store {
                         self.ask(protocol::Request::Open {
                             owner: Token::new(1),
                             root: protocol::Root { token: Token::new(1), fd },
+                            installation: self.installation,
                         });
                     }
                     continue;
@@ -462,7 +490,7 @@ pub(crate) fn worst_case(application: &root::Limits, limits: &protocol::Limits) 
         .checked_add(FileIo::worst_case(handles(limits), max_read(limits), 32, max_read(limits))?.checked_mul(3)?)?
         .checked_add(Queue::<file::Request>::worst_case(room)?.checked_mul(3)?)?
         .checked_add(Queue::<file::Event>::worst_case(room)?.checked_mul(3)?)?
-        .checked_add(Queue::<protocol::Event>::worst_case(room)?.checked_mul(2)?)?
+        .checked_add(Queue::<protocol::Event>::worst_case(room)?.checked_mul(3)?)?
         .checked_add(Queue::<Up>::worst_case(room)?)?
         .checked_add(Queue::<Submit>::worst_case(room)?)?
         .checked_add(Map::<Token, ()>::worst_case(handles(limits))?.checked_mul(3)?)?

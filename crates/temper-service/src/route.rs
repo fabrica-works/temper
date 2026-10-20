@@ -122,6 +122,7 @@ fn worker(engine: &mut Engine, request: root::WorkerRequest) {
             root::Delivery::Procedure { .. }
             | root::Delivery::Application { .. }
             | root::Delivery::WebReply { .. }
+            | root::Delivery::CarriedUnused { .. }
             | root::Delivery::Read { .. }
             | root::Delivery::Document { .. }
             | root::Delivery::WatchEnded { .. }

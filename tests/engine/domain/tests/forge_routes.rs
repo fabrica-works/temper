@@ -646,6 +646,7 @@ impl World {
             sign_in: self.signed_in.expect("signed in"),
             key: [91; 16],
             digest: [5; 32],
+            carried: None,
             request: forge_top::Adoption {
                 project: 1,
                 home: true,
@@ -804,6 +805,7 @@ fn change_world_in(
         budget: tasks::Budget { spend: 40, deadline: None },
         notes: tasks::Scopes(0),
         note_resources: Box::new([]),
+        models: tasks::Models::NONE,
     };
     let event = world.protocol.call(
         Token::new(7),
@@ -1469,6 +1471,7 @@ fn an_amendment_while_gathering_discards_the_old_brief_without_claiming() {
                 wake: None,
                 dependencies: None,
                 authority: None,
+                llm: None,
                 reason: b"new failure detail".as_slice().into(),
             },
         },
@@ -2086,6 +2089,7 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
         sign_in: world.signed_in.expect("owner session"),
         key: [98; 16],
         digest: [5; 32],
+        carried: None,
         request: forge_top::Adoption {
             project: 1,
             home: false,

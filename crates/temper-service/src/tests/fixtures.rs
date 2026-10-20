@@ -30,8 +30,7 @@ pub const ENGINE: &[u8] = br#"{
 "accounts": [{
 "number": 1,
 "source": {"handed_in": {"file": "accounts/chat.json"}}
-}],
-"records": "accounts/records"
+}]
 },
 "hosts": {
 "workers": [
@@ -47,8 +46,8 @@ pub const ENGINE: &[u8] = br#"{
 "inspect": true, "modify": false, "shell": false, "agents": false, "call_timeout_ms": 10000
 }],
 "templates": [
-{"number": 1, "name": "chat", "executor": {"charter": 1}, "contract": {"report": {"words": 32}}, "shallower": 1, "budget": {"as_allowed": null}, "deadline": "none", "tracked": null, "conversation": true, "listed": false, "retention": "kept", "label": 1, "grace_ms": 5000},
-{"number": 2, "name": "goal", "executor": "chosen", "contract": {"report": {"words": 32}}, "shallower": 1, "budget": "given", "deadline": "given", "tracked": {"priority": 1}, "conversation": false, "listed": true, "retention": "kept", "label": 2, "grace_ms": null}
+{"number": 1, "name": "chat", "executor": {"charter": 1}, "contract": {"report": {"words": 32}}, "shallower": 1, "budget": {"as_allowed": null}, "deadline": "none", "tracked": null, "conversation": true, "listed": false, "retention": "kept", "label": 1, "grace_ms": 5000, "llm": null},
+{"number": 2, "name": "goal", "executor": "chosen", "contract": {"report": {"words": 32}}, "shallower": 1, "budget": "given", "deadline": "given", "tracked": {"priority": 1}, "conversation": false, "listed": true, "retention": "kept", "label": 2, "grace_ms": null, "llm": null}
 ],
 "clients": {
 "heartbeat_ms": 10000,
@@ -145,6 +144,7 @@ pub fn task_record(number: u64) -> jig_domain_tasks::TaskRecord {
         hold: 0,
         proposal_rows: Box::new([]),
         instructions: None,
+        llm: None,
         refused: Box::new([]),
         grace: None,
         created_at: Wall::EPOCH,
@@ -183,6 +183,7 @@ pub fn task_record(number: u64) -> jig_domain_tasks::TaskRecord {
         contract: tasks::Contract::Report { words: 32 },
         authority: tasks::Authority {
             tools: tasks::Tools(0),
+            models: tasks::Models::NONE,
             grants: Box::new([]),
             delegation: tasks::Delegation { kinds: Box::new([]), tasks: 1, depth: 0 },
             budget: tasks::Budget { spend: 1, deadline: None },
@@ -225,18 +226,21 @@ pub fn store_limits() -> (temper_engine_domain::Limits, jig_domain_core::Limits,
 
 pub fn memory_store() -> crate::store::Store {
     let (root, core, profile) = store_limits();
-    memory_store_for(&root, &core, &profile)
+    let models = jig_protocol_config::core(&engine().jig, [7; 16], 7).settings.models;
+    memory_store_for(&root, &core, &profile, &models)
 }
 fn memory_store_for(
     root: &temper_engine_domain::Limits,
     core: &jig_domain_core::Limits,
     profile: &jig_protocol_store::Limits,
+    models: &[jig_domain_core::Model],
 ) -> crate::store::Store {
     let limits = crate::store::limits(root, core, &root.forge, profile).expect("checked store limits");
-    let mut store = crate::store::Store::new(root, &limits);
+    let mut store = crate::store::Store::new(root, &limits, models, seeds().installation);
     store.component = jig_protocol_store::Store::over(
         &limits,
         temper_protocol_store::application(&root.forge).expect("application sizes"),
+        models,
         jig_protocol_store::Stores {
             store: skein_kv::Store::memory(&limits.store),
             secrets: skein_kv::Store::memory(&limits.secrets),
@@ -245,6 +249,7 @@ fn memory_store_for(
     store.ask(jig_protocol_store::Request::Open {
         owner: OWNER,
         root: jig_protocol_store::Root { token: OWNER, fd: skein_io::kernel::Fd::new(1) },
+        installation: seeds().installation,
     });
     let Some(jig_protocol_store::Event::Opened { .. }) = store.above.pop() else { panic!("store opened") };
     store.opened = true;
@@ -303,24 +308,12 @@ pub fn load(
 
 pub const ACCOUNT: &[u8] = br#"{"access_token":"test-token","expires_at":120,"account_id":"acc"}"#;
 pub fn seeds() -> settings::Seeds {
-    settings::Seeds { deployment: [7; 16], seed: 7, crypto: Secret::new(Box::new([7; 32])) }
+    settings::Seeds { deployment: [7; 16], installation: [9; 16], seed: 7, crypto: Secret::new(Box::new([7; 32])) }
 }
 
-pub struct AccountStand {
-    pub accounts: crate::accounts::Accounts,
-    pub values: crate::values::Values,
-}
-
-pub fn accounts_with(record: &[u8]) -> AccountStand {
-    let config = engine().jig;
-    let mut entries = skein_lib::List::with_capacity(1);
-    entries.push((Box::from(&b"accounts/chat.json"[..]), Secret::new(record.into()))).unwrap();
-    account_stand(&config, &settings::Files { entries }, None)
-}
-
-pub fn missing_account() -> AccountStand {
-    let mut config = engine().jig;
-    config.llm.accounts[0].source = jig_protocol_config::Source::SignIn(jig_protocol_config::SignIn {
+/// A sign-in source on the issuer the tests' runtime names.
+pub fn signed_in_source() -> jig_protocol_config::Source {
+    jig_protocol_config::Source::SignIn(jig_protocol_config::SignIn {
         client: Box::from(&b"client"[..]),
         secret: None,
         authorization: Box::from(&b"http://127.0.0.1:7102/authorize"[..]),
@@ -332,59 +325,7 @@ pub fn missing_account() -> AccountStand {
         transport: jig_protocol_config::Transport::Plaintext,
         redirect: Box::from(&b"http://127.0.0.1:7103/callback"[..]),
         scope: Box::from(&b"read"[..]),
-    });
-    let mut issuers = skein_lib::List::with_capacity(1);
-    issuers
-        .push((
-            1,
-            skein_oauth_accounts::Endpoint {
-                address: core::net::SocketAddr::from(([127, 0, 0, 1], 7102)),
-                transport: skein_oauth_accounts::Transport::Plaintext,
-            },
-        ))
-        .unwrap();
-    account_stand(
-        &config,
-        &settings::Files { entries: skein_lib::List::with_capacity(0) },
-        Some(crate::AccountsRuntime {
-            root: skein_io::kernel::Fd::new(10),
-            effective_user: 1000,
-            issuers,
-            trust_roots: 0,
-            trust_root_bytes: 0,
-        }),
-    )
-}
-fn account_stand(
-    config: &jig_protocol_config::Engine,
-    files: &settings::Files,
-    runtime: Option<crate::AccountsRuntime>,
-) -> AccountStand {
-    AccountStand {
-        accounts: crate::accounts::Accounts::new(config, files, &seeds(), runtime, 64).expect("configured account"),
-        values: crate::values::Values::new(
-            config.limits.core.accounts.accounts.checked_add(1).unwrap(),
-            config.limits.driver.client.document.token_bytes,
-        ),
-    }
-}
-
-pub fn want(stand: &mut AccountStand, account: u32) -> Box<[temper_engine_domain::Event]> {
-    use skein_lib::{Queue, Time, Wall};
-    let mut events = Queue::with_capacity(8);
-    let wall = Wall::from_nanos(1_000_000_000);
-    stand.accounts.iterate(Time::ZERO, wall, &mut stand.values, &mut events);
-    stand.accounts.request(jig_domain_accounts::Request::Component(jig_domain_accounts::ToComponent::Want { account }));
-    stand.accounts.iterate(Time::ZERO, wall, &mut stand.values, &mut events);
-    let mut out = skein_lib::List::with_capacity(events.len());
-    for _ in 0_u32..events.len() {
-        out.push(events.pop().unwrap()).unwrap();
-    }
-    out.into_boxed()
-}
-
-pub fn lent(stand: &AccountStand, account: u32, generation: u64) -> &Secret {
-    &stand.values.accounts.value(account, generation, skein_lib::Time::ZERO).expect("lent account").token
+    })
 }
 
 pub fn root() -> (temper_engine_domain::Domain, skein_lib::Env<temper_engine_domain::Limits>) {
@@ -407,6 +348,19 @@ pub fn root() -> (temper_engine_domain::Domain, skein_lib::Env<temper_engine_dom
     )
 }
 
+/// The files the engine document names: its charter, account and worker digests.
+pub fn fill_files(settings: &mut settings::Engine) {
+    settings.files.entries = skein_lib::List::with_capacity(4);
+    settings
+        .files
+        .entries
+        .push((b"charters/chat.txt".as_slice().into(), Secret::new(b"Answer briefly".as_slice().into())))
+        .unwrap();
+    settings.files.entries.push((b"accounts/chat.json".as_slice().into(), Secret::new(ACCOUNT.into()))).unwrap();
+    for worker in &settings.jig.hosts.workers {
+        settings.files.entries.push((worker.digest.clone(), Secret::new(WORKER_DIGEST.into()))).unwrap();
+    }
+}
 pub fn started() -> crate::Service {
     started_with_projects(&[(1, 100)])
 }
@@ -462,16 +416,7 @@ fn start_with_worker(
         configured.push(project).unwrap();
     }
     settings.jig.projects = configured.into_boxed();
-    settings.files.entries = skein_lib::List::with_capacity(4);
-    settings
-        .files
-        .entries
-        .push((b"charters/chat.txt".as_slice().into(), Secret::new(b"Answer briefly".as_slice().into())))
-        .unwrap();
-    settings.files.entries.push((b"accounts/chat.json".as_slice().into(), Secret::new(ACCOUNT.into()))).unwrap();
-    for worker in &settings.jig.hosts.workers {
-        settings.files.entries.push((worker.digest.clone(), Secret::new(WORKER_DIGEST.into()))).unwrap();
-    }
+    fill_files(&mut settings);
     if worker.is_some() {
         settings.jig.limits.hub = worker_settings().jig.limits.hub;
         settings.limits.checkout = worker_limits().checkout;
@@ -481,7 +426,10 @@ fn start_with_worker(
     let root = limits::engine(&settings.jig.limits, &settings.limits).unwrap();
     let store = match stored {
         Some(store) => store,
-        None => memory_store_for(&root, &settings.jig.limits.core, &settings.jig.limits.store),
+        None => {
+            let models = jig_protocol_config::core(&settings.jig, [7; 16], 7).settings.models;
+            memory_store_for(&root, &settings.jig.limits.core, &settings.jig.limits.store, &models)
+        }
     };
     let worker_io = if worker.is_some() { Some(worker_settings().jig.limits.io) } else { None };
     let io = crate::startup::checks::process_io(&settings.jig.limits.io, worker_io.as_ref()).unwrap();
@@ -696,7 +644,13 @@ pub fn settle_root(
             }
         }
         if let Some(accounts) = &mut engine.accounts {
-            accounts.iterate(engine.env.now, engine.env.wall, &mut engine.values, &mut engine.events);
+            accounts.iterate(
+                engine.env.now,
+                engine.env.wall,
+                &mut engine.values,
+                &mut engine.events,
+                &mut engine.store,
+            );
         }
         engine.domain.reclaim();
         if engine.domain.quiescent() && engine.events.is_empty() && engine.store.idle() {
@@ -820,6 +774,7 @@ pub fn people_member(words: &[u8], spend: u64) -> jig_domain_people::Member {
         contract: people::Contract::Report { words: 16 },
         authority: people::Authority {
             tools: 0,
+            models: 0,
             grants: Box::new([]),
             delegation: people::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
             spend,
@@ -840,6 +795,7 @@ pub fn people_member(words: &[u8], spend: u64) -> jig_domain_people::Member {
         tracked: None,
         label: 0,
         flags: people::Flags::PLAIN,
+        llm: None,
     }
 }
 

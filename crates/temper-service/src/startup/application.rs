@@ -694,9 +694,13 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
     }
     for (index, identity) in members.identities.iter().enumerate() {
         let path = read::index(&Path::root().member(b"application").member(b"identities"), index).member(b"token");
-        if let Some(token) =
-            contents(files, &identity.token, jig_protocol_worker_wire::CEILINGS.grant_value, path, problems)
-        {
+        if let Some(token) = contents(
+            files,
+            &identity.token,
+            jig_protocol_worker_wire::CEILINGS.application_value_secret,
+            path,
+            problems,
+        ) {
             identities
                 .push(settings::Identity {
                     number: identity.number,

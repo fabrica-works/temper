@@ -103,6 +103,9 @@ pub fn to_component(request: root::PartyRequest) -> Option<kit::Event> {
 fn delivered(delivery: root::Delivery) -> Option<kit::Event> {
     match delivery {
         root::Delivery::WebReply { to, reply } => Some(kit::Event::Reply { to, reply }),
+        root::Delivery::CarriedUnused { number } => {
+            Some(kit::Event::Application(kit::FromApplication::Unused { number }))
+        }
         root::Delivery::Read { reply, answer } => Some(kit::Event::Read { reply, answer }),
         root::Delivery::Document { watcher, document } => Some(kit::Event::Delivery { watcher, document }),
         root::Delivery::WatchEnded { watcher, why } => Some(kit::Event::WatchEnded { watcher, why }),

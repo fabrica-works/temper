@@ -778,6 +778,7 @@ impl World {
             Delivery::Link { down: host::LinkDown::Grant { .. }, .. } => {}
             Delivery::Application { .. }
             | Delivery::WebReply { .. }
+            | Delivery::CarriedUnused { .. }
             | Delivery::Link { .. }
             | Delivery::ForgeCall { .. }
             | Delivery::Read { .. }

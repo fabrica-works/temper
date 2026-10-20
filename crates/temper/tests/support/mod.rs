@@ -3,7 +3,6 @@ pub mod boxed;
 pub mod configuration;
 pub mod ctl;
 pub mod owned;
-pub mod sign_in;
 pub mod terminal;
 pub mod webhooks;
 pub const WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(30);
@@ -22,7 +21,7 @@ pub(super) fn write_private(path: &Path, bytes: &[u8]) {
 }
 pub fn configuration(directory: &Path, forge: &Forge<'_>) {
     assert!(Path::new("/usr/bin/git").is_file(), "/usr/bin/git is required");
-    for name in ["accounts", "accounts/records", "secrets", "charters", "state"] {
+    for name in ["accounts", "secrets", "charters", "state"] {
         fs::create_dir_all(directory.join(name)).expect("deployment directory");
     }
     for (name, bytes) in jig_channel_world::fixtures::files(false).entries.into_boxed() {

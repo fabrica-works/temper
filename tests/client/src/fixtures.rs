@@ -531,6 +531,7 @@ fn adopt_goal_repository(driver: &mut Driver) {
         sign_in: driver.session(),
         key: ADOPT_KEY,
         digest: ADOPT_DIGEST,
+        carried: None,
         request,
     }));
     driver.settle();

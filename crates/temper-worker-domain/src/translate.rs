@@ -190,17 +190,21 @@ pub(crate) const fn operation(operation: agent::Operation) -> host::Operation {
     }
 }
 
-/// Why a run failed, as it reports it. An exhausted account stays a failure
-/// of its own (`domain/worker.md`, 4.3; jig's `domain/hosts.md`, 6.3), for the
-/// engine to retry the run once the account has room.
+/// Why a run failed, as it reports it. A limited or refused account stays a
+/// failure of its own (`domain/worker.md`, 4.3; jig's `domain/hosts.md`, 6.3),
+/// for the engine to retry the run once the account has room.
 pub(crate) const fn run_failure(failure: &agent::RunFailure) -> host::RunFailure {
     match failure {
-        agent::RunFailure::Model(agent::ModelFault::Limited { .. }) => host::RunFailure::Exhausted,
+        agent::RunFailure::Model(agent::ModelFault::Limited { account, reset }) => {
+            host::RunFailure::Limited { account: *account, reset: *reset }
+        }
+        agent::RunFailure::Model(agent::ModelFault::Refused { account, code: _ }) => {
+            host::RunFailure::Refused { account: *account }
+        }
         agent::RunFailure::Transcript(_)
         | agent::RunFailure::Model(
             agent::ModelFault::Completion { .. }
             | agent::ModelFault::Provider
-            | agent::ModelFault::Refused { .. }
             | agent::ModelFault::Unauthorized { .. }
             | agent::ModelFault::Program { .. }
             | agent::ModelFault::Declined

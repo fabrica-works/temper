@@ -44,6 +44,8 @@ fn assignment() -> engine::Assignment {
                     cache_write_price: None,
                     output_price: 1,
                     price_unit: 1000,
+                    efforts: Box::new([]),
+                    effort: None,
                 },
                 alternatives: Box::new([]),
                 inspect: true,
@@ -55,6 +57,7 @@ fn assignment() -> engine::Assignment {
             contract: tasks::Contract::Report { words: 128 },
             authority: tasks::Authority {
                 tools: tasks::Tools(1),
+                models: tasks::Models::NONE,
                 grants: Box::new([]),
                 delegation: tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
                 budget: tasks::Budget { spend: 40, deadline: None },
@@ -367,6 +370,7 @@ fn amend_and_release_calls_name_their_revision() {
                     wake: None,
                     dependencies: None,
                     authority: None,
+                    llm: None,
                     reason: Box::new(*b"change"),
                 },
             }

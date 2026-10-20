@@ -44,6 +44,7 @@ pub(crate) fn held(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisi
         core::Held::PeopleReply { to, reply } => {
             emit(decision, &env.limits, Delivery::WebReply { to, reply });
         }
+        core::Held::CarriedUnused { number } => emit(decision, &env.limits, Delivery::CarriedUnused { number }),
         core::Held::CallAnswer { to, key, part } => {
             let answer = forge_route::effect_answer(domain, key, &part);
             relay_call(domain, &env.limits, decision, to, answer);

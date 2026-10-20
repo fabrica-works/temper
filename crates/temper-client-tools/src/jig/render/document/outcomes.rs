@@ -144,9 +144,31 @@ pub(super) fn encode_refusal(value: &jig_client::contract::Refusal, out: &mut En
             out.object_end();
             out.object_end();
         }
+        jig_client::contract::Refusal::Llm { model, why } => {
+            out.object_start();
+            out.key(b"llm");
+            out.object_start();
+            out.key(b"model");
+            out.string(model.bytes());
+            out.key(b"why");
+            encode_llm_why(*(why), out);
+            out.object_end();
+            out.object_end();
+        }
         jig_client::contract::Refusal::Unknown => out.string(b"unknown"),
         jig_client::contract::Refusal::NotOffered => out.string(b"not_offered"),
         jig_client::contract::Refusal::KeyConflict => out.string(b"key_conflict"),
+    }
+}
+
+fn encode_llm_why(value: jig_client::contract::LlmWhy, out: &mut Encoder) {
+    match value {
+        jig_client::contract::LlmWhy::Unconfigured => out.string(b"unconfigured"),
+        jig_client::contract::LlmWhy::Effort => out.string(b"effort"),
+        jig_client::contract::LlmWhy::Charter => out.string(b"charter"),
+        jig_client::contract::LlmWhy::Authority => out.string(b"authority"),
+        jig_client::contract::LlmWhy::Procedure => out.string(b"procedure"),
+        jig_client::contract::LlmWhy::Repeated => out.string(b"repeated"),
     }
 }
 

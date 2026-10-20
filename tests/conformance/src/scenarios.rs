@@ -410,6 +410,7 @@ impl ScenarioApplication for Temper {
                                     inputs: Box::new([]),
                                 },
                                 contract: tasks::Contract::Report { words: 128 },
+                                llm: None,
                                 authority: child,
                                 numbers: tasks::Numbers { budget: 10, spent: 0, spent_below: 0, reserved: 0 },
                                 funder: tasks::Funder::Period { project: 1, period: 0 },
@@ -654,6 +655,7 @@ pub(crate) fn change(world: &mut World, completion: u32) -> Result<(), Violation
         budget: tasks::Budget { spend: 20, deadline: None },
         notes: tasks::Scopes(0),
         note_resources: Box::new([]),
+        models: tasks::Models::NONE,
     };
     let before = world.peers.assignments.len();
     crate::link::call(

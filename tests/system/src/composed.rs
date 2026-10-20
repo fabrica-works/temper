@@ -147,6 +147,7 @@ fn config(seed: u64) -> engine::Config {
     let mut config = crate::world::config(seed);
     let mut charter = crate::world::charter();
     charter.policy.model.account = 0;
+    config.core.settings.models = Box::new([charter.policy.model.clone()]);
     config.core.settings.charters = Box::new([charter]);
     config.core.settings.resume_bytes = 32768;
     config.core.hub_turns = 2;
@@ -614,7 +615,8 @@ impl World {
             | Delivery::Fleet(_)
             | Delivery::ReadLoad { .. }
             | Delivery::Drained
-            | Delivery::Load { .. }) => panic!("unscripted released delivery: {other:?}"),
+            | Delivery::Load { .. }
+            | Delivery::CarriedUnused { .. }) => panic!("unscripted released delivery: {other:?}"),
         }
     }
 
@@ -642,6 +644,7 @@ impl World {
                 sign_in: self.party.sign_in.expect("authenticated party"),
                 key: [90; 16],
                 digest: [5; 32],
+                carried: None,
                 request: adoption(),
             }));
         }
@@ -657,8 +660,9 @@ impl World {
                     host::LinkUp::Turn { .. } => self.observed.turns += 1,
                     host::LinkUp::Call { .. } => self.observed.relays += 1,
                     host::LinkUp::Activity { .. }
-                    | host::LinkUp::Rejected { .. }
-                    | host::LinkUp::Exhausted { .. }
+                    | host::LinkUp::Unauthorized { .. }
+                    | host::LinkUp::Limited { .. }
+                    | host::LinkUp::AccountRefused { .. }
                     | host::LinkUp::Answer { .. } => {}
                 }
                 self.up(engine::Link::Up { up, parts: engine::Parts::none() });

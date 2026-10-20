@@ -570,7 +570,7 @@ pub fn example_document(directory: &Path, owned: &Owned) -> Vec<u8> {
 }
 /// The guide's copied files and private credentials, with the fake peer's account.
 pub fn lay(directory: &Path, owned: &Owned) {
-    for name in ["owned/charters", "secrets", "accounts/records"] {
+    for name in ["owned/charters", "secrets", "accounts"] {
         let path = directory.join(name);
         fs::create_dir_all(&path).expect("example directory");
         fs::set_permissions(path, fs::Permissions::from_mode(0o700)).expect("private directory");

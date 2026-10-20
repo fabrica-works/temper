@@ -344,6 +344,9 @@ pub enum PartyInput {
         key: [u8; 16],
         digest: [u8; 32],
         request: forge::Adoption,
+        /// The number and digest of a value the request carried, already kept
+        /// in the secrets' store (jig's `protocol/client.md`, 5).
+        carried: Option<core::Carried>,
     },
     StartRecurring {
         project: u32,
@@ -636,6 +639,7 @@ pub(crate) fn delivery_output(delivery: Delivery) -> Request {
         | Delivery::TurnBusy { .. }) => Request::Worker(WorkerRequest::Deliver(delivery)),
         delivery @ (Delivery::Application { .. }
         | Delivery::WebReply { .. }
+        | Delivery::CarriedUnused { .. }
         | Delivery::Read { .. }
         | Delivery::Document { .. }
         | Delivery::WatchEnded { .. }

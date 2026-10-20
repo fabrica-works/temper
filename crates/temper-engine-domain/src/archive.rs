@@ -83,6 +83,7 @@ pub(crate) fn input_loaded(
             )
             | jig_domain_core::Record::Tasks(_)
             | jig_domain_core::Record::People(_)
+            | jig_domain_core::Record::Accounts(_)
             | jig_domain_core::Record::Notes(_),
         )
         | Record::Forge { .. } => {
@@ -172,7 +173,8 @@ pub(crate) fn note_loaded(
                     | jig_domain_core::CoreRecord::Projection(_),
                 )
                 | jig_domain_core::Record::Tasks(_)
-                | jig_domain_core::Record::People(_),
+                | jig_domain_core::Record::People(_)
+                | jig_domain_core::Record::Accounts(_),
             )
             | Record::Forge { .. } => {
                 note_failed(domain, waiter);
@@ -318,6 +320,7 @@ pub(crate) fn dependency_loaded(
             )
             | jig_domain_core::Record::Tasks(_)
             | jig_domain_core::Record::People(_)
+            | jig_domain_core::Record::Accounts(_)
             | jig_domain_core::Record::Notes(_),
         )
         | Record::Forge { .. } => {
@@ -383,6 +386,7 @@ pub(crate) fn transcript_loaded(
                 )
                 | jig_domain_core::Record::Tasks(_)
                 | jig_domain_core::Record::People(_)
+                | jig_domain_core::Record::Accounts(_)
                 | jig_domain_core::Record::Notes(_),
             )
             | Record::Forge { .. } => {

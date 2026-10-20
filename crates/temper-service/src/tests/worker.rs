@@ -172,12 +172,10 @@ fn a_git_identity_s_value_lands_in_the_identities_table_only() {
     worker.link(
         fixtures::NOW,
         link::Request::Value {
-            table: hub::GrantTable::Application,
             account: 1,
             generation: 3,
             expires: Time::from_nanos(u64::MAX),
-            value: Secret::new(Box::new([255])),
-            account_id: Secret::new(Box::new([])),
+            value: link::GrantValue::Application { secret: Secret::new(Box::new([255])) },
         },
     );
     assert_eq!(worker.undecodable_values, 1);

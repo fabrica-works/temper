@@ -253,7 +253,8 @@ impl World {
                         | jig_domain_core::CoreRecord::EscalationDecision(_)
                         | jig_domain_core::CoreRecord::ProposalDecision(_),
                     )
-                    | jig_domain_core::Record::Notes(_),
+                    | jig_domain_core::Record::Notes(_)
+                    | jig_domain_core::Record::Accounts(_),
                 )
                 | Record::Forge { .. } => {}
             }

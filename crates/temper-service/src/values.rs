@@ -1,8 +1,8 @@
 //! Lent account credentials stay in the protocol layer (protocol/credentials.md, 3).
 use alloc::boxed::Box;
 use jig_domain_host as host;
-use jig_protocol_accounts::table::Table;
-use jig_protocol_engine_workers::GrantValue;
+use jig_protocol_accounts::table::{self, Table};
+use jig_protocol_engine_workers::{GrantValue, Scheme};
 use skein_lib::{List, Map, Secret, Time};
 #[derive(Debug)]
 pub struct Values {
@@ -37,13 +37,17 @@ impl Values {
     }
 }
 
-fn account_grant(value: Option<&jig_protocol_accounts::table::Value>) -> Option<GrantValue> {
+fn account_grant(value: Option<&table::Value>) -> Option<GrantValue> {
     let value = value?;
-    Some(GrantValue { value: value.token.clone(), account_id: value.account_id.clone() })
+    Some(match &value.scheme {
+        table::Scheme::Bearer => GrantValue::Credential { scheme: Scheme::Bearer, token: value.token.clone() },
+        table::Scheme::Key => GrantValue::Credential { scheme: Scheme::Key, token: value.token.clone() },
+        table::Scheme::Withdrawn { id } => GrantValue::Withdrawn { id: id.clone(), bearer: value.token.clone() },
+    })
 }
 fn identity_grant(value: Option<&Secret>) -> Option<GrantValue> {
     let value = value?;
-    Some(GrantValue { value: value.clone(), account_id: Secret::new(Box::new([])) })
+    Some(GrantValue::Application { secret: value.clone() })
 }
 impl Values {
     pub(crate) fn fill(

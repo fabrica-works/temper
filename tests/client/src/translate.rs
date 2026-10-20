@@ -123,7 +123,9 @@ pub fn request(
     let mut events = Vec::new();
     let Request::Client { request: jig_client::Request::Down { down } } = request else { panic!("typed wire request") };
     match down {
-        Down::Send { attempt, key, request: ask } => {
+        Down::Send { attempt, key, request: ask, value } => {
+            // Temper's client carries no value with an ask yet (jig's client.md, 5).
+            assert!(value.is_none(), "no carried value");
             let sign_in = transport.sign_in(who).expect("authenticated keyed request");
             let ask = match ask {
                 Ask::Jig(ask) => ask,
@@ -249,7 +251,8 @@ fn delivery_packet(
         | Delivery::Drained
         | Delivery::Refuse { .. }
         | Delivery::TurnBusy { .. }
-        | Delivery::Load { .. } => None,
+        | Delivery::Load { .. }
+        | Delivery::CarriedUnused { .. } => None,
     }
 }
 /// The kit's shared packet carrier has a test application owner; only jig belongs here.

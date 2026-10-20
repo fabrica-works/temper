@@ -260,7 +260,7 @@ fn named_lists_each_file_with_its_bound_and_privacy() {
     let named = crate::named(&fixtures::document()).unwrap();
     assert_eq!(named.files.len(), 8, "all files listed");
     for (name, path, max, private) in [
-        (b"charters/chat.txt".as_slice(), b"engine.charters[0].instructions".as_slice(), 16_219, false),
+        (b"charters/chat.txt".as_slice(), b"engine.charters[0].instructions".as_slice(), 16_070, false),
         (b"secrets/worker-a.digest", b"engine.hosts.workers[0].digest", 65, true),
         (b"accounts/chat.json", b"engine.llm.accounts[0].source.handed_in.file", 65_536, true),
         (b"worker-secret", b"workers[0].secret", 257, true),

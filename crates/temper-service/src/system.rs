@@ -92,17 +92,8 @@ impl Service {
         {
             return Err(start_problem(b"memory_bytes", what));
         }
-        let accounts = if settings.jig.llm.accounts.is_empty() {
-            None
-        } else {
-            Some(accounts::Accounts::new(
-                &settings.jig,
-                &settings.files,
-                seeds,
-                accounts,
-                max.checked_mul(6).expect("account routing room"),
-            )?)
-        };
+        let room = max.checked_mul(6).expect("account routing room");
+        let accounts = accounts_driver(&settings, seeds, accounts, room, store_limits.secrets.value)?;
         let mut values = values::Values::new(
             limits.accounts.accounts.checked_add(1).expect("numbered accounts"),
             settings.jig.limits.driver.client.document.token_bytes,
@@ -141,12 +132,13 @@ impl Service {
             identities,
             forge_charter: settings.charter,
         };
+        let store = store::Store::new(&limits, &store_limits, &config.core.settings.models, seeds.installation);
         Ok(Self {
             worker,
             engine: engine::Engine::new(
                 config,
                 &limits,
-                store::Store::new(&limits, &store_limits),
+                store,
                 engine::Children { accounts, workers, clients, forge },
                 values,
                 first_periods,
@@ -377,6 +369,20 @@ fn start_problem(member: &[u8], what: What) -> Problems {
     problems.push(Path::root().member(b"engine").member(member), what);
     problems
 }
+/// The accounts' driver, when the engine configures an account; its records
+/// are kept in the secrets' store, at most `secret_bytes` each.
+fn accounts_driver(
+    settings: &settings::Engine,
+    seeds: &settings::Seeds,
+    runtime: Option<AccountsRuntime>,
+    room: u32,
+    secret_bytes: u32,
+) -> Result<Option<accounts::Accounts>, Problems> {
+    if settings.jig.llm.accounts.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(accounts::Accounts::new(&settings.jig, &settings.files, seeds, runtime, room, secret_bytes)?))
+}
 fn read_charters(settings: &mut settings::Engine) -> Result<(), Problems> {
     for charter in &mut settings.jig.charters {
         charter.policy.instructions = settings
@@ -406,13 +412,8 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
                 break;
             }
             let complete = service.completions.pop().expect("completion count");
-            let files = pending_files(service.engine.accounts.as_ref());
-            let (files, complete) = service.kernel.complete(complete, &service.raw_submissions, files);
-            if files {
-                service.engine.accounts.as_mut().expect("file owner").complete(complete);
-            } else {
-                service.complete(complete);
-            }
+            let complete = service.kernel.complete(complete, &service.raw_submissions);
+            service.complete(complete);
         }
         if service.completions.is_empty() {
             for _ in 0..service.io_env.limits.sockets.checked_mul(2).expect("io timers") {
@@ -466,10 +467,7 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
         let link = service.engine.clients.links.pop().expect("printed sign-in links");
         service.links.push(link);
     }
-    service.kernel.publish(false, &mut service.raw_submissions, &mut service.submissions);
-    if let Some(accounts) = &mut service.engine.accounts {
-        service.kernel.publish(true, &mut accounts.submitted, &mut service.submissions);
-    }
+    service.kernel.publish(&mut service.raw_submissions, &mut service.submissions);
     service.io.reclaim();
 }
 fn route_events(service: &mut Service) {
@@ -594,8 +592,8 @@ fn memory(
         .checked_add(Queue::<io::Event>::worst_case(queue)?)?
         .checked_add(Queue::<Box<[u8]>>::worst_case(queue)?)?
         .checked_add(u64::from(queue).checked_mul(u64::from(io.output).checked_add(512)?)?)?
-        .checked_add(Map::<Token, (bool, Token, Option<Token>)>::worst_case(operations)?)?
-        .checked_add(Map::<(bool, Token), Token>::worst_case(operations)?)?;
+        .checked_add(Map::<Token, (Token, Option<Token>)>::worst_case(operations)?)?
+        .checked_add(Map::<Token, Token>::worst_case(operations)?)?;
     bytes = bytes.checked_add(workers::worst_case(
         settings,
         temper_engine_domain::max_out(root).checked_mul(jig_protocol_engine_workers::MAX_OUT_DOWN)?,
@@ -642,8 +640,4 @@ fn memory(
         bytes = bytes.checked_add(skein_tls::roots_worst_case(runtime.trust_roots, runtime.trust_root_bytes)?)?;
     }
     Some(bytes)
-}
-fn pending_files(accounts: Option<&accounts::Accounts>) -> Option<&Queue<Submit>> {
-    let accounts = accounts?;
-    Some(&accounts.submitted)
 }

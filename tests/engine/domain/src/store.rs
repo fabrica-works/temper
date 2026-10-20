@@ -29,6 +29,10 @@ pub const HEADER: Deployment = Deployment {
     commits: 0,
 };
 
+/// The installation's identifier these worlds draw: an empty store keeps it,
+/// and a reopened one answers the one it kept (jig's configuration.md, 8).
+const INSTALLATION: [u8; 16] = [0; 16];
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fault {
     Hold { commits: u32 },
@@ -51,6 +55,7 @@ pub struct Store {
     routes: route::Routes,
     limits: engine::Limits,
     component_limits: Limits,
+    models: Box<[engine::Model]>,
     inflight: BTreeMap<u64, Box<[Write]>>,
     durable: Vec<(u64, Box<[Write]>)>,
     replies: Vec<engine::StoreInput>,
@@ -123,9 +128,12 @@ impl Store {
             store: skein_kv::Store::memory(&component_limits.store),
             secrets: skein_kv::Store::memory(&component_limits.secrets),
         };
+        // The worlds' configured models, in their order (jig's store over a configuration's).
+        let models = crate::walking::models();
         let component = protocol::Store::over(
             &component_limits,
             temper_protocol_store::application(&limits.forge).expect("checked family sizes"),
+            &models,
             stores,
         );
         let mut store = Store {
@@ -139,6 +147,7 @@ impl Store {
             routes: routes(limits),
             limits: *limits,
             component_limits,
+            models,
             inflight: BTreeMap::new(),
             durable: Vec::new(),
             replies: Vec::new(),
@@ -214,6 +223,7 @@ impl Store {
         self.component = Some(protocol::Store::over(
             &self.component_limits,
             temper_protocol_store::application(&self.limits.forge).expect("checked family sizes"),
+            &self.models,
             stores,
         ));
         self.routes = routes(&self.limits);
@@ -327,7 +337,7 @@ impl Store {
     fn open(&mut self) {
         let root = self.files.root();
         self.drive(
-            VecDeque::from([Request::Open { owner: Token::new(0), root }]),
+            VecDeque::from([Request::Open { owner: Token::new(0), root, installation: INSTALLATION }]),
             Queue::with_capacity(protocol::MAX_OUT_DOWN),
         );
         assert!(!self.failed, "durable stores reopen");
@@ -408,6 +418,8 @@ impl Store {
             | Event::Turns { .. }
             | Event::Unread { .. }
             | Event::Kept { .. }
+            | Event::Carried { .. }
+            | Event::Stale { .. }
             | Event::Erased { .. }
             | Event::Secret { .. }
             | Event::SecretsLoaded { .. }) => self.route(event, requests),

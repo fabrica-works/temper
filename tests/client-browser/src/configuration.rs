@@ -19,7 +19,6 @@ const RELATIVE: &[&str] = &[
     "secrets/forge-1.api-token",
     "secrets/forge-1.git-token",
     "state",
-    "accounts/records",
     "worker-root",
 ];
 
@@ -101,7 +100,7 @@ pub(crate) fn private(path: &Path, bytes: &[u8]) {
 /// The deployment's files and its two documents, `agent.json` and `config.json`, in `directory`.
 pub(crate) fn write(directory: &Path, program: &Path, bundle: &Path) {
     assert!(Path::new("/usr/bin/git").is_file(), "/usr/bin/git is required");
-    for name in ["accounts", "accounts/records", "secrets", "charters", "state"] {
+    for name in ["accounts", "secrets", "charters", "state"] {
         fs::create_dir_all(directory.join(name)).expect("deployment directory");
     }
     for (name, bytes) in jig_channel_world::fixtures::files(false).entries.into_boxed() {

@@ -48,7 +48,7 @@ pub(crate) fn bytes(snapshot: bool) -> Bytes {
     let root = files.root().fd;
     let temper_engine_domain::Record::Core(row) = row() else { unreachable!() };
     let key = keys::encode(&row.key(), limits.key).expect("fixture key");
-    let value = codec::encode(&row, &super::codec()).expect("fixture row");
+    let value = codec::encode(&row, &super::codec(), super::store_names()).expect("fixture row");
     let ops = Box::new([skein_kv::Op::Put { key, value }]);
     let mut requests = vec![
         skein_kv::Request::Open { owner: OPEN, root },

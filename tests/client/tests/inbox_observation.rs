@@ -19,6 +19,7 @@ fn a_release_is_observed_against_the_inbox_escalation_the_person_saw() {
                     revision: REVISION,
                     again: None,
                 })),
+                value: None,
             },
         },
     };

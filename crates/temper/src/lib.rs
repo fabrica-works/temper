@@ -22,9 +22,8 @@ pub mod forge;
 mod host;
 pub mod open;
 mod setup;
-pub mod sign_in;
 pub use host::Host;
-pub const USAGE: &str = "usage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
+pub const USAGE: &str = "usage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
 const CONFIG_BYTES: u32 = 1 << 20;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -34,7 +33,6 @@ pub enum Command {
     Agent { configuration: PathBuf },
     Open { arguments: Vec<OsString> },
     Ctl { arguments: Vec<OsString> },
-    SignIn { arguments: Vec<OsString> },
     Forge { arguments: Vec<OsString> },
 }
 fn prefixed(command: &str, why: &str) -> String {
@@ -58,9 +56,6 @@ pub fn configure(mut args: impl Iterator<Item = OsString>) -> Result<Command, St
     }
     if command == "open" {
         return Ok(Command::Open { arguments: args.collect() });
-    }
-    if command == "sign-in" {
-        return Ok(Command::SignIn { arguments: args.collect() });
     }
     let configuration = args.next().ok_or_else(usage)?.into();
     if args.next().is_some() {
@@ -87,7 +82,6 @@ pub fn run(command: Command) -> Result<u8, String> {
         Command::Forge { arguments } => return Ok(forge::run(&arguments)),
         Command::Ctl { arguments } => return Ok(ctl::run(&arguments, &Clock::new())),
         Command::Open { arguments } => return Ok(open::run(&arguments, &Clock::new())),
-        Command::SignIn { arguments } => return Ok(sign_in::run(&arguments, &Clock::new())),
     };
     Ok(match exit {
         Exit::Code(code) => code,
@@ -253,12 +247,7 @@ fn server_name(bytes: &[u8]) -> Result<skein_tls::Name, String> {
     skein_tls::Name::new(std::str::from_utf8(bytes).map_err(|why| why.to_string())?)
         .ok_or_else(|| "invalid server name".into())
 }
-fn accounts(
-    directory: &Path,
-    engine: &config::Engine,
-    owned: &mut Vec<Fd>,
-    user: u32,
-) -> Result<service::AccountsRuntime, String> {
+fn accounts(directory: &Path, engine: &config::Engine) -> Result<service::AccountsRuntime, String> {
     let mut issuers = List::with_capacity(u32::try_from(engine.llm.accounts.len()).expect("account count"));
     let mut trust_roots = 0_u32;
     let mut trust_root_bytes = 0_u32;
@@ -279,9 +268,7 @@ fn accounts(
                 .expect("account count");
         }
     }
-    let root = skein_shell::open_root(directory).map_err(|errno| format!("account root: errno {errno}"))?;
-    owned.push(root);
-    Ok(service::AccountsRuntime { root, effective_user: user, issuers, trust_roots, trust_root_bytes })
+    Ok(service::AccountsRuntime { issuers, trust_roots, trust_root_bytes })
 }
 fn forges(directory: &Path, document: &skein_json::Document) -> Result<List<service::ForgeRuntime>, String> {
     use skein_forge_connection::settings::Transport;
@@ -352,18 +339,23 @@ fn prepare(directory: &Path, bytes: &[u8], owned: &mut Vec<Fd>) -> Result<servic
         .map_err(|errno| format!("application.workers[0].root: errno {errno}"))?;
     owned.push(root);
     private_root(&root_path, user).map_err(|why| format!("application.workers[0].root: {why}"))?;
-    let accounts = accounts(directory, &engine, owned, user)?;
+    let accounts = accounts(directory, &engine)?;
     let forges = forges(directory, &document)?;
     let seed = skein_shell::seed().map_err(|errno| format!("random seed: errno {errno}"))?;
     let crypto = skein_shell::crypto_seed().map_err(|errno| format!("cryptographic seed: errno {errno}"))?;
     let drawn = skein_shell::crypto_seed().map_err(|errno| format!("deployment id: errno {errno}"))?;
     let mut deployment = [0_u8; 16];
     deployment.copy_from_slice(drawn.expose().get(..16).expect("32-byte seed"));
+    // Drawn at every start; the service keeps it at the first and restores
+    // the kept one at every later start (jig's configuration.md 8).
+    let drawn = skein_shell::crypto_seed().map_err(|errno| format!("installation id: errno {errno}"))?;
+    let mut installation = [0_u8; 16];
+    installation.copy_from_slice(drawn.expose().get(..16).expect("32-byte seed"));
     let mut service = service::startup(
         bytes,
         &files,
         &agent,
-        &Seeds { deployment, seed, crypto },
+        &Seeds { deployment, installation, seed, crypto },
         Some(accounts),
         service::WorkerRuntime { root, path: root_path.as_os_str().as_bytes().into() },
         forges,

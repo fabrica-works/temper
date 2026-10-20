@@ -165,7 +165,12 @@ pub(crate) fn files() -> temper_service::settings::Files {
 }
 pub(crate) fn seeds() -> temper_service::settings::Seeds {
     let seed = channel::seeds();
-    temper_service::settings::Seeds { deployment: seed.deployment, seed: seed.seed, crypto: seed.crypto }
+    temper_service::settings::Seeds {
+        deployment: seed.deployment,
+        seed: seed.seed,
+        crypto: seed.crypto,
+        installation: seed.installation,
+    }
 }
 pub(crate) fn agent() -> temper_service::settings::Agent {
     let mut agent = channel::agent();
@@ -254,15 +259,17 @@ pub(crate) fn forges() -> List<temper_service::ForgeRuntime> {
 pub(crate) fn provider() -> skein_fake_peers::llm::Peer {
     let mut script = channel::one_chat(b"Hello");
     script.result = br#"{"form":"report","text":"World answer","fields":{}}"#.as_slice().into();
-    smith_agent_process_world::fake::configured(
+    channel::provider(
         Box::new([skein_fake_llm_domain::api::Script { cue: Box::default(), turns: channel::provider_turns(&script) }]),
-        skein_llm::Credential::codex(channel::TOKEN.into(), b"acc".as_slice().into()),
+        skein_llm::Credential::bearer(channel::TOKEN.into()),
         Duration::ZERO,
+        skein_fake_peers::Transport::Plaintext,
+        skein_fake_llm_protocol::documents::Provider::OpenAi,
     )
 }
 pub(crate) fn read_then_wait_provider() -> skein_fake_peers::llm::Peer {
     use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
-    smith_agent_process_world::fake::configured(
+    channel::provider(
         Box::new([Script {
             cue: Box::default(),
             turns: Box::new([
@@ -284,11 +291,22 @@ pub(crate) fn read_then_wait_provider() -> skein_fake_peers::llm::Peer {
                 },
             ]),
         }]),
-        skein_llm::Credential::codex(channel::TOKEN.into(), b"acc".as_slice().into()),
+        skein_llm::Credential::bearer(channel::TOKEN.into()),
         Duration::ZERO,
+        skein_fake_peers::Transport::Plaintext,
+        skein_fake_llm_protocol::documents::Provider::OpenAi,
     )
 }
 pub(crate) fn codec() -> jig_protocol_store::codec::Limits {
+    let limits = jig_test_service_limits(&engine().limits);
+    jig_protocol_store::codec::limits(&limits.root.core).expect("codec")
+}
+/// The configured models' names the people records name models by (jig's protocol/store.md, 5.1).
+pub(crate) fn store_names() -> &'static [Box<[u8]>] {
+    static NAMES: std::sync::OnceLock<Box<[Box<[u8]>]>> = std::sync::OnceLock::new();
+    NAMES.get_or_init(|| jig_protocol_store::codec::names(&engine().llm.models))
+}
+fn engine() -> jig_protocol_config::Engine {
     let bytes = document();
     let size = u32::try_from(bytes.len()).expect("fixture document");
     let doc = jig_protocol_config::document(
@@ -298,9 +316,7 @@ pub(crate) fn codec() -> jig_protocol_store::codec::Limits {
     .expect("document");
     let mut object = jig_protocol_config::read::Object::new(&doc, 0).expect("object");
     let at = object.member(&doc, b"engine").expect("engine member");
-    let engine = jig_protocol_config::engine(&doc, at).expect("engine");
-    let limits = jig_test_service_limits(&engine.limits);
-    jig_protocol_store::codec::limits(&limits.root.core).expect("codec")
+    jig_protocol_config::engine(&doc, at).expect("engine")
 }
 fn jig_test_service_limits(overrides: &jig_protocol_config::Limits) -> jig_test_service::limits::Limits {
     jig_test_service::limits::for_profile(jig_protocol_config::Profile::Small, overrides)

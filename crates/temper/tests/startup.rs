@@ -154,19 +154,6 @@ fn a_managed_entrys_absent_admin_token_file_does_not_stop_temper_serve() {
     assert!(temper::prepare_in(scratch.path()).is_ok());
     scratch.remove();
 }
-#[test]
-fn a_setup_naming_another_api_token_file_refuses_temper_sign_in_naming_its_path() {
-    let scratch = support::Scratch::startup("setup-sign-in");
-    let mut value = managed(scratch.path(), true);
-    value["application"]["forges"][0]["api_token"] = "another/api_token".into();
-    let refused = temper::sign_in::account(&serde_json::to_vec(&value).expect("configuration JSON"), 1)
-        .err()
-        .expect("configuration refused")
-        .line();
-    assert_eq!(refused, "temper sign-in: application.forges[0].api_token: invalid form\n");
-    scratch.remove();
-}
-
 fn box_document(scratch: &support::Scratch) -> serde_json::Value {
     support::configuration(scratch.path(), &support::Forge::Unreached);
     serde_json::from_slice(&fs::read(scratch.path().join("config.json")).expect("configuration")).expect("JSON")
@@ -376,7 +363,6 @@ fn every_command_checks_setup_before_reading_files() {
     let line = "application.limits.overrides.setup.backoff_ms: must agree with application.limits.overrides.setup.backoff_max_ms\n";
     for (command, refused) in [
         ("serve", temper::prepare_in(scratch.path()).err().expect("serve refused")),
-        ("sign-in", temper::sign_in::account(&bytes, 1).err().expect("sign-in refused").line()),
         ("box", temper::run(temper::Command::Box { configuration: path }).expect_err("box refused")),
     ] {
         assert_eq!(refused, format!("temper {command}: {line}"), "{command}");

@@ -249,9 +249,13 @@ pub(crate) fn told(client: &jig_client::Client, limits: &crate::Limits, told: ji
             let request = skein_lib::Token::new(key.number);
             let answer = match outcome {
                 Outcome::Answered(answered) => answer(limits, &answered)?,
-                Outcome::Unknown | Outcome::Limit | Outcome::Held | Outcome::NotKept | Outcome::Unconfirmed => {
-                    Answer::Unknown
-                }
+                Outcome::Unknown
+                | Outcome::Limit
+                | Outcome::Held
+                | Outcome::NotKept
+                | Outcome::Unsent
+                | Outcome::Lost
+                | Outcome::Unconfirmed => Answer::Unknown,
             };
             Some(Event::Answered { request, answer })
         }

@@ -176,7 +176,7 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
         return;
     }
     if let Some(accounts) = &mut engine.accounts {
-        accounts.iterate(now, wall, &mut engine.values, &mut engine.events);
+        accounts.iterate(now, wall, &mut engine.values, &mut engine.events, &mut engine.store);
     }
     engine.forge.iterate(now, wall);
     forge_pass(engine);
@@ -305,12 +305,23 @@ fn answer(engine: &mut Engine) {
         }
         let event = engine.store.above.pop().expect("store terminals");
         match event {
-            jig_protocol_store::Event::Opened { .. } => engine.store.opened = true,
+            jig_protocol_store::Event::Opened { installation, .. } => {
+                engine.store.opened = true;
+                engine.store.installation = installation;
+            }
             jig_protocol_store::Event::OpenRefused { .. } => stop::unavailable(engine, b"deployment"),
-            event @ (jig_protocol_store::Event::Kept { .. }
-            | jig_protocol_store::Event::Erased { .. }
-            | jig_protocol_store::Event::Secret { .. }
-            | jig_protocol_store::Event::SecretsLoaded { .. }) => engine.store.secrets.push(event),
+            event @ (jig_protocol_store::Event::Kept { owner }
+            | jig_protocol_store::Event::Stale { owner }
+            | jig_protocol_store::Event::Erased { owner }
+            | jig_protocol_store::Event::Carried { owner, .. }
+            | jig_protocol_store::Event::Secret { owner, .. }
+            | jig_protocol_store::Event::SecretsLoaded { owner, .. }) => {
+                if crate::accounts::owns(owner) {
+                    engine.store.sources.push(event);
+                } else {
+                    engine.store.secrets.push(event);
+                }
+            }
             event @ (jig_protocol_store::Event::Committed { .. }
             | jig_protocol_store::Event::Failed { .. }
             | jig_protocol_store::Event::Restored { .. }

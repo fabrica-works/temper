@@ -209,6 +209,7 @@ pub(crate) fn me(party: u64) -> c::Me {
             pool: None,
             templates: List::with_capacity(EMPTY),
             creating: None,
+            models: List::with_capacity(EMPTY),
         })
         .expect("one project");
     c::Me {
@@ -235,7 +236,7 @@ pub(crate) fn waiting_on_me() -> c::WaitsOn {
     c::WaitsOn::Party { whom: c::Whom::Person(PARTY), entries: 1, task: OTHER_TASK, kind: c::WaitedFor::Question }
 }
 pub(crate) fn goal(number: u64, waits_on: c::WaitsOn) -> c::Task {
-    use jig_client_protocol_wire::v9 as w;
+    use jig_client_protocol_wire::v10 as w;
     let record =
         w::Task::new(&w::CEILINGS, jig_client_test_records::task_record().into_parts()).expect("record fixture");
     let limits = jig_client_protocol_link::Limits::new(
@@ -373,7 +374,7 @@ impl Harness {
                     assert!(self.answers.insert(number, printed).is_none(), "answered exactly once");
                 }
                 root::Request::Client {
-                    request: client::Request::Down { down: client::Down::Send { attempt, key, request } },
+                    request: client::Request::Down { down: client::Down::Send { attempt, key, request, value: _ } },
                 } => {
                     let call = self.serving.unwrap_or(self.next);
                     self.sends.insert(call, (attempt, key, request));

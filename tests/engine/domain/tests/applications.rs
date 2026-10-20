@@ -116,6 +116,7 @@ fn adopt(driver: &mut Driver, request: forge::Adoption, reply: u64) {
         sign_in: driver.session(),
         key: [95; 16],
         digest: [5; 32],
+        carried: None,
         request,
     }));
     driver.settle();

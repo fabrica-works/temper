@@ -264,6 +264,9 @@ pub enum CoreRange {
     Calls,
     /// Singleton header read by the root at startup; at most one row and no continuation.
     Deployment,
+    /// The accounts' counter, accounts and sources, after the header and before the children
+    /// (jig's `RestoreRange::Accounts`).
+    Accounts,
     /// Root startup pages only child Live/Ledger state; historical Ended rows stay outside this
     /// range. Actual root-supported task shapes validate before child restoration.
     Tasks,
@@ -324,7 +327,8 @@ impl Range {
                 jig_domain_core::Key::Core(_)
                 | jig_domain_core::Key::Tasks(_)
                 | jig_domain_core::Key::People(_)
-                | jig_domain_core::Key::Notes(_) => false,
+                | jig_domain_core::Key::Notes(_)
+                | jig_domain_core::Key::Accounts(_) => false,
             },
             Range::Core(range) => range.contains(core),
         }
@@ -366,10 +370,14 @@ impl CoreRange {
                 let Core::Core(CoreKey::Deployment) = key else { return false };
                 true
             }
+            CoreRange::Accounts => {
+                let Core::Accounts(_) = key else { return false };
+                true
+            }
             CoreRange::Tasks => match key {
                 Core::Core(CoreKey::Projection(_)) => true,
                 Core::Tasks(child) => child.live(),
-                Core::Core(_) | Core::People(_) | Core::Notes(_) => false,
+                Core::Core(_) | Core::People(_) | Core::Notes(_) | Core::Accounts(_) => false,
             },
             CoreRange::People => {
                 let Core::People(child) = key else { return false };
@@ -501,6 +509,13 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
         }
         Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Terminal(row))) => terminal_bytes(row),
         Record::Core(jig_domain_core::Record::Tasks(row)) => jig_domain_tasks::stored_bytes(row),
+        Record::Core(jig_domain_core::Record::Accounts(row)) => match row {
+            jig_domain_accounts::Stored::Next { .. } => Some(0),
+            jig_domain_accounts::Stored::Account { subject, display, .. } => {
+                u64::try_from(subject.len()).ok()?.checked_add(u64::try_from(display.len()).ok()?)
+            }
+            jig_domain_accounts::Stored::Source { name, .. } => u64::try_from(name.len()).ok(),
+        },
         Record::Core(jig_domain_core::Record::Notes(row)) => match row {
             jig_domain_notes::Record::Entry(entry) => note_entry_bytes(entry),
             jig_domain_notes::Record::Line(line) => {
@@ -589,7 +604,9 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                 | jig_domain_people::Ask::SetPool { .. }
                 | jig_domain_people::Ask::HandBackPerson { .. }
                 | jig_domain_people::Ask::Stop { .. }
-                | jig_domain_people::Ask::Release { .. } => Some(0),
+                | jig_domain_people::Ask::Release { .. }
+                | jig_domain_people::Ask::AccountSignIn { .. }
+                | jig_domain_people::Ask::AccountSignOut { .. } => Some(0),
                 jig_domain_people::Ask::AnswerPerson { result, .. } => match result {
                     jig_domain_people::PersonResult::Report { words }
                     | jig_domain_people::PersonResult::Verdict { words, .. } => u64::try_from(words.len()).ok(),
@@ -663,7 +680,8 @@ pub(crate) fn owned_bytes(write: &Write) -> Option<u64> {
                     | jig_domain_core::CoreKey::Projection(_),
                 )
                 | jig_domain_core::Key::Tasks(_)
-                | jig_domain_core::Key::People(_),
+                | jig_domain_core::Key::People(_)
+                | jig_domain_core::Key::Accounts(_),
             )
             | Key::Forge(_),
         ) => Some(0),

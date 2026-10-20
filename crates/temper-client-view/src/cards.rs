@@ -19,8 +19,9 @@ pub fn status(b: &mut Builder, words: &Words, word: P, holes: &[Hole]) {
     text(b, Role::Status, &words::say(words, word, holes));
 }
 pub fn refusal(b: &mut Builder, words: &Words, value: &c::Refusal) {
-    let number = match value {
+    let hole = match value {
         c::Refusal::Taken { by } => Some(Hole::Number(*by)),
+        c::Refusal::Llm { model, .. } => Some(name(model.bytes())),
         c::Refusal::NoEscalationHolder
         | c::Refusal::Malformed { .. }
         | c::Refusal::Role { .. }
@@ -34,7 +35,7 @@ pub fn refusal(b: &mut Builder, words: &Words, value: &c::Refusal) {
         | c::Refusal::NotOffered
         | c::Refusal::KeyConflict => None,
     };
-    text(b, Role::Status, &words.say_word(jig_client::words::Word::refusal(value), number.as_slice()));
+    text(b, Role::Status, &words.say_word(jig_client::words::Word::refusal(value), hole.as_slice()));
     if let c::Refusal::Role { held: None } = value {
         phrase(b, words, P::NoHeldRole, &[]);
     }

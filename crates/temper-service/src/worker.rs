@@ -7,7 +7,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use jig_domain_host as hub;
-use jig_protocol_accounts::table::{Table, Value};
+use jig_protocol_accounts::table::{Scheme, Table, Value};
 use jig_protocol_config::{Problems, What};
 use jig_protocol_worker_link as link;
 use skein_channel::{Lower, LowerEvent};
@@ -280,27 +280,24 @@ impl Worker {
                 self.events.push(root::Event::Assign { assignment, items, save });
             }
             link::Request::Down { down, .. } => self.events.push(root::Event::Link(down)),
-            link::Request::Value {
-                table: hub::GrantTable::Accounts,
-                account,
-                generation,
-                expires,
-                value,
-                account_id,
-            } => {
-                self.values
-                    .granted(account, generation, Value { token: value, account_id }, expires)
-                    .expect("wire values fit tables");
-            }
-            link::Request::Value { table: hub::GrantTable::Application, account, generation, value, .. } => {
-                match worker_route::identity(&value, &self.payload) {
-                    Some(identity) => {
-                        if self.identities.granted(account, generation, identity).is_err() {
-                            self.undecodable_values = self.undecodable_values.saturating_add(1);
-                        }
+            link::Request::Value { account, generation, expires, value } => {
+                let value = match value {
+                    link::GrantValue::Credential { scheme: link::Scheme::Bearer, token } => {
+                        Value { token, scheme: Scheme::Bearer }
                     }
-                    None => self.undecodable_values = self.undecodable_values.saturating_add(1),
-                }
+                    link::GrantValue::Credential { scheme: link::Scheme::Key, token } => {
+                        Value { token, scheme: Scheme::Key }
+                    }
+                    link::GrantValue::Withdrawn { id, bearer } => {
+                        Value { token: bearer, scheme: Scheme::Withdrawn { id } }
+                    }
+                    // An application's grant is a configured git identity.
+                    link::GrantValue::Application { secret } => {
+                        self.identity(account, generation, &secret);
+                        return;
+                    }
+                };
+                self.values.granted(account, generation, value, expires).expect("wire values fit tables");
             }
             link::Request::Dial => {
                 if self.stopping {
@@ -330,6 +327,16 @@ impl Worker {
             }
             link::Request::Closed => self.closed = true,
             link::Request::Fact { .. } => {}
+        }
+    }
+    fn identity(&mut self, account: u32, generation: u64, secret: &skein_lib::Secret) {
+        match worker_route::identity(secret, &self.payload) {
+            Some(identity) => {
+                if self.identities.granted(account, generation, identity).is_err() {
+                    self.undecodable_values = self.undecodable_values.saturating_add(1);
+                }
+            }
+            None => self.undecodable_values = self.undecodable_values.saturating_add(1),
         }
     }
     pub(super) fn step(&mut self, event: root::Event) {
@@ -663,9 +670,13 @@ fn grant_value(table: &Table, grant: smith::Grant, now: Time) -> Option<host::Va
 }
 fn account(table: &Table, grant: smith::Grant, now: Time) -> Option<smith_protocol_channel::GrantValue> {
     let value = table.value(grant.account, grant.generation, now)?;
-    Some(smith_protocol_channel::GrantValue::Withdrawn {
-        account_id: value.account_id.expose().into(),
-        bearer: value.token.expose().into(),
+    let token = value.token.expose().into();
+    Some(match &value.scheme {
+        Scheme::Bearer => smith_protocol_channel::GrantValue::Bearer(token),
+        Scheme::Key => smith_protocol_channel::GrantValue::Key(token),
+        Scheme::Withdrawn { id } => {
+            smith_protocol_channel::GrantValue::Withdrawn { account_id: id.expose().into(), bearer: token }
+        }
     })
 }
 pub(crate) fn start_values(table: &Table, start: &smith::Start, root: &[u8], now: Time) -> Option<host::Values> {

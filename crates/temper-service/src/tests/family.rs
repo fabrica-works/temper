@@ -44,6 +44,7 @@ fn exchange(family: u16, version: u32, record: Box<[u8]>) -> kit::ToApplication 
         version,
         record,
         digest: [7; 32],
+        carried: None,
         scope: people::ApplicationScope::Project(7),
     }
 }
@@ -192,7 +193,7 @@ fn an_outcome_past_its_retention_is_encoded_unknown() {
 }
 #[test]
 fn a_core_refusal_uses_jigs_refusal_record() {
-    use jig_client_protocol_wire::v9 as j;
+    use jig_client_protocol_wire::v10 as j;
     let limits = fixtures::engine().jig.limits.clients.wire;
     for (row, input, expected) in [
         ("unknown", people::Refusal::Unknown, j::Refusal::Unknown),

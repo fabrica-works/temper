@@ -144,8 +144,11 @@ fn parse(input: &[u8]) -> Result<Parsed, Problems> {
 fn all_files(parsed: &Parsed) -> Box<[config::File]> {
     let engine = config::files(&parsed.engine);
     let worker = config::worker_files(parsed.workers.first().expect("one worker checked"));
-    let application =
-        application::files(&parsed.application, API_TOKEN_BYTES, jig_protocol_worker_wire::CEILINGS.grant_value);
+    let application = application::files(
+        &parsed.application,
+        API_TOKEN_BYTES,
+        jig_protocol_worker_wire::CEILINGS.application_value_secret,
+    );
     let count = engine
         .len()
         .checked_add(worker.len())

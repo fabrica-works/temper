@@ -117,7 +117,8 @@ impl Referee {
                             | jig_domain_core::CoreRecord::EscalationDecision(_)
                             | jig_domain_core::CoreRecord::ProposalDecision(_),
                         )
-                        | jig_domain_core::Record::Notes(_),
+                        | jig_domain_core::Record::Notes(_)
+                        | jig_domain_core::Record::Accounts(_),
                     )
                     | Record::Forge { .. },
                 )
@@ -161,7 +162,8 @@ impl Referee {
                             | jig_domain_core::CoreRecord::EscalationDecision(_)
                             | jig_domain_core::CoreRecord::ProposalDecision(_),
                         )
-                        | jig_domain_core::Record::Notes(_),
+                        | jig_domain_core::Record::Notes(_)
+                        | jig_domain_core::Record::Accounts(_),
                     )
                     | Record::Forge { .. },
                 )
@@ -230,7 +232,8 @@ impl Referee {
                                 | jig_domain_core::CoreRecord::EscalationDecision(_)
                                 | jig_domain_core::CoreRecord::ProposalDecision(_),
                             )
-                            | jig_domain_core::Record::Notes(_),
+                            | jig_domain_core::Record::Notes(_)
+                            | jig_domain_core::Record::Accounts(_),
                         )
                         | Record::Forge { .. },
                     )
@@ -306,6 +309,10 @@ impl Referee {
                     | jig_domain_core::Key::Tasks(_)
                     | jig_domain_core::Key::Notes(_),
                 )) => return Err("role administration changed funding or accepted work"),
+                Write::Save(Record::Core(jig_domain_core::Record::Accounts(_)))
+                | Write::Erase(Key::Core(jig_domain_core::Key::Accounts(_))) => {
+                    return Err("role administration changed accounts");
+                }
                 Write::Save(Record::Core(
                     jig_domain_core::Record::People(_)
                     | jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(_)),

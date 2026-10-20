@@ -228,7 +228,7 @@ impl Protocol {
                 })])
             }
             engine::Request::Account(request) => {
-                self.accounts.push(request);
+                self.accounts.push(request.clone());
                 Ok(match request {
                     accounts::Request::Component(accounts::ToComponent::Want { account }) => {
                         vec![granted(account, 1)]
@@ -240,6 +240,10 @@ impl Protocol {
                         accounts::ToComponent::Release { .. } | accounts::ToComponent::Close,
                     )
                     | accounts::Request::Granted { .. }
+                    | accounts::Request::Save { .. }
+                    | accounts::Request::Erase { .. }
+                    | accounts::Request::Signing(_)
+                    | accounts::Request::Answer { .. }
                     | accounts::Request::Closed => Vec::new(),
                 })
             }

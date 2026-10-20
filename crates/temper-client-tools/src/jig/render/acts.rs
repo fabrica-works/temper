@@ -244,6 +244,7 @@ pub fn refusal(why: &Refusal, book: &Phrasebook, out: &mut Text) {
     let word = Word::refusal(why);
     let text = match why {
         Refusal::Taken { by } => book.say(0, word.id(), &[Hole::Number(*by)]),
+        Refusal::Llm { model, .. } => book.say(0, word.id(), &[Hole::Name(model.bytes().into())]),
         Refusal::NoEscalationHolder
         | Refusal::Malformed { .. }
         | Refusal::Role { .. }

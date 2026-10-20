@@ -193,6 +193,8 @@ pub fn up(routes: &mut Routes, event: store::Event, into: &mut Queue<Up>) {
         store::Event::OpenRefused { .. } => stop(routes, into),
         store::Event::Opened { .. }
         | store::Event::Kept { .. }
+        | store::Event::Carried { .. }
+        | store::Event::Stale { .. }
         | store::Event::Erased { .. }
         | store::Event::Secret { .. }
         | store::Event::SecretsLoaded { .. } => {}

@@ -63,6 +63,9 @@ pub struct Seeds {
     pub deployment: [u8; 16],
     pub seed: u64,
     pub crypto: Secret,
+    /// The installation's identifier drawn for a first start; a later start
+    /// sends the one its store keeps (jig's configuration.md, 8).
+    pub installation: [u8; 16],
 }
 
 /// The engine's settings: jig's part, typed by jig-protocol-config, and

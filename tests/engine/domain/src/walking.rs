@@ -168,6 +168,9 @@ pub fn limits() -> engine::Limits {
         },
         accounts: accounts::Limits {
             accounts: 1,
+            holder_accounts: 1,
+            sources: 3,
+            sign_ins: 1,
             credentials: 1,
             backoff_base: Duration::from_millis(10),
             backoff_max: Duration::from_secs(1),
@@ -269,6 +272,8 @@ pub fn config(seed: u64) -> engine::Config {
                 charters: Box::new([charter()]),
                 resume_bytes: 256,
                 tools: jig_domain_core::ToolFamilies::JIG,
+                models: models(),
+                llm_providers: accounts::Providers::none(),
             },
             template_overrides: skein_lib::Map::with_capacity(authority_limits().projects),
             projects,
@@ -308,6 +313,12 @@ fn permission_roles() -> skein_lib::Map<u32, Box<[people::PermissionRole]>> {
     projects
 }
 
+/// The deployment's configured models: its one charter's.
+#[must_use]
+pub fn models() -> Box<[engine::Model]> {
+    Box::new([charter().policy.model])
+}
+
 /// The deployment's one charter: the chats' and the forge's agent work's.
 /// Its default spend holds its reserve floor (jig's `domain/authority.md`, 7).
 #[must_use]
@@ -334,6 +345,8 @@ pub fn charter() -> engine::Charter {
                 cache_write_price: None,
                 output_price: 1,
                 price_unit: 1000,
+                efforts: Box::new([]),
+                effort: None,
             },
             alternatives: Box::new([]),
             inspect: true,
@@ -770,6 +783,7 @@ impl World {
             | Delivery::Procedure { .. }
             | Delivery::Application { .. }
             | Delivery::WebReply { .. }
+            | Delivery::CarriedUnused { .. }
             | Delivery::Read { .. }
             | Delivery::ReadLoad { .. }
             | Delivery::Document { .. }

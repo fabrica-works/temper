@@ -42,7 +42,7 @@ The digest hashes the secret without its final newline. Keep both files
 private; the worker receives the secret and the engine receives its digest.
 
 ```sh
-mkdir -m 700 -p secrets accounts/records
+mkdir -m 700 -p secrets accounts
 secret=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
 printf '%s\n' "$secret" > secrets/worker.secret
 printf %s "$secret" | sha256sum | cut -d' ' -f1 > secrets/worker.digest
@@ -62,9 +62,8 @@ chmod 600 accounts/llm.json
 
 The file has jig's `access_token`, `expires_at` (Unix seconds), and
 `account_id` members. An account handed in is never refreshed: a lapsed
-one is handed in again. `temper sign-in` is the other route once the
-provider registration described in the milestone is settled. The real
-account and the work requested in steps 4 and 8 belong to the dogfood run.
+one is handed in again. The real account and the work requested in
+steps 4 and 8 belong to the dogfood run.
 
 ## Step 5. Start the box and keep its terminal
 
