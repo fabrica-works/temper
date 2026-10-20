@@ -149,6 +149,11 @@ Files: temper `tools/forgejo-conformance/` -> skein `tests/forge/conformance/`, 
   New `scripts/proof-forgejo-conformance.sh`; shared root Cargo.toml (explicit member), Cargo.lock.
   The script is a thin shell invocation of Rust.
 Shape:
+- The whole-file move also carries Temper06.4's `json::write_bounded` and
+  `facts::bodies`/`LARGE_FACT_REQUEST_BYTES`: ordinary writes retain65_536,
+  only the two unchanged large-fact requests use their explicit1_048_607byte
+  room. Preserve both fact names/equality assertions, request bytes and all
+  recording/digest proof copies; refresh further reached copies and list users.
 - Set `license.workspace = true` in the destination Cargo.toml's `[package]`, beside its other
   workspace-inherited fields (README, Workspace license inheritance).
 - Keep `Fixture`, `Mask`, `Secrets`, `Fact`, `Outcome`, `Hosted` and the cases, provisioning order,

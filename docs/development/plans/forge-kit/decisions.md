@@ -1657,6 +1657,22 @@ where its answer lands.
 
      The accepted main-process proof is f338a5b9355fe50222c5e0147873960c7952c0a2,24PASS149.032s. A separate ordinary exact-main check covers the newer06.3 source; neither this record nor upstream gate attestations waive a final owning tree's proofs. Primary index refresh remains root-owned with bounded source fallback until exact recorded inputs complete. The fixed kit and full dependency-ready capacity stay.
 
+200. **Explicit output room for unchanged large conformance facts** (plan defect, temper06.4 block of 2026-10-20T02:43:22Z).
+     Use a separately bounded writer for the two unchanged large-fact requests.
+     This is a plan defect:06.4requires existing bodies to stay byte-identical,
+     but its65_536byte default cannot encode either existing large row plus framing.
+     Skein json.md4 says the caller runs its own encoding function twice, measuring
+     before allocation with `Limits { depth, length }`; it specifies no65_536global cap.
+     Extract `json::write_bounded(length: u32, build: impl Fn(&mut Encoder))` from the
+     same two-pass implementation. Ordinary write/object remain at65_536and depth8;
+     only facts::bodies names LARGE_FACT_REQUEST_BYTES=1_048_607 for the existing maximum
+     1_048_576ASCII x bytes plus31bytes of complete sorted-object framing.
+     Preserve both pass limits/data, measurement refusal/error behavior, exact body
+     bytes, both fact names and GET equality assertions. There is no shared or production
+     limit increase, new fixture value or changed admission. Existing35unit and strict
+     recording/digest proofs remain. Skein06.2carries the helper/caller with the move;
+     refresh further reached copies/proof scripts and list changed users in the commit.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

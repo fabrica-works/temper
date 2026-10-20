@@ -91,7 +91,8 @@ as it stands at the step's start, where temper 01.2 has repointed the pin lines.
 - Hotspot: Cargo.toml and Cargo.lock (every temper session). Test builds stay
   unoptimized; the process tier runs once, never in the gate, with the pinned
   binaries README names (`$WS` as the README's Rules define it).
-- 06.2 to 06.4: no behaviour change, no raised bound, no loosened assertion;
+- 06.2 to 06.4: no behaviour change, no raised ordinary writer or production bound, no loosened assertion;
+  only06.4's explicitly bounded existing large-fact requests use their own output room;
   moved tests keep names; units under 20 ms, focused worlds under 0.5 s. Proofs
   state gate counts as deltas from the step's start; the gate lane takes a
   committed tree only, so recordings run committed. Don't rewrite a moved part,
@@ -324,7 +325,8 @@ Removes: nothing.
 
 Scope: decision 27, last part: every body sent is written by the encoder; `serde_json` leaves.
 Needs: 06.3.
-Files: `tools/forgejo-conformance/src/json.rs` (`Put`, `object`), `Cargo.toml` (`serde_json` out),
+Files: `tools/forgejo-conformance/src/json.rs` (`Put`, `object`, `write_bounded`),
+  `facts.rs::bodies` and its `LARGE_FACT_REQUEST_BYTES`; `Cargo.toml` (`serde_json` out),
   `fixture.rs` (`api(&self, method: &str, target: &str, body: &[u8])`) and its 146 callers; the 69
   `json!` sites in 14 files (deliveries 23, facts 14, fixture 9, tokens 6, component/reads 4, hooks 3,
   orgs 2, job_clone 2, one each in users, setup, runner, component/writes, registration, cases); the
@@ -334,6 +336,21 @@ Shape: a flat object becomes `json::object(&[("key", &value), ..])` with its key
   refuses unsorted or repeated keys. A nested one becomes `json::write(|out| ..)`. `TEAM` is sent as
   its own bytes, unparsed (its keys are unsorted): the two recorded `r.send` POSTs already send them
   so, and the PATCH goes through `Fixture::api`, which records nothing.
+  Existing large-fact requests: extract the same two-pass implementation into
+  `json::pub(crate) fn write_bounded(length: u32, build: impl Fn(&mut Encoder))
+  -> Result<Box<[u8]>>`. Ordinary `write` delegates with65_536 and `object`
+  continues through ordinary `write`; depth8, error handling and measure-before-allocation
+  stay. Only `facts::bodies` uses the explicit helper for its existing two rows,
+  replaying the sorted `body`, `title` object builder with unchanged text and title.
+  Name `LARGE_FACT_REQUEST_BYTES: u32 = 1_048_607` there: existing maximum
+ 1_048_576 ASCII `x` bytes plus31bytes for `{"body":"","title":"body fact"}`.
+  The two complete requests are65_567and1_048_607bytes. Use identical limits and
+  stable data on both passes; measurement still counts all escaping and refuses
+  a longer document before output allocation. This is only room for those unchanged
+  fixtures, never a replacement-text promise or a shared cap increase. Keep both
+  fact names, GET equality assertions, request bytes and recording proofs. Carry
+  the helper/caller into Skein06.2's whole-file move and refresh further reached
+  copies or proof scripts, listing users in the commit body.
 Test shape: three new unit tests, <20 ms (conformance tests: 35):
   - `an_object_is_written_compact_in_sorted_key_order`: `object(&[("a", &1u64), ("b", &"x"), ("c",
     &true)])` writes `{"a":1,"b":"x","c":true}`.
@@ -347,7 +364,7 @@ Proof: unit; `heavy cargo nextest run -p forgejo-conformance`: 35 passed (the ba
 Proof: process; 06.2's two recordings, the stable-fact line and the transcripts diff, as 06.3: `api`
   builds the state the facts record, so equal counts, digest and files show the bodies unchanged.
 Proof: joint; `heavy --gate scripts/check.sh`: the focused count plus 3, fuzzy unchanged.
-Don't: raise a bound for the writer; write a body by `format!`; edit a transcript to match.
+Don't: raise ordinary writer or production bounds, enlarge the explicit large-fact room beyond its named existing-input derivation, write a body by `format!`, or edit a transcript to match.
 Size: about 100 lines changed in place (counted as moved), about 105 new (`Put` and `object` about
   66, the three tests about 40); counted as new, about 205.
 Removes: `serde_json` from the conformance's manifest and its 96 lines at the base in 18 files.
