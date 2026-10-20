@@ -88,14 +88,18 @@ Still required to finish S's canonical document/templates and runnable checks:
   and `checks/end-state`, stderr evidence and runner check result encoding.
 - Director-routed `wait forges --until connected:1`, plus the
   runner's ready captures, collection and command/check contracts. Then render
-  `forge.json`, `llm.json`, serve/agent/charter/worker files and `experiment.json`
+  `forge.json`, `llm.json`, `config/temper.json`, agent/charter/worker files
+  and `experiment.json`
   against those exact landed contracts, and run S's three attended seeds.
 
 `add-key` is available at temper `dfc7cc70a` as
 `add-key PROVIDER FILE --deployment --key KEY`. It reads a private regular
 owned file and strips one final newline; it does not supply the fake's
-pending key-output interface. The cluster's three-directory serve/fake
-forms and the forge wait remain dependencies in qa.md, 11.1.
+pending key-output interface. Serve's directory form is available at temper
+`65d2b3bea`: `temper serve --config CONFIG --data DATA --cache CACHE`, with
+`temper.json` inside CONFIG. The lab supplies absolute paths to these three
+directories. The fake forms and the forge wait remain dependencies in
+qa.md, 11.1.
 The wrapper/story expect the full printed sign-in URL without a second scheme
 prefix, as qa.md, 5.1 specifies.
 The fake Observation (`observe.rs`: Merged.commit, Moved.to, Refused) and Object
