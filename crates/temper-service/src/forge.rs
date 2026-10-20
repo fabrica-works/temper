@@ -259,8 +259,14 @@ pub fn problems(unusable: skein_forge_connection::Unusable, found: &mut Problems
             return;
         }
         Unusable::Forges { .. } => &[b"forge_component.forges"],
-        Unusable::Request { .. } => {
-            &[b"forge_component.target_bytes", b"forge_component.token_bytes", b"forge_component.tls.send"]
+        Unusable::Request { forge } => {
+            found.push(forge_path(u32::from(forge)).member(b"api_token"), What::Bound);
+            &[
+                b"forge_component.target_bytes",
+                b"forge_component.token_bytes",
+                b"forge_component.tls.send",
+                b"io.output",
+            ]
         }
         Unusable::Zero | Unusable::Word => &[b"forge_component"],
         Unusable::Duplicate { forge } => {
@@ -310,6 +316,7 @@ pub(crate) fn indexed(
     | skein_forge_connection::Unusable::Token { forge }
     | skein_forge_connection::Unusable::User { forge }
     | skein_forge_connection::Unusable::PlaintextName { forge }
+    | skein_forge_connection::Unusable::Request { forge }
     | skein_forge_connection::Unusable::Address { forge } = &mut unusable
     {
         for (index, configured) in forges.iter().enumerate() {

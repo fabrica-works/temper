@@ -92,16 +92,7 @@ pub fn engine() -> settings::Engine {
             bundle: None,
         },
         files: settings::Files { entries: skein_lib::List::with_capacity(0) },
-        forges: Box::new([settings::Forge {
-            number: 1,
-            kind: settings::Kind::Forgejo,
-            api: jig_protocol_config::Address::Host { name: Box::from(&b"forge.example"[..]), port: 443 },
-            transport: settings::Transport::Plaintext,
-            git: Box::from(&b"https://forge.example"[..]),
-            api_token: Secret::new(Box::from(&b"api-token"[..])),
-            user: 42,
-            identity: 1,
-        }]),
+        forges: forges(),
         identities: Box::new([settings::Identity {
             number: 1,
             token: Secret::new(Box::from(&b"forge-token-1234"[..])),
@@ -118,6 +109,19 @@ pub fn engine() -> settings::Engine {
         charter: 1,
         limits: limits::profile(limits::Profile::Small),
     }
+}
+
+pub fn forges() -> Box<[settings::Forge]> {
+    Box::new([settings::Forge {
+        number: 1,
+        kind: settings::Kind::Forgejo,
+        api: jig_protocol_config::Address::Host { name: Box::from(&b"forge.example"[..]), port: 443 },
+        transport: settings::Transport::Plaintext,
+        git: Box::from(&b"https://forge.example"[..]),
+        api_token: Secret::new(Box::from(&b"api-token"[..])),
+        user: 42,
+        identity: 1,
+    }])
 }
 
 pub const OWNER: Token = Token::new(91);

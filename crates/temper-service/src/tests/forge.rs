@@ -214,9 +214,14 @@ fn the_component_s_new_refusals_are_problems_naming_their_members() {
 }
 
 #[test]
-fn a_refusal_naming_a_forge_is_indexed_to_the_configured_forge() {
+fn the_forge_fixture_number_differs_from_its_index() {
     let config = fixtures::engine();
     assert_ne!(config.forges[0].number, 0);
+}
+
+#[test]
+fn a_refusal_naming_a_forge_is_indexed_to_the_configured_forge() {
+    let config = fixtures::engine();
     let refusal = skein_forge_connection::Unusable::PlaintextName { forge: config.forges[0].number };
     assert_eq!(
         problem_lines(forge::indexed(refusal, &config.forges)).as_ref(),
@@ -270,4 +275,37 @@ fn the_shared_numbers_are_the_clients_plain_numbers() {
             io: *io,
         }
     );
+}
+
+const HEAD_PROBLEMS: &[u8] = b"application.forges[0].api_token: past its bound\n\
+    application.limits.overrides.forge_component.target_bytes: past its bound\n\
+    application.limits.overrides.forge_component.token_bytes: past its bound\n\
+    application.limits.overrides.forge_component.tls.send: past its bound\n\
+    application.limits.overrides.io.output: past its bound\n";
+
+#[test]
+fn a_head_past_the_request_room_is_a_problem_naming_its_members_and_the_forge() {
+    let forges = fixtures::forges();
+    let refusal = skein_forge_connection::Unusable::Request { forge: forges[0].number };
+    assert_eq!(problem_lines(forge::indexed(refusal, &forges)).as_ref(), HEAD_PROBLEMS);
+}
+
+// The output room is 1,048,576 bytes, less the fixed 192, Host's 18,
+// token's 9 and user agent's 12 bytes: exactly 1,048,345 target bytes.
+const FITTING_TARGET_BYTES: u32 = 1_048_345;
+const REFUSED_TARGET_BYTES: u32 = 1_048_346;
+
+#[test]
+fn the_longest_head_of_the_shipped_forge_fits_its_room_to_the_byte() {
+    let mut config = fixtures::engine();
+    for (target_bytes, expected) in [(FITTING_TARGET_BYTES, None), (REFUSED_TARGET_BYTES, Some(HEAD_PROBLEMS))] {
+        config.limits.forge_component.target_bytes = target_bytes;
+        let problems = match forge::prepare(&config, fixtures::forge_runtime()) {
+            Ok(_) => None,
+            Err(found) => {
+                Some(crate::startup::lines(&crate::startup::Problems::jig(found, &jig_protocol_config::Path::root())))
+            }
+        };
+        assert_eq!(problems.as_deref(), expected, "target_bytes={target_bytes}");
+    }
 }
