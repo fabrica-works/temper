@@ -603,8 +603,9 @@ token makes an App:
 
 Run on 2026-10-20 with a throwaway public App, `temper-probe-d0fc06`,
 installed on the account `freeekanayaka` (repository
-`freeekanayaka/temper-probe`) and the org `fabrig-dev` (repository
-`fabrig-dev/temper-probe`), with API version 2026-03-10; each repository
+`freeekanayaka/temper-probe`) and the org `fabrica-works`, then named
+`fabrig-dev` (repository `fabrica-works/temper-probe`; the API answers
+the old name with a 301), with API version 2026-03-10; each repository
 had one Actions workflow, a job `ci` that sleeps 45 seconds and fails
 when the head's message says `FAIL`. Rulesets, pull requests, issues,
 branches and tokens made by the probes were removed after. The scripts
@@ -985,7 +986,7 @@ Each step lands working, and shows what it proved in the real loop
   owner's probe repositories, with administration, contents, pull
   requests and the App installation's repository access to write, and
   metadata to read. The user made them on 2026-10-20, beside the App's
-  key, as `person-freeekanayaka.token` and `person-fabrig-dev.token`;
+  key, as `person-freeekanayaka.token` and `person-fabrica-works.token`;
   each was checked to write its own repositories and be refused the
   other's. The user's own classic token is never used.
 - **Its credentials expire,** the person's tokens on their dates and
