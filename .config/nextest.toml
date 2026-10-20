@@ -5,7 +5,7 @@
 # slow period is flagged SLOW as it runs.
 
 [profile.default]
-default-filter = "not binary(/^fuzzy_/) & not binary(/^(process|live)$/) & not binary(/^qa_/)"
+default-filter = "not binary(/^fuzzy_/) & not binary(/^(process|live)$/) & not binary(/^qa_/) & not binary(/^browser_/)"
 global-timeout = "15s"
 slow-timeout = { period = "3s" }
 
@@ -51,4 +51,11 @@ retries = 0
 # the shipped binary.
 default-filter = "binary(/^qa_/)"
 global-timeout = "10m"
+test-threads = 1
+
+# Chromium against temper serve, one test at a time (client/browser.md, 4.3).
+[profile.browser]
+default-filter = "package(temper-client-browser-world) & binary(/^browser_/)"
+global-timeout = "60s"
+slow-timeout = { period = "20s", terminate-after = 3 }
 test-threads = 1

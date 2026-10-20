@@ -13,7 +13,6 @@ temper-client-protocol-wire.workspace = true
 skein-lib.workspace = true
 skein-json.workspace = true
 skein-ui.workspace = true
-skein-ui-bundle.workspace = true
 
 [dev-dependencies]
 jig-client-test-records.workspace = true

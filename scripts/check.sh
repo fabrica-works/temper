@@ -23,3 +23,9 @@ cargo nextest run --workspace
 cargo nextest run --workspace --profile fuzzy
 # The browser bundle, built once by the gate (client/browser.md, 4.3).
 scripts/bundle.sh target/temper-bundle >/dev/null
+# The browser tier, Chromium against temper serve on that bundle
+# (client/browser.md, 4.3).
+cargo build -p temper
+TEMPER_TEST_BUNDLE="$(pwd)/target/temper-bundle"
+export TEMPER_TEST_BUNDLE
+cargo nextest run --workspace --profile browser

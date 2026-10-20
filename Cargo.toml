@@ -15,6 +15,7 @@ members = [
     "crates/temper-client-shell-cli",
     "crates/temper-client-shell-web",
     "tests/client",
+    "tests/client-browser",
     "crates/temper-client-view",
     "crates/temper-client-domain",
     "crates/temper-client-tools",
@@ -92,6 +93,9 @@ jig-protocol-transcript = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-client-test-kit = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-client-world = { git = "https://github.com/fabrig-dev/jig.git" }
 skein-fake-person = { git = "https://github.com/fabrig-dev/skein.git" }
+skein-fake-person-browser = { git = "https://github.com/fabrig-dev/skein.git" }
+skein-browser = { git = "https://github.com/fabrig-dev/skein.git" }
+jig-client-fake-person-browser = { git = "https://github.com/fabrig-dev/jig.git" }
 skein-ui = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-ui-text = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-ui-web = { git = "https://github.com/fabrig-dev/skein.git" }

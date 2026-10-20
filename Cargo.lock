@@ -343,6 +343,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-client-fake-person-browser"
+version = "0.0.0"
+source = "git+https://github.com/fabrig-dev/jig.git#15cac77495b761d3c1edbf2254c8f8ddf88e0b10"
+dependencies = [
+ "base64",
+ "skein-fake-person",
+ "skein-fake-person-browser",
+ "skein-http",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-client-protocol-http"
 version = "0.0.0"
 source = "git+https://github.com/fabrig-dev/jig.git#15cac77495b761d3c1edbf2254c8f8ddf88e0b10"
@@ -1217,6 +1229,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
+name = "skein-browser"
+version = "0.0.0"
+source = "git+https://github.com/fabrig-dev/skein.git#6448909388d4c0e0b0eea58db0487e6b2977d7e2"
+dependencies = [
+ "skein-json",
+ "skein-lib",
+]
+
+[[package]]
 name = "skein-channel"
 version = "0.0.0"
 source = "git+https://github.com/fabrig-dev/skein.git#6448909388d4c0e0b0eea58db0487e6b2977d7e2"
@@ -1338,6 +1359,22 @@ source = "git+https://github.com/fabrig-dev/skein.git#6448909388d4c0e0b0eea58db0
 dependencies = [
  "skein-lib",
  "skein-ui",
+]
+
+[[package]]
+name = "skein-fake-person-browser"
+version = "0.0.0"
+source = "git+https://github.com/fabrig-dev/skein.git#6448909388d4c0e0b0eea58db0487e6b2977d7e2"
+dependencies = [
+ "skein-browser",
+ "skein-fake-person",
+ "skein-http",
+ "skein-io",
+ "skein-lib",
+ "skein-scratch",
+ "skein-shell",
+ "skein-ui",
+ "skein-ui-web",
 ]
 
 [[package]]
@@ -2140,6 +2177,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-client-browser-world"
+version = "0.0.0"
+dependencies = [
+ "jig-channel-world",
+ "jig-client",
+ "jig-client-fake-person-browser",
+ "jig-client-protocol-link",
+ "jig-client-protocol-wire",
+ "serde_json",
+ "skein-browser",
+ "skein-fake-person",
+ "skein-fake-person-browser",
+ "skein-lib",
+ "skein-scratch",
+ "skein-tls-world",
+ "skein-ui",
+ "skein-ui-bundle",
+]
+
+[[package]]
 name = "temper-client-domain"
 version = "0.0.0"
 dependencies = [
@@ -2230,7 +2287,6 @@ dependencies = [
  "skein-json",
  "skein-lib",
  "skein-ui",
- "skein-ui-bundle",
  "temper-client-domain",
  "temper-client-protocol-wire",
  "temper-client-shell-terminal",
