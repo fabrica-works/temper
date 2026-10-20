@@ -976,7 +976,12 @@ Each step lands working, and shows what it proved in the real loop
   page's form posted to GitHub's address (`../client/browser.md`).
 - **Live, outside every suite:** the conformance on github.com with the
   fixtures' App and repositories, credentials from the person's private
-  directory, never the suites'.
+  directory, never the suites'. The person's part (rulesets, approvals,
+  an installation's repositories) is played by a fine-grained token
+  limited to the two `temper-probe` repositories, with administration,
+  contents and pull requests to write and metadata to read: the user
+  provides it when the conformance is built. The user's own classic
+  token is never used.
 
 ## 18. Later
 
