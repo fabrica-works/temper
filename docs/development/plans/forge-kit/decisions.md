@@ -1763,6 +1763,46 @@ where its answer lands.
 
      Checked: scratch-hourly-18/temper-diagnostic-comparison.json lists12new sites and5unique Accounts messages against Temperbbcde306/Skein8a60888e/Smith9db44609/Jigf5166161, with exact locks retained. One bounded wrapper: Smith builds55.307s, Jig fails134.900s, Temper fails56.738s; unchanged-source/dependency Hearth failure reused23.154s with its existing Interrupt owner preserved. The checker ended/reaped and removed only its completed target. No new implementation scope or proof waiver is added.
 
+211. **Story hook obligations and held-hint Answering coverage** (designer answers to Temper05.2 and Skein08.3;four verified design/plan landings).
+     Apply skein bb505e790f6c65c33c3d21a1da6c997db7cbd740/e5f7313612fb86776b552db1b58e3b87e3a335bc and temper aa5c20d3c34ff21653ec8c663cfbd4f1a4f49f1d/e054589237e35783cfed34a270fb3a4ddf18aee0:
+     Landed with `land --docs`: skein bb505e790f6c65c33c3d21a1da6c997db7cbd740
+     (fake-forge.md 5) and e5f7313612fb86776b552db1b58e3b87e3a335bc
+     (forge-connection.md 8.4, 10); temper aa5c20d3c34ff21653ec8c663cfbd4f1a4f49f1d
+     (testing.md 4.2, plan 05.2) and e054589237e35783cfed34a270fb3a4ddf18aee0 (08.3).
+
+     ### temper05.2: scheduled hook missing from Adopt's completion obligation
+
+     1. No forge source and no new API: a story is owed what it caused. skein 5:
+        it "ends only once the peer holds a delivery's outcome for each hook the
+        story's own changes cause, a count the story states. A hook is scheduled
+        at its change and released later, so no count of the hooks the forge has
+        released so far (its domain's tally) says what a story is still owed".
+     2. 05.2: Adopt completes on `forge.complete()` and the live peer's `Delivery`
+        records numbering `stories.rs`' `ADOPT_HOOKS` (2, one per push: the
+        setup's topic push and the agent's). `hooks_complete` takes that count,
+        never `tally().hooks`; at the end the referee asserts the tally equals it.
+        All else stays in Adopt, nothing moving in the pyramid: Listen-fd learning,
+        exactly `[NoAddress, Written]`, no resend, barrier, wait or setup move, the
+        room, the deadline, every assertion.
+     3. Returns: a second outcome not `Written` (with its io failure), an Adopt
+        at its deadline short of 2 records, a tally not 2.
+
+     ### skein08.3: public Answering boundary and world verification
+
+     4. Atomic. 8.4: "Answering has no moment before its `204` is queued that its
+        owner can hold": with the entry point's room, the verifying step queues
+        the 204, then offers the hint. "Answering lasts only while its hint is
+        held", its deadline from its 204.
+     5. 08.3's deadline rows: `Head, Body` | accept/last answer + hook_deadline |
+        0 | 0 | 0; `Answering, its hint refused and held` | its 204 +
+        hook_deadline | 0 | 0 | 0; Closing unchanged. The Answering row first
+        asserts the step in `send` (responses 1, hints 1, `hinted_after_answer()`),
+        then `refuse()` (hints 0) with no Offer: a zero hint baseline.
+     6. Close: Answering is the existing "Held answer/hint: initial offer refused,
+        then Close" row; Head/Body take "Close before pending terminal". No
+        pre-204 row or seam, starved room, poke or shipped code; 40 focused, 7
+        fuzzy and the caps unchanged.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
