@@ -458,6 +458,14 @@ fn synthetic_frame(builder: &mut skein_ui::Builder, behind: bool) {
     builder.state(skein_ui::State::Selected);
     builder.bind(binding());
     builder.close();
+    builder.open(Role::Navigation);
+    for name in [b"Inbox 0".as_slice(), b"Chats", b"Adopt a repository"] {
+        builder.open(Role::Link);
+        builder.name(name);
+        builder.link(binding());
+        builder.close();
+    }
+    builder.close();
     builder.open(Role::Region);
     builder.region(temper_client_view::frame::link_region());
     builder.open(Role::Status);
@@ -476,14 +484,6 @@ fn synthetic_frame(builder: &mut skein_ui::Builder, behind: bool) {
     builder.name(b"Sign out");
     builder.bind(binding());
     builder.close();
-    builder.close();
-    builder.open(Role::Navigation);
-    for name in [b"Inbox 0".as_slice(), b"Chats", b"Adopt a repository"] {
-        builder.open(Role::Link);
-        builder.name(name);
-        builder.link(binding());
-        builder.close();
-    }
     builder.close();
 }
 pub fn synthetic_header(builder: &mut skein_ui::Builder, title: Option<&[u8]>, behind: bool) {

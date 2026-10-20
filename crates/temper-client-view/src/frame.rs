@@ -1,4 +1,4 @@
-//! temper's banner and navigation, in the mockups' order (client/README.md, 5).
+//! temper's banner, with navigation after the projects (client/README.md, 5).
 use skein_lib::{List, Token};
 use skein_ui::{Binding, Builder, Region, Role, Run};
 use temper_client_domain::{Address, Domain, pages::Act};
@@ -56,17 +56,23 @@ impl Bindings {
         List::<(Token, Act)>::worst_case(capacity)
     }
 }
-fn text(builder: &mut Builder, role: Role, words: &[u8]) {
+fn text(builder: &mut Builder, role: Role, words: &[u8], style: Option<skein_ui::Style>) {
     builder.open(role);
+    if let Some(style) = style {
+        builder.style(style);
+    }
     builder.name(words);
     builder.text(Run::Plain, words);
     builder.close();
 }
-fn action(builder: &mut Builder, role: Role, words: &[u8], act: Act, bindings: &mut Bindings) {
+fn action(builder: &mut Builder, role: Role, words: &[u8], act: Act, current: bool, bindings: &mut Bindings) {
     builder.open(role);
     builder.name(words);
     if role == Role::Link {
         builder.text(Run::Plain, words);
+    }
+    if current {
+        builder.state(skein_ui::State::Current);
     }
     builder.bind(bindings.insert(act));
     builder.close();
@@ -83,11 +89,11 @@ pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words:
     let me = pages.me(root.client());
     builder.open(Role::Banner);
     builder.style(crate::look::BANNER);
-    text(builder, Role::Paragraph, &words.say(crate::words::Word::Brand, &[]));
+    text(builder, Role::Paragraph, &words.say(crate::words::Word::Brand, &[]), Some(crate::look::BRAND));
     if let Some(word) = unavailable(root) {
         builder.open(Role::Region);
         builder.region(link_region());
-        text(builder, Role::Status, &words.say(word, &[]));
+        text(builder, Role::Status, &words.say(word, &[]), None);
         builder.close();
         builder.close();
         return;
@@ -111,17 +117,18 @@ pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words:
             }
         }
     }
+    navigation(builder, root, words, bindings);
     builder.open(Role::Region);
     builder.region(link_region());
-    let status = match root.client().link().state {
-        jig_client::Link::Offline => crate::words::Word::Offline,
-        jig_client::Link::Live if me.is_some() => crate::words::Word::Live,
+    let (status, style) = match root.client().link().state {
+        jig_client::Link::Offline => (crate::words::Word::Offline, crate::look::OFFLINE),
+        jig_client::Link::Live if me.is_some() => (crate::words::Word::Live, crate::look::LIVE),
         jig_client::Link::SignedOut
         | jig_client::Link::Starting
         | jig_client::Link::Live
-        | jig_client::Link::OutOfDate => crate::words::Word::Connecting,
+        | jig_client::Link::OutOfDate => (crate::words::Word::Connecting, crate::look::CONNECTING),
     };
-    text(builder, Role::Status, &words.say(status, &[]));
+    text(builder, Role::Status, &words.say(status, &[]), Some(style));
     let me_behind = match root.client().document(temper_client_domain::pages::me_handle()) {
         Some(document) => document.state == jig_client::State::Behind,
         None => false,
@@ -134,17 +141,17 @@ pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words:
         None => false,
     };
     if me_behind || page_behind {
-        text(builder, Role::Status, &words.say(crate::words::Word::Behind, &[]));
+        text(builder, Role::Status, &words.say(crate::words::Word::Behind, &[]), Some(crate::look::BEHIND));
     }
     builder.close();
     if let Some(me) = me {
-        text(builder, Role::Status, me.party.name.bytes());
+        text(builder, Role::Status, me.party.name.bytes(), None);
     }
     if root.client().link().sign_out_lost {
-        text(builder, Role::Alert, &words.say(crate::words::Word::SignOutLost, &[]));
+        text(builder, Role::Alert, &words.say(crate::words::Word::SignOutLost, &[]), None);
     }
     if me.is_some() || root.client().link().sign_out_lost {
-        action(builder, Role::Button, &words.say(crate::words::Word::SignOut, &[]), Act::SignOut, bindings);
+        action(builder, Role::Button, &words.say(crate::words::Word::SignOut, &[]), Act::SignOut, false, bindings);
     }
     builder.close();
 }
@@ -152,6 +159,11 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
     if unavailable(root).is_some() {
         return;
     }
+    let (inbox_current, adopt_current) = match root.pages().address() {
+        Address::Inbox { .. } => (true, false),
+        Address::Adopt { .. } => (false, true),
+        Address::Chats | Address::Chat { .. } | Address::Task { .. } | Address::Accounts => (false, false),
+    };
     let name = words.say(
         crate::words::Word::Inbox,
         &[skein_ui::phrases::Hole::Number(u64::from(match root.pages().me(root.client()) {
@@ -166,6 +178,7 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
         Role::Link,
         &name,
         Act::Go { address: Address::Inbox { filter: temper_client_domain::address::Filter::ALL } },
+        inbox_current,
         bindings,
     );
     action(
@@ -173,6 +186,7 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
         Role::Link,
         &words.say(crate::words::Word::Chats, &[]),
         Act::Go { address: Address::Chats },
+        *root.pages().address() == Address::Chats,
         bindings,
     );
     if let Some(project) = root.pages().project() {
@@ -181,6 +195,7 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
             Role::Link,
             &words.say(crate::words::Word::Adoption, &[]),
             Act::Go { address: Address::Adopt { project } },
+            adopt_current,
             bindings,
         );
     }
@@ -189,6 +204,7 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
         Role::Link,
         &crate::accounts::words::say(words, crate::accounts::words::Word::Accounts, &[]),
         Act::Go { address: Address::Accounts },
+        *root.pages().address() == Address::Accounts,
         bindings,
     );
     builder.close();

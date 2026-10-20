@@ -53,6 +53,8 @@ pub enum Word {
     Chat,
     ChatSpend,
     ChatDelegates,
+    ChatTime,
+    ChatHint,
     Accept,
     Reject,
     Answer,
@@ -98,7 +100,7 @@ pub enum Word {
     SignOutLost,
     Unshowable,
 }
-const ALL: [Word; 85] = [
+const ALL: [Word; 87] = [
     Word::TaskHeader,
     Word::Asked,
     Word::Plan,
@@ -141,6 +143,8 @@ const ALL: [Word; 85] = [
     Word::Chat,
     Word::ChatSpend,
     Word::ChatDelegates,
+    Word::ChatTime,
+    Word::ChatHint,
     Word::Accept,
     Word::Reject,
     Word::Answer,
@@ -235,6 +239,8 @@ impl Word {
             Self::Chat => 143,
             Self::ChatSpend => 144,
             Self::ChatDelegates => 145,
+            Self::ChatTime => 184,
+            Self::ChatHint => 185,
             Self::Accept => 125,
             Self::Reject => 126,
             Self::Answer => 127,
@@ -366,6 +372,11 @@ impl Words {
     pub fn say_word(&self, word: jig_client::words::Word, holes: &[Hole]) -> Box<[u8]> {
         self.book.say(self.language, word.id(), holes).expect("checked jig word").text
     }
+    /// Absolute UTC time: the view has delivered instants, but no current clock.
+    pub(crate) fn chat_time(&self, at: skein_lib::Wall) -> Box<[u8]> {
+        self.say(Word::ChatTime, &[Hole::Name(copy_of(&chat_clock(at)))])
+    }
+
     pub fn text(&self, builder: &mut Builder, word: Word, holes: &[Hole]) {
         builder.text(Run::Plain, &self.say(word, holes));
     }
@@ -441,6 +452,8 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::Chat => (&[b"Chat ", b""], &[Number]),
         Word::ChatSpend => (&[b"Spent ", b"; delegates spent ", b""], &[Number, Number]),
         Word::ChatDelegates => (&[b"Live delegates ", b""], &[Number]),
+        Word::ChatTime => (&[b"", b""], &[Name]),
+        Word::ChatHint => (&[b"Enter to start \xc2\xb7 Shift+Enter for a new line"], &[]),
         Word::Accept => (&[b"Accept"], &[]),
         Word::Reject => (&[b"Reject with reason"], &[]),
         Word::Answer => (&[b"Answer"], &[]),
@@ -544,5 +557,54 @@ fn resource_phrases(connector: u16, joined: u32, shapes: &mut List<PhraseShape>,
         phrases
             .push(Phrase { id, forms: Box::new([Form { class: PluralClass::Other, segments: segments.into_boxed() }]) })
             .expect("closed phrases fit");
+    }
+}
+
+// Gregorian civil month/day from epoch days, using 400-year eras and March-based months.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "u64 nanoseconds bound epoch days to 213503; calendar intermediates fit u64 and decimal digits are at most 9"
+)]
+fn chat_clock(at: skein_lib::Wall) -> [u8; 12] {
+    let days = at.as_secs() / 86_400 + 719_468;
+    let day_of_era = days % 146_097;
+    let year = (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let day_of_year = day_of_era - (365 * year + year / 4 - year / 100);
+    let march_month = (5 * day_of_year + 2) / 153;
+    let day = u8::try_from(day_of_year - (153 * march_month + 2) / 5 + 1).expect("day fits");
+    let month = u8::try_from(if march_month < 10 { march_month + 3 } else { march_month - 9 }).expect("month fits");
+    let minutes = at.as_secs() / 60;
+    let hour = u8::try_from((minutes / 60) % 24).expect("hour fits");
+    let minute = u8::try_from(minutes % 60).expect("minute fits");
+    [
+        b'0' + month / 10,
+        b'0' + month % 10,
+        b'-',
+        b'0' + day / 10,
+        b'0' + day % 10,
+        b' ',
+        b'0' + hour / 10,
+        b'0' + hour % 10,
+        b':',
+        b'0' + minute / 10,
+        b'0' + minute % 10,
+        b'Z',
+    ]
+}
+#[cfg(test)]
+mod clock_tests {
+    #[test]
+    fn the_chat_clock_keeps_day_month_and_leap_boundaries() {
+        for (seconds, expected) in [
+            (0, b"01-01 00:00Z"),
+            (86_399, b"01-01 23:59Z"),
+            (86_400, b"01-02 00:00Z"),
+            (2_678_399, b"01-31 23:59Z"),
+            (2_678_400, b"02-01 00:00Z"),
+            (1_709_251_199, b"02-29 23:59Z"),
+            (1_709_251_200, b"03-01 00:00Z"),
+        ] {
+            assert_eq!(&super::chat_clock(skein_lib::Wall::from_nanos(seconds * 1_000_000_000)), expected);
+        }
     }
 }

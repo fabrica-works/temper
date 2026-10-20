@@ -715,11 +715,11 @@ shown as external links and never opened by the client (6.5).
 - **`build`:** when the domain's shown count moved, it builds the page
   in one outline (skein's `ui.md`, section 14), in the mockups' order:
   - *a banner:* temper's name; the project the person is in, and the
-    others to choose from; the link's state, one word for each of
+    others to choose from; the navigation (5.3) after the projects, as in
+    the mockups; the link's state, one word for each of
     `jig-client`'s `Link` states ("Signed out", "Connecting" while
     starting, "Live", "Offline", "Out of date"), and "Behind" while a
     page's watch reopens; the person's name and "Sign out";
-  - *the navigation* (5.3);
   - *the accounts' banner,* while no account the person's work may use
     is usable (the `accounts` watch; jig's
     `client/domain/contract.md`, 7.1): its words and three buttons

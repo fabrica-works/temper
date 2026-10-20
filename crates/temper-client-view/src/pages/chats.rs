@@ -28,6 +28,8 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
     text(b, Role::Heading { level: 1 }, &words.say(Word::Chats, &[]));
     if let Some(chats) = root.pages().chats() {
         if root.pages().me(root.client()).is_some() && root.pages().project().is_some() {
+            b.open(Role::Slot);
+            b.style(crate::look::ENTRY);
             b.open(Role::TextArea);
             b.name(&words.say(Word::StartChat, &[]));
             b.state(State::SubmitsOnEnter);
@@ -35,7 +37,12 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             b.value(&chats.words, temper_client_domain::pages::shown(root.pages()));
             b.bind(bindings.insert(Act::ChatWords { words: Box::default() }));
             b.close();
+            b.open(Role::Paragraph);
+            b.style(crate::look::HINT);
+            words.text(b, Word::ChatHint, &[]);
+            b.close();
             control(b, bindings, Role::Button, &words.say(Word::Start, &[]), Act::StartChat);
+            b.close();
         }
         if chats.refusal.is_some() {
             words.refusal(b, &jig_client::contract::Refusal::NotOffered, text_limit);
@@ -44,17 +51,27 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             outcome_text(b, words, outcome, text_limit);
         }
         text(b, Role::Heading { level: 2 }, &words.say(Word::LiveChats, &[]));
-        if let Some(live) = chats.live(root.client()) {
+        if let Some(live) = chats.live(root.client())
+            && !live.rows.is_empty()
+        {
+            b.open(Role::List);
+            b.style(crate::look::ROWS);
             for line in &live.rows {
                 row(b, root, line, words, bindings);
             }
+            b.close();
         }
         text(b, Role::Heading { level: 2 }, &words.say(Word::ClosedChats, &[]));
         if let Some(page) = &chats.page
             && let EndedGroup::Rows { rows, after, .. } = &page.ended
         {
-            for line in rows {
-                row(b, root, line, words, bindings);
+            if !rows.is_empty() {
+                b.open(Role::List);
+                b.style(crate::look::ROWS);
+                for line in rows {
+                    row(b, root, line, words, bindings);
+                }
+                b.close();
             }
             if after.is_some() {
                 control(b, bindings, Role::Button, &words.say(Word::MoreClosedChats, &[]), Act::ClosedChats);
@@ -65,7 +82,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
 }
 pub(crate) fn row(b: &mut Builder, root: &Domain, line: &TaskLine, words: &Words, bindings: &mut Bindings) {
     b.open(Role::Item);
-    b.style(crate::look::CARD);
+    b.style(crate::look::ROW);
     b.key(skein_ui::Key { owner: crate::frame::owner(), kind: 10, a: line.chip.task, b: 0 });
     control(
         b,
@@ -89,6 +106,10 @@ pub(crate) fn row(b: &mut Builder, root: &Domain, line: &TaskLine, words: &Words
     if let jig_client::contract::ChipPhase::Owner { details, .. } = line.chip.details.as_ref() {
         text(b, Role::Paragraph, &words.say(Word::ChatDelegates, &[Hole::Number(u64::from(details.live_delegates))]));
     }
+    b.open(Role::Paragraph);
+    b.style(crate::look::TIME);
+    b.text(Run::Plain, &words.chat_time(line.ended_at.unwrap_or(line.last_activity)));
+    b.close();
     b.close();
 }
 
@@ -131,5 +152,23 @@ pub(crate) fn status(
         | jig_client::facts::ChatStatus::Closing
         | jig_client::facts::ChatStatus::Ended { .. } => None,
     };
-    text(b, Role::Status, &words.say_word(jig_client::words::Word::status(&status), holes.as_slice()));
+    let token = match status {
+        jig_client::facts::ChatStatus::WaitingForYou { .. } => crate::look::STATUS_YOURS,
+        jig_client::facts::ChatStatus::Held(_) => crate::look::STATUS_HELD,
+        jig_client::facts::ChatStatus::Retrying { .. } => crate::look::STATUS_RETRYING,
+        jig_client::facts::ChatStatus::Starting
+        | jig_client::facts::ChatStatus::Writing
+        | jig_client::facts::ChatStatus::Tool { .. }
+        | jig_client::facts::ChatStatus::Working { .. } => crate::look::STATUS_ACTIVE,
+        jig_client::facts::ChatStatus::WaitingFor(_)
+        | jig_client::facts::ChatStatus::Parked
+        | jig_client::facts::ChatStatus::Closing
+        | jig_client::facts::ChatStatus::Ended { .. } => crate::look::STATUS_QUIET,
+    };
+    b.open(Role::Status);
+    b.style(token);
+    let name = words.say_word(jig_client::words::Word::status(&status), holes.as_slice());
+    b.name(&name);
+    b.text(Run::Plain, &name);
+    b.close();
 }

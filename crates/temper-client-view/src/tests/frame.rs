@@ -178,3 +178,58 @@ fn each_link_shows_its_name_as_its_text() {
     }
     assert_eq!(links, 4);
 }
+
+#[test]
+fn the_navigation_is_inside_the_banner_after_projects_before_the_link() {
+    let view = fixtures::signed_in_with_project();
+    let nodes = view.tree().nodes();
+    let mut banner = None;
+    let mut nav = None;
+    let mut region = None;
+    for (index, node) in nodes.iter().enumerate() {
+        if node.role == Role::Banner {
+            banner = Some(index);
+        }
+        if node.role == Role::Navigation {
+            nav = Some(index);
+        }
+        if node.region == Some(crate::frame::link_region()) {
+            region = Some(index);
+        }
+    }
+    let banner = banner.expect("banner");
+    let nav = nav.expect("navigation");
+    let region = region.expect("link");
+    assert!(nav > banner && nav < banner + usize::try_from(nodes[banner].size).expect("size"));
+    assert!(nav < region);
+    for (index, node) in nodes.iter().enumerate() {
+        if node.role == Role::Button && node.states.as_slice().contains(&skein_ui::State::Selected) {
+            assert!(index < nav, "projects precede navigation");
+        }
+    }
+}
+#[test]
+fn the_navigation_marks_only_the_current_page() {
+    use temper_client_domain::{Address, address::Filter};
+    for (address, current) in [
+        (Address::Inbox { filter: Filter::ALL }, Some(b"Inbox 0".as_slice())),
+        (Address::Inbox { filter: Filter { goal: Some(9), ..Filter::ALL } }, Some(b"Inbox 0".as_slice())),
+        (Address::Chats, Some(b"Chats".as_slice())),
+        (Address::Adopt { project: fixtures::PROJECT }, Some(b"Adopt a repository".as_slice())),
+        (Address::Accounts, Some(b"Accounts".as_slice())),
+        (Address::Chat { task: 9 }, None),
+        (Address::Task { task: 9 }, None),
+    ] {
+        let root = fixtures::root_at(address, &fixtures::domain_limits()).0;
+        let view = fixtures::page_view(&root);
+        let mut found = None;
+        for node in view.tree().nodes() {
+            if node.states.as_slice().contains(&skein_ui::State::Current) {
+                assert_eq!(node.role, Role::Link);
+                assert!(found.is_none(), "one current page");
+                found = node.name.as_deref();
+            }
+        }
+        assert_eq!(found, current);
+    }
+}

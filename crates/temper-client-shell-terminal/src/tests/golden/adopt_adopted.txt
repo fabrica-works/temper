@@ -1,11 +1,11 @@
 == Adopt a repository into shop == Live
 temper
 [1] Shop (selected)
+[2] Inbox 0
+[3] Chats
+[4] Adopt a repository
 * Pat
-[2] Sign out
-[3] Inbox 0
-[4] Chats
-[5] Adopt a repository
+[5] Sign out
 [6] Forge number: 1
 [7] Owner: acme
 [8] Name: shop
