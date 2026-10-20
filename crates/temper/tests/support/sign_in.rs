@@ -20,6 +20,7 @@ pub fn configuration(directory: &Path) {
     let mut agent: serde_json::Value =
         serde_json::from_slice(&fs::read(directory.join("agent.json")).expect("agent configuration")).expect("JSON");
     agent["endpoints"][0]["provider"] = "anthropic".into();
+    agent["endpoints"][0]["dialect"] = 2.into();
     agent["endpoints"][0]["address"] = "127.0.0.1:34545".into();
     agent["endpoints"][0]["transport"] = "plaintext".into();
     let endpoint = agent["endpoints"][0].as_object_mut().expect("endpoint object");
