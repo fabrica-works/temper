@@ -157,6 +157,7 @@ pub(super) fn encode_refusal(value: &jig_client::contract::Refusal, out: &mut En
         }
         jig_client::contract::Refusal::Unknown => out.string(b"unknown"),
         jig_client::contract::Refusal::NotOffered => out.string(b"not_offered"),
+        jig_client::contract::Refusal::Provider => out.string(b"provider"),
         jig_client::contract::Refusal::KeyConflict => out.string(b"key_conflict"),
     }
 }

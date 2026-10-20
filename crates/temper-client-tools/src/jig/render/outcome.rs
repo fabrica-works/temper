@@ -64,6 +64,7 @@ impl Operation {
                 c::Ask::Withdraw { .. } => (b"withdraw", None),
                 c::Ask::SignIn { .. } => (b"connect", None),
                 c::Ask::SignOut { .. } => (b"disconnect", None),
+                c::Ask::AccountChange { .. } => (b"account-change", None),
             },
         };
         Self { word, task, to: None, party: None, retry: None }

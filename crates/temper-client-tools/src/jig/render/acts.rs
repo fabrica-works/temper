@@ -256,7 +256,8 @@ pub fn refusal(why: &Refusal, book: &Phrasebook, out: &mut Text) {
         | Refusal::Ended { .. }
         | Refusal::Unknown
         | Refusal::NotOffered
-        | Refusal::KeyConflict => book.say(0, word.id(), &[]),
+        | Refusal::KeyConflict
+        | Refusal::Provider => book.say(0, word.id(), &[]),
     }
     .expect("checked refusal phrase")
     .text;

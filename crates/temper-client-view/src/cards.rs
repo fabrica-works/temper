@@ -33,7 +33,8 @@ pub fn refusal(b: &mut Builder, words: &Words, value: &c::Refusal) {
         | c::Refusal::Ended { .. }
         | c::Refusal::Unknown
         | c::Refusal::NotOffered
-        | c::Refusal::KeyConflict => None,
+        | c::Refusal::KeyConflict
+        | c::Refusal::Provider => None,
     };
     text(b, Role::Status, &words.say_word(jig_client::words::Word::refusal(value), hole.as_slice()));
     if let c::Refusal::Role { held: None } = value {
@@ -116,7 +117,10 @@ fn owner_outcome(b: &mut Builder, words: &Words, value: &c::OwnerOutcome) {
         | O::Withdrawn { .. }
         | O::RolesSet { .. }
         | O::PolicyChanged { .. }
-        | O::PoolSet { .. } => P::Applied,
+        | O::PoolSet { .. }
+        | O::AccountKeyKept { .. }
+        | O::AccountChanged
+        | O::AccountRemoved { .. } => P::Applied,
         O::AccountSignInStarted { .. } => P::AccountSignInStarted,
         O::AccountSignedOut { .. } => P::AccountSignedOut,
     };

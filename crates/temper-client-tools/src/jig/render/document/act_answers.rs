@@ -197,6 +197,25 @@ pub(super) fn encode_owner_outcome(
     budget: &mut super::Cut,
 ) {
     match value {
+        jig_client::contract::OwnerOutcome::AccountKeyKept { source } => {
+            out.object_start();
+            out.key(b"account_key_kept");
+            out.object_start();
+            out.key(b"source");
+            out.unsigned(u64::from(*source));
+            out.object_end();
+            out.object_end();
+        }
+        jig_client::contract::OwnerOutcome::AccountChanged => out.string(b"account_changed"),
+        jig_client::contract::OwnerOutcome::AccountRemoved { confirmed } => {
+            out.object_start();
+            out.key(b"account_removed");
+            out.object_start();
+            out.key(b"confirmed");
+            out.boolean(*confirmed);
+            out.object_end();
+            out.object_end();
+        }
         jig_client::contract::OwnerOutcome::AccountSignInStarted { source, address } => {
             out.object_start();
             out.key(b"account_sign_in_started");
