@@ -448,7 +448,7 @@ fn credential_capacity_is_checked_on_both_sides_and_against_smith() {
         checks::grants(&engine, &worker, &agent, &mut problems);
         assert_eq!(problems.is_empty(), accepted, "{sent} -> {received}");
         if !accepted {
-            assert!(String::from_utf8(lines(&problems).into()).unwrap().contains("accounts.token"));
+            assert!(core::str::from_utf8(&lines(&problems)).unwrap().contains("accounts.token"));
         }
     }
     engine.limits.token = bound;
@@ -483,5 +483,5 @@ fn configured_keys_use_the_key_ceiling_instead_of_the_oauth_token_bound() {
     agent.limits.bodies.program_value_name = u32::try_from(smith_host_domain::SourceName::BYTES).unwrap() - 1;
     let mut problems = Problems::empty();
     checks::grants(&engine, &worker, &agent, &mut problems);
-    assert!(String::from_utf8(lines(&problems).into()).unwrap().contains("program_value_name"));
+    assert!(core::str::from_utf8(&lines(&problems)).unwrap().contains("program_value_name"));
 }

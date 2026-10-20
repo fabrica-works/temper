@@ -446,6 +446,8 @@ fn engine_values_preserve_slots_and_refuse_a_different_declared_form() {
         for (grant, value) in grants.iter().zip(filled.iter()) {
             assert_eq!(value.is_some(), grant.form == actual);
         }
-        assert!(values.grants(&grants, Time::from_nanos(9)).iter().all(Option::is_none));
+        for value in values.grants(&grants, Time::from_nanos(9)) {
+            assert!(value.is_none());
+        }
     }
 }

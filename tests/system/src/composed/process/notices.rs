@@ -12,47 +12,50 @@ fn saves(world: &World) -> Vec<accounts::Stored> {
         .values()
         .filter_map(|record| match record {
             Record::Core(jig_domain_core::Record::Accounts(record)) => Some(record.clone()),
-            _ => None,
+            Record::Core(_) | Record::Forge { .. } => None,
         })
         .collect()
+}
+
+#[derive(Clone, Copy)]
+enum Notice {
+    Unauthorized,
+    Limited { reset: Option<Duration> },
+    Refused,
+}
+impl Notice {
+    fn message(self) -> agent::Up {
+        match self {
+            Self::Unauthorized => agent::Up::Unauthorized { account: 0, generation: 1 },
+            Self::Limited { reset } => agent::Up::Limited { account: 0, reset },
+            Self::Refused => agent::Up::Refused {
+                account: 0,
+                code: b"quota".as_slice().into(),
+                reason: b"provider refused".as_slice().into(),
+            },
+        }
+    }
 }
 
 #[test]
 fn composed_notices_reach_the_accounts_child_before_the_attempt_ends() {
     for notice in [
-        agent::Up::Unauthorized { account: 0, generation: 1 },
-        agent::Up::Limited { account: 0, reset: None },
-        agent::Up::Limited { account: 0, reset: Some(Duration::ZERO) },
-        agent::Up::Limited { account: 0, reset: Some(Duration::from_secs(9)) },
-        agent::Up::Refused {
-            account: 0,
-            code: b"quota".as_slice().into(),
-            reason: b"provider refused".as_slice().into(),
-        },
+        Notice::Unauthorized,
+        Notice::Limited { reset: None },
+        Notice::Limited { reset: Some(Duration::ZERO) },
+        Notice::Limited { reset: Some(Duration::from_secs(9)) },
+        Notice::Refused,
     ] {
         let mut world = World::chat(930, report_script(true));
         world.until_call();
         assert_eq!(world.observed.answers, 0);
-        let message = match &notice {
-            agent::Up::Unauthorized { account, generation } => {
-                agent::Up::Unauthorized { account: *account, generation: *generation }
-            }
-            agent::Up::Limited { account, reset } => agent::Up::Limited { account: *account, reset: *reset },
-            agent::Up::Refused { account, code, reason } => {
-                agent::Up::Refused { account: *account, code: code.clone(), reason: reason.clone() }
-            }
-            _ => unreachable!(),
-        };
-        world.process.up.push_front(message);
+        world.process.up.push_front(notice.message());
         world.run();
         match notice {
-            agent::Up::Unauthorized { account, generation } => assert!(
-                world
-                    .protocol
-                    .accounts
-                    .contains(&accounts::Request::Component(accounts::ToComponent::Rejected { account, generation }))
-            ),
-            agent::Up::Limited { reset, .. } => {
+            Notice::Unauthorized => assert!(world.protocol.accounts.contains(&accounts::Request::Component(
+                accounts::ToComponent::Rejected { account: 0, generation: 1 }
+            ))),
+            Notice::Limited { reset } => {
                 if reset == Some(Duration::ZERO) {
                     assert!(
                         !saves(&world).iter().any(|record| matches!(
@@ -71,20 +74,21 @@ fn composed_notices_reach_the_accounts_child_before_the_attempt_ends() {
                                 held: Some(accounts::Held::Limited { reset }),
                                 ..
                             } => Some(reset),
-                            _ => None,
+                            accounts::Stored::Source { .. }
+                            | accounts::Stored::Account { .. }
+                            | accounts::Stored::Next { .. } => None,
                         })
                         .expect("the accounts child saves the source's hold");
-                    assert_eq!(held.is_some(), reset.is_some(), "unknown stays unknown; zero stays supplied");
+                    assert_eq!(held.is_some(), reset.is_some(), "unknown stays unknown");
                     if let Some(reset) = reset {
-                        assert!(held.unwrap() >= Wall::from_nanos(reset.as_nanos()));
+                        assert!(held.expect("supplied reset") >= Wall::from_nanos(reset.as_nanos()));
                     }
                 }
             }
-            agent::Up::Refused { .. } => assert!(saves(&world).iter().any(|record| matches!(
+            Notice::Refused => assert!(saves(&world).iter().any(|record| matches!(
                 record,
                 accounts::Stored::Source { account: 0, number: 0, held: Some(accounts::Held::Refused), .. }
             ))),
-            _ => unreachable!(),
         }
         assert_eq!(world.observed.answers, 1, "notice does not replace the terminal");
         let before = world.protocol.accounts.clone();

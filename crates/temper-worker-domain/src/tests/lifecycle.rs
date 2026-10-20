@@ -140,7 +140,16 @@ fn notices_keep_the_source_and_reset_and_do_not_replace_the_terminal() {
                 code: code.clone(),
                 reason: reason.clone(),
             },
-            _ => unreachable!(),
+            agent::Up::Admitted
+            | agent::Up::MessageRefused { .. }
+            | agent::Up::Call { .. }
+            | agent::Up::Withdraw { .. }
+            | agent::Up::Turn { .. }
+            | agent::Up::Fact { .. }
+            | agent::Up::Long { .. }
+            | agent::Up::LongDone
+            | agent::Up::Waiting { .. }
+            | agent::Up::Answer { .. } => unreachable!(),
         };
         let mut h = Harness::new();
         h.run(Event::Link(host::LinkDown::Assign {
@@ -155,7 +164,16 @@ fn notices_keep_the_source_and_reset_and_do_not_replace_the_terminal() {
             agent::Up::Refused { account, code, reason } => {
                 agent::Up::Refused { account: *account, code: code.clone(), reason: reason.clone() }
             }
-            _ => unreachable!(),
+            agent::Up::Admitted
+            | agent::Up::MessageRefused { .. }
+            | agent::Up::Call { .. }
+            | agent::Up::Withdraw { .. }
+            | agent::Up::Turn { .. }
+            | agent::Up::Fact { .. }
+            | agent::Up::Long { .. }
+            | agent::Up::LongDone
+            | agent::Up::Waiting { .. }
+            | agent::Up::Answer { .. } => unreachable!(),
         };
         assert!(h.say(again).contains(&Request::Link(expected)), "{notice:?}");
         h.say(parked(0));
@@ -165,12 +183,7 @@ fn notices_keep_the_source_and_reset_and_do_not_replace_the_terminal() {
             owner: h.agent.unwrap(),
             message: notice,
         })));
-        assert!(!stale.iter().any(|row| matches!(
-            row,
-            Request::Link(
-                host::LinkUp::Unauthorized { .. } | host::LinkUp::Limited { .. } | host::LinkUp::AccountRefused { .. }
-            )
-        )));
+        no_notices(&stale);
         h.run(Event::Link(host::LinkDown::Acknowledge { run: RUN, attempt: ATTEMPT }));
     }
 }
@@ -179,7 +192,7 @@ fn notices_keep_the_source_and_reset_and_do_not_replace_the_terminal() {
 fn a_terminal_authentication_failure_does_not_synthesize_an_account_notice() {
     let mut h = Harness::new();
     h.started();
-    let mut rows = h.say(agent::Up::Answer {
+    let rows = h.say(agent::Up::Answer {
         answer: agent::Answer {
             read: None,
             turns: 0,
@@ -189,21 +202,30 @@ fn a_terminal_authentication_failure_does_not_synthesize_an_account_notice() {
             },
         },
     });
-    let mut ended = rows.into_vec();
-    ended.extend(h.gone());
-    rows = ended.into_boxed_slice();
+    no_notices(&rows);
+    let ended = h.gone();
     assert!(answered(
-        &rows,
+        &ended,
         &host::Ending::Failed {
             failure: host::Failure::Run(host::RunFailure::Model),
             detail: Box::default(),
             work: host::Work { left: None, saved: None }
         }
     ));
-    assert!(!rows.iter().any(|row| matches!(
-        row,
-        Request::Link(
-            host::LinkUp::Unauthorized { .. } | host::LinkUp::Limited { .. } | host::LinkUp::AccountRefused { .. }
-        )
-    )));
+    no_notices(&ended);
+}
+
+fn no_notices(rows: &[Request]) {
+    for row in rows {
+        let Request::Link(up) = row else { continue };
+        match up {
+            host::LinkUp::Unauthorized { .. } | host::LinkUp::Limited { .. } | host::LinkUp::AccountRefused { .. } => {
+                panic!("unexpected notice: {up:?}")
+            }
+            host::LinkUp::Turn { .. }
+            | host::LinkUp::Call { .. }
+            | host::LinkUp::Activity { .. }
+            | host::LinkUp::Answer { .. } => {}
+        }
+    }
 }

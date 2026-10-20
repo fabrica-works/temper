@@ -444,7 +444,7 @@ fn a_program_grant_lends_only_its_validated_name_without_a_table_entry() {
     let agent = fixtures::worker_agent();
     let table = jig_protocol_accounts::table::Table::new(0, 0);
     for size in [0, 1, smith::SourceName::BYTES, smith::SourceName::BYTES + 1] {
-        let bytes = vec![b'a'; size];
+        let bytes = repeated(b'a', size);
         let Some(name) = smith::SourceName::new(&bytes) else {
             assert!(size == 0 || size > smith::SourceName::BYTES);
             continue;
@@ -458,7 +458,7 @@ fn a_program_grant_lends_only_its_validated_name_without_a_table_entry() {
         let mut start = decoded_chat_start(&agent);
         start.grants = Box::new([grant]);
         let values = crate::worker::start_values(&table, &start, b"/worker", Time::ZERO).unwrap();
-        assert_eq!(values.credentials.as_ref(), [smith_protocol_channel::GrantValue::Program(bytes.clone().into())]);
+        assert_eq!(values.credentials.as_ref(), [smith_protocol_channel::GrantValue::Program(bytes.clone())]);
         assert_eq!(crate::worker::grant_value(&table, grant, Time::ZERO).unwrap().credentials, values.credentials);
         let encoded = encode_grants(*start, values, &agent).unwrap();
         let body = &encoded.bytes()[encoded.bytes().len() - usize::try_from(encoded.body_len()).unwrap()..];
@@ -469,14 +469,14 @@ fn a_program_grant_lends_only_its_validated_name_without_a_table_entry() {
             (grant.account, grant.generation, grant.valid)
         );
         let smith_channel::GrantValue::Program(value) = value.value() else { panic!("only a program name") };
-        assert_eq!(value.name(), bytes);
+        assert_eq!(value.name(), bytes.as_ref());
         let mut mismatched = decoded_chat_start(&agent);
         mismatched.grants = Box::new([grant]);
         let wrong = smith_host_protocol::Values {
             paths: Box::default(),
             credentials: Box::new([smith_protocol_channel::GrantValue::Bearer(Box::default())]),
         };
-        assert!(encode_grants(*mismatched, wrong, &agent).is_err());
+        encode_grants(*mismatched, wrong, &agent).unwrap_err();
     }
     for bytes in [b"UPPER".as_slice(), b"slash/name", b"claude_code"] {
         assert!(smith::SourceName::new(bytes).is_none());
@@ -654,6 +654,7 @@ fn encode_grants(
 
 #[test]
 fn key_values_reach_smith_at_their_bound_and_fit_the_workers_memory() {
+    const SOURCE: u32 = 17;
     use jig_protocol_accounts::table::{Scheme, Value};
     use smith_host_domain as smith;
     let key_bytes = jig_client_protocol_wire::v10::CEILINGS.keyed_value_some;
@@ -666,17 +667,13 @@ fn key_values_reach_smith_at_their_bound_and_fit_the_workers_memory() {
     let meter = skein_world::domain::heap::Meter::new();
     meter.start();
     let mut worker = crate::Worker::new(&settings, &agent, &limits, &files, fixtures::worker_runtime(), 7).unwrap();
-    const SOURCE: u32 = 17;
     for generation in [2, 3] {
         worker
             .values
             .granted(
                 SOURCE,
                 generation,
-                Value {
-                    scheme: Scheme::Key,
-                    token: Secret::new(vec![b'k'; usize::try_from(key_bytes).unwrap()].into()),
-                },
+                Value { scheme: Scheme::Key, token: Secret::new(repeated(b'k', usize::try_from(key_bytes).unwrap())) },
                 Time::from_nanos(9),
             )
             .unwrap();
@@ -684,7 +681,7 @@ fn key_values_reach_smith_at_their_bound_and_fit_the_workers_memory() {
     let measured = meter.end();
     meter.check(measured, worst, &"two retained full-size key generations");
     for size in [key_bytes - 1, key_bytes, key_bytes + 1] {
-        let token = Secret::new(vec![b'k'; usize::try_from(size).unwrap()].into());
+        let token = Secret::new(repeated(b'k', usize::try_from(size).unwrap()));
         let accepted = worker.values.granted(SOURCE, 3, Value { scheme: Scheme::Key, token }, Time::from_nanos(9));
         assert_eq!(accepted.is_ok(), size <= key_bytes);
         if accepted.is_err() {
@@ -708,4 +705,10 @@ fn key_values_reach_smith_at_their_bound_and_fit_the_workers_memory() {
         assert_eq!(value.scheme(), &smith_channel::Scheme::Key);
         assert_eq!(value.bytes().expose().len(), usize::try_from(size).unwrap());
     }
+}
+
+fn repeated(byte: u8, len: usize) -> Box<[u8]> {
+    let mut bytes = skein_lib::bytes::zeroed(len);
+    bytes.fill(byte);
+    bytes
 }
