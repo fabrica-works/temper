@@ -42,6 +42,8 @@ pub enum Refused {
     /// Value outside the field's representation.
     Range,
 }
+/// `forge_component.installations` default; temper-01 adds the configuration row.
+pub const FORGE_INSTALLATIONS: u32 = 8;
 const CLIENT: skein_forge_client::Limits = skein_forge_client::Limits {
     // Logical calls retained, queued and in flight, from the engine forge world fixture.
     pending: 4,

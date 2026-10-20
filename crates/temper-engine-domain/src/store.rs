@@ -104,7 +104,7 @@ impl CallAnswer {
                     Some(skein_forge_client::Outcome::Withdrawn) => {
                         Some(jig_domain_core::connector::OutboxOutcome::Withdrawn)
                     }
-                    Some(skein_forge_client::Outcome::Uncertain) => {
+                    Some(skein_forge_client::Outcome::Uncertain | skein_forge_client::Outcome::Queued) => {
                         Some(jig_domain_core::connector::OutboxOutcome::Uncertain)
                     }
                     Some(skein_forge_client::Outcome::Held) => {

@@ -499,3 +499,14 @@ fn account_notices_are_not_turns_and_terminal_failure_classes_stay_distinct() {
         );
     }
 }
+
+#[test]
+fn queued_names_the_forge_outcome() {
+    let rendered = answer(&engine::CallAnswer::ForgeEffect {
+        entry: 1,
+        deadline: skein_lib::Wall::EPOCH,
+        outcome: Some(skein_forge_client::Outcome::Queued),
+    });
+    assert_eq!(rendered.text(), b"Forge effect 1: queued");
+    assert!(!rendered.error());
+}

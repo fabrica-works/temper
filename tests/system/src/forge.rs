@@ -432,7 +432,7 @@ impl World {
                         }
                     };
                     self.events.push_back(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Client(
-                        skein_forge_client::Event::Answered { call, cost: 1, result },
+                        skein_forge_client::Event::Answered { free: 0, rate: None, call, cost: 1, result },
                     ))));
                 }
                 fake::Request::Hook { .. } => {}

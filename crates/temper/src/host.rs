@@ -70,6 +70,7 @@ impl skein_shell::Host for Host {
                     let member = match value {
                         Value::Credential | Value::Token => "api_token",
                         Value::User => "user",
+                        Value::Key => "app_key",
                         Value::Secret => "webhook_secret",
                     };
                     format!("temper serve: forge {number}: {member}: invalid\n")

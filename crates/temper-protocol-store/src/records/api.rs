@@ -260,6 +260,10 @@ pub(super) fn encode_outcome(value: skein_forge_client::Outcome) -> w::Outcome {
             )
             .expect(FITS),
         ),
+        // temper configures Forgejo alone until temper-05; Forgejo never answers Queued.
+        skein_forge_client::Outcome::Queued => unreachable!(
+            "temper configures Forgejo alone until temper-05; Forgejo never answers Queued; temper-05 takes temper-12’s EntryRow.queued tag 10 at STORE_VERSION 3 and removes this arm"
+        ),
         skein_forge_client::Outcome::Uncertain => w::Outcome::Uncertain,
         skein_forge_client::Outcome::Held => w::Outcome::Held,
         skein_forge_client::Outcome::Withdrawn => w::Outcome::Withdrawn,

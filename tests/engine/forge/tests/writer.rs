@@ -43,6 +43,7 @@ fn a_restored_writer_precedes_the_restored_effect_on_a_writerless_restart() {
             start: None,
             attempt: None,
             failures: 0,
+            queued: false,
         },
     });
     assert!(world.stored().contains_key(&top::Key::Entry(1)));

@@ -352,6 +352,7 @@ pub fn names_holds_and_topics() -> Box<[(&'static str, top::Stored)]> {
 
 pub fn entry(write: skein_forge::api::Write, condition: skein_forge_client::Condition) -> skein_forge_client::Entry {
     skein_forge_client::Entry {
+        queued: false,
         number: 3,
         task: 4,
         repository: REPO,

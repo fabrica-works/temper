@@ -420,6 +420,7 @@ fn enqueue_merge(world: &mut Protocol, pull: u64, head: skein_forge::api::Commit
             start: None,
             attempt: None,
             failures: 0,
+            queued: false,
         },
     });
 }

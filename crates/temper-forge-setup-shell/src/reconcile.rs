@@ -55,6 +55,7 @@ impl Refused {
             Self::File { forge, file, why } => (*forge, format!("{}: {why}", file_name(*file))),
             Self::Stopped(failure) => {
                 let stage = match failure.step {
+                    Stage::Installation => "installation",
                     Stage::Admin => "admin",
                     Stage::Bot => "bot",
                     Stage::Token => "token",

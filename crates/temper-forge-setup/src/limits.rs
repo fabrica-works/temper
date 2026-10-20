@@ -10,8 +10,12 @@ pub enum Refused {
 /// The shipped profile (forge-setup decision 5).
 #[must_use]
 pub fn small() -> Limits {
+    // forge.client.repositories shipped value (setup.md 5.3); temper-14a feeds that member.
+    let repositories = 2;
     Limits {
         orgs: 8,
+        reachable: 8, // temper-10 supplies picker.page.
+        repositories,
         deadline: Duration::from_secs(120),
         backoff: Duration::from_millis(100),
         backoff_max: Duration::from_secs(5),

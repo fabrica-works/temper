@@ -7,6 +7,9 @@ pub fn limits() -> Limits {
     Limits {
         forges: 2,
         token_bytes: 64,
+        key_bytes: u32::try_from(skein_tls::RS256_KEY_BYTES).expect("RS256 key bound fits u32"),
+        installations: 8,
+        renew_before: Duration::from_secs(10 * 60),
         connections: 2,
         head_bytes: 4096,
         headers: 32,

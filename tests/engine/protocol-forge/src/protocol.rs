@@ -469,6 +469,8 @@ impl Protocol {
             self.secrets_kept &= fixtures::token_absent(&answer);
             if generation == self.generation {
                 self.event(top::Event::Client(skein_forge_client::Event::Answered {
+                    free: 0,
+                    rate: None,
                     call,
                     cost: answer.cost,
                     result: answer.result,

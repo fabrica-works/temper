@@ -24,6 +24,8 @@ pub fn begin_adoption(d: &mut Domain, request: Token, adoption: Adoption) -> Box
     outputs(
         d,
         Event::Client(skein_forge_client::Event::Answered {
+            free: 0,
+            rate: None,
             call: *call,
             cost: 1,
             result: Ok(skein_forge::api::Answer::Located { repository: REPO.repository }),
@@ -112,6 +114,7 @@ pub fn opening() -> (Domain, Token) {
         start: None,
         attempt: None,
         failures: 0,
+        queued: false,
     };
     outputs(&mut d, Event::Change { row });
     outputs(&mut d, Event::Enqueue { entry });
@@ -135,7 +138,8 @@ pub fn answer(
     call: Token,
     result: Result<skein_forge::api::Answer, skein_forge::api::Error>,
 ) -> Box<[Request]> {
-    let answered = outputs(d, Event::Client(skein_forge_client::Event::Answered { call, cost: 1, result }));
+    let answered =
+        outputs(d, Event::Client(skein_forge_client::Event::Answered { free: 0, rate: None, call, cost: 1, result }));
     d.reclaim();
     answered
 }

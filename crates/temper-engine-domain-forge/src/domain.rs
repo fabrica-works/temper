@@ -214,7 +214,7 @@ impl Domain {
 
     /// Update the connector's own part when its client reports an effect outcome.
     pub fn named_outcome(&mut self, entry: u64, outcome: skein_forge_client::Outcome) {
-        if outcome == skein_forge_client::Outcome::Uncertain {
+        if outcome == skein_forge_client::Outcome::Uncertain || outcome == skein_forge_client::Outcome::Queued {
             return;
         }
         let Some(key) = self.named_effect(entry) else { return };
@@ -898,7 +898,7 @@ fn drain(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                 d.named_outcome(entry, outcome);
                 outcome_facts(d, env, entry, task, outcome, out);
                 match outcome {
-                    skein_forge_client::Outcome::Uncertain => {}
+                    skein_forge_client::Outcome::Uncertain | skein_forge_client::Outcome::Queued => {}
                     skein_forge_client::Outcome::Held => {
                         // It stays in the outbox, keeping its room, until a
                         // person or its task's close settles it.
@@ -918,6 +918,7 @@ fn drain(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                 }
                 emit(out, Request::Outcome { entry, task, outcome });
                 if outcome != skein_forge_client::Outcome::Uncertain
+                    && outcome != skein_forge_client::Outcome::Queued
                     && match d.releases.get(&task) {
                         Some(row) => !row.failed,
                         None => false,
@@ -982,6 +983,7 @@ fn outcome_facts(
         | skein_forge_client::Outcome::Failed(_)
         | skein_forge_client::Outcome::Raced { .. }
         | skein_forge_client::Outcome::Uncertain
+        | skein_forge_client::Outcome::Queued
         | skein_forge_client::Outcome::Held
         | skein_forge_client::Outcome::Withdrawn => false,
     };
@@ -1045,6 +1047,7 @@ fn outcome_facts(
         | skein_forge_client::Outcome::Failed(_)
         | skein_forge_client::Outcome::Raced { .. }
         | skein_forge_client::Outcome::Uncertain
+        | skein_forge_client::Outcome::Queued
         | skein_forge_client::Outcome::Held
         | skein_forge_client::Outcome::Withdrawn => {}
     }
@@ -2171,6 +2174,7 @@ fn emit_change_effect(
         start: None,
         attempt: None,
         failures: 0,
+        queued: false,
     };
     row.pending = Some(pending.entry);
     row.effect = change::EffectResult::Pending;
@@ -2246,6 +2250,7 @@ fn change_outcome(
         | skein_forge_client::Outcome::Failed(_)
         | skein_forge_client::Outcome::Raced { .. }
         | skein_forge_client::Outcome::Uncertain
+        | skein_forge_client::Outcome::Queued
         | skein_forge_client::Outcome::Held
         | skein_forge_client::Outcome::Withdrawn => false,
     };
@@ -2256,7 +2261,7 @@ fn change_outcome(
         | skein_forge_client::Outcome::Raced { .. }
         | skein_forge_client::Outcome::Held
         | skein_forge_client::Outcome::Withdrawn => change::EffectResult::Failed,
-        skein_forge_client::Outcome::Uncertain => return,
+        skein_forge_client::Outcome::Uncertain | skein_forge_client::Outcome::Queued => return,
     };
     row.pending = None;
     if pull_closed {
@@ -2307,6 +2312,7 @@ fn change_outcome(
         | skein_forge_client::Outcome::Failed(_)
         | skein_forge_client::Outcome::Raced { .. }
         | skein_forge_client::Outcome::Uncertain
+        | skein_forge_client::Outcome::Queued
         | skein_forge_client::Outcome::Held
         | skein_forge_client::Outcome::Withdrawn => {}
     }
@@ -2589,6 +2595,7 @@ fn enqueue_release(
         start: None,
         attempt: None,
         failures: 0,
+        queued: false,
     };
     row.pending = Some((number, resource));
     d.releases.insert(row.task, row.clone()).expect("replaces release");
@@ -2597,7 +2604,7 @@ fn enqueue_release(
 }
 
 fn release_outcome(d: &mut Domain, entry: u64, outcome: skein_forge_client::Outcome, out: &mut Queue<Request>) {
-    if outcome == skein_forge_client::Outcome::Uncertain {
+    if outcome == skein_forge_client::Outcome::Uncertain || outcome == skein_forge_client::Outcome::Queued {
         return;
     }
     let mut owner = None;
@@ -2628,7 +2635,9 @@ fn release_outcome(d: &mut Domain, entry: u64, outcome: skein_forge_client::Outc
             row.failed = true;
             emit(out, Request::ReleaseFailed { task });
         }
-        skein_forge_client::Outcome::Uncertain => unreachable!("uncertain returned above"),
+        skein_forge_client::Outcome::Uncertain | skein_forge_client::Outcome::Queued => {
+            unreachable!("uncertain returned above")
+        }
     }
     d.releases.insert(task, row.clone()).expect("replaces release");
     emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Release(row) });
@@ -2714,6 +2723,7 @@ fn project(
                 start: None,
                 attempt: None,
                 failures: 0,
+                queued: false,
             };
             let row = IssueRow {
                 goal,
@@ -2788,7 +2798,7 @@ fn projection_outcome(d: &mut Domain, entry: u64, outcome: skein_forge_client::O
     let Some(goal) = goal else { return };
     let Some(row) = d.issues.get_mut(&goal) else { unreachable!("found issue row") };
     match outcome {
-        skein_forge_client::Outcome::Uncertain => return,
+        skein_forge_client::Outcome::Uncertain | skein_forge_client::Outcome::Queued => return,
         skein_forge_client::Outcome::Made { made, .. } => {
             if row.number.is_none() {
                 match made {

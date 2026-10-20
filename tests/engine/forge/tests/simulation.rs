@@ -91,6 +91,7 @@ fn a_context_repository_cannot_receive_a_write() {
             start: None,
             attempt: None,
             failures: 0,
+            queued: false,
         },
     });
     world.event(top::Event::Committed { entry: 1 });
@@ -119,6 +120,7 @@ fn a_permission_refusal_rereads_capabilities_and_narrows_later_writes() {
         start: None,
         attempt: None,
         failures: 0,
+        queued: false,
     };
     world.event(top::Event::Enqueue { entry: entry.clone() });
     world.event(top::Event::Committed { entry: 1 });
@@ -855,6 +857,7 @@ fn a_restored_write_waits_for_the_fresh_repository_read() {
             start: None,
             attempt: None,
             failures: 0,
+            queued: false,
         },
     });
     assert!(world.stored().contains_key(&top::Key::Entry(1)));
@@ -895,6 +898,7 @@ fn a_merge_with_its_answer_lost_is_found_after_restart_without_merging_twice() {
             start: None,
             attempt: None,
             failures: 0,
+            queued: false,
         },
     });
     world.event(top::Event::Committed { entry: 1 });
@@ -930,6 +934,7 @@ fn a_merge_decided_for_an_old_head_cannot_land_the_new_head() {
             start: None,
             attempt: None,
             failures: 0,
+            queued: false,
         },
     });
     world.event(top::Event::Committed { entry: 1 });
@@ -1050,6 +1055,7 @@ fn prior_effects_settle_before_cleanup_can_delete_a_held_resource() {
             start: None,
             attempt: None,
             failures: 0,
+            queued: false,
         },
     });
     world.take_seen();
@@ -1095,6 +1101,7 @@ fn cancelling_withdraws_a_prior_effect_that_never_went_out() {
             start: None,
             attempt: None,
             failures: 0,
+            queued: false,
         },
     });
     world.take_seen();

@@ -42,7 +42,13 @@ fn decode_effect(value: w::Effect) -> skein_forge_client::Effect {
 }
 #[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
 fn encode_entry(value: &skein_forge_client::Entry) -> w::Entry {
-    let skein_forge_client::Entry { number, task, repository, effect, start, attempt, failures } = value;
+    let skein_forge_client::Entry { number, task, repository, effect, start, attempt, failures, queued } = value;
+    if *queued {
+        // temper configures Forgejo alone until temper-05; Forgejo never answers Queued.
+        unreachable!(
+            "temper configures Forgejo alone until temper-05; Forgejo never answers Queued; temper-05 takes temper-12’s EntryRow.queued tag 10 at STORE_VERSION 3 and removes this arm"
+        );
+    }
     w::Entry::new(
         &w::CEILINGS,
         w::EntryParts {
@@ -80,6 +86,7 @@ fn decode_entry(value: w::Entry) -> skein_forge_client::Entry {
             None => None,
         },
         failures,
+        queued: false,
     }
 }
 pub(super) fn encode_position(value: skein_forge_client::Position) -> w::Position {

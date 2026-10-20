@@ -604,6 +604,8 @@ impl World {
                     self.to_top.push((
                         pending.generation,
                         top::Event::Client(skein_forge_client::Event::Answered {
+                            free: 0,
+                            rate: None,
                             call: pending.client,
                             cost: 1,
                             result,

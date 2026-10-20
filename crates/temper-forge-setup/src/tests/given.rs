@@ -41,6 +41,8 @@ fn expected_given() -> skein_forge_setup::given::Given {
         bot_login: b"temper".as_slice().into(),
         bot_email: b"temper@example.invalid".as_slice().into(),
         orgs: Box::new([]),
+        // None adopted until temper-14a gives the owned forge’s adopted list.
+        adopted: Box::new([]),
         org_owner: None,
         listener: None,
         word: b"temper".as_slice().into(),
@@ -49,6 +51,8 @@ fn expected_given() -> skein_forge_setup::given::Given {
         git_name: b"temper-git".as_slice().into(),
         limits: skein_forge_setup::limits::Limits {
             orgs: 8,
+            reachable: 8,
+            repositories: crate::limits::small().repositories,
             deadline: Duration::from_secs(120),
             backoff: Duration::from_millis(100),
             backoff_max: Duration::from_secs(5),

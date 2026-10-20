@@ -309,6 +309,7 @@ fn forge_outcome(text: &mut Text, outcome: &skein_forge_client::Outcome) -> Resu
             text.add(b" raced: ")?;
             forge_error(text, *why)
         }
+        skein_forge_client::Outcome::Queued => text.add(b"queued"),
         skein_forge_client::Outcome::Uncertain => text.add(b"uncertain; connector will find it"),
         skein_forge_client::Outcome::Held => text.add(b"uncertain; task held for a person"),
         skein_forge_client::Outcome::Withdrawn => text.add(b"withdrawn before write"),

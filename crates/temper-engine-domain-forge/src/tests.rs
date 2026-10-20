@@ -157,6 +157,7 @@ fn status(number: u64, task: u64) -> skein_forge_client::Entry {
         start: None,
         attempt: None,
         failures: 0,
+        queued: false,
     }
 }
 fn branch() -> Name {
@@ -297,6 +298,8 @@ fn adoption_reads_permission_before_committing_its_role() {
     let result = outputs(
         &mut d,
         Event::Client(skein_forge_client::Event::Answered {
+            free: 0,
+            rate: None,
             call,
             cost: 1,
             result: Ok(skein_forge::api::Answer::Permission(skein_forge::api::Permission::Write)),
@@ -345,6 +348,8 @@ fn adoption_reads_permission_before_committing_its_role() {
         outputs(
             &mut d,
             Event::Client(skein_forge_client::Event::Answered {
+                free: 0,
+                rate: None,
                 call: branches,
                 cost: 1,
                 result: Ok(skein_forge::api::Answer::Branches(Box::new([Box::from(&b"main"[..])]))),
@@ -447,6 +452,8 @@ fn restored_ci_subscriptions_are_read_in_the_fresh_step_and_delay_its_completion
     let done = outputs(
         &mut d,
         Event::Client(skein_forge_client::Event::Answered {
+            free: 0,
+            rate: None,
             call: *call,
             cost: 1,
             result: Ok(skein_forge::api::Answer::Statuses {
@@ -572,6 +579,7 @@ fn native_effect_rows_keep_the_clients_recovery_promises() {
 /// is held for a person (domain/forge.md, 6).
 fn held_issue() -> skein_forge_client::Entry {
     skein_forge_client::Entry {
+        queued: false,
         number: 11,
         task: 7,
         repository: REPO,
@@ -735,8 +743,16 @@ fn four_writers() -> Domain {
 /// The forge's answer to client call `call`: the branch is at `commit`.
 fn branch_at(d: &mut Domain, call: u64, commit: u8) -> Box<[Request]> {
     let result = Ok(skein_forge::api::Answer::Commit([commit; 32]));
-    let answered =
-        outputs(d, Event::Client(skein_forge_client::Event::Answered { call: Token::new(call), cost: 1, result }));
+    let answered = outputs(
+        d,
+        Event::Client(skein_forge_client::Event::Answered {
+            free: 0,
+            rate: None,
+            call: Token::new(call),
+            cost: 1,
+            result,
+        }),
+    );
     d.reclaim();
     answered
 }

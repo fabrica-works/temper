@@ -112,6 +112,8 @@ pub fn shared(limits: &limits::Limits, io: &skein_io::Limits) -> skein_forge_con
 #[must_use]
 pub fn event(answer: skein_forge_connection::Answered) -> root::Event {
     root::Event::Forge(Box::new(forge::Event::Client(skein_forge_client::Event::Answered {
+        free: 0,
+        rate: None,
         call: answer.call,
         cost: answer.cost,
         result: answer.result,
@@ -124,7 +126,7 @@ pub fn hinted(hinted: skein_forge_connection::hooks::Hinted) -> root::Event {
 }
 /// Recover an answer refused by admission or returned during the drain.
 pub fn back(event: Box<forge::Event>) -> Result<skein_forge_connection::Answered, Box<forge::Event>> {
-    if let forge::Event::Client(skein_forge_client::Event::Answered { call, cost, result }) = *event {
+    if let forge::Event::Client(skein_forge_client::Event::Answered { call, cost, result, .. }) = *event {
         Ok(skein_forge_connection::Answered { call, cost, result })
     } else {
         Err(event)
@@ -136,6 +138,9 @@ pub fn small(forge: &forge::Limits) -> skein_forge_connection::Limits {
     skein_forge_connection::Limits {
         forges: 4,
         token_bytes: 512,
+        key_bytes: u32::try_from(skein_tls::RS256_KEY_BYTES).expect("RS256 key bound fits u32"),
+        installations: limits::FORGE_INSTALLATIONS,
+        renew_before: Duration::from_secs(10 * 60),
         connections: forge.client.calls,
         head_bytes: 16_384,
         headers: 64,
@@ -238,6 +243,11 @@ pub fn problems(unusable: skein_forge_connection::Unusable, found: &mut Problems
             b"forge_component.inner",
             b"forge.client.answer_bytes",
         ],
+        // temper configures Forgejo alone until temper-05 (runtime 30 precedent).
+        Unusable::GitHub { .. } => unreachable!("temper configures Forgejo alone until temper-05"),
+        Unusable::KeyBytes { .. } => &[b"forge_component.key_bytes"],
+        Unusable::AppDeadline { .. } => &[b"forge_component.deadline_ms"],
+        Unusable::RenewBefore { .. } => &[b"forge_component.renew_before_ms", b"forge_component.deadline_ms"],
         Unusable::Documents(_) => {
             &[b"forge_component.depth", b"forge_component.body_bytes_in", b"forge_component.chunk"]
         }
@@ -280,6 +290,10 @@ pub fn problems(unusable: skein_forge_connection::Unusable, found: &mut Problems
             found.push(forge_path(u32::from(forge)).member(b"api_token"), What::Bound);
             return;
         }
+        Unusable::Key { forge } => {
+            found.push(forge_path(u32::from(forge)).member(b"app_key"), What::Bound);
+            return;
+        }
         Unusable::User { forge } => {
             found.push(forge_path(u32::from(forge)).member(b"user"), What::Bound);
             return;
@@ -316,6 +330,7 @@ pub(crate) fn indexed(
     let mut unusable = unusable;
     if let skein_forge_connection::Unusable::Duplicate { forge }
     | skein_forge_connection::Unusable::Secret { forge }
+    | skein_forge_connection::Unusable::Key { forge }
     | skein_forge_connection::Unusable::Token { forge }
     | skein_forge_connection::Unusable::Credential { forge }
     | skein_forge_connection::Unusable::User { forge }

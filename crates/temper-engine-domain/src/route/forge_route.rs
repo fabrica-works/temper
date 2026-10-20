@@ -2181,7 +2181,9 @@ pub(crate) fn outputs(
                         jig_domain_core::connector::OutboxOutcome::Failed
                     }
                     skein_forge_client::Outcome::Withdrawn => jig_domain_core::connector::OutboxOutcome::Withdrawn,
-                    skein_forge_client::Outcome::Uncertain => jig_domain_core::connector::OutboxOutcome::Uncertain,
+                    skein_forge_client::Outcome::Uncertain | skein_forge_client::Outcome::Queued => {
+                        jig_domain_core::connector::OutboxOutcome::Uncertain
+                    }
                     skein_forge_client::Outcome::Held => jig_domain_core::connector::OutboxOutcome::Held { entry },
                 };
                 domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(
@@ -2503,6 +2505,7 @@ pub(crate) fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, as
                                 start: None,
                                 attempt: None,
                                 failures: 0,
+                                queued: false,
                             },
                         },
                     }));
@@ -2545,6 +2548,7 @@ pub(crate) fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, as
                             start: None,
                             attempt: None,
                             failures: 0,
+                            queued: false,
                         },
                     }));
                 }

@@ -36,6 +36,10 @@ pub fn refusal(index: u32, why: Refused) -> Problems {
             what = What::Reason(b"outside its type");
             limits.member(b"setup.backoff_max_ms")
         }
+        Place::ReachableLimit | Place::Page => unreachable!("no picker until temper-10; reachable is fixed nonzero"),
+        Place::Repositories | Place::Repository(_) | Place::RepositoriesLimit => {
+            unreachable!("temper adopts nothing until temper-14a; repositories is fixed nonzero (limits::small)")
+        }
         Place::Word => {
             what = What::Own(b"temper's word");
             root
@@ -57,6 +61,12 @@ pub fn refusal(index: u32, why: Refused) -> Problems {
         what = What::Against(match other {
             Place::BackoffMax => b"setup.backoff_max_ms",
             Place::Deadline => b"setup.deadline_ms",
+            Place::ReachableLimit | Place::Page => {
+                unreachable!("no picker until temper-10; reachable is fixed nonzero")
+            }
+            Place::Repositories | Place::Repository(_) | Place::RepositoriesLimit => {
+                unreachable!("temper adopts nothing until temper-14a; repositories is fixed nonzero (limits::small)")
+            }
             Place::Word
             | Place::BotLogin
             | Place::BotEmail
@@ -91,6 +101,8 @@ pub fn values(
             crate::setup::Mode::Managed { .. } => Box::new([]),
             crate::setup::Mode::Owned(_) => entry.orgs.clone(),
         },
+        // None adopted until temper-14a gives the owned forge’s adopted list.
+        adopted: Box::new([]),
         org_owner: match &entry.mode {
             crate::setup::Mode::Managed { .. } => None,
             crate::setup::Mode::Owned(owned) => Some(owned.person.login.clone()),

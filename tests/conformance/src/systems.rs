@@ -150,7 +150,13 @@ impl FakeForge {
             self.late.push((call, repository, op, key));
             self.uncertainty(key);
             return vec![engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Client(
-                skein_forge_client::Event::Answered { call, cost: 1, result: Err(api::Error::Timeout) },
+                skein_forge_client::Event::Answered {
+                    free: 0,
+                    rate: None,
+                    call,
+                    cost: 1,
+                    result: Err(api::Error::Timeout),
+                },
             )))];
         }
         self.send(clock, call, op, key, false);
@@ -282,6 +288,8 @@ impl FakeForge {
                 if pending.generation == self.generation {
                     events.push(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Client(
                         skein_forge_client::Event::Answered {
+                            free: 0,
+                            rate: None,
                             call: pending.root_call,
                             cost: 1,
                             result: match result {
