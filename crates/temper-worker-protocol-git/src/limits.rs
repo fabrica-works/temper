@@ -101,7 +101,7 @@ pub fn worst_case(limits: &Limits, checkout: &checkout::Limits) -> Option<u64> {
         .checked_add(u64::from(checkout.message_bytes).checked_add(3)?)?
         .checked_add(8192)?
         // The repository program retained by the operation and its spawn.
-        .checked_add(4096_u64.checked_mul(2)?)?;
+        .checked_add(u64::from(checkout::PROGRAM_BYTES).checked_mul(2)?)?;
     let capacity = limits.operations.checked_add(1)?;
     let table = Slab::<Operation>::worst_case(capacity.checked_mul(2)?)?
         .checked_add(Map::<Token, Id<Operation>>::worst_case(capacity)?)?;
@@ -115,7 +115,7 @@ pub fn worst_case(limits: &Limits, checkout: &checkout::Limits) -> Option<u64> {
         .checked_add(table)?
         .checked_add(background)?
         // One last checked item program and its answer.
-        .checked_add(4096)
+        .checked_add(u64::from(checkout::PROGRAM_BYTES))
 }
 
 /// The most records one entry point emits, except abort.

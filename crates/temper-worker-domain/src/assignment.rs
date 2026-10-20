@@ -6,6 +6,8 @@
 //! repository sits in, so one path component unique within its workspace;
 //! the root relies on the workspace fitting the limits once it has passed.
 
+use temper_worker_domain_checkout as checkout;
+
 use crate::Limits;
 use crate::wire::{Access, Repository, Start, Workspace};
 
@@ -43,7 +45,7 @@ fn repository(repository: &Repository, limits: &Limits) -> Result<(), &'static [
         return Err(b"remote");
     }
     if let Some(program) = &repository.git
-        && (!program.starts_with(b"/") || program.len() > 4096 || program.contains(&0))
+        && (!program.starts_with(b"/") || len(program) > u64::from(checkout::PROGRAM_BYTES) || program.contains(&0))
     {
         return Err(b"repository git");
     }

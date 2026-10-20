@@ -7,6 +7,10 @@ use crate::cache::{Cloned, Workspace};
 use crate::facts::Fact;
 use crate::hold::{Hold, Tips};
 
+/// The longest program a repository names, its absolute path
+/// (protocol/channel.md, section 4).
+pub const PROGRAM_BYTES: u32 = 4096;
+
 /// The checkout child domain's limits (section 7), handed by its parent to
 /// every step read-only.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -63,8 +67,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let cache = u64::from(limits.workspaces).checked_mul(workspace)?;
     let hold_slots = holds(limits)?;
     let holds = Slab::<Hold>::worst_case(hold_slots)?;
-    // A repository's name, remote, identity, starting branch and push branch.
-    let repository = name.checked_mul(4)?.checked_add(4096)?;
+    // A repository's name, remote, identity, starting branch and push branch,
+    // and its program.
+    let repository = name.checked_mul(4)?.checked_add(u64::from(PROGRAM_BYTES))?;
     let spec = List::<Repository>::worst_case(limits.repositories)?
         .checked_add(u64::from(limits.repositories).checked_mul(repository)?)?;
     let push = List::<Landing>::worst_case(limits.repositories)?

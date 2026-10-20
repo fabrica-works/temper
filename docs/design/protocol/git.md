@@ -174,11 +174,10 @@ pipes      stdin (written, then closed), stdout, stderr
 - **No program.** With `workers[].git` `null` and an item naming none,
   nothing is spawned: each invocation fails as git's fatal exit would,
   status 128, its stderr `fatal: no git on this machine for HOST`, HOST
-  the remote's host with its port; an operation without a remote
-  (`CheckOut`, `Merge`, `Commit`) names no host: `fatal: no git on this machine`.
-  So the operation ends
-  `FailedWithOutput { Broken, diagnostic }` (section 6), and the forge's
-  row warns (`../client/forge.md`, 5.4).
+  the remote's host with its port, and an operation without a remote
+  (`CheckOut`, `Merge`, `Commit`) names no host, `fatal: no git on this
+  machine`; so the operation ends `FailedWithOutput { Broken, diagnostic }`
+  (section 6), and the forge's row warns (`../client/forge.md`, 5.4).
 - **The version.** At the worker's start the component runs `git
   version` once with `workers[].git`, unless `null`, in the environment
   of section 5, and refuses the start, naming the program, when it fails
