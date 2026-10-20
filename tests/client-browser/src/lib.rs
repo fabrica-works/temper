@@ -9,6 +9,7 @@ use skein_fake_person_browser::{
 use skein_ui::Role;
 use std::path::{Path, PathBuf};
 mod configuration;
+mod forgery;
 
 /// How long a story waits for what a page shows.
 pub const WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(5);
@@ -78,13 +79,14 @@ fn live() -> Find {
 /// A scratch deployment for one story's `temper serve`.
 pub struct Tier {
     scratch: skein_scratch::Scratch,
+    forged: Box<[u8]>,
 }
 impl Tier {
     #[must_use]
     pub fn new(name: &str) -> Self {
         let scratch = skein_scratch::Scratch::new(name);
         configuration::write(scratch.path(), &temper(), &bundle());
-        Self { scratch }
+        Self { scratch, forged: forgery::request() }
     }
     #[must_use]
     pub fn setup(&self) -> Setup<'_> {
@@ -106,6 +108,16 @@ impl Tier {
             live: live(),
             offline: Find::exactly_named(Role::Status, b"Offline"),
             signed_out: Find::text(b"Signed out. To sign in, open a sign-in link temper serve printed."),
+        }
+    }
+    /// A forged chat would show its words on the chats page if accepted.
+    #[must_use]
+    pub fn target(&self) -> jig_client_fake_person_browser::Target<'_> {
+        jig_client_fake_person_browser::Target {
+            prefix: b"/jig",
+            page: b"/chats",
+            request: &self.forged,
+            done: Find::text(b"Forged"),
         }
     }
 }
