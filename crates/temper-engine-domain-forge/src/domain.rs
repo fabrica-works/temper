@@ -1944,7 +1944,6 @@ fn queue_first(d: &Domain, row: &ChangeRow, now: skein_lib::Wall, l: &Limits) ->
 }
 
 fn finish_step(d: &mut Domain, env: &Env<Limits>, pending: PendingStep, out: &mut Queue<Request>) {
-    decide_step(d, env, &pending, out);
     if pending.woken {
         step_change(
             d,
@@ -1958,6 +1957,8 @@ fn finish_step(d: &mut Domain, env: &Env<Limits>, pending: PendingStep, out: &mu
             },
             out,
         );
+    } else {
+        decide_step(d, env, &pending, out);
     }
 }
 

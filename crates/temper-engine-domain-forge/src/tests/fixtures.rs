@@ -39,6 +39,23 @@ pub const OPEN: u64 = 11;
 pub const HEAD: skein_forge::api::Commit = [3; 32];
 pub const BASE: skein_forge::api::Commit = [4; 32];
 
+pub fn open_pull() -> skein_forge::api::Pull {
+    skein_forge::api::Pull {
+        reviewers: Box::new([]),
+        number: 1,
+        state: skein_forge::api::State::Open,
+        head: Box::from(b"temper/51".as_slice()),
+        base: Box::from(b"main".as_slice()),
+        commit: HEAD,
+        base_commit: Some(BASE),
+        merged: None,
+        mergeable: true,
+        ci: skein_forge::api::Ci::Passed,
+        queued: None,
+        dequeued: None,
+    }
+}
+
 pub fn opening() -> (Domain, Token) {
     use temper_engine_domain_forge_change as change;
     let mut d = domain();
