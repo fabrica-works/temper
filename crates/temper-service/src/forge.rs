@@ -1,4 +1,5 @@
 //! The forge component's boundary to the engine (protocol/README.md, 6).
+pub(crate) mod records;
 use crate::{limits, settings};
 use alloc::boxed::Box;
 use jig_protocol_config::{Path, Problems, Segment, What};
@@ -181,6 +182,10 @@ pub(crate) struct Layer {
     pub(crate) io: Queue<skein_io::Request>,
     pub(crate) closed: bool,
     begun: bool,
+    #[cfg(test)]
+    pub(crate) starts: List<(u16, skein_forge_connection::Access)>,
+    #[cfg(test)]
+    pub(crate) accepted: List<(u16, Box<[u64]>)>,
 }
 impl Layer {
     pub(crate) fn new(
@@ -198,6 +203,10 @@ impl Layer {
             io: Queue::with_capacity(batch.checked_mul(skein_forge_connection::MAX_OUT.below).expect("forge io room")),
             closed: false,
             begun: false,
+            #[cfg(test)]
+            starts: List::with_capacity(limits.forges),
+            #[cfg(test)]
+            accepted: List::with_capacity(limits.forges),
         })
     }
     pub(crate) fn room(&self, batch: u32) -> bool {
@@ -205,6 +214,14 @@ impl Layer {
             && self.io.room() >= batch.checked_mul(skein_forge_connection::MAX_OUT.below).expect("forge batch io")
     }
     pub(crate) fn down(&mut self, request: skein_forge_connection::Request) {
+        #[cfg(test)]
+        if let skein_forge_connection::Request::Connect { forge, access } = &request {
+            self.starts.push((*forge, access.clone())).expect("test starts");
+        }
+        #[cfg(test)]
+        if let skein_forge_connection::Request::Installations { forge, accepted } = &request {
+            self.accepted.push((*forge, accepted.clone())).expect("test accepted");
+        }
         self.component.down(&self.env, request, &mut self.above, &mut self.io);
     }
     pub(crate) fn up(&mut self, event: skein_io::Event) {
@@ -417,7 +434,12 @@ pub(crate) fn config(
     let mut writers = List::with_capacity(count);
     let mut identities = List::with_capacity(count);
     for forge in &settings.forges {
-        writers.push(skein_forge_client::Writer { forge: forge.number, author: forge.user }).expect("forge writers");
+        // GitHub's writer is unknown until Connected; temper-05 gives it to the client.
+        if forge.kind == settings::Kind::Forgejo {
+            writers
+                .push(skein_forge_client::Writer { forge: forge.number, author: forge.user })
+                .expect("forge writers");
+        }
         identities
             .push(forge::GitIdentity { forge: forge.number, credential: forge.identity })
             .expect("forge identities");

@@ -2439,13 +2439,20 @@ name = "temper-codecs-world"
 version = "0.0.0"
 dependencies = [
  "jig-client-protocol-wire",
+ "jig-protocol-config",
  "skein-codegen",
+ "skein-fake-forge-github",
+ "skein-forge",
  "skein-forge-client",
+ "skein-forge-connection",
+ "skein-forge-setup",
+ "skein-io",
  "skein-lib",
  "temper-client-protocol-wire",
  "temper-engine-domain-forge",
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-issues",
+ "temper-protocol-records",
  "temper-protocol-store",
  "temper-protocol-worker-wire",
 ]
@@ -2585,6 +2592,7 @@ version = "0.0.0"
 dependencies = [
  "jig-domain-people",
  "skein-fake-forge-domain",
+ "skein-fake-forge-github",
  "skein-fake-forge-protocol",
  "skein-forge",
  "skein-forge-client",
@@ -2751,6 +2759,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-protocol-records"
+version = "0.0.0"
+dependencies = [
+ "jig-protocol-config",
+ "skein-forge",
+ "skein-forge-connection",
+ "skein-forge-setup",
+ "skein-lib",
+]
+
+[[package]]
 name = "temper-protocol-store"
 version = "0.0.0"
 dependencies = [
@@ -2839,9 +2858,11 @@ dependencies = [
  "jig-protocol-worker-wire",
  "skein-channel",
  "skein-codec",
+ "skein-fake-forge-github",
  "skein-forge",
  "skein-forge-client",
  "skein-forge-connection",
+ "skein-forge-setup",
  "skein-http",
  "skein-io",
  "skein-json",
@@ -2864,6 +2885,7 @@ dependencies = [
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-issues",
  "temper-engine-smith",
+ "temper-protocol-records",
  "temper-protocol-store",
  "temper-protocol-worker-wire",
  "temper-worker-domain",

@@ -33,7 +33,14 @@ fn identities_are_announced_before_the_restart() {
     service.engine.store.opened = true;
     let _listen = service.engine.workers.io.pop().unwrap();
     assert_eq!(service.engine.domain.next_deadline(&service.engine.env), None);
-    crate::engine::iterate(&mut service.engine, Time::ZERO, skein_lib::Wall::EPOCH);
+    for _ in 0_u8..8 {
+        crate::engine::iterate(&mut service.engine, Time::ZERO, skein_lib::Wall::EPOCH);
+        if service.engine.credentials.is_empty() {
+            break;
+        }
+        assert!(service.engine.store.routed.is_empty(), "records precede Restart");
+    }
+    assert!(service.engine.forge_records.done());
     assert!(service.engine.credentials.is_empty());
     assert_eq!(service.engine.domain.next_deadline(&service.engine.env), Some(Time::from_nanos(u64::MAX)));
     assert!(service.engine.store.routed.is_empty(), "the restart has not asked for a load");

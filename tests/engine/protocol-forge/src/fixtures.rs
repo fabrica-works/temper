@@ -156,3 +156,20 @@ pub fn token_absent(value: &impl core::fmt::Debug) -> bool {
     let bytes = format!("{TOKEN:?}");
     !text.as_bytes().windows(TOKEN.len()).any(|part| part == TOKEN) && !text.contains(&bytes[1..bytes.len() - 1])
 }
+
+/// The machine world's fake App and bot, supplied by temper's own fixture.
+#[must_use]
+pub fn github_settings() -> Settings {
+    let mut settings = settings();
+    let forge = settings.forges.get_mut(0).expect("forge");
+    forge.kind = Kind::GitHub;
+    forge.access = Some(skein_forge_connection::Access {
+        credential: skein_forge::credential::Credential::App {
+            id: 7,
+            key: Secret::new(Box::from(skein_fake_forge_github::keys::KEYS[0])),
+        },
+        user: 9,
+        webhook_secret: None,
+    });
+    settings
+}

@@ -24,6 +24,10 @@ struct Driver {
 }
 #[derive(Debug)]
 pub struct Store {
+    #[cfg(test)]
+    pub(crate) forge_loads: skein_lib::List<Option<u64>>,
+    #[cfg(test)]
+    pub(crate) erases: u32,
     pub(crate) component: protocol::Store,
     env: Env<protocol::Limits>,
     pub(crate) routes: route::Routes,
@@ -97,6 +101,10 @@ impl Store {
             temper_protocol_store::bounds(&application.forge).expect("checked family bounds"),
         );
         Self {
+            #[cfg(test)]
+            forge_loads: skein_lib::List::with_capacity(128),
+            #[cfg(test)]
+            erases: 0,
             component: protocol::Store::on_directory(
                 limits,
                 temper_protocol_store::application(&application.forge).expect("checked application sizes"),
@@ -185,6 +193,16 @@ impl Store {
     }
     /// Get answers stay in this pass; secret writes' terminals are handed to their owner.
     pub fn secrets(&mut self, owner: Token, request: protocol::Secrets) -> Option<protocol::Event> {
+        #[cfg(test)]
+        if owner == crate::forge::records::LOAD
+            && let protocol::Secrets::Load { after, .. } = &request
+        {
+            self.forge_loads.push(*after).expect("test page trace");
+        }
+        #[cfg(test)]
+        if let protocol::Secrets::Erase { .. } = &request {
+            self.erases = self.erases.checked_add(1).expect("test erases");
+        }
         let immediate = match &request {
             protocol::Secrets::Get { .. } | protocol::Secrets::Load { .. } => true,
             protocol::Secrets::Adopt { .. }

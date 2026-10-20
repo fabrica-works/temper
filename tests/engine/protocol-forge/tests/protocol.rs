@@ -444,3 +444,31 @@ fn held_branch(world: &mut Protocol) -> (top::Name, skein_forge::api::Commit) {
 
     (name, pushed)
 }
+
+#[test]
+fn github_reaches_ready_through_its_accepted_installations() {
+    use skein_forge_machine_world::machine::{Answer, Machine};
+    let mut world = Machine::github(
+        7,
+        fixtures::limits(),
+        fixtures::github_settings(),
+        [
+            "GET /app/installations?per_page=100&page=1",
+            "GET /app/installations?per_page=100&page=2",
+            "POST /app/installations/1/access_tokens",
+            "POST /app/installations/1/access_tokens",
+            "POST /graphql",
+        ]
+        .into_iter()
+        .map(Answer::served)
+        .collect(),
+    );
+    world.action(skein_forge_connection::Request::Installations { forge: fixtures::FORGE, accepted: Box::from([1]) });
+    world.run_for(skein_lib::Duration::from_secs(1));
+    assert_eq!(world.connected_forges(), &[fixtures::FORGE]);
+    assert_eq!(world.start(fixtures::FORGE), Some(skein_forge_connection::start::Start::Ready { cap: 100 }));
+    assert_eq!(world.requests().len(), 5);
+    assert_eq!(world.git_tokens().len(), 1);
+    assert!(world.script_done());
+    assert!(world.close());
+}

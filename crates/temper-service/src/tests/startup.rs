@@ -598,7 +598,10 @@ fn paths_are_resolved_by_kind_and_absolute_only_members_refuse_relative_values()
 }
 
 fn github_application() -> Box<str> {
-    core::str::from_utf8(fixtures::APPLICATION).unwrap()
+    github_input(core::str::from_utf8(fixtures::APPLICATION).unwrap())
+}
+fn github_input(input: &str) -> Box<str> {
+    input
                 .replace("\"kind\":\"forgejo\"", "\"kind\":\"github\"")
         .replace("\"api\":{\"socket\":\"127.0.0.1:9\"}", "\"api\":null")
         .replace("\"transport\":\"plaintext\"", "\"transport\":null")
@@ -673,4 +676,36 @@ fn github_refusals_name_the_configured_member() {
     let (members, problems) = application(input.as_bytes(), &jig);
     assert!(members.is_none());
     assert!(core::str::from_utf8(&lines(&problems)).unwrap().contains("forges[0].web"));
+}
+
+#[test]
+fn a_configured_github_forge_without_records_starts_not_connected() {
+    let document = fixtures::document();
+    let document = github_input(core::str::from_utf8(&document).unwrap());
+    let mut service = crate::startup(
+        document.as_bytes(),
+        &config::Directories::working(),
+        &fixtures::files(),
+        &fixtures::startup_agent(),
+        &fixtures::seeds(),
+        None,
+        fixtures::worker_runtime(),
+        fixtures::forge_runtime(),
+    )
+    .unwrap();
+    assert_eq!(service.engine.workers.forges[0].kind, settings::Kind::GitHub);
+    service.engine.store = fixtures::memory_store();
+    let mut face = fixtures::ForgeFace::new();
+    for _ in 0_u8..32 {
+        face.turn(&mut service);
+    }
+    assert_eq!(
+        service.notes().pop(),
+        Some(crate::Note::ForgeNotConnected { number: 1, why: crate::NotConnected::NoRecords })
+    );
+    assert!(service.engine.credentials.is_empty());
+    assert!(service.engine.forge.starts.is_empty());
+    assert!(service.engine.forge_records.done());
+    assert!(service.engine.domain.ready());
+    assert_eq!(service.end(), None);
 }

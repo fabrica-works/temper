@@ -66,6 +66,8 @@ impl Service {
             limits::engine(&settings.jig.limits, &settings.limits).ok_or(start_problem(b"limits", What::Bound))?;
         let (forge_settings, forge_roots, forge_owned) = forges;
         let shared = crate::forge::shared(&settings.limits, &settings.jig.limits.io);
+        settings.jig.limits.clients.wire.keyed_value_some =
+            settings.jig.limits.clients.wire.keyed_value_some.min(settings.limits.records.value_bytes);
         read_charters(&mut settings)?;
         let store_limits = store::limits(&limits, &settings.jig.limits.core, &limits.forge, &settings.jig.limits.store)
             .ok_or(start_problem(b"limits", What::Bound))?;
@@ -138,7 +140,7 @@ impl Service {
                 config,
                 &limits,
                 store,
-                engine::Children { accounts, workers, clients, forge, notes },
+                engine::Children { accounts, workers, clients, forge, notes, limits: settings.limits },
                 values,
                 first_periods,
             ),
@@ -643,5 +645,8 @@ fn memory(
     if let Some(runtime) = runtime {
         bytes = bytes.checked_add(skein_tls::roots_worst_case(runtime.trust_roots, runtime.trust_root_bytes)?)?;
     }
+    bytes = bytes
+        .checked_add(crate::forge::records::worst_case(settings)?)?
+        .checked_add(List::<u16>::worst_case(u32::try_from(settings.forges.len()).ok()?)?)?;
     Some(bytes)
 }

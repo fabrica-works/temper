@@ -63,8 +63,7 @@ impl skein_shell::Host for Host {
     }
     fn drain(&mut self) {
         while let Some(note) = self.service.notes().pop() {
-            let temper_service::Note::ForgeStopped { number, why } = note;
-            let lines = stopped_line(number, why);
+            let lines = note_line(note);
             eprint!("{lines}");
         }
         while let Some(link) = self.service.links().pop() {
@@ -82,6 +81,20 @@ impl skein_shell::Host for Host {
     }
 }
 
+fn note_line(note: temper_service::Note) -> String {
+    match note {
+        temper_service::Note::ForgeStopped { number, why } => stopped_line(number, why),
+        temper_service::Note::ForgeNotConnected { number, why } => {
+            format!("temper serve: forge {number}: not connected: {why}\n")
+        }
+        temper_service::Note::ForgeUnconfigured { number } => {
+            format!("temper serve: forge {number}: its records are not configured\n")
+        }
+        temper_service::Note::ForgeUnkept { number, installation } => {
+            format!("temper serve: forge {number}: installation {installation}: not kept\n")
+        }
+    }
+}
 fn stopped_line(number: u16, why: skein_forge_connection::Stopped) -> String {
     use skein_forge_connection::{StartRead, Stopped, Value};
     match why {
@@ -126,4 +139,31 @@ fn github_start_refusals_name_their_paths() {
     ] {
         assert_eq!(stopped_line(1, why), format!("temper serve: forge 1: {words}\n"));
     }
+}
+
+#[test]
+fn records_and_installation_notes_name_the_forge_and_reason() {
+    use temper_service::{NotConnected, Note};
+    assert_eq!(
+        note_line(Note::ForgeNotConnected { number: 7, why: NotConnected::Unreadable }),
+        "temper serve: forge 7: not connected: its records are unreadable\n"
+    );
+    assert_eq!(
+        note_line(Note::ForgeNotConnected {
+            number: 7,
+            why: NotConnected::OtherForge {
+                kind: skein_forge_connection::settings::Kind::Forgejo,
+                api: Box::from("fake.test:443")
+            }
+        }),
+        "temper serve: forge 7: not connected: its records were made for forgejo at fake.test:443\n"
+    );
+    assert_eq!(
+        note_line(Note::ForgeUnconfigured { number: 8 }),
+        "temper serve: forge 8: its records are not configured\n"
+    );
+    assert_eq!(
+        note_line(Note::ForgeUnkept { number: 7, installation: 93 }),
+        "temper serve: forge 7: installation 93: not kept\n"
+    );
 }

@@ -334,7 +334,7 @@ fn checked_start(
         .ok_or(problem(indexed(0).member(b"memory_bytes"), What::Jig(config::What::Bound)))?;
     let worker_operations = crate::worker_settings::operations(&parsed.application.limits.git_component)
         .ok_or(problem(indexed(0).member(b"limits"), What::Jig(config::What::Bound)))?;
-    let engine = settings::Engine {
+    let mut engine = settings::Engine {
         jig: parsed.engine,
         clients: parsed.application.clients,
         webhooks: resolved.webhooks,
@@ -345,6 +345,8 @@ fn checked_start(
         charter: parsed.application.charter,
         limits: parsed.application.limits,
     };
+    engine.jig.limits.clients.wire.keyed_value_some =
+        engine.jig.limits.clients.wire.keyed_value_some.min(engine.limits.records.value_bytes);
     let root = crate::limits::engine(&engine.jig.limits, &engine.limits)
         .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Jig(config::What::Bound)))?;
     checks::root(&engine, seeds, &parsed.application.landing_projects, &root, &mut problems);

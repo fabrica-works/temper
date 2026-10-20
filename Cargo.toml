@@ -3,6 +3,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/temper-protocol-records",
     "tests/real-loop",
     "crates/temper-box",
     "tools/live-login",
@@ -53,6 +54,8 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+temper-protocol-records = { path = "crates/temper-protocol-records" }
+skein-fake-forge-github = { git = "https://github.com/fabrig-dev/skein.git" }
 temper-box = { path = "crates/temper-box" }
 temper-forge-setup-shell = { path = "crates/temper-forge-setup-shell" }
 temper-forge-setup = { path = "crates/temper-forge-setup" }

@@ -8,6 +8,7 @@ pub mod limits;
 pub mod settings;
 pub mod startup;
 pub use startup::{Named, named, startup};
+pub use temper_protocol_records::NotConnected;
 pub mod system;
 pub use system::{Service, iterate};
 pub mod store;
@@ -59,4 +60,7 @@ use jig_protocol_config::Problems;
 #[derive(PartialEq, Eq, Debug)]
 pub enum Note {
     ForgeStopped { number: u16, why: skein_forge_connection::Stopped },
+    ForgeNotConnected { number: u16, why: NotConnected },
+    ForgeUnconfigured { number: u16 },
+    ForgeUnkept { number: u16, installation: u64 },
 }

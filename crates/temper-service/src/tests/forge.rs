@@ -412,3 +412,288 @@ fn connected_then_token_refused_keeps_the_note_and_engine_running() {
     assert_eq!(service.end(), None);
     assert!(service.engine.drain.is_none());
 }
+
+fn records_service() -> (crate::Service, skein_lib::Secret) {
+    use crate::settings::{Kind, Transport};
+    use skein_lib::List;
+    let mut settings = fixtures::engine();
+    settings.limits.forge_component.forges = 9;
+    settings.limits.forge_component.repositories = 9;
+    settings.limits.forge.repositories = 9;
+    settings.limits.forge.client.repositories = 9;
+    settings.limits.forge.output = 256;
+    let mut forges = List::with_capacity(9);
+    let mut runtime = List::with_capacity(9);
+    for number in 1..=9_u16 {
+        let mut forge = fixtures::forges().into_iter().next().unwrap();
+        forge.number = number;
+        if number != 1 {
+            forge.kind = Kind::GitHub;
+            forge.api_token = None;
+        }
+        forge.api = jig_protocol_config::Address::Addr(skein_io::Addr::Ip(
+            ([127, 0, 0, 1], 2999_u16.checked_add(number).unwrap()).into(),
+        ));
+        forge.transport = Transport::Plaintext;
+        forges.push(forge).unwrap();
+        runtime
+            .push(crate::ForgeRuntime {
+                number,
+                address: ([127, 0, 0, 1], 2999_u16.checked_add(number).unwrap()).into(),
+                transport: skein_forge_connection::settings::Transport::Plaintext { name: None },
+                trust_roots: 0,
+                trust_root_bytes: 0,
+            })
+            .unwrap();
+    }
+    settings.forges = forges.into_boxed();
+    fixtures::fill_files(&mut settings);
+    let file_token = settings.forges[0].api_token.clone().unwrap();
+    let mut service = crate::Service::engine(settings, &fixtures::seeds(), None, runtime).unwrap();
+    service.engine.store = fixtures::records_store();
+    (service, file_token)
+}
+#[expect(clippy::disallowed_macros, reason = "ordinary fixtures build versioned row bytes")]
+fn startup_records() -> skein_lib::List<(u64, skein_lib::Secret)> {
+    use skein_lib::{List, Secret};
+    use temper_protocol_records::{self as records, Item, Origin};
+    let mut kept = List::with_capacity(64);
+    for number in [1, 2, 4, 5, 6, 7, 8, 9, 77] {
+        let kind = if number == 1 || number == 7 {
+            skein_forge_connection::settings::Kind::Forgejo
+        } else {
+            skein_forge_connection::settings::Kind::GitHub
+        };
+        let api = if number == 8 {
+            "another.test:443".into()
+        } else {
+            alloc::format!("127.0.0.1:{}", 2999_u16.checked_add(number).unwrap()).into_boxed_str()
+        };
+        let mut values = List::with_capacity(7);
+        values.push((Item::Origin, Origin { kind, api }.encode())).unwrap();
+        if number != 4 {
+            values.push((Item::User, Box::from(9_u64.to_le_bytes()))).unwrap();
+            if number == 1 {
+                let token = skein_lib::Decimal::of(skein_lib::Rng::new(512).next_u64());
+                values.push((Item::ApiToken, Box::from(token.as_bytes()))).unwrap();
+            } else {
+                for (item, value) in [
+                    (Item::AppId, Box::from(7_u64.to_le_bytes())),
+                    (Item::AppSlug, Box::from(b"test-app".as_slice())),
+                    (Item::AppKey, Box::from(skein_fake_forge_github::keys::KEYS[0])),
+                    (Item::Accepted, Box::from(1_u64.to_le_bytes())),
+                ] {
+                    values.push((item, value)).unwrap();
+                }
+                if number == 9 {
+                    values
+                        .push((
+                            Item::ApiToken,
+                            Box::from(skein_lib::Decimal::of(skein_lib::Rng::new(513).next_u64()).as_bytes()),
+                        ))
+                        .unwrap();
+                }
+            }
+        }
+        for (item, bytes) in values.into_boxed() {
+            let mut value = records::encode(&bytes);
+            if number == 5 && item == Item::User {
+                value[0] = 2;
+            }
+            if number == 6 && item == Item::AppKey {
+                value.resize(1198, 0);
+            }
+            let number = records::number(number, item);
+            kept.push((number, Secret::new(value.into_boxed_slice()))).unwrap();
+        }
+    }
+    // A carried row and a later one: neither value decodes as any record.
+    kept.push((records::CARRIED, Secret::new(Box::from([2, 255])))).unwrap();
+    kept.push((records::CARRIED + 1, Secret::new(Box::from([2, 254])))).unwrap();
+    kept
+}
+#[test]
+#[expect(clippy::disallowed_methods, reason = "ordinary routing tests inspect store requests and HTTP fixture bytes")]
+fn records_start_routes_two_pages_without_erasing_or_reading_carried_values() {
+    use jig_protocol_store::{SecretOwner, Secrets};
+    use skein_lib::List;
+    use temper_protocol_records::{self as records, NotConnected};
+    let (mut service, file_token) = records_service();
+    let kept = startup_records();
+    for (number, value) in &kept {
+        assert!(
+            service
+                .engine
+                .store
+                .secrets(
+                    Token::new(123),
+                    Secrets::Keep { owner: SecretOwner::Application, number: *number, value: value.clone() }
+                )
+                .is_none()
+        );
+        let Some(jig_protocol_store::Event::Kept { .. }) = service.engine.store.above.pop() else { panic!("row kept") };
+    }
+    let mut face = fixtures::ForgeFace::new();
+    for _ in 0_u32..40 {
+        face.turn(&mut service);
+    }
+    assert!(service.engine.forge_records.done());
+    assert_eq!(service.engine.store.forge_loads.len(), 2);
+    for cursor in &service.engine.store.forge_loads {
+        assert!(cursor.is_none_or(|number| number < records::CARRIED));
+    }
+    assert_eq!(service.engine.store.erases, 0);
+    for number in &service.engine.forge_records.inspected {
+        assert!(*number < records::CARRIED);
+    }
+    assert_eq!(service.engine.forge_records.inspected.len(), kept.len().checked_sub(2).unwrap());
+    assert_eq!(service.engine.forge.starts.len(), 1);
+    let (number, access) = service.engine.forge.starts.get(0).unwrap();
+    assert_eq!((*number, access.user), (2, 9));
+    let skein_forge::credential::Credential::App { id, key } = &access.credential else { panic!("App credential") };
+    assert_eq!(*id, 7);
+    assert!(key.expose() == skein_fake_forge_github::keys::KEYS[0]);
+    assert_eq!(service.engine.forge.accepted.get(0).unwrap(), &(2, Box::from([1_u64])));
+    let mut notes = List::with_capacity(9);
+    while let Some(note) = service.notes().pop() {
+        notes.push(note).unwrap();
+    }
+    for (number, why) in [
+        (3, NotConnected::NoRecords),
+        (4, NotConnected::Incomplete),
+        (5, NotConnected::Unreadable),
+        (6, NotConnected::Unreadable),
+        (
+            7,
+            NotConnected::OtherForge {
+                kind: skein_forge_connection::settings::Kind::Forgejo,
+                api: Box::from("127.0.0.1:3006"),
+            },
+        ),
+        (
+            8,
+            NotConnected::OtherForge {
+                kind: skein_forge_connection::settings::Kind::GitHub,
+                api: Box::from("another.test:443"),
+            },
+        ),
+        (
+            9,
+            NotConnected::OtherForge {
+                kind: skein_forge_connection::settings::Kind::Forgejo,
+                api: Box::from("127.0.0.1:3008"),
+            },
+        ),
+    ] {
+        assert!(notes.as_slice().contains(&crate::Note::ForgeNotConnected { number, why }));
+    }
+    assert_eq!(notes.len(), 8);
+    assert!(notes.as_slice().contains(&crate::Note::ForgeUnconfigured { number: 77 }));
+    face.select(1);
+    assert!(
+        face.sent().windows(b"GET /api/v1/user ".len()).any(|part| part == b"GET /api/v1/user "),
+        "Forgejo starts with its files"
+    );
+    assert!(face.sent().windows(file_token.expose().len()).any(|part| part == file_token.expose()));
+    face.capture_answers();
+    for number in 3..=9 {
+        service.engine.forge.down(skein_forge_connection::Request::Call {
+            call: Token::new(u64::from(number)),
+            repository: skein_forge::api::Repository { forge: number, repository: 0 },
+            op: skein_forge::api::Op::Read(skein_forge::api::Read::Settings),
+        });
+        face.turn(&mut service);
+    }
+    face.turn(&mut service);
+    let answers = face.take_answers();
+    assert_eq!(answers.len(), 7);
+    for answer in answers {
+        assert_eq!(answer.cost, 0);
+        assert_eq!(answer.result, Err(skein_forge::api::Error::NotConnected));
+    }
+    assert_records_untouched(&mut service, &kept);
+}
+#[test]
+fn an_unkept_installation_only_emits_its_diagnostic() {
+    let mut service = fixtures::ready();
+    service.engine.forge.above.push(skein_forge_connection::Event::Fact {
+        forge: 1,
+        fact: skein_forge_connection::Fact::Unkept { installation: 93 },
+    });
+    crate::engine::forge_pass(&mut service.engine);
+    assert_eq!(service.notes().pop(), Some(crate::Note::ForgeUnkept { number: 1, installation: 93 }));
+    assert!(service.engine.events.is_empty());
+    assert_eq!(service.end(), None);
+    assert!(service.engine.drain.is_none());
+}
+
+fn assert_records_untouched(service: &mut crate::Service, kept: &skein_lib::List<(u64, skein_lib::Secret)>) {
+    use jig_protocol_store::{SecretOwner, Secrets};
+    for (number, original) in kept {
+        let Some(jig_protocol_store::Event::Secret { value: Some(found), .. }) = service
+            .engine
+            .store
+            .secrets(Token::new(124), Secrets::Get { owner: SecretOwner::Application, number: *number })
+        else {
+            panic!("row preserved")
+        };
+        assert!(found.expose() == original.expose());
+    }
+}
+
+#[test]
+fn a_refused_or_corrupt_records_load_stops_the_engine_named() {
+    for corrupt in [true, false] {
+        let mut service = fixtures::started();
+        if corrupt {
+            service.engine.store.above.push(jig_protocol_store::Event::Corrupt { owner: forge::records::LOAD });
+        } else {
+            let (root, core, profile) = fixtures::store_limits();
+            let limits = crate::store::limits(&root, &core, &root.forge, &profile).unwrap();
+            service.engine.store = crate::store::Store::new(&root, &limits, &[], fixtures::seeds().installation);
+            service.engine.store.opened = true; // The closed store refuses the loader's synchronous read.
+        }
+        crate::engine::iterate(&mut service.engine, Time::from_nanos(1), skein_lib::Wall::EPOCH);
+        let mut expected = jig_protocol_config::Problems::empty();
+        expected.push(jig_protocol_config::Path::root().member(b"forge records"), jig_protocol_config::What::Refers);
+        assert_eq!(service.end(), Some(&End::Stopped(Stop::Start(expected))));
+    }
+}
+
+#[test]
+fn a_records_key_that_cannot_sign_stops_only_its_forge() {
+    use jig_protocol_store::{SecretOwner, Secrets};
+    let (mut service, _) = records_service();
+    for (number, value) in startup_records().into_boxed() {
+        let value = if number == temper_protocol_records::number(2, temper_protocol_records::Item::AppKey) {
+            skein_lib::Secret::new(temper_protocol_records::encode(&[0x30, 0]).into_boxed_slice())
+        } else {
+            value
+        };
+        let _write = service
+            .engine
+            .store
+            .secrets(Token::new(123), Secrets::Keep { owner: SecretOwner::Application, number, value });
+        let _kept = service.engine.store.above.pop();
+    }
+    let mut face = fixtures::ForgeFace::new();
+    for _ in 0_u32..40 {
+        face.turn(&mut service);
+    }
+    let mut stopped = 0_u32;
+    while let Some(note) = service.notes().pop() {
+        if note
+            == (crate::Note::ForgeStopped {
+                number: 2,
+                why: Stopped::Invalid { value: skein_forge_connection::Value::Key },
+            })
+        {
+            stopped = stopped.checked_add(1).unwrap();
+        }
+    }
+    assert_eq!(stopped, 1);
+    assert_eq!(service.end(), None);
+    face.select(1);
+    assert!(face.sent().starts_with(b"GET /api/v1/user "));
+    assert_eq!(service.engine.store.erases, 0);
+}

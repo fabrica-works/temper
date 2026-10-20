@@ -12,6 +12,7 @@ pub(crate) struct Engine {
     pub(crate) workers: crate::workers::Workers,
     pub(crate) clients: crate::clients::Clients,
     pub(crate) forge: crate::forge::Layer,
+    pub(crate) forge_records: crate::forge::records::Loader,
     pub(crate) admission: Option<skein_lib::Token>,
     pub(crate) facts: u64,
     pub(crate) values: crate::values::Values,
@@ -34,6 +35,7 @@ pub(crate) struct Children {
     pub(crate) workers: crate::workers::Workers,
     pub(crate) clients: crate::clients::Clients,
     pub(crate) forge: crate::forge::Layer,
+    pub(crate) limits: crate::limits::Limits,
     pub(crate) notes: Queue<crate::Note>,
 }
 impl Engine {
@@ -45,7 +47,8 @@ impl Engine {
         values: crate::values::Values,
         first_periods: List<(u32, u64)>,
     ) -> Self {
-        let Children { accounts, workers, clients, forge, notes } = children;
+        let forge_records = crate::forge::records::Loader::new(&children.limits);
+        let Children { accounts, workers, clients, forge, notes, limits: _ } = children;
         let max_out = root::max_out(limits);
         let capacity = max_out.checked_mul(2).expect("root routing room");
         let mut credentials = List::with_capacity(values.identities.len());
@@ -61,6 +64,7 @@ impl Engine {
             workers,
             clients,
             forge,
+            forge_records,
             admission: None,
             facts: 0,
             values,
@@ -181,7 +185,12 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     if let Some(accounts) = &mut engine.accounts {
         accounts.iterate(now, wall, &mut engine.values, &mut engine.events, &mut engine.store);
     }
-    engine.forge.iterate(now, wall);
+    engine.forge.env.now = now;
+    engine.forge.env.wall = wall;
+    crate::forge::records::advance(engine);
+    if !engine.forge_records.loading() || engine.end.is_some() || engine.drain.is_some() {
+        engine.forge.iterate(now, wall);
+    }
     forge_pass(engine);
     engine.workers.iterate(now, &mut engine.events);
     let open = !engine.begin && engine.domain.ready() && engine.first_periods.is_empty();
@@ -207,6 +216,9 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
         return;
     }
     if !engine.room() {
+        return;
+    }
+    if !engine.forge_records.done() && engine.drain.is_none() {
         return;
     }
     if engine.begin {
@@ -321,7 +333,13 @@ fn answer(engine: &mut Engine) {
             | jig_protocol_store::Event::Carried { owner, .. }
             | jig_protocol_store::Event::Secret { owner, .. }
             | jig_protocol_store::Event::SecretsLoaded { owner, .. }) => {
-                if crate::accounts::owns(owner) {
+                if owner == crate::forge::records::LOAD {
+                    if let jig_protocol_store::Event::SecretsLoaded { rows, next, .. } = event {
+                        engine.forge_records.loaded(rows, next);
+                    } else {
+                        stop::unavailable(engine, b"forge records");
+                    }
+                } else if crate::accounts::owns(owner) {
                     engine.store.sources.push(event);
                 } else {
                     engine.store.secrets.push(event);
@@ -336,7 +354,13 @@ fn answer(engine: &mut Engine) {
             | jig_protocol_store::Event::Turns { .. }
             | jig_protocol_store::Event::Unread { .. }
             | jig_protocol_store::Event::Corrupt { .. }) => {
-                crate::store::route::up(&mut engine.store.routes, event, &mut engine.store.routed);
+                if let jig_protocol_store::Event::Corrupt { owner } = &event
+                    && *owner == crate::forge::records::LOAD
+                {
+                    stop::unavailable(engine, b"forge records");
+                } else {
+                    crate::store::route::up(&mut engine.store.routes, event, &mut engine.store.routed);
+                }
             }
         }
         if engine.end.is_some() {
@@ -435,16 +459,18 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
                 }
                 engine.drain_facts();
             }
-            // temper-02 gives runtime connection state meaning in the root.
-            // temper-02 gives installation and git-token events meaning in the root.
-            // Only Fact::Unkept exists at this pin, from GitHub's installations tracker alone
-            // (skein component.rs Kind::GitHub; installations.rs output). Temper configures
-            // Forgejo alone until temper-05, so none arrives; temper-01 logs forge and
-            // installation and adds the note it needs. This pass decides nothing.
-            skein_forge_connection::Event::Connected { forge: _ }
+            // temper-02 gives these events meaning in the root.
+            skein_forge_connection::Event::Connected { .. }
             | skein_forge_connection::Event::Installation { .. }
-            | skein_forge_connection::Event::GitToken { .. }
-            | skein_forge_connection::Event::Fact { .. } => {}
+            | skein_forge_connection::Event::GitToken { .. } => {}
+            skein_forge_connection::Event::Fact {
+                forge,
+                fact: skein_forge_connection::Fact::Unkept { installation },
+            } => {
+                if engine.notes.room() > 0 {
+                    engine.notes.push(crate::Note::ForgeUnkept { number: forge, installation });
+                }
+            }
             skein_forge_connection::Event::ListenerLost => stop::hooks(engine),
             skein_forge_connection::Event::Stopped { forge, why } => {
                 // At most once per connect generation, possibly after Connected. temper-02 revisits
