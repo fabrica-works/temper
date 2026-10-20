@@ -807,6 +807,13 @@ pass:
      - Name which of the three is the first cause: the tree read unanswered, the delegate held at `Branch`, or the protection read the fake forge does not answer; one run's finding for each is enough to order them.
      - A cause whose fix lies inside 13.5's Files (the world's `landing`, `forge`, `calls`) is fixed there and named in the commit body. One outside them (temper-client-tools, temper-service, temper-engine-*, temper-fake-git, skein's fake forge) is raised as a block with the cause found, before any such file is changed; the ruling then adds the step that fixes it.
 
+141. **kit 9ab88f69** (kit fix).
+     Kit fix: the run's kit moves from skein 74e48147 to 9ab88f69, which takes two fixes for defects the run has met, and two changes to owners.md that touch no role of this run:
+     - 88a5e38d "heavy: let a build's load settle before the gate": after the other groups drain, heavy waits up to `HEAVY_SETTLE` (120 s by default) for the one-minute load to fall below the core count. The run met it in 13.4's measure: `logs/temper-13/measure-13-4-1.log:2: heavy: load 8.36 9.94 10.76 on 8 cores as it starts alone`.
+     - 7227d909 "land: report heavy refusals separately from task failures": `land` exits 9 when heavy refuses and nothing ran. The run met it in 13.3: `reports/temper-13-20261020T112900Z.md:7: Heavy's disk-floor refusal was resolved by cargo clean in this worktree.`
+
+     `heavy -- <run>/kit/scripts/dev/test-plan` passed at 9ab88f69 (logs/20261020T123633-3831.log). Gates keep the default settling wait; a `land` exit 9 is a refusal to resolve, never a failed gate to diagnose.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
