@@ -62,6 +62,7 @@ pub(crate) struct PendingStep {
     contains_base: change::Status,
     reviews: Box<[skein_forge::api::Review]>,
     reviews_complete: bool,
+    woken: bool,
 }
 struct StepInput {
     task: u64,
@@ -1670,12 +1671,15 @@ fn step_change(d: &mut Domain, env: &Env<Limits>, input: StepInput, out: &mut Qu
         emit(out, Request::Refused { task });
         return;
     };
-    for (_, pending) in &d.steps {
+    let mut owner = None;
+    for (token, pending) in &d.steps {
         if pending.task == task {
-            // A timer or a delegate result can wake this procedure while its
-            // prior fresh-read chain is still in flight.
-            return;
+            owner = Some(*token);
         }
+    }
+    if let Some(owner) = owner {
+        d.steps.get_mut(&owner).expect("found pending step").woken = true;
+        return;
     }
     if gates.len() > usize::try_from(env.limits.change_policy.gates).expect("u32 fits usize")
         || d.steps.len() == env.limits.changes
@@ -1709,6 +1713,7 @@ fn step_change(d: &mut Domain, env: &Env<Limits>, input: StepInput, out: &mut Qu
         contains_base: change::Status::Unknown,
         reviews: Box::new([]),
         reviews_complete: true,
+        woken: false,
     };
     d.steps.insert(owner, pending).expect("step capacity checked");
     child(
@@ -1939,6 +1944,24 @@ fn queue_first(d: &Domain, row: &ChangeRow, now: skein_lib::Wall, l: &Limits) ->
 }
 
 fn finish_step(d: &mut Domain, env: &Env<Limits>, pending: PendingStep, out: &mut Queue<Request>) {
+    decide_step(d, env, &pending, out);
+    if pending.woken {
+        step_change(
+            d,
+            env,
+            StepInput {
+                task: pending.task,
+                entry: pending.entry,
+                heard: pending.heard,
+                gates: pending.gates,
+                queue_repair_active: pending.queue_repair_active,
+            },
+            out,
+        );
+    }
+}
+
+fn decide_step(d: &mut Domain, env: &Env<Limits>, pending: &PendingStep, out: &mut Queue<Request>) {
     let Some(mut row) = d.changes.get(&pending.task).cloned() else { return };
     let prior = row.change.clone();
     let Some(base_tip) = pending.base_tip else {
@@ -1975,7 +1998,7 @@ fn finish_step(d: &mut Domain, env: &Env<Limits>, pending: PendingStep, out: &mu
         }
     }
     crate::settle::observe(d, env, &row, pending.pull.as_ref(), pending.ci);
-    let facts = change_facts(d, env, &row, &pending, base_tip);
+    let facts = change_facts(d, env, &row, pending, base_tip);
     let heard = change::Heard {
         effect: if row.pending.is_some() { change::EffectResult::Pending } else { row.effect },
         ..pending.heard
@@ -1987,7 +2010,7 @@ fn finish_step(d: &mut Domain, env: &Env<Limits>, pending: PendingStep, out: &mu
         match stepped.decision {
             change::Decision::None if advanced => {}
             change::Decision::Effect(effect) => {
-                emit_change_effect(d, env, &mut row, &pending, prior, effect, out);
+                emit_change_effect(d, env, &mut row, pending, prior, effect, out);
                 return;
             }
             decision @ (change::Decision::None
