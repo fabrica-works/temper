@@ -1740,6 +1740,13 @@ where its answer lands.
 
      Checked: scratch-hourly-17/temper-check.log and temper-diagnostic-comparison.json retain the exact additional sites/messages against frozen Temperc7e7392f with Skein33dbc782/Smith3fb2c826/Jig8aa241fd and the before/after lock map. One bounded wrapper found Smith builds57.343s, Jig fails152.862s, Hearth fails23.154s and Temper fails62.460s. The pre-existing Hearth Interrupt repair remains assigned by2c2fe04 to its next repin; no duplicate repair is added. Existing Accounts-2 errors remain separate from the new sites.
 
+208. **Document boundary row shape and fixture conversion reason** (hourly17 document check of2026-10-20T04:35:15Z).
+     Add skein06.s2, skein/06.s2-document-test-shape.md, after landed06.4 with normal readiness. It changes only the document boundary table's private type spelling: name BoundaryRow=(&'static str,fn(&mut Limits)), use it for the eight zero-field and two depth rows, and remove that function's type_complexity expectation. Preserve cases, assertions, expected values, identities, limits, corpus and production behavior; relative counts remain N->N. The existing unlanded closing temper-repin waits for06.s2; other starts stay independent.
+
+     Resolve the other sampled suppression by recording its reason, not by changing API spelling. clippy.toml says core::str::from_utf8 is banned because "the protocol layer validates text". The existing forgejo_deliveries fixture converts fixed subscribed-event byte names into fixture paths in a protocol document test; no production domain parses. Retain its narrow, reasoned disallowed_methods expectation as the stated fixture departure from development.md14.3's "no lint exception in tests" checklist. The candidate's inherent str::from_utf8 invokes the same validator but misses the lint's path match; that spelling substitution is rejected. No broader parsing/lint exception is granted.
+
+     Checked: hourly17-document-lints froze Skein33dbc782 and mapped61document/4fuzzy/177unit identities unchanged. Its BoundaryRow file passed format, all-target Clippy and238default/4fuzzy/verified-empty browser; reversing the recorded patch reproduces original files byte-for-byte. The delivered scope keeps that executed BoundaryRow file and leaves the delivery file at its already-landed baseline, rather than authorizing the shortcut. The owner's actual-tree Clippy, package profile proofs and normal landing gate remain required; conformance39and completed process/recordings are untouched. Refresh further reached copies and list users in the commit body. Evidence/copy maps are in scratch-hourly17-document-lints.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
