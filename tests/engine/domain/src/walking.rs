@@ -273,7 +273,13 @@ pub fn config(seed: u64) -> engine::Config {
                 resume_bytes: 256,
                 tools: jig_domain_core::ToolFamilies::JIG,
                 models: models(),
-                llm_providers: accounts::Providers::none(),
+                llm_providers: accounts::Providers {
+                    providers: Box::new([accounts::Provider {
+                        number: 1,
+                        models: Box::new([charter().policy.model.name]),
+                        offers: accounts::Offers { sign_in: true, key: false, programs: Box::new([]) },
+                    }]),
+                },
             },
             template_overrides: skein_lib::Map::with_capacity(authority_limits().projects),
             projects,
@@ -704,6 +710,21 @@ impl World {
         }
     }
 
+    fn check_assignment(&self, channel: Token, assignment: &engine::Assignment) {
+        assert_eq!(channel, Token::new(7));
+        assert_eq!(assignment.run.placement, fleet::PlacementConstraint { channel, kind: fleet::HostKind::Worker });
+        let Some(engine::Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(proof)))) =
+            self.store.rows.get(&engine::Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::RunProof(
+                assignment.task,
+            ))))
+        else {
+            panic!("assignment follows its durable proof")
+        };
+        assert_eq!(assignment.run.accounts, proof.accounts);
+        assert_eq!(proof.placement, Some(channel));
+        assert_eq!(assignment.run.sources.as_ref(), &[Some(assignment.grants[0].account)]);
+    }
+
     fn delivery(&mut self, delivery: Delivery) {
         match delivery {
             Delivery::WebReply { reply: people::Reply::SignedIn { person, sign_in, .. }, .. } => {
@@ -728,7 +749,7 @@ impl World {
                 self.referee.started(&self.store.rows, task).expect("atomic chat task and answer");
             }
             Delivery::Assigned { channel, assignment } => {
-                assert_eq!(channel, Token::new(7));
+                self.check_assignment(channel, &assignment);
                 self.referee.assigned(&self.store.rows, &assignment).expect("committed claim and real brief");
                 self.assignment = Some(assignment);
                 self.turn(1);

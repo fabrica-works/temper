@@ -23,6 +23,7 @@ pub(crate) fn agent(spawn: &Spawn, inherited: &Inherited) -> Proc {
                     // Start carries the checkout paths after spawn. Open those paths in
                     // Start order, just as the shipped process does on this filesystem.
                     roots: None,
+                    programs: None,
                 },
                 Box::new(errors),
             )

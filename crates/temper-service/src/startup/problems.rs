@@ -117,6 +117,7 @@ fn words(what: What) -> &'static [u8] {
             config::What::Memory { .. } => b"the worst case passes memory_bytes by ",
             config::What::Override => b"invalid override",
             config::What::Unreadable => b"not read",
+            config::What::Relative => b"relative path must be non-empty with no .. component",
         },
     }
 }
@@ -207,7 +208,8 @@ fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
                 | config::What::Silence
                 | config::What::StopBound
                 | config::What::Override
-                | config::What::Unreadable,
+                | config::What::Unreadable
+                | config::What::Relative,
             )
             | What::Standalone
             | What::Loopback

@@ -111,7 +111,7 @@ fn parse(input: &[u8]) -> Result<Parsed, Problems> {
     whole.finish(&document, &root, &mut found);
     problems.append(found, &root);
     let engine = match engine_at {
-        Some(at) => match config::engine(&document, at) {
+        Some(at) => match config::engine(&document, at, &jig_protocol_config::Directories::working()) {
             Ok(mut engine) => {
                 engine.limits.clients.watches_per_stream = temper_engine_domain::WATCHES_PER_STREAM;
                 Some(engine)
@@ -135,7 +135,7 @@ fn parse(input: &[u8]) -> Result<Parsed, Problems> {
     };
     let mut workers = List::with_capacity(ats.len());
     for (index, at) in ats.iter().enumerate() {
-        match config::worker(&document, *at) {
+        match config::worker(&document, *at, &jig_protocol_config::Directories::working()) {
             Ok(worker) => workers.push(worker).expect("bounded workers"),
             Err(found) => problems.append(found, &indexed(index)),
         }

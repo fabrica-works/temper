@@ -17,7 +17,8 @@ fn process_engine() -> jig_protocol_config::Engine {
     value["engine"]["limits"]["overrides"]["notes.scopes"] = 15.into();
     let bytes = serde_json::to_vec(&value["engine"]).expect("engine JSON");
     let document = jig_protocol_config::document(&bytes, &DOCUMENT).expect("engine document");
-    let engine = jig_protocol_config::engine(&document, 0).expect("engine configuration");
+    let engine = jig_protocol_config::engine(&document, 0, &jig_protocol_config::Directories::working())
+        .expect("engine configuration");
     scratch.remove();
     engine
 }
@@ -57,7 +58,8 @@ fn the_owned_example_fits_the_native_client() {
     let value: serde_json::Value = serde_json::from_slice(support::owned::EXAMPLE).expect("owned example JSON");
     let bytes = serde_json::to_vec(&value["engine"]).expect("engine JSON");
     let document = jig_protocol_config::document(&bytes, &DOCUMENT).expect("engine document");
-    let engine = jig_protocol_config::engine(&document, 0).expect("engine configuration");
+    let engine = jig_protocol_config::engine(&document, 0, &jig_protocol_config::Directories::working())
+        .expect("engine configuration");
     let native = temper_client_shell_terminal::limits::native().client.client.domain;
     assert!(engine.limits.core.documents.rows <= native.rows);
     assert!(engine.limits.core.documents.lines <= native.rows);

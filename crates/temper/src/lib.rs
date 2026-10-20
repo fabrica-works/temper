@@ -267,7 +267,9 @@ fn prepare(directory: &Path, bytes: &[u8], owned: &mut Vec<Fd>) -> Result<servic
     let document =
         config::document(bytes, &config::DocumentLimits { bytes: CONFIG_BYTES, tokens: CONFIG_BYTES, depth: 32 })
             .expect("named checked document");
-    let engine = config::engine(&document, member(&document, 0, b"engine")).expect("named checked engine");
+    let engine =
+        config::engine(&document, member(&document, 0, b"engine"), &jig_protocol_config::Directories::working())
+            .expect("named checked engine");
     let agent = agent::preflight(directory, &named)?;
     let user = skein_shell::effective_user();
     let files = read_files(directory, named.files, user)?;

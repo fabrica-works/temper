@@ -268,7 +268,8 @@ pub fn completions(directory: &Path) -> u32 {
         .expect("object")
         .member(&document, b"engine")
         .expect("engine member");
-    let engine = jig_protocol_config::engine(&document, at).expect("engine configuration");
+    let engine = jig_protocol_config::engine(&document, at, &jig_protocol_config::Directories::working())
+        .expect("engine configuration");
     let limits = codec::limits(&engine.limits.core).expect("store codec limits");
     let mut paths = Vec::new();
     files(&directory.join("state/transcripts"), &mut paths);

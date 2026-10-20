@@ -90,6 +90,10 @@ fn walking_referee_rejects_duplicate_transaction_keys_and_transcripts() {
         temper_engine_domain::RunProof {
             conversation: task.attempt,
             credentials: Box::new([]),
+            accounts: Box::new([jig_domain_authority::AccountBinding { provider: 1, account: 1, source: 1 }]),
+            placement: Some(skein_lib::Token::new(7)),
+            account_failure: None,
+            account_terminal: false,
             window: None,
             host: fleet::HostKind::Worker,
             task: task.number,
@@ -187,6 +191,12 @@ fn walking_referee_rejects_wrong_task_or_uncommitted_or_duplicate_assignment() {
         conversation: task.attempt,
         charter: 1,
         run: Box::new(engine::RunCharter {
+            sources: Box::new([Some(1)]),
+            accounts: Box::new([jig_domain_authority::AccountBinding { provider: 1, account: 1, source: 1 }]),
+            placement: jig_domain_fleet::PlacementConstraint {
+                channel: skein_lib::Token::new(7),
+                kind: jig_domain_fleet::HostKind::Worker,
+            },
             policy: temper_engine_domain_world::walking::charter().policy,
             contract: task.contract.clone(),
             authority: task.authority.clone(),
@@ -321,6 +331,10 @@ fn walking_referee_rejects_missing_or_split_current_claim_turn_and_terminal_proo
         temper_engine_domain::RunProof {
             conversation: task.attempt,
             credentials: Box::new([]),
+            accounts: Box::new([jig_domain_authority::AccountBinding { provider: 1, account: 1, source: 1 }]),
+            placement: Some(skein_lib::Token::new(7)),
+            account_failure: None,
+            account_terminal: false,
             window: None,
             host: fleet::HostKind::Worker,
             task: task.number,
@@ -482,6 +496,10 @@ fn independent_terminal_cut_referee_rejects_missing_or_altered_evidence() {
             temper_engine_domain::RunProof {
                 conversation: task.attempt,
                 credentials: Box::new([]),
+                accounts: Box::new([jig_domain_authority::AccountBinding { provider: 1, account: 1, source: 1 }]),
+                placement: Some(skein_lib::Token::new(7)),
+                account_failure: None,
+                account_terminal: false,
                 window: None,
                 host: fleet::HostKind::Worker,
                 task: task.number,

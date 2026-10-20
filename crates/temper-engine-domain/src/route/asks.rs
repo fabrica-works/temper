@@ -250,11 +250,13 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
                 }
                 let assignment = domain.assignments.get(&task).expect("claimed assignment");
                 let workstream = assignment.workstream;
+                let placement = Some(assignment.run.placement);
                 let grants = fleet_grants(&assignment.grants);
                 emit(
                     decision,
                     &env.limits,
                     Delivery::Fleet(fleet::Event::Start {
+                        placement,
                         grants,
                         kinds,
                         charter,

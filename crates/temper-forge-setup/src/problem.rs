@@ -45,6 +45,7 @@ impl Problems {
                 config::What::Bound => b"past its bound",
                 config::What::Unique => b"must be unique",
                 config::What::Refers => b"unknown reference",
+                config::What::Relative => b"relative path must be non-empty with no .. component",
                 config::What::Json
                 | config::What::Form
                 | config::What::Plaintext

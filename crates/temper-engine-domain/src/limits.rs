@@ -433,11 +433,25 @@ pub(crate) fn run_carriers_bound(limits: &Limits) -> Option<u64> {
 }
 
 pub(crate) fn run_policy_bound(policy: &RunPolicy, limits: &Limits) -> Option<u64> {
-    run_policy_bytes(policy)?.checked_add(run_carriers_bound(limits)?)
+    run_policy_bytes(policy)?.checked_add(run_carriers_bound(limits)?)?.checked_add(
+        u64::from(tasks::MODELS).checked_mul(
+            u64::try_from(size_of::<Option<u32>>())
+                .ok()?
+                .checked_add(u64::try_from(size_of::<jig_domain_authority::AccountBinding>()).ok()?)?,
+        )?,
+    )
 }
 
 pub(crate) fn run_charter_bytes(charter: &RunCharter) -> Option<u64> {
-    let mut bytes = run_policy_bytes(&charter.policy)?;
+    let mut bytes = run_policy_bytes(&charter.policy)?
+        .checked_add(
+            u64::try_from(charter.sources.len()).ok()?.checked_mul(u64::try_from(size_of::<Option<u32>>()).ok()?)?,
+        )?
+        .checked_add(
+            u64::try_from(charter.accounts.len())
+                .ok()?
+                .checked_mul(u64::try_from(size_of::<jig_domain_authority::AccountBinding>()).ok()?)?,
+        )?;
     match &charter.contract {
         tasks::Contract::Report { .. } | tasks::Contract::Change { .. } => {}
         tasks::Contract::Approval { state, .. } => bytes = bytes.checked_add(u64::try_from(state.len()).ok()?)?,

@@ -195,6 +195,7 @@ fn jig_refusals_print_words() {
         (config::What::Memory { over: 7 }, b"at: the worst case passes memory_bytes by 7 bytes\n"),
         (config::What::Override, b"at: invalid override\n"),
         (config::What::Unreadable, b"at: not read\n"),
+        (config::What::Relative, b"at: relative path must be non-empty with no .. component\n"),
     ] {
         let mut problems = Problems::empty();
         problems.push(Path::root().member(b"at"), What::Jig(what));

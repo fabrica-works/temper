@@ -386,7 +386,7 @@ fn every_offered_adapter_must_be_declared_by_the_agent() {
     )
     .unwrap();
     let engine_at = config::read::Object::new(&document, 0).unwrap().member(&document, b"engine").unwrap();
-    let engine = config::engine(&document, engine_at).unwrap();
+    let engine = config::engine(&document, engine_at, &jig_protocol_config::Directories::working()).unwrap();
     for declared in [false, true] {
         let mut agent = fixtures::startup_agent();
         if declared {
@@ -467,7 +467,7 @@ fn configured_keys_use_the_key_ceiling_instead_of_the_oauth_token_bound() {
     );
     let document =
         config::document(input.as_bytes(), &config::DocumentLimits { bytes: 65_536, tokens: 4096, depth: 32 }).unwrap();
-    let mut engine = config::engine(&document, 0).unwrap();
+    let mut engine = config::engine(&document, 0, &jig_protocol_config::Directories::working()).unwrap();
     engine.limits.token = 1;
     let key = jig_client_protocol_wire::v10::CEILINGS.keyed_value_some;
     assert_eq!(crate::values::credential_bytes(&engine), key);

@@ -24,6 +24,12 @@ fn assignment() -> engine::Assignment {
         conversation: 7,
         charter: 1,
         run: Box::new(engine::RunCharter {
+            sources: Box::new([Some(1)]),
+            accounts: Box::new([jig_domain_authority::AccountBinding { provider: 1, account: 1, source: 1 }]),
+            placement: jig_domain_fleet::PlacementConstraint {
+                channel: Token::new(1),
+                kind: jig_domain_fleet::HostKind::Worker,
+            },
             policy: engine::RunPolicy {
                 instructions: b"Do the task".as_slice().into(),
                 waiting: Duration::from_secs(1),
@@ -103,6 +109,34 @@ fn root_charter_becomes_a_smith_start_with_ordered_brief_and_exact_budget() {
     assert_eq!(charter.grants.host_tools.len(), tools(Duration::from_secs(10)).len());
     assert_eq!(grants[0].name.generation, 2);
     assert!(transcript.is_none());
+}
+
+#[test]
+fn selected_sources_and_efforts_reach_main_and_alternative_llms() {
+    let mut assignment = assignment();
+    assignment.run.policy.model.effort = Some(b"high".as_slice().into());
+    let alternative = engine::Model {
+        name: b"alternative".as_slice().into(),
+        account: 2,
+        effort: Some(b"low".as_slice().into()),
+        ..assignment.run.policy.model.clone()
+    };
+    assignment.run.policy.alternatives = Box::new([alternative.clone()]);
+    assignment.run.sources = Box::new([Some(17), Some(23)]);
+    assignment.run.accounts = Box::new([
+        jig_domain_authority::AccountBinding { provider: 1, account: 11, source: 17 },
+        jig_domain_authority::AccountBinding { provider: 2, account: 19, source: 23 },
+    ]);
+    let charter = crate::charter(&assignment);
+    assert_eq!(charter.llm.account, Some(17));
+    assert_eq!(charter.llm.effort.as_deref(), Some(b"high".as_slice()));
+    assert_eq!(charter.models[0].account, Some(23));
+    assert_eq!(charter.models[0].model, alternative.name);
+    assert_eq!(charter.models[0].effort, alternative.effort);
+    assignment.run.sources = Box::new([None, None]);
+    let charter = crate::charter(&assignment);
+    assert_eq!(charter.llm.account, None);
+    assert_eq!(charter.models[0].account, None);
 }
 
 #[test]

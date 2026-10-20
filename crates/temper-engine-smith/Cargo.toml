@@ -24,5 +24,8 @@ smith-domain.workspace = true
 smith-domain-run.workspace = true
 smith-domain-session.workspace = true
 
+[dev-dependencies]
+jig-domain-fleet.workspace = true
+
 [lints]
 workspace = true

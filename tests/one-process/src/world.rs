@@ -512,6 +512,7 @@ fn agent(_spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {
                     pid: 101,
                     trace: None,
                     roots: Some(inherited.roots.iter().map(|(_, fd)| *fd).collect()),
+                    programs: None,
                 },
                 Box::new(errors),
             )

@@ -317,7 +317,7 @@ fn engine() -> jig_protocol_config::Engine {
     .expect("document");
     let mut object = jig_protocol_config::read::Object::new(&doc, 0).expect("object");
     let at = object.member(&doc, b"engine").expect("engine member");
-    jig_protocol_config::engine(&doc, at).expect("engine")
+    jig_protocol_config::engine(&doc, at, &jig_protocol_config::Directories::working()).expect("engine")
 }
 fn jig_test_service_limits(overrides: &jig_protocol_config::Limits) -> jig_test_service::limits::Limits {
     jig_test_service::limits::for_profile(jig_protocol_config::Profile::Small, overrides)

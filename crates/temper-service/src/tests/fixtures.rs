@@ -84,7 +84,8 @@ pub fn engine() -> settings::Engine {
     )
     .expect("engine document");
     settings::Engine {
-        jig: jig_protocol_config::engine(&document, 0).expect("typed jig engine"),
+        jig: jig_protocol_config::engine(&document, 0, &jig_protocol_config::Directories::working())
+            .expect("typed jig engine"),
         webhooks: None,
         clients: crate::startup::application::Clients {
             listener: jig_protocol_config::Address::Addr(http::address()),
@@ -550,6 +551,12 @@ pub fn assignment_with_settings(
         conversation: 2,
         charter: 1,
         run: Box::new(temper_engine_domain::RunCharter {
+            sources: Box::new([Some(1)]),
+            accounts: Box::new([jig_domain_authority::AccountBinding { provider: 1, account: 1, source: 1 }]),
+            placement: jig_domain_fleet::PlacementConstraint {
+                channel: Token::new(1),
+                kind: jig_domain_fleet::HostKind::Worker,
+            },
             policy: settings.jig.charters[0].policy.clone(),
             contract: task.contract,
             authority: task.authority,

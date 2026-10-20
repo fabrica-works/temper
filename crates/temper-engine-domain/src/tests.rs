@@ -333,8 +333,6 @@ fn deep_child_rows_and_arbitrary_internal_payloads_are_refused_before_retention(
 
 #[test]
 fn held_assignment_checks_owned_bytes_and_section_backing_before_acceptance() {
-    use jig_domain_accounts as accounts;
-    use jig_domain_brief as brief;
     let limits = crate::JournalLimits {
         commits: 1,
         held: 1,
@@ -345,12 +343,43 @@ fn held_assignment_checks_owned_bytes_and_section_backing_before_acceptance() {
         run_bytes: 512,
     };
     let mut decision = Decision::new(&limits);
-    let assignment = crate::Assignment {
+    let mut assignment = held_assignment();
+    assert!(
+        decision
+            .deliver(&limits, Delivery::Assigned { channel: Token::new(1), assignment: assignment.clone() })
+            .is_err()
+    );
+    assignment.sections = Box::new([]);
+    let bytes = crate::limits::run_charter_bytes(&assignment.run).expect("fixture charter bytes");
+    let exact = crate::JournalLimits { run_bytes: u32::try_from(bytes).expect("tiny charter"), ..limits };
+    let mut decision = Decision::new(&exact);
+    decision
+        .deliver(&exact, Delivery::Assigned { channel: Token::new(1), assignment: assignment.clone() })
+        .expect("the exact run byte envelope accepts its binding arrays");
+    assignment.run.sources = Box::new([Some(1), Some(2)]);
+    assignment.run.accounts = Box::new([
+        jig_domain_authority::AccountBinding { provider: 1, account: 1, source: 1 },
+        jig_domain_authority::AccountBinding { provider: 2, account: 2, source: 2 },
+    ]);
+    let mut decision = Decision::new(&exact);
+    assert!(decision.deliver(&exact, Delivery::Assigned { channel: Token::new(1), assignment }).is_err());
+}
+
+fn held_assignment() -> crate::Assignment {
+    use jig_domain_accounts as accounts;
+    use jig_domain_brief as brief;
+    crate::Assignment {
         task: 1,
         attempt: 1,
         conversation: 1,
         charter: 1,
         run: Box::new(crate::RunCharter {
+            sources: Box::new([Some(1)]),
+            accounts: Box::new([jig_domain_authority::AccountBinding { provider: 1, account: 1, source: 1 }]),
+            placement: jig_domain_fleet::PlacementConstraint {
+                channel: Token::new(1),
+                kind: jig_domain_fleet::HostKind::Worker,
+            },
             policy: crate::RunPolicy {
                 instructions: Box::new([]),
                 waiting: skein_lib::Duration::from_secs(1),
@@ -410,6 +439,5 @@ fn held_assignment_checks_owned_bytes_and_section_backing_before_acceptance() {
             generation: 1,
             valid: skein_lib::Duration::from_secs(1),
         }]),
-    };
-    assert!(decision.deliver(&limits, Delivery::Assigned { channel: Token::new(1), assignment }).is_err());
+    }
 }

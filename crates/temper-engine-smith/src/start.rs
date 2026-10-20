@@ -10,11 +10,11 @@ use smith_domain as smith;
 use smith_domain_run as run;
 use temper_engine_domain as engine;
 
-/// Turn one root-owned model policy into Smith's model data.
+/// Translate one model with the source grant selected for this run.
 #[must_use]
-pub fn model(model: &engine::Model) -> run::charter::Llm {
+pub fn model(model: &engine::Model, grant: Option<u32>) -> run::charter::Llm {
     run::charter::Llm {
-        effort: None,
+        effort: model.effort.clone(),
         prices: run::Prices {
             input: model.input_price,
             cached: model.cached_price,
@@ -23,7 +23,7 @@ pub fn model(model: &engine::Model) -> run::charter::Llm {
             unit: model.price_unit,
         },
         dialect: model.dialect,
-        account: Some(model.account),
+        account: grant,
         endpoint: run::charter::Endpoint(model.endpoint),
         model: model.name.clone(),
         window: model.window,
@@ -123,8 +123,13 @@ pub fn charter(assignment: &engine::Assignment) -> run::Charter {
     }
     let policy = &assignment.run.policy;
     let mut models = List::with_capacity(policy.alternatives.len().try_into().expect("bounded model list"));
-    for candidate in &policy.alternatives {
-        models.push(model(candidate)).expect("bounded model list");
+    for (index, candidate) in policy.alternatives.iter().enumerate() {
+        let grant = *assignment
+            .run
+            .sources
+            .get(index.checked_add(1).expect("bounded model index"))
+            .expect("retained alternative source binding");
+        models.push(model(candidate, grant)).expect("bounded model list");
     }
     let outcome = contract(&assignment.run.contract);
     run::Charter {
@@ -146,7 +151,7 @@ pub fn charter(assignment: &engine::Assignment) -> run::Charter {
         outcome,
         budget: run::Budget { turns: policy.turns, spend: assignment.run.budget, time: policy.time },
         reserve: run::charter::Reserve { turns: policy.reserve_turns, time: policy.reserve_time },
-        llm: model(&policy.model),
+        llm: model(&policy.model, *assignment.run.sources.first().expect("main source binding")),
         models: models.into_boxed(),
     }
 }

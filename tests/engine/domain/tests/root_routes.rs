@@ -191,6 +191,19 @@ fn with_policy(configuration: &mut engine::Config, change: impl FnOnce(&mut auth
 /// The walking configuration with its role's chats at 100 each: a chat takes
 /// its role's spend from its person's pool (jig a2616181), so one pool of 500
 /// funds more than one.
+fn two_slot_limits() -> engine::Limits {
+    let mut limits = limits();
+    limits.fleet.slots = 2;
+    limits.journal.writes = tasks::max_out(&limits.tasks) * 8
+        + people::max_out(&limits.people) * 4
+        + limits.people.pending * 2
+        + fleet::max_out(&limits.fleet) * 4
+        + temper_engine_domain_forge::max_out(&limits.forge)
+        + limits.tasks.tasks
+        + 6;
+    limits
+}
+
 fn sharing_config(seed: u64) -> engine::Config {
     let mut configuration = config(seed);
     with_policy(&mut configuration, |policy| policy.roles[0].authority.budget.spend = 100);
@@ -880,10 +893,11 @@ fn refused_terminal_clears_fleet_handoff_without_charging_rejected_spend() {
 
 #[test]
 fn a_refused_assignment_spends_no_try() {
-    let mut limits = limits();
+    let mut limits = two_slot_limits();
     limits.fleet.attempts = 1;
     let mut driver = Driver::configured(Store::new(), sharing_config(94), &limits);
-    hello(&mut driver);
+    // Placement has room; the one-entry attempt table refuses the second claim.
+    driver.send(protocol::hello_slots(Token::new(7), 2, Box::new([])));
     driver.settle();
     driver.sign_in();
     driver.settle();
@@ -4009,8 +4023,9 @@ fn a_typed_call_replay_uses_the_settled_record_without_rendering_again() {
 
 #[test]
 fn restart_refuses_live_tasks_or_claims_past_lowered_limits_without_dropping_them() {
-    let mut driver = Driver::configured(Store::new(), sharing_config(91), &limits());
-    hello(&mut driver);
+    let bounds = two_slot_limits();
+    let mut driver = Driver::configured(Store::new(), sharing_config(91), &bounds);
+    driver.send(protocol::hello_slots(Token::new(7), 2, Box::new([])));
     driver.settle();
     driver.sign_in();
     driver.settle();
