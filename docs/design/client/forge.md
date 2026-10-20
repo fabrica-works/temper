@@ -1,19 +1,20 @@
 # The forge in temper's client
 
-Provisional, 2026-10-05, revised 2026-10-18. What the forge connector
+Provisional, 2026-10-05, revised 2026-10-20. What the forge connector
 adds to temper's client: a change's way to landing and its result, a
 project's landing queues, approvals at a head, the forge's holds in
-words, repositories with their health and landing rules, goals,
-findings and landings as the forge shows them, and the forge's part of
-the deployment. jig's pages and cards (jig's `client/domain/pages.md`
+words, repositories with their health and landing rules, the picker of
+repositories to adopt, goals, findings and landings as the forge shows
+them, and the forge's part of the deployment, where each configured
+forge is connected. jig's pages and cards (jig's `client/domain/pages.md`
 and jig's `client/domain/objects.md`) leave a slot for each part a
 connector shows (jig's `client/domain/root.md`, section 6), and
 temper's pages and cards, its own after them, show the same parts
 (`README.md`, section 1); this document says what the forge shows in
-those slots and on the pages only temper has, `Changes` and `Adopt`
-(`README.md`, 3.5), in temper's words. The forge's client family, its
-words for resources and kinds, and its adoption form are `README.md`,
-section 4. Each part shows what `../domain/forge.md` keeps or reads,
+those slots and on the pages only temper has, `Changes`, `Adopt` and
+`Forges` (`README.md`, 3.5), in temper's words. The forge's client
+family, its words for resources and kinds, its adoption form and its
+requests are `README.md`, sections 4 and 8. Each part shows what `../domain/forge.md` keeps or reads,
 and links to the forge for code. What is still open is listed in
 section 10.
 
@@ -35,7 +36,9 @@ section 10.
 - **Queues are shown, not managed.** A landing branch's queue is its
   ready changes in order, on temper's `Changes` page; a person changes
   the order through goals' priorities on the board, never by moving
-  changes about.
+  changes about. Where a branch lands through GitHub's merge queue,
+  temper's queue decides only what enters it and when, and the panel
+  says "in GitHub's merge queue, n" (2.1).
 - **Code stays on the forge.** Parts link to a pull request, its diff,
   its files and its failing jobs; the client shows states and verdicts,
   never code, and has no code review of its own.
@@ -47,7 +50,25 @@ section 10.
   (section 6).
 - **What the forge did not tell temper is said:** a repository with no
   webhooks, protection temper could not read, a branch someone else
-  moved.
+  moved, a job's log on a host temper does not read (5.4).
+- **Forges are connected from the client.** Configuration names each
+  forge, never its access; on the deployment's `Forges` page (5.4) a
+  person whose role holds the deployment's connectors connects it:
+  GitHub through an App made from temper's manifest, or one of their
+  own, its key pasted; Forgejo with its bot's tokens pasted, or a site
+  admin's token from which temper makes its bot. The page says what
+  temper is there, what stopped it, and offers Replace.
+- **Adoption picks from what temper can reach** (5.1): per connected
+  forge, the repositories temper can reach there, a page at a time by
+  number, and "Not listed" for one named by owner and name, with what
+  would make it reachable. A forge not connected offers none.
+- **The forge's refusals are said with their remedy** (5.5): not
+  connected, not installed on an account, not granted to temper's App
+  (linked to the installation's page on GitHub), stopped and why.
+- **The browser's steps of a connect are temper's routes** on the
+  clients' listener (9.1): the manifest's page, GitHub's redirect and
+  its setup, each authenticated by a one-use state alone. The client
+  prints a connect's link and never opens it.
 
 ## 2. A change's panel
 
@@ -73,14 +94,26 @@ producing ─ opening ─ checking ─ gating ─ queued ─ first ─ landing �
 | opening | opening its pull request |
 | checking | CI on its head, and for how long |
 | gating | which gates are running, as chips, and which requirements wait |
-| queued | its place in its landing branch's queue, and who is ahead |
+| queued | its place in its landing branch's queue, and who is ahead; handed to GitHub's merge queue, "in GitHub's merge queue, n", n its place there |
 | first | first in the queue: updating from its base, CI on the updated head, or merging |
-| repairing | why (CI's failure, a gate's remarks, a semantic conflict), the repair as a chip, and how many repairs are left |
+| repairing | why (CI's failure, a gate's remarks, a semantic conflict, taken out of GitHub's merge queue and GitHub's reason), the repair as a chip, and how many repairs are left |
 | updating | the base it takes in |
 | resolving | the conflicting files, the resolution as a chip, and how many are left |
 | recreating, reopening | after drift released (6.2): its branch made again at the head temper last knew, or its pull request reopened or retargeted back |
 | landing | merging at its head |
 | landed | its merge commit, and when |
+
+Where the landing branch requires GitHub's merge queue
+(`../domain/forge.md`, on merging through it), temper's own queue
+decides only which change enters GitHub's and when: the first change's
+merge hands it to GitHub's queue at the head its decision saw, and
+until it lands or leaves, the panel says "in GitHub's merge queue, n",
+n the position the forge reads for its pull request (`Pull.queued`) as
+each read gives it. GitHub builds the merge group, runs CI on it and lands
+it; the landed step names the commit the group landed (`Pull.merged`),
+which is not the head temper saw. A pull request GitHub takes out of
+its queue for any reason but its merge is repaired, as a failed CI is,
+the repairing step naming GitHub's reason. Forgejo has no such queue.
 
 ### 2.2 What it shows
 
@@ -145,8 +178,9 @@ section 2, steps 6 and 7):
 
 - **Its result,** a connector's result (jig's
   `client/domain/objects.md`, section 8): landed, with its pull
-  request's number and title, its merge commit, and the address of each
-  on the forge; or ended otherwise, with what became of its pull request
+  request's number and title, its merge commit (through GitHub's merge
+  queue, the commit its group landed), and the address of each on the
+  forge; or ended otherwise, with what became of its pull request
   and its branch. It shows on the change's page, in the chat that
   delegated it, as its delegate's result, and in the update of the
   person who asked for it.
@@ -238,10 +272,69 @@ What the adoption names there: the repository's role (owned, where
 temper pushes and lands; a fork of an upstream; or context, read only),
 its landing branch, temper's branch prefix (`temper/` by default),
 whether it is the project's home, and whether it runs CI or the checks
-its changes are gated on without it; the merge style is the
-repository's default. A repository where another deployment's branches
-already live under the prefix is refused, saying so (jig's
-`domain/connectors.md`, section 12).
+its changes are gated on without it. The merge style is the forge's for
+the repository, which the form shows before the adoption is confirmed:
+on GitHub the first the repository allows of merge, squash and rebase,
+on Forgejo its default (`../domain/forge.md`, what adoption says of the
+branch's rules). A repository where another
+deployment's branches already live under the prefix is refused, saying
+so (jig's `domain/connectors.md`, section 12).
+
+**The picker.** Below the forge's choice, for the chosen forge, the form
+lists the repositories temper can reach there (the `Reachable` request,
+`README.md`, section 8), a page at a time by number from 1, each page
+at most `picker.page` rows (`../protocol/configuration.md`, its limits)
+clipped to the forge's own page cap, with "Next" while the answer says
+more follow, which it says when the page is full. The request names no
+project, so the project's own repositories are among the rows; adopting
+one again is refused as any adoption is (section 10). Each row is
+OWNER/NAME, marked "private" where it is; the repository's id and its
+owner's id the row carries ride in the adoption request and are never
+shown. Choosing a row fills the owner and the name. What temper can
+reach:
+
+| The forge | Listed |
+|---|---|
+| GitHub | the repositories of temper's App's installations (GitHub's `GET /installation/repositories`, on each installation's token), by account: "All accounts", then each installation's account by login, the installations as the deployment's page reads them (5.4), marked "selected repositories" where its installation has chosen repositories and "suspended" where GitHub suspended it |
+| Forgejo, connected | the repositories its bot may write |
+| Forgejo, managed or owned | every repository the site admin can see, read by the setup's host's `Reachable { forge, page }` plan on the admin's token (skein's `forge-setup.md`, 4.8), by id ascending, its `reachable` rows given from `picker.page`, since adopting one grants the bot its access (`../protocol/forge.md`, the setup's host's `Reachable` and `Adopt`); the admin's token stays the setup's host's, and the picker gets the rows alone. The plan runs beside the forge's one writing run; a second read of the picker while one runs is refused busy, and so is one past `setup.runs`, which counts both. Its own refusals are the admin's token's, as the reconcile's first step has them (`forge-setup.md`, 4.3): "the admin's token is missing" and "NAME is not a site admin" |
+
+A forge not connected offers none: the picker says "Forge F is not
+connected." and links to the deployment's page (5.4), and the "Adopt"
+button stays disabled for it. A suspended installation's repositories are
+listed and marked; adopting one is refused as no access until GitHub
+unsuspends it.
+
+**Not listed.** Below the list, "Not listed" takes a repository's owner
+and name, and the form says what would make it reachable, by the forge
+and what its read answered:
+
+| Where | The form says |
+|---|---|
+| GitHub, an account whose installation has selected repositories | "Grant OWNER/NAME to temper's App on GitHub's installation page.", linked to that installation's page (5.5) |
+| GitHub, an account with no installation of temper's App | "temper's App is not installed on OWNER.", with "Install on another account" (5.4) |
+| Forgejo, connected | "Make LOGIN a collaborator with write on OWNER/NAME.", LOGIN the bot's |
+| Forgejo, managed or owned | nothing: adopting it grants the bot its access |
+| any forge | a repository its credential can read may be adopted as context |
+
+Once the forge says so (an installation's repositories changed, a
+collaborator added), the repository is listed on the picker's next
+page, with no restart.
+
+**The rules, in words** (`../domain/forge.md`, on what adoption reads):
+the landing branch's rules as the forge applies them, each with what it
+means for landing: a merge queue (temper enters it, 2.1), required
+approvals (a person approves, or temper's App may bypass), required
+status checks (CI as the landing rule's), code owners (a person
+reviews), signed commits (temper's pushes are refused, so its landings
+wait), linear history (a merge style that keeps it), and whether
+temper's App may bypass the rules. Where a rule keeps temper from
+landing, the form names the one setting on the forge that would let it
+land, for the person to choose; until it is changed, its ready changes
+wait for someone else's merge (section 3). temper never changes a
+repository's rules. Forgejo's reads answer none of the merge queue,
+signed commits, linear history and code owners, and no bypass, so on
+Forgejo the form says its branch protection alone.
 
 ### 5.2 Health
 
@@ -250,9 +343,15 @@ deployment's page):
 
 - **what temper may do** there, and whether that narrowed since adoption
   ("a merge was refused: temper may no longer land into main");
-- **its webhooks:** when they were last heard; none, or none for days,
-  means changes are seen by polling alone, more slowly;
+- **its webhooks:** when they were last heard, on GitHub the App's
+  deliveries as its delivery log records them (`../protocol/forge.md`,
+  a GitHub App's delivery log); none, or none for days, means changes
+  are seen by polling alone, more slowly;
 - **its landing branches:** their tips and CI on them;
+- **on GitHub, its installation:** the account's, marked suspended
+  while GitHub suspends it; a repository that left the installation is
+  marked "not granted to temper's App", linked to the installation's
+  page (5.5);
 - **what is held** on it for drift (6.2).
 
 ### 5.3 In a project's settings
@@ -274,11 +373,93 @@ deployment's page):
 ### 5.4 The deployment's page
 
 The forge's part of the deployment's connectors (jig's
-`client/domain/pages.md`, section 7), for each configured forge: its
-request budget and what uses it (fresh reads, writes, keeping up, the
-slow pass; `../domain/forge.md`, 5.4); a pause for its rate, and
-until when; its outbox, the effects waiting and those uncertain, being
-looked for; and when each repository's webhooks were last heard.
+`client/domain/pages.md`, section 7), on temper's `Forges` page
+(`README.md`, 3.5), read for a person whose role holds the deployment's
+connectors, in standalone the deployment's owner; any other's read is
+refused, in jig's words (`README.md`, section 8). A row for each
+configured forge, by its number, its kind and its `web` address, says:
+
+- **Its connection,** one of:
+
+  | State | The row says |
+  |---|---|
+  | not connected | "Not connected", with Connect; where its records say why, "Not connected: its records are unreadable" or "Not connected: its records were made for KIND at ADDRESS", and connecting again overwrites them (`../protocol/forge.md`, at start); an owned forge not prepared yet, "Not connected: prepare it with `temper forge prepare`" (`../protocol/setup.md`, owned), with no Connect |
+  | connecting | "Connecting": a run holds the forge, and what it waits for: a managed or owned Forgejo's reconcile, the forge's answers to a check, or the person's browser on GitHub until the link's state ends (`setup.state_life`) |
+  | connected | "Connected as LOGIN (ID)", the user the records hold: the bot's on Forgejo, the App's on GitHub |
+  | stopped | "Stopped: WHY", the component's reason in words (its key or token refused, a user other than its own, an access it finds invalid, a refusal that asking again would not mend), with Replace; the engine and every other forge run on |
+
+  A connect that ends otherwise is said on the row until the next one:
+  refused (the person's role, the forge's kind or mode, "busy": the
+  forge's one writing run is taken, or `setup.runs` runs are running),
+  "the pasted value changed", "the API token
+  and the git token answer as LOGIN and LOGIN", "LOGIN is not temper's
+  bot: add `temper:bot` to its full name on Forgejo" (5.5), on GitHub
+  an App lacking what temper needs, each permission and event named
+  (5.5), the forge unreachable, or "interrupted; paste again" after a
+  restart.
+- **Its mode** (`../protocol/setup.md`, the modes): owned, where the
+  configuration's setup owns the forge; managed, where temper keeps a
+  site admin's token for it; connected otherwise. Owned and managed say
+  "admin's token kept": the setup's host alone reads it, never the
+  forge's component.
+- **On GitHub, temper's App:** its slug, and its installations, each
+  with its account's login, "all repositories" or "selected
+  repositories" (linked to the installation's page, 5.5), "suspended"
+  while GitHub suspends it, and a stray, an installation never accepted
+  through temper's link, "uninstalled at the next reconcile".
+- **A job's log on a host temper does not read:** "A job's log is on
+  HOST:PORT, which temper does not read: add it to this forge's
+  `log_origins` and restart." (`../protocol/configuration.md`, the
+  forges' members), until a start names it; the same line is in the
+  engine's log.
+- **Its load:** its request budget and what uses it (fresh reads,
+  writes, keeping up, the slow pass; `../domain/forge.md`, 5.4); a
+  pause for its rate, and until when; its outbox, the effects waiting
+  and those uncertain, being looked for; and when each repository's
+  webhooks were last heard.
+
+Its actions, each a request of the forge's family (`README.md`,
+section 8), offered by kind, mode and state:
+
+| Action | Offered | What it does |
+|---|---|---|
+| Connect | GitHub, not connected or stopped | "Connect GitHub", for the person's account or an organization they name: the answer is a link to the manifest's page on the clients' listener (9.1), shown as text for the person to open; on GitHub they create the App, then install it on an account, and come back to temper. Or "Connect an App of your own": its id, and its private key pasted as GitHub gives it; no webhook secret is asked, since temper points the App's hook at `https://SLUG.invalid/` and hears changes from its delivery log |
+| Connect | Forgejo not owned, not connected; a Forgejo of the connected mode, stopped | its bot's API token, its git token and, where the person made hooks to temper's listener, their secret, pasted together; both tokens must answer as one user |
+| Connect | Forgejo not owned, not connecting | "Connect as its admin": a site admin's token pasted; temper makes its bot (or takes over the connected one, 5.5) and the forge becomes managed |
+| Replace | GitHub, connected or stopped; a Forgejo of the connected mode, connected or stopped | a new App key, or a new API token, git token or both, pasted, which must answer as the forge's user (on GitHub, the same App); the old is erased once the new is kept |
+| Install on another account | GitHub, connected | a fresh link to install temper's App, shown as text; the person picks the account and its repositories, the page advising selected ones over all |
+| Forget the admin's token | managed | the admin's token erased; the forge is connected, its bot and tokens kept, and adopting a repository grants nothing more: the person makes the bot a collaborator |
+
+A pasted value is a field of its own (`README.md`, 3.6 and section 8),
+emptied as the request leaves and shown nowhere, then or after; the
+page shows that it was given, never what. The link a connect or an
+install answers is shown as text, and the client never opens it
+(`README.md`, 6.5).
+
+### 5.5 How the forge's refusals show
+
+What the forge's protocol layer answers a call, or tells the root
+(`../protocol/forge.md`, a forge stopped, GitHub's installations,
+what the vocabulary adds and the setup's host's outcomes), wherever a
+part shows it: the deployment's
+page, the adoption form and its outcome, a change's panel and its hold.
+
+| The forge answers or tells | It shows |
+|---|---|
+| `NotConnected` | on the forge's row, "Not connected", with Connect (5.4); the adoption form lists none of its repositories, and an adoption on it is refused, "Forge F is not connected." |
+| `NotInstalled`, no accepted installation on the owner | "temper's App is not installed on OWNER.", with "Install on another account"; a push to it is refused the same way |
+| `Missing`, on a repository whose account has an installation of selected repositories | "OWNER/NAME is not granted to temper's App.", linked to the installation's page on GitHub: `WEB/settings/installations/ID` for a person's account, `WEB/organizations/ORG/settings/installations/ID` for an organization's, WEB the forge's configured `web` address and ID the installation's |
+| `Missing` otherwise | not found, as `README.md`, 4.7 says |
+| `Stopped { why }`, told to the root | on the forge's row, "Stopped: WHY", with Replace (5.4); its calls answer `NotConnected` until its next connect, shown as that row says |
+| an installation suspended | "suspended" on the installation, on the forge's row and on each repository of it (5.2); its calls are refused as no access |
+| a stray installation | on the forge's row, "uninstalled at the next reconcile" |
+| `Lacking`, a GitHub App's `Paste` (a connect of an App of the person's own, or a Replace) whose App lacks permissions or events temper needs | on the forge's row, "temper's App lacks WHAT: grant them in the App's settings, then paste its key again.", WHAT each permission, with its level, and each event, as GitHub names them; with Replace where the forge is connected, Connect where it is not, and a link to the App's settings, `WEB/settings/apps/SLUG`, or `WEB/organizations/ORG/settings/apps/SLUG` for an organization's App |
+| `Unmarked`, connecting as the admin a forge whose user lacks temper's mark | "LOGIN is not temper's bot: add `temper:bot` to its full name on Forgejo, then connect again." |
+
+The installation's page and the App's settings are built by the engine
+from the configured `web` address, never from an address a forge's
+answer gave, so a link the client shows points at the configured forge
+alone. SLUG is the App's slug, as the forge's row shows it (5.4).
 
 ## 6. Holds, in the forge's words
 
@@ -390,6 +571,66 @@ The first are a change's result and its hold (2.5).
 | adoption, repositories, health, landing rules | temper's `Adopt` page; a project's part | `../domain/forge.md`, sections 4 and 5, and 8.7; jig's `domain/connectors.md`, section 12; jig's `domain/authority.md`, section 10 |
 | goals' issues, landings as news, findings | a project's part; a goal's page | `../domain/forge.md`, sections 7 and 12 |
 | the forge itself | the deployment's part | `../domain/forge.md`, 5.4 |
+| the picker (5.1) | temper's `Adopt` page, through the `Reachable` request (`README.md`, section 8) | `../protocol/forge.md`, GitHub's installations; `../domain/forge.md`, section 4 |
+| each forge's connection, its mode, installations and actions (5.4, 5.5) | temper's `Forges` page; the deployment's part | `../protocol/forge.md`, at start, connecting at runtime, a forge stopped, GitHub's installations and the setup's host; `../protocol/credentials.md`, the forges' records |
+| the browser's steps of a connect (9.1) | none of jig's: temper's routes on the clients' listener | `../protocol/forge.md`, the setup's host |
+
+### 9.1 The browser's steps, on the clients' listener
+
+A GitHub connect's browser steps are temper's routes on the clients'
+listener (`README.md`, section 8): temper's server asks jig's clients'
+component first whether it claims a path (jig claims `/jig/...`), then
+routes `/forges/...`, then serves the browser's bundle. GitHub sends
+the person's browser to them, and nothing of temper's client calls
+them.
+
+| Route | What it does | Answers |
+|---|---|---|
+| `GET /forges/N/github/manifest?state=S` | the page the setup's host's `Manifest` run produced for that state, held with it: one form posting temper's manifest to `WEB/settings/apps/new?state=S`, or `WEB/organizations/ORG/settings/apps/new?state=S` for an organization, one button, no script; the manifest's redirect and setup addresses are whole URLs on the clients' listener, `http://LISTENER/forges/N/github/redirect` and `http://LISTENER/forges/N/github/setup` | `200`, the page |
+| `GET /forges/N/github/redirect?code=C&state=S` | `Convert`: the code exchanged for the App's id, slug and key, each kept before the browser is answered, and its user; the App's hook points at `https://SLUG.invalid/`, so no webhook secret is kept on GitHub; then the forge connects | `302` to the install page, `Install`'s link for that state |
+| `GET /forges/N/github/setup?installation_id=I&setup_action=A&state=S` | `Accept`: the installation checked and accepted, then the forge's installations handed to its component again | `200`, a short page: "temper has the installation; you may close this tab." |
+
+N is the forge's `number`, WEB its configured `web` address, ORG the
+organization the connect named and LISTENER the clients' listener's
+address, as temper builds the manifest from it
+(`../protocol/forge.md`, the setup's host).
+
+- **The manifest's page's headers:** `Content-Security-Policy:
+  default-src 'none'; form-action WEB`, `Cache-Control: no-store` and
+  `Referrer-Policy: no-referrer`. It loads nothing, runs nothing, and
+  may post only to the configured forge.
+- **The state is the only authenticator.** A route takes no cookie and
+  no credential of jig's: the state, 128 bits or more drawn by the
+  setup's host for one connect or one install, is good once, for its
+  life (`setup.state_life`), for that forge alone. The host keeps at
+  most `setup.states` of them, in memory, so a restart forgets them
+  (`../protocol/forge.md`, the setup's host).
+- **Refused:** a state used, unknown or past its life, or a code GitHub
+  refuses, is answered a short page, "This link has ended. Start again
+  from temper.", and nothing is kept.
+- **A visit with no state** to the setup route is GitHub's, after a
+  person changed the installation's repositories on GitHub: for an
+  installation accepted already it is a refresh, the connector reading
+  its repositories again so the picker lists them; any other is refused.
+- **Bounds and others:** a query past `routes.query_bytes` is refused;
+  a method other than `GET` is answered `405`; a forge not configured,
+  or one that is not GitHub, `404`; any other path under `/forges/`,
+  not found.
+- **A fixed address with a GitHub forge.** The App's `redirect_url` and
+  `setup_url` are those whole URLs on the clients' listener, and
+  GitHub's API cannot change them, so a deployment configuring a GitHub
+  forge gives its clients' listener a fixed address, never port 0; the
+  engine
+  checks it at start and refuses to start, naming it
+  (`../protocol/configuration.md`, the clients' listener). GitHub takes
+  `http://127.0.0.1:PORT` for both, so a standalone deployment needs no
+  public address: the browser that follows the link runs where that
+  address reaches (section 10).
+- **Tested without GitHub.** The fake forge's pages are plain `302`s,
+  so the three steps run as plain requests on the clients' listener, and
+  the browser's tier opens the manifest's page once to see its form post
+  to the configured `web` (`../domain/testing.md`, the real loop); no
+  test calls github.com.
 
 ## 10. Open questions
 
@@ -403,3 +644,28 @@ The first are a change's result and its hold (2.5).
 - **A person's approval as a rule,** posted on the forge as the person
   (`../README.md`, section 8), which the approval's card would then
   say.
+- **A browser on another machine** for GitHub's connect. Default: the
+  link names the clients' listener's fixed address, and the person
+  opens it where that address reaches (in standalone, the engine's
+  machine) or forwards the port themselves; temper makes no tunnel.
+- **Mending a stopped managed or owned forge.** Default: Replace is
+  offered for what a person pasted (a GitHub App's key, a connected
+  Forgejo's tokens); a managed forge is mended by connecting as its
+  admin again, reconcile making the bot's tokens anew for the same
+  user; an owned one by its preparation and a restart.
+- **Disconnecting a forge** from the client. Default: later; a forge's
+  records are overwritten by connecting again, and those of a forge the
+  configuration stops naming are named once in the engine's log.
+- **The picker's pages kept.** Default: none; each page is a fresh read
+  of the forge within its request budget, asked by number, so a
+  repository added or removed between two pages can move a row across
+  them, seen twice or missed until the list is read again from its
+  first page, and a page past the last answers no rows, as "Next" after
+  a last page that came back full does.
+- **The project's own repositories in the picker:** `Reachable` names no
+  project, so neither the engine nor the client can leave out the
+  repositories the project holds, as `../domain/forge.md`, what the
+  picker offers, says the list does. Default: every reachable
+  repository is listed, and adopting one the project holds is refused
+  by the engine as any adoption; the request naming the project is the
+  candidate, and the domain's page is asked to say which.

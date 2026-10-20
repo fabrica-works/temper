@@ -1,6 +1,6 @@
 # temper's parts on jig's channel
 
-Provisional, 2026-10-03, revised 2026-10-19. What temper carries on the
+Provisional, 2026-10-03, revised 2026-10-20. What temper carries on the
 channel between its engine and a worker: its parts inside jig's records,
 under its payload version, and a git identity's value inside a credential
 grant. The channel is jig's (jig's `protocol/channel.md`), and this
@@ -105,7 +105,7 @@ In the schema's terms (each byte field and list has its limit, section
 
 ```
 record Items       { repositories: list Repository  save: option bytes }
-record Repository  { tag: u32  name: bytes  remote: bytes  start: Start  access: Access  identity: u32 }
+record Repository  { tag: u32  name: bytes  remote: bytes  start: Start  access: Access  identity: u32  account: option u64 }
 enum   Start       { merge: Merge, base: Branch, branch: Branch, commit: Commit, saved: Branch }
 record Merge       { branch: bytes  base: fixed 32 }
 record Branch      { branch: bytes }
@@ -121,7 +121,8 @@ record Writable    { push: bytes  expected: option fixed 32 }
 | `remote` | made: the `git` of the configured forge whose number is `provider.forge`, `/`, `owner`, `/`, `name`, `.git` (configuration.md, section 3) | `remote`, never interpreted by the domain; the git component's URL (git.md, section 3) |
 | `start` | `ForgeStart::Base`, `Branch`, `Saved`, `Merge { branch, base }`; the engine never asks for a commit | `Start`, all five |
 | `access` | `push: Some(branch)` is `writable { push: branch, expected: none }`; `None` is `read_only` | `Access` |
-| `identity` | `identity`: the forge's git identity | `identity`, the grant's number in the application's table |
+| `identity` | `identity`: the number of the forge's git identity, the credential jig grants the attempt (credentials.md, section 4) | `identity`, the grant's number in the application's table |
+| `account` | on a GitHub forge, the forge's id of the repository's owner's account; none on Forgejo | `account`, by which the worker's routing picks the identity's entry for each git operation on the repository (section 6) |
 | `save` | the saved-work branch, when the root asks for a save | `save` beside `Event::Assign` |
 
 - **Ids** are the full object id in 32 bytes: a SHA-256 id as it is, a
@@ -202,30 +203,58 @@ One secret of jig's credential grant (jig's `protocol/channel.md`,
 section 8), from the application's table:
 
 ```
-record Identity { token: secret  login: text  name: text  email: text }
+record Identity { kind: Kind  login: text  name: text  email: text }
+enum   Kind     { forgejo: Token, github: Entries }
+record Token    { token: secret }
+record Entries  { entries: list Entry }
+record Entry    { account: u64  account_login: text  token: secret  expires: u64 }
 ```
 
-- **Its fields** are configuration's (configuration.md, section 3): the
-  forge token git authenticates with, its login, and the author's name
-  and email. The login holds no `:` and no control byte; the name and
-  the email are not empty and hold no NUL, newline, `<` or `>`.
-- **On the engine:** the routing encodes each identity once, at start,
-  into the identities' table, as one secret held by number and
-  generation (credentials.md, section 4); `jig-protocol-engine-workers`
-  fills it in as a grant's `value`, through the routing, with an empty
-  `account_id`.
+- **Versioned twice:** by `PAYLOAD_VERSION` (section 3), and by its
+  kind, so a worker tells Forgejo's value from GitHub's before it reads
+  a token.
+- **Forgejo's** is one token, the forge's `GitToken` record, with the
+  bot's login, the `User` record's (credentials.md, 2.1 and section 4).
+- **GitHub's** is a list of entries, one per accepted installation, at
+  most `forges.installations` (configuration.md, section 7): the
+  installation's account id and login, its token, and the token's
+  expiry. The tokens are those the GitHub forge mints, held in memory
+  only and never stored; the login is `x-access-token`.
+- **Its other fields** are configuration's or the forge's defaults
+  (configuration.md, section 3): the login, and the author's name and
+  email, by default on GitHub the bot's, `<slug>[bot]` and
+  `<id>+<slug>[bot]@users.noreply.github.com`, `<slug>` the `AppSlug`
+  record's and `<id>` the `User` record's. The login holds no `:` and no
+  control byte; the name and the email are not empty and hold no NUL,
+  newline, `<` or `>`.
+- **Generations.** Each change of value is a new generation, strictly
+  increasing per number: a Forgejo forge's `GitToken` replaced; on
+  GitHub, each token minted or renewed and each installation accepted,
+  deleted, suspended or unsuspended (forge.md, 2.5). Generation 1 at
+  each start.
+- **On the engine:** the routing encodes the value at start and at each
+  new generation into the identities' table, as one secret held by
+  number and generation, the two newest kept (credentials.md, section
+  4); `jig-protocol-engine-workers` fills it in as a grant's `value`,
+  through the routing, with an empty `account_id`.
 - **On the worker:** `jig-protocol-worker-link` takes the value out with
   its table, the application's, its number and generation; the routing
   decodes it and keeps it in the worker's identities' table, at most the
-  two newest generations of each, and hands it to the git component with
-  each operation that names it (git.md, sections 2 and 5). A value that
-  does not decode, or breaks a field's rule, is dropped and counted; an
-  operation that needs it fails `Broken`.
-- **Shown nowhere.** The record's `Debug` shows the token's length only
+  two newest generations of each, so that a push in flight across a
+  change ends on the value it began with. With each operation that names
+  the identity, the routing hands the git component one token, its login
+  and the author (git.md, sections 2 and 5): Forgejo's token, or on
+  GitHub the entry whose `account` is the repository's item's `account`
+  (section 4). With no such entry the operation fails `Refused` without
+  running git, named "temper's App is not installed on <account>". A
+  value that does not decode, or breaks a field's rule, is dropped and
+  counted; an operation that needs it fails `Broken`.
+- **Shown nowhere.** The record's `Debug` shows each token's length only
   (skein-lib's `Secret`, the schema's `secret`); the login and the author
   are not secret. No root, fact, store record or log holds the value.
 - **Its size** must fit jig's bound on a grant's value (section 8), which
-  configuration checks for every identity at start.
+  configuration checks for every identity at start; a GitHub forge's
+  grows with `forges.installations`.
 
 ## 7. Translation
 
@@ -237,7 +266,7 @@ the routing in the step that routes the record:
 |---|---|---|---|
 | engine | items | the root's `Assignment` (its workspace, its saved-work branch) and the configured forges' `git` bases | `Items`, or none for an empty workspace |
 | engine | parts | `Left`, `Saved`, `Preparation`, each if present | `Parts` |
-| engine | identity | an identity's configured token, login and author | `Identity`'s bytes |
+| engine | identity | the forge's records (Forgejo) or the GitHub forge's minted installation tokens (in memory), with the identity's configured login and author | `Identity`'s bytes |
 | worker | workspace | `Items`, or none | `wire::Workspace`, `save` |
 | worker | work | `wire::Work`, with each repository's tag and start | `Left`, `Saved` |
 | worker | preparation | `wire::Preparation`, with the repository's tag | `Preparation`, or none for a transient one |
@@ -277,7 +306,7 @@ the routing in the step that routes the record:
   | `saved` | `Saved` | the checkout's `repositories`, `conflicts` and `path_bytes`, and `PushDiagnostic::CAPACITY` |
   | `resource` | `Preparation` | fixed |
   | `evidence` | smith's delivery reply | smith's channel limits, as the hub's `delivery_evidence_bytes` takes them |
-  | `grant` | the larger of an LLM grant's (a credential's value, or a program source's name) and the largest `Identity` | jig's accounts (jig's `protocol/llm.md`, section 6); configuration's identities |
+  | `grant` | the larger of an LLM grant's (a credential's value, or a program source's name) and the largest `Identity`, which grows with `forges.installations` on a GitHub forge | jig's accounts (jig's `protocol/llm.md`, section 6); configuration's identities, `records.value_bytes` and `forges.installations`, checked to fit jig's grant bound at start (configuration.md, section 3) |
   | `credentials` | the number of git identities | configuration (configuration.md, section 3) |
 
 - **Within jig's ceilings.** Each must fit the ceiling jig's schema gives
@@ -304,7 +333,7 @@ Within the suites' budgets (`../domain/testing.md`, section 2):
 
 - **Step tests in `temper-protocol-worker-wire`,** those skein's
   `codec.md`, section 6 generates for each record, and `Identity`'s
-  `Debug` holding no byte of its token. Golden bytes fail when an
+  `Debug` holding no byte of its tokens, of either kind. Golden bytes fail when an
   encoding changes, which is when `PAYLOAD_VERSION` moves.
 - **Step tests of the translation** in `temper-service`: each function
   both ways for every variant; an engine's workspace through `Items` to

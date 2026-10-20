@@ -38,6 +38,10 @@ draft to landed change.
   it is built from, and where each part of its design lives.
 - [`docs/guide/box.md`](docs/guide/box.md): a local temper box, with its
   own Forgejo, on loopback.
+- [`docs/guide/github.md`](docs/guide/github.md): GitHub connected from
+  temper's client, through temper's own App.
+- [`docs/guide/forgejo.md`](docs/guide/forgejo.md): a Forgejo connected
+  from temper's client, managed, owned or connected.
 - [`docs/design/STATUS.md`](docs/design/STATUS.md): how far the code is
   from the design.
 - skein's foundation, which temper follows: `programming-model.md`,

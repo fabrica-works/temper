@@ -1,6 +1,6 @@
 # temper's store
 
-Provisional, 2026-10-05, revised 2026-10-18. What temper keeps in jig's
+Provisional, 2026-10-05, revised 2026-10-20. What temper keeps in jig's
 store, and how: its families, the forge's records, under the
 application's tag; their keys, their records and temper's store
 version; and the restart's ranges. The store itself is jig's
@@ -17,9 +17,12 @@ a second store. temper's part is the crate `temper-protocol-store`
   under the application's tag, in the same commits (jig's
   `protocol/store.md`, section 12).
 - **One family per forge record.** Each variant of the forge connector's
-  `Stored` is a family, a keyed adoption's outcome among them. Nothing
-  else of temper's is stored: temper has no index of its own and no
-  secret record; the core's records, people's and tasks' are jig's.
+  `Stored` is a family, a keyed adoption's outcome and each forge's
+  writer among them. Nothing
+  else of temper's is in the main store: temper has no index of its own
+  and no secret record there, its forges' records being in jig's
+  secrets' store (credentials.md, 2.1); the core's records, people's and
+  tasks' are jig's.
 - **Keys sort as the forge's keys do:** a family byte in the variants'
   order, then the key's fields by jig's key rule; a property test holds
   each encoder to the derived order (section 3).
@@ -41,9 +44,11 @@ a second store. temper's part is the crate `temper-protocol-store`
 - **jig's, cited, not restated:**
   - transcripts: one file per task, written before their commit (jig's
     `protocol/store.md`, section 8);
-  - secrets: a second store, which holds no record of temper's in
-    standalone (jig's `protocol/store.md`, section 9; credentials.md,
-    section 1);
+  - secrets: a second store, holding temper's forges' records under
+    temper's tag (credentials.md, 2.1) and the values clients' requests
+    carry, kept by jig until their run ends (credentials.md, 2.2); both
+    written and read by the engine's protocol layer, never by this
+    crate (jig's `protocol/store.md`, section 9);
   - opening: the format row and the header checked before the root
     starts (jig's `protocol/store.md`, section 10);
   - fill: reported with each commit, new work refused above the
@@ -78,6 +83,7 @@ section 7).
 | 13 | `Issue` | `Issue(u64)`: the goal | a goal's issue projection | `issues` |
 | 14 | `Release` | `Release(u64)`: the task | a closing task's release | `tasks` |
 | 15 | `Application` | `Application(u64)`: the people child's token for the request | a keyed adoption's outcome, kept until its retention ends (jig's `domain/connectors.md`, 5.5: a connector keeps its keyed requests' outcomes durably) | `applications` |
+| 16 | `Writer` | `Writer(forge)`: the forge's number | the forge's writer, given at runtime from its connect's user (skein's `forge-client.md`, 7.1; credentials.md, section 5), restored at start so that restored effects never meet `Forbidden` | the configured `forges` |
 
 - **Loaded:** every family at the forge's restart step, and never
   otherwise. No party reads them: the engine serves none of the forge's
@@ -139,6 +145,33 @@ section 7).
   The routing gives it to jig's component, whose format row records it;
   a store written with another refuses to open, saying so (jig's
   `protocol/store.md`, 5.2 and 5.3).
+- **`STORE_VERSION` is 3,** with the `Writer` family, tag 16,
+  `Key::Writer(forge)` (section 2): each forge's writer, given at
+  runtime, kept by skein's forge client as its own record (skein's
+  `forge-client.md`, 7.1), and not secret (credentials.md, 2.1). The
+  move from 2 to 3 breaks the stored format: a store written at 2
+  refuses to open, saying so (jig's `protocol/store.md`, 5.3).
+  Pre-release, nothing is translated; upgrades stay open (section 7).
+  Another owner's move in the same window is this one: the version
+  moves once (`README.md`, section 9).
+- **A deployment made again** after such a break: stop temper, move its
+  store aside, the `store/` and `transcripts/` directories in the
+  deployment's directory that jig's `deployment` member names
+  (configuration.md, section 2; jig's `protocol/store.md`, section 2),
+  and start afresh, a first start (configuration.md, section 8). What
+  survives:
+  - the forges' records, only where `secrets/`, jig's secrets' store, is
+    kept and its own format still matches (jig's `protocol/store.md`,
+    section 9; credentials.md, 2.1); otherwise each forge is connected
+    again;
+  - the configuration and its private files, which no store holds;
+  - nothing else: jig sweeps its own secrets the new store names none
+    of, so LLM accounts are signed in again (jig's `protocol/store.md`,
+    section 9); owners and projects are seeded again from `engine`, and
+    each repository is adopted again through the client
+    (configuration.md, section 8); tasks, goals and temper's families
+    stay in the store moved aside, and the deployment's id is drawn
+    again, so its branch namespace is new.
 - **Sizes.** `temper-protocol-store` computes, from the forge's limits,
   the largest key and the largest value of its families, and hands them
   with `STORE_VERSION` to jig's component, which checks them with its own
@@ -231,7 +264,7 @@ Within the suites' budgets (`../domain/testing.md`, section 2):
 - **Upgrades:** reading an older `STORE_VERSION` as it loads, or a pass
   at opening that rewrites it, once a deployment's data must outlive a
   release. Default: jig's (jig's `protocol/store.md`, section 16), a store
-  of another version refused.
+  of another version refused, and the deployment made again (section 4).
 - **Indexes for the forge's client parts,** once panels are served
   (`../client/README.md`, section 4): a family of small rows per view, as jig's
   indexes are (jig's `protocol/store.md`, 7.4). Default: none until

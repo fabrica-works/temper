@@ -1,55 +1,73 @@
 # The forge's setup
 
-Provisional, 2026-10-16, revised 2026-10-19. How a forge comes to be
+Provisional, 2026-10-16, revised 2026-10-20. How a forge comes to be
 ready for temper, in three modes: connected, where a person runs and sets
-up Forgejo and gives temper only what it strictly needs; managed, where a
-person runs it and gives temper a site admin's token, with which temper
-sets itself up; and owned, where temper runs Forgejo and its runner, and
-sets itself up on them. The engine is the same in every mode: each mode
-makes the files the one below reads, and the engine reads connected's.
-Owned mode is commands any host can arrange; `temper box` is one
-arrangement, and wiring only. A box is what temper's first milestone is
-set up on and checked by CI on (`../README.md`, section 2), and what QA's
-agents drive (`../draft/qa.md`, 4.1). The members are configuration.md's
-(section 3), the credentials credentials.md's (section 2), the webhooks
-forge.md's (section 5), and the commands and crates README.md's
-(sections 4 and 5). What comes later is section 15; what is open,
-section 16.
+up the forge and gives temper only what it strictly needs; managed,
+where a person runs it and temper sets itself up on it, with a Forgejo
+site admin's token or, on GitHub, with an App made from temper's
+manifest; and owned, where temper runs Forgejo and its runner, and sets
+itself up on them. A person chooses a forge's mode and connects it from
+temper's client (`../client/forge.md`, the deployment's page). The
+engine is the same in every mode: each mode makes the records the one
+below reads, kept in jig's secrets' store (credentials.md, the records),
+and the engine's forge component reads connected's. Owned mode is
+commands any host can arrange; `temper box` is one arrangement, and
+wiring only. A box is what temper's first milestone is set up on and
+checked by CI on (`../README.md`, section 2), and what QA's agents drive
+(`../draft/qa.md`, 4.1). The members are configuration.md's (section 3),
+the credentials credentials.md's (section 2), the webhooks forge.md's
+(section 5), and the commands and crates README.md's (sections 4 and 5).
+A person's walks are `docs/guide/box.md`, `docs/guide/forgejo.md` and
+`docs/guide/github.md`. What comes later is section 15; what is open,
+section 16; connecting GitHub, section 17.
 
 ## 1. In one page
 
-- **Three modes, per forge** (section 2). Connected: a person runs and
-  sets up Forgejo, and temper is given its bot's tokens and id. Managed:
-  a person runs it, and temper is given a site admin's token. Owned:
-  temper runs Forgejo and its runner.
+- **Three modes, per forge** (section 2), chosen and connected from
+  temper's client. Connected: a person runs and sets up the forge, and
+  pastes the bot's two tokens on Forgejo, or an App's id and key on
+  GitHub. Managed: a person runs it, and pastes a Forgejo site admin's
+  token, or on GitHub makes temper's App from its manifest in their
+  browser. Owned: temper runs Forgejo and its runner.
 - **Each mode is a layer that makes the inputs of the one below.**
   Owned's preparation makes a Forgejo and an admin's token, managed's
-  input; managed's reconcile makes the bot, its tokens, its id and the
-  webhooks' secret, connected's inputs. The engine always runs
-  connected: it reads the same files, checks the same user, and never
-  holds an admin's token (section 3).
-- **Files are the interface.** Each layer writes private files in the
-  forge's directory, under fixed names, and the next reads them. No layer
-  calls another, so any host can run them in any arrangement.
-- **The core is step code; the hosts are thin.** Reconcile is a machine
-  of skein's `skein-forge-setup` (`forge-setup.md`, section 4); the
-  preparation, Forgejo's settings and the processes' specs are machines
-  and pure functions of `temper-forge-setup`. Running a command, a
-  request or a file write is a host's. Three commands host them: `temper
-  forge prepare`, `temper forge run` and `temper forge reconcile`
-  (sections 5, 6 and 11).
+  input, and hands the token over in a file; managed's plans make the
+  bot, its tokens, its id and the webhooks' secret, connected's inputs.
+  The forge component always runs connected: it reads the same records,
+  checks the same user, and never holds an admin's token (section 3).
+- **The records are the interface.** Each forge's records, under its
+  configured `number`, a stable id never reused, are kept in jig's
+  secrets' store by the engine's protocol layer alone (credentials.md,
+  the records). The one file that passes between the layers is an owned
+  forge's handover, `admin_token`, which the engine takes once.
+- **The core is step code; the hosts are thin.** The setup's plans are
+  skein's `skein-forge-setup` (skein's `forge-setup.md`, sections 4 and
+  5), run inside the engine by skein's setup host component (its host,
+  6.3): per forge, one writing plan at once and the picker's read beside
+  it (5.1). The preparation, Forgejo's settings and the processes' specs
+  are machines and pure functions of `temper-forge-setup`, hosted by two
+  commands, `temper forge prepare` and `temper forge run` (section 6).
+  No command writes the records.
 - **`temper box` is wiring only.** It runs a configuration's steps in
-  order (prepare, Forgejo, its runner, reconcile, `temper serve`),
-  restarts what exits, and stops them in reverse order. It names no
-  Forgejo request and nothing of setup but its steps. systemd, QA's
-  environments or a test arrange the same commands another way
-  (section 7).
-- **Reconcile converges at every start:** the bot user, made when
-  missing and otherwise checked, never edited; its two tokens, a team
-  with write on every repository of each configured org, the bot in it,
-  and each org's webhook, each made when missing, repaired when changed
-  and left alone otherwise. The admin's token is read then, by `temper
-  forge reconcile` alone (section 5).
+  order (prepare, Forgejo, its runner, `temper serve`), restarts what
+  exits, and stops them in reverse order. It names no Forgejo request
+  and nothing of setup but its steps. systemd, QA's environments or a
+  test arrange the same commands another way (section 7).
+- **Reconcile converges at every start** of a managed or owned Forgejo,
+  in the engine: the bot user, made when missing and otherwise checked,
+  never edited; its two tokens; an owned forge's person's orgs; and each
+  adopted repository's access, the bot a collaborator with write and the
+  repository's hook; each made when missing, repaired when changed, and
+  left alone otherwise (section 5).
+- **Access at adoption.** Adopting a repository of a managed or owned
+  Forgejo first gives the bot its access (`Adopt`, 5.4); nothing is
+  granted org-wide. The picker offers every repository the site admin
+  can see, read by the `Reachable` plan, which writes nothing (5.2).
+- **GitHub** (section 17): managed by the manifest flow, through the
+  clients' listener's routes, or connected by an App the person pasted;
+  both end in the same records. Its reconcile, after each connect,
+  repairs only the App's hook's address; its changes reach the engine
+  through the App's delivery log, with no webhook secret.
 - **Owned is a stock Forgejo.** temper writes its `app.ini`, runs its
   migrations, makes its own admin and the person's account with
   Forgejo's command line, registers the runner offline, dumps before an
@@ -59,56 +77,71 @@ section 16.
 - **A box is reactive.** Every change on the forge that a box's work
   waits on reaches the engine as a signed webhook delivery, and becomes a
   hint, read within the keep's `hinted`: pushes, pull requests, issues,
-  comments, reviews and each CI job's end. Reconcile makes the hooks; an
-  owned Forgejo is allowed to deliver to the engine's listener. Polling
-  is unchanged, the fallback for a delivery lost or refused (section 10).
+  comments, reviews and each CI job's end. Adoption and reconcile make
+  the hooks; an owned Forgejo is allowed to deliver to the engine's
+  listener. Polling is unchanged, the fallback for a delivery lost or
+  refused (section 10).
 - **Loopback.** An owned Forgejo listens on loopback, as temper's
   clients' and webhooks' listeners do; a person on another machine
   reaches them through a tunnel. A forge on another host polls: its
   webhooks need skein's TLS server side (section 15).
-- **Not here:** GitHub, binaries' digests, webhooks from another host,
-  the isolation of CI's jobs, provisioning at runtime and the forge as
+- **Not here:** binaries' digests, webhooks from another host, the
+  isolation of CI's jobs, provisioning at runtime and the forge as
   people's sign-in provider (section 15).
 
 ## 2. The three modes
 
 | | connected | managed | owned |
 |---|---|---|---|
-| Runs Forgejo and CI's runner | the person | the person | temper |
-| Makes temper's bot, its tokens, its access and the webhooks | the person | temper, with a site admin's token | temper, with an admin it makes |
-| temper is given | the bot's two tokens and its id; optionally a webhooks' secret | a site admin's token; the orgs temper works in | the Forgejo and runner binaries; an address on loopback; the person's login; the orgs |
+| Runs the forge and CI's runner | the person | the person | temper |
+| Makes temper's bot, its tokens, its access and the webhooks | the person | temper: on Forgejo with a site admin's token; on GitHub, an App from temper's manifest | temper, with an admin it makes |
+| temper is given, on Forgejo | the bot's two tokens, pasted; optionally a webhooks' secret | a site admin's token, pasted | the Forgejo and runner binaries; an address on loopback; the person's login, email and orgs |
+| temper is given, on GitHub | an App's id and its private key, pasted | the person's steps in their browser, from a link temper prints | none: GitHub is never owned |
 
 - **Per forge.** A deployment may mix them: an owned Forgejo beside a
-  connected one. Each set-up forge has a directory of its own and, when
-  owned, an address of its own.
-- **A mode is changed by the configuration and a restart:**
-  - owned to managed: temper stops running Forgejo; its directory's
-    `forgejo/` is a stock work path, and its `admin_token` stays valid;
-  - managed to connected: the forge's entry of `setup` is removed; no
-    reconcile runs, and its files stay as it last wrote them;
-  - connected to managed: an admin's token is given, and reconcile takes
-    over a bot it made before, or makes one (section 5).
+  connected one, or beside GitHub. Each owned forge has a directory and
+  an address of its own.
+- **A mode is no record** (credentials.md, the records): a forge is
+  owned when its `setup` entry says so (section 8); managed when it is
+  not owned and its `AdminToken` record is kept; connected otherwise. On
+  GitHub, managed and connected end in the same records, and differ only
+  in how the App came to be (section 17).
+- **A mode changes:**
+  - owned to managed, by the configuration and a restart: the forge's
+    `setup` entry says `"managed"`, temper stops running Forgejo, and
+    its directory's `forgejo/` is a stock work path a person runs; the
+    `AdminToken` record, taken over (6.5), stays valid;
+  - managed to connected, from the client, "Forget the admin's token":
+    the `AdminToken` record is erased, no reconcile runs for the forge,
+    and its bot, tokens, id and hooks stay as reconcile last kept them;
+    adopting a repository then grants nothing, and the person makes the
+    bot a collaborator (section 4);
+  - connected to managed, from the client, "Connect as its admin": a
+    site admin's token is pasted, and reconcile runs with it, taking
+    over the connected user as its bot when its full name carries
+    `temper:bot` (5.5).
 
 ## 3. The layers and their files
 
 The three modes and their layering (each mode makes the inputs of the
 one below, and the service always runs connected) are held by skein's
-`forge-setup.md`, section 3. temper's layers, and the files that pass
-between them:
+`forge-setup.md`, section 3. temper's layers, and what passes between
+them:
 
 ```
-owned      temper forge prepare     ──► the forge's work path, the runner's, admin_token, person_password
-           temper forge run         ──► forgejo web, forgejo-runner daemon (each exec'd)
-managed    temper forge reconcile   ──► api_token, git_token, user, webhook_secret
-connected  temper serve             ◄── reads them, through the forges and identities that name them
+owned      temper forge prepare      ──► the forge's work path, the runner's, person_password,
+                                         admin_token (the handover)
+           temper forge run          ──► forgejo web, forgejo-runner daemon (each exec'd)
+managed    the engine's setup host   ──► the forge's records (below); takes the handover once
+connected  the forge component       ◄── its access, built from the records
 ```
 
-- **One directory per set-up forge,** named by its setup (section 8):
+- **One directory per owned forge,** named by its setup (section 8):
   private, `0o700`, the user's own and not reached through a link, as a
-  worker's root is (configuration.md, section 4). The first command that
-  writes in it makes it so when it is absent: `temper forge prepare`
-  when owned, `temper forge reconcile` when managed. A directory that is
-  not so refuses the command, naming it. Its files:
+  worker's root is (configuration.md, section 4). `temper forge
+  prepare` makes it so when it is absent; a directory that is not so
+  refuses the command, naming it. A managed or connected forge has
+  none. Its files:
 
   | File | Made by | Read by | Holds |
   |---|---|---|---|
@@ -116,92 +149,229 @@ connected  temper serve             ◄── reads them, through the forges and
   | `runner/` | prepare | the runner, through `run` | the runner's configuration, its registration, its jobs' directories, `secret` |
   | `backups/` | prepare | the person | one dump before each upgrade's migration |
   | `state` | prepare | prepare, `run` | owned's record: the versions prepared, whether the first preparation ended, Forgejo's own secrets |
-  | `admin_token` | prepare, when owned | reconcile | temper's admin's token |
+  | `admin_token` | prepare, when missing | the engine's setup host, once, at the start that finds it | the handover: temper's admin's token, kept as the forge's `AdminToken` record by `TakeOver`, after whose `Done` the file is removed (6.5) |
   | `person_password` | prepare | the person | the person's first password on the owned Forgejo |
-  | `api_token` | reconcile | the engine's forge component | the bot's API token |
-  | `git_token` | reconcile | the identities' table | the bot's git token |
-  | `user` | reconcile | the engine | the bot's id, in decimal |
-  | `webhook_secret` | reconcile | the engine's webhooks' listener | the secret of the hooks reconcile makes |
 
-  A managed forge's admin's token is the person's file, named by its
-  setup, wherever it is.
+- **What the preparation leaves for the engine** is `admin_token`
+  alone: the token's text, nothing else, private and written whole;
+  made at the first preparation and at each later one that finds it
+  missing, which it is once the engine has taken it, and left as it is
+  when present (6.3).
+- **No other file is read.** temper reads no `api_token`, `git_token`,
+  `user` or `webhook_secret` file: a forge's directory that holds them,
+  from a temper before the records, keeps them unread, and nothing is
+  converted. Every record is written by a plan, `User` as its 8 bytes
+  within a version-1 record (credentials.md, the records). An owned
+  forge's records are made afresh at the start that takes its handover
+  (6.5); a managed forge whose records are missing is not connected, and
+  is connected again from the client (5.5).
 - **Written whole.** Each file is written beside its name and renamed
   over it, private, so a reader never sees half a token.
-- **Read as configuration.md, section 6 reads a secret's file,** each
-  within its bound.
+- **The handover is read** as configuration.md, section 6 reads a
+  secret's file, within its bound: it is the one file of `setup` that
+  `temper serve` reads.
+- **The records, by mode** (credentials.md, the records):
+
+  | Forge | Records |
+  |---|---|
+  | Forgejo, connected | `ApiToken`, `GitToken`, `User`, `Origin`; `WebhookSecret` when the person gave one |
+  | Forgejo, managed or owned | those, and `AdminToken`; `WebhookSecret` drawn by reconcile when the webhooks' listener is configured |
+  | GitHub, managed or connected | `AppId`, `AppSlug`, `AppKey`, `User` (the App's bot user), `Accepted`, `Origin`; no `WebhookSecret` |
+
+- **Written by the setup host's plans alone,** each write kept before
+  the plan goes on (5.1). A value a person pastes is kept by jig until
+  its run ends (credentials.md, pasted values), and is no record.
+- **Records made for another forge,** an `Origin` naming another kind
+  or address, and unreadable ones, leave that forge not connected,
+  named on the deployment's page; nothing is erased, and connecting
+  again overwrites them (credentials.md, the records).
 - **Nothing passes between the layers** in an argument or the
   environment but the configuration's path and the forge's number.
 
 ## 4. Connected
 
-- **What temper strictly needs,** for each forge: the bot's API token,
-  its git token and its id (credentials.md, sections 4 and 5); for
-  webhooks, their secret. The scopes (skein's `forge-setup.md`, section
-  8): `read:user`, `write:issue` and `write:repository` for the API token;
+- **What temper strictly needs** of a connected Forgejo: the bot's API
+  token and its git token, and, for webhooks, their secret; the bot's
+  id is read with the tokens (credentials.md, sections 4 and 5). The
+  scopes (skein's `forge-setup.md`, section 8): `read:user`,
+  `write:issue` and `write:repository` for the API token;
   `write:repository` and `read:user` for the git token, the second so
-  that reconcile can ask whose it is (skein's `forge-setup.md`, section
-  4.3, step 3).
+  that the setup's plans can ask whose it is (skein's `forge-setup.md`,
+  4.3, step 3, and 4.6).
 - **What the person does:** a Forgejo user for temper, not a site admin;
   its two tokens; its write access to each repository temper will adopt,
   as a collaborator or through a team; optionally, each repository's or
-  org's webhook to temper's listener, with the secret and the events of
-  skein's `forge.md`, section 7, and Forgejo's `[webhook]
-  ALLOWED_HOST_LIST` letting it reach the listener; CI, as each
-  repository has it.
+  org's webhook to temper's listener, `http://<listener>/hooks/<number>`,
+  with the secret and the events of skein's `forge.md`, section 7, and
+  Forgejo's `[webhook] ALLOWED_HOST_LIST` letting it reach the listener;
+  CI, as each repository has it.
+- **Pasted from the client, together** (`Connect` with `ForgejoTokens`;
+  `../client/forge.md`, the deployment's page): both tokens, and the
+  secret when given, one value, kept by jig until its run ends
+  (credentials.md, pasted values). The setup host's `Check { forge }`
+  (skein's `forge-setup.md`, 4.6) finds that both answer as one user,
+  not a site admin, and writes the records; the page then says
+  "Connected as LOGIN (ID)". Tokens of two users stop it `OtherUser`, a
+  site admin's `BotIsAdmin`, a refused token `Refused`, each named, and
+  the forge stays as it was.
+- **Replaced** from the client (`Replace`): a new token, checked to
+  answer as the kept user, kept before the old is erased.
 - **Nothing more is required** (`../domain/forge.md`, section 4): polling
   stands in for webhooks, and a project's checks for CI.
-- **The engine as configuration.md has it,** with `user` read from a
-  file when the setup names one (section 8).
+- **A connected GitHub** is an App the person made, pasted (17.3).
 
 ## 5. Managed: reconcile
 
-`temper forge reconcile CONFIG.json FORGE`, for a forge whose setup is
-managed or owned.
+Reconcile is skein's plan, run by the engine's setup host at each start
+of a managed or owned Forgejo and at a managed connect. No command runs
+it, and nothing but the setup host writes what it makes.
 
-- **The machine is skein's.** Its six steps, in this order (1 the
-  admin; 2 the bot, marked `<word>:bot`; 3 the bot's two tokens; 4 the
-  bot's id; 5 each org's team, with the bot in it; 6 each org's
-  webhook), each read first and written only where the forge differs;
-  its wait for the forge; its bounds; and what it refuses are held by
-  skein's `forge-setup.md`, section 4. It does no io and reads no
-  configuration: it is given values, says each request, and its host
-  runs it. temper's setup shell is that host (section 11).
+### 5.1 The setup host in the engine
+
+- **skein's host component** (skein's `forge-setup.md`, its host, 6.3),
+  a child of the engine's protocol layer beside the forge component; the
+  routing carries what passes between it, the root and the records
+  (forge.md, the setup's host). It holds an admin's token and a GitHub
+  App's key only while a plan that asked for them runs, and drops them
+  at its end.
+- **Per forge, one writing plan at once, and one `Reachable` beside
+  it,** since the picker's read writes nothing. A second of either kind
+  is refused "busy", never queued, and so is one past `setup.runs`,
+  which counts both kinds.
+- **Its needs:** a write is a `Keep` of the forge's record, answered
+  `Written` only once `Kept`, so a browser is answered and a connect
+  sent only on what a restart would find; a read is served from the
+  run's pasted value first, then from the forge's record. It draws its
+  random bytes from the engine's source.
+- **States,** for GitHub's browser steps, are its own, in memory: at
+  most `setup.states`, each living `setup.state_life_ms`, an hour at
+  most; a restart forgets them (17.2).
+- **At each start,** once the records are loaded: an owned forge's
+  handover, when its file exists, by `TakeOver` (6.5); then `Reconcile`
+  for each managed and owned Forgejo; and GitHub's `Reconcile` after each
+  GitHub forge connects (17.5). The deployment's page shows a forge
+  "Connecting" until its plan is done and it connects.
+- **A run's end:** `Done`, or `Lacking` (done, with what the App lacks
+  named), keeps its writes, then connects the forge after a plan that
+  connects; `Stop` names its failure and its step, with no secret, and
+  leaves the forge as it was. A start's reconcile that stops leaves that
+  forge not connected, named, until the next start or a managed connect;
+  the engine and every other forge run on.
+
+### 5.2 The setup host's plans
+
+| Plan | Forge | When | skein's `forge-setup.md` |
+|---|---|---|---|
+| `Reconcile { forge, adopted }` | Forgejo, managed or owned | each start; a managed connect | section 4 |
+| `Adopt { forge, repository }` | Forgejo, managed or owned | an adoption, before its reads | 4.5 |
+| `Check { forge }` | Forgejo, connected | a connect; a replacement | 4.6 |
+| `TakeOver { forge, admin_token }` | Forgejo, owned | a start that finds the handover | 4.7 |
+| `Reachable { forge, page }` | Forgejo, managed or owned | the picker | 4.8 |
+| `Manifest { forge, target }` | GitHub | Connect, managed | 5.1 |
+| `Convert { forge, code, state }` | GitHub | the redirect back | 5.2 |
+| `Install { forge }` | GitHub | Install on another account | 5.4 |
+| `Accept { forge, installation, state }` | GitHub | the setup route's visit | 5.4 |
+| `Reconcile { forge }` | GitHub | after each connect | 5.6 |
+| `Paste { forge, app }` | GitHub | Connect with a pasted App; Replace | 5.8 |
+
+- **What each does, and when the routing runs it,** is forge.md's (the
+  setup's host); each plan's steps, its bounds and what it refuses are
+  skein's.
+- **`Reachable`** runs on the admin's token, which stays the setup
+  host's, and is refused `Missing` or `NotAdmin` as reconcile's first
+  step is. It reads one page of the forge's repositories by id
+  ascending, pages counted from 1, at most `reachable` rows, which
+  temper gives from `picker.page` (configuration.md, section 7), and
+  ends `Done(Reachable { rows, more })`, `more` when the page is full;
+  it writes nothing.
+- **Outcomes:** `Done`; `Page`, the manifest page's bytes, which temper
+  holds with its state; `Link`, the install link; `Lacking`, done, with
+  each permission or event the App lacks named.
+
+### 5.3 Reconcile's given values, and its answers
+
+- **The plan is skein's.** Its six steps, in this order (1 the admin; 2
+  the bot, marked `<word>:bot`; 3 the bot's two tokens; 4 the bot's id;
+  5 each org, when owned; 6 each adopted repository's access, the bot a
+  collaborator and the repository's hook), each read first and written
+  only where the forge differs; its wait for the forge; its bounds; and
+  what it refuses are held by skein's `forge-setup.md`, section 4. It
+  does no io and reads no configuration: it is given values, says each
+  request, and the setup host runs it.
 - **Its given values, from temper's configuration:**
 
   | Reconcile's value | temper's |
   |---|---|
-  | the forge's number | the forge's number (configuration.md, section 3) |
-  | the bot's login and email | the setup's `bot.login` and `bot.email` (section 8) |
+  | the forge's number | the forge's `number` (configuration.md, section 3) |
+  | the bot's login and email | the setup's `bot.login` and `bot.email` (section 8); at a connect as its admin of a forge connected before, the connected user's login (5.5) |
   | the tokens' names | `temper-api` for the API's, `temper-git` for git's |
-  | the orgs | the setup's `orgs` |
-  | the orgs' owner, which makes an absent org | `mode.owned.person.login` (6.5) when owned; none when managed |
+  | the orgs, and their owner | `mode.owned.person.orgs` and `mode.owned.person.login` when owned (6.5); none when managed |
+  | the repositories | the forge's adopted repositories, the root's, restored before the start's reconcile |
   | the name a failure gives the admin | `temper-admin` |
-  | the listener's address | `application.webhooks.listener`'s address, when configured; none otherwise. The hook's URL is derived from it (skein's `forge-setup.md`, section 4.1) |
+  | the listener's address | `application.webhooks.listener`'s, when configured; none otherwise. Each hook's URL, `http://<address>/hooks/<number>`, is derived from it (skein's `forge-setup.md`, 4.1) |
   | the word | `temper`, so the bot's mark is `temper:bot` |
-  | its limits | `setup.orgs`, `setup.deadline_ms`, `setup.backoff_ms` and `setup.backoff_max_ms` (configuration.md, section 7) |
+  | its limits | `orgs` from `setup.orgs`, `repositories` from `forge.client.repositories`, `reachable` from `picker.page`, and `deadline`, `backoff` and `backoff_max` from `setup.deadline_ms`, `setup.backoff_ms` and `setup.backoff_max_ms` (configuration.md, section 7) |
 
-  The API's address is the host's: the forge's `api` (configuration.md,
-  section 3). temper-forge-setup maps the setup onto these values and
-  runs the kit's check on them, for every command (section 11); a value
-  the check refuses comes back as its `Place` (skein's `forge-setup.md`,
-  section 6.1), and is named by the path this table gives for it.
-- **What the host answers, as needs:**
+  The API's address is the forge's `api` (configuration.md, section 3).
+  temper-forge-setup maps the setup onto these values and runs the
+  kit's check on them, at each start and for every command (section
+  11); a value the check refuses comes back as its `Place` (skein's
+  `forge-setup.md`, 6.1), and is named by the path this table gives for
+  it.
+- **What the setup host answers, as needs:**
 
-  | Reconcile asks for | The setup shell answers |
+  | Reconcile asks for | The setup host answers |
   |---|---|
-  | the admin's token | the file the setup's `mode.managed.admin_token` names when managed; `admin_token` in the forge's directory when owned (section 3) |
-  | the API and git tokens, the bot's id | the content of `api_token`, `git_token` and `user`, or none when the file is missing |
-  | the webhooks' secret | the content of `webhook_secret`, or none when the file is missing, and reconcile then draws one |
+  | the admin's token | at a managed connect, the pasted value; otherwise the `AdminToken` record |
+  | the API and git tokens, the bot's id | the `ApiToken`, `GitToken` and `User` records, or none when absent |
+  | the webhooks' secret | the `WebhookSecret` record, or none, and reconcile then draws one |
 
-- **Plaintext to loopback alone:** the forge's `transport` is
-  plaintext, and a setup whose forge's transport is TLS is refused,
-  naming it (section 15).
-- **Its files** (section 3). The host reads the admin's token and, when
-  they exist, `api_token`, `git_token`, `user` and `webhook_secret`, as
-  configuration.md, section 6 reads a secret's file, each within its
-  bound; writes the four whole when reconcile asks; and draws the
-  random bytes reconcile asks for, which become `webhook_secret` when
-  that file is missing. An existing `webhook_secret` is kept.
+  Each answer is a record or a pasted value, never a file: a forge's
+  `api_token`, `git_token`, `user` or `webhook_secret` file, from a
+  temper before the records, is not read, and reconcile makes what is
+  missing afresh (section 3). Each item reconcile writes is kept as the
+  forge's record; a kept `WebhookSecret` is never drawn again.
+
+### 5.4 Access at adoption
+
+- **`Adopt { forge, repository }`** runs before an adoption's reads on a
+  managed or owned Forgejo (skein's `forge-setup.md`, 4.5): the bot made
+  a collaborator with write, and the repository's hook made when the
+  listener is configured, with the forge's secret. Stopped, the adoption
+  is refused, named (`../domain/forge.md`, access at adoption).
+- **At each start,** reconcile's step 6 checks each adopted
+  repository's access, and repairs what changed.
+- **Nothing org-wide:** the bot reaches the repositories adopted, a
+  person's own among them, and no other.
+- **A connected Forgejo, and a managed one forgotten,** grant nothing at
+  adoption: the person makes the bot a collaborator, and the repository
+  polls unless the person adds its hook (section 4).
+
+### 5.5 Connecting as its admin, and forgetting
+
+- **"Connect as its admin"** (`Connect` with `ForgejoAdmin`;
+  `../client/forge.md`, the deployment's page), on a Forgejo not owned
+  and not connecting, whose `setup` entry is managed (section 8): the
+  site admin's token, with the preparation's scopes (6.3), pasted, kept
+  by jig until its run ends, and
+  `Reconcile` run with it. Done, the token is kept as the forge's
+  `AdminToken` record beside reconcile's writes, and the forge connects,
+  managed.
+- **Its bot:** on a forge with no records, the setup's `bot.login`, made
+  when missing; on a forge connected before, the connected user's login,
+  taken over when its full name carries `temper:bot`, or the run stops
+  `Unmarked`, named, and the forge stays connected.
+- **A Forgejo with no `setup` entry** refuses it, naming
+  `application.setup` (section 16).
+- **"Forget the admin's token"** (`Forget`): the `AdminToken` record is
+  erased, and the forge is connected, its bot, tokens, id and hooks
+  kept; no reconcile runs for it after.
+
+### 5.6 What holds of every plan on Forgejo
+
+- **Plaintext to loopback alone:** a managed or owned forge's
+  `transport` is plaintext, and one whose transport is TLS is refused at
+  start, naming it (section 15).
 - **The bot's email** is the setup's `bot.email` when reconcile makes
   the bot, and stays as it is after: a change to `bot.email` reaches
   only a bot made after it, and an existing bot's email is the
@@ -209,14 +379,6 @@ managed or owned.
   and its commits name the identity's `author` (configuration.md,
   section 3), not this email.
 - **The scopes** of the tokens are section 4's.
-- **A failure** stops the command with exit status 1, naming the step,
-  and leaves each file it wrote whole and valid.
-- **Only at a start.** `temper serve` never reads the admin's token, and
-  reconcile ends when converged. With no admin's token, a forge is
-  connected.
-- **Repositories outside the orgs,** a person's own among them, are
-  adopted as connected's are: the person makes the bot a collaborator,
-  and the repository polls unless the person adds its hook.
 - **What it cannot set:** Forgejo's settings, which its API does not
   change (skein's `forge-setup.md`, section 4): the webhooks'
   `ALLOWED_HOST_LIST`, and whether Actions are enabled. A managed forge
@@ -229,7 +391,7 @@ managed or owned.
 
 - **Inputs:** the Forgejo binary's absolute path, and the runner's, or
   no runner; the address Forgejo listens on, a socket address on
-  loopback; the person's login and email; the orgs; the runner's labels,
+  loopback; the person's login, email and orgs; the runner's labels,
   capacity and `PATH`; the forge's directory.
 - **The binaries are checked** by every command that runs them: the
   first line of each one's version equal to temper's pin, Forgejo's and
@@ -274,12 +436,12 @@ files: at a first preparation, and for a runner older than its pin
 1. **The first preparation:** the layout of section 3; `app.ini`;
    `forgejo migrate`; temper's admin, `temper-admin`, made as a site
    admin with a password Forgejo draws and nobody keeps, and its token
-   made by `admin user generate-access-token` into `admin_token`, with
-   the scopes `write:admin`, `write:organization` and `write:user` (the
-   scopes the conformance records reconcile's routes under; skein's
-   `forge-setup.md`, section 8, says which route needs which), under a
-   name that ends in a random suffix, since Forgejo refuses a second
-   token of one name; the
+   made by `admin user generate-access-token` into `admin_token`, the
+   handover (section 3), with the scopes `write:admin`,
+   `write:organization` and `write:user` (the scopes the conformance
+   records reconcile's routes under; skein's `forge-setup.md`, section
+   8, says which route needs which), under a name that ends in a random
+   suffix, since Forgejo refuses a second token of one name; the
    person's account, a site admin with a password Forgejo draws into
    `person_password`, to change at their first sign-in; the runner's
    secret drawn into `runner/secret` (40 hexadecimal digits, no line
@@ -299,10 +461,11 @@ files: at a first preparation, and for a runner older than its pin
 2. **A later preparation at the same versions, with a runner exactly
    when `state` records one:** `app.ini` written again, so a change of
    the setup reaches Forgejo; `admin_token` made again when missing,
-   under a fresh suffix, for temper's admin, which Forgejo's command line
-   cannot make twice: an admin a person deleted fails the preparation,
-   naming it; nothing else. It takes Forgejo's lock alone, so a box
-   restarts a Forgejo, after its preparation, while the runner runs.
+   which it is once the engine has taken it (6.5), under a fresh suffix,
+   for temper's admin, which Forgejo's command line cannot make twice:
+   an admin a person deleted fails the preparation, naming it; nothing
+   else. It takes Forgejo's lock alone, so a box restarts a Forgejo,
+   after its preparation, while the runner runs.
 3. **An upgrade:** a recorded Forgejo older than the pin is dumped
    (`forgejo dump`) into `backups/forgejo-<old>-to-<new>.zip`, written as
    `backups/dump.partial.zip` (Forgejo adds `.zip` to a name without it)
@@ -333,9 +496,8 @@ files: at a first preparation, and for a runner older than its pin
   it: it writes the runner's connection itself, in the runner's
   configuration, with its token in a file (13.3).
 - **Its commands run on skein-io's processes,** as the box's children
-  do and as reconcile's HTTP runs: each spawned with its arguments and
-  the spec's environment, its output read through pipes within a bound,
-  its exit status awaited.
+  do: each spawned with its arguments and the spec's environment, its
+  output read through pipes within a bound, its exit status awaited.
 - **Interrupted** by a termination signal while a command runs, it
   kills the command's process group and exits 1, printing `forge <n>:
   interrupted`. `state` is not marked ended, so the next preparation
@@ -384,18 +546,28 @@ files: at a first preparation, and for a runner older than its pin
   capacity, labels, timeouts, its jobs' directory, no cache), its `PATH`
   from the setup. Its jobs run as the user that runs it (section 15).
 
-### 6.5 Then reconcile, and the person
+### 6.5 Then the engine's start, and the person
 
-- **Reconcile runs as managed's** (section 5), with `admin_token`, and
-  makes each org that is missing, owned by the person (`POST
+- **The handover,** at `temper serve`'s start: the setup host finds
+  `admin_token`, reads it once, and runs `TakeOver { forge, admin_token
+  }` (skein's `forge-setup.md`, 4.7): the token checked as a site
+  admin's, kept as the forge's `AdminToken` record, and temper's admin's
+  other tokens deleted, so no older one stays valid. The file is
+  removed after its `Done`, never before; a `TakeOver` that stops leaves
+  it, and the forge not connected, named. A start with no file uses the
+  record.
+- **Then reconcile runs as managed's** (section 5), and makes each of
+  the person's orgs that is missing, owned by the person (`POST
   /api/v1/admin/users/{person}/orgs`).
+- **A forge not prepared,** with neither a handover nor an `AdminToken`
+  record, is not connected, and the client says "prepare it with
+  `temper forge prepare`" (`../client/forge.md`, the deployment's page).
 - **The person** signs in on Forgejo's web as a site admin with
   `person_password`, and changes it, since Forgejo's API refuses them
-  until they do (13.3); makes repositories in the orgs, with Actions,
+  until they do (13.3); makes repositories in their orgs, with Actions,
   and adopts them through temper's client. temper's admin is temper's; a
-  person who deletes it makes the next reconcile and the next
-  preparation stop, naming it. A preparation with `admin_token` removed
-  makes a new token for it.
+  person who deletes it makes the next start's reconcile and the next
+  preparation stop, naming it.
 - **The forge's members** are connected's, written out: `api` the
   address, `transport` plaintext, `git` `http://<address>` (section 8).
 
@@ -412,9 +584,8 @@ temper box CONFIG.json
 ├── temper forge prepare CONFIG.json 2        once, per owned forge
 ├── forgejo web                               long: temper forge run CONFIG.json 2 forgejo
 ├── forgejo-runner daemon                     long: temper forge run CONFIG.json 2 runner
-├── temper forge reconcile CONFIG.json 1      once, per managed or owned forge
-├── temper forge reconcile CONFIG.json 2
-└── temper serve CONFIG.json                  long: its own tree (README.md, section 4)
+└── temper serve CONFIG.json                  long: its own tree (README.md, section 4); its setup
+                                              host takes each handover and reconciles (section 5)
 ```
 
 ### 7.2 What it does
@@ -424,9 +595,12 @@ temper box CONFIG.json
 - **Restarts** a long step that exits, after a backoff doubling from
   `box.backoff_ms` to `box.backoff_max_ms` (configuration.md, section 7),
   first running again the steps that are once just before it: a Forgejo
-  is restarted after its preparation, `temper serve` after its
-  reconciles, so a token revoked under a running engine, which stops it
-  (credentials.md, section 5), is made again before the engine starts.
+  is restarted after its preparation, so a change of the setup reaches
+  its `app.ini`. `temper serve` restarts on its own, and its start takes
+  a handover the preparation left and reconciles each managed and owned
+  forge. A token revoked under a running engine stops that forge alone,
+  named, and not the engine (forge.md, a forge stopped); the engine's
+  next start makes it again.
 - **Gives up,** exit 1, naming the step, when a once step fails or a long
   one exits more than `box.restarts` times within `box.window_ms`. The
   backoff is counted from a step's exits within the window, so it starts
@@ -464,8 +638,8 @@ temper box CONFIG.json
 
 Each needs nothing below the commands to change:
 
-- **systemd,** a unit per long step: `prepare` and `reconcile` as
-  `ExecStartPre=`, `run` and `temper serve` as `ExecStart=`, the order as
+- **systemd,** a unit per long step: `prepare` as `ExecStartPre=` of
+  Forgejo's unit, `run` and `temper serve` as `ExecStart=`, the order as
   the units' dependencies; `temper serve`'s unit keeps systemd's default
   kill of its control group, which ends a crashed service's whole tree
   before its restart (skein's `shell.md`, 13);
@@ -482,60 +656,59 @@ Each needs nothing below the commands to change:
 - **One document,** `temper serve`'s (configuration.md, section 2).
   Every `temper forge` command and `temper box` read it whole, check it
   as configuration.md, section 8 says, `setup` among it, and act on
-  their part: they read no file but their own part's,
-  since a set-up forge's files do not exist before reconcile makes
-  them.
+  their part: they read no file but their own part's.
 - **`application.setup`,** a list, at most one entry per forge:
 
   ```
   "setup": [
-    {"forge": 1, "directory": "forge-1",
+    {"forge": 1,
      "bot": {"login": "temper", "email": "temper@example.invalid"},
-     "orgs": ["acme"],
-     "mode": {"managed": {"admin_token": "secrets/forgejo-admin"}}},
+     "mode": "managed"},
     {"forge": 2, "directory": "forge-2",
      "bot": {"login": "temper", "email": "temper@example.invalid"},
-     "orgs": ["work"],
      "mode": {"owned": {
        "forgejo": "/opt/forgejo/forgejo",
        "runner": {"binary": "/opt/forgejo/forgejo-runner",
                   "labels": ["temper-host:host"], "capacity": 1,
                   "path": "/usr/local/bin:/usr/bin:/bin"},
        "listen": {"socket": "127.0.0.1:3000"},
-       "person": {"login": "ada", "email": "ada@example.invalid"}}}}
+       "person": {"login": "ada", "email": "ada@example.invalid",
+                  "orgs": ["work"]}}}}
   ]
   ```
 
   | Member | Type | Bounds |
   |---|---|---|
   | `forge` | u16 | the `number` of one entry of `forges`, of kind Forgejo |
-  | `directory` | a path | a private directory (section 3), unique among `setup` |
-  | `bot` | `{"login", "email"}` | a Forgejo login; an email, the bot's when reconcile makes it (section 5) |
-  | `orgs` | list of strings | at least one, at most `setup.orgs`, each a Forgejo org name |
-  | `mode` | `{"managed": {"admin_token": file}}` or `{"owned": ...}` | |
+  | `directory` | a path | when owned, and only then: a private directory (section 3), unique among `setup` |
+  | `bot` | `{"login", "email"}` | a Forgejo login; an email, the bot's when reconcile makes it (5.6) |
+  | `mode` | `"managed"` or `{"owned": ...}` | managed: temper may be given a site admin's token for the forge from the client (5.5) |
   | `owned.forgejo`, `owned.runner.binary` | absolute paths | checked against the pins of 6.1 |
   | `owned.runner` | the runner's members, or null for none | `capacity` at least 1; `labels` at least one, at most 8 |
   | `owned.listen` | an address, jig's format | a socket address on loopback; unique among the deployment's listeners and owned forges |
-  | `owned.person` | `{"login", "email"}` | a Forgejo login other than the bot's and `temper-admin` |
+  | `owned.person` | `{"login", "email", "orgs"}` | a Forgejo login other than the bot's and `temper-admin`; `orgs` at least one, at most `setup.orgs`, each a Forgejo org name |
 
-- **The forge's own members stay connected's,** written out, never
-  derived, and checked against its setup; a mismatch refuses every
-  command, naming the path:
-  - its `api_token` is `<directory>/api_token` and its `user` `{"file":
-    "<directory>/user"}`; its identity's `token` is
-    `<directory>/git_token` and its `login` the bot's; its
-    `webhook_secret`, when `webhooks` is configured,
-    `<directory>/webhook_secret`;
-  - when owned, its `api` is `listen`, its `transport` plaintext and its
-    `git` `http://<listen>`.
-- **`user` as a file:** `forges[].user` takes a u64, or `{"file": path}`,
-  a private file holding the id in decimal, read at start. The check
-  against `GET /api/v1/user` is the same (credentials.md, section 5).
+- **A Forgejo with no `setup` entry** is connected's alone; GitHub takes
+  no entry (section 17).
+- **The forge's own members name no credential:** its records hold
+  them (section 3). They stay connected's, written out, never derived,
+  and checked against its setup; a mismatch refuses every command,
+  naming the path: when owned, its `api` is `listen`, its `transport`
+  plaintext and its `git` `http://<listen>`; an identity's `login`, when
+  given, is the bot's.
+- **A forge's `number` is its stable id** (configuration.md, section
+  3), never reused: its records are kept under it, so a forge given
+  another number is a new forge, not connected; and records made for
+  another kind or address leave a forge not connected, named, with
+  nothing erased (section 3).
 - **`webhooks`,** `application.webhooks`, `{"listener": address}`, on
-  loopback, and each forge's `webhook_secret`, a file (configuration.md,
-  section 3; skein's `forge.md`, section 7).
-- **`temper serve` checks `setup`** and acts on none of it: it reads no
-  file that only `setup` names.
+  loopback; each Forgejo forge's secret is its `WebhookSecret` record
+  (configuration.md, section 3; skein's `forge.md`, section 7).
+- **The clients' listener at a fixed address** when a GitHub forge is
+  configured: GitHub's redirect and setup URLs name it, so its port is
+  never 0, checked at start (17.1).
+- **`temper serve` checks `setup`,** and reads one file of it, an owned
+  forge's handover (section 3).
 - **An owned example** ships for a person, a test or QA's host to start
   from (8.1).
 
@@ -553,11 +726,11 @@ says how each is made. A person, a test or QA's host
 starts from a copy, and `temper box CONFIG.json` runs it (section 7).
 
 - **Its forge,** forge 1, is owned, in `forge-1`, with a runner whose
-  label is `temper-host:host`, the bot `temper`, the person `ada` and the
-  org `acme`. Its members are its setup's, written out (above): `api`
-  and `git` from `listen`, plaintext; `api_token`, `user`,
-  `webhook_secret` and the identity's `token` in the forge's directory;
-  the identity's `login` the bot's.
+  label is `temper-host:host`, the bot `temper`, and the person `ada`,
+  whose org is `acme`. Its members are its setup's, written out (above):
+  `api` and `git` from `listen`, plaintext; no credential, since its
+  records are made at the engine's first start, from the handover
+  (6.5); the identity's `login` the bot's.
 - **Its landing rule** covers `acme/widget`'s `main`, and asks for CI,
   Actions on the owned runner, the head up to date with its base, and an
   agent's review, gate 1, at a clean head (configuration.md, section 3).
@@ -620,15 +793,16 @@ starts from a copy, and `temper box CONFIG.json` runs it (section 7).
   less smith's 2-byte separator, where jig's small has 65,536. Its
   `application.limits` is `small` with no override.
 - **Its `memory_bytes`** hold its worst cases wherever a person lays it
-  and whatever its forge's files hold: each start passes with each
+  and whatever its forge's records hold: each start passes with each
   string its service's worst case counts, and a person's copy changes,
   at its bound (configuration.md, section 7, one worst case per
   service).
-  - The engine's counts the forge's `api_token` and its `git` base, a
-    byte for each of theirs: the token at `small`'s
-    `forge_component.token_bytes`, 512, past which the start is refused,
-    and the base at an owned forge's longest, `http://` with a loopback
-    address and a port, `http://127.255.255.254:65535`, 28 bytes.
+  - The engine's counts the forge's API token, its `ApiToken` record,
+    and its `git` base, a byte for each of theirs: the token at
+    `small`'s `forge_component.token_bytes`, 512, past which the start
+    is refused, and the base at an owned forge's longest, `http://`
+    with a loopback address and a port, `http://127.255.255.254:65535`,
+    28 bytes.
   - The worker's counts its agent's `program` and the configuration's
     path among its `arguments`, two bytes for each of theirs with the
     example's one slot: each at Linux's `PATH_MAX`, 4,096 bytes; and
@@ -649,25 +823,34 @@ starts from a copy, and `temper box CONFIG.json` runs it (section 7).
 
 ## 9. Credentials
 
-| Credential | Mode | Made by | Kept | Read by |
+| Credential | Mode | Made by | Kept | Used by |
 |---|---|---|---|---|
-| a site admin's token | managed; owned | the person; the preparation, by Forgejo's command line | a private file | `temper forge reconcile` alone |
-| the bot's password | managed, owned | reconcile, random, when it makes the bot | nowhere | nothing |
+| a site admin's token | Forgejo, managed; owned | the person, pasted; the preparation, by Forgejo's command line | the `AdminToken` record; an owned forge's handover, until the engine takes it | the setup host alone, while a plan runs: reconcile, `TakeOver`, access at adoption (`Adopt`), and the picker's read (`Reachable`, skein's `forge-setup.md`, 4.8) |
+| the bot's API and git tokens | Forgejo, every mode | the person, pasted; reconcile | the `ApiToken` and `GitToken` records | the forge component; the identities' table |
+| the bot's password | Forgejo, managed, owned | reconcile, random, when it makes the bot | nowhere | nothing |
 | temper's admin's password | owned | Forgejo, random | nowhere | nothing |
 | the person's first password | owned | Forgejo, random, at the first preparation | `person_password` | the person |
 | the runner's secret | owned | the preparation | `runner/secret` | Forgejo's command line; the runner's connection, through the token's file it names |
 | Forgejo's own secrets | owned | the preparation | `state`, and `app.ini` | Forgejo |
-| the webhooks' secret | every mode | the person; reconcile | `webhook_secret`, or the person's file | the webhooks' listener; Forgejo's hooks |
+| the webhooks' secret | Forgejo, every mode | the person, pasted; reconcile, drawn | the `WebhookSecret` record | the webhooks' listener; Forgejo's hooks |
+| a GitHub App's key | GitHub | GitHub, at the manifest's conversion; the person, pasted as PEM | the `AppKey` record, DER; a PEM never | the forge component, for its tokens; the setup host, while a plan runs |
+| an installation's token; a GitHub git token | GitHub | the forge component, from the App's key | memory alone | the forge component; git |
 
-- **Least power, kept.** The engine holds the bot's two tokens and the
-  webhooks' secret, as in connected, and never an admin's token; the bot
-  is never a site admin; the admin's token is read by a process of its
-  own, which ends.
+- **Every credential the engine holds is a record** in jig's secrets'
+  store (credentials.md, the records), written by the setup host's
+  plans; a pasted value is kept by jig until its run ends
+  (credentials.md, pasted values).
+- **Least power, kept.** The forge component holds the bot's tokens and
+  the webhooks' secret, or the App's key, as in connected, and never an
+  admin's token; the bot is never a site admin; the setup host holds the
+  admin's token only while a plan that asked for it runs, and drops it
+  at its end.
 - **No secret in an argument, a URL or a log,** for Forgejo's command
   line as for git (credentials.md, section 4): 6.3.
-- **Never across a domain boundary:** the setup's processes are outside
-  the engine; the engine's rules (credentials.md, section 1) hold for the
-  files it reads.
+- **Never across a domain boundary:** the setup host is in the engine's
+  protocol layer, below the core, which sees a pasted value's number and
+  digest alone; the engine's rules (credentials.md, section 1) hold for
+  the records and for the handover.
 
 ## 10. Webhooks on a box
 
@@ -676,11 +859,12 @@ the signature, the events and the hints they become (`forge.md`, section
 7). This section says what makes them reach the engine on a box, and
 that they cover what its work waits on.
 
-- **Made by reconcile** (section 5; skein's `forge-setup.md`, section
-  4.3, step 6): one hook per org and forge, with the events of skein's
-  `forge.md`, section 7, and the forge's secret. An
-  owned Forgejo's `app.ini` allows the listener's address (6.2). On a
-  box, nothing is left to the person.
+- **Made at adoption, checked at each start** (section 5; skein's
+  `forge-setup.md`, 4.5, and 4.3, step 6): one hook per adopted
+  repository, to `http://<listener>/hooks/<number>`, with the events of
+  skein's `forge.md`, section 7, and the forge's secret. An owned
+  Forgejo's `app.ini` allows the listener's address (6.2). On a box,
+  nothing is left to the person.
 - **What a box's work waits on, and what ends each wait,** with the keep
   reading the forge within `hinted` of the hint, which gathers one
   change's hints into one read (`../domain/forge.md`, 5.2):
@@ -714,6 +898,10 @@ that they cover what its work waits on.
   webhook. A delivery lost while `temper serve` is down, refused for its
   size, or never sent is found by them; Forgejo does not send a failed
   delivery again (skein's `forge.md`, section 9).
+- **GitHub sends no delivery to temper:** its App's changes come from
+  the App's delivery log, read by the forge component, with no address
+  GitHub must reach and no webhook secret (forge.md, a GitHub App's
+  delivery log; 17.6).
 - **Checked:** the process tier's hinted story (13.4) checks the
   table's third row, CI on a head: the one wait of its landing that the
   forge ends. Its other waits end on temper's own writes, its push, its
@@ -733,41 +921,43 @@ that they cover what its work waits on.
 ## 11. The crates
 
 ```
-skein-forge                  + the setup's documents: admin users and their tokens, orgs, teams
-│                              and their members, org hooks; both sides, as its others; the pins
-│                              (skein's forge.md, sections 4 and 5)
-skein-forge-setup            reconcile's machine, its types and its checks; the access it ends with.
-│                              Names no host (skein's forge-setup.md, section 6)
+skein-forge                  + the setup's documents: admin users and their tokens, orgs, repositories'
+│                              collaborators and hooks, GitHub's App documents; both sides, as its
+│                              others; the pins (skein's forge.md, sections 4 and 5)
+skein-forge-setup            the setup's plans, their types and checks, the access they end with, and the
+│                              host component a service runs them on (skein's forge-setup.md, section 6)
 ├── skein-forge
 └── skein-lib, skein-json
 temper-forge-setup           step code: the setup's types and checks, read from the configuration; the
-│                              setup mapped onto reconcile's given values, and the kit's check of them;
+│                              setup mapped onto the plans' given values, and the kit's check of them;
 │                              the preparation's machine; app.ini and the runner's files; the processes'
 │                              specs; the configuration's steps. Names no host
 ├── skein-forge-setup, skein-forge
 └── jig-protocol-config, skein-lib, skein-json
-temper-forge-setup-shell     ordinary Rust: the hosts of prepare, run and reconcile: commands, files,
-│                              the forge's locks, the exec; HTTP on skein-http over skein-io. Its
-│                              reconcile runs skein's machine on the values temper-forge-setup maps
-│                              (section 5)
-├── temper-forge-setup, skein-forge-setup, skein-forge
-└── skein-io, skein-http, skein-lib, skein-json, skein-shell
+temper-forge-setup-shell     ordinary Rust: the hosts of prepare and run: commands, files, the forge's
+│                              locks, the exec, on skein-io
+├── temper-forge-setup
+└── skein-io, skein-lib, skein-json, skein-shell
 temper-box                   the box's machine (step code) and its host (ordinary Rust) on skein-io's
 │                              processes; nothing of setup but its steps (7.3); one crate, under the
 │                              subset's lints, its host written within the subset
 ├── temper-forge-setup
 └── skein-lib, skein-io, skein-shell
-temper                       the binary: temper forge prepare|run|reconcile, temper box
+temper                       the binary: temper forge prepare|run, temper box
 ```
 
+- **The engine runs the setup host** in its protocol layer (5.1):
+  temper-service maps each forge's setup onto the plans' given values
+  through `temper-forge-setup` (section 5), and depends on neither
+  `temper-forge-setup-shell` nor `temper-box`.
 - **The binary checks `setup` and its limits** for every command,
   `temper serve`'s included: `temper-forge-setup` checks `setup` and the
   `setup.` limits, and `temper-box` the `box.` limits, beside
-  temper-service's startup. temper-service depends on neither.
-- **Machines, not scripts.** Reconcile (skein's) and the preparation
+  temper-service's startup.
+- **Machines, not scripts.** The plans (skein's) and the preparation
   decide from what they read, and say each request or command they need;
   a host runs it and hands back its outcome. Step tests drive them with
-  answers; reconcile's world, skein's, drives it against the fake forge
+  answers; the plans' world, skein's, drives them against the fake forge
   (13.2).
 - **Not the throwaway's code.** `testing/skein-throwaway-forgejo` is a
   test crate (skein's `fake-forge.md`, section 6). The production
@@ -810,35 +1000,42 @@ relies on.
   lock alone.
 - **The specs:** each command's arguments and environment, and no secret
   of the preparation's in any argument.
-- **Reconcile's decisions** from answers are skein's (skein's
+- **The plans' decisions** from answers are skein's (skein's
   `forge-setup.md`, section 7). What is temper's is the mapping of
   section 5, in temper-forge-setup: each member of a managed setup and
   of an owned one becomes its value, the word `temper` and the names
   `temper-api` and `temper-git` among them, and each `Place` the kit's
   check refuses is named by its path.
 - **The configuration:** each mismatch of section 8 refused, naming its
-  path; `steps` for each arrangement of modes.
+  path; a managed entry with a `directory`, and an owned one without,
+  refused; `steps` for each arrangement of modes.
 - **The box's machine:** the order; a restart after its once steps; the
   backoff and the cap; the stop's order, and `temper serve`'s second
   signal.
 
 ### 13.2 Reconcile's world
 
-The world is skein's (`forge-setup.md`, section 7): reconcile on the
-fake forge's protocol layer, serving the setup's routes. What is
-temper's is its host of reconcile, checked by the shell's own tests and
-by the process tier (13.4):
+The world is skein's (`forge-setup.md`, section 7): the plans on the
+fake forge's protocol layer, serving the setup's routes, and the host
+component's own waits and bounds. What is temper's is the engine's
+routing of the setup host, checked in temper's protocol world
+(`../domain/testing.md`) and by the process tier (13.4):
 
-- the first request made again, with the backoff doubling to its cap,
-  until the API answers, and the run ended at `setup.deadline_ms` when
-  nothing answers or the forge goes silent after an answer;
-- a later request that fails not made again;
-- the admin's token sent as a token header;
-- an admin's token readable by others refused, naming it;
-- each file read within its own bound;
-- an io short of the HTTP intake or output refused before any request;
-- a refused request, and a deleted admin, ended naming their step, with
-  no secret in the message.
+- a start's handover taken, its file removed only after `TakeOver`'s
+  `Done`, and left when it stops; a handover readable by others
+  refused, naming it;
+- each write answered `Written` only once kept, so a restart between
+  finds what a browser was told;
+- a read served from the run's pasted value before the forge's record;
+  a pasted value whose digest differs refused, "the pasted value
+  changed";
+- one writing plan per forge and one `Reachable` beside it, a second of
+  either refused busy, and a request past `setup.runs` refused busy;
+- a start's reconcile that stops leaving that forge not connected,
+  named with its step and no secret, and the others served;
+- records made for another kind or address leaving the forge not
+  connected, named, nothing erased; an `api_token`, `git_token`, `user`
+  or `webhook_secret` file in a forge's directory left unread.
 
 ### 13.3 What the setup relies on
 
@@ -895,10 +1092,10 @@ The tier, its budget and its referee are `../domain/testing.md`'s (2.6). What
 it checks of this document:
 
 - **Owned in place of the test's support:** the test runs `temper forge
-  prepare`, `run forgejo`, `run runner` and `reconcile` itself, then
-  `temper serve`, with the binaries `TEMPER_FORGEJO` and
-  `TEMPER_FORGEJO_RUNNER` name, and webhooks on. Its repository runs
-  Actions, so its landing rule asks for CI.
+  prepare`, `run forgejo` and `run runner` itself, then `temper serve`,
+  whose setup host takes the handover and reconciles, with the binaries
+  `TEMPER_FORGEJO` and `TEMPER_FORGEJO_RUNNER` name, and webhooks on.
+  Its repository runs Actions, so its landing rule asks for CI.
 - **The hinted story:** the same story with the keep's `poll`,
   `poll_max` and `slow` and the change's `stall` raised past the story's
   budget (configuration.md, section 7; `../domain/forge.md`, 8.4), and its
@@ -915,14 +1112,6 @@ it checks of this document:
 
 Each is intended; what it needs is named with it.
 
-- **GitHub.** The setup's plan is skein's (`forge-setup.md`, section 5):
-  what the modes share, connected's fine-grained token or App, and
-  managed's App manifest flow, which the plan drafts and the person
-  creates on GitHub, with installing the App as its scope in place of
-  teams. An installation's token expires within the hour, so it is a
-  credential the forge component renews (skein's `forge-connection.md`,
-  section 5); GitHub's forge component is open (`forge.md`, section 14).
-  Owned: none.
 - **A lock and an exec in skein's shell,** onto which 6.4's module
   moves once skein's shell offers an exec and a lock held across it,
   which skein's `Lock` is not (skein's `io.md`, section 5). A second
@@ -936,13 +1125,13 @@ Each is intended; what it needs is named with it.
 - **Webhooks from another host,** over TLS (skein's
   `forge-connection.md`, section 6), once skein has TLS's server side.
 - **CI's isolation.** An owned runner's jobs in host mode run as the
-  box's user, who can read every file of temper's, its tokens among them,
-  as credentials.md, section 8 accepts of agents in standalone. Until
-  they are isolated, an owned forge runs the person's and temper's
-  agents' code only, never a stranger's pull request.
+  box's user, who can read every file of temper's as credentials.md,
+  section 8 accepts of agents in standalone, the handover among them
+  until the engine takes it. Until they are isolated, an owned forge
+  runs the person's and temper's agents' code only, never a stranger's
+  pull request.
 - **Provisioning at adoption** (jig's `domain/connectors.md`, 12): a
-  repository in a person's own namespace, made writable and hooked
-  without the person.
+  repository in a person's own namespace, made without the person.
 - **The forge as people's sign-in provider** (credentials.md, section
   8), which would link the person's account on an owned Forgejo to their
   owner in jig.
@@ -955,19 +1144,40 @@ Each is intended; what it needs is named with it.
 - **A token for the person's scripts and agents.** Default: none; the
   person makes one on Forgejo's web, with the scopes they choose. A QA
   harness playing the person makes one so, with read scopes alone, for
-  the agent it runs (`../client/tools.md`, section 10); never the preparation's
-  `admin_token`, which reconcile alone reads (section 9).
+  the agent it runs (`../client/tools.md`, section 10); never the
+  preparation's `admin_token`, which the engine's setup host alone takes
+  (section 9).
 - **Backups beyond an upgrade's.** Default: the person's, of the forge's
   directory and the store, with the box stopped.
 - **Two deployments on one managed forge.** Default: each its own bot
-  login, and so its own team and hooks; the marker does not tell
-  deployments apart.
+  login, and so its own collaborators and hooks; the marker does not
+  tell deployments apart.
 - **A hook left at an old listener's address,** after the listener
   moves, is skein's question (skein's `forge-setup.md`, section 9).
   Default: left alone; the person deletes it.
 - **A managed forge whose host list refuses the listener.** Default:
   nothing tells the person but the hints that never arrive
   (`../domain/forge.md`, section 4).
+- **The managed picker's departure.** On a managed or owned Forgejo the
+  picker lists every repository the site admin can see, not those the
+  bot can write, as a connected forge's does, since adoption grants the
+  bot its access (5.4). Default: the admin's view, through `Reachable`,
+  plus "not listed" by owner and name; the admin's token stays the
+  setup host's, and the picker gets the rows alone.
+- **"Connect as its admin" on a Forgejo with no `setup` entry.**
+  Default: refused, naming `application.setup`, since the bot's login
+  and email are the configuration's (5.5).
+- **The scopes of a managed forge's admin's token.** Default: the
+  preparation's, `write:admin`, `write:organization` and `write:user`
+  (6.3), as `docs/guide/forgejo.md` asks; skein's facts (`forge-setup.md`, section 8)
+  name `write:admin` for the token routes and a user scope for `GET
+  /user`, and none for the repositories' routes `Adopt` calls.
+- **A start's reconcile that stops.** Default: that forge is not
+  connected, named with its step, until the next start or a managed
+  connect; the engine runs no reconcile again within a process.
+- **A managed or owned forge stopped at runtime,** its bot's token
+  revoked. Default: stopped, named, until the next start's reconcile or
+  a managed connect; Replace is a connected forge's alone.
 - **The owned example's agent, sized for a person's work.** Default: the
   process tier's profile (8.1), sized for the live tier's stories.
 - **The owned example's `memory_bytes`** are `small`'s worst cases with
@@ -976,3 +1186,137 @@ Each is intended; what it needs is named with it.
   has, so the start's check bounds nothing a person's machine holds.
   Default: as the example states them; which terms of the worst cases
   make them so large is open (configuration.md, section 11).
+
+## 17. Connecting GitHub
+
+GitHub is managed or connected, never owned. Both modes end in the same
+records (section 3), and the engine runs both alike after; they differ
+in who made the App. The plans are skein's (`forge-setup.md`, section
+5), run by the setup host (5.1); the browser's routes are the clients'
+listener's (`../client/forge.md`, the browser's steps).
+
+### 17.1 GitHub's App and its permissions
+
+- **One App per deployment,** public, so that it installs on any
+  account (skein's `forge-setup.md`, section 5). Its permissions:
+  contents, pull requests, issues and merge queues, write; checks,
+  statuses, actions, administration and metadata, read; never
+  workflows, never administration's write. Its events are skein's
+  (5.6).
+- **Its hook** points at `https://<slug>.invalid/`, an address that
+  never resolves, so GitHub delivers nowhere and holds no secret of
+  temper's; the App's changes come from its delivery log (17.6).
+- **Its records:** `AppId`, `AppSlug`, `AppKey` (DER; a PEM is never
+  kept), `User` (the App's bot user), `Accepted` and `Origin`
+  (credentials.md, the records).
+- **Its addresses** are github.com's when the forge's `api`, `git` and
+  `web` are null (configuration.md, section 3); a forge names them only
+  to point at a fake.
+- **The clients' listener at a fixed address,** a loopback port the
+  person's browser reaches, since GitHub's redirect and setup URLs name
+  it; its port 0 is refused at start while a GitHub forge is
+  configured.
+- **A repository's own rules** are read and said at adoption, and never
+  changed (`../domain/forge.md`, what adoption says of the branch's
+  rules): a merge queue is taken as it is; required approvals need the
+  App on the rule's bypass list or a person's approval; required
+  signatures, linear history and code owners are each named with the
+  one setting that lets temper land.
+
+### 17.2 Managed: the manifest flow
+
+1. **Connect,** "Connect GitHub" on the deployment's page or its tool
+   of `temper ctl`, for the person's account or an org they name
+   (`Connect` with `GitHubManifest { org? }`). The setup host runs
+   `Manifest { forge, target }` (skein's `forge-setup.md`, 5.1) for a
+   fresh state; its `Page` is held with the state. The client shows the
+   link, `http://<listener>/forges/<n>/github/manifest?state=<s>`, as
+   text, and never opens it.
+2. **The manifest's page,** opened by the person: one form posting the
+   manifest to `<web>/settings/apps/new?state=<s>`, or
+   `<web>/organizations/<org>/settings/apps/new?state=<s>`, one button,
+   no script; its headers allow a form to `<web>` alone, keep no copy
+   and send no referrer.
+3. **GitHub's form:** the person creates the App.
+4. **The redirect back,** `http://<listener>/forges/<n>/github/redirect`:
+   `Convert { forge, code, state }` (5.2) exchanges the code for the
+   App's id, slug and key, finds its bot user, and writes the records;
+   the conversion's PEM, webhook secret and OAuth pair are never kept.
+   Once they are kept, the forge connects, and the browser goes on to
+   the App's install page.
+5. **Installing:** the person picks an account, and all or selected
+   repositories; temper's client advises selected. GitHub sends the
+   browser to `http://<listener>/forges/<n>/github/setup`, where
+   `Accept` (5.4) checks the installation and adds it to `Accepted`;
+   the page says "temper has the installation; you may close this
+   tab."
+
+- **States** are one use, drawn by the setup host, at most
+  `setup.states`, each living `setup.state_life_ms`, at most the
+  conversion code's hour; a used, unknown or expired one is refused,
+  "This link has ended. Start again from temper.", and a restart
+  forgets them all.
+- **The redirect and setup URLs** temper gives the plans are whole,
+  built from the clients' listener's address (forge.md, the setup's
+  host).
+
+### 17.3 Connected: an App pasted
+
+- **The person makes an App** on GitHub with 17.1's permissions and
+  events, and pastes its id and its private key as GitHub gives it,
+  PEM: "Connect an App of your own" (`Connect` with `GitHubApp { id, key
+  }`). No webhook secret is asked: the paste check sets the App's hook.
+- **Its setup URL is the person's to give** on GitHub's form, since no
+  plan can set it: `http://<listener>/forges/<n>/github/setup`, with
+  redirect on update, no callback URL and no user's authorization at
+  install (`docs/guide/github.md`). An installation of an App without
+  it never comes back through the setup route, and is a stray (17.4).
+- **The paste check,** `Paste { forge, app }` (skein's
+  `forge-setup.md`, 5.8): the key, kept by jig until its run ends,
+  decoded to DER; the App read with it, its id the one pasted, else
+  `OtherApp`; its bot user found; its hook set to
+  `https://<slug>.invalid/`; its permissions and events checked as its
+  reconcile checks them. It writes `AppId`, `AppSlug`, `AppKey` and
+  `User`, the records the manifest flow writes, and ends done, or
+  `Lacking` with each permission or event named, never refused for it.
+- **Installing** is 17.4's.
+- **Replace,** a new key: the paste check with the kept id, so a key of
+  another App stops it `OtherApp` and the forge stays as it was.
+
+### 17.4 Another account, and repositories later
+
+- **"Install on another account"** (`Install { forge }`, skein's
+  `forge-setup.md`, 5.4): a fresh state and GitHub's install link
+  (`Link`), shown as text; the person installs on another account or
+  org, and the setup route accepts it.
+- **Repositories added later** to an installation of selected
+  repositories are the person's, on the installation's page on GitHub;
+  GitHub's visit to the setup route with no state refreshes an accepted
+  installation's repositories, and is refused otherwise. The forge
+  component reads an installation's repositories again on its events.
+- **An installation temper did not accept,** a stray made with no
+  state of temper's, is shown, and uninstalled by the next reconcile
+  once older than a state's life; one deleted on GitHub leaves
+  `Accepted`; one suspended is shown.
+
+### 17.5 Its reconcile
+
+- **`Reconcile { forge }`** (skein's `forge-setup.md`, 5.6) runs after
+  each `Connected`: the App's key, permissions, events and installations
+  checked. It repairs only its hook's address.
+- **A key GitHub refuses** stops the forge, named, with Replace (17.3).
+- **A permission or event lacking** is named, `Lacking`, never refused:
+  the person grants it in the App's settings and approves it on each
+  installation, as GitHub asks.
+
+### 17.6 Job logs, and the delivery log
+
+- **A job's log** lies behind a redirect to a storage host, which the
+  forge component follows only to a host its `log_origins` lists
+  (configuration.md, section 3; forge.md, GitHub's API as temper uses
+  it): on GitHub one host by default; `[]` fetches no job log. A host
+  not listed is named on the deployment's page, and the person adds it
+  to the forge's `log_origins` and restarts.
+- **The delivery log** is read by the forge component every
+  `log_poll`, and its deliveries become hints as Forgejo's webhooks do
+  (forge.md, a GitHub App's delivery log).

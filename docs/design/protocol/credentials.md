@@ -1,17 +1,19 @@
 # Credentials
 
-Provisional, 2026-10-03, revised 2026-10-19. temper's credentials: which
+Provisional, 2026-10-03, revised 2026-10-20. temper's credentials: which
 secrets temper's processes hold, where each comes from, who may use it,
 and how it reaches the process that does. LLM accounts, workers' secrets
 and people's sign-ins are jig's (jig's `protocol/README.md`, section 8;
 jig's `domain/accounts.md`; jig's `protocol/llm.md`, sections 5 and 6),
-and temper adds `temper program-login` (section 3); temper's own are
-its git identities, the forges' API tokens and their webhooks' secrets.
-The files they come from are configuration.md's (section 6); a git
-identity's value on the channel is channel.md's (section 6); git's use
-of it is git.md's (section 5); the credentials of the forge's setup,
-which `temper serve` never holds, are setup.md's (section 9). What is
-open is listed in section 8.
+and temper adds `temper program-login` (section 3); temper's own are its
+forges' credentials, records in jig's secrets' store under temper's tag
+(jig's `protocol/store.md`, section 9), and the git identities made from
+them. A forge's credentials come from the client, in a request carrying
+a value (jig's `protocol/client.md`, section 5), or from the engine's
+setup host, never from configuration (configuration.md, section 6); a
+git identity's value on the channel is channel.md's (section 6); git's
+use of it is git.md's (section 5); the forge's setup's own secrets are
+setup.md's (section 9). What is open is listed in section 8.
 
 ## 1. In one page
 
@@ -24,26 +26,42 @@ open is listed in section 8.
   LLM provider, a key, or a program's login. temper writes no OAuth
   exchange and configures no account, and adds `temper program-login`,
   which signs a program's login in on a host (section 3).
+- **Every forge credential is a record in jig's secrets' store,** under
+  temper's tag, one row per forge and item: the forge's tokens, a GitHub
+  App's id, slug and key, the bot's user, a Forgejo forge's webhooks'
+  secret, the accepted installations (section 2.1). A connect from the
+  client makes them, from the values pasted in its request or through
+  the engine's setup host; nothing configures them, and `temper serve`
+  reads no forge credential from a file but an owned Forgejo's handover,
+  once. The main store keeps each forge's writer, which is not secret.
+- **Kept before used, read once at start.** A new value is durable in the
+  store before the forge component or a worker gets it; one load at start
+  builds every forge's access before the forge component starts.
+- **A pasted value never reaches a domain.** jig keeps a request's
+  carried value under temper's tag before the core sees the request, and
+  the core gets its number and its digest only (section 2.2).
+- **A forge's access is the forge component's:** Forgejo's API token and
+  its webhooks' secret, or a GitHub App's id and key and the
+  installations' tokens it mints, with the forge's user; never granted,
+  never sent to another forge or host (section 5). GitHub has no
+  webhooks' secret: its changes are read from the App's delivery log.
 - **Git identities are temper's application credentials,** one per
-  forge: a forge token, a login and an author, read from a private file
-  at start, granted with each assignment that needs one. Each
-  repository's runs use its forge's git identity (section 4).
-- **The API token is the engine's protocol layer's only.** One per forge,
-  read at start, never granted, never stored, and checked against the
-  forge's user before temper acts as it (section 5).
-- **The webhooks' secret is the forge component's too.** One per forge
-  with webhooks, read at start, by which the webhooks' listener checks
-  each delivery's signature; never granted, never stored, and never sent
-  by the engine (forge.md, section 5). Reconcile gives it to the hooks it
-  makes (setup.md, section 5).
+  forge: Forgejo's kept git token, or a GitHub App's installations'
+  tokens, minted about hourly and never kept; each with a login and an
+  author. Each change of value is a new generation, granted with each
+  assignment that needs one (section 4).
 - **Git gets its credentials per invocation,** in that process's
   environment only, never in an argument, a URL or a file.
-- **Least power.** The git identity is apart from the API token: a worker
-  needs only fetching and pushing, so a deployment can give git a token
-  with less power than the engine's. The engine never holds a site
-  admin's token: when temper sets a forge up, the admin's token is read
-  by `temper forge reconcile` alone, which ends (setup.md, section 9).
-- **No temper secret in jig's secrets' store** (section 2).
+- **Least power.** The forge component never holds an admin's token: the
+  engine's setup host holds a managed or owned Forgejo's only while a
+  plan runs, for reconcile, for access at an adoption and for the
+  picker's reads (a `Reachable` plan), and Forget erases it, making the
+  forge connected. A worker gets the git identity alone, never the
+  forge's access.
+- **A forge's credential failing stops that forge, never the engine.** A
+  credential the forge refuses, or records that do not fit the configured
+  forge, leave that forge stopped or not connected, named, with Replace
+  or Connect offered; other forges and the engine run on (section 5).
 - **Workers keep nothing between runs.** A worker's configuration holds
   no credential but its own secret; every other comes with assignments.
 
@@ -52,21 +70,171 @@ open is listed in section 8.
 | Credential | Owner | Kind | Source | Held by | Used by | Changes |
 |---|---|---|---|---|---|---|
 | an LLM account's source | jig | a signed-in record (refresh token, access token, expiry), a key, or a program's login | a sign-in or a key from the client; a program's login, `temper program-login` on each host (section 3) | jig's secrets' store, lent by skein's accounts driver, the access tokens and keys in jig's accounts' table; a program's login, the program, in the source's configuration directory | the worker's agent processes, through grants | the driver refreshes a signed-in record; a key's holder replaces it from the client; the program renews its own login |
-| a git identity | temper | a forge token, a login, an author | a private token file per identity, the person's, or reconcile's when its forge is managed or owned (setup.md, section 5), and the identity's members | the identities' table on the engine, and on the worker from grants | the git component's invocations | an operator replaces the file and restarts; reconcile makes it again at a start when its file does not answer as the bot |
-| a forge's API token | temper | a forge token | a private file per forge, the person's, or reconcile's when the forge is managed or owned (setup.md, section 5) | the forge component | that forge's API requests | an operator replaces the file and restarts; reconcile makes it again at a start when its file does not answer as the bot |
+| a git identity | temper | a token with its login, and an author: on Forgejo the `GitToken` record; on GitHub the accepted installations' tokens | the forge's records and tokens, and the identity's members (section 4) | the identities' table on the engine, and on the worker from grants | the git component's invocations | a new generation at each change of value (section 4) |
+| a forge's API token | temper | a Forgejo token, the `ApiToken` record | pasted from the client at a connect, or made by the setup host's reconcile when the forge is managed or owned (setup.md, section 5) | jig's secrets' store; the forge component, in the forge's access | that forge's API requests | replaced from the client (section 5), or made again by reconcile when it does not answer as the bot |
+| a GitHub App's key | temper | an RSA private key, PKCS#1 DER, 2048 bits, the `AppKey` record beside `AppId` | the manifest's conversion; or pasted from the client as GitHub gives it, PEM, which the setup host decodes to DER | jig's secrets' store; the forge component, in the forge's access; the setup host, while a plan runs | signing the App's own requests, and minting its installations' tokens | replaced from the client with a key of the same App (section 5) |
+| an installation's token | temper | a GitHub token, expiring within the hour | minted by the forge component with the App's key, one per accepted installation (section 5) | the forge component; the forge's git identity; never kept | that installation's API requests; git's, through the identity | minted again `renew_before` ahead of its expiry |
 | a worker's secret | jig | a shared secret | the worker's secret file; the engine's digest file | the worker; the engine, its digest | the link's opening | an operator replaces both |
 | a sign-in's secret | jig | a bearer token | the printed link, then the sign-in | `jig-client` in `temper open`, which keeps it in its directory; the engine, its digest | each of the client's exchanges and its stream | the sign-in ends or expires |
-| a forge's webhooks' secret | temper | a shared secret | a private file per forge, `forges[].webhook_secret`: the person's, or reconcile's, drawn when the file is missing (setup.md, section 5) | the forge component's webhooks' listener, on loopback; the forge's hooks, which sign each delivery with it | checking each delivery's signature (forge.md, section 5) | an operator replaces the file and the hooks' secret, and restarts; reconcile patches its hooks with the file's at every start |
+| a Forgejo forge's webhooks' secret | temper | a shared secret, the `WebhookSecret` record; a GitHub forge has none | pasted at a connected Forgejo's connect; or drawn by the setup host and set on a managed or owned Forgejo's hooks by reconcile | jig's secrets' store; the forge component's webhooks' listener, on loopback; the forge's hooks, which sign each delivery with it | checking each delivery's signature (forge.md, section 5) | replaced from the client with the forge's tokens; reconcile sets a managed or owned Forgejo's hooks' secret to the record's |
+| a site admin's token | temper | a Forgejo token, the `AdminToken` record | pasted from the client at a managed connect; an owned Forgejo's handover file, taken once and removed (setup.md, section 9) | jig's secrets' store; the setup host, only while a plan runs | reconcile, access at an adoption, and the picker's reads on a managed or owned Forgejo (a `Reachable` plan) | erased by Forget, after which the forge is connected |
 
-- **No temper secret in jig's secrets' store** in standalone: every
-  temper secret is a file read at start. jig keeps sign-ins' and
-  services' digests there, and LLM accounts' records and keys (jig's
-  `protocol/store.md`, section 9).
-- **The forge's setup's credentials** (a site admin's token, the bot's
-  and temper's admin's passwords, the person's first password on an
-  owned Forgejo, the runner's secret, Forgejo's own secrets) are
-  setup.md's (section 9): made and read by the setup's commands, kept in
-  the forge's directory or nowhere, and never held by `temper serve`.
+- **Every forge credential the engine uses is in jig's secrets' store,**
+  under temper's tag (`SecretOwner::Application`), beside jig's own:
+  sign-ins' and services' digests, LLM accounts' records and keys (jig's
+  `protocol/store.md`, section 9). No forge credential is a file
+  `temper serve` reads, but an owned Forgejo's handover admin's token,
+  read once, kept as a record, and removed.
+- **A GitHub forge has no webhooks' secret.** The setup host points the
+  App's hook at `https://<slug>.invalid/`, a name that never resolves; the
+  conversion's webhook secret is never kept, and a pasted App's connect
+  draws none. The forge component reads changes from the App's delivery
+  log (forge.md, a GitHub App's delivery log).
+- **The forge's setup's own secrets** (the bot's and temper's admin's
+  passwords, the person's first password on an owned Forgejo, the
+  runner's secret, Forgejo's own secrets) are setup.md's (section 9):
+  kept in the forge's directory or nowhere, never in jig's secrets'
+  store.
+
+### 2.1 The records
+
+- **Where:** jig's secrets' store, under temper's tag,
+  `SecretOwner::Application`, one row per forge and item, written and
+  read by the engine's protocol layer alone, through `Request::Secrets`
+  (`Keep`, `Erase`, `Get`, `Load`). The items that are not secret (ids,
+  the App's slug, the bot's user, the accepted installations, the
+  origin) sit beside the secret ones, so that one load builds a forge's
+  access, one durability answer (`Kept`) covers each of the setup host's
+  writes, and one erase forgets a forge. The main store's application
+  rows are the root's, and hold none of them.
+- **The number** (`u64`): `family << 48 | forge << 16 | item`. Family 1 is
+  a forge's records; other families, up to `0x7FFF`, are free for
+  temper's later records. temper's own numbers keep the top bit clear, so
+  they never fall in the sub-range jig reserves under temper's tag for
+  carried values, which jig numbers itself (section 2.2). `forge` is the
+  configured forge's `number` (`u16`; configuration.md, section 3), its
+  explicit, stable id: reordering, adding or removing forges never moves
+  one forge's records to another, and a forge given another number is a
+  new forge, not connected.
+- **The items** (`item`, `u16`):
+
+  | Code | Item | Value | Forges |
+  |---|---|---|---|
+  | 1 | `AdminToken` | a site admin's token | Forgejo, managed or owned |
+  | 2 | `ApiToken` | the bot's API token | Forgejo |
+  | 3 | `GitToken` | the bot's git token | Forgejo |
+  | 4 | `User` | the bot's user id: on Forgejo the bot's, on GitHub the App's bot user | both |
+  | 5 | `WebhookSecret` | the hooks' shared secret | Forgejo alone; optional on a connected Forgejo |
+  | 6 | `AppId` | the App's id | GitHub |
+  | 7 | `AppSlug` | the App's slug | GitHub |
+  | 8 | `AppKey` | the App's private key, PKCS#1 DER, 2048 bits | GitHub |
+  | 9 | `Accepted` | the accepted installations' ids, at most `forges.installations` | GitHub |
+  | 10 | `Origin` | the forge's kind and `api` address the records were made for | both |
+
+  Code 0 is never written, and a code never changes its meaning. temper
+  maps skein's setup items to these codes; on GitHub, `User` is the
+  App's bot user. `Origin` is temper's own, written at each connect.
+- **The value:** a version byte, 1, then the item's bytes exactly as
+  skein's setup host writes them, which skein's `forge-setup.md` (6.4)
+  pins:
+  - the tokens (`AdminToken`, `ApiToken`, `GitToken`, `WebhookSecret`):
+    text, at most `token_bytes`;
+  - `User` and `AppId`: a `u64`, little-endian, 8 bytes, never 0;
+  - `AppSlug`: text, at most `name_bytes`;
+  - `AppKey`: PKCS#1 DER, at most `key_bytes`;
+  - `Accepted`: the installations' ids, each a `u64` little-endian,
+    concatenated, ascending, distinct, at most `installations` of them,
+    empty for none;
+  - `Origin`, temper's: `[kind u8][api as text]`.
+
+  Each item has one total decoder, skein's (temper's for `Origin`); a
+  change of an item's bytes is a new item, under a new code. temper keeps
+  the values opaque, hands them back unchanged on the setup host's read,
+  and decodes only what builds an access. A value is at most
+  `records.value_bytes` (configuration.md, section 7), checked against
+  jig's secrets' store's bound at start.
+- **A PEM is never a record.** skein's setup plan decodes the
+  conversion's key and a pasted key to DER before it writes; a pasted PEM
+  sits only in its carried row, which jig numbered, until its run ends.
+- **`Accepted`** is one row per GitHub forge, the whole list, rewritten
+  at each installation accepted or deleted.
+- **Replacement:** `Keep` under the same number replaces; the new value is
+  durable before the forge component or a worker gets it.
+- **Read at start, whole:** one `Load`, paged, grouped by forge, builds
+  each configured forge's access before the forge component starts
+  (forge.md, the forge component's start).
+- **Records that do not fit the configured forge** (an `Origin` naming
+  another kind or `api` address, an `AppKey` under a Forgejo forge, an
+  `ApiToken` under a GitHub forge): that forge is not connected, named on
+  the deployment's page, "its records were made for <kind> at <address>";
+  nothing is erased, and connecting again overwrites them.
+- **An unreadable row** (an unknown version, bytes skein's decoder
+  refuses): that forge is not connected, named, "its records are
+  unreadable"; other forges run on; nothing is erased.
+- **An incomplete set** (a crash inside a conversion: an `AppId` kept, no
+  `AppKey`): the forge is not connected; the next Connect overwrites it.
+- **Rows of a forge not configured** are left as they are, and
+  named once in the log at start (section 8).
+- **A mode is not a record.** Owned is configuration's (`setup[]`'s owned
+  entry); managed is an `AdminToken` row on a forge not owned; connected
+  is neither. A GitHub App made from the manifest and one pasted end in
+  the same rows.
+- **Never kept:** installations' tokens; a GitHub forge's git tokens; the
+  manifest's states and pages; the conversion's PEM; the App's OAuth
+  client and its secret; any generation number.
+- **The main store** keeps no credential. It keeps each forge's writer,
+  which is not secret: the writer given at runtime (section 5), kept by
+  skein's forge client as its own record (skein's `forge-client.md`,
+  7.1), `Stored::Writer` under `Key::Writer(forge)`, temper's small
+  store's tag 16, `STORE_VERSION` 3. It is restored at start, so effects
+  restored with it never meet `Forbidden`.
+
+### 2.2 Pasted values
+
+- **One value per request.** A client request may carry one value (jig's
+  `protocol/client.md`, section 5). jig's clients' component takes it out
+  as it decodes the request, keeps it in the secrets' store under
+  temper's tag before the core sees the request, and hands the core its
+  number and its digest. The value never reaches the core, a root, a
+  document or a log.
+- **The requests that carry one** (`../client/README.md`, the FORGE
+  requests): `Connect` with `ForgejoTokens` (one bundle: the API token,
+  the git token, and the webhooks' secret when given), with
+  `ForgejoAdmin` (the admin's token) and with `GitHubApp` (the App's key
+  as GitHub gives it, PEM; the id rides in the request); and `Replace`
+  (one token or key). A GitHub App has no webhooks' secret: a pasted
+  App's connect writes `AppId`, `AppSlug`, `AppKey` and `User`, and sets
+  the App's hook to `https://<slug>.invalid/` (section 2).
+- **The number is jig's.** jig numbers each carried value itself, in a
+  sub-range of temper's tag it reserves for carried values, from a next
+  number it keeps durably and never reuses (section 8). The request names
+  no number and the client draws none; the core gets the number and the
+  digest. A number already holding a row is refused at decode, never
+  overwritten, and a refused or duplicate request erases only the value
+  its own decode just kept. A forge's records lie outside the sub-range
+  (section 2.1), so no request, refused or not, overwrites or erases
+  them.
+- **Only the core's decisions** replace or erase a kept value: a carried
+  row's erase at its run's end, and at start, is a decision of the
+  core's, which the routing carries out.
+- **The value:** temper's bundle, versioned: `[1][count u8]`, then per
+  entry `[item u16][length u16][bytes]`, at most `records.value_bytes` in
+  all. It lives until its run ends.
+- **The core** keeps the number and the digest in the connect's own
+  record, no secret, and checks the person's role, the forge's kind and
+  mode, and that no run holds the forge. Refused, it answers so, and jig
+  erases the value its decode kept.
+- **The run:** accepted, the root asks the routing to run the connect's
+  plan with that number. The routing gets the row, checks its digest is
+  the request's (else the run is refused, "the pasted value changed"),
+  and serves the setup host's read of each pasted item from it before the
+  forge's rows. When the run ends, done or failed, the core decides the
+  row's erase, which the routing carries out; on done, the items the run
+  wrote are kept under the forge's family-1 numbers first.
+- **A restart** drops runs, whose states are in memory: the core decides
+  the erase of each carried row under temper's tag found at start (jig's
+  reserved sub-range, loaded from its first number), and a connect the
+  root holds as running ends "interrupted; paste again".
 
 ## 3. LLM accounts
 
@@ -169,52 +337,79 @@ sources in its holder's order. temper configures the LLM providers
 
 ## 4. Git identities
 
-- **What one is:** a forge token git authenticates with, the forge login
-  it goes with, and the author (a name and an email) of the commits made
-  with it. It is an application credential (jig's `domain/engine.md`,
-  12.1), numbered by configuration (configuration.md, section 3).
-- **Each repository to a git identity.** Each forge names one identity,
-  and each repository's runs use its forge's git identity: the root's
+- **What one is:** the token git authenticates with, the login it goes
+  with, and the author (a name and an email) of the commits made with
+  it. It is an application credential (jig's `domain/engine.md`, 12.1),
+  numbered by configuration (configuration.md, section 3).
+- **One per forge.** Each identity serves exactly one forge, and each
+  repository's runs use its forge's: configuration names the identity's
+  number, its forge and its author; its value is the forge's. The root's
   `GitIdentity { forge, credential }` comes from configuration, and each
-  repository of an assignment's workspace names its forge's. An identity
-  serves exactly one forge.
-- **Its source** is the private token file `identities[].token`, read at
-  start; its login and author are the identity's members. Each start
-  gives it generation 1. Its validity is unbounded (`Duration` at its
-  largest, as jig's reference service gives its credential): Forgejo's
-  tokens do not expire.
-- **Announced first.** The engine's routing gives the root
-  `Event::Credential { number, generation: 1, valid }` for each identity
-  as its first events, before its restart, so every identity is usable
-  when decisions open (jig's `domain/engine.md`, 12.1;
-  `../domain/root.md`, 7.1).
-- **The identities' table, on the engine:** each identity's value,
-  temper's record of its token, login and author (channel.md, section 6),
-  encoded once at start by `temper-protocol-worker-wire`, and held as one
-  secret by number and generation. No root, store record, fact or log
-  ever holds it.
-- **Granted with the assignment.** A run whose workspace names a
-  repository is granted its forge's identity, the grant naming the
-  application's table; `jig-protocol-engine-workers` fills the value in
-  from the identities' table, through the routing, as it encodes the
-  assignment or a grant record, and grants follow their attempts as an
-  account's do (jig's `protocol/channel.md`, section 8). A run with no
-  repository is granted none.
+  repository of an assignment's workspace names its forge's.
+- **On Forgejo:** the forge's `GitToken` record, with the bot's login,
+  as the forge's `Connected` names it, unless configuration gives
+  another. Its validity
+  is unbounded (`Duration` at its largest, as jig's reference service
+  gives its credential): Forgejo's tokens do not expire.
+- **On GitHub:** a list of entries, one per accepted installation, each
+  the installation's account id and login, a token and its expiry, built
+  from the forge component's `Event::GitToken` and held in memory only.
+  The component mints each token with the App's key, for contents alone,
+  `renew_before` ahead of the previous one's expiry (skein's
+  `forge-connection.md`). The login is `x-access-token`; the author
+  defaults to the App's bot, `<slug>[bot]` with
+  `<id>+<slug>[bot]@users.noreply.github.com`, `<slug>` the `AppSlug`
+  record's and `<id>` the `User` record's. The value's validity is the
+  earliest expiry among its tokens, minus now.
+- **Generations.** Each start gives each identity that has a value
+  generation 1. Each change of value makes the next generation, strictly
+  increasing per number: a Forgejo forge's `GitToken` replaced; on
+  GitHub, each token renewed and each installation accepted or removed.
+  With N accepted installations, a GitHub forge's identity takes about N
+  generations an hour, each one `Event::Credential` to the live attempts
+  holding it. A generation is never kept.
+- **The order:** the routing puts each value in the identities' table,
+  then gives the root `Event::Credential { number, generation, valid }`
+  (jig's `domain/engine.md`, 12.1; `../domain/root.md`, 7.1). At start,
+  each identity with a value is announced before the root's restart, so
+  it is usable when decisions open; a GitHub forge's is announced when
+  its first tokens are minted.
+- **The identities' table, on the engine:** each identity's two newest
+  values, by number and generation, each encoded once by
+  `temper-protocol-worker-wire` and held as one secret; the value server
+  answers either. No root, record of the main store, fact or log ever
+  holds a value.
+- **The value's codec,** engine to worker, is temper's, versioned
+  (channel.md, section 6): a kind holding Forgejo's one token or GitHub's
+  list, with the login and the author. It is never stored.
+- **Granted with the assignment.** temper's assignment names the
+  identity's number in each workspace item that names a repository, with
+  the account id of the repository's owner; jig pushes an attempt only
+  the credential numbers its workspace names. `jig-protocol-engine-workers`
+  fills the value in from the identities' table, through the routing, as
+  it encodes the assignment or a grant record, and grants follow their
+  attempts as an account's do (jig's `protocol/channel.md`, section 8). A
+  run with no repository is granted none.
 - **On the worker,** `jig-protocol-worker-link` takes the value out into
   the worker's identities' table, by number, at most the two newest
-  generations; the hub hears the name only. The routing hands the git
-  component the identity's newest value with each operation that names
-  it, and the component holds it only while that operation is in flight;
-  it never reads the table itself (git.md, sections 2 and 5). An
-  operation whose identity has no value in the table fails `Broken`
+  generations, so that a push in flight across a change ends on the
+  value it began with; the hub hears the name only. temper's worker-side
+  protocol layer hands the git component the identity's value with each
+  operation that names it, for git's HTTPS transport, and the component
+  holds it only while that operation is in flight; it never reads the
+  table itself (git.md, sections 2 and 5). On GitHub the worker picks the
+  entry whose account id is the repository's owner's; with none, the
+  push is refused, named "temper's App is not installed on <account>".
+  An operation whose identity has no value in the table fails `Broken`
   without running git. An entry goes as jig's do (jig's
-  `protocol/channel.md`, section 8); a git identity's never expires, so
-  only a newer generation pushes it out.
+  `protocol/channel.md`, section 8): a newer generation pushes it out, or
+  its validity ends.
 - **In git,** the environment only: an `http.extraHeader` of HTTP basic
   authentication from the login and the token, and the author's
   variables; never an argument, a URL, a repository's configuration or a
   file (git.md, section 5).
-- **Agents never get one.** An agent process's environment holds no
+- **Agents never get one.** jig's hub never forwards an application's
+  credential to an agent: an agent process's environment holds no
   credential (jig's `protocol/service.md`, section 6), and the hub hands
   an agent its LLM grants only.
 - **A forge that refuses the identity** fails the workspace, never the
@@ -222,39 +417,77 @@ sources in its holder's order. temper configures the LLM providers
   (`../domain/worker.md`, 4.3), a push `Landing::Refused`
   (`../domain/worker.md`, section 5). Limited, refused and unauthorized
   are LLM accounts' notices only (jig's `domain/accounts.md`, 3.5).
-- **Replaced** by an operator, who replaces the token file and restarts;
-  the new start grants generation 1 again. In standalone no worker
-  outlives the engine, since the worker is in its process, so no holder
-  can mix the two values under one name (section 8).
+- **Replaced** from the client: `Replace` on a Forgejo forge's git token
+  (section 5) keeps the new record, then announces the next generation.
+  A GitHub forge's tokens renew themselves. Generation 1 at each start is
+  sound only because no worker outlives the engine: in standalone the
+  worker is in the engine's process (section 8).
 
-## 5. The forges' API tokens
+## 5. The forges' access
 
-- **One per forge,** read at start from `forges[].api_token`, and held
-  by the forge component alone. It goes in the `Authorization: token`
-  header of each request to that forge's API (forge.md, 3.1), over TLS
-  unless the forge is on loopback (configuration.md, section 3).
-- **Never granted, never stored:** not in a grant, a root, the store, a
-  fact or a log, and never sent to another forge or another host.
-- **Checked at start.** The forge component's first exchange with each
-  forge is `GET /api/v1/user`; the answer's `id` must equal
-  `forges[].user`: the number it gives, or the id in decimal in the
-  private file it names, read at start (configuration.md, sections 3 and
-  6), which reconcile writes when the forge is managed or owned
-  (setup.md, section 5). Another id, or a `401` or `403`, stops the
-  engine, naming the forge, whether at start or when the forge first
-  answers: a wrong token would make temper act as someone else, so the
-  check is fail-stop, never a degraded mode (README.md, section 6).
-  Until it passes, the forge's calls wait in the component, and a check
-  that goes unanswered is made again (forge.md, 3.5).
+- **One access per forge,** built at start from its records (section
+  2.1) and held by the forge component alone:
+  - **Forgejo:** the `ApiToken`, in the `Authorization: token` header of
+    each request to that forge's API (forge.md, 3.1); the `User`
+    record's id; the `WebhookSecret`, when there is one.
+  - **GitHub:** the App's id and key (`AppId`, `AppKey`), which sign the
+    App's own requests, and by which the component mints a token for
+    each installation the `Accepted` record names, expiring within the
+    hour and minted again `renew_before` ahead of its expiry (skein's
+    `forge-connection.md`); the `User` record's id, the App's bot's; no
+    webhooks' secret. The App's hook points at `https://<slug>.invalid/`,
+    and the component reads changes from the App's delivery log (forge.md,
+    a GitHub App's delivery log).
+
+  Each request goes over TLS unless the forge is on loopback
+  (configuration.md, section 3).
+- **Never granted, never stored elsewhere:** an access's values are in no
+  grant, root, record of the main store, fact or log, and are never sent
+  to another forge or another host. An installation's token is never
+  kept: a restart mints new ones.
+- **Its user, checked.** A connect's run finds the user its credentials
+  answer as, and keeps its id (`User`) with the `Origin` the records
+  were made for. A connected Forgejo's two pasted tokens must
+  answer as one user; a replacement must answer as the forge's kept
+  user, and on GitHub be a key of the same App (setup.md, the setup
+  host's plans). The forge component's first exchange with each forge
+  checks its access answers as that user (skein's `forge-connection.md`,
+  section 3): until it passes, the forge's calls wait in the component,
+  and a check that goes unanswered is made again (skein's
+  `forge-connection.md`, 3.3).
+- **A forge that refuses its access stops that forge, never the
+  engine.** A `401`, a `403` for the credential, or an answer as another
+  user, ends in `Stopped { forge, why }` from the forge component; the
+  routing hands it to the root, the deployment's page names it, and the
+  client offers Replace. That forge's calls fail as forge.md classifies a
+  stopped forge; other forges, the engine and its runs go on. A wrong
+  credential would make temper act as someone else, so the stop holds
+  until a replacement answers as the forge's user: never a degraded mode.
+  A failure of jig's secrets' store itself stops the engine, as the main
+  store's does (jig's `protocol/store.md`, section 9).
 - **The same user is the forge writer** in the domain (`Writer { forge,
   author: user }`), by which the forge connector tells temper's own
   writes from others': a key's provenance, and its own writes' echoes
-  (`../domain/forge.md`, 5.2; forge.md, section 4).
-- **A token the forge stops taking** fails each call as forge.md, 3.4
-  classifies a refusal; nothing refreshes it while the engine runs. An
-  operator replaces the file and restarts, and the check runs again; on
-  a managed or owned forge, reconcile makes it again before the restart's
-  `temper serve` (setup.md, 7.2 and section 5).
+  (`../domain/forge.md`, 5.2; forge.md, section 4). It comes from the
+  forge's connect, never from configuration: on `Connected` the root is
+  told the user (id and login), and the connector takes the writer.
+  skein's forge client keeps it in the main store, not secret (section
+  2.1).
+- **The admin's token is the setup host's alone,** never the forge
+  component's. The setup host holds a managed or owned Forgejo's while a
+  plan runs (reconcile at each start and at a managed connect; access at
+  an adoption; the picker's reads, a `Reachable` plan, skein's
+  `forge-setup.md`, 4.8), from its record, and drops it when the plan ends (setup.md, the
+  setup host in the engine; forge.md, the setup's host). The picker's
+  page holds repositories only, never the token (`../domain/forge.md`,
+  the picker). `Forget` erases the record: the forge is then connected,
+  the bot's tokens its whole power.
+- **Replaced from the client:** `Replace { forge, value }` carries the
+  new token or key (section 2.2); the setup host checks it answers as
+  the forge's user, the new record is kept, and the forge component is
+  given the new access. On a managed or owned Forgejo, reconcile makes
+  the bot's tokens again when they do not answer as the bot (setup.md,
+  section 5).
 
 ## 6. Workers' secrets and sign-ins
 
@@ -276,17 +509,37 @@ sources in its holder's order. temper configures the LLM providers
 
 - **No value across a domain boundary:** the one-process world and the
   forge's protocol world search every root's events and requests, every
-  fact and every store record for the values their fakes issued (LLM
-  access tokens and keys, identities' tokens, API tokens, webhooks'
-  secrets), and fail on any (`../domain/testing.md`, 2.5).
+  fact and every record of the main store for the values their fakes
+  issued (LLM access tokens and keys, forges' tokens, Apps' keys,
+  installations' tokens, admins' tokens, webhooks' secrets), and fail on
+  any (`../domain/testing.md`, 2.5). After each real-loop story, no
+  secret is in a root, a fact, a record but the secrets' store's, a
+  request or an answer.
+- **No live forge:** every forge these tests reach is skein's fake, and
+  every credential a placeholder its fake issued; no test calls
+  github.com or uses a real credential. Live calls are skein's opt-in
+  conformance's alone.
+- **The codecs,** in step tests with golden bytes and fuzzing: the
+  records' numbers and each item's value, the pasted bundle, and the git
+  identity's value of each kind; an unknown version refused, and each
+  item's bytes that skein's decoder refuses (an id of 0, `Accepted` out
+  of order, repeated or past its bound) leaving the forge not connected.
 - **The identities' table:** step tests of its filling at start, a value
-  filled into a grant and taken out on the worker, and two generations.
+  filled into a grant and taken out on the worker, two generations, a
+  push across a change ending on the value it began with, and on GitHub
+  the entry picked by the owner's account id, a push with none refused.
 - **Git's environment:** step tests of its builder: the header's bytes,
   the author's variables, and no credential in an argument or a URL
   (git.md, section 9).
-- **The user check,** in the forge's protocol world: a token of another
-  user stops the engine, naming the forge; calls wait until the check is
-  answered; an unanswered check is made again.
+- **The routing,** in the forge's protocol world: start's load, where a
+  forge's unreadable row, records made for another forge, or an
+  incomplete set leave it not connected, named, and the other forges
+  running; a connect whose carried value is read by its run and erased
+  at its end; carried rows erased at a restart; installations' tokens
+  renewed, each a new generation; a credential of another user, or one
+  refused, stopping that forge alone, named, while the engine and the
+  other forges run on; calls waiting until the user check is answered,
+  and an unanswered check made again.
 - **Startup:** a secret file readable by another user, or reached
   through a link, refuses the start, naming it.
 - **`temper program-login`,** step tests: each refusal (a name out of
@@ -317,14 +570,19 @@ sources in its holder's order. temper configures the LLM providers
   instead. An owned runner's jobs run as the same user too; their
   isolation, CI's, is setup.md's (section 15).
 - **Generations across starts.** Generation 1 at every start names a new
-  value once a token file is replaced, which is sound only while no
-  worker outlives the engine. Default: standalone only; workers on other
-  hosts wait for a generation kept across starts.
-- **Short-lived git credentials.** Forgejo's tokens do not expire. A
-  forge that issues short-lived ones (GitHub's app installation tokens)
-  would make a git identity's source an exchange the protocol layer
-  refreshes, announcing each new generation (jig's `domain/engine.md`,
-  12.1). Default: static tokens only.
+  value once a record is replaced or a token minted, which is sound only
+  while no worker outlives the engine; a GitHub forge's identity moves
+  about one generation an hour per installation. Default: standalone
+  only; a fleet whose workers outlive the engine waits for generations
+  kept across starts.
+- **jig's reserved sub-range for carried values.** Default: the numbers
+  with the top bit set under temper's tag; jig's `protocol/store.md`
+  is to name it, and temper's families stay outside it.
+- **Rows of a forge not configured.** Default: left as they are and
+  named once in the log at start; erasing them waits for a request that
+  disconnects a forge.
+- **Backups of the secrets' store.** Default: none; a deployment moved
+  elsewhere takes its secrets' directory, or connects its forges again.
 - **A second program.** `temper program-login` signs in the agent's
   one program, Claude Code. Default: it takes `--program ADAPTER` once
   smith's agent adapts a second (smith's `protocol/programs.md`).
@@ -334,6 +592,6 @@ sources in its holder's order. temper configures the LLM providers
   component to mint a credential for that identity, with a `Mint` from
   temper's server code alone (jig's `protocol/client.md`, section 8;
   jig's `protocol/service.md`, section 2; `../client/README.md`, section 11).
-  The forge's OAuth client secret is then temper's, a private file read
-  at start. Default: the printed link signs in the deployment's one
-  owner.
+  The forge's OAuth client and its secret are then temper's records, in
+  jig's secrets' store. Default: the printed link signs in the
+  deployment's one owner.

@@ -1,6 +1,6 @@
 # The checkout's io: git
 
-Provisional, 2026-10-14, revised 2026-10-18. How the worker's protocol
+Provisional, 2026-10-14, revised 2026-10-20. How the worker's protocol
 layer runs the checkout's operations (`../domain/worker.md`, section 5):
 the git component, `temper-worker-protocol-git`. For each operation of
 `temper-worker-domain-checkout`'s `git::Op`, the fixed sequence of git
@@ -81,11 +81,16 @@ the worker's root directory     workers[].root
 - **The root's requests reach it through the routing,** which keeps no
   state. For an operation that names an identity, the routing reads the
   identity's newest value from the worker's identities' table and hands
-  it over with the operation (credentials.md, section 4), so the
+  over one token, its login and the author with the operation
+  (credentials.md, section 4): Forgejo's one token, or on GitHub the
+  entry whose account id is the repository's owner's, which its
+  workspace item carries (channel.md, sections 4 and 6). So the
   component holds a value only while that operation is in flight. An
   operation whose identity has no value in the table fails `Broken`
   without running git: grants arrive with the assignment, so this is a
-  fault of the worker's side.
+  fault of the worker's side. One whose GitHub value has no entry for
+  the owner's account fails `Refused` without running git, named
+  "temper's App is not installed on <account>".
 - **Each operation ends exactly once:** `Done` with its own terminal, or
   `Failed`/`FailedWithOutput` with a fault, and `Cancelled` only if the
   cancel won the race (section 7). Its `owner` token is echoed.
@@ -436,9 +441,11 @@ variable of the worker's own process reaches git.
   helpers (`git-remote-https`, `index-pack`) from its build's exec path;
   nothing in these invocations runs a program by name, so none can be
   found in a working tree.
-- **The identity's value** is the one channel.md, section 6 encodes: its
-  token, login and author. The header's value is base64 and a fixed
-  prefix, so no byte of the token can break it.
+- **The identity's value** is the one channel.md, section 6 encodes, as
+  the routing hands it over (section 2): one token, Forgejo's or the
+  GitHub entry it picked, with the login and the author. The header's
+  value is base64 and a fixed prefix, so no byte of the token can break
+  it.
 - **Never elsewhere:** no credential in an argument, a URL, a
   repository's configuration or a file; no `GIT_TRACE*` or
   `GIT_CURL_VERBOSE`, so git never prints the header, and the diagnostic

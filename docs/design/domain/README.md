@@ -1,6 +1,6 @@
 # temper's domain
 
-Provisional, 2026-10-04, revised 2026-10-19. The design of temper's domain
+Provisional, 2026-10-04, revised 2026-10-20. The design of temper's domain
 layer: its root, which composes jig's core with the forge connector; the
 forge connector; the worker; and what temper fills in of smith's agent;
 and how temper is tested. temper as a whole is `../README.md`; the domain
@@ -159,10 +159,11 @@ What temper decides within jig's design, with where each is answered:
   and what its spec names and its saved work, with the project's context
   repositories read only; cached by the change's task for a change's
   runs (root.md, 7.1; worker.md, 4.1).
-- **Git identities are application credentials,** one per forge, read
-  from a file at start and granted with an assignment; the forge's API
-  token and webhook secret never leave the engine's protocol layer
-  (root.md, 7.1; `../protocol/credentials.md`, sections 4 and 5).
+- **Git identities are application credentials,** one per forge, made
+  from the forge's records in jig's secrets' store and granted with an
+  assignment; the forge's API token or App key, and a Forgejo forge's
+  webhook secret, never leave the engine's protocol layer (root.md, 7.1;
+  `../protocol/credentials.md`, sections 4 and 5).
 - **The checkout is the worker's alone:** cached by workstream, a merge
   in progress as a place to start, a push that commits exactly the tree
   the run checked, and no credentials on disk (worker.md, section 5).

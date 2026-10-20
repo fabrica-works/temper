@@ -1,6 +1,6 @@
 # Tools: temper for agents
 
-Provisional, 2026-10-17, revised 2026-10-19. How agents drive temper:
+Provisional, 2026-10-17, revised 2026-10-20. How agents drive temper:
 they read what it holds, act through jig's operations and wait for what
 changes, with `temper ctl`, a command line. It serves the agents
 (smith's) that QA and develop temper's core: they drive a throwaway
@@ -44,9 +44,15 @@ still open is listed in section 15.
   prints the address to open and returns, and the agent follows it with
   `wait accounts`; a key is read from a private file and sent in a
   request that is never kept (section 7).
-- **Grown by areas,** the first and the fifth designed in full, the
-  others named (5.5); **later, named:** the MCP endpoint and the
-  extraction into `jig-client-tools` (section 14).
+- **Forges are an area of their own** (5.5, area 6): `forges` reads
+  each configured forge as the `Forges` page shows it; a connect prints
+  its link as text, never opened, or reads its pasted value from a
+  private file, and returns, and the agent follows it with `wait
+  forges`; `repositories` reads the picker's page, whose rows ride
+  `adopt`.
+- **Grown by areas,** the first, the fifth and the sixth designed in
+  full, the others named (5.5); **later, named:** the MCP endpoint and
+  the extraction into `jig-client-tools` (section 14).
 
 ## 2. What it is for, and what not
 
@@ -219,8 +225,9 @@ watch's subject, its digest (5.4). It needs no key.
 - **The forge's changes are read on the forge,** with its API or `git`,
   as a person reads them there. A part of the forge's that the engine
   does not serve prints "Shown on the forge.", with the resource in the
-  forge's words (`README.md`, 4.1 and 4.2). The forge's read family
-  (`forge.md`, section 9) joins the table as tools of its own
+  forge's words (`README.md`, 4.1 and 4.2). Of the forge's read family
+  (`forge.md`, section 9), the deployment's part is a tool, `forges`
+  (5.5, area 6); the others join the table as tools of their own
   (section 14).
 
 ### 5.3 Acts
@@ -234,7 +241,7 @@ agent must name.
 | `chat --project P TEXT` | starts a chat | `shapes::chat`, a `Create` | yes |
 | `message N TEXT` | words to a task | `Message` | yes |
 | `close N [--move D]... [--reason TEXT]` | closes a chat: its live delegates cancelled, or moved to the party where named; the reason empty unless given, as jig's reference UI sends it | `shapes::close_chat`, a compound request | yes |
-| `adopt --project P [--forge F] --owner O --name N --landing B [--role owned\|fork\|context] [--prefix X] [--no-home] [--no-ci] [--check G]...` | adopts a repository | the forge family's request (`README.md`, 4.4) | yes |
+| `adopt --project P [--forge F] --owner O --name N [--ids R/U] --landing B [--role owned\|fork\|context] [--prefix X] [--no-home] [--no-ci] [--check G]...` | adopts a repository | the forge family's request (`README.md`, 4.4) | yes |
 | `answer N M TEXT` | answers question M of task N | `Answer` | |
 | `decide P/K accept\|reject\|pass-up [REASON]` | decides a proposal: P is `tN` for task N's, `pN` for party N's | `Decide` | |
 | `decide N --hold R release\|leave\|pass-up [REASON]` | decides an escalation | `Decide` | |
@@ -253,7 +260,10 @@ agent must name.
   4.4): forge 1, role `owned`, prefix `temper/`, the home and CI on.
   `--landing` names the landing branch. A context repository is never
   the home: `--role context` turns the home off. `--no-ci` needs at
-  least one `--check`, a gate number, each number once. The form's
+  least one `--check`, a gate number, each number once. `--ids R/U` is
+  a picker row's repository id and owner id, as `repositories` prints
+  them (5.5, area 6), carried with that row's `--owner` and `--name`;
+  without it the request carries no ids (`README.md`, 4.6). The form's
   checks are the parser's: a call that fails one exits 1 before
   anything is sent.
 - **No confirmation.** The person's client says what an act will do
@@ -274,9 +284,9 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
 
 - **The subject** is a watch's (jig's `client/domain/contract.md`, 7.1):
   `me`, `inbox`, `task N`, `tree N`, `run N`, `accounts` (area 5 of
-  5.5), or a task query as `tasks` takes it, with what its watch takes
-  alone: `inbox` with no flag, the
-  inbox's watch being the party's whole inbox; `tasks` without
+  5.5), `forges` (area 6), or a task query as `tasks` takes it, with
+  what its watch takes alone: `inbox` with no flag, the inbox's watch
+  being the party's whole inbox; `tasks` without
   `--after` or `--ended`, `tasks{query}` following live tasks. Any
   other is a usage error, exit 1.
 - **A digest** is the first 8 bytes of the SHA-256 (skein's `lib.md`,
@@ -297,7 +307,8 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
   `client/domain/contract.md`, 7.2), which no tool prints.
 - **Which reads print one:** a read whose arguments are a watch's
   subject, with every wait's answer: `me`; `inbox` and `tasks` with the
-  arguments a wait takes (above); `task N`; `run N`; `accounts`.
+  arguments a wait takes (above); `task N`; `run N`; `accounts`;
+  `forges`.
   `task N --tree --run` prints one for each subject, `task N`, `tree N`
   and `run N`, each over its own part of the result. `--activity`'s
   lines, `chat`, `activity` and `turn` are pages, not subjects, and
@@ -318,6 +329,7 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
   | `tree N` | `ended` |
   | `run N` | `ended` |
   | `accounts` | `usable` (an account the party's work may use has a source usable on a host); `settled` (no sign-in or check the party asked is in progress) |
+  | `forges` | `settled` (no connect or install the deployment asked is in progress); `connected:F` (forge F is connected) |
 
 - **`replied`** holds while a chat's status (jig's
   `client/domain/client.md`, section 19, its facts) is parked, waiting
@@ -337,14 +349,21 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
   `client/domain/contract.md`, 7.2), so a delivery may never show one.
   `--until phase:done` and its kin are usage errors, exit 1, naming
   `--until ended`.
-- **`settled`** follows a sign-in or a check to its end. A sign-in is in
+- **`settled`** follows a sign-in or a check, or a forge's connect or
+  install, to its end. A sign-in is in
   progress from its request's answer until it ends: made, renewed,
   refused, or past the sign-in's deadline (skein's `oauth.md`, section
   3); a check, until each host it asks has reported (jig's
   `domain/accounts.md`, 3.4). So a wait begun once `connect` or `verify`
   has answered is not met before them: `connect 1 --key chatgpt`, then
   `wait accounts --until settled`, then the account's state in its
-  answer.
+  answer. On `forges`, a connect or an install is in progress from its
+  request's answer until its run ends: connected, refused, lacking, or
+  failed, or its link's state past its life (`setup.state_life`,
+  `../protocol/configuration.md`); `forge-connect 1 github --key gh`,
+  then `wait forges --until settled`, then the forge's row in its
+  answer. `connected:F` is met by a delivery where forge F is
+  connected, whoever connected it.
 - **`usable`** counts the party's own accounts, those whose uses name
   the party, and the deployment's (jig's `domain/accounts.md`, 4.3), on
   any host: the box's harness waits on it once it has added the
@@ -448,8 +467,79 @@ area lands with its stories (section 11).
    - **An account's uses** have no tool: each takes jig's default (jig's
      `domain/accounts.md`, 4.2) until the QA loop asks for one (section
      15).
+6. **Forges** (`forge.md`, 5.1, 5.4 and 5.5): each configured forge as
+   temper's `Forges` page shows it, its connects, and the adoption
+   form's picker. Each act is one of the FORGE requests (`README.md`,
+   section 8), made through `jig-client` as the forge family's bytes,
+   as `adopt` is.
 
-- **Areas 1 and 5 are designed here in full.** Areas 2 to 4 name their
+   | Tool | What it does | temper's | K |
+   |---|---|---|---|
+   | `forges` | each configured forge by its number, kind and `web` address: its connection, "connected as LOGIN (ID)", connecting and what it waits for, stopped and why, or not connected and why; how its last connect ended, a GitHub App's lacking permissions and events each named; its mode, and "admin's token kept" for managed and owned; on GitHub, the App's slug and its installations, each with its id, its account's login, all or selected repositories, suspended, or stray, "uninstalled at the next reconcile"; a job's log on a host it does not read, with how to add it; its load; its acts | the forge's deployment part, read and watched (`forge.md`, section 9) | |
+   | `forge-connect F github [--org O]` | starts GitHub's manifest flow for the person's account, or organization O: prints the link to open in a browser, the manifest's page on the clients' listener, and the call that follows it, `wait forges --until settled`; exits 0 once the request is durable | `Connect { forge, how: GitHubManifest { org? } }` | yes |
+   | `forge-connect F github-app ID FILE` | connects an App of the person's own: ID its id, FILE its private key, PEM as GitHub gives it; no webhook secret, since temper points the App's hook at `https://SLUG.invalid/`; then `wait forges --until settled` | `Connect { forge, how: GitHubApp { id, key } }` | yes |
+   | `forge-connect F forgejo FILE` | connects a Forgejo through its bot's tokens, FILE a tokens file (below) naming `api`, `git` and, where the person made hooks to temper's listener, `webhook_secret`; then `wait forges --until settled` | `Connect { forge, how: ForgejoTokens { api, git, webhook_secret? } }` | yes |
+   | `forge-connect F forgejo-admin FILE` | connects a Forgejo as its site admin, FILE the admin's token; temper makes its bot, and the forge becomes managed; then `wait forges --until settled` | `Connect { forge, how: ForgejoAdmin { admin_token } }` | yes |
+   | `forge-install F` | prints a fresh link to install temper's App on another account, GitHub alone; the installation shows on `forges` once the person's browser comes back | `Install { forge }` | |
+   | `forge-replace F FILE` | replaces what a person pasted: on GitHub, FILE the App's new key; on a connected Forgejo, a tokens file naming `api`, `git` or both; it must answer as the forge's user, and the old is erased once the new is kept | `Replace { forge, value }` | |
+   | `forge-forget F` | erases a managed forge's admin's token; the forge is connected, its bot and tokens kept | `Forget { forge }` | |
+   | `repositories F [--account I] [--page N]` | the picker's page N, from 1 (`README.md`, 4.4): a line per row, `OWNER/NAME`, `private` where it is, and `R/U`, its repository id and owner id for `adopt --ids`; then the call that reads page N plus one while more follow, or that none do. `--account I` is an installation's id, as `forges` prints it, GitHub alone | `Reachable { forge, account?, page }` | |
+
+   - **The names are the forge's and the page's.** A `forge-` prefix
+     keeps them apart from area 5's `connect`, `forget` and
+     `replace-key`, which are an LLM account's; `forges` and
+     `repositories` are reads, nouns as the others are.
+   - **Who may:** a party whose role holds the deployment's connectors;
+     in standalone, the deployment's owner (`README.md`, section 8). Any
+     other call of this area is refused by the engine, exit 2, in its
+     words, before a forge is called; `adopt` without `--ids` stays the
+     way of a party that may adopt and not read the picker.
+   - **One result per call.** A connect or an install prints the link
+     as text and returns; a pasted connect returns once the request is
+     durable. The run goes on at the engine, and `wait forges --until
+     settled` follows it (5.4); its end, connected or why not, is the
+     forge's row in `forges`, never the call's status. No tool opens a
+     link: the person opens it in a browser where the clients' listener
+     reaches (`forge.md`, 9.1).
+   - **A pasted value is read from FILE,** never an argument, never
+     typed and never printed: a private file, as area 5's key is (the
+     user's own, no group or other bits, not reached through a link),
+     within the bound of section 12. A key's file and an admin's
+     token's are their bytes, less a final newline. A tokens file is
+     one item a line, `NAME VALUE`, NAME one of `api`, `git` and
+     `webhook_secret`, each at most once, VALUE its bytes to the line's
+     end, and no other line; a file that breaks it is a usage error,
+     exit 1, nothing sent, the line's number named and never its value.
+     The tool makes temper's bundle of the items
+     (`../protocol/credentials.md`, pasted values), sends it once and
+     keeps no copy (section 7).
+   - **No pasted value is echoed:** not in a result, a `kept:` line,
+     `--json`, an error or the help. `forges` says that a value was
+     given, and what the forge answered of it, never the value; an act
+     it offers that takes one prints its call with `FILE`, the agent's
+     own path to give.
+   - **The refusals** are the engine's, exit 2, in `forge.md`, 5.5's
+     words: no such forge; the forge's kind or mode does not take the
+     act (an install on Forgejo, a forget on a forge not managed, a
+     replacement on a managed or owned forge, a connect of an owned
+     one); busy, since a forge runs one writing plan, a connect, an
+     install or a reconcile, and one picker's read beside it, a second
+     of either kind refused, as is one past `setup.runs`, which counts
+     both; and, for `repositories`, the forge's reason (not connected,
+     not installed, unreachable) and, on a managed or owned Forgejo, the
+     admin's token's, missing or not a site admin's (skein's
+     `forge-setup.md`, 4.3 and 4.8).
+   - **A page** is at most `picker.page` rows
+     (`../protocol/configuration.md`, its limits), clipped to the
+     forge's own page cap, and says more follow when it is full; so a
+     page past the last, the one after a full last page among them,
+     answers no rows and no more, exit 0.
+   - **"Not listed"** is `adopt` by `--owner` and `--name` without
+     `--ids`; a repository temper cannot reach is refused, exit 2, with
+     what would make it reachable, the installation's page among it
+     (`README.md`, 4.7; `forge.md`, 5.5).
+
+- **Areas 1, 5 and 6 are designed here in full.** Areas 2 to 4 name their
   tools and jig's operations; each area's arguments are checked against
   jig's operations as they stand when the QA loop reaches it, by a
   design pass (skein's `development.md`, section 4), and land with it.
@@ -651,20 +741,27 @@ may change with them.
   optionally; without it the table draws one, which the small store
   keeps until answered (8.2).
 - **A request carrying a value,** `add-key`'s and `replace-key`'s (5.5,
-  area 5), is sent once and never kept: `jig-client` writes no record of
+  area 5), and area 6's `forge-connect` with a FILE and `forge-replace`,
+  is sent once and never kept: `jig-client` writes no record of
   it to DIRECTORY's store and never sends it again (jig's
   `client/domain/client.md`, section 6; jig's `protocol/client.md`,
-  section 10), and the engine takes the value out as it decodes the
-  request, so no committed request or answer holds it (jig's
-  `domain/accounts.md`, section 5). The client's own answers *unsent*
+  sections 5 and 10), and the engine takes the value out as it decodes
+  the request, so no committed request or answer holds it (jig's
+  `domain/accounts.md`, section 5). A forge's pasted value is kept by
+  jig's clients' component in the secrets' store under temper's tag, at
+  a number jig gives it, before temper's core sees the request; a
+  request refused, or a duplicate, has jig erase it
+  (`../protocol/credentials.md`, pasted values). The tool names no
+  number. The client's own answers *unsent*
   (the engine did not make it) and *lost* (it may have) exit 1 with
   nothing kept, as a call cut or a link down before its answer does, and
   `pending` lists nothing of it. The agent asks again with the same
   `--key` and the same FILE: within the engine's retention, `add-key`
-  gets the first answer, never a second account. `replace-key` takes
-  `--key` optionally, as the other acts do, but the name it draws is not
+  gets the first answer, never a second account, and `forge-connect`
+  never a second connect. `replace-key` and `forge-replace` take
+  `--key` optionally, as the other acts do, but the name drawn is not
   kept, so only a name the agent gives can be asked again; a rerun
-  without one replaces the key again.
+  without one replaces the key or the tokens again.
 
 ## 8. The command line: `temper ctl`
 
@@ -689,7 +786,7 @@ temper ctl help [TOOL]
 - **A call `--call` reads gives no argument of the type a file** (5.1),
   a path or `-`: one that does is a usage error, exit 1, once the call
   is decoded and before DIRECTORY opens. So `sign-in`, and each tool
-  of areas 3 to 5 that reads or writes a FILE, is called from its
+  of areas 3 to 6 that reads or writes a FILE, is called from its
   arguments. A call opens a FILE only beneath a root its start opened
   before the loop, the directory of the FILE its arguments name, and
   `--call`'s call is decoded on the loop, from FILE or from stdin
@@ -837,9 +934,16 @@ harness's:
   (`../protocol/setup.md`, section 16), whose scopes are reads alone:
   `read:repository`, `read:issue`, `read:organization` and `read:user`.
   The agent is handed that token, never the preparation's
-  `admin_token`, which reconcile alone reads (`../protocol/setup.md`,
-  section 9). Forgejo refuses the agent's writes with it; the agent
-  changes the forge only through temper, and the guide says so (11.5).
+  `admin_token`, which the engine's setup host alone takes, once
+  (`../protocol/setup.md`, sections 3 and 9). Forgejo refuses the
+  agent's writes with it; the agent changes the forge only through
+  temper, and the guide says so (11.5).
+- **The forge through temper:** the box's Forgejo is owned, connected by
+  the box's own preparation and the setup host's plans
+  (`../protocol/setup.md`, owned), so it takes no connect, and the agent is never handed a value
+  to paste. With area 6, the agent reads it with `forges` and the
+  repositories to adopt with `repositories`, every one the site admin
+  can see, and adopts one with `adopt --ids`.
 - **Logs:** the engine's and the worker's in the box's stderr, each line
   prefixed by its step; Forgejo's in its directory. Outside the tools.
 - **Thrown away** by stopping the box with a termination signal and
@@ -858,7 +962,8 @@ harness's:
   and only then; each condition over documents that meet and miss it.
 - **The boundary:** `src/jig/` names no temper item (section 4).
 - **The bounds:** each of the tools' ceilings within the client's limit
-  it reads from (section 12).
+  it reads from, and a picker's page within a result's text (section
+  12).
 - **DIRECTORY's records,** in `temper-client-shell-cli`'s tests: a
   record of a store version the tools do not read counted by `pending`,
   and the next call that sends saying it dropped it.
@@ -884,7 +989,20 @@ answer scripted made, refused and past its deadline, each meeting
 waiting for its account and `task N` saying why, then `retry` and the
 run started; `rank` and
 `forget`; a program source declared, and `verify` answered as each host
-reports.
+reports. Area 6's, over the engine root's forge connector and the
+setup's host with skein's fake forge (`../domain/testing.md`, 2.4): a
+GitHub connect printing its link, never opening it, the browser's
+steps driven by the world, then `wait forges --until settled` and the
+forge connected; a pasted connect cut before its answer and asked
+again with its key and file, one connect; an App lacking a permission
+and an event, each named on the forge's row; a tokens file with a
+line broken, exit 1 naming the line and never its value;
+`repositories` by page number, a full last page's next and a page past
+the last answering no rows, and one row adopted with `--ids`; a second
+picker's read while one runs, busy; a call by a party whose role does
+not hold the deployment's connectors, exit 2; `forge-forget` on a
+managed Forgejo. After each, no pasted value in DIRECTORY's store or
+in any document the tools print.
 
 ### 11.3 The real loop
 
@@ -934,6 +1052,28 @@ stories (`../domain/testing.md`, 2.4):
   engine's store holds a key's or a record's value in a request, an
   answer or a fact; the secrets' store alone does.
 
+Area 6's stories reach the forge through the tools, on skein's fake
+forge, whose browser pages are plain-HTTP redirects (skein's
+`fake-forge.md`, section 10), so the test drives a browser's steps as
+plain requests and no story calls github.com:
+
+- **GitHub through the manifest:** `forge-connect F github`, the printed
+  link followed as plain requests on the clients' listener and the
+  fake's pages, then `wait forges --until settled`, and `forges`
+  showing the forge connected as the App's user.
+- **A repository added later,** from the picker: `repositories F`, then
+  `adopt --ids` of one of its rows into a project holding another.
+- **A repository granted on GitHub:** the fake grants one to an
+  installation of selected repositories, and the next `repositories F`
+  lists it.
+- **Forgejo connected, managed and owned** from the tools:
+  `forge-connect F forgejo FILE` and `forge-connect F forgejo-admin
+  FILE`, each followed by `wait forges --until settled`, and an owned
+  forge's `repositories`.
+- **No secret kept:** after each, no pasted value, key, token or secret
+  in a root, a fact, a record but the secrets' store's, a request or an
+  answer, nor in DIRECTORY's store.
+
 Each call of `temper ctl` in these stories is its host,
 `temper-client-shell-cli`'s, hosted as a program of the real world, one
 per call, on its DIRECTORY: the lock, DIRECTORY's files and the call's
@@ -961,7 +1101,8 @@ what needs the executable: argv through `main`, printed output, the OS's
 exit statuses, the printed link read on stdin (`sign-in -`), the
 deployment's credential (a `handed_in` file until area 5's tools, as in
 11.3; with them, its key added from a private file as the first act,
-section 10, and a key's file refused when it is not private), an act
+section 10, and a key's file refused when it is not private, as a
+forge's pasted value's file is), an act
 cut by a termination signal, its status 128 plus the signal's number
 (8.2), then asked again under its key, made once, and agent process
 launch. One landing on the owned Forgejo proves a change against real
@@ -975,7 +1116,10 @@ how to sign in, the loop of 5.4, naming keys and their prefix, reading
 acts, the exit statuses, reading the forge and never changing it but
 through temper (section 10), and an LLM account's key read from a
 private file, never typed, with a sign-in followed by `wait accounts`
-(5.5, area 5). The guide is text of `temper-client-tools`; a
+(5.5, area 5), and a forge's pasted value read from a private file,
+never typed, with a connect's link printed as text, never opened, and
+followed by `wait forges` (5.5, area 6). The guide is text of
+`temper-client-tools`; a
 test fails when it names a tool the table lacks.
 
 ### 11.6 Findings into stories
@@ -1018,6 +1162,8 @@ terminal's, whose window shows two rows:
 | the link's deadline: the engine unreachable, or a call's request or answer unheard | 30 s |
 | the lock's wait | 60 s, tried every 100 ms |
 | a key's file, less a final newline (5.5, area 5) | 4 KiB; past it, or empty, exit 1 with nothing sent; a key the engine refuses is its refusal, exit 2 |
+| a forge's pasted value: its file, and the bundle the tool makes of it (5.5, area 6) | 8 KiB; past it, or empty, exit 1 with nothing sent; a value the engine refuses, one past the deployment's `records.value_bytes` among them, is its refusal, exit 2 |
+| a picker's page, `repositories` (5.5, area 6) | 100 rows, the most `picker.page` takes, printed whole: temper's own family carries them, not jig's rows; a step test fails when 100 rows at the client's bound on a field's bytes pass a result's text (11.1) |
 | a wait's timeout | 300 s by default, at most 3600 (5.4) |
 
 The client's other limits are the terminal's (`README.md`, section 2).
@@ -1050,6 +1196,13 @@ contract's reads, watches and requests, they take:
   section 3); and a request carrying a value,
   sent once and never kept nor resent (jig's `client/domain/client.md`,
   section 6; jig's `protocol/client.md`, section 10).
+- **For area 6,** temper's FORGE requests (`README.md`, section 8), each
+  under a key as the others, through `jig-client` as the forge family's
+  bytes; jig's request carrying a value (jig's `protocol/client.md`,
+  section 5) for a pasted connect and a replacement, the value numbered
+  and kept by jig's clients' component (`../protocol/credentials.md`,
+  pasted values), sent once and never kept nor resent; and the forge's
+  deployment part, read and watched (`forge.md`, section 9).
 - **The rest as jig designs it:** its helpers (`shapes`, `facts`,
   `thread`, `words`; jig's `client/domain/client.md`, section 19), the
   documents' acts and `me`'s bounds (jig's `client/domain/contract.md`,
@@ -1072,8 +1225,8 @@ Each is named here and designed when it comes.
   print a call, a call per asker.
 - **Extraction into jig,** `temper-client-tools`' module `jig` moved to
   `jig-client-tools`, when a second application wants the tools.
-- **The forge's read family's tools,** as the engine serves each of the
-  forge's parts (`forge.md`, section 9).
+- **The forge's read family's tools,** beside `forges` (area 6), as the
+  engine serves each of the forge's other parts (`forge.md`, section 9).
 - **A service's credential reissued, or a service removed** (jig's
   `domain/people.md`, section 3): tools of area 3.
 - **An account moved,** `export ACCOUNT FILE` and `import FILE` (keyed),
@@ -1099,3 +1252,21 @@ Each is named here and designed when it comes.
 - **An account's uses:** no tool, each account taking jig's defaults
   (jig's `domain/accounts.md`, 4.2). Default: a tool of area 5 once the
   QA loop plays a service paid by a person's account (section 14).
+- **A tokens file's layout** (5.5, area 6): temper's bundle is items by
+  number (`../protocol/credentials.md`, pasted values), which no person
+  writes. Default: `NAME VALUE` lines, as 5.5 has them; JSON, or a file
+  per token, if the QA loop asks.
+- **An agent and GitHub's browser steps:** a manifest's or an install's
+  link needs a person's browser signed in on GitHub. Default: the tools
+  print the link for a person and open nothing; tests drive its steps as
+  plain requests on skein's fake forge (11.2, 11.3); an agent alone
+  connects a Forgejo, or an App of its own with `github-app`.
+- **The picker's read as a keyed request:** `repositories` draws a key
+  as the other unmarked acts do, and the engine keeps its answer for the
+  retention (`README.md`, section 11, the picker's page as a read).
+  Default: kept as any keyed request; a read of the forge's family once
+  the engine serves one.
+- **Waiting on one forge:** `wait forges` watches every forge's row, so
+  another forge's change answers a wait with no condition. Default:
+  `--until settled` or `--until connected:F` names what is waited for; a
+  subject per forge, `forge F`, if the QA loop asks.

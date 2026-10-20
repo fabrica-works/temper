@@ -68,9 +68,10 @@ account and the work requested in steps 4 and 8 belong to the dogfood run.
 
 ## Step 5. Start the box and keep its terminal
 
-The box resolves the provider's name at its start. It prepares Forgejo,
-starts its runner, reconciles the bot and webhook, and prints a sign-in
-link. Keep this terminal open; copy that link for step 7.
+The box resolves the provider's name at its start. It prepares Forgejo
+and starts its runner; temper takes over the admin's token the
+preparation left, makes its bot, and prints a sign-in link. Keep this
+terminal open; copy that link for step 7.
 
 ```sh
 "$TEMPER" box config.json
@@ -124,7 +125,9 @@ read -r LINK
 Choose the numbered **Adopt a repository** control. Set **Owner** to
 `acme`, **Name** to `widget`, **Landing branch** to `main`, and **Checks**
 to `1`. Keep **It runs CI** checked. Choose **Adopt** and wait for
-`Adopted acme/widget on forge 1`. Type `q` to leave the client.
+`Adopted acme/widget on forge 1`; adopting makes temper's bot a
+collaborator on the repository and adds its webhook. Type `q` to leave
+the client.
 
 ## Step 8. Ask for work, stop, and start again
 

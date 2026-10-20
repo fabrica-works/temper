@@ -1,6 +1,6 @@
 # The browser
 
-Provisional, 2026-10-05, revised 2026-10-19. temper's browser client: a
+Provisional, 2026-10-05, revised 2026-10-20. temper's browser client: a
 second shell of temper's client (`README.md`), beside the terminal, on
 skein's browser parts. What its pages do is the client's (`README.md`;
 `forge.md`), with the mockups' look (`mockups/`, reference material),
@@ -264,7 +264,9 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   forge, hosted on loopback in that loop by skein's forge peer
   (`../domain/testing.md`, 4.2), and skein's fake LLM peer, as the
   process tier has them (`../domain/testing.md`, 2.6), join with the
-  second milestone's first story that needs them (4.2).
+  second milestone's first story that needs them (4.2). The one
+  exception is 4.4's test, for which the forge peer joins earlier
+  serving only the fake's GitHub `web`.
 - **Only what a browser alone shows.** temper's stories (what a page
   shows, what an act sends, a chat answered, a proposal accepted, a
   repository adopted, a run's live text) are the joint world's
@@ -340,6 +342,34 @@ that opens a tab of its own.
   `temper-client-view`, `temper-client-protocol-wire` and
   `temper-client-shell-web`, so a change that stops them building for
   the browser fails the gate.
+
+### 4.4 GitHub's manifest page
+
+One test, the github plan's, counted in 4.3's guide: with the ten
+tests 4.1's stories take and 4.2's story, the tier reaches its 12.
+
+- **What only a browser shows:** the manifest page's form posted under
+  the page's own policy, `form-action WEB` (`forge.md`, 9.1). The
+  redirect and the setup address need no browser; the real loop's
+  GitHub stories follow all three steps as plain requests
+  (`../domain/testing.md`, 2.4).
+- **What it runs against:** `temper serve` with a GitHub forge whose
+  `api` and `web` are the fake's GitHub layer, hosted on loopback in the
+  harness's loop by skein's forge peer (skein's `fake-forge.md`, section
+  10), which joins the tier for this test alone, ahead of the second
+  milestone (section 4): the test needs only its `web`. A GitHub forge needs a fixed
+  clients' listener (`forge.md`, 9.1), so the tier reserves a loopback
+  port the kernel assigns before `temper serve` starts and names it in
+  the configuration.
+- **The test:** GitHub's Connect asked through `temper ctl`, which
+  prints the manifest page's link (`tools.md`); the browser opens
+  `/forges/N/github/manifest?state=S` and presses its one button. The
+  form posts to `WEB/settings/apps/new?state=S`, the fake's. The test
+  ends once the fake's GitHub layer has taken the post, its `manifest`
+  field the page's and its state S, with no policy violation.
+- **No github.com:** `web` is the fake's, and the page's policy lets
+  its form post nowhere else. No test of the tier holds a real
+  credential.
 
 ## 5. Open questions
 

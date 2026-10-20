@@ -1,0 +1,288 @@
+# Connect GitHub
+
+temper works on GitHub through a GitHub App. temper makes the App from
+its manifest in your browser, or you make one yourself and paste its id
+and key; both end in the same records, and temper runs them alike. You
+open every GitHub page in your own browser: temper shows each link as
+text and never opens one. The design is
+`docs/design/protocol/setup.md`, connecting GitHub; the page you use is
+the client's **Forges** (`docs/design/client/forge.md`, the deployment's
+page).
+
+## 1. What you need
+
+- **A GitHub account,** or an organization where you may make Apps, as
+  its owner or one of its App managers.
+- **temper's clients' listener at a fixed address** your browser
+  reaches, such as `127.0.0.1:7100`. GitHub sends your browser back to
+  it, so open temper's links in a browser on the engine's machine, or
+  forward that port yourself; temper makes no tunnel.
+- **Who may connect:** the one whose role holds the deployment's
+  connectors; in standalone, the deployment's owner.
+- **The client,** or `temper ctl` signed in once with the link
+  `temper serve` printed:
+
+```sh
+temper ctl me sign-in -     # paste the sign-in link, then Ctrl-D
+```
+
+## 2. Add the forge to the configuration
+
+Add a forge of kind `github` to `application.forges`, and its identity
+to `application.identities`. Its addresses are `null`, which are
+github.com's; a value is given only to point at a fake, as temper's
+tests do.
+
+```json
+{"number": 2, "kind": "github", "api": null, "transport": null,
+ "git": null, "web": null, "log_origins": null}
+```
+
+```json
+{"number": 2, "forge": 2, "login": null, "author": null}
+```
+
+- **A forge's `number` is its stable id,** never reused. temper keeps
+  the forge's records under it, so give GitHub a number no other forge
+  has had. A forge whose number changes is a new forge, not connected,
+  and its old number's records are left as they are.
+- **Records made for another kind or address** leave the forge "Not
+  connected: its records were made for KIND at ADDRESS". Nothing is
+  erased; connecting again overwrites them.
+- **The identity's `null`s** are the App's: git signs in as
+  `x-access-token`, and commits are the App's bot's, `<slug>[bot]`.
+- **The clients' listener** needs a fixed port, as
+  `"clients": {"listener": {"socket": "127.0.0.1:7100"}, ...}`; port 0
+  refuses the start, naming `application.clients.listener`.
+- **A landing rule** for one of its repositories names `github.com` as
+  the forge's host:
+  `"segments": ["forge", "github.com", "<owner>", "<name>", "branch"]`.
+- **GitHub takes no `setup` entry.**
+
+Restart `temper serve`. The forge's row on **Forges** says "Not
+connected", with **Connect**.
+
+## 3. Connect GitHub with temper's App
+
+On **Forges**, choose **Connect** on the forge's row, then **Connect
+GitHub**, for your own account or for an organization you name. temper
+shows a link as text:
+
+```text
+http://127.0.0.1:7100/forges/2/github/manifest?state=<state>
+```
+
+Or, with `temper ctl` (add `--org <org>` for an organization):
+
+```sh
+temper ctl me forge-connect 2 github --key github
+temper ctl me wait forges --until settled
+```
+
+1. **Open the link** in your browser. temper's page is one button: it
+   sends temper's manifest to GitHub's form for a new App.
+2. **Create the App** on GitHub's form. You may rename it there; temper
+   takes the name GitHub keeps.
+3. **GitHub sends you back to temper,** which keeps the App's id, slug
+   and key, then sends you on to the App's install page.
+4. **Install it** (section 5's choices): pick the account, and **Only
+   select repositories**, as temper advises, or **All repositories**.
+   GitHub brings you back to temper, whose page says "temper has the
+   installation; you may close this tab."
+
+The row says "Connected as `<slug>[bot]` (`<id>`)", and lists the
+installation: its account, and "selected repositories" or "all
+repositories".
+
+- **A link is good once,** and for a while. A used or expired link, or
+  one from before a restart, answers "This link has ended. Start again
+  from temper.": choose **Connect** again, or **Install on another
+  account** once the App is made.
+- **A tab closed before installing** leaves the App made and installed
+  nowhere: install it as section 5 says.
+
+## 4. Or connect an App of your own
+
+Make the App on GitHub's page for a new GitHub App, under your account's
+or your organization's developer settings:
+
+- **Its name and homepage** are yours to choose.
+- **Callback URL:** none. Leave **Request user authorization (OAuth)
+  during installation** unchecked; temper asks for no user's sign-in.
+- **Setup URL:** temper's setup route, with **Redirect on update**
+  checked. GitHub brings your browser there after each install and each
+  change of its repositories; an installation that never comes back
+  through it is a stray, uninstalled at the next reconcile.
+
+  ```text
+  http://127.0.0.1:7100/forges/2/github/setup
+  ```
+
+- **Webhook:** keep **Active** checked, with any address that never
+  resolves, such as `https://<slug>.invalid/`, and no secret. temper
+  sets it to `https://<slug>.invalid/` and reads the App's deliveries
+  from GitHub's log of them, so GitHub needs no address of yours.
+- **Repository permissions:** Contents, Pull requests, Issues and Merge
+  queues, read and write; Checks, Commit statuses, Actions,
+  Administration and Metadata, read-only; Workflows, no access.
+- **Events:** Push; Pull request, Pull request review and Pull request
+  review comment; Issue comment; Issues; Check run and Check suite;
+  Status; Workflow job and Workflow run; Create and Delete; Merge group.
+- **Where it installs:** **Any account** to install it on accounts
+  other than its owner's; **Only on this account** keeps it to yours.
+
+Create it. Note its App ID on its page, and generate a private key:
+GitHub downloads it as a `.pem` file. On **Forges**, choose **Connect**,
+then **Connect an App of your own**: its id, and the key's text pasted
+as GitHub gives it. No webhook secret is asked. Or:
+
+```sh
+chmod 600 <slug>.private-key.pem
+temper ctl me forge-connect 2 github-app <id> <slug>.private-key.pem --key github-app
+temper ctl me wait forges --until settled
+```
+
+- **temper checks the App with the key:** its id the one you gave, its
+  bot user, its hook, its permissions and events. Then the row says
+  "Connected as `<slug>[bot]` (`<id>`)".
+- **An App lacking a permission or event** connects, and the row says
+  "temper's App lacks WHAT: grant them in the App's settings, then
+  paste its key again.", with a link to the App's settings. Grant them
+  there; GitHub asks each installation's owner to approve them. Then
+  choose **Replace** and paste the key again.
+- **Install it** as section 5 says: an App of your own is installed
+  through temper's link, the first account included.
+- **Delete the downloaded file** once the row says connected. temper
+  keeps the key; GitHub makes you a new one when you need it (section
+  9).
+
+## 5. Install on another account
+
+On the forge's row, choose **Install on another account**, or:
+
+```sh
+temper ctl me forge-install 2
+```
+
+temper shows GitHub's install link as text. Open it, pick the account
+or organization, and **Only select repositories**, as temper advises,
+or **All repositories**. GitHub brings you back to temper, and the row
+lists the installation.
+
+- **Only installations made through temper's link are used.** temper's
+  App is public, so anyone may install it from GitHub; an installation
+  made otherwise is listed as a stray, "uninstalled at the next
+  reconcile", and never used.
+- **An installation deleted on GitHub** leaves the row; one GitHub
+  suspends says "suspended", and its repositories are refused until it
+  is resumed.
+- **Adopting on an account with no installation** is refused: "temper's
+  App is not installed on OWNER.", with **Install on another account**.
+
+## 6. Add repositories later
+
+An installation of selected repositories reaches only those. To add
+one, open the installation's page on GitHub, linked from the forge's
+row:
+
+```text
+https://github.com/settings/installations/<id>
+https://github.com/organizations/<org>/settings/installations/<id>
+```
+
+Add the repository and save. GitHub brings your browser back to temper's
+setup route, and the adoption form's picker lists the repository. Or
+list the picker's pages with `temper ctl me repositories 2`.
+
+- **A repository not granted** is said where you adopt it: "OWNER/NAME
+  is not granted to temper's App.", linked to the installation's page;
+  the picker's "Not listed" says "Grant OWNER/NAME to temper's App on
+  GitHub's installation page."
+
+## 7. What a repository's rules need
+
+temper reads the landing branch's rules at adoption, rulesets and
+classic protection alike, and says each with what it means for landing
+and the one setting that lets temper land. temper never changes a
+repository's rules.
+
+- **A merge queue** is fine: temper's change enters it as its merge,
+  and the queue merges by its own method, set in the branch's rules.
+  The branch's required checks run on the queue's groups too, by
+  GitHub's rule: a workflow that is required lists `merge_group` among
+  its events.
+- **Landing directly,** with no merge queue: temper merges the pull
+  request once its landing rule is met.
+- **Required approvals or code owners:** a person approves on GitHub, or
+  you add temper's App to the rule's bypass list, for pull requests
+  only or always.
+- **Required checks** are CI, as the landing rule's.
+- **Signed commits:** temper's workers do not sign their commits. Where
+  GitHub refuses temper's merge for it, the change waits for a person's
+  merge.
+- **Linear history:** allow squash or rebase merging on the repository.
+- **The merge style** is the first the repository allows of merge,
+  squash and rebase: to have temper squash, allow squash and not merge
+  commits.
+
+## 8. Job logs
+
+GitHub serves a job's log through a redirect to a storage host. temper
+follows it only to a host its forge's `log_origins` lists. `null` is
+GitHub's default host, `productionresultssa1.blob.core.windows.net:443`;
+`[]` fetches no job log.
+
+When **Forges** says "A job's log is on HOST:PORT, which temper does not
+read: add it to this forge's `log_origins` and restart.", list that
+host. A list replaces the default, so keep the default in it:
+
+```json
+"log_origins": ["productionresultssa1.blob.core.windows.net:443", "<host>:443"]
+```
+
+Then restart `temper serve`. The list holds at most `forges.log_origins`
+hosts (`docs/design/protocol/configuration.md`, the limits).
+
+## 9. Replace the App's key
+
+On GitHub, open the App's settings, linked from the forge's row, and
+generate a new private key. On **Forges**, choose **Replace** and paste
+the new key's text, or:
+
+```sh
+chmod 600 <slug>.private-key.pem
+temper ctl me forge-replace 2 <slug>.private-key.pem --key github-key
+```
+
+- **The key must be the same App's.** A key of another App is refused,
+  named on the row, and the forge stays as it was.
+- **temper erases its old key** once it keeps the new. GitHub accepts
+  the old key until you delete it: delete it in the App's settings once
+  the row says connected, then delete the downloaded file.
+- **A key GitHub refuses** stops the forge: "Stopped: WHY", with
+  **Replace**. The engine and every other forge run on.
+
+This holds for temper's App and for an App of your own alike.
+
+## 10. What temper keeps, and where
+
+- **In jig's secrets' store,** under the forge's number, written and
+  read by the engine alone: the App's id, its slug, its key as DER, its
+  bot user's id, the installations accepted through temper's links, and
+  the kind and address the records were made for
+  (`docs/design/protocol/credentials.md`, the records).
+- **Never the PEM.** The key you paste is kept by jig until its run
+  ends, the pasted value, then erased; temper keeps it decoded, and no
+  page, log or answer shows it (`docs/design/protocol/credentials.md`,
+  pasted values). A run cut by a restart says "interrupted; paste
+  again".
+- **Never kept at all:** the installations' tokens, minted from the key
+  about hourly and held in memory; the App's OAuth client and its
+  secret; the webhook secret GitHub gives temper's App at its making;
+  the links' states.
+- **No webhook secret for GitHub.** The App's hook points at an address
+  that never resolves, and temper reads its deliveries from GitHub's
+  log, so your deployment needs no address GitHub can reach.
+- **`temper ctl` reads a key from a private file:** your own, with no
+  group or other permission bits, not a link. It never prints the key,
+  and sends it once.

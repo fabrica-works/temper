@@ -1,6 +1,6 @@
 # temper's root
 
-Provisional, 2026-10-04, revised 2026-10-18. What temper's engine root
+Provisional, 2026-10-04, revised 2026-10-20. What temper's engine root
 is and does: `temper-engine-domain`, the top-level domain of temper's
 engine, which composes jig's core with the forge connector in the shape
 jig's `domain/root.md` gives every application's root. It says what the
@@ -422,10 +422,12 @@ its claim commits:
 - **Grants:** the LLM accounts its charter's models need, the core's;
   and each repository's forge's git identity, one of temper's
   application credentials, by number and generation (jig's
-  `domain/engine.md`, 12.1). Their generations come from temper's own
-  source, a file read at start, each announced before the restart
-  (`../protocol/credentials.md`, section 4). The forge's API token and
-  webhook secret stay in the protocol layer, and are never granted.
+  `domain/engine.md`, 12.1). Their values come from the forge's records
+  in jig's secrets' store, generation 1 at each start and the next at
+  each change of value, each announced before the restart
+  (`../protocol/credentials.md`, section 4). The forge's API token or App
+  key, and a Forgejo forge's webhook secret, stay in the protocol layer,
+  and are never granted.
 - **The writes it claims:** the branches it pushes, the core's writer
   slots in the claim's commit and the forge's after it (5.3).
 
@@ -589,8 +591,8 @@ adds:
   it;
 - give the core a type of the forge's, or the forge one of the core's;
 - route by content beyond the variant;
-- price a forge effect, or grant the forge's API token or webhook
-  secret.
+- price a forge effect, or grant the forge's API token, App key or
+  webhook secret.
 
 ## 12. The world
 
