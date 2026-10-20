@@ -8,13 +8,13 @@ use skein_lib::{List, Map, Secret, Time};
 /// A configured key can exceed the OAuth token bound. The worker has no
 /// provider declarations and reserves the key ceiling unconditionally.
 pub(crate) fn credential_bytes(engine: &jig_protocol_config::Engine) -> u32 {
-    let mut bound = engine.limits.token;
+    let token = engine.limits.token;
     for provider in &engine.llm.providers {
         if provider.keys {
-            bound = crate::worker_settings::credential_bytes(bound);
+            return crate::worker_settings::credential_bytes(token);
         }
     }
-    bound
+    token
 }
 #[derive(Debug)]
 pub struct Values {
