@@ -1,0 +1,17 @@
+#!/bin/sh
+# qa.md, 5.2. Same trusted prefix as tools/ctl; the runner owns the 120s
+# command deadline. The one product watch uses the designed 110s timeout.
+set -eu
+[ "$#" -eq 3 ] || { printf 'story: expected temper, client directory and run link\n' >&2; exit 1; }
+base=${0%/*}/..
+# Keep the prefix separate from each literal call; no agent input is evaluated.
+created=$(/bin/sh "$base/tools/ctl" "$@" chat --project 1 --key smoke-chat \
+    'Add a file NOTICE to widget holding one line: Maintained by temper.')
+printf '%s\n' "$created"
+task=$(printf '%s\n' "$created" | python3 "$base/smoke/_ctl_output.py" created)
+waited=$(/bin/sh "$base/tools/ctl" "$@" wait task "$task" --until ended --timeout 110)
+printf '%s\n' "$waited"
+printf '%s\n' "$waited" | python3 "$base/smoke/_ctl_output.py" ended "$task"
+tree=$(/bin/sh "$base/tools/ctl" "$@" task "$task" --tree)
+printf '%s\n' "$tree"
+printf '%s\n' "$tree" | python3 "$base/smoke/_ctl_output.py" tree "$task"
