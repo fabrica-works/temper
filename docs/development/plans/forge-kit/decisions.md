@@ -1506,6 +1506,13 @@ where its answer lands.
 
      Checked: graph locates temper-service startup.rs::startup; git -C temper show2a739880:crates/temper-service/src/startup.rs confirms the independent startup_worst_case call and forge::roots input. Plan Files/Shape omitted that caller; scratch-recheck-temper-03-start/increment-audit.md and downstream exact-name sweep find no further missing component consumer. Complete Skein fixture2,812,047 passes; actual Temper named-slice31 is only a source derivation, not a complete measured sum. Full evidence and untouched assertion/identity maps are in that scratch; pump/recheck-temper-03-start.md keeps every unrun limitation.
 
+192. **Recording proof follows empty-body HTTP framing** (plan defect, temper06.2 block of 2026-10-20T01:28:59Z).
+     Accept exactly the four additional empty-body headers as the current design's intended request framing. Skein http.md3.1 says: “Content-Length: 0” for “a POST, PUT or PATCH without one”. The two team-member requests are PUT; update-conflict/update-pull are POST. Every extra file differs solely by that header before Connection:close, with all other bytes unchanged. No upstream repair or new design choice is needed.
+
+     The unchanged corpus comparison now expects exactly six paths: the original merge-conflict/request and merge-stale-head/request, plus setup-team-member-added/request, setup-team-member-missing-user/request, update-conflict/request and update-pull/request. The original merge differences remain; the other four permit only that single header addition. Keep all stable facts, digest, captured/committed transcripts, deliveries and budgets. Do not normalize or broadly ignore headers. Any other byte/path/digest difference is a new report. Refresh every further reached proof-script/copy in the owning step and list users in its commit body.
+
+     The preserved two post-repair recordings and matching stable digest satisfy this recording obligation once their exact diff is recorded under this rule; do not rerun them solely to change the old expected file count. Retain all original logs and artifacts. Resume the clean JSON candidate from a71a3fffcf22594a7506eea010bf605edfb7de4c; record this framing disposition and complete the required landing gate before continuing06.3/06.4. No gate, proof count, corpus or production behavior is waived or changed.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
