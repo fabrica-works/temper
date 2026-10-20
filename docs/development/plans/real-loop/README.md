@@ -97,8 +97,8 @@ plan's own.
   once temper 05 has; temper 10 once temper 05 has; temper 09 once temper
   08 has; temper 13 once temper 08 and forge-kit's temper-05.2 have;
   temper-13.s1 at once, and 13.4 after it (ruling 112); temper-13.s2
-  after temper-13.5 (ruling 142); temper-13.s3 before 13.5 goes on
-  (ruling 145).
+  after temper-13.5 (ruling 142); temper-13.s3 (ruling 145), then
+  temper-13.s4 (ruling 148), before 13.5 goes on.
 - **When slots are short,** start first: temper 05, temper 08, temper
   14; then temper 13, temper 09, temper 06 and temper 10.
 - **The longest chain,** 12 steps: temper 05.1 to 05.6 → temper 08.4 →

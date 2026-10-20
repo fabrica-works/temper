@@ -858,6 +858,13 @@ pass:
 
      The director, 2026-10-20T13:34Z, to every owner: the pueue stopgap is lifted; heavy's fix is on all five machines and o/hygiene cleaned pueue of credential-shaped variables. "pueue status and pueue log are allowed again, though heavy's own output and log paths are still the better read. Two rules stand for good: never read another process's environment (/proc/*/environ, ps e), and launch Codex with umask 077 so its logs are private." The README's rule now says that. Each prompt a role writes for an agent keeps the line on other processes' environments; a further copy of the old rule's text (a context file, a prompt) takes the new rule's.
 
+148. **An overtaken chain sends no decision** (plan defect, temper 13's block of 2026-10-20T14:17:29Z).
+     Ruling 148: a plan defect in ruling 145's 13.s3 Shape, which let the overtaken chain decide before it stepped again. On `main` at 3d677cddc, `finish_step` calls `decide_step` first and only then, when `pending.woken`, `step_change`: the chain that read the pull Missing sends a Wait, the root's `change_decision` takes it as the due procedure step (jig's `procedure_due` is Some only while a step is Due, and the step's apply sets it Idle), and the fresh chain's Ready finds `procedure_due` None and returns at forge_route.rs's `let Some((connector, code, step)) = domain.core.tasks.procedure_due(task) else { return };`.
+
+     The design answers which side is wrong. domain/forge.md 5.3: "Before a decision depends on a fact, the change child domain asks for it afresh"; domain/root.md 6: "The change procedure's decisions become the core's procedure steps", one per step ("a wait; ready steps it again"). A chain a wake overtook rests on a fact read before the wake: it decides nothing, and only the fresh chain after it does. The root stays as it is.
+
+     New step `temper-13.s4`, "An overtaken chain sends no decision" (`temper/13.s4-overtaken-chain-sends-nothing.md`): in `crates/temper-engine-domain-forge/src/domain.rs`'s `finish_step`, a woken pending step calls no `decide_step` and starts the next step from Branch; the test `an_overtaking_open_outcome_restarts_the_fresh_chain` in `src/tests/change.rs` asserts no `ChangeDecision` from the overtaken chain and one Ready from the fresh one. Proof: unit; budget three runs and 20 minutes. 13.5 needs it, rebases onto it, and its budget starts afresh. The diagnosis also saw "frozen record count fits" and a 30 s retry, both during the stall the stale Wait made; if either remains after 13.s4, 13.5 reports it with its run, as ruling 140 says.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
