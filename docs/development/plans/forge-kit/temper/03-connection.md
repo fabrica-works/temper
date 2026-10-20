@@ -132,7 +132,7 @@ Test shape: **no test of the crate stays** (112 at the step's start, 117 at the 
     `(Unusable::PlaintextName { forge: 1 }, b"application.forges[1].api: past its bound\n")`.
   - `a_refusal_naming_a_forge_is_indexed_to_the_configured_forge`: `PlaintextName { forge:
     config.forges[0].number }` through `indexed` names `application.forges[0].api` (the number differs
-    from the index, asserted).
+    from the index;03.2 gives that fixture contract its own test).
   - `the_start_request_carries_the_user_agent_and_the_host` (reference; world: `fixtures::started()`
     with the `ForgeFace`, whose accessor `sent(&self) -> &[u8]` is three new lines):
     ```rust
@@ -202,7 +202,13 @@ Shape: two commits. 1. **The repin**: update and check, then the page-size and h
   `.tls.send` and `io.output` (the base named the first three, without the forge); `indexed` gains
   `Request { forge }`. Answer 2 adds no variant; answer 3 changes no temper line (no temper test pins
   a malformed or uppercase signature).
-Test shape: two new units, <20 ms (0.007 and 0.010 s in the scratch):
+Test shape: three new units, each <20 ms (the two original units took0.007 and0.010s in the scratch):
+  - `the_forge_fixture_number_differs_from_its_index`: the same `fixtures::engine()`
+    setup and the existing `assert_ne!(config.forges[0].number, 0)`, moved from
+    `a_refusal_naming_a_forge_is_indexed_to_the_configured_forge`. Keep the latter
+    test's input and indexed-problem assertion unchanged. This separates the
+    fixture contract under testing-strategy.md10, The setup the assertion reads;
+    both assertions remain, with no replacement value or setup change.
   - `a_head_past_the_request_room_is_a_problem_naming_its_members_and_the_forge`: `Request { forge:
     config.forges[0].number }` through `indexed` and `problems` gives `HEAD_PROBLEMS` (number not 0).
   - `the_longest_head_of_the_shipped_forge_fits_its_room_to_the_byte`: `forge::prepare` with
@@ -221,11 +227,11 @@ Test shape: two new units, <20 ms (0.007 and 0.010 s in the scratch):
   head is 4096 + 259 + 512 + 12 + 192 = 5071, under `tls.send` 16_384 and
   `io.output` 1_048_576 (the landed Host helper and arithmetic passed a scratch oracle; future
   component admission remains unproved).
-Proof: unit; `heavy cargo nextest run -p temper-service tests::forge`: 18 passed (16 at 03.1, plus 2).
-Proof: joint; the users command of 03.1: its count at the step's start plus 2, <15 s.
+Proof: unit; `heavy cargo nextest run -p temper-service tests::forge`: 19 passed (16 at03.1, plus3; the added fixture-contract unit is included).
+Proof: joint; the users command of 03.1: its count at the step's start plus3, <15 s.
 Proof: process; 03.1's component recording: exit 0, about 30 s. Once.
 Proof: process; 03.1's command: its count at the step's start passed (19 at the base), <5 minutes. Once.
-Proof: joint; `heavy --gate scripts/check.sh`: focused plus 2, fuzzy unchanged, clean.
+Proof: joint; `heavy --gate scripts/check.sh`: focused plus3, fuzzy unchanged, clean.
 Don't: raise a bound, drop a row or loosen an assertion to pass; add an arm for answer 2.
 Size: about 20 lines moved (the repin's repairs, as many as the run shows), about 55 new (the arm and
   `indexed` about 12, the tests and the literal about 43).
@@ -277,5 +283,5 @@ and the head's size.
   `crates/temper-service/src/forge.rs:1` and `crates/temper-service/src/tests/forge.rs:1`.
 - `heavy python3 -I -c 'from pathlib import Path; print("component_copy_absent=" +
   str(not Path("crates/temper-engine-protocol-forge").exists()))'` prints `component_copy_absent=True`.
-- `heavy cargo nextest run -p temper-service tests::forge` shows 18 passed.
+- `heavy cargo nextest run -p temper-service tests::forge` shows19passed (the step-start count plus3).
 - The process tier (03.1's command) exits 0 with its count at the step's start (19 at the base).

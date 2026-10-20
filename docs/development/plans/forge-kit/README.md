@@ -384,6 +384,20 @@ chain.
   dependencies, backpin or duplicate another plan's adapter sweep. Refresh
   any further reached copy or derived value within the owning repin, and
   list every user in its commit body.
+- **New Accounts-2 interfaces:** Jig's newer host/fleet vocabulary in
+  `155773d20ae312294fcfa9be48fe19b645f57f8c` and
+  `a5f3a733a12dd3908e2eccfb52f9987377064545`, and configuration refusals
+  `Confidential`/`NoProvider` in `9cd5dc229e955a9036ecbd540b67d3658d620ba0`,
+  have separate Accounts-2 downstream custody. Before an owning repin takes
+  those interfaces, obtain the compatible downstream repair/disposition from
+  that owner; preserve the exact host/fleet payloads and refusal meanings.
+  The reached Temper users are worker-domain `agents.rs`/`translate.rs`,
+  engine-domain `decision.rs`/`link.rs`, and forge-setup `problem.rs`.
+  Earlier Accounts mappings to removed `Rejected`/`Exhausted` are not a
+  translation for this newer range. Preserve compatible committed pins and
+  independent starts; this requires no early pin or duplicate adapter sweep.
+  Refresh further reached copies within the owning repair and list users in
+  its commit body; only actual-tree compilation establishes compatibility.
 - **Settled smith adapters at the next repin:** smith's live-text
   decisions2.2/answer4 and For the user9 settle v3 paths, `live: None`
   and ignored `OpenEvent::Live`; its later.md expressly assigns them to

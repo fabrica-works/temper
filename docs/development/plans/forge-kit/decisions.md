@@ -1650,6 +1650,13 @@ where its answer lands.
      6. Unchanged from the last answer: the Listen-fd learner, Adopt's settled
         end, and `[NoAddress, Written]`.
 
+199. **Fixture-contract separation and Accounts-2 compatibility custody** (hourly15 check of 2026-10-20T02:23:19Z).
+     Separate Temper03's fixture validity assertion from its indexing behavior under pinned testing-strategy.md10, The setup the assertion reads: “a precondition worth checking is another test's behaviour.”03.2 adds the_forge_fixture_number_differs_from_its_index, moving the existing nonzero-number assertion out of a_refusal_naming_a_forge_is_indexed_to_the_configured_forge. Preserve both assertions, fixture inputs and the indexed-problem literal. Its source-checked base has16forge units;03.2 now adds3, for19, with joint/gate relative+3 and unchanged fuzzy count and timing limits. Reverses no prior ruling; amends the plan-prescribed assertion location in03.1 and03.2's proof counts. No production behavior changes.
+
+     Retain the new Accounts-2 host/fleet and configuration-refusal diagnostics under the README's New Accounts-2 interfaces rule. Exact frozen sources/locks and compiler errors remain in scratch-hourly-15; Jig STATUS names the active Accounts-2 owner on debian-16gb-hel1-1 with unversioned owner notes. Director routing must establish that owner's downstream custody before a Forge-kit repin consumes these newer interfaces; no Step trailer is invented and no existing compatible pin is moved by this ruling. Older Accounts185/130 adapters apply to their older vocabulary only. Preserve the new payloads and refusal cases, refresh further reached copies and list users in the owning commit.
+
+     The accepted main-process proof is f338a5b9355fe50222c5e0147873960c7952c0a2,24PASS149.032s. A separate ordinary exact-main check covers the newer06.3 source; neither this record nor upstream gate attestations waive a final owning tree's proofs. Primary index refresh remains root-owned with bounded source fallback until exact recorded inputs complete. The fixed kit and full dependency-ready capacity stay.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
