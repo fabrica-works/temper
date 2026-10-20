@@ -4,6 +4,18 @@ use jig_domain_host as host;
 use jig_protocol_accounts::table::{self, Table};
 use jig_protocol_engine_workers::{GrantValue, Scheme};
 use skein_lib::{List, Map, Secret, Time};
+
+/// A configured key can exceed the OAuth token bound. The worker has no
+/// provider declarations and reserves the key ceiling unconditionally.
+pub(crate) fn credential_bytes(engine: &jig_protocol_config::Engine) -> u32 {
+    let mut bound = engine.limits.token;
+    for provider in &engine.llm.providers {
+        if provider.keys {
+            bound = crate::worker_settings::credential_bytes(bound);
+        }
+    }
+    bound
+}
 #[derive(Debug)]
 pub struct Values {
     pub accounts: Table,
@@ -25,7 +37,9 @@ impl Values {
         let mut values = List::with_capacity(u32::try_from(grants.len()).expect("bounded grants"));
         for grant in grants {
             let value = match grant.form.table() {
-                host::GrantTable::Accounts => account_grant(self.accounts.value(grant.account, grant.generation, now)),
+                host::GrantTable::Accounts => {
+                    account_grant(grant.form, self.accounts.value(grant.account, grant.generation, now))
+                }
                 host::GrantTable::Application if grant.generation == 1 => {
                     identity_grant(self.identities.get(&grant.account))
                 }
@@ -37,8 +51,16 @@ impl Values {
     }
 }
 
-fn account_grant(value: Option<&table::Value>) -> Option<GrantValue> {
+fn account_grant(form: host::Form, value: Option<&table::Value>) -> Option<GrantValue> {
     let value = value?;
+    let actual = match &value.scheme {
+        table::Scheme::Bearer => host::Form::Credential(host::Scheme::Bearer),
+        table::Scheme::Key => host::Form::Credential(host::Scheme::Key),
+        table::Scheme::Withdrawn { .. } => host::Form::Withdrawn,
+    };
+    if form != actual {
+        return None;
+    }
     Some(match &value.scheme {
         table::Scheme::Bearer => GrantValue::Credential { scheme: Scheme::Bearer, token: value.token.clone() },
         table::Scheme::Key => GrantValue::Credential { scheme: Scheme::Key, token: value.token.clone() },

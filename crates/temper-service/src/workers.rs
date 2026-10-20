@@ -469,23 +469,21 @@ pub fn limits(settings: &crate::settings::Engine) -> Option<kit::Limits> {
     let link = jig.link;
     let ceilings = jig_protocol_worker_wire::CEILINGS;
     let sizes = jig_protocol_worker_wire::sizes::Sizes {
-        charter: u32::try_from(hub.charter_bytes).expect("channel byte bound"),
-        transcript: u32::try_from(hub.transcript_bytes).expect("channel byte bound"),
-        turn: u32::try_from(hub.turn_bytes).expect("channel byte bound"),
+        charter: u32::try_from(hub.charter_bytes).ok()?,
+        transcript: u32::try_from(hub.transcript_bytes).ok()?,
+        turn: u32::try_from(hub.turn_bytes).ok()?,
         message: core.tasks.message_bytes,
         sender: ceilings.message_sender,
-        call_name: u32::try_from(core.fleet.call_name_bytes).expect("call name bound"),
+        call_name: u32::try_from(core.fleet.call_name_bytes).ok()?,
         tool_name: ceilings.call_tool,
         call_input: core.call_answer_bytes,
         answer: core.call_answer_bytes,
-        result: u32::try_from(hub.outcome_bytes).expect("channel byte bound"),
+        result: u32::try_from(hub.outcome_bytes).ok()?,
         detail: hub.detail_bytes,
-        grant: jig
-            .driver
-            .client
-            .document
-            .token_bytes
-            .max(u32::try_from(wire::Identity::worst_case_bytes(&wire)?).ok()?),
+        grant: crate::worker_settings::grant_bytes(
+            crate::values::credential_bytes(&settings.jig),
+            u32::try_from(wire::Identity::worst_case_bytes(&wire)?).ok()?,
+        )?,
         account_id: jig_protocol_accounts::ACCOUNT_ID_BYTES,
         name: link.name,
         secret: link.secret,
@@ -493,7 +491,7 @@ pub fn limits(settings: &crate::settings::Engine) -> Option<kit::Limits> {
         items: u32::try_from(wire::Items::worst_case_bytes(&wire)?).ok()?,
         left: u32::try_from(wire::Left::worst_case_bytes(&wire)?).ok()?,
         saved: u32::try_from(wire::Saved::worst_case_bytes(&wire)?).ok()?,
-        evidence: u32::try_from(hub.delivery_evidence_bytes).expect("channel byte bound"),
+        evidence: u32::try_from(hub.delivery_evidence_bytes).ok()?,
         resource: u32::try_from(wire::Preparation::worst_case_bytes(&wire)?).ok()?,
         slots: core.fleet.slots,
         calls: hub.run_calls,

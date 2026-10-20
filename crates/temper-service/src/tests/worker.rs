@@ -50,16 +50,7 @@ fn a_workspace_start_carries_one_path_per_directory() {
         values.paths.as_ref(),
         [Box::from(b"/worker/workspaces/73/second".as_slice()), Box::from(b"/worker/workspaces/41/first".as_slice()),]
     );
-    smith_host_protocol::encode_start(
-        *start,
-        smith::Window { turns: 1, bytes: 65536 },
-        values,
-        &agent.limits.bodies,
-        &agent.limits.charter,
-        &agent.limits.transcript,
-        &agent.endpoints,
-    )
-    .expect("two prepared directories encode with their paths");
+    encode_grants(*start, values, &agent).expect("two prepared directories encode with their paths");
 }
 
 fn decoded_chat_start(agent: &crate::settings::Agent) -> Box<smith_host_domain::Start> {
@@ -90,7 +81,7 @@ use jig_protocol_worker_link as link;
 use jig_protocol_worker_wire::Part;
 use skein_channel::{Lower, LowerEvent};
 use skein_io as io;
-use skein_lib::{Intake, Queue, Reader, Secret, Time, Token, Wall, stream};
+use skein_lib::{Duration, Intake, Queue, Reader, Secret, Time, Token, Wall, stream};
 use temper_protocol_worker_wire::v1;
 use temper_worker_domain::{self as root, wire};
 
@@ -397,4 +388,324 @@ fn worker_heap(
     meter.check(measured, bound, &"worker construction");
     drop(worker);
     held
+}
+
+#[test]
+fn start_and_renewal_require_the_declared_form_and_live_generation() {
+    use jig_protocol_accounts::table::{Scheme, Table, Value};
+    use smith_host_domain as smith;
+    let agent = fixtures::worker_agent();
+    let forms = [
+        smith::Form::Credential(smith::Scheme::Bearer),
+        smith::Form::Credential(smith::Scheme::Key),
+        smith::Form::Withdrawn,
+    ];
+    for (scheme, expected) in [
+        (Scheme::Bearer, forms[0]),
+        (Scheme::Key, forms[1]),
+        (Scheme::Withdrawn { id: Secret::new(b"provider-account".as_slice().into()) }, forms[2]),
+    ] {
+        let mut table = Table::new(1, 64);
+        for generation in [2, 3] {
+            table
+                .granted(
+                    7,
+                    generation,
+                    Value { scheme: scheme.clone(), token: Secret::new(b"credential".as_slice().into()) },
+                    Time::from_nanos(9),
+                )
+                .unwrap();
+        }
+        for (number, generation, now, live) in
+            [(7, 2, 8, true), (7, 3, 8, true), (7, 1, 8, false), (7, 3, 9, false), (8, 3, 8, false)]
+        {
+            for form in forms {
+                let grant = smith::Grant { account: number, generation, valid: Duration::from_secs(5), form };
+                let now = Time::from_nanos(now);
+                let mut start = decoded_chat_start(&agent);
+                start.grants = Box::new([grant]);
+                let opening = crate::worker::start_values(&table, &start, b"/worker", now);
+                let renewal = crate::worker::grant_value(&table, grant, now);
+                let accepted = live && form == expected;
+                assert_eq!(opening.is_some(), accepted, "start {grant:?} at {now:?}");
+                assert_eq!(renewal.is_some(), accepted, "renewal {grant:?} at {now:?}");
+                if let Some(values) = opening {
+                    assert_eq!(smith_host_protocol::grant_form(&values.credentials[0]).unwrap(), form);
+                    encode_grants(*start, values, &agent).unwrap();
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn a_program_grant_lends_only_its_validated_name_without_a_table_entry() {
+    use smith_host_domain as smith;
+    let agent = fixtures::worker_agent();
+    let table = jig_protocol_accounts::table::Table::new(0, 0);
+    for size in [0, 1, smith::SourceName::BYTES, smith::SourceName::BYTES + 1] {
+        let bytes = vec![b'a'; size];
+        let Some(name) = smith::SourceName::new(&bytes) else {
+            assert!(size == 0 || size > smith::SourceName::BYTES);
+            continue;
+        };
+        let grant = smith::Grant {
+            account: 17,
+            generation: 4,
+            valid: Duration::from_secs(6),
+            form: smith::Form::Program(name),
+        };
+        let mut start = decoded_chat_start(&agent);
+        start.grants = Box::new([grant]);
+        let values = crate::worker::start_values(&table, &start, b"/worker", Time::ZERO).unwrap();
+        assert_eq!(values.credentials.as_ref(), [smith_protocol_channel::GrantValue::Program(bytes.clone().into())]);
+        assert_eq!(crate::worker::grant_value(&table, grant, Time::ZERO).unwrap().credentials, values.credentials);
+        let encoded = encode_grants(*start, values, &agent).unwrap();
+        let body = &encoded.bytes()[encoded.bytes().len() - usize::try_from(encoded.body_len()).unwrap()..];
+        let decoded = smith_channel::Start::decode(&agent.limits.bodies, &mut Reader::new(body)).unwrap();
+        let value = decoded.grants().get(0).unwrap();
+        assert_eq!(
+            (value.account(), value.generation(), value.valid()),
+            (grant.account, grant.generation, grant.valid)
+        );
+        let smith_channel::GrantValue::Program(value) = value.value() else { panic!("only a program name") };
+        assert_eq!(value.name(), bytes);
+        let mut mismatched = decoded_chat_start(&agent);
+        mismatched.grants = Box::new([grant]);
+        let wrong = smith_host_protocol::Values {
+            paths: Box::default(),
+            credentials: Box::new([smith_protocol_channel::GrantValue::Bearer(Box::default())]),
+        };
+        assert!(encode_grants(*mismatched, wrong, &agent).is_err());
+    }
+    for bytes in [b"UPPER".as_slice(), b"slash/name", b"claude_code"] {
+        assert!(smith::SourceName::new(bytes).is_none());
+    }
+}
+
+#[test]
+fn grant_sizes_take_credentials_source_names_and_generated_identities() {
+    let name = u32::try_from(smith_host_domain::SourceName::BYTES).unwrap();
+    for (credential, identity, expected) in [
+        (name - 1, name - 1, name),
+        (name, name, name),
+        (name + 1, name, name + 1),
+        (name, name + 1, name + 1),
+        (4096, name, 4096),
+    ] {
+        assert_eq!(worker_settings::grant_bytes(credential, identity), Some(expected));
+    }
+    let mut engine = fixtures::engine();
+    let mut worker = fixtures::worker_settings();
+    let payload = worker_settings::payload_limits(&fixtures::worker_limits().checkout).unwrap();
+    for credential in [1, name, 4096] {
+        engine.jig.limits.token = credential;
+        // Table capacity, not OAuth's separate parsing bound, sizes every credential scheme.
+        engine.jig.limits.driver.client.document.token_bytes = 1;
+        worker.jig.limits.token = credential;
+        let left = crate::workers::limits(&engine).unwrap();
+        let right = worker_settings::link_limits(&worker.jig, &payload).unwrap();
+        let wire = crate::translate::limits(&engine.limits).unwrap();
+        let identity = u32::try_from(v1::Identity::worst_case_bytes(&wire).unwrap()).unwrap();
+        assert_eq!(left.sizes.grant, credential.max(name).max(identity));
+        assert_eq!(
+            right.sizes.grant,
+            worker_settings::credential_bytes(credential)
+                .max(name)
+                .max(temper_protocol_worker_wire::largest(&payload).unwrap().grant)
+        );
+    }
+    engine.jig.limits.hub.charter_bytes = u64::MAX;
+    assert!(crate::workers::limits(&engine).is_none());
+    worker.jig.limits.hub.charter_bytes = u64::MAX;
+    assert!(worker_settings::link_limits(&worker.jig, &payload).is_none());
+    assert!(
+        worker_settings::worker_worst_case(&worker, &fixtures::worker_agent(), &fixtures::worker_limits()).is_none()
+    );
+}
+
+#[test]
+fn multiple_models_and_providers_preserve_the_supplied_grant_list() {
+    use smith_host_domain as smith;
+    let mut agent = fixtures::worker_agent();
+    let mut endpoints = skein_lib::List::with_capacity(2);
+    for (name, number) in [(b"fake".as_slice(), 1), (b"other", 2)] {
+        endpoints
+            .push(smith_protocol_channel::Endpoint { name: name.into(), number, dialect: fixtures::DIALECT })
+            .unwrap();
+    }
+    agent.endpoints = smith_protocol_channel::Endpoints::new(endpoints);
+    let mut charter = decoded_chat_start(&agent).charter.into_value();
+    let mut main = charter.llm.clone();
+    main.account = Some(7);
+    let mut alternative = main.clone();
+    alternative.model = b"alternative".as_slice().into();
+    let mut other = main.clone();
+    other.account = Some(19);
+    other.endpoint.0 = 2;
+    charter.llm = main;
+    charter.models = Box::new([alternative, other]);
+    let charter = smith_protocol_channel::encode_charter(&charter, &agent.limits.charter, &agent.endpoints).unwrap();
+    let grants = [
+        hub::Grant {
+            account: 19,
+            generation: 8,
+            valid: Duration::from_secs(11),
+            form: hub::Form::Credential(hub::Scheme::Key),
+        },
+        hub::Grant {
+            account: 7,
+            generation: 3,
+            valid: Duration::from_secs(5),
+            form: hub::Form::Credential(hub::Scheme::Bearer),
+        },
+        hub::Grant { account: 99, generation: 1, valid: Duration::from_secs(6), form: hub::Form::Application },
+    ];
+    let start = crate::worker_route::decode(
+        Token::new(31),
+        hub::Start {
+            workspace: None,
+            charter,
+            activation: 2,
+            identity: [3; 16],
+            turns: Box::default(),
+            answered: Box::default(),
+            messages: Box::default(),
+            grants: grants.into(),
+        },
+        &agent,
+    )
+    .unwrap();
+    assert_eq!(start.charter.value().models.len(), 2);
+    assert_eq!(
+        start.grants.as_ref(),
+        [
+            smith::Grant {
+                account: 19,
+                generation: 8,
+                valid: Duration::from_secs(11),
+                form: smith::Form::Credential(smith::Scheme::Key)
+            },
+            smith::Grant {
+                account: 7,
+                generation: 3,
+                valid: Duration::from_secs(5),
+                form: smith::Form::Credential(smith::Scheme::Bearer)
+            },
+        ]
+    );
+}
+
+#[test]
+fn smith_channel_notices_keep_the_source_generation_and_optional_reset() {
+    use smith_host_domain as smith;
+    use smith_host_protocol::{OpenEvent, ProcessEvent};
+    let owner = Token::new(32);
+    for (notice, expected) in [
+        (
+            OpenEvent::Unauthorized { account: 17, generation: 4 },
+            smith::Up::Unauthorized { account: 17, generation: 4 },
+        ),
+        (OpenEvent::Limited { account: 17, reset: None }, smith::Up::Limited { account: 17, reset: None }),
+        (
+            OpenEvent::Limited { account: 17, reset: Some(Duration::ZERO) },
+            smith::Up::Limited { account: 17, reset: Some(Duration::ZERO) },
+        ),
+        (
+            OpenEvent::Limited { account: 17, reset: Some(Duration::from_secs(9)) },
+            smith::Up::Limited { account: 17, reset: Some(Duration::from_secs(9)) },
+        ),
+        (
+            OpenEvent::Refused {
+                account: 17,
+                code: b"quota".as_slice().into(),
+                reason: b"provider refused".as_slice().into(),
+            },
+            smith::Up::Refused {
+                account: 17,
+                code: b"quota".as_slice().into(),
+                reason: b"provider refused".as_slice().into(),
+            },
+        ),
+    ] {
+        let actual = crate::worker_route::process(ProcessEvent::Channel { agent: owner, event: Box::new(notice) });
+        assert_eq!(
+            actual,
+            Some(root::Event::Process(Box::new(smith::process::Event::Received { owner, message: expected })))
+        );
+    }
+}
+
+fn encode_grants(
+    start: smith_host_domain::Start,
+    values: smith_host_protocol::Values,
+    agent: &crate::settings::Agent,
+) -> Result<skein_channel::Frame, smith_host_protocol::Error> {
+    smith_host_protocol::encode_start(
+        start,
+        smith_host_domain::Window { turns: agent.host_limits.turns, bytes: agent.host_limits.unacknowledged_bytes },
+        values,
+        &agent.limits.bodies,
+        &agent.limits.charter,
+        &agent.limits.transcript,
+        &agent.endpoints,
+    )
+}
+
+#[test]
+fn key_values_reach_smith_at_their_bound_and_fit_the_workers_memory() {
+    use jig_protocol_accounts::table::{Scheme, Value};
+    use smith_host_domain as smith;
+    let key_bytes = jig_client_protocol_wire::v10::CEILINGS.keyed_value_some;
+    let mut settings = fixtures::worker_settings();
+    settings.jig.limits.token = 1;
+    let agent = fixtures::worker_agent();
+    let limits = fixtures::worker_limits();
+    let files = fixtures::worker_files();
+    let worst = worker_settings::worker_worst_case(&settings, &agent, &limits).unwrap();
+    let meter = skein_world::domain::heap::Meter::new();
+    meter.start();
+    let mut worker = crate::Worker::new(&settings, &agent, &limits, &files, fixtures::worker_runtime(), 7).unwrap();
+    const SOURCE: u32 = 17;
+    for generation in [2, 3] {
+        worker
+            .values
+            .granted(
+                SOURCE,
+                generation,
+                Value {
+                    scheme: Scheme::Key,
+                    token: Secret::new(vec![b'k'; usize::try_from(key_bytes).unwrap()].into()),
+                },
+                Time::from_nanos(9),
+            )
+            .unwrap();
+    }
+    let measured = meter.end();
+    meter.check(measured, worst, &"two retained full-size key generations");
+    for size in [key_bytes - 1, key_bytes, key_bytes + 1] {
+        let token = Secret::new(vec![b'k'; usize::try_from(size).unwrap()].into());
+        let accepted = worker.values.granted(SOURCE, 3, Value { scheme: Scheme::Key, token }, Time::from_nanos(9));
+        assert_eq!(accepted.is_ok(), size <= key_bytes);
+        if accepted.is_err() {
+            continue;
+        }
+        let mut start = decoded_chat_start(&agent);
+        start.grants = Box::new([smith::Grant {
+            account: SOURCE,
+            generation: 3,
+            valid: Duration::from_secs(5),
+            form: smith::Form::Credential(smith::Scheme::Key),
+        }]);
+        let values = crate::worker::start_values(&worker.values, &start, b"/worker", Time::ZERO).unwrap();
+        let encoded = encode_grants(*start, values, &agent).unwrap();
+        let offset = encoded.bytes().len() - usize::try_from(encoded.body_len()).unwrap();
+        let decoded =
+            smith_channel::Start::decode(&agent.limits.bodies, &mut Reader::new(&encoded.bytes()[offset..])).unwrap();
+        let smith_channel::GrantValue::Credential(value) = decoded.grants().get(0).unwrap().value() else {
+            panic!("credential")
+        };
+        assert_eq!(value.scheme(), &smith_channel::Scheme::Key);
+        assert_eq!(value.bytes().expose().len(), usize::try_from(size).unwrap());
+    }
 }

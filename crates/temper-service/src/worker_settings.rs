@@ -52,9 +52,10 @@ pub fn prepare(worker: &settings::Worker, agent: &settings::Agent, own: &limits:
     worker.jig.slots.checked_mul(4).ok_or(problem(b"slots", What::Bound))?;
     worker.jig.limits.core.accounts.accounts.checked_add(1).ok_or(problem(b"limits", What::Bound))?;
     let bodies = &agent.limits.bodies;
-    if worker.jig.limits.token > bodies.credential_value_bytes
+    if credential_bytes(worker.jig.limits.token) > bodies.credential_value_bytes
         || worker.jig.limits.token > bodies.withdrawn_value_bearer
         || jig_protocol_accounts::ACCOUNT_ID_BYTES > bodies.withdrawn_value_id
+        || u32::try_from(smith_host_domain::SourceName::BYTES).expect("bounded source name") > bodies.program_value_name
     {
         return Err(problem(b"limits", What::Bound));
     }
@@ -109,7 +110,7 @@ pub fn link_limits(worker: &config::Worker, payload: &v1::Limits) -> Option<link
         answer: core.call_answer_bytes,
         result: u32::try_from(hub.outcome_bytes).ok()?,
         detail: hub.detail_bytes,
-        grant: jig.token.max(largest.grant),
+        grant: grant_bytes(credential_bytes(jig.token), largest.grant)?,
         account_id: jig_protocol_accounts::ACCOUNT_ID_BYTES,
         name: profile.name,
         secret: profile.secret,
@@ -143,6 +144,15 @@ pub fn link_limits(worker: &config::Worker, payload: &v1::Limits) -> Option<link
         grace: worker.graces.grace,
         busy: profile.busy,
     })
+}
+
+/// Credentials (including keys), a program source name, or a generated identity.
+pub(crate) fn grant_bytes(credential: u32, identity: u32) -> Option<u32> {
+    Some(credential.max(u32::try_from(smith_host_domain::SourceName::BYTES).ok()?).max(identity))
+}
+
+pub(crate) fn credential_bytes(token: u32) -> u32 {
+    token.max(jig_client_protocol_wire::v10::CEILINGS.keyed_value_some)
 }
 
 /// One retained declaration per recognized adapter, with each path at smith's bound.
@@ -184,7 +194,7 @@ pub fn worker_worst_case(worker: &settings::Worker, agent: &settings::Agent, own
         .checked_add(link::worst_case(&prepared.link)?)?
         .checked_add(jig_protocol_accounts::table::worst_case(
             jig.limits.core.accounts.accounts.checked_add(1)?,
-            jig.limits.token,
+            credential_bytes(jig.limits.token),
         )?)?
         .checked_add(crate::identities::identities_worst_case(
             jig.limits.core.accounts.credentials,

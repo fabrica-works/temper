@@ -826,6 +826,11 @@ starts from a copy, and `temper box CONFIG.json` runs it (section 7).
     path, its other addresses and secrets, its logins, emails, binaries
     and charters, its LLM providers, whose sizes jig's limits bound.
 
+  Channel frames and queues use max(the checked credential value bound,
+  the 32-byte source name, the generated Identity bound), independently
+  on each side; configured keys include jig's 4,096-byte ceiling, and
+  workers reserve it without provider declarations. The program paths
+  are retained once, separately from the per-slot spawn command paths.
   `temper-service::startup::memory_requirements` derives both envelopes
   from startup's checked calculations without starting a service. The
   owned startup test checks the two literals against that query with

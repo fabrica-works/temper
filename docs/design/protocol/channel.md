@@ -307,12 +307,19 @@ the routing in the step that routes the record:
   | `saved` | `Saved` | the checkout's `repositories`, `conflicts` and `path_bytes`, and `PushDiagnostic::CAPACITY` |
   | `resource` | `Preparation` | fixed |
   | `evidence` | smith's delivery reply | smith's channel limits, as the hub's `delivery_evidence_bytes` takes them |
-  | `grant` | the larger of an LLM grant's (a credential's value, or a program source's name) and the largest `Identity`, which grows with `forges.installations` on a GitHub forge | jig's accounts (jig's `protocol/llm.md`, section 6); configuration's identities, `records.value_bytes` and `forges.installations`, checked to fit jig's grant bound at start (configuration.md, section 3) |
+  | `grant` | max(credential value bound, program source name bound 32, generated `Identity::worst_case_bytes`), which grows with `forges.installations` on a GitHub forge | jig's accounts (jig's `protocol/llm.md`, section 6); configuration's identities, `records.value_bytes` and `forges.installations`, checked to fit jig's grant bound at start (configuration.md, section 3) |
   | `credentials` | the number of git identities | configuration (configuration.md, section 3) |
 
 - **Within jig's ceilings.** Each must fit the ceiling jig's schema gives
   its field; `temper serve` refuses a start whose limits pass one, naming
   the limit.
+- **Credential capacity.** The engine uses max(`accounts.token`, jig's 4,096-byte
+  key ceiling) when a configured provider offers keys. The worker has no
+  provider declarations and reserves that key ceiling unconditionally.
+  Tables and frames use those same bounds. Startup checks the engine's bound against the worker's
+  table, and the worker's against smith's credential and withdrawn bodies;
+  a source name must fit smith's program body too. No wire length is
+  counted by hand. Channel sizes use each side's own limits.
 - **The engine's within the worker's.** Each side computes its sizes from
   its own limits, and jig's terms compare them at the opening (jig's
   `protocol/channel.md`, 4.1). In one process both are known at start,

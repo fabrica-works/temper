@@ -308,6 +308,29 @@ pub fn identities(identities: &[settings::Identity], limits: &payload::v1::Limit
         }
     }
 }
+/// Each sender's credential fits the receiving table and smith's bodies.
+pub fn grants(engine: &config::Engine, worker: &config::Limits, agent: &settings::Agent, problems: &mut Problems) {
+    let credential = crate::worker_settings::credential_bytes(worker.token);
+    if crate::values::credential_bytes(engine) > credential {
+        problems.push(worker_limit(b"accounts.token"), What::Against { other: b"engine.limits accounts.token" });
+    }
+    let bodies = &agent.limits.bodies;
+    if u32::try_from(smith_host_domain::SourceName::BYTES).expect("bounded source name") > bodies.program_value_name {
+        problems.push(
+            at(0, Path::root().member(b"workers")).member(b"agent").member(b"configuration"),
+            What::Against { other: b"the agent's program_value_name" },
+        );
+    }
+    for (bytes, bound, other) in [
+        (credential, bodies.credential_value_bytes, b"the agent's credential_value_bytes".as_slice()),
+        (worker.token, bodies.withdrawn_value_bearer, b"the agent's withdrawn_value_bearer"),
+        (jig_protocol_accounts::ACCOUNT_ID_BYTES, bodies.withdrawn_value_id, b"the agent's withdrawn_value_id"),
+    ] {
+        if bytes > bound {
+            problems.push(worker_limit(b"accounts.token"), What::Against { other });
+        }
+    }
+}
 fn worker_limit(member: &[u8]) -> Path {
     at(0, Path::root().member(b"workers")).member(b"limits").member(b"overrides").member(member)
 }

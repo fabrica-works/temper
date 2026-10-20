@@ -432,3 +432,56 @@ fn agent_model_windows_and_outputs_are_checked_with_their_names() {
         );
     }
 }
+
+#[test]
+fn credential_capacity_is_checked_on_both_sides_and_against_smith() {
+    let mut engine = fixtures::engine().jig;
+    let mut worker = fixtures::worker_settings().jig.limits;
+    let mut agent = fixtures::worker_agent();
+    let bound = agent.limits.bodies.credential_value_bytes.min(agent.limits.bodies.withdrawn_value_bearer);
+    for (sent, received, accepted) in
+        [(bound, bound, true), (bound - 1, bound, true), (bound, bound - 1, false), (bound + 1, bound + 1, false)]
+    {
+        engine.limits.token = sent;
+        worker.token = received;
+        let mut problems = Problems::empty();
+        checks::grants(&engine, &worker, &agent, &mut problems);
+        assert_eq!(problems.is_empty(), accepted, "{sent} -> {received}");
+        if !accepted {
+            assert!(String::from_utf8(lines(&problems).into()).unwrap().contains("accounts.token"));
+        }
+    }
+    engine.limits.token = bound;
+    worker.token = bound;
+    agent.limits.bodies.withdrawn_value_id = jig_protocol_accounts::ACCOUNT_ID_BYTES - 1;
+    let mut problems = Problems::empty();
+    checks::grants(&engine, &worker, &agent, &mut problems);
+    assert!(!problems.is_empty());
+}
+
+#[test]
+fn configured_keys_use_the_key_ceiling_instead_of_the_oauth_token_bound() {
+    let input = core::str::from_utf8(fixtures::ENGINE).unwrap().replace(
+        "\"llm\": {",
+        r#""llm": {"providers":[{"name":"Fake","number":1,"models":["small"],"sources":{"keys":true}}],"#,
+    );
+    let document =
+        config::document(input.as_bytes(), &config::DocumentLimits { bytes: 65_536, tokens: 4096, depth: 32 }).unwrap();
+    let mut engine = config::engine(&document, 0).unwrap();
+    engine.limits.token = 1;
+    let key = jig_client_protocol_wire::v10::CEILINGS.keyed_value_some;
+    assert_eq!(crate::values::credential_bytes(&engine), key);
+    let mut worker = fixtures::worker_settings().jig.limits;
+    worker.token = 1;
+    let mut agent = fixtures::worker_agent();
+    for bytes in [key - 1, key, key + 1] {
+        agent.limits.bodies.credential_value_bytes = bytes;
+        let mut problems = Problems::empty();
+        checks::grants(&engine, &worker, &agent, &mut problems);
+        assert_eq!(problems.is_empty(), bytes >= key);
+    }
+    agent.limits.bodies.program_value_name = u32::try_from(smith_host_domain::SourceName::BYTES).unwrap() - 1;
+    let mut problems = Problems::empty();
+    checks::grants(&engine, &worker, &agent, &mut problems);
+    assert!(String::from_utf8(lines(&problems).into()).unwrap().contains("program_value_name"));
+}

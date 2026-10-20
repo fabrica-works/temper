@@ -416,3 +416,36 @@ fn a_worker_assignment_uses_the_services_configured_forges() {
     assert_eq!(parts, root::Parts::none());
     assert_eq!(service.end(), None);
 }
+
+#[test]
+fn engine_values_preserve_slots_and_refuse_a_different_declared_form() {
+    use jig_protocol_accounts::table::{Scheme, Value};
+    let forms = [
+        host::Form::Credential(host::Scheme::Bearer),
+        host::Form::Credential(host::Scheme::Key),
+        host::Form::Withdrawn,
+    ];
+    for (scheme, actual) in [
+        (Scheme::Bearer, forms[0]),
+        (Scheme::Key, forms[1]),
+        (Scheme::Withdrawn { id: skein_lib::Secret::new(b"provider-account".as_slice().into()) }, forms[2]),
+    ] {
+        let mut values = fixtures::values_with_identity(1, b"forge-token");
+        values
+            .accounts
+            .granted(
+                2,
+                3,
+                Value { scheme, token: skein_lib::Secret::new(b"llm-token".as_slice().into()) },
+                Time::from_nanos(9),
+            )
+            .unwrap();
+        let grants =
+            forms.map(|form| host::Grant { form, account: 2, generation: 3, valid: skein_lib::Duration::from_secs(5) });
+        let filled = values.grants(&grants, Time::from_nanos(8));
+        for (grant, value) in grants.iter().zip(filled.iter()) {
+            assert_eq!(value.is_some(), grant.form == actual);
+        }
+        assert!(values.grants(&grants, Time::from_nanos(9)).iter().all(Option::is_none));
+    }
+}

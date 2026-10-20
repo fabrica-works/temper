@@ -319,6 +319,7 @@ fn checked_start(
     let own = parsed.application.workers.into_iter().next().expect("one application worker checked");
     let worker = settings::Worker { jig: worker, root: own.root, git: own.git };
     checks::worker(&crate::worker_settings::root_limits(&worker, agent, &parsed.application.limits), &mut problems);
+    checks::grants(&parsed.engine, &worker.jig.limits, agent, &mut problems);
     if !problems.is_empty() {
         return Err(problems);
     }

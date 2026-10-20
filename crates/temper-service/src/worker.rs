@@ -114,7 +114,7 @@ impl Worker {
             retired: List::with_capacity(slots),
             values: Table::new(
                 config.limits.core.accounts.accounts.checked_add(1).expect("account slots"),
-                config.limits.token,
+                worker_settings::credential_bytes(config.limits.token),
             ),
             identities: IdentityTable::new(config.limits.core.accounts.credentials),
             undecodable_values: 0,
@@ -665,12 +665,24 @@ impl Worker {
         worker_settings::operations(self.git.component.limits()).expect("checked worker operations")
     }
 }
-fn grant_value(table: &Table, grant: smith::Grant, now: Time) -> Option<host::Values> {
+pub(crate) fn grant_value(table: &Table, grant: smith::Grant, now: Time) -> Option<host::Values> {
     let value = account(table, grant, now)?;
     Some(host::Values { paths: Box::default(), credentials: Box::new([value]) })
 }
 fn account(table: &Table, grant: smith::Grant, now: Time) -> Option<smith_protocol_channel::GrantValue> {
+    match grant.form {
+        smith::Form::Program(name) => return Some(smith_protocol_channel::GrantValue::Program(name.as_bytes().into())),
+        smith::Form::Credential(_) | smith::Form::Withdrawn => {}
+    }
     let value = table.value(grant.account, grant.generation, now)?;
+    let actual = match &value.scheme {
+        Scheme::Bearer => smith::Form::Credential(smith::Scheme::Bearer),
+        Scheme::Key => smith::Form::Credential(smith::Scheme::Key),
+        Scheme::Withdrawn { .. } => smith::Form::Withdrawn,
+    };
+    if grant.form != actual {
+        return None;
+    }
     let token = value.token.expose().into();
     Some(match &value.scheme {
         Scheme::Bearer => smith_protocol_channel::GrantValue::Bearer(token),

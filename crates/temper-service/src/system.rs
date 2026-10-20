@@ -94,10 +94,8 @@ impl Service {
         }
         let room = max.checked_mul(6).expect("account routing room");
         let accounts = accounts_driver(&settings, seeds, accounts, room, store_limits.secrets.value)?;
-        let mut values = values::Values::new(
-            settings.jig.limits.driver.accounts,
-            settings.jig.limits.driver.client.document.token_bytes,
-        );
+        let mut values =
+            values::Values::new(settings.jig.limits.driver.accounts, values::credential_bytes(&settings.jig));
         let wire = translate::limits(&settings.limits).ok_or(start_problem(b"limits", What::Bound))?;
         values.fill(&settings.identities, &wire)?;
         let (forge_config, identities) = crate::forge::config(&settings, seeds.deployment);
@@ -581,7 +579,7 @@ fn memory(
         .checked_add(store::worst_case(root, store)?)?
         .checked_add(jig_protocol_accounts::table::worst_case(
             settings.jig.limits.driver.accounts,
-            settings.jig.limits.driver.client.document.token_bytes,
+            values::credential_bytes(&settings.jig),
         )?)?
         .checked_add(List::<(u32, u64)>::worst_case(root.authority.projects)?)?
         .checked_add(Queue::<temper_engine_domain::Event>::worst_case(events)?)?
