@@ -83,7 +83,8 @@ Files (from -> to): `crates/temper-engine-protocol-forge/` -> `skein-forge-conne
   `tools/forgejo-conformance`, `tests/{codecs,one-process,engine/protocol-forge}` (the world, which
   stays until temper 07.1). Changed Rust at the base: temper-service
   `src/{forge,settings,lib,stop,route,limits,engine,system}.rs`,
-  `src/startup/application.rs::{Resolved,resolve}` and `src/tests/{forge,fixtures}.rs`,
+  `src/startup.rs::startup`, `src/startup/application.rs::{Resolved,resolve}`
+  and `src/tests/{forge,fixtures}.rs`,
   `src/tests/fixtures/forge.rs`; `crates/temper/src/{forge,lib,host}.rs`; the shell's
   `tests/support/mod.rs`; `tests/codecs/{src/forgejo.rs,tests/{fuzzy_forgejo,forgejo_deliveries}.rs}`;
   the conformance's `src/{component.rs,component/hosted.rs}`; `tests/one-process/src/fixtures.rs`;
@@ -106,9 +107,13 @@ Shape: three commits, each builds and passes its crates' tests.
      occurrences in `startup/application.rs::{Resolved,resolve}` and `forge.rs::settings` name the path.
      Before consuming the component Settings, compute checked `settings::owned_bytes(&settings)`
      and thread the retained-owner byte count through its landed `limits::worst_case` signature:
-     temper-service `system::{Service::new,startup_worst_case,memory}` and the conformance's
+     temper-service `system::{Service::new,startup_worst_case,memory}`, the separate
+     `startup.rs::startup` pre-admission caller, and the conformance's
      `component/hosted.rs::Hosted::new`. Follow skein 03.1's landed signature; retain checked
-     overflow/refusal handling and separate TLS-root accounting. Refresh each reached startup or
+     overflow/refusal handling and separate TLS-root accounting. The pre-admission sum uses
+     the same actual retained DNS/plaintext/owner bytes as Settings construction, counted once;
+     borrowing or factoring construction must not allocate or price a second retained copy.
+     Refresh each reached startup or
      memory fixture and further derived copy, report the complete sum and list changed users in the
      commit body. Historical sums 2,812,325 and 2,812,377 are not the new owner-byte total.
      `problems` gains

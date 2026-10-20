@@ -1497,6 +1497,15 @@ where its answer lands.
 
      Checked: git -C skein show e880245:crates/skein-forge-client/src/keep.rs, validation: participating Branch/Repository returns Error::Refused. git -C temper show2a739880:tests/forge-setup/reconcile/src/fixtures.rs names given(owned:bool) and seed_token's old place::File. git -C skein grep a0e6f46 confirms simulation/fuzzy version1,length3,kit frames. Evidence/copy maps and120 client/103 setup assertion mapping: scratch-recheck-skein-07-start, report pump/recheck-skein-07-start.md. Pinned kit scripts/dev/plan has bg/ruling/ring; no new tool assumed.
 
+191. **Temper03 startup retained-owner caller** (started recheck of temper-03.1).
+     Reverses: nothing. Amends temper/03-connection.md03.1 Files and Shape.
+
+     Name startup.rs::startup explicitly: before Service::new it calls system::startup_worst_case and must receive the same checked retained-owner byte count as actual component Settings construction, separately from TLS-root accounting. Count the actual DNS/plaintext names, word and user agent once; preserve overflow/refusal handling. Refresh complete component/service/startup/example sums and any further reached derived copy, listing users in the commit body, as the existing Shape already requires.
+
+     The started-session checker confirmed landed upstream APIs and366 passing upstream tests, but exhausted3 wrappers on scratch compilation defects before any Temper suite or seven proposed units ran. Its final helper/namespace corrections remain uncompiled; no specific scratch helper API is prescribed. Preserve the retained protocol-forge world imports (they are not deleted component aliases), exhaustive own-enum matching and existing function ceilings. W57 owns actual-tree clean compilation, reached profiles, complete sums, timings, process/recordings and required gate; its start remains unheld. Loaded upstream unit timing misses remain reported evidence, not a ceiling increase or a reason for an idle rerun. No duplicate gate/process or answered TLS/adapter question is introduced.
+
+     Checked: graph locates temper-service startup.rs::startup; git -C temper show2a739880:crates/temper-service/src/startup.rs confirms the independent startup_worst_case call and forge::roots input. Plan Files/Shape omitted that caller; scratch-recheck-temper-03-start/increment-audit.md and downstream exact-name sweep find no further missing component consumer. Complete Skein fixture2,812,047 passes; actual Temper named-slice31 is only a source derivation, not a complete measured sum. Full evidence and untouched assertion/identity maps are in that scratch; pump/recheck-temper-03-start.md keeps every unrun limitation.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
