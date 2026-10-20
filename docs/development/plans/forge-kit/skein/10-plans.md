@@ -313,7 +313,7 @@ Proof: unit; `heavy cargo nextest run -p skein-forge -E 'test(/plans::tests::(ca
   passes 48 tests, <1 s; no connected component yet in skein-forge itself;
   world; `heavy cargo nextest run -p skein-forge-machine-world` passes the count it had at
   the step's start, each <0.5 s: 33 after skein 08.1, then 38, 40 and 41 after 08.2 to
-  08.4 (none added or removed here); only that world scripts an Items head without a Date.
+  08.4 before08.s1 (none added or removed here); include08.s1’s relative+2 once landed. Final machine count43 retains the same scenarios. Only that world scripts an Items head without a Date.
 Don't: put a Date in `response`; add one to the fake's Reply; touch a terminal 404's drop;
   take `now` from a read other than Items; change a test's expected values to pass.
 Size: about 0 lines moved, 165 new: 85 production plus 80 tests and fixtures (estimated:
@@ -327,7 +327,7 @@ After skein10.s2, final calls/edges coverage adds its two independent contract t
 - `heavy cargo nextest run -p skein-forge -E 'test(/plans::tests::(calls|edges)::/)'` prints the parent-session48 plus skein10.s2’s2
   passed, 0 failed, <1 s in all; each test <20 ms.
 - `heavy cargo nextest run -p skein-forge-machine-world` prints the count skein 08 has
-  reached passed (33 after 08.1, 41 after 08.4), 0 failed, each <0.5 s.
+  reached passed (33 after08.1;43 after08.4 and08.s1, originally41 before the split), 0 failed, each <0.5 s.
 - `heavy cargo clippy -p skein-forge --all-targets -- -D warnings` exits 0, prints Finished
   and no warning.
 - `heavy rg -n -i temper crates/skein-forge tests/forge/machine` prints nothing (exit 1).

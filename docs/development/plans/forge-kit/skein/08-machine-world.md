@@ -190,6 +190,8 @@ Size: about 0 lines moved, 300 new including tests: 100 driver/pauses, 100 focus
   100 request/head sweep and reference; no shipped code.
 Removes: nothing.
 
+Skein08.s1 separately splits the seven existing08.2deadline cases into three uniform tests, adding two focused identities and no scenario. Its count delta applies to later runtime totals:38/6 becomes40/6, then42/7 after08.3 and43/8 after08.4. The landed08.2proof above stays historical. Preserve its driver inputs and W73's pending08.3append when rebasing the shared test file.
+
 ### 08.3 Close races and listener faults
 Scope: forge-connection 6, 8.4–8.5, 10's close in every state, and the listener's byte faults.
 Needs: 08.2's paused driver and refusal/return actions.
@@ -243,7 +245,7 @@ fn listener_faults_at_each_byte() {
   hints1, status204. Before verification: hints0; after verification a queued204 may have produced one
   hint, never two. Response queued before Hint; all sockets settle. Retain the old split sweep.
 Proof:
-world; `heavy cargo nextest run -p skein-forge-machine-world`: 40 passed (38+2), each <0.5 s; this world alone controls close/terminal ordering and io settlement.
+world; `heavy cargo nextest run -p skein-forge-machine-world`: its step-start focused count plus2 (40 from38;42 after08.s1), each <0.5 s; this world alone controls close/terminal ordering and io settlement.
 world; `heavy cargo nextest run -p skein-forge-machine-world --profile fuzzy`: 7 passed (6+1), new sweeps ≤5 s together; inherited four ≤7.8 s each and fuzzy_hooks <0.5 s.
 Don't: send an answer for an outstanding call after Close; spin waiting for already settled io.
 Size: about 0 lines moved, 280 new including tests: 90 close/settlement observation, 90 tables/tests,
@@ -252,7 +254,7 @@ Removes: nothing.
 
 ### 08.4 TLS faults and the machine stories over TLS
 Scope: forge-connection 8, 10's TLS forge, including handshake faults/deadlines and Close.
-Needs: 08.3's machine/listener stories; skein's TLS fixtures exist at base.
+Needs: 08.3's machine/listener stories and landed skein08.s1; skein's TLS fixtures exist at base.
 Files: tests/forge/machine/{Cargo.toml,src/{machine,peer,fixtures,lib}.rs,tests/machine.rs}; new src/tls.rs
   and tests/fuzzy_tls.rs. Manifest: skein-tls-world = { path = "../../tls" }.
 Shape: wrap scripted HTTP peer bytes in skein_tls_world::server::Server, pki::Server::plain().config(),
@@ -303,7 +305,7 @@ fn tls_faults_at_each_byte_end_once() {
   Before any call write (including failed start/handshake): Unavailable/cost0; after first call write:
   Timeout/cost1 (Read::Locate as 08.2); successful control cost1. Each case checks that Error.
 Proof:
-world; `heavy cargo nextest run -p skein-forge-machine-world`: 41 passed (40+1), each <0.5 s, new focused work ≤1 s so far; only this harness controls TLS/HTTP phase and Close boundaries.
+world; `heavy cargo nextest run -p skein-forge-machine-world`: its step-start focused count plus1 (43 after08.s1/08.3), each <0.5 s, new focused work ≤1 s so far; only this harness controls TLS/HTTP phase and Close boundaries.
 world; `heavy cargo nextest run -p skein-forge-machine-world --profile fuzzy`: 8 passed (7+1), additions ≤5 s together, inherited four ≤7.8 s each and fuzzy_hooks <0.5 s; suite <60 s.
 Don't: TLS listener, renewal, optimized dependencies, fixed ECDSA flight lengths or entropy-seeded assertions.
 Size: about 0 lines moved, 300 new including tests: 140 TLS peer/clock, 100 sweep, 60 focused/table tests.
@@ -317,7 +319,7 @@ in git history. Every retained move and its inherited coverage still runs.
 
 ## Timing and deferred measurement
 
-The retained eight new focused tests and three new fuzzy tests keep their original ceilings.
+The retained ten focused identities (eight original plus08.s1’s two separated identities) and three new fuzzy tests keep their original ceilings.
 Report additions against decision18's +1.5s default/+6s fuzzy whole-plan aims, retaining the four
 inherited sweeps and their measured cost separately. The new protocol tests09.2–09.4 and independent
 allocator measurement08.5 move to the GitHub draft, section17 (ruling189); measure the complete
@@ -327,11 +329,11 @@ component once after GitHub's holders exist. Keep the existing component formula
 
 From skein; existing base-form command evidence is findings/base-skein-08.md. New crates/tests first run
 when dependencies land (development.md 5.4). Record each new test's elapsed time from these commands,
-then sum the eight new focused tests and three new fuzzy tests separately; report those sums against decision18's +1.5 s/+6 s whole-plan aims. Keep moved times separately, not subtracted from
+then sum the ten focused identities (including08.s1’s two separated cases) and three new fuzzy tests separately; report those sums against decision18's +1.5 s/+6 s whole-plan aims. Keep moved times separately, not subtracted from
 skein's additions. Per-test sums are conservative accounting, not a substitute for README's three gate
 runs measuring whole-suite wall time. Report an excess with its three slowest tests and measured sums.
 
-- `heavy cargo nextest run -p skein-forge-machine-world` prints 41 passed, each <0.5 s; new focused sum ≤1 s.
+- `heavy cargo nextest run -p skein-forge-machine-world` prints43passed after08.s1 (41 original+2 separated identities), each <0.5 s; new focused sum ≤1 s.
 - `heavy cargo nextest run -p skein-forge-machine-world --profile fuzzy` prints 8 passed; inherited four ≤7.8 s each, fuzzy_hooks <0.5 s, new fuzzy sum ≤5 s.
 - `heavy cargo clippy -p skein-forge-machine-world --all-targets -- -D warnings` prints Finished without warnings.
 - `heavy rg -n '^    "tests/forge/machine",$' Cargo.toml` prints exactly one member line.
