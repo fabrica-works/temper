@@ -216,6 +216,7 @@ pub(crate) fn watch<'a>(
     outer.push(*name).or(Err(Usage::Tool))?;
     let (subject, consumed) = match *name {
         b"me" => (Subject::Me, 0),
+        b"accounts" => (Subject::Accounts, 0),
         b"inbox" => (Subject::Inbox, 0),
         b"task" | b"tree" | b"run" => {
             let number = value::number(rest.first().ok_or(Usage::Missing { argument: 0 })?)
@@ -320,7 +321,7 @@ fn validate_subject(table: &[&Tool], subject: &Subject, limits: &Limits) -> Resu
                 }
             }
         }
-        Subject::Me | Subject::Inbox | Subject::Task(_) | Subject::Tree(_) | Subject::Run(_) => {}
+        Subject::Me | Subject::Accounts | Subject::Inbox | Subject::Task(_) | Subject::Tree(_) | Subject::Run(_) => {}
     }
     Ok(())
 }
@@ -440,6 +441,7 @@ fn escaped_position(args: &[Argument], values: &[Option<Values>], table: &[&Tool
 pub(crate) fn write_subject(table: &[&Tool], subject: &Subject, out: &mut List<Box<[u8]>>) -> Result<(), Unwritten> {
     let (word, number) = match subject {
         Subject::Me => (b"me".as_slice(), None),
+        Subject::Accounts => (b"accounts".as_slice(), None),
         Subject::Inbox => (b"inbox".as_slice(), None),
         Subject::Task(n) => (b"task".as_slice(), Some(*n)),
         Subject::Tree(n) => (b"tree".as_slice(), Some(*n)),

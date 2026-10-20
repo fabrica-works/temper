@@ -102,7 +102,7 @@ pub fn tool(tool: &Tool, out: &mut Writer) -> Result<(), Overflow> {
     Ok(())
 }
 fn wait(out: &mut Writer) -> Result<(), Overflow> {
-    out.put(b"Subjects and --until conditions:\n  me: waiting\n  inbox: waiting|updates (no subject flags)\n  task N: ended|waiting-on-me|held|replied|phase:<phase>\n  tree N: ended\n  run N: ended\n  tasks: no condition; its read arguments except --after and --ended\nLive phases: ")?;
+    out.put(b"Subjects and --until conditions:\n  me: waiting\n  inbox: waiting|updates (no subject flags)\n  task N: ended|waiting-on-me|held|replied|phase:<phase>\n  tree N: ended\n  run N: ended\n  accounts: usable|settled\n  tasks: no condition; its read arguments except --after and --ended\nLive phases: ")?;
     let mut separator = b"".as_slice();
     for phase in super::subject::PHASES {
         if super::subject::live(*phase) {

@@ -17,7 +17,9 @@ pub fn holds(condition: &Condition, facts: &Facts<'_>) -> Option<bool> {
     match subject {
         c::Delivery::Me(me) => match condition {
             Condition::Waiting => Some(me.needs_total > 0),
-            Condition::Updates
+            Condition::Usable
+            | Condition::Settled
+            | Condition::Updates
             | Condition::Ended
             | Condition::WaitingOnMe
             | Condition::Held
@@ -32,16 +34,24 @@ pub fn holds(condition: &Condition, facts: &Facts<'_>) -> Option<bool> {
                     || inbox.needs.person_tasks > 0,
             ),
             Condition::Updates => Some(inbox.updates.value > 0),
-            Condition::Ended | Condition::WaitingOnMe | Condition::Held | Condition::Replied | Condition::Phase(_) => {
-                None
-            }
+            Condition::Usable
+            | Condition::Settled
+            | Condition::Ended
+            | Condition::WaitingOnMe
+            | Condition::Held
+            | Condition::Replied
+            | Condition::Phase(_) => None,
         },
         c::Delivery::OwnerInbox(inbox) => match condition {
             Condition::Waiting => Some(inbox.cached_needs > 0),
             Condition::Updates => Some(inbox.cached_updates.value > 0),
-            Condition::Ended | Condition::WaitingOnMe | Condition::Held | Condition::Replied | Condition::Phase(_) => {
-                None
-            }
+            Condition::Usable
+            | Condition::Settled
+            | Condition::Ended
+            | Condition::WaitingOnMe
+            | Condition::Held
+            | Condition::Replied
+            | Condition::Phase(_) => None,
         },
         c::Delivery::Task(task) => task_holds(*condition, task, facts.me),
         c::Delivery::Tree(tree) => {
@@ -62,6 +72,11 @@ pub fn holds(condition: &Condition, facts: &Facts<'_>) -> Option<bool> {
                 None
             }
         }
+        c::Delivery::OwnerAccounts(accounts) => match condition {
+            Condition::Usable => Some(accounts.usable),
+            Condition::Settled => Some(accounts.settled),
+            _ => None,
+        },
         c::Delivery::OwnerProject(_)
         | c::Delivery::OwnerProposal(_)
         | c::Delivery::Chips(_)
@@ -69,8 +84,7 @@ pub fn holds(condition: &Condition, facts: &Facts<'_>) -> Option<bool> {
         | c::Delivery::Run(_)
         | c::Delivery::RunState(_)
         | c::Delivery::Deployment(_)
-        | c::Delivery::OwnerDeployment(_)
-        | c::Delivery::OwnerAccounts(_) => None,
+        | c::Delivery::OwnerDeployment(_) => None,
     }
 }
 fn task_holds(condition: Condition, task: &c::Task, me: Option<&c::Me>) -> Option<bool> {
@@ -92,7 +106,7 @@ fn task_holds(condition: Condition, task: &c::Task, me: Option<&c::Me>) -> Optio
             | ChatStatus::Working { .. }
             | ChatStatus::Retrying { .. } => false,
         },
-        Condition::Waiting | Condition::Updates => return None,
+        Condition::Usable | Condition::Settled | Condition::Waiting | Condition::Updates => return None,
     })
 }
 /// Terminal chip facts can arrive before a watch's terminal.

@@ -16,6 +16,9 @@ const READS: &[&[&str]] = &[
     &["activity", "41", "--limit", "32"],
     &["turn", "41", "3.7", "--part", "2", "--from", "16384"],
     &["run", "41"],
+    &["accounts"],
+    &["models"],
+    &["models", "--project", "shop"],
 ];
 #[test]
 fn each_read_parses_into_its_call_and_prints_back() {

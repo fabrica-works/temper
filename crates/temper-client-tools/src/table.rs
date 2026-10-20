@@ -28,6 +28,8 @@ pub const TOOLS: &[&Tool] = &[
     &rows::SIGN_OUT,
     &rows::PENDING,
     &rows::HELP,
+    &rows::ACCOUNTS,
+    &rows::MODELS,
 ];
 pub fn parse(words: &[&[u8]]) -> Result<Parsed, Usage> {
     argv::parse(TOOLS, words, &crate::limits::tools())

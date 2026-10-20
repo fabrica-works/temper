@@ -7,6 +7,10 @@ use crate::jig::{
 use jig_client::contract::Phase;
 use skein_lib::Duration;
 const UNTIL: &[(&[&str], bool)] = &[
+    (&["wait", "accounts", "--until", "usable"], true),
+    (&["wait", "accounts", "--until", "settled"], true),
+    (&["wait", "accounts", "--until", "waiting"], false),
+    (&["wait", "me", "--until", "usable"], false),
     (&["wait", "me", "--until", "waiting"], true),
     (&["wait", "me", "--until", "ended"], false),
     (&["wait", "inbox", "--until", "updates"], true),

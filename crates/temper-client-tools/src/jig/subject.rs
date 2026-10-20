@@ -5,6 +5,7 @@ use jig_client::contract::Phase;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Subject {
     Me,
+    Accounts,
     Inbox,
     Task(u64),
     Tree(u64),
@@ -14,6 +15,8 @@ pub enum Subject {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Condition {
     Waiting,
+    Usable,
+    Settled,
     Updates,
     Ended,
     WaitingOnMe,
@@ -47,7 +50,8 @@ pub fn condition(subject: &Subject, word: &[u8]) -> Result<Condition, Usage> {
 #[must_use]
 pub fn takes(subject: &Subject, condition: &Condition) -> bool {
     match (subject, condition) {
-        (Subject::Me, Condition::Waiting)
+        (Subject::Accounts, Condition::Usable | Condition::Settled)
+        | (Subject::Me, Condition::Waiting)
         | (Subject::Inbox, Condition::Waiting | Condition::Updates)
         | (Subject::Task(_), Condition::Ended | Condition::WaitingOnMe | Condition::Held | Condition::Replied)
         | (Subject::Tree(_) | Subject::Run(_), Condition::Ended) => true,
@@ -58,6 +62,8 @@ pub fn takes(subject: &Subject, condition: &Condition) -> bool {
 pub(super) fn parse(word: &[u8]) -> Option<Condition> {
     Some(match word {
         b"waiting" => Condition::Waiting,
+        b"usable" => Condition::Usable,
+        b"settled" => Condition::Settled,
         b"updates" => Condition::Updates,
         b"ended" => Condition::Ended,
         b"waiting-on-me" => Condition::WaitingOnMe,

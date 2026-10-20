@@ -11,6 +11,7 @@ Subjects and --until conditions:
   task N: ended|waiting-on-me|held|replied|phase:<phase>
   tree N: ended
   run N: ended
+  accounts: usable|settled
   tasks: no condition; its read arguments except --after and --ended
 Live phases: waiting|idle|due|preparing|claimed|running|backing-off|active|closing|held
 Use --until ended for done, failed, cancelled or ended; terminal phase conditions are usage errors.

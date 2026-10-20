@@ -78,6 +78,8 @@ pub(crate) const EVERY_TOOL: &[&[&str]] = &[
     &["sign-out"],
     &["pending"],
     &["help"],
+    &["accounts"],
+    &["models"],
 ];
 
 /// Parse the printer's bytes back without re-creating argv in each test.
@@ -547,11 +549,11 @@ pub(crate) const UNKNOWN_ASKER: client::Asker = client::Asker(999);
 /// A stable stored request's engine key, unrelated to its client call prefix.
 const KEPT_KEY: skein_lib::RequestKey = [9; 16];
 /// Six calls are needed for sign-in, me, wait, inbox, task and message.
-pub(super) const GUIDE_CALLS: u32 = 6;
+pub(super) const GUIDE_CALLS: u32 = 9;
 /// One slot per guide line, including the final line; fewer loses that line.
-const GUIDE_LINES: u32 = 55;
+const GUIDE_LINES: u32 = 61;
 /// One slot per row and form; fewer omits decide's second form.
-pub(super) const TOOL_FORMS: u32 = 23;
+pub(super) const TOOL_FORMS: u32 = 25;
 /// Exactly one example exercises each row and form; zero misses it entirely.
 pub(super) const EXAMPLES_PER_FORM: u32 = 1;
 /// One missing byte exercises the first refused destination; zero would fit.

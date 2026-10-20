@@ -89,6 +89,7 @@ pub(crate) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, cal
 fn watch(subject: &Subject, me: &c::Me, window: u32) -> Option<(c::Subject, &'static [u8])> {
     Some(match subject {
         Subject::Me => (c::Subject::Me, b"me"),
+        Subject::Accounts => (c::Subject::Accounts, b"accounts"),
         Subject::Inbox => (c::Subject::Inbox { window }, b"inbox"),
         Subject::Task(task) => (c::Subject::Task { task: *task }, b"task"),
         Subject::Tree(task) => (c::Subject::Tree { task: *task, window }, b"tree"),

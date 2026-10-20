@@ -296,6 +296,8 @@ pub(crate) fn encode(table: &[&Tool], kind: Kind, value: &Value) -> Result<Box<[
         Value::Condition(condition) => {
             let bytes: &[u8] = match condition {
                 Condition::Waiting => b"waiting",
+                Condition::Usable => b"usable",
+                Condition::Settled => b"settled",
                 Condition::Updates => b"updates",
                 Condition::Ended => b"ended",
                 Condition::WaitingOnMe => b"waiting-on-me",

@@ -13,6 +13,12 @@ Loop by waiting again; use the matching read's digest with --since to wait for a
 With --since and --until, both must hold. Read acts and their effects before sending.
 A stopping engine's wait continues through reconnect and fails only past the link deadline.
 
+Read accounts without values; model names and limits are supplied facts:
+  temper ctl DIRECTORY accounts
+  temper ctl DIRECTORY models --project shop
+  temper ctl DIRECTORY wait accounts --until usable
+Settled follows party-requested sign-ins; program checks and provider readiness await upstream facts.
+
 Name keys for chat, message, close and adopt; other acts accept an optional --key NAME.
 Names are one to 64 lower-case letters, digits or hyphens.
 Give each agent a distinct prefix, such as investigate-41; reads and waits need no key.
@@ -97,3 +103,7 @@ pending
   List requests kept in the store
 help [TOOL]
   Read the guide or one tool's record
+accounts
+  Read accounts and their sources without values
+models [--project P]
+  Read authorized models grouped by provider

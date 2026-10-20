@@ -50,6 +50,8 @@ const USAGES: &[&[u8]] = &[
     b"sign-out\n",
     b"pending\n",
     b"help [TOOL]\n",
+    b"accounts\n",
+    b"models [--project P]\n",
 ];
 #[test]
 fn a_tools_usage_reads_as_the_design_writes_it() {

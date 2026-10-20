@@ -253,3 +253,21 @@ pub const WAIT: Tool = Tool {
     keyed: Keyed::Never,
     area: 1,
 };
+
+/// Area 5 reads append to preserve earlier tool and keyed-call identities.
+pub const ACCOUNTS: Tool = Tool {
+    name: b"accounts",
+    line: b"Read accounts and their sources without values",
+    result: b"accounts",
+    forms: &[&[]],
+    keyed: Keyed::Never,
+    area: 5,
+};
+pub const MODELS: Tool = Tool {
+    name: b"models",
+    line: b"Read authorized models grouped by provider",
+    result: b"models",
+    forms: &[&[flag(b"project", b"P", Kind::Project, Optional, b"Project name or number")]],
+    keyed: Keyed::Never,
+    area: 5,
+};
