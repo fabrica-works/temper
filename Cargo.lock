@@ -2240,6 +2240,7 @@ dependencies = [
  "temper-engine-domain",
  "temper-forge-setup",
  "temper-forge-setup-shell",
+ "temper-init",
  "temper-protocol-store",
  "temper-real-loop-world",
  "temper-service",

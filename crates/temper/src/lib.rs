@@ -26,15 +26,17 @@ pub mod bundle;
 pub mod ctl;
 pub mod forge;
 mod host;
+mod init;
 pub mod open;
 mod program_login;
 mod setup;
 pub use host::Host;
-pub const USAGE: &str = "usage: temper serve [DIRECTORIES] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
+pub const USAGE: &str = "usage: temper init [DIRECTORIES] | temper serve [DIRECTORIES] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
 const CONFIG_BYTES: u32 = 1 << 20;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
+    Init { directories: Directories },
     Serve { directories: Directories },
     Box { directories: Directories },
     ProgramLogin { directories: Directories, name: OsString },
@@ -83,7 +85,7 @@ pub fn configure_with(
                 _ => Err(invalid()),
             };
         }
-        b"serve" | b"box" | b"program-login" | b"forge" => {}
+        b"init" | b"serve" | b"box" | b"program-login" | b"forge" => {}
         _ => return Err(invalid()),
     }
     let (verb, arguments) = if command.as_ref() == b"forge" {
@@ -99,6 +101,7 @@ pub fn configure_with(
         directories::resolve(arguments, environment, working).map_err(|why| format!("temper: {why}\n{}", usage()))?;
     let rest = os(&rest);
     match command.as_ref() {
+        b"init" if rest.is_empty() => Ok(Command::Init { directories }),
         b"serve" if rest.is_empty() => Ok(Command::Serve { directories }),
         b"box" if rest.is_empty() => Ok(Command::Box { directories }),
         b"program-login" if rest.len() == 1 => Ok(Command::ProgramLogin { directories, name: rest[0].clone() }),
@@ -121,6 +124,7 @@ pub fn configure_with(
 }
 pub fn run(command: Command) -> Result<u8, String> {
     let exit = match command {
+        Command::Init { directories } => return init::run(&directories).map_err(|why| prefixed("temper init", &why)),
         Command::Serve { directories } => serve(&directories).map_err(|why| prefixed("temper serve", &why))?,
         Command::Box { directories } => box_command::run(&directories).map_err(|why| prefixed("temper box", &why))?,
         Command::Agent { configuration } => smith_agent_shell::run(&configuration, Box::new(std::io::stderr()))

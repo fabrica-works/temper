@@ -1,5 +1,6 @@
 pub mod support;
 use std::{
+    fmt::Write,
     fs,
     os::unix::fs::{PermissionsExt, symlink},
 };
@@ -706,4 +707,34 @@ fn program_login_prepares_private_directories_through_each_supported_parent() {
         no_deployment_resources(directory);
         scratch.remove();
     }
+}
+
+#[test]
+fn init_prints_only_its_written_files_and_explicit_start_flags_on_stderr() {
+    let scratch = support::Scratch::startup("init-command");
+    let bin = scratch.path().join("bin");
+    fs::create_dir(&bin).expect("bin");
+    let git = bin.join("git");
+    fs::write(&git, b"#!/bin/sh\nexit 0\n").expect("git");
+    fs::set_permissions(&git, fs::Permissions::from_mode(0o755)).expect("executable");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_temper"))
+        .arg("init")
+        .args(support::configuration::flags(scratch.path()))
+        .env_clear()
+        .env("PATH", &bin)
+        .output()
+        .expect("init command");
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(output.stdout.is_empty());
+    let lines = String::from_utf8(output.stderr).expect("init lines");
+    let mut expected = String::new();
+    for name in
+        ["worker.secret", "worker.digest", "charters/chat.txt", "charters/coding.txt", "agent.json", "temper.json"]
+    {
+        writeln!(expected, "init: wrote {}", scratch.path().join(name).display()).expect("string");
+    }
+    assert!(lines.starts_with(&expected), "files are reported in write order");
+    let path = scratch.path().display();
+    assert!(lines.ends_with(&format!("init: start it with temper box --config {path} --data {path} --cache {path}\n")));
+    scratch.remove();
 }

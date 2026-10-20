@@ -70,3 +70,7 @@ Commands that read the deployment use `<config>/temper.json` and accept
 falls back to `TEMPER_CONFIG`, `TEMPER_DATA` or `TEMPER_CACHE`, then the
 corresponding XDG directory under `temper`. Relative flags are joined to
 the working directory once at startup. Data and cache must be private.
+
+`temper init --config ./config --data ./data --cache ./cache` writes the
+initial configuration, worker secret and charters. It refuses existing
+`temper.json`, `worker.secret` or `worker.digest` files.
