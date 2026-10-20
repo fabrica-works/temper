@@ -27,7 +27,7 @@ impl View {
             render: skein_ui::View::new(&limits.tree),
             forge: forge::bindings::Bindings::new(limits.tree.bindings, domain.forge.checks, forge),
             pages: crate::frame::Bindings::new(limits.tree.bindings),
-            accounts: crate::accounts::Bindings::new(32),
+            accounts: crate::accounts::Bindings::new(domain.accounts),
             forge_words,
             limits: *limits,
             rows: domain.client.domain.rows,
@@ -55,7 +55,7 @@ impl View {
     }
 }
 pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
-    let shown = temper_client_domain::shown(root);
+    let shown = temper_client_domain::shown(root).checked_add(view.accounts.revision()).expect("view revisions fit");
     if !view.render.stale(shown) {
         return;
     }
@@ -92,7 +92,13 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     } else if let temper_client_domain::Address::Task { .. } = root.pages().address() {
         view.task_main(&mut builder, root);
     } else if *root.pages().address() == temper_client_domain::Address::Accounts {
-        crate::pages::accounts::main(&mut builder, root, &view.forge_words, &mut view.accounts);
+        crate::pages::accounts::main(
+            &mut builder,
+            root,
+            &view.forge_words,
+            &mut view.accounts,
+            view.limits.tree.text_per_node,
+        );
     } else if let temper_client_domain::Address::Adopt { .. } = root.pages().address() {
         view.adoption_main(&mut builder, root);
     }

@@ -5,6 +5,15 @@ use skein_lib::Queue;
 pub struct Limits {
     pub forge: forge::Limits,
     pub client: jig_client::Limits,
+    pub accounts: AccountLimits,
+}
+/// Interim view counts until jig owns receiving counts (owner, 17:51Z; x1g).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AccountLimits {
+    pub accounts: u32,
+    pub sources: u32,
+    pub uses: u32,
+    pub sign_ins: u32,
 }
 #[must_use]
 pub fn max_out(limits: &Limits) -> u32 {

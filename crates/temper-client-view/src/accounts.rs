@@ -26,14 +26,23 @@ pub(crate) struct Bindings {
     entries: List<(Token, Meaning)>,
     next: u64,
     invalid: u8,
+    revision: u64,
+    counts: temper_client_domain::limits::AccountLimits,
 }
 pub(crate) const fn owner() -> skein_ui::Owner {
     // View-local owner, outside the u16 wire family/asker namespace.
     skein_ui::Owner { number: 65536 }
 }
 impl Bindings {
-    pub fn new(capacity: u32) -> Self {
-        Self { entries: List::with_capacity(capacity), next: 0, invalid: 0 }
+    pub fn new(counts: temper_client_domain::limits::AccountLimits) -> Self {
+        let capacity = binding_capacity(&counts);
+        Self { entries: List::with_capacity(capacity), next: 0, invalid: 0, revision: 0, counts }
+    }
+    pub const fn counts(&self) -> temper_client_domain::limits::AccountLimits {
+        self.counts
+    }
+    pub const fn revision(&self) -> u64 {
+        self.revision
     }
     pub fn begin(&mut self, reset: bool) {
         if reset {
@@ -41,11 +50,11 @@ impl Bindings {
         }
         self.entries.clear();
     }
-    pub fn insert(&mut self, meaning: Meaning) -> Binding {
-        self.next = self.next.checked_add(1).expect("account bindings fit");
+    pub fn insert(&mut self, meaning: Meaning) -> Option<Binding> {
+        self.next = self.next.checked_add(1)?;
         let token = Token::new(self.next);
-        self.entries.push((token, meaning)).expect("account bindings fit");
-        Binding { owner: owner(), token }
+        self.entries.push((token, meaning)).ok()?;
+        Some(Binding { owner: owner(), token })
     }
     pub fn decode(&mut self, token: Token, act: Act) -> Option<Event> {
         for (key, meaning) in &self.entries {
@@ -55,6 +64,7 @@ impl Bindings {
             let action = match (meaning, act) {
                 (Meaning::Key, Act::Input { value }) => return Some(Event::AccountKey { value: Secret::new(value) }),
                 (Meaning::Field(field, selection), Act::Input { value }) => {
+                    self.revision = self.revision.checked_add(1).expect("field edit revisions fit");
                     let bit = field.bit();
                     self.invalid &= !bit;
                     let number = if value.is_empty() {
@@ -66,6 +76,7 @@ impl Bindings {
                         };
                         if parsed.is_none() {
                             self.invalid |= bit;
+                            return None;
                         }
                         parsed
                     };
@@ -118,4 +129,25 @@ impl Field {
             Self::Source => 4,
         }
     }
+}
+
+/// Two holder controls, three number fields, a key field, seven operations, confirm and cancel;
+/// only one matched account/source can contribute the two rank directions apiece.
+pub(crate) fn binding_capacity(counts: &temper_client_domain::limits::AccountLimits) -> u32 {
+    let holders = 2;
+    let fields = 4;
+    let operations = 7;
+    let confirmation = 2;
+    let account_moves = if counts.accounts > 0 { 2 } else { 0 };
+    let source_moves = if counts.accounts > 0 && counts.sources > 0 { 2 } else { 0 };
+    u32::checked_add(holders, fields)
+        .expect("controls fit")
+        .checked_add(operations)
+        .expect("controls fit")
+        .checked_add(confirmation)
+        .expect("controls fit")
+        .checked_add(account_moves)
+        .expect("controls fit")
+        .checked_add(source_moves)
+        .expect("controls fit")
 }

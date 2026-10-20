@@ -14,7 +14,7 @@ fn the_accounts_page_returns_after_a_key_send() {
     };
     let accounts = || Find::exactly_named(Role::Heading { level: 1 }, b"Accounts");
     let chats = || Find::exactly_named(Role::Heading { level: 1 }, b"Chats");
-    let address = || Find::text(b"http://127.0.0.1:9/authorize");
+    let address = || Find::text(b"Open the sign-in page");
     let mut script = Script::new(Box::new([
         see(tier.states().live),
         press(b"Accounts", Role::Link),

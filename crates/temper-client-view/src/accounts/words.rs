@@ -108,8 +108,27 @@ pub(crate) enum Word {
     Number,
     Until,
     After,
+    AccountsOmitted,
+    SourcesOmitted,
+    UsesOmitted,
+    SignInsOmitted,
+    OpenSignIn,
+    UnsafeAddress,
+    AddressLong,
+    OwnHolder,
+    DeploymentHolder,
+    UnknownAccount,
 }
 const ROWS: &[(Word, &[u8])] = &[
+    (Word::AccountsOmitted, b"Accounts left out: "),
+    (Word::SourcesOmitted, b"Sources left out: "),
+    (Word::UsesOmitted, b"Uses left out: "),
+    (Word::SignInsOmitted, b"Sign-ins left out: "),
+    (Word::OpenSignIn, b"Open the sign-in page"),
+    (Word::UnsafeAddress, b"Sign-in address is not an http(s) address."),
+    (Word::OwnHolder, b"Your own accounts"),
+    (Word::DeploymentHolder, b"The deployment's accounts"),
+    (Word::UnknownAccount, b"Account not shown"),
     (Word::Removed, b"Account removed; confirmed."),
     (
         Word::RemovedUnconfirmed,
@@ -227,6 +246,10 @@ pub(crate) fn say(words: &Words, word: Word, holes: &[Hole]) -> Box<[u8]> {
         201
     } else if word == Word::After {
         202
+    } else if word == Word::UsageUntil {
+        203
+    } else if word == Word::AddressLong {
+        204
     } else {
         literal_number(word)
     };
@@ -250,6 +273,8 @@ pub(crate) fn extend(shapes: &mut List<PhraseShape>, phrases: &mut List<Phrase>)
         (200, b"".as_slice(), HoleKind::Number),
         (201, b"Limited until ".as_slice(), HoleKind::Wall),
         (202, b"Try again after ".as_slice(), HoleKind::Span),
+        (203, b"Usage limit until ".as_slice(), HoleKind::Wall),
+        (204, b"Sign-in address is longer than this client shows; bytes: ".as_slice(), HoleKind::Number),
     ] {
         let id = id(number);
         shapes
@@ -271,7 +296,7 @@ pub(crate) fn capacity(words: &Words) -> Option<u32> {
     for number in 0..u16::try_from(ROWS.len()).ok()? {
         most = most.max(words.book.capacity(id(number))?);
     }
-    for number in [200, 201, 202] {
+    for number in [200, 201, 202, 203, 204] {
         most = most.max(words.book.capacity(id(number))?);
     }
     Some(most)

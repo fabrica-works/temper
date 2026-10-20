@@ -30,10 +30,22 @@ fn fact(b: &mut Builder, w: &Words, word: W, value: u64) {
     b.close();
     b.close();
 }
-fn control(b: &mut Builder, w: &Words, bindings: &mut Bindings, word: W, meaning: Meaning, disabled: bool) {
+fn control(
+    b: &mut Builder,
+    w: &Words,
+    bindings: &mut Bindings,
+    word: W,
+    meaning: Meaning,
+    disabled: bool,
+    selected: bool,
+) {
+    let Some(binding) = bindings.insert(meaning) else { return };
     b.open(Role::Button);
     b.name(&words::say(w, word, &[]));
-    b.bind(bindings.insert(meaning));
+    b.bind(binding);
+    if selected {
+        b.state(State::Selected);
+    }
     if disabled {
         b.state(State::Disabled);
     }
@@ -100,14 +112,18 @@ fn state(b: &mut Builder, w: &Words, source: &c::OwnerAccountSource) {
         c::OwnerAccountState::Closing => run(b, w, W::Closing),
     }
     if source.expiring {
+        b.run(Run::Plain, b" \xc2\xb7 ");
         run(b, w, W::Expiring);
     }
     if source.attention {
+        b.run(Run::Plain, b" \xc2\xb7 ");
         run(b, w, W::Attention);
     }
     if let Some(at) = source.spent_until {
+        b.run(Run::Plain, b" \xc2\xb7 ");
         run(b, w, W::Spent);
-        b.run(Run::Plain, &words::say(w, W::Until, &[Hole::Wall(at)]));
+        b.run(Run::Plain, b" \xc2\xb7 ");
+        b.run(Run::Plain, &words::say(w, W::UsageUntil, &[Hole::Wall(at)]));
     }
 }
 #[expect(
@@ -126,19 +142,22 @@ fn account(
     uses: Option<&skein_lib::List<c::OwnerAccountUse>>,
     sources: &skein_lib::List<c::OwnerAccountSource>,
     cut: bool,
+    counts: temper_client_domain::limits::AccountLimits,
 ) {
     b.open(Role::Region);
     b.open(Role::Heading { level: 3 });
     b.open(Role::Text);
     run(b, w, W::Account);
     number(b, w, u64::from(number_value));
-    b.run(Run::Plain, b" \xc2\xb7 ");
     if let Some(provider) = provider {
+        b.run(Run::Plain, b" \xc2\xb7 ");
         run(b, w, W::Provider);
         number(b, w, u64::from(provider));
     }
-    b.run(Run::Plain, b" \xc2\xb7 ");
-    b.run(Run::Plain, display.bytes());
+    if !display.bytes().is_empty() {
+        b.run(Run::Plain, b" \xc2\xb7 ");
+        b.run(Run::Plain, display.bytes());
+    }
     b.close();
     b.close();
     b.open(Role::Paragraph);
@@ -151,12 +170,17 @@ fn account(
         b.run(Run::Plain, b" \xc2\xb7 ");
         run(b, w, W::Plan);
     }
-    b.run(Run::Plain, b" \xc2\xb7 ");
     match uses {
-        None => run(b, w, W::DefaultUses),
+        None => {
+            b.run(Run::Plain, b" \xc2\xb7 ");
+            run(b, w, W::DefaultUses);
+        }
         Some(uses) => {
-            run(b, w, W::Uses);
-            for value in uses {
+            if !uses.is_empty() {
+                b.run(Run::Plain, b" \xc2\xb7 ");
+                run(b, w, W::Uses);
+            }
+            for value in uses.iter().take(usize::try_from(counts.uses).expect("u32 fits")) {
                 b.close();
                 b.open(Role::Text);
                 match value {
@@ -171,15 +195,20 @@ fn account(
                 }
                 b.run(Run::Plain, b"; ");
             }
+            if uses.len() > counts.uses {
+                run(b, w, W::UsesOmitted);
+                number(b, w, u64::from(uses.len().saturating_sub(counts.uses)));
+            }
         }
     }
     if cut || display.cut {
+        b.run(Run::Plain, b" \xc2\xb7 ");
         run(b, w, W::Cut);
     }
     b.close();
     b.close();
     b.open(Role::List);
-    for source in sources {
+    for source in sources.iter().take(usize::try_from(counts.sources).expect("u32 fits")) {
         b.open(Role::Item);
         b.open(Role::Text);
         run(b, w, W::Source);
@@ -195,6 +224,7 @@ fn account(
         b.close();
     }
     b.close();
+    omitted(b, w, W::SourcesOmitted, sources.len(), counts.sources);
     b.close();
 }
 fn end(b: &mut Builder, w: &Words, end: &c::OwnerAccountEnd) {
@@ -263,7 +293,8 @@ fn refused(b: &mut Builder, w: &Words, refusal: c::OwnerAccountRefusal) {
     };
     run(b, w, word);
 }
-pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings) {
+pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, text_per_node: u32) {
+    let counts = bindings.counts();
     b.open(Role::Main);
     b.style(crate::look::MAIN);
     text(b, w, Role::Heading { level: 1 }, W::Accounts);
@@ -272,7 +303,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
         if doc.accounts.is_empty() {
             text(b, w, Role::Paragraph, W::Empty);
         }
-        for row in &doc.accounts {
+        for row in doc.accounts.iter().take(usize::try_from(counts.accounts).expect("u32 fits")) {
             account(
                 b,
                 w,
@@ -285,9 +316,11 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
                 row.uses.as_ref(),
                 &row.sources,
                 row.cut,
+                counts,
             );
         }
-        for signing in &doc.signing {
+        omitted(b, w, W::AccountsOmitted, doc.accounts.len(), counts.accounts);
+        for signing in doc.signing.iter().take(usize::try_from(counts.sign_ins).expect("u32 fits")) {
             b.open(Role::Status);
             b.open(Role::Text);
             run(b, w, W::Signing);
@@ -300,6 +333,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
             b.close();
             b.close();
         }
+        omitted(b, w, W::SignInsOmitted, doc.signing.len(), counts.sign_ins);
         if doc.settled {
             text(b, w, Role::Status, W::Settled);
         }
@@ -317,7 +351,10 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
         if is_owner(root) {
             text(b, w, Role::Heading { level: 2 }, W::Deployment);
             if let Some(doc) = form.deployment(root.client()) {
-                for row in &doc.accounts {
+                if doc.accounts.is_empty() {
+                    text(b, w, Role::Paragraph, W::Empty);
+                }
+                for row in doc.accounts.iter().take(usize::try_from(counts.accounts).expect("u32 fits")) {
                     account(
                         b,
                         w,
@@ -330,8 +367,10 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
                         row.uses.as_ref(),
                         &row.sources,
                         row.cut,
+                        counts,
                     );
                 }
+                omitted(b, w, W::AccountsOmitted, doc.accounts.len(), counts.accounts);
                 if doc.cut {
                     text(b, w, Role::Status, W::Cut);
                 }
@@ -339,11 +378,19 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
                 text(b, w, Role::Status, W::Unknown);
             }
         }
-        form_page(b, root, w, bindings, form);
+        form_page(b, root, w, bindings, form, text_per_node);
     }
     b.close();
 }
-fn form_page(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, form: &accounts::Accounts) {
+fn form_page(
+    b: &mut Builder,
+    root: &Domain,
+    w: &Words,
+    bindings: &mut Bindings,
+    form: &accounts::Accounts,
+    text_per_node: u32,
+) {
+    let counts = bindings.counts();
     let busy = match &form.pending {
         Some(p) => p.outcome.is_none(),
         None => false,
@@ -361,6 +408,7 @@ fn form_page(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings,
             word,
             Meaning::Action(Act::Select { selection: accounts::Selection { holder, ..Default::default() } }),
             busy,
+            form.selection.holder == holder,
         );
     }
     for (field, word, value) in [
@@ -368,6 +416,7 @@ fn form_page(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings,
         (Field::Account, W::AccountField, form.selection.account),
         (Field::Source, W::SourceField, form.selection.source),
     ] {
+        let Some(binding) = bindings.insert(Meaning::Field(field, form.selection)) else { continue };
         b.open(Role::TextField);
         b.name(&words::say(w, word, &[]));
         let text: Box<[u8]> = match value {
@@ -375,7 +424,7 @@ fn form_page(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings,
             None => Box::new([]),
         };
         b.value(&text, form.key_written());
-        b.bind(bindings.insert(Meaning::Field(field, form.selection)));
+        b.bind(binding);
         if bindings.invalid_field(field) {
             b.state(State::Invalid);
         }
@@ -384,15 +433,17 @@ fn form_page(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings,
         }
         b.close();
     }
-    b.open(Role::TextField);
-    b.name(&words::say(w, W::KeyField, &[]));
-    b.entry(skein_ui::EntryKind::Secret);
-    b.value(if form.has_key() { b"*" } else { b"" }, form.key_written());
-    b.bind(bindings.insert(Meaning::Key));
-    if busy {
-        b.state(State::Disabled);
+    if let Some(binding) = bindings.insert(Meaning::Key) {
+        b.open(Role::TextField);
+        b.name(&words::say(w, W::KeyField, &[]));
+        b.entry(skein_ui::EntryKind::Secret);
+        b.value(b"", form.key_written());
+        b.bind(binding);
+        if busy {
+            b.state(State::Disabled);
+        }
+        b.close();
     }
-    b.close();
     let busy = busy || bindings.invalid();
     if bindings.invalid() {
         text(b, w, Role::Alert, W::Selection);
@@ -407,39 +458,34 @@ fn form_page(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings,
         (Operation::RemoveAccount, W::RemoveAccount),
         (Operation::Resume, W::Resume),
     ] {
-        control(b, w, bindings, word, bindings::submit(name, operation), busy);
+        control(b, w, bindings, word, bindings::submit(name, operation), busy, false);
     }
     // Rank controls use the engine's one-based positions, never provider or holder preference.
     if let Some(doc) = accounts::document(root.client()) {
-        for row in &doc.accounts {
+        for row in doc.accounts.iter().take(usize::try_from(counts.accounts).expect("u32 fits")) {
             if form.selection.account == Some(row.number) && form.selection.holder == c::AccountHolder::Own {
                 rank(b, w, bindings, name, form, row.place, &row.sources, busy);
+                break;
             }
         }
     }
     if let Some(doc) = form.deployment(root.client()) {
-        for row in &doc.accounts {
+        for row in doc.accounts.iter().take(usize::try_from(counts.accounts).expect("u32 fits")) {
             if form.selection.account == Some(row.number) && form.selection.holder == c::AccountHolder::Deployment {
                 rank(b, w, bindings, name, form, row.place, &row.sources, busy);
+                break;
             }
         }
     }
     if let Some((_, ask)) = &form.confirm {
-        let word = if let c::Ask::SignOut { .. } = ask {
-            W::ConfirmSignOut
-        } else if let c::Ask::AccountChange { change: c::AccountChange::RemoveKey { .. }, .. } = ask {
-            W::ConfirmKey
-        } else {
-            W::ConfirmAccount
-        };
-        text(b, w, Role::Alert, word);
-        control(b, w, bindings, W::Confirm, Meaning::Action(Act::Confirm), busy);
+        confirmation(b, root, w, form, ask);
+        control(b, w, bindings, W::Confirm, Meaning::Action(Act::Confirm), busy, false);
     }
-    control(b, w, bindings, W::Cancel, Meaning::Action(Act::Cancel), false);
-    outcome(b, root, w, form);
+    control(b, w, bindings, W::Cancel, Meaning::Action(Act::Cancel), false, false);
+    outcome(b, root, w, form, text_per_node);
     b.close();
 }
-fn outcome(b: &mut Builder, root: &Domain, w: &Words, form: &accounts::Accounts) {
+fn outcome(b: &mut Builder, root: &Domain, w: &Words, form: &accounts::Accounts, text_per_node: u32) {
     if let Some(broken) = form.broken {
         text(
             b,
@@ -486,10 +532,31 @@ fn outcome(b: &mut Builder, root: &Domain, w: &Words, form: &accounts::Accounts)
     }
     if let Some(address) = form.sign_in_address(root.client()) {
         text(b, w, Role::Paragraph, W::Address);
-        b.open(Role::Link);
-        b.text(Run::Plain, address);
-        b.external(address);
-        b.close();
+        if skein_ui::markdown::safe_url(address) {
+            let label = words::say(w, W::OpenSignIn, &[]);
+            let bytes = u64::try_from(label.len())
+                .expect("word length fits")
+                .saturating_add(u64::try_from(address.len()).expect("address length fits"));
+            if bytes <= u64::from(text_per_node) {
+                b.open(Role::Link);
+                b.text(Run::Plain, &label);
+                b.external(address);
+                b.close();
+            } else {
+                b.open(Role::Alert);
+                b.text(
+                    Run::Plain,
+                    &words::say(
+                        w,
+                        W::AddressLong,
+                        &[Hole::Number(u64::try_from(address.len()).expect("address length fits"))],
+                    ),
+                );
+                b.close();
+            }
+        } else {
+            text(b, w, Role::Alert, W::UnsafeAddress);
+        }
     }
 }
 #[expect(clippy::too_many_arguments, reason = "rank controls share the current form and supplied source positions")]
@@ -506,23 +573,56 @@ fn rank(
     if place > 1
         && let Some(up) = place.checked_sub(1)
     {
-        control(b, w, bindings, W::UpAccount, bindings::submit(name, Operation::MoveAccount { place: up }), busy);
+        control(
+            b,
+            w,
+            bindings,
+            W::UpAccount,
+            bindings::submit(name, Operation::MoveAccount { place: up }),
+            busy,
+            false,
+        );
     }
     if let Some(down) = place.checked_add(1) {
-        control(b, w, bindings, W::DownAccount, bindings::submit(name, Operation::MoveAccount { place: down }), busy);
+        control(
+            b,
+            w,
+            bindings,
+            W::DownAccount,
+            bindings::submit(name, Operation::MoveAccount { place: down }),
+            busy,
+            false,
+        );
     }
-    for source in sources {
+    for source in sources.iter().take(usize::try_from(bindings.counts().sources).expect("u32 fits")) {
         if form.selection.source != Some(source.number) {
             continue;
         }
         if source.place > 1
             && let Some(up) = source.place.checked_sub(1)
         {
-            control(b, w, bindings, W::UpSource, bindings::submit(name, Operation::MoveSource { place: up }), busy);
+            control(
+                b,
+                w,
+                bindings,
+                W::UpSource,
+                bindings::submit(name, Operation::MoveSource { place: up }),
+                busy,
+                false,
+            );
         }
         if let Some(down) = source.place.checked_add(1) {
-            control(b, w, bindings, W::DownSource, bindings::submit(name, Operation::MoveSource { place: down }), busy);
+            control(
+                b,
+                w,
+                bindings,
+                W::DownSource,
+                bindings::submit(name, Operation::MoveSource { place: down }),
+                busy,
+                false,
+            );
         }
+        break;
     }
 }
 
@@ -531,4 +631,62 @@ fn is_owner(root: &Domain) -> bool {
         Some(me) => me.deployment_role == Some(c::HeldRole::Owner),
         None => false,
     }
+}
+
+fn omitted(b: &mut Builder, w: &Words, word: W, actual: u32, limit: u32) {
+    if actual > limit {
+        fact(b, w, word, u64::from(actual.saturating_sub(limit)));
+    }
+}
+fn confirmation(b: &mut Builder, root: &Domain, w: &Words, form: &accounts::Accounts, ask: &c::Ask) {
+    let (held, account, source, word) = if let c::Ask::SignOut { holder, source } = ask {
+        (*holder, source_account(root, form, *holder, *source), Some(*source), W::ConfirmSignOut)
+    } else if let c::Ask::AccountChange { holder, change: c::AccountChange::RemoveKey { source } } = ask {
+        (*holder, source_account(root, form, *holder, *source), Some(*source), W::ConfirmKey)
+    } else if let c::Ask::AccountChange { holder, change: c::AccountChange::Remove { account } } = ask {
+        (*holder, Some(*account), None, W::ConfirmAccount)
+    } else {
+        return;
+    };
+    b.open(Role::Alert);
+    b.open(Role::Text);
+    run(b, w, word);
+    b.run(Run::Plain, b" \xc2\xb7 ");
+    run(b, w, if held == c::AccountHolder::Own { W::OwnHolder } else { W::DeploymentHolder });
+    b.run(Run::Plain, b" \xc2\xb7 ");
+    if let Some(account) = account {
+        run(b, w, W::Account);
+        number(b, w, u64::from(account));
+    } else {
+        run(b, w, W::UnknownAccount);
+    }
+    if let Some(source) = source {
+        b.run(Run::Plain, b" \xc2\xb7 ");
+        run(b, w, W::Source);
+        number(b, w, u64::from(source));
+    }
+    b.close();
+    b.close();
+}
+// One confirmation names its source's account even when that row is beyond the display cap.
+// Lookup allocates nothing; its input remains bounded by the admitted document.
+fn source_account(root: &Domain, form: &accounts::Accounts, holder: c::AccountHolder, source: u32) -> Option<u32> {
+    if holder == c::AccountHolder::Own {
+        for row in &accounts::document(root.client())?.accounts {
+            for entry in &row.sources {
+                if entry.number == source {
+                    return Some(row.number);
+                }
+            }
+        }
+    } else {
+        for row in &form.deployment(root.client())?.accounts {
+            for entry in &row.sources {
+                if entry.number == source {
+                    return Some(row.number);
+                }
+            }
+        }
+    }
+    None
 }

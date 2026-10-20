@@ -113,7 +113,7 @@ impl Tier {
         let keys =
             format!("http://{socket}/bundle/{}/issuer.webmanifest", digest.file_name().to_str().expect("digest"));
         value["application"]["clients"]["bundle"] = serde_json::json!(private_bundle);
-        value["engine"]["limits"]["overrides"]["accounts.sign_in_deadline_ms"] = 5000.into();
+        value["engine"]["limits"]["overrides"]["accounts.sign_in_deadline_ms"] = 2000.into();
         value["engine"]["llm"]["providers"] = serde_json::json!([{
             "name":"Test provider", "number":17, "models":["fake"],
             "sources":{"keys":true,"sign_in":{

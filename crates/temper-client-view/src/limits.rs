@@ -8,12 +8,7 @@ impl Limits {
     #[must_use]
     pub fn of(domain: &temper_client_domain::Limits, words: &Words) -> Option<Limits> {
         let receiving = &domain.client.domain;
-        // Client v10 admits a sign-in address of at most 2048 bytes.
-        let text = words
-            .capacity()?
-            .max(receiving.text.checked_mul(2)?)
-            .max(domain.forge.field_bytes.checked_add(64)?)
-            .max(2048);
+        let text = words.capacity()?.max(receiving.text.checked_mul(2)?).max(domain.forge.field_bytes.checked_add(64)?);
         let markdown = skein_ui::markdown::max_nodes(receiving.text)?;
         // Each grant and note scope has a bounded sequence of pattern segments.
         let pattern = receiving.segments.checked_add(2)?.checked_mul(2)?;
@@ -31,14 +26,14 @@ impl Limits {
             .checked_mul(receiving.rows)?
             .checked_mul(receiving.rows)?
             .checked_mul(receiving.rows)?;
-        // Two whole documents: the party's and, for an owner, deployment's accounts.
-        // An account emits at most six structural nodes and occupies at least 26 wire bytes;
-        // a source emits two nodes and occupies at least 18 including its piece length;
-        // a use occupies at least 9 bytes per text node. Sign-ins occupy at least 14 per status/text pair.
-        // Four admitted bytes per node therefore cover their combined lists without
-        // multiplying the account and source maxima or using task-window rows.
-        let account_nodes = u32::try_from(receiving.document_bytes.checked_mul(2)?.checked_div(4)?)
-            .ok()?
+        let counts = domain.accounts;
+        // Per account: six structural nodes, one per use, two per source and two omission words.
+        // Own and deployment lists each have a heading, omission word, sign-in and last-end room.
+        let account = counts.sources.checked_mul(2)?.checked_add(counts.uses)?.checked_add(10)?;
+        let account_nodes = account
+            .checked_mul(counts.accounts)?
+            .checked_mul(2)?
+            .checked_add(counts.sign_ins.checked_mul(2)?)?
             .checked_add(receiving.projects.checked_mul(4)?)?
             .checked_add(128)?;
         let nodes = cards
@@ -72,7 +67,7 @@ pub fn worst_case(limits: &Limits, domain: &temper_client_domain::Limits, words:
         .checked_add(skein_lib::List::<u64>::worst_case(domain.client.domain.rows.checked_add(1)?)?)?
         .checked_add(crate::forge::bindings::worst_case(limits.tree.bindings)?)?
         .checked_add(crate::frame::Bindings::worst_case(limits.tree.bindings)?)?
-        .checked_add(crate::accounts::Bindings::worst_case(32)?)?
+        .checked_add(crate::accounts::Bindings::worst_case(crate::accounts::binding_capacity(&domain.accounts))?)?
         .checked_add(skein_ui::phrases::worst_case(words.book.limits())?)?
         .checked_add(u64::from(words.capacity()?))
 }
