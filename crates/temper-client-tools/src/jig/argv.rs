@@ -287,6 +287,10 @@ pub fn check(table: &[&Tool], call: &Call, limits: &Limits) -> Result<(), Usage>
         Keyed::Never | Keyed::Optional | Keyed::Required => {}
     }
     check_values(table, args, &call.values, limits)?;
+    // The creation row owns this rule; reading a chat has no keyed choice form.
+    if tool.name == b"chat" && tool.keyed == Keyed::Required {
+        check_choice(call, 2, 3, limits)?;
+    }
     if tool.area == 5 && tool.keyed != Keyed::Never {
         for (index, (arg, slot)) in args.iter().zip(&call.values).enumerate() {
             if let Some(Values::One(Value::Number(n))) = slot
@@ -546,6 +550,28 @@ fn check_inbox(call: &Call) -> Result<(), Usage> {
         && InboxReadGroup::of(*kind) != group
     {
         return Err(Usage::Kind { argument: 3 });
+    }
+    Ok(())
+}
+
+/// argv is protocol input: validate names without allocating another copy.
+#[expect(clippy::disallowed_methods, reason = "the model/effort argv rule validates UTF-8 at the input boundary")]
+fn check_choice(call: &Call, model: usize, effort: usize, limits: &Limits) -> Result<(), Usage> {
+    for index in [model, effort] {
+        let argument = u8::try_from(index).or(Err(Usage::Tool))?;
+        if let Some(value) = crate::jig::call::value(call, index) {
+            let Value::Text(text) = value else { return Err(Usage::Kind { argument }) };
+            if text.len() > usize::try_from(limits.text).expect("text bound fits") {
+                return Err(Usage::Long { argument });
+            }
+            if core::str::from_utf8(text).is_err() {
+                return Err(Usage::Kind { argument });
+            }
+        }
+    }
+    if crate::jig::call::value(call, effort).is_some() && crate::jig::call::value(call, model).is_none() {
+        let argument = u8::try_from(model).or(Err(Usage::Tool))?;
+        return Err(Usage::Missing { argument });
     }
     Ok(())
 }

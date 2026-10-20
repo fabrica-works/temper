@@ -94,3 +94,48 @@ fn key_fixture() -> (Joint, Root, String) {
         text.split("\"number\":").nth(1).expect("party account").split(',').next().expect("number end").to_owned();
     (front, root, account)
 }
+
+#[test]
+fn a_tools_chat_choice_reaches_its_task_document() {
+    let (mut front, mut root) = accounts::tools_fixture(fixtures::SEED);
+    call(
+        &mut front,
+        &mut root,
+        1,
+        &[b"chat", b"--project", b"1", b"--model", b"scripted", b"--key", b"choice", b"Hello"],
+        None,
+    );
+    let task = fixtures::done_task(root.agent().printed(1).expect("created chat"));
+    call(&mut front, &mut root, 2, &[b"task", task.to_string().as_bytes(), b"--json"], None);
+    let printed = root.agent().printed(2).expect("task document");
+    let text = std::str::from_utf8(&printed.stdout).expect("JSON");
+    assert!(text.contains("\"main\":{\"model\":\"scripted\",\"effort\":null}"), "{text}");
+}
+
+#[test]
+fn a_tools_chat_effort_reaches_its_task_document() {
+    let (mut front, mut root) = accounts::tools_fixture(fixtures::SEED);
+    call(
+        &mut front,
+        &mut root,
+        1,
+        &[
+            b"chat",
+            b"--project",
+            b"1",
+            b"--model",
+            b"effort-model",
+            b"--effort",
+            b"high",
+            b"--key",
+            b"effort-choice",
+            b"Hello",
+        ],
+        None,
+    );
+    let task = fixtures::done_task(root.agent().printed(1).expect("created chat"));
+    call(&mut front, &mut root, 2, &[b"task", task.to_string().as_bytes(), b"--json"], None);
+    let printed = root.agent().printed(2).expect("task document");
+    let text = std::str::from_utf8(&printed.stdout).expect("JSON");
+    assert!(text.contains("\"main\":{\"model\":\"effort-model\",\"effort\":\"high\"}"), "{text}");
+}

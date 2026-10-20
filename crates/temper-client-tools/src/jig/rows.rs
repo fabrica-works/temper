@@ -137,6 +137,8 @@ pub const CHAT_CREATE: Tool = Tool {
     forms: &[&[
         flag(b"project", b"P", Kind::Project, Required, b"Project name or number"),
         positional(b"text", b"TEXT", Kind::Text, Required, b"Opening words"),
+        MODEL,
+        EFFORT,
     ]],
     keyed: Keyed::Required,
     area: 1,
@@ -343,3 +345,7 @@ pub const RETRY: Tool = Tool {
     keyed: Keyed::Optional,
     area: 5,
 };
+
+/// Names are checked against the project's current me document before sending.
+const MODEL: super::table::Argument = flag(b"model", b"M", Kind::Text, Optional, b"Configured model name");
+const EFFORT: super::table::Argument = flag(b"effort", b"E", Kind::Text, Optional, b"Effort offered by that model");

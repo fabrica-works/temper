@@ -1,4 +1,5 @@
 //! Offered acts are read once, then kept by the shared client's request table.
+mod choice;
 use super::{Called, Out, Runner, finish};
 use crate::jig::{
     Limits,
@@ -50,19 +51,27 @@ pub(super) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, cal
     });
     runner.acts.insert(called.call_number, Reading { called, document: None });
 }
-type Prepared = Result<(Request, Option<c::Recipient>), &'static [u8]>;
+pub(super) enum Failed {
+    Fixed(&'static [u8]),
+    Unknown { what: &'static [u8], name: Box<[u8]> },
+    EffortRequired { name: Box<[u8]> },
+}
+type Prepared = Result<(Request, Option<c::Recipient>), Failed>;
 fn chat(call: &Call, me: &c::Me, limits: &Limits) -> Prepared {
-    let project = super::reads::project(call, me).ok_or(b"unknown project".as_slice())?;
-    let Ok(ask) = shapes::chat(me, project, words(call, 1, limits)?) else { return Err(b"chat not offered") };
-    let c::Ask::Create { tasks, .. } = &ask else { unreachable!("chat creates") };
-    let task = tasks.get(0).expect("chat creates one task");
+    let project = super::reads::project(call, me).ok_or(Failed::Fixed(b"unknown project"))?;
+    let Ok(mut ask) = shapes::chat(me, project, words(call, 1, limits)?) else {
+        return Err(Failed::Fixed(b"chat not offered"));
+    };
+    let c::Ask::Create { tasks, .. } = &mut ask else { unreachable!("chat creates") };
+    let task = tasks.get_mut(0).expect("chat creates one task");
+    task.llm = choice::llm(call, 2, 3, me, project, task.llm.as_ref())?;
     let mut creating = None;
     for membership in &me.projects {
         if membership.project == project {
             creating = membership.creating.as_ref();
         }
     }
-    let creating = creating.ok_or(b"chat not offered".as_slice())?;
+    let creating = creating.ok_or(Failed::Fixed(b"chat not offered"))?;
     let draft = shapes::GoalDraft {
         words: task.spec.words.clone(),
         executor: task.executor,
@@ -84,18 +93,18 @@ fn chat(call: &Call, me: &c::Me, limits: &Limits) -> Prepared {
                 Some(to),
             ))
         }
-        shapes::Fall::Refused(_) | shapes::Fall::NotOffered(_) => Err(b"chat exceeds offered bounds"),
+        shapes::Fall::Refused(_) | shapes::Fall::NotOffered(_) => Err(Failed::Fixed(b"chat exceeds offered bounds")),
     }
 }
-fn words(call: &Call, index: usize, limits: &Limits) -> Result<c::Text, &'static [u8]> {
+fn words(call: &Call, index: usize, limits: &Limits) -> Result<c::Text, Failed> {
     let bytes = match value(call, index) {
         Some(Value::Text(bytes)) => bytes.as_ref(),
         None => b"",
-        _ => return Err(b"text not loaded"),
+        _ => return Err(Failed::Fixed(b"text not loaded")),
     };
     match c::Text::new(Box::from(bytes), limits.text) {
         Ok(text) => Ok(text),
-        Err(_) => Err(b"text limit"),
+        Err(_) => Err(Failed::Fixed(b"text limit")),
     }
 }
 fn empty(limits: &Limits) -> c::Text {
@@ -119,7 +128,7 @@ pub(super) fn page(
                 build(&called.call, &document, me, &env.limits, Some(task.project))
             }
             Readout::Limit | Readout::NotServed { .. } | Readout::Jig(_) | Readout::Family { .. } => {
-                Err(b"task project unavailable".as_slice())
+                Err(Failed::Fixed(b"task project unavailable"))
             }
         };
         prepared(runner, client, env, called, ask, out);
@@ -192,12 +201,12 @@ fn build(call: &Call, document: &c::ReadValue, me: &c::Me, limits: &Limits, proj
     let (project, offers) = match document {
         c::ReadValue::Task(task) => (task.project, &task.acts),
         c::ReadValue::Question(question) => {
-            (chip_project(&question.task).or(project).ok_or(b"project unavailable".as_slice())?, &question.acts)
+            (chip_project(&question.task).or(project).ok_or(Failed::Fixed(b"project unavailable"))?, &question.acts)
         }
         c::ReadValue::Proposal(proposal) => (proposal.project, &proposal.acts),
         c::ReadValue::OwnerProposal(proposal) => (proposal.project, &proposal.acts),
         c::ReadValue::Escalation(escalation) => {
-            (chip_project(&escalation.task).or(project).ok_or(b"project unavailable".as_slice())?, &escalation.acts)
+            (chip_project(&escalation.task).or(project).ok_or(Failed::Fixed(b"project unavailable"))?, &escalation.acts)
         }
         c::ReadValue::OwnerEscalation(escalation) => (escalation.task.project, &escalation.acts),
         c::ReadValue::Tasks(_)
@@ -220,7 +229,7 @@ fn build(call: &Call, document: &c::ReadValue, me: &c::Me, limits: &Limits, proj
         | c::ReadValue::Notes(_)
         | c::ReadValue::Deployment(_)
         | c::ReadValue::OwnerDeployment(_) => {
-            return Err(b"tools' bug; unexpected act document; report it as a finding");
+            return Err(Failed::Fixed(b"tools' bug; unexpected act document; report it as a finding"));
         }
     };
     let act = kind(call);
@@ -233,8 +242,8 @@ fn build(call: &Call, document: &c::ReadValue, me: &c::Me, limits: &Limits, proj
     let to = match admission {
         Some(c::Admission::Allowed) => None,
         Some(c::Admission::Proposed { to }) => Some(to.clone()),
-        Some(c::Admission::Bounded { .. }) => return Err(b"act has no bounded draft"),
-        Some(c::Admission::Refused(_)) | None => return Err(b"act not offered"),
+        Some(c::Admission::Bounded { .. }) => return Err(Failed::Fixed(b"act has no bounded draft")),
+        Some(c::Admission::Refused(_)) | None => return Err(Failed::Fixed(b"act not offered")),
     };
     let task = number(call, 0).unwrap_or(0);
     let ask = match call.tool {
@@ -325,7 +334,7 @@ fn kind(call: &Call) -> c::ActKind {
         _ => unreachable!("act tool"),
     }
 }
-fn decision(call: &Call, limits: &Limits) -> Result<c::Decision, &'static [u8]> {
+fn decision(call: &Call, limits: &Limits) -> Result<c::Decision, Failed> {
     let index = if call.form == 0 { 1 } else { 2 };
     let reason = words(call, if call.form == 0 { 2 } else { 3 }, limits)?;
     Ok(match value(call, index) {
@@ -362,7 +371,11 @@ pub(super) fn prepared(
     let (request, to) = match request {
         Ok(request) => request,
         Err(why) => {
-            let printed = render::failure(why, called.json, 1);
+            let printed = match why {
+                Failed::Fixed(why) => render::failure(why, called.json, 1),
+                Failed::Unknown { what, name } => choice::named(b"unknown ", what, &name, called.json),
+                Failed::EffortRequired { name } => choice::named(b"effort required", b"", &name, called.json),
+            };
             finish(called, printed, out);
             return;
         }
@@ -443,14 +456,8 @@ pub(super) fn answered(
     }
 }
 
-fn close(
-    call: &Call,
-    document: &c::ReadValue,
-    me: &c::Me,
-    project: u32,
-    limits: &Limits,
-) -> Result<c::Ask, &'static [u8]> {
-    let c::ReadValue::Task(task) = document else { return Err(b"unexpected close document") };
+fn close(call: &Call, document: &c::ReadValue, me: &c::Me, project: u32, limits: &Limits) -> Result<c::Ask, Failed> {
+    let c::ReadValue::Task(task) = document else { return Err(Failed::Fixed(b"unexpected close document")) };
     if let Some(Some(Values::Many(moves))) = call.values.get(1) {
         for moved in moves {
             let mut found = false;
@@ -460,7 +467,7 @@ fn close(
                 }
             }
             if !found {
-                return Err(b"move is not a live delegate");
+                return Err(Failed::Fixed(b"move is not a live delegate"));
             }
         }
     }
@@ -478,6 +485,6 @@ fn close(
     }
     match shapes::close_chat(me, project, task.chip.task, delegates.as_slice(), words(call, 2, limits)?) {
         Ok(ask) => Ok(ask),
-        Err(_) => Err(b"close not offered"),
+        Err(_) => Err(Failed::Fixed(b"close not offered")),
     }
 }

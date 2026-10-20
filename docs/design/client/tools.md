@@ -463,7 +463,10 @@ area lands with its stories (section 11).
    - **The task's model** is chosen with this area: `chat` and area 2's
      `goal` take `--model M [--effort E]`, the task's LLM choice, the
      charter's default without them (jig's `domain/tasks.md`, section
-     3), and area 2's `amend` changes it.
+     3), and area 2's `amend` changes it. The bracket applies only to a model
+     with no declared efforts: when a model declares efforts, `--effort E` is
+     required, naming one of them. An amendment replaces the main choice whole;
+     its effort is the caller's, never inherited from the task's old main.
    - **An account's uses** have no tool: each takes jig's default (jig's
      `domain/accounts.md`, 4.2) until the QA loop asks for one (section
      15).

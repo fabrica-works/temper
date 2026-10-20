@@ -42,6 +42,16 @@ fn fixture_root(seed: u64, tools: bool, own_accounts: u32, rows: Option<u32>) ->
                 offers: a::Offers { sign_in: true, key: true, programs: Box::new([]) },
             }]),
         };
+        if tools {
+            let mut model = walking::charter().policy.model;
+            model.name = Box::from(b"effort-model".as_slice());
+            model.efforts = Box::new([Box::from(b"high".as_slice())]);
+            model.effort = None;
+            config.core.settings.models = Box::new([walking::charter().policy.model, model.clone()]);
+            config.core.settings.charters.get_mut(0).expect("fixture charter").policy.alternatives = Box::new([model]);
+            config.core.settings.llm_providers.providers.get_mut(0).expect("fixture provider").models =
+                Box::new([Box::from(b"scripted".as_slice()), Box::from(b"effort-model".as_slice())]);
+        }
         let mut engine_limits = engine_limits();
         // Restore one deployment account and leave the requested room for party accounts.
         engine_limits.documents.lines = engine_limits.documents.lines.max(own_accounts);

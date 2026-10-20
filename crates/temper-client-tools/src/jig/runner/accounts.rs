@@ -31,7 +31,7 @@ pub(super) fn resolved(
 ) {
     let request = match build(&reading) {
         Ok(request) => Ok((request, None)),
-        Err(why) => Err(why),
+        Err(why) => Err(acts::Failed::Fixed(why)),
     };
     acts::prepared(runner, client, env, reading.called, request, out);
 }

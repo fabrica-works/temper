@@ -43,7 +43,7 @@ const USAGES: &[&[u8]] = &[
     b"activity N [--before C] [--limit K]\n",
     b"turn N A.T [--part K] [--from B]\n",
     b"run N\n",
-    b"chat --project P TEXT --key NAME\n",
+    b"chat --project P TEXT [--model M] [--effort E] --key NAME\n",
     b"message N TEXT --key NAME\n",
     b"close N [--move D]... [--reason TEXT] --key NAME\n",
     b"answer N M TEXT [--key NAME]\n",
@@ -194,7 +194,7 @@ fn the_guide_omits_request_identity() {
 }
 
 const CHAT_READ: &[u8] = b"chat N [--before C]\nRead a conversation from its end\nResult: chat\n  task: Task number\n  before: Continue before this cursor\n";
-const CHAT_CREATE: &[u8] = b"chat --project P TEXT --key NAME\nStart a chat\nResult: chat_create\n  project: Project name or number\n  text: Opening words\n";
+const CHAT_CREATE: &[u8] = b"chat --project P TEXT [--model M] [--effort E] --key NAME\nStart a chat\nResult: chat_create\n  project: Project name or number\n  text: Opening words\n  model: Configured model name\n  effort: Effort offered by that model\n";
 #[test]
 fn help_includes_each_later_row_of_its_name() {
     // The table's read-chat and create-chat rows, in its published order.

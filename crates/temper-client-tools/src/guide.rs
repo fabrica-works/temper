@@ -30,6 +30,12 @@ disconnect, forget, rank and retry resolve a unique --source sign_in|key|program
 forget without --source removes the whole account; rank without it moves the account.
 connect prints a browser address and wait accounts --until settled, then exits once durable.
 
+Choose a chat's main model from models --project P; --effort is required when that model declares efforts:
+  temper ctl DIRECTORY chat --project shop --model chosen-model --effort chosen-effort hello --key model-chat
+Without these flags the template's choice or engine default is sent unchanged.
+A model change preserves the supplied account and sub-agent choices; there is no --account flag.
+Unknown model or effort names fail locally (exit 1), without sending.
+
 Name keys for chat, message, close, adopt, connect and add-key; other acts accept an optional --key NAME.
 Names are one to 64 lower-case letters, digits or hyphens.
 Give each agent a distinct prefix, such as investigate-41; reads and waits need no key.

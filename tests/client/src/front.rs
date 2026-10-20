@@ -205,8 +205,26 @@ impl Joint {
         });
         transport.models.clone_from(&configs[1].core.settings.models);
         transport.providers = configs[1].core.settings.llm_providers.clone();
+        let worker_models = configs[1]
+            .core
+            .settings
+            .models
+            .iter()
+            .map(|model| jig_domain_host::ModelBound {
+                name: model.name.clone(),
+                window: model.window,
+                output: model.output,
+            })
+            .collect();
+        let mut hello =
+            temper_engine_domain_world::protocol::hello_slots(fixtures::QUESTION_WORKER, slots, Box::new([]));
+        let engine::Event::Worker(engine::WorkerInput::Link { link: engine::Link::Hello(value), .. }) = &mut hello
+        else {
+            unreachable!("worker hello")
+        };
+        value.bounds.models = worker_models;
         let mut engine = Driver::with_repositories(store, configs, engine_limits, fixtures::REPOSITORIES);
-        engine.send(temper_engine_domain_world::protocol::hello_slots(fixtures::QUESTION_WORKER, slots, Box::new([])));
+        engine.send(hello);
         engine.settle();
         let last_commit = engine.store.header().commits;
         let truth = jig_client_world::joint::truth::Truth::after(core_rows(&engine));
