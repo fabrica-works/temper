@@ -7,6 +7,10 @@ use skein_ui::Role;
 use std::collections::BTreeMap;
 use temper_engine_domain as root;
 use temper_fake_checkout::git::Remote;
+
+// One hook per push: the setup's topic push and the agent's change.
+pub(crate) const ADOPT_HOOKS: usize = 2;
+
 thread_local! { static STORY: std::cell::Cell<Story> = const { std::cell::Cell::new(Story::Chat { words: b"Hello" }) }; }
 pub(crate) fn set(story: Story) {
     STORY.with(|slot| slot.set(story));
@@ -148,7 +152,7 @@ pub(crate) fn forge(story: Story) -> temper_fake_git::Transport {
                 cue: None,
             },
             protection: None,
-            hooked: false,
+            hooked: matches!(story, Story::Adopt),
         },
     );
     skein_fake_forge_domain::grant(

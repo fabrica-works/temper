@@ -13,6 +13,7 @@ pub(crate) struct Forge {
     merge: bool,
     edited: bool,
     prepared: bool,
+    hooks: Option<std::net::SocketAddr>,
 }
 impl Forge {
     pub(crate) fn new(transport: temper_fake_git::Transport, story: Story) -> Self {
@@ -24,6 +25,17 @@ impl Forge {
             merge: matches!(story, Story::Merge),
             edited: false,
             prepared: false,
+            hooks: None,
+        }
+    }
+    pub(crate) fn hand_hooks(&mut self, bound: std::net::SocketAddr) {
+        if self.hooks != Some(bound) {
+            self.transport.forge.borrow_mut().hooks = Some(skein_fake_forge_protocol::delivery::Endpoint {
+                forge: 1,
+                host: bound.to_string().into_bytes().into(),
+                secret: skein_lib::Secret::new(fixtures::HOOK_SECRET.into()),
+            });
+            self.hooks = Some(bound);
         }
     }
     pub(crate) fn adopted(&mut self) {
@@ -34,6 +46,12 @@ impl Forge {
     }
     pub(crate) fn observe(&mut self, procs: &[Proc]) {
         for proc in procs {
+            if let Proc::Forge(peer) = proc {
+                assert!(
+                    peer.address().is_none() || peer.address() == Some(fixtures::FORGE),
+                    "forge binds the configured address"
+                );
+            }
             if let Proc::Shell(shell) = proc
                 && !shell.written.is_empty()
             {
@@ -63,6 +81,24 @@ impl Forge {
             let parents = object.parent.into_iter().chain(object.merge_parent).collect();
             self.pushed.push(Pushed { branch, commit: to, parents });
         }
+    }
+    pub(crate) fn hooks_complete(procs: &[Proc], hooks: usize) -> bool {
+        procs.iter().any(|proc| {
+            let Proc::Forge(peer) = proc else { return false };
+            let deliveries = peer
+                .observations()
+                .iter()
+                .filter(|record| matches!(record, skein_fake_peers::forge::Observation::Delivery { .. }))
+                .count();
+            deliveries == hooks
+        })
+    }
+    pub(crate) fn require_hooks(&self, hooks: usize) {
+        assert_eq!(
+            usize::try_from(self.transport.forge.borrow().domain.tally().hooks).expect("hook tally fits"),
+            hooks,
+            "the story's own hooks have all been released"
+        );
     }
     pub(crate) fn complete(&self) -> bool {
         self.pushed.iter().any(|push| !self.merge || push.parents == [fixtures::BRANCH_HEAD, fixtures::MOVED_BASE])

@@ -224,6 +224,9 @@ impl skein_world::Referee<Proc> for Referee {
     fn act(&mut self, now: Time, procs: &mut [Proc]) {
         let (service, other) = procs.split_at_mut(1);
         let Proc::Service(service) = &mut service[0] else { panic!("service first") };
+        if let Some(bound) = service.hooks {
+            self.forge.borrow_mut().hand_hooks(bound);
+        }
         if !service.attached {
             service.attached = true;
             if self.attached.is_some() || self.cold.is_some() {
@@ -285,7 +288,11 @@ impl skein_world::Referee<Proc> for Referee {
                 crate::world::Story::Chat { .. } => terminals(&self.store.borrow()) > 0,
                 crate::world::Story::ChatReadThenWait { .. } => chat_waited(&self.store.borrow()),
                 crate::world::Story::Adoption => crate::stories::adopted(&self.store.borrow().rows) > 0,
-                crate::world::Story::Adopt | crate::world::Story::Merge => self.forge.borrow().complete(),
+                crate::world::Story::Adopt => {
+                    let forge = self.forge.borrow();
+                    forge.complete() && forge::Forge::hooks_complete(other, crate::stories::ADOPT_HOOKS)
+                }
+                crate::world::Story::Merge => self.forge.borrow().complete(),
             },
         };
         if self.done.is_none()

@@ -4,6 +4,9 @@ pub(crate) mod durable;
 use crate::world::Settings;
 use jig_channel_world::fixtures as channel;
 use skein_lib::{Duration, List, Secret};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+pub(crate) const FORGE: SocketAddr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 3000));
+pub const HOOK_SECRET: &[u8] = b"world-webhook-secret";
 pub const SEED: u64 = 7;
 pub const ANSWER: &[u8] = b"World answer";
 pub const LLM_TOKEN: &[u8] = channel::TOKEN;
@@ -116,10 +119,10 @@ pub(crate) fn document() -> Vec<u8> {
         value["engine"]["limits"]["overrides"][name] = count.into();
     }
     value["application"] = serde_json::json!({
-        "webhooks":null,
+        "webhooks":{"listener":{"socket":"127.0.0.1:0"}},
 "clients":{"listener":{"socket":CLIENTS.to_string()},"bundle":null},
-        "forges":[{"number":1,"kind":"forgejo","api":{"socket":"127.0.0.1:3000"},"transport":"plaintext",
-            "git":"http://127.0.0.1:3000","webhook_secret":null,"api_token":"secrets/forge.api-token","user":{"file":"secrets/forge-1.user"},"identity":1}],
+        "forges":[{"number":1,"kind":"forgejo","api":{"socket":FORGE.to_string()},"transport":"plaintext",
+            "git":format!("http://{FORGE}"),"webhook_secret":"secrets/forge-1.webhook-secret","api_token":"secrets/forge.api-token","user":{"file":"secrets/forge-1.user"},"identity":1}],
         "identities":[{"number":1,"token":"secrets/forge.git-token","login":"worker","author":{"name":"Worker","email":"worker@example.invalid"}}],
         "setup":[],"landing":{"deployment":[],"projects":[]},"charter":1,
         "limits":{"profile":"small","overrides":{"checkout.name_bytes":256,"checkout.repositories":2,"checkout.message_bytes":4096,"forge.name_bytes":64,"forge.resources_per_task":2,"git_component.stdout_bytes":2048}},
@@ -142,7 +145,7 @@ pub(crate) fn document() -> Vec<u8> {
     serde_json::to_vec(&value).expect("deployment JSON")
 }
 pub(crate) fn files() -> temper_service::settings::Files {
-    let mut entries = List::with_capacity(9);
+    let mut entries = List::with_capacity(10);
     for source in [channel::files(false), channel::files(true)] {
         for (name, value) in source.entries.into_boxed() {
             let name = if name.as_ref() == b"agent.json" { b"/opt/temper/agent.json".as_slice().into() } else { name };
@@ -155,6 +158,9 @@ pub(crate) fn files() -> temper_service::settings::Files {
     entries
         .push((b"secrets/forge-1.user".as_slice().into(), Secret::new(b"1\n".as_slice().into())))
         .expect("user file");
+    entries
+        .push((b"secrets/forge-1.webhook-secret".as_slice().into(), Secret::new(HOOK_SECRET.into())))
+        .expect("webhook secret file");
     temper_service::settings::Files { entries }
 }
 pub(crate) fn seeds() -> temper_service::settings::Seeds {
@@ -237,7 +243,7 @@ pub(crate) fn forges() -> List<temper_service::ForgeRuntime> {
     forges
         .push(temper_service::ForgeRuntime {
             number: 1,
-            address: ([127, 0, 0, 1], 3000).into(),
+            address: FORGE,
             transport: skein_forge_connection::settings::Transport::Plaintext { name: None },
             trust_roots: 0,
             trust_root_bytes: 0,
@@ -298,4 +304,55 @@ pub(crate) fn codec() -> jig_protocol_store::codec::Limits {
 }
 fn jig_test_service_limits(overrides: &jig_protocol_config::Limits) -> jig_test_service::limits::Limits {
     jig_test_service::limits::for_profile(jig_protocol_config::Profile::Small, overrides)
+}
+
+// A whole story's frozen peer records: room for the largest story, about
+// 16 times Adopt's 65 recorded observations, at the skein peer fixture's 2 KiB per record.
+const STORY_OBSERVATIONS: u32 = 1_024;
+const STORY_OBSERVATION_BYTES: u32 = 2_097_152;
+pub(crate) fn peer_limits() -> skein_fake_peers::Limits {
+    skein_fake_peers::Limits {
+        io: skein_io::Limits {
+            sockets: 16,
+            names: 0,
+            refusals: 8,
+            intake: 65_536,
+            receive: 1024,
+            output: 65_536,
+            sends: 8,
+            accepts: 4,
+            backlog: 8,
+            close_timeout: Duration::from_secs(1),
+            retry: Duration::from_millis(1),
+        },
+        connections: 4,
+        queue: 64,
+        plaintext: 32_768,
+        ciphertext: 32_768,
+        observations: STORY_OBSERVATIONS,
+        observation_bytes: STORY_OBSERVATION_BYTES,
+    }
+}
+pub(crate) fn forge_limits() -> skein_fake_forge_protocol::Limits {
+    skein_fake_forge_protocol::Limits {
+        calls: 4,
+        connections: 4,
+        raw_bytes: 4096,
+        http: skein_http::server::Limits {
+            head: 4096,
+            headers: 16,
+            body: 16384,
+            read: 1024,
+            response: 4096,
+            send: 1024,
+        },
+        documents: skein_forge::forgejo::limits::Limits {
+            json: skein_json::tokenizer::Limits { chunk: 1024, string: 16384, number: 32, depth: 16, length: 65536 },
+            writer: skein_json::writer::Limits { depth: 16, length: 65536 },
+            string_bytes: 512,
+            body_bytes: 16384,
+            inner: 32,
+            target_bytes: 4096,
+        },
+    }
 }

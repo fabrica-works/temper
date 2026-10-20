@@ -1,3 +1,4 @@
+use skein_fake_peers::forge::Delivery;
 use skein_world::domain::Verdict;
 use temper_one_process_world::referee::{restart, secrets};
 use temper_one_process_world::{fixtures, world};
@@ -45,4 +46,5 @@ fn an_adopted_repository_gets_its_change_pushed_through_git() {
     assert_eq!(outcome.verdict, Verdict::Passed);
     assert_eq!(outcome.adopted, 1);
     assert_eq!(outcome.pushed.len(), 1);
+    assert_eq!(outcome.deliveries, [Delivery::NoAddress, Delivery::Written]);
 }

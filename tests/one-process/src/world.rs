@@ -1,17 +1,18 @@
 //! One real startup, native person, hosted agent and git, and loopback byte peers.
 use crate::{
-    fixtures, forge,
+    fixtures,
     machine::{self, Machine, SignalHost},
     referee::{self, Capture, Store, Wire},
     stories,
 };
 use jig_client_protocol_link::Signing;
+use skein_fake_peers::forge::{Delivery, Observation, Peer};
 use skein_fake_person::{Doing, Face, Find, Found, Next, Step, TreeFace};
 use skein_io::kernel::{Complete, Exit, Fd, Submit};
 use skein_lib::{Duration, Queue, Time, Wall};
 use skein_shell::Host;
 use skein_world::{Inherited, Memory};
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, net::SocketAddr, rc::Rc};
 use temper_client_shell_terminal::client::{NativeClient, Settings as ClientSettings, Start};
 #[derive(Clone, Copy, Debug)]
 pub struct Settings {
@@ -33,6 +34,7 @@ pub struct Outcome {
     pub chats_answered: u32,
     pub adopted: u32,
     pub pushed: Vec<Pushed>,
+    pub deliveries: Vec<Delivery>,
     pub drained: bool,
     pub restarts: u32,
     pub claims_settled_at_restart: u32,
@@ -68,6 +70,8 @@ thread_local! {
 }
 pub(crate) struct ServiceHost {
     pub(crate) service: temper_service::Service,
+    pub(crate) hooks: Option<SocketAddr>,
+    bound_hooks: Option<(Fd, SocketAddr)>,
     capture: Capture,
     store: Rc<RefCell<Store>>,
     pub(crate) commits: Vec<crate::referee::durable::Commit>,
@@ -83,6 +87,9 @@ impl Host for ServiceHost {
     fn iterate(&mut self, now: Time, wall: Wall) {
         self.before_iteration = self.submitted;
         for complete in self.service.completions().iter() {
+            if let Some(bound) = hooks_address(&mut self.bound_hooks, complete) {
+                self.hooks = Some(bound);
+            }
             self.capture.complete(complete);
             self.wire.complete(complete);
         }
@@ -128,7 +135,7 @@ pub(crate) enum Proc {
     Git(Box<temper_fake_git::Git>),
     Shell(Box<stories::Shell>),
     Peer(Box<SignalHost<skein_fake_peers::llm::Peer>>),
-    Forge(Box<SignalHost<forge::ForgeHost>>),
+    Forge(Box<SignalHost<Peer>>),
     Client(Box<SignalHost<Person>>),
 }
 impl Proc {
@@ -458,6 +465,8 @@ fn service(inherited: &Inherited) -> Proc {
             .expect("application codec bounds");
     Proc::Service(Box::new(ServiceHost {
         service,
+        hooks: None,
+        bound_hooks: None,
         capture,
         store: STORE.with(|store| store.borrow().as_ref().expect("world store").clone()),
         commits: Vec::new(),
@@ -500,7 +509,7 @@ fn agent(_spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {
     ))
 }
 fn git(spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {
-    Proc::Git(Box::new(temper_fake_git::Git::new(spawn, inherited, forge::transport())))
+    Proc::Git(Box::new(temper_fake_git::Git::new(spawn, inherited, transport())))
 }
 fn shell(spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {
     Proc::Shell(Box::new(stories::Shell::new(spawn, inherited)))
@@ -598,11 +607,42 @@ fn person(inherited: &Inherited) -> Proc {
     }
     Proc::Client(Box::new(SignalHost::new(person, Some(inherited.signal))))
 }
-fn peer(inherited: &Inherited) -> Proc {
+fn llm_peer(inherited: &Inherited) -> Proc {
     Proc::Peer(Box::new(SignalHost::new(fixtures::provider(), Some(inherited.signal))))
 }
+
+fn hooks_address(bound: &mut Option<(Fd, SocketAddr)>, complete: &Complete) -> Option<SocketAddr> {
+    use skein_io::kernel::{Done, Op};
+    match (&complete.kind, &complete.result) {
+        (Op::Bind { fd, addr: asked }, Ok(Done::Bound(addr))) if asked.port() == 0 => {
+            *bound = Some((*fd, *addr));
+            None
+        }
+        (Op::Listen { fd, .. }, Ok(_)) if bound.is_some_and(|(at, _)| at == *fd) => bound.take().map(|(_, addr)| addr),
+        _ => None,
+    }
+}
+thread_local! { static SHARED: RefCell<Option<temper_fake_git::Transport>> = const { RefCell::new(None) }; }
+fn share(transport: Option<temper_fake_git::Transport>) {
+    SHARED.with(|shared| *shared.borrow_mut() = transport);
+}
+fn transport() -> temper_fake_git::Transport {
+    SHARED.with(|shared| shared.borrow().as_ref().expect("world's forge").clone())
+}
+fn peer() -> Peer {
+    Peer::new(
+        fixtures::FORGE,
+        fixtures::peer_limits(),
+        temper_fake_git::fixtures::table(b"acme/app", None),
+        fixtures::forge_limits(),
+        transport().forge,
+        fixtures::SEED,
+    )
+    .expect("forge peer")
+}
+
 fn fake_forge(inherited: &Inherited) -> Proc {
-    Proc::Forge(Box::new(SignalHost::new(forge::ForgeHost::new(), Some(inherited.signal))))
+    Proc::Forge(Box::new(SignalHost::new(peer(), Some(inherited.signal))))
 }
 fn host_programs(world: &mut skein_world::World<Proc, referee::Referee, Machine>) {
     world.host_roots(
@@ -628,6 +668,27 @@ fn host_programs(world: &mut skein_world::World<Proc, referee::Referee, Machine>
         agent_root,
     );
 }
+fn deliveries(procs: &[Proc]) -> Vec<Delivery> {
+    procs
+        .iter()
+        .filter_map(|proc| if let Proc::Forge(peer) = proc { Some(peer.observations()) } else { None })
+        .flatten()
+        .filter_map(|observation| {
+            if let Observation::Delivery { outcome, .. } = observation {
+                Some(match outcome {
+                    Delivery::Written => Delivery::Written,
+                    Delivery::NoAddress => Delivery::NoAddress,
+                    Delivery::NoRoom => Delivery::NoRoom,
+                    Delivery::Refused => Delivery::Refused,
+                    Delivery::Reset => Delivery::Reset,
+                })
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 fn run_phase(
     settings: Settings,
     scenario: Story,
@@ -645,7 +706,7 @@ fn run_phase(
     });
     let transport = stories::forge(scenario);
     let observed_forge = Rc::new(RefCell::new(referee::forge::Forge::new(transport.clone(), scenario)));
-    forge::set(Some(transport.clone()));
+    share(Some(transport.clone()));
     let mut world = skein_world::World::new_controlled(settings.seed, settings.config, Memory::Unchecked, |controls| {
         referee::Referee::new(controls, store.clone(), scenario, observed_forge.clone(), run.clone(), phase)
     })
@@ -667,23 +728,26 @@ fn run_phase(
                 }],
                 person,
             );
-            world.spawn_restartable(vec![], peer);
+            world.spawn_restartable(vec![], llm_peer);
             world.spawn_restartable(vec![], fake_forge);
             world.cut(0, before, cut);
         }
         Phase::Restart => {
             world.spawn(|| Proc::Peer(Box::new(SignalHost::new(stories::provider(scenario), None))));
-            world.spawn(|| Proc::Forge(Box::new(SignalHost::new(forge::ForgeHost::new(), None))));
+            world.spawn(|| Proc::Forge(Box::new(SignalHost::new(peer(), None))));
         }
         Phase::Story | Phase::Drain => {
             world.spawn_root(skein_sim::Handle::new(client.expect("story client root").raw()), |root| {
                 Proc::Client(Box::new(SignalHost::new(Person::new(root, scenario), None)))
             });
             world.spawn(|| Proc::Peer(Box::new(SignalHost::new(stories::provider(scenario), None))));
-            world.spawn(|| Proc::Forge(Box::new(SignalHost::new(forge::ForgeHost::new(), None))));
+            world.spawn(|| Proc::Forge(Box::new(SignalHost::new(peer(), None))));
         }
     }
     let mut outcome = world.run();
+    if matches!(scenario, Story::Adopt) {
+        observed_forge.borrow().require_hooks(stories::ADOPT_HOOKS);
+    }
     let signed_in = outcome
         .procs
         .iter()
@@ -702,8 +766,9 @@ fn run_phase(
         referee::require_replayed(&run.borrow(), &store.borrow());
     }
     let pushed = std::mem::take(&mut observed_forge.borrow_mut().pushed);
+    let deliveries = deliveries(&outcome.procs);
     assert!(outcome.procs.iter().all(Host::is_empty), "all processes drain");
-    forge::set(None);
+    share(None);
     STORE.with(|cell| {
         *cell.borrow_mut() = None;
     });
@@ -714,6 +779,7 @@ fn run_phase(
         chats_answered,
         adopted,
         pushed,
+        deliveries,
         drained: run.borrow().drained,
         restarts: run.borrow().restarts,
         claims_settled_at_restart: run.borrow().settled,
@@ -725,21 +791,4 @@ fn run_phase(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn an_adoption_saves_a_pending_window_before_the_engine_commit() {
-        let setup = Rc::new(RefCell::new(referee::Run::default()));
-        let (outcome, _, _) =
-            run_phase(fixtures::calm(1), Story::Adoption, Phase::Story, machine::fresh(), Store::new(), setup.clone());
-        assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
-        assert_eq!(outcome.adopted, 1);
-        PROGRESS.with(|progress| {
-            assert!(
-                setup.borrow().window.is_some(),
-                "saved pending adoption window: {:?}",
-                progress.borrow().cache.borrow()
-            );
-        });
-    }
-}
+mod tests;
