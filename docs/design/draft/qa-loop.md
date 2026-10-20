@@ -10,7 +10,7 @@ This draft covers the loop's mechanics and its first milestone, M1:
 the loop's process and tooling, proven on the simplest story, on fake
 backends. M2 (a real forge, the fake LLM) and M3
 (real forges, real LLMs) are drafts of their own; the mapping of the
-owners' process onto temper is a session of its own.
+owners' process onto temper is `temper-on-temper.md`.
 
 ## 1. In one page
 
@@ -295,7 +295,7 @@ class, and a fix checked again.
 - **M3:** real forges and real LLMs, Codex then Claude; verdicts become
   rates over many runs (draft of its own).
 - **More stories,** growing with the tools' areas 2 to 4, until
-  temper-on-temper (a session of its own).
+  temper-on-temper (`temper-on-temper.md`).
 - **Driver agents on documents alone:** no code, only the user-facing
   documents and the tools' guide, so their findings shape those
   documents too; a later milestone.
