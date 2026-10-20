@@ -1728,6 +1728,11 @@ where its answer lands.
 
      Record Smith's newer Grant.form diagnostics under README Host grant forms: introduced by smith-sources/smith-01,a26eadcf50888eee56f5d4b453bbedd83981c5de, reached in Jig test-worker translation/account-notice fixtures. Director routing establishes the downstream owner/disposition in coordination with Accounts-2; no repair Step trailer is invented and no form mapping or early pin is chosen here. Preserve payload semantics and exact sources/locks; refresh further copies within that repair and list users. Independent compatible starts remain at full capacity.
 
+206. **Independent listener work pending the Answering decision** (design gap, Skein08.3 block of2026-10-20T04:10:31Z).
+     Pinned development.md10.4 says: "When the step can go on meanwhile, the supervisor's interim ruling lets it go on only with work that does not rest on the answer". Skein08.3 may continue its already-scoped independent listener byte-fault, io settlement and lint work. Its public Answering boundary question is now in question.md alongside Temper05.2; it remains for the designer. This ruling chooses neither an atomic replacement assertion nor a new control seam.
+
+     Keep the prescribed ambiguous Answering deadline and owner-Close rows unresolved and unproved until that answer. Retain the failed-run evidence, original expectations, draft and bounded driver. Do not land08.3, omit a row, accept a nonzero initial hint for its zero row, add a private diagnostic/control seam, or change shipped code under this interim ruling. No extra diagnostic attempt or budget is added. Once the answer lands, the owning step must finish its normal actual-tree proofs with the plan's counts and caps. Temper05.2 remains independently blocked.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
