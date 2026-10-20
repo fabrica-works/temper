@@ -824,6 +824,14 @@ pass:
 
      So, as development.md 14.4 says for a test-shape rule a script can test, sent a second time, step `temper-13.s2` (`temper/13.s2-git-test-shapes.md`), in session 13 after temper-13.5 (both change `scripts/check.sh`), fixes these and adds a check to temper's gate for the two forms a script finds: a tuple of exits asserted together, and a length asserted against a bare integer, in `tests/real-loop/tests` (`grep -rnE 'assert_eq!\(\([a-z_]+\.exit, [a-z_]+\.exit|\.len\(\), [0-9]+[,)]' tests/real-loop/tests` on origin/main: the three lines above). An assertion of a setup's exit alone, before the act, is no form a script can tell from the act's own; it stays the rule's, for the checks to read. temper is the most downstream repository: no repin.
 
+143. **13.5's agent adapter takes the service's roots** (plan defect, temper 13's block of 2026-10-20T12:47:48Z).
+     Ruling 143: the cause 13.5 found is a defect of the real-loop world's agent adapter, which 13.5's story is the first to meet (the first agent that reads a repository's checkout), so a plan defect: 13.5's Files miss `tests/real-loop/src/agent.rs`. The README's rule "A world failure's cause, within a budget" asks for a fix "within the step's Files and rulings": this ruling adds the file to them.
+
+     - `agent::roots` hands every agent one descriptor, `<config's parent>/worker-root`, while the service names each Start directory `<worker root>/workspaces/<directory.root>/<directory.name>` (`temper-service/src/worker.rs`, `start_values`), and the shipped agent adopts supplied descriptors "in Start order" (smith 6747e66, `smith-agent-shell/src/agent_shell.rs`, `Resources::roots`). Without supplied roots it opens the host's path itself (`skein_shell::open_root`). So the world hands the agent a root above the checkout, and the coder's `README.md` is "path not found".
+     - 13.5 fixes `agent::{agent, roots}` so that each agent adopts, in Start order, the directory the service names for it, as the shipped agent would open it, and names the fix and the other real-loop stories it touches in the commit body. `temper-service`, smith and skein stay unchanged; a fix that needs one of them, or `skein_world`, is raised as a block with the cause, before it is changed.
+     - The fixes inside 13.5's Files made under ruling 140 (the tools' row bound, the delegate decoder, the builder window) stay, each named in the commit body with the run that found it.
+     - The budget starts afresh for what comes after this fix: a further symptom gets the README rule's three diagnostic runs, then eight runs and 40 minutes, through `heavy`, diagnostics removed before the commit. Then 13.5's Proof, clippy, the dependent tests and the three measurements, as its session file says.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

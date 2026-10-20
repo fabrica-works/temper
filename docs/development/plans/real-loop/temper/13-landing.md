@@ -286,6 +286,8 @@ land through the hosted agents, fake git and the peer (tools.md, 11.3;
 domain/forge.md, 8.2).
 Needs: 13.1 to 13.4; temper 05's waits and `task --tree` read.
 Files: `tests/real-loop/src/{landing.rs, calls.rs, forge.rs, lib.rs}`,
+`tests/real-loop/src/agent.rs` (`agent` and `roots`: each agent adopts,
+in Start order, the directory the service names for it, ruling 143),
 `tests/real-loop/tests/forge.rs`, `scripts/check.sh` (`delegate` in its
 real-loop call positions' pattern).
 Shape:
