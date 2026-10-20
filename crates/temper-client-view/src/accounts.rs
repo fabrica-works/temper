@@ -27,7 +27,8 @@ pub(crate) struct Bindings {
     next: u64,
 }
 pub(crate) const fn owner() -> skein_ui::Owner {
-    skein_ui::Owner { number: 1001 }
+    // View-local owner, outside the u16 wire family/asker namespace.
+    skein_ui::Owner { number: 65536 }
 }
 impl Bindings {
     pub fn new(capacity: u32) -> Self {

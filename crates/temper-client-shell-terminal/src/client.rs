@@ -139,10 +139,10 @@ impl NativeClient {
         if matches!(self.phase, Phase::Closing { .. }) {
             return false;
         }
-        let Some(action) = view::act(&mut self.view, node, act) else {
+        let Some(event) = view::event(&mut self.view, node, act) else {
             return false;
         };
-        self.event(domain::Event::Act { action });
+        self.event(event);
         true
     }
     /// Navigation is a root event, even when its address did not change.

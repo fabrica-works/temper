@@ -110,8 +110,11 @@ pub(crate) enum Word {
     After,
 }
 const ROWS: &[(Word, &[u8])] = &[
-    (Word::Removed,b"Account removed; confirmed."),
-    (Word::RemovedUnconfirmed,b"Account removed; revocation was not confirmed. Disconnect temper in the provider's settings."),
+    (Word::Removed, b"Account removed; confirmed."),
+    (
+        Word::RemovedUnconfirmed,
+        b"Account removed; revocation was not confirmed. Disconnect temper in the provider's settings.",
+    ),
     (Word::Accounts, b"Accounts"),
     (Word::Own, b"Your accounts"),
     (Word::Deployment, b"Deployment accounts"),

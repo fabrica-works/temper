@@ -98,8 +98,8 @@ impl Host {
         root::fire(&mut self.root, &self.env, &mut self.out);
     }
     pub fn act(&mut self, node: NodeId, act: Act) {
-        if let Some(action) = view::act(&mut self.view, node, act) {
-            self.event(Event::Act { action });
+        if let Some(event) = view::event(&mut self.view, node, act) {
+            self.event(event);
         }
     }
     pub fn heard(&mut self, heard: Heard) {

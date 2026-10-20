@@ -450,9 +450,15 @@ fn outcome(b: &mut Builder, root: &Domain, w: &Words, form: &accounts::Accounts)
             None => text(b, w, Role::Status, W::InFlight),
             Some(jig_client::Outcome::Lost) => text(b, w, Role::Alert, W::Lost),
             Some(jig_client::Outcome::Unsent) => text(b, w, Role::Alert, W::Unsent),
-            Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountSignedOut {confirmed}))))) => text(b,w,Role::Status,if *confirmed {W::Confirmed} else {W::Unconfirmed}),
-            Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountRemoved {confirmed}))))) => text(b,w,Role::Status,if *confirmed {W::Removed} else {W::RemovedUnconfirmed}),
-            Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountKeyKept {source}))))) => fact(b,w,W::Saved,u64::from(*source)),
+            Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
+                c::OwnerOutcome::AccountSignedOut { confirmed },
+            ))))) => text(b, w, Role::Status, if *confirmed { W::Confirmed } else { W::Unconfirmed }),
+            Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
+                c::OwnerOutcome::AccountRemoved { confirmed },
+            ))))) => text(b, w, Role::Status, if *confirmed { W::Removed } else { W::RemovedUnconfirmed }),
+            Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
+                c::OwnerOutcome::AccountKeyKept { source },
+            ))))) => fact(b, w, W::Saved, u64::from(*source)),
             Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Refused { refusal, .. }))) => {
                 crate::cards::refusal(b, w, refusal);
             }

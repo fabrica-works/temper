@@ -82,3 +82,27 @@ fn the_largest_fixture_tree_prints_within_its_bounds() {
     let native = crate::limits::view(&crate::limits::native()).expect("native view bounds").0;
     assert!(skein_ui_text::worst_case(&native.tree).is_some(), "native view has a print envelope: {:?}", native.tree);
 }
+
+#[test]
+fn account_fields_print_hidden() {
+    let mut builder = skein_ui::Builder::new(&fixtures::tree_limits());
+    builder.open(skein_ui::Role::TextField);
+    builder.name(b"Key (pasted once)");
+    builder.entry(skein_ui::EntryKind::Secret);
+    builder.value(b"*", 1);
+    builder.close();
+    let print = fixtures::print(&builder.finish());
+    assert!(print.text.as_slice().windows(b"(hidden)".len()).any(|part| part == b"(hidden)"));
+}
+#[test]
+fn account_sign_in_addresses_print_with_their_visible_text() {
+    const ADDRESS: &[u8] = b"https://issuer.example/visit";
+    let mut builder = skein_ui::Builder::new(&fixtures::tree_limits());
+    builder.open(skein_ui::Role::Link);
+    builder.text(skein_ui::Run::Plain, ADDRESS);
+    builder.external(ADDRESS);
+    builder.close();
+    let print = fixtures::print(&builder.finish());
+    let expected = b"https://issuer.example/visit <https://issuer.example/visit>";
+    assert!(print.text.as_slice().windows(expected.len()).any(|part| part == expected));
+}
