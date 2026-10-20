@@ -1,3 +1,4 @@
+use crate::json;
 use crate::{
     Result,
     cases::{Auth, Recorder},
@@ -9,9 +10,23 @@ use skein_throwaway_forgejo::{Token, fresh_secret};
 use std::path::Path;
 pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
     let password = fresh_secret().map_err(|e| crate::failure(&e))?;
-    let body = format!(
-        "{{\"username\":\"bot\",\"email\":\"bot@example.invalid\",\"password\":\"{password}\",\"full_name\":\"temper:bot\",\"must_change_password\":false}}"
-    );
+    let body = String::from_utf8(
+        json::write(|out| {
+            out.object_start();
+            out.key(b"username");
+            out.string(b"bot");
+            out.key(b"email");
+            out.string(b"bot@example.invalid");
+            out.key(b"password");
+            out.string(password.as_bytes());
+            out.key(b"full_name");
+            out.string(b"temper:bot");
+            out.key(b"must_change_password");
+            out.boolean(false);
+            out.object_end();
+        })?
+        .into_vec(),
+    )?;
     std::thread::sleep(std::time::Duration::from_secs(1));
     r.send_new(
         "setup-user-create",
@@ -38,9 +53,23 @@ pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
         r.send_new(name, "GET", target, None, Auth::Token(admin), &[])?;
     }
     let password = fresh_secret().map_err(|e| crate::failure(&e))?;
-    let body = format!(
-        "{{\"username\":\"person\",\"email\":\"person@example.invalid\",\"password\":\"{password}\",\"full_name\":\"Person\",\"must_change_password\":true}}"
-    );
+    let body = String::from_utf8(
+        json::write(|out| {
+            out.object_start();
+            out.key(b"username");
+            out.string(b"person");
+            out.key(b"email");
+            out.string(b"person@example.invalid");
+            out.key(b"password");
+            out.string(password.as_bytes());
+            out.key(b"full_name");
+            out.string(b"Person");
+            out.key(b"must_change_password");
+            out.boolean(true);
+            out.object_end();
+        })?
+        .into_vec(),
+    )?;
     std::thread::sleep(std::time::Duration::from_secs(1));
     r.send_new(
         "setup-user-create-person",
@@ -56,7 +85,7 @@ pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
     r.f.api(
         "PATCH",
         "/api/v1/admin/users/person",
-        &serde_json::json!({"login_name":"person", "source_id":0, "must_change_password":false}),
+        &json::object(&[("login_name", &"person"), ("must_change_password", &false), ("source_id", &0u64)])?,
     )?;
     r.send_new("setup-user-person-cleared", "GET", "/api/v1/user", None, Auth::Token(&person), &[])?;
     Ok(())

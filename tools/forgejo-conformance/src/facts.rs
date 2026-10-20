@@ -1,9 +1,9 @@
+use crate::json;
 use crate::json::Json;
 use crate::{
     Result, failure,
     fixture::{Fixture, R, encode},
 };
-use serde_json::{Value, json};
 use skein_throwaway_forgejo::{Forgejo, Outgoing, Settings};
 use std::{fs, path::Path, time::Duration};
 #[derive(Debug, PartialEq, Eq)]
@@ -273,7 +273,7 @@ fn pause() {
 }
 fn updated(f: &Fixture, facts: &mut Vec<Fact>) -> Result<(Json, Json)> {
     let issue = f
-        .api("POST", &format!("{R}/issues"), &json!({"title":"time facts","body":"initial"}))?
+        .api("POST", &format!("{R}/issues"), &json::object(&[("body", &"initial"), ("title", &"time facts")])?)?
         .root()
         .get("number")
         .u64()
@@ -281,7 +281,7 @@ fn updated(f: &Fixture, facts: &mut Vec<Fact>) -> Result<(Json, Json)> {
     let route = format!("{R}/issues/{issue}");
     let before = f.get(&route)?;
     pause();
-    let original = f.api("POST", &format!("{route}/comments"), &json!({"body":"original"}))?;
+    let original = f.api("POST", &format!("{route}/comments"), &json::object(&[("body", &"original")])?)?;
     let posted = f.get(&route)?;
     add(
         facts,
@@ -291,7 +291,7 @@ fn updated(f: &Fixture, facts: &mut Vec<Fact>) -> Result<(Json, Json)> {
     );
     pause();
     let comment = format!("{R}/issues/comments/{}", original.root().get("id").u64().ok_or("comment id missing")?);
-    let edited = f.api("PATCH", &comment, &json!({"body":"edited"}))?;
+    let edited = f.api("PATCH", &comment, &json::object(&[("body", &"edited")])?)?;
     add(
         facts,
         "updated-stays-on-comment-edit",
@@ -299,7 +299,7 @@ fn updated(f: &Fixture, facts: &mut Vec<Fact>) -> Result<(Json, Json)> {
         &format!("{:?}", f.get(&route)?.root().get("updated_at").str()),
     );
     pause();
-    f.api("DELETE", &comment, &Value::Null)?;
+    f.api("DELETE", &comment, &json::write(skein_json::writer::Encoder::null)?)?;
     add(
         facts,
         "updated-stays-on-comment-delete",
@@ -323,30 +323,24 @@ fn updated(f: &Fixture, facts: &mut Vec<Fact>) -> Result<(Json, Json)> {
         pause();
         match operation {
             0 => {
-                f.api("POST", &format!("{R}/pulls/{pull}/reviews"), &json!({"event":"COMMENT","body":"time review"}))?;
+                f.api(
+                    "POST",
+                    &format!("{R}/pulls/{pull}/reviews"),
+                    &json::object(&[("body", &"time review"), ("event", &"COMMENT")])?,
+                )?;
             }
             1 => {
                 f.put(R, "facts-head", "facts-new.txt", "new head\n")?;
             }
-            2 => {
-                let head = f
-                    .get(&format!("{R}/branches/facts-head"))?
-                    .root()
-                    .get("commit")
-                    .get("id")
-                    .str()
-                    .ok_or("fact head missing")?
-                    .to_owned();
-                f.api("POST", &format!("{R}/statuses/{head}"), &json!({"state":"success","context":"time/test"}))?;
-            }
+            2 => time_status(f)?,
             3 => {
                 f.put(R, "facts-base", "facts-base.txt", "new base\n")?;
             }
             4 => {
-                f.api("PATCH", &route, &json!({"state":"closed"}))?;
+                f.api("PATCH", &route, &json::object(&[("state", &"closed")])?)?;
             }
             5 => {
-                f.api("PATCH", &route, &json!({"state":"open"}))?;
+                f.api("PATCH", &route, &json::object(&[("state", &"open")])?)?;
             }
             _ => return Err("unknown time operation".into()),
         }
@@ -369,7 +363,21 @@ fn updated(f: &Fixture, facts: &mut Vec<Fact>) -> Result<(Json, Json)> {
     }
     Ok((original, edited))
 }
+fn time_status(f: &Fixture) -> Result<()> {
+    let head = f.get(&format!("{R}/branches/facts-head"))?;
+    let head = head.root().get("commit").get("id").str().ok_or("fact head missing")?;
+    f.api(
+        "POST",
+        &format!("{R}/statuses/{head}"),
+        &json::object(&[("context", &"time/test"), ("state", &"success")])?,
+    )?;
+    Ok(())
+}
+
 fn bodies(f: &Fixture, out: &Path, changed: &(Json, Json), facts: &mut Vec<Fact>) -> Result<()> {
+    // The existing largest ASCII x string (1,048,576 bytes) plus the complete
+    // sorted object's {"body":"","title":"body fact"} framing (31 bytes).
+    const LARGE_FACT_REQUEST_BYTES: u32 = 1_048_607;
     let comment = case(out, "post-comment")?;
     let review = case(out, "post-review-approved")?;
     add(
@@ -398,7 +406,15 @@ fn bodies(f: &Fixture, out: &Path, changed: &(Json, Json), facts: &mut Vec<Fact>
     );
     for (name, size) in [("body-of-65536-bytes-kept-whole", 65536), ("body-of-1048576-bytes-kept-whole", 1_048_576)] {
         let text = "x".repeat(size);
-        let made = f.api("POST", &format!("{R}/issues"), &json!({"title":"body fact","body":text}))?;
+        let body = json::write_bounded(LARGE_FACT_REQUEST_BYTES, |out| {
+            out.object_start();
+            out.key(b"body");
+            out.string(text.as_bytes());
+            out.key(b"title");
+            out.string(b"body fact");
+            out.object_end();
+        })?;
+        let made = f.api("POST", &format!("{R}/issues"), &body)?;
         let read = f.get(&format!("{R}/issues/{}", made.root().get("number").u64().ok_or("issue number missing")?))?;
         add(
             facts,
@@ -413,7 +429,7 @@ fn pulls(f: &Fixture, out: &Path, facts: &mut Vec<Fact>) -> Result<()> {
     let edited = f.api(
         "PATCH",
         &format!("{R}/issues/{}", f.feature),
-        &json!({"title":"pull edited","body":"pull edited body"}),
+        &json::object(&[("body", &"pull edited body"), ("title", &"pull edited")])?,
     )?;
     add(
         facts,
@@ -428,7 +444,7 @@ fn pulls(f: &Fixture, out: &Path, facts: &mut Vec<Fact>) -> Result<()> {
     f.api(
         "PATCH",
         &format!("{R}/issues/{}", first.root().get("number").u64().ok_or("pull number missing")?),
-        &json!({"state":"closed"}),
+        &json::object(&[("state", &"closed")])?,
     )?;
     let newest = f.pull(R, "repeat-head", "landing")?;
     let found = f.get(&format!("{R}/pulls/landing/repeat-head"))?;
@@ -461,7 +477,7 @@ fn pulls(f: &Fixture, out: &Path, facts: &mut Vec<Fact>) -> Result<()> {
     );
     let head = newest.root().get("head").get("sha").str().ok_or("status head missing")?;
     for (state, context) in [("skipped", "skip/test"), ("success", "pass/test")] {
-        f.api("POST", &format!("{R}/statuses/{head}"), &json!({"state":state,"context":context}))?;
+        f.api("POST", &format!("{R}/statuses/{head}"), &json::object(&[("context", &context), ("state", &state)])?)?;
     }
     let combined = f.get(&format!("{R}/commits/{head}/status?page=1&limit=2"))?;
     add(
@@ -494,7 +510,7 @@ fn orders(f: &Fixture, out: &Path, facts: &mut Vec<Fact>) -> Result<()> {
     )?;
     let review = crate::json(&response)?;
     let id = review.root().get("id").u64().ok_or("dismissal review missing")?;
-    f.api("POST", &format!("{route}/{id}/dismissals"), &json!({"message":"dismiss fact"}))?;
+    f.api("POST", &format!("{route}/{id}/dismissals"), &json::object(&[("message", &"dismiss fact")])?)?;
     let dismissed = f.get(&format!("{route}/{id}"))?;
     add(
         facts,

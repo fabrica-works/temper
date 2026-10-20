@@ -1,10 +1,10 @@
+use crate::json;
 use crate::{
     Result,
     fixture::{Fixture, R, encode},
     mask::{self, Mask},
     write::{self, SecretKind, Secrets},
 };
-use serde_json::json;
 use skein_throwaway_forgejo::{Exchange, Token};
 use std::path::Path;
 pub(crate) struct Recorder<'a> {
@@ -133,12 +133,7 @@ fn writes(r: &mut Recorder<'_>) -> Result<Written> {
         ("post-review-request-changes", "REQUEST_CHANGES", "04"),
         ("post-review-comment", "COMMENT", "05"),
     ] {
-        r.w(
-            name,
-            "POST",
-            &format!("{pull_route}/reviews"),
-            Some(&format!("{{\"event\":\"{event}\",\"body\":\"<!-- temper:key 010000{key} -->\\nreview text\"}}")),
-        )?;
+        r.w(name, "POST", &format!("{pull_route}/reviews"), Some(std::str::from_utf8(&review_event(event, key)?)?))?;
     }
     r.w(
         "request-reviewers",
@@ -164,7 +159,8 @@ fn writes(r: &mut Recorder<'_>) -> Result<Written> {
         &format!("{R}/statuses/{head}"),
         Some("{\"state\":\"pending\",\"context\":\"fixture/other\"}"),
     )?;
-    let branch_body = format!("{{\"new_branch_name\":\"recorded\",\"old_ref_name\":\"{head}\"}}");
+    let branch_body =
+        String::from_utf8(json::object(&[("new_branch_name", &"recorded"), ("old_ref_name", &head)])?.into_vec())?;
     r.w("create-branch", "POST", &format!("{R}/branches"), Some(&branch_body))?;
     r.w("create-branch-exists", "POST", &format!("{R}/branches"), Some(&branch_body))?;
     r.w("close-issue", "PATCH", &issue_route, Some("{\"state\":\"closed\"}"))?;
@@ -185,12 +181,28 @@ fn writes(r: &mut Recorder<'_>) -> Result<Written> {
         "merge-pull",
         "POST",
         &format!("{R}/pulls/{own}/merge"),
-        Some(&format!("{{\"Do\":\"merge\",\"head_commit_id\":\"{own_head}\"}}")),
+        Some(std::str::from_utf8(&json::object(&[("Do", &"merge"), ("head_commit_id", &own_head)])?)?),
     )?;
     r.w("delete-branch", "DELETE", &format!("{R}/branches/recorded"), None)?;
-    let remark = f.api("POST", &format!("{pull_route}/reviews"), &json!({"event":"COMMENT","body":"remark review","comments":[{"path":"file-0.txt","new_position":1,"body":"remark text"}]}))?.root().get("id").u64().ok_or("remark review missing")?;
+    let remark = f
+        .api("POST", &format!("{pull_route}/reviews"), &crate::fixture::remark_review("remark review", "remark text")?)?
+        .root()
+        .get("id")
+        .u64()
+        .ok_or("remark review missing")?;
     Ok(Written { issue, own, own_head, remark })
 }
+fn review_event(event: &str, key: &str) -> Result<Box<[u8]>> {
+    json::write(|out| {
+        out.object_start();
+        out.key(b"event");
+        out.string(event.as_bytes());
+        out.key(b"body");
+        out.string(format!("<!-- temper:key 010000{key} -->\nreview text").as_bytes());
+        out.object_end();
+    })
+}
+
 fn reads(r: &mut Recorder<'_>, written: &Written) -> Result<()> {
     let f = r.f;
     let owner = &f.owner.token;
@@ -328,7 +340,7 @@ fn failures(r: &mut Recorder<'_>, written: &Written) -> Result<()> {
             name,
             "POST",
             &format!("{repo}/pulls/{number}/merge"),
-            Some(&format!("{{\"Do\":\"{style}\",\"head_commit_id\":\"{sha}\"}}")),
+            Some(std::str::from_utf8(&json::object(&[("Do", &style), ("head_commit_id", &sha)])?)?),
         )?;
     }
     r.w("update-conflict", "POST", &format!("{R}/pulls/{}/update?style=merge", f.conflict), None)?;

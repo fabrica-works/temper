@@ -1,3 +1,4 @@
+use crate::json;
 use crate::{
     Result,
     cases::Recorder,
@@ -13,7 +14,7 @@ pub(crate) fn scoped(f: &Fixture, secrets: &mut Secrets, login: &str, name: &str
     let row = f.api(
         "POST",
         &format!("/api/v1/admin/users/{login}/tokens"),
-        &serde_json::json!({"name":name, "scopes":scopes}),
+        &json::object(&[("name", &name), ("scopes", &scopes)])?,
     )?;
     let value = row.root().get("sha1").str().ok_or("token value missing")?;
     secrets.add(SecretKind::ApiToken, value);

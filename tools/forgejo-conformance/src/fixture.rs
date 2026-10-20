@@ -1,5 +1,5 @@
+use crate::json;
 use crate::{Result, failure, json::Json};
-use serde_json::{Value, json};
 use skein_throwaway_forgejo::{Account, Exchange, Forgejo, Init, Instance, Outgoing, Settings, Token};
 use std::path::Path;
 pub const R: &str = "/api/v1/repos/fixture/specimen";
@@ -28,11 +28,11 @@ impl Fixture {
         }
         f.repository = ids[0];
         f.private = ids[1];
-        f.api("PATCH", "/api/v1/repos/fixture/private", &json!({"private": true}))?;
-        f.api("PATCH", "/api/v1/repos/fixture/archived", &json!({"archived": true}))?;
-        f.api("PATCH", "/api/v1/repos/fixture/moved", &json!({"name": "renamed"}))?;
-        f.api("PATCH", "/api/v1/repos/fixture/narrow", &json!({"allow_squash_merge": false}))?;
-        f.api("POST", &format!("{R}/labels"), &json!({"name":"temper / label", "color":"abcdef"}))?;
+        f.api("PATCH", "/api/v1/repos/fixture/private", &json::object(&[("private", &true)])?)?;
+        f.api("PATCH", "/api/v1/repos/fixture/archived", &json::object(&[("archived", &true)])?)?;
+        f.api("PATCH", "/api/v1/repos/fixture/moved", &json::object(&[("name", &"renamed")])?)?;
+        f.api("PATCH", "/api/v1/repos/fixture/narrow", &json::object(&[("allow_squash_merge", &false)])?)?;
+        f.api("POST", &format!("{R}/labels"), &json::object(&[("color", &"abcdef"), ("name", &"temper / label")])?)?;
         f.put(R, "main", "conflict.txt", "original\n")?;
         f.main =
             f.get(&format!("{R}/branches/main"))?.root().get("commit").get("id").str().ok_or("main id missing")?.into();
@@ -55,7 +55,18 @@ impl Fixture {
         f.branch(narrow, "feature", "main")?;
         f.put(narrow, "feature", "narrow.txt", "narrow\n")?;
         f.narrow = f.pull(narrow, "feature", "main")?.root().get("number").u64().ok_or("narrow pull missing")?;
-        f.api("POST", &format!("{R}/branch_protections"), &json!({"branch_name":"main", "enable_push":false, "enable_status_check":true, "status_check_contexts":["fixture/test"], "required_approvals":1, "dismiss_stale_approvals":true}))?;
+        f.api(
+            "POST",
+            &format!("{R}/branch_protections"),
+            &json::object(&[
+                ("branch_name", &"main"),
+                ("dismiss_stale_approvals", &true),
+                ("enable_push", &false),
+                ("enable_status_check", &true),
+                ("required_approvals", &1u64),
+                ("status_check_contexts", &["fixture/test"]),
+            ])?,
+        )?;
         Ok(f)
     }
     pub fn bare(forgejo: &Forgejo, scratch: &Path, settings: &Settings) -> Result<Self> {
@@ -99,22 +110,25 @@ impl Fixture {
             .exchange_basic(&Outgoing { method, target, body, token: None, range: None }, login, secret)
             .map_err(|e| failure(&e))
     }
-    pub fn api(&self, method: &str, target: &str, body: &Value) -> Result<Json> {
-        let body = body.to_string();
-        let response = self.exchange(method, target, Some(body.as_bytes()), Some(&self.owner.token), None)?;
+    pub fn api(&self, method: &str, target: &str, body: &[u8]) -> Result<Json> {
+        let response = self.exchange(method, target, Some(body), Some(&self.owner.token), None)?;
         api_answer(target, &response)
     }
     pub fn get(&self, target: &str) -> Result<Json> {
         crate::json(&self.exchange("GET", target, None, Some(&self.owner.token), None)?)
     }
     pub fn branch(&self, repo: &str, name: &str, from: &str) -> Result<Json> {
-        self.api("POST", &format!("{repo}/branches"), &json!({"new_branch_name":name, "old_ref_name":from}))
+        self.api(
+            "POST",
+            &format!("{repo}/branches"),
+            &json::object(&[("new_branch_name", &name), ("old_ref_name", &from)])?,
+        )
     }
     pub fn pull(&self, repo: &str, head: &str, base: &str) -> Result<Json> {
         let target = format!("{repo}/pulls");
-        let body = json!({"head":head,"base":base,"title":head,"body":"fixture pull"}).to_string();
+        let body = json::object(&[("base", &base), ("body", &"fixture pull"), ("head", &head), ("title", &head)])?;
         for attempt in 0..=3 {
-            let response = self.exchange("POST", &target, Some(body.as_bytes()), Some(&self.owner.token), None)?;
+            let response = self.exchange("POST", &target, Some(&body), Some(&self.owner.token), None)?;
             eprintln!(
                 "provisioning {target}, attempt {}: HTTP {}: {}",
                 attempt + 1,
@@ -131,13 +145,14 @@ impl Fixture {
     pub fn put(&self, repo: &str, branch: &str, path: &str, content: &str) -> Result<Json> {
         let route = format!("{repo}/contents/{path}");
         let old = self.get(&format!("{route}?ref={}", encode(branch)))?;
-        let mut body = json!({"branch":branch, "message":path, "content":base64(content)});
-        let method = if old.root().get("sha").str().is_some() {
-            body["sha"] = json!(old.root().get("sha").str().expect("string checked"));
-            "PUT"
+        let sha = old.root().get("sha").str();
+        let content = base64(content);
+        let body = if let Some(sha) = sha {
+            json::object(&[("branch", &branch), ("content", &content), ("message", &path), ("sha", &sha)])?
         } else {
-            "POST"
+            json::object(&[("branch", &branch), ("content", &content), ("message", &path)])?
         };
+        let method = if sha.is_some() { "PUT" } else { "POST" };
         self.api(method, &route, &body)
     }
     pub fn ready(&self, repo: &str, pull: u64, previous: Option<&str>) -> Result<()> {
@@ -153,6 +168,28 @@ impl Fixture {
         Err("pull did not become mergeable".into())
     }
 }
+pub(crate) fn remark_review(body: &str, remark: &str) -> Result<Box<[u8]>> {
+    json::write(|out| {
+        out.object_start();
+        out.key(b"body");
+        out.string(body.as_bytes());
+        out.key(b"comments");
+        out.array_start();
+        out.object_start();
+        out.key(b"body");
+        out.string(remark.as_bytes());
+        out.key(b"new_position");
+        out.unsigned(1);
+        out.key(b"path");
+        out.string(b"file-0.txt");
+        out.object_end();
+        out.array_end();
+        out.key(b"event");
+        out.string(b"COMMENT");
+        out.object_end();
+    })
+}
+
 pub(crate) fn api_answer(target: &str, response: &Exchange) -> Result<Json> {
     if !(200..300).contains(&response.status) {
         return Err(format!("provisioning {target}: HTTP {}: {}", response.status, body_preview(response)).into());

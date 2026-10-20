@@ -1,3 +1,4 @@
+use crate::json;
 use crate::json::{At, Json};
 use crate::{
     Result,
@@ -34,29 +35,37 @@ const EVENTS: &[&str] = &[
     "workflow_job_cancelled",
     "workflow_job_skipped",
 ];
-fn body(port: u16, path: &str, secret: &str, events: &[&str], active: bool, create: bool) -> String {
-    let kind = if create { "\"type\":\"forgejo\"," } else { "" };
-    format!(
-        "{{{kind}\"config\":{{\"url\":\"http://127.0.0.1:{port}/{path}\",\"content_type\":\"json\",\"secret\":\"{secret}\"}},\"events\":{},\"active\":{active}}}",
-        String::from_utf8(
-            crate::json::write(|out| {
-                out.array_start();
-                for event in events {
-                    out.string(event.as_bytes());
-                }
-                out.array_end();
-            })
-            .expect("event names")
-            .into_vec()
-        )
-        .expect("JSON UTF-8")
-    )
+fn body(port: u16, path: &str, secret: &str, events: &[&str], active: bool, create: bool) -> Result<String> {
+    Ok(String::from_utf8(
+        json::write(|out| {
+            out.object_start();
+            if create {
+                out.key(b"type");
+                out.string(b"forgejo");
+            }
+            out.key(b"config");
+            out.object_start();
+            out.key(b"url");
+            out.string(format!("http://127.0.0.1:{port}/{path}").as_bytes());
+            out.key(b"content_type");
+            out.string(b"json");
+            out.key(b"secret");
+            out.string(secret.as_bytes());
+            out.object_end();
+            out.key(b"events");
+            json::Put::put(&events, out);
+            out.key(b"active");
+            out.boolean(active);
+            out.object_end();
+        })?
+        .into_vec(),
+    )?)
 }
 pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
     r.send("setup-hook-list-none", "GET", ROUTE, None, Some(admin), None)?;
     let port = r.f.instance.port();
-    let make = body(port, "hooks/1", FIRST, EVENTS, true, true);
-    let other = body(port, "other", FIRST, &["push"], true, true);
+    let make = body(port, "hooks/1", FIRST, EVENTS, true, true)?;
+    let other = body(port, "other", FIRST, &["push"], true, true)?;
     let mut ids = Vec::new();
     for (name, body) in [("setup-hook-made", &make), ("setup-hook-made-twin", &make), ("setup-hook-made-other", &other)]
     {
@@ -76,10 +85,10 @@ pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
     for (name, events, active) in
         [("setup-hook-patched", EVENTS, true), ("setup-hook-patched-narrow", &["push"][..], false)]
     {
-        let patch = body(port, "hooks/1", SECOND, events, active, false);
+        let patch = body(port, "hooks/1", SECOND, events, active, false)?;
         r.send(name, "PATCH", &first, Some(&patch), Some(admin), None)?;
     }
-    let patch = body(port, "hooks/1", SECOND, EVENTS, true, false);
+    let patch = body(port, "hooks/1", SECOND, EVENTS, true, false)?;
     r.send("setup-hook-patch-missing", "PATCH", &format!("{ROUTE}/999999"), Some(&patch), Some(admin), None)?;
     r.send("setup-hook-deleted", "DELETE", &format!("{ROUTE}/{}", ids[1]), None, Some(admin), None)?;
     r.send("setup-hook-delete-missing", "DELETE", &format!("{ROUTE}/999999"), None, Some(admin), None)?;

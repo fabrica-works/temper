@@ -1,4 +1,4 @@
-use super::{Json, write};
+use super::{Json, object, write};
 const BODY: &[u8] =
     br#"{"id":7,"name":"specimen","private":false,"labels":["a","b"],"owner":{"id":3,"login":"fixture"}}"#;
 #[test]
@@ -49,4 +49,23 @@ fn a_key_is_found_at_any_depth_and_a_value_is_not_a_key() {
     assert!(json.has_key("secret"));
     assert!(json.has_key("c"));
     assert!(!json.has_key("x"));
+}
+
+#[test]
+fn an_object_is_written_compact_in_sorted_key_order() {
+    let body = object(&[("a", &1u64), ("b", &"x"), ("c", &true)]).expect("sorted members");
+    assert_eq!(&*body, br#"{"a":1,"b":"x","c":true}"#);
+}
+
+#[test]
+fn members_out_of_order_or_repeated_are_refused() {
+    for members in [[("b", &true), ("a", &true)], [("a", &true), ("a", &true)]] {
+        assert!(object(&members.map(|(key, value)| (key, value as &dyn super::Put))).is_err(), "{members:?}");
+    }
+}
+
+#[test]
+fn a_string_is_escaped_to_the_bytes_the_base_wrote() {
+    let body = write(|out| out.string("\"\\\n\t\u{1}é".as_bytes())).expect("string");
+    assert_eq!(&*body, "\"\\\"\\\\\\n\\t\\u0001é\"".as_bytes());
 }

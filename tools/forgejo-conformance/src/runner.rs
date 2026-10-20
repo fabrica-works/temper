@@ -1,3 +1,4 @@
+use crate::json;
 use crate::json::{At, Json};
 use crate::{
     Result,
@@ -7,7 +8,6 @@ use crate::{
     registration,
     write::{self, SecretKind, Secrets},
 };
-use serde_json::json;
 use skein_throwaway_forgejo::{Exchange, Range};
 use std::{
     fs::{self, File},
@@ -67,7 +67,7 @@ fn run_with(f: &Fixture, out: Option<&Path>, mask: &mut Mask, secrets: &mut Secr
     let binary = PathBuf::from(binary);
     let (_runner, version) = start(f, &binary, secrets)?;
     let online = registration::online(f)?;
-    f.api("PATCH", R, &json!({"has_actions":true}))?;
+    f.api("PATCH", R, &json::object(&[("has_actions", &true)])?)?;
     f.branch(R, "actions", "landing")?;
     f.put(R,"actions",".forgejo/workflows/conformance.yaml","name: conformance\non: push\njobs:\n  pass:\n    runs-on: temper-host\n    steps:\n      - run: exit 0\n  fail:\n    runs-on: temper-host\n    steps:\n      - run: |\n          printf 'TEMPER_CONFORMANCE_FAILED_JOB\\n'\n          exit 1\n")?;
     let head = f

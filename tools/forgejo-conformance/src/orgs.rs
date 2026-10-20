@@ -1,3 +1,4 @@
+use crate::json;
 use crate::json::At;
 use crate::{
     Result,
@@ -6,7 +7,6 @@ use crate::{
     fixture::Fixture,
     setup,
 };
-use serde_json::json;
 use skein_throwaway_forgejo::Token;
 use std::{path::Path, thread, time::Duration};
 const ORG: &str = "/api/v1/orgs/ensemble";
@@ -30,7 +30,7 @@ pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
             name,
             "POST",
             route,
-            Some(&format!("{{\"username\":\"{org}\",\"visibility\":\"private\"}}")),
+            Some(std::str::from_utf8(&json::object(&[("username", &org), ("visibility", &"private")])?)?),
             Some(token),
             None,
         )?;
@@ -55,8 +55,12 @@ pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
     r.send("setup-team-member-added", "PUT", &format!("{team}/members/writer"), None, Some(admin), None)?;
     r.send("setup-team-members", "GET", &format!("{team}/members"), None, Some(admin), None)?;
     r.send("setup-team-member-missing-user", "PUT", &format!("{team}/members/missing"), None, Some(admin), None)?;
-    r.f.api("PATCH", &team, &serde_json::from_str(TEAM)?)?;
-    r.f.api("POST", &format!("{ORG}/repos"), &json!({"name":"stage", "private":true, "auto_init":true}))?;
+    r.f.api("PATCH", &team, TEAM.as_bytes())?;
+    r.f.api(
+        "POST",
+        &format!("{ORG}/repos"),
+        &json::object(&[("auto_init", &true), ("name", &"stage"), ("private", &true)])?,
+    )?;
     thread::sleep(Duration::from_secs(1));
     r.send(
         "setup-org-issue-by-member",

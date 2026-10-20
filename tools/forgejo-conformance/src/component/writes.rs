@@ -2,12 +2,12 @@ use super::{
     Hosted, Operation,
     reads::{bytes, commit, repository},
 };
+use crate::json;
 use crate::{
     Result,
     facts::Fact,
     fixture::{Fixture, R},
 };
-use serde_json::json;
 use skein_forge::api::{self, Answer, Read, Write};
 pub(super) fn run(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Result<()> {
     let repo = repository(f)?;
@@ -170,7 +170,7 @@ fn open_after_closed(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Resu
     f.branch(R, "component-repeat", "main")?;
     f.put(R, "component-repeat", "repeat.txt", "repeat\n")?;
     let first = f.pull(R, "component-repeat", "main")?.root().get("number").u64().ok_or("first pull")?;
-    f.api("PATCH", &format!("{R}/issues/{first}"), &json!({"state":"closed"}))?;
+    f.api("PATCH", &format!("{R}/issues/{first}"), &json::object(&[("state", &"closed")])?)?;
     let second = f.pull(R, "component-repeat", "main")?.root().get("number").u64().ok_or("second pull")?;
     facts.push(h.observe(
         "component-read-pull-for-open-after-closed",

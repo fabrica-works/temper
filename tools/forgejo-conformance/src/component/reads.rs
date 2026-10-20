@@ -1,10 +1,10 @@
 use super::{Hosted, Operation};
+use crate::json;
 use crate::{
     Result,
     facts::Fact,
     fixture::{Fixture, R},
 };
-use serde_json::json;
 use skein_forge::api::{self, Answer, Read};
 use skein_lib::Time;
 const JOB_END: &str = "component-read-job-answers-the-failed-steps-end";
@@ -23,19 +23,32 @@ pub(super) fn repository(f: &Fixture) -> Result<api::Repository> {
 }
 pub(super) fn run(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Result<()> {
     let issue = f
-        .api("POST", &format!("{R}/issues"), &json!({"title":"read fixture","body":"read body"}))?
+        .api("POST", &format!("{R}/issues"), &json::object(&[("body", &"read body"), ("title", &"read fixture")])?)?
         .root()
         .get("number")
         .u64()
         .ok_or("issue number")?;
     let comment = f
-        .api("POST", &format!("{R}/issues/{issue}/comments"), &json!({"body":"thread fixture"}))?
+        .api("POST", &format!("{R}/issues/{issue}/comments"), &json::object(&[("body", &"thread fixture")])?)?
         .root()
         .get("id")
         .u64()
         .ok_or("comment id")?;
-    let review = f.api("POST", &format!("{R}/pulls/{}/reviews", f.feature), &json!({"event":"COMMENT","body":"review fixture","comments":[{"path":"file-0.txt","new_position":1,"body":"remark fixture"}]}))?.root().get("id").u64().ok_or("review id")?;
-    f.api("POST", &format!("{R}/statuses/{}", f.head), &json!({"state":"success","context":"fixture/test"}))?;
+    let review = f
+        .api(
+            "POST",
+            &format!("{R}/pulls/{}/reviews", f.feature),
+            &crate::fixture::remark_review("review fixture", "remark fixture")?,
+        )?
+        .root()
+        .get("id")
+        .u64()
+        .ok_or("review id")?;
+    f.api(
+        "POST",
+        &format!("{R}/statuses/{}", f.head),
+        &json::object(&[("context", &"fixture/test"), ("state", &"success")])?,
+    )?;
     let repo = repository(f)?;
     let head = commit(&f.head)?;
     let base = commit(&f.main)?;

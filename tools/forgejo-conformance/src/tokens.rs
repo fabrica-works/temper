@@ -1,3 +1,4 @@
+use crate::json;
 use crate::{
     Result,
     cases::{Auth, Recorder},
@@ -5,7 +6,6 @@ use crate::{
     fixture::R,
     setup,
 };
-use serde_json::json;
 use skein_throwaway_forgejo::Token;
 use std::path::Path;
 const ROUTE: &str = "/api/v1/admin/users/bot/tokens";
@@ -20,7 +20,7 @@ fn make(r: &mut Recorder<'_>, admin: &Token, case: &str, name: &str, scopes: &[&
         case,
         "POST",
         ROUTE,
-        Some(&json!({"name":name, "scopes":scopes}).to_string()),
+        Some(std::str::from_utf8(&json::object(&[("name", &name), ("scopes", &scopes)])?)?),
         Auth::Token(admin),
         &[],
     )?;
@@ -28,14 +28,14 @@ fn make(r: &mut Recorder<'_>, admin: &Token, case: &str, name: &str, scopes: &[&
     Ok(Token::new(body.root().get("sha1").str().ok_or("made token missing")?.to_owned()))
 }
 pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
-    r.f.api("PUT", &format!("{R}/collaborators/bot"), &json!({"permission":"write"}))?;
+    r.f.api("PUT", &format!("{R}/collaborators/bot"), &json::object(&[("permission", &"write")])?)?;
     let api = make(r, admin, "setup-token-make", "temper-api", API)?;
     let git = make(r, admin, "setup-token-make-git", "temper-git", GIT)?;
     r.send_new(
         "setup-token-make-again",
         "POST",
         ROUTE,
-        Some(&json!({"name":"temper-api", "scopes":API}).to_string()),
+        Some(std::str::from_utf8(&json::object(&[("name", &"temper-api"), ("scopes", &API)])?)?),
         Auth::Token(admin),
         &[],
     )?;

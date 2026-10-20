@@ -158,11 +158,77 @@ impl<'a> At<'a> {
     }
 }
 
+/// A value the encoder can place without an intermediate value tree.
+pub trait Put {
+    fn put(&self, out: &mut Encoder);
+}
+impl Put for str {
+    fn put(&self, out: &mut Encoder) {
+        out.string(self.as_bytes());
+    }
+}
+impl Put for String {
+    fn put(&self, out: &mut Encoder) {
+        self.as_str().put(out);
+    }
+}
+impl Put for bool {
+    fn put(&self, out: &mut Encoder) {
+        out.boolean(*self);
+    }
+}
+impl Put for u64 {
+    fn put(&self, out: &mut Encoder) {
+        out.unsigned(*self);
+    }
+}
+impl<T: Put + ?Sized> Put for &T {
+    fn put(&self, out: &mut Encoder) {
+        (*self).put(out);
+    }
+}
+impl<T: Put> Put for [T] {
+    fn put(&self, out: &mut Encoder) {
+        out.array_start();
+        for value in self {
+            value.put(out);
+        }
+        out.array_end();
+    }
+}
+impl<T: Put, const N: usize> Put for [T; N] {
+    fn put(&self, out: &mut Encoder) {
+        self.as_slice().put(out);
+    }
+}
+/// Writes a compact object, with strictly increasing member names.
+/// # Errors
+/// Returns unordered or repeated keys, or a document beyond the writer's limits.
+pub fn object(members: &[(&str, &dyn Put)]) -> Result<Box<[u8]>> {
+    if members.windows(2).any(|pair| pair[0].0 >= pair[1].0) {
+        return Err("JSON object keys must be sorted and unique".into());
+    }
+    write(|out| {
+        out.object_start();
+        for (key, value) in members {
+            out.key(key.as_bytes());
+            value.put(out);
+        }
+        out.object_end();
+    })
+}
+
 /// Runs the builder twice, measuring before allocating the encoded document.
 /// # Errors
 /// Returns a document beyond the writer's limits.
 pub fn write(build: impl Fn(&mut Encoder)) -> Result<Box<[u8]>> {
-    let limits = writer::Limits { depth: 8, length: 65_536 };
+    write_bounded(65_536, build)
+}
+/// Runs both passes under the caller's document-length bound, at depth eight.
+/// # Errors
+/// Returns a document beyond the writer's limits.
+pub fn write_bounded(length: u32, build: impl Fn(&mut Encoder)) -> Result<Box<[u8]>> {
+    let limits = writer::Limits { depth: 8, length };
     let mut measure = Encoder::measure(&limits);
     build(&mut measure);
     let length = measure.measured().map_err(|error| format!("{error:?}"))?;

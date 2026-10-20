@@ -1,3 +1,4 @@
+use crate::json;
 use crate::json::Json;
 use crate::{
     Result,
@@ -8,7 +9,6 @@ use crate::{
     runner,
     write::{self, SecretKind, Secrets},
 };
-use serde_json::{Value, json};
 use skein_throwaway_forgejo::{Exchange, Forgejo, Settings};
 #[expect(clippy::disallowed_types, reason = "the recorder probes real deliveries against a wall clock deadline")]
 use std::time::Instant;
@@ -221,12 +221,11 @@ impl Scenario<'_> {
             next = Instant::now() + delay;
         }
     }
-    fn act(&mut self, method: &str, route: &str, body: &Value, writer: bool, events: &[&str]) -> Result<Json> {
-        let bytes = body.to_string();
+    fn act(&mut self, method: &str, route: &str, body: &[u8], writer: bool, events: &[&str]) -> Result<Json> {
         let answer = self.fixture.exchange(
             method,
             &format!("{REPO}{route}"),
-            Some(bytes.as_bytes()),
+            Some(body),
             Some(if writer { &self.fixture.writer.token } else { &self.fixture.owner.token }),
             None,
         )?;
@@ -238,21 +237,43 @@ impl Scenario<'_> {
     }
 }
 fn provision(f: &Fixture, port: u16) -> Result<Json> {
-    f.api("POST", "/api/v1/orgs", &json!({"username":"hooked","visibility":"private"}))?;
+    f.api("POST", "/api/v1/orgs", &json::object(&[("username", &"hooked"), ("visibility", &"private")])?)?;
     f.api(
         "POST",
         "/api/v1/orgs/hooked/repos",
-        &json!({"name":"specimen","private":true,"auto_init":true,"default_branch":"main"}),
+        &json::object(&[("auto_init", &true), ("default_branch", &"main"), ("name", &"specimen"), ("private", &true)])?,
     )?;
-    f.api("PUT", &format!("{REPO}/collaborators/writer"), &json!({"permission":"write"}))?;
-    f.api("POST", "/api/v1/orgs/hooked/hooks", &json!({"type":"forgejo","active":true,"events":EVENTS,"config":{"url":format!("http://127.0.0.1:{port}/hooks/1"),"content_type":"json","secret":SECRET}}))
+    f.api("PUT", &format!("{REPO}/collaborators/writer"), &json::object(&[("permission", &"write")])?)?;
+    f.api(
+        "POST",
+        "/api/v1/orgs/hooked/hooks",
+        &json::write(|out| {
+            out.object_start();
+            out.key(b"active");
+            json::Put::put(&true, out);
+            out.key(b"config");
+            out.object_start();
+            out.key(b"content_type");
+            json::Put::put(&"json", out);
+            out.key(b"secret");
+            json::Put::put(&SECRET, out);
+            out.key(b"url");
+            json::Put::put(&(format!("http://127.0.0.1:{port}/hooks/1")), out);
+            out.object_end();
+            out.key(b"events");
+            json::Put::put(&EVENTS, out);
+            out.key(b"type");
+            json::Put::put(&"forgejo", out);
+            out.object_end();
+        })?,
+    )
 }
 pub(crate) fn record(forgejo: &Forgejo, scratch: &Path, out: &Path, secrets: &mut Secrets) -> Result<Vec<Fact>> {
     let listener = Listener::start()?;
     secrets.add(SecretKind::HookSecret, SECRET);
     let a = Fixture::bare(forgejo, &scratch.join("hooks-default"), &Settings::small())?;
     provision(&a, listener.port)?;
-    a.api("POST", &format!("{REPO}/issues"), &json!({"title":"refused","body":"marker"}))?;
+    a.api("POST", &format!("{REPO}/issues"), &json::object(&[("body", &"marker"), ("title", &"refused")])?)?;
     let refused = listener.next(Duration::from_secs(3)).is_none();
     a.instance.stop().map_err(|e| failure(&e))?;
     let mut settings = Settings::small();
@@ -274,7 +295,8 @@ pub(crate) fn record(forgejo: &Forgejo, scratch: &Path, out: &Path, secrets: &mu
         checking: false,
     };
     scenario(&mut s)?;
-    let retry = s.act("POST", "/issues", &json!({"title":"failed delivery","body":"marker"}), false, &[])?;
+    let retry =
+        s.act("POST", "/issues", &json::object(&[("body", &"marker"), ("title", &"failed delivery")])?, false, &[])?;
     s.take(&["issues"], None, 500)?;
     let no_retry = listener.next(Duration::from_secs(3)).is_none();
     let mut facts = evaluate(&s, refused, no_retry, &hook, retry.root().get("number").u64().ok_or("issue number")?);
@@ -303,40 +325,63 @@ pub(crate) fn record(forgejo: &Forgejo, scratch: &Path, out: &Path, secrets: &mu
     Ok(facts)
 }
 fn scenario(s: &mut Scenario<'_>) -> Result<()> {
-    s.act("POST", "/issues", &json!({"title":"issue","body":"<!-- temper:key 01 -->\n"}), false, &["issues"])?;
-    s.act("PATCH", "/issues/1", &json!({"assignees":["writer"]}), true, &["issue_assign"])?;
+    s.act(
+        "POST",
+        "/issues",
+        &json::object(&[("body", &"<!-- temper:key 01 -->\n"), ("title", &"issue")])?,
+        false,
+        &["issues"],
+    )?;
+    s.act("PATCH", "/issues/1", &json::object(&[("assignees", &["writer"])])?, true, &["issue_assign"])?;
     let label = s
         .fixture
-        .api("POST", &format!("{REPO}/labels"), &json!({"name":"hook","color":"abcdef"}))?
+        .api("POST", &format!("{REPO}/labels"), &json::object(&[("color", &"abcdef"), ("name", &"hook")])?)?
         .root()
         .get("id")
         .u64()
         .ok_or("fixture id missing")?;
-    s.act("POST", "/issues/1/labels", &json!({"labels":[label]}), false, &["issue_label"])?;
+    s.act("POST", "/issues/1/labels", &json::object(&[("labels", &[label])])?, false, &["issue_label"])?;
     let milestone = s
         .fixture
-        .api("POST", &format!("{REPO}/milestones"), &json!({"title":"hook"}))?
+        .api("POST", &format!("{REPO}/milestones"), &json::object(&[("title", &"hook")])?)?
         .root()
         .get("id")
         .u64()
         .ok_or("fixture id missing")?;
-    s.act("PATCH", "/issues/1", &json!({"milestone":milestone}), false, &["issue_milestone"])?;
-    s.act("POST", "/issues/1/comments", &json!({"body":"<!-- temper:key 02 -->\n"}), true, &["issue_comment"])?;
+    s.act("PATCH", "/issues/1", &json::object(&[("milestone", &milestone)])?, false, &["issue_milestone"])?;
+    s.act(
+        "POST",
+        "/issues/1/comments",
+        &json::object(&[("body", &"<!-- temper:key 02 -->\n")])?,
+        true,
+        &["issue_comment"],
+    )?;
     s.fixture.branch(REPO, "topic", "main")?;
     s.take(&["create"], None, 204)?;
     s.fixture.put(REPO, "topic", "topic.txt", "topic\n")?;
     s.take(&["push"], None, 204)?;
-    let pull =
-        s.act("POST", "/pulls", &json!({"head":"topic","base":"main","title":"topic"}), false, &["pull_request"])?;
+    let pull = s.act(
+        "POST",
+        "/pulls",
+        &json::object(&[("base", &"main"), ("head", &"topic"), ("title", &"topic")])?,
+        false,
+        &["pull_request"],
+    )?;
     s.checking |= pull.root().get("mergeable").bool() == Some(false);
-    s.act("PATCH", "/issues/2", &json!({"assignees":["writer"]}), true, &["pull_request_assign"])?;
-    s.act("POST", "/issues/2/labels", &json!({"labels":[label]}), true, &["pull_request_label"])?;
-    s.act("PATCH", "/issues/2", &json!({"milestone":milestone}), true, &["pull_request_milestone"])?;
-    s.act("POST", "/issues/2/comments", &json!({"body":"<!-- temper:key 03 -->\n"}), true, &["pull_request_comment"])?;
+    s.act("PATCH", "/issues/2", &json::object(&[("assignees", &["writer"])])?, true, &["pull_request_assign"])?;
+    s.act("POST", "/issues/2/labels", &json::object(&[("labels", &[label])])?, true, &["pull_request_label"])?;
+    s.act("PATCH", "/issues/2", &json::object(&[("milestone", &milestone)])?, true, &["pull_request_milestone"])?;
+    s.act(
+        "POST",
+        "/issues/2/comments",
+        &json::object(&[("body", &"<!-- temper:key 03 -->\n")])?,
+        true,
+        &["pull_request_comment"],
+    )?;
     s.act(
         "POST",
         "/pulls/2/requested_reviewers",
-        &json!({"reviewers":["writer"]}),
+        &json::object(&[("reviewers", &["writer"])])?,
         false,
         &["pull_request_review_request"],
     )?;
@@ -344,7 +389,7 @@ fn scenario(s: &mut Scenario<'_>) -> Result<()> {
         s.act(
             "POST",
             "/pulls/2/reviews",
-            &json!({"event":event,"body":"<!-- temper:key 04 -->\n"}),
+            &json::object(&[("body", &"<!-- temper:key 04 -->\n"), ("event", &event)])?,
             true,
             &[&format!("pull_request_review_{kind}")],
         )?;
@@ -352,7 +397,11 @@ fn scenario(s: &mut Scenario<'_>) -> Result<()> {
     let moved = s.act(
         "POST",
         "/contents/writer.txt",
-        &json!({"branch":"topic","message":"writer","content":crate::fixture::base64("writer\n")}),
+        &json::object(&[
+            ("branch", &"topic"),
+            ("content", &(crate::fixture::base64("writer\n"))),
+            ("message", &"writer"),
+        ])?,
         true,
         &[],
     )?;
@@ -365,12 +414,15 @@ fn scenario(s: &mut Scenario<'_>) -> Result<()> {
     s.take(&["push"], Some(moved.root().get("commit").get("sha").str().ok_or("base head missing")?), 204)?;
     s.fixture.branch(REPO, "gone", "main")?;
     s.take(&["create"], None, 204)?;
-    s.act("DELETE", "/branches/gone", &Value::Null, false, &["delete"])?;
-    s.act("POST", "/tags", &json!({"tag_name":"v1","target":"main"}), false, &["create"])?;
-    s.act("DELETE", "/tags/v1", &Value::Null, false, &["delete"])?;
+    s.act("DELETE", "/branches/gone", &json::write(skein_json::writer::Encoder::null)?, false, &["delete"])?;
+    s.act("POST", "/tags", &json::object(&[("tag_name", &"v1"), ("target", &"main")])?, false, &["create"])?;
+    s.act("DELETE", "/tags/v1", &json::write(skein_json::writer::Encoder::null)?, false, &["delete"])?;
+    workflow(s)
+}
+fn workflow(s: &mut Scenario<'_>) -> Result<()> {
     s.fixture.branch(REPO, "ci", "main")?;
     s.take(&["create"], None, 204)?;
-    s.fixture.api("PATCH", REPO, &json!({"has_actions":true}))?;
+    s.fixture.api("PATCH", REPO, &json::object(&[("has_actions", &true)])?)?;
     s.fixture.put(REPO,"ci",".forgejo/workflows/deliveries.yaml","name: deliveries\non:\n  push:\n    branches: [ci]\njobs:\n  pass:\n    runs-on: temper-host\n    steps:\n      - run: exit 0\n  fail:\n    runs-on: temper-host\n    steps:\n      - run: exit 1\n  after:\n    needs: [fail]\n    runs-on: temper-host\n    steps:\n      - run: exit 0\n  held:\n    runs-on: temper-held\n    steps:\n      - run: exit 0\n")?;
     s.take(&["push", "workflow_job_success", "workflow_job_failure", "workflow_job_skipped"], None, 204)?;
     let run = s
@@ -378,7 +430,13 @@ fn scenario(s: &mut Scenario<'_>) -> Result<()> {
         .iter()
         .find_map(|capture| capture.value.root().get("job").get("run_id").u64())
         .ok_or("run id missing")?;
-    s.act("POST", &format!("/actions/runs/{run}/cancel"), &Value::Null, false, &[])?;
+    s.act(
+        "POST",
+        &format!("/actions/runs/{run}/cancel"),
+        &json::write(skein_json::writer::Encoder::null)?,
+        false,
+        &[],
+    )?;
     s.take(&["workflow_job_cancelled"], None, 204)
 }
 fn event_facts(s: &Scenario<'_>, facts: &mut Vec<Fact>) {
