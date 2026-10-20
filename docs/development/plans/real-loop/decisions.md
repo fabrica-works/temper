@@ -796,6 +796,9 @@ pass:
      - 13.5's Shape: `calls::Called` derives `Debug`, which the story's `{:?}` of `ran.calls()` needs; the story names its positions `CHAT` and `TREE` (README, "A setup written once, and rows carry data"; `scripts/check.sh` refuses `task(2)`); and `scripts/check.sh`'s pattern of literal call positions names `delegate`, in 13.5's Files.
      A further copy of these (another `admit` user, another literal position) is refreshed the same way and listed in the commit body.
 
+139. **temper 13.3's proof after the sign-in fix** (process, temper 13's block of 2026-10-20T11:29:24Z).
+     Ruling 139: the process proof's failure, `native signing failed: Again` at `crates/temper/tests/support/person.rs` in `a_change_lands_by_deliveries_with_every_poll_raised` before any landing turn, has its cause fixed on `origin/main` after 13.3's branch was cut: e9bb42960 "Send a link sign-in answered Again after a backoff" (11:20:10Z, owner work) makes the native process person resend the same link after `Signing::Again`, at 100 ms doubling to 2 s within `START_WITHIN`; 13.3's branch starts at 787649ae4 (11:14:40Z) and lacks it. So no retry without a change: rebase 13.3 onto `origin/main`, which is that change aimed at the cause its log names (implementer 8.8), and run the full process proof once, as 13.3's Proof says. If it fails again on `Again`, or on anything else, block with both logs.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
