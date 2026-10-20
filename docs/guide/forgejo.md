@@ -160,9 +160,9 @@ needs itself.
   `application.setup`.
 - **A site admin's token,** made in that admin's settings, with the
   scopes temper's own preparation gives its admin: `write:admin`,
-  `write:organization`, `write:repository` and `write:user`. Without
-  `write:repository`, Forgejo refuses temper the bot's access when you
-  adopt a repository.
+  `read:user` and `write:repository`. Without `write:repository`,
+  Forgejo refuses temper the bot's access when you adopt a repository,
+  and temper says that scope is missing.
 
 On **Forges**, choose **Connect as its admin** and paste the token, or:
 

@@ -346,7 +346,10 @@ it, and nothing but the setup host writes what it makes.
   managed or owned Forgejo (skein's `forge-setup.md`, 4.5): the bot made
   a collaborator with write, and the repository's hook made when the
   listener is configured, with the forge's secret. Stopped, the adoption
-  is refused, named (`../domain/forge.md`, access at adoption).
+  is refused, named (`../domain/forge.md`, access at adoption). A
+  `403` here, at reconcile's step 6 or at the picker's read, is the
+  admin's token without `write:repository` (skein's 4.3, step 1): it
+  is shown as that scope missing, named with its step.
 - **At each start,** reconcile's step 6 checks each adopted
   repository's access, and repairs what changed.
 - **Nothing org-wide:** the bot reaches the repositories adopted, a
@@ -445,12 +448,11 @@ files: at a first preparation, and for a runner older than its pin
    `forgejo migrate`; temper's admin, `temper-admin`, made as a site
    admin with a password Forgejo draws and nobody keeps, and its token
    made by `admin user generate-access-token` into `admin_token`, the
-   handover (section 3), with the scopes `write:admin`,
-   `write:organization`, `write:repository` and `write:user` (skein's
-   `forge-setup.md`, section 8, says which of reconcile's routes needs
-   which; it names none for the repositories' routes of `Adopt`,
-   reconcile's step 6 and the picker's read, its 4.5 and 4.8, which
-   Forgejo refuses 403 without `write:repository`), under a name that
+   handover (section 3), with the scopes `write:admin`, `read:user`
+   and `write:repository`, the three skein's `forge-setup.md` names
+   (4.3, step 1: the users, their tokens and the orgs; `GET /user`; and
+   the repositories' routes of `Adopt`, reconcile's step 6 and the
+   picker's read), and no other, under a name that
    ends in a random suffix, since Forgejo refuses a second token of one
    name; the
    person's account, a site admin with a password Forgejo draws into
@@ -1191,14 +1193,6 @@ Each is intended; what it needs is named with it.
 - **"Connect as its admin" on a Forgejo with no `setup` entry.**
   Default: refused, naming `application.setup`, since the bot's login
   and email are the configuration's (5.5).
-- **The scopes of a managed forge's admin's token.** Default: the
-  preparation's, `write:admin`, `write:organization`,
-  `write:repository` and `write:user` (6.3), as `docs/guide/forgejo.md`
-  asks; skein's facts (`forge-setup.md`, section 8) name `write:admin`
-  for the token routes and a user scope for `GET /user`, and none for
-  the repositories' routes `Adopt` calls. Forgejo refuses those routes
-  403 to an admin's token without `write:repository`, so it is in the
-  list until skein records which scope they need.
 - **A start's reconcile that stops.** Default: that forge is not
   connected, named with its step, until the next start or a managed
   connect; the engine runs no reconcile again within a process.
