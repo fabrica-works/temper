@@ -24,14 +24,14 @@ credentials.md's (section 4). What is open is listed in section 10.
   operation's one deadline. Which invocation comes next depends only on
   what the last one said, never on a retry: the component never retries
   (README.md, section 5).
-- **git as it ships, told exactly what to do.** git is run by an
-  absolute path: the one a repository's item names, a fake forge's
-  program (channel.md, section 4), or else `workers[].git`
-  (configuration.md, section 4); with neither, the invocation fails,
-  naming the forge's host. It runs in an environment given whole, with settings on the command line that turn
-  off what could run another program or outlive the invocation: hooks,
-  credential helpers, the file system monitor, background maintenance,
-  every transport but HTTPS and HTTP.
+- **git as it ships, told exactly what to do.** git is run by an absolute
+  path: the one a repository's item names, a fake forge's program
+  (channel.md, section 4), or else `workers[].git` (configuration.md,
+  section 4); with neither, the invocation fails, naming the forge's host.
+  It runs in an environment given whole, with settings on the command line
+  that turn off what could run another program or outlive the invocation:
+  hooks, credential helpers, the file system monitor, background
+  maintenance, every transport but HTTPS and HTTP.
 - **Credentials in the environment only.** An operation that reaches the
   forge gets its git identity's token as an `http.extraHeader` set
   through `GIT_CONFIG_*`, and a commit its author through `GIT_AUTHOR_*`

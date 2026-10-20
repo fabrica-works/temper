@@ -788,22 +788,22 @@ temper box
   runs once per box: the long step's restarts never run it again.
 - **Restarts** a long step that exits, after a backoff doubling from
   `box.backoff_ms` to `box.backoff_max_ms` (configuration.md, section 7),
-  first running again the steps that are once just before it: a Forgejo
-  is restarted after its preparation, so a change of the setup reaches
-  its `app.ini`. `temper serve` restarts on its own, with a pipe made
-  afresh, and its start takes a handover the preparation left and
-  reconciles each managed and owned forge. A token revoked under a running engine stops that forge alone,
-  named, and not the engine (forge.md, a forge stopped); the engine's
-  next start makes it again. A fake forge's restart is such a revoke:
-  it serves its seed afresh, without the bot, so that forge stops alone
-  until the engine's next start takes the handover its preparation drew
-  again (8.4).
+  first running again the steps that are once just before it: a Forgejo is
+  restarted after its preparation, so a change of the setup reaches its
+  `app.ini`. `temper serve` restarts on its own, with a pipe made afresh,
+  and its start takes a handover the preparation left and reconciles each
+  managed and owned forge. A token revoked under a running engine stops
+  that forge alone, named, and not the engine (forge.md, a forge stopped);
+  the engine's next start makes it again. A fake forge's restart is such a
+  revoke: it serves its seed afresh, without the bot, so that forge stops
+  alone until the engine's next start takes the handover its preparation
+  drew again (8.4).
 - **Gives up,** exit 1, naming the step, when a once or link step fails,
   but a dormant group's before its `started`, which answers `failed`
-  (7.1), or a long one exits more than `box.restarts` times within `box.window_ms`. The
-  backoff is counted from a step's exits within the window, so it starts
-  again from `box.backoff_ms` once a step has run a window without
-  exiting.
+  (7.1), or a long one exits more than `box.restarts` times within
+  `box.window_ms`. The backoff is counted from a step's exits within the
+  window, so it starts again from `box.backoff_ms` once a step has run a
+  window without exiting.
 - **Stops** at a first termination signal: the long steps in reverse
   order, each by a signal, `box.grace_ms`, a second signal, which turns
   `temper serve`'s drain into an abort (README.md, section 4),
@@ -852,10 +852,11 @@ pipe: `temper serve` runs without `--box`, an owned forge is set up by
 running its commands, and the client names them (6.5).
 
 - **systemd,** a unit per long step: `fetch` and `prepare` as
-  `ExecStartPre=` of Forgejo's unit, `run` and `temper serve` as `ExecStart=`, the order as
-  the units' dependencies; `temper serve`'s unit keeps systemd's default
-  kill of its control group, which ends a crashed service's whole tree
-  before its restart (skein's `shell.md`, 13);
+  `ExecStartPre=` of Forgejo's unit, `run` and `temper serve` as
+  `ExecStart=`, the order as the units' dependencies; `temper serve`'s
+  unit keeps systemd's default kill of its control group, which ends a
+  crashed service's whole tree before its restart (skein's `shell.md`,
+  13);
 - **the process tier** (section 13.4), which runs the commands itself;
 - **QA's environments** (`../draft/qa.md`, 4.1), whose "temper in a box" is
   an owned setup with a scripted LLM, made by its own host from the same
@@ -1091,10 +1092,7 @@ directory is empty (7.1).
   the configuration directory holds `temper.json`, or the data
   directory holds `worker.secret`, `worker.digest`, `demo/llm.key` or
   `demo/bin/git`. It never replaces a file; a person who starts again
-  removes them. Refused too, naming why, when it cannot find the person
-  (below): no entry in `/etc/passwd` for its effective uid, or a login
-  that is not a Forgejo login, or is the bot's, `temper-admin` or the
-  org's, `work`.
+  removes them.
 - **Its directories:** the data and cache directories made and checked
   as every command makes and checks them (configuration.md, section
   12), and the configuration directory made the same way when absent;
@@ -1126,7 +1124,11 @@ directory is empty (7.1).
   - *the person,* forge 3's (8.3): its `login` the name of the effective
     uid's entry in `/etc/passwd` (`geteuid`, then that file), the login
     the person signs in to their Forgejo with; its `email`
-    `LOGIN@localhost`; its one org `work`;
+    `LOGIN@localhost`; its one org `work`. With no entry, or a name that
+    is not a Forgejo login, is one of Forgejo's reserved names (such as
+    `admin`), or is the bot's, `temper-admin` or `work`, the login is
+    `person`, and init says so: forge 3 waits dormant, so the person's
+    login is never a reason the first run does not start;
   - *the bundle,* `<the binary's directory>/../share/temper/bundle` when
     it holds `index.html`: `clients.bundle`; else `null`, and init says
     the browser is not served;
@@ -1143,7 +1145,9 @@ directory is empty (7.1).
 - **What it says,** on stderr: `init: wrote <path>` for each file;
   `init: no bundle at <path>: the browser is not served` when there is
   none; `init: no git on PATH: a real forge's repositories need git
-  2.41 or later, set as workers[].git` when there is none; and last,
+  2.41 or later, set as workers[].git` when there is none; `init:
+  LOGIN cannot be a Forgejo login: forge 3's person is person` when
+  the login falls back (above); and last,
   `init: start it with temper box`, with the flags init was given. Its
   stdout is empty; exit 0.
 - **Nothing else:** no account, no forge credential, no repository and
@@ -1152,22 +1156,22 @@ directory is empty (7.1).
   `../client/forge.md`), and the demo's account and repository the
   seed's, through the client's protocol (8.4).
 - **Its code:** `temper-init`, step code (section 11): given the facts
-  above, git's path or none and the person's login among them, the
-  three directories, the secret's 32 bytes and the demo key's 32 bytes,
-  it answers the files, each with its directory, its name, its bytes
-  and whether it is private, or a login's refusal; it reads, writes and
-  binds nothing. The binary's `init` finds the facts, checks the
-  refusals and writes the files, on skein-io.
-- **Checked:** temper-init's step tests check that its `engine.llm` is
-  the owned example's with the demo's provider (8.3), that the digest is
-  the secret's, and the files' names, directories and order. The
-  binary's crate tests, on scratch directories, check that the document
-  init writes passes configuration.md, section 8, as `temper serve`
-  checks it, with the agent's configuration it writes, at the fixed
-  ports and at kernel's ports, the four always distinct, with and
-  without `claude`, a bundle and git; each refusal writing nothing,
-  each login's among them; the files' modes; and the link's target. The process tier starts a box on
-  empty directories (13.4).
+  above, git's path or none and the person's login among them, the three
+  directories, the secret's 32 bytes and the demo key's 32 bytes, it
+  answers the files, each with its directory, its name, its bytes and
+  whether it is private, and the person's login, fallen back to `person`
+  or not; it reads, writes and binds nothing. The binary's `init` finds
+  the facts, checks the refusals and writes the files, on skein-io.
+- **Checked:** temper-init's step tests check that its `engine.llm` is the
+  owned example's with the demo's provider (8.3), that the digest is the
+  secret's, and the files' names, directories and order. The binary's
+  crate tests, on scratch directories, check that the document init writes
+  passes configuration.md, section 8, as `temper serve` checks it, with
+  the agent's configuration it writes, at the fixed ports and at kernel's
+  ports, the four always distinct, with and without `claude`, a bundle and
+  git; each refusal writing nothing, the person's fallback login among
+  them; the files' modes; and the link's target. The process tier starts a
+  box on empty directories (13.4).
 
 ### 8.3 The default document
 
