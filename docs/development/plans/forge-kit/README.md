@@ -157,6 +157,11 @@ chain.
 - **Plan contracts and repository matches:** skein10.s2 owns hourly05’s three sampled corrections after10.4: separate the literal subscription contract from delivery mapping, keep word-validity assertions separate from marker round trips, and match repository Documents exhaustively under programming-model.md10.2. Preserve every mapped assertion, outcome and ordering. Add only the scoped plan-shapes AST gate mode under development.md14.4; preserve landed recovery controls, and listing mode/controls only when present from10.s1. 10.s2 must neither add nor require10.s1 files; later10.s1 preserves plan-shapes mode/controls. Normal readiness precedes implementation; serialize shared checker/gate edits with10.s1 without holding existing starts. Closing temper-repin waits for10.s2. Final calls/edges counts include its relative +2; historical increment proofs retain their original counts.
 
 - **Graph freshness:** the supervisor refreshes only the primary checkout indexes. Use the exact primary project names and check each result in the actual worktree. Until a stale index's refresh is reported, use source searches for that repository; a missing graph result proves no absence. A refresh applies through its reported source commit; later source landings require a fresh comparison. Source search remains available throughout.
+  The supervisor also resolves primary-behind preflight drift: fast-forward
+  only a clean primary `main` to its already-landed `origin/main`, check
+  alignment and the dry-run push again, and preserve the passed gate's
+  exact tree/result. Dirty or divergent primaries return a report. This
+  synchronization touches no implementer's worktree or the pinned kit.
 
 - **Busy admission test shape:** jig01.s4 extracts only the reference busy test’s typed socket-drain plumbing into its existing server fixtures. Keep all eight assertions visible and ordered in the single test, with the same calls, queued ends, retirement, fixture values and budgets. No runtime, pin, accounting, gate or test-count change; normal readiness comes first. The existing closing temper-repin also waits for01.s4; Temper02.1 and Accounts retain independent ownership, and other starts stay unheld. Refresh further reached copies within this test-only scope and list users in the commit body.
 
