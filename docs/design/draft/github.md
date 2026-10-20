@@ -27,8 +27,11 @@ is open section 19.
 - **Secrets in the store.** A forge's credentials are made from the
   client, or by temper while it connects, and kept in jig's secrets'
   store under temper's tag (jig's `protocol/store.md`, section 9),
-  never in a file temper reads at start. This reverses credentials.md's
-  "no temper secret in jig's secrets' store" (section 3).
+  never in a file temper reads at start: one way, in every forge and
+  mode. An owned Forgejo's preparation, which runs before the engine,
+  hands its admin's token over once, by a file the engine takes in and
+  removes. This reverses credentials.md's "no temper secret in jig's
+  secrets' store" (section 3).
 - **A forge connected while temper runs.** skein's component takes a
   forge's credential at runtime, and again when it is replaced or
   renewed; git identities take new generations as they change
@@ -158,6 +161,12 @@ is open section 19.
 
 ## 3. Secrets in the store
 
+- **One way, in every forge and mode:** each credential the engine uses
+  lives in the store, and nowhere else, and enters it through a
+  connect: pasted in the client, made by the engine's own exchange or
+  reconcile, or, on an owned Forgejo alone, handed over once by its
+  preparation, which runs before the engine and cannot write the store
+  (section 13).
 - **Where:** jig's secrets' store, a private skein-kv store of the
   engine's (jig's `protocol/store.md`, section 9), which keeps "an
   application's own records, under its tag: its connectors'
@@ -165,13 +174,15 @@ is open section 19.
   - GitHub: the App's id, slug and private key, and its webhook secret;
     the installation tokens are never kept, but minted (section 8);
   - Forgejo: the bot's API token, its git token, its id and the webhook
-    secret; managed, the site admin's token too (section 12.2, an open
-    question);
+    secret; managed and owned, a site admin's token too (12.2, section
+    13);
   - each with the forge user's id it stands for, checked at each start.
-- **Not there:** a worker's secret and its digest (jig's files, as
-  now); an owned Forgejo's own secrets, its `app.ini` and its runner's
-  secret, which Forgejo reads from files (section 13); LLM accounts,
-  already jig's.
+- **Not there, being no credential of the engine's:** what other
+  programs read from files, an owned Forgejo's own secrets (`app.ini`,
+  `state`) and its runner's, and the person's first password on it
+  (section 13); a worker's secret and its digest, jig's files, which
+  open the link before any store is reached; LLM accounts, already in
+  the store as jig's.
 - **jig's rules hold** (jig's `protocol/store.md`, section 9): written
   by components alone, through the protocol layer's routing; kept, and
   durable, before used; replaced stating the digest it replaces; erased
@@ -598,9 +609,12 @@ had one Actions workflow, a job `ci` that sleeps 45 seconds and fails
 when the head's message says `FAIL`. Rulesets, pull requests, issues,
 branches and tokens made by the probes were removed after. The scripts
 and their evidence are not kept; the live conformance records the
-facts for good (section 17), and the App and the repositories may serve
-as its fixtures (section 19). Each fact is cited by its probe's number
-across this document.
+facts for good (section 17). The App and the repositories are kept as
+its fixtures, with a spare repository, `freeekanayaka/temper-probe-2`,
+not granted to the App; the App's key, hook secret and a README are in
+the person's private `~/src/rust/tmp/github-conformance/`, never in a
+repository. Each fact is cited by its probe's number across this
+document.
 
 - **Setup.** The manifest flow takes `http://127.0.0.1:<port>` as its
   `redirect_url` and `setup_url`; the conversion answers `id`, `slug`,
@@ -750,14 +764,14 @@ across this document.
   forge's, since temper grants itself access when one is chosen
   (2.2).
 - **The admin's token is kept** in the store, since adoption needs it
-  at any time; an open question (section 19). It is read by the setup's
-  host alone and never handed to the forge component, which makes every
-  request of temper's work. Least power is restated so: the component
-  never holds an admin's token; the engine's setup host holds one for a
-  managed forge, and uses it for reconcile and for access at adoption
-  alone. "Forget the admin's token" in the client makes the forge
-  connected: the bot and its tokens stay, and access is the person's to
-  give again.
+  at any time, as on an owned forge (section 13). It is read by the
+  setup's host alone and never handed to the forge component, which
+  makes every request of temper's work. Least power is restated so: the
+  component never holds an admin's token; the engine's setup host holds
+  one for a managed or owned forge, and uses it for reconcile and for
+  access at adoption alone. On a managed forge, "Forget the admin's
+  token" in the client makes the forge connected: the bot and its
+  tokens stay, and access is the person's to give again.
 - **Connected, then managed:** an admin's token given for a forge
   already connected keeps its user, since a forge's writer never changes
   (section 4). Reconcile is given the connected user's login, and takes
@@ -773,11 +787,23 @@ across this document.
   Forgejo's own secrets (`app.ini`, `state`) and the runner's are
   Forgejo's and the runner's to read, from files, as now; and so is the
   person's first password, `person_password`.
-- **The admin's token passes as a file,** the preparation's
-  `admin_token`, as today: the engine's setup host reads it at each
-  start, for an owned forge, in place of the store's admin record, and
-  reconcile runs in the engine (12.2). It is an owned Forgejo's own
-  secret, made by Forgejo's command line on its directory.
+- **The admin's token lives in the store,** as a managed forge's does
+  (12.2); only its way in differs, since temper's preparation makes it,
+  not a person. The preparation makes it by Forgejo's command line,
+  under Forgejo's lock and before the engine runs, so it cannot write
+  the store: it leaves the token in `admin_token`, a handover, as today.
+  The engine's setup host takes it at its start, through the same
+  connect as a pasted admin's token: kept in the store, the file
+  removed, and temper's admin's other tokens deleted on Forgejo, by the
+  routes reconcile uses for the bot's (skein's `forge-setup.md`, 4.3,
+  step 3). The file lives from the preparation to the engine's next
+  start, and no credential is ever read from a file after.
+- **A new token at each preparation:** with the file gone once taken,
+  each preparation makes the next, as it makes one now when the file is
+  missing (setup.md, 6.3, item 2). A box's every start so renews
+  temper's admin's token, and one revoked on Forgejo is replaced at the
+  next. `temper serve` started again alone, with no preparation before
+  it, takes no file and runs on the store's token.
 - **What reconcile makes goes to the store:** the bot's tokens, its id
   and the hooks' secret. The forge's directory loses `api_token`,
   `git_token`, `user` and `webhook_secret`, and configuration's forge
@@ -792,7 +818,8 @@ across this document.
   adoption, as on a managed forge (12.2).
 - **Connected from the start:** an owned forge is connected by its
   preparation and the engine's first reconcile; the client has nothing
-  to paste.
+  to paste. An owned forge not yet prepared is not connected, and the
+  client names `temper forge prepare`.
 
 ## 14. What changes in temper's documents
 
@@ -811,9 +838,12 @@ across this document.
   (section 4); limits for the puller, the installations, the store's
   records and the manifest's routes.
 - **`../protocol/setup.md`:** the modes' table (who is given what, now
-  from the client); the layers' files (section 13); reconcile's host in
-  the engine; `setup.orgs` gone, `person.orgs` for owned; the box's
-  steps; section 9's table; GitHub (part B) in place of "Not here".
+  from the client); the layers' files (section 13), `admin_token` a
+  handover the engine takes and removes, the only file `temper serve`
+  reads of a setup; reconcile's host in the engine; `setup.orgs` gone,
+  `person.orgs` for owned; the box's steps; section 9's table, every
+  credential of the engine's in the store; GitHub (part B) in place of
+  "Not here".
 - **`../protocol/forge.md`:** GitHub's dialect as temper uses it, the
   delivery log as a hint feed, credentials at runtime.
 - **`../domain/forge.md`:** a forge connected or not (section 4); the
@@ -993,18 +1023,10 @@ Each with the default the draft takes.
   or the adoption asks. Default: the first allowed, shown at adoption.
 - **The installation's scope:** all repositories, or selected. Default:
   the install page's own choice, with the client advising selected.
-- **The admin's token, kept or asked again** at each adoption on a
-  managed Forgejo. Default: kept, read by the setup's host alone, and
-  forgotten on request (12.2).
 - **`log_catch_up`:** how far back the puller reads at start. GitHub's
   documents keep deliveries three days. Default: back to the newest
   `guid` temper kept, and within a day at most; the slow pass covers the
   rest.
-- **The probe App and repositories as fixtures:** keep
-  `temper-probe-d0fc06` and the two `temper-probe` repositories for the
-  live conformance, with a fine-grained token limited to them to play
-  the person; or delete them and let the conformance make its own.
-  Default: keep, pending the user's word.
 - **Generations across starts** (credentials.md, section 8): generation
   1 at every start, and growing while the engine runs. Default: still
   standalone only.
