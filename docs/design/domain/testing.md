@@ -633,7 +633,14 @@ loopback (section 5). temper's worlds add:
 - **Its deliveries** go to the engine's webhooks' listener: the world
   writes each on a connection to it, as Forgejo sends one
   (../protocol/forge.md, section 5), and the forge peer does so in the real
-  loop (2.4).
+  loop (2.4). The world hands the peer that listener's address once it
+  listens (skein's `fake-forge.md`, section 5). A hook due before then has
+  no address, and is dropped and observed, as the hooks of a story's setup
+  are, since the setup runs before any host. The adopted repository's
+  story is the hooked one. Its setup's push is lost. The agent's push, which
+  ends the story, is written: the story ends only once each hook the forge
+  released has its outcome. Its adoption, with the first lost, shows that a
+  lost delivery "costs latency, never liveness" (`forge.md`, 5.2).
 - **Its setup routes** serve reconcile's tests (../protocol/setup.md, 13.2).
 - **Its referee** drains the forge's observations (skein's
   `fake-forge.md`, 2.4; here, 5.2).

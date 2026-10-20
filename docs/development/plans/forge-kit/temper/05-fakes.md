@@ -28,7 +28,17 @@ the README table's; the code shows no other. Design built: skein `fake-forge.md`
 - fake-forge.md 5: the peer hosts the protocol layer over a forge its owner
   hands it; `address()` is known after io's listening event; it delivers a
   hooked repository's hooks to the endpoint's `host`, which an owner whose
-  listener binds port 0 sets once known; delivery is best effort.
+  listener binds port 0 sets once that listener listens, "not at its bind";
+  delivery is best effort, and "A world asserts a delivery written only for
+  a hook due inside its listener's life" (skein `1b33f85`). Its frozen
+  records are two per connection, two per call and one per delivery, never
+  drained, and "a world's cap is the most its stories can record … never a
+  count one run happened to record".
+- domain/testing.md 4.2: the world
+  hands the peer the webhooks' listener's address once it listens; the
+  setup's hooks are lost; the adopted repository's story is the hooked
+  one, its setup's push lost and the agent's push written, since "the story
+  ends only once each hook the forge released has its outcome".
 - domain/testing.md 2.4 and 4.2: the one-process world and the real loop both host
   the one peer; the real loop's listeners are on kernel-assigned ports passed
   to their clients once bound, and a story never uses a fixed port.
@@ -47,9 +57,18 @@ the README table's; the code shows no other. Design built: skein `fake-forge.md`
   is `Some(FORGE)` once the peer listens. The kernel-assigned hand-over is the
   real loop's (domain/testing.md 4.2), as decision 15 says.
 - Port-0 binds work in the sim, so the engine's webhooks listener binds
-  `127.0.0.1:0`. `ServiceHost` records its bound address; the referee's `act`
-  (between passes) sets `Forge.hooks` when it first appears and when a restart
-  changes it. Until then a hook gets `NoAddress`, dropped and observed.
+  `127.0.0.1:0`. `ServiceHost` records the port-0 bind's address and names
+  it once that socket's `Listen` completes; the referee's `act` (between
+  passes) sets `Forge.hooks` when it first appears and when a restart
+  changes it. Until then a hook gets `NoAddress`, dropped and observed: the
+  Adopt story's setup push, released at `Time(0)` before any host runs, is
+  one. The Adopt story ends once its push is seen and each hook the forge
+  released has its delivery's outcome, so the agent's push, which ends it,
+  is written before `Terminate`. No barrier holds a hook, the setup or the
+  engine's listener back.
+- The peer's observation room is the world's, derived from the whole
+  corpus (05.2, "Observation room"); skein's peer fixture's 16 sizes
+  skein's own tests only.
 - Only the Adopt story's repository is `hooked`. The document carries the
   webhooks section for every story (one document); an unhooked story fires none.
 - `forge.rs` is deleted whole (temper 07's Needs say so). Its thread-local
@@ -171,30 +190,62 @@ Shape: temper-fake-git's `Forge` (struct and `new`, 18 lines) is deleted;
   scratch run found); `HOOK_SECRET`, `peer_limits()` and `forge_limits()` are
   new. `stories.rs`: `hooked: matches!(story, Story::Adopt)`.
   `ServiceHost.hooks: Option<SocketAddr>`, set in `iterate` by `hooks_address`
-  (sketch A) from a port-0 `Op::Bind`'s `Done::Bound`, is read by the referee's
-  `act`, which calls `referee::forge::Forge::hand_hooks` when it changes. The
-  referee asserts each peer's `address()` is `None` or `Some(FORGE)`, and
-  gathers the live peer's `Delivery` outcomes into `Outcome.deliveries`.
+  (sketch A): a port-0 `Op::Bind`'s `Done::Bound` address, kept with its fd
+  and named when that fd's `Op::Listen` completes, never at the bind; it is
+  read by the referee's `act`, which calls `referee::forge::Forge::hand_hooks`
+  when it changes. The referee asserts each peer's `address()` is `None` or
+  `Some(FORGE)`, and gathers the live peer's `Delivery` outcomes into
+  `Outcome.deliveries`. `referee.rs`'s completion of `Story::Adopt` becomes
+  `forge.complete()` and the live peer's `Delivery` records numbering
+  `forge.domain.tally().hooks`, read between passes; no other story's
+  completion changes.
+  Observation room: `peer_limits()`' `observations` and `observation_bytes`
+  are named consts in `fixtures.rs`, each a sum of named terms with its
+  source in a comment, over the whole corpus (`one_process.rs`,
+  `fuzzy_one_process.rs` and the lib's world tests: the focused stories,
+  drain and restart, the fuzzy crashes and power losses, each `calm`):
+  `LIVES` 2, the most engine lives one peer meets (a drain or a cut, then the
+  restart; process 0 alone is cut); `WINDOWS` 2, the client's 10 s rate
+  windows, each opened by its first request, that the referee's 10 s
+  deadline meets; `CALLS = LIVES * WINDOWS * CLIENT.rate` (400);
+  `CONNECTIONS = CALLS + LIVES * CLIENT.calls` (404: every connection
+  carries a request but those a cut leaves); `HOOKS` 2, the Adopt story's;
+  `observations = 2 * CONNECTIONS + 2 * CALLS + HOOKS` (1,610).
+  `observation_bytes` charges each of the `CALLS` its head at the peer's
+  head bound and its call record at its repository's, op's and result's
+  bounds, and each of the `HOOKS` its post at the forge's bounds, each term
+  named. First check each premise in source: no more than `rate` requests a
+  window, retries included; no story past the deadline; at most two lives
+  a peer. A premise that fails returns. So does `Peer::new` refusing the
+  sum, or the room moving a story's time. Never a sample, a larger round
+  number, or a drained or cleared history.
 Test shape: three new units in `world.rs`' tests, no world, each <20 ms:
-  `a_port_zero_bind_names_the_hooks_address` passes `hooks_address` a `Complete`
-  for a bind of `127.0.0.1:0` done as `Bound(127.0.0.1:41000)` and expects
-  `Some` of that; `a_fixed_port_bind_is_not_a_hooks_address` uses fixed port
-  7102 and expects `None`; `a_failed_bind_is_not_a_hooks_address` uses a port-0
+  `a_port_zero_listener_names_the_hooks_address_once_it_listens` passes
+  `hooks_address` a `Complete` for a bind of `127.0.0.1:0` done as
+  `Bound(127.0.0.1:41000)`, expecting `None`, then that fd's `Listen` done,
+  expecting `Some` of that address; `a_fixed_port_bind_is_not_a_hooks_address`
+  uses fixed port 7102, bound and listening, and expects `None`;
+  `a_failed_bind_is_not_a_hooks_address` uses a port-0
   bind failed `AddressInUse` and expects `None`. Follow testing-strategy.md 10,
   One behaviour per test. One changed test,
   `an_adopted_repository_gets_its_change_pushed_through_git`
   (`tests/one_process.rs`, `world::run(fixtures::calm(SEED), Story::Adopt)`),
-  adds `assert_eq!(outcome.deliveries, [Delivery::Written, Delivery::Written])`: the 2 hooks
-  the Adopt story's domain fires at the base (at `Time(0)` and one second on,
-  counted in a scratch with `hooked: true`, findings), each written whole and
-  none resent. Other stories are unhooked: no delivery. Fault and crash phases
+  adds `assert_eq!(outcome.deliveries, [Delivery::NoAddress, Delivery::Written])`:
+  the 2 hooks the Adopt story's domain fires (counted in a scratch with
+  `hooked: true`, findings): the setup's topic push, released at `Time(0)`
+  before any host runs, which has no address, and the agent's push, which
+  ends the story, written whole to the listening engine; none resent. The
+  adoption's own assertions pass with the first lost. A second outcome of
+  `Refused` or `Reset` after this change is a finding: return it with its
+  io failure, never an edit. Other stories are unhooked: no delivery. Fault and crash phases
   may see `Refused` or `Reset` and are not asserted. The other 8 tests keep
   names and assertions; the referee's address rule covers them all. The
   engine's reaction (a hint refreshes, a read that fires no hook) is unmeasured
   until the peer exists: a count other than `deliveries` that moves, or a
-  delivery count other than 2, goes to the supervisor, not into an edit.
+  delivery count (or `tally().hooks`) other than 2, goes to the supervisor,
+  not into an edit.
 Proof: unit; `heavy cargo nextest run -p temper-one-process-world -E
-  'test(a_port_zero_bind_names_the_hooks_address) | test(a_fixed_port_bind_is_not_a_hooks_address) | test(a_failed_bind_is_not_a_hooks_address)'`: 3 passed, each <20 ms.
+  'test(a_port_zero_listener_names_the_hooks_address_once_it_listens) | test(a_fixed_port_bind_is_not_a_hooks_address) | test(a_failed_bind_is_not_a_hooks_address)'`: 3 passed, each <20 ms.
 Proof: joint; `heavy cargo nextest run -p temper-one-process-world`: its count at
   the step's start plus 3 (12 from the base's 9, 0.953 s; the scratch with webhooks configured ran them in
   1.96 s serially, the Adopt story in 1.08 s). The Adopt story alone took
@@ -212,12 +263,17 @@ Proof: process; `TEMPER_FORGEJO=$WS/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-li
   at the base). That script runs the real-binary tier; the one-process stories are the
   joint lines above.
 Don't: add a story or a world; edit a story's name or an assertion beyond the
-  two above; resend a delivery; keep `Forge`
+  two above; resend a delivery; hold a hook back, move the setup's push, or
+  wait in the engine or the peer for the listener; name the hooks' address
+  at a bind; size the observation room from a run's count, or drain or clear
+  the peer's history; change skein's peer or its fixture; keep `Forge`
   or `ForgeHost` anywhere; touch the engine's webhooks listener (temper 01.3,
   03.1); name `temper` in skein's peer.
-Size: about 12 lines moved (the handle), 215 new (estimated: `fixtures.rs` 75,
-  `world.rs` 75 plus the three unit fixtures, `referee/forge.rs` and `referee.rs` 30,
-  `transport.rs` 15, `stories.rs` and `one_process.rs` 14, manifests 6).
+Size: about 12 lines moved (the handle), 245 new (estimated: `fixtures.rs` 95,
+  with the observation room's sums about 20; `world.rs` 80 plus the three unit
+  fixtures, the learner's listen about 5; `referee/forge.rs` and `referee.rs` 35,
+  Adopt's end about 5; `transport.rs` 15, `stories.rs` and `one_process.rs` 14,
+  manifests 6).
 Removes: `forge.rs` (about 256 lines of the host); the fake-git `Forge` (18 lines); the one-process
   dependency on `temper-engine-protocol-forge-world`.
 
@@ -225,11 +281,18 @@ Removes: `forge.rs` (about 256 lines of the host); the fake-git `Forge` (18 line
 
 A: `world.rs`, the delivery learner (compiled in the scratch, clippy clean).
 ```rust
-fn hooks_address(complete: &Complete) -> Option<SocketAddr> {
-    if let skein_io::kernel::Op::Bind { addr: asked, .. } = &complete.kind
-        && asked.port() == 0
-        && let Ok(skein_io::kernel::Done::Bound(bound)) = &complete.result
-    { Some(*bound) } else { None }
+// The port-0 bind's address, named once that socket listens (amended by
+// the startup-hooks answer, not compiled; `Fd` is the kernel's fd type).
+fn hooks_address(bound: &mut Option<(Fd, SocketAddr)>, complete: &Complete) -> Option<SocketAddr> {
+    use skein_io::kernel::{Done, Op};
+    match (&complete.kind, &complete.result) {
+        (Op::Bind { fd, addr: asked, .. }, Ok(Done::Bound(addr))) if asked.port() == 0 => {
+            *bound = Some((*fd, *addr));
+            None
+        }
+        (Op::Listen { fd, .. }, Ok(_)) if bound.is_some_and(|(at, _)| at == *fd) => bound.take().map(|(_, addr)| addr),
+        _ => None,
+    }
 }
 // referee::forge::Forge, between passes
 pub(crate) fn hand_hooks(&mut self, bound: SocketAddr) {
@@ -253,7 +316,8 @@ fn peer() -> Peer {
 `peer_limits()` gives `io` every field of the host's `Listen` in `forge.rs` (sockets
 16, refusals 8, intake 65,536, receive 1024, output 65,536, sends 8, accepts 4,
 backlog 8, names 0, close_timeout 1 s, retry 1 ms), `connections`
-4, `queue` 64, the rest from skein's `tests/forge/fixtures.rs::limits` at its
+4, `queue` 64, `observations` and `observation_bytes` the world's own
+(05.2, "Observation room"), the rest from skein's `tests/forge/fixtures.rs::limits` at its
 landed revision; `Peer::new` checks the sum. `forge_limits()` copies
 `fake_limits()`: calls 4, connections 4, raw_bytes 4096, the http and documents
 values of `tests/engine/protocol-forge/src/fixtures.rs`.
