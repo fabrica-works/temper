@@ -1205,9 +1205,9 @@ defaults for a person's real work are open (section 16).
     person the one init finds, `LOGIN@localhost`, with the org `work`
     (8.2).
 
-  No webhooks' listener: the fake sends no delivery, forge 3 polls
-  (forge.md, section 6), and GitHub's hints come from its App's delivery
-  log.
+  No webhooks' listener: reconcile registers no hook, so the fake has
+  none to deliver to, forge 3 polls (forge.md, section 6), and GitHub's
+  hints come from its App's delivery log.
 - **Its LLM providers:** the owned example's `engine.llm`, whole (8.1),
   with no account; and 3, Demo, the demo model's (8.4): one endpoint,
   `demo`, at `127.0.0.1:<the fake LLM's port>`, plaintext, OpenAI's
@@ -1269,14 +1269,27 @@ demo's own work pushes nothing yet.
   | `llm.listen` | an address, jig's format | a socket address on loopback; unique among the deployment's listeners and owned and fake forges |
   | `llm.provider` | u32 | the number of one of `engine.llm`'s providers (configuration.md, section 2), whose endpoints are each at `llm.listen`, plaintext, OpenAI's dialect on its public route, and whose source is a key alone |
   | `llm.key` | a data path (configuration.md, section 12) | a secret's file, 0o600 (section 9): the key is its bytes less a final newline |
-  | `llm.asked` | a list of `{"cue", "turns"}` | at most 8; each `cue` non-empty text, unique; `turns` 1 to 8 texts |
-  | `llm.otherwise` | a list of texts | 1 to 8 |
+  | `llm.asked` | a list of `{"cue", "turns"}` | at most 8; each `cue` non-empty text, unique; `turns` 1 to 8 turns (below) |
+  | `llm.otherwise` | a list of turns | 1 to 8 |
   | `forge` | u16 | the `forge` of one fake `setup` entry (section 8) |
   | `project` | u32 | the number of one of `engine.projects` (configuration.md, section 2) |
   | `client` | a data path | a private directory (section 3), unique among the document's directories |
 
   The scripts, `asked` and `otherwise` together, fit skein's fake LLM's
   `script_bytes` (skein's `fake-llm.md`), which `temper-fake` sets.
+- **A turn** is skein's `Turn` (skein's `fake-llm.md`, section 2), in
+  either of two spellings:
+  - *a text,* the demo's: one text line, finishing `stop`, its tokens
+    its bytes divided by 4, rounded up;
+  - *an object,* `{"lines", "finish", "tokens"}`, the QA loop's: `lines`
+    1 to 8, each `{"text"}`, non-empty text, or `{"call", "arguments"}`,
+    a tool's name of 1 to 64 ASCII letters, digits, `_` and `-` and its
+    arguments a JSON object, which `temper-fake` writes compact as the
+    call's bytes; `finish` one of `stop`, `tool_calls`, `length` and
+    `content_filter`; `tokens` a u64, at least 1.
+
+  Each is checked as skein checks a script's turns (its section 2.3).
+  No turn holds a hold, a failing line or opaque bytes.
 - **Its words,** as `temper init` writes them (8.2): one `asked` script
   for each request the client suggests in the demo project
   (`../client/mockups/first-run.html`): "Add CSV export to widget", "Add
@@ -1311,17 +1324,33 @@ demo's own work pushes nothing yet.
   - *the owner,* `fake.owner`, a user of the domain, numbered apart from
     the setup's accounts (skein's `fake-forge.md`, section 5);
   - *its repositories,* `fake.repositories`, each the owner's, in the
-    protocol's `config.repositories` and the domain alike, with the same
-    number at every start, a few files on its `landing` branch and
-    `.forgejo/workflows/check.yml`;
-  - *its CI,* `Checks` passing every head with one context, `check`.
+    protocol's `config.repositories` and the domain alike, numbered
+    from 1 in the list's order at every start, so the box's
+    `demo/widget` and the QA loop's `fake/widget` are each 1; on its
+    `landing` branch, one commit of `temper-fake`'s constants, its
+    files, author and time alike, so its head is the same commit at
+    every start: a few files and `.forgejo/workflows/check.yml`, which
+    describes the check the fake's CI stands for and is not run;
+  - *its CI,* `Checks` with one context, `check`, with no latency,
+    silence or rerun: on a repository with a cue, the domain's `Cue { path, green
+    }` (skein's `fake-forge.md`, 2.3), a head whose file at `path` holds
+    `green` passing and any other failing; on one without, every head
+    passing. The box gives none; the lab's form gives each repository's
+    (below).
 
   The bot is reconcile's, and its access to a repository the adoption's
   collaborator grant, which reaches the fake's domain (skein's
   `fake-forge.md`, section 4): the seed grants nothing. It serves its
   git route among its routes (skein's `fake-forge.md`, section 4), and
-  no git smart HTTP; it sends no delivery and keeps no state across its
-  starts.
+  no git smart HTTP; it keeps no state across its starts.
+- **Its deliveries follow the setup's hooks** (skein's `fake-forge.md`,
+  section 4): each event goes to each hook a repository's setup holds
+  that takes it, signed by that hook's secret. Reconcile makes a
+  repository's hook at adoption when the deployment has a webhooks'
+  listener (section 10), at `http://<listener>/hooks/<number>`, so the
+  fake reaches serve's listener as a Forgejo does. The box has no
+  webhooks' listener (8.3), so it registers none and polls; the QA
+  loop's serve has one, on loopback.
 - **`temper fake git`,** no step: the demo forge's git, which the
   worker spawns for the fake's repositories by the program their
   records name, the fake entry's `git`, the demo's link (8.2; channel.md,
@@ -1340,30 +1369,75 @@ demo's own work pushes nothing yet.
   - `--ready PREFIX`: once its listener is bound, the program writes
     PREFIX, then the bound address as `127.0.0.1:<port>`, then a
     newline on stdout, flushed; nothing else is on its stdout;
-  - `--seed N`: its domain's seed, a u64 (skein's `fake-llm.md`'s
-    `Domain::played`; skein's `fake-forge.md`'s `Service::new`), 0 when
-    absent, as the box runs it;
-  - `--observations FILE`, the fake forge's alone: each observation its
-    domain makes (skein's `fake-forge.md`, 2.4), drained as a referee
-    drains it, appended to FILE, created new at 0o600, as one JSON line
-    in skein's encoding of the domain's observations, flushed at each
-    pass, and a last line with the count lost (`observations_lost`) at
-    its stop. Without it, the program drains and drops them.
+  - `--seed N`: its domain's seed, a u64 in decimal (skein's
+    `fake-llm.md`'s `Domain::played`; skein's `fake-forge.md`'s
+    `Service::new`), 0 when absent, as the box runs it; in a document's
+    form, its credentials' too (below);
+  - `--observations FILE`, the fake forge's alone: FILE created new at
+    0o600, and each observation its domain makes (skein's
+    `fake-forge.md`, 2.4) drained after each pass, as a referee drains
+    it, and written to FILE in skein's encoding, one JSON line each in
+    drain order. A pass that observed or lost any ends its lines with a
+    checkpoint, `{"observations_lost":N}`, the count lost so far, and
+    the program writes one more at its stop, so FILE is whole up to its
+    last checkpoint, and a stopped program's last line is one. Nothing
+    of a pass is sent, no reply and no delivery, before its lines'
+    write completes, so a reader that has seen a reply, or what a reply
+    caused, finds in FILE what the pass observed. Without the flag, the
+    program drains and drops them, and sends as it serves.
 
   Both peers run `without_records`, with the flags or without them.
 - **From a document of its own,** `temper fake llm --document FILE` and
   `temper fake forge --document FILE`, the QA loop's form, which reads
-  no deployment: FILE is a fake's configuration as `temper-fake` derives
-  it from the deployment's document in the box's form. The LLM's:
-  `listen`, `key` (an absolute path), the provider's `models` (each
-  name, window and output), `asked` and `otherwise`. The forge's:
-  `listen`, `admin_token` (an absolute path, written by its runner as
-  the preparation writes it), `owner` and `repositories` (each `name`
-  and `landing`). Each `listen` is a loopback socket address, port 0
-  for the kernel's; the rest is checked as the deployment's members are
-  (above). So a runner starts the fakes first, learns their
-  addresses from their ready lines, then writes temper's document
-  naming them, and starts `temper serve`.
+  no deployment: FILE is a fake's configuration, a JSON object, as
+  `temper-fake` derives it from the deployment's document in the box's
+  form, with what a run needs beside it. The LLM's:
+
+  | Member | Type | Bounds |
+  |---|---|---|
+  | `listen` | an address, jig's format | a socket address on loopback, port 0 for the kernel's |
+  | `key` | an absolute path | the key's file, which the fake writes (below) |
+  | `tls` | `{"root"}`, or null for plaintext | `root` an absolute path: the test root's file, which the fake writes (below) |
+  | `models` | a list of `{"name", "window", "output"}` | 1 to 8, each as a provider's model's members are (configuration.md, section 2) |
+  | `cued` | a list of `{"cue", "turns"}` | at most 8, as `llm.asked` is; each cue looked for in the system text (skein's `fake-llm.md`, 2.4) |
+  | `asked`, `otherwise` | as `llm.asked` and `llm.otherwise` | the same |
+
+  The forge's:
+
+  | Member | Type | Bounds |
+  |---|---|---|
+  | `listen` | an address, jig's format | a socket address on loopback, port 0 for the kernel's |
+  | `admin_token` | an absolute path | the handover's file, which the fake writes (below) |
+  | `owner` | a Forgejo login | other than the bot's and `temper-admin` |
+  | `repositories` | a list of `{"name", "landing", "ci"}` | as `fake.repositories` are; `ci` `{"path", "green"}`, or null for every head passing: `path` a file's path in the repository, relative, none of the seed's, and `green` non-empty text, both within the domain's content limits |
+
+  The box's derivation gives `cued` none, `tls` and each `ci` null.
+- **Its outputs,** in a document's form, where the box's fakes read
+  the files `temper init` and the preparation drew: the fake writes
+  each file the document names before it binds, so that each exists
+  before its ready line, created new at 0o600; a file already there
+  refuses the start, naming it. Each file's directory must exist, but
+  the admin token's, the forge's directory (section 3), which the fake
+  makes private when absent and refuses, naming it, when it is not
+  private, as `temper forge prepare` does. The key and the admin token
+  are each 20 bytes as 40 lowercase hexadecimal digits, from
+  skein-lib's `Rng` seeded by `--seed` and a constant of each
+  credential's, a stream apart from the domain's draws, so the runner
+  draws none (`../draft/qa-loop.md`, section 4). A seeded credential is
+  no secret from whoever holds the run's record: it opens only that
+  run's loopback processes, which end with it, which is why the box
+  draws its own from the kernel instead. `tls.root` gets
+  `skein_fake_peers::transport::ROOT`'s bytes, and the fake serves the
+  fixed chain that root signs, whose leaf names `skein.test` and
+  `127.0.0.1` (skein's `fake-llm.md`, section 3); an endpoint reaching
+  it names `skein.test` as its server and trusts that file alone
+  (configuration.md, section 12), as the QA loop's serve and agent do.
+  The fake removes none of them at its stop: serve's setup host
+  removes the admin token when it takes it (section 3), and the run's
+  directories go with the run.
+- **A runner** starts the fakes first, learns their addresses from
+  their ready lines, then writes temper's document naming them and the
+  files the fakes wrote, and starts `temper serve`.
 - **`temper serve`** takes the fake's handover and reconciles it as an
   owned forge's (5.1, 6.5): `TakeOver`, then `Reconcile`, which makes the
   bot and its tokens on the fake. A fake not yet bound when the start's
@@ -1408,19 +1482,19 @@ demo's own work pushes nothing yet.
   `temper-fake-git`'s core on the real file system (`../domain/testing.md`,
   4.3), which `main` runs when its `argv[0]`'s last component is `git`.
   `Mode::Fake` and the link step's kind are `temper-forge-setup`'s.
-- **Not yet:** git's smart HTTP on the fake, its deliveries, its pages,
-  and its state across starts; TLS on the fake LLM, with skein's test
-  root; and `temper fake forge check FILE`, which judges an
-  observations file by the forge's promises under the QA loop's contract
-  for a check (its exits 0, 1 and 2, its signatures as JSON lines); each
-  is the demo's follow-up or the QA loop's (`../draft/qa-loop.md`,
-  sections 4 and 11).
+- **Not yet:** git's smart HTTP on the fake, its pages, and its state
+  across starts; a webhooks' listener in the box, so the demo's forge
+  delivers as the QA loop's does; and `temper fake forge check FILE`,
+  which judges an observations file by the forge's promises under the
+  QA loop's contract for a check (its exits 0, 1 and 2, its signatures
+  as JSON lines); each is the demo's follow-up or the QA loop's
+  (`../draft/qa-loop.md`, sections 4 and 11).
 
 ## 9. Credentials
 
 | Credential | Mode | Made by | Kept | Used by |
 |---|---|---|---|---|
-| a site admin's token | Forgejo, managed; owned; fake | the person, pasted; the preparation, by Forgejo's command line, or drawn for a fake (8.4) | the `AdminToken` record; an owned or fake forge's handover, until the engine takes it, which a fake forge reads at its start | the setup host alone, while a plan runs: reconcile, `TakeOver`, access at adoption (`Adopt`), and the picker's read (`Reachable`, skein's `forge-setup.md`, 4.8) |
+| a site admin's token | Forgejo, managed; owned; fake | the person, pasted; the preparation, by Forgejo's command line, or drawn for a fake, or the fake from its seed in a document's form (8.4) | the `AdminToken` record; an owned or fake forge's handover, until the engine takes it, which a fake forge reads at its start | the setup host alone, while a plan runs: reconcile, `TakeOver`, access at adoption (`Adopt`), and the picker's read (`Reachable`, skein's `forge-setup.md`, 4.8) |
 | the bot's API and git tokens | Forgejo, every mode | the person, pasted; reconcile | the `ApiToken` and `GitToken` records | the forge component; the identities' table |
 | the bot's password | Forgejo, managed, owned, fake | reconcile, random, when it makes the bot | nowhere | nothing |
 | temper's admin's password | owned | Forgejo, random | nowhere | nothing |
@@ -1430,7 +1504,7 @@ demo's own work pushes nothing yet.
 | the webhooks' secret | Forgejo, every mode | the person, pasted; reconcile, drawn | the `WebhookSecret` record | the webhooks' listener; Forgejo's hooks |
 | a GitHub App's key | GitHub | GitHub, at the manifest's conversion; the person, pasted as PEM | the `AppKey` record, DER; a PEM never | the forge component, for its tokens; the setup host, while a plan runs |
 | an installation's token; a GitHub git token | GitHub | the forge component, from the App's key | memory alone | the forge component; git |
-| the demo model's key | the demo | `temper init`, random (8.2) | `demo/llm.key` | the fake LLM, its one credential; the seed, which adds it as the deployment's account (8.4) |
+| the demo model's key | the demo | `temper init`, random (8.2), or the fake LLM from its seed in a document's form (8.4) | `demo/llm.key`, or the document's `key` | the fake LLM, its one credential; the seed, which adds it as the deployment's account (8.4) |
 
 - **Every credential the engine holds is a record** in jig's secrets'
   store (credentials.md, the records), written by the setup host's
