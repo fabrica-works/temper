@@ -96,7 +96,7 @@ impl Tier {
     #[must_use]
     pub fn accounts(name: &str) -> Self {
         let tier = Self::reserved(name);
-        let path = tier.scratch.path().join("config.json");
+        let path = tier.scratch.path().join("temper.json");
         let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("deployment")).expect("JSON");
         let private_bundle = tier.scratch.path().join("bundle");
         copy_bundle(&bundle(), &private_bundle);

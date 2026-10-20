@@ -185,7 +185,7 @@ pub(crate) fn key_documents(directory: &Path) -> std::io::Result<()> {
     let mut agent: serde_json::Value = serde_json::from_slice(&std::fs::read(&path)?)?;
     agent["endpoints"][0]["provider"] = "openai".into();
     agent["endpoints"][0]["dialect"] = 3.into();
-    let config_path = directory.join("config.json");
+    let config_path = directory.join("temper.json");
     let mut config: serde_json::Value = serde_json::from_slice(&std::fs::read(&config_path)?)?;
     config["engine"]["llm"]["endpoints"][0]["dialect"] = 3.into();
     // Give the fixture owner a real deployment membership for the joined read.

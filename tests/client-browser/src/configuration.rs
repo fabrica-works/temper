@@ -100,8 +100,9 @@ pub(crate) fn private(path: &Path, bytes: &[u8]) {
 /// The deployment's files and its two documents, `agent.json` and `temper.json`, in `directory`.
 pub(crate) fn write(directory: &Path, program: &Path, bundle: &Path) {
     assert!(Path::new("/usr/bin/git").is_file(), "/usr/bin/git is required");
-    for name in ["accounts", "secrets", "charters", "state"] {
+    for name in ["", "accounts", "secrets", "charters", "state"] {
         fs::create_dir_all(directory.join(name)).expect("deployment directory");
+        fs::set_permissions(directory.join(name), fs::Permissions::from_mode(0o700)).expect("private directory");
     }
     for (name, bytes) in jig_channel_world::fixtures::files(false).entries.into_boxed() {
         private(&directory.join(std::str::from_utf8(&name).expect("fixture path")), bytes.expose());
