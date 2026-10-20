@@ -1015,7 +1015,8 @@ by the commands in `docs/development/workflow.md`. In temper:
   live tier's binary `live`, which both suites' filters leave out, run
   under the nextest profiles `process` and `live` by
   `scripts/proof-one-process.sh` and `scripts/proof-live.sh`. The gate
-  never runs them.
+  never runs them; `scripts/after-landing.sh` runs the process tier
+  after each landing (skein's `owners.md`, 4.5).
 
 A fuzzy test lives in its world's crate, beside the focused ones, and
 uses that world: a world's settings, random ones included, are the
@@ -1094,6 +1095,7 @@ tests/fake-checkout                 temper-fake-checkout: working trees' git, ov
 tools/git-transcripts               git's transcripts, from real git against skein's throwaway Forgejo (../protocol/git.md, section 9)
 scripts/proof-one-process.sh        the process tier
 scripts/proof-live.sh               the live tier
+scripts/after-landing.sh            the process tier, after each landing
 ```
 
 - **The worlds and the harness** are skein's world harness
