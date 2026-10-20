@@ -886,6 +886,19 @@ pass:
 
      A further Done when command whose literal fails only on another plan's lines is recorded so, with the commit that wrote them, rather than amended after the run.
 
+151. **The other worlds' sum is 0.04 s past 4 s** (Done when 5, run of 2026-10-20T16:03:56Z).
+     Reverses: nothing.
+     Amends: nothing.
+
+     Done when 5's worlds below the domain, run with ruling 150's six packages at temper 8f2228ce8, four runs after one build through `heavy --gate` (task 93, ran alone for 33 s, logs/20261020T160401-93.log), the last three counted: the other worlds 4.04, 4.09 and 4.02 s, median **4.04 s, past testing.md 6.1's 4 s by 0.04 s**; the real loop 3.23, 3.29 and 3.21 s, median 3.23 s, within its 6 s, so the ceiling does not go to the user; no real-loop story past its 1 s in any run. Each run passed 125 of 125 tests.
+
+     The miss is recorded for the user, as the README's Rules ("The worlds' sums below the domain hold no step") and ruling 112 have it: each test within its own guide landed, and only a step the supervisor names makes a test cheaper for a sum. The three slowest of the other worlds' tests, by their median of the three runs:
+     1. `temper-one-process-world::one_process an_adopted_repository_gets_its_change_pushed_through_git`, 0.899 s (0.902, 0.899, 0.888), which was 0.87 s at the plan's base (ruling 112's answer, point 1);
+     2. `… a_person_signs_in_by_the_printed_link_and_a_chat_is_answered`, 0.264 s;
+     3. `… a_signal_mid_run_drains_and_the_next_start_settles_the_claims`, 0.253 s.
+
+     The adoption story alone is 22% of the sum. Work on it belongs to temper's owner, past this run (the director's message of 2026-10-20T10:03Z: new work goes to owners). The run is done either way (Done when 5).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
