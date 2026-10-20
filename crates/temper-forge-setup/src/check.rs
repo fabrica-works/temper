@@ -98,7 +98,7 @@ pub fn members(setup: &Setup, members: &Members, webhooks: bool, ps: &mut Proble
         require(f.identity_token == joined(&[&e.directory, b"/git_token"]), p.member(b"forge"), ps);
         require(f.identity_login == e.bot.login, p.member(b"bot").member(b"login"), ps);
         match &e.mode {
-            Mode::Managed { .. } => {}
+            Mode::Managed { .. } => require(!e.asked, p.member(b"start"), ps),
             Mode::Owned(o) => {
                 let op = p.member(b"mode").member(b"owned");
                 require(

@@ -64,6 +64,11 @@ fn an_entry_at_odds_with_itself_or_its_forge_is_refused_naming_its_path() {
         check::members(&setup, &fixtures::members(), false, &mut problems);
         assert!(skein_lib::bytes::find(&problem::lines(&problems), expected).is_some(), "case {from:?}");
     }
+    let mut setup = fixtures::setup();
+    setup.entries[0].asked = true;
+    let mut ps = problem::Problems::empty();
+    check::members(&setup, &fixtures::members(), false, &mut ps);
+    assert_eq!(&*problem::lines(&ps), b"application.setup[0].start: invalid form\n");
     for field in [b"token".as_slice(), b"login", b"git", b"transport"] {
         let mut members = fixtures::members();
         let expected = match field {

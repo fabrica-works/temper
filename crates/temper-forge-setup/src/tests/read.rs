@@ -76,6 +76,13 @@ fn an_entry_past_the_orgs_limit_is_refused() {
 fn a_member_outside_its_bounds_is_refused_naming_its_path() {
     for (from, to, expected) in [
         (
+            br#""forge":2"#.as_slice(),
+            br#""forge":2,"start":"now""#.as_slice(),
+            b"application.setup[1].start: invalid form\n".as_slice(),
+        ),
+        (br#""forge":1"#, br#""forge":1,"start":"asked""#, b"application.setup[0].start: invalid form\n"),
+        (br#""forge":2"#, br#""forge":2,"start":true"#, b"application.setup[1].start: wrong value kind\n"),
+        (
             br#""orgs":["acme"]"#.as_slice(),
             br#""orgs":[]"#.as_slice(),
             b"application.setup[0].orgs: invalid form\n".as_slice(),
@@ -172,5 +179,21 @@ fn setup_paths_join_their_kind_keep_absolute_values_and_refuse_escaping_relative
             .is_none()
         );
         assert!(problem::lines(&problems).starts_with(path.as_bytes()));
+    }
+}
+
+#[test]
+fn an_owned_entry_reads_start_absent_or_asked() {
+    for (text, asked) in [(br#""forge":2"#.as_slice(), false), (br#""forge":2,"start":"asked""#, true)] {
+        let bytes = fixtures::changed(br#""forge":2"#, text);
+        let setup = Setup::read(
+            &fixtures::document(&bytes),
+            0,
+            &limits::small(),
+            &jig_protocol_config::Directories::working(),
+            &mut Problems::empty(),
+        )
+        .unwrap();
+        assert_eq!(setup.entry(2).unwrap().asked, asked);
     }
 }

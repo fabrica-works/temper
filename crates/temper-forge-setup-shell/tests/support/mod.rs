@@ -60,6 +60,7 @@ pub fn settings(address: std::net::SocketAddr) -> temper_forge_setup_shell::reco
     let io = io();
     let profile = temper_service::limits::profile(temper_service::limits::Profile::Small).forge_component;
     let entry = Entry {
+        asked: false,
         forge: 1,
         directory: Box::new([]),
         bot: Account { login: b"temper-bot".as_slice().into(), email: b"bot@example.invalid".as_slice().into() },

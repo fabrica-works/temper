@@ -746,6 +746,12 @@ temper box
   `<data>/box/started/FORGE` exists: one empty file per forge, written
   once the group's preparation has exited 0, so that a later box runs
   the group in its place, as an unasked one, before `temper serve`.
+  The record is written beneath the data directory, `box` and
+  `box/started` made as needed, mode 0600. When it cannot be written,
+  the box's stderr names why, the group answers
+  `failed FORGE record not written` and is dormant again. At its start
+  the box looks for each asked group's record; one it cannot look at
+  is named on its stderr, and its group stays dormant.
 - **The pipe,** two of them, made again at each spawn of `temper
   serve`: its fd 3, serve to box, and its fd 4, box to serve. `--box`
   tells `temper serve` to adopt them; without it, as under every other
@@ -757,11 +763,14 @@ temper box
   | `start FORGE` | serve, at the client's ask (6.5) | start the forge's group |
   | `step FORGE STEP` | the box | the group's step `fetch`, `prepare` or `run` is starting, for the client's row (`../client/forge.md`, 5.4) |
   | `started FORGE` | the box | the group's long steps are started, and its record written |
-  | `failed FORGE WHY` | the box | the group stopped: `WHY` names the step and how it ended, such as `prepare exited 1`, cut to fit the line's bound, and holds no secret; a step's own lines are on the box's stderr (7.2) |
+  | `failed FORGE WHY` | the box | the group stopped: `WHY` names the step by its name, as the box's stderr prefixes it (7.2), such as `prepare 3 exited 1`: `<step> exited <code>`, `<step> killed by signal <n>`, `<step> did not start`, or `record not written`, cut to fit the line's bound, and holds no secret; a step's own lines are on the box's stderr (7.2) |
 
-  One ask at a time: a `start` while a group starts is answered
-  `failed FORGE busy`, and one for a forge with no dormant group
-  `failed FORGE not asked`, or `started FORGE` when it is started. An
+  One ask at a time: a `start` for another forge while a group starts,
+  or while a failed group's steps close, is answered `failed FORGE busy`;
+  one for the forge whose group is starting, by that group's own lines;
+  one for a forge with no group, `failed FORGE not asked`; one for a
+  started group, `started FORGE`; one while the box stops,
+  `failed FORGE stopping`. An
   answer to a `temper serve` that has exited is dropped: its restart
   finds the handover at its start (6.5). Each line is at most
   `box.line_bytes` (configuration.md, section 7), which both sides
@@ -832,8 +841,10 @@ temper box
   closes, the pipe's lines and the groups' records out), hosted on
   skein-io.
 - **The steps in groups:** `Steps { always, asked }`, `always` the steps
-  run in order, and `asked` a list of `Group { forge, steps }`, each
-  dormant until asked (7.1). The machine's step tests drive a group
+  run in order, and `asked` a list of `Group { forge, before, steps }`, each
+  dormant until asked (7.1). `before` is its place in the order: the
+  index in `always` it runs just before (its length puts it last). Each
+  step carries its `Stage`, whose word its `step` lines carry. The machine's step tests drive a group
   from dormant to `started`, and to `failed`, by lines and exits alone
   (13.1).
 - **The binary hands it the steps.** `temper box` resolves its three
@@ -843,7 +854,7 @@ temper box
   (8.4), and gives them to `temper-box`, an asked forge's group apart.
 - **Checked:** a boundary test fails the gate when `temper-box` depends
   on a crate named `temper-*` but `temper-forge-setup`, or names an item
-  of it but `steps` and `Step`.
+  of it but `steps`, `Steps`, `Group`, `Stage` and `Step`.
 
 ### 7.4 Other arrangements of the same commands
 
@@ -1728,7 +1739,9 @@ relies on.
   running the group's steps in order, a `step` line for each, then the
   record written and `started FORGE`; a step's failure answering `failed
   FORGE WHY`, the group dormant again and the others running on; a
-  second `start` while one runs answered busy, a forge with no group
+  second `start` while one runs answered busy, a re-ask of the starting
+  forge answered by its own lines, an ask while stopping, a record not
+  written, a forge with no group
   `not asked`, and a started one `started`; a start with the record
   running the group as an always group; a line past `box.line_bytes`
   refused; `temper serve` restarted with a pipe afresh, an answer meant

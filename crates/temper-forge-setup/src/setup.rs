@@ -45,6 +45,7 @@ pub struct Entry {
     pub bot: Account,
     pub orgs: Box<[Box<[u8]>]>,
     pub mode: Mode,
+    pub asked: bool,
 }
 /// The setup list, with at most one entry per forge.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -271,7 +272,30 @@ fn entry(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Prob
     let bot_at = o.required(d, b"bot", p, ps);
     let orgs_at = o.required(d, b"orgs", p, ps);
     let mode_at = o.required(d, b"mode", p, ps);
+    let start_at = o.member(d, b"start");
     o.finish(d, p, ps);
+    let mode = mode(d, mode_at?, &p.member(b"mode"), ps)?;
+    let asked = if let Some(at) = start_at {
+        let value = match read::text(d, at, 4096) {
+            Ok(value) => value,
+            Err(what) => {
+                ps.push(p.member(b"start"), what);
+                return None;
+            }
+        };
+        valid(
+            value.as_ref() == b"asked"
+                && match mode {
+                    Mode::Owned(_) => true,
+                    Mode::Managed { .. } => false,
+                },
+            p.member(b"start"),
+            ps,
+        );
+        true
+    } else {
+        false
+    };
     let forge = match read::integer(d, forge_at?, u64::from(u16::MAX)) {
         Ok(n) => u16::try_from(n).expect("forge bounded"),
         Err(w) => {
@@ -286,7 +310,8 @@ fn entry(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Prob
         directory,
         bot: account(d, bot_at?, &p.member(b"bot"), ps)?,
         orgs: strings(d, orgs_at?, limits.orgs, true, &p.member(b"orgs"), ps)?,
-        mode: mode(d, mode_at?, &p.member(b"mode"), ps)?,
+        mode,
+        asked,
     })
 }
 fn list(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Problems) -> Option<Setup> {

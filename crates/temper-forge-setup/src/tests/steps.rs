@@ -5,7 +5,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 fn names(setup: &Setup, expected: &[(&[u8], bool)]) {
-    let steps = steps(setup, &flags());
+    let steps = steps(setup, &flags()).always;
     assert_eq!(steps.len(), expected.len());
     for (step, (name, long)) in steps.iter().zip(expected) {
         assert_eq!(step.name(), *name);
@@ -25,7 +25,7 @@ fn a_managed_and_an_owned_forge_run_the_six_steps_of_the_design_tree() {
             (b"serve", true),
         ],
     );
-    let commands = steps(&fixtures::setup(), &flags());
+    let commands = steps(&fixtures::setup(), &flags()).always;
     let expected: &[&[&[u8]]] = &[
         &[b"forge", b"prepare", b"--config", b"/config", b"--data", b"/data", b"--cache", b"/cache", b"2"],
         &[b"forge", b"run", b"--config", b"/config", b"--data", b"/data", b"--cache", b"/cache", b"2", b"forgejo"],
@@ -78,4 +78,41 @@ fn flags() -> Box<[Box<[u8]>]> {
         Box::from(b"--cache".as_slice()),
         Box::from(b"/cache".as_slice()),
     ])
+}
+
+#[test]
+fn asked_groups_keep_their_place_and_stages_without_reconcile() {
+    for runner in [false, true] {
+        let mut setup = fixtures::setup();
+        setup.entries[1].asked = true;
+        if !runner {
+            let Mode::Owned(owned) = &mut setup.entries[1].mode else { panic!("owned") };
+            owned.runner = None;
+        }
+        let commands = steps(&setup, &flags());
+        assert_eq!(commands.always.len(), 2);
+        for (step, name) in commands.always.iter().zip([b"reconcile 1".as_slice(), b"serve"]) {
+            assert_eq!(step.name(), name);
+        }
+        assert_eq!(commands.asked.len(), 1);
+        let group = &commands.asked[0];
+        assert_eq!((group.forge, group.before), (2, 0));
+        assert_eq!(group.steps.len(), if runner { 3 } else { 2 });
+        assert_eq!(group.steps[0].0, crate::Stage::Prepare);
+        for (stage, step) in group.steps.iter().skip(1) {
+            assert_eq!(*stage, crate::Stage::Run);
+            assert!(step.is_long());
+        }
+    }
+    for (stage, word) in
+        [(crate::Stage::Fetch, b"fetch".as_slice()), (crate::Stage::Prepare, b"prepare"), (crate::Stage::Run, b"run")]
+    {
+        assert_eq!(stage.word(), word);
+    }
+    let mut setup = fixtures::setup();
+    let mut other = setup.entries[1].clone();
+    other.forge = 3;
+    other.asked = true;
+    setup.entries = Box::new([setup.entries[1].clone(), other]);
+    assert_eq!(steps(&setup, &flags()).asked[0].before, 3);
 }

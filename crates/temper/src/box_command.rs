@@ -34,7 +34,7 @@ pub fn run(directories: &super::Directories) -> Result<Exit, String> {
             stdout: Fd::new(1),
             stderr: Fd::new(2),
         };
-        let service = Service::new(&limits, steps, settings).map_err(|why| format!("box limits: {why:?}"))?;
+        let service = Service::new(&limits, steps.always, settings).map_err(|why| format!("box limits: {why:?}"))?;
         let kernel = Kernel::open(Config { operations: service.operations() }).map_err(|why| why.to_string())?;
         Ok((service, kernel))
     })();

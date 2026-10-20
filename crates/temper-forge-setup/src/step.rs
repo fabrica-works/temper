@@ -5,6 +5,36 @@ use crate::{
 };
 use alloc::boxed::Box;
 use skein_lib::{Decimal, List, bytes};
+/// The word carried by a group's step lines (protocol/setup.md, 7.3).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Stage {
+    Fetch,
+    Prepare,
+    Run,
+}
+impl Stage {
+    #[must_use]
+    pub fn word(self) -> &'static [u8] {
+        match self {
+            Self::Fetch => b"fetch",
+            Self::Prepare => b"prepare",
+            Self::Run => b"run",
+        }
+    }
+}
+/// A dormant forge's steps and their place in the always chain.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Group {
+    pub forge: u16,
+    pub before: u32,
+    pub steps: Box<[(Stage, Step)]>,
+}
+/// Commands run at startup, and groups run when asked.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Steps {
+    pub always: Box<[Step]>,
+    pub asked: Box<[Group]>,
+}
 /// One command of the temper binary that the box runs.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Step {
@@ -59,25 +89,38 @@ fn forge(action: &[u8], flags: &[Box<[u8]>], number: u16, run: Option<&[u8]>) ->
 /// Carries the box's absolute directory flags after each command's words.
 /// Commands in setup order: owned processes, every reconcile, then serve.
 #[must_use]
-pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Box<[Step]> {
+pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
     let count = u32::try_from(setup.entries.len()).expect("bounded entries");
     let mut out = List::with_capacity(
         count.checked_mul(4).expect("bounded step count").checked_add(1).expect("bounded step count"),
     );
+    let mut asked = List::with_capacity(count);
     for e in &setup.entries {
         match &e.mode {
             Mode::Managed { .. } => {}
             Mode::Owned(o) => {
-                out.push(forge(b"prepare", flags, e.forge, None)).expect("step capacity");
-                out.push(forge(b"run", flags, e.forge, Some(b"forgejo"))).expect("step capacity");
+                let mut group = List::with_capacity(3);
+                group.push((Stage::Prepare, forge(b"prepare", flags, e.forge, None))).expect("prepare");
+                group.push((Stage::Run, forge(b"run", flags, e.forge, Some(b"forgejo")))).expect("forgejo");
                 if o.runner.is_some() {
-                    out.push(forge(b"run", flags, e.forge, Some(b"runner"))).expect("step capacity");
+                    group.push((Stage::Run, forge(b"run", flags, e.forge, Some(b"runner")))).expect("runner");
+                }
+                if e.asked {
+                    asked
+                        .push(Group { forge: e.forge, before: out.len(), steps: group.into_boxed() })
+                        .expect("entry capacity");
+                } else {
+                    for (_, step) in group.into_boxed() {
+                        out.push(step).expect("step capacity");
+                    }
                 }
             }
         }
     }
     for e in &setup.entries {
-        out.push(forge(b"reconcile", flags, e.forge, None)).expect("step capacity");
+        if !e.asked {
+            out.push(forge(b"reconcile", flags, e.forge, None)).expect("step capacity");
+        }
     }
     let mut serve = List::with_capacity(
         u32::try_from(flags.len()).expect("bounded flags").checked_add(1).expect("bounded arguments"),
@@ -87,5 +130,5 @@ pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Box<[Step]> {
         serve.push(flag.clone()).expect("flags counted");
     }
     out.push(Step::new(bytes::copy_of(b"serve"), serve.into_boxed(), true)).expect("serve capacity");
-    out.into_boxed()
+    Steps { always: out.into_boxed(), asked: asked.into_boxed() }
 }
