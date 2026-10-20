@@ -59,7 +59,10 @@ pub fn native() -> Limits {
 /// The shared transport and its wrapper queues, beside the native shell's io.
 #[must_use]
 pub fn transport(limits: &Limits) -> Option<u64> {
-    if limits.connections.exchanges != EXCHANGES {
+    if limits.connections.exchanges != EXCHANGES
+        || limits.connections.body_bytes == 0
+        || limits.connections.deadline == Duration::ZERO
+    {
         return None;
     }
     if limits.io.intake < limits.connections.http.head.max(limits.connections.http.read) {
@@ -69,11 +72,16 @@ pub fn transport(limits: &Limits) -> Option<u64> {
         return None;
     }
     // Keep the checked stream bounds before constructing the transport's queues.
-    limits.connections.body_bytes.checked_add(512)?;
+    skein_http::client::worst_case(&limits.connections.http)?;
+    jig_client_protocol_http::worst_case(&jig_client_protocol_http::Limits {
+        record: limits.connections.body_bytes.checked_add(512)?,
+        chunk: limits.connections.http.read,
+    })?;
     limits.connections.http.read.checked_mul(3)?.checked_add(8)?;
+    let io = skein_io::worst_case(&limits.io)?;
     let transport = crate::transport::Memory::new(
         skein_io::Addr::Ip((std::net::Ipv4Addr::LOCALHOST, 0).into()),
         &limits.connections,
     );
-    skein_io::worst_case(&limits.io)?.checked_add(transport.worst_case(&limits.io))
+    io.checked_add(transport.worst_case(&limits.io))
 }
