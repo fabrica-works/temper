@@ -134,6 +134,7 @@ fn git_listen(git: &[u8], listen: SocketAddr) -> bool {
 pub fn checked(
     document: &Document,
     at: u32,
+    directories: &jig_protocol_config::Directories,
     members_value: &Members,
     listener: Option<SocketAddr>,
     overrides: &[(Box<[u8]>, u64)],
@@ -159,7 +160,7 @@ pub fn checked(
             false
         }
     };
-    let setup = Setup::read(document, at, &limits, &mut ps);
+    let setup = Setup::read(document, at, &limits, directories, &mut ps);
     if let Some(setup) = &setup {
         members(setup, members_value, listener.is_some(), &mut ps);
         if limits_ok {

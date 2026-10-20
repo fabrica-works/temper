@@ -1,20 +1,22 @@
-use super::configure;
-
 #[test]
-fn serve_without_a_configuration_path_is_a_usage_error() {
-    assert_eq!(
-        configure(["serve".into()].into_iter()),
-        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper program-login CONFIG.json NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]\n".into())
-    );
+fn directory_commands_take_flags_after_their_command_words() {
+    for (words, valid) in [
+        (vec!["serve"], true),
+        (vec!["box"], true),
+        (vec!["serve", "old.json"], false),
+        (vec!["program-login", "name"], true),
+        (vec!["program-login"], false),
+        (vec!["forge", "prepare", "1"], true),
+        (vec!["forge", "run", "1", "runner"], true),
+        (vec!["forge", "reconcile", "1"], true),
+        (vec!["unknown"], false),
+    ] {
+        let mut words: Vec<Box<[u8]>> = words.iter().map(|v| Box::from(v.as_bytes())).collect();
+        words
+            .extend([b"--config".as_slice(), b"/c", b"--data", b"/d", b"--cache", b"/k"].iter().map(|v| Box::from(*v)));
+        assert_eq!(super::configure_with(&words, &[], b"/").is_ok(), valid);
+    }
 }
-#[test]
-fn an_unknown_command_prints_the_usage_line() {
-    assert_eq!(
-        configure(["unknown".into(), "config.json".into()].into_iter()),
-        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper program-login CONFIG.json NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]\n".into())
-    );
-}
-
 const OPEN_LINK: &[u8] =
     b"http://127.0.0.1:7000/jig/v1/sign-in/link?secret=AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM".as_slice();
 type OpenRow = (&'static str, &'static [u8], Result<(bool, &'static str), &'static str>);
@@ -78,31 +80,6 @@ fn open_without_two_arguments_prints_its_usage() {
 
 #[path = "../tests/support/configuration.rs"]
 pub(crate) mod configuration;
-#[test]
-fn forge_without_its_arguments_prints_its_usage() {
-    assert_eq!(
-        super::forge::start(&[]).expect_err("usage refused").line(),
-        "temper forge prepare: usage: temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE\n"
-    );
-}
-
-#[test]
-fn box_with_one_path_is_the_box_command() {
-    assert_eq!(
-        configure(["box".into(), "config.json".into()].into_iter()),
-        Ok(super::Command::Box { configuration: "config.json".into() })
-    );
-}
-#[test]
-fn box_without_a_path_prints_the_usage() {
-    assert_eq!(configure(["box".into()].into_iter()),
-        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper program-login CONFIG.json NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]\n".into()));
-}
-#[test]
-fn box_with_two_paths_prints_the_usage() {
-    assert_eq!(configure(["box".into(), "one.json".into(), "two.json".into()].into_iter()),
-        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper program-login CONFIG.json NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]\n".into()));
-}
 
 #[test]
 fn the_standalone_envelope_retains_no_descriptors() {
@@ -133,10 +110,12 @@ fn the_standalone_envelope_retains_no_descriptors() {
     write("accounts/chat.json", br#"{"access_token":"token","expires_at":4102444800,"account_id":"acc"}"#);
     let (agent, document) = configuration::documents(&directory, "/fixture/temper");
     write("agent.json", &agent);
-    let envelope = super::envelope_in(&directory, &document).expect("standalone envelope");
+    assert_eq!(configuration::flags(&directory).len(), 6);
+    let envelope = super::envelope_in(&configuration::directories(&directory), &document).expect("standalone envelope");
     assert_no_descriptors_in(&directory);
     let mut owned = Vec::new();
-    let service = super::prepare(&directory, &document, &mut owned).expect("same standalone preparation");
+    let service = super::prepare(&configuration::directories(&directory), &document, &mut owned)
+        .expect("same standalone preparation");
     assert_eq!(envelope, (service.worst_case(), service.operations()));
     drop(service);
     super::close(owned);
@@ -156,12 +135,20 @@ fn assert_no_descriptors_in(directory: &std::path::Path) {
 fn ctl_is_configured() {
     for arguments in [vec!["help".into()], vec!["directory".into(), "me".into()]] {
         let words = std::iter::once("ctl".into()).chain(arguments.clone());
-        assert_eq!(configure(words), Ok(super::Command::Ctl { arguments }));
+        assert_eq!(
+            super::configure_with(
+                &words.map(|v: std::ffi::OsString| Box::from(v.as_encoded_bytes())).collect::<Vec<_>>(),
+                &[],
+                b"/"
+            ),
+            Ok(super::Command::Ctl { arguments })
+        );
     }
 }
 
 #[test]
 fn fixed_sign_in_ports_are_checked_against_owned_listeners_only() {
+    // Fixture parsing without a deployment keeps written paths.
     let example = include_bytes!("../../../docs/examples/owned.json");
     let mut value: serde_json::Value = serde_json::from_slice(example).expect("owned JSON");
     value["engine"]["llm"]["providers"] = serde_json::json!([{
@@ -174,12 +161,18 @@ fn fixed_sign_in_ports_are_checked_against_owned_listeners_only() {
     }]);
     let bytes = serde_json::to_vec(&value).expect("owned JSON");
     assert_eq!(
-        super::setup::check(&bytes).expect_err("owned listen conflict"),
+        super::setup::check(&bytes, &jig_protocol_config::Directories::working()).expect_err("owned listen conflict"),
         "engine.llm.providers[0].sources.sign_in.redirect_port: fixed port conflicts with application.setup[0].mode.owned.listen\n"
     );
     // The same API on a connected forge belongs to the remote peer, not this process.
     value["application"]["setup"] = serde_json::json!([]);
-    assert!(super::setup::check(&serde_json::to_vec(&value).expect("connected JSON")).is_ok());
+    assert!(
+        super::setup::check(
+            &serde_json::to_vec(&value).expect("connected JSON"),
+            &jig_protocol_config::Directories::working()
+        )
+        .is_ok()
+    );
 }
 
 #[test]
@@ -197,23 +190,32 @@ fn a_programs_owner_refusal_identifies_the_directory_ownership_conflict() {
 }
 
 #[test]
-fn program_login_refuses_arguments_outside_the_two_required_operands() {
+fn program_login_refuses_arguments_outside_the_required_source_name() {
     for arguments in [
         vec!["program-login"],
-        vec!["program-login", "config.json"],
+        vec!["program-login", "source", "extra"],
         vec!["program-login", "config.json", "source", "extra"],
-        vec!["sign-in", "config.json"],
+        vec!["sign-in", "source"],
     ] {
-        assert_eq!(
-            configure(arguments.into_iter().map(Into::into)),
-            Err(format!("temper: invalid arguments\n{}\n", super::USAGE))
-        );
+        assert_eq!(configure_program_login(&arguments), Err(format!("temper: invalid arguments\n{}", super::usage())));
     }
 }
 #[test]
-fn program_login_accepts_exactly_the_two_required_operands() {
+fn program_login_accepts_exactly_the_required_source_name() {
+    let directories =
+        super::directories::resolve(&[], &[(Box::from(b"HOME".as_slice()), Box::from(b"/home/test".as_slice()))], b"/")
+            .expect("default directories")
+            .0;
     assert_eq!(
-        configure(["program-login", "config.json", "source"].into_iter().map(Into::into)),
-        Ok(super::Command::ProgramLogin { configuration: "config.json".into(), name: "source".into() })
+        configure_program_login(&["program-login", "source"]),
+        Ok(super::Command::ProgramLogin { directories, name: "source".into() })
     );
+}
+
+fn configure_program_login(arguments: &[&str]) -> Result<super::Command, String> {
+    super::configure_with(
+        &arguments.iter().map(|value| Box::from(value.as_bytes())).collect::<Vec<_>>(),
+        &[(Box::from(b"HOME".as_slice()), Box::from(b"/home/test".as_slice()))],
+        b"/",
+    )
 }

@@ -3,7 +3,6 @@ use std::{
     ffi::OsString,
     fs,
     os::unix::{ffi::OsStrExt, fs::DirBuilderExt},
-    path::Path,
 };
 use temper_forge_setup::{
     place::{File, Place},
@@ -86,7 +85,7 @@ fn pinned(which: Which) -> (&'static str, &'static str) {
     }
 }
 fn login(user: u32) -> Result<Box<[u8]>, String> {
-    let passwd = skein_shell::read_file(Path::new("/etc/passwd"), 1 << 20)
+    let passwd = skein_shell::read_file(std::path::Path::new("/etc/passwd"), 1 << 20)
         .map_err(|why| format!("user: {}", super::unread(why)))?;
     for line in passwd.split(|c| *c == b'\n') {
         let fields: Vec<_> = line.split(|c| *c == b':').collect();
@@ -97,8 +96,9 @@ fn login(user: u32) -> Result<Box<[u8]>, String> {
     }
     Err(format!("user {user}: no login in /etc/passwd"))
 }
-fn run_refusal(why: Refusal, launch: &run::Launch, number: u16) -> String {
-    let prepare = |why: String| format!("{why}: run temper forge prepare CONFIG.json {number}");
+fn run_refusal(why: Refusal, launch: &run::Launch, number: u16, directories: &super::Directories) -> String {
+    let flags = directories.flags().iter().map(|arg| text(arg)).collect::<Vec<_>>().join(" ");
+    let prepare = |why: String| format!("{why}: run temper forge prepare {flags} {number}");
     match why {
         Refusal::NoRunner => "the setup has no runner".into(),
         Refusal::NotPrepared => prepare("not prepared".into()),
@@ -126,9 +126,9 @@ fn run_refusal(why: Refusal, launch: &run::Launch, number: u16) -> String {
         Refusal::Binary { printed } => format!("{} printed {printed:?}, not the pinned release", text(&launch.program)),
     }
 }
-fn run_failure(why: host::Failed, launch: &run::Launch, number: u16) -> String {
+fn run_failure(why: host::Failed, launch: &run::Launch, number: u16, directories: &super::Directories) -> String {
     match why {
-        host::Failed::Refused(why) => run_refusal(why, launch, number),
+        host::Failed::Refused(why) => run_refusal(why, launch, number, directories),
         host::Failed::Locked => format!(
             "{} is running or being prepared already",
             if launch.which == Which::Forgejo { "forgejo" } else { "runner" }
@@ -139,33 +139,31 @@ fn run_failure(why: host::Failed, launch: &run::Launch, number: u16) -> String {
         host::Failed::Exec(why) => format!("{}: {why}", text(&launch.program)),
     }
 }
-pub(crate) fn start(arguments: &[OsString]) -> Result<u8, Refused> {
+pub(crate) fn start(directories: &super::Directories, arguments: &[OsString]) -> Result<u8, Refused> {
     let usage = || {
         Refused {
         verb: "prepare",
         number: None,
-        why: "usage: temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE".into(),
+        why: "usage: temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE".into(),
     }
     };
-    let (verb, configuration, number, which) = match arguments {
-        [verb, configuration, number] if verb == "prepare" => ("prepare", configuration, number, None),
-        [verb, configuration, number] if verb == "reconcile" => ("reconcile", configuration, number, None),
-        [verb, configuration, number, which] if verb == "run" => {
+    let (verb, number, which) = match arguments {
+        [verb, number] if verb == "prepare" => ("prepare", number, None),
+        [verb, number] if verb == "reconcile" => ("reconcile", number, None),
+        [verb, number, which] if verb == "run" => {
             let which = match which.to_str() {
                 Some("forgejo") => Which::Forgejo,
                 Some("runner") => Which::Runner,
                 _ => return Err(usage()),
             };
-            ("run", configuration, number, Some(which))
+            ("run", number, Some(which))
         }
         _ => return Err(usage()),
     };
     let number = number.to_str().and_then(|n| n.parse::<u16>().ok()).ok_or_else(usage)?;
     let refused = |why| Refused { verb, number: Some(number), why };
-    let bytes = skein_shell::read_file(Path::new(configuration), super::CONFIG_BYTES).map_err(|why| {
-        refused(format!("configuration {}: {}", Path::new(configuration).display(), super::unread(why)))
-    })?;
-    let (named, checked, _) = super::setup::check(&bytes).map_err(refused)?;
+    let bytes = directories.read().map_err(refused)?;
+    let (named, checked, _) = super::setup::check(&bytes, &directories.jig()).map_err(refused)?;
     if verb == "reconcile" {
         let settings = reconcile_settings(&named, &checked, number).map_err(refused)?;
         return temper_forge_setup_shell::reconcile::reconcile(settings, &skein_shell::Clock::new())
@@ -180,23 +178,23 @@ pub(crate) fn start(arguments: &[OsString]) -> Result<u8, Refused> {
     let Mode::Owned(owned) = &entry.mode else {
         return Err(refused("it is managed, not owned".into()));
     };
-    let directory = std::path::absolute(super::path(&entry.directory)).map_err(|why| refused(why.to_string()))?;
+    let directory = super::path(&entry.directory);
     if which.is_none() && !directory.exists() {
         fs::DirBuilder::new()
             .recursive(true)
             .mode(0o700)
-            .create(&directory)
+            .create(directory)
             .map_err(|why| refused(format!("{}: {why}", directory.display())))?;
     }
     let user = skein_shell::effective_user();
     if directory.exists() {
-        super::private_root(&directory, user).map_err(|why| refused(format!("{}: {why}", directory.display())))?;
+        super::private_root(directory, user).map_err(|why| refused(format!("{}: {why}", directory.display())))?;
     }
     let place = Place { directory: directory.as_os_str().as_bytes().into(), user: login(user).map_err(refused)? };
     let limits = jig_protocol_config::profile(jig_protocol_config::Profile::Small).io;
     if let Some(which) = which {
         let launch = run::launch(owned, &place, which).map_err(|_| refused("the setup has no runner".into()))?;
-        return Err(refused(run_failure(host::run(&limits, &launch), &launch, number)));
+        return Err(refused(run_failure(host::run(&limits, &launch), &launch, number, directories)));
     }
     prepare::run(
         &limits,
@@ -211,8 +209,8 @@ pub(crate) fn start(arguments: &[OsString]) -> Result<u8, Refused> {
     Ok(0)
 }
 #[must_use]
-pub fn run(arguments: &[OsString]) -> u8 {
-    match start(arguments) {
+pub fn run(directories: &super::Directories, arguments: &[OsString]) -> u8 {
+    match start(directories, arguments) {
         Ok(code) => code,
         Err(why) => {
             eprint!("{}", why.line());
@@ -232,7 +230,7 @@ pub fn reconcile_settings(
         return Err("its transport is TLS, and reconcile speaks plaintext to loopback alone".into());
     }
     let entry = checked.setup.entry(number).ok_or("the setup has no entry for it")?;
-    let directory = std::path::absolute(super::path(&entry.directory)).map_err(|why| why.to_string())?;
+    let directory = super::path(&entry.directory).to_path_buf();
     if !directory.exists() {
         fs::DirBuilder::new().recursive(true).mode(0o700).create(&directory).map_err(|why| why.to_string())?;
     }
@@ -240,9 +238,7 @@ pub fn reconcile_settings(
         .map_err(|why| format!("{}: {why}", directory.display()))?;
     let address = super::address(&forge.api)?;
     let admin_token = match &entry.mode {
-        Mode::Managed { admin_token } => {
-            std::path::absolute(super::path(admin_token)).map_err(|why| why.to_string())?
-        }
+        Mode::Managed { admin_token } => super::path(admin_token).to_path_buf(),
         Mode::Owned(_) => directory.join("admin_token"),
     };
     let mut profile = temper_service::limits::profile(temper_service::limits::Profile::Small);

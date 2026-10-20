@@ -6,8 +6,11 @@ use temper_forge_setup::{
 };
 use temper_service::startup::{Named, Transport, User};
 
-pub(crate) fn check(bytes: &[u8]) -> Result<(Named, Checked, temper_box::limits::Limits), String> {
-    let named = temper_service::named(bytes)
+pub(crate) fn check(
+    bytes: &[u8],
+    directories: &config::Directories,
+) -> Result<(Named, Checked, temper_box::limits::Limits), String> {
+    let named = temper_service::named(bytes, directories)
         .map_err(|why| String::from_utf8_lossy(&temper_service::startup::lines(&why)).into_owned())?;
     let document = config::document(
         bytes,
@@ -52,7 +55,7 @@ pub(crate) fn check(bytes: &[u8]) -> Result<(Named, Checked, temper_box::limits:
     let setup_overrides: Vec<_> =
         named.overrides.iter().filter(|(name, _)| !name.starts_with(b"box.")).cloned().collect();
     let listener = named.webhooks.as_ref().map(|webhooks| super::address(&webhooks.listener)).transpose()?;
-    let checked = check::checked(&document, at, &members, listener, &setup_overrides)
+    let checked = check::checked(&document, at, directories, &members, listener, &setup_overrides)
         .map_err(|why| String::from_utf8_lossy(&problem::lines(&why)).into_owned())?;
     let mut problems = temper_service::startup::Problems::empty();
     for (index, entry) in checked.setup.entries.iter().enumerate() {

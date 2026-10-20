@@ -124,6 +124,7 @@ fn admit(value: &Value) {
         &jig_protocol_config::DocumentLimits { bytes: 1_048_576, tokens: 65_536, depth: 32 },
     )
     .expect("engine document");
+    // Parsing a fixture without a deployment; only its limits are used.
     let jig = jig_protocol_config::engine(&document, 0, &jig_protocol_config::Directories::working())
         .expect("engine configuration");
     let mut own = temper_service::limits::profile(temper_service::limits::Profile::Small);

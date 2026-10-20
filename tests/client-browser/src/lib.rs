@@ -133,7 +133,7 @@ impl Tier {
         let tier = Self::new(name);
         let listener = TcpListener::bind("127.0.0.1:0").expect("reserve restart port");
         let address = listener.local_addr().expect("restart address");
-        let path = tier.scratch.path().join("config.json");
+        let path = tier.scratch.path().join("temper.json");
         let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("deployment")).expect("JSON");
         value["application"]["clients"]["listener"]["socket"] = serde_json::json!(address.to_string());
         configuration::private(&path, &serde_json::to_vec(&value).expect("reserved deployment JSON"));
@@ -141,7 +141,15 @@ impl Tier {
     }
     #[must_use]
     pub fn setup(&self) -> Setup<'_> {
-        let args = vec!["serve".into(), self.scratch.path().join("config.json").into_os_string()];
+        let args = vec![
+            "serve".into(),
+            "--config".into(),
+            self.scratch.path().into(),
+            "--data".into(),
+            self.scratch.path().into(),
+            "--cache".into(),
+            self.scratch.path().into(),
+        ];
         Setup {
             server: temper(),
             args: args.clone(),

@@ -8,13 +8,13 @@ use std::{
 fn a_configuration_file_past_its_bound_is_refused() {
     let scratch = support::Scratch::startup("configuration-bound");
     let directory = scratch.path();
-    fs::File::create(directory.join("config.json"))
+    fs::File::create(directory.join("temper.json"))
         .expect("configuration file")
         .set_len(1_048_577)
         .expect("one byte past bound");
     assert_eq!(
-        temper::prepare_in(directory).err().expect("refused"),
-        "temper serve: configuration config.json: past 1048576 bytes\n"
+        temper::prepare_in(&support::configuration::directories(directory)).err().expect("refused"),
+        format!("temper serve: configuration {}: past 1048576 bytes\n", directory.join("temper.json").display())
     );
     scratch.remove();
 }
@@ -25,10 +25,13 @@ fn a_secret_file_readable_by_others_refuses_the_start_naming_it() {
     support::configuration(directory, &support::Forge::Unreached);
     fs::set_permissions(directory.join("secrets/forge-1.git-token"), fs::Permissions::from_mode(0o644))
         .expect("public permissions");
-    let refused = temper::prepare_in(directory).err().expect("start refused");
+    let refused = temper::prepare_in(&support::configuration::directories(directory)).err().expect("start refused");
     assert_eq!(
         refused,
-        "temper serve: application.identities[0].token: secrets/forge-1.git-token: readable by others or reached through a link\n"
+        format!(
+            "temper serve: application.identities[0].token: {}: readable by others or reached through a link\n",
+            scratch.path().join("secrets/forge-1.git-token").display()
+        )
     );
     assert!(!refused.contains("forge-1-git-token-value"), "no secret in a diagnostic");
     scratch.remove();
@@ -41,7 +44,7 @@ fn a_worker_root_reached_through_a_link_is_refused() {
     fs::create_dir(directory.join("real-root")).expect("root directory");
     symlink(directory.join("real-root"), directory.join("worker-root")).expect("linked root");
     assert_eq!(
-        temper::prepare_in(directory).err().expect("refused"),
+        temper::prepare_in(&support::configuration::directories(directory)).err().expect("refused"),
         "temper serve: application.workers[0].root: must be a private directory of this user's, not reached through a link\n"
     );
     scratch.remove();
@@ -50,9 +53,9 @@ fn a_worker_root_reached_through_a_link_is_refused() {
 fn problems_reach_stderr_one_line_each() {
     let scratch = support::Scratch::startup("problem-lines");
     let directory = scratch.path();
-    fs::write(directory.join("config.json"), b"{}").expect("configuration");
+    fs::write(directory.join("temper.json"), b"{}").expect("configuration");
     assert_eq!(
-        temper::prepare_in(directory).err().expect("refused"),
+        temper::prepare_in(&support::configuration::directories(directory)).err().expect("refused"),
         "temper serve: engine: missing\ntemper serve: workers: missing\ntemper serve: application: missing\n"
     );
     scratch.remove();
@@ -86,15 +89,18 @@ fn a_user_file_readable_by_others_refuses_the_start_naming_it() {
     fs::set_permissions(scratch.path().join("secrets/forge-1.user"), fs::Permissions::from_mode(0o644))
         .expect("fixture operation");
     assert_eq!(
-        temper::prepare_in(scratch.path()).err().expect("configuration refused"),
-        "temper serve: application.forges[0].user.file: secrets/forge-1.user: readable by others or reached through a link\n"
+        temper::prepare_in(&support::configuration::directories(scratch.path())).err().expect("configuration refused"),
+        format!(
+            "temper serve: application.forges[0].user.file: {}: readable by others or reached through a link\n",
+            scratch.path().join("secrets/forge-1.user").display()
+        )
     );
     scratch.remove();
 }
 fn managed(directory: &std::path::Path, move_files: bool) -> serde_json::Value {
     support::configuration(directory, &support::Forge::Unreached);
     let mut value: serde_json::Value =
-        serde_json::from_slice(&fs::read(directory.join("config.json")).expect("configuration bytes"))
+        serde_json::from_slice(&fs::read(directory.join("temper.json")).expect("configuration bytes"))
             .expect("fixture operation");
     value["application"]["setup"] = serde_json::json!([{
         "forge":1,"directory":"forge-1","bot":{"login":"temper","email":"temper@example.test"},
@@ -113,7 +119,7 @@ fn managed(directory: &std::path::Path, move_files: bool) -> serde_json::Value {
         value["application"]["forges"][0]["user"] = serde_json::json!({"file":"forge-1/user"});
         value["application"]["identities"][0]["token"] = "forge-1/git_token".into();
     }
-    support::write_private(&directory.join("config.json"), &serde_json::to_vec(&value).expect("configuration JSON"));
+    support::write_private(&directory.join("temper.json"), &serde_json::to_vec(&value).expect("configuration JSON"));
     value
 }
 #[test]
@@ -122,11 +128,11 @@ fn a_setup_naming_another_api_token_file_refuses_temper_serve_naming_its_path() 
     let mut value = managed(scratch.path(), true);
     value["application"]["forges"][0]["api_token"] = "another/api_token".into();
     support::write_private(
-        &scratch.path().join("config.json"),
+        &scratch.path().join("temper.json"),
         &serde_json::to_vec(&value).expect("configuration JSON"),
     );
     assert_eq!(
-        temper::prepare_in(scratch.path()).err().expect("configuration refused"),
+        temper::prepare_in(&support::configuration::directories(scratch.path())).err().expect("configuration refused"),
         "temper serve: application.forges[0].api_token: invalid form\n"
     );
     scratch.remove();
@@ -137,11 +143,11 @@ fn a_setup_limit_past_its_check_refuses_temper_serve_naming_both_limits() {
     let mut value = managed(scratch.path(), true);
     value["application"]["limits"]["overrides"]["setup.backoff_ms"] = 6000.into();
     support::write_private(
-        &scratch.path().join("config.json"),
+        &scratch.path().join("temper.json"),
         &serde_json::to_vec(&value).expect("configuration JSON"),
     );
     assert_eq!(
-        temper::prepare_in(scratch.path()).err().expect("configuration refused"),
+        temper::prepare_in(&support::configuration::directories(scratch.path())).err().expect("configuration refused"),
         "temper serve: application.limits.overrides.setup.backoff_ms: must agree with application.limits.overrides.setup.backoff_max_ms\n"
     );
     scratch.remove();
@@ -151,22 +157,25 @@ fn a_managed_entrys_absent_admin_token_file_does_not_stop_temper_serve() {
     let scratch = support::Scratch::startup("setup-no-admin");
     managed(scratch.path(), true);
     assert!(!scratch.path().join("secrets/forgejo-admin").exists());
-    assert!(temper::prepare_in(scratch.path()).is_ok());
+    assert!(temper::prepare_in(&support::configuration::directories(scratch.path())).is_ok());
     scratch.remove();
 }
 fn box_document(scratch: &support::Scratch) -> serde_json::Value {
     support::configuration(scratch.path(), &support::Forge::Unreached);
-    serde_json::from_slice(&fs::read(scratch.path().join("config.json")).expect("configuration")).expect("JSON")
+    serde_json::from_slice(&fs::read(scratch.path().join("temper.json")).expect("configuration")).expect("JSON")
 }
 fn refused_box(scratch: &support::Scratch, value: &serde_json::Value) -> String {
-    support::write_private(&scratch.path().join("config.json"), &serde_json::to_vec(value).expect("JSON"));
-    temper::run(temper::Command::Box { configuration: scratch.path().join("config.json") }).expect_err("box refused")
+    support::write_private(&scratch.path().join("temper.json"), &serde_json::to_vec(value).expect("JSON"));
+    temper::run(temper::Command::Box { directories: support::configuration::directories(scratch.path()) })
+        .expect_err("box refused")
 }
 #[test]
 fn a_box_configuration_that_is_absent_is_refused_naming_it() {
     assert_eq!(
-        temper::run(temper::Command::Box { configuration: "absent.json".into() }),
-        Err("temper box: configuration absent.json: absent\n".into())
+        temper::run(temper::Command::Box {
+            directories: support::configuration::directories(std::path::Path::new("/absent-temper"))
+        }),
+        Err("temper box: configuration /absent-temper/temper.json: absent; temper init writes one\n".into())
     );
 }
 #[test]
@@ -247,9 +256,9 @@ fn a_box_limit_past_its_check_refuses_temper_serve_too() {
     let scratch = support::Scratch::startup("box-serve-refused");
     let mut value = box_document(&scratch);
     value["application"]["limits"]["overrides"]["box.backoff_max_ms"] = 100.into();
-    support::write_private(&scratch.path().join("config.json"), &serde_json::to_vec(&value).expect("JSON"));
+    support::write_private(&scratch.path().join("temper.json"), &serde_json::to_vec(&value).expect("JSON"));
     assert_eq!(
-        temper::prepare_in(scratch.path()).err().expect("serve refused"),
+        temper::prepare_in(&support::configuration::directories(scratch.path())).err().expect("serve refused"),
         "temper serve: application.limits.overrides.box.backoff_ms: must agree with box.backoff_max_ms\n"
     );
     scratch.remove();
@@ -259,8 +268,8 @@ fn a_box_limit_within_its_check_is_accepted_by_temper_serve() {
     let scratch = support::Scratch::startup("box-serve-accepted");
     let mut value = box_document(&scratch);
     value["application"]["limits"]["overrides"]["box.restarts"] = 3.into();
-    support::write_private(&scratch.path().join("config.json"), &serde_json::to_vec(&value).expect("JSON"));
-    assert!(temper::prepare_in(scratch.path()).is_ok());
+    support::write_private(&scratch.path().join("temper.json"), &serde_json::to_vec(&value).expect("JSON"));
+    assert!(temper::prepare_in(&support::configuration::directories(scratch.path())).is_ok());
     scratch.remove();
 }
 
@@ -271,8 +280,11 @@ fn a_webhook_secret_readable_by_others_refuses_startup() {
     fs::set_permissions(scratch.path().join("secrets/forge-1.webhook-secret"), fs::Permissions::from_mode(0o644))
         .expect("public permissions");
     assert_eq!(
-        temper::prepare_in(scratch.path()).err().expect("configuration refused"),
-        "temper serve: application.forges[0].webhook_secret: secrets/forge-1.webhook-secret: readable by others or reached through a link\n"
+        temper::prepare_in(&support::configuration::directories(scratch.path())).err().expect("configuration refused"),
+        format!(
+            "temper serve: application.forges[0].webhook_secret: {}: readable by others or reached through a link\n",
+            scratch.path().join("secrets/forge-1.webhook-secret").display()
+        )
     );
     scratch.remove();
 }
@@ -281,7 +293,7 @@ fn owned_example(case: &str) -> support::Scratch {
     let scratch = support::Scratch::startup(case);
     let owned = support::owned::Owned::example();
     support::owned::lay(scratch.path(), &owned);
-    fs::write(scratch.path().join("config.json"), support::owned::example_document(scratch.path(), &owned))
+    fs::write(scratch.path().join("temper.json"), support::owned::example_document(scratch.path(), &owned))
         .expect("example configuration");
     scratch
 }
@@ -289,11 +301,12 @@ fn owned_example(case: &str) -> support::Scratch {
 fn the_owned_example_asks_for_reconciles_files() {
     let scratch = owned_example("owned-example-refused");
     assert_eq!(
-        temper::prepare_in(scratch.path()).err().expect("start refused"),
+        temper::prepare_in(&support::configuration::directories(scratch.path())).err().expect("start refused"),
         "temper serve: application.forges[0].api_token: forge-1/api_token: absent\n\
          temper serve: application.forges[0].user.file: forge-1/user: absent\n\
          temper serve: application.forges[0].webhook_secret: forge-1/webhook_secret: absent\n\
          temper serve: application.identities[0].token: forge-1/git_token: absent\n"
+            .replace(": forge-1/", &format!(": {}/forge-1/", scratch.path().display()))
     );
     scratch.remove();
 }
@@ -305,7 +318,7 @@ fn serve_prepares_once_on_the_owned_example() {
     let owned = support::owned::Owned::example();
     support::owned::lay(scratch.path(), &owned);
     support::write_private(
-        &scratch.path().join("config.json"),
+        &scratch.path().join("temper.json"),
         &support::owned::example_document(scratch.path(), &owned),
     );
     let forge = scratch.path().join("forge-1");
@@ -319,14 +332,16 @@ fn serve_prepares_once_on_the_owned_example() {
     ] {
         support::write_private(&forge.join(name), bytes);
     }
-    let prepared = temper::prepare_in(scratch.path());
+    let prepared = temper::prepare_in(&support::configuration::directories(scratch.path()));
     assert!(prepared.is_ok(), "{}", prepared.err().unwrap_or_default());
     scratch.remove();
 }
 
 #[test]
 fn the_owned_example_is_named_without_a_problem() {
-    let named = temper_service::named(support::owned::EXAMPLE).expect("owned example named");
+    // Only naming a fixture document; no deployment or files are opened.
+    let named = temper_service::named(support::owned::EXAMPLE, &jig_protocol_config::Directories::working())
+        .expect("owned example named");
     assert_eq!(named.agent.as_ref(), b"/home/me/temper/owned/agent.json");
     assert_eq!(named.worker_root.as_ref(), b"workspaces");
     assert_eq!(named.deployment.as_ref(), b"state");
@@ -348,15 +363,22 @@ fn the_owned_example_is_named_without_a_problem() {
 #[test]
 fn every_command_checks_setup_before_reading_files() {
     let scratch = owned_example("every-command-setup");
-    let path = scratch.path().join("config.json");
+    let path = scratch.path().join("temper.json");
     let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
     value["application"]["limits"]["overrides"]["setup.backoff_ms"] = 6000.into();
     let bytes = serde_json::to_vec(&value).expect("configuration JSON");
     support::write_private(&path, &bytes);
     let line = "application.limits.overrides.setup.backoff_ms: must agree with application.limits.overrides.setup.backoff_max_ms\n";
     for (command, refused) in [
-        ("serve", temper::prepare_in(scratch.path()).err().expect("serve refused")),
-        ("box", temper::run(temper::Command::Box { configuration: path }).expect_err("box refused")),
+        (
+            "serve",
+            temper::prepare_in(&support::configuration::directories(scratch.path())).err().expect("serve refused"),
+        ),
+        (
+            "box",
+            temper::run(temper::Command::Box { directories: support::configuration::directories(scratch.path()) })
+                .expect_err("box refused"),
+        ),
     ] {
         assert_eq!(refused, format!("temper {command}: {line}"), "{command}");
     }
@@ -386,7 +408,11 @@ fn fixture_bundle(directory: &std::path::Path) {
 }
 fn bundle_configuration(directory: &std::path::Path) {
     support::configuration(directory, &support::Forge::Unreached);
-    support::owned::configuration_value(directory, |value| value["application"]["clients"]["bundle"] = "bundle".into());
+    let document = directory.join("temper.json");
+    let mut value: serde_json::Value =
+        serde_json::from_slice(&fs::read(&document).expect("configuration")).expect("JSON");
+    value["application"]["clients"]["bundle"] = directory.join("bundle").to_str().expect("bundle path").into();
+    support::write_private(&document, &serde_json::to_vec(&value).expect("JSON"));
 }
 #[test]
 fn a_bundle_directory_is_read_with_its_one_digest_directory() {
@@ -394,7 +420,8 @@ fn a_bundle_directory_is_read_with_its_one_digest_directory() {
     let directory = scratch.path();
     fixture_bundle(directory);
     let limits = temper_service::limits::Clients { bundle_files: 128, bundle_bytes: 16 << 20 };
-    let bundle = temper::bundle::read(directory, b"bundle", limits).expect("bundle read");
+    let bundle =
+        temper::bundle::read(directory.join("bundle").as_os_str().as_encoded_bytes(), limits).expect("bundle read");
     assert_eq!(bundle.page.as_ref(), PAGE);
     assert_eq!(bundle.etag.as_ref(), b"\"edaa28e315690734\"");
     assert_eq!(bundle.digest.as_ref(), b"0123456789abcdef");
@@ -438,7 +465,11 @@ fn a_directory_that_is_no_bundle_refuses_the_start() {
         bundle_configuration(directory);
         fixture_bundle(directory);
         spoil(directory);
-        assert_eq!(temper::prepare_in(directory).err().expect("refused"), expected, "row {name}");
+        assert_eq!(
+            temper::prepare_in(&support::configuration::directories(directory)).err().expect("refused"),
+            expected.replace(": bundle", &format!(": {}/bundle", directory.display())),
+            "row {name}"
+        );
         scratch.remove();
     }
 }
@@ -462,7 +493,11 @@ fn a_bundle_past_a_limit_refuses_the_start() {
         bundle_configuration(directory);
         fixture_bundle(directory);
         support::owned::configuration_value(directory, limit);
-        assert_eq!(temper::prepare_in(directory).err().expect("refused"), expected, "row {name}");
+        assert_eq!(
+            temper::prepare_in(&support::configuration::directories(directory)).err().expect("refused"),
+            expected.replace(": bundle", &format!(": {}/bundle", directory.display())),
+            "row {name}"
+        );
         scratch.remove();
     }
 }
@@ -503,7 +538,7 @@ fn programs_directories_are_checked_at_the_name_before_startup_effects() {
         fs::write(agent_path, serde_json::to_vec(&agent).expect("agent JSON")).expect("agent");
         // A later missing secret proves that the preflight neither creates nor inspects a login.
         fs::remove_file(directory.join("secrets/forge-1.api-token")).expect("absent peer");
-        let refused = temper::prepare_in(directory).err().expect("refused");
+        let refused = temper::prepare_in(&support::configuration::directories(directory)).err().expect("refused");
         if ["missing", "private", "linked-parent"].contains(&row) {
             assert!(refused.contains("application.forges[0].api_token"), "{row}: {refused}");
             assert!(!refused.contains("programs.claude_code.directory"), "{row}: {refused}");
@@ -577,9 +612,9 @@ fn program_login_refuses_invalid_input_before_creation() {
             std::path::Path::new("/nonexistent/claude"),
         );
         match row {
-            "malformed" => fs::write(directory.join("config.json"), b"{").expect("malformed JSON"),
-            "missing-members" => fs::write(directory.join("config.json"), b"{}").expect("missing members"),
-            "oversized" => fs::File::create(directory.join("config.json"))
+            "malformed" => fs::write(directory.join("temper.json"), b"{").expect("malformed JSON"),
+            "missing-members" => fs::write(directory.join("temper.json"), b"{}").expect("missing members"),
+            "oversized" => fs::File::create(directory.join("temper.json"))
                 .expect("configuration")
                 .set_len(1_048_577)
                 .expect("past bound"),

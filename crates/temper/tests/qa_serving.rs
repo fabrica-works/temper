@@ -99,9 +99,9 @@ fn lay(root: &Path, layout: Layout) {
 }
 fn configure(directory: &Path, edit: impl FnOnce(&mut serde_json::Value)) {
     let mut value: serde_json::Value =
-        serde_json::from_slice(&fs::read(directory.join("config.json")).expect("deployment")).expect("deployment JSON");
+        serde_json::from_slice(&fs::read(directory.join("temper.json")).expect("deployment")).expect("deployment JSON");
     edit(&mut value["application"]);
-    support::write_private(&directory.join("config.json"), &serde_json::to_vec(&value).expect("deployment JSON"));
+    support::write_private(&directory.join("temper.json"), &serde_json::to_vec(&value).expect("deployment JSON"));
 }
 fn deployment(case: &str, layout: Layout) -> support::Scratch {
     let scratch = support::Scratch::new(case);
@@ -376,9 +376,9 @@ fn a_path_under_bundle_that_is_no_file_of_the_digest_directory_is_not_found() {
         format!("/bundle/{DIGEST}/boot.js/"),
         format!("/bundle//{DIGEST}/boot.js"),
         format!("/bundle/{DIGEST}/../index.html"),
-        format!("/bundle/{DIGEST}/../../config.json"),
-        format!("/bundle/{DIGEST}/%2e%2e/%2e%2e/config.json"),
-        format!("/bundle/{DIGEST}/..%2f..%2fconfig.json"),
+        format!("/bundle/{DIGEST}/../../temper.json"),
+        format!("/bundle/{DIGEST}/%2e%2e/%2e%2e/temper.json"),
+        format!("/bundle/{DIGEST}/..%2f..%2ftemper.json"),
         format!("/bundle/{DIGEST}/%2E%2E/index.html"),
     ];
     for path in paths {
@@ -435,7 +435,8 @@ fn with_no_bundle_every_path_outside_jig_is_not_found_with_the_policy() {
 /// A start that must refuse: `temper serve`'s exit code, `None` if it was still running after 30 s, and its stderr.
 fn refusal(directory: &Path) -> (Option<i32>, String) {
     let mut serve = std::process::Command::new(env!("CARGO_BIN_EXE_temper"))
-        .args(["serve", "config.json"])
+        .arg("serve")
+        .args(support::configuration::flags(directory))
         .current_dir(directory)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::piped())

@@ -40,7 +40,7 @@ fn setup() -> api::Setup {
     }
 }
 pub fn write(scratch: &Path, forge: SocketAddr, fixture: &Fixture) -> std::io::Result<()> {
-    let mut config: serde_json::Value = serde_json::from_slice(&std::fs::read(scratch.join("config.json"))?)?;
+    let mut config: serde_json::Value = serde_json::from_slice(&std::fs::read(scratch.join("temper.json"))?)?;
     let mut agent: serde_json::Value = serde_json::from_slice(&std::fs::read(scratch.join("agent.json"))?)?;
     config["application"]["webhooks"] = serde_json::json!({"listener":{"socket":"127.0.0.1:0"}});
     config["application"]["forges"][0]["webhook_secret"] = "secrets/forge-1.webhook-secret".into();
@@ -54,7 +54,7 @@ pub fn write(scratch: &Path, forge: SocketAddr, fixture: &Fixture) -> std::io::R
     ] {
         fixtures::private(&scratch.join("secrets").join(name), bytes)?;
     }
-    fixtures::private(&scratch.join("config.json"), &serde_json::to_vec(&config)?)?;
+    fixtures::private(&scratch.join("temper.json"), &serde_json::to_vec(&config)?)?;
     fixtures::private(&scratch.join("agent.json"), &serde_json::to_vec(&agent)?)
 }
 #[derive(Default)]

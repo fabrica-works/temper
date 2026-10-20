@@ -210,18 +210,18 @@ temper prepares and runs a Forgejo of its own on loopback, with a
 runner, and manages it. The setup entry's `mode` is `owned`, naming
 Forgejo's and the runner's binaries, the forge's directory, its address
 and your account (`docs/design/protocol/setup.md`, the configuration;
-`docs/examples/owned.json` is a whole one). `temper box CONFIG.json`
+`docs/examples/owned.json` is a whole one). `temper box --config C --data D --cache K`
 runs every step below in order; the box's walk is `docs/guide/box.md`.
 
-1. **`temper forge prepare CONFIG.json 1`** makes the forge's private
+1. **`temper forge prepare --config C --data D --cache K 1`** makes the forge's private
    directory and Forgejo's settings; temper's admin, `temper-admin`;
    your account, a site admin, with its first password in
    `person_password`; and the runner's registration. It leaves one file
    for the engine: `admin_token`, the handover, temper's admin's token.
    A later preparation makes it again only when it is missing.
-2. **`temper forge run CONFIG.json 1 forgejo`**, and `... 1 runner`,
+2. **`temper forge run --config C --data D --cache K 1 forgejo`**, and `... 1 runner`,
    run Forgejo and its runner.
-3. **`temper serve CONFIG.json`** takes the handover at its start: it
+3. **`temper serve --config C --data D --cache K`** takes the handover at its start: it
    reads `admin_token` once, keeps it as the forge's admin's token,
    deletes temper's admin's other tokens, and removes the file. Then it
    reconciles as managed, and makes each of your organizations that is

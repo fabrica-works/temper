@@ -68,9 +68,8 @@ pub(crate) fn read(configuration: &Path) -> Result<Agent, String> {
 }
 /// Read declarations and check existing programs directories at their names (io.md, 5.3).
 /// Missing directories stay missing; neither this nor smith's check reads any login.
-pub(crate) fn preflight(directory: &Path, named: &service::Named) -> Result<Agent, String> {
-    let agent =
-        read(&directory.join(path(&named.agent))).map_err(|why| format!("workers[0].agent.configuration: {why}"))?;
+pub(crate) fn preflight(named: &service::Named) -> Result<Agent, String> {
+    let agent = read(path(&named.agent)).map_err(|why| format!("workers[0].agent.configuration: {why}"))?;
     for program in &agent.programs {
         smith_agent_shell::program::private_directory(path(&program.directory))
             .map_err(|why| program_directory_refusal(&why))?;

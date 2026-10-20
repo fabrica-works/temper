@@ -80,9 +80,9 @@ fn digest(shown: &Path, root: &Path, limits: Clients) -> Result<Box<[u8]>, Strin
 
 /// Read the bundle in `configured` (a path under `directory`) whole, within `limits`; `Err` is the refusal's
 /// line.
-pub fn read(directory: &Path, configured: &[u8], limits: Clients) -> Result<Bundle, String> {
+pub fn read(configured: &[u8], limits: Clients) -> Result<Bundle, String> {
     let shown = PathBuf::from(std::ffi::OsStr::from_bytes(configured));
-    let root = directory.join(&shown);
+    let root = shown.clone();
     let mut state = Files { limits, bytes: 0, count: 0 };
     let page = state.read(&shown.join("index.html"), &root.join("index.html"))?;
     let digest = digest(&shown, &root, limits)?;

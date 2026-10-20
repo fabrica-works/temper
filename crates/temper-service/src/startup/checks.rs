@@ -60,6 +60,25 @@ pub fn standalone(
         if !in_process(&worker.engine) {
             problems.push(path.member(b"engine"), What::Standalone);
         }
+        let command = match worker.agent.arguments.first() {
+            Some(value) => value.as_ref() == b"agent",
+            None => false,
+        };
+        if command {
+            let absolute = match worker.agent.arguments.get(1) {
+                Some(value) => value.starts_with(b"/"),
+                None => false,
+            };
+            if worker.agent.arguments.len() != 2 || !absolute {
+                problems.push(path.member(b"agent").member(b"arguments"), What::Absolute);
+            }
+        } else {
+            for (index, value) in worker.agent.arguments.iter().enumerate() {
+                if !value.starts_with(b"/") {
+                    problems.push(at(index, path.member(b"agent").member(b"arguments")), What::Absolute);
+                }
+            }
+        }
         for (name, value) in
             [(b"program".as_slice(), &worker.agent.program), (b"configuration", &worker.agent.configuration)]
         {
@@ -604,5 +623,18 @@ pub(super) fn port(address: &config::Address) -> Option<u16> {
     match address {
         config::Address::Addr(address) => Some(address.socket()?.port()),
         config::Address::Host { port, .. } => Some(*port),
+    }
+}
+
+/// Check standalone's raw agent path before jig joins a configuration path.
+pub(super) fn raw_worker(document: &skein_json::Document, at: u32, path: &Path, problems: &mut Problems) {
+    if let Ok(mut worker) = config::read::Object::new(document, at)
+        && let Some(agent_at) = worker.member(document, b"agent")
+        && let Ok(mut agent) = config::read::Object::new(document, agent_at)
+        && let Some(at) = agent.member(document, b"configuration")
+        && let Ok(value) = config::read::text(document, at, 4096)
+        && !value.starts_with(b"/")
+    {
+        problems.push(path.member(b"agent").member(b"configuration"), What::Absolute);
     }
 }

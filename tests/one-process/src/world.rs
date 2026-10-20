@@ -453,6 +453,8 @@ fn service(inherited: &Inherited) -> Proc {
     let worker = inherited.roots.iter().find(|(name, _)| name.as_ref() == b"worker").expect("worker root").1;
     let mut service = temper_service::startup::startup(
         &fixtures::document(),
+        // Simulated fixture paths stay relative to their inherited roots.
+        &jig_protocol_config::Directories::working(),
         &fixtures::files(),
         &fixtures::agent(),
         &fixtures::seeds(),

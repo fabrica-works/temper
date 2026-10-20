@@ -394,7 +394,7 @@ fn temper_box_prints_its_link_and_stops_its_processes() {
 fn boxed_example(scratch: &support::Scratch) -> support::owned::Owned {
     let owned = support::owned::Owned::tier();
     support::owned::lay(scratch.path(), &owned);
-    std::fs::write(scratch.path().join("config.json"), support::owned::example_document(scratch.path(), &owned))
+    std::fs::write(scratch.path().join("temper.json"), support::owned::example_document(scratch.path(), &owned))
         .expect("box example");
     owned
 }

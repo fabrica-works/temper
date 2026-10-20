@@ -64,3 +64,9 @@ agent-driven software factory: write, prove, run.
 | [jig](https://github.com/fabrica-works/jig) | Engine for agentic applications | skein, smith |
 | [temper](https://github.com/fabrica-works/temper) | Agent-driven software development on a forge | skein, smith, jig |
 | [hearth](https://github.com/fabrica-works/hearth) | Immutable machines, built from a revision | skein |
+
+Commands that read the deployment use `<config>/temper.json` and accept
+`--config DIR --data DIR --cache DIR` after their command words. Each flag
+falls back to `TEMPER_CONFIG`, `TEMPER_DATA` or `TEMPER_CACHE`, then the
+corresponding XDG directory under `temper`. Relative flags are joined to
+the working directory once at startup. Data and cache must be private.

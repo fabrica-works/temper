@@ -95,7 +95,9 @@ fn a_termination_signal_kills_the_commands_group_and_ends_the_preparation_interr
     let programs = support::owned::scripted(scratch.path());
     programs.hang("forgejo", "migrate");
     let run = Command::new(env!("CARGO_BIN_EXE_temper"))
-        .args(["forge", "prepare", "config.json", "1"])
+        .args(["forge", "prepare"])
+        .args(support::configuration::flags(scratch.path()))
+        .arg("1")
         .current_dir(scratch.path())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -212,7 +214,7 @@ fn no_secret_of_the_state_reaches_a_refusal() {
     assert_eq!(refused.status.code(), Some(1));
     assert_eq!(
         refused.stderr,
-        b"temper forge run: forge 1: its preparation did not end: run temper forge prepare CONFIG.json 1\n"
+        format!("temper forge run: forge 1: its preparation did not end: run temper forge prepare --config {0} --data {0} --cache {0} 1\n", scratch.path().display()).as_bytes()
     );
     for secret in [&state.secrets.secret_key, &state.secrets.internal_token, &state.secrets.jwt_secret] {
         assert_eq!(skein_lib::bytes::find(&refused.stderr, secret.expose()), None);
@@ -268,7 +270,7 @@ fn the_run_names_prepare_for_a_runner_added() {
     let _programs = owned::scripted(scratch.path());
     owned::finished(scratch.path());
     owned::recorded_without_runner(scratch.path());
-    owned::refused(scratch.path(), "run", b"temper forge run: forge 1: prepared without a runner, and the setup has one: run temper forge prepare CONFIG.json 1\n");
+    owned::refused(scratch.path(), "run", format!("temper forge run: forge 1: prepared without a runner, and the setup has one: run temper forge prepare --config {0} --data {0} --cache {0} 1\n", scratch.path().display()).as_bytes());
     scratch.remove();
 }
 #[test]
@@ -278,7 +280,7 @@ fn the_run_names_prepare_for_a_runner_removed() {
     let _programs = owned::scripted(scratch.path());
     owned::finished(scratch.path());
     owned::setup_without_runner(scratch.path());
-    owned::refused(scratch.path(), "run", b"temper forge run: forge 1: prepared with a runner, and the setup has none: run temper forge prepare CONFIG.json 1\n");
+    owned::refused(scratch.path(), "run", format!("temper forge run: forge 1: prepared with a runner, and the setup has none: run temper forge prepare --config {0} --data {0} --cache {0} 1\n", scratch.path().display()).as_bytes());
     scratch.remove();
 }
 #[test]
@@ -292,7 +294,9 @@ fn an_interrupted_upgrade_leaves_the_state_for_the_next_preparation() {
     let before = fs::read(&path).expect("old state");
     programs.hang("forgejo", "dump");
     let run = Command::new(env!("CARGO_BIN_EXE_temper"))
-        .args(["forge", "prepare", "config.json", "1"])
+        .args(["forge", "prepare"])
+        .args(support::configuration::flags(scratch.path()))
+        .arg("1")
         .current_dir(scratch.path())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())

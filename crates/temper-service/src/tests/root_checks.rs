@@ -1,3 +1,4 @@
+// Fixture parsing without a deployment keeps written paths.
 //! What the root's construction asserts and the worker's rules against the
 //! agent, each refused at start naming its path (protocol/configuration.md, 7).
 #![expect(
@@ -16,6 +17,7 @@ const WORKER_OVERRIDES: &str =
 fn started(document: &[u8]) -> Box<[u8]> {
     let found = match crate::startup(
         document,
+        &jig_protocol_config::Directories::working(),
         &fixtures::files(),
         &fixtures::startup_agent(),
         &fixtures::seeds(),

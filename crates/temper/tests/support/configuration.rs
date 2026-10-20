@@ -46,3 +46,25 @@ pub fn documents(directory: &Path, program: &str) -> (Vec<u8>, Vec<u8>) {
         "workers":[{"root":"worker-root","git":"/usr/bin/git"}]});
     (serde_json::to_vec(&agent).expect("agent JSON"), serde_json::to_vec(&value).expect("deployment JSON"))
 }
+
+/// All directories are explicit and belong to this fixture's scratch.
+#[must_use]
+pub fn directories(directory: &Path) -> temper::directories::Directories {
+    use std::os::unix::ffi::OsStrExt;
+    let values = [
+        b"--config".as_slice(),
+        directory.as_os_str().as_bytes(),
+        b"--data",
+        directory.as_os_str().as_bytes(),
+        b"--cache",
+        directory.as_os_str().as_bytes(),
+    ];
+    temper::directories::resolve(&values.iter().map(|v| Box::from(*v)).collect::<Vec<_>>(), &[], b"/")
+        .expect("fixture directories")
+        .0
+}
+#[must_use]
+pub fn flags(directory: &Path) -> Vec<std::ffi::OsString> {
+    use std::os::unix::ffi::OsStringExt;
+    directories(directory).flags().into_vec().into_iter().map(|v| std::ffi::OsString::from_vec(v.into_vec())).collect()
+}

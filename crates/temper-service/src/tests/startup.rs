@@ -1,3 +1,4 @@
+// Fixture parsing without a deployment keeps written paths.
 #![expect(clippy::disallowed_methods, reason = "ordinary test code edits UTF-8 configuration fixtures")]
 use super::fixtures;
 use crate::startup::{Problems, What, application, lines};
@@ -38,7 +39,7 @@ fn application(input: &[u8], jig: &config::Engine) -> (Option<application::Membe
     let document =
         config::document(input, &config::DocumentLimits { bytes: 1_048_576, tokens: 16_384, depth: 32 }).unwrap();
     let mut problems = Problems::empty();
-    let members = application::parse(&document, 0, jig, &mut problems);
+    let members = application::parse(&document, 0, jig, &config::Directories::working(), &mut problems);
     (members, problems)
 }
 #[test]
@@ -71,7 +72,7 @@ fn the_example_engine_keeps_jigs_chat_and_goal_templates() {
 fn a_chats_member_is_refused_as_unknown_naming_its_path() {
     let input = fixtures::document();
     let input = core::str::from_utf8(&input).unwrap().replacen("\"templates\": [", "\"chats\": [", 1);
-    let problems = crate::named(input.as_bytes()).unwrap_err();
+    let problems = crate::named(input.as_bytes(), &jig_protocol_config::Directories::working()).unwrap_err();
     assert_eq!(&*lines(&problems), b"engine.templates: missing\nengine.chats: unknown member\n");
 }
 fn refused(input: &[u8]) -> Box<[u8]> {
@@ -258,7 +259,7 @@ fn application_files_keep_paths_bounds_privacy_and_resolution_refusals() {
 }
 #[test]
 fn named_lists_each_file_with_its_bound_and_privacy() {
-    let named = crate::named(&fixtures::document()).unwrap();
+    let named = crate::named(&fixtures::document(), &jig_protocol_config::Directories::working()).unwrap();
     assert_eq!(named.files.len(), 8, "all files listed");
     for (name, path, max, private) in [
         (b"charters/chat.txt".as_slice(), b"engine.charters[0].instructions".as_slice(), 16_070, false),
@@ -280,7 +281,7 @@ fn named_lists_each_file_with_its_bound_and_privacy() {
 }
 #[test]
 fn named_returns_the_worker_root_and_the_agent_configuration() {
-    let named = crate::named(&fixtures::document()).unwrap();
+    let named = crate::named(&fixtures::document(), &jig_protocol_config::Directories::working()).unwrap();
     assert_eq!(named.deployment.as_ref(), b"state");
     assert_eq!(named.worker_root.as_ref(), b"worker-root");
     assert_eq!(named.agent.as_ref(), fixtures::AGENT_JSON);
@@ -291,6 +292,7 @@ fn a_file_named_but_not_given_refuses_the_start_naming_it() {
     files.entries = fixtures::without(files.entries, b"secrets/forge-1.git-token");
     let refused = crate::startup(
         &fixtures::document(),
+        &jig_protocol_config::Directories::working(),
         &files,
         &fixtures::startup_agent(),
         &fixtures::seeds(),
@@ -307,13 +309,14 @@ fn jigs_problems_keep_their_paths_under_engine() {
     let input = core::str::from_utf8(&input)
         .unwrap()
         .replace("\"memory_bytes\": 1152921504606846976,", "\"memory_bytes\": \"bad\",");
-    let problems = crate::named(input.as_bytes()).unwrap_err();
+    let problems = crate::named(input.as_bytes(), &jig_protocol_config::Directories::working()).unwrap_err();
     assert_eq!(&*lines(&problems), b"engine.memory_bytes: wrong value kind\n".as_slice());
 }
 #[test]
 fn startup_makes_the_one_process_from_the_example() {
     let mut service = match crate::startup(
         &fixtures::document(),
+        &jig_protocol_config::Directories::working(),
         &fixtures::files(),
         &fixtures::startup_agent(),
         &fixtures::seeds(),
@@ -355,6 +358,7 @@ fn a_workers_missing_or_oversized_secret_keeps_its_absolute_path() {
         }
         let found = match crate::startup(
             &document,
+            &jig_protocol_config::Directories::working(),
             &files,
             &agent,
             &seeds,
@@ -464,7 +468,7 @@ fn a_setup_or_box_override_is_handed_on_with_its_value() {
 
 #[test]
 fn the_webhook_listener_and_secret_file_are_read() {
-    let named = crate::named(&fixtures::webhook_document()).unwrap();
+    let named = crate::named(&fixtures::webhook_document(), &jig_protocol_config::Directories::working()).unwrap();
     let webhooks = named.webhooks.unwrap();
     let config::Address::Addr(listener) = webhooks.listener else { panic!("socket") };
     assert_eq!(listener.socket().unwrap(), "127.0.0.1:7200".parse().unwrap());
@@ -497,7 +501,10 @@ fn a_missing_webhook_secret_is_refused_by_path() {
 fn an_in_process_webhook_listener_is_refused() {
     let input =
         fixtures::with(&fixtures::document(), b"application.webhooks", br#"{"listener":{"in_process":"hooks"}}"#);
-    assert_eq!(&*lines(&crate::named(&input).unwrap_err()), b"application.webhooks.listener: invalid form\n");
+    assert_eq!(
+        &*lines(&crate::named(&input, &jig_protocol_config::Directories::working()).unwrap_err()),
+        b"application.webhooks.listener: invalid form\n"
+    );
 }
 #[test]
 fn the_webhook_secret_excludes_its_final_newline() {
@@ -511,9 +518,9 @@ fn the_webhook_secret_excludes_its_final_newline() {
 }
 #[test]
 fn the_configured_bundle_is_named_for_the_binary() {
-    let document = fixtures::with(&fixtures::document(), b"application.clients.bundle", br#""bundle""#);
-    let named = crate::named(&document).expect("named");
-    assert_eq!(named.bundle.as_deref(), Some(b"bundle".as_slice()));
+    let document = fixtures::with(&fixtures::document(), b"application.clients.bundle", br#""/bundle""#);
+    let named = crate::named(&document, &jig_protocol_config::Directories::working()).expect("named");
+    assert_eq!(named.bundle.as_deref(), Some(b"/bundle".as_slice()));
     assert_eq!(named.bundle_limits, crate::limits::Clients { bundle_files: 128, bundle_bytes: 16 << 20 });
 }
 #[test]
@@ -528,5 +535,58 @@ fn a_webhook_listener_with_a_bundle_is_refused() {
         b"application.webhooks",
         br#"{"listener":{"socket":"127.0.0.1:7200"},"bundle":null}"#,
     );
-    assert_eq!(&*lines(&crate::named(&document).unwrap_err()), b"application.webhooks.bundle: unknown member\n");
+    assert_eq!(
+        &*lines(&crate::named(&document, &jig_protocol_config::Directories::working()).unwrap_err()),
+        b"application.webhooks.bundle: unknown member\n"
+    );
+}
+
+#[test]
+fn paths_are_resolved_by_kind_and_absolute_only_members_refuse_relative_values() {
+    let directories = config::Directories::given(b"/configuration", b"/data", b"/cache").unwrap();
+    for (member, input, expected, refused) in [
+        (b"application.workers[0].root".as_slice(), br#""root""#.as_slice(), b"/data/root".as_slice(), false),
+        (b"application.workers[0].root", br#""/kept/root""#, b"/kept/root", false),
+        (b"engine.deployment.directory", br#""state""#, b"/data/state", false),
+        (b"engine.deployment.directory", br#""/kept/state""#, b"/kept/state", false),
+        (b"engine.charters[0].instructions", br#""chat.txt""#, b"/configuration/chat.txt", false),
+        (b"engine.charters[0].instructions", br#""/kept/chat.txt""#, b"/kept/chat.txt", false),
+        (b"workers[0].secret", br#""secret""#, b"/data/secret", false),
+        (b"workers[0].secret", br#""/kept/secret""#, b"/kept/secret", false),
+        (b"engine.hosts.workers[0].digest", br#""digest""#, b"/data/digest", false),
+        (b"engine.hosts.workers[0].digest", br#""/kept/digest""#, b"/kept/digest", false),
+        (b"application.workers[0].git", br#""git""#, b"", true),
+        (b"application.clients.bundle", br#""bundle""#, b"", true),
+        (b"application.clients.bundle", br#""/kept/bundle""#, b"/kept/bundle", false),
+        (b"workers[0].agent.program", br#""temper""#, b"", true),
+        (b"workers[0].agent.configuration", br#""agent.json""#, b"", true),
+        (b"workers[0].agent.arguments", br#"["agent","agent.json"]"#, b"", true),
+    ] {
+        let document = fixtures::with(&fixtures::document(), member, input);
+        let result = crate::named(&document, &directories);
+        if refused {
+            let lines = lines(&result.unwrap_err());
+            let expected = [member, b": must be an absolute path\n"].concat();
+            assert_eq!(lines.as_ref(), expected, "{}", core::str::from_utf8(member).expect("test path"));
+        } else {
+            let named = result.unwrap();
+            let value = match member {
+                b"application.workers[0].root" => &*named.worker_root,
+                b"engine.deployment.directory" => &*named.deployment,
+                b"application.clients.bundle" => named.bundle.as_deref().unwrap(),
+                _ => &*named.files.iter().find(|file| file.path.as_ref() == expected).expect("resolved file key").path,
+            };
+            assert_eq!(value, expected);
+        }
+    }
+    for trust in [br#""roots.der""#.as_slice(), br#""/kept/roots.der""#] {
+        let tls = [br#"{"tls":{"server_name":"example.test","trust":"#.as_slice(), trust, b"}}"].concat();
+        let document = fixtures::with(&fixtures::document(), b"application.forges[0].transport", &tls);
+        let named = crate::named(&document, &directories).unwrap();
+        let application::Transport::Tls { trust: Some(value), .. } = &named.forges[0].transport else { panic!("TLS") };
+        assert_eq!(
+            value.as_ref(),
+            if trust == br#""roots.der""# { b"/configuration/roots.der".as_slice() } else { b"/kept/roots.der" }
+        );
+    }
 }

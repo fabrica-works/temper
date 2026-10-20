@@ -21,19 +21,19 @@ EXAMPLES="$PWD/docs/examples"
 ## Step 2. Copy the example into a private directory
 
 Use a fresh directory. For a second box, change the three addresses
-together in `config.json`, including their repetitions in the forge,
+together in `temper.json`, including their repetitions in the forge,
 landing rule and listeners.
 
 ```sh
 umask 077
 mkdir -m 700 temper-box
 cd temper-box
-cp "$EXAMPLES/owned.json" config.json
+cp "$EXAMPLES/owned.json" temper.json
 cp -R "$EXAMPLES/owned" .
 sed -i -e "s|/home/me/temper|$PWD|g" \
   -e "s|/opt/forgejo/forgejo-runner|$RUNNER|g" \
   -e "s|/opt/forgejo/forgejo|$FORGEJO|g" \
-  -e "s|/usr/local/bin/temper|$TEMPER|g" config.json owned/agent.json
+  -e "s|/usr/local/bin/temper|$TEMPER|g" temper.json owned/agent.json
 ```
 
 ## Step 3. Make the worker's secret and digest
@@ -73,7 +73,7 @@ preparation left, makes its bot, and prints a sign-in link. Keep this
 terminal open; copy that link for step 7.
 
 ```sh
-"$TEMPER" box config.json
+"$TEMPER" box --config "$PWD" --data "$PWD" --cache "$PWD/cache"
 ```
 
 ## Step 6. Make acme/widget on Forgejo's web

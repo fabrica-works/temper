@@ -141,7 +141,7 @@ pub fn run(directory: &Path, forgejo: SocketAddr, plan: Plan, deadline: Duration
     let mut binary = Binary::start_with_tree(
         Command {
             program: env!("CARGO_BIN_EXE_temper").into(),
-            arguments: vec!["box".into(), "config.json".into()],
+            arguments: std::iter::once("box".into()).chain(super::configuration::flags(directory)).collect(),
             directory: directory.into(),
             environment: Vec::new(),
         },

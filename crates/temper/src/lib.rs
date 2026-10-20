@@ -1,4 +1,6 @@
 //! Startup for temper's standalone binary (protocol/configuration.md, section 2).
+// tests::configuration includes the shared integration fixture, which names temper::directories.
+extern crate self as temper;
 use jig_protocol_config::{self as config, read};
 use skein_io::kernel::{Error, Exit, Fd};
 use skein_lib::{List, Secret};
@@ -7,7 +9,7 @@ use std::{
     ffi::OsString,
     fmt::Write,
     net::ToSocketAddrs,
-    os::unix::{ffi::OsStrExt, fs::MetadataExt},
+    os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
 };
 use temper_service::{
@@ -15,6 +17,8 @@ use temper_service::{
     settings::{Files, Seeds},
 };
 
+pub mod directories;
+use directories::{Directories, private_root};
 mod accounts_runtime;
 mod agent;
 pub mod box_command;
@@ -26,18 +30,24 @@ pub mod open;
 mod program_login;
 mod setup;
 pub use host::Host;
-pub const USAGE: &str = "usage: temper serve CONFIG.json | temper agent AGENT.json | temper program-login CONFIG.json NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
+pub const USAGE: &str = "usage: temper serve [DIRECTORIES] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
 const CONFIG_BYTES: u32 = 1 << 20;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
-    Serve { configuration: PathBuf },
-    Box { configuration: PathBuf },
-    ProgramLogin { configuration: PathBuf, name: OsString },
+    Serve { directories: Directories },
+    Box { directories: Directories },
+    ProgramLogin { directories: Directories, name: OsString },
     Agent { configuration: PathBuf },
     Open { arguments: Vec<OsString> },
     Ctl { arguments: Vec<OsString> },
-    Forge { arguments: Vec<OsString> },
+    Forge { directories: Directories, arguments: Vec<OsString> },
+}
+#[must_use]
+pub fn usage() -> String {
+    let mut help = format!("{USAGE}\nDIRECTORIES: [--config DIR] [--data DIR] [--cache DIR]\n").into_bytes();
+    skein_shell::help(&directories::SETTINGS, &mut help);
+    String::from_utf8(help).expect("help is UTF-8")
 }
 fn prefixed(command: &str, why: &str) -> String {
     let mut lines = String::new();
@@ -49,52 +59,77 @@ fn prefixed(command: &str, why: &str) -> String {
 pub(crate) fn problems(found: &service::startup::Problems) -> String {
     prefixed("temper serve", &String::from_utf8_lossy(&service::startup::lines(found)))
 }
-pub fn configure(mut args: impl Iterator<Item = OsString>) -> Result<Command, String> {
-    let usage = || format!("temper: invalid arguments\n{USAGE}\n");
-    let command = args.next().ok_or_else(usage)?;
-    if command == "forge" {
-        return Ok(Command::Forge { arguments: args.collect() });
-    }
-    if command == "ctl" {
-        return Ok(Command::Ctl { arguments: args.collect() });
-    }
-    if command == "open" {
-        return Ok(Command::Open { arguments: args.collect() });
-    }
-    let configuration = args.next().ok_or_else(usage)?.into();
-    if command == "program-login" {
-        let name = args.next().ok_or_else(usage)?;
-        if args.next().is_some() {
-            return Err(usage());
+pub fn configure(args: impl Iterator<Item = OsString>) -> Result<Command, String> {
+    let arguments: Vec<Box<[u8]>> = args.map(|arg| Box::from(arg.as_bytes())).collect();
+    let working = std::env::current_dir().map_err(|why| why.to_string())?;
+    configure_with(&arguments, &skein_shell::environment(), working.as_os_str().as_bytes())
+}
+type EnvironmentEntry = (Box<[u8]>, Box<[u8]>);
+pub fn configure_with(
+    arguments: &[Box<[u8]>],
+    environment: &[EnvironmentEntry],
+    working: &[u8],
+) -> Result<Command, String> {
+    let invalid = || format!("temper: invalid arguments\n{}", usage());
+    let Some((command, arguments)) = arguments.split_first() else { return Err(invalid()) };
+    let os =
+        |args: &[Box<[u8]>]| args.iter().map(|arg| std::ffi::OsStr::from_bytes(arg).to_owned()).collect::<Vec<_>>();
+    match command.as_ref() {
+        b"ctl" => return Ok(Command::Ctl { arguments: os(arguments) }),
+        b"open" => return Ok(Command::Open { arguments: os(arguments) }),
+        b"agent" => {
+            return match arguments {
+                [configuration] => Ok(Command::Agent { configuration: path(configuration).into() }),
+                _ => Err(invalid()),
+            };
         }
-        return Ok(Command::ProgramLogin { configuration, name });
+        b"serve" | b"box" | b"program-login" | b"forge" => {}
+        _ => return Err(invalid()),
     }
-    if args.next().is_some() {
-        return Err(usage());
-    }
-    if command == "serve" {
-        Ok(Command::Serve { configuration })
-    } else if command == "box" {
-        Ok(Command::Box { configuration })
-    } else if command == "agent" {
-        Ok(Command::Agent { configuration })
+    let (verb, arguments) = if command.as_ref() == b"forge" {
+        let Some((verb, arguments)) = arguments.split_first() else { return Err(invalid()) };
+        if ![b"prepare".as_slice(), b"run", b"reconcile"].contains(&verb.as_ref()) {
+            return Err(invalid());
+        }
+        (Some(verb), arguments)
     } else {
-        Err(usage())
+        (None, arguments)
+    };
+    let (directories, rest) =
+        directories::resolve(arguments, environment, working).map_err(|why| format!("temper: {why}\n{}", usage()))?;
+    let rest = os(&rest);
+    match command.as_ref() {
+        b"serve" if rest.is_empty() => Ok(Command::Serve { directories }),
+        b"box" if rest.is_empty() => Ok(Command::Box { directories }),
+        b"program-login" if rest.len() == 1 => Ok(Command::ProgramLogin { directories, name: rest[0].clone() }),
+        b"forge" => {
+            let verb = verb.expect("forge command word");
+            let valid = if verb.as_ref() == b"run" {
+                rest.len() == 2 && (rest[1] == "forgejo" || rest[1] == "runner")
+            } else {
+                rest.len() == 1
+            };
+            if !valid || rest[0].to_str().and_then(|n| n.parse::<u16>().ok()).is_none() {
+                return Err(invalid());
+            }
+            let mut arguments = os(std::slice::from_ref(verb));
+            arguments.extend(rest);
+            Ok(Command::Forge { directories, arguments })
+        }
+        _ => Err(invalid()),
     }
 }
 pub fn run(command: Command) -> Result<u8, String> {
     let exit = match command {
-        Command::Serve { configuration } => serve(&configuration).map_err(|why| prefixed("temper serve", &why))?,
-        Command::Box { configuration } => {
-            box_command::run(&configuration).map_err(|why| prefixed("temper box", &why))?
-        }
+        Command::Serve { directories } => serve(&directories).map_err(|why| prefixed("temper serve", &why))?,
+        Command::Box { directories } => box_command::run(&directories).map_err(|why| prefixed("temper box", &why))?,
         Command::Agent { configuration } => smith_agent_shell::run(&configuration, Box::new(std::io::stderr()))
             .map_err(|why| prefixed("temper agent", &why))?,
-        Command::ProgramLogin { configuration, name } => {
-            return program_login::run(&configuration, &name)
+        Command::ProgramLogin { directories, name } => {
+            return program_login::run(&directories, &name)
                 .map_err(|why| prefixed("temper program-login", &why.lines().collect::<Vec<_>>().join("; ")));
         }
-        Command::Forge { arguments } => return Ok(forge::run(&arguments)),
+        Command::Forge { directories, arguments } => return Ok(forge::run(&directories, &arguments)),
         Command::Ctl { arguments } => return Ok(ctl::run(&arguments, &Clock::new())),
         Command::Open { arguments } => return Ok(open::run(&arguments, &Clock::new())),
     };
@@ -154,15 +189,15 @@ fn file_path(at: config::Path) -> String {
     let bytes = service::startup::lines(&found);
     String::from_utf8_lossy(&bytes).trim_end().strip_suffix(": not read").expect("path and reason").into()
 }
-fn read_files(directory: &Path, names: Box<[config::File]>, user: u32) -> Result<Files, String> {
+fn read_files(names: Box<[config::File]>, user: u32) -> Result<Files, String> {
     let mut entries = List::with_capacity(u32::try_from(names.len()).expect("bounded files"));
     let mut refused = String::new();
     for file in names {
-        let resolved = directory.join(path(&file.path));
+        let resolved = path(&file.path);
         let value = if file.private {
-            skein_shell::read_private_file(&resolved, file.max, user)
+            skein_shell::read_private_file(resolved, file.max, user)
         } else {
-            skein_shell::read_file(&resolved, file.max).map(Secret::new)
+            skein_shell::read_file(resolved, file.max).map(Secret::new)
         };
         match value {
             Ok(value) => entries.push((file.path, value)).expect("named capacity"),
@@ -184,10 +219,9 @@ fn address(configured: &config::Address) -> Result<std::net::SocketAddr, String>
             .ok_or_else(|| "endpoint has no address".into()),
     }
 }
-fn trust(directory: &Path, file: Option<&[u8]>) -> Result<(skein_tls::Config, u32, u32), String> {
-    let source = file.map_or(skein_shell::Trust::Machine { ssl_cert_file: None }, |file| {
-        skein_shell::Trust::Der(directory.join(path(file)))
-    });
+fn trust(file: Option<&[u8]>) -> Result<(skein_tls::Config, u32, u32), String> {
+    let source = file
+        .map_or(skein_shell::Trust::Machine { ssl_cert_file: None }, |file| skein_shell::Trust::Der(path(file).into()));
     let roots = skein_shell::read_trust_roots(
         &source,
         &skein_shell::RootBounds { bundle_bytes: CONFIG_BYTES, certificates: 1024, certificate_bytes: 65_536 },
@@ -212,82 +246,51 @@ fn server_name(bytes: &[u8]) -> Result<skein_tls::Name, String> {
     skein_tls::Name::new(std::str::from_utf8(bytes).map_err(|why| why.to_string())?)
         .ok_or_else(|| "invalid server name".into())
 }
-fn accounts(directory: &Path, engine: &config::Engine) -> Result<service::AccountsRuntime, String> {
-    accounts_runtime::resolve(directory, engine)
+fn accounts(engine: &config::Engine) -> Result<service::AccountsRuntime, String> {
+    accounts_runtime::resolve(engine)
 }
 
-fn forges(directory: &Path, document: &skein_json::Document) -> Result<List<service::ForgeRuntime>, String> {
+fn forges(configured: &[service::startup::Forge]) -> Result<List<service::ForgeRuntime>, String> {
     use skein_forge_connection::settings::Transport;
-    let application = member(document, 0, b"application");
-    let list =
-        read::list(document, member(document, application, b"forges"), document.len()).expect("named checked forges");
-    let mut runtime = List::with_capacity(list.len());
-    for (index, at) in list.iter().enumerate() {
+    let mut runtime = List::with_capacity(u32::try_from(configured.len()).expect("bounded forges"));
+    for (index, forge) in configured.iter().enumerate() {
         let prefix = format!("application.forges[{index}]");
-        let mut found = config::Problems::empty();
-        let configured =
-            config::address::read(document, member(document, *at, b"api"), &config::Path::root(), &mut found)
-                .expect("named checked address");
-        let address = address(&configured).map_err(|why| format!("{prefix}.api: {why}"))?;
-        let number =
-            read::integer(document, member(document, *at, b"number"), u64::from(u16::MAX)).expect("checked number");
-        let at = member(document, *at, b"transport");
-        let (transport, trust_roots, trust_root_bytes) = if read::text(document, at, 32).is_ok() {
-            (Transport::Plaintext { name: None }, 0, 0)
-        } else {
-            let tls = member(document, at, b"tls");
-            let name = read::text(document, member(document, tls, b"server_name"), 253).expect("checked TLS name");
-            let file = read::text(document, member(document, tls, b"trust"), CONFIG_BYTES).ok();
-            let (trust, count, each) =
-                trust(directory, file.as_deref()).map_err(|why| format!("{prefix}.transport.tls.trust: {why}"))?;
-            (Transport::Tls { server_name: server_name(&name)?, trust }, count, each)
+        let address = address(&forge.api).map_err(|why| format!("{prefix}.api: {why}"))?;
+        let (transport, trust_roots, trust_root_bytes) = match &forge.transport {
+            service::startup::Transport::Plaintext => (Transport::Plaintext { name: None }, 0, 0),
+            service::startup::Transport::Tls { server_name: name, trust: file } => {
+                let (trust, count, each) =
+                    trust(file.as_deref()).map_err(|why| format!("{prefix}.transport.tls.trust: {why}"))?;
+                (Transport::Tls { server_name: server_name(name)?, trust }, count, each)
+            }
         };
         runtime
-            .push(service::ForgeRuntime {
-                number: u16::try_from(number).expect("checked number"),
-                address,
-                transport,
-                trust_roots,
-                trust_root_bytes,
-            })
+            .push(service::ForgeRuntime { number: forge.number, address, transport, trust_roots, trust_root_bytes })
             .expect("forge count");
     }
     Ok(runtime)
 }
-fn private_root(path: &Path, user: u32) -> Result<(), String> {
-    let metadata = std::fs::symlink_metadata(path).map_err(|why| why.to_string())?;
-    if !metadata.is_dir() || metadata.file_type().is_symlink() || metadata.uid() != user || metadata.mode() & 0o077 != 0
-    {
-        return Err("must be a private directory of this user's, not reached through a link".into());
-    }
-    Ok(())
-}
-fn prepare(directory: &Path, bytes: &[u8], owned: &mut Vec<Fd>) -> Result<service::Service, String> {
-    let (named, _, _) = setup::check(bytes)?;
+fn prepare(directories: &Directories, bytes: &[u8], owned: &mut Vec<Fd>) -> Result<service::Service, String> {
+    let (named, _, _) = setup::check(bytes, &directories.jig())?;
     let document =
         config::document(bytes, &config::DocumentLimits { bytes: CONFIG_BYTES, tokens: CONFIG_BYTES, depth: 32 })
             .expect("named checked document");
     let engine =
-        config::engine(&document, member(&document, 0, b"engine"), &jig_protocol_config::Directories::working())
-            .expect("named checked engine");
-    let agent = agent::preflight(directory, &named)?;
+        config::engine(&document, member(&document, 0, b"engine"), &directories.jig()).expect("named checked engine");
+    let forges = forges(&named.forges)?;
+    let agent = agent::preflight(&named)?;
     let user = skein_shell::effective_user();
-    let files = read_files(directory, named.files, user)?;
-    let bundle = named
-        .bundle
-        .as_deref()
-        .map(|configured| bundle::read(directory, configured, named.bundle_limits))
-        .transpose()?;
-    let root_path = directory.join(path(&named.worker_root));
-    if std::fs::symlink_metadata(&root_path).is_ok() {
-        private_root(&root_path, user).map_err(|why| format!("application.workers[0].root: {why}"))?;
+    let files = read_files(named.files, user)?;
+    let bundle = named.bundle.as_deref().map(|configured| bundle::read(configured, named.bundle_limits)).transpose()?;
+    let root_path = path(&named.worker_root);
+    if std::fs::symlink_metadata(root_path).is_ok() {
+        private_root(root_path, user).map_err(|why| format!("application.workers[0].root: {why}"))?;
     }
-    let root = skein_shell::make_root(&root_path, 0o700)
+    let root = skein_shell::make_root(root_path, 0o700)
         .map_err(|errno| format!("application.workers[0].root: errno {errno}"))?;
     owned.push(root);
-    private_root(&root_path, user).map_err(|why| format!("application.workers[0].root: {why}"))?;
-    let accounts = accounts(directory, &engine)?;
-    let forges = forges(directory, &document)?;
+    private_root(root_path, user).map_err(|why| format!("application.workers[0].root: {why}"))?;
+    let accounts = accounts(&engine)?;
     let seed = skein_shell::seed().map_err(|errno| format!("random seed: errno {errno}"))?;
     let crypto = skein_shell::crypto_seed().map_err(|errno| format!("cryptographic seed: errno {errno}"))?;
     let drawn = skein_shell::crypto_seed().map_err(|errno| format!("deployment id: errno {errno}"))?;
@@ -300,6 +303,7 @@ fn prepare(directory: &Path, bytes: &[u8], owned: &mut Vec<Fd>) -> Result<servic
     installation.copy_from_slice(drawn.expose().get(..16).expect("32-byte seed"));
     let mut service = service::startup(
         bytes,
+        &directories.jig(),
         &files,
         &agent,
         &Seeds { deployment, installation, seed, crypto },
@@ -308,7 +312,7 @@ fn prepare(directory: &Path, bytes: &[u8], owned: &mut Vec<Fd>) -> Result<servic
         forges,
     )
     .map_err(|why| String::from_utf8_lossy(&service::startup::lines(&why)).into_owned())?;
-    let root = skein_shell::make_root(&directory.join(path(&named.deployment)), 0o700)
+    let root = skein_shell::make_root(path(&named.deployment), 0o700)
         .map_err(|errno| format!("engine.deployment.directory: errno {errno}"))?;
     owned.push(root);
     service.adopt_store(root, user).map_err(|_| "store refused its deployment root")?;
@@ -323,30 +327,26 @@ fn close(owned: Vec<Fd>) {
     }
 }
 /// Derive the standalone admission envelope without retaining its descriptors.
-pub fn envelope_in(directory: &Path, config: &[u8]) -> Result<(u64, u32), String> {
-    let directory = std::path::absolute(directory).map_err(|why| prefixed("temper serve", &why.to_string()))?;
+pub fn envelope_in(directories: &Directories, config: &[u8]) -> Result<(u64, u32), String> {
+    directories.open(skein_shell::effective_user())?;
     let mut owned = Vec::new();
-    let result = prepare(&directory, config, &mut owned).map(|service| (service.worst_case(), service.operations()));
+    let result = prepare(directories, config, &mut owned).map(|service| (service.worst_case(), service.operations()));
     close(owned);
     result.map_err(|why| prefixed("temper serve", &why))
 }
-pub fn prepare_in(directory: &Path) -> Result<service::Service, String> {
-    let directory = std::path::absolute(directory).map_err(|why| prefixed("temper serve", &why.to_string()))?;
-    let bytes = skein_shell::read_file(&directory.join("config.json"), CONFIG_BYTES)
-        .map_err(|why| prefixed("temper serve", &format!("configuration config.json: {}", unread(why))))?;
+pub fn prepare_in(directories: &Directories) -> Result<service::Service, String> {
+    let bytes = directories.read().map_err(|why| prefixed("temper serve", &why))?;
     let mut owned = Vec::new();
-    let result = prepare(&directory, &bytes, &mut owned);
+    let result = prepare(directories, &bytes, &mut owned);
     if result.is_err() {
         close(owned);
     }
     result.map_err(|why| prefixed("temper serve", &why))
 }
-fn serve(path: &Path) -> Result<Exit, String> {
-    let directory = std::env::current_dir().map_err(|why| why.to_string())?;
-    let bytes = skein_shell::read_file(path, CONFIG_BYTES)
-        .map_err(|why| format!("configuration {}: {}", path.display(), unread(why)))?;
+fn serve(directories: &Directories) -> Result<Exit, String> {
+    let bytes = directories.read()?;
     let mut owned = Vec::new();
-    let prepared = prepare(&directory, &bytes, &mut owned);
+    let prepared = prepare(directories, &bytes, &mut owned);
     let mut service = match prepared {
         Ok(service) => service,
         Err(why) => {

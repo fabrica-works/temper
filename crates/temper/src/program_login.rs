@@ -4,7 +4,6 @@
 use std::{
     ffi::OsStr,
     os::unix::{ffi::OsStrExt, process::CommandExt},
-    path::Path,
 };
 
 fn source_name(name: &OsStr) -> Result<&str, String> {
@@ -14,16 +13,14 @@ fn source_name(name: &OsStr) -> Result<&str, String> {
 }
 
 fn command(
-    configuration: &Path,
+    directories: &super::Directories,
     name: &OsStr,
     environment: impl IntoIterator<Item = (std::ffi::OsString, std::ffi::OsString)>,
 ) -> Result<std::process::Command, String> {
     let name = source_name(name)?;
-    let bytes = skein_shell::read_file(configuration, super::CONFIG_BYTES)
-        .map_err(|why| format!("configuration {}: {}", configuration.display(), super::unread(why)))?;
-    let (named, _, _) = super::setup::check(&bytes)?;
-    let directory = std::env::current_dir().map_err(|why| why.to_string())?;
-    let agent = super::agent::preflight(&directory, &named)?;
+    let bytes = directories.read()?;
+    let (named, _, _) = super::setup::check(&bytes, &directories.jig())?;
+    let agent = super::agent::preflight(&named)?;
     let program = agent
         .programs
         .iter()
@@ -34,8 +31,8 @@ fn command(
     Ok(smith_agent_shell::program::sign_in(super::path(&program.path), &source, environment))
 }
 
-pub(crate) fn run(configuration: &Path, name: &OsStr) -> Result<u8, String> {
-    let error = command(configuration, name, std::env::vars_os())?.exec();
+pub(crate) fn run(directories: &super::Directories, name: &OsStr) -> Result<u8, String> {
+    let error = command(directories, name, std::env::vars_os())?.exec();
     Err(format!("exec: {error}"))
 }
 

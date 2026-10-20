@@ -97,7 +97,7 @@ pub(crate) fn private(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).expect("fixture file");
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).expect("private fixture");
 }
-/// The deployment's files and its two documents, `agent.json` and `config.json`, in `directory`.
+/// The deployment's files and its two documents, `agent.json` and `temper.json`, in `directory`.
 pub(crate) fn write(directory: &Path, program: &Path, bundle: &Path) {
     assert!(Path::new("/usr/bin/git").is_file(), "/usr/bin/git is required");
     for name in ["accounts", "secrets", "charters", "state"] {
@@ -117,5 +117,5 @@ pub(crate) fn write(directory: &Path, program: &Path, bundle: &Path) {
     private(&directory.join("root.der"), skein_tls_world::pki::ROOT);
     let (agent, value) = documents(directory, program, bundle);
     private(&directory.join("agent.json"), &agent);
-    private(&directory.join("config.json"), &value);
+    private(&directory.join("temper.json"), &value);
 }

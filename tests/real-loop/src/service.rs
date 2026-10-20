@@ -55,8 +55,8 @@ impl ServiceHost {
         if let Some(fixture) = fixture {
             crate::forge::write(&path, address, &fixture).expect("forge documents");
         }
-        let config = std::fs::read(path.join("config.json")).expect("standalone document");
-        let mut envelope = temper::envelope_in(&path, &config).expect("standalone admission envelope");
+        let config = std::fs::read(path.join("temper.json")).expect("standalone document");
+        let mut envelope = temper::envelope_in(&directories(&path), &config).expect("standalone admission envelope");
         // The deferred document names port 0 in its LLM, API and git addresses.
         // Each kernel-assigned port can add four decimal digits at preparation.
         if fixture.is_some() {
@@ -127,7 +127,7 @@ impl Host for ServiceHost {
             if let Some(fixture) = self.fixture {
                 crate::forge::write(&self.path, forge, &fixture).expect("forge documents");
             }
-            let mut service = temper::prepare_in(&self.path).expect("standalone preparation");
+            let mut service = temper::prepare_in(&directories(&self.path)).expect("standalone preparation");
             if self.fixture.is_some() {
                 assert!(service.worst_case() <= self.envelope.0, "bound ports fit deferred admission");
                 assert_eq!(service.operations(), self.envelope.1, "preparation preserves operations");
@@ -202,4 +202,21 @@ impl Host for ServiceHost {
     fn operations(&self) -> u32 {
         self.envelope.1
     }
+}
+
+/// All directories are explicit and belong to this fixture's scratch.
+#[must_use]
+pub fn directories(directory: &std::path::Path) -> temper::directories::Directories {
+    use std::os::unix::ffi::OsStrExt;
+    let values = [
+        b"--config".as_slice(),
+        directory.as_os_str().as_bytes(),
+        b"--data",
+        directory.as_os_str().as_bytes(),
+        b"--cache",
+        directory.as_os_str().as_bytes(),
+    ];
+    temper::directories::resolve(&values.iter().map(|v| Box::from(*v)).collect::<Vec<_>>(), &[], b"/")
+        .expect("fixture directories")
+        .0
 }

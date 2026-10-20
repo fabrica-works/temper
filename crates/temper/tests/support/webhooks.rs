@@ -29,7 +29,7 @@ pub fn free_address() -> SocketAddr {
 pub fn configuration(directory: &Path) -> SocketAddr {
     super::configuration(directory, &super::Forge::Unreached);
     let address = free_address();
-    let path = directory.join("config.json");
+    let path = directory.join("temper.json");
     let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
     value["application"]["webhooks"] = serde_json::json!({"listener":{"socket":address.to_string()}});
     value["application"]["forges"][0]["webhook_secret"] = "secrets/forge-1.webhook-secret".into();

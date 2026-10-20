@@ -46,7 +46,12 @@ pub fn clients(document: &Document, at: u32, path: &Path, bundle: bool, problems
         && document.token(at)?.kind != Kind::Null
     {
         match config::read::text(document, at, 1_048_576) {
-            Ok(value) => directory = Some(value),
+            Ok(value) => {
+                if !value.starts_with(b"/") {
+                    problems.push(path.member(b"bundle"), What::Absolute);
+                }
+                directory = Some(value);
+            }
             Err(what) => problems.push(path.member(b"bundle"), What::Jig(what)),
         }
     }
@@ -196,6 +201,9 @@ fn user(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> O
     read::finish(object, document, path, problems);
     if let Some(file) = &file {
         read::form(!file.is_empty(), path.member(b"file"), problems);
+        if file.is_empty() {
+            return None;
+        }
     }
     Some(User::File(file?))
 }
@@ -426,6 +434,7 @@ fn workers(
     document: &Document,
     ats: Option<List<u32>>,
     count: u32,
+    directories: &config::Directories,
     path: &Path,
     problems: &mut Problems,
 ) -> List<Worker> {
@@ -443,13 +452,22 @@ fn workers(
                 if !git.starts_with(b"/") {
                     problems.push(path.member(b"git"), What::Absolute);
                 }
-                workers.push(Worker { root, git }).expect("bounded workers");
+                if let Some(root) = joined(directories, config::Directory::Data, &root, &path.member(b"root"), problems)
+                {
+                    workers.push(Worker { root, git }).expect("bounded workers");
+                }
             }
         }
     }
     workers
 }
-pub fn parse(document: &Document, at: u32, jig: &config::Engine, problems: &mut Problems) -> Option<Members> {
+pub fn parse(
+    document: &Document,
+    at: u32,
+    jig: &config::Engine,
+    directories: &config::Directories,
+    problems: &mut Problems,
+) -> Option<Members> {
     let path = Path::root().member(b"application");
     let mut object = read::object(document, at, &path, problems)?;
     let mut overrides = List::with_capacity(document.len());
@@ -497,7 +515,8 @@ pub fn parse(document: &Document, at: u32, jig: &config::Engine, problems: &mut 
     let mut forges = List::with_capacity(bounds.forge.client.repositories);
     if let Some(ats) = forge_ats {
         for (index, at) in ats.iter().enumerate() {
-            if let Some(forge) = forge(document, *at, &read::index(&path.member(b"forges"), index), problems) {
+            if let Some(mut forge) = forge(document, *at, &read::index(&path.member(b"forges"), index), problems) {
+                resolve_forge(directories, &mut forge, &read::index(&path.member(b"forges"), index), problems);
                 forges.push(forge).expect("bounded forges");
             }
         }
@@ -505,13 +524,23 @@ pub fn parse(document: &Document, at: u32, jig: &config::Engine, problems: &mut 
     let mut identities = List::with_capacity(jig.limits.core.accounts.credentials);
     if let Some(ats) = identity_ats {
         for (index, at) in ats.iter().enumerate() {
-            if let Some(identity) = identity(document, *at, &read::index(&path.member(b"identities"), index), problems)
+            if let Some(mut identity) =
+                identity(document, *at, &read::index(&path.member(b"identities"), index), problems)
             {
+                if let Some(value) = joined(
+                    directories,
+                    config::Directory::Data,
+                    &identity.token,
+                    &read::index(&path.member(b"identities"), index).member(b"token"),
+                    problems,
+                ) {
+                    identity.token = value;
+                }
                 identities.push(identity).expect("bounded identities");
             }
         }
     }
-    let workers = workers(document, workers_ats, jig.limits.core.fleet.workers, &path, problems);
+    let workers = workers(document, workers_ats, jig.limits.core.fleet.workers, directories, &path, problems);
     if let Some(charter) = charter
         && forges.len() == forge_count
         && identities.len() == identity_count
@@ -722,4 +751,51 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
         webhooks = Some(skein_forge_connection::hooks::Webhooks { listener: *listener });
     }
     Some(Resolved { forges: forges.into_boxed(), identities: identities.into_boxed(), webhooks })
+}
+
+fn joined(
+    directories: &config::Directories,
+    kind: config::Directory,
+    value: &[u8],
+    path: &Path,
+    problems: &mut Problems,
+) -> Option<Box<[u8]>> {
+    match directories.join(kind, value) {
+        Ok(value) => Some(value),
+        Err(what) => {
+            problems.push(path.clone(), What::Jig(what));
+            None
+        }
+    }
+}
+
+fn resolve_forge(directories: &config::Directories, forge: &mut Forge, fp: &Path, problems: &mut Problems) {
+    if let Transport::Tls { trust: Some(trust), .. } = &mut forge.transport
+        && let Some(value) = joined(
+            directories,
+            config::Directory::Config,
+            trust,
+            &fp.member(b"transport").member(b"tls").member(b"trust"),
+            problems,
+        )
+    {
+        *trust = value;
+    }
+    if let Some(value) =
+        joined(directories, config::Directory::Data, &forge.api_token, &fp.member(b"api_token"), problems)
+    {
+        forge.api_token = value;
+    }
+    if let Some(value) = &mut forge.webhook_secret
+        && let Some(resolved) =
+            joined(directories, config::Directory::Data, value, &fp.member(b"webhook_secret"), problems)
+    {
+        *value = resolved;
+    }
+    if let User::File(value) = &mut forge.user
+        && let Some(resolved) =
+            joined(directories, config::Directory::Data, value, &fp.member(b"user").member(b"file"), problems)
+    {
+        *value = resolved;
+    }
 }

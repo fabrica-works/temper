@@ -54,7 +54,7 @@ impl Throwaway {
         let person = person_token(&instance);
         let repository = repository(&instance, &person, sleep_seconds);
         let config: Value =
-            serde_json::from_slice(&fs::read(scratch.path().join("config.json")).expect("configuration"))
+            serde_json::from_slice(&fs::read(scratch.path().join("temper.json")).expect("configuration"))
                 .expect("JSON");
         let webhooks = config["application"]["webhooks"]["listener"]["socket"]
             .as_str()
@@ -201,7 +201,7 @@ pub fn configuration(directory: &Path, forge: &Forge<'_>, value: &mut Value) {
     let mut owned = owned::Owned::tier();
     owned.forgejo = *api;
     owned.forgejo_binary = forgejo.into();
-    let path = directory.join("config.json");
+    let path = directory.join("temper.json");
     if let Ok(bytes) = fs::read(&path) {
         let previous: Value = serde_json::from_slice(&bytes).expect("previous configuration");
         for (name, listener) in [("clients", &mut owned.clients), ("webhooks", &mut owned.webhooks)] {

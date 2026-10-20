@@ -1,4 +1,5 @@
 use super::*;
+use std::os::unix::fs::PermissionsExt;
 use std::{ffi::OsString, os::unix::ffi::OsStringExt};
 
 #[test]
@@ -28,7 +29,8 @@ fn source_names_refuse_values_outside_smiths_alphabet_or_length() {
 fn smiths_terminal_login_command_preserves_its_configured_process_contract() {
     let directory = std::env::temp_dir().join(format!("temper-login-command-{}", std::process::id()));
     std::fs::create_dir(&directory).expect("login command scratch");
-    let executable = Path::new("/nonexistent/configured-claude");
+    std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700)).expect("private scratch");
+    let executable = std::path::Path::new("/nonexistent/configured-claude");
     let programs = directory.join("programs");
     let source = programs.join("source");
     let (agent, deployment) = crate::tests::configuration::documents(&directory, "/fixture/temper");
@@ -36,11 +38,11 @@ fn smiths_terminal_login_command_preserves_its_configured_process_contract() {
     agent["programs"] = serde_json::json!({"claude_code":{"path":executable,"directory":programs}});
     std::fs::write(directory.join("agent.json"), serde_json::to_vec(&agent).expect("agent JSON")).expect("agent");
     std::fs::write(directory.join("root.der"), skein_tls_world::pki::ROOT).expect("public trust");
-    let configuration = directory.join(OsString::from_vec(b"config-\xff.json".to_vec()));
+    let configuration = directory.join("temper.json");
     std::fs::write(&configuration, deployment).expect("non-UTF8 configuration path");
     let benign = OsString::from_vec(b"value-\xff".to_vec());
     let command = command(
-        &configuration,
+        &crate::tests::configuration::directories(&directory),
         OsStr::new("source"),
         [
             ("HOME".into(), "/home/person".into()),

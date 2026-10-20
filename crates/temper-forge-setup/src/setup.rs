@@ -53,10 +53,58 @@ pub struct Setup {
 }
 impl Setup {
     /// Reads a list at `at`, recording paths under application.setup.
-    pub fn read(d: &Document, at: u32, limits: &Limits, problems: &mut Problems) -> Option<Self> {
+    pub fn read(
+        d: &Document,
+        at: u32,
+        limits: &Limits,
+        directories: &config::Directories,
+        problems: &mut Problems,
+    ) -> Option<Self> {
         let mut ps = config::Problems::empty();
         let p = Path::root().member(b"application").member(b"setup");
-        let result = list(d, at, limits, &p, &mut ps);
+        let mut result = list(d, at, limits, &p, &mut ps);
+        if ps.is_empty()
+            && let Some(setup) = &mut result
+        {
+            for (index, entry) in setup.entries.iter_mut().enumerate() {
+                let p = p.child(config::Segment::Index(u32::try_from(index).expect("bounded entries")));
+                resolve_path(
+                    directories,
+                    config::Directory::Data,
+                    &mut entry.directory,
+                    p.member(b"directory"),
+                    &mut ps,
+                );
+                match &mut entry.mode {
+                    Mode::Managed { admin_token } => resolve_path(
+                        directories,
+                        config::Directory::Data,
+                        admin_token,
+                        p.member(b"mode").member(b"managed").member(b"admin_token"),
+                        &mut ps,
+                    ),
+                    Mode::Owned(owned) => {
+                        let p = p.member(b"mode").member(b"owned");
+                        resolve_path(
+                            directories,
+                            config::Directory::Cache,
+                            &mut owned.forgejo,
+                            p.member(b"forgejo"),
+                            &mut ps,
+                        );
+                        if let Some(runner) = &mut owned.runner {
+                            resolve_path(
+                                directories,
+                                config::Directory::Cache,
+                                &mut runner.binary,
+                                p.member(b"runner").member(b"binary"),
+                                &mut ps,
+                            );
+                        }
+                    }
+                }
+            }
+        }
         let clean = ps.is_empty();
         problems.append(ps);
         if clean { result } else { None }
@@ -157,7 +205,7 @@ fn runner(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<
     valid(capacity > 0, p.member(b"capacity"), ps);
     let binary = binary?;
     let path_value = path_value?;
-    valid(path(&binary) && binary.starts_with(b"/"), p.member(b"binary"), ps);
+    valid(path(&binary), p.member(b"binary"), ps);
     valid(path(&path_value), p.member(b"path"), ps);
     Some(Runner {
         binary,
@@ -192,7 +240,7 @@ fn owned(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<O
         }
     };
     let forgejo = forgejo?;
-    valid(path(&forgejo) && forgejo.starts_with(b"/"), p.member(b"forgejo"), ps);
+    valid(path(&forgejo), p.member(b"forgejo"), ps);
     Some(Owned { forgejo, runner, listen, person: account(d, person_at?, &p.member(b"person"), ps)? })
 }
 fn mode(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<Mode> {
@@ -258,4 +306,17 @@ fn list(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Probl
         }
     }
     Some(Setup { entries: entries.into_boxed() })
+}
+
+fn resolve_path(
+    directories: &config::Directories,
+    kind: config::Directory,
+    value: &mut Box<[u8]>,
+    path: Path,
+    problems: &mut config::Problems,
+) {
+    match directories.join(kind, value) {
+        Ok(resolved) => *value = resolved,
+        Err(what) => problems.push(path, what),
+    }
 }

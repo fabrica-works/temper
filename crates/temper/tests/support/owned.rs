@@ -1,3 +1,4 @@
+// Bounded admission fixtures have a fake runtime and retain fixture-relative file keys.
 //! Fixtures for the owned forge commands, shared with the process tier.
 use skein_forge::forgejo::pin::{RUNNER_VERSION, VERSION};
 use skein_lib::Duration;
@@ -41,7 +42,7 @@ pub fn document(value: &mut serde_json::Value, names: &Names<'_>) {
 
 pub fn configuration(directory: &Path, names: &Names<'_>) {
     super::configuration(directory, &super::Forge::Unreached);
-    let path = directory.join("config.json");
+    let path = directory.join("temper.json");
     let mut value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
     document(&mut value, names);
     super::write_private(&path, &serde_json::to_vec(&value).expect("JSON"));
@@ -49,7 +50,9 @@ pub fn configuration(directory: &Path, names: &Names<'_>) {
 #[must_use]
 pub fn prepare(directory: &Path, forge: u16) -> Output {
     Command::new(env!("CARGO_BIN_EXE_temper"))
-        .args(["forge", "prepare", "config.json", &forge.to_string()])
+        .args(["forge", "prepare"])
+        .args(super::configuration::flags(directory))
+        .arg(forge.to_string())
         .current_dir(directory)
         .output()
         .expect("temper forge prepare")
@@ -202,7 +205,11 @@ impl Programs {
 #[must_use]
 pub fn command(directory: &Path, program: &str) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_temper"));
-    command.args(["forge", "run", "config.json", "1", program]).current_dir(directory);
+    command
+        .args(["forge", "run"])
+        .args(super::configuration::flags(directory))
+        .args(["1", program])
+        .current_dir(directory);
     command
 }
 /// A process proof's child, reaped even when an assertion fails.
@@ -337,7 +344,7 @@ pub fn recorded_without_runner(directory: &Path) {
     super::write_private(&path, temper_forge_setup::state::encode(&state).expose());
 }
 pub fn setup_without_runner(directory: &Path) {
-    let path = directory.join("config.json");
+    let path = directory.join("temper.json");
     let mut config: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("config")).expect("JSON");
     config["application"]["setup"][0]["mode"]["owned"]["runner"] = serde_json::Value::Null;
     super::write_private(&path, &serde_json::to_vec(&config).expect("JSON"));
@@ -393,7 +400,9 @@ pub fn start(directory: &Path) -> Running {
 #[must_use]
 pub fn reconcile(directory: &Path, forge: u16) -> Output {
     Command::new(env!("CARGO_BIN_EXE_temper"))
-        .args(["forge", "reconcile", "config.json", &forge.to_string()])
+        .args(["forge", "reconcile"])
+        .args(super::configuration::flags(directory))
+        .arg(forge.to_string())
         .current_dir(directory)
         .output()
         .expect("temper forge reconcile")
@@ -439,7 +448,7 @@ pub fn managed(directory: &Path) {
             orgs: &["acme"],
         },
     );
-    let path = directory.join("config.json");
+    let path = directory.join("temper.json");
     let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
     value["application"]["setup"][0]["mode"] = serde_json::json!({"managed":{"admin_token":"admin_token"}});
     value["application"]["limits"]["overrides"]["setup.deadline_ms"] = 300.into();
@@ -449,7 +458,7 @@ pub fn managed(directory: &Path) {
     super::write_private(&directory.join("admin_token"), b"managed-admin-token");
 }
 pub fn configuration_value(directory: &Path, change: fn(&mut serde_json::Value)) {
-    let path = directory.join("config.json");
+    let path = directory.join("temper.json");
     let mut value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
     change(&mut value);
     super::write_private(&path, &serde_json::to_vec(&value).expect("JSON"));
@@ -633,6 +642,7 @@ impl Bounded {
     pub fn requirements(&self) -> temper_service::startup::Requirements {
         temper_service::startup::memory_requirements(
             &self.document,
+            &jig_protocol_config::Directories::working(),
             &self.files,
             &self.agent,
             &self.seeds,
@@ -644,6 +654,7 @@ impl Bounded {
     pub fn startup(&self, document: &[u8]) -> Result<temper_service::Service, temper_service::startup::Problems> {
         temper_service::startup(
             document,
+            &jig_protocol_config::Directories::working(),
             &self.files,
             &self.agent,
             &self.seeds,
@@ -666,8 +677,9 @@ pub fn bounded(directory: &Path) -> Bounded {
     value["workers"][0]["agent"]["program"] = path.clone().into();
     value["workers"][0]["agent"]["arguments"][1] = path.clone().into();
     let document = serde_json::to_vec(&value).expect("bounded JSON");
-    let named = temper_service::named(&document).expect("bounded example named");
-    let mut agent = agent::preflight(directory, &named).expect("ordinary agent declarations");
+    let named =
+        temper_service::named(&document, &jig_protocol_config::Directories::working()).expect("bounded example named");
+    let mut agent = agent::preflight(&named).expect("ordinary agent declarations");
     assert_eq!(agent.programs.len(), 1, "owned example declares Claude Code");
     agent.programs[0].path = path.as_bytes().into();
     agent.programs[0].directory = path.as_bytes().into();

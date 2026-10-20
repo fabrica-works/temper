@@ -41,7 +41,7 @@ pub fn configuration(directory: &Path, forge: &Forge<'_>) {
     write_private(&directory.join("agent.json"), &agent);
     let mut value: serde_json::Value = serde_json::from_slice(&value).expect("deployment JSON");
     forgejo::configuration(directory, forge, &mut value);
-    write_private(&directory.join("config.json"), &serde_json::to_vec(&value).expect("deployment JSON"));
+    write_private(&directory.join("temper.json"), &serde_json::to_vec(&value).expect("deployment JSON"));
 }
 
 /// A case's scratch, retained if a test panics.
@@ -63,6 +63,7 @@ impl Scratch {
             fs::remove_dir_all(&path).expect("remove prior scratch");
         }
         fs::create_dir_all(&path).expect("scratch directory");
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).expect("private scratch");
         Self { path }
     }
     #[must_use]
@@ -90,7 +91,7 @@ pub fn serve(directory: &Path) -> Binary {
 fn serve_command(directory: &Path) -> Command {
     Command {
         program: env!("CARGO_BIN_EXE_temper").into(),
-        arguments: vec!["serve".into(), "config.json".into()],
+        arguments: std::iter::once("serve".into()).chain(configuration::flags(directory)).collect(),
         directory: directory.into(),
         environment: Vec::new(),
     }
@@ -491,7 +492,7 @@ const HINTED_SETTLE_MS: u64 = 3000;
 
 /// Raises the three keep paces and the change's stall, and shortens the hinted story's settle.
 pub fn raise_paces(directory: &Path) {
-    let path = directory.join("config.json");
+    let path = directory.join("temper.json");
     let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
     for name in
         ["forge.client.poll_ms", "forge.client.poll_max_ms", "forge.client.slow_ms", "forge.change_policy.stall_ms"]

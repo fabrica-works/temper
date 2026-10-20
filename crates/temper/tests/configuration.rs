@@ -9,7 +9,7 @@ const AUTHORITY_ENTRIES: u32 = 12;
 fn process_engine() -> jig_protocol_config::Engine {
     let scratch = support::Scratch::startup("native-document-limits");
     support::configuration(scratch.path(), &support::Forge::Unreached);
-    let bytes = std::fs::read(scratch.path().join("config.json")).expect("process configuration");
+    let bytes = std::fs::read(scratch.path().join("temper.json")).expect("process configuration");
     let mut value: serde_json::Value = serde_json::from_slice(&bytes).expect("deployment JSON");
     // Forge::Unreached omits Forgejo's overrides; include its whole-authority bounds here.
     value["engine"]["limits"]["overrides"]["authority.grants"] = 12.into();
@@ -17,6 +17,7 @@ fn process_engine() -> jig_protocol_config::Engine {
     value["engine"]["limits"]["overrides"]["notes.scopes"] = 15.into();
     let bytes = serde_json::to_vec(&value["engine"]).expect("engine JSON");
     let document = jig_protocol_config::document(&bytes, &DOCUMENT).expect("engine document");
+    // Parsing a fixture without a deployment; only its limits are used.
     let engine = jig_protocol_config::engine(&document, 0, &jig_protocol_config::Directories::working())
         .expect("engine configuration");
     scratch.remove();
@@ -58,6 +59,7 @@ fn the_owned_example_fits_the_native_client() {
     let value: serde_json::Value = serde_json::from_slice(support::owned::EXAMPLE).expect("owned example JSON");
     let bytes = serde_json::to_vec(&value["engine"]).expect("engine JSON");
     let document = jig_protocol_config::document(&bytes, &DOCUMENT).expect("engine document");
+    // Parsing a fixture without a deployment; only its limits are used.
     let engine = jig_protocol_config::engine(&document, 0, &jig_protocol_config::Directories::working())
         .expect("engine configuration");
     let native = temper_client_shell_terminal::limits::native().client.client.domain;

@@ -1,3 +1,4 @@
+// Fixture parsing without a deployment keeps written paths.
 use super::fixtures;
 use crate::{
     check::{self, Members, User},
@@ -6,7 +7,9 @@ use crate::{
 use alloc::boxed::Box;
 use core::net::{Ipv4Addr, SocketAddr};
 fn refused(bytes: &[u8], members: &Members, expected: &[u8]) {
-    let problems = check::checked(&fixtures::document(bytes), 0, members, None, &[]).unwrap_err();
+    let problems =
+        check::checked(&fixtures::document(bytes), 0, &jig_protocol_config::Directories::working(), members, None, &[])
+            .unwrap_err();
     assert_eq!(&*problem::lines(&problems), expected);
 }
 #[test]
@@ -54,6 +57,7 @@ fn an_entry_at_odds_with_itself_or_its_forge_is_refused_naming_its_path() {
             &fixtures::document(&fixtures::changed(from, to)),
             0,
             &crate::limits::small(),
+            &jig_protocol_config::Directories::working(),
             &mut problems,
         )
         .unwrap();
@@ -93,8 +97,15 @@ fn a_webhook_secret_off_the_forge_directory_is_refused() {
 }
 
 fn refused_webhooks(members: &Members, expected: &[u8]) {
-    let problems =
-        check::checked(&fixtures::document(fixtures::TWO), 0, members, Some(fixtures::listener()), &[]).unwrap_err();
+    let problems = check::checked(
+        &fixtures::document(fixtures::TWO),
+        0,
+        &jig_protocol_config::Directories::working(),
+        members,
+        Some(fixtures::listener()),
+        &[],
+    )
+    .unwrap_err();
     assert_eq!(&*problem::lines(&problems), expected);
 }
 #[test]

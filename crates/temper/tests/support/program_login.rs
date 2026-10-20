@@ -8,14 +8,17 @@ pub fn configuration(directory: &Path, programs: Option<&Path>, executable: &Pat
         agent["programs"] = serde_json::json!({"claude_code":{"path":executable,"directory":programs}});
     }
     fs::write(directory.join("agent.json"), serde_json::to_vec(&agent).expect("agent JSON")).expect("agent");
-    fs::write(directory.join("config.json"), deployment).expect("deployment configuration");
+    fs::write(directory.join("temper.json"), deployment).expect("deployment configuration");
     fs::write(directory.join("root.der"), skein_tls_world::pki::ROOT).expect("public trust");
 }
 
 #[must_use]
 pub fn refused(directory: &Path, name: &std::ffi::OsStr) -> String {
-    temper::run(temper::Command::ProgramLogin { configuration: directory.join("config.json"), name: name.into() })
-        .expect_err("login refused")
+    temper::run(temper::Command::ProgramLogin {
+        directories: super::configuration::directories(directory),
+        name: name.into(),
+    })
+    .expect_err("login refused")
 }
 
 pub fn no_deployment_resources(directory: &Path) {
@@ -49,7 +52,10 @@ pub fn run(directory: &Path) -> super::Ended {
     let mut binary = Binary::start(
         Command {
             program: env!("CARGO_BIN_EXE_temper").into(),
-            arguments: vec!["program-login".into(), "config.json".into(), "source".into()],
+            arguments: std::iter::once("program-login".into())
+                .chain(super::configuration::flags(directory))
+                .chain(["source".into()])
+                .collect(),
             directory: directory.into(),
             environment: vec![
                 ("HOME".into(), directory.into()),

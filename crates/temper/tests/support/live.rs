@@ -36,7 +36,7 @@ pub fn mode() -> Mode {
 }
 #[must_use]
 pub fn configure(directory: &Path, mode: &Mode, forge: &Throwaway) -> Option<skein_fake_peers::llm::Peer> {
-    let path = directory.join("config.json");
+    let path = directory.join("temper.json");
     let mut value: Value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
     value["engine"]["charters"][0]["turns"] = 5.into();
     value["engine"]["charters"][0]["time_ms"] = 240_000.into();
@@ -258,7 +258,7 @@ pub fn run(
 }
 #[must_use]
 pub fn completions(directory: &Path) -> u32 {
-    let value = fs::read(directory.join("config.json")).expect("configuration");
+    let value = fs::read(directory.join("temper.json")).expect("configuration");
     let document = jig_protocol_config::document(
         &value,
         &jig_protocol_config::DocumentLimits { bytes: 1 << 20, tokens: 1 << 20, depth: 32 },
@@ -268,7 +268,7 @@ pub fn completions(directory: &Path) -> u32 {
         .expect("object")
         .member(&document, b"engine")
         .expect("engine member");
-    let engine = jig_protocol_config::engine(&document, at, &jig_protocol_config::Directories::working())
+    let engine = jig_protocol_config::engine(&document, at, &super::configuration::directories(directory).jig())
         .expect("engine configuration");
     let limits = codec::limits(&engine.limits.core).expect("store codec limits");
     let mut paths = Vec::new();

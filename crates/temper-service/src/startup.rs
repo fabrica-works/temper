@@ -91,7 +91,7 @@ fn problem(path: Path, what: What) -> Problems {
 fn indexed(index: usize) -> Path {
     Path::root().member(b"workers").child(Segment::Index(u32::try_from(index).expect("bounded workers")))
 }
-fn parse(input: &[u8]) -> Result<Parsed, Problems> {
+fn parse(input: &[u8], directories: &config::Directories) -> Result<Parsed, Problems> {
     let length = u32::try_from(input.len()).or(Err(problem(Path::root(), What::Jig(config::What::Bound))))?;
     let document =
         match config::document(input, &config::DocumentLimits { bytes: 1_048_576, tokens: length, depth: 32 }) {
@@ -111,7 +111,7 @@ fn parse(input: &[u8]) -> Result<Parsed, Problems> {
     whole.finish(&document, &root, &mut found);
     problems.append(found, &root);
     let engine = match engine_at {
-        Some(at) => match config::engine(&document, at, &jig_protocol_config::Directories::working()) {
+        Some(at) => match config::engine(&document, at, directories) {
             Ok(mut engine) => {
                 engine.limits.clients.watches_per_stream = temper_engine_domain::WATCHES_PER_STREAM;
                 Some(engine)
@@ -135,14 +135,15 @@ fn parse(input: &[u8]) -> Result<Parsed, Problems> {
     };
     let mut workers = List::with_capacity(ats.len());
     for (index, at) in ats.iter().enumerate() {
-        match config::worker(&document, *at, &jig_protocol_config::Directories::working()) {
+        checks::raw_worker(&document, *at, &indexed(index), &mut problems);
+        match config::worker(&document, *at, directories) {
             Ok(worker) => workers.push(worker).expect("bounded workers"),
             Err(found) => problems.append(found, &indexed(index)),
         }
     }
     let application = match &engine {
         Some(engine) => match application_at {
-            Some(at) => application::parse(&document, at, engine, &mut problems),
+            Some(at) => application::parse(&document, at, engine, directories, &mut problems),
             None => None,
         },
         None => None,
@@ -220,8 +221,8 @@ fn all_files(parsed: &Parsed) -> Box<[config::File]> {
     files.into_boxed()
 }
 /// Parse every member before the binary reads any named file.
-pub fn named(document: &[u8]) -> Result<Named, Problems> {
-    let parsed = parse(document)?;
+pub fn named(document: &[u8], directories: &config::Directories) -> Result<Named, Problems> {
+    let parsed = parse(document, directories)?;
     let files = all_files(&parsed);
     Ok(Named {
         files,
@@ -266,23 +267,25 @@ struct CheckedStart {
 /// File, agent, root, channel and runtime checks are identical to startup's.
 pub fn memory_requirements(
     document: &[u8],
+    directories: &config::Directories,
     files: &settings::Files,
     agent: &settings::Agent,
     seeds: &settings::Seeds,
     accounts: Option<&AccountsRuntime>,
     forges: List<crate::ForgeRuntime>,
 ) -> Result<Requirements, Problems> {
-    Ok(checked_start(document, files, agent, seeds, accounts, forges)?.requirements)
+    Ok(checked_start(document, directories, files, agent, seeds, accounts, forges)?.requirements)
 }
 fn checked_start(
     document: &[u8],
+    directories: &config::Directories,
     files: &settings::Files,
     agent: &settings::Agent,
     seeds: &settings::Seeds,
     accounts: Option<&AccountsRuntime>,
     forges: List<crate::ForgeRuntime>,
 ) -> Result<CheckedStart, Problems> {
-    let parsed = parse(document)?;
+    let parsed = parse(document, directories)?;
     check_files(&parsed, files)?;
     let mut problems = Problems::empty();
     let resolved = application::resolve(&parsed.application, files, &mut problems);
@@ -375,8 +378,10 @@ fn checked_start(
     })
 }
 /// Build the engine and worker together from the parsed document and read files.
+#[expect(clippy::too_many_arguments, reason = "startup receives the same directories as named plus the runtime facts")]
 pub fn startup(
     document: &[u8],
+    directories: &config::Directories,
     files: &settings::Files,
     agent: &settings::Agent,
     seeds: &settings::Seeds,
@@ -385,7 +390,7 @@ pub fn startup(
     forges: List<crate::ForgeRuntime>,
 ) -> Result<Service, Problems> {
     let CheckedStart { engine, worker, requirements, io, forges } =
-        checked_start(document, files, agent, seeds, accounts.as_ref(), forges)?;
+        checked_start(document, directories, files, agent, seeds, accounts.as_ref(), forges)?;
     let mut problems = Problems::empty();
     checks::memory(
         requirements.engine_bytes,

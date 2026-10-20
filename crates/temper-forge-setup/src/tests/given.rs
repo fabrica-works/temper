@@ -1,3 +1,4 @@
+// Fixture parsing without a deployment keeps written paths.
 use crate::problem;
 use skein_forge_setup::given::{Place, Refused};
 
@@ -91,6 +92,7 @@ fn a_refused_limit_pair_keeps_its_order_and_is_printed_once() {
         let problems = crate::check::checked(
             &fixtures::document(bytes),
             0,
+            &jig_protocol_config::Directories::working(),
             &fixtures::members(),
             None,
             &[(b"setup.backoff_ms".as_slice().into(), 121_000), (b"setup.backoff_max_ms".as_slice().into(), 120_000)],

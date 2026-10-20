@@ -84,7 +84,7 @@ pub fn write(directory: &Path, llm: SocketAddr, forge: SocketAddr) -> std::io::R
     private(&directory.join("secrets/forge-1.git-token"), b"forge-1-git-token-value")?;
     let (agent, config) = documents(directory, llm, forge);
     private(&directory.join("agent.json"), &serde_json::to_vec(&agent)?)?;
-    private(&directory.join("config.json"), &serde_json::to_vec(&config)?)
+    private(&directory.join("temper.json"), &serde_json::to_vec(&config)?)
 }
 pub(crate) fn private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(path)?.write_all(bytes)

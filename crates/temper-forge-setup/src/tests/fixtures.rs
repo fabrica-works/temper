@@ -1,3 +1,4 @@
+// Fixture parsing without a deployment keeps written paths.
 use crate::{
     Setup,
     check::{Forge, Members, User},
@@ -20,7 +21,14 @@ pub fn document(bytes: &[u8]) -> Document {
     .expect("test JSON")
 }
 pub fn setup() -> Setup {
-    Setup::read(&document(TWO), 0, &limits::small(), &mut Problems::empty()).expect("design's setup")
+    Setup::read(
+        &document(TWO),
+        0,
+        &limits::small(),
+        &jig_protocol_config::Directories::working(),
+        &mut Problems::empty(),
+    )
+    .expect("design's setup")
 }
 pub fn members() -> Members {
     Members {
