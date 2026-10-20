@@ -60,5 +60,11 @@
       ]
     }
   ],
+  "programs": {
+    "claude_code": {
+      "path": "/usr/local/bin/claude",
+      "directory": "/home/me/temper/programs"
+    }
+  },
   "environment": []
 }

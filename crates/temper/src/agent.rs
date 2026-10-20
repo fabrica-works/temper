@@ -72,10 +72,11 @@ pub(crate) fn preflight(directory: &Path, named: &service::Named) -> Result<Agen
     let agent =
         read(&directory.join(path(&named.agent))).map_err(|why| format!("workers[0].agent.configuration: {why}"))?;
     for program in &agent.programs {
-        smith_agent_shell::program::private_directory(path(&program.directory)).map_err(program_directory_refusal)?;
+        smith_agent_shell::program::private_directory(path(&program.directory))
+            .map_err(|why| program_directory_refusal(&why))?;
     }
     Ok(agent)
 }
-pub(crate) fn program_directory_refusal(why: smith_agent_shell::program::Refusal) -> String {
+pub(crate) fn program_directory_refusal(why: &smith_agent_shell::program::Refusal) -> String {
     format!("workers[0].agent.configuration: programs.claude_code.directory: {why}")
 }

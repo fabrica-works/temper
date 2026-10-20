@@ -579,10 +579,7 @@ pub fn redirect_ports(
 }
 pub(super) fn port(address: &config::Address) -> Option<u16> {
     match address {
-        config::Address::Addr(address) => match address.socket() {
-            Some(socket) => Some(socket.port()),
-            None => None,
-        },
+        config::Address::Addr(address) => Some(address.socket()?.port()),
         config::Address::Host { port, .. } => Some(*port),
     }
 }

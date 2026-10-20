@@ -299,22 +299,15 @@ fn the_owned_example_asks_for_reconciles_files() {
 }
 #[test]
 fn serve_prepares_once_on_the_owned_example() {
-    // protocol/setup.md 8.1: Linux PATH_MAX and small's forge_component.token_bytes.
-    const PATH_BYTES: usize = 4096;
     const TOKEN_BYTES: usize = 512;
-    const BOT_USER: &[u8] = b"42"; // forge-1/user's content.
+    const BOT_USER: &[u8] = b"42";
     let scratch = support::Scratch::startup("owned-example-prepared");
-    let owned = support::owned::Owned {
-        forgejo: "127.255.255.254:65535".parse().expect("longest owned forge"),
-        ..support::owned::Owned::example()
-    };
+    let owned = support::owned::Owned::example();
     support::owned::lay(scratch.path(), &owned);
-    let mut value: serde_json::Value =
-        serde_json::from_slice(&support::owned::example_document(scratch.path(), &owned)).expect("example JSON");
-    let path = format!("/{}", "p".repeat(PATH_BYTES - 1));
-    value["workers"][0]["agent"]["program"] = path.clone().into();
-    value["workers"][0]["agent"]["arguments"][1] = path.into();
-    support::write_private(&scratch.path().join("config.json"), &serde_json::to_vec(&value).expect("example JSON"));
+    support::write_private(
+        &scratch.path().join("config.json"),
+        &support::owned::example_document(scratch.path(), &owned),
+    );
     let forge = scratch.path().join("forge-1");
     fs::create_dir(&forge).expect("forge directory");
     fs::set_permissions(&forge, fs::Permissions::from_mode(0o700)).expect("private forge");
@@ -533,4 +526,40 @@ fn programs_directories_are_checked_at_the_name_before_startup_effects() {
         assert!(!target.exists() || row != "missing", "missing programs stay missing");
         scratch.remove();
     }
+}
+
+#[test]
+fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
+    let scratch = support::Scratch::startup("owned-memory-figures");
+    let bounded = support::owned::bounded(scratch.path());
+    let required = bounded.requirements();
+    support::owned::check_memory(required);
+    eprintln!("owned requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
+    let mut value: serde_json::Value = serde_json::from_slice(&bounded.document).expect("bounded JSON");
+    value["engine"]["memory_bytes"] = required.engine_bytes.into();
+    value["workers"][0]["memory_bytes"] = required.worker_bytes.into();
+    let document = serde_json::to_vec(&value).expect("exact envelopes JSON");
+    let started = bounded.startup(&document);
+    assert!(
+        started.is_ok(),
+        "{}",
+        String::from_utf8_lossy(&temper_service::startup::lines(&started.err().expect("startup refusal")))
+    );
+    for (engine, path) in [(true, "engine.memory_bytes"), (false, "workers[0].memory_bytes")] {
+        let mut short = value.clone();
+        if engine {
+            short["engine"]["memory_bytes"] = (required.engine_bytes - 1).into();
+        } else {
+            short["workers"][0]["memory_bytes"] = (required.worker_bytes - 1).into();
+        }
+        let refused = bounded
+            .startup(&serde_json::to_vec(&short).expect("one-byte-short JSON"))
+            .err()
+            .expect("refused before construction");
+        assert_eq!(
+            String::from_utf8_lossy(&temper_service::startup::lines(&refused)),
+            format!("{path}: the worst case passes memory_bytes by 1 bytes\n")
+        );
+    }
+    scratch.remove();
 }

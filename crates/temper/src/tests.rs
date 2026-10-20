@@ -174,7 +174,7 @@ fn fixed_sign_in_ports_are_checked_against_owned_listeners_only() {
     }]);
     let bytes = serde_json::to_vec(&value).expect("owned JSON");
     assert_eq!(
-        super::setup::check(&bytes).unwrap_err(),
+        super::setup::check(&bytes).expect_err("owned listen conflict"),
         "engine.llm.providers[0].sources.sign_in.redirect_port: fixed port conflicts with application.setup[0].mode.owned.listen\n"
     );
     // The same API on a connected forge belongs to the remote peer, not this process.
@@ -186,7 +186,7 @@ fn fixed_sign_in_ports_are_checked_against_owned_listeners_only() {
 fn a_programs_owner_refusal_keeps_the_path_and_owner() {
     use smith_agent_shell::program::{Refusal, Unsafe};
     let other = skein_shell::effective_user().wrapping_add(1);
-    let why = super::agent::program_directory_refusal(Refusal::Unsafe {
+    let why = super::agent::program_directory_refusal(&Refusal::Unsafe {
         path: "/programs".into(),
         found: Unsafe::Owner { found: other },
     });

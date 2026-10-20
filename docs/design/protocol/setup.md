@@ -821,9 +821,22 @@ starts from a copy, and `temper box CONFIG.json` runs it (section 7).
     path, its other addresses and secrets, its logins, emails, binaries
     and charters, its LLM providers, whose sizes jig's limits bound.
 
-  A test starts the example with those strings at their bounds, so that
-  the example starts from a person's directory, with Forgejo's tokens,
-  on the ports a host picks.
+  `temper-service::startup::memory_requirements` derives both envelopes
+  from startup's checked calculations without starting a service. The
+  owned startup test checks the two literals against that query with
+  these strings at their bounds in service settings, and checks each
+  one-byte deficit at startup. Artificial paths are never opened. A
+  separate shell test prepares the example with ordinary paths.
+  Regenerate only the two literals with:
+
+  ```sh
+  SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper --test startup -E 'test(owned_memory_figures)'
+  ```
+
+  At these pins the engine requires 79,538,334,051,202 bytes and the worker
+  2,343,588,716,154 bytes. Ordinary runs fail on drift and never write the
+  example. Program declarations survive startup; runnable program grants
+  still wait for smith's program backend and jig's program sources.
 - **Three loopback addresses,** Forgejo's (`listen`, `127.0.0.1:3000`),
   the clients' listener's (`127.0.0.1:7100`) and the webhooks'
   listener's (`127.0.0.1:7101`), are what a host changes to run several

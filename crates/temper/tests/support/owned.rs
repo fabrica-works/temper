@@ -4,7 +4,7 @@ use skein_lib::Duration;
 use std::{
     fs,
     net::SocketAddr,
-    os::unix::fs::PermissionsExt,
+    os::unix::{ffi::OsStrExt, fs::PermissionsExt},
     path::{Path, PathBuf},
     process::{Command, Output},
 };
@@ -594,4 +594,139 @@ pub fn lay(directory: &Path, owned: &Owned) {
         &directory.join("accounts/llm.json"),
         br#"{"access_token":"token","expires_at":4102444800,"account_id":"acc"}"#,
     );
+}
+
+// Reuse the shell's conversion without making a second public configuration API.
+#[path = "../../src/agent.rs"]
+mod agent;
+
+/// The strings the service counts, at checked bounds; these paths are never opened.
+pub struct Bounded {
+    pub document: Vec<u8>,
+    pub files: temper_service::settings::Files,
+    pub agent: temper_service::settings::Agent,
+    pub seeds: temper_service::settings::Seeds,
+    forge: std::net::SocketAddr,
+}
+impl Bounded {
+    #[must_use]
+    pub fn forges(&self) -> skein_lib::List<temper_service::ForgeRuntime> {
+        let mut forges = skein_lib::List::with_capacity(1);
+        forges
+            .push(temper_service::ForgeRuntime {
+                number: 1,
+                address: self.forge,
+                transport: skein_forge_connection::settings::Transport::Plaintext { name: None },
+                trust_roots: 0,
+                trust_root_bytes: 0,
+            })
+            .expect("one forge");
+        forges
+    }
+    #[must_use]
+    pub fn accounts() -> temper_service::AccountsRuntime {
+        temper_service::AccountsRuntime {
+            issuers: skein_lib::List::with_capacity(0),
+            trust_roots: 0,
+            trust_root_bytes: 0,
+        }
+    }
+    #[must_use]
+    pub fn requirements(&self) -> temper_service::startup::Requirements {
+        temper_service::startup::memory_requirements(
+            &self.document,
+            &self.files,
+            &self.agent,
+            &self.seeds,
+            Some(&Self::accounts()),
+            self.forges(),
+        )
+        .unwrap_or_else(|why| panic!("{}", String::from_utf8_lossy(&temper_service::startup::lines(&why))))
+    }
+    pub fn startup(&self, document: &[u8]) -> Result<temper_service::Service, temper_service::startup::Problems> {
+        temper_service::startup(
+            document,
+            &self.files,
+            &self.agent,
+            &self.seeds,
+            Some(Self::accounts()),
+            temper_service::WorkerRuntime { root: skein_io::kernel::Fd::new(9), path: b"/worker".as_slice().into() },
+            self.forges(),
+        )
+    }
+}
+/// One owned forge's longest base; small's token bound; two worker paths and two program paths.
+#[must_use]
+pub fn bounded(directory: &Path) -> Bounded {
+    use skein_lib::{List, Secret};
+    use temper_service::settings::{Files, PROGRAM_PATH_BYTES, Seeds};
+    let owned = Owned { forgejo: "127.255.255.254:65535".parse().expect("longest owned forge"), ..Owned::example() };
+    lay(directory, &owned);
+    let mut value: serde_json::Value =
+        serde_json::from_slice(&example_document(directory, &owned)).expect("example JSON");
+    let path = format!("/{}", "p".repeat(PROGRAM_PATH_BYTES - 1));
+    value["workers"][0]["agent"]["program"] = path.clone().into();
+    value["workers"][0]["agent"]["arguments"][1] = path.clone().into();
+    let document = serde_json::to_vec(&value).expect("bounded JSON");
+    let named = temper_service::named(&document).expect("bounded example named");
+    let mut agent = agent::preflight(directory, &named).expect("ordinary agent declarations");
+    assert_eq!(agent.programs.len(), 1, "owned example declares Claude Code");
+    agent.programs[0].path = path.as_bytes().into();
+    agent.programs[0].directory = path.as_bytes().into();
+    let mut entries = List::with_capacity(u32::try_from(named.files.len()).expect("file count"));
+    let token_bytes =
+        temper_service::limits::profile(temper_service::limits::Profile::Small).forge_component.token_bytes;
+    for file in named.files {
+        let bytes = match file.path.as_ref() {
+            b"forge-1/api_token" => vec![b't'; usize::try_from(token_bytes).expect("token bound")],
+            b"forge-1/user" => b"42".to_vec(),
+            b"forge-1/webhook_secret" => b"webhook-secret".to_vec(),
+            b"forge-1/git_token" => b"git-token".to_vec(),
+            name => fs::read(directory.join(std::ffi::OsStr::from_bytes(name))).expect("fixture file"),
+        };
+        entries.push((file.path, Secret::new(bytes.into_boxed_slice()))).expect("named file count");
+    }
+    Bounded {
+        document,
+        files: Files { entries },
+        agent,
+        seeds: Seeds { deployment: [7; 16], installation: [8; 16], seed: 7, crypto: Secret::new(Box::new([9; 32])) },
+        forge: owned.forgejo,
+    }
+}
+
+/// Only this drift check writes the two literals, and only in the established explicit mode.
+pub fn check_memory(required: temper_service::startup::Requirements) {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/examples/owned.json");
+    let mut text = fs::read_to_string(&path).expect("owned example");
+    let value: serde_json::Value = serde_json::from_str(&text).expect("owned JSON");
+    let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
+    let again =
+        "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper --test startup -E 'test(owned_memory_figures)'";
+    for (previous, required, name) in [
+        (
+            value["engine"]["memory_bytes"].as_u64().expect("engine memory_bytes"),
+            required.engine_bytes,
+            "engine.memory_bytes",
+        ),
+        (
+            value["workers"][0]["memory_bytes"].as_u64().expect("worker memory_bytes"),
+            required.worker_bytes,
+            "workers[0].memory_bytes",
+        ),
+    ] {
+        if write {
+            let literal = format!("\"memory_bytes\": {previous}");
+            assert_eq!(text.matches(&literal).count(), 1, "one literal per envelope");
+            text = text.replace(&literal, &format!("\"memory_bytes\": {required}"));
+        } else {
+            assert_eq!(previous, required, "{name} drifted; {again}");
+        }
+    }
+    if write {
+        fs::write(&path, text).expect("write only owned memory literals");
+    }
+    let value: serde_json::Value = serde_json::from_slice(&fs::read(path).expect("owned example")).expect("owned JSON");
+    assert_eq!(value["engine"]["memory_bytes"].as_u64(), Some(required.engine_bytes));
+    assert_eq!(value["workers"][0]["memory_bytes"].as_u64(), Some(required.worker_bytes));
 }
