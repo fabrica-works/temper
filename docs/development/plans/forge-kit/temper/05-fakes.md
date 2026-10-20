@@ -32,8 +32,9 @@ the README table's; the code shows no other. Design built: skein `fake-forge.md`
   delivery is best effort, and "A world asserts a delivery written only for
   a hook due inside its listener's life" (skein `1b33f85`). Its frozen
   records are two per connection, two per call and one per delivery, never
-  drained, and "a world's cap is the most its stories can record … never a
-  count one run happened to record".
+  drained or dropped: "a world's caps are a stated room for a whole story,
+  each named for what it holds, with its reason, and a story that outgrows
+  it fails by name rather than losing its history" (skein `3df1162`).
 - domain/testing.md 4.2: the world
   hands the peer the webhooks' listener's address once it listens; the
   setup's hooks are lost; the adopted repository's story is the hooked
@@ -66,9 +67,9 @@ the README table's; the code shows no other. Design built: skein `fake-forge.md`
   released has its delivery's outcome, so the agent's push, which ends it,
   is written before `Terminate`. No barrier holds a hook, the setup or the
   engine's listener back.
-- The peer's observation room is the world's, derived from the whole
-  corpus (05.2, "Observation room"); skein's peer fixture's 16 sizes
-  skein's own tests only.
+- The peer's observation room is the world's, a stated room (05.2,
+  "Observation room"); skein's peer fixture's 16 sizes skein's own tests
+  only.
 - Only the Adopt story's repository is `hooked`. The document carries the
   webhooks section for every story (one document); an unhooked story fires none.
 - `forge.rs` is deleted whole (temper 07's Needs say so). Its thread-local
@@ -200,25 +201,15 @@ Shape: temper-fake-git's `Forge` (struct and `new`, 18 lines) is deleted;
   `forge.domain.tally().hooks`, read between passes; no other story's
   completion changes.
   Observation room: `peer_limits()`' `observations` and `observation_bytes`
-  are named consts in `fixtures.rs`, each a sum of named terms with its
-  source in a comment, over the whole corpus (`one_process.rs`,
-  `fuzzy_one_process.rs` and the lib's world tests: the focused stories,
-  drain and restart, the fuzzy crashes and power losses, each `calm`):
-  `LIVES` 2, the most engine lives one peer meets (a drain or a cut, then the
-  restart; process 0 alone is cut); `WINDOWS` 2, the client's 10 s rate
-  windows, each opened by its first request, that the referee's 10 s
-  deadline meets; `CALLS = LIVES * WINDOWS * CLIENT.rate` (400);
-  `CONNECTIONS = CALLS + LIVES * CLIENT.calls` (404: every connection
-  carries a request but those a cut leaves); `HOOKS` 2, the Adopt story's;
-  `observations = 2 * CONNECTIONS + 2 * CALLS + HOOKS` (1,610).
-  `observation_bytes` charges each of the `CALLS` its head at the peer's
-  head bound and its call record at its repository's, op's and result's
-  bounds, and each of the `HOOKS` its post at the forge's bounds, each term
-  named. First check each premise in source: no more than `rate` requests a
-  window, retries included; no story past the deadline; at most two lives
-  a peer. A premise that fails returns. So does `Peer::new` refusing the
-  sum, or the room moving a story's time. Never a sample, a larger round
-  number, or a drained or cleared history.
+  are `fixtures.rs`' `STORY_OBSERVATIONS` (1,024) and
+  `STORY_OBSERVATION_BYTES` (2,097,152), "a whole story's frozen peer
+  records", their comment giving the reason: a room for the largest story,
+  about 16 times the most a story has recorded (Adopt's 65), at skein's peer
+  fixture's 2 KiB a record. They are a room, not a derived bound: a story
+  that outgrows them fails by the peer's own assertion, `frozen record
+  count fits` or `frozen payload admitted before copying`, and returns as
+  a finding naming the story. Its derivation is later.md's. `Peer::new`
+  refusing the sum also returns.
 Test shape: three new units in `world.rs`' tests, no world, each <20 ms:
   `a_port_zero_listener_names_the_hooks_address_once_it_listens` passes
   `hooks_address` a `Complete` for a bind of `127.0.0.1:0` done as
@@ -265,12 +256,13 @@ Proof: process; `TEMPER_FORGEJO=$WS/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-li
 Don't: add a story or a world; edit a story's name or an assertion beyond the
   two above; resend a delivery; hold a hook back, move the setup's push, or
   wait in the engine or the peer for the listener; name the hooks' address
-  at a bind; size the observation room from a run's count, or drain or clear
-  the peer's history; change skein's peer or its fixture; keep `Forge`
+  at a bind; drop, drain or clear the peer's history, or catch its
+  overflow; raise the room past an overflow rather than return it; change
+  skein's peer or its fixture; keep `Forge`
   or `ForgeHost` anywhere; touch the engine's webhooks listener (temper 01.3,
   03.1); name `temper` in skein's peer.
 Size: about 12 lines moved (the handle), 245 new (estimated: `fixtures.rs` 95,
-  with the observation room's sums about 20; `world.rs` 80 plus the three unit
+  with the observation room about 6; `world.rs` 80 plus the three unit
   fixtures, the learner's listen about 5; `referee/forge.rs` and `referee.rs` 35,
   Adopt's end about 5; `transport.rs` 15, `stories.rs` and `one_process.rs` 14,
   manifests 6).
