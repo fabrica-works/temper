@@ -249,8 +249,8 @@ experience; good defaults for a person's real work are open (section 8).
 3. **The demo, mechanics first:** the fakes moved and served, the
    `fake` mode, the seed and the box's client tool. Its bar is a chat
    that works on the demo model, and the demo forge registered and
-   working as far as today's pieces allow: no real git on it, its state
-   gone at a restart as it happens to be. Section 8's demo questions,
+   working as far as today's pieces allow: the fake git program on it
+   (8), its state gone at a restart as it happens to be. Section 8's demo questions,
    the defaults and the content are its follow-up.
 4. **Going real from the client:** fetch, the dormant owned forge, the
    box's pipe, the handover at runtime, and the client's banner and
@@ -311,10 +311,13 @@ experience; good defaults for a person's real work are open (section 8).
 - **git on the demo forge.** The fake forge's git is reached through a
   typed transport, never over HTTP (`fake-forge.md`, section 3), and
   the real loop runs a fake git program (`../domain/testing.md`, 4.3).
-  A demo whose worker runs real git needs the fake forge to serve git's
-  smart HTTP: real-loop's later real-git bridge (`../STATUS.md`).
-  Default: none in the first iteration (5, item 3); the bridge in its
-  follow-up.
+  The demo needs a git that reaches the fake forge across processes,
+  not real git: its agent is the fake LLM, and nothing else reads its
+  working trees. Default: the fake git program as a program of its
+  own, with its transport over the network, as the QA loop needs it
+  (`qa-loop.md`, section 11, item 2); the demo then needs no git on
+  the machine. Real git against the fake forge is real-loop's later
+  real-git bridge, for real agents on the fake forge (`../STATUS.md`).
 - **The default port.** Default: one unassigned port, chosen with the
   default document.
 - **Good defaults** for a person's real work: charters, landing rules,

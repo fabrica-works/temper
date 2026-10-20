@@ -91,8 +91,9 @@ order of its pages, not contract (`client/README.md`, 3.5).
   the fakes as
   product crates and as the box's steps, a demo project, and real
   backends added from the client; skein's arguments' rule beside it.
-  Waits for the accounts' second part and github; its demo's real git
-  is real-loop's `later.md`'s real-git bridge.
+  Waits for the accounts' second part and github; its demo's git is
+  the fake git program across processes, as the QA loop's
+  (`draft/qa-loop.md`, section 11), and needs no real git.
 - **The connector's shared top** (`draft/forge-kit.md`): the neutral
   part of `temper-engine-domain-forge` moved out. Waits for a second
   application that works on a forge.

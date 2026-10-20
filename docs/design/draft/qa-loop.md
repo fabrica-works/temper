@@ -41,14 +41,16 @@ owners' process onto temper is a session of its own.
 - **M1's bar:** the process and the tooling work: one story, as simple
   as it can be, passes on several seeds, and a planted fault comes out
   as a classed finding (section 10).
-- **Before it:** the fakes as processes, and the fake forge serving git
-  to real git (section 11).
+- **Before it:** the fakes as processes, the fake git program among
+  them, reaching the fake forge across processes; real git comes with
+  M2's real forge (section 11).
 
 ## 2. What it is for, and what not
 
 - **For:** temper's underlying model, end to end, on real processes:
   the binary's startup and configuration, the engine and the worker
-  together, real git, the agents' tools as an agent meets them, the
+  together, git as a program the worker spawns (real git from M2), the
+  agents' tools as an agent meets them, the
   forge's deliveries and polls across a network, and the loop from a
   request to a landing. What the worlds reach only in parts.
 - **For the tools' use:** the tools are the agents' interface; an agent
@@ -261,9 +263,27 @@ class, and a fix checked again.
    forge serves its API, its deliveries and its observations. This is
    the piece of `first-run.md`'s 3.5 that moves the fakes into product
    crates, pulled forward.
-2. **The fake forge serving git's smart HTTP:** real-loop's later
-   real-git bridge (`../STATUS.md`; `first-run.md`, section 8), so that
-   temper's worker runs real git against it. Its CI stays by cue
+2. **The fake git program across processes,** so that `temper
+   serve`'s worker spawns it by the absolute path `workers[].git`
+   names, as it spawns real git:
+   - **a program of its own,** for example `temper fake git`, over the
+     fake git program's step core, which the real loop already runs on
+     the real file system (`tests/real-loop`'s hosted fake git); its
+     working trees keep the fake checkout's `.git`;
+   - **its transport over the network:** the typed calls of skein's
+     `fake-forge.md`, section 3, encoded, to a private route on the
+     fake forge's listener, found from the remote URL already on git's
+     command line, with the token from its `http.extraHeader`;
+   - **one store:** the fake forge's domain stays the only state, with
+     its commits' counts, policies, faults and observations, so the
+     checks of section 6 read it as the worlds' referee does.
+
+   Not real git: M1's agent is the fake LLM, whose commands are the
+   shell subset, and nothing but the git component reads a working
+   tree's git. Real git's own behaviour is the transcripts' and the
+   process tier's (`../protocol/git.md`, section 9), and the loop's
+   from M2, whose real forge serves it. The real-git bridge stays later,
+   for real agents on the fake forge (section 12). Its CI stays by cue
    (`../domain/testing.md`, 2.4).
 3. **The runner,** with the records' formats.
 4. **M1's experiments,** and the first campaign.
@@ -271,7 +291,7 @@ class, and a fix checked again.
 ## 12. Later
 
 - **M2:** a real forge with the fake LLM: skein's throwaway Forgejo,
-  then GitHub (draft of its own).
+  then GitHub, and with it real git in the loop (draft of its own).
 - **M3:** real forges and real LLMs, Codex then Claude; verdicts become
   rates over many runs (draft of its own).
 - **More stories,** growing with the tools' areas 2 to 4, until
@@ -282,6 +302,12 @@ class, and a fix checked again.
 - **Explorers** that write experiments of their own, aimed at what
   landed.
 - **The cluster grown:** an engine alone and workers.
+- **Real agents on the fake forge:** a real LLM's agent with the fake
+  forge's seeded faults, cheaper and more repeatable than M3's real
+  forges. Such an agent runs git in its working tree (`git status`,
+  `git diff`, `git log`), which a fake checkout's `.git` cannot answer,
+  so it needs real git against the fake forge: the real-git bridge
+  (real-loop's `later.md`).
 - **The box's own experiments,** apart from these.
 - **Into the lab application:** its records as its state, the runner as
   its run procedure, the driver and the triager as its agents
@@ -290,7 +316,7 @@ class, and a fix checked again.
 ## 13. Open questions
 
 - **Reproducing on real processes:** how much a seed fixes once real
-  scheduling and real git are in the run; whether M1 records enough to
+  scheduling, and from M2 real git, are in the run; whether M1 records enough to
   replay a failure that does not come back.
 - **The records' format:** JSON on skein-json, or Markdown with a JSON
   head; and how the runner's checks are written per experiment

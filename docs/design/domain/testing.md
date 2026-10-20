@@ -760,8 +760,9 @@ loopback (section 5). temper's worlds add:
   checkout in the domain worlds. Real git meets an owned Forgejo in the
   process and live tiers, and skein's throwaway Forgejo in temper's
   transcripts (2.6). The real-loop world's repository stories run on the
-  fake git program too (2.4); a real-git bridge is an open question
-  (section 10).
+  fake git program too (2.4), as the QA loop's processes do, across
+  processes (`../draft/qa-loop.md`, section 11); a real-git bridge is an
+  open question (section 10).
 - **CI follows content,** by the fake forge's cue (skein's
   `fake-forge.md`, 2.3; here, 2.4). CI that runs a repository's checks
   in the shell subset (4.3) on the pushed tree, so that a change that is
@@ -1156,10 +1157,21 @@ scripts/after-landing.sh            the process tier, after each landing
   API's reads and merges. The design must keep object identities, refs,
   protection and merge results consistent, and reuse the fake's policies
   and scenario expectations. It is designed against skein's fake forge,
-  in skein's `fake-forge.md`, section 3. Default: the real loop's
-  clone, push and landing stories run on the fake git program over the
-  shared forge (2.4), and real git meets a forge in the process tier
-  (2.6); no story waits for the bridge.
+  in skein's `fake-forge.md`, section 3. What needs it: a real agent
+  on the fake forge, which runs git in its working tree as a person
+  does; nothing else does, since the fake git program reaches the fake
+  forge across processes too (`../draft/qa-loop.md`, section 11), and
+  real git's own behaviour is the transcripts' and the process tier's.
+  A likely shape: the domain stays authoritative over refs and policy,
+  the bare repositories mirror it, the protocol layer keeps a table of
+  the domain's counts to git's ids, a push's ref updates are decided
+  by the domain before git writes them and its tree imported as the
+  domain's commit, and a merge the domain makes is written to the mirror
+  with a fixed author and time, so its id is the same on every run.
+  Default: the real loop's clone, push and landing stories run on the
+  fake git program over the shared forge (2.4), real git meets a forge
+  in the process tier (2.6) and the QA loop's M2, and no story waits for
+  the bridge.
 - **What the real loop leaves out:** the real-git bridge (above),
   CI that runs a workflow's steps in the shell subset (how much sh,
   below), faults in the loop, and several real workers in one world.
