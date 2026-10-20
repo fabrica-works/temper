@@ -66,6 +66,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `skein/07-worlds.md` | skein 07: the client's and setup's worlds, `tests/forge/client` and `tests/forge/setup`, moved, with client recovery; extra setup stories deferred | temper 02.1, temper 05.1 | 07.1: skein 02.2; 07.3: temper 04.1, skein 08.1 |
 | `skein/08-machine-world.md` | skein 08: the component's machine and listener world, `tests/forge/machine`, moved, with plaintext and TLS faults, deadlines, and closing; independent allocation measurement deferred (forge-connection.md 10; decision 23) | temper 03.1, temper 05.1, skein 06.2 |08.4: skein08.s1 |
 | `skein/08.s1-deadline-test-shape.md` | skein08.s1: separate existing deadline outcomes and name time allowances | landed skein08.2; normal ready check |08.4 and closing temper-repin wait |
+| `skein/08.s2-close-test-shape.md` | skein08.s2: explicit Close expected rows and named fixture allowances | landed skein08.3 and08.s1; normal ready check | closing temper-repin waits; later08.4 shared-file integration |
 | `skein/09-protocol-world.md` | skein 09: the protocol world's component and fake tests, `tests/forge/protocol`, moved (five tests); added owner/stories/invariants deferred (forge-connection.md 10; decisions 22, 23) | skein 07.1, skein 08.1, temper 03.1, temper 05.1, skein 06.2 | |
 | `skein/10-plans.md` | skein 10: `skein-forge`'s plans' pure tests on canned exchanges, and the plans' differences from the design (answers 7 to 12 and 35), each its own increment (decision 28) | skein 01.4 | 10.5: skein 08.1 |
 | `skein/10.s1-named-page-fixtures.md` | skein10.s1: named page fixtures and scoped AST recurrence checks | skein10.5 | |
@@ -92,7 +93,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `temper/06-throwaway.md` | temper 06: temper's process tier, tools and conformance on skein's throwaway; temper's deleted; the conformance on skein-json (decision 27) | skein 06.1 | 06.2: skein06.s1 |
 | `temper/07-worlds.md` | temper 07: the moved worlds, the dialect's tests and the conformance with its transcripts deleted from temper; the protocol world keeps temper's own tests (decision 22) | skein 06.3; temper 06.1 | the client's world: skein 07.1; setup's: skein 07.3; the component's: skein 08.1 and 09.1; 07.1: temper 05.2 |
 
-17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2,06.s1,06.s2,03.s1,08.s1,10.s1,10.s2 and jig01.s1,01.s2,01.s3,01.s4. The brief's fifth step, the fakes and
+17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2,06.s1,06.s2,03.s1,08.s1,08.s2,10.s1,10.s2 and jig01.s1,01.s2,01.s3,01.s4. The brief's fifth step, the fakes and
 the conformance, is skein 05 to 09 and temper 05 to 07, by size. The
 increments per session are in each file.
 
@@ -164,6 +165,8 @@ chain.
   The existing scoped `disallowed_methods` expectation in `forgejo_deliveries.rs::every_subscribed_event_has_a_recorded_delivery_the_decoder_knows` is retained as a stated fixture exception to the hourly checklist: it converts the fixed subscribed-event byte names into fixture-directory names in a protocol document test. The lint's stated reason is "the protocol layer validates text"; no production domain parses here. Keep its explicit reason. Changing `core::str::from_utf8` to inherent `str::from_utf8` merely avoids the lint's path match and is not an authorized repair. No broader lint or parsing exception is granted.
 
 - **Deadline test shapes:** skein08.s1 separates the existing seven08.2 deadline cases into start/retry, unseen-call Unavailable/cost0 and seen-call Timeout/cost1 tests, with shared setup/observation and no row-selected assertion behavior. Name the unchanged six-second observation allowance (fixture idle5s plus existing SECOND startup allowance, not a proved startup-duration bound) and eleven-second retry point (deadline10s plus initial backoff1s). Preserve all inputs, D-1/D, retry/teardown assertions and runtime workload. Normal readiness precedes implementation;08.4 and closing temper-repin wait for08.s1. Its relative+2 focused identities give final43/8; historical proofs retain their counts. Preserve/rebase W73's independent08.3append in the shared test file; refresh reached copies and list users. Both designer questions, five scope drops and all timing caps remain.
+
+- **Close table shape:** skein08.s2 owns hourly19 points1–2 on landed08.3/08.s1: literal six-column expected data for35 machine and5 typed listener rows, the same single Close test and three211atomic assertions. Name the current32 refusal prefix as a fixture allowance preventing fallback to Made, and reuse CALL_ADMISSION for its three existing6s observation points; neither is a derived hard bound. No input, outcome, driver, scenario, identity or cap changes. Normal readiness precedes implementation. Closing temper-repin waits for08.s2. Preserve the dirty08.4 append; whichever shared-file landing follows rebases and runs its normal actual-tree checks, including exhaustive once that profile exists. Other independent08.4 work stays unheld. If the combined file exceeds800lines, move Close helpers/rows to tests/machine/close.rs while keeping the parent test identity. Refresh further reached copies and list users in the commit body.
 
 - **Terminal cuts in world fixtures:** stop scripted dispatch after its configured terminal EOF/reset across every reached handshake, request and response cut path. Retain receiving/decrypting and independent write accounting; drain ciphertext and faults and retire peers through the existing io/Closed paths. A dead script wait is distinct from actionable room/grant work: establish quiescence before advancing the virtual clock. Keep Silent and held-response controls nonterminal. Preserve every byte row, assertion and cap, refresh further reached copies and name users in the commit body. Skein08.4's explicit follow-up budget governs its current draft and grants no retry elsewhere.
 
@@ -582,7 +585,7 @@ and fail naming the one that is unset (decisions.md, Design questions
 ## Repin
 
 temper's, in each temper increment that needs a new skein step (Rules),
-and the closing `temper-repin` once every skein step, including03.s1 and10.s2, and jig01.s1/01.s2/01.s3/01.s4 have
+and the closing `temper-repin` once every skein step, including03.s1,08.s2 and10.s2, and jig01.s1/01.s2/01.s3/01.s4 have
 landed, dropped or split (development.md, 5.7): temper 07.1's repin may land
 before skein's last tests do. skein's changes are new crates, a module
 of `skein-fake-peers` and new test crates, so nothing of smith, jig or

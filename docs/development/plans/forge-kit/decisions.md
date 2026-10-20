@@ -1895,6 +1895,17 @@ where its answer lands.
         Return a boundary sweep past 5 s, an exhaustive past 60 s or an unproved
         quiet premise; never sample, split or thin a sweep. Nothing is deferred.
 
+218. **Close expected rows and named fixture allowances** (hourly19 shape checks and final validation of skein08.s2).
+     Add skein08.s2, `skein/08.s2-close-test-shape.md`, for hourly19's Close expected-row and named-fixture findings. Pinned testing-strategy.md10 requires expected observations independent of the execution and fixture meanings visible in setup. Keep literal expected six-column data for35machine/5listener rows,40comparisons, the existing Close test identity, unchanged drivers and211's three atomic assertions. Name32 as a stated refusal-prefix allowance preventing the scripted outcome queue's default Made fallback; reuse the existing CALL_ADMISSION for the three6s observation points. These are fixture allowances, not invented hard bounds. No scenario, input, expected value, runtime behavior, count or cap changes.
+
+     The code-backed dependency is landed08.3+08.s1, then normal readiness. This replaces only216's preparation wording that assumed after08.4 (ruling216,2026-10-20T08:41:00Z); no08.4API is needed. Preserve W80's dirtyTLSappend and allow its independent217work to continue. Serialize shared-file integration: whichever landing follows rebases the earlier one and runs normal actual-tree checks on its combined tree. If the resulting file exceeds800lines, move Close helpers/rows to tests/machine/close.rs with the parent #[test]identity unchanged. Existing closing temper-repin also waits for08.s2; it is unlanded, so no reopened repin is added. Five195drops and217's43/8/1 TLS assertion map stay.
+
+     Checked: the exact primary Skein graph locates owner_close_wins_or_follows_each_terminal/drive_close in tests/forge/machine/tests/machine.rs; git show origin/main of that file hashes f310655a6b18ca28ece836edbc531fe7f1217edd4ee89c96fca1045375122c71, byte-identical to the executed parent. Cross-repository git grep for the Close helpers/CALL_ADMISSION/refusal prefix finds the owning Skein file only, with no Smith/Jig/Hearth/Temper Rust user. The source/copy/case maps are retained in scratch-skein08-close-final-validation and pump/skein08-close218-premises.json. New private types/helper names are the candidate's additions, not asserted current exports.
+
+     Final validation: one immutable task733, exact-one JSON listings, parentClose0.173s and candidateClose0.161s, final format/all-targetClippy and verified-empty browser pass. Source-equivalent executed inline42/7 evidence is retained and reusable for its frozen closure; the prior zero-selection attempt and historical timing misses stay as failures/findings. Newer additive GitHub production compilation was not exercised by this check: the implementation owner's current-tree checks and gate remain required. No current43/8/1 runtime proof is claimed.
+
+     Register skein-08.s2 in check with that session file, then use the completed read-only checks for readiness and record the checked source revisions; normal implementation happens in its own worktree. The rule is in README, with the existing closing-repin wait. Refresh further reached helper/fixture/derived-observation copies within this scope and list users in the commit body. No kit move, production repair, additional TLS attempt or director compatibility repair is authorized.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
