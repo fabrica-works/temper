@@ -719,9 +719,12 @@ loopback (section 5). temper's worlds add:
   no address, and is dropped and observed, as the hooks of a story's setup
   are, since the setup runs before any host. The adopted repository's
   story is the hooked one. Its setup's push is lost. The agent's push, which
-  ends the story, is written: the story ends only once each hook the forge
-  released has its outcome. Its adoption, with the first lost, shows that a
-  lost delivery "costs latency, never liveness" (`forge.md`, 5.2).
+  ends the story, is written: the story ends only once the peer holds an
+  outcome for each of the story's own two hooks, one per push it makes, and
+  never on a count of the hooks the forge has released so far, since a hook
+  is scheduled at its push and released later. Its adoption, with the first
+  lost, shows that a lost delivery "costs latency, never liveness"
+  (`forge.md`, 5.2).
 - **Its setup routes** serve reconcile's tests (../protocol/setup.md, 13.2).
 - **Its referee** drains the forge's observations (skein's
   `fake-forge.md`, 2.4; here, 5.2).

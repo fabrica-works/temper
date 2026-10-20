@@ -39,7 +39,8 @@ the README table's; the code shows no other. Design built: skein `fake-forge.md`
   hands the peer the webhooks' listener's address once it listens; the
   setup's hooks are lost; the adopted repository's story is the hooked
   one, its setup's push lost and the agent's push written, since "the story
-  ends only once each hook the forge released has its outcome".
+  ends only once the peer holds an outcome for each of the story's own two
+  hooks, one per push it makes".
 - domain/testing.md 2.4 and 4.2: the one-process world and the real loop both host
   the one peer; the real loop's listeners are on kernel-assigned ports passed
   to their clients once bound, and a story never uses a fixed port.
@@ -63,10 +64,13 @@ the README table's; the code shows no other. Design built: skein `fake-forge.md`
   passes) sets `Forge.hooks` when it first appears and when a restart
   changes it. Until then a hook gets `NoAddress`, dropped and observed: the
   Adopt story's setup push, released at `Time(0)` before any host runs, is
-  one. The Adopt story ends once its push is seen and each hook the forge
-  released has its delivery's outcome, so the agent's push, which ends it,
-  is written before `Terminate`. No barrier holds a hook, the setup or the
-  engine's listener back.
+  one. The Adopt story ends once its push is seen and the live peer holds a
+  `Delivery` for each of the story's own two hooks, so the agent's hook,
+  scheduled at its push and released after it, is written before
+  `Terminate`. The count is the story's, never the domain's tally, which
+  counts a hook only at its release (skein's `fake-forge.md`, 5). No
+  barrier holds a hook, the setup or the engine's listener back, and no
+  skein API is added.
 - The peer's observation room is the world's, a stated room (05.2,
   "Observation room"); skein's peer fixture's 16 sizes skein's own tests
   only.
@@ -198,7 +202,11 @@ Shape: temper-fake-git's `Forge` (struct and `new`, 18 lines) is deleted;
   `Some(FORGE)`, and gathers the live peer's `Delivery` outcomes into
   `Outcome.deliveries`. `referee.rs`'s completion of `Story::Adopt` becomes
   `forge.complete()` and the live peer's `Delivery` records numbering
-  `forge.domain.tally().hooks`, read between passes; no other story's
+  `stories.rs`' `ADOPT_HOOKS` (2: one per push the story makes to its hooked
+  repository, the setup's topic push and the agent's), read between passes:
+  `referee/forge.rs::hooks_complete` takes that count, never
+  `forge.domain.tally().hooks`. At the end the referee asserts
+  `forge.domain.tally().hooks` equals `ADOPT_HOOKS`. No other story's
   completion changes.
   Observation room: `peer_limits()`' `observations` and `observation_bytes`
   are `fixtures.rs`' `STORY_OBSERVATIONS` (1,024) and
@@ -233,7 +241,8 @@ Test shape: three new units in `world.rs`' tests, no world, each <20 ms:
   names and assertions; the referee's address rule covers them all. The
   engine's reaction (a hint refreshes, a read that fires no hook) is unmeasured
   until the peer exists: a count other than `deliveries` that moves, or a
-  delivery count (or `tally().hooks`) other than 2, goes to the supervisor,
+  delivery count (or `tally().hooks`) other than 2, or an Adopt that meets
+  its existing deadline still short of 2 records, goes to the supervisor,
   not into an edit.
 Proof: unit; `heavy cargo nextest run -p temper-one-process-world -E
   'test(a_port_zero_listener_names_the_hooks_address_once_it_listens) | test(a_fixed_port_bind_is_not_a_hooks_address) | test(a_failed_bind_is_not_a_hooks_address)'`: 3 passed, each <20 ms.
