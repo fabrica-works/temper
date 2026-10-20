@@ -26,6 +26,7 @@ pub fn repository_parts(tag: u32, remote: Box<[u8]>) -> v1::RepositoryParts {
         tag,
         name: Box::from(&b"shop"[..]),
         remote,
+        git: None,
         start: v1::Start::Base(branch),
         access: v1::Access::Writable(writable),
         identity: 1,

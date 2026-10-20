@@ -42,6 +42,11 @@ fn repository(repository: &Repository, limits: &Limits) -> Result<(), &'static [
     if !name(&repository.remote, limits) {
         return Err(b"remote");
     }
+    if let Some(program) = &repository.git
+        && (!program.starts_with(b"/") || program.len() > 4096 || program.contains(&0))
+    {
+        return Err(b"repository git");
+    }
     match &repository.start {
         Start::Base { branch } | Start::Branch { branch } | Start::Saved { branch } => {
             if !name(branch, limits) {

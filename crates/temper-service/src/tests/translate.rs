@@ -18,6 +18,7 @@ fn a_workspace_reaches_items_with_each_remote_made_from_its_base() {
         let first = items.repositories.into_boxed().into_iter().next().unwrap().into_parts();
         assert_eq!(first.tag, 7, "{base:?}");
         assert_eq!(first.remote.as_ref(), remote, "{base:?}");
+        assert_eq!(first.git, None, "routing leaves the repository program unset");
         assert_eq!(items.save, None, "{base:?}");
     }
 }

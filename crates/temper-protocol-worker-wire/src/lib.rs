@@ -11,7 +11,7 @@ use alloc::boxed::Box;
 use skein_lib::{Secret, Writer};
 
 /// The application's channel payload version (protocol/channel.md, section 3).
-pub const PAYLOAD_VERSION: u32 = 1;
+pub const PAYLOAD_VERSION: u32 = 2;
 
 /// Domain bounds shared by both sides of the channel (protocol/channel.md,
 /// section 8).
@@ -36,6 +36,7 @@ pub fn limits(bounds: &Bounds) -> Option<v1::Limits> {
         writable_push: bounds.name_bytes,
         items_save_some: bounds.name_bytes,
         repository_remote: bounds.remote_bytes,
+        repository_git_some: v1::CEILINGS.repository_git_some,
         items_repositories: bounds.repositories,
         left_landed: bounds.repositories,
         saved_repositories: bounds.repositories,

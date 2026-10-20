@@ -31,6 +31,8 @@ pub struct Repository {
     /// The forge's address of the repository, never interpreted: the
     /// protocol layer maps it to a URL.
     pub remote: Box<[u8]>,
+    /// The item's program, carried to checkout and never read.
+    pub git: Option<Box<[u8]>>,
     pub start: Start,
     pub access: Access,
     /// Who the worker is to the forge for this repository, to read it and to

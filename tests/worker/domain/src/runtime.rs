@@ -460,6 +460,7 @@ impl World {
 
     fn assign(&mut self) {
         let repository = wire::Repository {
+            git: None,
             tag: 19,
             name: Box::from(&b"app"[..]),
             remote: Box::from(&b"org/app"[..]),

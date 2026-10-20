@@ -10,6 +10,14 @@ fn items(bytes: &[u8]) {
     }
 }
 
+fn repository(bytes: &[u8]) {
+    if let Ok(record) = v1::Repository::decode(&v1::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(record.measure()).expect("measured length"));
+        record.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes, "Repository");
+    }
+}
+
 fn left(bytes: &[u8]) {
     if let Ok(record) = v1::Left::decode(&v1::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(record.measure()).expect("measured length"));
@@ -44,7 +52,7 @@ fn identity(bytes: &[u8]) {
 
 #[test]
 fn worker_wire_decoders_never_panic_and_reencode_the_same() {
-    let decoders: [fn(&[u8]); 5] = [items, left, saved, preparation, identity];
+    let decoders: [fn(&[u8]); 6] = [items, repository, left, saved, preparation, identity];
     let mut rng = Rng::new(0x7e3d_0301);
     let goldens = temper_codecs_world::goldens("crates/temper-protocol-worker-wire/golden/v1");
     for _ in 0..2_000 {
@@ -54,6 +62,9 @@ fn worker_wire_decoders_never_panic_and_reencode_the_same() {
         }
     }
     for golden in &goldens {
+        for decode in decoders {
+            decode(golden);
+        }
         for _ in 0..8 {
             let bytes = temper_codecs_world::mutated(&mut rng, golden);
             for decode in decoders {

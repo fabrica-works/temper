@@ -3,6 +3,7 @@ use temper_worker_domain::wire;
 pub fn one_repository() -> wire::Workspace {
     wire::Workspace {
         repositories: Box::new([wire::Repository {
+            git: None,
             tag: 3,
             name: b"app".as_slice().into(),
             remote: b"https://forge.example/acme/app.git".as_slice().into(),

@@ -21,7 +21,8 @@ fn the_worker_sizes_each_part_from_its_payload_codec() {
     assert_eq!(prepared.root.host.slots, 1);
     assert_eq!(prepared.root.checkout.repositories, 1);
     assert_eq!(prepared.prefix, (3_u64 << 60_u32) + (1_u64 << 48_u32));
-    assert_eq!(prepared.link.sizes.items, 420);
+    assert_eq!(u64::from(prepared.link.sizes.items), v1::Items::worst_case_bytes(&prepared.payload).unwrap());
+    assert_eq!(prepared.payload.repository_git_some, 4096);
     assert!(worker_settings::worker_worst_case(&settings, &agent, &limits).unwrap() > 0);
 }
 

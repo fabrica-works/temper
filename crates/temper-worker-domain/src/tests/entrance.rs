@@ -17,12 +17,41 @@ fn workspace_items_that_did_not_decode_are_refused_naming_them() {
 }
 
 #[test]
-fn a_repository_named_twice_is_refused_as_an_invalid_start_naming_it() {
-    let mut h = Harness::new();
-    let assign =
-        Event::Assign { assignment: assignment(true, Box::new([])), items: Ok(items(&[b"app", b"app"])), save: None };
-    assert_eq!(&*h.step(assign), [refused(b"repository named twice")]);
-    assert_eq!(h.domain.host().hosted(), 0);
+#[expect(clippy::manual_map, reason = "explicit option match follows the step subset")]
+fn workspace_items_are_refused_naming_the_item_or_carry_their_program_to_checkout() {
+    let mut bound = Box::new([b'x'; 4096]);
+    *bound.first_mut().expect("nonempty program") = b'/';
+    let mut long = Box::new([b'x'; 4097]);
+    *long.first_mut().expect("nonempty program") = b'/';
+    for (row, program, duplicate, why) in [
+        ("duplicate", None, true, Some(b"repository named twice".as_slice())),
+        ("relative", Some(b"git".as_slice()), false, Some(b"repository git".as_slice())),
+        ("past bound", Some(long.as_slice()), false, Some(b"repository git".as_slice())),
+        ("NUL", Some(b"/bin/g\0it".as_slice()), false, Some(b"repository git".as_slice())),
+        ("absolute", Some(b"/opt/fake/git".as_slice()), false, None),
+        ("at bound", Some(bound.as_slice()), false, None),
+        ("none", None, false, None),
+    ] {
+        let mut h = Harness::new();
+        let mut workspace = if duplicate { items(&[b"app", b"app"]) } else { items(&[b"app"]) };
+        workspace.repositories.first_mut().expect("one repository").git = match program {
+            Some(program) => Some(Box::from(program)),
+            None => None,
+        };
+        if let Some(why) = why {
+            let assign = Event::Assign { assignment: assignment(true, Box::new([])), items: Ok(workspace), save: None };
+            assert_eq!(&*h.step(assign), [refused(why)], "{row}");
+            assert_eq!(h.domain.host().hosted(), 0, "{row}");
+        } else {
+            assert_eq!(crate::assignment::check(&workspace, None, &h.env.limits), Ok(()), "{row}");
+            let spec = translate::spec(7, workspace);
+            assert_eq!(
+                spec.repositories.first().expect("one repository").git.as_deref(),
+                program,
+                "{row}: program reaches checkout"
+            );
+        }
+    }
 }
 
 #[test]

@@ -289,6 +289,7 @@ impl World {
     /// The engine assigns the run, its one repository starting at `start`.
     fn assign(&mut self, start: wire::Start) {
         let repository = wire::Repository {
+            git: None,
             tag: 1,
             name: Box::from(&b"app"[..]),
             remote: Box::from(REMOTE),

@@ -14,6 +14,7 @@ fn limits_take_each_bound_from_its_source_field() {
             writable_push: 16,
             repository_name: 16,
             repository_remote: 48,
+            repository_git_some: 4096,
             items_repositories: 2,
             items_save_some: 16,
             left_landed: 2,
@@ -40,12 +41,29 @@ fn items_one_repository_past_their_bound_are_refused() {
 }
 
 #[test]
-fn a_remote_one_byte_past_its_bound_is_refused() {
+fn repository_byte_fields_stop_at_their_bounds() {
     let limits = fixtures::limits();
-    v1::Repository::new(&limits, fixtures::repository_parts(1, Box::new([b'r'; 48]))).expect("at the bound");
-    let made = v1::Repository::new(&limits, fixtures::repository_parts(1, Box::new([b'r'; 49])));
-    let problem = made.expect_err("a remote past its bound is refused");
-    assert_eq!(problem, v1::Problem { path: v1::Path::RepositoryRemote, reason: skein_codec::Reason::Bound });
+    for (program, bound, path) in
+        [(false, 48_usize, v1::Path::RepositoryRemote), (true, 4096_usize, v1::Path::RepositoryGit)]
+    {
+        for past in [false, true] {
+            let length = if past { bound.checked_add(1).expect("test length") } else { bound };
+            let mut parts = fixtures::repository_parts(1, Box::from(&b"remote"[..]));
+            let mut bytes = skein_lib::bytes::zeroed(length);
+            bytes.fill(b'x');
+            if program {
+                parts.git = Some(bytes);
+            } else {
+                parts.remote = bytes;
+            }
+            let made = v1::Repository::new(&limits, parts);
+            if past {
+                assert_eq!(made.expect_err("past bound"), v1::Problem { path, reason: skein_codec::Reason::Bound });
+            } else {
+                made.expect("at bound");
+            }
+        }
+    }
 }
 
 #[test]
@@ -76,7 +94,7 @@ fn largest_parts_are_the_generated_worst_cases() {
     assert_eq!(u64::from(sizes.saved), v1::Saved::worst_case_bytes(&limits).expect("saved"));
     assert_eq!(u64::from(sizes.resource), v1::Preparation::worst_case_bytes(&limits).expect("preparation"));
     assert_eq!(u64::from(sizes.grant), v1::Identity::worst_case_bytes(&limits).expect("identity"));
-    assert_eq!(sizes, crate::Largest { items: 399, left: 76, saved: 1076, resource: 6, grant: 104 });
+    assert_eq!(sizes, crate::Largest { items: 8601, left: 76, saved: 1076, resource: 6, grant: 104 });
 }
 
 #[test]
