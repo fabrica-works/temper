@@ -19,12 +19,16 @@ impl Frame {
         let document = w::Owned::new(
             &w::CEILINGS,
             w::OwnedParts { owner: w::Owner::Jig, version: w::VERSION, record: encode!(read) },
-        ).expect("read document");
-        self.host.transport.as_mut().expect("live memory transport").down(self.now, jig_client::Request::Exchange {
-            exchange,
-            message: jig_client::Message::Read(encode!(document)),
-            credential: None,
-        });
+        )
+        .expect("read document");
+        self.host.transport.as_mut().expect("live memory transport").down(
+            self.now,
+            jig_client::Request::Exchange {
+                exchange,
+                message: jig_client::Message::Read(encode!(document)),
+                credential: None,
+            },
+        );
         self.run();
     }
     pub(super) fn probe_reply(&mut self) {
@@ -38,7 +42,23 @@ impl Frame {
                     self.probe = None;
                 }
                 jig_client::Event::Lost { exchange: lost } if lost == exchange => panic!("probe exchange lost"),
-                event => other.push(event),
+                event @ (jig_client::Event::Start { .. }
+                | jig_client::Event::StartUnlinked { .. }
+                | jig_client::Event::SignIn { .. }
+                | jig_client::Event::SignOut
+                | jig_client::Event::SignOutLost
+                | jig_client::Event::Watch { .. }
+                | jig_client::Event::Unwatch { .. }
+                | jig_client::Event::Read { .. }
+                | jig_client::Event::Send { .. }
+                | jig_client::Event::Carry { .. }
+                | jig_client::Event::Reply { .. }
+                | jig_client::Event::Lost { .. }
+                | jig_client::Event::Streamed { .. }
+                | jig_client::Event::StreamGone
+                | jig_client::Event::Stored
+                | jig_client::Event::NotStored
+                | jig_client::Event::Up { .. }) => other.push(event),
             }
         }
         for event in other {
@@ -47,13 +67,17 @@ impl Frame {
     }
     pub fn probe_replies(&self) -> Vec<(u64, Time)> {
         for (_, _, message) in &self.probe_replies {
-            let answer = w::ReadAnswer::decode(&w::CEILINGS, &mut skein_lib::Reader::new(message)).expect("read answer");
+            let answer =
+                w::ReadAnswer::decode(&w::CEILINGS, &mut skein_lib::Reader::new(message)).expect("read answer");
             assert!(matches!(answer, w::ReadAnswer::Value(_)), "complete read response");
         }
         self.probe_replies.iter().map(|(number, now, _)| (*number, *now)).collect()
     }
     pub fn stream_live(&self) -> bool {
-        self.stream.is_some_and(|fd| self.sockets.get(&fd).is_some_and(|socket| socket.eof.is_none()))
+        self.stream.is_some_and(|fd| {
+            self.sockets.get(&fd).is_some_and(|socket| socket.eof.is_none() && !socket.closed)
+                && self.held.iter().any(|submit| matches!(submit.kind, Op::Recv { fd: receiving, .. } if receiving == fd))
+        })
     }
     pub fn wait(words: &[&str]) -> Self {
         let mut frame = Self::read(words);

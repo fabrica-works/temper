@@ -21,15 +21,19 @@ fn memory_exchanges_wait_for_closing_sockets() {
         assert!(f.stream_live());
         assert_eq!(f.exit(), None);
     }
-    assert_eq!(f.probe_replies(), vec![
-        (1, start.saturating_add(close)),
-        (2, start.saturating_add(close)),
-        (3, start.saturating_add(close.saturating_mul(2))),
-        (4, start.saturating_add(close.saturating_mul(2))),
-        (5, start.saturating_add(close.saturating_mul(3))),
-    ]);
+    assert_eq!(
+        f.probe_replies(),
+        vec![
+            (1, start.saturating_add(close)),
+            (2, start.saturating_add(close)),
+            (3, start.saturating_add(close.saturating_mul(2))),
+            (4, start.saturating_add(close.saturating_mul(2))),
+            (5, start.saturating_add(close.saturating_mul(3))),
+        ]
+    );
     f.signal(ServiceSignal::Terminate);
     assert_eq!(f.exit(), Some(Exit::Code(limits::TERMINATED)));
+    assert!(!f.stream_live());
     assert!(skein_shell::Host::is_empty(&f.host));
 }
 #[test]

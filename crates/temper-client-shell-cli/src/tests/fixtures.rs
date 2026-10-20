@@ -379,6 +379,10 @@ impl Frame {
                 self.released_after = Some(self.store_count());
                 Ok(Done::Nothing)
             }
+            Op::Close { fd } if self.sockets.contains_key(fd) => {
+                self.sockets.get_mut(fd).expect("closing socket").closed = true;
+                Ok(Done::Nothing)
+            }
             Op::Sync { .. } | Op::Remove { .. } | Op::Connect { .. } | Op::Shutdown { .. } | Op::Close { .. } => {
                 Ok(Done::Nothing)
             }
@@ -439,6 +443,7 @@ struct Socket {
     reply: VecDeque<u8>,
     answered: bool,
     eof: Option<()>,
+    closed: bool,
 }
 pub type Engine = Frame;
 pub type Disk = Frame;
