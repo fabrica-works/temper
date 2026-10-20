@@ -100,6 +100,7 @@ pub struct World {
     writes: u32,
     calls: u32,
     hints: Vec<skein_forge::api::Hint>,
+    signatures: bool,
 }
 
 impl World {
@@ -110,12 +111,46 @@ impl World {
 
     #[must_use]
     pub fn with_facts(seed: u64, facts: u32) -> World {
-        Self::configured(seed, facts, false, Some(skein_forge_client::Writer { forge: REPO.forge, author: 1 }))
+        Self::configured(
+            seed,
+            facts,
+            false,
+            Some(skein_forge_client::Writer { forge: REPO.forge, author: 1 }),
+            None,
+            false,
+        )
     }
 
-    fn configured(seed: u64, facts: u32, hooked: bool, writer: Option<skein_forge_client::Writer>) -> World {
+    /// Branch rules from the independent fake, with signatures supplied by the layer.
+    #[must_use]
+    pub fn with_protection(seed: u64, protection: raw::Protection, signatures: bool) -> World {
+        Self::configured(
+            seed,
+            LIMITS.facts,
+            false,
+            Some(skein_forge_client::Writer { forge: REPO.forge, author: 1 }),
+            Some(protection),
+            signatures,
+        )
+    }
+
+    pub fn signatures(&mut self, required: bool) {
+        self.signatures = required;
+    }
+
+    fn configured(
+        seed: u64,
+        facts: u32,
+        hooked: bool,
+        writer: Option<skein_forge_client::Writer>,
+        protection: Option<raw::Protection>,
+        signatures: bool,
+    ) -> World {
         let limits = top::Limits { facts, client: skein_forge_client::Limits { facts, ..CLIENT }, ..LIMITS };
-        let config = fake_config();
+        let mut config = fake_config();
+        config.limits.bypassing_users = protection
+            .as_ref()
+            .map_or(0, |rule| u32::try_from(rule.bypassing_users.len()).expect("fixture bypass list"));
         let mut fake = forge::Domain::new(&config, seed);
         forge::repository(
             &mut fake,
@@ -135,7 +170,7 @@ impl World {
                     reruns: 0,
                     cue: None,
                 },
-                protection: None,
+                protection,
                 hooked,
             },
         );
@@ -169,6 +204,7 @@ impl World {
             writes: 0,
             calls: 0,
             hints: Vec::new(),
+            signatures,
         };
         world.event(top::Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
         world
@@ -177,7 +213,7 @@ impl World {
     /// Construct and restart without any configured writer.
     #[must_use]
     pub fn writerless(seed: u64) -> World {
-        Self::configured(seed, LIMITS.facts, false, None)
+        Self::configured(seed, LIMITS.facts, false, None, None, false)
     }
     pub fn give_writer(&mut self, writer: skein_forge_client::Writer) -> bool {
         let accepted = top::writer(&mut self.top, &self.env, writer, &mut self.top_out);
@@ -192,7 +228,14 @@ impl World {
     /// As `new`, hearing the repository's hooks.
     #[must_use]
     pub fn hooked(seed: u64) -> World {
-        Self::configured(seed, LIMITS.facts, true, Some(skein_forge_client::Writer { forge: REPO.forge, author: 1 }))
+        Self::configured(
+            seed,
+            LIMITS.facts,
+            true,
+            Some(skein_forge_client::Writer { forge: REPO.forge, author: 1 }),
+            None,
+            false,
+        )
     }
 
     #[must_use]
@@ -596,7 +639,9 @@ impl World {
                 forge::Request::Reply { to, result } => {
                     let pending = self.pending.remove(&to.into_token()).expect("pending call");
                     let result = match result {
-                        Ok(answer) => Ok(translate::answer(&pending.op, answer, &self.env.limits.client)),
+                        Ok(answer) => {
+                            Ok(translate::answer_as(&pending.op, answer, &self.env.limits.client, 1, self.signatures))
+                        }
                         Err(error) => {
                             Err(translate::error(error, forge::time(&self.forge_env.limits, self.forge_env.now)))
                         }

@@ -391,7 +391,7 @@ narrowed, and its changes wait.
   may bypass them, `Never`, `PullsOnly` or `Always` (the App's own,
   never the ruleset's list). skein's `Protection` carries them as
   `queue`, `signatures`, `linear`, `code_owners` and `bypass` (skein's
-  `forge.md`, 3.6; `forge-github.md`, 5.3), pending in skein's code.
+  `forge.md`, 3.6; `forge-github.md`, 5.3).
   Forgejo answers each false, and `Never`.
 - **What each means:**
   - a merge queue: temper's changes enter it (9.1);

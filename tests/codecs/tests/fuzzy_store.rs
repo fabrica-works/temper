@@ -5,6 +5,8 @@ use temper_protocol_store::{Bounds, keys, records};
 
 #[path = "support/store.rs"]
 mod fixture;
+#[path = "support/protection.rs"]
+mod protection;
 use fixture::LIMITS;
 
 fn record(bytes: &[u8], bounds: &Bounds) {
@@ -46,6 +48,22 @@ fn store_decoders_never_panic_and_reencode_the_same() {
         let bytes = keys::encode(&forge::stored_key(&writer), u32::MAX).expect("writer key");
         key(&bytes);
         key(&temper_codecs_world::mutated(&mut rng, &bytes));
+    }
+    for _ in 0..128 {
+        let flags = u8::try_from(rng.below(16)).expect("four flags");
+        let bypass = match rng.below(3) {
+            0 => skein_forge::api::Bypass::Never,
+            1 => skein_forge::api::Bypass::PullsOnly,
+            _ => skein_forge::api::Bypass::Always,
+        };
+        for row in protection::rows(protection::rule(flags, bypass)) {
+            let bytes = records::encode(&row);
+            assert_eq!(records::decode(&bytes, &bounds), Ok(row), "all protection facts survive");
+            record(&bytes, &bounds);
+            for _ in 0..8 {
+                record(&temper_codecs_world::mutated(&mut rng, &bytes), &bounds);
+            }
+        }
     }
     // Queue-bearing records are also fuzz seeds, with both queue flags.
     for queued in [false, true] {

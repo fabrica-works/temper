@@ -77,22 +77,7 @@ pub(super) fn encode_protection(value: &d::Protection) -> w::RepositoryProtectio
     match value {
         d::Protection::Unknown => w::RepositoryProtection::Unknown,
         d::Protection::Absent => w::RepositoryProtection::Absent,
-        d::Protection::Rule(value) => {
-            // temper-05 connects GitHub; the current Forgejo source supplies false/Never for the new facts.
-            let api::Protection { branch, contexts, approvals, dismiss_stale, .. } = value;
-            w::RepositoryProtection::Rule(
-                w::Protection::new(
-                    &w::CEILINGS,
-                    w::ProtectionParts {
-                        branch: branch.clone(),
-                        contexts: encode_piece(contexts),
-                        approvals: *approvals,
-                        dismiss_stale: *dismiss_stale,
-                    },
-                )
-                .expect(FITS),
-            )
-        }
+        d::Protection::Rule(value) => w::RepositoryProtection::Rule(super::answers::encode_protection(value)),
     }
 }
 pub(super) fn decode_contexts(bytes: &[u8], bounds: &Bounds) -> Result<Box<[Box<[u8]>]>, Undecodable> {
@@ -111,20 +96,7 @@ pub(super) fn decode_protection(value: w::RepositoryProtection, bounds: &Bounds)
     Ok(match value {
         w::RepositoryProtection::Unknown => d::Protection::Unknown,
         w::RepositoryProtection::Absent => d::Protection::Absent,
-        w::RepositoryProtection::Rule(value) => {
-            let w::ProtectionParts { branch, contexts, approvals, dismiss_stale } = value.into_parts();
-            d::Protection::Rule(api::Protection {
-                queue: false,
-                signatures: false,
-                linear: false,
-                code_owners: false,
-                bypass: api::Bypass::Never,
-                branch,
-                contexts: decode_contexts(&contexts, bounds)?,
-                approvals,
-                dismiss_stale,
-            })
-        }
+        w::RepositoryProtection::Rule(value) => d::Protection::Rule(super::answers::decode_protection(value, bounds)?),
     })
 }
 

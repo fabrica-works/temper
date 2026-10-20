@@ -12,7 +12,8 @@ record Name { forge: u16 repository: u32 what: What }
 enum ItemState { open, closed }
 enum Ci { none, pending, passed, failed }
 # The contexts: one piece; limit client.answer_bytes + 4 x client.rows.
-record Protection { branch: bytes 1048576 contexts: bytes 2097152 approvals: u32 dismiss_stale: bool }
+enum Bypass { never, pulls_only, always }
+record Protection { branch: bytes 1048576 contexts: bytes 2097152 approvals: u32 dismiss_stale: bool queue: bool signatures: bool linear: bool code_owners: bool bypass: Bypass }
 record Settings { default_branch: bytes 1048576 merge: bool squash: bool rebase: bool }
 
 # 04.2: family 2, Repository (forge::Repository).

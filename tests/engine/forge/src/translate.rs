@@ -187,6 +187,18 @@ pub fn error(error: forge::Error, now: Time) -> client::Error {
 }
 #[must_use]
 pub fn answer(asked: &client::Op, answer: forge::Answer, l: &Limits) -> client::Answer {
+    answer_as(asked, answer, l, 1, false)
+}
+
+/// Translate protection for the acting user, with the layer's signatures setting.
+#[must_use]
+pub fn answer_as(
+    asked: &client::Op,
+    answer: forge::Answer,
+    l: &Limits,
+    actor: u64,
+    signatures: bool,
+) -> client::Answer {
     match answer {
         forge::Answer::Located { id } => client::Answer::Located { repository: id },
         forge::Answer::Items { items, more, now } => {
@@ -242,11 +254,11 @@ pub fn answer(asked: &client::Op, answer: forge::Answer, l: &Limits) -> client::
         forge::Answer::Job { job, steps } => job_answer(asked, &job, &steps),
         forge::Answer::Protection(protection) => client::Answer::Protection(match protection {
             Some(p) => Some(client::Protection {
-                queue: false,
-                signatures: false,
-                linear: false,
-                code_owners: false,
-                bypass: skein_forge::api::Bypass::Never,
+                queue: p.queue,
+                signatures,
+                linear: p.linear,
+                code_owners: p.code_owners,
+                bypass: if p.bypassing_users.contains(&actor) { client::Bypass::Always } else { client::Bypass::Never },
                 branch: p.branch,
                 contexts: p.contexts,
                 approvals: p.approvals,

@@ -283,28 +283,43 @@ pub(super) fn decode(value: w::Answer, bounds: &Bounds) -> Result<d::Answer, Und
         w::Answer::Done => d::Answer::Done,
     })
 }
-fn encode_protection(value: &d::Protection) -> w::Protection {
-    // temper-05 connects GitHub; the current Forgejo source supplies false/Never for the new facts.
-    let d::Protection { branch, contexts, approvals, dismiss_stale, .. } = value;
+pub(super) fn encode_protection(value: &d::Protection) -> w::Protection {
+    let d::Protection { branch, contexts, approvals, dismiss_stale, queue, signatures, linear, code_owners, bypass } =
+        value;
     w::Protection::new(
         &w::CEILINGS,
         w::ProtectionParts {
             branch: branch.clone(),
             contexts: names::encode_piece(contexts),
             approvals: *approvals,
-            dismiss_stale: *dismiss_stale,
+            skein_bools: [*dismiss_stale, *queue, *signatures, *linear, *code_owners],
+            bypass: match bypass {
+                d::Bypass::Never => w::Bypass::Never,
+                d::Bypass::PullsOnly => w::Bypass::PullsOnly,
+                d::Bypass::Always => w::Bypass::Always,
+            },
         },
     )
     .expect(FITS)
 }
-fn decode_protection(value: w::Protection, bounds: &Bounds) -> Result<d::Protection, Undecodable> {
-    let w::ProtectionParts { branch, contexts, approvals, dismiss_stale } = value.into_parts();
+pub(super) fn decode_protection(value: w::Protection, bounds: &Bounds) -> Result<d::Protection, Undecodable> {
+    let w::ProtectionParts {
+        branch,
+        contexts,
+        approvals,
+        skein_bools: [dismiss_stale, queue, signatures, linear, code_owners],
+        bypass,
+    } = value.into_parts();
     Ok(d::Protection {
-        queue: false,
-        signatures: false,
-        linear: false,
-        code_owners: false,
-        bypass: skein_forge::api::Bypass::Never,
+        queue,
+        signatures,
+        linear,
+        code_owners,
+        bypass: match bypass {
+            w::Bypass::Never => d::Bypass::Never,
+            w::Bypass::PullsOnly => d::Bypass::PullsOnly,
+            w::Bypass::Always => d::Bypass::Always,
+        },
         branch,
         contexts: names::decode_contexts(&contexts, bounds)?,
         approvals,
