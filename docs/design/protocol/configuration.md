@@ -30,8 +30,8 @@ document says what temper adds. What is open is listed in section 11.
   writes no parser of its own for them, and adds only the checks
   standalone needs (section 2).
 - **temper's members,** under `application`: `forges`, `identities`,
-  `landing`, `charter`, `clients`, `webhooks` and `limits` for the
-  engine (section 3), and `workers`, one entry per worker (section 4).
+  `landing`, `charter`, `clients`, `webhooks`, `setup`, `demo` and
+  `limits` for the engine (section 3), and `workers`, one entry per worker (section 4).
   `webhooks` is the forge component's webhooks' listener, on loopback
   (forge.md, section 5).
 - **Forges of two kinds,** Forgejo and GitHub, each by its `number`: its
@@ -42,8 +42,11 @@ document says what temper adds. What is open is listed in section 11.
 - **`setup`, for the forge's setup** (setup.md): how each set-up forge is
   run and set up, which the `temper forge` commands and `temper box` act
   on, and the engine's setup host reconciles at each start. `temper
-  serve` reads one file of it, an owned forge's handover (sections 3 and
-  6).
+  serve` reads one file of it, an owned or fake forge's handover
+  (sections 3 and 6).
+- **`demo`, a first run's demo** (setup.md, 8.4): the fake LLM the box
+  runs, its scripts and its key, and what the seed adopts; null for
+  none. `temper serve` reads none of its files.
 - **Not configuration:** repositories, which people adopt at runtime;
   the branch namespace, which the root derives from the deployment's id;
   the forge writer's identity, which comes from each forge's connect and
@@ -53,8 +56,9 @@ document says what temper adds. What is open is listed in section 11.
 - **No secret in the document,** and no forge credential in a file the
   document names. Each forge's credentials are records in jig's secrets'
   store under temper's tag (credentials.md, 2.1). The private files the
-  document names are jig's, a worker's secret and its digest, and an
-  owned forge's handover, each read at start (section 6).
+  document names are jig's, a worker's secret and its digest, an owned
+  or fake forge's handover, each read at start, and the demo model's
+  key, which `temper serve` never reads (section 6).
 - **LLM providers, never accounts.** jig's `engine.llm` names the LLM
   providers, written out whole: their endpoints, models and prices, and
   the sources each offers. Accounts are made at runtime from the client,
@@ -104,9 +108,9 @@ document says what temper adds. What is open is listed in section 11.
   port for each sign-in, unless the LLM provider's registration fixes a
   port (jig's `protocol/configuration.md`, section 3; skein's
   `oauth.md`, 6.5). A fixed port is checked at start against the
-  deployment's own listeners: the clients' and the webhooks', and an
-  owned forge's `listen` (setup.md, section 8), whose ports it must not
-  share on loopback.
+  deployment's own listeners: the clients' and the webhooks', an owned
+  or fake forge's `listen` (setup.md, section 8) and the demo's fake
+  LLM's (setup.md, 8.4), whose ports it must not share on loopback.
 - **`workers`** is a list of jig's worker parts (jig's
   `protocol/configuration.md`, section 4).
 - **`application`** holds temper's members (sections 3 and 4).
@@ -152,9 +156,9 @@ document says what temper adds. What is open is listed in section 11.
   2. jig's parts, by `jig-protocol-config`; `application`, by
      `temper-service`'s startup, with `jig-protocol-config`'s readers, so
      every problem names its path the same way
-     (`application.forges[0].api`); `setup`, and the setup's and the
-     box's limits, by their own crates' checks (setup.md, sections 8 and
-     11);
+     (`application.forges[0].api`); `setup`, `demo`, and the setup's and
+     the box's limits, by their own crates' checks (setup.md, sections 8,
+     8.4 and 11);
   3. the checks across the whole: the references of sections 2 to 5,
      the clients' listener's fixed port with a GitHub forge and each
      identity's largest value against the channel's bound on a
@@ -311,10 +315,18 @@ and the checks of the forge's own members against each entry are
 setup.md, section 8's. An owned forge's orgs are its person's,
 `mode.owned.person.orgs`, which reconcile makes when missing; a setup
 names no other orgs. `temper serve` checks it whole, and the engine's
-setup host reconciles each managed and owned forge at each start
+setup host reconciles each managed, owned and fake forge at each start
 (setup.md, the setup host in the engine). Of the files `setup` names,
-`temper serve` reads one: an owned forge's handover, `admin_token`,
-taken once (section 6).
+`temper serve` reads one: an owned or fake forge's handover,
+`admin_token`, taken once (section 6).
+
+**`demo`:** a first run's demo, or `null` for none, never missing
+(section 10): the fake LLM the box runs, its address, its LLM provider,
+its key's file and its scripts, and the seed's forge, project and client
+directory. Its members, their bounds and their checks against the
+document's LLM providers, `setup` and projects are setup.md, 8.4's,
+`temper-fake`'s. `temper serve` checks it whole and reads none of its
+files; the engine takes nothing of it.
 
 **What the engine root's `Config` takes,** field by field:
 
@@ -402,8 +414,9 @@ top-level `workers`, in the same order; standalone has one. Each:
 
 | File | Named by | Holds | Read by |
 |---|---|---|---|
-| an owned forge's handover: its admin's token | `admin_token` in the forge's setup directory, `application.setup[].directory` (setup.md, section 3) | the token's bytes | the engine's setup host, once, at the start that finds it (setup.md, the setup host in the engine) |
+| an owned or fake forge's handover: its admin's token | `admin_token` in the forge's setup directory, `application.setup[].directory` (setup.md, section 3) | the token's bytes | the engine's setup host, once, at the start that finds it (setup.md, the setup host in the engine); a fake forge, at its start (setup.md, 8.4) |
 | a worker's secret, its digest | jig's parts, data paths: `worker.secret` and `worker.digest` in the data directory as `temper init` writes them (setup.md, 8.2) | jig's formats (jig's `protocol/configuration.md`, sections 7 and 10) | jig's components |
+| the demo model's key | `application.demo.llm.key`, a data path: `demo/llm.key` as `temper init` writes it (setup.md, 8.2) | the key's bytes | the fake LLM, at its start, and the seed (setup.md, 8.4); never `temper serve` |
 
 - **A secret file holds its bytes and nothing else** but a final
   newline, which is not part of the secret (jig's
@@ -425,7 +438,8 @@ top-level `workers`, in the same order; standalone has one. Each:
   forge's credentials are replaced from the client, with no restart
   (credentials.md, section 5).
 - **Every forge credential in jig's secrets' store,** under temper's
-  tag, and in no file but an owned forge's handover until it is taken:
+  tag, and in no file but an owned or fake forge's handover until it is
+  taken:
   a forge's tokens, its App's key, its webhooks' secret, its user, from
   the client or from the engine's setup host (credentials.md, sections
   2 and 2.1).
@@ -947,7 +961,7 @@ variable, else its default.
 | Directory | Flag, variable | Default | Holds | Kept |
 |---|---|---|---|---|
 | configuration | `--config DIR`, `TEMPER_CONFIG` | `$XDG_CONFIG_HOME/temper` | the document, `temper.json`; smith's agent configuration, `agent.json`; the charters' instructions; trusted roots' files | as a person's own files are: copied, synced or published, so it holds no secret |
-| data | `--data DIR`, `TEMPER_DATA` | `$XDG_DATA_HOME/temper` | the deployment's directory, with the store, transcripts and jig's secrets' store; the worker's secret and its digest; the worker's root; each set-up forge's directory (setup.md, section 3); the programs directory | the deployment: backed up whole |
+| data | `--data DIR`, `TEMPER_DATA` | `$XDG_DATA_HOME/temper` | the deployment's directory, with the store, transcripts and jig's secrets' store; the worker's secret and its digest; the worker's root; each set-up forge's directory (setup.md, section 3); the demo's key and its seed's client directory, in `demo/` (setup.md, 8.4); the programs directory | the deployment: backed up whole |
 | cache | `--cache DIR`, `TEMPER_CACHE` | `$XDG_CACHE_HOME/temper` | binaries fetched again at will, such as an owned forge's Forgejo and runner | never backed up |
 
 - **The document is `temper.json` in the configuration directory,**
@@ -975,7 +989,8 @@ variable, else its default.
   - *data paths:* jig's `engine.deployment.directory`, each of
     `engine.hosts.workers`' `digest` and the worker's `secret`; each of
     `application.workers`' `root` (section 4) and of
-    `application.setup`'s `directory` (setup.md, section 8);
+    `application.setup`'s `directory` (setup.md, section 8); and
+    `application.demo`'s `llm.key` and `client` (setup.md, 8.4);
   - *cache paths:* an owned forge's `forgejo` and `runner.binary`
     (setup.md, section 8);
   - *absolute paths,* refused when relative: each of
@@ -984,8 +999,8 @@ variable, else its default.
     which are installed programs and files, or the spawn's own; every
     path in smith's agent configuration, which is smith's format.
 - **No secret in the configuration directory:** a worker's secret and
-  its digest, an owned forge's handover and every set-up forge's file are
-  data paths, and jig's secrets' store is in the deployment's directory.
+  its digest, an owned or fake forge's handover, every set-up forge's
+  file and the demo model's key are data paths, and jig's secrets' store is in the deployment's directory.
 - **The box passes its three on** to each step, as flags, each absolute
   (setup.md, 7.1).
 - **Tests give all three,** each a directory of the test's own: no test
