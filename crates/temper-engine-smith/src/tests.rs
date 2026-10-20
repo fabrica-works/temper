@@ -112,7 +112,7 @@ fn root_charter_becomes_a_smith_start_with_ordered_brief_and_exact_budget() {
 }
 
 #[test]
-fn selected_sources_and_efforts_reach_main_and_alternative_llms() {
+fn selected_llm_bindings_reach_smith() {
     let mut assignment = assignment();
     assignment.run.policy.model.effort = Some(b"high".as_slice().into());
     let alternative = engine::Model {

@@ -345,9 +345,9 @@ fn fixed_redirect_ports_compare_numbers_and_ignore_unreserved_listeners() {
 }
 #[test]
 fn provider_redirect_ports_are_checked_before_files_are_read() {
-    const PROVIDERS: &str = r#""llm": {"providers":[{"name":"Fake","number":1,"models":["small"],"sources":{"sign_in":{"issuer":"https://issuer.example","client":"client","scopes":[],"authorization":"https://issuer.example/auth","token":"https://issuer.example/token","keys":"https://issuer.example/keys","transport":"tls","server_name":"issuer.example","must_grant":[],"redirect_path":"callback","redirect_port":7100}}}],"#;
-    let input = fixtures::document();
-    let input = core::str::from_utf8(&input).unwrap().replace("\"llm\": {", PROVIDERS);
+    const PROVIDERS: &[u8] = br#"[{"name":"Fake","number":1,"models":["small"],"sources":{"sign_in":{"issuer":"https://issuer.example","client":"client","scopes":[],"authorization":"https://issuer.example/auth","token":"https://issuer.example/token","keys":"https://issuer.example/keys","transport":"tls","server_name":"issuer.example","must_grant":[],"redirect_path":"callback","redirect_port":7100}}}]"#;
+    let input = fixtures::with(&fixtures::document(), b"engine.llm.providers", PROVIDERS);
+    let input = core::str::from_utf8(&input).unwrap();
     for (listener, expected) in [
         (r#"{"socket":"127.0.0.1:7100"}"#, true),
         (r#"{"socket":"[::1]:7100"}"#, true),
@@ -378,10 +378,13 @@ fn provider_redirect_ports_are_checked_before_files_are_read() {
 
 #[test]
 fn every_offered_adapter_must_be_declared_by_the_agent() {
-    let document = fixtures::document();
-    let document = core::str::from_utf8(&document).unwrap().replace("\"llm\": {", r#""llm": {"providers":[{"name":"Fake","number":1,"models":["small"],"sources":{"programs":["claude_code"]}}],"#);
+    let document = fixtures::with(
+        &fixtures::document(),
+        b"engine.llm.providers",
+        br#"[{"name":"Fake","number":1,"models":["small"],"sources":{"programs":["claude_code"]}}]"#,
+    );
     let document = jig_protocol_config::document(
-        document.as_bytes(),
+        &document,
         &config::DocumentLimits { bytes: 1_048_576, tokens: 16_384, depth: 32 },
     )
     .unwrap();
@@ -461,12 +464,13 @@ fn credential_capacity_is_checked_on_both_sides_and_against_smith() {
 
 #[test]
 fn configured_keys_use_the_key_ceiling_instead_of_the_oauth_token_bound() {
-    let input = core::str::from_utf8(fixtures::ENGINE).unwrap().replace(
-        "\"llm\": {",
-        r#""llm": {"providers":[{"name":"Fake","number":1,"models":["small"],"sources":{"keys":true}}],"#,
+    let input = fixtures::with(
+        fixtures::ENGINE,
+        b"llm.providers",
+        br#"[{"name":"Fake","number":1,"models":["small"],"sources":{"keys":true}}]"#,
     );
     let document =
-        config::document(input.as_bytes(), &config::DocumentLimits { bytes: 65_536, tokens: 4096, depth: 32 }).unwrap();
+        config::document(&input, &config::DocumentLimits { bytes: 65_536, tokens: 4096, depth: 32 }).unwrap();
     let mut engine = config::engine(&document, 0, &jig_protocol_config::Directories::working()).unwrap();
     engine.limits.token = 1;
     let key = jig_client_protocol_wire::v10::CEILINGS.keyed_value_some;

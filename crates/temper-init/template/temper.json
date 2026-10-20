@@ -19,6 +19,14 @@
       }
     },
     "llm": {
+      "providers": [
+        {
+          "name": "codex",
+          "number": 1,
+          "models": ["gpt-6-luna"],
+          "sources": {"keys": true}
+        }
+      ],
       "endpoints": [
         {
           "name": "codex",
@@ -190,7 +198,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 79649713754316,
+    "memory_bytes": 79659992279960,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -823,7 +831,7 @@
           "hub.event_bytes": 598
         }
       },
-      "memory_bytes": 2343588716154
+      "memory_bytes": 2343551512136
     }
   ],
   "application": {
