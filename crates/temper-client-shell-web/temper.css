@@ -220,9 +220,12 @@ dialog { position: fixed; inset: 0; z-index: 20; height: fit-content; margin: au
 dialog[open] { display: flex; flex-wrap: wrap; column-gap: 8px; }
 dialog[open] > :not(button) { flex: 0 0 100%; }
 dialog::backdrop { background: rgba(30,26,22,.34); }
-dialog h2 { font: 700 14px ui-monospace, monospace; margin-bottom: 9px; }
+dialog h2, dialog > span:first-child { font: 700 14px/1.35 ui-monospace, monospace; margin-bottom: 9px; }
+dialog h3 { font: 700 12px/1.35 var(--temper-mono); letter-spacing: -.025em; margin: 0 0 6px; }
 dialog p { color: #756e65; font-size: 11px; margin: 0 0 1em; }
 dialog > p:first-child { margin-top: 1em; }
+dialog section { margin-bottom: 1em; }
+dialog section p { margin: 0; }
 .temper-card textarea { margin-top: 8px; }
 .temper-card textarea, dialog textarea { display: block; width: 100%; min-height: 75px; border: 1px solid #d8d0c5; border-radius: 5px; padding: 8px; resize: vertical; font: inherit; }
 dialog button { border: 1px solid #d8d0c5; background: #fffefd; border-radius: 5px; padding: 6px 10px; margin-top: 17px; font: 600 11px ui-monospace, monospace; }
@@ -301,11 +304,16 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 /* .inbox-card h3 and .proposal-items: a title paragraph and supplied facts. */
 .temper-page .temper-card .temper-title { font-size: 13px; font-weight: 700; line-height: 1.35; letter-spacing: -.025em; color: var(--temper-ink); margin: 6px 0; }
 .temper-page .temper-meta + p:not(.temper-title) { margin-top: 6px; }
-.temper-details { display: grid; gap: 8px; background: #faf8f4; border-radius: 3px; margin: 10px 0; padding: 9px 12px; font-size: 11px; }
+.temper-details { display: flex; flex-wrap: wrap; gap: 8px 28px; background: #faf8f4; border-radius: 3px; margin: 10px 0; padding: 9px 12px; font-size: 11px; }
+.temper-details > * { flex: 0 0 100%; min-width: 0; }
+.temper-details > section { flex: 1 1 260px; }
 .temper-page .temper-details p { margin: 0; }
 .temper-details h3 { font: 700 12px/1.35 var(--temper-mono); letter-spacing: -.025em; margin: 0; }
-/* .button-row and .button: the first decision is primary, with full-width reason fields. */
-.temper-page .temper-card button { border: 1px solid #dcd5ca; border-radius: 4px; min-height: 28px; padding: 5px 9px; margin: 10px 8px 0 0; background: var(--temper-paper); color: var(--temper-ink); font: 600 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+/* .button-row and .button: the first decision is primary; a reason or answer field sits in the row, before its button. */
+.temper-page .temper-card button { vertical-align: bottom; border: 1px solid #dcd5ca; border-radius: 4px; min-height: 28px; padding: 5px 9px; margin: 10px 8px 0 0; background: var(--temper-paper); color: var(--temper-ink); font: 600 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.temper-page .temper-card textarea { display: inline-block; vertical-align: bottom; width: min(100%, 30em); min-height: 28px; height: 28px; margin: 10px 8px 0 0; border-color: #dcd5ca; border-radius: 4px; padding: 5px 8px; background: #fff; color: var(--temper-ink); font: 11px/1.35 var(--temper-mono); }
+.temper-page .temper-card > :not(button):not(textarea):has(+ button, + textarea) { margin-bottom: 0; }
+@supports (field-sizing: content) { .temper-page .temper-card textarea { field-sizing: content; height: auto; max-height: 120px; } }
 .temper-page .temper-card button:hover { border-color: #c9b7a8; background: #faf7f2; }
 .temper-page .temper-card button:first-of-type { background: var(--temper-accent); border-color: var(--temper-accent); color: white; }
 .temper-page .temper-card button:first-of-type:hover { background: #a8563e; }
@@ -334,6 +342,7 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 }
 /* .section-heading at 600px: filters below the heading, all controls retained. */
 @media (max-width: 600px) {
-  .temper-page .temper-heading { display: block; }
-  .temper-heading .temper-filters { margin-top: 8px; justify-content: flex-start; }
+  .temper-page .temper-heading { flex-wrap: wrap; row-gap: 0; }
+  .temper-heading .temper-filters { flex: 0 0 100%; margin-top: 8px; justify-content: flex-start; }
+  .temper-page .temper-card textarea { width: 100%; }
 }
