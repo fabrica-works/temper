@@ -291,6 +291,9 @@ pub fn check(table: &[&Tool], call: &Call, limits: &Limits) -> Result<(), Usage>
     if tool.name == b"chat" && tool.keyed == Keyed::Required {
         check_choice(call, 2, 3, limits)?;
     }
+    if tool.name == b"amend" {
+        check_choice(call, 2, 3, limits)?;
+    }
     if tool.area == 5 && tool.keyed != Keyed::Never {
         for (index, (arg, slot)) in args.iter().zip(&call.values).enumerate() {
             if let Some(Values::One(Value::Number(n))) = slot

@@ -1,6 +1,6 @@
 //! Model names come from me; account and sub-agent preferences stay as supplied
 //! by the template or task (client/tools.md, 5.5).
-use super::{Call, Failed, value};
+use super::{Call, Failed, Limits, Prepared, Request, number, value, words};
 use crate::jig::{call::Value, render, runner::Printed};
 use alloc::boxed::Box;
 use jig_client::contract as c;
@@ -100,4 +100,44 @@ pub(super) fn named(prefix: &[u8], what: &[u8], name: &[u8], json: bool) -> Prin
         out.put(b"...").expect("measured cut marker");
     }
     render::failure(&out.finish(), json, 1)
+}
+
+pub(super) fn amend(call: &Call, document: &c::ReadValue, me: &c::Me, limits: &Limits) -> Prepared {
+    let c::ReadValue::Task(task) = document else { return Err(Failed::Fixed(b"unexpected amendment document")) };
+    let change = Box::new(c::Amendment {
+        addressed: None,
+        spec: None,
+        wake: None,
+        dependencies: None,
+        authority: None,
+        instructions: None,
+        tracked: None,
+        llm: llm(call, 2, 3, me, task.project, task.llm.as_ref())?,
+    });
+    let mut admission = None;
+    for offer in &task.acts {
+        if offer.act == c::ActKind::Amend {
+            admission = Some(c::admission::amendment(&offer.admission, &change, &task.authority));
+        }
+    }
+    // This is the caller's shown revision, even if the new read has already moved.
+    let revision = c::Revision { value: number(call, 1).ok_or(Failed::Fixed(b"spec revision missing"))? };
+    let reason = words(call, 4, limits)?;
+    let (ask, to) = match admission {
+        Some(c::Admission::Allowed) => (
+            c::Ask::Amend { project: task.project, task: task.chip.task, revision: Some(revision), change, reason },
+            None,
+        ),
+        Some(c::Admission::Proposed { to }) => (
+            c::Ask::Propose {
+                project: task.project,
+                action: c::ProposeAction::Amendment { task: task.chip.task, revision, change },
+                reason,
+            },
+            Some(to),
+        ),
+        Some(c::Admission::Bounded { .. }) => return Err(Failed::Fixed(b"amendment has no bounded draft")),
+        Some(c::Admission::Refused(_)) | None => return Err(Failed::Fixed(b"amendment not offered")),
+    };
+    Ok((Request::Ask(ask), to))
 }

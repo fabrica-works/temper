@@ -340,6 +340,7 @@ pub(crate) fn retry(call: &crate::jig::call::Call) -> Box<[u8]> {
         14 => &rows::STOP,
         15 => &rows::CANCEL,
         24..=30 => account_tool(call.tool),
+        31 => &rows::AMEND,
         _ => unreachable!("act tool"),
     };
     let mut call = call.clone();

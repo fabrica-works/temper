@@ -37,6 +37,7 @@ pub const TOOLS: &[&Tool] = &[
     &rows::FORGET,
     &rows::RANK,
     &rows::RETRY,
+    &rows::AMEND,
 ];
 pub fn parse(words: &[&[u8]]) -> Result<Parsed, Usage> {
     argv::parse(TOOLS, words, &crate::limits::tools())

@@ -41,7 +41,7 @@ pub fn text(task: &Task, me: Option<&Me>, book: &Phrasebook, out: &mut Text) {
     out.put(b"acts:\n");
     for offer in &task.acts {
         out.put(b"  ");
-        if !has_tool(offer.act) {
+        if !has_tool(task, offer.act) {
             out.put(name(offer.act));
             out.put(b" (no tool)\n");
             continue;
@@ -73,7 +73,7 @@ pub fn text(task: &Task, me: Option<&Me>, book: &Phrasebook, out: &mut Text) {
         out.put(b"\n");
     }
 }
-fn has_tool(act: ActKind) -> bool {
+fn has_tool(task: &Task, act: ActKind) -> bool {
     match act {
         ActKind::Message
         | ActKind::Answer
@@ -85,9 +85,9 @@ fn has_tool(act: ActKind) -> bool {
         | ActKind::Stop
         | ActKind::Cancel
         | ActKind::Adopt => true,
+        ActKind::Amend => task.llm.is_some(),
         ActKind::Take
         | ActKind::HandBack
-        | ActKind::Amend
         | ActKind::Move
         | ActKind::Reorder
         | ActKind::Seen
@@ -151,10 +151,16 @@ fn call(task: &Task, act: ActKind, out: &mut Text) {
             out.number(u64::from(task.project));
             out.put(b" --owner O --name N --landing B");
         }
+        ActKind::Amend => {
+            out.put(b"amend ");
+            out.number(task.chip.task);
+            out.put(b" --spec ");
+            out.number(task.spec_revision.value);
+            out.put(b" --model M [--effort E] REASON");
+        }
         // Non-tool offers have already been printed without their admission.
         ActKind::Take
         | ActKind::HandBack
-        | ActKind::Amend
         | ActKind::Move
         | ActKind::Reorder
         | ActKind::Seen

@@ -31,6 +31,9 @@ connect prints a browser address and wait accounts --until settled, then exits o
 
 Choose a chat's main model from models --project P; --effort is required when that model declares efforts:
   temper ctl DIRECTORY chat --project shop --model chosen-model --effort chosen-effort hello --key model-chat
+  temper ctl DIRECTORY amend 41 --spec 7 --model chosen-model --effort chosen-effort because --key model-amend
+amend changes only the main model and effort, using the task's shown spec revision.
+Goal model flags arrive with area 2's goal tool and its executor/budget/deadline inputs.
 Without these flags the template's choice or engine default is sent unchanged.
 A model change preserves the supplied account and sub-agent choices; there is no --account flag.
 Unknown model or effort names fail locally (exit 1), without sending.
@@ -137,3 +140,5 @@ rank ACCOUNT POSITION [--source sign_in|key|program] [--key NAME]
   Move an account or source to a one-based position
 retry ACCOUNT [--source sign_in|key|program] [--key NAME]
   Resume a limited source
+amend N --spec R --model M [--effort E] REASON [--key NAME]
+  Change a task's main model at its shown spec revision

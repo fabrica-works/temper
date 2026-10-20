@@ -6,19 +6,13 @@ use skein_lib::List;
 fn chat_uses_the_named_model() {
     let mut root = f::choice_root(f::choice_me(f::CHAT_BUDGET));
     let call = root.submit(f::MODEL_CHAT);
-    assert_eq!(
-        f::chat_task(&root, call).llm.as_ref().expect("choice").main,
-        f::model_effort(f::MODEL_NAME, Some(f::EFFORT_NAME))
-    );
+    assert_eq!(f::chat_task(&root, call).llm.as_ref().expect("choice").main.model.bytes(), f::MODEL_NAME);
 }
 #[test]
 fn chat_uses_the_named_effort() {
     let mut root = f::choice_root(f::choice_me(f::CHAT_BUDGET));
     let call = root.submit(f::MODEL_CHAT);
-    assert_eq!(
-        f::chat_task(&root, call).llm.as_ref().expect("choice").main,
-        f::model_effort(f::MODEL_NAME, Some(f::EFFORT_NAME))
-    );
+    assert_eq!(f::chat_task(&root, call).llm.as_ref().expect("choice").main.effort, Some(f::act_text(f::EFFORT_NAME)));
 }
 #[test]
 fn chat_keeps_the_template_account() {

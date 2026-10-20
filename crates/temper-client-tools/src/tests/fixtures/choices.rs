@@ -49,3 +49,39 @@ pub(crate) fn chat_task(root: &Harness, call: u32) -> &c::NewTask {
     let c::Ask::Create { tasks, .. } = act_ask(root, call) else { panic!("chat creates") };
     tasks.get(0).expect("one chat task")
 }
+
+/// The user's revision is older than the new read; it must not be substituted.
+pub(crate) const CHOICE_SPEC: u64 = 7;
+pub(crate) const MODEL_AMEND: &[&str] =
+    &["amend", "41", "--spec", "7", "--model", "chosen-model", "--effort", "high", "because", "--key", "model-amend"];
+pub(crate) fn choice_task(admission: c::Admission) -> c::Task {
+    let mut task = offered(&[c::ActKind::Amend]);
+    task.acts.get_mut(0).expect("amend offer").admission = admission;
+    task.spec_revision = c::Revision { value: CHOICE_SPEC + 1 };
+    task.llm = Some(prior_choice());
+    task
+}
+pub(crate) fn send_choice_amend(argv: &[&str], task: c::Task) -> (Harness, u32) {
+    let mut root = choice_root(choice_me(CHAT_BUDGET));
+    let call = root.submit(argv);
+    assert_eq!(root.reads.get(&call).expect("task read").1, c::Read::Task { task: TASK });
+    root.serve(call, task_result(task));
+    (root, call)
+}
+pub(crate) fn model_change(effort: Option<&[u8]>) -> Box<c::Amendment> {
+    let mut llm = prior_choice();
+    llm.main = model_effort(MODEL_NAME, effort);
+    Box::new(c::Amendment {
+        addressed: None,
+        spec: None,
+        wake: None,
+        dependencies: None,
+        authority: None,
+        instructions: None,
+        tracked: None,
+        llm: Some(llm),
+    })
+}
+
+pub(crate) const EFFORTLESS_AMEND: &[&str] =
+    &["amend", "41", "--spec", "7", "--model", "plain-model", "because", "--key", "plain-amend"];

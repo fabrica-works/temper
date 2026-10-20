@@ -198,6 +198,9 @@ pub(super) fn page(
     prepared(runner, client, env, called, ask, out);
 }
 fn build(call: &Call, document: &c::ReadValue, me: &c::Me, limits: &Limits, project: Option<u32>) -> Prepared {
+    if call.tool == 31 {
+        return choice::amend(call, document, me, limits);
+    }
     let (project, offers) = match document {
         c::ReadValue::Task(task) => (task.project, &task.acts),
         c::ReadValue::Question(question) => {
@@ -432,7 +435,7 @@ pub(super) fn prepared(
     if called.call.tool == 10 {
         operation.word = b"close";
     }
-    if called.call.tool >= 24 {
+    if (24..=30).contains(&called.call.tool) {
         operation.word = render::outcome::account_tool(called.call.tool).name;
     }
     runner.sent.insert(key, Sent { called, operation });

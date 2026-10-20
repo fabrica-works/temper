@@ -19,6 +19,7 @@ const GOLDENS: &[(Option<u8>, &str)] = &[
     (Some(16), "help_wait"),
     (Some(20), "help_pending"),
     (Some(17), "help_adopt"),
+    (Some(31), "help_amend"),
 ];
 #[test]
 fn the_help_prints_as_its_golden_files() {
@@ -66,6 +67,7 @@ const USAGES: &[&[u8]] = &[
     b"forget ACCOUNT [--source sign_in|key|program] [--key NAME]\n",
     b"rank ACCOUNT POSITION [--source sign_in|key|program] [--key NAME]\n",
     b"retry ACCOUNT [--source sign_in|key|program] [--key NAME]\n",
+    b"amend N --spec R --model M [--effort E] REASON [--key NAME]\n",
 ];
 #[test]
 fn a_tools_usage_reads_as_the_design_writes_it() {

@@ -349,3 +349,19 @@ pub const RETRY: Tool = Tool {
 /// Names are checked against the project's current me document before sending.
 const MODEL: super::table::Argument = flag(b"model", b"M", Kind::Text, Optional, b"Configured model name");
 const EFFORT: super::table::Argument = flag(b"effort", b"E", Kind::Text, Optional, b"Effort offered by that model");
+
+/// The model change is amend's only CHANGE form until the rest of area 2.
+pub const AMEND: Tool = Tool {
+    name: b"amend",
+    line: b"Change a task's main model at its shown spec revision",
+    result: b"amend",
+    forms: &[&[
+        positional(b"task", b"N", Kind::Number, Required, b"Task number"),
+        flag(b"spec", b"R", Kind::Number, Required, b"Shown specification revision"),
+        flag(b"model", b"M", Kind::Text, Required, b"Configured model name"),
+        EFFORT,
+        positional(b"reason", b"REASON", Kind::Text, Required, b"Reason for changing the model"),
+    ]],
+    keyed: Keyed::Optional,
+    area: 2,
+};

@@ -1,0 +1,8 @@
+amend N --spec R --model M [--effort E] REASON [--key NAME]
+Change a task's main model at its shown spec revision
+Result: amend
+  task: Task number
+  spec: Shown specification revision
+  model: Configured model name
+  effort: Effort offered by that model
+  reason: Reason for changing the model

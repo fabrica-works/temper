@@ -138,7 +138,7 @@ fn run(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, call
         }
         1..=7 | 22 | 23 | 25 | 27..=30 => reads::start(runner, client, env, called, out),
         24 | 26 => accounts::start(runner, client, env, called, out),
-        8..=15 => acts::start(runner, client, env, called, out),
+        8..=15 | 31 => acts::start(runner, client, env, called, out),
         16 => wait::start(runner, client, env, called, out),
         _ => {
             let printed = render::failure(b"call not supported", called.json, 1);
