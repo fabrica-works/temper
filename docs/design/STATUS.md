@@ -84,13 +84,22 @@ order of its pages, not contract (`client/README.md`, 3.5).
 - **The connector's shared top** (`draft/forge-kit.md`): the neutral
   part of `temper-engine-domain-forge` moved out. Waits for a second
   application that works on a forge.
+- **GitHub, and forges connected from the client** (`draft/github.md`):
+  temper as a GitHub App made by the manifest flow, hearing changes
+  through its delivery log with no public address, landing directly or
+  through GitHub's merge queue; every forge connected from the client,
+  its credentials in jig's secrets' store, and repositories added to
+  projects at any time; Forgejo's setup moved onto the same footing.
+  Waits for the forge-kit plan's end, and Forgejo's part for jig's
+  request carrying a value.
 - **After standalone** (`protocol/README.md`, section 14): between hosts
   (TLS on the engine's listeners, a worker-only process, contained
   process trees for agents and git), the forge's webhooks from another
   host and reconcile over TLS (`protocol/forge.md`, section 5;
-  `protocol/setup.md`, section 15), GitHub (`protocol/forge.md`,
-  section 14). Waits for a deployment beyond one person's machine, and
-  for skein's TLS server side and contained process trees (jig's
+  `protocol/setup.md`, section 15), GitHub's pushed deliveries
+  (`draft/github.md`, section 7). Waits for a deployment beyond one
+  person's machine, and for skein's TLS server side and contained
+  process trees (jig's
   `protocol/README.md`, section 10).
 - **The forge as people's sign-in provider**
   (`protocol/credentials.md`, section 8): through jig's `Mint`. Waits for
