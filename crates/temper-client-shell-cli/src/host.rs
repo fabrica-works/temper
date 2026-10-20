@@ -50,7 +50,9 @@ pub struct OneShot {
     pub(crate) root: root::Root,
     root_env: Env<root::Limits>,
     requests: Queue<root::Request>,
-    transport: Option<Memory>,
+    pub(crate) transport: Option<Memory>,
+    #[cfg(test)]
+    pub(crate) test_connections: Option<jig_client_shell_native::Limits>,
     signing: Option<Signing>,
     recovery: Recovery,
     startup: Startup,
@@ -117,6 +119,8 @@ impl OneShot {
             root_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.root },
             requests: Queue::with_capacity(request_room),
             transport: None,
+            #[cfg(test)]
+            test_connections: None,
             signing: None,
             recovery: Recovery::new(request_room),
             startup,
@@ -273,8 +277,10 @@ impl OneShot {
             && matches!(self.class, Class::Read | Class::Wait)
             && let Some(token) = self.directory.token.take()
         {
-            self.transport =
-                Some(Memory::new(self.directory.engine.expect("loaded engine"), &limits::native().connections));
+            let connections = limits::native().connections;
+            #[cfg(test)]
+            let connections = self.test_connections.unwrap_or(connections);
+            self.transport = Some(Memory::new(self.directory.engine.expect("loaded engine"), &connections));
             self.until = Some(self.env.now.saturating_add(limits::DEADLINE));
             self.root_event(jig_client::Event::Start { kept: skein_lib::List::with_capacity(0) });
             self.root_event(jig_client::Event::SignIn { with: jig_client::With::Held(skein_lib::Secret::new(token)) });

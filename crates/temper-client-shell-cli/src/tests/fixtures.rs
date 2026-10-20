@@ -77,6 +77,8 @@ pub struct Frame {
     stderr: Vec<u8>,
     pub write_size: usize,
     pub writes: u32,
+    probe: Option<skein_lib::Token>,
+    probe_replies: Vec<(u64, Time, Box<[u8]>)>,
 }
 impl Frame {
     pub fn act(words: &[&[u8]]) -> Self {
@@ -143,6 +145,8 @@ impl Frame {
             stderr: Vec::new(),
             write_size: usize::MAX,
             writes: 0,
+            probe: None,
+            probe_replies: Vec::new(),
         }
     }
     pub fn sign_in(link: &'static [u8]) -> Self {
@@ -229,6 +233,7 @@ impl Frame {
                 }
             }
             self.host.iterate(self.now, Wall::EPOCH);
+            self.probe_reply();
             let mut answered = false;
             while let Some(mut submit) = self.host.submissions().pop() {
                 if self.hold_stores.is_some() && matches!(submit.kind, Op::Sync { .. }) {

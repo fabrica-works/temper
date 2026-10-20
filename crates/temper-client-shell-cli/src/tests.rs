@@ -4,6 +4,35 @@ use skein_io::kernel::{Exit, ServiceSignal};
 const SIGN_IN_FIRST: skein_lib::Duration = skein_lib::Duration::from_millis(100);
 const SIGN_IN_FILE_CALL: &[u8] = br#"{"tool":"sign-in","arguments":{"file":"link-file"}}"#;
 #[test]
+fn memory_exchanges_wait_for_closing_sockets() {
+    let mut f = fixtures::Engine::socket_wait();
+    let close = limits::native().io.close_timeout;
+    let start = skein_lib::Time::ZERO;
+    for number in 1..=5 {
+        let requests = f.requests();
+        f.exchange(number);
+        if number % 2 == 1 {
+            assert_eq!(f.probe_replies().len(), usize::try_from(number - 1).expect("reply count"));
+            assert_eq!(f.requests(), requests, "no socket starts while all are closing");
+            assert!(f.stream_live());
+            f.advance_past(close);
+        }
+        assert_eq!(f.probe_replies().last().map(|(reply, _)| *reply), Some(number));
+        assert!(f.stream_live());
+        assert_eq!(f.exit(), None);
+    }
+    assert_eq!(f.probe_replies(), vec![
+        (1, start.saturating_add(close)),
+        (2, start.saturating_add(close)),
+        (3, start.saturating_add(close.saturating_mul(2))),
+        (4, start.saturating_add(close.saturating_mul(2))),
+        (5, start.saturating_add(close.saturating_mul(3))),
+    ]);
+    f.signal(ServiceSignal::Terminate);
+    assert_eq!(f.exit(), Some(Exit::Code(limits::TERMINATED)));
+    assert!(skein_shell::Host::is_empty(&f.host));
+}
+#[test]
 fn a_busy_directory_is_refused_after_60_s_of_retries() {
     let mut f = fixtures::Frame::act(fixtures::CHAT);
     f.lock_busy();

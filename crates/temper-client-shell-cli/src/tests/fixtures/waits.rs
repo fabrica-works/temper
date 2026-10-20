@@ -2,6 +2,59 @@ use super::*;
 pub const LONG_LIVE: Duration = Duration::from_secs(31); // Exceeds the ordinary link deadline, below Hello's 60 seconds.
 pub const BEFORE_DEADLINE: Duration = Duration::from_secs(29); // Proves the stopping wait cannot finish one second early.
 impl Frame {
+    pub fn socket_wait() -> Self {
+        let mut frame = Self::read(&["wait", "task", "41"]);
+        frame.host.test_connections = Some(jig_client_shell_native::Limits {
+            // The live stream and the two completed watches occupy all three sockets.
+            exchanges: 2,
+            ..crate::limits::native().connections
+        });
+        frame.sign_in_then_deliver_me();
+        frame
+    }
+    pub fn exchange(&mut self, number: u64) {
+        let exchange = skein_lib::Token::new((1 << 63) | number);
+        assert!(self.probe.replace(exchange).is_none(), "one probe exchange at a time");
+        let read = w::Read::Task(w::ReadTask::new(&w::CEILINGS, w::ReadTaskParts { task: 41 }).expect("read task"));
+        let document = w::Owned::new(
+            &w::CEILINGS,
+            w::OwnedParts { owner: w::Owner::Jig, version: w::VERSION, record: encode!(read) },
+        ).expect("read document");
+        self.host.transport.as_mut().expect("live memory transport").down(self.now, jig_client::Request::Exchange {
+            exchange,
+            message: jig_client::Message::Read(encode!(document)),
+            credential: None,
+        });
+        self.run();
+    }
+    pub(super) fn probe_reply(&mut self) {
+        let Some(exchange) = self.probe else { return };
+        let memory = self.host.transport.as_mut().expect("probe transport");
+        let mut other = Vec::new();
+        while let Some(event) = memory.events.pop() {
+            match event {
+                jig_client::Event::Reply { exchange: reply, message } if reply == exchange => {
+                    self.probe_replies.push((reply.raw() & !(1 << 63), self.now, message));
+                    self.probe = None;
+                }
+                jig_client::Event::Lost { exchange: lost } if lost == exchange => panic!("probe exchange lost"),
+                event => other.push(event),
+            }
+        }
+        for event in other {
+            memory.events.push(event);
+        }
+    }
+    pub fn probe_replies(&self) -> Vec<(u64, Time)> {
+        for (_, _, message) in &self.probe_replies {
+            let answer = w::ReadAnswer::decode(&w::CEILINGS, &mut skein_lib::Reader::new(message)).expect("read answer");
+            assert!(matches!(answer, w::ReadAnswer::Value(_)), "complete read response");
+        }
+        self.probe_replies.iter().map(|(number, now, _)| (*number, *now)).collect()
+    }
+    pub fn stream_live(&self) -> bool {
+        self.stream.is_some_and(|fd| self.sockets.get(&fd).is_some_and(|socket| socket.eof.is_none()))
+    }
     pub fn wait(words: &[&str]) -> Self {
         let mut frame = Self::read(words);
         frame.sign_in_then_deliver_me();
