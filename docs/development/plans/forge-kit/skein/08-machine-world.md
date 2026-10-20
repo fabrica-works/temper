@@ -274,23 +274,34 @@ Shape: wrap scripted HTTP peer bytes in skein_tls_world::server::Server, pki::Se
   ECDSA handshake lengths vary. Capture each trial's wire flight, derive the cut range from those bytes,
   and cut that same flight; never use a previous handshake's length or assert an exact TLS byte count.
   HTTP cuts range over that trial's plaintext framing; assertions concern outcomes/counts only.
-  Bounded driver follow-up after the third repeated handshake-cut mismatch:
-  at most15minutes from the owner's start, one executable pinned-heavy
-  Bash-script submission and10active execution minutes, including setup and
-  compilation. Inspect the same-trial server-flight cut through
-  `peer::Peer::{take,request,write}` and `machine::Machine::respond`; only
-  the scripted world's HTTP responder may stop after its configured
-  terminal EOF/reset. Retain decrypting/accounting of bytes independently
-  where needed, every flight/offset/EOF/reset row and every exact
-  result/cost/terminal/Closed assertion. Add bounded failing-row diagnostics,
-  then run only `fuzzy_tls::tls_faults_at_each_byte_end_once` once. An
-  unchanged result mismatch, a missing cut/control row or a timing miss
-  returns with the same-trial flight and io evidence; no second diagnostic
-  submission, guessed result, fixed ECDSA length or shipped-code change.
-  A passing isolated check permits the increment's unspent normal proofs
-  once, with all existing43focused/8fuzzy counts and caps. Independent lint
-  and source review may continue; refresh further reached world-driver
-  copies within this scope and list them in the commit body.
+  Ruling214's single handshake-only follow-up is exhausted. A fresh owner
+  gets at most20 wall minutes from start, TWO executable pinned-heavy
+  absolute-Bash submissions and10 active execution minutes, including
+  setup/compilation, for the reached HTTP terminal copies and busy clock.
+  First inspect and repair only this world's Peer and Machine driver.
+  Submission1 may exercise the existing full-length first-start HTTP
+  response cut, checking pending io, independently measured writes/cost
+  and last-Closed ordering. Submission2 is ONE complete existing TLS
+  sweep, after that narrow check passes and a source-backed cause is
+  recorded. Setup failures spend submissions; queue time creates none.
+  Generalize the responder-terminal guard across every reached cut path,
+  retaining decryption and independent write accounting. A one-time
+  awaiting_request clear is insufficient because io rearms it. Establish
+  quiescence with all actionable room/grant, ciphertext and fault work
+  settled before letting run_for jump to its existing next deadline;
+  settle is a same-time loop, not the10us clock loop. No skipped io,
+  early peer retirement or shared Wire/TLS API change. Keep Silent,
+  held-response and release paths nonterminal. Preserve all byte rows,
+  actual-trial flights, controls, assertions and caps. Return on an
+  exhausted submission, repeated failure, missing coverage, unproved
+  io-liveness premise, timing miss or needed change outside this world.
+  A complete passing sweep still beyond5s goes to the designer for its
+  measured aim before any further tuning run. Success permits only the
+  unspent normal proofs once, at43 focused/8 fuzzy. A narrow diagnostic
+  adds no permanent identity/scenario. Refresh further reached terminal
+  copies and observations, listing users and changed observed write counts
+  in the commit body; the before/after-write error mapping stays.
+
 Test shape: one new focused (<0.5 s), one fuzzy (<5 s); pki is the trust override, no application profile.
   a_tls_forge_starts_and_answers_a_call uses the moved fixture's limits and this reference:
 ```rust
