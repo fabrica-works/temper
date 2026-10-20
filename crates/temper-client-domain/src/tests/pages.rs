@@ -1,3 +1,4 @@
+mod accounts;
 mod chat;
 mod chats;
 mod inbox;

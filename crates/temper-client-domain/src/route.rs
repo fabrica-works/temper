@@ -23,6 +23,7 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
         },
         Event::Client { event } => client(root, env, event, out),
         Event::Forge(event) => forge(root, env, event, out),
+        Event::AccountKey { value } => pages(root, env, crate::pages::Event::AccountKey { value }, out),
         Event::SignedOut => client(root, env, jig_client::Event::Up { up: jig_client::Up::SignedOut }, out),
     }
 }

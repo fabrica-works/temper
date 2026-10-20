@@ -35,6 +35,7 @@ pub enum Act {
         project: u32,
     },
     SignOut,
+    Accounts(accounts::Act),
     ChatWords {
         words: Box<[u8]>,
     },
@@ -77,6 +78,7 @@ pub enum Act {
 pub enum Event {
     Started,
     Left,
+    AccountKey { value: skein_lib::Secret },
     Went { address: Address },
     Act { act: Act },
     Told { told: Told },
@@ -115,7 +117,32 @@ impl Pages {
     }
     #[must_use]
     pub fn accounts(&self) -> Option<&accounts::Accounts> {
-        if self.accounts_open { Some(&self.accounts) } else { None }
+        if self.accounts_open && self.party.is_some() { Some(&self.accounts) } else { None }
+    }
+    #[must_use]
+    pub fn account_name(&self) -> skein_lib::RequestKey {
+        if let Some(pending) = &self.accounts.pending
+            && (pending.outcome.is_none()
+                || pending.outcome == Some(jig_client::Outcome::Unsent)
+                || pending.outcome == Some(jig_client::Outcome::Lost))
+            && let Some(name) = pending.name
+        {
+            return name;
+        }
+        let mut name = [0; 16];
+        for (slot, byte) in name.iter_mut().zip(*b"accounts") {
+            *slot = byte;
+        }
+        for (slot, byte) in name
+            .get_mut(8..)
+            .expect("name number fits")
+            .iter_mut()
+            .zip(self.serial.checked_add(1).expect("page keys fit").to_be_bytes())
+        {
+            *slot = byte;
+        }
+
+        name
     }
     #[must_use]
     pub fn availability(&self, client: &Client) -> Option<bool> {
@@ -200,6 +227,16 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
             }
         }
         Event::Went { address } => went(pages, env, address, out),
+        Event::AccountKey { value } => {
+            if pages.accounts_open && accounts::current_me(client).is_some() {
+                pages.accounts.key(value);
+            }
+        }
+        Event::Act { act: Act::Accounts(act) } => {
+            if pages.accounts_open {
+                pages.accounts.act(client, act, &mut pages.serial, out);
+            }
+        }
         Event::Left => {
             pages.accounts.leave(out);
             pages.accounts_open = false;
@@ -246,52 +283,8 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
         Event::Act { act: Act::Project { project } } => choose_project(pages, client, project),
         Event::Act { act: Act::SignOut } => out.push(Request::Client(jig_client::Event::SignOut)),
         Event::Act { act: Act::Go { address } } => out.push(Request::Show { address }),
-        Event::Told { told: Told::Changed { handle } } if handle == me_handle() => {
-            if let Some(me) = accounts::current_me(client) {
-                if pages.party.is_some() && pages.party != Some(me.party.number) {
-                    pages.accounts.leave(out);
-                    pages.accounts = accounts::Accounts::default();
-                    out.push(Request::Client(jig_client::Event::Unwatch { handle: accounts::handle() }));
-                    out.push(Request::Client(jig_client::Event::Watch {
-                        handle: accounts::handle(),
-                        subject: Watchable::Jig(Subject::Accounts),
-                    }));
-                }
-                pages.party = Some(me.party.number);
-            }
-            if let Some(me) = pages.me(client)
-                && !contains(me, pages.project)
-            {
-                pages.project = None;
-                if let Some(row) = me.projects.iter().next() {
-                    pages.project = Some(row.project);
-                }
-            }
-        }
-        Event::Link { link: Link::SignedOut | Link::OutOfDate } => {
-            if pages.watching {
-                out.push(Request::Client(jig_client::Event::Unwatch { handle: me_handle() }));
-                pages.watching = false;
-                out.push(Request::Client(jig_client::Event::Unwatch { handle: accounts::handle() }));
-            }
-            pages.accounts.leave(out);
-            pages.accounts = accounts::Accounts::default();
-            pages.party = None;
-            pages.project = None;
-        }
-        Event::Link { link: Link::Starting | Link::Live | Link::Offline } => {
-            if !pages.watching {
-                pages.watching = true;
-                out.push(Request::Client(jig_client::Event::Watch {
-                    handle: me_handle(),
-                    subject: Watchable::Jig(Subject::Me),
-                }));
-                out.push(Request::Client(jig_client::Event::Watch {
-                    handle: accounts::handle(),
-                    subject: Watchable::Jig(Subject::Accounts),
-                }));
-            }
-        }
+        Event::Told { told: Told::Changed { handle } } if handle == me_handle() => me_changed(pages, client, out),
+        Event::Link { link } => link_changed(pages, link, out),
         Event::Told { told } => {
             if crate::acts::told(pages, &told) {
                 pages.shown = pages.shown.checked_add(1).expect("pages shown fits");
@@ -303,7 +296,10 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
         }
     }
     let owner = pages.accounts_open
-        && matches!(accounts::current_me(client), Some(me) if me.deployment_role == Some(jig_client::contract::HeldRole::Owner));
+        && match accounts::current_me(client) {
+            Some(me) => me.deployment_role == Some(jig_client::contract::HeldRole::Owner),
+            None => false,
+        };
     pages.accounts.configure(owner, &mut pages.next, out);
     let me = pages.me(client);
     if let Some(chats) = &mut pages.chats {
@@ -393,6 +389,9 @@ fn seen(pages: &mut Pages, out: &mut Queue<Request>) {
 }
 
 fn page_told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Request>) -> bool {
+    if pages.accounts.told(client, &told) {
+        return true;
+    }
     if let Told::Changed { handle } | Told::Ended { handle, .. } = &told
         && (*handle == accounts::handle() || *handle == me_handle() || Some(*handle) == pages.accounts.deployment)
     {
@@ -458,6 +457,7 @@ fn confirmation(pages: &mut Pages, env: &Env<Limits>, client: &Client, act: Act,
             crate::acts::step(pages, env, act, out);
         }
         Act::Project { .. }
+        | Act::Accounts(_)
         | Act::SignOut
         | Act::ChatWords { .. }
         | Act::StartChat
@@ -495,4 +495,62 @@ fn redirect_chat(pages: &Pages, client: &Client, out: &mut Queue<Request>) {
 #[must_use]
 pub fn max_out(limits: &Limits) -> u32 {
     inbox::max_out(limits).checked_add(4).expect("pages output fits")
+}
+
+fn me_changed(pages: &mut Pages, client: &Client, out: &mut Queue<Request>) {
+    if let Some(me) = accounts::current_me(client) {
+        let parked = if let Some(pending) = &pages.accounts.pending
+            && let Some(held) = client.pending(pending.key)
+        {
+            held.party != me.party.number
+        } else {
+            false
+        };
+        if (pages.party.is_some() && pages.party != Some(me.party.number)) || parked {
+            pages.accounts.leave(out);
+            pages.accounts = accounts::Accounts::default();
+            out.push(Request::Client(jig_client::Event::Unwatch { handle: accounts::handle() }));
+            out.push(Request::Client(jig_client::Event::Watch {
+                handle: accounts::handle(),
+                subject: Watchable::Jig(Subject::Accounts),
+            }));
+        }
+        pages.party = Some(me.party.number);
+    }
+    if let Some(me) = pages.me(client)
+        && !contains(me, pages.project)
+    {
+        pages.project = None;
+        if let Some(row) = me.projects.iter().next() {
+            pages.project = Some(row.project);
+        }
+    }
+}
+fn link_changed(pages: &mut Pages, link: Link, out: &mut Queue<Request>) {
+    match link {
+        Link::SignedOut | Link::OutOfDate => {
+            if pages.watching {
+                out.push(Request::Client(jig_client::Event::Unwatch { handle: me_handle() }));
+                pages.watching = false;
+                out.push(Request::Client(jig_client::Event::Unwatch { handle: accounts::handle() }));
+            }
+            pages.accounts.leave(out);
+            pages.accounts = accounts::Accounts::default();
+            pages.party = None;
+            pages.project = None;
+        }
+        Link::Starting | Link::Live | Link::Offline => {
+            if !pages.watching {
+                pages.watching = true;
+                out.push(Request::Client(jig_client::Event::Watch {
+                    handle: me_handle(),
+                    subject: Watchable::Jig(Subject::Me),
+                }));
+                out.push(Request::Client(jig_client::Event::Watch {
+                    handle: accounts::handle(),
+                    subject: Watchable::Jig(Subject::Accounts),
+                }));
+            }
+        }
+    }
 }

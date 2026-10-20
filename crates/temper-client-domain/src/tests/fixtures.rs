@@ -180,6 +180,12 @@ pub fn adopted() -> forge::Answer {
     })
 }
 pub fn start(root: &mut crate::Domain, kept: List<skein_lib::RequestRecord<jig_client::Held>>) -> Token {
+    start_accounts(root, kept).0
+}
+pub fn start_accounts(
+    root: &mut crate::Domain,
+    kept: List<skein_lib::RequestRecord<jig_client::Held>>,
+) -> (Token, Token) {
     let limits = limits();
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     crate::step(
@@ -212,7 +218,18 @@ pub fn start(root: &mut crate::Domain, kept: List<skein_lib::RequestRecord<jig_c
         &mut out,
     );
     let mut frame = None;
+    let mut accounts = None;
     while let Some(request) = out.pop() {
+        if let Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down:
+                        jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(contract::Subject::Accounts) },
+                },
+        } = &request
+        {
+            accounts = Some(*watch);
+        }
         if let Request::Client {
             request:
                 jig_client::Request::Down {
@@ -223,7 +240,7 @@ pub fn start(root: &mut crate::Domain, kept: List<skein_lib::RequestRecord<jig_c
             frame = Some(watch);
         }
     }
-    frame.expect("start opens a frame watch")
+    (frame.expect("start opens a frame watch"), accounts.expect("start opens accounts"))
 }
 pub fn confirm(root: &mut crate::Domain, watch: Token, party: u64, out: &mut Queue<Request>) {
     let limits = limits();
