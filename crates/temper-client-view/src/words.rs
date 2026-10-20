@@ -345,7 +345,7 @@ impl Words {
                         .push(HoleShape {
                             kind: *kind,
                             bytes: if word == Word::DemoRequest {
-                                1024
+                                temper_client_domain::forge::DEMO_FIELD_BYTES
                             } else if *kind == HoleKind::Name {
                                 joined
                             } else {
@@ -392,7 +392,7 @@ impl Words {
             holes: 3,
             segments: 1536,
             text_bytes: 24576,
-            hole_bytes: joined.max(1024),
+            hole_bytes: joined.max(temper_client_domain::forge::DEMO_FIELD_BYTES),
         };
         let book = Phrasebook::load(shapes.into_boxed(), Box::new([language]), &limits)?;
         Ok(Words { book, language: 0, connector })

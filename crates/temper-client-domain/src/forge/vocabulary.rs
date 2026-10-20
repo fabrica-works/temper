@@ -125,3 +125,12 @@ pub struct Demo {
     pub name: Box<[u8]>,
     pub cues: Box<[Box<[u8]>]>,
 }
+/// The longest owner or name a `Demo` holds: the wire's ceiling (client/README.md, 4.6).
+pub const DEMO_FIELD_BYTES: u32 = {
+    let ceilings = temper_client_protocol_wire::v1::CEILINGS;
+    if ceilings.demo_answer_owner > ceilings.demo_answer_name {
+        ceilings.demo_answer_owner
+    } else {
+        ceilings.demo_answer_name
+    }
+};

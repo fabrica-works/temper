@@ -634,16 +634,14 @@ for its kind, its user's login and its installations. Its nodes:
 - **`CLIENT_VERSION`:** the version of every record below, 1 at first,
   2 since the demo's read, moved as `../protocol/README.md`, section 9
   says: at most once in a plan, at its first landing that changes one
-  of these records, and
-  shared by plans that run at once. A request, an outcome or a field
-  added to the family (the FORGE requests of section 8, the picker's
-  ids in `Adopt`, the forge's kind in the adopted outcome, the demo's
-  read) changes
-  them, so it is such a move, never a second version served beside the
-  first. The engine serves exactly one version (jig's
-  `protocol/client.md`, section 9): a client of another is out of date
-  for the forge (4.4), and its kept adoption is dropped as kept work at
-  start (6.6; jig's `protocol/client.md`, section 10).
+  of these records, and shared by plans that run at once. A request, an
+  outcome or a field added to the family (the FORGE requests of section
+  8, the picker's ids in `Adopt`, the forge's kind in the adopted
+  outcome, the demo's read) changes them, so it is such a move, never a
+  second version served beside the first. The engine serves exactly one
+  version (jig's `protocol/client.md`, section 9): a client of another
+  is out of date for the forge (4.4), and its kept adoption is dropped
+  as kept work at start (6.6; jig's `protocol/client.md`, section 10).
 - **The request, `Adopt`:** the project (u32); the forge's number
   (u16); the owner, the name, the prefix and the landing branch (byte
   strings); the role (owned, fork or context); home and ci (booleans);
@@ -968,7 +966,7 @@ OWNER/NAME is the demo's repository, and the cues the demo's, copied in:
 - **The suggestions,** on the chats page, after the level-1 heading and
   before the composer: the heading "What shall we change?"; "Try a
   request in OWNER/NAME. Follow the task from its branch to a landed
-  change."; a group named "Suggested requests" of one button per cue,
+  change."; a list named "Suggested requests" of one button per cue,
   each named by its cue's words; and "The demo model plays these
   requests from a script."
 - **The composer's line,** on the demo's account: "Using NAME · MODEL",

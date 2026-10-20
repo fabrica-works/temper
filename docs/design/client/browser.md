@@ -296,12 +296,12 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
 
 ### 4.1 The first milestone's stories
 
-1. **Signing in by the printed link:** the inbox shows, and the
-   address reads `/` once it does; a reload on a chat's address shows
-   that chat, signed in by the cookie; a link spent shows the browser's
-   signed-out paragraph (2.4). That the secret leaves the address
-   before the first request is held by the shell's start order (2.1),
-   and is not tested.
+1. **Signing in by the printed link:** the chats show, and the
+   address reads `/chats` once they do (2.4); a reload on a chat's
+   address shows that chat, signed in by the cookie; a link spent shows
+   the browser's signed-out paragraph (2.4). That the secret leaves the
+   address before the first request is held by the shell's start order
+   (2.1), and is not tested.
 2. **Addresses:** skein's `back_and_forward` (skein's `ui-web.md`,
    14.2), from the chats to a chat by its link and back; an address
    that is no page opens the inbox, and the address reads `/` once it

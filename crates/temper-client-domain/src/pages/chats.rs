@@ -130,10 +130,7 @@ impl Chats {
             return;
         }
         let (Some(me), Some(project)) = (me, project) else { return };
-        let Ok(words) = Text::new(words, env.limits.client.domain.text.max(temper_client_protocol_wire::CUE_BYTES))
-        else {
-            return;
-        };
+        let Ok(words) = Text::new(words, env.limits.client.domain.text) else { return };
         match jig_client::shapes::chat(me, project, words) {
             Ok(ask) => {
                 *serial = serial.checked_add(1).expect("page keys fit");

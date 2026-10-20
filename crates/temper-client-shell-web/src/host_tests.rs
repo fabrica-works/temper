@@ -167,3 +167,8 @@ fn the_accounts_href_navigates_inside_the_app() {
 fn the_web_preset_has_a_literal_price() {
     assert_eq!(limits::worst_case(&limits::client()), Some(119_483_766_472));
 }
+
+#[test]
+fn the_web_preset_sends_a_whole_suggested_request() {
+    assert!(limits::client().client.domain.text >= temper_client_protocol_wire::CUE_BYTES);
+}

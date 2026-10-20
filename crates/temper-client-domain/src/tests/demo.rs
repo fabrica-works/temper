@@ -192,14 +192,19 @@ fn opened(cue: &[u8]) -> (crate::Domain, skein_lib::Token) {
 }
 #[test]
 fn a_suggestion_starts_one_chat_with_its_cue_and_preserves_the_draft() {
-    for (row, pending, project, model, cue, count) in [
-        ("demo project", false, f::PROJECT, true, 0, 1),
-        ("pending", true, f::PROJECT, true, 0, 0),
-        ("other project", false, f::PROJECT + 1, true, 0, 0),
-        ("no model half", false, f::PROJECT, false, 0, 0),
-        ("past cues", false, f::PROJECT, true, 1, 0),
+    assert_eq!(f::limits().client.domain.text, 32, "the bound rows below sit at the composer's bound");
+    let at_bound = [b'a'; 32];
+    let past_bound = [b'a'; 33];
+    for (row, words, pending, project, model, cue, count) in [
+        ("demo project", CUE, false, f::PROJECT, true, 0, 1),
+        ("at the composer's bound", &at_bound, false, f::PROJECT, true, 0, 1),
+        ("past the composer's bound", &past_bound, false, f::PROJECT, true, 0, 0),
+        ("pending", CUE, true, f::PROJECT, true, 0, 0),
+        ("other project", CUE, false, f::PROJECT + 1, true, 0, 0),
+        ("no model half", CUE, false, f::PROJECT, false, 0, 0),
+        ("past cues", CUE, false, f::PROJECT, true, 1, 0),
     ] {
-        let (mut root, account) = opened(CUE);
+        let (mut root, account) = opened(words);
         if pending {
             act(&mut root, Act::StartChat);
         }
@@ -254,32 +259,10 @@ fn a_suggestion_starts_one_chat_with_its_cue_and_preserves_the_draft() {
         if count == 1 {
             assert_eq!(
                 sent.as_slice(),
-                [jig_client::shapes::chat(&f::chats::me(), f::PROJECT, f::acts::text(CUE)).unwrap()],
+                [jig_client::shapes::chat(&f::chats::me(), f::PROJECT, f::acts::text(words)).unwrap()],
                 "{row}"
             );
         }
         assert_eq!(root.pages().chats().unwrap().words.as_ref(), DRAFT, "{row}");
     }
-}
-
-#[test]
-fn a_suggestion_at_the_cue_byte_ceiling_sends_all_its_words() {
-    let cue = [b'a'; 256];
-    let (mut root, _) = opened(&cue);
-    let mut out = act(&mut root, Act::Suggest { cue: 0 });
-    let expected =
-        jig_client::shapes::chat(&f::chats::me(), f::PROJECT, c::Text::new(cue.into(), wire::CUE_BYTES).unwrap())
-            .unwrap();
-    let mut sent = List::with_capacity(1);
-    while let Some(request) = out.pop() {
-        if let crate::Request::Client {
-            request:
-                jig_client::Request::Down { down: jig_client::Down::Send { request: jig_client::Ask::Jig(ask), .. } },
-        } = request
-        {
-            sent.push(*ask).unwrap();
-        }
-    }
-    assert_eq!(sent.as_slice(), [expected]);
-    assert_eq!(root.pages().chats().unwrap().words.as_ref(), DRAFT);
 }
