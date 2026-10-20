@@ -101,3 +101,5 @@ fn a_long_forge_path_shows_its_last_whole_segment() {
         b"\xe2\x80\xa6/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/last"
     );
 }
+
+mod accounts;

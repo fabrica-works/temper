@@ -62,14 +62,21 @@ impl Accounts {
     pub(crate) fn act(&mut self, client: &Client, act: Act, serial: &mut u64, out: &mut Queue<Request>) {
         match act {
             Act::Select { selection } => {
-                self.value = None;
+                self.clear_key();
                 self.confirm = None;
                 self.selection = selection;
                 self.broken = None;
             }
             Act::Cancel => {
                 self.confirm = None;
-                self.value = None;
+                self.clear_key();
+                self.broken = None;
+                if let Some(pending) = &self.pending
+                    && (pending.outcome == Some(jig_client::Outcome::Lost)
+                        || pending.outcome == Some(jig_client::Outcome::Unsent))
+                {
+                    self.pending = None;
+                }
             }
             Act::Confirm => {
                 if let Some((name, ask)) = self.confirm.take() {
@@ -96,7 +103,7 @@ impl Accounts {
                         || pending.outcome == Some(jig_client::Outcome::Lost))
                     && (pending.name != Some(name) || pending.ask != ask)
                 {
-                    self.value = None;
+                    self.clear_key();
                     self.broken = Some(Broken::ValueAgain);
                     return;
                 }
@@ -168,6 +175,7 @@ impl Accounts {
             return;
         }
         let value = self.value.take();
+        self.clear_key();
         if carrying && value.is_none() {
             self.broken = Some(Broken::ValueAgain);
             return;

@@ -53,6 +53,7 @@ pub struct Accounts {
     pub confirm: Option<(skein_lib::RequestKey, c::Ask)>,
     pub broken: Option<Broken>,
     value: Option<Secret>,
+    written: u64,
 }
 
 impl Default for Accounts {
@@ -71,12 +72,13 @@ impl Accounts {
             confirm: None,
             broken: None,
             value: None,
+            written: 0,
         }
     }
 
     pub(crate) fn configure(&mut self, owner: bool, next: &mut u64, out: &mut Queue<Request>) {
         if !owner && self.deployment.is_some() && self.selection.holder == c::AccountHolder::Deployment {
-            self.value = None;
+            self.clear_key();
             self.confirm = None;
             self.selection.provider = None;
             self.selection.account = None;
@@ -96,7 +98,7 @@ impl Accounts {
     }
 
     pub(crate) fn leave(&mut self, out: &mut Queue<Request>) {
-        self.value = None;
+        self.clear_key();
         self.confirm = None;
         self.selection = Selection::default();
         if let Some(handle) = self.deployment.take() {
@@ -135,6 +137,14 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
 }
 
 impl Accounts {
+    #[must_use]
+    pub const fn key_written(&self) -> u64 {
+        self.written
+    }
+    pub(super) fn clear_key(&mut self) {
+        self.value = None;
+        self.written = self.written.checked_add(1).expect("account field writes fit");
+    }
     #[must_use]
     pub fn has_key(&self) -> bool {
         self.value.is_some()

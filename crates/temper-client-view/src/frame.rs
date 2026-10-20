@@ -184,5 +184,12 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
             bindings,
         );
     }
+    action(
+        builder,
+        Role::Link,
+        &crate::accounts::words::say(words, crate::accounts::words::Word::Accounts, &[]),
+        Act::Go { address: Address::Accounts },
+        bindings,
+    );
     builder.close();
 }

@@ -1,5 +1,5 @@
 use jig_client::contract::{OwnerPart, OwnerPartKey, OwnerPartKind, Part};
-use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Wall, Writer};
+use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Token, Wall, Writer};
 use temper_client_domain::{Limits, forge};
 pub const FORGE: u16 = temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Forge);
 pub const PROJECT: u32 = 1;
@@ -155,7 +155,7 @@ pub fn find(tree: &skein_ui::Tree, role: skein_ui::Role, name: &[u8]) -> Option<
 pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
     root_with_watch(project).0
 }
-pub fn root_with_watch(project: Option<u32>) -> (temper_client_domain::Domain, skein_lib::Token) {
+pub fn root_with_watch(project: Option<u32>) -> (temper_client_domain::Domain, Token) {
     let (root, me, _) = root_at(
         temper_client_domain::Address::Inbox {
             filter: temper_client_domain::address::Filter { project, ..temper_client_domain::address::Filter::ALL },
@@ -167,21 +167,33 @@ pub fn root_with_watch(project: Option<u32>) -> (temper_client_domain::Domain, s
 pub(super) fn root_at(
     address: temper_client_domain::Address,
     limits: &Limits,
-) -> (temper_client_domain::Domain, skein_lib::Token, Option<skein_lib::Token>) {
+) -> (temper_client_domain::Domain, Token, Option<Token>) {
     let (root, me, page, _) = root_at_with_tree(address, limits);
     (root, me, page)
 }
 pub(super) fn root_at_with_tree(
     address: temper_client_domain::Address,
     limits: &Limits,
-) -> (temper_client_domain::Domain, skein_lib::Token, Option<skein_lib::Token>, Option<skein_lib::Token>) {
+) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>) {
     root_at_with_tree_named(address, limits, b"Shop")
 }
 fn root_at_with_tree_named(
     address: temper_client_domain::Address,
     limits: &Limits,
     project_name: &[u8],
-) -> (temper_client_domain::Domain, skein_lib::Token, Option<skein_lib::Token>, Option<skein_lib::Token>) {
+) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>) {
+    let (root, me, page, tree, _) = root_at_full(address, limits, project_name);
+    (root, me, page, tree)
+}
+pub fn account_root() -> (temper_client_domain::Domain, Token) {
+    let (root, _, _, _, accounts) = root_at_full(temper_client_domain::Address::Accounts, &domain_limits(), b"Shop");
+    (root, accounts.expect("global accounts watch"))
+}
+fn root_at_full(
+    address: temper_client_domain::Address,
+    limits: &Limits,
+    project_name: &[u8],
+) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>) {
     use jig_client::contract::{
         self, Delivery, DocumentText, HeldRole, Me, MeParty, MeProject, Needs, PartyKind, Subject, WatchEvent,
     };
@@ -200,6 +212,7 @@ fn root_at_with_tree_named(
     let mut watch = None;
     let mut inbox_watch = None;
     let mut tree_watch = None;
+    let mut account_watch = None;
     for _ in 0..out.len() {
         if let Some(Request::Client {
             request:
@@ -210,6 +223,8 @@ fn root_at_with_tree_named(
         {
             if subject == Subject::Me {
                 watch = Some(token);
+            } else if subject == Subject::Accounts {
+                account_watch = Some(token);
             } else if let Subject::Tree { .. } = subject {
                 tree_watch = Some(token);
             } else if let Subject::Inbox { .. } | Subject::Task { .. } = subject {
@@ -267,7 +282,7 @@ fn root_at_with_tree_named(
         },
         &mut out,
     );
-    (root, watch.expect("me opened"), inbox_watch, tree_watch)
+    (root, watch.expect("me opened"), inbox_watch, tree_watch, account_watch)
 }
 pub fn adoption_root() -> temper_client_domain::Domain {
     adoption_page(PROJECT, b"shop")

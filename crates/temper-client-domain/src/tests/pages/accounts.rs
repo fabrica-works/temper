@@ -546,3 +546,101 @@ fn assert_finished_operation(
     page.act(client, Act::Confirm, serial, out);
     assert!(out.is_empty());
 }
+
+#[test]
+fn cancel_abandons_a_named_lost_account_act() {
+    for envelope in [skein_lib::RequestEnvelope::Lost, skein_lib::RequestEnvelope::Again] {
+        let (mut root, _, _) = opened(c::HeldRole::Member);
+        select(&mut root, c::AccountHolder::Own);
+        key(&mut root, b"first-key");
+        let attempt = sends(submit(&mut root, Operation::AddKey)).pop().unwrap().0;
+        event(
+            &mut root,
+            Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Answer { attempt, envelope, answer: None, why: None },
+                },
+            },
+        );
+        act(&mut root, Act::Cancel);
+        assert!(root.pages().accounts().unwrap().pending.is_none());
+        key(&mut root, b"another-key");
+        assert_eq!(sends(act(&mut root, Act::Submit { name: [99; 16], operation: Operation::AddKey })).len(), 1);
+    }
+}
+#[test]
+fn cancel_abandons_a_restored_lost_account_act() {
+    for outcome in [jig_client::Outcome::Lost, jig_client::Outcome::Unsent] {
+        let (mut root, _, _) = opened(c::HeldRole::Member);
+        let key = jig_client::Key { asker: pages::me_handle().asker, number: 991 };
+        let mut out = Queue::with_capacity(crate::max_out(&fixtures::limits()));
+        crate::route::told(
+            &mut root,
+            &fixtures::env(&fixtures::limits()),
+            jig_client::Told::Kept {
+                key,
+                request: jig_client::Ask::Jig(Box::new(c::Ask::SignIn {
+                    holder: c::AccountHolder::Own,
+                    provider: PROVIDER,
+                })),
+            },
+            &mut out,
+        );
+        crate::route::told(
+            &mut root,
+            &fixtures::env(&fixtures::limits()),
+            jig_client::Told::Answered { key, outcome },
+            &mut out,
+        );
+        assert_eq!(root.pages().accounts().unwrap().pending.as_ref().unwrap().name, None);
+        act(&mut root, Act::Cancel);
+        select(&mut root, c::AccountHolder::Own);
+        assert_eq!(sends(submit(&mut root, Operation::Resume)).len(), 1);
+    }
+}
+#[test]
+fn typed_account_lists_outlive_the_task_window() {
+    let (mut root, _, watch) = opened(c::HeldRole::Member);
+    let count = fixtures::limits().client.domain.rows.checked_add(1).unwrap();
+    let mut rows = List::with_capacity(count);
+    let mut signing = List::with_capacity(count);
+    for number in 1..=count {
+        let mut sources = List::with_capacity(count);
+        for source in 1..=count {
+            sources
+                .push(c::OwnerAccountSource {
+                    place: source,
+                    number: source,
+                    kind: c::OwnerAccountKind::Key,
+                    state: c::OwnerAccountState::Granted,
+                    usable: true,
+                    expiring: false,
+                    attention: false,
+                    spent_until: None,
+                })
+                .unwrap();
+        }
+        rows.push(c::OwnerAccountLine {
+            number,
+            place: number,
+            uses: None,
+            plan: false,
+            provider: Some(PROVIDER),
+            display: c::DocumentText::complete(c::Text::new(Box::from(b"Account".as_slice()), 32).unwrap()),
+            holder: c::OwnerAccountHolder::Party(fixtures::PARTY),
+            sources,
+            cut: false,
+        })
+        .unwrap();
+        signing
+            .push(c::OwnerAccountSignIn {
+                source: number,
+                provider: PROVIDER,
+                holder: c::OwnerAccountHolder::Party(fixtures::PARTY),
+            })
+            .unwrap();
+    }
+    let doc = c::OwnerAccounts { accounts: rows, signing, last_end: None, usable: true, settled: false, cut: false };
+    deliver(&mut root, watch, c::WatchEvent::Delivered(c::Delivery::OwnerAccounts(Box::new(doc.clone()))));
+    assert_eq!(accounts::document(root.client()), Some(&doc));
+}

@@ -302,8 +302,8 @@ impl Words {
             },
             None => return Err(Invalid::Overflow),
         };
-        let mut shapes = List::with_capacity(320);
-        let mut phrases = List::with_capacity(320);
+        let mut shapes = List::with_capacity(512);
+        let mut phrases = List::with_capacity(512);
         for word in ALL {
             let (literals, kinds) = english(word, shell);
             let mut holes = List::with_capacity(3);
@@ -337,6 +337,7 @@ impl Words {
         for phrase in jig_language().phrases {
             phrases.push(phrase).expect("jig words fit");
         }
+        crate::accounts::words::extend(&mut shapes, &mut phrases);
         crate::cards::words::extend(text, &mut shapes, &mut phrases);
         temper_client_domain::forge::words::extend(connector, text, &mut shapes, &mut phrases);
         resource_phrases(connector, joined, &mut shapes, &mut phrases);
@@ -348,10 +349,10 @@ impl Words {
         };
         let limits = PhraseLimits {
             languages: 1,
-            phrases: 320,
+            phrases: 512,
             holes: 3,
             segments: 1536,
-            text_bytes: 16384,
+            text_bytes: 24576,
             hole_bytes: joined.max(513),
         };
         let book = Phrasebook::load(shapes.into_boxed(), Box::new([language]), &limits)?;
@@ -392,7 +393,7 @@ impl Words {
         for word in jig_client::words::ALL {
             most = most.max(self.book.capacity(word.id())?);
         }
-        Some(most.max(crate::forge::words::capacity(self)?))
+        Some(most.max(crate::forge::words::capacity(self)?).max(crate::accounts::words::capacity(self)?))
     }
 }
 fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [HoleKind]) {

@@ -2,6 +2,7 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+mod accounts;
 pub mod cards;
 mod confirm;
 pub mod forge;
@@ -12,6 +13,6 @@ pub mod pages;
 mod root;
 pub mod words;
 pub use limits::{Limits, worst_case};
-pub use root::{View, act, build};
+pub use root::{View, act, build, event};
 #[cfg(test)]
 mod tests;

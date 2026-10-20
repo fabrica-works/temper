@@ -13,6 +13,7 @@ pub struct View {
     forge_words: Words,
     forge: forge::bindings::Bindings,
     pages: crate::frame::Bindings,
+    accounts: crate::accounts::Bindings,
     limits: Limits,
     rows: u32,
     text: u32,
@@ -26,6 +27,7 @@ impl View {
             render: skein_ui::View::new(&limits.tree),
             forge: forge::bindings::Bindings::new(limits.tree.bindings, domain.forge.checks, forge),
             pages: crate::frame::Bindings::new(limits.tree.bindings),
+            accounts: crate::accounts::Bindings::new(32),
             forge_words,
             limits: *limits,
             rows: domain.client.domain.rows,
@@ -59,6 +61,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     }
     view.forge.begin();
     view.pages.begin();
+    view.accounts.begin();
     let mut builder = view.render.builder();
     builder.open(Role::Page);
     crate::frame::banner(&mut builder, root, &view.forge_words, &mut view.pages);
@@ -88,6 +91,8 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
         crate::pages::chat::main(&mut builder, root, &view.forge_words, &mut view.pages, view.rows, view.text);
     } else if let temper_client_domain::Address::Task { .. } = root.pages().address() {
         view.task_main(&mut builder, root);
+    } else if *root.pages().address() == temper_client_domain::Address::Accounts {
+        crate::pages::accounts::main(&mut builder, root, &view.forge_words, &mut view.accounts);
     } else if let temper_client_domain::Address::Adopt { .. } = root.pages().address() {
         view.adoption_main(&mut builder, root);
     }
@@ -96,12 +101,22 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
 }
 #[must_use]
 pub fn act(view: &mut View, node: NodeId, act: Act) -> Option<Action> {
+    if let temper_client_domain::Event::Act { action } = event(view, node, act)? { Some(action) } else { None }
+}
+/// Shell inputs can move a secret directly to the domain without a clonable action.
+#[must_use]
+pub fn event(view: &mut View, node: NodeId, act: Act) -> Option<temper_client_domain::Event> {
     let bound = view.render.act(node, act)?;
+    if bound.binding.owner == crate::accounts::owner() {
+        return view.accounts.decode(bound.binding.token, bound.act);
+    }
     if bound.binding.owner == crate::frame::owner() {
-        return view.pages.decode(bound.binding.token, bound.act);
+        return Some(temper_client_domain::Event::Act { action: view.pages.decode(bound.binding.token, bound.act)? });
     }
     if bound.binding.owner == temper_client_domain::forge::words::owner(view.forge_words.connector) {
-        forge::bindings::decode(&view.forge, bound.binding.token, bound.act)
+        Some(temper_client_domain::Event::Act {
+            action: forge::bindings::decode(&view.forge, bound.binding.token, bound.act)?,
+        })
     } else {
         None
     }

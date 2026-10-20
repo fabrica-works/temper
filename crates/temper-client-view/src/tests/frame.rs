@@ -3,11 +3,11 @@ use skein_ui::{Act, Role};
 use temper_client_domain::{Action, pages};
 
 #[test]
-fn the_navigation_offers_inbox_chats_and_adoption_in_order() {
+fn the_navigation_ends_with_accounts() {
     let view = fixtures::signed_in_with_project();
     assert_eq!(
         fixtures::link_names(&view).as_ref(),
-        [Box::from(*b"Inbox 0"), Box::from(*b"Chats"), Box::from(*b"Adopt a repository")]
+        [Box::from(*b"Inbox 0"), Box::from(*b"Chats"), Box::from(*b"Adopt a repository"), Box::from(*b"Accounts")]
     );
 }
 #[test]
@@ -176,5 +176,5 @@ fn each_link_shows_its_name_as_its_text() {
             links += 1;
         }
     }
-    assert_eq!(links, 3);
+    assert_eq!(links, 4);
 }
