@@ -263,16 +263,18 @@ Removes: nothing.
 ### 08.4 TLS faults and the machine stories over TLS
 Scope: forge-connection 8, 10's TLS forge, including handshake faults/deadlines and Close.
 Needs: 08.3's machine/listener stories and landed skein08.s1; skein's TLS fixtures exist at base.
-Files: tests/forge/machine/{Cargo.toml,src/{machine,peer,fixtures,lib}.rs,tests/machine.rs}; new src/tls.rs
-  and tests/fuzzy_tls.rs. Manifest: skein-tls-world = { path = "../../tls" }.
+Files: tests/forge/machine/{Cargo.toml,src/{machine,peer,fixtures,lib}.rs,tests/machine.rs}; new src/tls.rs,
+  tests/fuzzy_tls.rs and tests/exhaustive_tls.rs; skein's .config/nextest.toml (the exhaustive profile).
+  Manifest: skein-tls-world = { path = "../../tls" }.
 Shape: wrap scripted HTTP peer bytes in skein_tls_world::server::Server, pki::Server::plain().config(),
   pki::client(&[]) and pki::name(). TLS clock starts at pki::VALID and advances with virtual time,
   never EPOCH. Use 03.1's Transport::Tls, no host field; Host follows decision25. Extend 08.2/08.3's
   machine tables to both transports, plus Handshaking (D, Unseen, Unavailable, cost0, terminal1) and Close.
-  tls::tls_cuts(seed: u64) -> Vec<(u64,u64,u64,u64)> returns independently counted written requests,
-  reported cost, terminals, Closed events per cut. TLS draws kernel entropy (testing-strategy 4.4);
-  ECDSA handshake lengths vary. Capture each trial's wire flight, derive the cut range from those bytes,
-  and cut that same flight; never use a previous handshake's length or assert an exact TLS byte count.
+  tls::tls_cuts(seed: u64, sweep: Sweep) -> Vec<(u64,u64,u64,u64)> returns independently counted written
+  requests, reported cost, terminals, Closed events per cut: Sweep::Every at every byte (4,709 rows at
+  this pin), Sweep::Boundaries at the readers' boundaries (the measured aim, below). TLS draws kernel
+  entropy (testing-strategy 4.4); ECDSA handshake lengths vary. Capture each trial's wire flight,
+  derive the cut range from those bytes, and cut that same flight; never use a previous handshake's length or assert an exact TLS byte count.
   HTTP cuts range over that trial's plaintext framing; assertions concern outcomes/counts only.
   Ruling214's single handshake-only follow-up is exhausted. A fresh owner
   gets at most20 wall minutes from start, TWO executable pinned-heavy
@@ -301,8 +303,45 @@ Shape: wrap scripted HTTP peer bytes in skein_tls_world::server::Server, pki::Se
   adds no permanent identity/scenario. Refresh further reached terminal
   copies and observations, listing users and changed observed write counts
   in the commit body; the before/after-write error mapping stays.
+  The measured aim (the designer's answer of 2026-10-20, forge-connection 10, "Over TLS, every byte
+  outside the gate"). Cause, measured per row on this draft: a client-hello cut 1.2 ms (6 ticks); a
+  server-flight cut 3.4-3.7 ms (55 ticks: the component's TLS client 1.1 ms, the peer's rustls server
+  1.3 ms); an HTTP cut 5-7 ms (106-138 ticks); a Locate-response cut 9-10 ms (1,749 ticks, 1,598 of
+  them busy only on `wire.eof && !wire.ended`). The 4,241 rows past the client's hello cost about
+  10 s in cryptography alone, so no driver repair brings Every within 5 s. No two rows can share a
+  flight: each is bound to its own hello, and seeded entropy, a cloned world or a replayed flight
+  changes the contract. So:
+  - Quiet: a peer whose only busy cause is its end waiting (`wire.eof && !wire.ended`) and whose Wire
+    answered nothing in that tick is not busy: Wire delivers the end once a demand comes, and run_for
+    jumps to the next deadline meanwhile. The rest of busy, the same-time settle and every terminal
+    path stay. On this draft it took the Locate-response rows from 1,749 ticks to 151, and all 4,709
+    rows passed.
+  - Boundaries: in each trial's own captured flight, each record's start and its 5-byte header's end,
+    and the flight's end; in the control's captured requests and the script's responses, 0, each line's
+    end (after its CRLF), the head's end and the body's end. Each edge -1/0/+1, clamped to 0..=length,
+    deduplicated, with EOF and reset. A handshake cut names its record, edge and delta, and the peer
+    resolves it against that trial's flight at capture, as Every resolves its byte; a trial whose flight
+    has no such record ends the phase. At this pin flights hold 3 records (ServerHello 122,
+    ChangeCipherSpec 1, one encrypted record of 1,063-1,066) and the hello 1 (228): about 220 rows.
+  - Map: `fuzzy_tls.rs::tls_faults_at_each_byte_end_once` moves unchanged to
+    `tests/exhaustive_tls.rs` (same name, `tls_cuts(7, Sweep::Every)`): every row's exact result
+    (Unavailable/cost0 before the call's write, Timeout/cost1 after, the complete row Ok/cost1),
+    cost == written, (terminals, Closed) = (1, 1), last event closed, and the control.
+    `fuzzy_tls.rs::tls_faults_at_each_boundary_end_once` runs `tls_cuts(7, Sweep::Boundaries)` through
+    the same `outcome` and control. `a_tls_forge_starts_and_answers_a_call` is unchanged. Counts:
+    focused 43, fuzzy 8 (7+1), exhaustive 1.
+  - Suite: `[profile.exhaustive]`, default-filter `binary(/^exhaustive_/)`, global-timeout 60 s,
+    slow-timeout 20 s; the default profile's filter adds `not binary(/^exhaustive_/)`; fuzzy's is
+    unchanged. The machine's post-landing lane runs `heavy cargo nextest run --workspace --profile
+    exhaustive` after each skein push and reports a failure against the commit; the lane is not this
+    step's.
+  - Next, bounded: one narrow check of the quiet rule (the Locate response cut at its length minus one,
+    EOF: result, ticks, last Closed), then the normal proofs once each. Return a boundary sweep past 5 s
+    (with each phase's rows and time), an exhaustive one past 60 s, or an unproved quiet premise; never
+    sample, split or thin a sweep to fit.
 
-Test shape: one new focused (<0.5 s), one fuzzy (<5 s); pki is the trust override, no application profile.
+Test shape: one new focused (<0.5 s), one fuzzy (<5 s), one exhaustive (<60 s); pki is the trust override,
+  no application profile.
   a_tls_forge_starts_and_answers_a_call uses the moved fixture's limits and this reference:
 ```rust
 // tests/forge/machine/tests/machine.rs; existing imports plus pki and Transport.
@@ -328,23 +367,36 @@ fn a_tls_forge_starts_and_answers_a_call() {
 }
 ```
 ```rust
-// tests/forge/machine/tests/fuzzy_tls.rs
+// tests/forge/machine/tests/fuzzy_tls.rs; both files use skein_forge_machine_world::tls::{Sweep, tls_cuts}.
+#[test]
+fn tls_faults_at_each_boundary_end_once() {
+    for (written, cost, terminals, closed) in tls_cuts(7, Sweep::Boundaries) {
+        assert_eq!(cost, written);
+        assert_eq!((terminals, closed), (1, 1));
+    }
+}
+// tests/forge/machine/tests/exhaustive_tls.rs: the every-byte sweep, moved unchanged.
 #[test]
 fn tls_faults_at_each_byte_end_once() {
-    for (written, cost, terminals, closed) in skein_forge_machine_world::tls::tls_cuts(7) {
+    for (written, cost, terminals, closed) in tls_cuts(7, Sweep::Every) {
         assert_eq!(cost, written);
         assert_eq!((terminals, closed), (1, 1));
     }
 }
 ```
-  Sweep minimal handshake and HTTP start/first-call bytes, request and response, EOF/reset; reuse trust.
+  Sweep minimal handshake and HTTP start/first-call bytes, request and response, EOF/reset, at every
+  byte (exhaustive) or each boundary (fuzzy); reuse trust.
   Before any call write (including failed start/handshake): Unavailable/cost0; after first call write:
   Timeout/cost1 (Read::Locate as 08.2); successful control cost1. Each case checks that Error.
 Proof:
 world; `heavy cargo nextest run -p skein-forge-machine-world`: its step-start focused count plus1 (43 after08.s1/08.3), each <0.5 s, new focused work ≤1 s so far; only this harness controls TLS/HTTP phase and Close boundaries.
 world; `heavy cargo nextest run -p skein-forge-machine-world --profile fuzzy`: 8 passed (7+1), additions ≤5 s together, inherited four ≤7.8 s each and fuzzy_hooks <0.5 s; suite <60 s.
-Don't: TLS listener, renewal, optimized dependencies, fixed ECDSA flight lengths or entropy-seeded assertions.
-Size: about 0 lines moved, 300 new including tests: 140 TLS peer/clock, 100 sweep, 60 focused/table tests.
+world; `heavy cargo nextest run -p skein-forge-machine-world --profile exhaustive`: 1 passed, within the profile's 60 s; run once before landing, then by the post-landing lane after each push.
+Don't: TLS listener, renewal, optimized dependencies, fixed ECDSA flight lengths or entropy-seeded assertions;
+  a boundary row drawn at random, a cut resolved from another trial's flight, a cloned or snapshotted
+  world, a replayed flight, or the every-byte sweep in the gate's fuzzy suite.
+Size: about 0 lines moved, 360 new including tests: 140 TLS peer/clock, 160 sweeps and the quiet rule,
+  60 focused/table tests; 8 lines of nextest profile.
 Removes: nothing.
 
 ### 08.5 The counted worst case — dropped
@@ -371,6 +423,7 @@ runs measuring whole-suite wall time. Report an excess with its three slowest te
 
 - `heavy cargo nextest run -p skein-forge-machine-world` prints43passed after08.s1 (41 original+2 separated identities), each <0.5 s; new focused sum ≤1 s.
 - `heavy cargo nextest run -p skein-forge-machine-world --profile fuzzy` prints 8 passed; inherited four ≤7.8 s each, fuzzy_hooks <0.5 s, new fuzzy sum ≤5 s.
+- `heavy cargo nextest run -p skein-forge-machine-world --profile exhaustive` prints 1 passed within 60 s: TLS's every-byte sweep, outside the gate (forge-connection 10).
 - `heavy cargo clippy -p skein-forge-machine-world --all-targets -- -D warnings` prints Finished without warnings.
 - `heavy rg -n '^    "tests/forge/machine",$' Cargo.toml` prints exactly one member line.
 - `heavy rg -n -i temper tests/forge/machine` prints nothing (rg exit1); README Done when5 covers the whole kit.
