@@ -24,9 +24,11 @@ credentials.md's (section 4). What is open is listed in section 10.
   operation's one deadline. Which invocation comes next depends only on
   what the last one said, never on a retry: the component never retries
   (README.md, section 5).
-- **git as it ships, told exactly what to do.** git is run by the
-  absolute path configuration gives (configuration.md, section 4), in an
-  environment given whole, with settings on the command line that turn
+- **git as it ships, told exactly what to do.** git is run by an
+  absolute path: the one a repository's item names, a fake forge's
+  program (channel.md, section 4), or else `workers[].git`
+  (configuration.md, section 4); with neither, the invocation fails,
+  naming the forge's host. It runs in an environment given whole, with settings on the command line that turn
   off what could run another program or outlive the invocation: hooks,
   credential helpers, the file system monitor, background maintenance,
   every transport but HTTPS and HTTP.
@@ -82,7 +84,8 @@ the worker's root directory     workers[].root
   state. For an operation that names an identity, the routing reads the
   identity's newest value from the worker's identities' table and hands
   over one token, its login and the author with the operation
-  (credentials.md, section 4): Forgejo's one token, or on GitHub the
+  (credentials.md, section 4), with the program its repository's item
+  named, if one did (section 3): Forgejo's one token, or on GitHub the
   entry whose account id is the repository's owner's, which its
   workspace item carries (channel.md, sections 4 and 6). So the
   component holds a value only while that operation is in flight. An
@@ -110,7 +113,7 @@ the worker's root directory     workers[].root
 Every invocation has this shape:
 
 ```
-program    workers[].git, an absolute path (configuration.md, section 4)
+program    the repository's item's git, else workers[].git: an absolute path (configuration.md, section 4)
 argv       git -c <setting> … <command> <options> [--] <operands>
 directory  beneath the worker's root: the repository's directory, or the workspace's for Clone
 environment  given whole (section 5)
@@ -163,10 +166,26 @@ pipes      stdin (written, then closed), stdout, stderr
   SHA-256 id whose last twelve bytes are zero, one in 2^96, is named by
   its first 40 digits, which git reads locally as an unambiguous
   abbreviation.)
+- **The program,** for each operation, is the one its repository's
+  item names (channel.md, section 4), the fake forge's, which the
+  domain carries from the item to each `git::Op` on the repository and
+  never reads; or, where the item names none, `workers[].git`. Every
+  invocation of an operation runs the one program.
+- **No program.** With `workers[].git` `null` and an item naming none,
+  nothing is spawned: each invocation fails as git's fatal exit would,
+  status 128, its stderr `fatal: no git on this machine for HOST`, HOST
+  the remote's host with its port; so the operation ends
+  `FailedWithOutput { Broken, diagnostic }` (section 6), and the forge's
+  row warns (`../client/forge.md`, 5.4).
 - **The version.** At the worker's start the component runs `git
-  version` once, in the environment of section 5, and refuses the start,
-  naming the program, when it fails or names a version below 2.41, the
-  first with `fetch --porcelain`. The component is tested against git
+  version` once with `workers[].git`, unless `null`, in the environment
+  of section 5, and refuses the start, naming the program, when it fails
+  or names a version below 2.41, the first with `fetch --porcelain`. A
+  program an item names is checked so at its first use, before the
+  operation's first invocation: one that fails it fails the operation
+  `Broken`, naming the program, without running it. The component keeps
+  the last such program it checked and its answer, one at a time, and
+  checks a different one afresh. The component is tested against git
   2.53 (section 9).
 
 ## 4. Each operation
@@ -501,8 +520,9 @@ variable of the worker's own process reaches git.
 - **With output or without.** A failure after git ran ends
   `FailedWithOutput { fault, diagnostic }`, the diagnostic from the
   invocation that failed; one before any invocation ran (a missing
-  identity's value, a failed spawn of the first, Make's file operations)
-  ends `Failed { fault }`.
+  identity's value, a failed spawn of the first, a named program that
+  fails its version, Make's file operations) ends `Failed { fault }`,
+  but for no program, whose diagnostic names the host (section 3).
 - **The messages are git 2.53's** in the C locale, as the transcripts of
   section 9 record them; a version that words them otherwise classifies
   them `Broken`, which the domain retries as transient and the process
@@ -561,8 +581,10 @@ The start is refused, naming the limit, when a rule does not hold. The
 component has no deadline of its own: an operation's is the domain's,
 and io's close timeout bounds the end of a killed invocation.
 
-- **Memory:** for each operation in flight, its argument vector (the
-  settings, a URL and a refspec within the checkout's `name_bytes`), its
+- **Memory:** for each operation in flight, its program (an absolute
+  path of at most 4,096 bytes, channel.md, section 8), its argument
+  vector (the settings, a URL and a refspec within the checkout's
+  `name_bytes`), its
   environment (an identity's value within the channel's bound,
   channel.md, section 8), its message (the checkout's `message_bytes`),
   `stdout_bytes`, `stderr_bytes`, `read_bytes` and the paths it parsed
@@ -594,7 +616,12 @@ checks this document's contract:
     and against their mutations;
   - **the scan's rule** on lines cut across reads, carriage returns, and
     markers of six and eight characters; **the sweep's step** over a
-    listing.
+    listing;
+  - **the program:** an item's spawned in place of `workers[].git`, its
+    `git version` at first use, again for a different one and never for
+    the same, a version below 2.41 failing the operation unrun; and no
+    program, each invocation failing 128, naming the host, with nothing
+    spawned.
 - **Transcripts** of real git 2.53, captured once, outside the suites, by
   `tools/git-transcripts`: every invocation of section 4, and every
   failure of section 6 (a missing repository, branch and commit, a wrong

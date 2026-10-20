@@ -50,15 +50,17 @@ section 16; connecting GitHub, section 17.
   5), run inside the engine by skein's setup host component (its host,
   6.3): per forge, one writing plan at once and the picker's read beside
   it (5.1). The preparation, Forgejo's settings and the processes' specs
-  are machines and pure functions of `temper-forge-setup`, hosted by two
-  commands, `temper forge prepare` and `temper forge run` (section 6).
-  No command writes the records.
+  are machines and pure functions of `temper-forge-setup`, hosted by
+  three commands, `temper forge fetch`, `temper forge prepare` and
+  `temper forge run` (section 6). No command writes the records.
 - **`temper box` is wiring only.** It runs a configuration's steps in
-  order (the demo's fakes, prepare, Forgejo, its runner, `temper serve`,
-  the demo's seed), restarts what exits, and stops them in reverse
-  order. It names no Forgejo request and nothing of setup but its
-  steps. systemd, QA's environments or a test arrange the same commands
-  another way (section 7).
+  order (the demo's fakes, fetch, prepare, Forgejo, its runner, `temper
+  serve`, the demo's seed), restarts what exits, and stops them in
+  reverse order. An owned forge's steps may wait, dormant, until the
+  client asks for them over a pipe to `temper serve` (7.1). It names no
+  Forgejo request and nothing of setup but its steps. systemd, QA's
+  environments or a test arrange the same commands another way (section
+  7).
 - **`temper init` writes a deployment that starts** into the three
   directories (configuration.md, section 12): the default document, its
   charters, its agent's configuration, the worker's secret and the demo
@@ -69,7 +71,10 @@ section 16; connecting GitHub, section 17.
   and a fake forge as the box's steps, and a seed that adds the demo
   model's key and adopts the demo repository through temper's client
   tools, as a person would, before the person's sign-in link is
-  printed. Real backends are added from the client beside it.
+  printed. Real backends are added from the client beside it: GitHub
+  and an owned Forgejo are in the default document, so connecting
+  either needs no restart, and the owned one's steps wait until the
+  client asks for its setup (8.3, 7.1).
 - **Reconcile converges at every start** of a managed or owned Forgejo,
   in the engine: the bot user, made when missing and otherwise checked,
   never edited; its two tokens; an owned forge's person's orgs; and each
@@ -89,7 +94,8 @@ section 16; connecting GitHub, section 17.
   migrations, makes its own admin and the person's account with
   Forgejo's command line, registers the runner offline, dumps before an
   upgrade's migration, and runs only the versions it pins, the
-  conformance's (section 6). Its directory, once temper stops running
+  conformance's, which it fetches itself when asked, checked against
+  the digests it pins (section 6). Its directory, once temper stops running
   it, is a Forgejo a person can run themselves, as managed.
 - **A box is reactive.** Every change on the forge that a box's work
   waits on reaches the engine as a signed webhook delivery, and becomes a
@@ -102,9 +108,9 @@ section 16; connecting GitHub, section 17.
   clients' and webhooks' listeners do; a person on another machine
   reaches them through a tunnel. A forge on another host polls: its
   webhooks need skein's TLS server side (section 15).
-- **Not here:** binaries' digests, webhooks from another host, the
-  isolation of CI's jobs, provisioning at runtime and the forge as
-  people's sign-in provider (section 15).
+- **Not here:** webhooks from another host, the isolation of CI's jobs,
+  provisioning at runtime and the forge as people's sign-in provider
+  (section 15).
 
 ## 2. The modes
 
@@ -112,7 +118,7 @@ section 16; connecting GitHub, section 17.
 |---|---|---|---|---|
 | Runs the forge and CI's runner | the person | the person | temper | temper: its fake forge, `temper fake forge`, whose CI answers each push itself; no runner |
 | Makes temper's bot, its tokens, its access and the webhooks | the person | temper: on Forgejo with a site admin's token; on GitHub, an App from temper's manifest | temper, with an admin it makes | temper, with the admin the fake is seeded with |
-| temper is given, on Forgejo | the bot's two tokens, pasted; optionally a webhooks' secret | a site admin's token, pasted | the Forgejo and runner binaries; an address on loopback; the person's login, email and orgs | an address on loopback; the seed's owner and repositories |
+| temper is given, on Forgejo | the bot's two tokens, pasted; optionally a webhooks' secret | a site admin's token, pasted | the Forgejo and runner binaries, or `"fetched"` for temper's (6.6); an address on loopback; the person's login, email and orgs | an address on loopback; the seed's owner and repositories |
 | temper is given, on GitHub | an App's id and its private key, pasted | the person's steps in their browser, from a link temper prints | none: GitHub is never owned | none: the fake is a Forgejo |
 
 - **Fake is owned's layers,** with temper's fake forge in place of
@@ -156,7 +162,8 @@ one below, and the service always runs connected) are held by skein's
 it (section 2). temper's layers, and what passes between them:
 
 ```
-owned      temper forge prepare      ──► the forge's work path, the runner's, person_password,
+owned      temper forge fetch        ──► the Forgejo and runner binaries, in the cache (6.6)
+           temper forge prepare      ──► the forge's work path, the runner's, person_password,
                                          admin_token (the handover)
            temper forge run          ──► forgejo web, forgejo-runner daemon (each exec'd)
 fake       temper forge prepare      ──► the forge's directory, admin_token (the handover)
@@ -187,6 +194,12 @@ connected  the forge component       ◄── its access, built from the record
   made at the first preparation and at each later one that finds it
   missing, which it is once the engine has taken it, and left as it is
   when present (6.3).
+- **Fetched binaries are the cache's,** not the forge's directory's:
+  `<cache>/forgejo/VERSION/forgejo` and
+  `<cache>/forgejo-runner/RUNNER_VERSION/forgejo-runner`, shared by
+  every owned forge whose binaries are `"fetched"`, written by `temper
+  forge fetch` alone and fetched again at will (6.6; configuration.md,
+  section 12).
 - **No other file is read.** temper reads no `api_token`, `git_token`,
   `user` or `webhook_secret` file: a forge's directory that holds them,
   from a temper before the records, keeps them unread, and nothing is
@@ -254,7 +267,8 @@ connected  the forge component       ◄── its access, built from the record
 ## 5. Managed: reconcile
 
 Reconcile is skein's plan, run by the engine's setup host at each start
-of a managed or owned Forgejo and at a managed connect. No command runs
+of a managed or owned Forgejo, at a managed connect and at an owned
+forge's set up from the client (5.1). No command runs
 it, and nothing but the setup host writes what it makes.
 
 ### 5.1 The setup host in the engine
@@ -283,6 +297,11 @@ it, and nothing but the setup host writes what it makes.
   `Reconcile` after each
   GitHub forge connects (17.5). The deployment's page shows a forge
   "Connecting" until its plan is done and it connects.
+- **At the box's `started`,** for an owned forge set up from the client
+  while the engine serves (7.1): its handover by `TakeOver`, then its
+  `Reconcile`, then its connect, as a pasted admin's token is taken
+  (`../draft/github.md`, 12.2). The row shows "Connecting" meanwhile;
+  a stop leaves the forge not connected, named, as a start's does.
 - **A run's end:** `Done`, or `Lacking` (done, with what the App lacks
   named), keeps its writes, then connects the forge after a plan that
   connects; `Stop` names its failure and its step, with no secret, and
@@ -294,10 +313,10 @@ it, and nothing but the setup host writes what it makes.
 
 | Plan | Forge | When | skein's `forge-setup.md` |
 |---|---|---|---|
-| `Reconcile { forge, adopted }` | Forgejo, managed, owned or fake | each start; a managed connect | section 4 |
+| `Reconcile { forge, adopted }` | Forgejo, managed, owned or fake | each start; a managed connect; the box's `started` (5.1) | section 4 |
 | `Adopt { forge, repository }` | Forgejo, managed, owned or fake | an adoption, before its reads | 4.5 |
 | `Check { forge }` | Forgejo, connected | a connect; a replacement | 4.6 |
-| `TakeOver { forge, admin_token }` | Forgejo, owned or fake | a start that finds the handover | 4.7 |
+| `TakeOver { forge, admin_token }` | Forgejo, owned or fake | a start that finds the handover; an owned forge's `started` from the box (5.1) | 4.7 |
 | `Reachable { forge, installation?, page }` | every kind | the picker | 4.8 |
 | `Manifest { forge, target }` | GitHub | Connect, managed | 5.1 |
 | `Convert { forge, code, state }` | GitHub | the redirect back | 5.2 |
@@ -431,19 +450,23 @@ it, and nothing but the setup host writes what it makes.
 
 ### 6.1 Its inputs and its binaries
 
-- **Inputs:** the Forgejo binary's absolute path, and the runner's, or
-  no runner; the address Forgejo listens on, a socket address on
-  loopback; the person's login, email and orgs; the runner's labels,
-  capacity and `PATH`; the forge's directory.
+- **Inputs:** the Forgejo binary, and the runner's, or no runner, each
+  an absolute path or `"fetched"`, temper's pinned build in the cache
+  (6.6); the address Forgejo listens on, a socket address on loopback;
+  the person's login, email and orgs; the runner's labels, capacity and
+  `PATH`; the forge's directory.
 - **The binaries are checked** by every command that runs them: the
   first line of each one's version equal to temper's pin, Forgejo's and
   the runner's (`skein-forge`'s `VERSION` and `RUNNER_VERSION`, skein's
   `forge.md`, section 4.3), the versions skein's conformance checks
   (`fake-forge.md`, section 7). Another binary refuses the command,
-  naming its path and what it printed. temper downloads nothing.
+  naming its path and what it printed. A fetched binary is checked so
+  too, after its digest at its fetch; temper downloads nothing but by
+  `temper forge fetch` (6.6).
 - **One pin,** `skein-forge`'s, read by owned mode, the throwaway and
   the conformance alike, so the Forgejo temper runs is the Forgejo whose
-  facts it checked (13.3).
+  facts it checked (13.3): the versions, and beside them each fetched
+  binary's SHA-256 for each architecture temper fetches for (6.6).
 
 ### 6.2 Forgejo's settings
 
@@ -592,7 +615,8 @@ files: at a first preparation, and for a runner older than its pin
 
 ### 6.5 Then the engine's start, and the person
 
-- **The handover,** at `temper serve`'s start: the setup host finds
+- **The handover,** at `temper serve`'s start, or at the box's `started`
+  for a forge set up from the client (7.1): the setup host finds
   `admin_token`, reads it once, and runs `TakeOver { forge, admin_token
   }` (skein's `forge-setup.md`, 4.7): the token checked as a site
   admin's, kept as the forge's `AdminToken` record, and temper's admin's
@@ -604,8 +628,18 @@ files: at a first preparation, and for a runner older than its pin
   the person's orgs that is missing, owned by the person (`POST
   /api/v1/admin/users/{person}/orgs`).
 - **A forge not prepared,** with neither a handover nor an `AdminToken`
-  record, is not connected, and the client says "prepare it with
-  `temper forge prepare`" (`../client/forge.md`, the deployment's page).
+  record, is not connected, and is set up from the client
+  (`../client/forge.md`, 5.4):
+  - *under the box,* an owned forge whose setup says `"start": "asked"`
+    is dormant (7.1), and the deployment's page offers "Set up a
+    Forgejo here". The engine's routing writes `start FORGE` on the
+    box's pipe; at `started FORGE` the setup host takes the handover,
+    reconciles and connects (5.1), and at `failed FORGE WHY` the page
+    names why and offers it again;
+  - *without the box* (7.4), `temper serve` has no pipe, and the page
+    names the commands to run: `temper forge fetch`, `temper forge
+    prepare`, `temper forge run FORGE forgejo`, `temper forge run FORGE
+    runner`, then a restart.
 - **The person** signs in on Forgejo's web as a site admin with
   `person_password`, and changes it, since Forgejo's API refuses them
   until they do (13.3); makes repositories in their orgs, with Actions,
@@ -614,6 +648,63 @@ files: at a first preparation, and for a runner older than its pin
   preparation stop, naming it.
 - **The forge's members** are connected's, written out: `api` the
   address, `transport` plaintext, `git` `http://<address>` (section 8).
+
+### 6.6 Fetching
+
+`temper forge fetch [DIRECTORIES] FORGE`, before an owned forge's
+preparation, for a forge whose `forgejo` or `runner.binary` is
+`"fetched"` (section 8): a once step of the box (7.1), and a command of
+its own for any other host.
+
+- **What it fetches,** each binary its setup gives as `"fetched"`, at
+  temper's pins (6.1), for the machine's architecture, `ARCH`:
+
+  | Binary | From | Into |
+  |---|---|---|
+  | Forgejo | `https://codeberg.org/forgejo/forgejo/releases/download/vVERSION/forgejo-VERSION-linux-ARCH` | `<cache>/forgejo/VERSION/forgejo` |
+  | the runner | `https://code.forgejo.org/forgejo/runner/releases/download/vRUNNER_VERSION/forgejo-runner-RUNNER_VERSION-linux-ARCH` | `<cache>/forgejo-runner/RUNNER_VERSION/forgejo-runner` |
+
+  `ARCH` is `amd64` or `arm64`; another machine refuses, naming its
+  architecture, and its binaries are given by path.
+- **One request, one answer.** Each URL answers `200` with the binary,
+  never a redirect: skein-http follows none, and any other status
+  refuses, naming the URL and the status.
+- **A mirror,** the owned entry's `mirror`, absent by default (section
+  8): an `https` origin for each binary, in place of codeberg.org's and
+  code.forgejo.org's, its paths and digests the pins' still. A host that
+  keeps its own copies names it, and the process tier its local file
+  server (13.4).
+- **TLS with the machine's roots,** read at the command's start as
+  skein's shell reads them (skein's `shell.md`, 6.2): the bundle
+  `SSL_CERT_FILE` names, or the first of the distributions' bundles that
+  exists. skein-tls embeds none, so a machine with neither refuses the
+  command.
+- **The digests are pinned,** one SHA-256 per binary and architecture,
+  in `skein-forge` beside `VERSION` and `RUNNER_VERSION` (skein's
+  `forge.md`, 4.3), and required: a fetched binary is the build the
+  conformance checked, byte for byte.
+- **Streamed, never held:** the body's chunks are asked for one at a
+  time, as the file takes them; each is hashed into the digest, which
+  is incremental, and written at its offset into `<file>.part`, private,
+  within `setup.fetch_bytes` (configuration.md, section 7). At the
+  body's end, a digest equal to the pin makes the part file `0o755` and
+  renames it over its name.
+- **A wrong digest** removes the part file and refuses, naming the URL,
+  the pinned digest and the digest it got. Nothing is left under the
+  binary's name.
+- **A file already there is hashed,** never fetched again: its pin's
+  digest is nothing to do; another is refused, naming its path, and
+  never overwritten, so a binary a person put there stays theirs to
+  remove.
+- **A part file an interrupted fetch left** is written again from its
+  start.
+- **Then the preparation checks its version** as every command that
+  runs it does (6.1); a digest is no version.
+- **Its code:** the fetch's machine in `temper-forge-setup`, its
+  requests, chunks, writes and digests its inputs and outputs, and its
+  host in `temper-forge-setup-shell`, on skein-io, skein-http and
+  skein-tls (section 11). It holds no credential and writes no record
+  (section 9).
 
 ## 7. The box: wiring only
 
@@ -630,11 +721,14 @@ temper box
 ├── temper fake llm DIRS              long, with the demo (8.4)
 ├── temper forge prepare DIRS 1       once, per fake forge: its handover
 ├── temper fake forge DIRS 1          long, per fake forge (8.4)
+├── temper forge fetch DIRS 3         once, per owned forge whose binaries are fetched (6.6)
 ├── temper forge prepare DIRS 3       once, per owned forge
 ├── forgejo web                       long: temper forge run DIRS 3 forgejo
 ├── forgejo-runner daemon             long: temper forge run DIRS 3 runner
-├── temper serve DIRS                 long: its own tree (README.md, section 4); its setup
-│                                     host takes each handover and reconciles (section 5)
+│                                     these four, the forge's group: here, or asked (below)
+├── temper serve DIRS --box           long: its own tree (README.md, section 4); its setup
+│                                     host takes each handover and reconciles (section 5);
+│                                     fds 3 and 4 its pipe to the box (below)
 └── temper fake seed DIRS             link, with the demo: serve's first line on its stdin (8.4)
 ```
 
@@ -644,9 +738,42 @@ temper box
   configuration, <path>`, and goes on to its steps. Otherwise the box
   never writes the document: a configuration directory with entries but
   no document is refused as every command refuses it.
+- **An owned forge's group,** its fetch, its preparation, its Forgejo
+  and its runner, runs in its place in the order at every start of the
+  box when its setup has no `start`. With `"start": "asked"` (section 8)
+  the box knows the group's steps and starts none of them until
+  `temper serve` asks on the pipe, or until the box's record
+  `<data>/box/started/FORGE` exists: one empty file per forge, written
+  once the group's preparation has exited 0, so that a later box runs
+  the group in its place, as an unasked one, before `temper serve`.
+- **The pipe,** two of them, made again at each spawn of `temper
+  serve`: its fd 3, serve to box, and its fd 4, box to serve. `--box`
+  tells `temper serve` to adopt them; without it, as under every other
+  arrangement (7.4), serve has no pipe. One line each, ending in a line
+  feed, `FORGE` the forge's number:
+
+  | Line | From | Says |
+  |---|---|---|
+  | `start FORGE` | serve, at the client's ask (6.5) | start the forge's group |
+  | `step FORGE STEP` | the box | the group's step `fetch`, `prepare` or `run` is starting, for the client's row (`../client/forge.md`, 5.4) |
+  | `started FORGE` | the box | the group's long steps are started, and its record written |
+  | `failed FORGE WHY` | the box | the group stopped: `WHY` names the step and how it ended, such as `prepare exited 1`, cut to fit the line's bound, and holds no secret; a step's own lines are on the box's stderr (7.2) |
+
+  One ask at a time: a `start` while a group starts is answered
+  `failed FORGE busy`, and one for a forge with no dormant group
+  `failed FORGE not asked`, or `started FORGE` when it is started. An
+  answer to a `temper serve` that has exited is dropped: its restart
+  finds the handover at its start (6.5). Each line is at most
+  `box.line_bytes` (configuration.md, section 7), which both sides
+  read within; another line, or a longer one, is named on its reader's
+  stderr and ignored.
+- **A group's failure** before `started` answers `failed`, and the group
+  is dormant again, to be asked again; the box runs on. Once started,
+  its long steps are restarted, and given up on, as 7.2 says.
 - **The default document's steps** are the demo's: the fake LLM, the
   fake forge's preparation and the fake forge, `temper serve` and the
-  seed; it has no owned forge (8.3).
+  seed; and forge 3's group, dormant until the client asks for it
+  (8.3).
 
 ### 7.2 What it does
 
@@ -663,16 +790,17 @@ temper box
   `box.backoff_ms` to `box.backoff_max_ms` (configuration.md, section 7),
   first running again the steps that are once just before it: a Forgejo
   is restarted after its preparation, so a change of the setup reaches
-  its `app.ini`. `temper serve` restarts on its own, and its start takes
-  a handover the preparation left and reconciles each managed and owned
-  forge. A token revoked under a running engine stops that forge alone,
+  its `app.ini`. `temper serve` restarts on its own, with a pipe made
+  afresh, and its start takes a handover the preparation left and
+  reconciles each managed and owned forge. A token revoked under a running engine stops that forge alone,
   named, and not the engine (forge.md, a forge stopped); the engine's
   next start makes it again. A fake forge's restart is such a revoke:
   it serves its seed afresh, without the bot, so that forge stops alone
   until the engine's next start takes the handover its preparation drew
   again (8.4).
-- **Gives up,** exit 1, naming the step, when a once or link step fails
-  or a long one exits more than `box.restarts` times within `box.window_ms`. The
+- **Gives up,** exit 1, naming the step, when a once or link step fails,
+  but a dormant group's before its `started`, which answers `failed`
+  (7.1), or a long one exits more than `box.restarts` times within `box.window_ms`. The
   backoff is counted from a step's exits within the window, so it starts
   again from `box.backoff_ms` once a step has run a window without
   exiting.
@@ -681,7 +809,8 @@ temper box
   `temper serve`'s drain into an abort (README.md, section 4),
   `box.grace_ms` again, then a close. The machine knows a step only as
   once, long or link, so every long step, and a link step still
-  running, is sent both. A second termination
+  running, is sent both; a dormant group's steps run nothing, and are
+  sent nothing. A second termination
   signal closes them all. It exits 0 after a stop it was asked for.
 - **Its streams:** `temper serve`'s stdout, the sign-in links, is the
   box's stdout, as is, but for its first line when a link step follows
@@ -697,23 +826,33 @@ temper box
 ### 7.3 What it names
 
 - **Steps only:** each step's name, its arguments and whether it is
-  once, long or link. Its policy is a small machine of its own (steps, exits and
-  timers in; spawns, signals and closes out), hosted on skein-io.
+  once, long or link; and which of them are a forge's dormant group,
+  by the forge's number alone. Its policy is a small machine of its own
+  (steps, exits, timers and the pipe's lines in; spawns, signals,
+  closes, the pipe's lines and the groups' records out), hosted on
+  skein-io.
+- **The steps in groups:** `Steps { always, asked }`, `always` the steps
+  run in order, and `asked` a list of `Group { forge, steps }`, each
+  dormant until asked (7.1). The machine's step tests drive a group
+  from dormant to `started`, and to `failed`, by lines and exits alone
+  (13.1).
 - **The binary hands it the steps.** `temper box` resolves its three
   directories, runs `temper init` when the configuration directory is
   empty (7.1), checks the document as section 8 says, asks `temper-fake`
   for its steps, `temper-forge-setup`'s with the demo's around them
-  (8.4), and gives them to `temper-box`.
+  (8.4), and gives them to `temper-box`, an asked forge's group apart.
 - **Checked:** a boundary test fails the gate when `temper-box` depends
   on a crate named `temper-*` but `temper-forge-setup`, or names an item
   of it but `steps` and `Step`.
 
 ### 7.4 Other arrangements of the same commands
 
-Each needs nothing below the commands to change:
+Each needs nothing below the commands to change. None has the box's
+pipe: `temper serve` runs without `--box`, an owned forge is set up by
+running its commands, and the client names them (6.5).
 
-- **systemd,** a unit per long step: `prepare` as `ExecStartPre=` of
-  Forgejo's unit, `run` and `temper serve` as `ExecStart=`, the order as
+- **systemd,** a unit per long step: `fetch` and `prepare` as
+  `ExecStartPre=` of Forgejo's unit, `run` and `temper serve` as `ExecStart=`, the order as
   the units' dependencies; `temper serve`'s unit keeps systemd's default
   kill of its control group, which ends a crashed service's whole tree
   before its restart (skein's `shell.md`, 13);
@@ -757,6 +896,7 @@ Each needs nothing below the commands to change:
      "bot": {"login": "temper", "email": "temper@example.invalid"},
      "mode": {"fake": {
        "listen": {"socket": "127.0.0.1:8369"},
+       "git": "demo/bin/git",
        "owner": "demo",
        "repositories": [{"name": "widget", "landing": "main"}]}}}
   ]
@@ -768,11 +908,14 @@ Each needs nothing below the commands to change:
   | `directory` | a data path (configuration.md, section 12) | when owned or fake, and only then: a private directory (section 3), unique among `setup` |
   | `bot` | `{"login", "email"}` | a Forgejo login; an email, the bot's when reconcile makes it (5.6) |
   | `mode` | `"managed"`, `{"owned": ...}` or `{"fake": ...}` | managed: temper may be given a site admin's token for the forge from the client (5.5); fake: the demo's (8.4) |
-  | `owned.forgejo`, `owned.runner.binary` | cache paths (configuration.md, section 12) | checked against the pins of 6.1 |
+  | `start` | absent, or `"asked"` | when owned, and only then: absent, the box runs the forge's steps at every start; `"asked"`, they wait, dormant, until the client asks for them or the box's record says they ran (7.1) |
+  | `owned.forgejo`, `owned.runner.binary` | cache paths (configuration.md, section 12), or `"fetched"` | checked against the pins of 6.1; `"fetched"` names temper's pinned build in the cache, which `temper forge fetch` writes (6.6) |
+  | `owned.mirror` | absent, or `{"forgejo", "runner"}`, each an origin | each `https://HOST` or `https://HOST:PORT`, no path: where `temper forge fetch` asks for the pinned paths (6.6) |
   | `owned.runner` | the runner's members, or null for none | `capacity` at least 1; `labels` at least one, at most 8 |
   | `owned.listen` | an address, jig's format | a socket address on loopback; unique among the deployment's listeners and owned and fake forges |
   | `owned.person` | `{"login", "email", "orgs"}` | a Forgejo login other than the bot's and `temper-admin`; `orgs` at least one, at most `setup.orgs`, each a Forgejo org name |
   | `fake.listen` | an address, jig's format | as `owned.listen` |
+  | `fake.git` | a data path | the demo's git, a link to `temper fake git` (8.2, 8.4): the program the engine names in each of the forge's repositories' records, for the worker to spawn in place of `workers[].git` (channel.md, section 4) |
   | `fake.owner` | a Forgejo login | other than the bot's and `temper-admin`: the user who owns the fake's repositories |
   | `fake.repositories` | a list of `{"name", "landing"}` | at least 1, at most 8, each `name` a Forgejo repository name, unique, and `landing` a branch name; their contents are `temper-fake`'s (8.4) |
 
@@ -797,7 +940,9 @@ Each needs nothing below the commands to change:
   configured: GitHub's redirect and setup URLs name it, so its port is
   never 0, checked at start (17.1).
 - **`temper serve` checks `setup`,** and reads one file of it, an owned
-  or fake forge's handover (section 3).
+  or fake forge's handover (section 3). Under the box, with `--box`, it
+  adopts the box's pipe, over which it asks for an owned forge's steps
+  whose `start` is `"asked"` (7.1).
 - **`application.demo`,** the demo's fake LLM and seed, or null for none
   (8.4).
 - **An owned example** ships for a person, a test or QA's host to start
@@ -946,7 +1091,10 @@ directory is empty (7.1).
   the configuration directory holds `temper.json`, or the data
   directory holds `worker.secret`, `worker.digest`, `demo/llm.key` or
   `demo/bin/git`. It never replaces a file; a person who starts again
-  removes them.
+  removes them. Refused too, naming why, when it cannot find the person
+  (below): no entry in `/etc/passwd` for its effective uid, or a login
+  that is not a Forgejo login, or is the bot's, `temper-admin` or the
+  org's, `work`.
 - **Its directories:** the data and cache directories made and checked
   as every command makes and checks them (configuration.md, section
   12), and the configuration directory made the same way when absent;
@@ -970,9 +1118,15 @@ directory is empty (7.1).
     `program`, with `arguments` `["agent", <configuration>/agent.json]`
     and `configuration` that same path (configuration.md, section 5),
     and the demo's link's target;
-  - *git,* the demo's link, `<data>/demo/bin/git`: the worker's `git`,
-    so that the demo's git is `temper fake git` (8.4) whatever git the
-    machine has, or none;
+  - *git,* the `git` found on `PATH`: the worker's `git`; with none,
+    `null`, written without refusing, and init says so (git.md, section
+    3). The demo's link, `<data>/demo/bin/git`, is the fake entry's
+    `git` (section 8), so that the demo's git is `temper fake git`
+    (8.4) whatever git the machine has, or none;
+  - *the person,* forge 3's (8.3): its `login` the name of the effective
+    uid's entry in `/etc/passwd` (`geteuid`, then that file), the login
+    the person signs in to their Forgejo with; its `email`
+    `LOGIN@localhost`; its one org `work`;
   - *the bundle,* `<the binary's directory>/../share/temper/bundle` when
     it holds `index.html`: `clients.bundle`; else `null`, and init says
     the browser is not served;
@@ -981,35 +1135,38 @@ directory is empty (7.1).
     0; the port written fixed, as a GitHub forge requires
     (configuration.md, section 3). A later start on a port taken is
     refused, naming it and the document, as any start is;
-  - *the demo's ports:* 8369, the fake forge's, and 8370, the fake
-    LLM's (8.4), each by the same rule. The three sockets, the clients'
-    and these two, are held until all three ports are chosen, so that no
-    two are the same, then closed. 8368 is held for an owned Forgejo
-    (8.3).
+  - *the forges' ports:* 8368, forge 3's, the owned Forgejo's (8.3);
+    8369, the fake forge's, and 8370, the fake LLM's (8.4), each by the
+    same rule. The four sockets, the clients' and these three, are held
+    until all four ports are chosen, so that no two are the same, then
+    closed.
 - **What it says,** on stderr: `init: wrote <path>` for each file;
   `init: no bundle at <path>: the browser is not served` when there is
-  none; and last, `init: start it with temper box`, with the flags init
-  was given. Its stdout is empty; exit 0.
+  none; `init: no git on PATH: a real forge's repositories need git
+  2.41 or later, set as workers[].git` when there is none; and last,
+  `init: start it with temper box`, with the flags init was given. Its
+  stdout is empty; exit 0.
 - **Nothing else:** no account, no forge credential, no repository and
   no store. The engine's first start makes its store; accounts, forges
   and repositories are the client's (credentials.md, section 3;
   `../client/forge.md`), and the demo's account and repository the
   seed's, through the client's protocol (8.4).
 - **Its code:** `temper-init`, step code (section 11): given the facts
-  above, the three directories, the secret's 32 bytes and the demo
-  key's 32 bytes, it answers the files, each with its directory, its
-  name, its bytes and whether it is private; it reads, writes and binds
-  nothing. The binary's `init` finds the facts, checks the refusals and
-  writes the files, on skein-io.
+  above, git's path or none and the person's login among them, the
+  three directories, the secret's 32 bytes and the demo key's 32 bytes,
+  it answers the files, each with its directory, its name, its bytes
+  and whether it is private, or a login's refusal; it reads, writes and
+  binds nothing. The binary's `init` finds the facts, checks the
+  refusals and writes the files, on skein-io.
 - **Checked:** temper-init's step tests check that its `engine.llm` is
   the owned example's with the demo's provider (8.3), that the digest is
   the secret's, and the files' names, directories and order. The
   binary's crate tests, on scratch directories, check that the document
   init writes passes configuration.md, section 8, as `temper serve`
   checks it, with the agent's configuration it writes, at the fixed
-  ports and at kernel's ports, the three always distinct, with and
-  without `claude` and a bundle; each refusal writing nothing; the
-  files' modes; and the link's target. The process tier starts a box on
+  ports and at kernel's ports, the four always distinct, with and
+  without `claude`, a bundle and git; each refusal writing nothing,
+  each login's among them; the files' modes; and the link's target. The process tier starts a box on
   empty directories (13.4).
 
 ### 8.3 The default document
@@ -1025,13 +1182,28 @@ defaults for a person's real work are open (section 16).
   - 2, GitHub, at GitHub's addresses, with one git identity whose
     members are GitHub's defaults, not connected until the person
     connects it from the client (section 17);
-  - 3 is held, with the port 8368 (8.2), for an owned Forgejo set up
-    from the client (`../draft/first-run.md`, 3.8), so that a later
-    default adds it under its number.
-- **One `setup` entry,** forge 1's, fake, in `demo/forge`, its bot
-  `temper`, its `owner` `demo`, its one repository `widget`, landing on
-  `main` (8.4). No webhooks' listener: the fake sends no delivery, and
-  GitHub's hints come from its App's delivery log.
+  - 3, the person's own Forgejo, its members its setup's (section 8):
+    `api` `127.0.0.1:<its port>`, 8368 (8.2), plaintext, `git`
+    `http://127.0.0.1:<its port>`, and one git identity whose `login`
+    is the bot's, `temper`; dormant, not connected until the person sets
+    it up from the client (`../draft/first-run.md`, 3.8; 6.5).
+
+  GitHub and the owned Forgejo are in the document from the first run,
+  so that connecting either from the client needs no restart.
+- **Two `setup` entries:**
+  - forge 1's, fake, in `demo/forge`, its `git` the demo's link (8.2),
+    its bot `temper`, its `owner` `demo`, its one repository `widget`,
+    landing on `main` (8.4);
+  - forge 3's, owned, in `forge-3`, `"start": "asked"` (7.1): its
+    `forgejo` and `runner.binary` `"fetched"` (6.6); its runner the
+    owned example's, `temper-host:host`, capacity 1, and its `path`;
+    its `listen` `127.0.0.1:<its port>`; its bot `temper`; and its
+    person the one init finds, `LOGIN@localhost`, with the org `work`
+    (8.2).
+
+  No webhooks' listener: the fake sends no delivery, forge 3 polls
+  (forge.md, section 6), and GitHub's hints come from its App's delivery
+  log.
 - **Its LLM providers:** the owned example's `engine.llm`, whole (8.1),
   with no account; and 3, Demo, the demo model's (8.4): one endpoint,
   `demo`, at `127.0.0.1:<the fake LLM's port>`, plaintext, OpenAI's
@@ -1050,16 +1222,19 @@ defaults for a person's real work are open (section 16).
   models end with `demo`: chat, 1, and coding, 2, the one the forge's procedures start agents' work under
   (`application.charter`); the templates `chat` and `goal`.
 - **One worker,** in the process, its `root` `workspaces` in the data
-  directory, its `git` the demo's link (8.2); the deployment's directory
+  directory, its `git` the machine's, or null (8.2); the deployment's directory
   `deployment` in the data directory; the clients' listener
   `127.0.0.1:<port>` (8.2).
 - **Its limits:** the owned example's (8.1). Its `memory_bytes` are
   derived as the owned example's are, with its own strings at their
-  bounds, two literals of `temper-init`'s checked by its tests the same
-  way.
+  bounds, the fake entry's `git`, which the engine names to the worker,
+  among them; two literals of `temper-init`'s checked by its tests the
+  same way.
 - **`application.demo`,** the demo's (8.4).
 - **Its box's steps:** the fake LLM, forge 1's preparation and its fake,
-  `temper serve` and the seed (7.1).
+  `temper serve` and the seed (7.1); and forge 3's group, dormant until
+  the client asks for it: its fetch, its preparation, Forgejo's web and
+  the runner's daemon.
 
 ### 8.4 The demo
 
@@ -1143,10 +1318,14 @@ demo's own work pushes nothing yet.
   git route among its routes (skein's `fake-forge.md`, section 4), and
   no git smart HTTP; it sends no delivery and keeps no state across its
   starts.
-- **`temper fake git`,** no step: the worker's git, which the worker
-  spawns by `workers[].git`, the demo's link (8.2), as it spawns real
-  git (git.md, section 5), and which a start checks as it checks real
-  git, by `git version`. It is the fake git program (`../domain/testing.md`,
+- **`temper fake git`,** no step: the demo forge's git, which the
+  worker spawns for the fake's repositories by the program their
+  records name, the fake entry's `git`, the demo's link (8.2; channel.md,
+  section 4), in place of `workers[].git`, as it spawns real git
+  (git.md, section 5), and which it checks at its first use as it checks
+  real git, by `git version` (git.md, section 3). A real forge's
+  repositories, on the same worker, take the machine's git. It is the
+  fake git program (`../domain/testing.md`,
   4.3): the fake checkout's `.git` in the worker's working trees; its
   remote the fake forge's git route, at the host of the clone URL the
   engine gives; its credential the bot's, from git's
@@ -1260,6 +1439,11 @@ demo's own work pushes nothing yet.
   at its end.
 - **No secret in an argument, a URL or a log,** for Forgejo's command
   line as for git (credentials.md, section 4): 6.3.
+- **No new credential to set up from the client:** `temper forge
+  fetch` sends none and keeps none, its downloads trusted by their
+  pinned digests alone (6.6); the box's pipe carries no secret, a
+  failure's reason among its lines (7.1); and the handover is taken as
+  at a start (6.5).
 - **Never across a domain boundary:** the setup host is in the engine's
   protocol layer, below the core, which sees a pasted value's number and
   digest alone; the engine's rules (credentials.md, section 1) hold for
@@ -1336,24 +1520,26 @@ that they cover what its work waits on.
 ```
 skein-forge                  + the setup's documents: admin users and their tokens, orgs, repositories'
 │                              collaborators and hooks, GitHub's App documents; both sides, as its
-│                              others; the pins (skein's forge.md, sections 4 and 5)
+│                              others; the pins, the versions and the fetched binaries' digests
+│                              (skein's forge.md, sections 4 and 5)
 skein-forge-setup            the setup's plans, their types and checks, the access they end with, and the
 │                              host component a service runs them on (skein's forge-setup.md, section 6)
 ├── skein-forge
 └── skein-lib, skein-json
 temper-forge-setup           step code: the setup's types and checks, read from the configuration; the
 │                              setup mapped onto the plans' given values, and the kit's check of them;
-│                              the preparation's machine; app.ini and the runner's files; the processes'
-│                              specs; the configuration's steps. Names no host
+│                              the fetch's machine and the preparation's; app.ini and the runner's
+│                              files; the processes' specs; the configuration's steps. Names no host
 ├── skein-forge-setup, skein-forge
 └── jig-protocol-config, skein-lib, skein-json
-temper-forge-setup-shell     ordinary Rust: the hosts of prepare and run: commands, files, the forge's
-│                              locks, the exec, on skein-io
+temper-forge-setup-shell     ordinary Rust: the hosts of fetch, prepare and run: commands, files, the
+│                              forge's locks, the exec, the fetch's requests over TLS, on skein-io
 ├── temper-forge-setup
-└── skein-io, skein-lib, skein-json, skein-shell
-temper-box                   the box's machine (step code) and its host (ordinary Rust) on skein-io's
-│                              processes; nothing of setup but its steps (7.3); one crate, under the
-│                              subset's lints, its host written within the subset
+└── skein-io, skein-http, skein-tls, skein-lib, skein-json, skein-shell
+temper-box                   the box's machine (step code), its asked groups and its pipe to temper
+│                              serve among it, and its host (ordinary Rust) on skein-io's processes;
+│                              nothing of setup but its steps (7.3); one crate, under the subset's
+│                              lints, its host written within the subset
 ├── temper-forge-setup
 └── skein-lib, skein-io, skein-shell
 temper-init                  step code: the default document and the files temper init writes, from
@@ -1369,7 +1555,7 @@ temper-fake-git              ordinary Rust: the fake git program's core, temper 
 │                              its two remotes (../domain/testing.md, 4.3)
 ├── skein-fake-checkout, skein-fake-forge-domain, skein-fake-forge-protocol, skein-fake-peers
 └── skein-lib, skein-io, skein-http, skein-json
-temper                       the binary: temper forge prepare|run, temper box, temper init,
+temper                       the binary: temper forge fetch|prepare|run, temper box, temper init,
                                temper fake llm|forge|git|seed
 ```
 
@@ -1448,6 +1634,32 @@ relies on.
   signal; a link step started on its long step's first line, given it
   alone, once per box, and given a restart's first line when the long
   step exited before writing one.
+- **The fetch's machine** (6.6), in temper-forge-setup, given its URLs
+  and digests: each pin's URL and digest for each architecture, and
+  another architecture refused; another status or a redirect refused;
+  a body past `setup.fetch_bytes` refused. With its host, in
+  temper-forge-setup-shell's tests against a local file server over
+  TLS, its root skein's test root named by `SSL_CERT_FILE`: a wrong
+  digest, its part file removed and its refusal naming the URL and both
+  digests; the right one, made 0o755 and renamed; a file already there
+  hashed, nothing asked when it matches, and a mismatch refused, naming
+  its path, the file left; a part file left by a fetch cut short
+  written again.
+- **The box's asked groups and its pipe** (7.1), in temper-box: a
+  dormant group running nothing at the box's start; `start FORGE`
+  running the group's steps in order, a `step` line for each, then the
+  record written and `started FORGE`; a step's failure answering `failed
+  FORGE WHY`, the group dormant again and the others running on; a
+  second `start` while one runs answered busy, a forge with no group
+  `not asked`, and a started one `started`; a start with the record
+  running the group as an always group; a line past `box.line_bytes`
+  refused; `temper serve` restarted with a pipe afresh, an answer meant
+  for the exited one dropped.
+- **The setup host's handover at runtime** (5.1), in temper-service's
+  step tests: at `started`, `TakeOver`, then `Reconcile`, then the
+  connect, the row "Connecting" between; a stop leaving the forge not
+  connected, named; `failed` leaving it "Set up failed" with its reason;
+  with no pipe, the row naming the commands (6.5).
 
 ### 13.2 Reconcile's world
 
@@ -1555,6 +1767,17 @@ it checks of this document:
   test's own clone of `demo/widget` by the demo's link, run as the
   worker runs git, holds the fake's landing head. A second box on the
   same directories does the same, its seed finding its acts done.
+- **A first run set up for real,** a test of its own: `temper box` on
+  three empty scratch directories, forge 3's `mirror` a local file
+  server over TLS with skein's test root, serving at the pinned paths
+  the binaries `TEMPER_FORGEJO` and `TEMPER_FORGEJO_RUNNER` name, which
+  the test checks against the pins first. The owner asks "Set up a
+  Forgejo here" through the client; forge 3's row goes through "Setting
+  up" and "Connecting" to connected, with no restart; the person's
+  repository, made on Forgejo's API as the person, is adopted, and a
+  worker clones it by the machine's git. A second box on the same
+  directories starts the group at once, by its record, and fetches
+  nothing.
 
 ## 15. Later
 
@@ -1564,9 +1787,6 @@ Each is intended; what it needs is named with it.
   moves once skein's shell offers an exec and a lock held across it,
   which skein's `Lock` is not (skein's `io.md`, section 5). A second
   service that execs is what would ask skein for them.
-- **The binaries' digests,** an optional SHA-256 per binary beside the
-  version's check, for a deployment that installs binaries it did not
-  build or download itself.
 - **Reconcile over TLS,** managed mode against a forge on another host,
   for a deployment whose managed forge is not on loopback (skein's
   `forge-setup.md`, section 9).
@@ -1624,17 +1844,6 @@ Each is intended; what it needs is named with it.
   a managed connect; Replace is a connected forge's alone.
 - **The owned example's agent, sized for a person's work.** Default: the
   process tier's profile (8.1), sized for the live tier's stories.
-- **One worker for the demo forge and a real one.** The demo's worker
-  runs `temper fake git` for every repository, and a fake git reaches a
-  fake forge alone: once the person adopts a repository of GitHub or of
-  an owned Forgejo, its first git command fails, `fatal:` naming the
-  host that serves no fake git route (8.4). Default: a git for each
-  kind of forge: `workers[].git` real git, `null` on a machine with
-  none, and a fake `setup` entry's own link, the git component taking
-  the program by the repository's forge; built with the first run's
-  step 4 (`../draft/first-run.md`, section 5). Else the fake git hands a
-  real forge's commands to real git, or the person sets `workers[].git`
-  and restarts.
 - **The owned example's `memory_bytes`** are `small`'s worst cases with
   its strings at their bounds (8.1): 78,669,036,604,974 bytes for the
   engine and 1,989,738,112,203 for the worker, more than any machine

@@ -387,7 +387,10 @@ configured forge, by its number, its kind and its `web` address, says:
 
   | State | The row says |
   |---|---|
-  | not connected | "Not connected", with Connect; where its records say why, "Not connected: its records are unreadable" or "Not connected: its records were made for KIND at ADDRESS", and connecting again overwrites them (`../protocol/forge.md`, at start); an owned forge not prepared yet, "Not connected: prepare it with `temper forge prepare`" (`../protocol/setup.md`, owned), with no Connect |
+  | not connected | "Not connected", with Connect; where its records say why, "Not connected: its records are unreadable" or "Not connected: its records were made for KIND at ADDRESS", and connecting again overwrites them (`../protocol/forge.md`, at start) |
+  | not set up | an owned forge not prepared yet (`../protocol/setup.md`, 6.5): under the box, "Not set up", with "Set up a Forgejo here"; without it, "Not set up: run `temper forge fetch N`, `temper forge prepare N`, `temper forge run N forgejo` and `temper forge run N runner`, then restart `temper serve`", N its number, with no action |
+  | setting up | the box runs its steps, asked: "Setting up: fetching", "Setting up: preparing" or "Setting up: starting", by the box's last word of the step it runs, else "Setting up" (`../protocol/setup.md`, 7.1); then "Connecting", as its handover is taken and reconciled (`../protocol/setup.md`, 5.1) |
+  | set up failed | "Set up failed: WHY", the box's reason in words (a step that exited, a digest that differs, a version refused, its port taken), with "Set up again"; the engine and every other forge run on |
   | connecting | "Connecting": a run holds the forge, and what it waits for: a managed or owned Forgejo's reconcile, the forge's answers to a check, or the person's browser on GitHub until the link's state ends (`setup.state_life_ms`) |
   | connected | "Connected as LOGIN (ID)", the user the records hold: the bot's on Forgejo, the App's on GitHub |
   | stopped | "Stopped: WHY", the component's reason in words (its key or token refused, a user other than its own, an access it finds invalid, a refusal that asking again would not mend), with Replace; the engine and every other forge run on |
@@ -409,7 +412,12 @@ configured forge, by its number, its kind and its `web` address, says:
   (`../protocol/setup.md`, 17.5), which clears the line or names what
   the App still lacks. The line is kept in memory alone: a restart
   drops it, and the start's reconcile names it again while the App
-  still lacks it.
+  still lacks it. A forge other than a fake, connected while a worker's
+  `git` is null (`../protocol/configuration.md`, section 4), says beside
+  "Connected as LOGIN (ID)": "No git on this machine: install git 2.41
+  or later and set workers[].git, then restart"; its repositories'
+  commands fail on that worker, naming the forge's host, until it has
+  one (`../protocol/git.md`, section 3).
 - **Its mode** (`../protocol/setup.md`, the modes): owned, where the
   configuration's setup owns the forge; managed, where temper keeps a
   site admin's token for it; connected otherwise. Owned and managed say
@@ -445,6 +453,8 @@ section 8), offered by kind, mode and state:
 | Replace | GitHub, connected or stopped; a Forgejo of the connected mode, connected or stopped | a new App key, or a new API token, git token or both, pasted, which must answer as the forge's user (on GitHub, the same App); the old is erased once the new is kept |
 | Install on another account | GitHub, connected | a fresh link to install temper's App, shown as text; the person picks the account and its repositories, the page advising selected ones over all |
 | Forget the admin's token | managed | the admin's token erased; the forge is connected, its bot and tokens kept, and adopting a repository grants nothing more: the person makes the bot a collaborator |
+| Set up a Forgejo here | owned, not set up, under the box | the box asked to run the forge's steps (`../protocol/setup.md`, 7.1): its binaries fetched, its preparation, Forgejo and its runner started, then its handover taken and reconciled; the person signs in to it as their login, with the password its preparation wrote (`person_password`, `../protocol/setup.md`, section 9) |
+| Set up again | owned, set up failed | the same ask again: what the last one left is kept, a fetched binary hashed and not fetched again |
 
 A pasted value is a field of its own (`README.md`, 3.6 and section 8),
 emptied as the request leaves and shown nowhere, then or after; the

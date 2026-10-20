@@ -475,7 +475,7 @@ area lands with its stories (section 11).
 
    | Tool | What it does | temper's | K |
    |---|---|---|---|
-   | `forges` | each configured forge by its number, kind and `web` address: its connection, "connected as LOGIN (ID)", connecting and what it waits for, stopped and why, or not connected and why; how its last connect ended, a GitHub App's lacking permissions and events each named; its mode, and "admin's token kept" for managed and owned; on GitHub, the App's slug and its installations, each with its id, its account's login, all or selected repositories, suspended, or stray, "uninstalled at the next reconcile"; a job's log on a host it does not read, with how to add it; its load; its acts | the forge's deployment part, read and watched (`forge.md`, section 9) | |
+   | `forges` | each configured forge by its number, kind and `web` address: its connection, "connected as LOGIN (ID)", connecting and what it waits for, stopped and why, not set up, setting up and at which step, set up failed and why, or not connected and why; how its last connect ended, a GitHub App's lacking permissions and events each named; its mode, and "admin's token kept" for managed and owned; on GitHub, the App's slug and its installations, each with its id, its account's login, all or selected repositories, suspended, or stray, "uninstalled at the next reconcile"; a job's log on a host it does not read, with how to add it; its load; its acts | the forge's deployment part, read and watched (`forge.md`, section 9) | |
    | `forge-connect F github [--org O]` | starts GitHub's manifest flow for the person's account, or organization O: prints the link to open in a browser, the manifest's page on the clients' listener, and the call that follows it, `wait forges --until settled`; exits 0 once the request is durable | `Connect { forge, how: GitHubManifest { org? } }` | yes |
    | `forge-connect F github-app ID FILE` | connects an App of the person's own: ID its id, FILE its private key, PEM as GitHub gives it; no webhook secret, since temper points the App's hook at `https://SLUG.invalid/`; then `wait forges --until settled` | `Connect { forge, how: GitHubApp { id, key } }` | yes |
    | `forge-connect F forgejo FILE` | connects a Forgejo through its bot's tokens, FILE a tokens file (below) naming `api`, `git` and, where the person made hooks to temper's listener, `webhook_secret`; then `wait forges --until settled` | `Connect { forge, how: ForgejoTokens { api, git, webhook_secret? } }` | yes |
@@ -483,6 +483,7 @@ area lands with its stories (section 11).
    | `forge-install F` | prints a fresh link to install temper's App on another account, GitHub alone; the installation shows on `forges` once the person's browser comes back | `Install { forge }` | |
    | `forge-replace F FILE` | replaces what a person pasted: on GitHub, FILE the App's new key; on a connected Forgejo, a tokens file naming `api`, `git` or both; it must answer as the forge's user, and the old is erased once the new is kept | `Replace { forge, value }` | |
    | `forge-forget F` | erases a managed forge's admin's token; the forge is connected, its bot and tokens kept | `Forget { forge }` | |
+   | `forge-setup F` | sets up an owned Forgejo here, under the box: the box fetches its binaries, prepares it and starts Forgejo and its runner, then temper takes its handover (`../protocol/setup.md`, 6.5); then `wait forges --until settled`. Without the box, refused "not under the box", with the commands to run | `SetUp { forge }` | |
    | `repositories F [--installation I] [--page N]` | the picker's page N, from 1 (`README.md`, 4.4): a line per row, `OWNER/NAME`, `private` where it is, and `R/U`, its repository id and owner id for `adopt --ids`; then the call that reads page N plus one while more follow, or that none do. `--installation I` is an accepted installation's id, as `forges` prints it, GitHub alone | `Reachable { forge, installation?, page }` | |
 
    - **The names are the forge's and the page's.** A `forge-` prefix
@@ -1011,7 +1012,8 @@ line broken, exit 1 naming the line and never its value;
 the last answering no rows, and one row adopted with `--ids`; a second
 picker's read while one runs, busy; a call by a party whose role does
 not hold the deployment's connectors, exit 2; `forge-forget` on a
-managed Forgejo. After each, no pasted value in DIRECTORY's store or
+managed Forgejo; `forge-setup` without the box, refused naming the
+commands. After each, no pasted value in DIRECTORY's store or
 in any document the tools print.
 
 ### 11.3 The real loop

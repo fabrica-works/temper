@@ -35,6 +35,8 @@ tested. What is open is listed in section 10.
   up.
 - **The remote is made on the engine,** from its forge's `git` base, its
   owner and its name, so workers need no forge configuration (section 4).
+  So is its git, where its forge has its own: a fake forge's program,
+  named in each of its repositories' items; none names the worker's.
 - **Translation is small total functions** in the routing, exhaustive
   both ways, holding no state. The composed system world calls the same
   functions without the bytes between (section 7).
@@ -89,7 +91,8 @@ worker's root      Event::Assign { assignment, items, save }            Request:
   `protocol/channel.md`, 4.1).
 - **It moves** when one of those encodings changes, by the rule temper's
   versions share (`README.md`, section 9); a repin of smith that changes
-  the delivery's record is such a change. An engine and its workers are
+  the delivery's record is such a change, and so was a repository's
+  `git` (section 4). An engine and its workers are
   one release, so nothing is translated between versions (jig's
   `protocol/README.md`, section 7).
 
@@ -105,7 +108,7 @@ In the schema's terms (each byte field and list has its limit, section
 
 ```
 record Items       { repositories: list Repository  save: option bytes }
-record Repository  { tag: u32  name: bytes  remote: bytes  start: Start  access: Access  identity: u32  account: option u64 }
+record Repository  { tag: u32  name: bytes  remote: bytes  git: option bytes  start: Start  access: Access  identity: u32  account: option u64 }
 enum   Start       { merge: Merge, base: Branch, branch: Branch, commit: Commit, saved: Branch }
 record Merge       { branch: bytes  base: fixed 32 }
 record Branch      { branch: bytes }
@@ -119,6 +122,7 @@ record Writable    { push: bytes  expected: option fixed 32 }
 | `tag` | `tag`, the deployment's tag | `tag`, echoed in what landed |
 | `name` | `name` | `name`: the directory, one path component, unique in the workspace |
 | `remote` | made: the `git` of the configured forge whose number is `provider.forge`, `/`, `owner`, `/`, `name`, `.git` (configuration.md, section 3) | `remote`, never interpreted by the domain; the git component's URL (git.md, section 3) |
+| `git` | made by the routing: the `git` of the setup entry faking the forge whose number is `provider.forge`, resolved to an absolute path (setup.md, 8.2); none for every other forge | `git`, never interpreted by the domain; the program the git component runs for every operation on the repository, and `workers[].git` for none (git.md, section 3) |
 | `start` | `ForgeStart::Base`, `Branch`, `Saved`, `Merge { branch, base }`; the engine never asks for a commit | `Start`, all five |
 | `access` | `push: Some(branch)` is `writable { push: branch, expected: none }`; `None` is `read_only` | `Access` |
 | `identity` | `identity`: the number of the forge's git identity, the credential jig grants the attempt (credentials.md, section 4) | `identity`, the grant's number in the application's table |
@@ -131,11 +135,17 @@ record Writable    { push: bytes  expected: option fixed 32 }
   together, both or neither; the worker's root saves only when both say
   so, and never for a workspace that starts a merge
   (`../domain/worker.md`, 4.2).
-- **The remote** is the only field the routing makes rather than copies;
-  everything a worker needs to reach the forge, but the credential, is in
-  it. The credential is the grant's (section 6).
-- **Checked at the worker's entrance:** names, remotes and branches
-  within its limits and a repository named twice are refused as an
+- **The remote and the git** are the fields the routing makes rather
+  than copies; everything a worker needs to reach the forge, but the
+  credential, is in them. The credential is the grant's (section 6).
+- **A fake forge's git is local.** Its program is a path on the
+  engine's machine, so a fake forge serves workers in `temper serve`'s
+  process alone, as its listener is loopback's (setup.md, 8.4); a
+  remote worker takes its own machine's git for every repository
+  (configuration.md, section 4).
+- **Checked at the worker's entrance:** names, remotes, programs and
+  branches within its limits, a program that is not an absolute path,
+  and a repository named twice are refused as an
   invalid start that names the item (`../domain/worker.md`, 4.1), as are
   items that do not decode (section 7).
 
@@ -302,7 +312,7 @@ the routing in the step that routes the record:
 
   | jig's size | temper's largest | From |
   |---|---|---|
-  | `items` | `Items` | the engine: the forge's `resources_per_task` and `name_bytes`, and the longest configured `git` base; the worker: the checkout's `repositories` and `name_bytes` |
+  | `items` | `Items` | the engine: the forge's `resources_per_task` and `name_bytes`, the longest configured `git` base and the longest fake forge's program; the worker: the checkout's `repositories` and `name_bytes`, and 4,096 bytes per program, Linux's `PATH_MAX` |
   | `left` | `Left` | the checkout's `repositories` |
   | `saved` | `Saved` | the checkout's `repositories`, `conflicts` and `path_bytes`, and `PushDiagnostic::CAPACITY` |
   | `resource` | `Preparation` | fixed |
@@ -330,7 +340,8 @@ the routing in the step that routes the record:
   can make, the longest `git` base, two `/`, an owner and a name of the
   forge's `name_bytes` and `.git`, must be within the checkout's
   `name_bytes`, and so must the forge's names and branches; otherwise the
-  start is refused, naming the limit.
+  start is refused, naming the limit. A fake forge's program, resolved,
+  is at most 4,096 bytes, or the start is refused, naming its path.
 - **Memory:** the routing holds a part only while it encodes or decodes
   it, within the codec's worst case; the identities' tables hold one
   value per identity and generation, at most two generations on a worker.

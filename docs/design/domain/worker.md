@@ -132,6 +132,10 @@ temper's workspace items beside it:
     engine's protocol layer makes from its forge's configuration
     (`../protocol/channel.md`, section 4), so a worker needs no forge
     configuration;
+  - its git, where its forge has its own: the program every git
+    operation on it runs, a fake forge's, which the domain carries to
+    each operation and never reads; otherwise the worker's own git
+    (`../protocol/git.md`, section 3);
   - where to start: a base branch, a branch, a commit by its full object
     id, saved work, or **a merge in progress**: a branch, and the commit
     of its base to merge into it (section 5);

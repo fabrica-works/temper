@@ -829,9 +829,10 @@ process.
 
 - **What it takes:** the invocations of ../protocol/git.md, section 4, with
   their settings (../protocol/git.md, section 3) and their environment
-  (../protocol/git.md, section 5), and nothing else. Any other argument
-  vector exits as git's usage error does, which fails the test that caused
-  it.
+  (../protocol/git.md, section 5), and `git version`, answered as git
+  2.53 answers it (../protocol/git.md, section 3), and nothing else.
+  Any other argument vector exits as git's usage error does, which fails
+  the test that caused it.
 - **What it does:** it acts on the repositories' files on the machine,
   keeping its git state in each repository's `.git` as skein's fake
   checkout keeps it, and reaches the fake forge through its typed
@@ -892,9 +893,10 @@ its own:
   assertion of skein's kit ends the process as a panic (101).
 - **How the binary is it:** `temper` is `temper fake git` when its
   `argv[0]`'s last component is `git`, before it reads a command of its
-  own: a link named `git` to the binary, which the worker spawns by the
-  absolute path `workers[].git` gives (../protocol/setup.md, 8.2), with
-  git's command line as it is.
+  own: a link named `git` to the binary, the fake setup entry's `git`,
+  which the worker spawns by the absolute path each of the forge's
+  repositories' records names (../protocol/setup.md, 8.2;
+  ../protocol/channel.md, section 4), with git's command line as it is.
 - **Its crates:** the core, `crates/temper-fake-git`, ordinary Rust
   (programming-model.md, 10.2) with no test dependency, since the
   binary ships it: the checks, the answers, the step core, the replay

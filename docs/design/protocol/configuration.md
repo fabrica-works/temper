@@ -41,9 +41,10 @@ document says what temper adds. What is open is listed in section 11.
   default to github.com's, and are given only to point at a fake.
 - **`setup`, for the forge's setup** (setup.md): how each set-up forge is
   run and set up, which the `temper forge` commands and `temper box` act
-  on, and the engine's setup host reconciles at each start. `temper
-  serve` reads one file of it, an owned or fake forge's handover
-  (sections 3 and 6).
+  on, and the engine's setup host reconciles at each start, and at the
+  box's `started` for an owned forge set up from the client (setup.md,
+  7.1). `temper serve` reads one file of it, an owned or fake forge's
+  handover (sections 3 and 6).
 - **`demo`, a first run's demo** (setup.md, 8.4): the fake LLM the box
   runs, its scripts and its key, and what the seed adopts; null for
   none. `temper serve` reads none of its files.
@@ -315,10 +316,14 @@ and the checks of the forge's own members against each entry are
 setup.md, section 8's. An owned forge's orgs are its person's,
 `mode.owned.person.orgs`, which reconcile makes when missing; a setup
 names no other orgs. `temper serve` checks it whole, and the engine's
-setup host reconciles each managed, owned and fake forge at each start
-(setup.md, the setup host in the engine). Of the files `setup` names,
-`temper serve` reads one: an owned or fake forge's handover,
-`admin_token`, taken once (section 6).
+setup host reconciles each managed, owned and fake forge at each start,
+and an owned forge whose setup says `"start": "asked"` once the box has
+started it (setup.md, 7.1; the setup host in the engine). Of the files
+`setup` names, `temper serve` reads one: an owned or fake forge's
+handover, `admin_token`, taken once (section 6). A fake forge's `git`
+it names and never reads: the program the engine's routing names in
+each of that forge's repositories' records, for the worker to spawn
+(channel.md, section 4).
 
 **`demo`:** a first run's demo, or `null` for none, never missing
 (section 10): the fake LLM the box runs, its address, its LLM provider,
@@ -346,9 +351,9 @@ section 5), and the webhooks' listener, `webhooks.listener`; the
 engine's setup host takes each forge's `kind`, `api`, `transport` and
 `web`, and `setup`; the identities' table takes each identity's number,
 forge, login and author, its value from its forge (credentials.md,
-section 4); the engine's routing takes each forge's `git`; the clients'
-listener takes `clients.listener`, and its forge routes each GitHub
-forge's `web`.
+section 4); the engine's routing takes each forge's `git`, and each fake
+forge's setup's `git`; the clients' listener takes `clients.listener`,
+and its forge routes each GitHub forge's `web`.
 
 ## 4. temper's members for a worker
 
@@ -358,7 +363,7 @@ top-level `workers`, in the same order; standalone has one. Each:
 | Member | Type | Bounds | Feeds |
 |---|---|---|---|
 | `root` | a directory, a data path | made private (0o700) if absent; an existing one must be the process's user's, private, and not reached through a link | the worker's workspace directory: every checkout's workspace is made under it (git.md, section 2; `../domain/worker.md`, section 5) |
-| `git` | string | an absolute path to an executable file, checked at start, whose `git version` is at least the one git.md, section 3 names | the program the git component runs for each invocation, in the environment git.md, section 5 gives it; the demo's, a link to `temper fake git` (setup.md, 8.2) |
+| `git` | string, or `null` | an absolute path to an executable file, checked at start, whose `git version` is at least the one git.md, section 3 names; `null` for none, as `temper init` writes it on a machine with no git (setup.md, 8.2) | the program the git component runs for each invocation in a repository whose record names none (channel.md, section 4), in the environment git.md, section 5 gives it; with `null`, each such invocation fails, naming its forge's host, and the row of each connected forge but a fake one warns (git.md, section 3; `../client/forge.md`, 5.4). The demo's git is the fake forge's setup's `git`, never this (setup.md, 8.2) |
 
 - **The worker's root takes the rest from jig's and smith's:** the hub's
   limits from jig's worker part; smith's host limits and the bounds its
@@ -367,7 +372,11 @@ top-level `workers`, in the same order; standalone has one. Each:
   checkout's limits from temper's profile (section 7).
 - **Workers are alike** (jig's `protocol/configuration.md`, section 4):
   no credential but the worker's secret, and no forge configuration.
-  Remotes and git identities come with each assignment.
+  Remotes, git identities and a fake forge's git program come with each
+  assignment, in its repositories' records (channel.md, section 4).
+- **A remote worker** takes its own machine's git as its `git`: a fake
+  forge is on loopback alone (setup.md, 8.4), and no remote worker
+  serves its repositories.
 
 ## 5. The agent's configuration
 
@@ -459,8 +468,8 @@ top-level `workers`, in the same order; standalone has one. Each:
   component's, its webhooks' listener's and its GitHub App's among them,
   the git component's, the engine's routing's records and forges, the
   setup host's, the clients' listener's forge routes' and the picker's;
-  and the box's, which `temper serve` checks and takes none of
-  (setup.md, section 7).
+  and the box's, which `temper serve` checks and takes none of but
+  `box.line_bytes`, its pipe's (setup.md, section 7).
 - **One profile, `small`,** for one person's machine; another name is
   refused. Its numbers are constants in `temper-service`'s limits module,
   and the setup's and the box's in their own crates, each documented
@@ -493,8 +502,8 @@ top-level `workers`, in the same order; standalone has one. Each:
   | `git_component.` | the git component's (git.md, section 8) |
   | `records.` | the engine's routing's: a forge's records and carried values in jig's secrets' store (credentials.md, 2.1) |
   | `forges.` | the engine's routing's, per forge: a GitHub forge's accepted installations and every forge's log origins (forge.md, section 7) |
-  | `setup.` | `temper-forge-setup`'s `Limits`: reconcile's (setup.md, section 5), and the engine's setup host's states and runs (setup.md, the setup host in the engine) |
-  | `box.` | `temper-box`'s `Limits`: the box's restarts and stop (setup.md, 7.2) |
+  | `setup.` | `temper-forge-setup`'s `Limits`: reconcile's (setup.md, section 5), the fetch's (setup.md, 6.6), and the engine's setup host's states and runs (setup.md, the setup host in the engine) |
+  | `box.` | `temper-box`'s `Limits`: the box's restarts and stop, and its pipe's lines (setup.md, 7.1 and 7.2) |
   | `clients.` | `temper-service`'s clients' server's `Limits`: the browser's bundle (`../client/browser.md`, 2.2) |
   | `routes.` | `temper-service`'s clients' listener's forge routes (`../client/README.md`, the routes) |
   | `picker.` | the picker's reads of a forge's repositories (`../domain/forge.md`, section 4) |
@@ -532,11 +541,13 @@ top-level `workers`, in the same order; standalone has one. Each:
   | `setup.states` | the setup host's states, held in memory, for the manifest's and the installation's returns |
   | `setup.state_life_ms` | a state's life; at most an hour, the life of the manifest's conversion code |
   | `setup.runs` | the setup host's runs at once, a forge's one writing run and its one `Reachable` beside it both counted; a request past them, or a second of either kind on one forge, is refused busy |
+  | `setup.fetch_bytes` | a fetched binary's body, written to its part file as it streams, never held; one past it removes the part file and is refused, naming the URL (setup.md, 6.6) |
   | `routes.query_bytes` | a forge route's query |
   | `picker.page` | the repositories one read of the picker takes, the setup host's `Reachable` plan's `reachable` on every kind (skein's `forge-setup.md`, 4.8), within the forge's own page cap: GitHub's page, a connected Forgejo's; at most 100, GitHub's largest page |
   | `box.backoff_ms`, `box.backoff_max_ms` | a long step restarted, doubling |
   | `box.restarts`, `box.window_ms` | a long step's exits within the window past which the box gives up; `box.restarts` at most 64; the backoff counted from the exits within the window (setup.md, 7.2) |
   | `box.grace_ms` | a long step's grace, after each of its stop's two signals (setup.md, 7.2) |
+  | `box.line_bytes` | a line of the box's pipe, either way, its line feed among them; the box and `temper serve` each read within it (setup.md, 7.1) |
   | `clients.bundle_files` | the bundle's files, its page among them |
   | `clients.bundle_bytes` | the bundle's files' bytes in all, held in memory while `temper serve` runs |
 - **Limits checked against each other at start,** each failure naming
@@ -563,8 +574,10 @@ top-level `workers`, in the same order; standalone has one. Each:
     `routes.query_bytes` and `picker.page`, above 0;
   - the setup's and the box's: each backoff at most its maximum;
     `setup.backoff_max_ms` below `setup.deadline_ms`; `box.backoff_max_ms`
-    below `box.window_ms`; `setup.states`, `setup.state_life_ms` and
-    `setup.runs` above 0;
+    below `box.window_ms`; `setup.states`, `setup.state_life_ms`,
+    `setup.runs` and `setup.fetch_bytes` above 0; `box.line_bytes` at
+    least 64, which holds each line but a `failed` one's `WHY`, which
+    the box cuts to fit (setup.md, 7.1);
   - the bundle's: `clients.bundle_files` and `clients.bundle_bytes`
     above 0;
   - the webhooks' listener's: each of its limits above 0;
@@ -728,9 +741,16 @@ top-level `workers`, in the same order; standalone has one. Each:
     ends interrupted, and the client asks to paste again
     (credentials.md, 2.2);
   - an owned forge's handover is taken, when its file exists (section
-    6); each managed and owned forge is reconciled by the engine's
-    setup host, and shows "connecting" until reconcile is done, while
-    the engine serves (setup.md, the setup host in the engine);
+    6), at the start, and at the box's `started` for a forge set up
+    from the client, while the engine serves (setup.md, 6.5 and 7.1);
+    each managed and owned forge is reconciled by the engine's setup
+    host, and shows "connecting" until reconcile is done, while the
+    engine serves (setup.md, the setup host in the engine); an owned
+    forge whose setup says `"start": "asked"`, with neither a handover
+    nor a record of one, is not set up until the client asks the box
+    for it (setup.md, 6.5);
+  - under the box, `temper serve --box` adopts the box's pipe, its fds 3
+    and 4 (setup.md, 7.1); a start without the flag has none;
   - every identity whose forge has a value is announced at generation 1
     before the root's restart; a GitHub forge's, once its first tokens
     are minted (credentials.md, section 4). Every connected forge's user
@@ -752,7 +772,11 @@ top-level `workers`, in the same order; standalone has one. Each:
   an identity's `login` or `author`, granted again at generation 1; a
   forge's `number`, a new forge, not connected (section 3); a forge's
   setup, at the engine's next reconcile, or the next run of its
-  commands (setup.md, 6.3 and section 5).
+  commands (setup.md, 6.3 and section 5); its `start`, at the box's next
+  start, but that a forge with the box's record runs at every start
+  (setup.md, 7.1); its `mirror`, at the next fetch; a fake forge's
+  `git`, every repository's from the next assignment on; a worker's
+  `git`, every invocation, checked at the start.
 - **A forge's credentials are no change of configuration:** they are
   connected, replaced and forgotten from the client, with no restart
   (credentials.md, section 5).
@@ -961,8 +985,8 @@ variable, else its default.
 | Directory | Flag, variable | Default | Holds | Kept |
 |---|---|---|---|---|
 | configuration | `--config DIR`, `TEMPER_CONFIG` | `$XDG_CONFIG_HOME/temper` | the document, `temper.json`; smith's agent configuration, `agent.json`; the charters' instructions; trusted roots' files | as a person's own files are: copied, synced or published, so it holds no secret |
-| data | `--data DIR`, `TEMPER_DATA` | `$XDG_DATA_HOME/temper` | the deployment's directory, with the store, transcripts and jig's secrets' store; the worker's secret and its digest; the worker's root; each set-up forge's directory (setup.md, section 3); the demo's key and its seed's client directory, in `demo/` (setup.md, 8.4); the programs directory | the deployment: backed up whole |
-| cache | `--cache DIR`, `TEMPER_CACHE` | `$XDG_CACHE_HOME/temper` | binaries fetched again at will, such as an owned forge's Forgejo and runner | never backed up |
+| data | `--data DIR`, `TEMPER_DATA` | `$XDG_DATA_HOME/temper` | the deployment's directory, with the store, transcripts and jig's secrets' store; the worker's secret and its digest; the worker's root; each set-up forge's directory (setup.md, section 3); the demo's key, its git's link and its seed's client directory, in `demo/` (setup.md, 8.4); the box's records of the forges it has started, in `box/started/` (setup.md, 7.1); the programs directory | the deployment: backed up whole |
+| cache | `--cache DIR`, `TEMPER_CACHE` | `$XDG_CACHE_HOME/temper` | binaries fetched again at will: an owned forge's Forgejo and runner, `temper forge fetch`'s in `forgejo/VERSION/` and `forgejo-runner/RUNNER_VERSION/` (setup.md, 6.6) | never backed up |
 
 - **The document is `temper.json` in the configuration directory,**
   always: no command takes a document's path. A command that finds none
@@ -989,15 +1013,17 @@ variable, else its default.
   - *data paths:* jig's `engine.deployment.directory`, each of
     `engine.hosts.workers`' `digest` and the worker's `secret`; each of
     `application.workers`' `root` (section 4) and of
-    `application.setup`'s `directory` (setup.md, section 8); and
-    `application.demo`'s `llm.key` and `client` (setup.md, 8.4);
-  - *cache paths:* an owned forge's `forgejo` and `runner.binary`
-    (setup.md, section 8);
+    `application.setup`'s `directory` and a fake forge's `git` (setup.md,
+    section 8); and `application.demo`'s `llm.key` and `client`
+    (setup.md, 8.4);
+  - *cache paths:* an owned forge's `forgejo` and `runner.binary`, or
+    `"fetched"` for `temper forge fetch`'s (setup.md, section 8 and 6.6);
   - *absolute paths,* refused when relative: each of
-    `application.workers`' `git`, `application.clients.bundle`, and the
-    agent's `program`, `configuration` and `arguments` (section 5),
-    which are installed programs and files, or the spawn's own; every
-    path in smith's agent configuration, which is smith's format.
+    `application.workers`' `git` but a null one,
+    `application.clients.bundle`, and the agent's `program`,
+    `configuration` and `arguments` (section 5), which are installed
+    programs and files, or the spawn's own; every path in smith's agent
+    configuration, which is smith's format.
 - **No secret in the configuration directory:** a worker's secret and
   its digest, an owned or fake forge's handover, every set-up forge's
   file and the demo model's key are data paths, and jig's secrets' store is in the deployment's directory.

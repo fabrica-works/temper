@@ -241,6 +241,11 @@ skein-io socket
   the root holds for the forge, which a root effect names after the
   root's restore. A connected Forgejo, and a GitHub forge, start with
   their access.
+- **An owned forge set up from the client** (setup.md, 6.5) starts not
+  set up: one whose setup says `"start": "asked"`, with neither the
+  handover file nor an `AdminToken` row, has its access `None` and no
+  run until the box answers `started` on its pipe (2.2); then its
+  `TakeOver`, its `Reconcile` and its `Connect`, as at a start.
 - **The mode is no record** (setup.md, the modes): owned is the
   configuration's (a `setup` entry owning the forge), managed is an
   `AdminToken` row on a forge not owned, and connected is neither.
@@ -256,8 +261,9 @@ skein-io socket
   access: a first connect, a replacement and a reconnect after a stop
   alike (skein's `forge-connection.md`, 3.5). The routing sends it after
   a setup's run is done and its writes are kept (2.6): a managed or
-  owned Forgejo's `Reconcile`, a connected Forgejo's `Check`, GitHub's
-  `Convert` and `Paste`, and each `Replace`. The access is built from
+  owned Forgejo's `Reconcile`, at start or after the box's `started`, a
+  connected Forgejo's `Check`, GitHub's `Convert` and `Paste`, and each
+  `Replace`. The access is built from
   the records, as at start, never from the run's outcome: a forge
   connected at runtime is the forge a restart would load.
 - **`Event::Connected { forge }`** reaches the root through the routing
@@ -269,9 +275,18 @@ skein-io socket
   `forge-client.md`, 7.1; `../domain/forge.md`, 4.1). A GitHub forge's
   `Reconcile { forge }` runs next, once the forge's writing run is free
   (2.6); it ends in no connect.
+- **The box's pipe** (setup.md, 7.1), under the box alone: at
+  `SetUp { forge }` (client/README.md, section 8) the routing writes
+  `start FORGE`, one ask at a time, and refuses it "not under the box"
+  with no pipe; it tells the root each `step` line, the forge setting
+  up and at which step; at `started FORGE`, the forge's `TakeOver`,
+  then its `Reconcile`, then `Request::Connect`; at `failed FORGE WHY`,
+  the forge set up failed, with `WHY`. An answer for a forge it did not
+  ask for is named in the log and dropped.
 - **Until then** each call on the forge is answered `NotConnected` at
   once, at cost 0 (2.7). The root shows the forge connecting while a run
-  holds it, and not connected otherwise.
+  holds it, setting up while the box runs its group, and not connected
+  otherwise.
 - **A replacement** ends the calls the old access began `Forbidden`, as
   a revocation would. A credential that answers as another user is
   refused before anything is kept (`Check`, `Paste`); one the component
@@ -390,8 +405,8 @@ carries what passes between it, the root and the records.
 
 | Plan | When | What it does |
 |---|---|---|
-| `Reconcile { forge, adopted }` | each start of a managed or owned Forgejo; a managed connect | converges the forge on what the deployment needs (setup.md, section 5), then the forge connects |
-| `TakeOver { forge, admin_token }` | an owned forge's start, when the handover file `admin_token` exists | keeps the admin's token the box handed over; the file is removed after its `Done` |
+| `Reconcile { forge, adopted }` | each start of a managed or owned Forgejo; a managed connect; the box's `started`, after its `TakeOver` (2.2) | converges the forge on what the deployment needs (setup.md, section 5), then the forge connects |
+| `TakeOver { forge, admin_token }` | an owned forge's start, when the handover file `admin_token` exists; the box's `started`, for an owned forge set up from the client (2.2) | keeps the admin's token the box handed over; the file is removed after its `Done` |
 | `Adopt { forge, repository }` | a managed or owned forge's adoption, before its reads | gives the bot access to the repository (`../domain/forge.md`, 4.2) |
 | `Check { forge }` | a connected Forgejo's pasted tokens, and their replacement | both tokens answer as one user, and as the kept user on a replacement |
 | `Manifest { forge, target }` | GitHub's Connect, for `Personal` or `Org(login)` | a fresh state and the manifest's page; it ends `Done(Manifest { state, page })` |
@@ -454,7 +469,8 @@ carries what passes between it, the root and the records.
   and never after GitHub's `Reconcile`; after `Convert`'s, `Install`
   first, whose link answers the browser (setup.md, 17.2);
   `Request::Installations` after an `Accept` (2.4); the adoption's
-  reads after an `Adopt`. **A run's `Stop`:** its failure named to the
+  reads after an `Adopt`; `Reconcile` after a `TakeOver`. **A run's
+  `Stop`:** its failure named to the
   root, and the forge as it was.
 - **States** are the host's, in memory: at most `setup.states`, each
   living `setup.state_life_ms` (1 h, the conversion code's hour). A

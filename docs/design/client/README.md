@@ -660,7 +660,8 @@ for its kind, its user's login and its installations. Its nodes:
   kept request, its request encoded by this crate as the family's bytes
   at `CLIENT_VERSION` (jig's `protocol/client.md`, section 10).
 - **The FORGE requests and their outcomes:** `Connect`, `Install`,
-  `Replace`, `Forget` and `Reachable`, beside `Adopt` (section 8).
+  `Replace`, `Forget`, `SetUp` and `Reachable`, beside `Adopt` (section
+  8).
 - **The forge's documents' records:** its reads, subjects and
   documents, and its other requests, beside `Adopt` (`forge.md`,
   section 9).
@@ -1163,8 +1164,8 @@ temper's:
   and a sign-in's record and a forge's credentials are the engine's
   alone (`../protocol/credentials.md`). A pending FORGE request that
   carries no value (a manifest's `Connect`, `Install`, `Forget`,
-  `Reachable`) is kept as any keyed request; one carrying a value is
-  not.
+  `SetUp`, `Reachable`) is kept as any keyed request; one carrying a
+  value is not.
 - **Loopback only** in standalone (`../protocol/configuration.md`,
   section 2; 6.1), so a bearer token never crosses a network in
   plaintext. Clients between hosts, over TLS, come after standalone.
@@ -1252,6 +1253,7 @@ does for the client:
   | `Install { forge }` | none | `Install`, GitHub alone | a link, the install page for a fresh state |
   | `Replace { forge, value }` | a new App key, or a new API token, git token or both | `Paste` with the kept App id, or `Check` against the kept user: it must answer as the forge's user; the old is erased once the new is kept | connecting |
   | `Forget { forge }` | none | the admin's token erased; a managed forge becomes connected (`../protocol/credentials.md`) | forgotten |
+  | `SetUp { forge }` | none | an owned forge not set up, or whose set up failed, whose setup says `"start": "asked"`: the routing asks the box for the forge's group, `start FORGE` on its pipe (`../protocol/setup.md`, 7.1), refused "not under the box" without a pipe and "busy" while a group starts; at the box's `started`, its handover taken, then reconciled and connected (`../protocol/forge.md`, 2.2) | setting up |
   | `Reachable { forge, installation?, page }` | none | on every kind, the setup's host's `Reachable { forge, installation?, page }` plan (skein's `forge-setup.md`, 4.8; `../domain/forge.md`, what the picker offers): on GitHub one accepted installation's repositories, `GET /installation/repositories` paged by number on a token minted for the page; on a connected Forgejo what the API token can push to; on a managed or owned Forgejo every repository the site admin can see by id ascending, read on the admin's token, which stays the setup's host's (`../protocol/forge.md`, the setup's host) | a page, `{ rows, more }`: at most `picker.page` rows on every forge, clipped to the forge's own page cap, each the repository's id, its owner's id and login, its name and whether it is private; `more` set when the page is full |
 
   Names in a carried value's braces are its bundle's items
