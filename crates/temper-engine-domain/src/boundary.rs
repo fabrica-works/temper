@@ -320,6 +320,7 @@ pub enum Fact {
 }
 
 #[derive(Debug)]
+#[expect(clippy::large_enum_variant, reason = "decoded calls stay inline in the bounded input queue priced at startup")]
 pub enum WorkerInput {
     /// A worker channel's hello, record or loss.
     Link { channel: Token, link: Link },

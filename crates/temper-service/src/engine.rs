@@ -186,7 +186,9 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     engine.clients.iterate(now, wall, &mut engine.events, &engine.workers.forges);
     clients_pass(engine);
     for _ in 0..engine.clients.early.len() {
-        if !engine.clients.room(1) || engine.events.room() == 0 {
+        // A not-ready key returns its carried value before replying.
+        let replies = if open { 1 } else { 2 };
+        if !engine.clients.room(replies) || engine.events.room() == 0 {
             break;
         }
         let event = engine.clients.early.pop().expect("staged client input");

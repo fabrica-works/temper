@@ -126,7 +126,8 @@ pub fn shell(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.io.output))?
         .checked_add(u64::from(limits.connections.body_bytes))?
         .checked_add(1024)?;
-    let connections = u64::from(limits.connections.exchanges.checked_add(1)?);
+    // Shell shares Transport across every admitted io socket, including close overlap.
+    let connections = u64::from(limits.io.sockets);
     let stream = jig_client_protocol_http::worst_case(&jig_client_protocol_http::Limits {
         record: limits.connections.body_bytes.checked_add(512)?,
         chunk: limits.connections.http.read,
@@ -136,7 +137,8 @@ pub fn shell(limits: &Limits) -> Option<u64> {
         .checked_add(stream)?
         .checked_add(skein_lib::Queue::<jig_client_protocol_http::Heard>::worst_case(heard)?)?
         .checked_add(connections.checked_mul(256)?.checked_mul(bytes)?)?
-        .checked_add(connections.checked_mul(u64::from(limits.io.intake))?)
+        .checked_add(connections.checked_mul(u64::from(limits.io.intake))?)?
+        .checked_add(skein_lib::Queue::<skein_io::Request>::worst_case(limits.io.sockets.checked_mul(64)?)?)
 }
 /// The terminal's own fixed bounds, independent of configuration.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

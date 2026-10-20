@@ -1136,7 +1136,7 @@ pub fn untag(mut event: io::Event) -> io::Event {
     }
     event
 }
-/// The accounts' bytes beside the driver's own: their queues, the sources
+/// The accounts' bytes: the driver, its queues, the sources
 /// as configured until the store's records are read, the handed-in records
 /// until kept, and each source's record on its way to the store.
 pub(crate) fn worst_case(limits: &driver::Limits, room: u32, page_rows: u32) -> Option<u64> {
@@ -1221,3 +1221,7 @@ pub(crate) fn configured_bytes(config: &config::Engine) -> Option<u64> {
     Map::<u32, driver::Account>::worst_case(count)?
         .checked_add(driver::worst_case(&limits)?.checked_mul(u64::from(count))?.checked_mul(2)?)
 }
+
+#[cfg(test)]
+#[path = "tests/accounts_host.rs"]
+mod tests;

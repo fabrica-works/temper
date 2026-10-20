@@ -215,8 +215,8 @@ impl CardWord {
             Self::ProposalBudget => (42, &[b"Budget ", b""], &[Number]),
             Self::Result => (43, &[b"Result"], &[]),
             Self::Authority => (44, &[b"Authority"], &[]),
-            Self::AccountSignInStarted => (45, &[b"LLM account sign-in started"], &[]),
-            Self::AccountSignedOut => (46, &[b"LLM account signed out"], &[]),
+            Self::AccountSignInStarted => (66, &[b"LLM account sign-in started"], &[]),
+            Self::AccountSignedOut => (67, &[b"LLM account signed out"], &[]),
         }
     }
     #[must_use]

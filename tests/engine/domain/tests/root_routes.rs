@@ -794,8 +794,8 @@ fn assigned(driver: &Driver) -> engine::Assignment {
         .unwrap_or_else(|| panic!("assigned chat: {:?}", driver.delivered))
 }
 
-// Accounts are wanted at the restart's first step and granted by the
-// component; a missing grant retains the activation (jig 7dcc65c5).
+// The source restore pass ends before accounts are wanted and granted by
+// the component; a missing grant retains the activation.
 #[test]
 fn an_ungranted_account_retains_the_chat_until_its_grant() {
     let mut driver = Driver::new(Store::new());
@@ -803,7 +803,13 @@ fn an_ungranted_account_retains_the_chat_until_its_grant() {
     let mut withheld = Vec::new();
     advance_withholding(&mut driver, &mut withheld, 50);
     assert!(driver.root.ready());
-    assert_eq!(driver.protocol.accounts, [accounts::Request::Component(accounts::ToComponent::Want { account: 1 })]);
+    assert_eq!(
+        driver.protocol.accounts,
+        [
+            accounts::Request::Signing(accounts::Signing::Restored),
+            accounts::Request::Component(accounts::ToComponent::Want { account: 1 }),
+        ]
+    );
     driver.sign_in();
     advance_withholding(&mut driver, &mut withheld, 50);
     chat(&mut driver, 9);

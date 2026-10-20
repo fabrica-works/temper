@@ -95,8 +95,11 @@ impl Stand {
         *hello.stream()
     }
     fn watch(&mut self, stream: [u8; 16]) -> Token {
+        self.watch_subject(stream, wire::Subject::Me)
+    }
+    fn watch_subject(&mut self, stream: [u8; 16], watched: wire::Subject) -> Token {
         let mut subject = Writer::new(1);
-        wire::Subject::Me.encode(&mut subject).unwrap();
+        watched.encode(&mut subject).unwrap();
         let subject = wire::Owned::new(
             &self.env.limits.wire,
             wire::OwnedParts {
@@ -111,7 +114,14 @@ impl Stand {
         value.encode(&mut bytes).unwrap();
         self.exchange(OPEN, kit::Message::Watch(bytes.finish()));
         let Some(kit::Request::Core(event)) = self.out.pop() else { panic!("core watch") };
-        let jig_domain_core::Event::Watch { watcher, .. } = *event else { panic!("frame watch") };
+        let Ok(temper_engine_domain::PartyInput::Watch { watcher, subject, .. }) =
+            crate::clients::translation::to_root(*event)
+        else {
+            panic!("root watch")
+        };
+        if let wire::Subject::Accounts = watched {
+            assert_eq!(subject, jig_domain_core::documents::Watched::Accounts);
+        }
         self.down(kit::Event::Admitted { watcher });
         while self.component.up(&self.env, &mut self.out) {}
         while self.out.pop().is_some() {}
@@ -148,4 +158,86 @@ fn an_unwatch_after_its_watch_ends_is_answered_when_the_stream_goes() {
         wire::CloseAnswer::decode(&stand.env.limits.wire, &mut Reader::new(&record)),
         Ok(wire::CloseAnswer::Closed)
     );
+}
+
+#[test]
+fn the_accounts_watch_reaches_the_root_and_returns_whole_cut_facts() {
+    use jig_domain_accounts as a;
+    use jig_domain_core::documents as d;
+    use temper_engine_domain::{Delivery, PartyRequest};
+    let mut stand = Stand::new();
+    let stream = stand.stream();
+    let watcher = stand.watch_subject(stream, wire::Subject::Accounts);
+    stand.down(kit::Event::Transport(kit::FromTransport::StreamTaken { stream: STREAM }));
+    let mut sources = List::with_capacity(1);
+    sources
+        .push(d::SourceLine {
+            number: 9001,
+            place: 2,
+            kind: a::Kind::Key,
+            state: d::AccountState::Later { until: None },
+            usable: false,
+            expiring: true,
+            attention: true,
+            spent_until: None,
+        })
+        .unwrap();
+    let mut accounts = List::with_capacity(1);
+    accounts
+        .push(d::AccountLine {
+            number: 7,
+            place: 3,
+            uses: None,
+            plan: true,
+            provider: Some(3),
+            display: d::Text { bytes: b"Personal".as_slice().into(), cut: true },
+            holder: a::Holder::Party(23),
+            sources,
+            cut: true,
+        })
+        .unwrap();
+    let document = d::Document::Accounts(Box::new(d::Accounts {
+        accounts,
+        signing: List::with_capacity(0),
+        last_end: Some(d::LastEnd { source: 9001, end: a::End::Failed { failure: a::Failure::SignInAgain } }),
+        usable: false,
+        settled: true,
+        cut: true,
+    }));
+    let request = PartyRequest::Deliver(Delivery::Document { watcher, document: Box::new(document) });
+    stand.down(crate::clients::translation::to_component(request).expect("whole accounts delivery"));
+    let mut delivered = false;
+    for _ in 0..ITERATIONS {
+        stand.component.up(&stand.env, &mut stand.out);
+        while let Some(request) = stand.out.pop() {
+            let kit::Request::Transport(kit::ToTransport::Streamed { message: kit::Streamed::Record(record), .. }) =
+                request
+            else {
+                continue;
+            };
+            let wire::StreamEvent::Delivery(value) =
+                wire::StreamEvent::decode(&stand.env.limits.wire, &mut Reader::new(&record)).unwrap()
+            else {
+                continue;
+            };
+            let wire::DeliveryValue::OwnerAccounts(value) =
+                wire::DeliveryValue::decode(&stand.env.limits.wire, &mut Reader::new(value.document().record()))
+                    .unwrap()
+            else {
+                panic!("accounts wire")
+            };
+            assert!(!value.usable());
+            assert!(value.settled());
+            assert!(value.cut());
+            let mut pieces = Reader::new(value.accounts());
+            let bytes = skein_codec::piece::split(&mut pieces).unwrap().expect("account piece");
+            let line = wire::OwnerAccountLine::decode(&stand.env.limits.wire, &mut Reader::new(&bytes)).unwrap();
+            assert_eq!(line.number(), 7);
+            assert!(line.cut());
+            assert_eq!(line.provider(), &Some(3));
+            assert!(!line.sources().is_empty());
+            delivered = true;
+        }
+    }
+    assert!(delivered);
 }
