@@ -1,14 +1,13 @@
 # Session 07: the client's and setup's worlds
 
 Move the client's and reconcile's worlds into skein, preserving their
-referees, allocator checks and sweeps; then add the missing recovery and
-setup stories. Each of the two destinations is a hand-listed workspace
+referees, allocator checks and sweeps; then add the missing client recovery.
+The additional setup stories (07.4) move to the GitHub draft, section 17 (ruling 189). Each of the two destinations is a hand-listed workspace
 member; the component's worlds belong to skein 08 and 09 (decisions 22, 23).
 
 Needs at start: temper 02.1 (the client world uses skein's client) and
 temper 05.1 (the worlds use skein's fakes), landed on origin/main.
-07.1 also needs skein 02.2; 07.3 temper 04.1 and skein 08.1; 07.4 skein
-04.2 (README's sessions table).
+07.1 also needs skein 02.2; 07.3 temper 04.1 and skein 08.1 (README's sessions table).
 
 ## Read first
 
@@ -40,8 +39,7 @@ future source commit. Preserve module names and test names. Count each
 file pair by code-organization 6; Size includes moved fixture/test lines
 for review, and adds no shipped production implementation here.
 
-Execute 07.1 (client move), 07.2 (recovery), 07.3 (setup move), then
-07.4 (setup stories). Client work comes before the setup wait on skein
+Execute 07.1 (client move), 07.2 (recovery), then 07.3 (setup move). Client work comes before the setup wait on skein
 08.1's shared machine support. New world behavior lands after its move.
 The copied 858-line simulation file is split by 07.2, not 07.1.
 
@@ -101,7 +99,7 @@ Proof:
   29 passing tests, including memory; baseline 0.075 s, repeat 0.020 s.
   world; `heavy cargo nextest run -p skein-forge-client-world --profile fuzzy`
   shows 2 passing tests; baseline 0.258 s, repeat 0.169 s.
-  These prove the copied harness itself; skein 09.2 connects the client
+  These prove the copied harness itself; the GitHub draft, section 17 (ruling 189), plans to connect the client
   to the component in a separate joint world.
 Don't: replace the fake with scripted client answers; inspect client state
   in the referee; split simulation on this move; alter any client behavior.
@@ -174,7 +172,7 @@ Proof:
   world; `heavy cargo nextest run -p skein-forge-client-world --profile fuzzy`
   shows the same 2 tests, baseline 0.258 s; each below 5 s.
   Parent recovery is this domain harness's behavior under test; the
-  client/component joint belongs to skein 09.2–09.4.
+  added client/component joint is deferred to the GitHub draft, section 17 (ruling 189).
 Don't: replay held entries through Make; refresh a saved attempt on a
   find; make Remake implicit; fix production behavior in this harness.
 Size: about 180 lines moved, 180 new.
@@ -252,68 +250,19 @@ Size: about 950 lines moved, 120 new.
 Removes: downstream configuration parsing/dependencies in the skein copy;
   nothing in temper.
 
-### 07.4 Add paging and independent-owner setup stories
-Scope: forge-setup 4, 7's paging, two services and off-loopback cases.
-Needs: 07.3's HTTP world; skein 04.2's marker rule, the mark matched
-  whole on both sides (decisions.md, Design questions 25, answered). No
-  machine signature changes.
-Files: `tests/forge/setup/src/{world,fixtures}.rs`; new
-  `src/world/tests.rs`, a child module of world, sharing its existing
-  driver and store. It can script given values and each owner's item
-  store without adding a public world API.
-Shape: retain `World` and the owner's given-values type. Script two
-  owners sequentially on one `Service`, keeping their item stores
-  separate; the admin authority is shared. No reset of the forge.
-Test shape: add 6 focused tests, all below 0.5 s, reusing `config`'s
-  page cap 2, `bot_tokens`, `team`, `listener`, `secret`, and `Store`:
-  `a_token_on_the_second_page_is_replaced`: three tokens, matching name
-  last, stale item; exactly one delete and one create, unrelated ids kept.
-  `a_hook_deleted_on_page_two_does_not_skip_the_next_row`: unrelated
-  first-page hooks, three matching hooks across later pages; lowest id
-  alone remains patched, the two unrelated hooks unchanged.
-  `a_member_on_the_second_page_is_not_added_again`: three members, bot
-  third; membership remains those three ids, AddMember count `0`.
-  `two_services_keep_separate_access_on_one_forge`: kit and peer, distinct
-  bot/token names and listener ports; two teams and two hooks per org,
-  four bot tokens, each owner's item answers its own bot; rerunning kit
-  preserves peer's token ids, scopes, hook secret and team membership.
-  `another_services_bot_is_unmarked`: peer word with kit's login;
-  `Ended::Stop` at `Stage::Bot`, `Why::Unmarked`, no subsequent mutation.
-  `an_off_loopback_listener_makes_no_hook_or_secret`: reference below.
-```rust
-#[test]
-fn an_off_loopback_listener_makes_no_hook_or_secret() {
-    let mut world = World::owned(7);
-    world.listening(([192, 0, 2, 1], 9898).into());
-    assert_eq!(world.reconcile(), Ended::Done);
-    assert_eq!(world.file(Item::WebhookSecret), None);
-    assert_eq!(world.store().subscriptions(b"acme").count(), 0);
-    assert_eq!(world.store().subscriptions(b"work").count(), 0);
-    assert!(!world.trace().iter().any(|line| line.contains("WebhookSecret")));
-}
-```
-  Also assert no OrgHooks/CreateOrgHook/EditOrgHook/DeleteOrgHook request
-  in that last story. Bot-password Draw remains legitimate; only the
-  webhook-secret read/draw is absent. Expected ids come from fixture
-  creation order; named counts come from the seeded rows, not reconcile.
-Proof:
-  joint; `heavy cargo nextest run -p skein-forge-setup-world` shows
-  27 passing tests; base form 21 at 0.122 s; aim below 1 s total.
-  joint; `heavy cargo nextest run -p skein-forge-setup-world --profile fuzzy`
-  shows the same 1 test, baseline 1.315 s, below 5 s.
-  These stories exercise the HTTP joint; process-host behavior is unchanged.
-Don't: change production paging to suit a test; merge the three paging
-  behaviors; count the bot password draw as a webhook-secret draw.
-Size: about 0 lines moved, 220 new.
-Removes: nothing.
+### 07.4 Add paging and independent-owner setup stories — dropped
+
+Dropped by the director's scope cut, ruling 189 (2026-10-20). Moved to the GitHub draft, section 17 (ruling 189).
+No implementation or proof of this increment runs in forge-kit; its earlier specification remains
+in git history. Every retained move and its inherited coverage still runs.
 
 ## Done when
 
-From skein, after these four increments:
+From skein, after retained increments 07.1–07.3 (07.4 is dropped):
 
 - `heavy cargo nextest run -p skein-forge-client-world` prints 31 passed;
   the same command with `--profile fuzzy` prints 2 passed.
-- `heavy cargo nextest run -p skein-forge-setup-world` prints 27 passed;
+- `heavy cargo nextest run -p skein-forge-setup-world` prints the 21 moved tests passed;
   the same command with `--profile fuzzy` prints 1 passed.
 - `heavy rg -n '^    "tests/forge/(client|setup)",$' Cargo.toml` prints
   two member lines.

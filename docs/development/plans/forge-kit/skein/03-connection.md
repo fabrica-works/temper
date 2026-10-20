@@ -158,7 +158,8 @@ PlaintextName { forge: u16 },
   implementation. Keep ready-check sum 2,812,325 as historical baseline;
   the pre-owner-value fixture now measures 2,812,377 after landed holder changes
   (recheck at temper9a2eda75). Neither figure is the final owner-byte sum.
-  skein 08.5 adds its independent allocator measurement.
+  The independent allocator measurement is to the GitHub draft, section 17 (ruling 189),
+  once its complete holders exist; the existing formula and runtime admission remain.
   Temper's side: crates/temper-service/src/forge.rs::{settings,shared,problems,
   indexed} must construct Forge/Credential/Transport, flatten Shared, handle
   Word/PlaintextName and map forge numbers to indices. crates/temper/src/forge.rs

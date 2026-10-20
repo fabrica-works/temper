@@ -1561,6 +1561,18 @@ where its answer lands.
         its io failure; `tally().hooks` other than 2; a failed premise; a refused
         sum. Nothing is deferred.
 
+195. **Director ruling189: five-step GitHub scope cut** (director instruction of 2026-10-20T02:05Z).
+     Reverses: earlier requirements to implement/prove only skein07.4,08.5,09.2,09.3,09.4, including the future07.4part of steer2026-10-20T01:36:19Z point2. All remaining scope/proof remains.
+     Amends: README scope/session table/closing repin/Done when; later.md; skein03,07,08,09,10 and Temper07 derived references; Skein design STATUS.
+
+     Execute the director's2026-10-20scope cut, cited as director ruling189 (the GitHub draft landed temper3a25150f739b8cf4b9dc206d62c27839f8b2c21b). Drop exactly skein07.4,08.5,09.2,09.3,09.4; record each ledger row dropped citing189 so the closing temper-repin waits for none of them. This run's numbered record is195; it is not the earlier Forge-kit primary-sync ruling189.
+
+     Move these added setup stories, independent component allocation measurement and new protocol owner/stories/invariants to the GitHub draft, section17 (ruling189). The director adds that draft text; this change does not edit it. Measure the complete component once after GitHub's holders exist. Preserve every other step, especially05.2first on scarce slots,07.3,08.1–08.4,09.1,10.5,10.s1 and Temper07.1/07.2. No test temper deletes is lost: every retained move keeps its identities/assertions, including the five09.1fake-protocol tests and temper's remaining policy world.
+
+     Final protocol-world Done when is5passed and no fuzzy run. Machine-world Done when is41after08.4, including10.5's count consumer; inherited machine fuzzy coverage remains. Setup-world ends at the21moved tests/1fuzzy, without dropped07.4's six additions. Preserve all retained gates, runtime/admission limits, process/conformance proofs and whole-plan measurements. Refresh further reached dependency/count/copy references and list users in owning commits. Existing explicit194failed-premise and06diagnostic reports are separate; the cut grants no speculative fix or waiver for kept work.
+
+     Checked: pinned plan set accepts state=dropped; all five rows were unlanded. The plan's091source inventory and git grep '#[test]' origin/main tests/engine/protocol-forge/tests/fake_protocol.rs both show5inherited tests. Remaining08.4declares41 and08.5was its sole added allocator test; changed final counts are future retained-plan requirements, not fresh executions. Scoped doc search reconciles all live07.4/08.5/09.2–.4references and the top-level trailer check excludes dropped rows. awaits.tsv is empty. Skein STATUS changes landed together as159f2f627b30c2d37439ef3c9266aa129c16b566, with forge-connection10/forge-setup7 explicitly to the GitHub draft, section17 (ruling189). Temper plan/later/count amendments are this one docs landing. No code, test corpus or runtime source changed.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

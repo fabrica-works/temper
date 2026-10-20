@@ -16,7 +16,7 @@ recorder with its corpus, and the document tests) and temper 06.1 (it
 repointed the conformance, which this session deletes); 07.1 also needs
 **temper 05.2** (README), which deletes `tests/one-process/src/forge.rs`,
 the one user of the protocol world outside the worlds (Files). Each capability must be on origin/main; skein's later
-test increments (06.4, 07.2, 07.4, 08.2 to 08.5, 09.2 to 09.4) may land after
+retained test increments (06.4, 07.2, 08.2 to 08.4) may land after
 this session (README, Repin).
 
 ## Read first

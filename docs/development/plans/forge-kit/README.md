@@ -62,9 +62,9 @@ more says so in its row and its file. Dependencies are by capability:
 | `skein/05-fakes.md` | skein 05: the fake forge's domain and protocol layer moved, with their tests; the forge peer in `skein-fake-peers` | temper 01.2 | 05.4: temper 05.1 |
 | `skein/06-conformance.md` | skein 06: the throwaway Forgejo on skein's HTTP client; the conformance on the kit, with its transcripts, and its script; the dialect's document tests on the transcripts | temper 01.2 | 06.2: temper 03.1, temper 06.4 |
 | `skein/06.s1-oneshot.md` | skein06.s1: bounded throwaway driver cause and evidenced scheduling repair | skein06.1 | |
-| `skein/07-worlds.md` | skein 07: the client's and setup's worlds, `tests/forge/client` and `tests/forge/setup`, moved, with the stories the design asks for | temper 02.1, temper 05.1 | 07.1: skein 02.2; 07.3: temper 04.1, skein 08.1; 07.4: skein 04.2 |
-| `skein/08-machine-world.md` | skein 08: the component's machine and listener world, `tests/forge/machine`, moved, with plaintext and TLS faults, deadlines, closing and the counted worst case (forge-connection.md 10; decision 23) | temper 03.1, temper 05.1, skein 06.2 | |
-| `skein/09-protocol-world.md` | skein 09: the protocol world's component and fake tests, `tests/forge/protocol`, moved, with its owner, stories and invariants on skein's client and component (forge-connection.md 10; decisions 22, 23) | skein 07.1, skein 08.1, temper 03.1, temper 05.1, skein 06.2 | |
+| `skein/07-worlds.md` | skein 07: the client's and setup's worlds, `tests/forge/client` and `tests/forge/setup`, moved, with client recovery; extra setup stories deferred | temper 02.1, temper 05.1 | 07.1: skein 02.2; 07.3: temper 04.1, skein 08.1 |
+| `skein/08-machine-world.md` | skein 08: the component's machine and listener world, `tests/forge/machine`, moved, with plaintext and TLS faults, deadlines, and closing; independent allocation measurement deferred (forge-connection.md 10; decision 23) | temper 03.1, temper 05.1, skein 06.2 | |
+| `skein/09-protocol-world.md` | skein 09: the protocol world's component and fake tests, `tests/forge/protocol`, moved (five tests); added owner/stories/invariants deferred (forge-connection.md 10; decisions 22, 23) | skein 07.1, skein 08.1, temper 03.1, temper 05.1, skein 06.2 | |
 | `skein/10-plans.md` | skein 10: `skein-forge`'s plans' pure tests on canned exchanges, and the plans' differences from the design (answers 7 to 12 and 35), each its own increment (decision 28) | skein 01.4 | 10.5: skein 08.1 |
 | `skein/10.s1-named-page-fixtures.md` | skein10.s1: named page fixtures and scoped AST recurrence checks | skein10.5 | |
 | `skein/10.s2-plan-contracts.md` | skein10.s2: independent plan contracts, exhaustive repository matches and scoped AST checks | skein10.4; normal ready check | |
@@ -116,9 +116,9 @@ last.
 **The critical path:** skein 01.1 → 01.2 → temper 01.2 → skein 01.3 →
 temper 01.3 → skein 01.4 → temper 01.4 → skein 03.1 → temper 03.1 →
 skein 06.2 → skein 08.1 → skein 09.1 → temper 07.1 → 07.2: fourteen
-steps to temper's last session. skein 08.2 → … → 08.5 and 09.2 → 09.3
-→ 09.4 reach fifteen and may land after it; the closing `temper-repin`
-follows every skein step: sixteen in all.
+steps to temper's last session. Retained machine refinements08.2–08.4 may land
+after it; the closing `temper-repin` follows all retained landings and never waits
+for the five dropped increments in the scope rule below.
 Beside it, skein 03.2 → 03.3 after skein 03.1, then temper 03.2;
 temper 06.1 → … → 06.4 after skein 06.1, before skein 06.2 (decision
 27); and skein 10.1 → … →
@@ -127,6 +127,8 @@ also waits for temper 05.2, behind skein 05.5 (decision 26): a shorter
 chain.
 
 ## Rules of this plan
+
+- **Director's scope cut, ruling189 (2026-10-20):** drop skein07.4,08.5,09.2,09.3,09.4 from this run, to the GitHub draft, section17. PartC reshapes teams/hooks, runtime credentials, App key, installation tokens and puller; the director owns that draft. Keep every other step, especially05.2first when slots are scarce,07.3,08.1–08.4,09.1,10.5,10.s1 and Temper07.1/07.2. Preserve every test temper deletes by its retained move; the protocol package ends with the five09.1tests, no fuzzy run; the machine package ends at41. The independent component measurement runs once after GitHub holders exist. The closing temper-repin waits only for retained steps. Session Done-when checks and later.md apply this cut; no runtime limit or kept proof changes.
 
 - **Director's parallel capacity instruction (2026-10-20 00:20Z):** run
   every dependency-ready session the coordinator can hold, in parallel,
@@ -515,7 +517,7 @@ skein, for skein's) at `origin/main`, the plan's worktrees removed.
    ready, running or blocked.
 2. The plan's commits: `git log origin/main --grep='^Plan: forge-kit$'
    --format='%(trailers:key=Step,valueonly,separator=)' | sort -u` in
-   skein lists the skein steps the session files number, and the same in
+   skein lists the retained, non-dropped skein steps, and the same in
    temper the temper steps; a supplementary step (`.s<k>`) adds a line.
 3. Each session file's "Done when" holds, in the sessions table's order.
 4. temper holds none of the moved crates: `ls crates testing tools`

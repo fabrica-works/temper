@@ -308,66 +308,29 @@ Don't: TLS listener, renewal, optimized dependencies, fixed ECDSA flight lengths
 Size: about 0 lines moved, 300 new including tests: 140 TLS peer/clock, 100 sweep, 60 focused/table tests.
 Removes: nothing.
 
-### 08.5 The counted worst case
-Scope: forge-connection 7.5, 10's first independent measurement of the component's declared sum.
-Needs: 08.4's TLS peer, 08.3's held-answer/hint driver and 03.1's worst_case formula.
-Files: tests/forge/machine/{Cargo.toml,src/lib.rs}, new src/memory.rs and tests/memory.rs;
-  skein-heap.workspace=true in the world's manifest (workspace dependency exists). If a measured holder
-  is missing, change crates/skein-forge-connection/src/limits.rs::worst_case and report its revised sum.
-Shape: memory::full_heap() -> (u64,u64,[u64;6]): owned maximum, declared bound, observed saturation
-  [forges,calls,connections,repositories,users,hooks]. Reuse skein_heap::{Counting,Meter} and
-  tests/heap/tests/meter.rs: meter construction and every component entry point, drop handed-out bytes
-  before Meter::check; exclude peer/server allocations. No copied allocator or application profile.
-  Fill 08.1's admitted caps: credentials/secrets/names/paths at bounds, tables full, all calls outstanding
-  then held answers, all hooks holding hints; exercise raw-growth overlap and TLS on every connection.
-  Observe reachable peaks, never sum mutually exclusive states. Owner io is priced once, separately.
-Test shape: full_holders_fit_the_declared_worst_case, one new focused (<0.5 s), uses settings/shared/
-  limits from 08.1 and 08.4's trust. Expected bound: limits::worst_case(&limits,&shared,2), 03.1's
-  named sum; margin floor0 bytes. Observed saturation [2,2,2,2,8,4] is not inferred from the formula.
-```rust
-// tests/forge/machine/tests/memory.rs
-#[global_allocator]
-static HEAP: skein_heap::Counting = skein_heap::Counting;
-#[test]
-fn full_holders_fit_the_declared_worst_case() {
-    let (owned, bound, full) = skein_forge_machine_world::memory::full_heap();
-    let expected = limits::worst_case(&fixtures::limits(), &fixtures::shared(), 2).expect("bound");
-    assert_eq!(bound, expected);
-    assert_eq!(full, [2, 2, 2, 2, 8, 4]);
-    assert!(owned > 0);
-    let margin = bound.checked_sub(owned).expect("margin at least 0 bytes");
-    eprintln!("owned={owned} bound={bound} margin={margin}");
-}
-```
-  Record allocation peaks and saturation observations, so an empty run cannot pass. If the formula
-  changes, temper's side: crates/temper-service/src/system.rs calls the moved limits::worst_case in
-  its aggregate bound; the next repin receives the new value, with no signature change. Report a
-  newly exposed shortfall; this test adds no service limit.
-Proof:
-world; `heavy cargo nextest run -p skein-forge-machine-world`: 42 passed (41+1), each <0.5 s, all new focused work ≤1 s; owned ≤ declared and literal saturation. Only this harness meters component allocations apart from owner/peer memory; conformance cannot.
-Don't: memory-margin claims without measurement, a smaller inherited profile or duplicate io pricing.
-Size: about 0 lines moved, 300 new including tests: 120 metering, 110 filling scenarios, 45 test/fixture
-  lines, 25 formula correction/glue allowance.
-Removes: nothing.
+### 08.5 The counted worst case — dropped
 
-## Questions to raise when reached
+Dropped by the director's scope cut, ruling 189 (2026-10-20). Moved to the GitHub draft, section 17 (ruling 189).
+No implementation or proof of this increment runs in forge-kit; its earlier specification remains
+in git history. Every retained move and its inherited coverage still runs.
 
-Report any missing holder with bytes and cause. Decision18's whole-plan aims are +1.5 s default and
-+6 s fuzzy: 08's new bounds (1 s/5 s) plus 09's (1 s/5 s) total 2 s/10 s, exceeding them by 0.5 s/4 s
-before moves. The four inherited sweeps alone have max7.709 s and summed30.369 s at the base. Report the
-measured additions and whole-suite result to the planner/user; never raise a budget or trim a move.
-These are timing risks, not pending design questions; answer36 is settled in 09.4.
+## Timing and deferred measurement
+
+The retained eight new focused tests and three new fuzzy tests keep their original ceilings.
+Report additions against decision18's +1.5s default/+6s fuzzy whole-plan aims, retaining the four
+inherited sweeps and their measured cost separately. The new protocol tests09.2–09.4 and independent
+allocator measurement08.5 move to the GitHub draft, section17 (ruling189); measure the complete
+component once after GitHub's holders exist. Keep the existing component formula and runtime admission.
 
 ## Done when
 
 From skein; existing base-form command evidence is findings/base-skein-08.md. New crates/tests first run
 when dependencies land (development.md 5.4). Record each new test's elapsed time from these commands,
-then sum the nine new focused tests and three new fuzzy tests separately; report those sums beside
-09's, against decision18's +1.5 s/+6 s whole-plan aims. Keep moved times separately, not subtracted from
+then sum the eight new focused tests and three new fuzzy tests separately; report those sums against decision18's +1.5 s/+6 s whole-plan aims. Keep moved times separately, not subtracted from
 skein's additions. Per-test sums are conservative accounting, not a substitute for README's three gate
 runs measuring whole-suite wall time. Report an excess with its three slowest tests and measured sums.
 
-- `heavy cargo nextest run -p skein-forge-machine-world` prints 42 passed, each <0.5 s; new focused sum ≤1 s.
+- `heavy cargo nextest run -p skein-forge-machine-world` prints 41 passed, each <0.5 s; new focused sum ≤1 s.
 - `heavy cargo nextest run -p skein-forge-machine-world --profile fuzzy` prints 8 passed; inherited four ≤7.8 s each, fuzzy_hooks <0.5 s, new fuzzy sum ≤5 s.
 - `heavy cargo clippy -p skein-forge-machine-world --all-targets -- -D warnings` prints Finished without warnings.
 - `heavy rg -n '^    "tests/forge/machine",$' Cargo.toml` prints exactly one member line.
