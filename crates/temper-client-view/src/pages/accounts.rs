@@ -157,6 +157,8 @@ fn account(
         Some(uses) => {
             run(b, w, W::Uses);
             for value in uses {
+                b.close();
+                b.open(Role::Text);
                 match value {
                     c::OwnerAccountUse::Party(p) => {
                         run(b, w, W::Party);
@@ -372,8 +374,11 @@ fn form_page(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings,
             Some(n) => words::say(w, W::Number, &[Hole::Number(u64::from(n))]),
             None => Box::new([]),
         };
-        b.value(&text, u64::from(value.unwrap_or(0)));
+        b.value(&text, form.key_written());
         b.bind(bindings.insert(Meaning::Field(field, form.selection)));
+        if bindings.invalid_field(field) {
+            b.state(State::Invalid);
+        }
         if busy {
             b.state(State::Disabled);
         }
@@ -388,6 +393,10 @@ fn form_page(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings,
         b.state(State::Disabled);
     }
     b.close();
+    let busy = busy || bindings.invalid();
+    if bindings.invalid() {
+        text(b, w, Role::Alert, W::Selection);
+    }
     let name = root.pages().account_name();
     for (operation, word) in [
         (Operation::SignIn, W::SignInAction),

@@ -61,7 +61,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     }
     view.forge.begin();
     view.pages.begin();
-    view.accounts.begin();
+    view.accounts.begin(root.pages().accounts().is_none());
     let mut builder = view.render.builder();
     builder.open(Role::Page);
     crate::frame::banner(&mut builder, root, &view.forge_words, &mut view.pages);

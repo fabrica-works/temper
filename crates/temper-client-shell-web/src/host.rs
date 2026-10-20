@@ -26,6 +26,7 @@ pub struct Host {
     pub show: Option<(Box<[u8]>, bool)>,
 }
 impl Host {
+    #[must_use]
     pub fn new(seed: u64, now: Time, wall: Wall) -> Self {
         let client = limits::client();
         assert!(limits::worst_case(&client).is_some(), "web capacities are checked");
@@ -76,6 +77,13 @@ impl Host {
         self.event(Event::Went { place: Place::Address(self.address.clone()) });
     }
     pub fn href(&mut self, node: NodeId) -> Option<Box<[u8]>> {
+        for shown in self.view.tree().nodes() {
+            if shown.id == node
+                && let Some(address) = &shown.external
+            {
+                return Some(address.clone());
+            }
+        }
         match view::act(&mut self.view, node, Act::Press)? {
             Action::Pages(pages::Act::Go { address }) => Some(print(&address)),
             Action::Forge(forge::Act::Go { address: forge::Address::Adopt { project } }) => {
@@ -212,7 +220,12 @@ impl Host {
     pub fn build(&mut self, patches: &mut Queue<Patch>) {
         view::build(&mut self.view, &self.root, patches);
     }
+    #[must_use]
     pub fn deadline(&self) -> Option<Time> {
         root::next_deadline(&self.root)
     }
 }
+
+#[cfg(test)]
+#[path = "host_tests.rs"]
+mod tests;

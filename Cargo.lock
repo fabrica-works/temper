@@ -2332,7 +2332,9 @@ version = "0.0.0"
 dependencies = [
  "jig-client",
  "jig-client-protocol-http",
+ "jig-client-protocol-link",
  "jig-client-shell-web",
+ "jig-client-test-records",
  "skein-lib",
  "skein-ui",
  "skein-ui-web",

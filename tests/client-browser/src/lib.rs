@@ -92,6 +92,40 @@ impl Tier {
         configuration::write(scratch.path(), &temper(), &bundle());
         Self { scratch, forged: forgery::request() }
     }
+    /// Account offers with a static public key set, served by the same scratch server before Visit.
+    #[must_use]
+    pub fn accounts(name: &str) -> Self {
+        let tier = Self::reserved(name);
+        let path = tier.scratch.path().join("config.json");
+        let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("deployment")).expect("JSON");
+        let private_bundle = tier.scratch.path().join("bundle");
+        copy_bundle(&bundle(), &private_bundle);
+        let digest = fs::read_dir(&private_bundle)
+            .expect("bundle entries")
+            .map(|entry| entry.expect("bundle entry"))
+            .find(|entry| entry.file_type().expect("bundle entry type").is_dir())
+            .expect("digest directory");
+        // Public, synthetic 2048-bit RSA modulus; no callback or signature is exercised here.
+        let keys = serde_json::json!({"keys":[{"kty":"RSA","n":format!("g{}", "A".repeat(341)),"e":"AQAB"}]});
+        fs::write(digest.path().join("issuer.webmanifest"), serde_json::to_vec(&keys).expect("key set"))
+            .expect("static issuer key set");
+        let socket = value["application"]["clients"]["listener"]["socket"].as_str().expect("reserved socket");
+        let keys =
+            format!("http://{socket}/bundle/{}/issuer.webmanifest", digest.file_name().to_str().expect("digest"));
+        value["application"]["clients"]["bundle"] = serde_json::json!(private_bundle);
+        value["engine"]["limits"]["overrides"]["accounts.sign_in_deadline_ms"] = 5000.into();
+        value["engine"]["llm"]["providers"] = serde_json::json!([{
+            "name":"Test provider", "number":17, "models":["fake"],
+            "sources":{"keys":true,"sign_in":{
+                "issuer":"http://127.0.0.1:9", "client":"temper-test", "scopes":["openid","chat"],
+                "authorization":"http://127.0.0.1:9/authorize", "token":"http://127.0.0.1:9/token",
+                "keys":keys, "transport":"plaintext", "must_grant":["chat"],
+                "redirect_path":"callback"
+            }}
+        }]);
+        configuration::private(&path, &serde_json::to_vec(&value).expect("accounts deployment JSON"));
+        tier
+    }
     /// A tier whose server listens at a loopback port reserved beforehand, so that a restart opens the same
     /// address and a page reconnects to it. Jig's tier has the same hook.
     #[must_use]
@@ -135,6 +169,20 @@ impl Tier {
             page: b"/chats",
             request: &self.forged,
             done: Find::text(b"Forged"),
+        }
+    }
+}
+
+/// Keep the built bundle immutable while giving this one-serve story its static issuer document.
+fn copy_bundle(from: &Path, to: &Path) {
+    fs::create_dir(to).expect("private bundle directory");
+    for entry in fs::read_dir(from).expect("built bundle") {
+        let entry = entry.expect("bundle entry");
+        let target = to.join(entry.file_name());
+        if entry.file_type().expect("bundle entry type").is_dir() {
+            copy_bundle(&entry.path(), &target);
+        } else {
+            fs::copy(entry.path(), target).expect("copy bundle file");
         }
     }
 }

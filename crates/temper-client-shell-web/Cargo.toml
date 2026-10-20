@@ -36,3 +36,21 @@ allow_attributes = "deny"
 allow_attributes_without_reason = "deny"
 disallowed_types = "deny"
 disallowed_methods = "deny"
+
+# Compile the shipped platform-independent host on native for focused patch tests.
+[[test]]
+name = "host"
+path = "tests/host.rs"
+
+[dev-dependencies]
+jig-client.workspace = true
+jig-client-protocol-http.workspace = true
+jig-client-shell-web.workspace = true
+jig-client-protocol-link.workspace = true
+jig-client-test-records.workspace = true
+skein-lib.workspace = true
+skein-ui.workspace = true
+skein-ui-web.workspace = true
+temper-client-domain.workspace = true
+temper-client-view.workspace = true
+temper-client-protocol-wire.workspace = true

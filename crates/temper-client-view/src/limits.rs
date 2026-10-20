@@ -34,7 +34,7 @@ impl Limits {
         // Two whole documents: the party's and, for an owner, deployment's accounts.
         // An account emits at most six structural nodes and occupies at least 26 wire bytes;
         // a source emits two nodes and occupies at least 18 including its piece length;
-        // each use adds text only. Sign-ins occupy at least 14 bytes per pair of status/text nodes.
+        // a use occupies at least 9 bytes per text node. Sign-ins occupy at least 14 per status/text pair.
         // Four admitted bytes per node therefore cover their combined lists without
         // multiplying the account and source maxima or using task-window rows.
         let account_nodes = u32::try_from(receiving.document_bytes.checked_mul(2)?.checked_div(4)?)
