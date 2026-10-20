@@ -208,13 +208,13 @@ pub fn run(forgejo: &Forgejo, runner: Option<&Path>,
   appearance, quoted times, fixed HTTP dates and ports, sorted units, git pkt-line prefixes;
   document the outstanding unquoted log-time repair owned by 06.4. The base mask's UUID rule clears
   four stale UUID occurrences during 06.2's recording; nine unquoted log times remain for 06.4.
-Test shape: move all 33 tests unchanged in name (the base's 25 and temper 06.2 to 06.4's 8;
+Test shape: move all 34 library tests unchanged in name (the base's25 plus9from Temper06.2–06.4, including the bounded-diagnostic test;
   temper 06.1's refusal test stays temper's, deleted by temper 07: answer 31); retain `Mask::new`, `Secrets::of`, `write::check`,
   `Fact::line`. No new test kind. Token/tail/password leaks retain the literal `Leak` case/kind;
   masked bytes and content lengths retain their asserted values. Base suite 0.114 s; listener world
   0.109 s (<0.5 s), other tests <20 ms.
 Proof: unit; `heavy cargo nextest run -p forgejo-conformance`
-  prints 33 passed, 0 skipped (the base's 25 in 0.114 s), preserving that workload/time.
+  prints34passed,0skipped (source-verified library identity count; the historical base's25took0.114s), preserving that workload/time.
 Proof: process; `heavy --gate scripts/proof-forgejo-conformance.sh --forgejo "$WS/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-linux-amd64" --runner "$WS/tmp/temper/forgejo/runner-v13.2.0/forgejo-runner-13.2.0-linux-amd64" --scratch target/forgejo-conformance --out tests/forge/conformance`
   once: exits 0; 218 facts, all 55 setup and 40 component facts hold. Then compare, as part of this
   Proof (no second recording):
@@ -382,14 +382,28 @@ Shape: retain `Mask::bytes(&mut self, &[u8]) -> Vec<u8>`. Its existing UUID rule
   same ordinal, different rendered bytes. Do not mask numeric resource ids, git pkt lengths or
   unrelated text. Update the mask contract.
   temper's side: no caller changes; `Mask::bytes` and 06.2's flags/runner arguments stay the same.
-Test shape: preserve the 33 moved tests; add two in existing src/tests.rs:
+Test shape: preserve the34moved library identities. Add two mask tests and split three existing success/refusal pairs in src/tests.rs (five additional test identities in total):
   `unquoted_log_times_keep_fraction_width_offset_and_identity` checks duplicate and distinct
   quoted/unquoted times, literal fractions/offsets;
   `recorded_corpus_has_no_unmasked_uuid_or_log_time` scans every committed request/response
   independently of Mask, accepting UUIDs only as `00000000-0000-0000-0000-<12 hex digits>` and
   volatile log dates only in their canonical 2020 form with zero fractions. Expected bad counts:
   0/0. Also check Content-Length against body bytes after masking, using the existing framing test.
-  Both new tests <20 ms; no new fixture or world.
+  The two mask tests and three separated negative cases each remain below20ms.
+  Split only these existing pairs under testing-strategy.md10, One behaviour per test:
+  keep the original positive test names and move their existing negative assertions
+  into `a_fact_read_from_a_case_rejects_a_different_status`,
+  `a_runner_absent_from_the_list_is_not_found`, and
+  `a_signature_refuses_a_changed_body`. Original positives are
+  `a_fact_read_from_a_case_compares_its_status_and_message`,
+  `a_listed_runner_is_found_by_its_uuid`, and
+  `a_signature_holds_only_for_the_body_it_signs`. Preserve all six assertions,
+  every input and expected value; factor their repeated setup into private helpers.
+  The fact's negative case changes only Exchange.status to405, retaining its409head
+  and message; the runner's negative lookup stays `absent`; the signature's negative
+  body stays `body!` under the original signature for `body`. No new case or world.
+  This belongs only to the already-changing06.4, never the completed06.2move or06.3.
+
 ```rust
 // tests/forge/conformance/src/tests.rs
 #[test]
@@ -409,20 +423,20 @@ Proof: process; `heavy --gate scripts/proof-forgejo-conformance.sh --forgejo "$W
   outcomes/reasons print, each holds or fails. Total 218; no unchecked; all 55 setup and 40
   component facts hold.
 Proof: unit; `heavy cargo nextest run -p forgejo-conformance` prints
-  35 passed (33 at the step's start, the base's 25 in 0.114 s; each new test <20 ms).
+  the step-start library count plus5 (39from the checked34: two mask tests and three separated negative cases), each new unit<20ms. Historical measurements remain evidence, not a new pass.
 Proof: unit; `heavy cargo nextest run -p skein-forge --test 'forgejo_*'`
   and `heavy cargo nextest run -p skein-forge --test fuzzy_forgejo --profile fuzzy`
   still print 61 and 4 passed, with 06.3's times and ceilings.
 Don't: fix the base's Forgejo quirks; mask by replacing the whole body; accept arbitrary UUIDs
   merely because decoding ignores them.
-Size: about 0 lines moved, 80 new production lines.
+Size: about0lines moved,80new production lines, plus about35test/helper lines for the three preserved assertion-pair splits.
 Removes: the gap for unquoted times, through recording; quoted behavior stays.
 
 ## Done when
 
 - `heavy cargo nextest run -p skein-throwaway-forgejo` prints
   16 passed, 1 skipped; `heavy cargo nextest run -p forgejo-conformance`
-  prints 35 passed. Tests needing the pinned Forgejo/runner stay outside the default suites.
+  prints39passed (checked34library baseline plus5; retain any further landed identities). Tests needing the pinned Forgejo/runner stay outside the default suites.
 - `heavy cargo nextest run -p skein-forge --test 'forgejo_*'` prints
   61 passed; `heavy cargo nextest run -p skein-forge --test fuzzy_forgejo --profile fuzzy`
   prints 4 passed. Moved names and costs match the findings' inventory.

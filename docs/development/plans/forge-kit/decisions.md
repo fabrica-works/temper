@@ -1721,6 +1721,13 @@ where its answer lands.
      No corpus rewrite, production-decoder change, shortened mutation or dropped test.
      All61focused/4fuzzy and normal gate proofs remain; no process proof is added.
 
+205. **Conformance test shapes, actual baseline and host grant custody** (hourly16 check of 2026-10-20T03:29:27Z).
+     Correct Skein06's conformance library baseline to34, verified by the retained34-to34 source identity map with no additions/removals at9861f9a6. Temper's separate environment-refusal test remains outside this moved library; historical35-package results and completed recordings are preserved.06.4adds two mask tests plus three separated negative-case identities, for checked39library tests (step-start+5), retaining any further landed tests. Skein08's unrelated33/5count is unchanged.
+
+     Under testing-strategy.md10, One behaviour per test, assign only the three sampled conformance success/refusal pairs to the already-changing06.4. Keep original positive names and all six assertions/inputs/expected values; move the negative cases to a_fact_read_from_a_case_rejects_a_different_status, a_runner_absent_from_the_list_is_not_found and a_signature_refuses_a_changed_body. Share repeated setup with private helpers. Preserve the negative fact's405status with its unchanged409head/message, absent runner lookup and body! under the original body's signature. No new scenario, recording, runtime mechanism or assertion is added. This neither rewrites completed06.2 nor expands active06.3. Use06.4's existing Clippy, unit, recording/digest and normal gate proofs with the corrected count and unchanged budgets.
+
+     Record Smith's newer Grant.form diagnostics under README Host grant forms: introduced by smith-sources/smith-01,a26eadcf50888eee56f5d4b453bbedd83981c5de, reached in Jig test-worker translation/account-notice fixtures. Director routing establishes the downstream owner/disposition in coordination with Accounts-2; no repair Step trailer is invented and no form mapping or early pin is chosen here. Preserve payload semantics and exact sources/locks; refresh further copies within that repair and list users. Independent compatible starts remain at full capacity.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

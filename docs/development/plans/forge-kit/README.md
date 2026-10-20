@@ -423,6 +423,15 @@ chain.
   independent starts; this requires no early pin or duplicate adapter sweep.
   Refresh further reached copies within the owning repair and list users in
   its commit body; only actual-tree compilation establishes compatibility.
+- **Host grant forms:** Smith `a26eadcf50888eee56f5d4b453bbedd83981c5de`
+  (smith-sources/smith-01) adds `Grant.form`. Its newly reached Jig users are
+  `testing/jig-test-worker/src/translate.rs::grant` and `src/tests.rs`'s
+  account-notice grant literal. Obtain smith-sources' downstream adapter
+  custody/disposition before consuming that interface, coordinated with the
+  existing Accounts-2 ownership. Preserve the intended credential/program/
+  withdrawn form; do not guess a mapping, force a new pin or repeat the
+  adapter sweep. Keep exact diagnostics/locks, refresh further reached copies
+  within that owning repair and list users. Actual-tree compilation remains required.
 - **Settled smith adapters at the next repin:** smith's live-text
   decisions2.2/answer4 and For the user9 settle v3 paths, `live: None`
   and ignored `OpenEvent::Live`; its later.md expressly assigns them to
