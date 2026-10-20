@@ -245,6 +245,8 @@ a { color: inherit; text-decoration: none; }
   .temper-chat .temper-message { display: block; }
   .temper-chat .temper-who { display: flex; gap: 8px; margin-bottom: 4px; }
   .temper-chat .temper-by-tool, .temper-chat .temper-cards > .temper-card, .temper-chat .temper-turn:not(.temper-marker) > :not(.temper-message) { margin-left: 0; }
-  .temper-chat .temper-chatbar [role=status] { flex: 0 1 auto; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+  .temper-chat .temper-chatbar > div:first-child { flex-wrap: wrap; }
+  .temper-chat .temper-chatbar > div:first-child > p { flex: 1; max-width: max-content; }
+  .temper-chat .temper-chatbar [role=status] { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
   .temper-chat .temper-entry textarea { font-size: 12px; }
 }
