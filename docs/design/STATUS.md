@@ -84,6 +84,12 @@ order of its pages, not contract (`client/README.md`, 3.5).
   against skein's fake forge (skein's `fake-forge.md`, section 3), with
   sh-subset CI, faults in the loop and several workers
   (`domain/testing.md`, section 10): plans of their own.
+- **A person's first run** (`draft/first-run.md`): `temper box` with
+  no argument, XDG's three directories, `temper init`, the fakes as
+  product crates and as the box's steps, a demo project, and real
+  backends added from the client; skein's arguments' rule beside it.
+  Waits for the accounts' second part and github; its demo's real git
+  is real-loop's `later.md`'s real-git bridge.
 - **The connector's shared top** (`draft/forge-kit.md`): the neutral
   part of `temper-engine-domain-forge` moved out. Waits for a second
   application that works on a forge.

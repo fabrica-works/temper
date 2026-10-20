@@ -4,6 +4,8 @@ These mockups are reference material for temper's client (`../README.md`): its l
 
 Open [chats.html](chats.html) for the chat entry screen, or [index.html](index.html) for a conversation. The other views are [inbox.html](inbox.html), [board.html](board.html), [task.html](task.html), and [changes.html](changes.html). On the goal page, agent subtasks open [agent-task.html](agent-task.html) with their individual transcripts. Each file opens directly in a browser; no build step is needed.
 
+[first-run.html](first-run.html) shows the owner’s first chat after opening the link from `temper box`, with scripted demo requests and sample model and forge connections; it loads no external assets, and **Reset demo** or reloading clears its local state.
+
 All pages use the compact, terminal-inspired layout: top navigation, monospaced text, quiet borders, and more room for the work. The conversation has no side panels. Its one-line composer grows with its contents and shrinks after sending or deleting text. Use Enter to send and Shift+Enter for a new line. The chat entry composer works the same way.
 
 These are browser-only mockups with sample data. You can start a chat, send words, accept or reject the shared proposal, answer an inbox choice, release a held task, filter lists, set a goal, and steer T21. Requests show a brief pending state, then update local sample state. No request is sent to temper or the forge. Use the **More** button on the list pages to reset the demo.

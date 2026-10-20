@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Reuse the shared stylesheet, but block its optional remote font import. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self'; font-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+  <title>Default · First run · temper</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="terminal-chat.css">
+  <script defer src="first-run.js"></script>
+</head>
+<body class="terminal-variant first-run">
+  <div class="terminal-shell">
+    <header class="terminal-topbar">
+      <a class="terminal-brand" href="chats.html" aria-label="temper chats">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1.5c1.5 5.6 2.9 7 8.5 8.5-5.6 1.5-7 2.9-8.5 8.5C10.5 12.9 9.1 11.5 3.5 10 9.1 8.5 10.5 7.1 12 1.5Z"/><circle cx="18.5" cy="18.5" r="2" fill="currentColor"/></svg>
+        <span>temper</span>
+      </a>
+      <span class="terminal-divider" aria-hidden="true"></span>
+      <span class="terminal-project">Default</span>
+      <nav class="terminal-nav" aria-label="Main navigation">
+        <a href="inbox.html">Inbox</a><a class="active" aria-current="page" href="chats.html">Chats</a>
+        <a href="board.html">Board</a><a href="changes.html">Changes</a><a href="task.html">Tasks</a>
+      </nav>
+      <div class="terminal-top-right"><span class="terminal-live"><i class="status-dot"></i> Live</span><span class="terminal-user">You · Owner</span></div>
+      <details class="terminal-mobile-menu">
+        <summary aria-label="Open navigation">☰</summary>
+        <nav aria-label="Mobile navigation"><a href="inbox.html">Inbox</a><a href="chats.html">Chats</a><a href="board.html">Board</a><a href="changes.html">Changes</a><a href="task.html">Tasks</a></nav>
+      </details>
+    </header>
+    <div class="terminal-chatbar">
+      <div class="terminal-chat-identity"><span class="terminal-number">T0</span><strong class="terminal-title">Default · Chat</strong><span class="terminal-phase" role="status">Ready</span></div>
+      <div class="terminal-chat-meta"><span>Demo model</span><button type="button" data-reset>Reset demo</button></div>
+    </div>
+    <main class="terminal-thread" aria-label="Conversation">
+      <div class="terminal-thread-inner">
+        <aside class="first-run-banner" aria-label="Demo">
+          <p>This is a demo, running on a demo model and a demo forge.</p>
+          <div class="terminal-proposal-actions"><button type="button" data-panel="accounts">Connect a model</button><button type="button" data-panel="forges">Connect a forge</button></div>
+        </aside>
+        <div class="compact-context first-run-context"><span>Default · <strong>demo/widget</strong> on Demo forge</span><span>Signed in as the deployment’s owner</span></div>
+        <section class="first-run-empty" aria-labelledby="first-run-title">
+          <h1 id="first-run-title">What shall we change?</h1>
+          <p>Try a request in demo/widget. Follow the task from its branch to a landed change.</p>
+          <div class="terminal-proposal-actions" aria-label="Suggested requests">
+            <button type="button" data-suggest>Add CSV export to widget</button>
+            <button type="button" data-suggest>Add a dark theme to widget</button>
+            <button type="button" data-suggest>Fix widget’s empty search state</button>
+          </div>
+          <p class="first-run-hint">The demo model plays these requests from a script.</p>
+        </section>
+        <div class="terminal-added-messages" role="log" aria-label="Chat messages" aria-live="polite"></div>
+      </div>
+    </main>
+    <footer class="terminal-composer-area">
+      <div class="first-run-account-line">Using Demo model · Default</div>
+      <div class="terminal-composer"><span class="terminal-input-prompt" aria-hidden="true">›</span><textarea rows="1" aria-label="Message T0" placeholder="Try a suggested request…"></textarea><span class="terminal-input-hint">Enter to send · Shift+Enter for newline</span><button type="button" class="terminal-send" aria-label="Send message">↑</button></div>
+    </footer>
+  </div>
+
+  <dialog id="accounts" class="terminal-dialog first-run-panel" aria-labelledby="accounts-title">
+    <div class="card-top"><h2 id="accounts-title">Accounts</h2><button type="button" data-dismiss aria-label="Close Accounts">Close</button></div>
+    <p>Add an account for your work. The new account becomes the deployment’s default. This demo project keeps Demo model.</p>
+    <h3>Deployment’s accounts</h3>
+    <div id="account-list" class="first-run-connections"><div class="kv"><span>Demo model · Deployment</span><strong>Ready · Default</strong></div></div>
+    <div class="rule"></div>
+    <div class="stack">
+      <div><button type="button" data-connect="chatgpt">Continue with ChatGPT</button><p>Use your ChatGPT plan.</p></div>
+      <div><button type="button" data-connect="claude">Use your Claude subscription</button><p>temper runs Claude Code. Sign in on the worker with temper program-login, then check the account.</p></div>
+      <div><button type="button" data-connect="key">Use an API key</button><p>Add a key from your LLM provider.</p></div>
+    </div>
+    <p class="first-run-hint">Mockup: these choices use sample accounts. Nothing is sent, and no credentials are needed.</p>
+    <p class="first-run-result" role="status" data-result></p>
+  </dialog>
+
+  <dialog id="forges" class="terminal-dialog first-run-panel" aria-labelledby="forges-title">
+    <div class="card-top"><h2 id="forges-title">Forges</h2><button type="button" data-dismiss aria-label="Close Forges">Close</button></div>
+    <p>Connect a forge, then adopt a repository into a new project or into Default. demo/widget stays on Demo forge.</p>
+    <div id="forge-list" class="first-run-connections"><div class="kv"><span>Demo forge · Demo</span><strong>Connected as temper-demo (1)</strong></div></div>
+    <div class="rule"></div>
+    <div class="stack">
+      <section>
+        <h3>Connect GitHub</h3>
+        <p>Create an App and install it on your account or organization. Choose selected repositories.</p>
+        <div class="button-row"><button type="button" data-connect="github-create">Create an App</button><button type="button" data-connect="github-paste">Paste an App</button></div>
+        <p>Connect an App of your own with its id and private key.</p>
+      </section>
+      <section><button type="button" data-connect="forgejo">Set up a Forgejo here</button><p>temper downloads Forgejo and its runner, then starts them. No restart needed.</p></section>
+      <section><button type="button" data-elsewhere>A Forgejo elsewhere</button><p>Add its address to the configuration and restart temper, then connect as its admin or with its bot’s tokens.</p></section>
+    </div>
+    <section id="elsewhere" hidden aria-labelledby="elsewhere-title">
+      <h3 id="elsewhere-title">A Forgejo elsewhere · Restart needed</h3>
+      <p>For a forge at forge.example, add this entry to application.forges in ~/.config/temper/temper.json. Replace the example host with yours; use an unused forge number.</p>
+      <pre><code>{
+  "number": 4,
+  "kind": "forgejo",
+  "api": {"host": "forge.example", "port": 443},
+  "transport": {"tls": {
+    "server_name": "forge.example", "trust": null
+  }},
+  "git": "https://forge.example",
+  "web": null,
+  "log_origins": null
+}</code></pre>
+      <p>Add its git identity to application.identities, using an unused identity number and the same forge number:</p>
+      <pre><code>{
+  "number": 4, "forge": 4, "login": null,
+  "author": {
+    "name": "temper",
+    "email": "temper-bot@forge.example"
+  }
+}</code></pre>
+      <p>Stop and start temper box. Return to Forges to connect with the bot’s API and git tokens, or choose “Connect as its admin”. Keep credentials out of the configuration.</p>
+    </section>
+    <p class="first-run-hint">Mockup: connections and downloads are simulated. Nothing is sent or written to your configuration.</p>
+    <p class="first-run-result" role="status" data-result></p>
+  </dialog>
+</body>
+</html>
