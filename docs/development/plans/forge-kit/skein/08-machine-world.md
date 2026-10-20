@@ -274,6 +274,23 @@ Shape: wrap scripted HTTP peer bytes in skein_tls_world::server::Server, pki::Se
   ECDSA handshake lengths vary. Capture each trial's wire flight, derive the cut range from those bytes,
   and cut that same flight; never use a previous handshake's length or assert an exact TLS byte count.
   HTTP cuts range over that trial's plaintext framing; assertions concern outcomes/counts only.
+  Bounded driver follow-up after the third repeated handshake-cut mismatch:
+  at most15minutes from the owner's start, one executable pinned-heavy
+  Bash-script submission and10active execution minutes, including setup and
+  compilation. Inspect the same-trial server-flight cut through
+  `peer::Peer::{take,request,write}` and `machine::Machine::respond`; only
+  the scripted world's HTTP responder may stop after its configured
+  terminal EOF/reset. Retain decrypting/accounting of bytes independently
+  where needed, every flight/offset/EOF/reset row and every exact
+  result/cost/terminal/Closed assertion. Add bounded failing-row diagnostics,
+  then run only `fuzzy_tls::tls_faults_at_each_byte_end_once` once. An
+  unchanged result mismatch, a missing cut/control row or a timing miss
+  returns with the same-trial flight and io evidence; no second diagnostic
+  submission, guessed result, fixed ECDSA length or shipped-code change.
+  A passing isolated check permits the increment's unspent normal proofs
+  once, with all existing43focused/8fuzzy counts and caps. Independent lint
+  and source review may continue; refresh further reached world-driver
+  copies within this scope and list them in the commit body.
 Test shape: one new focused (<0.5 s), one fuzzy (<5 s); pki is the trust override, no application profile.
   a_tls_forge_starts_and_answers_a_call uses the moved fixture's limits and this reference:
 ```rust
