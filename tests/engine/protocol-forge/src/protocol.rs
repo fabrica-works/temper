@@ -525,11 +525,14 @@ fn key(row: &top::Stored) -> top::Key {
         top::Stored::Client(row) => top::Key::Client(match row {
             skein_forge_client::Stored::Live(row) => skein_forge_client::Key::Live(row.watch.resource.clone()),
             skein_forge_client::Stored::Repository(row) => skein_forge_client::Key::Repository(row.repository),
-            skein_forge_client::Stored::Writer(row) => skein_forge_client::Key::Writer(row.forge),
+            skein_forge_client::Stored::Writer(_) => {
+                unreachable!("the connector keeps the client's writer as Stored::Writer")
+            }
         }),
         top::Stored::Change(row) => top::Key::Change(row.task),
         top::Stored::Issue(row) => top::Key::Issue(row.goal),
         top::Stored::Release(row) => top::Key::Release(row.task),
         top::Stored::Application { token, .. } => top::Key::Application(*token),
+        top::Stored::Writer(row) => top::Key::Writer(row.forge),
     }
 }

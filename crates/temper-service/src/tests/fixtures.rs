@@ -363,6 +363,9 @@ pub fn fill_files(settings: &mut settings::Engine) {
         settings.files.entries.push((worker.digest.clone(), Secret::new(WORKER_DIGEST.into()))).unwrap();
     }
 }
+pub fn started_with_two_forges() -> crate::Service {
+    start_with_worker(&[(1, 100)], None, None, 0, true)
+}
 pub fn started() -> crate::Service {
     started_with_projects(&[(1, 100)])
 }
@@ -370,15 +373,38 @@ pub fn started_with_projects(projects: &[(u32, u64)]) -> crate::Service {
     start_with_store(projects, None)
 }
 pub fn start_with_store(projects: &[(u32, u64)], stored: Option<crate::store::Store>) -> crate::Service {
-    start_with_worker(projects, stored, None, 0)
+    start_with_worker(projects, stored, None, 0, false)
 }
 fn start_with_worker(
     projects: &[(u32, u64)],
     stored: Option<crate::store::Store>,
     worker: Option<crate::Worker>,
     worker_bytes: u64,
+    two_forges: bool,
 ) -> crate::Service {
     let mut settings = engine();
+    let mut runtime = forge_runtime();
+    if two_forges {
+        let mut second = forges().into_iter().next().unwrap();
+        second.number = 2;
+        second.api_token =
+            Secret::new(Box::from(skein_lib::Decimal::of(skein_lib::Rng::new(104).next_u64()).as_bytes()));
+        let mut first = settings.forges.into_iter().next().unwrap();
+        first.api_token =
+            Secret::new(Box::from(skein_lib::Decimal::of(skein_lib::Rng::new(105).next_u64()).as_bytes()));
+        settings.forges = Box::new([first, second]);
+        let first = runtime.into_boxed().into_iter().next().unwrap();
+        let second = crate::ForgeRuntime {
+            number: 2,
+            address: ([127, 0, 0, 1], 3001).into(),
+            transport: skein_forge_connection::settings::Transport::Plaintext { name: None },
+            trust_roots: 0,
+            trust_root_bytes: 0,
+        };
+        runtime = skein_lib::List::with_capacity(2);
+        runtime.push(first).unwrap();
+        runtime.push(second).unwrap();
+    }
     settings.jig.limits.core.people.operations = 2;
     settings.jig.limits.core.tasks.tasks = 2;
     settings.jig.limits.core.tasks.project_tasks = 2;
@@ -435,7 +461,7 @@ fn start_with_worker(
     };
     let worker_io = if worker.is_some() { Some(worker_settings().jig.limits.io) } else { None };
     let io = crate::startup::checks::process_io(&settings.jig.limits.io, worker_io.as_ref()).unwrap();
-    let mut service = crate::Service::new(settings, &seeds(), None, forge_runtime(), worker, worker_bytes, io).unwrap();
+    let mut service = crate::Service::new(settings, &seeds(), None, runtime, worker, worker_bytes, io).unwrap();
 
     service.engine.store = store;
     service

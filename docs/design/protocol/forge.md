@@ -287,8 +287,8 @@ skein-io socket
 - **Named to the root,** which shows the forge and why on its row, with
   Replace (client/forge.md, the deployment's page). The engine and every
   other forge run on; nothing is erased, and the next start tries the
-  same records. Pending in the code: `temper-service`'s `stop.rs` stops
-  the engine on it.
+  same records. Pending in the code: it is named on `temper serve`'s
+  standard error, not yet to the root.
 - **The webhooks' listener** stays the engine's: one that fails stops
   the engine (section 5).
 

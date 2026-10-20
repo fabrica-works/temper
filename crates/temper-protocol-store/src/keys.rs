@@ -64,6 +64,7 @@ fn read_segments(reader: &mut KeyReader<'_>, limit: u32) -> Option<Box<[Box<[u8]
 pub fn largest(limits: &forge::Limits) -> Option<u32> {
     let name = limits.name_bytes.checked_mul(3)?.checked_add(19)?;
     let topic = limits.name_bytes.checked_mul(2)?.checked_add(28)?;
+    // Writer is one family byte and an eight-byte forge number: 9 bytes.
     Some(name.max(topic).max(92))
 }
 
@@ -133,6 +134,9 @@ pub fn encode(key: &forge::Key, limit: u32) -> Option<Box<[u8]>> {
         forge::Key::Application(token) => {
             writer.tag(15).u64(*token);
         }
+        forge::Key::Writer(forge) => {
+            writer.tag(16).u64(u64::from(*forge));
+        }
     }
     writer.finish()
 }
@@ -163,6 +167,7 @@ pub fn decode(bytes: &[u8], limits: &forge::Limits) -> Option<forge::Key> {
         13 => forge::Key::Issue(reader.u64()?),
         14 => forge::Key::Release(reader.u64()?),
         15 => forge::Key::Application(reader.u64()?),
+        16 => forge::Key::Writer(u16::try_from(reader.u64()?).ok()?),
         _ => return None,
     };
     if !reader.is_empty() {
@@ -227,7 +232,7 @@ fn read_topic(reader: &mut KeyReader<'_>, limits: &forge::Limits) -> Option<forg
 }
 fn write_client(writer: &mut KeyWriter, key: &skein_forge_client::Key) {
     match key {
-        skein_forge_client::Key::Writer(_) => unreachable!("temper-04 stores runtime writers"),
+        skein_forge_client::Key::Writer(_) => unreachable!("the connector keeps the client's writer as Stored::Writer"),
         skein_forge_client::Key::Live(resource) => {
             writer.tag(0);
             write_repository(writer, resource.repository);

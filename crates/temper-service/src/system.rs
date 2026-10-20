@@ -122,6 +122,7 @@ impl Service {
         for configured in &mut settings.forges {
             configured.api_token = skein_lib::Secret::new(Box::new([]));
         }
+        let notes = Queue::with_capacity(u32::try_from(settings.forges.len()).expect("configured forges"));
         let workers = workers::Workers::configured(&mut settings, seeds.deployment, max)?;
         let config = temper_engine_domain::Config {
             core: jig_protocol_config::core(&settings.jig, seeds.deployment, seeds.seed),
@@ -137,7 +138,7 @@ impl Service {
                 config,
                 &limits,
                 store,
-                engine::Children { accounts, workers, clients, forge },
+                engine::Children { accounts, workers, clients, forge, notes },
                 values,
                 first_periods,
             ),
@@ -228,6 +229,10 @@ impl Service {
     /// Printed sign-in links, taken by the binary.
     pub const fn links(&mut self) -> &mut Queue<Box<[u8]>> {
         &mut self.links
+    }
+    /// Operator diagnostics, taken by the binary.
+    pub const fn notes(&mut self) -> &mut Queue<crate::Note> {
+        &mut self.engine.notes
     }
     /// Root, component and I/O deadlines on the injected clock.
     #[must_use]
@@ -589,6 +594,7 @@ fn memory(
         .checked_add(Queue::<Submit>::worst_case(queue)?.checked_mul(2)?)?
         .checked_add(Queue::<io::Event>::worst_case(queue)?)?
         .checked_add(Queue::<Box<[u8]>>::worst_case(queue)?)?
+        .checked_add(Queue::<crate::Note>::worst_case(u32::try_from(settings.forges.len()).ok()?)?)?
         .checked_add(u64::from(queue).checked_mul(u64::from(io.output).checked_add(512)?)?)?
         .checked_add(Map::<Token, (Token, Option<Token>)>::worst_case(operations)?)?
         .checked_add(Map::<Token, Token>::worst_case(operations)?)?;

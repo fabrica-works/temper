@@ -1,5 +1,5 @@
 //! Total translations between durable domain rows and generated records.
-use crate::{Bounds, Undecodable, v2 as w};
+use crate::{Bounds, Undecodable, v3 as w};
 use alloc::boxed::Box;
 use skein_lib::{Reader, Writer};
 use temper_engine_domain_forge as d;
@@ -35,6 +35,10 @@ pub fn encode(value: &d::Stored) -> Box<[u8]> {
         d::Stored::ProposedEffect(value) => w::Value::ProposedEffect(entries::encode_proposed(value)),
         d::Stored::Entry { entry, held } => w::Value::Entry(entries::encode_entry_row(entry, *held)),
         d::Stored::Call { key, answer } => w::Value::Call(entries::encode_call(key, answer)),
+        d::Stored::Writer(value) => w::Value::Writer(
+            w::ForgeWriter::new(&w::CEILINGS, w::ForgeWriterParts { forge: value.forge, author: value.author })
+                .expect(FITS),
+        ),
         d::Stored::Client(value) => w::Value::Client(client::encode(value)),
         d::Stored::Change(value) => w::Value::Change(Box::new(change::encode_change_row(value))),
         d::Stored::Issue(value) => w::Value::Issue(Box::new(issues::encode(value))),
@@ -52,6 +56,13 @@ pub fn decode(bytes: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
         w::Value::Application(value) => application::decode(value, bounds)?,
         w::Value::Issue(value) => d::Stored::Issue(issues::decode(*value)),
         w::Value::Change(value) => d::Stored::Change(change::decode_change_row(*value)),
+        w::Value::Writer(value) => {
+            let w::ForgeWriterParts { forge, author } = value.into_parts();
+            if author == 0 {
+                return Err(Undecodable);
+            }
+            d::Stored::Writer(skein_forge_client::Writer { forge, author })
+        }
         w::Value::Client(value) => d::Stored::Client(client::decode(value, bounds)?),
         w::Value::Call(value) => entries::decode_call(value, bounds)?,
         w::Value::ProposedEffect(value) => d::Stored::ProposedEffect(entries::decode_proposed(value, bounds)?),

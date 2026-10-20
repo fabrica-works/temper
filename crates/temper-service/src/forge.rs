@@ -392,6 +392,7 @@ pub(crate) fn config(
     deployment: [u8; 16],
 ) -> (skein_forge_client::Config, Box<[forge::GitIdentity]>) {
     let count = u32::try_from(settings.forges.len()).expect("configured forges");
+    // temper-05 replaces configured writers with the runtime Connected entry.
     let mut writers = List::with_capacity(count);
     let mut identities = List::with_capacity(count);
     for forge in &settings.forges {

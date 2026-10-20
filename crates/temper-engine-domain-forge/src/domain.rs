@@ -270,8 +270,8 @@ impl Domain {
         self.namespace = Box::from(id);
         true
     }
-    /// Construct a connector with a configured client writer and deployment
-    /// namespace; invalid limits or writer configuration are refused.
+    /// Construct a connector with the deployment namespace and any writers
+    /// known at start; invalid limits or writer configuration are refused.
     pub fn new(
         l: &Limits,
         seed: u64,
@@ -287,7 +287,7 @@ impl Domain {
                 return Err(skein_forge::api::Error::TooLarge);
             }
         }
-        let mut writers = Map::with_capacity(l.repositories);
+        let mut writers = Map::with_capacity(l.client.repositories);
         for writer in &config.writers {
             if writers.insert(writer.forge, writer.author).is_err() {
                 return Err(skein_forge::api::Error::TooLarge);
@@ -859,6 +859,17 @@ pub fn fire(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     drain(d, env, out);
 }
 
+/// Give a forge its writer once access is known (domain/forge.md, 4.1).
+/// A refusal keeps neither a writer nor a durable row.
+pub fn writer(d: &mut Domain, env: &Env<Limits>, writer: skein_forge_client::Writer, out: &mut Queue<Request>) -> bool {
+    if !skein_forge_client::writer(&mut d.client, &child_env(env), writer, &mut d.client_out) {
+        return false;
+    }
+    d.writers.insert(writer.forge, writer.author).expect("client writer fits the connector's table");
+    drain(d, env, out);
+    true
+}
+
 fn child_env(env: &Env<Limits>) -> Env<skein_forge_client::Limits> {
     Env { now: env.now, wall: env.wall, limits: env.limits.client }
 }
@@ -873,7 +884,13 @@ fn drain(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         let request = d.client_out.pop().expect("counted child output");
         match request {
             skein_forge_client::Request::Save { record } => {
-                emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Client(record) });
+                let record = match record {
+                    skein_forge_client::Stored::Writer(row) => Stored::Writer(row),
+                    row @ (skein_forge_client::Stored::Live(_) | skein_forge_client::Stored::Repository(_)) => {
+                        Stored::Client(row)
+                    }
+                };
+                emit(out, Request::Save { read_afresh: None, release: None, record });
             }
             skein_forge_client::Request::Erase { key } => emit(out, Request::Erase { key: Key::Client(key) }),
             skein_forge_client::Request::Progress { entry } => keep_entry(d, entry, None, out),
@@ -3448,6 +3465,17 @@ fn restore(d: &mut Domain, env: &Env<Limits>, record: Stored) {
         }
         Stored::Entry { entry, held } => {
             d.entries.insert(entry.number, Outboxed { entry, held }).expect("restored entry within limits");
+        }
+        Stored::Writer(row) => {
+            let mut discarded = Queue::with_capacity(env.limits.output);
+            child(
+                d,
+                env,
+                skein_forge_client::Event::Restore { record: skein_forge_client::Stored::Writer(row) },
+                &mut discarded,
+            );
+            assert!(discarded.is_empty(), "restoration emits no output");
+            d.writers.insert(row.forge, row.author).expect("restored writer within limits");
         }
         Stored::Client(row) => {
             let mut discarded = Queue::with_capacity(env.limits.output);

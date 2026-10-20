@@ -31,7 +31,7 @@ mod tests;
 mod topics;
 pub use boundary::*;
 pub use brief::hex;
-pub use domain::{Domain, fire, max_out, resume, step};
+pub use domain::{Domain, fire, max_out, resume, step, writer};
 pub use gates::{GateCandidate, GateLast, GatePattern, GatePolicy, GateTemplate};
 pub use judge::{Criterion, Freshness as JudgeFreshness, Judges, Reviewer, Verdict as JudgeVerdict};
 pub use limits::{Limits, worst_case};
@@ -201,12 +201,15 @@ pub fn stored_key(row: &Stored) -> Key {
         Stored::Client(row) => Key::Client(match row {
             skein_forge_client::Stored::Live(row) => skein_forge_client::Key::Live(row.watch.resource.clone()),
             skein_forge_client::Stored::Repository(row) => skein_forge_client::Key::Repository(row.repository),
-            skein_forge_client::Stored::Writer(row) => skein_forge_client::Key::Writer(row.forge),
+            skein_forge_client::Stored::Writer(_) => {
+                unreachable!("the connector keeps the client's writer as Stored::Writer")
+            }
         }),
         Stored::Change(row) => Key::Change(row.task),
         Stored::Issue(row) => Key::Issue(row.goal),
         Stored::Release(row) => Key::Release(row.task),
         Stored::Application { token, .. } => Key::Application(*token),
+        Stored::Writer(row) => Key::Writer(row.forge),
     }
 }
 /// Checked payload bytes of one connector record for its parent's store page.
@@ -355,7 +358,7 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
         }
         Stored::BranchHead(row) => name(&row.name),
         Stored::PullState(row) => name(&row.name),
-        Stored::Ci(_) | Stored::Landed { .. } => Some(0),
+        Stored::Ci(_) | Stored::Landed { .. } | Stored::Writer(_) => Some(0),
         Stored::ProposedEffect(row) => {
             let resource = match &row.resource {
                 What::Branch(branch) => {

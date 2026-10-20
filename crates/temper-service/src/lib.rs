@@ -52,9 +52,11 @@ pub enum Stop {
     Listener,
     /// The webhooks listener failed.
     Hooks,
-    Forge {
-        number: u16,
-        why: skein_forge_connection::Stopped,
-    },
 }
 use jig_protocol_config::Problems;
+
+/// Operator diagnostics taken by the shell (protocol/forge.md, 2.3).
+#[derive(PartialEq, Eq, Debug)]
+pub enum Note {
+    ForgeStopped { number: u16, why: skein_forge_connection::Stopped },
+}

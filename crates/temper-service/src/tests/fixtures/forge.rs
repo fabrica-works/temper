@@ -1,38 +1,76 @@
 use skein_io as io;
-use skein_lib::{Time, Token, Wall};
+use skein_lib::{List, Map, Time, Token, Wall};
 
 /// A forge's component face, with each connection's demand answered through Wire.
 pub struct ForgeFace {
-    owner: Option<Token>,
-    wire: skein_world::stream::Wire,
+    peers: Map<Token, Peer>,
+    selected: u16,
+    answers: List<skein_forge_connection::Answered>,
+    capture_answers: bool,
     now: Time,
     worker_owner: Option<Token>,
 }
+struct Peer {
+    number: u16,
+    socket: Token,
+    wire: skein_world::stream::Wire,
+}
 impl ForgeFace {
     pub fn new() -> Self {
-        Self { owner: None, wire: skein_world::stream::Wire::new(7), now: Time::from_nanos(1), worker_owner: None }
+        Self {
+            peers: Map::with_capacity(8),
+            selected: 1,
+            answers: List::with_capacity(8),
+            capture_answers: false,
+            now: Time::from_nanos(1),
+            worker_owner: None,
+        }
     }
     pub fn connected(&mut self, service: &mut crate::Service) {
         for _ in 0_u32..256 {
             self.turn(service);
-            if self.owner.is_some() && self.wire.received.ends_with(b"\r\n\r\n") {
+            if self.sent().ends_with(b"\r\n\r\n") {
                 return;
             }
         }
         panic!("start request sent");
     }
     pub fn sent(&self) -> &[u8] {
-        &self.wire.received
+        for (_, peer) in &self.peers {
+            if peer.number == self.selected {
+                return &peer.wire.received;
+            }
+        }
+        &[]
     }
     pub fn answer(&mut self, service: &mut crate::Service, bytes: &[u8]) {
-        self.wire.write(bytes);
+        let mut owner = None;
+        for (token, peer) in &self.peers {
+            if peer.number == self.selected {
+                owner = Some(*token);
+                break;
+            }
+        }
+        self.peers.get_mut(&owner.expect("selected forge connected")).unwrap().wire.write(bytes);
         for _ in 0_u32..512 {
             self.turn(service);
         }
     }
+    pub fn select(&mut self, number: u16) {
+        self.selected = number;
+    }
+    pub fn capture_answers(&mut self) {
+        self.capture_answers = true;
+    }
+    pub fn take_answers(&mut self) -> Box<[skein_forge_connection::Answered]> {
+        core::mem::replace(&mut self.answers, List::with_capacity(8)).into_boxed()
+    }
     pub fn refuse(&mut self, service: &mut crate::Service) {
-        if let Some(owner) = self.owner {
-            service.engine.forge.up(io::Event::Failed { owner, error: io::Error::Refused });
+        for (owner, peer) in &self.peers {
+            if peer.number == self.selected {
+                service.engine.forge.up(io::Event::Failed { owner: *owner, error: io::Error::Refused });
+                break;
+            }
         }
     }
     pub fn at(&mut self, service: &mut crate::Service, now: Time) {
@@ -88,18 +126,57 @@ impl ForgeFace {
                 | io::Request::Window { .. } => panic!("unexpected worker listener request"),
             }
         }
+        for _ in 0..engine.forge.above.len() {
+            let event = engine.forge.above.pop().unwrap();
+            if self.capture_answers
+                && let skein_forge_connection::Event::Answered(answer) = event
+            {
+                self.answers.push(answer).unwrap();
+            } else {
+                engine.forge.above.push(event);
+            }
+        }
         crate::engine::iterate(engine, self.now, Wall::EPOCH);
+        self.forge_io(engine);
+    }
+    fn forge_io(&mut self, engine: &mut crate::engine::Engine) {
         for _ in 0_u32..engine.forge.io.len() {
             match engine.forge.io.pop().unwrap() {
-                io::Request::Connect { owner, .. } => {
-                    self.owner = Some(owner);
-                    self.wire = skein_world::stream::Wire::new(7);
-                    engine.forge.up(io::Event::Connecting { owner, socket: Token::new(99) });
+                io::Request::Connect { owner, addr } => {
+                    let number = match addr {
+                        io::Addr::Ip(address) => address.port().checked_sub(2999).expect("fixture forge port"),
+                        io::Addr::InProcess(_) => panic!("forge socket"),
+                    };
+                    let socket = Token::new(owner.raw().checked_add(99).unwrap());
+                    assert!(
+                        self.peers
+                            .insert(owner, Peer { number, socket, wire: skein_world::stream::Wire::new(7) })
+                            .is_ok()
+                    );
+                    engine.forge.up(io::Event::Connecting { owner, socket });
                     engine.forge.up(io::Event::Connected { owner });
                 }
-                io::Request::Stream { down, .. } => self.wire.take(down),
-                io::Request::Close { .. } | io::Request::Abort { .. } => {
-                    engine.forge.up(io::Event::Closed { owner: self.owner.take().unwrap() });
+                io::Request::Stream { stream, down } => {
+                    let mut owner = None;
+                    for (token, peer) in &self.peers {
+                        if peer.socket == stream {
+                            owner = Some(*token);
+                            break;
+                        }
+                    }
+                    self.peers.get_mut(&owner.expect("stream peer")).unwrap().wire.take(down);
+                }
+                io::Request::Close { entity } | io::Request::Abort { entity } => {
+                    let mut owner = None;
+                    for (token, peer) in &self.peers {
+                        if peer.socket == entity || *token == entity {
+                            owner = Some(*token);
+                            break;
+                        }
+                    }
+                    let owner = owner.expect("closing peer");
+                    self.peers.remove(&owner);
+                    engine.forge.up(io::Event::Closed { owner });
                 }
                 io::Request::Listen { .. }
                 | io::Request::Bind { .. }
@@ -111,12 +188,18 @@ impl ForgeFace {
                 | io::Request::Window { .. } => panic!("unexpected forge request"),
             }
         }
-        if let Some(up) = self.wire.answer()
-            && let Some(owner) = self.owner
-        {
-            engine.forge.up(io::Event::Stream { owner, up });
+        let mut owners = List::with_capacity(self.peers.len());
+        for (owner, _) in &self.peers {
+            owners.push(*owner).unwrap();
+        }
+        for owner in &owners {
+            let peer = self.peers.get_mut(owner).unwrap();
+            if let Some(up) = peer.wire.answer() {
+                engine.forge.up(io::Event::Stream { owner: *owner, up });
+            }
         }
     }
+
     pub fn pending(service: &crate::Service) -> u32 {
         service.engine.forge.above.len()
     }

@@ -28,7 +28,10 @@ pub fn one_process() -> SystemStand {
         7,
     )
     .unwrap();
-    SystemStand { service: super::start_with_worker(&[(1, 100)], None, Some(worker), bytes), kernel: Kernel::new() }
+    SystemStand {
+        service: super::start_with_worker(&[(1, 100)], None, Some(worker), bytes, false),
+        kernel: Kernel::new(),
+    }
 }
 pub fn until_hosting(stand: &mut SystemStand) {
     for _ in 0_u16..256 {

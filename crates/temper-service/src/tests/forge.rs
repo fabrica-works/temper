@@ -4,18 +4,71 @@ use skein_forge_connection::{StartRead, Stopped};
 use skein_lib::{Duration, Time, Token};
 use temper_engine_domain as root;
 #[test]
-fn a_refused_start_check_stops_the_engine_naming_the_forge() {
-    let mut service = fixtures::started();
-    let mut forge = fixtures::ForgeFace::new();
-    forge.connected(&mut service);
-    forge.answer(&mut service, b"HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n");
-    for _ in 0_u32..64 {
-        forge.turn(&mut service);
-    }
+fn a_stopped_forge_is_named_and_only_its_calls_are_not_connected() {
+    use skein_forge::api::{Answer, Error, Op, Read, Repository};
+    let mut service = fixtures::started_with_two_forges();
+    let mut face = fixtures::ForgeFace::new();
+    face.connected(&mut service);
+    face.answer(&mut service, b"HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n");
+    assert_eq!(service.end(), None);
+    assert!(service.engine.drain.is_none(), "a stopped forge never starts the engine's drain");
+    assert_eq!(service.notes().capacity(), 2);
     assert_eq!(
-        service.end(),
-        Some(&End::Stopped(Stop::Forge { number: 1, why: Stopped::Refused { read: StartRead::User, status: 401 } }))
+        service.notes().pop(),
+        Some(crate::Note::ForgeStopped { number: 1, why: Stopped::Refused { read: StartRead::User, status: 401 } })
     );
+    assert!(service.notes().is_empty());
+    face.select(2);
+    face.answer(&mut service, &forge_ok(br#"{"id":42,"login":"writer"}"#));
+    face.answer(&mut service, &forge_ok(br#"{"max_response_items":2,"default_paging_num":30}"#));
+    face.capture_answers(); // Scripted calls have no outstanding client token in the root.
+    for (number, call) in [(1, Token::new(7)), (2, Token::new(8))] {
+        crate::route::request(
+            &mut service.engine,
+            root::Request::Forge {
+                call,
+                repository: Repository { forge: number, repository: 0 },
+                op: Op::Read(Read::Locate {
+                    owner: Box::from(b"fixture".as_slice()),
+                    name: Box::from(b"specimen".as_slice()),
+                }),
+            },
+        );
+    }
+    face.answer(&mut service, &forge_ok(br#"{"id":2,"owner":{"id":42,"login":"fixture"},"name":"specimen","object_format_name":"sha1","default_branch":"main","default_merge_style":"merge","allow_merge_commits":true,"allow_squash_merge":false,"allow_rebase":false,"html_url":"http://127.0.0.1:3001/fixture/specimen"}"#));
+    let answers = face.take_answers();
+    assert_eq!(
+        answers.as_ref(),
+        [
+            skein_forge_connection::Answered { call: Token::new(7), cost: 0, result: Err(Error::NotConnected) },
+            skein_forge_connection::Answered {
+                call: Token::new(8),
+                cost: 1,
+                result: Ok(Answer::Located { repository: 2 })
+            },
+        ]
+    );
+    assert_eq!(service.end(), None);
+    assert!(service.engine.drain.is_none());
+    assert!(service.notes().is_empty());
+}
+fn forge_ok(body: &[u8]) -> Box<[u8]> {
+    const HEAD: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Length: ";
+    let length = skein_lib::Decimal::of(u64::try_from(body.len()).unwrap());
+    let size = HEAD
+        .len()
+        .checked_add(length.as_bytes().len())
+        .unwrap()
+        .checked_add(4)
+        .unwrap()
+        .checked_add(body.len())
+        .unwrap();
+    let mut response = skein_lib::Writer::new(size);
+    response.put(HEAD).unwrap();
+    response.put(length.as_bytes()).unwrap();
+    response.put(b"\r\n\r\n").unwrap();
+    response.put(body).unwrap();
+    response.finish()
 }
 #[test]
 fn a_forge_call_waiting_past_its_deadline_reaches_the_root_unavailable() {
@@ -308,4 +361,24 @@ fn the_longest_head_of_the_shipped_forge_fits_its_room_to_the_byte() {
         };
         assert_eq!(problems.as_deref(), expected, "target_bytes={target_bytes}");
     }
+}
+
+#[test]
+fn a_full_notes_queue_keeps_its_first_diagnostic_and_the_engine_running() {
+    let mut service = fixtures::ready();
+    for user in [7, 8] {
+        service
+            .engine
+            .forge
+            .above
+            .push(skein_forge_connection::Event::Stopped { forge: 1, why: Stopped::OtherUser { user } });
+    }
+    crate::engine::forge_pass(&mut service.engine);
+    assert_eq!(service.end(), None);
+    assert!(service.engine.drain.is_none());
+    assert_eq!(
+        service.notes().pop(),
+        Some(crate::Note::ForgeStopped { number: 1, why: Stopped::OtherUser { user: 7 } })
+    );
+    assert!(service.notes().is_empty());
 }

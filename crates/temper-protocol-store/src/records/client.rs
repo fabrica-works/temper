@@ -177,7 +177,9 @@ fn decode_repository(value: w::RepositoryRecord) -> skein_forge_client::Reposito
 }
 pub(super) fn encode(value: &skein_forge_client::Stored) -> w::ClientRow {
     let value = match value {
-        skein_forge_client::Stored::Writer(_) => unreachable!("temper-04 stores runtime writers"),
+        skein_forge_client::Stored::Writer(_) => {
+            unreachable!("the connector keeps the client's writer as Stored::Writer")
+        }
         skein_forge_client::Stored::Live(value) => w::ClientValue::Live(Box::new(encode_live(value))),
         skein_forge_client::Stored::Repository(value) => w::ClientValue::Repository(encode_repository(*value)),
     };

@@ -120,3 +120,21 @@ fn take_closes(store: &mut Store, fds: &[Fd]) -> Box<[Submit]> {
     assert!(store.submitted.is_empty());
     out.into_boxed()
 }
+
+#[test]
+fn a_writer_committed_is_reloaded_through_the_real_store() {
+    let mut store = fixtures::memory_store();
+    let row = temper_engine_domain_forge::Stored::Writer(skein_forge_client::Writer { forge: 1, author: 42 });
+    fixtures::commit(
+        &mut store,
+        1,
+        Box::new([engine::Write::Save(engine::Record::Forge { row: Box::new(row.clone()) })]),
+    );
+    let Some(jig_protocol_store::Event::Committed { number: 1, .. }) = store.above.pop() else {
+        panic!("writer commit")
+    };
+    assert_eq!(
+        fixtures::load(&mut store, engine::Range::Forge).as_ref(),
+        [engine::Record::Forge { row: Box::new(row) }]
+    );
+}

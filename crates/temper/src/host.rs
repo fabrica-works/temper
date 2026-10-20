@@ -56,35 +56,37 @@ impl skein_shell::Host for Host {
                 Stop::CommitFailed { number } => format!("temper serve: commit {number} failed\n"),
                 Stop::Hooks => "temper serve: webhooks listener failed\n".into(),
                 Stop::Listener => "temper serve: client listener failed\n".into(),
-                Stop::Forge { number, why } => {
-                    use skein_forge_connection::{StartRead, Stopped, Value};
-                    match why {
-                        Stopped::Invalid { value } => {
-                            let member = match value {
-                                Value::Credential | Value::Token => "api_token",
-                                Value::User => "user",
-                                Value::Secret => "webhook_secret",
-                            };
-                            format!("temper serve: forge {number}: {member}: invalid\n")
-                        }
-                        Stopped::OtherUser { user } => {
-                            format!("temper serve: forge {number}: start answered as user {user}\n")
-                        }
-                        Stopped::Refused { read, status } => {
-                            let path = match read {
-                                StartRead::User => "/api/v1/user",
-                                StartRead::ApiSettings => "/api/v1/settings/api",
-                            };
-                            format!("temper serve: forge {number}: {path}: status {status}\n")
-                        }
-                    }
-                }
             };
             eprint!("{lines}");
         }
         Some(Exit::Code(u8::from(self.output_failed || self.service.end() != Some(&End::Drained))))
     }
     fn drain(&mut self) {
+        while let Some(note) = self.service.notes().pop() {
+            use skein_forge_connection::{StartRead, Stopped, Value};
+            let temper_service::Note::ForgeStopped { number, why } = note;
+            let lines = match why {
+                Stopped::Invalid { value } => {
+                    let member = match value {
+                        Value::Credential | Value::Token => "api_token",
+                        Value::User => "user",
+                        Value::Secret => "webhook_secret",
+                    };
+                    format!("temper serve: forge {number}: {member}: invalid\n")
+                }
+                Stopped::OtherUser { user } => {
+                    format!("temper serve: forge {number}: start answered as user {user}\n")
+                }
+                Stopped::Refused { read, status } => {
+                    let path = match read {
+                        StartRead::User => "/api/v1/user",
+                        StartRead::ApiSettings => "/api/v1/settings/api",
+                    };
+                    format!("temper serve: forge {number}: {path}: status {status}\n")
+                }
+            };
+            eprint!("{lines}");
+        }
         while let Some(link) = self.service.links().pop() {
             if self
                 .output

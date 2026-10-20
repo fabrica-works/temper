@@ -458,6 +458,8 @@ pub enum Stored {
         until: skein_lib::Wall,
         outcome: ApplicationOutcome,
     },
+    /// A forge's writer, kept before any restored effect (domain/forge.md, 4.1).
+    Writer(skein_forge_client::Writer),
 }
 /// A bounded connector payload awaiting an authority holder's decision.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -486,6 +488,7 @@ pub enum Key {
     Issue(u64),
     Release(u64),
     Application(u64),
+    Writer(u16),
 }
 /// A completed phase of the connector's restart contract.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

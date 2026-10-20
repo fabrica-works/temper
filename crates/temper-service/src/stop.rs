@@ -75,18 +75,7 @@ pub(crate) fn unavailable(engine: &mut Engine, member: &[u8]) {
     engine.end = Some(End::Stopped(Stop::Start(problems)));
 }
 
-pub(crate) fn forge(engine: &mut Engine, number: u16, why: skein_forge_connection::Stopped) {
-    if engine.drain.is_none() {
-        shutdown(engine);
-    }
-    if let Some(drain) = &mut engine.drain
-        && drain.stopped.is_none()
-    {
-        drain.stopped = Some(Stop::Forge { number, why });
-    }
-}
-
-/// Losing the webhook listener drains the engine, like a failed forge start.
+/// Losing the webhook listener drains the engine (protocol/forge.md, 2.3).
 pub(crate) fn hooks(engine: &mut Engine) {
     if engine.drain.is_none() {
         shutdown(engine);

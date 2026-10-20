@@ -18,6 +18,7 @@ pub(crate) struct Engine {
     pub(crate) events: Queue<root::Event>,
     pub(crate) requests: Queue<root::Request>,
     pub(crate) end: Option<End>,
+    pub(crate) notes: Queue<crate::Note>,
     pub(crate) first_periods: List<(u32, u64)>,
     pub(crate) drain: Option<stop::Drain>,
     pub(crate) blocked: bool,
@@ -33,6 +34,7 @@ pub(crate) struct Children {
     pub(crate) workers: crate::workers::Workers,
     pub(crate) clients: crate::clients::Clients,
     pub(crate) forge: crate::forge::Layer,
+    pub(crate) notes: Queue<crate::Note>,
 }
 impl Engine {
     pub(crate) fn new(
@@ -43,7 +45,7 @@ impl Engine {
         values: crate::values::Values,
         first_periods: List<(u32, u64)>,
     ) -> Self {
-        let Children { accounts, workers, clients, forge } = children;
+        let Children { accounts, workers, clients, forge, notes } = children;
         let max_out = root::max_out(limits);
         let capacity = max_out.checked_mul(2).expect("root routing room");
         let mut credentials = List::with_capacity(values.identities.len());
@@ -65,6 +67,7 @@ impl Engine {
             events: Queue::with_capacity(capacity.checked_mul(route_out()).expect("account event room")),
             requests: Queue::with_capacity(max_out),
             end: None,
+            notes,
             first_periods,
             drain: None,
             blocked: false,
@@ -435,7 +438,13 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
             // temper-02 gives runtime connection state meaning in the root.
             skein_forge_connection::Event::Connected { forge: _ } => {}
             skein_forge_connection::Event::ListenerLost => stop::hooks(engine),
-            skein_forge_connection::Event::Stopped { forge, why } => stop::forge(engine, forge, why),
+            skein_forge_connection::Event::Stopped { forge, why } => {
+                // Each forge stops once per connect. temper-02 must revisit
+                // dropping a full queue when runtime reconnects are routed.
+                if engine.notes.room() > 0 {
+                    engine.notes.push(crate::Note::ForgeStopped { number: forge, why });
+                }
+            }
             skein_forge_connection::Event::Closed => engine.forge.closed = true,
         }
     }

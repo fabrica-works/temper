@@ -95,6 +95,8 @@ pub struct World {
     serial: u64,
     generation: u64,
     seed: u64,
+    writer: Option<skein_forge_client::Writer>,
+    writer_saves: u32,
     writes: u32,
     calls: u32,
     hints: Vec<skein_forge::api::Hint>,
@@ -108,10 +110,10 @@ impl World {
 
     #[must_use]
     pub fn with_facts(seed: u64, facts: u32) -> World {
-        Self::configured(seed, facts, false)
+        Self::configured(seed, facts, false, Some(skein_forge_client::Writer { forge: REPO.forge, author: 1 }))
     }
 
-    fn configured(seed: u64, facts: u32, hooked: bool) -> World {
+    fn configured(seed: u64, facts: u32, hooked: bool, writer: Option<skein_forge_client::Writer>) -> World {
         let limits = top::Limits { facts, client: skein_forge_client::Limits { facts, ..CLIENT }, ..LIMITS };
         let config = fake_config();
         let mut fake = forge::Domain::new(&config, seed);
@@ -142,10 +144,7 @@ impl World {
         let top = top::Domain::new(
             &limits,
             seed,
-            skein_forge_client::Config {
-                namespace: Box::from(&b"world"[..]),
-                writers: Box::new([skein_forge_client::Writer { forge: REPO.forge, author: 1 }]),
-            },
+            skein_forge_client::Config { namespace: Box::from(&b"world"[..]), writers: writer.into_iter().collect() },
             &[top::GitIdentity { forge: REPO.forge, credential: 1 }],
         )
         .expect("valid connector configuration");
@@ -165,6 +164,8 @@ impl World {
             serial: 0,
             generation: 1,
             seed,
+            writer,
+            writer_saves: 0,
             writes: 0,
             calls: 0,
             hints: Vec::new(),
@@ -173,10 +174,25 @@ impl World {
         world
     }
 
+    /// Construct and restart without any configured writer.
+    #[must_use]
+    pub fn writerless(seed: u64) -> World {
+        Self::configured(seed, LIMITS.facts, false, None)
+    }
+    pub fn give_writer(&mut self, writer: skein_forge_client::Writer) -> bool {
+        let accepted = top::writer(&mut self.top, &self.env, writer, &mut self.top_out);
+        self.take_top();
+        accepted
+    }
+    #[must_use]
+    pub fn writer_saves(&self) -> u32 {
+        self.writer_saves
+    }
+
     /// As `new`, hearing the repository's hooks.
     #[must_use]
     pub fn hooked(seed: u64) -> World {
-        Self::configured(seed, LIMITS.facts, true)
+        Self::configured(seed, LIMITS.facts, true, Some(skein_forge_client::Writer { forge: REPO.forge, author: 1 }))
     }
 
     #[must_use]
@@ -290,7 +306,7 @@ impl World {
             self.seed,
             skein_forge_client::Config {
                 namespace: Box::from(&b"world"[..]),
-                writers: Box::new([skein_forge_client::Writer { forge: REPO.forge, author: 1 }]),
+                writers: self.writer.into_iter().collect(),
             },
             &[top::GitIdentity { forge: REPO.forge, credential: 1 }],
         )
@@ -502,6 +518,9 @@ impl World {
                     }
                 }
                 top::Request::Save { record, .. } => {
+                    if matches!(record, top::Stored::Writer(_)) {
+                        self.writer_saves += 1;
+                    }
                     let key = key(&record);
                     self.stored.insert(key, record).expect("world store capacity");
                 }
@@ -613,12 +632,15 @@ fn key(row: &top::Stored) -> top::Key {
         top::Stored::Client(row) => top::Key::Client(match row {
             skein_forge_client::Stored::Live(row) => skein_forge_client::Key::Live(row.watch.resource.clone()),
             skein_forge_client::Stored::Repository(row) => skein_forge_client::Key::Repository(row.repository),
-            skein_forge_client::Stored::Writer(row) => skein_forge_client::Key::Writer(row.forge),
+            skein_forge_client::Stored::Writer(_) => {
+                unreachable!("the connector keeps the client's writer as Stored::Writer")
+            }
         }),
         top::Stored::Change(row) => top::Key::Change(row.task),
         top::Stored::Issue(row) => top::Key::Issue(row.goal),
         top::Stored::Release(row) => top::Key::Release(row.task),
         top::Stored::Application { token, .. } => top::Key::Application(*token),
+        top::Stored::Writer(row) => top::Key::Writer(row.forge),
     }
 }
 
