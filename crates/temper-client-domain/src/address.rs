@@ -5,6 +5,7 @@ use skein_lib::{Decimal, Writer};
 pub enum Address {
     Inbox { filter: Filter },
     Chats,
+    Accounts,
     Chat { task: u64 },
     Task { task: u64 },
     Adopt { project: u32 },
@@ -37,6 +38,7 @@ pub enum Place {
 pub fn print(address: &Address) -> Box<[u8]> {
     let (name, number, tail) = match address {
         Address::Inbox { .. } => return Box::from(b"/".as_slice()),
+        Address::Accounts => (b"accounts".as_slice(), None, b"".as_slice()),
         Address::Chats => (b"chats".as_slice(), None, b"".as_slice()),
         Address::Chat { task } => (b"chats".as_slice(), Some(*task), b"".as_slice()),
         Address::Task { task } => (b"tasks".as_slice(), Some(*task), b"".as_slice()),
@@ -80,6 +82,7 @@ pub fn parse(path: &[u8]) -> Place {
     let (name, rest) = segment(path);
     let (number, tail) = segment(rest);
     let address = match (name, number, tail) {
+        (b"accounts", b"", b"") => Address::Accounts,
         (b"chats", b"", b"") => Address::Chats,
         (b"chats", _, b"") => {
             let Some(task) = decimal(number) else {

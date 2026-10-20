@@ -37,12 +37,13 @@ fn went(root: &mut Domain, env: &Env<Limits>, place: Place, out: &mut Queue<Requ
             }
         }
         Place::Missing => {
+            pages(root, env, crate::pages::Event::Left, out);
             forge(root, env, forge::Event::Left, out);
         }
     }
 }
 pub(crate) fn pages(root: &mut Domain, env: &Env<Limits>, event: crate::pages::Event, out: &mut Queue<Request>) {
-    let mut child = Queue::with_capacity(crate::pages::inbox::max_out(&env.limits));
+    let mut child = Queue::with_capacity(crate::pages::max_out(&env.limits));
     crate::pages::step(&mut root.pages, env, &root.client, event, &mut child);
     for _ in 0..child.len() {
         match child.pop().expect("counted pages output") {

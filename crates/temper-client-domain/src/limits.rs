@@ -13,10 +13,11 @@ pub fn max_out(limits: &Limits) -> u32 {
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     let mut total = crate::pages::task::worst_case(limits)?;
+    total = total.checked_add(crate::pages::accounts::worst_case()?)?;
     total = total.checked_add(crate::pages::inbox::worst_case(limits)?)?;
     total = total.checked_add(crate::pages::chats::worst_case(limits)?)?;
     total = total.checked_add(crate::pages::chat::worst_case(limits)?)?;
-    total = total.checked_add(Queue::<crate::pages::Request>::worst_case(crate::pages::inbox::max_out(limits))?)?;
+    total = total.checked_add(Queue::<crate::pages::Request>::worst_case(crate::pages::max_out(limits))?)?;
     total = total.checked_add(forge::worst_case(&limits.forge)?)?;
     total = total.checked_add(limits.client.domain.document_bytes)?;
     total = total.checked_add(jig_client::worst_case(&limits.client)?)?;

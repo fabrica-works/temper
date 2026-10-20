@@ -24,6 +24,13 @@ fn the_pages_watch_me_from_start_under_their_own_asker() {
             subject: jig_client::Watchable::Jig(jig_client::contract::Subject::Me),
         }))
     );
+    assert_eq!(
+        out.pop(),
+        Some(Request::Client(jig_client::Event::Watch {
+            handle: pages::accounts::handle(),
+            subject: jig_client::Watchable::Jig(jig_client::contract::Subject::Accounts),
+        }))
+    );
     assert!(out.is_empty());
 }
 #[test]

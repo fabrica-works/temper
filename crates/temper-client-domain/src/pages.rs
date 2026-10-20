@@ -6,6 +6,7 @@ use jig_client::{
     contract::{Delivery, Me, Subject},
 };
 use skein_lib::{Env, Queue, Time};
+pub mod accounts;
 pub mod chat;
 pub mod chats;
 pub mod inbox;
@@ -20,6 +21,9 @@ pub struct Pages {
     chats: Option<chats::Chats>,
     chat: Option<chat::Chat>,
     task: Option<task::Task>,
+    accounts: accounts::Accounts,
+    accounts_open: bool,
+    party: Option<u64>,
     next: u64,
     pub(crate) serial: u64,
     seen: Option<(u64, jig_client::Key)>,
@@ -72,6 +76,7 @@ pub enum Act {
 #[derive(Debug)]
 pub enum Event {
     Started,
+    Left,
     Went { address: Address },
     Act { act: Act },
     Told { told: Told },
@@ -99,11 +104,25 @@ impl Pages {
             chats: None,
             chat: None,
             task: None,
+            accounts: accounts::Accounts::default(),
+            accounts_open: false,
+            party: None,
             next: 1,
             serial: 0,
             seen: None,
             confirm: None,
         }
+    }
+    #[must_use]
+    pub fn accounts(&self) -> Option<&accounts::Accounts> {
+        if self.accounts_open { Some(&self.accounts) } else { None }
+    }
+    #[must_use]
+    pub fn availability(&self, client: &Client) -> Option<bool> {
+        if !self.watching || self.party != Some(accounts::current_me(client)?.party.number) {
+            return None;
+        }
+        Some(accounts::document(client)?.usable)
     }
     #[must_use]
     pub const fn confirmation(&self) -> Option<&crate::acts::Confirm> {
@@ -164,6 +183,8 @@ pub fn me_handle() -> Handle {
 pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event, out: &mut Queue<Request>) {
     match event {
         Event::Started => {
+            pages.accounts.leave(out);
+            pages.accounts_open = false;
             pages.address = Address::Inbox { filter: crate::address::Filter::ALL };
             pages.project = None;
             if !pages.watching {
@@ -172,9 +193,17 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
                     handle: me_handle(),
                     subject: Watchable::Jig(Subject::Me),
                 }));
+                out.push(Request::Client(jig_client::Event::Watch {
+                    handle: accounts::handle(),
+                    subject: Watchable::Jig(Subject::Accounts),
+                }));
             }
         }
         Event::Went { address } => went(pages, env, address, out),
+        Event::Left => {
+            pages.accounts.leave(out);
+            pages.accounts_open = false;
+        }
         Event::Act { act: Act::ChatWords { words } } => {
             if let Some(chats) = &mut pages.chats {
                 chats.write(words, &env.limits);
@@ -218,6 +247,18 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
         Event::Act { act: Act::SignOut } => out.push(Request::Client(jig_client::Event::SignOut)),
         Event::Act { act: Act::Go { address } } => out.push(Request::Show { address }),
         Event::Told { told: Told::Changed { handle } } if handle == me_handle() => {
+            if let Some(me) = accounts::current_me(client) {
+                if pages.party.is_some() && pages.party != Some(me.party.number) {
+                    pages.accounts.leave(out);
+                    pages.accounts = accounts::Accounts::default();
+                    out.push(Request::Client(jig_client::Event::Unwatch { handle: accounts::handle() }));
+                    out.push(Request::Client(jig_client::Event::Watch {
+                        handle: accounts::handle(),
+                        subject: Watchable::Jig(Subject::Accounts),
+                    }));
+                }
+                pages.party = Some(me.party.number);
+            }
             if let Some(me) = pages.me(client)
                 && !contains(me, pages.project)
             {
@@ -231,7 +272,11 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
             if pages.watching {
                 out.push(Request::Client(jig_client::Event::Unwatch { handle: me_handle() }));
                 pages.watching = false;
+                out.push(Request::Client(jig_client::Event::Unwatch { handle: accounts::handle() }));
             }
+            pages.accounts.leave(out);
+            pages.accounts = accounts::Accounts::default();
+            pages.party = None;
             pages.project = None;
         }
         Event::Link { link: Link::Starting | Link::Live | Link::Offline } => {
@@ -240,6 +285,10 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
                 out.push(Request::Client(jig_client::Event::Watch {
                     handle: me_handle(),
                     subject: Watchable::Jig(Subject::Me),
+                }));
+                out.push(Request::Client(jig_client::Event::Watch {
+                    handle: accounts::handle(),
+                    subject: Watchable::Jig(Subject::Accounts),
                 }));
             }
         }
@@ -253,6 +302,9 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
             }
         }
     }
+    let owner = pages.accounts_open
+        && matches!(accounts::current_me(client), Some(me) if me.deployment_role == Some(jig_client::contract::HeldRole::Owner));
+    pages.accounts.configure(owner, &mut pages.next, out);
     let me = pages.me(client);
     if let Some(chats) = &mut pages.chats {
         chats.configure(me, pages.project, &env.limits, out);
@@ -280,9 +332,15 @@ fn contains(me: &Me, project: Option<u32>) -> bool {
 }
 
 fn went(pages: &mut Pages, env: &Env<Limits>, address: Address, out: &mut Queue<Request>) {
-    if (pages.inbox.is_none() && pages.chats.is_none() && pages.chat.is_none() && pages.task.is_none())
+    if (!pages.accounts_open
+        && pages.inbox.is_none()
+        && pages.chats.is_none()
+        && pages.chat.is_none()
+        && pages.task.is_none())
         || pages.address != address
     {
+        pages.accounts.leave(out);
+        pages.accounts_open = address == Address::Accounts;
         if let Some(inbox) = pages.inbox.take() {
             pages.next = inbox.leave(out);
         }
@@ -335,6 +393,11 @@ fn seen(pages: &mut Pages, out: &mut Queue<Request>) {
 }
 
 fn page_told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Request>) -> bool {
+    if let Told::Changed { handle } | Told::Ended { handle, .. } = &told
+        && (*handle == accounts::handle() || *handle == me_handle() || Some(*handle) == pages.accounts.deployment)
+    {
+        return true;
+    }
     if let Some(task) = &mut pages.task {
         return task.told(client, told, out);
     }
@@ -426,4 +489,10 @@ fn redirect_chat(pages: &Pages, client: &Client, out: &mut Queue<Request>) {
     {
         out.push(Request::Show { address });
     }
+}
+
+/// Navigation can also close/reopen the two account watches.
+#[must_use]
+pub fn max_out(limits: &Limits) -> u32 {
+    inbox::max_out(limits).checked_add(4).expect("pages output fits")
 }
