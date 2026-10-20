@@ -472,3 +472,44 @@ fn a_native_chat_reaches_the_model() {
     forgejo.stop();
     scratch.remove();
 }
+
+#[test]
+fn program_login_execs_the_configured_fake_claude() {
+    program_login_story("success", smith_fake_claude::Login::Immediate("claude.ai".into()), 0);
+}
+
+#[test]
+fn program_login_propagates_the_fake_claudes_refusal() {
+    program_login_story("refused", smith_fake_claude::Login::Refused, 1);
+}
+
+fn program_login_story(row: &str, login: smith_fake_claude::Login, exit: u8) {
+    use smith_fake_claude::{LOGIN_FILE, OBSERVATIONS_FILE, STORY_FILE, Story, observations};
+    let scratch = support::Scratch::new(&format!("program-login-{row}"));
+    let directory = scratch.path();
+    let executable = std::path::PathBuf::from(
+        std::env::var_os("TEMPER_TEST_CLAUDE")
+            .expect("build smith's fake-claude through heavy and set its absolute TEMPER_TEST_CLAUDE path"),
+    );
+    assert!(executable.is_absolute() && executable.is_file(), "configured fake binary: {}", executable.display());
+    let programs = directory.join("programs");
+    support::program_login::configuration(directory, Some(&programs), &executable);
+    let source = smith_agent_shell::program::prepare(&programs, "source").expect("story directory");
+    std::fs::write(source.join(STORY_FILE), Story { login, ..Story::default() }.encode()).expect("fake story");
+    let ended = support::program_login::run(directory);
+    assert_eq!(ended.exit, Some(Exit::Code(exit)), "{}", String::from_utf8_lossy(&ended.stderr));
+    let records = observations(&std::fs::read(source.join(OBSERVATIONS_FILE)).expect("observations"));
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].arguments, ["auth", "login"]);
+    assert_eq!(records[0].environment, ["CLAUDE_CONFIG_DIR", "HOME", "PATH", "TEMPER_BENIGN"]);
+    if exit == 0 {
+        assert_eq!(std::fs::read(source.join(LOGIN_FILE)).expect("login written"), b"claude.ai");
+        assert!(ended.stderr.is_empty());
+    } else {
+        assert!(!source.join(LOGIN_FILE).exists());
+        assert!(ended.stderr.windows(b"sign-in refused".len()).any(|bytes| bytes == b"sign-in refused"));
+        assert!(!ended.stderr.starts_with(b"temper program-login:"), "the program owns this refusal");
+    }
+    support::program_login::no_deployment_resources(directory);
+    scratch.remove();
+}

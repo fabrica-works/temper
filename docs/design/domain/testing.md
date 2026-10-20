@@ -413,6 +413,14 @@ and 10).
 
 ### 2.6 The process tier
 
+`program_login_execs_the_configured_fake_claude` and its refusal row run
+`temper program-login` against smith’s pinned `fake-claude`, with no engine
+or deployment secrets, each within five seconds. Build that binary through
+`heavy cargo build -p smith-fake-claude --bin fake-claude`, then pass its
+absolute path as `TEMPER_TEST_CLAUDE` when running these process tests.
+The shell’s lower tests cover validation, directory checks at each name,
+creation and the command’s arguments and environment before execution.
+
 `crates/temper/tests/process.rs`, after jig's reference binary's (jig's
 `protocol/service.md`, section 8): temper as it ships, as processes.
 
