@@ -1,7 +1,7 @@
 # Session 08: the machine and listener world
 
-Move the machine/listener world into skein, then prove plaintext/TLS faults, deadlines, closing and
-memory. The client/component protocol world is skein 09. Needs at start: temper 03.1's users on the
+Move the machine/listener world into skein, then prove plaintext/TLS faults, deadlines and closing.
+The complete component-memory measurement is deferred to the GitHub draft, section17 (director ruling189; execution195). The client/component protocol world is skein 09. Needs at start: temper 03.1's users on the
 component, temper 05.1's users on the fakes, and skein 06.2's transcripts/deliveries, all landed on
 origin/main (README; decisions 22, 23).
 
@@ -20,8 +20,9 @@ origin/main (README; decisions 22, 23).
 
 - Connection 6, 8: authenticated hints after responses; each phase's deadline; Close drops outstanding work,
   then closed once and last after io settles.
-- Connection 7, 10: plaintext/TLS byte faults and an independently metered worst case; client/component
-  stories and invariants over the fake's bytes.
+- Connection7: plaintext/TLS byte faults; client/component stories and invariants over the fake's bytes.
+  Connection10's complete worst-case measurement is deferred to the GitHub draft, section17,
+  after its holders exist (director ruling189; execution195).
 - Fake 4, 8: its existing HTTP/domain boundary, observations and tally; testing-strategy 8: preserve moved
   coverage and understand slow tests.
 

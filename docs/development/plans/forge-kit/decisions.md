@@ -1685,6 +1685,11 @@ where its answer lands.
      The retained recordings satisfy this check without another recording/process attempt;
      all pending normal gate and actual-tree obligations remain.
 
+202. **Skein08 readiness and inherited scope-cut wording** (ready check of skein08.1 completed 2026-10-20T03:25Z).
+     Skein08ready check found no additional current-name mismatch or missed live consumer across retained08.1–.4. Preserve the existing move/test/fixture/export Shapes and33focused/5fuzzy inherited identities; all120assertions/invariants remain mapped. Final scratch33focused/.060s and5fuzzy/3.710s, plus verified-empty browser, passed with clippy; future08.2–.4behavior and landed06.2integration remain owning proofs, not readiness proof claims. Initial fuzzy timings8.831–9.213s andhooks1.091s are retained as misses; later passing results do not erase them or raise any ceiling. Keep moved/new timing limits and report actual-tree timings at implementation.
+
+     Remove only stale active-memory wording from08's introduction/What the design asks, applying the already-landed director scope cut195. No08.5step or component-memory proof is restored. Final machine count41/8is unchanged;08.1requires06.2landed and supplies07.3exports. There is no new code, gate/AST mode, fixture value, bound or scope. Other dependency-ready starts remain unheld.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
