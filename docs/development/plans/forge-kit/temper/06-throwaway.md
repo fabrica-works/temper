@@ -336,8 +336,8 @@ Shape: a flat object becomes `json::object(&[("key", &value), ..])` with its key
   refuses unsorted or repeated keys. A nested one becomes `json::write(|out| ..)`. `TEAM` is sent as
   its own bytes, unparsed (its keys are unsorted): the two recorded `r.send` POSTs already send them
   so, and the PATCH goes through `Fixture::api`, which records nothing.
-  Existing large-fact requests: extract the same two-pass implementation into
-  `json::pub(crate) fn write_bounded(length: u32, build: impl Fn(&mut Encoder))
+  Existing large-fact requests: extract the same two-pass implementation in `json.rs` as
+  `pub(crate) fn write_bounded(length: u32, build: impl Fn(&mut Encoder))
   -> Result<Box<[u8]>>`. Ordinary `write` delegates with65_536 and `object`
   continues through ordinary `write`; depth8, error handling and measure-before-allocation
   stay. Only `facts::bodies` uses the explicit helper for its existing two rows,
