@@ -844,6 +844,12 @@ pass:
      - 13.5's fixes in its Files stay on its branch (the adapter of ruling 143, the title within the fixture's 16 bytes, the peer's clock skew, the domain's four calls and the client's matching connections, all through admitted overrides); each is named in its commit body, with the run that found it.
      - Once 13.s3 has landed, 13.5 rebases onto it and its budget starts afresh, as ruling 143's did: a further symptom gets the README rule's three diagnostic runs, then eight runs and 40 minutes. Then its Proof, clippy, the dependent tests and the three measurements.
 
+146. **13.s3's tests in a module of their own** (steer of 2026-10-20T13:33:20Z).
+     Reverses: nothing.
+     Amends: temper/13.s3-wake-across-fresh-chain.md's Files.
+
+     From the hourly check of 2026-10-20T13:33:20Z: 13.s3's commit cf16adacb grows `crates/temper-engine-domain-forge/src/tests.rs` from 785 lines on `main` (`git show origin/main:crates/temper-engine-domain-forge/src/tests.rs | wc -l`) to 828, past the README's `file-lines: 800`. 13.s3's Files gain `src/tests/change.rs`, a module beside `tests/adoption.rs`, `tests/fixtures.rs` and `tests/purpose.rs` (`git ls-tree --name-only origin/main crates/temper-engine-domain-forge/src/tests/`), for this step's tests; any further test the step adds goes there too. Its two tests also take testing-strategy.md, section 10's "A setup written once" (they repeat `fixtures::opening()`, `fixtures::missing_pull` and the Created answer) and "Named fixtures and sizes" (the expected `Wall::from_nanos(130_000_000_000)`), as the steer of this check says.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
