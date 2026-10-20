@@ -165,5 +165,5 @@ fn the_accounts_href_navigates_inside_the_app() {
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {
-    assert_eq!(limits::worst_case(&limits::client()), Some(99_029_637_499));
+    assert_eq!(limits::worst_case(&limits::client()), Some(119_483_766_472));
 }

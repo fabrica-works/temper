@@ -69,6 +69,11 @@ fn the_native_limits_pass_each_worst_case() {
     assert_eq!(limits::shell(&limits), Some(shell.worst_case()), "checked shell formula");
     assert_eq!(limits::worst_case(&limits), Some(root + view + shell.worst_case()), "sum of all owners");
     assert!(skein_io::worst_case(&limits.io).is_some(), "usable io");
+    let wire = client::forge::wire_limits(&limits.client.forge).expect("client wire bounds");
+    let demo = temper_client_protocol_wire::v1::DemoAnswer::worst_case_bytes(&wire).expect("demo bound");
+    assert!(demo <= limits.client.client.domain.document_bytes, "family read answer fits");
+    assert!(demo <= u64::from(limits.connections.body_bytes), "whole HTTP answer fits");
+    assert!(limits.client.client.domain.text >= temper_client_protocol_wire::CUE_BYTES, "whole cue sends");
 }
 
 #[test]

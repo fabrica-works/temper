@@ -39,12 +39,13 @@ fn the_demo_banner_follows_the_frame_on_work_pages() {
 }
 #[test]
 fn suggestions_show_only_in_the_demo_project_with_the_model_half() {
-    for (row, project, model, shown) in [
-        ("demo project", f::PROJECT, true, true),
-        ("other project", f::SECOND_PROJECT, true, false),
-        ("no model half", f::PROJECT, false, false),
+    for (row, project, model, demo, shown) in [
+        ("demo project", f::PROJECT, true, true, true),
+        ("other project", f::SECOND_PROJECT, true, true, false),
+        ("no model half", f::PROJECT, false, true, false),
+        ("no demo", f::PROJECT, true, false, false),
     ] {
-        let root = f::demo_root(Address::Chats, project, model);
+        let root = if demo { f::demo_root(Address::Chats, project, model) } else { f::chats_root() };
         let view = f::page_view(&root);
         assert_eq!(
             f::find(view.tree(), Role::Heading { level: 2 }, b"What shall we change?").is_some(),
@@ -119,5 +120,19 @@ fn suggestion_buttons_wait_for_a_start_and_press_their_own_cue() {
         }
         let start = start.expect("start button");
         assert_eq!(start.states.as_slice().contains(&State::Disabled), pending, "{row}: composer send");
+    }
+}
+
+#[test]
+fn the_demo_banner_is_absent_when_the_link_is_unavailable() {
+    for (row, up) in [
+        ("signed out", jig_client::Up::SignedOut),
+        ("out of date", jig_client::Up::Served { served: false, versions: None }),
+    ] {
+        let mut root = f::demo_root(Address::Chats, f::PROJECT, true);
+        f::root_event(&mut root, Event::Client { event: jig_client::Event::Up { up } });
+        let view = f::page_view(&root);
+        assert!(f::find(view.tree(), Role::Region, b"Demo").is_none(), "{row}");
+        assert!(f::find(view.tree(), Role::List, b"Suggested requests").is_none(), "{row}");
     }
 }

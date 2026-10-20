@@ -18,9 +18,19 @@ fn answer(bytes: &[u8]) {
     }
 }
 
+fn reading(bytes: &[u8]) {
+    if let Some(record) = temper_client_protocol_wire::decode_reading(bytes, &v1::CEILINGS) {
+        assert_eq!(temper_client_protocol_wire::reading(&record).as_ref(), bytes, "Reading");
+    }
+}
+fn demo_answer(bytes: &[u8]) {
+    if let Some(record) = temper_client_protocol_wire::decode_demo_answer(bytes, &v1::CEILINGS) {
+        assert_eq!(temper_client_protocol_wire::demo_answer(&record).as_ref(), bytes, "DemoAnswer");
+    }
+}
 #[test]
 fn client_wire_decoders_never_panic_and_reencode_the_same() {
-    let decoders: [fn(&[u8]); 2] = [adopt, answer];
+    let decoders: [fn(&[u8]); 4] = [adopt, answer, reading, demo_answer];
     let mut rng = Rng::new(0x7e3d_0302);
     let goldens = temper_codecs_world::goldens("crates/temper-client-protocol-wire/golden/v1");
     for _ in 0..2_000 {
