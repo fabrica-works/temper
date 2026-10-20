@@ -1573,6 +1573,36 @@ where its answer lands.
 
      Checked: pinned plan set accepts state=dropped; all five rows were unlanded. The plan's091source inventory and git grep '#[test]' origin/main tests/engine/protocol-forge/tests/fake_protocol.rs both show5inherited tests. Remaining08.4declares41 and08.5was its sole added allocator test; changed final counts are future retained-plan requirements, not fresh executions. Scoped doc search reconciles all live07.4/08.5/09.2–.4references and the top-level trailer check excludes dropped rows. awaits.tsv is empty. Skein STATUS changes landed together as159f2f627b30c2d37439ef3c9266aa129c16b566, with forge-connection10/forge-setup7 explicitly to the GitHub draft, section17 (ruling189). Temper plan/later/count amendments are this one docs landing. No code, test corpus or runtime source changed.
 
+196. **Captured-body diagnostics use original bounded response bytes** (designer answer to temper06.3 block of 2026-10-20T01:51:38Z).
+     Apply the director's landed ruling as designer answer, tempere29e3d89a9ba17e4efad6bf12d7980a232d035fb.
+
+     Landed with `land --docs`: temper e29e3d89a9ba17e4efad6bf12d7980a232d035fb
+     (plan temper/06-throwaway.md 06.3, and 06.4's counts). This is the director's
+     ruling, as the designer's answer.
+
+     1. Yes, use the original bytes. 06.3, Diagnostics: "a whole body in a
+        failure's text (`facts.rs`: `initial(&defaults.to_string())`,
+        `listing(&since.to_string())`, and `flags`' `format!("Forward {}, reverse
+        {}, verification {}", ..)`) is printed as the response's own bytes, as
+        received, the `body` its call site already holds". `facts.rs::diagnostic`
+        cuts them at `DIAGNOSTIC_BYTES` (4096), decodes them lossily as UTF-8, and
+        marks a cut `… (N more bytes)`. "JSON order and spacing may differ from
+        today's `Display`: a diagnostic is for a person reading a failure, not a
+        fact."
+     2. A scalar's diagnostic "prints the decoded value as Rust's escaped
+        `{:?}`".
+     3. "`Json` keeps no bytes and gets no serializer: the seam is the
+        conformance's fact code, not skein-json." Fact names, outcomes, statuses,
+        order and every assertion stay.
+     4. Test: `a_diagnostic_is_the_bodys_bytes_cut_at_its_bound_and_marked`
+        (exactly the bound prints whole, one byte over is cut and marked).
+        Conformance tests become 32 after 06.3 and 35 after 06.4; the focused
+        count is plus 2.
+     5. Don't: give `Json` retained bytes, a `Display` or a serializer; print a
+        body through a second parser or normalizer; change ruling 192's six-path
+        recording proof or any bound. A changed digest is still a question,
+        since diagnostics print only on a failure. Nothing is deferred.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
