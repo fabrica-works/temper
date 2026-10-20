@@ -53,7 +53,7 @@ pub fn native() -> Limits {
                     records: 16,
                     kept: 16,
                     projects: 2,
-                    text: 128,
+                    text: temper_client_protocol_wire::CUE_BYTES, // Admit a whole suggested request.
                     rows: 2,
                     fields: 16,
                     segments: 9,

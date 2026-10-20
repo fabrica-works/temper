@@ -34,6 +34,13 @@ fn build(limits: &Limits, seed: u64, unlinked: bool) -> Domain {
 }
 impl Domain {
     #[must_use]
+    pub fn demo(&self) -> Option<(&forge::Demo, forge::demo::Halves)> {
+        let answer = self.forge.demo()?;
+        let halves = forge::demo::halves(Some(answer), self.pages.accounts_document(&self.client));
+        if halves.model || halves.forge { Some((answer, halves)) } else { None }
+    }
+
+    #[must_use]
     pub const fn pages(&self) -> &crate::pages::Pages {
         &self.pages
     }

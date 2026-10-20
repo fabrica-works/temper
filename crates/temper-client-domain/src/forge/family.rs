@@ -141,3 +141,17 @@ const fn role_from(role: &w::Role) -> forge::Role {
         w::Role::Context => forge::Role::Context,
     }
 }
+
+/// Decode the demo's complete record, including its embedded family version.
+#[must_use]
+pub fn demo(record: &[u8], limits: &w::Limits) -> Option<forge::Demo> {
+    let answer = wire::decode_demo_answer(record, limits)?.into_parts();
+    Some(forge::Demo {
+        project: answer.project,
+        forge: answer.forge,
+        provider: answer.provider,
+        owner: answer.owner,
+        name: answer.name,
+        cues: answer.cues.into_boxed(),
+    })
+}

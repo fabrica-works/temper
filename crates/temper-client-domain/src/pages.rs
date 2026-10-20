@@ -40,6 +40,9 @@ pub enum Act {
         words: Box<[u8]>,
     },
     StartChat,
+    Suggest {
+        cue: u8,
+    },
     MessageWords {
         words: Box<[u8]>,
     },
@@ -145,11 +148,15 @@ impl Pages {
         name
     }
     #[must_use]
-    pub fn availability(&self, client: &Client) -> Option<bool> {
+    pub fn accounts_document<'a>(&self, client: &'a Client) -> Option<&'a jig_client::contract::OwnerAccounts> {
         if !self.watching || self.party != Some(accounts::current_me(client)?.party.number) {
             return None;
         }
-        Some(accounts::document(client)?.usable)
+        accounts::document(client)
+    }
+    #[must_use]
+    pub fn availability(&self, client: &Client) -> Option<bool> {
+        Some(self.accounts_document(client)?.usable)
     }
     #[must_use]
     pub const fn confirmation(&self) -> Option<&crate::acts::Confirm> {
@@ -183,6 +190,13 @@ impl Pages {
             return Some(&mut task.cards);
         }
         if let Some(chat) = &mut self.chat { Some(&mut chat.cards) } else { Some(&mut self.inbox.as_mut()?.cards) }
+    }
+    pub(crate) fn suggest(&mut self, env: &Env<Limits>, client: &Client, words: &[u8], out: &mut Queue<Request>) {
+        let me = self.me(client);
+        if let Some(chats) = &mut self.chats {
+            chats.suggest(env, me, self.project, words, &mut self.serial, out);
+            self.shown = self.shown.checked_add(1).expect("pages shown fits");
+        }
     }
     pub(crate) fn seeded(seed: u64) -> Self {
         Self { serial: skein_lib::Rng::new(seed).next_u64(), ..Self::new() }
@@ -252,6 +266,7 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
                 chats.start(env, me, pages.project, &mut pages.serial, out);
             }
         }
+        Event::Act { act: Act::Suggest { .. } } => unreachable!("suggestions are resolved by the root"),
         Event::Act { act: Act::ClosedChats } => {
             if let Some(chats) = &pages.chats {
                 chats.older(out);
@@ -461,6 +476,7 @@ fn confirmation(pages: &mut Pages, env: &Env<Limits>, client: &Client, act: Act,
         | Act::SignOut
         | Act::ChatWords { .. }
         | Act::StartChat
+        | Act::Suggest { .. }
         | Act::MessageWords { .. }
         | Act::Send
         | Act::Stop

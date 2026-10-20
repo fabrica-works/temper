@@ -114,3 +114,14 @@ pub enum Served {
     Yes,
     OutOfDate,
 }
+
+/// The deployment's demo, kept across link gaps (client/README.md, 4.6 and 4.8).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Demo {
+    pub project: u32,
+    pub forge: u16,
+    pub provider: u32,
+    pub owner: Box<[u8]>,
+    pub name: Box<[u8]>,
+    pub cues: Box<[Box<[u8]>]>,
+}

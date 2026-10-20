@@ -104,11 +104,36 @@ impl Chats {
         serial: &mut u64,
         out: &mut Queue<Request>,
     ) {
-        if self.start.is_some() || self.words.is_empty() {
+        self.send(env, me, project, self.words.clone(), serial, out);
+    }
+    pub(crate) fn suggest(
+        &mut self,
+        env: &Env<Limits>,
+        me: Option<&Me>,
+        project: Option<u32>,
+        words: &[u8],
+        serial: &mut u64,
+        out: &mut Queue<Request>,
+    ) {
+        self.send(env, me, project, words.into(), serial, out);
+    }
+    fn send(
+        &mut self,
+        env: &Env<Limits>,
+        me: Option<&Me>,
+        project: Option<u32>,
+        words: Box<[u8]>,
+        serial: &mut u64,
+        out: &mut Queue<Request>,
+    ) {
+        if self.start.is_some() || words.is_empty() {
             return;
         }
         let (Some(me), Some(project)) = (me, project) else { return };
-        let Ok(words) = Text::new(self.words.clone(), env.limits.client.domain.text) else { return };
+        let Ok(words) = Text::new(words, env.limits.client.domain.text.max(temper_client_protocol_wire::CUE_BYTES))
+        else {
+            return;
+        };
         match jig_client::shapes::chat(me, project, words) {
             Ok(ask) => {
                 *serial = serial.checked_add(1).expect("page keys fit");

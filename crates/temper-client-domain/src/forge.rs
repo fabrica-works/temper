@@ -1,5 +1,6 @@
 //! The forge's adoption form, requests and receiving state.
 use skein_lib::{Env, Queue, Time};
+pub mod demo;
 pub mod family;
 mod form;
 pub(crate) mod me;
@@ -30,6 +31,7 @@ pub enum Request {
 }
 #[derive(Debug)]
 pub struct Side {
+    demo: demo::State,
     address: Option<Address>,
     served: Served,
     form: Option<Form>,
@@ -43,6 +45,7 @@ impl Side {
     #[must_use]
     pub fn new(_limits: &Limits, seed: u64) -> Side {
         Side {
+            demo: demo::State::new(),
             address: None,
             served: Served::Unknown,
             form: None,
@@ -64,6 +67,10 @@ impl Side {
     #[must_use]
     pub const fn form(&self) -> Option<&Form> {
         self.form.as_ref()
+    }
+    #[must_use]
+    pub const fn demo(&self) -> Option<&Demo> {
+        self.demo.answer.as_ref()
     }
     fn changed(&mut self) {
         self.shown = self.shown.checked_add(1).expect("forge shown count fits");
@@ -206,7 +213,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.field_bytes < 7 {
         return None;
     }
-    u64::from(limits.field_bytes).checked_mul(6)?.checked_add(u64::from(limits.checks).checked_mul(4)?)
+    let wire = wire_limits(limits)?;
+    u64::from(limits.field_bytes)
+        .checked_mul(6)?
+        .checked_add(u64::from(limits.checks).checked_mul(4)?)?
+        .checked_add(temper_client_protocol_wire::v1::DemoAnswer::worst_case_heap(&wire)?)?
+        .checked_add(u64::try_from(size_of::<jig_client::Handle>()).ok()?)
 }
 
 fn served(side: &mut Side, served: Served) {

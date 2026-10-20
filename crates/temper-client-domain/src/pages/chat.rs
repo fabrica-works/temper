@@ -350,6 +350,7 @@ impl Chat {
             | Act::SignOut
             | Act::ChatWords { .. }
             | Act::StartChat
+            | Act::Suggest { .. }
             | Act::ClosedChats
             | Act::Filter { .. }
             | Act::Decide { .. }

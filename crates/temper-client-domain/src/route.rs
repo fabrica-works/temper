@@ -18,6 +18,7 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
         }
         Event::Went { place } => went(root, env, place, out),
         Event::Act { action } => match action {
+            Action::Pages(crate::pages::Act::Suggest { cue }) => suggest(root, env, cue, out),
             Action::Pages(act) => pages(root, env, crate::pages::Event::Act { act }, out),
             Action::Forge(act) => forge(root, env, forge::Event::Act { act }, out),
         },
@@ -112,6 +113,7 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: jig_client::Told,
         Told::Link { link } => {
             pages(root, env, crate::pages::Event::Link { link: *link }, out);
             forge_served(root, env, out);
+            forge_demo(root, env, &told, out);
             forge_me(root, env, &told, out);
             return;
         }
@@ -127,6 +129,9 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: jig_client::Told,
     match Owner::of(asker) {
         Some(Owner::Pages) => pages(root, env, crate::pages::Event::Told { told }, out),
         Some(Owner::Forge) => {
+            if forge_demo(root, env, &told, out) {
+                return;
+            }
             if forge_me(root, env, &told, out) {
                 return;
             }
@@ -154,4 +159,27 @@ fn forge_me(root: &mut Domain, env: &Env<Limits>, told: &jig_client::Told, out: 
     let consumed = forge::me::told(&mut root.forge, &root.client, told, &mut child);
     route_forge(root, env, &mut child, out);
     consumed
+}
+
+fn forge_demo(root: &mut Domain, env: &Env<Limits>, told: &jig_client::Told, out: &mut Queue<Request>) -> bool {
+    let mut child = Queue::with_capacity(forge::max_out(&env.limits.forge));
+    let consumed = forge::demo::told(&mut root.forge, told, env.limits.forge, &mut child);
+    route_forge(root, env, &mut child, out);
+    consumed
+}
+fn suggest(root: &mut Domain, env: &Env<Limits>, cue: u8, out: &mut Queue<Request>) {
+    let Some((demo, halves)) = root.demo() else { return };
+    if !halves.model || root.pages.project() != Some(demo.project) {
+        return;
+    }
+    let Some(words) = demo.cues.get(usize::from(cue)) else { return };
+    let words = words.clone();
+    let mut child = Queue::with_capacity(crate::pages::max_out(&env.limits));
+    root.pages.suggest(env, &root.client, &words, &mut child);
+    while let Some(request) = child.pop() {
+        match request {
+            crate::pages::Request::Client(event) => client(root, env, event, out),
+            crate::pages::Request::Show { address } => out.push(Request::Show { address, replace: false }),
+        }
+    }
 }
