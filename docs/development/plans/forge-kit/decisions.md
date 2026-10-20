@@ -1803,6 +1803,13 @@ where its answer lands.
         pre-204 row or seam, starved room, poke or shipped code; 40 focused, 7
         fuzzy and the caps unchanged.
 
+212. **Resume preflight retrospective and clean Smith alignment** (process, coordinator resume block of 2026-10-20T07:08:49Z).
+     The three reported failed preflight checks are resolved. Smith accounts' retrospective proposals1–10 are already decided by the director in smith4886930dfc6586454282c345929a4de08f936111; the pinned check_decisions now passes against fetched origin/main. This run neither decides those proposals nor adopts a newer process or kit. The supervisor fast-forwarded only Smith's clean primary main to already-landed origin/main f2da0f7bd5ae8bc79f09c56f9821a9dabefd9210. It is clean, zero ahead/behind, and its push dry-run passes. An intervening remote advance caused one retained dry-run rejection before the final fetch/fast-forward/check succeeded.
+
+     Preserve the just-passed Temper main gate and the completed other preflight checks. No full preflight, queue probe or gate is repeated solely for this metadata correction; all three failed checks have received their targeted passing recheck under189. Every implementer's actual-tree compilation, suites, process proofs and land-owned gate remain required.
+
+     The named resume cause is ruling211 at temper e0e9a4a3d1e855bdee4ee83eed9bb4f1a3aa7089, applying the landed designer answers skein bb505e790f6c65c33c3d21a1da6c997db7cbd740/e5f7313612fb86776b552db1b58e3b87e3a335bc and temper aa5c20d3c34ff21653ec8c663cfbd4f1a4f49f1d/e054589237e35783cfed34a270fb3a4ddf18aee0. The07:03:50Zfixed-kit resume, archived pause and verified worktree inventory stand. Start fresh owners for Temper05.2 and Skein08.3 from their preserved checkpoints in parallel now, applying211word for word. All other dependency-ready sessions run at full coordinator capacity;05.2is first only when actual slots are short. Kit d6d4abeb22ae0c3a5e12e3c7a8978a30bdfb6421 and all local adapter hashes are unchanged. Keep the existing graph source fallback beyond recorded index inputs while root refreshes; no start waits for that refresh. Preserve dirty drafts, settled adapters, landed08.s1, all failed evidence and W52's browser custody. Refresh further reached copies and derived values in their owning increments and list users in the commit body.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
