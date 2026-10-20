@@ -286,6 +286,15 @@ Shape:
   `2020-01-01T00:00:12+05:30` fields. Follow the README Recorded fixture
   expectations rule for further reached masked identities/times/derived values
   in the moved case tables and after06.4's required recording; list changed users.
+  The same pure-decode rule includes captured page membership: in
+  `tests/common/cases/reviews.rs`, `branches-page-2` retains two ordered rows
+  and every exact equality. Keep `writer-head`/sha9first; the recorded second
+  row is now `conflict`/sha10rather than `main`/sha3, independently verified
+  from the old/new raw responses. These are fixture input values, not a
+  guarantee of stable API page selection. Apply the README rule to all further
+  reached files/items/reviews/writes table literals; do not adjust semantic
+  error/status/scenario guarantees, remove a case or derive expected values
+  from the decoder under test.
   This does not change58inherited test names/cases/assertions or61focused/4fuzzy
   final counts. Preserve every malformed mutation and its expected error;
   repair the independent JSON mutation adaptation within its existing scope,

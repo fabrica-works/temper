@@ -169,16 +169,20 @@ chain.
 
 - **World migration fixture copies:** Skein07 retains every assertion and identity suffix when changing namespace frames to `kit`, including simulation issue/post and fuzzy seeds. Its branch recovery watch is nonparticipating; the durable Writer claim and recovery outcomes stay. Setup's direct `fixtures::given` and every Item parameter, including `fixtures::seed_token`, follow landed types; preserve limits and the independent decoder. Refresh any further reached fixture or derived copy and list users in the owning commit body. A scratch correction without execution stays unproved; remaining setup validation is supervisor-owned and does not hold unrelated starts.
 
-- **Recorded fixture expectations:** when a required recording changes masked
-  times or identities, refresh only the exact Rust expectations derived from
-  those captured fields and their checked representations. First compare the
-  old and new raw recordings independently of the decoder under test; record
-  each field, conversion and expected value in the commit body. Preserve every
-  case, test name, assertion structure, status, error, ordering invariant and
-  boundary. Do not alter the corpus outside its recording step or change a
-  production decoder to fit a fixture. A changed semantic outcome returns as
-  a finding. Refresh further reached literal/derived copies and list users;
-  Skein06.3and06.4's recording/mask consumers keep this rule.
+- **Recorded fixture expectations:** pure document tests compare a captured
+  input with its independently transcribed expected document/rows. When a
+  required recording changes those input fields, refresh the corresponding
+  literal expectations, including masked times/identities and captured page
+  membership. First compare old/new raw bytes independently of the decoder;
+  record each field, conversion and expected value in the commit body.
+  Preserve every case, assertion structure, exact row equality and captured
+  order; preserve row-count, boundary, error and scenario-outcome guarantees.
+  A captured-row refresh does not assert a new stable API selection/order.
+  Never use actual decoder output as the expectation, edit the corpus outside
+  recording, or change a production decoder to fit it. A changed interpretation,
+  refusal, scenario outcome or lost case returns as a finding. Refresh further
+  reached literal/derived copies and list users, including06.4's consumers.
+
 - **Empty-body recording framing:** Temper06.2–06.4 keep the stable-fact
   digest and committed corpus unchanged. Exactly four request paths must differ
   by only `Content-Length: 0` before Connection: `setup-team-member-added`,

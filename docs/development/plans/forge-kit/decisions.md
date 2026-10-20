@@ -1707,6 +1707,20 @@ where its answer lands.
      scope with every malformed case and expected error preserved. All proofs/counts
      and the unrelated05.2design question remain.
 
+204. **Transcribe required captured-page values in pure decoder fixtures** (plan defect, skein06.3 block of 2026-10-20T03:46:20Z).
+     Allow independently transcribed captured-field expectations to follow the required
+     fresh recording in these pure document decode tests, including captured branch
+     membership. They assert exact decoding of the fixture input, not stable API page
+     selection. In branches-page-2retain two rows in captured order: writer-head/sha9,
+     then conflict/sha10in place of main/sha3. Keep every assertion and exact equality.
+     For further files/items/reviews/writes literal mismatches, independently verify the
+     old/new raw fields and their typed representation; list each refresh and source in
+     the commit body. Do not use the decoder's actual output as the expected value.
+     Preserve row-count, error, boundary, ordering and scenario-outcome guarantees;
+     a changed decoding interpretation, refusal or lost case still returns as a finding.
+     No corpus rewrite, production-decoder change, shortened mutation or dropped test.
+     All61focused/4fuzzy and normal gate proofs remain; no process proof is added.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
