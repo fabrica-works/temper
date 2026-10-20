@@ -1522,6 +1522,45 @@ where its answer lands.
 
      Checked: current primary Jig crates/jig-domain-authority/src/value.rs names Models(u64), Models::ALL=u64::MAX and run_by(Procedure)=>NONE. domain/authority.md3 states the default. Temper tests/engine/domain/src/walking.rs::authority_value constructs ceiling and policy/role without models, with no narrower model choice; its config callers and known further Authority literal locators are retained by the hourly audit. Primary graph was stale for this addition; bounded exact-source verification used, root owns refresh. No new API invented or execution result claimed.
 
+194. **Adopt startup loss, live delivery and derived observation room** (designer answer to temper05.2 block of 2026-10-20T01:16:44Z).
+     Apply the landed answer: skein1b33f85b8267cbcc5e91b806a24e8c5e221680a4 and temper68b0cd47df79d61084b8a1ae6981ebe4417ae6a9.
+
+     Landed with `land --docs`: skein 1b33f85b8267cbcc5e91b806a24e8c5e221680a4
+     (fake-forge.md 5) and temper 68b0cd47df79d61084b8a1ae6981ebe4417ae6a9
+     (domain/testing.md 4.2, STATUS.md; plan temper/05-fakes.md).
+
+     1. Neither option as asked. Adopt's two hooks sit at its two edges: the
+        setup's topic push before any host runs, and the agent's push, which
+        ends the story (Terminate follows at once). skein 5: "A world asserts a
+        delivery written only for a hook due inside its listener's life: a story
+        set up before any host runs loses the setup's hooks, and a story that
+        asserts the hook its own end releases ends only once each hook the forge
+        released (its domain's tally) has its delivery's outcome."
+     2. So 05.2 asserts `[Delivery::NoAddress, Delivery::Written]`. The first is
+        the design's best effort ("until then … there is no address"). The second
+        is written to the listening engine. The adoption's own assertions pass
+        with the first lost (testing.md 4.2: "costs latency, never liveness").
+        Hook count 2, none resent, every original assertion kept.
+     3. The ordering is the world's (the owner's), never the peer's or the
+        engine's. The learner names the port-0 bind's address "once that
+        listener listens … not at its bind": kept with its fd, named at that fd's
+        `Op::Listen` completion (sketch A). Adopt's completion becomes
+        `forge.complete()` with the peer's `Delivery` records numbering
+        `forge.domain.tally().hooks`. Unit 1 is renamed
+        `a_port_zero_listener_names_the_hooks_address_once_it_listens`. No
+        barrier, setup move, or engine or listener change.
+     4. Observation room: yes, derived, never 16 or a sample. skein 5: two
+        records per connection, two per call, one per delivery, "Nothing drains
+        them … never a count one run happened to record". The constants are named
+        in `fixtures.rs` for the whole corpus: `LIVES` 2, `WINDOWS` 2,
+        `CALLS = LIVES*WINDOWS*CLIENT.rate` (400), `CONNECTIONS = CALLS +
+        LIVES*CLIENT.calls` (404), `HOOKS` 2, `observations` 1,610, and
+        `observation_bytes` from the same terms at their head and record bounds.
+        Each premise is checked in source first.
+     5. Returns, never edits: a second outcome still `Refused` or `Reset`, with
+        its io failure; `tally().hooks` other than 2; a failed premise; a refused
+        sum. Nothing is deferred.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
