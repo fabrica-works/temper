@@ -185,6 +185,17 @@ Needs: skein 03.3 (and so 03.2); 03.1.
 Files: `Cargo.lock`; temper-service `src/forge.rs` (`problems`' `Request` arm, `indexed`) and
   `src/tests/forge.rs`; what the repin's run shows broken among `forge::{small, shared, prepare}`, the
   fixtures of 03.1 and the conformance's `component/hosted.rs` (skein 03.2 and 03.3 name them).
+Compatibility at this repin: rebase browser-1's landed `qa-401.3`
+  (`eca69f1f36cb2f28eefa54c7b936cac53e8a2607`), which takes Jig's `qa-401.2`
+  (`f407ba4501064b06fc03041f20173bc89696bca9`). Keep its web host's status
+  forwarding in `crates/temper-client-shell-web/src/host.rs`, its charter
+  translation in `crates/temper-engine-domain/src/route/asks.rs`, the
+  `tests/engine/domain/src/walking.rs` authority fixture, browser regression
+  and derived `docs/examples/owned.json`. Retain the newer compatible Skein
+  source this step needs; resolve Cargo source conflicts from main and rerun
+  this step's repin, keeping one revision per source. Recompute reached complete
+  memory sums at unchanged inputs, never copy a historical delta. Refresh
+  further reached copies and list users in the commit body; all proofs remain.
 Shape: two commits. 1. **The repin**: update and check, then the page-size and head expectations
   repaired to skein's measure, no limit raised. 2. **The arm**: `Unusable::Request { forge }` pushes
   `forges[i].api_token` as `What::Bound` and names `forge_component.target_bytes`, `.token_bytes`,

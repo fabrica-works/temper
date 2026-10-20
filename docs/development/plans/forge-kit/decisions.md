@@ -1603,6 +1603,22 @@ where its answer lands.
         recording proof or any bound. A changed digest is still a question,
         since diagnostics print only on a failure. Nothing is deferred.
 
+197. **Reuse landed browser-1 stream status adapters for Temper03.2** (cross-session scope, temper03.2 block of 2026-10-20T02:08:54Z).
+     The upstream repair is already landed: browser-1/qa-401.2, Jig
+     `f407ba4501064b06fc03041f20173bc89696bca9`, and its downstream
+     browser-1/qa-401.3, Temper `eca69f1f36cb2f28eefa54c7b936cac53e8a2607`.
+     Jig protocol/client.md17.2 specifies a401 as the stream refused signed out;
+     any other status but200 is StreamGone. The landed adapter preserves the status
+     and Temper's web host hands it to stream.opened. Reuse those complete repairs
+     by rebasing03.2 onto main; no new Jig implementation or supplement is needed.
+     Preserve the two local commits and failed-gate evidence, retain the newer
+     compatible Skein pin required by03.2, and keep one revision per upstream source.
+     Bring forward the landed charter/Models::ALL users and derive any reached memory
+     allowance from the complete sum at unchanged inputs under the README rule.
+     Historical native/recording/process passes remain evidence for their exact tree;
+     complete the increment's required actual-tree checks and gate after integration.
+     Refresh further reached copies and list every changed user in the commit body.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
