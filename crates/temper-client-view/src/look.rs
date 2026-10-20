@@ -45,6 +45,10 @@ pub const TIME: Style = Style { owner: owner(), token: 19 };
 pub const HINT: Style = Style { owner: owner(), token: 20 };
 /// The banner's corner: link state, person and sign out.
 pub const CORNER: Style = Style { owner: owner(), token: 21 };
+/// The accounts' banner: no usable account, its words and acts.
+pub const ACCOUNTS: Style = Style { owner: owner(), token: 22 };
+/// The composer's account and model line.
+pub const ACCOUNT_LINE: Style = Style { owner: owner(), token: 23 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -72,6 +76,8 @@ pub const NAMES: Names<'static> = Names {
         b"temper-time",
         b"temper-hint",
         b"temper-corner",
+        b"temper-accounts",
+        b"temper-account-line",
     ],
     regions: &[b"temper-link"],
 };
