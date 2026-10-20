@@ -204,14 +204,22 @@ Test shape: two new focused tests (<0.5 s each) and one fuzzy (<5 s). Reuse 08.1
 
 | Phase | Deadline | New responses | New hints | Sockets after settlement |
 |---|---|---:|---:|---:|
-| Head, Body, Answering before 204 queued | accept/last answer + hook_deadline (10 s) | 0 | 0 | 0 |
+| Head, Body | accept/last answer + hook_deadline (10 s) | 0 | 0 | 0 |
+| Answering, its hint refused and held | its 204 + hook_deadline (10 s) | 0 | 0 | 0 |
 | Closing | close request + shared.io.close_timeout (1 s) | 0 | 0 | 0 |
 
   At deadline-1 ns, expiry count0; at deadline, expiry count1. Closing has no API cost or call terminal.
+  Answering has no public moment before its 204 is queued (forge-connection 8.4): with the entry point's
+  room, the step that verifies the body queues the 204 and then offers the hint. Its row first asserts
+  that step, in the `send` of a signed push: responses1, hints1 and `hinted_after_answer()` (the 204
+  queued before the Hint). Then `refuse()` (hints0, the hint held) and no Offer; its new
+  responses and hints count from there, a zero hint baseline. At its deadline the held hint is dropped,
+  never offered. Never reach a pre-204 state by starving room, a private poke or a diagnostic control.
   Use 08.2's table/driver reference shape with the literal expected columns above.
   owner_close_wins_or_follows_each_terminal covers connection Closed/Connecting/Sending/Reading/Idle,
   call Waiting/Resolving/running/answered, start Checking/Settings/Waiting/Ready/Stopped, listener
-  Head/Body/Answering/Closing and held/refused/returned answers/hints. Repeat Handshaking in 08.4.
+  Head/Body (Close before pending terminal), Answering (the held row: its hint refused, then Close;
+  no pre-204 row), Closing and held/refused/returned answers/hints. Repeat Handshaking in 08.4.
   Cross each applicable pending call/hint/stopped terminal with Close before/after its delivery:
 
 | Ordering at owner Close | Terminals before Close | Reoffers after Close | Closed before io settles | Closed after settlement |
