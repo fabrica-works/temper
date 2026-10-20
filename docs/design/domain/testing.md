@@ -413,22 +413,6 @@ and 10).
 
 ### 2.6 The process tier
 
-`program_login_execs_the_configured_fake_claude` and its refusal row run
-`temper program-login` against smith’s pinned `fake-claude`, with no engine
-or deployment secrets, each within five seconds. `tools/fake-claude`
-(`temper-fake-claude`) supplies only an executable entry point calling
-`smith_fake_claude::main()` at the pinned smith revision. The process proof's
-`scripts/proof-one-process.sh` builds it beside temper with
-`cargo build -p temper --bin temper -p temper-fake-claude --bin fake-claude`
-and exports `TEMPER_TEST_CLAUDE="$(pwd)/target/debug/fake-claude"` before
-nextest. Run the proof through heavy; a focused login run uses that same
-build and absolute path with nextest's process profile and
-`-E 'test(/^program_login_/)'`.
-The shell’s lower tests cover validation, directory checks at each name,
-creation and the command’s arguments and environment before execution.
-The refusal story also checks a failed exec: only secret-free `smith: `
-diagnostics may precede temper's one final `temper program-login:` line.
-
 `crates/temper/tests/process.rs`, after jig's reference binary's (jig's
 `protocol/service.md`, section 8): temper as it ships, as processes.
 
@@ -562,10 +546,23 @@ diagnostics may precede temper's one final `temper program-login:` line.
   in jig's secrets' store, and the admin's token the preparation's
   handover, `admin_token`, which the setup host takes once
   (../protocol/setup.md, sections 3 and 9).
+- **`temper program-login`,** in two stories of their own, each within
+  five seconds and with no engine, service or deployment secret: it execs
+  smith's fake `claude`, which signs the source in; and the fake's
+  refusal exits with the fake's status, while an exec that fails exits 1
+  with one final `temper program-login:` line, which only smith's
+  secret-free `smith: ` diagnostics may precede
+  (../protocol/credentials.md, section 3). The fake is smith's
+  `smith_fake_claude::main()` at temper's pin, built as
+  `tools/fake-claude`'s `fake-claude` binary and named by the absolute
+  path in `TEMPER_TEST_CLAUDE`. The argument checks, the directories
+  checked at each name and made private, and the command's arguments and
+  environment before the exec are the shell's lower tests.
 - **Outside the suites:** nextest profile `process`, run by
-  `scripts/proof-one-process.sh`, which builds the binary first. It aims
-  at 3 minutes; if CI takes it past, the story with CI becomes a test of
-  its own (../protocol/setup.md, 13.4).
+  `scripts/proof-one-process.sh`, which builds the binary and the fake
+  `claude` first and sets `TEMPER_TEST_CLAUDE`. It aims at 3 minutes; if
+  CI takes it past, the story with CI becomes a test of its own
+  (../protocol/setup.md, 13.4).
 
 ### 2.7 The live tier
 
