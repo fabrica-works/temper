@@ -1,8 +1,0 @@
-POST /api/v1/admin/users/bot/tokens HTTP/1.1
-Host: 127.0.0.1:3000
-Authorization: token MASKED
-Content-Type: application/json
-Content-Length: 77
-Connection: close
-
-{"name":"temper-api","scopes":["read:user","write:issue","write:repository"]}

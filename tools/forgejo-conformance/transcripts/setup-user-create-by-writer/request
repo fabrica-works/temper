@@ -1,8 +1,0 @@
-POST /api/v1/admin/users HTTP/1.1
-Host: 127.0.0.1:3000
-Authorization: token MASKED
-Content-Type: application/json
-Content-Length: 180
-Connection: close
-
-{"username":"bot","email":"bot@example.invalid","password":"0000000000000000000000000000000000000000000000000000000000000001","full_name":"temper:bot","must_change_password":false}

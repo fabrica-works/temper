@@ -48,6 +48,3 @@ pub fn mutated_into(rng: &mut Rng, golden: &[u8], bytes: &mut Vec<u8>) {
         }
     }
 }
-
-/// Forgejo transcript fixtures.
-pub mod forgejo;

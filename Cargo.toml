@@ -24,7 +24,6 @@ members = [
     "crates/temper-forge-setup-shell",
     "crates/temper-worker-protocol-git",
     "crates/temper-client-protocol-wire",
-    "tools/forgejo-conformance",
     "tools/git-transcripts",
     "crates/temper-protocol-worker-wire",
     "tests/codecs",
