@@ -1,6 +1,6 @@
 //! Restart and shutdown bounds (protocol/configuration.md, 7).
 use skein_lib::{Duration, Queue, Time};
-/// The five box limits, durations in milliseconds at configuration boundaries.
+/// The box limits, durations in milliseconds at configuration boundaries.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
     pub backoff: Duration,
@@ -8,6 +8,7 @@ pub struct Limits {
     pub restarts: u32,
     pub window: Duration,
     pub grace: Duration,
+    pub line_bytes: u32,
 }
 /// The most restarts whose exit times can be retained.
 pub const MAX_RESTARTS: u32 = 64;
@@ -17,6 +18,7 @@ pub enum Unfit {
     Backoff,
     Window,
     Restarts,
+    LineBytes,
 }
 /// An unknown name or a value beyond u32.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -32,6 +34,7 @@ impl Unfit {
             Self::Backoff => &[b"box.backoff_ms", b"box.backoff_max_ms"],
             Self::Window => &[b"box.backoff_max_ms", b"box.window_ms"],
             Self::Restarts => &[b"box.restarts"],
+            Self::LineBytes => &[b"box.line_bytes"],
         }
     }
 }
@@ -44,12 +47,20 @@ pub fn small() -> Limits {
         restarts: 5,
         window: Duration::from_secs(300),
         grace: Duration::from_secs(10),
+        line_bytes: 256,
     }
 }
 /// Applies one whole dotted name.
 pub fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), Refused> {
-    if ![b"box.backoff_ms".as_slice(), b"box.backoff_max_ms", b"box.restarts", b"box.window_ms", b"box.grace_ms"]
-        .contains(&name)
+    if ![
+        b"box.backoff_ms".as_slice(),
+        b"box.backoff_max_ms",
+        b"box.restarts",
+        b"box.window_ms",
+        b"box.grace_ms",
+        b"box.line_bytes",
+    ]
+    .contains(&name)
     {
         return Err(Refused::Unknown);
     }
@@ -61,6 +72,7 @@ pub fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), Refused
         b"box.restarts" => limits.restarts = value,
         b"box.window_ms" => limits.window = duration,
         b"box.grace_ms" => limits.grace = duration,
+        b"box.line_bytes" => limits.line_bytes = value,
         _ => return Err(Refused::Unknown),
     }
     Ok(())
@@ -75,6 +87,9 @@ pub fn check(limits: &Limits) -> Result<(), Unfit> {
     }
     if limits.restarts > MAX_RESTARTS {
         return Err(Unfit::Restarts);
+    }
+    if limits.line_bytes < 64 {
+        return Err(Unfit::LineBytes);
     }
     Ok(())
 }

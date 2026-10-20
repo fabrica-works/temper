@@ -6,6 +6,7 @@ pub mod host;
 pub mod limits;
 pub mod lines;
 pub mod machine;
+pub mod pipe;
 pub mod sink;
 #[cfg(test)]
 mod tests;

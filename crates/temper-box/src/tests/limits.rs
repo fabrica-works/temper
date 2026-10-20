@@ -1,7 +1,7 @@
 use crate::limits::{self, Refused, Unfit};
 use skein_lib::Duration;
 #[test]
-fn the_small_profile_has_the_five_values_of_the_plan() {
+fn the_small_profile_has_the_values_of_the_plan() {
     assert_eq!(
         limits::small(),
         limits::Limits {
@@ -9,6 +9,7 @@ fn the_small_profile_has_the_five_values_of_the_plan() {
             backoff_max: Duration::from_secs(30),
             restarts: 5,
             window: Duration::from_secs(300),
+            line_bytes: 256,
             grace: Duration::from_secs(10)
         }
     );
@@ -41,10 +42,27 @@ fn a_name_that_is_no_box_limit_is_unknown() {
 }
 #[test]
 fn a_value_past_u32_is_out_of_range() {
-    for name in
-        [b"box.backoff_ms".as_slice(), b"box.backoff_max_ms", b"box.restarts", b"box.window_ms", b"box.grace_ms"]
-    {
+    for name in [
+        b"box.backoff_ms".as_slice(),
+        b"box.backoff_max_ms",
+        b"box.restarts",
+        b"box.window_ms",
+        b"box.grace_ms",
+        b"box.line_bytes",
+    ] {
         assert_eq!(limits::apply(&mut limits::small(), name, 4_294_967_296), Err(Refused::Range), "{name:?}");
         assert_eq!(limits::apply(&mut limits::small(), name, 0), Ok(()), "zero fits {name:?}");
     }
+}
+
+#[test]
+fn pipe_lines_need_at_least_sixty_four_bytes_after_other_checks() {
+    for (value, expected) in [(0, Err(Unfit::LineBytes)), (63, Err(Unfit::LineBytes)), (64, Ok(())), (256, Ok(()))] {
+        let mut limits = limits::small();
+        limits::apply(&mut limits, b"box.line_bytes", value).unwrap();
+        assert_eq!(limits::check(&limits), expected);
+    }
+    assert_eq!(Unfit::LineBytes.names(), &[b"box.line_bytes".as_slice()]);
+    let limits = limits::Limits { line_bytes: 0, restarts: 65, ..limits::small() };
+    assert_eq!(limits::check(&limits), Err(Unfit::Restarts));
 }
