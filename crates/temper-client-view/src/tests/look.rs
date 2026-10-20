@@ -199,11 +199,12 @@ fn the_conversation_tokens_stay_on_their_roles() {
 
 #[test]
 fn the_inbox_tokens_stay_on_their_roles() {
-    let roots = [
-        fixtures::inbox_root(),
-        super::confirm::root(jig_client::contract::ActKind::Accept, jig_client::contract::Admission::Allowed),
-        super::inbox::question_root(),
-    ];
+    let mut roots = skein_lib::List::with_capacity(3);
+    roots.push(fixtures::inbox_root()).expect("inbox");
+    roots
+        .push(super::confirm::root(jig_client::contract::ActKind::Accept, jig_client::contract::Admission::Allowed))
+        .expect("proposal");
+    roots.push(super::inbox::question_root()).expect("question");
     for (token, role) in [
         (PAGE, Role::Main),
         (PAGEBAR, Role::Slot),

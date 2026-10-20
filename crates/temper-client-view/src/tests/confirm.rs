@@ -131,18 +131,33 @@ fn the_inbox_keeps_proposal_and_decision_facts_before_its_controls() {
     let details = super::inbox::styled(tree, crate::look::DETAILS);
     let facts = super::inbox::subtree(tree, details);
     for expected in ACCEPT_WORDS {
-        assert!(facts.iter().any(|node| node.text.iter().any(|run| contains(&run.text, expected))), "{expected:?}");
+        let mut found = false;
+        for node in facts {
+            for run in &node.text {
+                found |= contains(&run.text, expected);
+            }
+        }
+        assert!(found, "{expected:?}");
     }
     let accept = fixtures::find(tree, Role::Button, b"Accept").expect("accept");
-    let control = tree.nodes().iter().position(|node| node.id == accept).expect("control position");
-    assert!(control >= details.checked_add(facts.len()).expect("facts end"));
-    assert!(facts.iter().all(|node| node.role != Role::Button && node.role != Role::TextArea));
-    let reason = tree
-        .nodes()
-        .iter()
-        .position(|node| node.text.iter().any(|run| run.text.as_ref() == b"Make a goal"))
-        .expect("reason");
-    assert!(reason < details);
+    let mut control = None;
+    let mut reason = None;
+    for (index, node) in tree.nodes().iter().enumerate() {
+        if node.id == accept {
+            control = Some(index);
+        }
+        for run in &node.text {
+            if run.text.as_ref() == b"Make a goal" {
+                reason = Some(index);
+            }
+        }
+    }
+    assert!(control.expect("control") >= details.checked_add(facts.len()).expect("facts end"));
+    for node in facts {
+        assert_ne!(node.role, Role::Button);
+        assert_ne!(node.role, Role::TextArea);
+    }
+    assert!(reason.expect("reason") < details);
 }
 
 #[test]
@@ -162,7 +177,14 @@ fn chat_and_task_cards_keep_their_flat_reason_facts_and_controls() {
         ),
         (fixtures::task::held_root(), &[Role::Paragraph, Role::Text, Role::Paragraph, Role::Text, Role::Button][..]),
     ] {
-        let card = root.pages().cards().expect("cards").iter().find(|card| card.page.is_some()).expect("loaded card");
+        let mut loaded = None;
+        for card in root.pages().cards().expect("cards") {
+            if card.page.is_some() {
+                loaded = Some(card);
+                break;
+            }
+        }
+        let card = loaded.expect("loaded card");
         let limits = fixtures::tree_limits();
         let mut builder = skein_ui::Builder::new(&limits);
         crate::confirm::card(

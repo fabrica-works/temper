@@ -345,7 +345,8 @@ pub fn inbox_with_document(
 ) -> temper_client_domain::Domain {
     use jig_client::contract::{self, InboxGroup as Group, ObjectKey as Object};
     let mut limits = domain_limits();
-    limits.client.domain.reads = 6;
+    // Six card reads beside the frame's own bounded reads.
+    limits.client.domain.reads = 8;
     let (mut root, _, watch) = root_at(temper_client_domain::Address::Inbox { filter }, &limits);
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));

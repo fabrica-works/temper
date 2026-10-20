@@ -1,4 +1,12 @@
 use super::fixtures;
+use crate::look;
+use jig_client::contract as c;
+use skein_ui::{Node, State, Tree};
+use temper_client_domain::{
+    Address, Domain, Event,
+    address::{Filter, Kind},
+};
+
 use skein_ui::{Act, Role};
 const GOAL: u64 = 7;
 #[test]
@@ -43,32 +51,46 @@ fn the_goal_filter_keeps_its_project_and_kind() {
     );
 }
 
-use crate::look;
-use jig_client::contract as c;
-use skein_ui::{Node, State, Tree};
-use temper_client_domain::{
-    Address, Domain, Event, Request,
-    address::{Filter, Kind},
-};
-
 pub(super) fn subtree(tree: &Tree, index: usize) -> &[Node] {
     let node = &tree.nodes()[index];
     &tree.nodes()[index..index.checked_add(usize::try_from(node.size).expect("subtree size")).expect("subtree end")]
 }
 pub(super) fn styled(tree: &Tree, token: skein_ui::Style) -> usize {
-    tree.nodes().iter().position(|node| node.styles.as_slice().contains(&token)).expect("styled node")
-}
-fn heading(tree: &Tree, name: &[u8]) -> usize {
     for (index, node) in tree.nodes().iter().enumerate() {
-        if node.styles.as_slice().contains(&look::HEADING)
-            && subtree(tree, index)
-                .iter()
-                .any(|child| child.role == (Role::Heading { level: 2 }) && child.name.as_deref() == Some(name))
-        {
+        if node.styles.as_slice().contains(&token) {
             return index;
         }
     }
+    panic!("styled node {token:?}");
+}
+fn heading(tree: &Tree, name: &[u8]) -> usize {
+    for (index, node) in tree.nodes().iter().enumerate() {
+        if node.styles.as_slice().contains(&look::HEADING) {
+            for child in subtree(tree, index) {
+                if child.role == (Role::Heading { level: 2 }) && child.name.as_deref() == Some(name) {
+                    return index;
+                }
+            }
+        }
+    }
     panic!("section heading");
+}
+fn style_count(nodes: &[Node], token: skein_ui::Style) -> usize {
+    let mut count = 0_usize;
+    for node in nodes {
+        if node.styles.as_slice().contains(&token) {
+            count = count.checked_add(1).expect("tree bounds count");
+        }
+    }
+    count
+}
+fn role_node(nodes: &[Node], role: Role) -> &Node {
+    for node in nodes {
+        if node.role == role {
+            return node;
+        }
+    }
+    panic!("role {role:?}");
 }
 #[test]
 fn headings_hold_the_page_title_filters_and_mark_seen() {
@@ -79,8 +101,10 @@ fn headings_hold_the_page_title_filters_and_mark_seen() {
     assert_eq!(bar[1].role, Role::Heading { level: 1 });
     assert_eq!(bar[1].name.as_deref(), Some(b"Inbox".as_slice()));
     let needs = subtree(tree, heading(tree, b"Needs you"));
-    assert!(needs.iter().any(|node| node.styles.as_slice() == [look::FILTERS]));
-    assert!(!needs.iter().any(|node| node.name.as_deref() == Some(b"Mark seen")));
+    assert_eq!(style_count(needs, look::FILTERS), 1);
+    for node in needs {
+        assert_ne!(node.name.as_deref(), Some(b"Mark seen".as_slice()));
+    }
     let updates = subtree(tree, heading(tree, b"Updates"));
     assert_eq!(updates.len(), 4);
     assert_eq!(updates[3].role, Role::Button);
@@ -99,23 +123,20 @@ fn filters_press_exactly_the_current_project_kind_and_all_goals() {
         let mut view = fixtures::page_view(&root);
         let tree = view.tree();
         let mut pressed = skein_lib::List::with_capacity(3);
+        let mut ids = skein_lib::List::with_capacity(3);
         let filters = subtree(tree, styled(tree, look::FILTERS));
         for node in filters {
             if node.states.as_slice().contains(&State::Pressed) {
                 assert_eq!(node.role, Role::Button);
                 pressed.push(node.name.as_deref().expect("filter name")).expect("one pressed per group");
+                ids.push(node.id).expect("three controls");
             }
         }
         assert_eq!(pressed.as_slice(), expected);
         // Each pressed button remains an action for the same filter.
-        let ids = filters
-            .iter()
-            .filter(|node| node.states.as_slice().contains(&State::Pressed))
-            .map(|node| node.id)
-            .collect::<Box<[_]>>();
-        for id in ids {
+        for id in ids.as_slice() {
             assert_eq!(
-                crate::act(&mut view, id, Act::Press),
+                crate::act(&mut view, *id, Act::Press),
                 Some(temper_client_domain::Action::Pages(temper_client_domain::pages::Act::Filter { filter }))
             );
         }
@@ -148,14 +169,14 @@ fn cards_are_grouped_in_lists_with_kinds_and_named_project_paths() {
         let node = &tree.nodes()[card];
         assert_eq!(node.role, Role::Item);
         assert_eq!(node.styles.as_slice(), [look::CARD, token]);
-        let list = lists.as_slice()[if i < 4 { 0 } else { 1 }];
+        let list = lists.as_slice()[usize::from(i >= 4)];
         assert!(card > list && card < list.checked_add(subtree(tree, list).len()).expect("list end"));
         let meta = subtree(tree, card.checked_add(1).expect("meta index"));
         assert_eq!(meta[0].styles.as_slice(), [look::META]);
         assert_eq!(meta[1].role, Role::Heading { level: 3 });
-        let project = meta.iter().find(|node| node.role == Role::Paragraph).expect("project");
+        let project = role_node(meta, Role::Paragraph);
         assert_eq!(project.name.as_deref(), Some(b"Shop".as_slice()));
-        let link = meta.iter().find(|node| node.role == Role::Link).expect("task link");
+        let link = role_node(meta, Role::Link);
         assert_eq!(link.name.as_deref(), Some(if i == 5 { b"Task 10".as_slice() } else { b"Task 9".as_slice() }));
     }
 }
@@ -185,11 +206,11 @@ fn absent_groups_have_no_empty_lists() {
         &mut out,
     );
     let view = fixtures::page_view(&root);
-    assert!(!view.tree().nodes().iter().any(|node| node.styles.as_slice().contains(&look::CARDS)));
+    assert_eq!(style_count(view.tree().nodes(), look::CARDS), 0);
     let filtered =
         fixtures::page_view(&fixtures::inbox_root_filtered(Filter { kind: Some(Kind::Question), ..Filter::ALL }));
-    assert_eq!(filtered.tree().nodes().iter().filter(|node| node.styles.as_slice().contains(&look::CARDS)).count(), 1);
-    assert!(!filtered.tree().nodes().iter().any(|node| node.styles.as_slice().contains(&look::UPDATES)));
+    assert_eq!(style_count(filtered.tree().nodes(), look::CARDS), 1);
+    assert_eq!(style_count(filtered.tree().nodes(), look::UPDATES), 0);
 }
 pub(super) fn question_root() -> Domain {
     let task = fixtures::task::document();
@@ -218,12 +239,12 @@ fn a_title_stays_a_paragraph_and_empty_facts_are_absent() {
     let title = styled(tree, look::TITLE);
     assert_eq!(tree.nodes()[title].role, Role::Paragraph);
     assert_eq!(tree.nodes()[title].name, Some(fixtures::task::document().chip.title.bytes().into()));
-    assert!(!tree.nodes().iter().any(|node| node.styles.as_slice().contains(&look::DETAILS)));
+    assert_eq!(style_count(tree.nodes(), look::DETAILS), 0);
 }
 #[test]
 fn an_unknown_project_name_keeps_the_numbered_fallback() {
     let limits = fixtures::domain_limits();
-    let (mut root, me_watch) = fixtures::root_with_watch(None);
+    let (mut root, me_watch, inbox_watch) = fixtures::root_at(Address::Inbox { filter: Filter::ALL }, &limits);
     let mut me = root.pages().me(root.client()).expect("me").clone();
     me.projects.get_mut(0).expect("project").name = None;
     fixtures::root_event(
@@ -252,58 +273,38 @@ fn an_unknown_project_name_keeps_the_numbered_fallback() {
             at: skein_lib::Wall::EPOCH,
         })
         .expect("entry");
-    // Obtain the page's watch through the model rather than replacing its cards.
-    let mut out = skein_lib::Queue::with_capacity(temper_client_domain::max_out(&limits));
-    temper_client_domain::step(
+    let watch = inbox_watch.expect("inbox watch");
+    fixtures::root_event(
         &mut root,
-        &skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits },
-        Event::Went {
-            place: temper_client_domain::Place::Address(Address::Inbox {
-                filter: Filter { project: Some(fixtures::PROJECT), ..Filter::ALL },
-            }),
-        },
-        &mut out,
-    );
-    while let Some(Request::Client {
-        request:
-            jig_client::Request::Down {
-                down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(c::Subject::Inbox { .. }) },
-            },
-    }) = out.pop()
-    {
-        fixtures::root_event(
-            &mut root,
-            Event::Client {
-                event: jig_client::Event::Up {
-                    up: jig_client::Up::Watched {
-                        watch,
-                        event: c::WatchEvent::Delivered(c::Delivery::Inbox(Box::new(c::Inbox {
-                            entries,
-                            needs: c::Needs { proposals: 0, questions: 0, escalations: 0, person_tasks: 0 },
-                            updates: c::Count { value: 1, limited: false },
-                            results_seen: 0,
-                            replies_seen: skein_lib::List::with_capacity(0),
-                            more: false,
-                        }))),
-                    },
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch,
+                    event: c::WatchEvent::Delivered(c::Delivery::Inbox(Box::new(c::Inbox {
+                        entries,
+                        needs: c::Needs { proposals: 0, questions: 0, escalations: 0, person_tasks: 0 },
+                        updates: c::Count { value: 1, limited: false },
+                        results_seen: 0,
+                        replies_seen: skein_lib::List::with_capacity(0),
+                        more: false,
+                    }))),
                 },
             },
-        );
-        break;
-    }
+        },
+    );
     let view = fixtures::page_view(&root);
     let meta = subtree(view.tree(), styled(view.tree(), look::META));
-    assert_eq!(
-        meta.iter().find(|node| node.role == Role::Paragraph).expect("project").name.as_deref(),
-        Some(b"Project 1".as_slice())
-    );
+    assert_eq!(role_node(meta, Role::Paragraph).name.as_deref(), Some(b"Project 1".as_slice()));
 }
 
 #[test]
 fn loaded_task_held_and_result_titles_keep_the_title_token() {
-    let task = fixtures::task::document();
+    let mut task = fixtures::task::document();
+    task.chip.task = fixtures::INBOX_TASK;
+    let mut reply = task.clone();
+    reply.chip.task = fixtures::INBOX_REPLY_TASK;
     for (read, value) in [
-        (c::Read::Task { task: fixtures::INBOX_REPLY_TASK }, c::ReadValue::Task(Box::new(task.clone()))),
+        (c::Read::Task { task: fixtures::INBOX_REPLY_TASK }, c::ReadValue::Task(Box::new(reply))),
         (
             c::Read::Escalation { task: fixtures::INBOX_TASK },
             c::ReadValue::OwnerEscalation(Box::new(c::OwnerEscalation {
@@ -323,7 +324,12 @@ fn loaded_task_held_and_result_titles_keep_the_title_token() {
             })),
         ),
     ] {
-        let root = fixtures::inbox_with_document(Filter::ALL, Some((read, value)));
+        let root = fixtures::inbox_with_document(Filter::ALL, Some((read.clone(), value)));
+        let mut loaded = false;
+        for card in &root.pages().inbox().expect("inbox").cards {
+            loaded |= card.page.is_some();
+        }
+        assert!(loaded, "{read:?}");
         let view = fixtures::page_view(&root);
         let title = &view.tree().nodes()[styled(view.tree(), look::TITLE)];
         assert_eq!(title.role, Role::Paragraph);
