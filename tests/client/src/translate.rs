@@ -120,19 +120,22 @@ fn unsupported_people(event: &people::Event) -> PartyInput {
 pub fn request(
     transport: &mut Transport,
     who: ClientId,
-    request: &Request,
+    request: &mut Request,
     limits: &jig_client::DomainLimits,
 ) -> Vec<engine::Event> {
     let mut events = Vec::new();
     let Request::Client { request: jig_client::Request::Down { down } } = request else { panic!("typed wire request") };
     match down {
         Down::Send { attempt, key, request: ask, value } => {
-            // Temper's client carries no value with an ask yet (jig's client.md, 5).
-            assert!(value.is_none(), "no carried value");
+            let carried = value.take().map(|value| {
+                let digest = skein_lib::sha256::digest(value.expose());
+                core::Carried { number: transport.carry(value), digest }
+            });
             let sign_in = transport.sign_in(who).expect("authenticated keyed request");
             let ask = match ask {
                 Ask::Jig(ask) => ask,
                 Ask::Family { record: ask, scope } => {
+                    assert!(carried.is_none(), "this fixture serves account values only");
                     events.push(forge::request(transport, who, *attempt, *key, *scope, ask));
                     return events;
                 }
@@ -140,7 +143,10 @@ pub fn request(
             let ask = wire::asks::ask(ask).expect("whole jig ask translates");
             let reply_to =
                 transport.reply_to(Reply::Keyed { client: who, attempt: *attempt, key: *key, owner: KeyedOwner::Jig });
-            events.push(party(core::Event::People(people::Event::Ask { reply_to, sign_in, key: *key, ask })));
+            events.push(party(match carried {
+                Some(carried) => core::Event::Key { reply_to, sign_in, key: *key, ask: Box::new(ask), carried },
+                None => core::Event::People(people::Event::Ask { reply_to, sign_in, key: *key, ask }),
+            }));
         }
 
         Down::Read { read, what: Readable::Jig(what) } => {
@@ -238,6 +244,10 @@ fn delivery_packet(
             .watch(watcher)
             .is_some()
             .then(|| packets::ended(transport, watcher, why).expect("original watch terminal")),
+        Delivery::CarriedUnused { number } => {
+            transport.unused(number);
+            None
+        }
         // Jig has no separate live requester Result; the task document carries it.
         Delivery::Application { .. }
         | Delivery::Result { .. }
@@ -254,8 +264,7 @@ fn delivery_packet(
         | Delivery::Drained
         | Delivery::Refuse { .. }
         | Delivery::TurnBusy { .. }
-        | Delivery::Load { .. }
-        | Delivery::CarriedUnused { .. } => None,
+        | Delivery::Load { .. } => None,
     }
 }
 /// The kit's shared packet carrier has a test application owner; only jig belongs here.

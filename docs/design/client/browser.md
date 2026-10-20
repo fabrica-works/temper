@@ -174,14 +174,14 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   |---|---|
   | `Inbox` | `/` |
   | `Chats` | `/chats` |
+  | `Accounts` | `/accounts` |
   | `Chat { task }` | `/chats/<task>` |
   | `Task { task }` | `/tasks/<task>` |
   | `Adopt { project }` | `/projects/<project>/adopt` |
 
   `<task>` and `<project>` are the task's and the project's numbers in
   decimal. A later page's path comes with it, in this shape
-  (`/projects/<project>/board`, `/projects/<project>/changes`,
-  `/accounts`). A page's filters (the inbox's project, kind and goal)
+  (`/projects/<project>/board`, `/projects/<project>/changes`). A page's filters (the inbox's project, kind and goal)
   are not in its address (section 5).
 - **A path that is no page** opens the inbox, and the address is
   replaced with `/`. The codec never prints a path under `/jig`,

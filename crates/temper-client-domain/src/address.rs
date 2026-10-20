@@ -33,7 +33,7 @@ pub enum Place {
 }
 
 /// The page's path (client/browser.md, 2.3): `/`, `/chats`, `/chats/<task>`, `/tasks/<task>`,
-/// `/projects/<project>/adopt`. The inbox prints `/` whatever its filter.
+/// `/projects/<project>/adopt`, `/accounts`. The inbox prints `/` whatever its filter.
 #[must_use]
 pub fn print(address: &Address) -> Box<[u8]> {
     let (name, number, tail) = match address {

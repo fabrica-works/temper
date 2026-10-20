@@ -97,6 +97,11 @@ fn accounts_path_and_global_unknown_lifecycle() {
     assert_eq!(root.pages().availability(root.client()), None);
     deliver(&mut root, watch, document(false));
     assert_eq!(root.pages().availability(root.client()), Some(false));
+    let c::WatchEvent::Delivered(c::Delivery::OwnerAccounts(mut usable)) = document(false) else { unreachable!() };
+    usable.usable = true;
+    deliver(&mut root, watch, c::WatchEvent::Delivered(c::Delivery::OwnerAccounts(usable)));
+    assert_eq!(root.pages().availability(root.client()), Some(true));
+    deliver(&mut root, watch, document(false));
     event(&mut root, Event::Went { place: crate::Place::Address(Address::Adopt { project: fixtures::PROJECT }) });
     assert_eq!(root.pages().availability(root.client()), Some(false));
     event(
@@ -105,8 +110,32 @@ fn accounts_path_and_global_unknown_lifecycle() {
             event: jig_client::Event::Up { up: jig_client::Up::WatchEnded { watch, end: c::WatchEnd::Dropped } },
         },
     );
+    assert_eq!(root.client().document(accounts::handle()).unwrap().state, jig_client::State::Behind);
     assert_eq!(root.pages().availability(root.client()), None);
     event(&mut root, Event::SignedOut);
+    assert_eq!(root.pages().availability(root.client()), None);
+    assert!(accounts::document(root.client()).is_none());
+    let mut opened =
+        event(&mut root, Event::Client { event: jig_client::Event::SignIn { with: jig_client::With::Transport } });
+    let mut me = None;
+    let mut accounts = None;
+    while let Some(request) = opened.pop() {
+        if let Request::Client { request: jig_client::Request::Down { down: Down::Open { watch, subject } } } = request
+        {
+            if subject == jig_client::Watchable::Jig(c::Subject::Me) {
+                me = Some(watch);
+            } else if subject == jig_client::Watchable::Jig(c::Subject::Accounts) {
+                accounts = Some(watch);
+            }
+        }
+    }
+    deliver(&mut root, me.expect("me reopened"), frame(c::HeldRole::Member, fixtures::PARTY));
+    deliver(&mut root, accounts.expect("accounts reopened"), document(false));
+    assert_eq!(root.pages().availability(root.client()), Some(false));
+    event(
+        &mut root,
+        Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Served { served: false, versions: None } } },
+    );
     assert_eq!(root.pages().availability(root.client()), None);
     assert!(accounts::document(root.client()).is_none());
 }
@@ -311,9 +340,14 @@ fn every_supported_operation_preserves_holder_numbers_and_one_based_rank() {
         }
     }
     let mut page = accounts::Accounts::default();
+    let mut out = Queue::with_capacity(4);
+    for operation in [Operation::MoveAccount { place: 0 }, Operation::MoveSource { place: 0 }] {
+        page.act(root.client(), Act::Submit { name: NAME, operation }, &mut 0, &mut out);
+        assert_eq!(page.broken, Some(accounts::Broken::Rank));
+        assert!(out.is_empty());
+    }
     page.selection.provider = Some(PROVIDER);
     page.key(Secret::new(Box::new([b'x'; 4096])));
-    let mut out = Queue::with_capacity(4);
     page.act(root.client(), Act::Submit { name: NAME, operation: Operation::AddKey }, &mut 0, &mut out);
     let c::Ask::AccountChange { change: c::AccountChange::AddKey { join: None, .. }, .. } = page.pending.unwrap().ask
     else {

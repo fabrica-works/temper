@@ -1,4 +1,5 @@
 //! Real engine root on its direct store driver, with jig's protocol correlation.
+pub mod account_acts;
 use crate::app::Event;
 use crate::{app::Temper, fixtures, translate};
 use jig_client_world::{
@@ -30,6 +31,7 @@ pub struct Joint {
     due: Option<Time>,
     observed: Vec<Observed>,
     lose_answers: u32,
+    lost_answer: Option<(ClientId, Token)>,
     hosting: BTreeMap<u64, u64>,
     seed: u64,
     now: Time,
@@ -204,6 +206,7 @@ impl Joint {
             due: None,
             observed: vec![Observed::Reachable { live: true }],
             lose_answers: 0,
+            lost_answer: None,
             hosting: BTreeMap::new(),
             seed,
             now: Time::ZERO,
@@ -259,8 +262,28 @@ impl Joint {
         }
         self.engine.send(event);
     }
-    fn request(&mut self, who: ClientId, request: Request) {
+    fn request(&mut self, who: ClientId, mut request: Request) {
         if self.offline_until.is_some() || self.transport.sign_in(who).is_none() {
+            if let Request::Client {
+                request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, value: Some(_), .. } },
+            } = &request
+            {
+                self.callbacks.push((
+                    who,
+                    RootEvent::Client {
+                        event: jig_client::Event::Up {
+                            up: jig_client::Up::Answer {
+                                attempt: *attempt,
+                                envelope: RequestEnvelope::Again,
+                                answer: None,
+                                why: None,
+                            },
+                        },
+                    }
+                    .into(),
+                ));
+                return;
+            }
             self.parked.entry(who).or_default().push(request);
             return;
         }
@@ -287,7 +310,8 @@ impl Joint {
             ));
             return;
         }
-        for event in translate::request(&mut self.transport, who, &request, &self.client_limits[&who].client.domain) {
+        for event in translate::request(&mut self.transport, who, &mut request, &self.client_limits[&who].client.domain)
+        {
             self.send(event);
         }
     }
@@ -305,6 +329,12 @@ impl Joint {
                     RootEvent::Client { event: jig_client::Event::Up { up: jig_client::Up::Answer { .. } } }
                 ) && self.lose_answers != 0
                 {
+                    if let RootEvent::Client {
+                        event: jig_client::Event::Up { up: jig_client::Up::Answer { attempt, .. } },
+                    } = &event
+                    {
+                        self.lost_answer = Some((client, *attempt));
+                    }
                     self.lose_answers -= 1;
                 } else {
                     self.callbacks.push((client, event.into()));
