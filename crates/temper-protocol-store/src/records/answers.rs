@@ -39,7 +39,20 @@ fn encode_reviewers(values: &[u64]) -> List<u64> {
     result
 }
 pub(super) fn encode_pull(value: &d::Pull) -> w::Pull {
-    let d::Pull { reviewers, number, state, head, base, commit, base_commit, merged, mergeable, ci } = value;
+    let d::Pull {
+        reviewers,
+        number,
+        state,
+        head,
+        base,
+        commit,
+        base_commit,
+        merged,
+        mergeable,
+        ci,
+        queued: _,
+        dequeued: _,
+    } = value;
     w::Pull::new(
         &w::CEILINGS,
         w::PullParts {
@@ -71,6 +84,8 @@ pub(super) fn decode_pull(value: w::Pull) -> d::Pull {
         merged,
         mergeable,
         ci: topics::decode_ci(ci),
+        queued: None,
+        dequeued: None,
     }
 }
 fn encode_step(value: &d::Step) -> w::Step {
@@ -177,6 +192,7 @@ pub(super) fn encode(value: &d::Answer) -> w::Answer {
             )
             .expect(FITS),
         ),
+        d::Answer::Queued => unreachable!("temper-12 stores merge queue answers"),
         d::Answer::Done => w::Answer::Done,
     }
 }

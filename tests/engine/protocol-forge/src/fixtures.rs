@@ -74,8 +74,11 @@ pub fn settings() -> Settings {
             kind: Kind::Forgejo,
             address: skein_io::Addr::Ip(SocketAddr::from((Ipv4Addr::LOCALHOST, 3000))),
             transport: Transport::Plaintext { name: None },
-            credential: skein_forge::credential::Credential::Token(Secret::new(Box::from(TOKEN))),
-            user: WRITER,
+            access: Some(skein_forge_connection::Access {
+                credential: skein_forge::credential::Credential::Token(Secret::new(Box::from(TOKEN))),
+                user: WRITER,
+                webhook_secret: None,
+            }),
         })
         .expect("one forge");
     Settings {
@@ -112,7 +115,7 @@ pub fn protocol_config() -> skein_fake_forge_protocol::Config {
 #[must_use]
 pub fn writer_settings() -> Settings {
     let mut settings = settings();
-    settings.forges.get_mut(0).expect("forge").user = 1;
+    settings.forges.get_mut(0).expect("forge").access.as_mut().expect("access").user = 1;
     settings
 }
 /// Component bounds use exactly the top's client limits.

@@ -450,6 +450,7 @@ fn forge_error(text: &mut Text, error: api::Error) -> Result<(), Problem> {
         api::Error::Refused => text.add(b"refused"),
         api::Error::InvalidAnswer => text.add(b"invalid provider answer"),
         api::Error::Busy => text.add(b"busy"),
+        api::Error::NotConnected => text.add(b"not connected"),
     }
 }
 
@@ -631,6 +632,7 @@ fn forge_answer(text: &mut Text, answer: &api::Answer) -> Result<(), Problem> {
             api::BranchCreation::Created => text.add(b"Branch created")?,
             api::BranchCreation::Exists => text.add(b"Branch already exists")?,
         },
+        api::Answer::Queued => unreachable!("temper-12 gives merge queue answers meaning"),
         api::Answer::Done => text.add(b"Done")?,
     }
     Ok(())

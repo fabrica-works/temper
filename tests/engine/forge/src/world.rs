@@ -613,6 +613,7 @@ fn key(row: &top::Stored) -> top::Key {
         top::Stored::Client(row) => top::Key::Client(match row {
             skein_forge_client::Stored::Live(row) => skein_forge_client::Key::Live(row.watch.resource.clone()),
             skein_forge_client::Stored::Repository(row) => skein_forge_client::Key::Repository(row.repository),
+            skein_forge_client::Stored::Writer(row) => skein_forge_client::Key::Writer(row.forge),
         }),
         top::Stored::Change(row) => top::Key::Change(row.task),
         top::Stored::Issue(row) => top::Key::Issue(row.goal),

@@ -22,7 +22,7 @@ pub enum File {
     ApiToken,
     /// The bot's git token.
     GitToken,
-    /// The bot's decimal user id.
+    /// The bot's decimal user id; the User item crosses as its 8 little-endian bytes.
     User,
     /// The hooks' shared secret.
     WebhookSecret,

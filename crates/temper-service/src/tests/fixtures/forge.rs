@@ -129,19 +129,17 @@ impl ForgeFace {
 }
 /// Install a real listener connection and return its first verified hint.
 pub fn hook(service: &mut crate::Service) -> skein_forge_connection::hooks::Hinted {
-    use skein_lib::{List, Secret, Writer};
+    use skein_lib::{Secret, Writer};
     const SECRET: &[u8] = b"fixture-hook-secret";
     const BODY: &[u8] = b"{\"repository\":{\"id\":2},\"number\":7}";
     let config = super::engine();
     let mut found = jig_protocol_config::Problems::empty();
     let mut settings =
         crate::forge::settings(&config.forges, super::forge_runtime(), None, &mut found).expect("settings");
-    let mut secrets = List::with_capacity(1);
-    secrets.push((1, Secret::new(Box::from(SECRET)))).expect("secret");
-    settings.webhooks = Some(skein_forge_connection::hooks::Webhooks {
-        listener: io::Addr::Ip(([127, 0, 0, 1], 7200).into()),
-        secrets,
-    });
+    settings.forges.get_mut(0).expect("forge").access.as_mut().expect("access").webhook_secret =
+        Some(Secret::new(Box::from(SECRET)));
+    settings.webhooks =
+        Some(skein_forge_connection::hooks::Webhooks { listener: io::Addr::Ip(([127, 0, 0, 1], 7200).into()) });
     let layer = &mut service.engine.forge;
     layer.component = skein_forge_connection::Component::new(
         settings,

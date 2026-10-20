@@ -3,6 +3,60 @@ use skein_lib::Duration;
 use skein_shell::Clock;
 use support::{ADMIN, Peer};
 use temper_forge_setup_shell::reconcile::{bound, reconcile};
+
+fn done(settings: temper_forge_setup_shell::reconcile::Settings, peer: Peer) {
+    const BOT: &[u8] = br#"{"id":42,"login":"temper-bot","is_admin":false,"full_name":"temper:bot"}"#;
+    for file in ["api_token", "git_token"] {
+        temper_forge_setup_shell::files::write_private(&settings.directory.join(file), b"kept-token")
+            .expect("private token");
+    }
+    std::thread::scope(|scope| {
+        let server = scope.spawn(|| peer.serve_after(0, &[(200, ADMIN), (200, BOT), (200, BOT), (200, BOT)]));
+        reconcile(settings, &Clock::new()).expect("Done");
+        assert_eq!(server.join().expect("peer thread").requests.len(), 4);
+    });
+}
+
+#[test]
+fn done_with_a_listener_draws_a_private_hex_secret() {
+    use std::os::unix::fs::PermissionsExt;
+    let peer = Peer::reserve();
+    let mut settings = support::settings(peer.address());
+    settings.given.orgs = Box::new([]);
+    settings.given.listener = Some(peer.address());
+    let path = settings.directory.join("webhook_secret");
+    done(settings, peer);
+    let bytes = std::fs::read(&path).expect("secret kept");
+    assert_eq!(bytes.len(), 64);
+    assert!(bytes.iter().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(byte)));
+    assert_eq!(std::fs::metadata(path).expect("private file").permissions().mode() & 0o777, 0o600);
+}
+
+#[test]
+fn done_keeps_the_secret_byte_for_byte_without_rewriting() {
+    use std::os::unix::fs::MetadataExt;
+    let peer = Peer::reserve();
+    let mut settings = support::settings(peer.address());
+    settings.given.orgs = Box::new([]);
+    settings.given.listener = Some(peer.address());
+    let path = settings.directory.join("webhook_secret");
+    let kept = [b'a'; 64];
+    temper_forge_setup_shell::files::write_private(&path, &kept).expect("kept secret");
+    let inode = std::fs::metadata(&path).expect("kept file").ino();
+    done(settings, peer);
+    assert!(std::fs::read(&path).expect("secret stays") == kept);
+    assert_eq!(std::fs::metadata(path).expect("same file").ino(), inode);
+}
+
+#[test]
+fn done_without_a_listener_makes_no_secret() {
+    let peer = Peer::reserve();
+    let mut settings = support::settings(peer.address());
+    settings.given.orgs = Box::new([]);
+    let path = settings.directory.join("webhook_secret");
+    done(settings, peer);
+    assert!(!path.exists());
+}
 #[test]
 fn a_first_request_is_made_again_until_the_api_answers() {
     let peer = Peer::reserve();
@@ -48,7 +102,8 @@ fn a_forge_that_goes_silent_after_its_answer_ends_the_run_at_the_deadline() {
 #[test]
 fn a_later_request_that_fails_is_not_made_again() {
     let peer = Peer::reserve();
-    let settings = support::settings(peer.address());
+    let mut settings = support::settings(peer.address());
+    settings.given.listener = Some(peer.address());
     let directory = settings.directory.clone();
     let heard = std::thread::scope(|scope| {
         let server = scope.spawn(|| peer.serve_after(0, &[(200, ADMIN), (503, b"")]));
@@ -59,6 +114,7 @@ fn a_later_request_that_fails_is_not_made_again() {
     assert_eq!(heard.requests.len(), 2);
     assert_eq!(heard.requests[1].line, "GET /api/v1/users/temper-bot HTTP/1.1");
     assert!(!directory.join("state").exists());
+    assert!(!directory.join("webhook_secret").exists());
 }
 #[test]
 fn a_forbidden_request_names_its_step_and_holds_no_secret() {

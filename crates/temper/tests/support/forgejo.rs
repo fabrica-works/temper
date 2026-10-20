@@ -59,6 +59,7 @@ impl Throwaway {
         let webhooks = config["application"]["webhooks"]["listener"]["socket"]
             .as_str()
             .map(|address| address.parse().expect("webhooks address"));
+        owned::adopt(scratch.path(), &instance, &person, webhooks);
         Self {
             instance,
             pid,

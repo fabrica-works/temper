@@ -2080,7 +2080,8 @@ pub(crate) fn outputs(
                     Err(error) => {
                         // The forge's adoption errors as jig's facts (brief D12).
                         let outcome = match error {
-                            skein_forge::api::Error::Busy
+                            skein_forge::api::Error::NotConnected
+                            | skein_forge::api::Error::Busy
                             | skein_forge::api::Error::Unavailable
                             | skein_forge::api::Error::Timeout
                             | skein_forge::api::Error::RateLimited { .. } => {

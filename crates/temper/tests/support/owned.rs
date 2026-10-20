@@ -406,7 +406,7 @@ pub fn attach(directory: &Path, port: u16, running: Running) -> skein_throwaway_
     Instance::attach(running.into_child(), port, directory, Token::new(token.trim().into()), &Settings::small())
         .expect("owned forge answers")
 }
-/// Reads the converged bot, its id, and its private organization's team.
+/// Reads the converged bot, its id, and its private organization.
 pub fn assert_converged(directory: &Path, instance: &skein_throwaway_forgejo::Instance) {
     use skein_throwaway_forgejo::{Outgoing, Token};
     let api = fs::read_to_string(directory.join("forge-1/api_token")).expect("API token");
@@ -425,9 +425,6 @@ pub fn assert_converged(directory: &Path, instance: &skein_throwaway_forgejo::In
     let org = instance.exchange(&Outgoing::get("/api/v1/orgs/acme", Some(admin))).expect("org answers");
     let org: serde_json::Value = serde_json::from_slice(&org.body).expect("org JSON");
     assert_eq!(org["visibility"], "private");
-    let teams = instance.exchange(&Outgoing::get("/api/v1/orgs/acme/teams", Some(admin))).expect("teams answer");
-    let teams: serde_json::Value = serde_json::from_slice(&teams.body).expect("teams JSON");
-    assert!(teams.as_array().expect("teams").iter().any(|team| team["name"] == "temper"));
 }
 /// A managed forge whose directory reconcile must make itself.
 pub fn managed(directory: &Path) {
@@ -729,4 +726,54 @@ pub fn check_memory(required: temper_service::startup::Requirements) {
     let value: serde_json::Value = serde_json::from_slice(&fs::read(path).expect("owned example")).expect("owned JSON");
     assert_eq!(value["engine"]["memory_bytes"].as_u64(), Some(required.engine_bytes));
     assert_eq!(value["workers"][0]["memory_bytes"].as_u64(), Some(required.worker_bytes));
+}
+/// Stands for skein's Adopt (forge-setup.md, 4.5 and 4.8); temper-14 removes it.
+/// Uses the kept webhook secret, drawing one only when absent.
+/// Uses the person's token because preparation's admin token carries no write:repository; temper-14 settles Adopt's scopes.
+pub fn adopt(
+    directory: &Path,
+    instance: &skein_throwaway_forgejo::Instance,
+    person: &skein_throwaway_forgejo::Token,
+    listener: Option<SocketAddr>,
+) {
+    use skein_throwaway_forgejo::Outgoing;
+    let response = instance
+        .exchange(&Outgoing::json(
+            "PUT",
+            "/api/v1/repos/acme/widget/collaborators/temper",
+            Some(person),
+            br#"{"permission":"write"}"#,
+        ))
+        .expect("collaborator answers");
+    assert_eq!(response.status, 204, "bot collaborator");
+    if let Some(listener) = listener {
+        let path = directory.join("forge-1/webhook_secret");
+        let secret = match fs::read_to_string(&path) {
+            Ok(secret) => secret,
+            Err(why) if why.kind() == std::io::ErrorKind::NotFound => {
+                let seed = skein_shell::crypto_seed().expect("hook entropy");
+                let mut secret = String::with_capacity(64);
+                for byte in seed.expose() {
+                    for nibble in [byte / 16, byte % 16] {
+                        secret.push(char::from(b"0123456789abcdef"[usize::from(nibble)]));
+                    }
+                }
+                super::write_private(&path, secret.as_bytes());
+                secret
+            }
+            Err(why) => panic!("kept hook secret unreadable: {why}"),
+        };
+        let events: Vec<_> = skein_forge::forgejo::delivery::SUBSCRIBED
+            .iter()
+            .map(|event| std::str::from_utf8(event).expect("event name"))
+            .collect();
+        let body = serde_json::to_vec(&serde_json::json!({"type":"forgejo", "config":{
+            "url":format!("http://{listener}/hooks/1"), "content_type":"json", "secret":secret},
+            "events":events, "active":true}))
+        .expect("hook JSON");
+        let response = instance
+            .exchange(&Outgoing::json("POST", "/api/v1/repos/acme/widget/hooks", Some(person), &body))
+            .expect("hook answers");
+        assert_eq!(response.status, 201, "repository hook");
+    }
 }

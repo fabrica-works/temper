@@ -14,6 +14,7 @@ pub struct Forge {
     pub git: Box<[u8]>,
     /// The API token, read from its private file: the forge component's alone.
     pub api_token: Secret,
+    pub webhook_secret: Option<Secret>,
     /// The forge user the API token belongs to: the forge writer.
     pub user: u64,
     /// The number of this forge's git identity.

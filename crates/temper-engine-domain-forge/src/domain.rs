@@ -3068,6 +3068,7 @@ fn changed(
             | skein_forge::api::Answer::Commented(_)
             | skein_forge::api::Answer::Reviewed(_)
             | skein_forge::api::Answer::Merged(_)
+            | skein_forge::api::Answer::Queued
             | skein_forge::api::Answer::Branch(_)
             | skein_forge::api::Answer::Done,
         )

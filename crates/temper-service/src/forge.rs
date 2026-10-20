@@ -67,8 +67,11 @@ pub fn settings(
                 kind: skein_forge_connection::settings::Kind::Forgejo,
                 address: skein_io::Addr::Ip(endpoint.address),
                 transport,
-                credential: skein_forge::credential::Credential::Token(forge.api_token.clone()),
-                user: forge.user,
+                access: Some(skein_forge_connection::Access {
+                    credential: skein_forge::credential::Credential::Token(forge.api_token.clone()),
+                    user: forge.user,
+                    webhook_secret: forge.webhook_secret.clone(),
+                }),
             })
             .expect("configured forge capacity");
     }
@@ -273,7 +276,7 @@ pub fn problems(unusable: skein_forge_connection::Unusable, found: &mut Problems
             found.push(forge_path(u32::from(forge)).member(b"number"), What::Unique);
             return;
         }
-        Unusable::Token { forge } => {
+        Unusable::Token { forge } | Unusable::Credential { forge } => {
             found.push(forge_path(u32::from(forge)).member(b"api_token"), What::Bound);
             return;
         }
@@ -314,6 +317,7 @@ pub(crate) fn indexed(
     if let skein_forge_connection::Unusable::Duplicate { forge }
     | skein_forge_connection::Unusable::Secret { forge }
     | skein_forge_connection::Unusable::Token { forge }
+    | skein_forge_connection::Unusable::Credential { forge }
     | skein_forge_connection::Unusable::User { forge }
     | skein_forge_connection::Unusable::PlaintextName { forge }
     | skein_forge_connection::Unusable::Request { forge }

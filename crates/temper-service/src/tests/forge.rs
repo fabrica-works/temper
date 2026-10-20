@@ -291,9 +291,9 @@ fn a_head_past_the_request_room_is_a_problem_naming_its_members_and_the_forge() 
 }
 
 // The output room is 1,048,576 bytes, less the fixed 192, Host's 18,
-// token's 9 and user agent's 12 bytes: exactly 1,048,345 target bytes.
-const FITTING_TARGET_BYTES: u32 = 1_048_345;
-const REFUSED_TARGET_BYTES: u32 = 1_048_346;
+// token bound's 512 and user agent's 12 bytes: exactly 1,047,842 target bytes.
+const FITTING_TARGET_BYTES: u32 = 1_047_842;
+const REFUSED_TARGET_BYTES: u32 = 1_047_843;
 
 #[test]
 fn the_longest_head_of_the_shipped_forge_fits_its_room_to_the_byte() {

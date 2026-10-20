@@ -201,6 +201,7 @@ pub fn stored_key(row: &Stored) -> Key {
         Stored::Client(row) => Key::Client(match row {
             skein_forge_client::Stored::Live(row) => skein_forge_client::Key::Live(row.watch.resource.clone()),
             skein_forge_client::Stored::Repository(row) => skein_forge_client::Key::Repository(row.repository),
+            skein_forge_client::Stored::Writer(row) => skein_forge_client::Key::Writer(row.forge),
         }),
         Stored::Change(row) => Key::Change(row.task),
         Stored::Issue(row) => Key::Issue(row.goal),

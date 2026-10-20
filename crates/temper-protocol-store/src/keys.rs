@@ -227,6 +227,7 @@ fn read_topic(reader: &mut KeyReader<'_>, limits: &forge::Limits) -> Option<forg
 }
 fn write_client(writer: &mut KeyWriter, key: &skein_forge_client::Key) {
     match key {
+        skein_forge_client::Key::Writer(_) => unreachable!("temper-04 stores runtime writers"),
         skein_forge_client::Key::Live(resource) => {
             writer.tag(0);
             write_repository(writer, resource.repository);

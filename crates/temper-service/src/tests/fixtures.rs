@@ -118,6 +118,7 @@ pub fn forges() -> Box<[settings::Forge]> {
         transport: settings::Transport::Plaintext,
         git: Box::from(&b"https://forge.example"[..]),
         api_token: Secret::new(Box::from(&b"api-token"[..])),
+        webhook_secret: None,
         user: 42,
         identity: 1,
     }])

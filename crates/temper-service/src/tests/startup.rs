@@ -506,7 +506,7 @@ fn the_webhook_secret_excludes_its_final_newline() {
         .replace("\"webhook_secret\":null", "\"webhook_secret\":\"secrets/forge-1.webhook-secret\"");
     let (members, _) = application(input.as_bytes(), &fixtures::engine().jig);
     let resolved = application::resolve(&members.unwrap(), &fixtures::files(), &mut Problems::empty()).unwrap();
-    assert_eq!(resolved.webhooks.unwrap().secrets.get(0).unwrap().1.expose(), b"fixture-hook-secret");
+    assert_eq!(resolved.forges[0].webhook_secret.as_ref().unwrap().expose(), b"fixture-hook-secret");
 }
 #[test]
 fn the_configured_bundle_is_named_for_the_binary() {

@@ -348,6 +348,8 @@ fn pull_answer(asked: &client::Op, pull: forge::Pull, l: &Limits) -> client::Ans
                 reviewers: pull.reviewers,
                 mergeable: pull.mergeable,
                 ci: combined(&pull.statuses),
+                queued: None,
+                dequeued: None,
             }),
             client::Read::Reviews { page, .. } => {
                 let range = page_range(pull.reviews.len(), *page, l.rows);

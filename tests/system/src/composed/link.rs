@@ -34,6 +34,7 @@ pub fn assignment(assignment: &engine::Assignment) -> (host::Assignment, wire::W
         transport: settings::Transport::Plaintext,
         git: GIT_BASE.into(),
         api_token: Secret::new(Box::new([])),
+        webhook_secret: None,
         user: 1,
         identity: 1,
     }];

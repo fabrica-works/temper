@@ -40,7 +40,7 @@ fn expected_given() -> skein_forge_setup::given::Given {
         forge: 1,
         bot_login: b"temper".as_slice().into(),
         bot_email: b"temper@example.invalid".as_slice().into(),
-        orgs: Box::new([b"acme".as_slice().into()]),
+        orgs: Box::new([]),
         org_owner: None,
         listener: None,
         word: b"temper".as_slice().into(),

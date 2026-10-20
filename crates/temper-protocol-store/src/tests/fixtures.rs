@@ -638,6 +638,8 @@ pub fn pull() -> skein_forge::api::Pull {
         merged: Some([8; 32]),
         mergeable: true,
         ci: Ci::Passed,
+        queued: None,
+        dequeued: None,
     }
 }
 

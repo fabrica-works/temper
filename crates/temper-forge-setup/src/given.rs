@@ -1,5 +1,6 @@
 //! Owner's words for the kit's refusal locations (protocol/setup.md, 5).
 use crate::problem::{Problems, What};
+use alloc::boxed::Box;
 use jig_protocol_config::{Path, Segment};
 use skein_forge_setup::given::{Place, Refused};
 
@@ -85,7 +86,11 @@ pub fn values(
         forge: entry.forge,
         bot_login: entry.bot.login.clone(),
         bot_email: entry.bot.email.clone(),
-        orgs: entry.orgs.clone(),
+        // temper-15 moves owned orgs under mode.owned.person.orgs; managed still parses them.
+        orgs: match &entry.mode {
+            crate::setup::Mode::Managed { .. } => Box::new([]),
+            crate::setup::Mode::Owned(_) => entry.orgs.clone(),
+        },
         org_owner: match &entry.mode {
             crate::setup::Mode::Managed { .. } => None,
             crate::setup::Mode::Owned(owned) => Some(owned.person.login.clone()),

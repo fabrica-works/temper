@@ -59,10 +59,12 @@ impl Refused {
                     Stage::Bot => "bot",
                     Stage::Token => "token",
                     Stage::Org => "org",
-                    Stage::Hook => "hook",
+                    Stage::Repository => "repository",
                 };
                 let why = match failure.why {
-                    Why::Missing | Why::OrgMissing => "missing".into(),
+                    Why::Missing => "missing".into(),
+                    Why::Busy => "busy".into(),
+                    Why::OtherUser => "another user".into(),
                     Why::Refused(status) => format!("HTTP {status}"),
                     Why::NotAdmin => "not a site admin".into(),
                     Why::BotIsAdmin => "is a site admin".into(),
@@ -115,6 +117,50 @@ fn unread(why: skein_shell::Unread) -> String {
         skein_shell::Unread::Kernel(_) => "could not read".into(),
     }
 }
+// temper-15 removes the forge files and this decimal-file/item translation.
+fn user_item(bytes: &[u8], forge: u16) -> Result<Secret, Refused> {
+    let bytes = bytes.strip_suffix(b"\n").unwrap_or(bytes);
+    let value = if !bytes.is_empty() && bytes.iter().all(u8::is_ascii_digit) {
+        std::str::from_utf8(bytes).ok().and_then(|text| text.parse::<u64>().ok())
+    } else {
+        None
+    };
+    value.map(|value| Secret::new(Box::new(value.to_le_bytes()))).ok_or(Refused::File {
+        forge,
+        file: File::User,
+        why: "could not read".into(),
+    })
+}
+// temper-15 removes the forge files and this item/decimal-file translation.
+fn user_file(bytes: &[u8], forge: u16) -> Result<Secret, Refused> {
+    let value = <[u8; 8]>::try_from(bytes).map_err(|_| Refused::File {
+        forge,
+        file: File::User,
+        why: "could not read".into(),
+    })?;
+    Ok(Secret::new(format!("{}\n", u64::from_le_bytes(value)).into_bytes().into_boxed_slice()))
+}
+fn webhook_secret(settings: &Settings) -> Result<(), Refused> {
+    if settings.given.listener.is_none() {
+        return Ok(());
+    }
+    let file = File::WebhookSecret;
+    let refused = |why| Refused::File { forge: settings.given.forge, file, why };
+    let path = file_path(settings, file);
+    match skein_shell::read_private_file(&path, bound(settings, file), skein_shell::effective_user()) {
+        Ok(_) => return Ok(()),
+        Err(skein_shell::Unread::Absent) => (),
+        Err(why) => return Err(refused(unread(why))),
+    }
+    // Since 75e20fd7 skein's reconcile draws no secret; Adopt will use this one; temper-14 decides whether the draw stays.
+    let seed = skein_shell::crypto_seed().map_err(|_| refused("entropy unavailable".into()))?;
+    let mut secret = [0; 64];
+    for (byte, digits) in seed.expose().iter().zip(secret.chunks_exact_mut(2)) {
+        digits[0] = b"0123456789abcdef"[usize::from(byte / 16)];
+        digits[1] = b"0123456789abcdef"[usize::from(byte % 16)];
+    }
+    crate::files::write_private(&path, &secret).map_err(|_| refused("could not write whole".into()))
+}
 const OWNER: Token = Token::new(1);
 struct Running {
     settings: Settings,
@@ -160,8 +206,15 @@ impl Running {
                 ) {
                     Ok(bytes) => {
                         let bytes = bytes.expose();
-                        self.event =
-                            Some(Event::Read(Some(Secret::new(bytes.strip_suffix(b"\n").unwrap_or(bytes).into()))));
+                        let value = if file == File::User {
+                            user_item(bytes, self.settings.given.forge)
+                        } else {
+                            Ok(Secret::new(bytes.strip_suffix(b"\n").unwrap_or(bytes).into()))
+                        };
+                        match value {
+                            Ok(value) => self.event = Some(Event::Read(Some(value))),
+                            Err(why) => self.result = Some(Err(why)),
+                        }
                     }
                     Err(skein_shell::Unread::Absent) => self.event = Some(Event::Read(None)),
                     Err(why) => self.result = Some(Err(self.file_error(file, unread(why)))),
@@ -169,6 +222,17 @@ impl Running {
             }
             Need::Write { item, bytes } => {
                 let file = place::item(item);
+                let bytes = if file == File::User {
+                    match user_file(bytes.expose(), self.settings.given.forge) {
+                        Ok(bytes) => bytes,
+                        Err(why) => {
+                            self.result = Some(Err(why));
+                            return;
+                        }
+                    }
+                } else {
+                    bytes
+                };
                 match crate::files::write_private(&file_path(&self.settings, file), bytes.expose()) {
                     Ok(()) => self.event = Some(Event::Written),
                     Err(_) => self.result = Some(Err(self.file_error(file, "could not write whole".into()))),
@@ -178,7 +242,7 @@ impl Running {
                 Ok(seed) => self.event = Some(Event::Drawn(seed)),
                 Err(_) => self.result = Some(Err(self.file_error(File::AdminToken, "entropy unavailable".into()))),
             },
-            Need::Done => self.result = Some(Ok(())),
+            Need::Done(_) => self.result = Some(webhook_secret(&self.settings)),
             Need::Stop(failure) => self.result = Some(Err(Refused::Stopped(failure))),
         }
     }
@@ -406,4 +470,31 @@ pub fn reconcile(settings: Settings, clock: &Clock) -> Result<(), Refused> {
     };
     skein_shell::drive(&mut kernel, clock, &mut running);
     running.result.expect("terminal reconcile")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{user_file, user_item};
+    #[test]
+    fn decimal_user_files_cross_as_little_endian_items_and_back() {
+        for (file, id) in [(b"42\n".as_slice(), 42_u64), (b"18446744073709551615\n", u64::MAX)] {
+            assert_eq!(user_item(file, 1).expect("decimal file").expose(), id.to_le_bytes());
+            assert_eq!(user_file(&id.to_le_bytes(), 1).expect("User item").expose(), file);
+        }
+    }
+    #[test]
+    fn invalid_user_bytes_name_the_file_without_showing_its_contents() {
+        for bytes in [b"".as_slice(), b"+42", b" 42", b"42\n\n", b"18446744073709551616", &[0xff]] {
+            assert_eq!(
+                user_item(bytes, 1).expect_err("invalid decimal").line(),
+                "temper forge reconcile: forge 1: user: could not read\n"
+            );
+        }
+        for bytes in [b"".as_slice(), &[0; 7], &[0; 9]] {
+            assert_eq!(
+                user_file(bytes, 1).expect_err("invalid item").line(),
+                "temper forge reconcile: forge 1: user: could not read\n"
+            );
+        }
+    }
 }

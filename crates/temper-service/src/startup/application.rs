@@ -627,11 +627,11 @@ fn contents(files: &settings::Files, name: &[u8], max: u32, at: Path, problems: 
 }
 pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Problems) -> Option<Resolved> {
     let mut forges = List::with_capacity(u32::try_from(members.forges.len()).expect("bounded forges"));
-    let mut secrets = List::with_capacity(u32::try_from(members.forges.len()).expect("bounded forges"));
     let mut identities = List::with_capacity(u32::try_from(members.identities.len()).expect("bounded identities"));
     for (index, forge) in members.forges.iter().enumerate() {
         let path = read::index(&Path::root().member(b"application").member(b"forges"), index);
         let token = contents(files, &forge.api_token, super::API_TOKEN_BYTES, path.member(b"api_token"), problems);
+        let mut webhook_secret = None;
         if let Some(name) = &forge.webhook_secret
             && let Some(value) = contents(
                 files,
@@ -641,7 +641,7 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
                 problems,
             )
         {
-            secrets.push((forge.number, config::secret(value))).expect("bounded secrets");
+            webhook_secret = Some(config::secret(value));
         }
         let transport = match &forge.transport {
             Transport::Plaintext => settings::Transport::Plaintext,
@@ -686,6 +686,7 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
                     transport,
                     git: forge.git.clone(),
                     api_token: config::secret(token),
+                    webhook_secret,
                     user,
                     identity: forge.identity,
                 })
@@ -718,7 +719,7 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
     if let Some(value) = &members.webhooks
         && let config::Address::Addr(listener) = &value.listener
     {
-        webhooks = Some(skein_forge_connection::hooks::Webhooks { listener: *listener, secrets });
+        webhooks = Some(skein_forge_connection::hooks::Webhooks { listener: *listener });
     }
     Some(Resolved { forges: forges.into_boxed(), identities: identities.into_boxed(), webhooks })
 }

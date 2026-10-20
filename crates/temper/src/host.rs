@@ -57,8 +57,16 @@ impl skein_shell::Host for Host {
                 Stop::Hooks => "temper serve: webhooks listener failed\n".into(),
                 Stop::Listener => "temper serve: client listener failed\n".into(),
                 Stop::Forge { number, why } => {
-                    use skein_forge_connection::{StartRead, Stopped};
+                    use skein_forge_connection::{StartRead, Stopped, Value};
                     match why {
+                        Stopped::Invalid { value } => {
+                            let member = match value {
+                                Value::Credential | Value::Token => "api_token",
+                                Value::User => "user",
+                                Value::Secret => "webhook_secret",
+                            };
+                            format!("temper serve: forge {number}: {member}: invalid\n")
+                        }
                         Stopped::OtherUser { user } => {
                             format!("temper serve: forge {number}: start answered as user {user}\n")
                         }

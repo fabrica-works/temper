@@ -430,6 +430,8 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
                 }
                 engine.drain_facts();
             }
+            // temper-02 gives runtime connection state meaning in the root.
+            skein_forge_connection::Event::Connected { forge: _ } => {}
             skein_forge_connection::Event::ListenerLost => stop::hooks(engine),
             skein_forge_connection::Event::Stopped { forge, why } => stop::forge(engine, forge, why),
             skein_forge_connection::Event::Closed => engine.forge.closed = true,
