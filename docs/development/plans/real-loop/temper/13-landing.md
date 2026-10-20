@@ -33,8 +33,8 @@ as landed. Steps: `temper-13.1` to `temper-13.5`.
   (`Disk`, the `hosted_*` cases) and `src/fixtures.rs`;
   `tests/one-process/src/world.rs` (`git`), `referee/forge.rs` (`green`);
   `crates/temper/tests/support/forgejo.rs` (`landing_scripts`,
-  `configuration`, `admit`); `temper-engine-domain-forge-client/src/
-  keep.rs` (the hint's alarm); `temper-service/src/limits/names.rs`.
+  `configuration`, `admit`); skein's `skein-forge-client/src/keep/poll.rs`
+  (`hint`, the hint's alarm); `temper-service/src/limits/names.rs`.
 
 ## What the design asks
 
@@ -204,7 +204,9 @@ Scope: one landing script set and configuration for the process tier
 and the real loop (README, "a helper two stories need").
 Needs: the session's start.
 Files: `tests/real-loop/src/{landing.rs (new), lib.rs}`,
-`tests/real-loop/tests/landing.rs` (new); `crates/temper/tests/support/
+`tests/real-loop/tests/landing.rs` (new), `tests/real-loop/Cargo.toml`
+(`jig-protocol-config`, `jig-protocol-store`, `temper-protocol-store`,
+`temper-engine-domain`, for `landing::admit`); `crates/temper/tests/support/
 {forgejo.rs, mod.rs}`, `crates/temper/Cargo.toml` (dev-dependency
 `temper-real-loop-world`), `Cargo.lock`.
 Shape:
@@ -283,7 +285,8 @@ land through the hosted agents, fake git and the peer (tools.md, 11.3;
 domain/forge.md, 8.2).
 Needs: 13.1 to 13.4; temper 05's waits and `task --tree` read.
 Files: `tests/real-loop/src/{landing.rs, calls.rs, forge.rs, lib.rs}`,
-`tests/real-loop/tests/forge.rs`.
+`tests/real-loop/tests/forge.rs`, `scripts/check.sh` (`delegate` in its
+real-loop call positions' pattern).
 Shape:
 - `landing::fixture()` builds on `forge::fixture()`: README
   `landing::README`; checks at latency 0 with `cue: Some(Cue { path:
@@ -292,6 +295,9 @@ Shape:
   through the overrides and `admit`: `forge.client.poll_ms` 10 (5 s
   shipped), `poll_max_ms` 50 (30 s), `slow_ms` 100 (40 s), and
   `hinted_ms` 10 (1 s; decisions.md, 11).
+- `calls::Called` derives `Debug` for the story's call diagnostics.
+- `scripts/check.sh`'s pattern of literal call positions names
+  `delegate` beside `task`, `watching`, `join` and `number`.
 - `calls::delegate(i)` (`Arg::Delegate`): the one child task call i's
   `task N --tree --json` names, in temper 05's member names as landed.
 - `Seen::merged_green()`: at `Observation::Merged` the referee reads
@@ -302,13 +308,15 @@ Test shape: `tests/forge.rs`.
 #[test]
 fn a_chat_lands_its_change_on_the_forge() {
     use temper_real_loop_world::{argv, calls::{call, delegate, sign_in, task, D1}, forge, landing, run_forge, Exit};
+    const CHAT: usize = 2;
+    const TREE: usize = 4;
     let ran = run_forge(landing::fixture(), |at| landing::scripts(at, u64::from(forge::ID), landing::README), || vec![
         sign_in(D1),
         call(D1, argv!["adopt", "--project", "1", "--owner", "acme", "--name", "app", "--landing", "main", "--key", "adopt-app"]),
         call(D1, argv!["chat", "--project", "1", "--key", "land", "@forge_chat Land a small change"]),
-        call(D1, argv!["wait", "task", task(2), "--until", "replied"]),
-        call(D1, argv!["task", task(2), "--tree", "--json"]),
-        call(D1, argv!["wait", "task", delegate(4), "--until", "ended"]),
+        call(D1, argv!["wait", "task", task(CHAT), "--until", "replied"]),
+        call(D1, argv!["task", task(CHAT), "--tree", "--json"]),
+        call(D1, argv!["wait", "task", delegate(TREE), "--until", "ended"]),
     ]);
     assert!(ran.calls().iter().all(|called| called.exit == Some(Exit::Code(0))), "{:?}", ran.calls());
     assert!(ran.forge().merged_green() && ran.forge().main_file(b"README.md").ends_with(landing::EDIT));

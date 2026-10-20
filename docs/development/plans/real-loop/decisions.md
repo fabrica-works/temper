@@ -789,6 +789,13 @@ pass:
 
      It applies from each session's next increment. Landed tests change only when a step touches them: refresh any further copy you meet in a file your step changes, and list it in the commit body. If the `_` form is seen once more, a step will add it to the gate.
 
+138. **temper 13's Shapes against main** (ready check of temper-13.1).
+     Ruling 138, from the ready check of temper-13.1 (on Codex, temper 584607692, skein c9b82bbd): 13-landing.md now says
+     - under "What exists": the hint's alarm is skein's `skein-forge-client/src/keep/poll.rs` (`hint`); `temper-engine-domain-forge-client/src/keep.rs` is not on main;
+     - 13.3's Files: `tests/real-loop/Cargo.toml` (`jig-protocol-config`, `jig-protocol-store`, `temper-protocol-store`, `temper-engine-domain`), which `admit` names once it moves from `crates/temper/tests/support/forgejo.rs` to `landing`;
+     - 13.5's Shape: `calls::Called` derives `Debug`, which the story's `{:?}` of `ran.calls()` needs; the story names its positions `CHAT` and `TREE` (README, "A setup written once, and rows carry data"; `scripts/check.sh` refuses `task(2)`); and `scripts/check.sh`'s pattern of literal call positions names `delegate`, in 13.5's Files.
+     A further copy of these (another `admit` user, another literal position) is refreshed the same way and listed in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
