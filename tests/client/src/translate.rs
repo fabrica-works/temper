@@ -174,9 +174,8 @@ pub fn request(
                 events.extend(terminals.into_iter().map(party));
             }
         }
-        Down::Read { what: Readable::Family { .. }, .. } | Down::Open { subject: Watchable::Family { .. }, .. } => {
-            panic!("no forge reads or watches")
-        }
+        Down::Read { what: Readable::Family { .. }, .. } => panic!("the front answers family reads"),
+        Down::Open { subject: Watchable::Family { .. }, .. } => panic!("no forge watches"),
         Down::Save { .. } | Down::Erase { .. } => panic!("shell duty never goes on wire"),
     }
     events

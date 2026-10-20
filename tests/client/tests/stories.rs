@@ -29,11 +29,20 @@ fn a_double_press_of_start_makes_one_chat() {
         vec![
             Step::See { find: Find::named(Role::TextArea, b"Start a chat"), within: fixtures::WITHIN },
             Step::Type { find: Find::named(Role::TextArea, b"Start a chat"), words: Box::from(*b"Hello") },
-            Step::Press { find: Find::named(Role::Button, b"Start") },
-            Step::Press { find: Find::named(Role::Button, b"Start") },
-            Step::See { find: Find::text(b"Hello"), within: fixtures::WITHIN },
         ],
     );
+    assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);
+    // Both presses reach the domain before the disabled Start is drawn.
+    let node = world
+        .tree(person)
+        .nodes()
+        .iter()
+        .find(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Start"))
+        .expect("Start")
+        .id;
+    world.act(person, node, skein_ui::Act::Press);
+    world.act(person, node, skein_ui::Act::Press);
+    world.person(person, vec![Step::See { find: Find::text(b"Hello"), within: fixtures::WITHIN }]);
     assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);
     assert_eq!(fixtures::chats(&world.front().engine), 1, "one chat task for the two presses");
 }

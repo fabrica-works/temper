@@ -310,6 +310,28 @@ impl Joint {
             ));
             return;
         }
+        if let Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down: jig_client::Down::Read { read, what: jig_client::Readable::Family { record, .. } },
+                },
+        } = &request
+        {
+            // The service answers every family read with none (temper-service's family.rs).
+            self.callbacks.push((
+                who,
+                RootEvent::Client {
+                    event: jig_client::Event::Up {
+                        up: jig_client::Up::ReadDone {
+                            read: *read,
+                            result: jig_client::Readout::Family { family: record.family, record: None },
+                        },
+                    },
+                }
+                .into(),
+            ));
+            return;
+        }
         for event in translate::request(&mut self.transport, who, &mut request, &self.client_limits[&who].client.domain)
         {
             self.send(event);
