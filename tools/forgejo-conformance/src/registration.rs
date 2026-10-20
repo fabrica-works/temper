@@ -1,3 +1,4 @@
+use crate::json::{At, Json};
 use crate::{
     Result,
     facts::{Fact, add},
@@ -6,7 +7,6 @@ use crate::{
     runner,
     write::{SecretKind, Secrets},
 };
-use serde_json::Value;
 use skein_forge::forgejo::pin::RUNNER_VERSION;
 use skein_throwaway_forgejo::Output;
 use std::{
@@ -40,8 +40,8 @@ pub(crate) fn configuration(base: &str, uuid: &str, token_file: &Path, jobs: &Pa
         token_file.display()
     )
 }
-pub(crate) fn listed(body: &Value, uuid: &str) -> Option<Value> {
-    body.as_array()?.iter().find(|row| row["uuid"] == uuid).cloned()
+pub(crate) fn listed<'a>(body: &'a Json, uuid: &str) -> Option<At<'a>> {
+    body.root().items().into_iter().find(|row| row.get("uuid").is(uuid))
 }
 pub(crate) fn private(path: &Path, secret: &str) -> Result<()> {
     use std::io::Write;
@@ -114,12 +114,13 @@ pub(crate) fn facts(f: &Fixture, binary: &Path, secrets: &mut Secrets) -> Result
     private(&path, FACT_SECRET)?;
     let out = register(f, &path, "renamed", "other:host")?;
     let all = f.get("/api/v1/admin/actions/runners")?;
-    let row = listed(&all, FACT_UUID).unwrap_or(Value::Null);
-    let one = all.as_array().is_some_and(|rows| rows.iter().filter(|r| r["uuid"] == FACT_UUID).count() == 1);
-    let matches = row["owner_id"] == 0
-        && row["repo_id"] == 0
-        && row["name"] == "renamed"
-        && row["labels"] == serde_json::json!(["other:host"]);
+    let one = all.root().items().iter().filter(|r| r.get("uuid").is(FACT_UUID)).count() == 1;
+    let matches = listed(&all, FACT_UUID).is_some_and(|row| {
+        row.get("owner_id").u64() == Some(0)
+            && row.get("repo_id").u64() == Some(0)
+            && row.get("name").is("renamed")
+            && row.get("labels").items().iter().map(|label| label.str()).eq([Some("other:host")])
+    });
     add(
         &mut facts,
         NAMES[3],
@@ -167,8 +168,8 @@ fn offline(binary: &Path, scratch: &Path, secret: &Path, facts: &mut Vec<Fact>) 
 pub(crate) fn online(f: &Fixture) -> Result<bool> {
     for _ in 0..300 {
         if let Some(row) = listed(&f.get("/api/v1/admin/actions/runners")?, RUNNER_UUID)
-            && (row["status"] == "idle" || row["status"] == "active")
-            && row["version"] == format!("v{RUNNER_VERSION}")
+            && (row.get("status").is("idle") || row.get("status").is("active"))
+            && row.get("version").is(&format!("v{RUNNER_VERSION}"))
         {
             return Ok(!f.instance.scratch().join("runner/.runner").exists());
         }

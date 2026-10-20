@@ -26,8 +26,8 @@ pub(super) fn run(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Result<
     facts.push(super::fact(
         "component-write-create-issue",
         matches!(issue, Ok(Answer::Created(_)))
-            && got["title"] == "component issue"
-            && got["body"] == "<!-- temper:key 01000001 -->\ncomponent body",
+            && got.root().get("title").is("component issue")
+            && got.root().get("body").is("<!-- temper:key 01000001 -->\ncomponent body"),
         &issue,
     ));
     let pull = h.call(
@@ -46,15 +46,15 @@ pub(super) fn run(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Result<
     facts.push(super::fact(
         "component-write-open-pull",
         matches!(pull, Ok(Answer::Created(_)))
-            && got["title"] == "component pull"
-            && got["head"]["ref"] == "writer-head"
-            && got["base"]["ref"] == "landing"
-            && got["body"] == "pull body",
+            && got.root().get("title").is("component pull")
+            && got.root().get("head").get("ref").is("writer-head")
+            && got.root().get("base").get("ref").is("landing")
+            && got.root().get("body").is("pull body"),
         &pull,
     ));
     let post = h.call(repo, Write::Post { number, key: Box::new([1, 0, 0, 2]), body: bytes("post body") }.operation());
     let comments = f.get(&format!("{route}/comments"))?;
-    facts.push(super::fact("component-write-post", matches!(post, Ok(Answer::Commented(id)) if comments.as_array().is_some_and(|rows| rows.iter().any(|r| r["id"] == id && r["body"] == "<!-- temper:key 01000002 -->\npost body"))), &post));
+    facts.push(super::fact("component-write-post", matches!(post, Ok(Answer::Commented(id)) if comments.root().array().is_some_and(|rows| rows.iter().any(|r| r.get("id").u64() == Some(id) && r.get("body").is("<!-- temper:key 01000002 -->\npost body")))), &post));
     let review = h.call(
         repo,
         Write::Review {
@@ -66,12 +66,12 @@ pub(super) fn run(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Result<
         .operation(),
     );
     let reviews = f.get(&format!("{R}/pulls/{}/reviews?page=1&limit=50", f.feature))?;
-    facts.push(super::fact("component-write-review", matches!(review, Ok(Answer::Reviewed(id)) if reviews.as_array().is_some_and(|rows| rows.iter().any(|r| r["id"] == id && r["body"] == "<!-- temper:key 01000003 -->\nkeyed review" && r["state"] == "COMMENT"))), &review));
+    facts.push(super::fact("component-write-review", matches!(review, Ok(Answer::Reviewed(id)) if reviews.root().array().is_some_and(|rows| rows.iter().any(|r| r.get("id").u64() == Some(id) && r.get("body").is("<!-- temper:key 01000003 -->\nkeyed review") && r.get("state").is("COMMENT")))), &review));
     let edit =
         h.call(repo, Write::Edit { number, title: Some(bytes("edited component issue")), body: None }.operation());
     facts.push(super::fact(
         "component-write-edit",
-        edit == Ok(Answer::Done) && f.get(&route)?["title"] == "edited component issue",
+        edit == Ok(Answer::Done) && f.get(&route)?.root().get("title").is("edited component issue"),
         &edit,
     ));
     let reviewers =
@@ -79,9 +79,11 @@ pub(super) fn run(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Result<
     facts.push(super::fact(
         "component-write-set-reviewers",
         reviewers == Ok(Answer::Done)
-            && f.get(&format!("{R}/pulls/{}", f.feature))?["requested_reviewers"]
-                .as_array()
-                .is_some_and(|rows| rows.len() == 1 && rows[0]["id"] == f.stranger.id),
+            && f.get(&format!("{R}/pulls/{}", f.feature))?
+                .root()
+                .get("requested_reviewers")
+                .array()
+                .is_some_and(|rows| rows.len() == 1 && rows[0].get("id").u64() == Some(f.stranger.id)),
         &reviewers,
     ));
     for (name, op, state) in [
@@ -89,7 +91,11 @@ pub(super) fn run(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Result<
         ("component-write-reopen", Write::Reopen { number }, "open"),
     ] {
         let result = h.call(repo, op.operation());
-        facts.push(super::fact(name, result == Ok(Answer::Done) && f.get(&route)?["state"] == state, &result));
+        facts.push(super::fact(
+            name,
+            result == Ok(Answer::Done) && f.get(&route)?.root().get("state").is(state),
+            &result,
+        ));
     }
     effects(f, h, facts, number, own, &own_route)?;
     open_after_closed(f, h, facts)?;
@@ -104,24 +110,27 @@ fn effects(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>, number: u64, own:
     f.branch(R, "component-merge", "landing")?;
     f.put(R, "component-merge", "merge.txt", "merged\n")?;
     let merge = f.pull(R, "component-merge", "landing")?;
-    let merge_number = merge["number"].as_u64().ok_or("merge number")?;
+    let merge_number = merge.root().get("number").u64().ok_or("merge number")?;
     f.ready(R, merge_number, None)?;
     let result = h.call(
         repo,
-        Write::Merge { number: merge_number, head: commit(merge["head"]["sha"].as_str().ok_or("merge head")?)? }
-            .operation(),
+        Write::Merge {
+            number: merge_number,
+            head: commit(merge.root().get("head").get("sha").str().ok_or("merge head")?)?,
+        }
+        .operation(),
     );
     let got = f.get(&format!("{R}/pulls/{merge_number}"))?;
-    facts.push(super::fact("component-write-merge", matches!(result, Ok(Answer::Merged(head)) if got["merged"] == true && commit(got["merge_commit_sha"].as_str().unwrap_or_default()).ok() == Some(head)), &result));
+    facts.push(super::fact("component-write-merge", matches!(result, Ok(Answer::Merged(head)) if got.root().get("merged").bool() == Some(true) && commit(got.root().get("merge_commit_sha").str().unwrap_or_default()).ok() == Some(head)), &result));
     f.ready(R, own, None)?;
-    let before = f.get(own_route)?["head"]["sha"].as_str().ok_or("update head")?.to_owned();
+    let before = f.get(own_route)?.root().get("head").get("sha").str().ok_or("update head")?.to_owned();
     let result = h.call(repo, Write::Update { number: own }.operation());
     if result == Ok(Answer::Done) {
         f.ready(R, own, Some(&before))?;
     }
     facts.push(super::fact(
         "component-write-update",
-        result == Ok(Answer::Done) && f.get(own_route)?["head"]["sha"] != before,
+        result == Ok(Answer::Done) && f.get(own_route)?.root().get("head").get("sha").str() != Some(before.as_str()),
         &result,
     ));
     let head = commit(&f.head)?;
@@ -133,16 +142,16 @@ fn effects(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>, number: u64, own:
     facts.push(super::fact(
         "component-write-status",
         result == Ok(Answer::Done)
-            && got["statuses"]
-                .as_array()
-                .is_some_and(|rows| rows.iter().any(|r| r["context"] == "component/test" && r["status"] == "success")),
+            && got.root().get("statuses").array().is_some_and(|rows| {
+                rows.iter().any(|r| r.get("context").is("component/test") && r.get("status").is("success"))
+            }),
         &result,
     ));
     let result = h.call(repo, Write::CreateBranch { branch: bytes("component-created"), commit: head }.operation());
     facts.push(super::fact(
         "component-write-create-branch",
         result == Ok(Answer::Branch(api::BranchCreation::Created))
-            && f.get(&format!("{R}/branches/component-created"))?["commit"]["id"] == f.head,
+            && f.get(&format!("{R}/branches/component-created"))?.root().get("commit").get("id").is(&f.head),
         &result,
     ));
     let result = h.call(repo, Write::DeleteBranch { branch: bytes("component-created") }.operation());
@@ -160,9 +169,9 @@ fn effects(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>, number: u64, own:
 fn open_after_closed(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Result<()> {
     f.branch(R, "component-repeat", "main")?;
     f.put(R, "component-repeat", "repeat.txt", "repeat\n")?;
-    let first = f.pull(R, "component-repeat", "main")?["number"].as_u64().ok_or("first pull")?;
+    let first = f.pull(R, "component-repeat", "main")?.root().get("number").u64().ok_or("first pull")?;
     f.api("PATCH", &format!("{R}/issues/{first}"), &json!({"state":"closed"}))?;
-    let second = f.pull(R, "component-repeat", "main")?["number"].as_u64().ok_or("second pull")?;
+    let second = f.pull(R, "component-repeat", "main")?.root().get("number").u64().ok_or("second pull")?;
     facts.push(h.observe(
         "component-read-pull-for-open-after-closed",
         repository(f)?,
@@ -187,7 +196,8 @@ fn empty_pull(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Result<()> 
     facts.push(super::fact(
         "component-write-open-pull-no-changes",
         result == Err(api::Error::NothingToMerge)
-            && rows.as_array().is_some_and(|rows| rows.iter().all(|r| r["head"]["ref"] != "component-empty")),
+            && rows.root().kind() == Some(skein_json::Kind::ArrayStart)
+            && rows.root().items().iter().all(|r| r.get("head").get("ref").str() != Some("component-empty")),
         &result,
     ));
     Ok(())

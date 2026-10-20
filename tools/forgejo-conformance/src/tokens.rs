@@ -25,7 +25,7 @@ fn make(r: &mut Recorder<'_>, admin: &Token, case: &str, name: &str, scopes: &[&
         &[],
     )?;
     let body = crate::json(&response)?;
-    Ok(Token::new(body["sha1"].as_str().ok_or("made token missing")?.to_owned()))
+    Ok(Token::new(body.root().get("sha1").str().ok_or("made token missing")?.to_owned()))
 }
 pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
     r.f.api("PUT", &format!("{R}/collaborators/bot"), &json!({"permission":"write"}))?;
@@ -48,7 +48,7 @@ pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
         Auth::Token(admin),
         &[],
     )?;
-    let id = crate::json(&listed)?[0]["id"].as_u64().ok_or("listed token id missing")?;
+    let id = crate::json(&listed)?.root().nth(0).get("id").u64().ok_or("listed token id missing")?;
     r.send_new("setup-token-as-the-bot", "GET", "/api/v1/user", None, Auth::Token(&api), &[])?;
     r.send_new("setup-token-git-as-the-bot", "GET", "/api/v1/user", None, Auth::Token(&git), &[])?;
     let alone = setup::scoped(r.f, r.secrets, "bot", "git-alone", &["write:repository"])?;
@@ -88,26 +88,49 @@ pub(crate) fn facts(out: &Path) -> Result<Vec<Fact>> {
         (
             "setup-admin-route-makes-a-token-answering-201-with-name-scopes-and-value",
             made.status == 201
-                && made.body["name"] == "temper-api"
-                && made.body["scopes"] == json!(STORED_API)
-                && made.body["sha1"].as_str().is_some_and(|s| s.len() == 40),
+                && made.body.root().get("name").is("temper-api")
+                && made
+                    .body
+                    .root()
+                    .get("scopes")
+                    .items()
+                    .iter()
+                    .map(|scope| scope.str())
+                    .eq(STORED_API.iter().copied().map(Some))
+                && made.body.root().get("sha1").str().is_some_and(|s| s.len() == 40),
         ),
         ("setup-token-of-an-existing-name-is-refused", case(out, "setup-token-make-again")?.status == 400),
         (
             "setup-token-list-shows-names-and-scopes-without-values",
             list.status == 200
-                && list.body[0]["name"] == "temper-git"
-                && list.body[0]["scopes"] == json!(GIT)
-                && second.body[0]["name"] == "temper-api"
-                && second.body[0]["scopes"] == json!(STORED_API)
-                && [&list, &second].iter().all(|c| c.body[0]["sha1"].as_str().is_none_or(str::is_empty)),
+                && list.body.root().nth(0).get("name").is("temper-git")
+                && list
+                    .body
+                    .root()
+                    .nth(0)
+                    .get("scopes")
+                    .items()
+                    .iter()
+                    .map(|scope| scope.str())
+                    .eq(GIT.iter().copied().map(Some))
+                && second.body.root().nth(0).get("name").is("temper-api")
+                && second
+                    .body
+                    .root()
+                    .nth(0)
+                    .get("scopes")
+                    .items()
+                    .iter()
+                    .map(|scope| scope.str())
+                    .eq(STORED_API.iter().copied().map(Some))
+                && [&list, &second].iter().all(|c| c.body.root().nth(0).get("sha1").str().is_none_or(str::is_empty)),
         ),
         (
             "setup-token-list-pages-by-page-and-limit",
-            list.body.as_array().is_some_and(|v| v.len() == 1)
+            list.body.root().array().is_some_and(|v| v.len() == 1)
                 && second.status == 200
-                && second.body.as_array().is_some_and(|v| v.len() == 1)
-                && list.body[0]["id"] != second.body[0]["id"],
+                && second.body.root().array().is_some_and(|v| v.len() == 1)
+                && list.body.root().nth(0).get("id").u64() != second.body.root().nth(0).get("id").u64(),
         ),
         ("setup-a-made-token-answers-user-as-the-bot", bot(out, "setup-token-as-the-bot")?),
         (
@@ -148,5 +171,5 @@ pub(crate) fn facts(out: &Path) -> Result<Vec<Fact>> {
 }
 fn bot(out: &Path, name: &str) -> Result<bool> {
     let row = case(out, name)?;
-    Ok(row.status == 200 && row.body["login"] == "bot")
+    Ok(row.status == 200 && row.body.root().get("login").is("bot"))
 }

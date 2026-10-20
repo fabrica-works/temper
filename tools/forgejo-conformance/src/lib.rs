@@ -56,8 +56,8 @@ pub(crate) fn forgejo() -> Result<Forgejo> {
     let binary = std::env::var_os("TEMPER_FORGEJO").ok_or("TEMPER_FORGEJO must name the pinned Forgejo")?;
     Forgejo::from_path(Path::new(&binary)).map_err(|e| format!("{e:?}").into())
 }
-fn json(exchange: &Exchange) -> Result<serde_json::Value> {
-    Ok(serde_json::from_slice(&exchange.body)?)
+fn json(exchange: &Exchange) -> Result<json::Json> {
+    json::Json::parse(&exchange.body)
 }
 #[cfg(test)]
 mod tests;

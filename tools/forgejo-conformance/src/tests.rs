@@ -153,10 +153,10 @@ fn the_runner_configuration_names_one_connection_by_its_token_file() {
 }
 #[test]
 fn a_listed_runner_is_found_by_its_uuid() {
-    let body: serde_json::Value = serde_json::from_str(&r#"[{"id":1,"uuid":"30313233-3435-3637-3839-616263646566","owner_id":0,"repo_id":0,"name":"r1","status":"idle","version":"v@","labels":["temper-host"],"description":"","ephemeral":false}]"#.replace('@', skein_forge::forgejo::pin::RUNNER_VERSION)).expect("row");
+    let body = crate::json::Json::parse(r#"[{"id":1,"uuid":"30313233-3435-3637-3839-616263646566","owner_id":0,"repo_id":0,"name":"r1","status":"idle","version":"v@","labels":["temper-host"],"description":"","ephemeral":false}]"#.replace('@', skein_forge::forgejo::pin::RUNNER_VERSION).as_bytes()).expect("row");
     let row = crate::registration::listed(&body, "30313233-3435-3637-3839-616263646566").expect("found");
-    assert_eq!(row["name"], "r1");
-    assert_eq!(crate::registration::listed(&body, "absent"), None);
+    assert_eq!(row.get("name").str(), Some("r1"));
+    assert_eq!(crate::registration::listed(&body, "absent").map(|_| ()), None);
 }
 #[test]
 fn the_clone_workflow_runs_steps_only_and_names_the_jobs_token() {
@@ -263,7 +263,7 @@ fn a_fresh_password_in_a_body_leaves_its_transcript_masked() {
 fn a_provisioning_failure_keeps_at_most_two_hundred_body_bytes() {
     let exchange = Exchange { sent: Vec::new(), status: 500, head: Vec::new(), body: vec![b'x'; 201] };
     assert_eq!(
-        crate::fixture::api_answer("/pulls", &exchange).expect_err("HTTP 500").to_string(),
+        crate::fixture::api_answer("/pulls", &exchange).err().expect("HTTP 500").to_string(),
         concat!(
             "provisioning /pulls: HTTP 500: ",
             "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",

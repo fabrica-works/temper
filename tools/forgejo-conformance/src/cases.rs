@@ -103,9 +103,11 @@ fn writes(r: &mut Recorder<'_>) -> Result<Written> {
         "POST",
         &format!("{R}/issues"),
         Some("{\"title\":\"fixture issue\",\"body\":\"<!-- temper:key 01000001 -->\\nissue text\"}"),
-    )?)?["number"]
-        .as_u64()
-        .ok_or("issue number missing")?;
+    )?)?
+    .root()
+    .get("number")
+    .u64()
+    .ok_or("issue number missing")?;
     let issue_route = format!("{R}/issues/{issue}");
     let pull_route = format!("{R}/pulls/{feature}");
     r.w(
@@ -121,9 +123,11 @@ fn writes(r: &mut Recorder<'_>) -> Result<Written> {
         "POST",
         &format!("{R}/pulls"),
         Some("{\"head\":\"writer-head\",\"base\":\"landing\",\"title\":\"writer pull\",\"body\":\"writer text\"}"),
-    )?)?["number"]
-        .as_u64()
-        .ok_or("writer pull missing")?;
+    )?)?
+    .root()
+    .get("number")
+    .u64()
+    .ok_or("writer pull missing")?;
     for (name, event, key) in [
         ("post-review-approved", "APPROVED", "03"),
         ("post-review-request-changes", "REQUEST_CHANGES", "04"),
@@ -166,15 +170,16 @@ fn writes(r: &mut Recorder<'_>) -> Result<Written> {
     r.w("close-issue", "PATCH", &issue_route, Some("{\"state\":\"closed\"}"))?;
     r.w("reopen-issue", "PATCH", &issue_route, Some("{\"state\":\"open\"}"))?;
     f.ready(R, own, None)?;
-    let previous = f.get(&format!("{R}/pulls/{own}"))?["head"]["sha"].as_str().ok_or("old head missing")?.to_owned();
+    let previous =
+        f.get(&format!("{R}/pulls/{own}"))?.root().get("head").get("sha").str().ok_or("old head missing")?.to_owned();
     r.w("update-pull", "POST", &format!("{R}/pulls/{own}/update?style=merge"), None)?;
     f.ready(R, own, Some(&previous))?;
     // A fresh pull avoids observing the update's old mergeability result.
     f.branch(R, "mergeable", "landing")?;
     f.put(R, "mergeable", "mergeable.txt", "mergeable\n")?;
     let merged = f.pull(R, "mergeable", "landing")?;
-    let own = merged["number"].as_u64().ok_or("merge pull missing")?;
-    let own_head = merged["head"]["sha"].as_str().ok_or("merge head missing")?.to_owned();
+    let own = merged.root().get("number").u64().ok_or("merge pull missing")?;
+    let own_head = merged.root().get("head").get("sha").str().ok_or("merge head missing")?.to_owned();
     f.ready(R, own, None)?;
     r.w(
         "merge-pull",
@@ -183,7 +188,7 @@ fn writes(r: &mut Recorder<'_>) -> Result<Written> {
         Some(&format!("{{\"Do\":\"merge\",\"head_commit_id\":\"{own_head}\"}}")),
     )?;
     r.w("delete-branch", "DELETE", &format!("{R}/branches/recorded"), None)?;
-    let remark = f.api("POST", &format!("{pull_route}/reviews"), &json!({"event":"COMMENT","body":"remark review","comments":[{"path":"file-0.txt","new_position":1,"body":"remark text"}]}))?["id"].as_u64().ok_or("remark review missing")?;
+    let remark = f.api("POST", &format!("{pull_route}/reviews"), &json!({"event":"COMMENT","body":"remark review","comments":[{"path":"file-0.txt","new_position":1,"body":"remark text"}]}))?.root().get("id").u64().ok_or("remark review missing")?;
     Ok(Written { issue, own, own_head, remark })
 }
 fn reads(r: &mut Recorder<'_>, written: &Written) -> Result<()> {
@@ -284,8 +289,8 @@ fn failures(r: &mut Recorder<'_>, written: &Written) -> Result<()> {
     f.branch(R, "stale", "landing")?;
     f.put(R, "stale", "stale.txt", "first\n")?;
     let stale = f.pull(R, "stale", "landing")?;
-    let old = stale["head"]["sha"].as_str().ok_or("stale head missing")?.to_owned();
-    let number = stale["number"].as_u64().ok_or("stale pull missing")?;
+    let old = stale.root().get("head").get("sha").str().ok_or("stale head missing")?.to_owned();
+    let number = stale.root().get("number").u64().ok_or("stale pull missing")?;
     f.put(R, "stale", "later.txt", "later\n")?;
     f.ready(R, number, Some(&old))?;
     for (name, repo, number, style, sha) in [
@@ -296,7 +301,13 @@ fn failures(r: &mut Recorder<'_>, written: &Written) -> Result<()> {
             R,
             f.conflict,
             "merge",
-            f.get(&format!("{R}/pulls/{}", f.conflict))?["head"]["sha"].as_str().ok_or("conflict head missing")?.into(),
+            f.get(&format!("{R}/pulls/{}", f.conflict))?
+                .root()
+                .get("head")
+                .get("sha")
+                .str()
+                .ok_or("conflict head missing")?
+                .into(),
         ),
         ("merge-protected", R, feature, "merge", head.clone()),
         (
@@ -304,8 +315,11 @@ fn failures(r: &mut Recorder<'_>, written: &Written) -> Result<()> {
             "/api/v1/repos/fixture/narrow",
             f.narrow,
             "squash",
-            f.get(&format!("/api/v1/repos/fixture/narrow/pulls/{}", f.narrow))?["head"]["sha"]
-                .as_str()
+            f.get(&format!("/api/v1/repos/fixture/narrow/pulls/{}", f.narrow))?
+                .root()
+                .get("head")
+                .get("sha")
+                .str()
                 .ok_or("narrow head missing")?
                 .into(),
         ),
@@ -337,11 +351,11 @@ pub fn flags(f: &Fixture, out: &Path, mask: &mut Mask, secrets: &mut Secrets) ->
 
 pub(crate) fn made_token(exchange: &Exchange, mask: &mut Mask, secrets: &mut Secrets) {
     if (200..300).contains(&exchange.status)
-        && let Ok(body) = serde_json::from_slice::<serde_json::Value>(&exchange.body)
-        && let Some(value) = body["sha1"].as_str().filter(|s| !s.is_empty())
+        && let Ok(body) = crate::json::Json::parse(&exchange.body)
+        && let Some(value) = body.root().get("sha1").str().filter(|s| !s.is_empty())
     {
         secrets.add(SecretKind::ApiToken, value);
-        if let Some(tail) = body["token_last_eight"].as_str().filter(|s| !s.is_empty()) {
+        if let Some(tail) = body.root().get("token_last_eight").str().filter(|s| !s.is_empty()) {
             secrets.add(SecretKind::ApiToken, tail);
             mask.literal(tail);
         }

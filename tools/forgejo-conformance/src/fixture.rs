@@ -1,4 +1,4 @@
-use crate::{Result, failure};
+use crate::{Result, failure, json::Json};
 use serde_json::{Value, json};
 use skein_throwaway_forgejo::{Account, Exchange, Forgejo, Init, Instance, Outgoing, Settings, Token};
 use std::path::Path;
@@ -34,17 +34,18 @@ impl Fixture {
         f.api("PATCH", "/api/v1/repos/fixture/narrow", &json!({"allow_squash_merge": false}))?;
         f.api("POST", &format!("{R}/labels"), &json!({"name":"temper / label", "color":"abcdef"}))?;
         f.put(R, "main", "conflict.txt", "original\n")?;
-        f.main = f.get(&format!("{R}/branches/main"))?["commit"]["id"].as_str().ok_or("main id missing")?.into();
+        f.main =
+            f.get(&format!("{R}/branches/main"))?.root().get("commit").get("id").str().ok_or("main id missing")?.into();
         f.branch(R, "feature/slash", "main")?;
         for n in 0..3 {
             f.put(R, "feature/slash", &format!("file-{n}.txt"), &format!("file {n}\n"))?;
         }
         let feature = f.pull(R, "feature/slash", "main")?;
-        f.feature = feature["number"].as_u64().ok_or("pull number missing")?;
-        f.head = feature["head"]["sha"].as_str().ok_or("head missing")?.into();
+        f.feature = feature.root().get("number").u64().ok_or("pull number missing")?;
+        f.head = feature.root().get("head").get("sha").str().ok_or("head missing")?.into();
         f.branch(R, "conflict", "main")?;
         f.put(R, "conflict", "conflict.txt", "head\n")?;
-        f.conflict = f.pull(R, "conflict", "main")?["number"].as_u64().ok_or("conflict pull missing")?;
+        f.conflict = f.pull(R, "conflict", "main")?.root().get("number").u64().ok_or("conflict pull missing")?;
         f.put(R, "main", "conflict.txt", "base\n")?;
         f.branch(R, "landing", "main")?;
         f.branch(R, "writer-head", "main")?;
@@ -53,7 +54,7 @@ impl Fixture {
         let narrow = "/api/v1/repos/fixture/narrow";
         f.branch(narrow, "feature", "main")?;
         f.put(narrow, "feature", "narrow.txt", "narrow\n")?;
-        f.narrow = f.pull(narrow, "feature", "main")?["number"].as_u64().ok_or("narrow pull missing")?;
+        f.narrow = f.pull(narrow, "feature", "main")?.root().get("number").u64().ok_or("narrow pull missing")?;
         f.api("POST", &format!("{R}/branch_protections"), &json!({"branch_name":"main", "enable_push":false, "enable_status_check":true, "status_check_contexts":["fixture/test"], "required_approvals":1, "dismiss_stale_approvals":true}))?;
         Ok(f)
     }
@@ -98,18 +99,18 @@ impl Fixture {
             .exchange_basic(&Outgoing { method, target, body, token: None, range: None }, login, secret)
             .map_err(|e| failure(&e))
     }
-    pub fn api(&self, method: &str, target: &str, body: &Value) -> Result<Value> {
+    pub fn api(&self, method: &str, target: &str, body: &Value) -> Result<Json> {
         let body = body.to_string();
         let response = self.exchange(method, target, Some(body.as_bytes()), Some(&self.owner.token), None)?;
         api_answer(target, &response)
     }
-    pub fn get(&self, target: &str) -> Result<Value> {
+    pub fn get(&self, target: &str) -> Result<Json> {
         crate::json(&self.exchange("GET", target, None, Some(&self.owner.token), None)?)
     }
-    pub fn branch(&self, repo: &str, name: &str, from: &str) -> Result<Value> {
+    pub fn branch(&self, repo: &str, name: &str, from: &str) -> Result<Json> {
         self.api("POST", &format!("{repo}/branches"), &json!({"new_branch_name":name, "old_ref_name":from}))
     }
-    pub fn pull(&self, repo: &str, head: &str, base: &str) -> Result<Value> {
+    pub fn pull(&self, repo: &str, head: &str, base: &str) -> Result<Json> {
         let target = format!("{repo}/pulls");
         let body = json!({"head":head,"base":base,"title":head,"body":"fixture pull"}).to_string();
         for attempt in 0..=3 {
@@ -127,12 +128,12 @@ impl Fixture {
         }
         unreachable!("the last attempt returns")
     }
-    pub fn put(&self, repo: &str, branch: &str, path: &str, content: &str) -> Result<Value> {
+    pub fn put(&self, repo: &str, branch: &str, path: &str, content: &str) -> Result<Json> {
         let route = format!("{repo}/contents/{path}");
         let old = self.get(&format!("{route}?ref={}", encode(branch)))?;
         let mut body = json!({"branch":branch, "message":path, "content":base64(content)});
-        let method = if old["sha"].is_string() {
-            body["sha"] = old["sha"].clone();
+        let method = if old.root().get("sha").str().is_some() {
+            body["sha"] = json!(old.root().get("sha").str().expect("string checked"));
             "PUT"
         } else {
             "POST"
@@ -142,7 +143,9 @@ impl Fixture {
     pub fn ready(&self, repo: &str, pull: u64, previous: Option<&str>) -> Result<()> {
         for _ in 0..100 {
             let row = self.get(&format!("{repo}/pulls/{pull}"))?;
-            if row["mergeable"] == true && previous.is_none_or(|old| row["head"]["sha"] != old) {
+            if row.root().get("mergeable").bool() == Some(true)
+                && previous.is_none_or(|old| !row.root().get("head").get("sha").is(old))
+            {
                 return Ok(());
             }
             std::thread::sleep(std::time::Duration::from_millis(50));
@@ -150,11 +153,11 @@ impl Fixture {
         Err("pull did not become mergeable".into())
     }
 }
-pub(crate) fn api_answer(target: &str, response: &Exchange) -> Result<Value> {
+pub(crate) fn api_answer(target: &str, response: &Exchange) -> Result<Json> {
     if !(200..300).contains(&response.status) {
         return Err(format!("provisioning {target}: HTTP {}: {}", response.status, body_preview(response)).into());
     }
-    if response.body.is_empty() { Ok(Value::Null) } else { crate::json(response) }
+    if response.body.is_empty() { Json::parse(b"null") } else { crate::json(response) }
 }
 fn body_preview(response: &Exchange) -> String {
     String::from_utf8_lossy(&response.body[..response.body.len().min(200)]).into_owned()

@@ -1,3 +1,4 @@
+use crate::json::At;
 use crate::{
     Result,
     cases::Recorder,
@@ -5,7 +6,7 @@ use crate::{
     fixture::Fixture,
     setup,
 };
-use serde_json::{Value, json};
+use serde_json::json;
 use skein_throwaway_forgejo::Token;
 use std::{path::Path, thread, time::Duration};
 const ORG: &str = "/api/v1/orgs/ensemble";
@@ -38,7 +39,7 @@ pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
     r.send("setup-team-list-new-org", "GET", &teams, None, Some(admin), None)?;
     thread::sleep(Duration::from_secs(1));
     let made = r.send("setup-team-made", "POST", &teams, Some(TEAM), Some(admin), None)?;
-    let id = crate::json(&made)?["id"].as_u64().ok_or("team id absent")?;
+    let id = crate::json(&made)?.root().get("id").u64().ok_or("team id absent")?;
     r.send("setup-team-made-again", "POST", &teams, Some(TEAM), Some(admin), None)?;
     for (name, suffix) in [
         ("setup-team-list", ""),
@@ -75,12 +76,12 @@ pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
     )?;
     Ok(())
 }
-fn write_team(value: &Value) -> bool {
-    value["permission"] == "write"
-        && value["includes_all_repositories"] == true
+fn write_team(value: At<'_>) -> bool {
+    value.get("permission").is("write")
+        && value.get("includes_all_repositories").bool() == Some(true)
         && ["repo.code", "repo.issues", "repo.pulls", "repo.actions"]
             .iter()
-            .all(|unit| value["units_map"][unit] == "write")
+            .all(|unit| value.get("units_map").get(unit).is("write"))
 }
 pub(crate) fn facts(_f: &Fixture, out: &Path) -> Result<Vec<Fact>> {
     let mut facts = Vec::new();
@@ -97,46 +98,57 @@ pub(crate) fn facts(_f: &Fixture, out: &Path) -> Result<Vec<Fact>> {
     for (name, holds) in [
         (
             "setup-org-made-for-a-user-by-an-admin-is-201-and-private",
-            made.status == 201 && made.body["visibility"] == "private",
+            made.status == 201 && made.body.root().get("visibility").is("private"),
         ),
         ("setup-org-made-again-is-422", case(out, "setup-org-made-again")?.status == 422),
-        ("setup-org-read-by-name-names-its-id", case(out, "setup-org-read")?.body["id"] == made.body["id"]),
+        (
+            "setup-org-read-by-name-names-its-id",
+            case(out, "setup-org-read")?.body.root().get("id").u64() == made.body.root().get("id").u64(),
+        ),
         ("setup-org-missing-is-404", case(out, "setup-org-missing")?.status == 404),
         (
             "setup-org-route-orgs-needs-write-organization",
             orgs_refused.status == 403
-                && orgs_refused.body["message"].as_str().is_some_and(|s| s.contains("write:organization"))
+                && orgs_refused.body.root().get("message").str().is_some_and(|s| s.contains("write:organization"))
                 && orgs_made.status == 201
-                && orgs_made.body["visibility"] == "private",
+                && orgs_made.body.root().get("visibility").is("private"),
         ),
         (
             "setup-org-made-for-a-user-takes-write-admin-alone",
-            only.status == 201 && only.body["visibility"] == "private",
+            only.status == 201 && only.body.root().get("visibility").is("private"),
         ),
         (
             "setup-org-starts-with-only-the-owners-team",
-            initial.body.as_array().is_some_and(|a| a.len() == 1 && a[0]["name"] == "Owners"),
+            initial.body.root().array().is_some_and(|a| a.len() == 1 && a[0].get("name").is("Owners")),
         ),
-        ("setup-team-made-with-write-all-repositories-and-four-units", team.status == 201 && write_team(&team.body)),
+        (
+            "setup-team-made-with-write-all-repositories-and-four-units",
+            team.status == 201 && write_team(team.body.root()),
+        ),
         (
             "setup-team-listing-reads-back-what-was-made",
-            list.body.as_array().is_some_and(|a| a.iter().any(|t| t["id"] == team.body["id"] && write_team(t))),
+            list.body.root().array().is_some_and(|a| {
+                a.iter().any(|t| t.get("id").u64() == team.body.root().get("id").u64() && write_team(*t))
+            }),
         ),
         ("setup-team-made-again-is-422", case(out, "setup-team-made-again")?.status == 422),
-        ("setup-team-edit-without-a-name-keeps-the-name", nameless.status == 200 && nameless.body["name"] == "writer"),
+        (
+            "setup-team-edit-without-a-name-keeps-the-name",
+            nameless.status == 200 && nameless.body.root().get("name").is("writer"),
+        ),
         (
             "setup-team-edit-replaces-units-and-flags",
             edit.status == 200
-                && edit.body["includes_all_repositories"] == false
-                && edit.body["units_map"]["repo.pulls"] == "read"
-                && edit.body["units_map"]["repo.code"] == "write"
-                && edit.body["units_map"]["repo.issues"] == "write"
-                && edit.body["units_map"]["repo.actions"] == "none",
+                && edit.body.root().get("includes_all_repositories").bool() == Some(false)
+                && edit.body.root().get("units_map").get("repo.pulls").is("read")
+                && edit.body.root().get("units_map").get("repo.code").is("write")
+                && edit.body.root().get("units_map").get("repo.issues").is("write")
+                && edit.body.root().get("units_map").get("repo.actions").is("none"),
         ),
         ("setup-team-member-put-is-204", case(out, "setup-team-member-added")?.status == 204),
         (
             "setup-team-members-list-the-added-user",
-            members.body.as_array().is_some_and(|a| a.len() == 1 && a[0]["login"] == "writer"),
+            members.body.root().array().is_some_and(|a| a.len() == 1 && a[0].get("login").is("writer")),
         ),
         ("setup-team-member-put-of-a-missing-user-is-404", case(out, "setup-team-member-missing-user")?.status == 404),
         ("setup-team-member-writes-in-a-repository-made-later", case(out, "setup-org-issue-by-member")?.status == 201),
@@ -146,8 +158,8 @@ pub(crate) fn facts(_f: &Fixture, out: &Path) -> Result<Vec<Fact>> {
         ),
         (
             "setup-team-listing-pages-by-limit",
-            case(out, "setup-team-list-page-1")?.body.as_array().is_some_and(|a| a.len() == 1)
-                && case(out, "setup-team-list-page-3")?.body == json!([]),
+            case(out, "setup-team-list-page-1")?.body.root().array().is_some_and(|a| a.len() == 1)
+                && case(out, "setup-team-list-page-3")?.body.root().array().is_some_and(|a| a.is_empty()),
         ),
     ] {
         add(&mut facts, name, holds, "captured status or members differ");

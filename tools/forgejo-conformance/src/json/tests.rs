@@ -42,3 +42,11 @@ fn an_array_of_strings_is_written_compact_and_escaped() {
     .expect("strings");
     assert_eq!(&*body, br#"["a","b\"c"]"#);
 }
+
+#[test]
+fn a_key_is_found_at_any_depth_and_a_value_is_not_a_key() {
+    let json = Json::parse(br#"{"a":{"secret":1},"b":["x",{"c":"secret"}]}"#).expect("body");
+    assert!(json.has_key("secret"));
+    assert!(json.has_key("c"));
+    assert!(!json.has_key("x"));
+}

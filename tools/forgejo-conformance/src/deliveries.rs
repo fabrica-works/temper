@@ -1,3 +1,4 @@
+use crate::json::Json;
 use crate::{
     Result,
     facts::{self, Fact, Outcome},
@@ -141,7 +142,7 @@ pub(crate) fn signed(received: &Received) -> bool {
 }
 struct Capture {
     received: Received,
-    value: Value,
+    value: Json,
     status: u16,
 }
 struct Scenario<'a> {
@@ -166,33 +167,33 @@ impl Scenario<'_> {
                 }
                 return Err(format!("delivery timeout: {missing:?}").into());
             };
-            let value: Value = serde_json::from_slice(&received.body)?;
+            let value = Json::parse(&received.body)?;
             let event = received.header("X-Forgejo-Event-Type");
             if event.starts_with("workflow_job_") {
                 let status = self.fixture.get(&format!(
                     "{REPO}/commits/{}/status?limit=10",
-                    value["run"]["commit_sha"].as_str().ok_or("job head missing")?
+                    value.root().get("run").get("commit_sha").str().ok_or("job head missing")?
                 ))?;
-                let name = value["job"]["name"].as_str().ok_or("job name missing")?;
+                let name = value.root().get("job").get("name").str().ok_or("job name missing")?;
                 if ["pass", "fail"].contains(&name) {
-                    self.jobs.push(status["statuses"].as_array().is_some_and(|rows| {
+                    self.jobs.push(status.root().get("statuses").array().is_some_and(|rows| {
                         rows.iter().any(|row| {
-                            row["context"].as_str().is_some_and(|context| context.contains(&format!("/ {name} ")))
-                                && (row["status"] == "success" || row["status"] == "failure")
+                            row.get("context").str().is_some_and(|context| context.contains(&format!("/ {name} ")))
+                                && (row.get("status").is("success") || row.get("status").is("failure"))
                         })
                     }));
                 }
             }
-            if event == "push" && probe.is_some_and(|head| value["after"] == head) {
+            if event == "push" && probe.is_some_and(|head| value.root().get("after").is(head)) {
                 let pull = self.fixture.get(&format!("{REPO}/pulls/2"))?;
-                let settled = pull["mergeable"] == true;
+                let settled = pull.root().get("mergeable").bool() == Some(true);
                 self.pulls.push(vec![settled]);
                 if !settled {
                     checking = Some((self.pulls.len() - 1, Instant::now()));
                 }
                 self.checking |= !settled;
             }
-            if event != "push" || probe.is_none_or(|head| value["after"] == head) {
+            if event != "push" || probe.is_none_or(|head| value.root().get("after").is(head)) {
                 missing.retain(|name| *name != event);
             }
             reply.answer(status);
@@ -210,7 +211,7 @@ impl Scenario<'_> {
         let mut next = answered + delay;
         loop {
             thread::sleep(next.min(until).saturating_duration_since(Instant::now()));
-            let mergeable = self.fixture.get(&format!("{REPO}/pulls/2"))?["mergeable"] == true;
+            let mergeable = self.fixture.get(&format!("{REPO}/pulls/2"))?.root().get("mergeable").bool() == Some(true);
             self.pulls[index].push(mergeable);
             if Instant::now() >= until || mergeable {
                 self.settled &= mergeable && Instant::now() <= until;
@@ -220,7 +221,7 @@ impl Scenario<'_> {
             next = Instant::now() + delay;
         }
     }
-    fn act(&mut self, method: &str, route: &str, body: &Value, writer: bool, events: &[&str]) -> Result<Value> {
+    fn act(&mut self, method: &str, route: &str, body: &Value, writer: bool, events: &[&str]) -> Result<Json> {
         let bytes = body.to_string();
         let answer = self.fixture.exchange(
             method,
@@ -233,10 +234,10 @@ impl Scenario<'_> {
             return Err(format!("delivery scenario {method} {route}: HTTP {}", answer.status).into());
         }
         self.take(events, None, 204)?;
-        Ok(serde_json::from_slice(&answer.body).unwrap_or(Value::Null))
+        Json::parse(&answer.body).or_else(|_| Json::parse(b"null"))
     }
 }
-fn provision(f: &Fixture, port: u16) -> Result<Value> {
+fn provision(f: &Fixture, port: u16) -> Result<Json> {
     f.api("POST", "/api/v1/orgs", &json!({"username":"hooked","visibility":"private"}))?;
     f.api(
         "POST",
@@ -276,13 +277,13 @@ pub(crate) fn record(forgejo: &Forgejo, scratch: &Path, out: &Path, secrets: &mu
     let retry = s.act("POST", "/issues", &json!({"title":"failed delivery","body":"marker"}), false, &[])?;
     s.take(&["issues"], None, 500)?;
     let no_retry = listener.next(Duration::from_secs(3)).is_none();
-    let mut facts = evaluate(&s, refused, no_retry, &hook, retry["number"].as_u64().ok_or("issue number")?);
+    let mut facts = evaluate(&s, refused, no_retry, &hook, retry.root().get("number").u64().ok_or("issue number")?);
     let mut mask = Mask::new(f.instance.port());
     mask.listener(listener.port);
     let mut written = std::collections::BTreeSet::new();
     for capture in &s.captures {
         let event = capture.received.header("X-Forgejo-Event-Type");
-        let name = format!("{event}{}", if capture.value["ref_type"] == "tag" { "-tag" } else { "" });
+        let name = format!("{event}{}", if capture.value.root().get("ref_type").is("tag") { "-tag" } else { "" });
         if written.insert(name.clone()) {
             let received = &capture.received;
             write::check(&name, &received.head, &received.body, &secrets_b)?;
@@ -304,10 +305,21 @@ pub(crate) fn record(forgejo: &Forgejo, scratch: &Path, out: &Path, secrets: &mu
 fn scenario(s: &mut Scenario<'_>) -> Result<()> {
     s.act("POST", "/issues", &json!({"title":"issue","body":"<!-- temper:key 01 -->\n"}), false, &["issues"])?;
     s.act("PATCH", "/issues/1", &json!({"assignees":["writer"]}), true, &["issue_assign"])?;
-    let label =
-        s.fixture.api("POST", &format!("{REPO}/labels"), &json!({"name":"hook","color":"abcdef"}))?["id"].clone();
+    let label = s
+        .fixture
+        .api("POST", &format!("{REPO}/labels"), &json!({"name":"hook","color":"abcdef"}))?
+        .root()
+        .get("id")
+        .u64()
+        .ok_or("fixture id missing")?;
     s.act("POST", "/issues/1/labels", &json!({"labels":[label]}), false, &["issue_label"])?;
-    let milestone = s.fixture.api("POST", &format!("{REPO}/milestones"), &json!({"title":"hook"}))?["id"].clone();
+    let milestone = s
+        .fixture
+        .api("POST", &format!("{REPO}/milestones"), &json!({"title":"hook"}))?
+        .root()
+        .get("id")
+        .u64()
+        .ok_or("fixture id missing")?;
     s.act("PATCH", "/issues/1", &json!({"milestone":milestone}), false, &["issue_milestone"])?;
     s.act("POST", "/issues/1/comments", &json!({"body":"<!-- temper:key 02 -->\n"}), true, &["issue_comment"])?;
     s.fixture.branch(REPO, "topic", "main")?;
@@ -316,7 +328,7 @@ fn scenario(s: &mut Scenario<'_>) -> Result<()> {
     s.take(&["push"], None, 204)?;
     let pull =
         s.act("POST", "/pulls", &json!({"head":"topic","base":"main","title":"topic"}), false, &["pull_request"])?;
-    s.checking |= pull["mergeable"] == false;
+    s.checking |= pull.root().get("mergeable").bool() == Some(false);
     s.act("PATCH", "/issues/2", &json!({"assignees":["writer"]}), true, &["pull_request_assign"])?;
     s.act("POST", "/issues/2/labels", &json!({"labels":[label]}), true, &["pull_request_label"])?;
     s.act("PATCH", "/issues/2", &json!({"milestone":milestone}), true, &["pull_request_milestone"])?;
@@ -344,9 +356,13 @@ fn scenario(s: &mut Scenario<'_>) -> Result<()> {
         true,
         &[],
     )?;
-    s.take(&["push", "pull_request_sync"], Some(moved["commit"]["sha"].as_str().ok_or("writer head missing")?), 204)?;
+    s.take(
+        &["push", "pull_request_sync"],
+        Some(moved.root().get("commit").get("sha").str().ok_or("writer head missing")?),
+        204,
+    )?;
     let moved = s.fixture.put(REPO, "main", "base.txt", "base\n")?;
-    s.take(&["push"], Some(moved["commit"]["sha"].as_str().ok_or("base head missing")?), 204)?;
+    s.take(&["push"], Some(moved.root().get("commit").get("sha").str().ok_or("base head missing")?), 204)?;
     s.fixture.branch(REPO, "gone", "main")?;
     s.take(&["create"], None, 204)?;
     s.act("DELETE", "/branches/gone", &Value::Null, false, &["delete"])?;
@@ -357,12 +373,15 @@ fn scenario(s: &mut Scenario<'_>) -> Result<()> {
     s.fixture.api("PATCH", REPO, &json!({"has_actions":true}))?;
     s.fixture.put(REPO,"ci",".forgejo/workflows/deliveries.yaml","name: deliveries\non:\n  push:\n    branches: [ci]\njobs:\n  pass:\n    runs-on: temper-host\n    steps:\n      - run: exit 0\n  fail:\n    runs-on: temper-host\n    steps:\n      - run: exit 1\n  after:\n    needs: [fail]\n    runs-on: temper-host\n    steps:\n      - run: exit 0\n  held:\n    runs-on: temper-held\n    steps:\n      - run: exit 0\n")?;
     s.take(&["push", "workflow_job_success", "workflow_job_failure", "workflow_job_skipped"], None, 204)?;
-    let run = s.captures.iter().find_map(|capture| capture.value["job"]["run_id"].as_u64()).ok_or("run id missing")?;
+    let run = s
+        .captures
+        .iter()
+        .find_map(|capture| capture.value.root().get("job").get("run_id").u64())
+        .ok_or("run id missing")?;
     s.act("POST", &format!("/actions/runs/{run}/cancel"), &Value::Null, false, &[])?;
     s.take(&["workflow_job_cancelled"], None, 204)
 }
-fn evaluate(s: &Scenario<'_>, refused: bool, no_retry: bool, hook: &Value, failed: u64) -> Vec<Fact> {
-    let mut facts = Vec::new();
+fn event_facts(s: &Scenario<'_>, facts: &mut Vec<Fact>) {
     let mut rows = BTreeMap::new();
     for c in &s.captures {
         rows.entry(c.received.header("X-Forgejo-Event-Type")).or_insert(c);
@@ -393,34 +412,53 @@ fn evaluate(s: &Scenario<'_>, refused: bool, no_retry: bool, hook: &Value, faile
                 let expected = if header.is_empty() { event.replace("_review", "") } else { (*header).into() };
                 c.received.header("X-Forgejo-Event") == expected
                     && paths.iter().all(|path| {
-                        c.value.pointer(path).is_some_and(|v| {
-                            if path.ends_with("id") || path.ends_with("number") { v.is_u64() } else { v.is_string() }
-                        })
+                        let v = path.split('/').skip(1).fold(c.value.root(), crate::json::At::get);
+                        if path.ends_with("id") || path.ends_with("number") {
+                            v.u64().is_some()
+                        } else {
+                            v.str().is_some()
+                        }
                     })
             })
         });
-        facts::add(&mut facts, name, holds, "event header or payload fields differ");
+        facts::add(facts, name, holds, "event header or payload fields differ");
     }
-    let repository = s.fixture.get(REPO).ok().and_then(|v| v["id"].as_u64());
+}
+fn evaluate(s: &Scenario<'_>, refused: bool, no_retry: bool, hook: &Json, failed: u64) -> Vec<Fact> {
+    let mut facts = Vec::new();
+    event_facts(s, &mut facts);
+    let repository = s.fixture.get(REPO).ok().and_then(|v| v.root().get("id").u64());
     let same_repo = s.captures.iter().all(|c| {
-        c.value["repository"]["id"].as_u64().or_else(|| c.value["run"]["repository"]["id"].as_u64()) == repository
+        c.value
+            .root()
+            .get("repository")
+            .get("id")
+            .u64()
+            .or_else(|| c.value.root().get("run").get("repository").get("id").u64())
+            == repository
             && repository.is_some()
     });
-    let subscribed = hook["events"].as_array().is_some_and(|events| {
-        events.len() == EVENTS.len() && EVENTS.iter().all(|name| events.iter().any(|v| v == name))
+    let subscribed = hook.root().get("events").array().is_some_and(|events| {
+        events.len() == EVENTS.len() && EVENTS.iter().all(|name| events.iter().any(|v| v.is(name)))
     });
-    let refs = s.captures.iter().filter(|c| c.value["ref_type"].is_string()).all(|c| {
-        c.value["ref"].as_str().is_some_and(|reference| {
-            reference.starts_with(if c.value["ref_type"] == "branch" { "refs/heads/" } else { "refs/tags/" })
+    let refs = s.captures.iter().filter(|c| c.value.root().get("ref_type").str().is_some()).all(|c| {
+        c.value.root().get("ref").str().is_some_and(|reference| {
+            reference.starts_with(if c.value.root().get("ref_type").is("branch") {
+                "refs/heads/"
+            } else {
+                "refs/tags/"
+            })
         })
     });
     let deletion = !s
         .captures
         .iter()
-        .any(|c| c.received.header("X-Forgejo-Event") == "push" && c.value["ref"] == "refs/heads/gone");
-    let echo = s.captures.iter().any(|c| {
-        c.received.header("X-Forgejo-Event-Type") == "issue_assign" && c.value["sender"]["id"] == s.fixture.writer.id
-    }) && s.captures.iter().any(|c| c.value["pusher"]["id"] == s.fixture.writer.id);
+        .any(|c| c.received.header("X-Forgejo-Event") == "push" && c.value.root().get("ref").is("refs/heads/gone"));
+    let echo =
+        s.captures.iter().any(|c| {
+            c.received.header("X-Forgejo-Event-Type") == "issue_assign"
+                && c.value.root().get("sender").get("id").u64() == Some(s.fixture.writer.id)
+        }) && s.captures.iter().any(|c| c.value.root().get("pusher").get("id").u64() == Some(s.fixture.writer.id));
     let (pull_settled, pull_checking) = pull_pair(&s.pulls, s.settled);
     for (name, holds) in [
         ("delivery-carries-the-repository-id", same_repo),
@@ -433,7 +471,8 @@ fn evaluate(s: &Scenario<'_>, refused: bool, no_retry: bool, hook: &Value, faile
         ("delivery-loopback-is-allowed-when-named", !s.captures.is_empty()),
         (
             "delivery-failed-delivery-is-not-sent-again",
-            no_retry && s.captures.iter().any(|c| c.value["number"] == failed && c.status == 500),
+            no_retry
+                && s.captures.iter().any(|c| c.value.root().get("number").u64() == Some(failed) && c.status == 500),
         ),
         ("delivery-pull-reads-not-mergeable-while-checked", s.checking),
         ("delivery-job-end-follows-its-commit-status", s.jobs.len() == 2 && s.jobs.iter().all(|seen| *seen)),

@@ -1,10 +1,10 @@
+use crate::json::{At, Json};
 use crate::{
     Result,
     cases::Recorder,
     facts::{Fact, add, case},
     fixture::Fixture,
 };
-use serde_json::{Value, json};
 use skein_throwaway_forgejo::Token;
 use std::{collections::BTreeSet, path::Path, thread, time::Duration};
 const ROUTE: &str = "/api/v1/orgs/ensemble/hooks";
@@ -63,7 +63,7 @@ pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
         // Every captured creation timestamp first appears in its own second.
         thread::sleep(Duration::from_secs(1));
         let answer = r.send(name, "POST", ROUTE, Some(body), Some(admin), None)?;
-        ids.push(crate::json(&answer)?["id"].as_u64().ok_or("hook id absent")?);
+        ids.push(crate::json(&answer)?.root().get("id").u64().ok_or("hook id absent")?);
     }
     for (name, query) in [
         ("setup-hook-list", ""),
@@ -85,12 +85,8 @@ pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
     r.send("setup-hook-delete-missing", "DELETE", &format!("{ROUTE}/999999"), None, Some(admin), None)?;
     Ok(())
 }
-fn no_secret(value: &Value) -> bool {
-    match value {
-        Value::Object(fields) => !fields.contains_key("secret") && fields.values().all(no_secret),
-        Value::Array(values) => values.iter().all(no_secret),
-        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => true,
-    }
+fn no_secret(value: &Json) -> bool {
+    !value.has_key("secret")
 }
 pub(crate) fn facts(f: &Fixture, out: &Path) -> Result<Vec<Fact>> {
     let made = case(out, "setup-hook-made")?;
@@ -98,79 +94,90 @@ pub(crate) fn facts(f: &Fixture, out: &Path) -> Result<Vec<Fact>> {
     let other = case(out, "setup-hook-made-other")?;
     let listed = case(out, "setup-hook-list")?;
     let patch = case(out, "setup-hook-patched-narrow")?;
-    let live = f.get(ROUTE)?;
-    let live_text = live.to_string();
-    let live = live.as_array().ok_or("hook list absent")?;
+    let response = f.exchange("GET", ROUTE, None, Some(&f.owner.token), None)?;
+    let live = crate::json(&response)?;
+    let live_text = String::from_utf8_lossy(&response.body);
+    let live_hides_secret = no_secret(&live);
+    let live = live.root().array().ok_or("hook list absent")?;
     let secrets_hidden = captures_hide_secrets(out)?;
     let mut facts = Vec::new();
     for (name, holds) in [
         ("setup-hook-for-a-loopback-address-is-made", made.status == 201),
         (
             "setup-hook-lists-the-events-it-was-made-with",
-            event_set(&made.body["events"]) == Some(EVENTS.iter().copied().collect())
-                && listed.body.as_array().is_some_and(|hooks| {
+            event_set(made.body.root().get("events")) == Some(EVENTS.iter().copied().collect())
+                && listed.body.root().array().is_some_and(|hooks| {
                     hooks.iter().any(|hook| {
-                        hook["id"] == made.body["id"]
-                            && event_set(&hook["events"]) == Some(EVENTS.iter().copied().collect())
+                        hook.get("id").u64() == made.body.root().get("id").u64()
+                            && event_set(hook.get("events")) == Some(EVENTS.iter().copied().collect())
                     })
                 }),
         ),
-        ("setup-hook-answers-its-target-in-config-url", made.body["config"]["url"] == "http://127.0.0.1:3000/hooks/1"),
-        ("setup-hook-is-json-and-active", made.body["config"]["content_type"] == "json" && made.body["active"] == true),
+        (
+            "setup-hook-answers-its-target-in-config-url",
+            made.body.root().get("config").get("url").is("http://127.0.0.1:3000/hooks/1"),
+        ),
+        (
+            "setup-hook-is-json-and-active",
+            made.body.root().get("config").get("content_type").is("json")
+                && made.body.root().get("active").bool() == Some(true),
+        ),
         (
             "setup-hook-never-shows-its-secret",
-            secrets_hidden
-                && no_secret(&Value::Array(live.clone()))
-                && !live_text.contains(FIRST)
-                && !live_text.contains(SECOND),
+            secrets_hidden && live_hides_secret && !live_text.contains(FIRST) && !live_text.contains(SECOND),
         ),
         (
             "setup-hook-patch-narrows-events-but-keeps-the-workflow-job-ones",
             patch.status == 200
-                && patch.body["events"]
-                    == json!([
-                        "push",
-                        "workflow_job_cancelled",
-                        "workflow_job_failure",
-                        "workflow_job_skipped",
-                        "workflow_job_success"
-                    ])
-                && patch.body["active"] == false,
+                && patch.body.root().get("events").items().iter().map(|event| event.str()).eq([
+                    Some("push"),
+                    Some("workflow_job_cancelled"),
+                    Some("workflow_job_failure"),
+                    Some("workflow_job_skipped"),
+                    Some("workflow_job_success"),
+                ])
+                && patch.body.root().get("active").bool() == Some(false),
         ),
         (
             "setup-hook-patch-leaves-the-orgs-other-hook",
             live.iter().any(|hook| {
-                hook["id"] == other.body["id"]
-                    && hook["events"] == other.body["events"]
-                    && hook["active"] == other.body["active"]
-                    && hook["config"]["url"].as_str().is_some_and(|url| url.ends_with("/other"))
+                hook.get("id").u64() == other.body.root().get("id").u64()
+                    && hook.get("events").items().iter().map(|event| event.str()).eq(other
+                        .body
+                        .root()
+                        .get("events")
+                        .items()
+                        .iter()
+                        .map(|event| event.str()))
+                    && hook.get("active").bool() == other.body.root().get("active").bool()
+                    && hook.get("config").get("url").str().is_some_and(|url| url.ends_with("/other"))
             }),
         ),
         ("setup-hook-patch-of-a-missing-id-is-404", case(out, "setup-hook-patch-missing")?.status == 404),
         (
             "setup-hook-listing-pages-by-limit",
-            case(out, "setup-hook-list-none")?.body == json!([])
-                && case(out, "setup-hook-list-page-1")?.body.as_array().is_some_and(|hooks| hooks.len() == 1)
-                && case(out, "setup-hook-list-page-4")?.body == json!([]),
+            case(out, "setup-hook-list-none")?.body.root().array().is_some_and(|a| a.is_empty())
+                && case(out, "setup-hook-list-page-1")?.body.root().array().is_some_and(|hooks| hooks.len() == 1)
+                && case(out, "setup-hook-list-page-4")?.body.root().array().is_some_and(|a| a.is_empty()),
         ),
         (
             "setup-hook-of-one-url-can-be-made-twice",
             twin.status == 201
-                && twin.body["id"] != made.body["id"]
-                && twin.body["config"]["url"] == made.body["config"]["url"]
-                && listed.body.as_array().is_some_and(|hooks| {
+                && twin.body.root().get("id").u64() != made.body.root().get("id").u64()
+                && twin.body.root().get("config").get("url").str() == made.body.root().get("config").get("url").str()
+                && listed.body.root().array().is_some_and(|hooks| {
                     hooks.len() == 3
-                        && hooks.iter().any(|hook| hook["id"] == twin.body["id"])
-                        && hooks.iter().any(|hook| hook["id"] == made.body["id"])
+                        && hooks.iter().any(|hook| hook.get("id").u64() == twin.body.root().get("id").u64())
+                        && hooks.iter().any(|hook| hook.get("id").u64() == made.body.root().get("id").u64())
                 }),
         ),
         (
             "setup-hook-delete-is-204-and-leaves-the-orgs-other-hooks",
             case(out, "setup-hook-deleted")?.status == 204
                 && live.len() == 2
-                && live.iter().any(|hook| hook["id"] == made.body["id"])
-                && live.iter().any(|hook| hook["id"] == other.body["id"])
-                && live.iter().all(|hook| hook["id"] != twin.body["id"]),
+                && live.iter().any(|hook| hook.get("id").u64() == made.body.root().get("id").u64())
+                && live.iter().any(|hook| hook.get("id").u64() == other.body.root().get("id").u64())
+                && live.iter().all(|hook| hook.get("id").u64() != twin.body.root().get("id").u64()),
         ),
         ("setup-hook-delete-of-a-missing-id-is-404", case(out, "setup-hook-delete-missing")?.status == 404),
     ] {
@@ -179,8 +186,8 @@ pub(crate) fn facts(f: &Fixture, out: &Path) -> Result<Vec<Fact>> {
     Ok(facts)
 }
 
-fn event_set(value: &Value) -> Option<BTreeSet<&str>> {
-    value.as_array().map(|items| items.iter().filter_map(Value::as_str).collect())
+fn event_set(value: At<'_>) -> Option<BTreeSet<&str>> {
+    value.array().map(|items| items.iter().filter_map(|item| item.str()).collect())
 }
 
 fn captures_hide_secrets(out: &Path) -> Result<bool> {

@@ -154,7 +154,7 @@ fn tokens(f: &Fixture, secrets: &mut Secrets, facts: &mut Vec<Fact>) -> Result<(
             && out.stderr.is_empty()
             && raw_token(&out.stdout).is_some()
             && user.status == 200
-            && crate::json(&user)?["login"] == "writer",
+            && crate::json(&user)?.root().get("login").is("writer"),
         &out,
     );
     let repo = token(f, secrets, "writer", "cli-repo", "read:repository")?;
@@ -202,10 +202,10 @@ fn tokens(f: &Fixture, secrets: &mut Secrets, facts: &mut Vec<Fact>) -> Result<(
     let second = get(f, &out, "/api/v1/user")?;
     let held = made.code == Some(0)
         && first.status == 403
-        && crate::json(&first)?["message"].as_str().is_some_and(|s| s.contains("change your password"))
+        && crate::json(&first)?.root().get("message").str().is_some_and(|s| s.contains("change your password"))
         && (200..300).contains(&patched.status)
         && second.status == 200
-        && crate::json(&second)?["login"] == "cli-person";
+        && crate::json(&second)?.root().get("login").is("cli-person");
     seen(facts, "cli-user-made-to-change-its-password-is-refused-the-api-until-cleared", held, &out);
     Ok(())
 }

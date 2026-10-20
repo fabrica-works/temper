@@ -47,6 +47,14 @@ impl Json {
     pub fn root(&self) -> At<'_> {
         At { document: &self.0, position: Some(0) }
     }
+    #[must_use]
+    pub fn has_key(&self, name: &str) -> bool {
+        (0..self.0.len()).any(|index| {
+            self.0
+                .token(index)
+                .is_some_and(|token| token.kind == Kind::Key && self.0.text(token) == Some(name.as_bytes()))
+        })
+    }
 }
 
 /// A position in a `Json`; a wrong path or kind reads as `None`.
@@ -59,7 +67,7 @@ impl<'a> At<'a> {
     fn at(self, position: Option<u32>) -> Self {
         Self { position, ..self }
     }
-    fn kind(self) -> Option<Kind> {
+    pub(crate) fn kind(self) -> Option<Kind> {
         Some(self.document.token(self.position?)?.kind)
     }
     fn text(self, kind: Kind) -> Option<&'a str> {
@@ -116,6 +124,9 @@ impl<'a> At<'a> {
             }
         }
         items
+    }
+    pub(crate) fn array(self) -> Option<Vec<Self>> {
+        (self.kind() == Some(Kind::ArrayStart)).then(|| self.items())
     }
     #[must_use]
     pub fn nth(self, n: usize) -> Self {

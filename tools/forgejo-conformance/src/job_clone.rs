@@ -17,16 +17,22 @@ pub(crate) fn fact(f: &Fixture) -> Result<Fact> {
     )?;
     f.api("PATCH", repo, &json!({"has_actions":true}))?;
     f.put(repo, "main", ".forgejo/workflows/clone.yaml", workflow())?;
-    let head =
-        f.get(&format!("{repo}/branches/main"))?["commit"]["id"].as_str().ok_or("clone head missing")?.to_owned();
+    let head = f
+        .get(&format!("{repo}/branches/main"))?
+        .root()
+        .get("commit")
+        .get("id")
+        .str()
+        .ok_or("clone head missing")?
+        .to_owned();
     let mut success = false;
     for _ in 0..120 {
         let row = f.get(&format!("{repo}/commits/{head}/status"))?;
-        if row["state"] == "success" {
+        if row.root().get("state").is("success") {
             success = true;
             break;
         }
-        if row["state"] == "failure" || row["state"] == "error" {
+        if row.root().get("state").is("failure") || row.root().get("state").is("error") {
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(500));

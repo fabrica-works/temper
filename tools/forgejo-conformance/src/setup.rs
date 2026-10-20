@@ -15,7 +15,7 @@ pub(crate) fn scoped(f: &Fixture, secrets: &mut Secrets, login: &str, name: &str
         &format!("/api/v1/admin/users/{login}/tokens"),
         &serde_json::json!({"name":name, "scopes":scopes}),
     )?;
-    let value = row["sha1"].as_str().ok_or("token value missing")?;
+    let value = row.root().get("sha1").str().ok_or("token value missing")?;
     secrets.add(SecretKind::ApiToken, value);
     Ok(Token::new(value.to_owned()))
 }

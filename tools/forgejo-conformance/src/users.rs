@@ -74,38 +74,46 @@ pub(crate) fn facts(out: &Path) -> Result<Vec<Fact>> {
         (
             "setup-create-user-answers-201-with-login-email-and-full-name",
             made.status == 201
-                && made.body["login"] == "bot"
-                && made.body["email"] == "bot@example.invalid"
-                && made.body["full_name"] == "temper:bot",
+                && made.body.root().get("login").is("bot")
+                && made.body.root().get("email").is("bot@example.invalid")
+                && made.body.root().get("full_name").is("temper:bot"),
         ),
         (
             "setup-created-user-is-no-site-admin-and-keeps-its-full-name",
-            made.body["is_admin"] == false && made.body["full_name"] == "temper:bot",
+            made.body.root().get("is_admin").bool() == Some(false)
+                && made.body.root().get("full_name").is("temper:bot"),
         ),
-        ("setup-create-user-again-is-refused-with-a-message", again.status >= 400 && again.body["message"].is_string()),
+        (
+            "setup-create-user-again-is-refused-with-a-message",
+            again.status >= 400 && again.body.root().get("message").str().is_some(),
+        ),
         (
             "setup-user-of-a-login-reads-admin-flag-and-full-name",
             user.status == 200
-                && user.body["login"] == "bot"
-                && user.body["is_admin"] == false
-                && user.body["full_name"] == "temper:bot",
+                && user.body.root().get("login").is("bot")
+                && user.body.root().get("is_admin").bool() == Some(false)
+                && user.body.root().get("full_name").is("temper:bot"),
         ),
         ("setup-user-of-a-missing-login-is-404", case(out, "setup-user-missing")?.status == 404),
         (
             "setup-a-non-admin-token-is-refused-the-admin-routes",
             case(out, "setup-user-create-by-writer")?.status == 403,
         ),
-        ("setup-the-admin-token-reads-user-as-a-site-admin", admin.status == 200 && admin.body["is_admin"] == true),
+        (
+            "setup-the-admin-token-reads-user-as-a-site-admin",
+            admin.status == 200 && admin.body.root().get("is_admin").bool() == Some(true),
+        ),
         (
             "setup-a-user-made-to-change-its-password-is-refused-the-api-under-basic-auth",
-            basic.status == 403 && basic.body["message"].as_str().is_some_and(|s| s.contains("change your password")),
+            basic.status == 403
+                && basic.body.root().get("message").str().is_some_and(|s| s.contains("change your password")),
         ),
         (
             "setup-a-user-made-to-change-its-password-is-refused-under-its-token-until-the-admin-clears-the-flag",
             token.status == 403
-                && token.body["message"].as_str().is_some_and(|s| s.contains("change your password"))
+                && token.body.root().get("message").str().is_some_and(|s| s.contains("change your password"))
                 && cleared.status == 200
-                && cleared.body["login"] == "person",
+                && cleared.body.root().get("login").is("person"),
         ),
     ] {
         add(&mut facts, name, holds, "captured status or members differ");
@@ -121,7 +129,7 @@ pub(crate) fn facts(out: &Path) -> Result<Vec<Fact>> {
         "setup-user-person-cleared",
     ] {
         let row = case(out, name)?;
-        whole &= row.body["is_admin"].is_boolean() && row.body["full_name"].is_string();
+        whole &= row.body.root().get("is_admin").bool().is_some() && row.body.root().get("full_name").str().is_some();
     }
     add(&mut facts, "setup-every-recorded-user-carries-is-admin-and-full-name", whole, "user members absent");
     Ok(facts)

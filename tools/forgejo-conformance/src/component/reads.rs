@@ -22,19 +22,29 @@ pub(super) fn repository(f: &Fixture) -> Result<api::Repository> {
     Ok(api::Repository { forge: 1, repository: f.repository.try_into()? })
 }
 pub(super) fn run(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Result<()> {
-    let issue = f.api("POST", &format!("{R}/issues"), &json!({"title":"read fixture","body":"read body"}))?["number"]
-        .as_u64()
+    let issue = f
+        .api("POST", &format!("{R}/issues"), &json!({"title":"read fixture","body":"read body"}))?
+        .root()
+        .get("number")
+        .u64()
         .ok_or("issue number")?;
-    let comment = f.api("POST", &format!("{R}/issues/{issue}/comments"), &json!({"body":"thread fixture"}))?["id"]
-        .as_u64()
+    let comment = f
+        .api("POST", &format!("{R}/issues/{issue}/comments"), &json!({"body":"thread fixture"}))?
+        .root()
+        .get("id")
+        .u64()
         .ok_or("comment id")?;
-    let review = f.api("POST", &format!("{R}/pulls/{}/reviews", f.feature), &json!({"event":"COMMENT","body":"review fixture","comments":[{"path":"file-0.txt","new_position":1,"body":"remark fixture"}]}))?["id"].as_u64().ok_or("review id")?;
+    let review = f.api("POST", &format!("{R}/pulls/{}/reviews", f.feature), &json!({"event":"COMMENT","body":"review fixture","comments":[{"path":"file-0.txt","new_position":1,"body":"remark fixture"}]}))?.root().get("id").u64().ok_or("review id")?;
     f.api("POST", &format!("{R}/statuses/{}", f.head), &json!({"state":"success","context":"fixture/test"}))?;
     let repo = repository(f)?;
     let head = commit(&f.head)?;
     let base = commit(&f.main)?;
-    let oldest = f.get(&format!("{R}/issues?state=all&sort=leastupdate&page=1&limit=1"))?[0]["number"]
-        .as_u64()
+    let oldest = f
+        .get(&format!("{R}/issues?state=all&sort=leastupdate&page=1&limit=1"))?
+        .root()
+        .nth(0)
+        .get("number")
+        .u64()
         .ok_or("least updated item")?;
     facts.push(h.observe("component-read-items", repo, Read::Items { since: Time::ZERO, page: 1, kind: None }.operation(), |a| matches!(a, Answer::Items { items, now, .. } if items.first().is_some_and(|i| i.number == oldest && i.kind == api::Kind::Pull) && *now > Time::ZERO)));
     facts.push(h.observe("component-read-item", repo, Read::Item { number: issue, after: 0 }.operation(), |a| matches!(a, Answer::Item { item, comments, more } if item.number == issue && item.title.as_ref() == b"read fixture" && item.body.as_ref() == b"read body" && comments.len() == 1 && comments[0].id == comment && comments[0].body.as_ref() == b"thread fixture" && !more)));
@@ -97,19 +107,23 @@ fn actions(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Result<()> {
         }
         return Ok(());
     }
-    let head = commit(f.get(&format!("{R}/branches/actions"))?["commit"]["id"].as_str().ok_or("actions head")?)?;
+    let head =
+        commit(f.get(&format!("{R}/branches/actions"))?.root().get("commit").get("id").str().ok_or("actions head")?)?;
     let repo = repository(f)?;
     let checks = h.call(repo, Read::Checks { commit: head }.operation());
     let job = if let Ok(Answer::Checks(statuses)) = &checks { statuses.iter().find_map(|s| s.job) } else { None };
     facts.push(super::fact("component-read-checks", matches!(&checks, Ok(Answer::Checks(s)) if s.len() == 2 && s.iter().any(|s| s.check == api::Check::Passed) && s.iter().any(|s| s.check == api::Check::Failed && s.job.is_some_and(|j| j.head == head))), &checks));
     if let Some(attempt) = job {
         let document = f.get(&format!("{R}/actions/jobs/{}", attempt.job))?;
-        let failed = document["steps"]
-            .as_array()
-            .and_then(|steps| steps.iter().find(|s| s["status"] == "failure"))
+        let failed = document
+            .root()
+            .get("steps")
+            .items()
+            .into_iter()
+            .find(|s| s.get("status").is("failure"))
             .ok_or("failed step")?;
-        facts.push(h.observe("component-read-job", repo, Read::Job { attempt, max_bytes: 65536 }.operation(), |a| matches!(a, Answer::Job { attempt: got, step: Some(step), log, .. } if *got == attempt && Some(u64::from(step.number)) == failed["number"].as_u64() && Some(step.name.as_ref()) == failed["name"].as_str().map(str::as_bytes) && log.windows(b"TEMPER_CONFORMANCE_FAILED_JOB".len()).any(|s| s == b"TEMPER_CONFORMANCE_FAILED_JOB"))));
-        let number = failed["number"].as_u64().ok_or("Failed step number")?;
+        facts.push(h.observe("component-read-job", repo, Read::Job { attempt, max_bytes: 65536 }.operation(), |a| matches!(a, Answer::Job { attempt: got, step: Some(step), log, .. } if *got == attempt && Some(u64::from(step.number)) == failed.get("number").u64() && Some(step.name.as_ref()) == failed.get("name").str().map(str::as_bytes) && log.windows(b"TEMPER_CONFORMANCE_FAILED_JOB".len()).any(|s| s == b"TEMPER_CONFORMANCE_FAILED_JOB"))));
+        let number = failed.get("number").u64().ok_or("Failed step number")?;
         let log = f.exchange(
             "GET",
             &format!("{R}/actions/jobs/{}/logs?attempt={}&step={number}", attempt.job, attempt.attempt),
