@@ -159,3 +159,39 @@ fn ctl_is_configured() {
         assert_eq!(configure(words), Ok(super::Command::Ctl { arguments }));
     }
 }
+
+#[test]
+fn fixed_sign_in_ports_are_checked_against_owned_listeners_only() {
+    let example = include_bytes!("../../../docs/examples/owned.json");
+    let mut value: serde_json::Value = serde_json::from_slice(example).expect("owned JSON");
+    value["engine"]["llm"]["providers"] = serde_json::json!([{
+        "name":"OpenAI", "number":1, "models":["gpt-6-luna"], "sources":{
+            "sign_in": {"issuer":"https://issuer.example", "client":"client", "scopes":[],
+                "authorization":"https://issuer.example/auth", "token":"https://issuer.example/token",
+                "keys":"https://issuer.example/keys", "transport":"tls", "server_name":"issuer.example",
+                "must_grant":[], "redirect_path":"callback", "redirect_port":3000}
+        }
+    }]);
+    let bytes = serde_json::to_vec(&value).expect("owned JSON");
+    assert_eq!(
+        super::setup::check(&bytes).unwrap_err(),
+        "engine.llm.providers[0].sources.sign_in.redirect_port: fixed port conflicts with application.setup[0].mode.owned.listen\n"
+    );
+    // The same API on a connected forge belongs to the remote peer, not this process.
+    value["application"]["setup"] = serde_json::json!([]);
+    assert!(super::setup::check(&serde_json::to_vec(&value).expect("connected JSON")).is_ok());
+}
+
+#[test]
+fn a_programs_owner_refusal_keeps_the_path_and_owner() {
+    use smith_agent_shell::program::{Refusal, Unsafe};
+    let other = skein_shell::effective_user().wrapping_add(1);
+    let why = super::agent::program_directory_refusal(Refusal::Unsafe {
+        path: "/programs".into(),
+        found: Unsafe::Owner { found: other },
+    });
+    assert_eq!(
+        why,
+        format!("workers[0].agent.configuration: programs.claude_code.directory: /programs: owned by user {other}")
+    );
+}

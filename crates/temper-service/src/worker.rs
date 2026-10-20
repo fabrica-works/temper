@@ -97,6 +97,7 @@ impl Worker {
             root: root::Domain::new(&prepared.root),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: prepared.root },
             agent: Agent {
+                programs: agent.programs.clone(),
                 endpoints: agent.endpoints.clone(),
                 limits: agent.limits,
                 bounds: agent.bounds.clone(),

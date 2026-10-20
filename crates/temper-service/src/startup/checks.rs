@@ -451,6 +451,25 @@ pub fn agent(engine: &config::Engine, agent: &settings::Agent, problems: &mut Pr
             problems.push(at(index, Path::root().member(b"engine").member(b"llm").member(b"endpoints")), What::Agent);
         }
     }
+    for (index, provider) in engine.llm.providers.iter().enumerate() {
+        for (offered, name) in provider.programs.iter().enumerate() {
+            let mut declared = false;
+            for program in &agent.programs {
+                declared |= program.adapter.name() == name.as_ref();
+            }
+            if !declared {
+                problems.push(
+                    at(
+                        offered,
+                        at(index, Path::root().member(b"engine").member(b"llm").member(b"providers"))
+                            .member(b"sources")
+                            .member(b"programs"),
+                    ),
+                    What::Adapter,
+                );
+            }
+        }
+    }
     for (index, charter) in engine.charters.iter().enumerate() {
         let path = at(index, Path::root().member(b"engine").member(b"charters"));
         model(&charter.policy.model, &agent.bounds, path.member(b"model"), problems);
@@ -539,5 +558,31 @@ pub fn memory(engine: u64, engine_memory: u64, worker: u64, worker_memory: u64, 
         if let Err(what) = config::fits(bound, &[config::Share { name: b"service", bytes }]) {
             problems.push(path.member(b"memory_bytes"), What::Jig(what));
         }
+    }
+}
+
+/// Compare port numbers, also across IPv4/IPv6. Absent or ephemeral listeners reserve none.
+pub fn redirect_ports(
+    redirects: &[super::RedirectPort],
+    port: Option<u16>,
+    listener: super::Listener,
+    problems: &mut Problems,
+) {
+    for redirect in redirects {
+        if let Some(port) = port
+            && port != 0
+            && port == redirect.port
+        {
+            problems.push(redirect.path.clone(), What::Redirect(listener));
+        }
+    }
+}
+pub(super) fn port(address: &config::Address) -> Option<u16> {
+    match address {
+        config::Address::Addr(address) => match address.socket() {
+            Some(socket) => Some(socket.port()),
+            None => None,
+        },
+        config::Address::Host { port, .. } => Some(*port),
     }
 }

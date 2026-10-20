@@ -371,8 +371,9 @@ top-level `workers`, in the same order; standalone has one. Each:
   Claude Code's (setup.md, 8.1). A programs directory need not exist
   until `temper program-login` makes it; one that exists must be a
   directory of the user's own with no group or other bits, not reached
-  through a link, or the start is refused, naming it. temper reads
-  nothing inside it.
+  through a link at its name, or the start is refused, naming it
+  (skein's `io.md`, 5.3). A linked parent is accepted. temper reads
+  nothing inside it and creates no missing programs directory at serve.
 - **The same names as the engine's** (jig's `protocol/configuration.md`,
   section 4), checked at start: every endpoint of `engine.llm`'s
   providers must be in the agent's configuration under the same name,
@@ -672,6 +673,10 @@ top-level `workers`, in the same order; standalone has one. Each:
   - the root's configuration is held to the root's limits before the
     root is made (`../domain/root.md`, section 6): a start that breaks
     one is refused, naming it;
+  - each provider's fixed `sources.sign_in.redirect_port` differs from
+    the clients', webhooks' and each owned forge's listener port, even
+    between IPv4 and IPv6. An absent or ephemeral listener reserves no
+    fixed port. A connected forge's remote API is no local listener;
   - a forge of kind GitHub with a clients' listener on port 0 refuses
     the start, naming `application.clients.listener` (section 3);
   - once io starts, the engine's routing loads every forge's records

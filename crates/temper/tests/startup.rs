@@ -473,3 +473,64 @@ fn a_bundle_past_a_limit_refuses_the_start() {
         scratch.remove();
     }
 }
+
+#[test]
+fn programs_directories_are_checked_at_the_name_before_startup_effects() {
+    for row in ["missing", "private", "link", "linked-parent", "mode", "file"] {
+        let scratch = support::Scratch::startup(&format!("programs-{row}"));
+        let directory = scratch.path();
+        support::configuration(directory, &support::Forge::Unreached);
+        let target = directory.join("programs");
+        if row != "missing" {
+            if row == "file" {
+                fs::write(&target, b"not a directory").expect("file");
+            } else {
+                fs::create_dir(&target).expect("programs directory");
+                fs::set_permissions(&target, fs::Permissions::from_mode(if row == "mode" { 0o750 } else { 0o700 }))
+                    .expect("directory mode");
+            }
+        }
+        let path = match row {
+            "link" => {
+                let link = directory.join("linked");
+                symlink(&target, &link).expect("leaf link");
+                link
+            }
+            "linked-parent" => {
+                let parent = directory.join("parent");
+                symlink(directory, &parent).expect("parent link");
+                parent.join("programs")
+            }
+            _ => target.clone(),
+        };
+        let agent_path = directory.join("agent.json");
+        let mut agent: serde_json::Value =
+            serde_json::from_slice(&fs::read(&agent_path).expect("agent")).expect("JSON");
+        agent["programs"] = serde_json::json!({"claude_code":{"path":"/nonexistent/claude", "directory":path}});
+        fs::write(agent_path, serde_json::to_vec(&agent).expect("agent JSON")).expect("agent");
+        // A later missing secret proves that the preflight neither creates nor inspects a login.
+        fs::remove_file(directory.join("secrets/forge-1.api-token")).expect("absent peer");
+        let refused = temper::prepare_in(directory).err().expect("refused");
+        if ["missing", "private", "linked-parent"].contains(&row) {
+            assert!(refused.contains("application.forges[0].api_token"), "{row}: {refused}");
+            assert!(!refused.contains("programs.claude_code.directory"), "{row}: {refused}");
+        } else {
+            let reason = match row {
+                "link" => "symbolic link",
+                "mode" => "nonprivate mode bits 0o50",
+                "file" => "not a directory",
+                _ => unreachable!(),
+            };
+            assert_eq!(
+                refused,
+                format!(
+                    "temper serve: workers[0].agent.configuration: programs.claude_code.directory: {}: {reason}\n",
+                    path.display()
+                )
+            );
+        }
+        assert!(!directory.join("worker-root").exists(), "{row}: no worker root");
+        assert!(!target.exists() || row != "missing", "missing programs stay missing");
+        scratch.remove();
+    }
+}

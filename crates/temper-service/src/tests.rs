@@ -1,3 +1,6 @@
+#[global_allocator]
+static HEAP: skein_world::domain::heap::Counting = skein_world::domain::heap::Counting;
+
 mod fixtures;
 mod limits;
 mod store_route;

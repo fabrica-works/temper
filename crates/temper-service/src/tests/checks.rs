@@ -1,3 +1,4 @@
+#![expect(clippy::disallowed_methods, reason = "ordinary tests edit UTF-8 configuration fixtures")]
 use super::fixtures;
 use crate::startup::{Problems, What, checks, lines};
 use jig_protocol_config::{self as config, Path};
@@ -77,14 +78,9 @@ fn an_endpoint_or_model_missing_from_the_agent_is_named() {
             "endpoint",
             false,
             true,
-            b"engine.llm.endpoints[0]: not in the agent's configuration under the same name and account\n".as_slice(),
+            b"engine.llm.endpoints[0]: not in the agent's configuration under the same name\n".as_slice(),
         ),
-        (
-            "model",
-            true,
-            false,
-            b"engine.charters[0].model: not in the agent's configuration under the same name and account\n",
-        ),
+        ("model", true, false, b"engine.charters[0].model: not in the agent's configuration under the same name\n"),
     ] {
         let mut agent = fixtures::startup_agent();
         if !endpoints {
@@ -320,5 +316,119 @@ fn a_bundle_limit_of_zero_refuses_the_start() {
         let document = fixtures::with(&fixtures::document(), b"application.limits.overrides", overrides);
         let found = crate::named(&document).unwrap_err();
         assert_eq!(&*lines(&found), expected.as_bytes(), "row {overrides:?}");
+    }
+}
+
+#[test]
+fn fixed_redirect_ports_compare_numbers_and_ignore_unreserved_listeners() {
+    use crate::startup::{Listener, RedirectPort};
+    let redirects = [7100, 7101].map(|port| RedirectPort {
+        port,
+        path: Path::root().member(b"redirect_port"),
+        redirect_path: b"callback".as_slice().into(),
+    });
+    for (port, listener, count) in [
+        (Some(7100), Listener::Clients, 1),
+        (Some(7101), Listener::Webhooks, 1),
+        (Some(7100), Listener::Owned(2), 1),
+        (Some(7102), Listener::Clients, 0),
+        (Some(0), Listener::Clients, 0),
+        (None, Listener::Webhooks, 0),
+    ] {
+        let mut problems = Problems::empty();
+        checks::redirect_ports(&redirects, port, listener, &mut problems);
+        assert_eq!(problems.problems.len(), count, "{listener:?} {port:?}");
+        if count != 0 {
+            assert_eq!(problems.problems.get(0).unwrap().what, What::Redirect(listener));
+        }
+    }
+}
+#[test]
+fn provider_redirect_ports_are_checked_before_files_are_read() {
+    const PROVIDERS: &str = r#""llm": {"providers":[{"name":"Fake","number":1,"models":["small"],"sources":{"sign_in":{"issuer":"https://issuer.example","client":"client","scopes":[],"authorization":"https://issuer.example/auth","token":"https://issuer.example/token","keys":"https://issuer.example/keys","transport":"tls","server_name":"issuer.example","must_grant":[],"redirect_path":"callback","redirect_port":7100}}}],"#;
+    let input = fixtures::document();
+    let input = core::str::from_utf8(&input).unwrap().replace("\"llm\": {", PROVIDERS);
+    for (listener, expected) in [
+        (r#"{"socket":"127.0.0.1:7100"}"#, true),
+        (r#"{"socket":"[::1]:7100"}"#, true),
+        (r#"{"socket":"127.0.0.1:7102"}"#, false),
+        (r#"{"socket":"127.0.0.1:0"}"#, false),
+    ] {
+        let document = fixtures::with(input.as_bytes(), b"application.clients.listener", listener.as_bytes());
+        let result = crate::named(&document);
+        if expected {
+            assert_eq!(&*lines(&result.unwrap_err()), b"engine.llm.providers[0].sources.sign_in.redirect_port: fixed port conflicts with application.clients.listener\n");
+        } else {
+            let named = result.unwrap();
+            assert_eq!(named.redirects.len(), 1);
+            assert_eq!(&*named.redirects[0].redirect_path, b"callback");
+        }
+    }
+    let hooks = input.replace("\"webhooks\":null", r#""webhooks":{"listener":{"socket":"[::1]:7100"}}"#);
+    let hooks = fixtures::with(hooks.as_bytes(), b"application.clients.listener", br#"{"socket":"127.0.0.1:7102"}"#);
+    assert_eq!(&*lines(&crate::named(&hooks).unwrap_err()), b"engine.llm.providers[0].sources.sign_in.redirect_port: fixed port conflicts with application.webhooks.listener\n");
+    let ephemeral = input.replace(",\"redirect_port\":7100", "");
+    assert!(crate::named(ephemeral.as_bytes()).unwrap().redirects.is_empty());
+    let input = input.replace("\"redirect_port\":7100", "\"redirect_port\":0");
+    assert_eq!(
+        &*lines(&crate::named(input.as_bytes()).unwrap_err()),
+        b"engine.llm.providers[0].sources.sign_in.redirect_port: invalid form\n"
+    );
+}
+
+#[test]
+fn every_offered_adapter_must_be_declared_by_the_agent() {
+    let document = fixtures::document();
+    let document = core::str::from_utf8(&document).unwrap().replace("\"llm\": {", r#""llm": {"providers":[{"name":"Fake","number":1,"models":["small"],"sources":{"programs":["claude_code"]}}],"#);
+    let document = jig_protocol_config::document(
+        document.as_bytes(),
+        &config::DocumentLimits { bytes: 1_048_576, tokens: 16_384, depth: 32 },
+    )
+    .unwrap();
+    let engine_at = config::read::Object::new(&document, 0).unwrap().member(&document, b"engine").unwrap();
+    let engine = config::engine(&document, engine_at).unwrap();
+    for declared in [false, true] {
+        let mut agent = fixtures::startup_agent();
+        if declared {
+            agent.programs = Box::new([crate::settings::Program {
+                adapter: crate::settings::Adapter::ClaudeCode,
+                path: b"/bin/claude".as_slice().into(),
+                directory: b"/programs".as_slice().into(),
+            }]);
+        }
+        let mut problems = Problems::empty();
+        checks::agent(&engine, &agent, &mut problems);
+        assert_eq!(
+            &*lines(&problems),
+            if declared {
+                b"".as_slice()
+            } else {
+                b"engine.llm.providers[0].sources.programs[0]: program adapter not declared in the agent's programs\n"
+                    .as_slice()
+            }
+        );
+        let mut no_offers = fixtures::engine().jig;
+        no_offers.llm.providers = Box::new([]);
+        let mut problems = Problems::empty();
+        checks::agent(&no_offers, &agent, &mut problems);
+        assert!(problems.is_empty(), "no offers need no declaration");
+    }
+}
+#[test]
+fn agent_model_windows_and_outputs_are_checked_with_their_names() {
+    for window in [true, false] {
+        let engine = fixtures::engine().jig;
+        let mut agent = fixtures::startup_agent();
+        if window {
+            agent.bounds.models[0].window = 1;
+        } else {
+            agent.bounds.models[0].output = 1;
+        }
+        let mut problems = Problems::empty();
+        checks::agent(&engine, &agent, &mut problems);
+        assert_eq!(
+            &*lines(&problems),
+            b"engine.charters[0].model: not in the agent's configuration under the same name\n"
+        );
     }
 }

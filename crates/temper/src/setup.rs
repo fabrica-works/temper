@@ -54,6 +54,20 @@ pub(crate) fn check(bytes: &[u8]) -> Result<(Named, Checked, temper_box::limits:
     let listener = named.webhooks.as_ref().map(|webhooks| super::address(&webhooks.listener)).transpose()?;
     let checked = check::checked(&document, at, &members, listener, &setup_overrides)
         .map_err(|why| String::from_utf8_lossy(&problem::lines(&why)).into_owned())?;
+    let mut problems = temper_service::startup::Problems::empty();
+    for (index, entry) in checked.setup.entries.iter().enumerate() {
+        if let temper_forge_setup::setup::Mode::Owned(owned) = &entry.mode {
+            temper_service::startup::redirect_ports(
+                &named.redirects,
+                Some(owned.listen.port()),
+                temper_service::startup::Listener::Owned(u32::try_from(index).expect("bounded setup")),
+                &mut problems,
+            );
+        }
+    }
+    if !problems.is_empty() {
+        return Err(String::from_utf8_lossy(&temper_service::startup::lines(&problems)).into_owned());
+    }
     let limits = box_limits(&named.overrides)?;
     Ok((named, checked, limits))
 }

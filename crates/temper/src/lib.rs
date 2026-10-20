@@ -12,9 +12,10 @@ use std::{
 };
 use temper_service::{
     self as service,
-    settings::{Agent, Files, Seeds},
+    settings::{Files, Seeds},
 };
 
+mod agent;
 pub mod box_command;
 pub mod bundle;
 pub mod ctl;
@@ -159,56 +160,6 @@ fn read_files(directory: &Path, names: Box<[config::File]>, user: u32) -> Result
     }
     if refused.is_empty() { Ok(Files { entries }) } else { Err(refused) }
 }
-fn agent(configuration: &Path) -> Result<Agent, String> {
-    let configuration = smith_agent_shell::config::read(configuration)?;
-    let limits = &configuration.service.limits;
-    let host_limits = smith_local_service::profile::host_limits(&configuration.profile, limits)
-        .map_err(|_| "agent host limits refused")?;
-    let channel = limits.channel;
-    let mut protocol = smith_host_protocol::Limits {
-        bodies: channel.bodies,
-        charter: channel.charter,
-        transcript: channel.transcript,
-        endpoints: channel.endpoints,
-        channel: channel.channel,
-        start_bytes: channel.start_bytes,
-        calls: host_limits.calls,
-    };
-    protocol.channel.output_bytes = smith_host_protocol::output_bytes(&protocol).ok_or("agent output bound")?;
-    let mut models = Vec::new();
-    for endpoint in &configuration.declarations.endpoints {
-        for model in &endpoint.models {
-            models.push(jig_domain_host::ModelBound {
-                name: model.name.clone(),
-                window: model.window,
-                output: model.output,
-            });
-        }
-    }
-    let policy = configuration.profile.policy;
-    let message_bytes = limits
-        .domain
-        .run
-        .message_bytes
-        .checked_sub(u32::try_from(temper_worker_domain::SEPARATOR).expect("message separator fits u32"))
-        .ok_or("agent message_bytes: too small for the rendered separator")?;
-    Ok(Agent {
-        endpoints: configuration.service.channel_endpoints,
-        limits: protocol,
-        host_limits,
-        bounds: jig_domain_host::Bounds {
-            models: models.into_boxed_slice(),
-            turns: policy.max_turns,
-            spend: policy.max_spend,
-            time: policy.max_time,
-            waiting: policy.max_waiting,
-            checks: policy.check_timeout,
-            message_bytes,
-            inbox: policy.inbox,
-            unacknowledged: policy.unacknowledged,
-        },
-    })
-}
 fn address(configured: &config::Address) -> Result<std::net::SocketAddr, String> {
     match configured {
         config::Address::Addr(address) => address.socket().ok_or_else(|| "requires a socket address".into()),
@@ -322,6 +273,7 @@ fn prepare(directory: &Path, bytes: &[u8], owned: &mut Vec<Fd>) -> Result<servic
         config::document(bytes, &config::DocumentLimits { bytes: CONFIG_BYTES, tokens: CONFIG_BYTES, depth: 32 })
             .expect("named checked document");
     let engine = config::engine(&document, member(&document, 0, b"engine")).expect("named checked engine");
+    let agent = agent::preflight(directory, &named)?;
     let user = skein_shell::effective_user();
     let files = read_files(directory, named.files, user)?;
     let bundle = named
@@ -329,8 +281,6 @@ fn prepare(directory: &Path, bytes: &[u8], owned: &mut Vec<Fd>) -> Result<servic
         .as_deref()
         .map(|configured| bundle::read(directory, configured, named.bundle_limits))
         .transpose()?;
-    let agent =
-        agent(&directory.join(path(&named.agent))).map_err(|why| format!("workers[0].agent.configuration: {why}"))?;
     let root_path = directory.join(path(&named.worker_root));
     if std::fs::symlink_metadata(&root_path).is_ok() {
         private_root(&root_path, user).map_err(|why| format!("application.workers[0].root: {why}"))?;

@@ -18,6 +18,8 @@ pub enum What {
     Past { bytes: u64, bound: u64 },
     Within { bytes: u64, limit: &'static [u8], bound: u64 },
     Agent,
+    Adapter,
+    Redirect(super::Listener),
     NoHub,
     Credentials,
     Escalation,
@@ -82,7 +84,9 @@ fn words(what: What) -> &'static [u8] {
         What::Override(limits::Refused::Range) => b"outside its type",
         What::Against { .. } => b"must agree with ",
         What::Past { .. } | What::Within { .. } => b"",
-        What::Agent => b"not in the agent's configuration under the same name and account",
+        What::Redirect(_) => b"fixed port conflicts with ",
+        What::Adapter => b"program adapter not declared in the agent's programs",
+        What::Agent => b"not in the agent's configuration under the same name",
         What::NoHub => b"the root has no hub, so the fleet must place every run on a worker",
         What::Credentials => b"must be from 1 to accounts.credentials, in engine.limits and in the worker's limits",
         What::Escalation => b"an owner's project must name an escalation role from 0 to 3",
@@ -116,6 +120,18 @@ fn words(what: What) -> &'static [u8] {
         },
     }
 }
+fn redirect_listener(listener: super::Listener, writer: &mut Writer, length: &mut usize, measuring: bool) {
+    let name = match listener {
+        super::Listener::Clients => b"application.clients.listener".as_slice(),
+        super::Listener::Webhooks => b"application.webhooks.listener".as_slice(),
+        super::Listener::Owned(index) => {
+            put(writer, length, measuring, b"application.setup[");
+            put(writer, length, measuring, Decimal::of(u64::from(index)).as_bytes());
+            b"].mode.owned.listen".as_slice()
+        }
+    };
+    put(writer, length, measuring, name);
+}
 fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
     let mut length = 0_usize;
     for problem in &problems.problems {
@@ -139,6 +155,7 @@ fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
         put(writer, &mut length, measuring, b": ");
         put(writer, &mut length, measuring, words(problem.what));
         match problem.what {
+            What::Redirect(listener) => redirect_listener(listener, writer, &mut length, measuring),
             What::Against { other } => put(writer, &mut length, measuring, other),
             What::Past { bytes, bound } => {
                 put(writer, &mut length, measuring, Decimal::of(bytes).as_bytes());
@@ -199,6 +216,7 @@ fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
             | What::NoWebhooks
             | What::Profile
             | What::Override(_)
+            | What::Adapter
             | What::Agent
             | What::NoHub
             | What::Credentials

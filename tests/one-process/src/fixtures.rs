@@ -192,6 +192,7 @@ pub(crate) fn agent() -> temper_service::settings::Agent {
     agent.bounds.message_bytes = 1024;
     agent.bounds.checks = Duration::from_secs(5);
     temper_service::settings::Agent {
+        programs: Box::new([]),
         endpoints: agent.endpoints,
         limits: agent.limits,
         bounds: agent.bounds,

@@ -5,16 +5,65 @@ mod problems;
 use crate::{AccountsRuntime, Service, Worker, WorkerRuntime, settings};
 use alloc::boxed::Box;
 pub use application::{Forge, Identity, Transport, USER_BYTES, User};
+pub use checks::redirect_ports;
 use jig_protocol_config::{self as config, Path, Segment, read};
 pub use problems::{Problem, Problems, What, lines};
 use skein_lib::List;
 
 /// A forge API token's bound, until the forge component supplies it.
 pub const API_TOKEN_BYTES: u32 = 4096;
+/// A provider's fixed sign-in redirect, with its diagnostic path; no credentials.
+#[derive(Debug)]
+pub struct RedirectPort {
+    pub port: u16,
+    pub path: Path,
+    pub redirect_path: Box<[u8]>,
+}
+/// The standalone listeners whose fixed ports a redirect must avoid.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Listener {
+    Clients,
+    Webhooks,
+    Owned(u32),
+}
+fn redirects(engine: &config::Engine) -> Box<[RedirectPort]> {
+    let mut redirects = List::with_capacity(u32::try_from(engine.llm.providers.len()).expect("bounded providers"));
+    for (index, provider) in engine.llm.providers.iter().enumerate() {
+        if let Some(registration) = &provider.sign_in
+            && let Some(port) = registration.redirect_port
+        {
+            redirects
+                .push(RedirectPort {
+                    port,
+                    path: Path::root()
+                        .member(b"engine")
+                        .member(b"llm")
+                        .member(b"providers")
+                        .child(Segment::Index(u32::try_from(index).expect("bounded providers")))
+                        .member(b"sources")
+                        .member(b"sign_in")
+                        .member(b"redirect_port"),
+                    redirect_path: registration.redirect_path.clone(),
+                })
+                .expect("one redirect per provider");
+        }
+    }
+    redirects.into_boxed()
+}
+fn check_redirects(engine: &config::Engine, application: &application::Members, problems: &mut Problems) {
+    let redirects = redirects(engine);
+    redirect_ports(&redirects, checks::port(&application.clients.listener), Listener::Clients, problems);
+    let port = match &application.webhooks {
+        Some(hooks) => checks::port(&hooks.listener),
+        None => None,
+    };
+    redirect_ports(&redirects, port, Listener::Webhooks, problems);
+}
 /// The files and directories the binary reads and opens before startup.
 #[derive(Debug)]
 pub struct Named {
     pub files: Box<[config::File]>,
+    pub redirects: Box<[RedirectPort]>,
     pub deployment: Box<[u8]>,
     pub worker_root: Box<[u8]>,
     pub agent: Box<[u8]>,
@@ -121,6 +170,7 @@ fn parse(input: &[u8]) -> Result<Parsed, Problems> {
         &mut problems,
     );
     checks::webhooks(&application, &mut problems);
+    check_redirects(engine.as_ref().expect("required engine checked"), &application, &mut problems);
     checks::limits(&application.limits, &application.limits.git_component, &mut problems);
     let mut base = 0;
     for forge in &application.forges {
@@ -175,6 +225,7 @@ pub fn named(document: &[u8]) -> Result<Named, Problems> {
     let files = all_files(&parsed);
     Ok(Named {
         files,
+        redirects: redirects(&parsed.engine),
         clients: parsed.application.clients.listener,
         bundle: parsed.application.clients.bundle,
         bundle_limits: parsed.application.limits.clients,
@@ -198,16 +249,39 @@ fn check_files(parsed: &Parsed, files: &settings::Files) -> Result<(), Problems>
     }
     if problems.is_empty() { Ok(()) } else { Err(problems) }
 }
-/// Build the engine and worker together from the parsed document and read files.
-pub fn startup(
+/// Checked envelopes from the same calculations startup uses, without starting services.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Requirements {
+    pub engine_bytes: u64,
+    pub worker_bytes: u64,
+}
+struct CheckedStart {
+    engine: settings::Engine,
+    worker: settings::Worker,
+    requirements: Requirements,
+    io: skein_io::Limits,
+    forges: (skein_forge_connection::Settings, u64, u64),
+}
+/// Derive the two envelopes without enforcing the document's memory declarations.
+/// File, agent, root, channel and runtime checks are identical to startup's.
+pub fn memory_requirements(
     document: &[u8],
     files: &settings::Files,
     agent: &settings::Agent,
     seeds: &settings::Seeds,
-    accounts: Option<AccountsRuntime>,
-    runtime: WorkerRuntime,
+    accounts: Option<&AccountsRuntime>,
     forges: List<crate::ForgeRuntime>,
-) -> Result<Service, Problems> {
+) -> Result<Requirements, Problems> {
+    Ok(checked_start(document, files, agent, seeds, accounts, forges)?.requirements)
+}
+fn checked_start(
+    document: &[u8],
+    files: &settings::Files,
+    agent: &settings::Agent,
+    seeds: &settings::Seeds,
+    accounts: Option<&AccountsRuntime>,
+    forges: List<crate::ForgeRuntime>,
+) -> Result<CheckedStart, Problems> {
     let parsed = parse(document)?;
     check_files(&parsed, files)?;
     let mut problems = Problems::empty();
@@ -283,7 +357,7 @@ pub fn startup(
         &engine,
         &root,
         &store,
-        accounts.as_ref(),
+        accounts,
         worker_operations,
         &io,
         (prepared_forges.1, prepared_forges.2),
@@ -291,7 +365,34 @@ pub fn startup(
         Ok(bytes) => bytes,
         Err(found) => return Err(Problems::jig(found, &Path::root())),
     };
-    checks::memory(engine_bytes, engine.jig.memory, bytes, worker.jig.memory, &mut problems);
+    Ok(CheckedStart {
+        engine,
+        worker,
+        requirements: Requirements { engine_bytes, worker_bytes: bytes },
+        io,
+        forges: prepared_forges,
+    })
+}
+/// Build the engine and worker together from the parsed document and read files.
+pub fn startup(
+    document: &[u8],
+    files: &settings::Files,
+    agent: &settings::Agent,
+    seeds: &settings::Seeds,
+    accounts: Option<AccountsRuntime>,
+    runtime: WorkerRuntime,
+    forges: List<crate::ForgeRuntime>,
+) -> Result<Service, Problems> {
+    let CheckedStart { engine, worker, requirements, io, forges } =
+        checked_start(document, files, agent, seeds, accounts.as_ref(), forges)?;
+    let mut problems = Problems::empty();
+    checks::memory(
+        requirements.engine_bytes,
+        engine.jig.memory,
+        requirements.worker_bytes,
+        worker.jig.memory,
+        &mut problems,
+    );
     if !problems.is_empty() {
         return Err(problems);
     }
@@ -299,7 +400,7 @@ pub fn startup(
         Ok(worker) => worker,
         Err(found) => return Err(Problems::jig(found, &Path::root())),
     };
-    match Service::prepared(engine, seeds, accounts, prepared_forges, Some(worker), bytes, io) {
+    match Service::prepared(engine, seeds, accounts, forges, Some(worker), requirements.worker_bytes, io) {
         Ok(service) => Ok(service),
         Err(found) => Err(Problems::jig(found, &Path::root())),
     }

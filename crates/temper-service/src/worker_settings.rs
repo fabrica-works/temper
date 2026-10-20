@@ -38,6 +38,7 @@ pub fn prepare(worker: &settings::Worker, agent: &settings::Agent, own: &limits:
         config::Address::Addr(address) => address,
         config::Address::Host { .. } => return Err(problem(b"engine", What::Form)),
     };
+    programs_worst_case(&agent.programs).ok_or(problem(b"agent", What::Bound))?;
     let domain_limits = root_limits(worker, agent, own);
     root::worst_case(&domain_limits).ok_or(problem(b"limits", What::Bound))?;
     host::Process::new(Token::new(0), &agent.limits, agent.host_limits.detail_bytes, agent.endpoints.clone())
@@ -144,6 +145,24 @@ pub fn link_limits(worker: &config::Worker, payload: &v1::Limits) -> Option<link
     })
 }
 
+/// One retained declaration per recognized adapter, with each path at smith's bound.
+fn programs_worst_case(programs: &[settings::Program]) -> Option<u64> {
+    if programs.len() > 1 {
+        return None;
+    }
+    let mut bytes =
+        u64::try_from(programs.len()).ok()?.checked_mul(u64::try_from(size_of::<settings::Program>()).ok()?)?;
+    for program in programs {
+        for path in [&program.path, &program.directory] {
+            if path.len() > settings::PROGRAM_PATH_BYTES || !path.starts_with(b"/") || path.contains(&0) {
+                return None;
+            }
+            bytes = bytes.checked_add(u64::try_from(path.len()).ok()?)?;
+        }
+    }
+    Some(bytes)
+}
+
 /// The layer's owned queues, processes, values, root and io, as the reference prices them.
 #[must_use]
 pub fn worker_worst_case(worker: &settings::Worker, agent: &settings::Agent, own: &limits::Limits) -> Option<u64> {
@@ -157,6 +176,7 @@ pub fn worker_worst_case(worker: &settings::Worker, agent: &settings::Agent, own
         command = command.checked_add(u64::try_from(argument.len()).ok()?)?;
     }
     root::worst_case(&prepared.root)?
+        .checked_add(programs_worst_case(&agent.programs)?)?
         .checked_add(
             host::process_worst_case(&agent.limits, agent.host_limits.detail_bytes)?
                 .checked_mul(u64::from(jig.slots))?,

@@ -363,3 +363,38 @@ impl LinkPeer {
         );
     }
 }
+
+#[test]
+fn retained_program_metadata_is_priced_once_and_paths_are_bounded() {
+    use crate::settings::{Adapter, PROGRAM_PATH_BYTES, Program};
+    let settings = fixtures::worker_settings();
+    let mut agent = fixtures::worker_agent();
+    let limits = fixtures::worker_limits();
+    let without = worker_settings::worker_worst_case(&settings, &agent, &limits).unwrap();
+    let empty_heap = worker_heap(&settings, &agent, &limits, without);
+    let path: Box<[u8]> = Box::new([b'/'; PROGRAM_PATH_BYTES]);
+    agent.programs = Box::new([Program { adapter: Adapter::ClaudeCode, path: path.clone(), directory: path }]);
+    let with = worker_settings::worker_worst_case(&settings, &agent, &limits).unwrap();
+    assert_eq!(with - without, u64::try_from(2 * PROGRAM_PATH_BYTES + size_of::<Program>()).unwrap());
+    let declared_heap = worker_heap(&settings, &agent, &limits, with);
+    assert_eq!(declared_heap - empty_heap, with - without, "the retained copy is priced once");
+    agent.programs[0].path = Box::new([b'/'; PROGRAM_PATH_BYTES + 1]);
+    worker_settings::prepare(&settings, &agent, &limits).unwrap_err();
+}
+
+fn worker_heap(
+    settings: &crate::settings::Worker,
+    agent: &crate::settings::Agent,
+    limits: &crate::limits::Limits,
+    bound: u64,
+) -> u64 {
+    let files = fixtures::worker_files();
+    let meter = skein_world::domain::heap::Meter::new();
+    meter.start();
+    let worker = crate::Worker::new(settings, agent, limits, &files, fixtures::worker_runtime(), 7).unwrap();
+    let measured = meter.end();
+    let held = measured.held();
+    meter.check(measured, bound, &"worker construction");
+    drop(worker);
+    held
+}
