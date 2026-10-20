@@ -1,14 +1,12 @@
 :root {
   color-scheme: light;
-  --temper-canvas: #fbfaf7;
-  --temper-sidebar: #f3f0e9;
+  --temper-canvas: #fcfbf8;
+  --temper-topbar: #f7f4ef;
   --temper-paper: #fffefd;
-  --temper-ink: #292721;
-  --temper-muted: #77756e;
-  --temper-faint: #a09c93;
-  --temper-line: #e8e4dc;
-  --temper-line-strong: #dcd5ca;
-  --temper-accent: #ba694e;
+  --temper-ink: #34312c;
+  --temper-muted: #898278;
+  --temper-line: #e9e4db;
+  --temper-accent: #b8664e;
   --temper-accent-dark: #9d5139;
   --temper-accent-pale: #f7ece6;
   --temper-green: #447864;
@@ -17,18 +15,104 @@
   --temper-amber-pale: #f6efe1;
   --temper-red: #a65d53;
   --temper-red-pale: #f9ece9;
-  --temper-shadow: 0 12px 35px rgba(55, 42, 27, .045), 0 1px 3px rgba(55, 42, 27, .04);
+  --temper-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 }
-body { background: var(--temper-canvas); color: var(--temper-ink); font: 14px/1.5 ui-monospace, monospace; }
+/* .terminal-brand: the wordmark's one self-hosted face. */
+@font-face { font-family: 'DM Sans'; font-style: normal; font-weight: 700; font-display: swap; src: url(files/fonts/dm-sans-700-latin.woff2) format('woff2'); }
+/* body.terminal-pages: the terminal sheets' canvas and type. */
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--temper-canvas); color: var(--temper-ink); font: 12px/1.58 var(--temper-mono); letter-spacing: -.015em; }
 button, input, textarea, select { font: inherit; }
-/* mockups/style.css .topbar: the banner and the navigation, each a compact row under a quiet border. */
-.temper-banner, .temper-navigation { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--temper-line); }
-/* .page: the main's width, centred. */
-.temper-main { width: min(1120px, calc(100% - 72px)); margin: 0 auto; padding: 30px 0 85px; }
-/* .card: the chats' rows and a chat's cards. */
-.temper-card { background: var(--temper-paper); border: 1px solid var(--temper-line); border-radius: 14px; box-shadow: var(--temper-shadow); padding: 12px 16px; }
-/* skein-ui.css sets no white-space: a turn's line break must show. */
+button { cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+/* .terminal-topbar: one sticky banner in the mockup's order. */
+.temper-banner { position: sticky; top: 0; z-index: 12; min-height: 49px; display: flex; align-items: center; gap: 16px; padding: 0 23px; border-bottom: 1px solid var(--temper-line); background: var(--temper-topbar); }
+.temper-banner > button { border: 0; border-radius: 5px; padding: 5px 0; background: transparent; color: #5f5a52; white-space: nowrap; }
+.temper-banner > button[aria-selected=true] { color: var(--temper-ink); font-weight: 700; }
+.temper-banner > button:hover { color: var(--temper-accent); }
+/* .terminal-brand and .terminal-divider: decorative mask and rule. */
+.temper-brand { display: flex; align-items: center; gap: 8px; margin: 0; font: 700 16px/1 'DM Sans', ui-sans-serif, system-ui, sans-serif; letter-spacing: -.045em; white-space: nowrap; }
+.temper-brand::before { content: ''; width: 19px; height: 19px; flex: none; background: var(--temper-accent); mask: url(files/brand.svg) center / contain no-repeat; }
+.temper-brand::after { content: ''; width: 1px; height: 17px; margin-left: 8px; background: #d9d2c8; flex: none; }
+/* .terminal-nav and .terminal-count: quiet links and current page. */
+.temper-navigation { align-self: stretch; display: flex; align-items: center; gap: 4px; margin-left: 12px; }
+.temper-navigation a { padding: 5px 10px; border-radius: 5px; font-size: 11px; color: #736c62; white-space: nowrap; }
+.temper-navigation a:hover { background: #eae4d9; color: var(--temper-ink); }
+.temper-navigation a[aria-current=page] { color: var(--temper-ink); background: #e9e3d8; font-weight: 700; }
+.temper-navigation strong { color: #a45c43; margin-left: 3px; font-weight: 700; }
+/* .terminal-top-right, .terminal-live and .terminal-user: connection and person. */
+.temper-banner > [data-region=temper-link] { margin-left: auto; display: flex; align-items: center; gap: 8px; white-space: nowrap; color: #767066; font-size: 11px; }
+.temper-banner > [role=status] { color: #827a6f; font-size: 11px; white-space: nowrap; }
+.temper-banner > [data-region=temper-link] ~ button { color: #756e65; font-size: 11px; padding: 3px 0; }
+.temper-live, .temper-connecting, .temper-offline { display: inline-flex; align-items: center; gap: 8px; }
+.temper-live::before, .temper-connecting::before, .temper-offline::before { content: ''; width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--temper-muted); }
+.temper-live::before { background: #6b9a77; box-shadow: 0 0 0 3px #dfe9dc; }
+.temper-connecting::before { background: var(--temper-amber); }
+.temper-behind { color: var(--temper-amber); }
+/* .page.narrow and .section-heading: the reading width and headings. */
+.temper-main { width: min(1040px, calc(100% - 48px)); margin: 0 auto; padding: 22px 0 58px; }
+.temper-main h1, .temper-main h2 { margin: 0 0 9px; font: 700 14px/1.3 var(--temper-mono); letter-spacing: -.025em; }
+.temper-main h2 { margin-top: 23px; }
+/* .terminal-entry-composer: prompt, growing text and named send control. */
+.temper-entry { width: min(760px, 100%); min-height: 42px; border: 1px solid #dcd4c9; border-radius: 6px; background: var(--temper-paper); display: flex; align-items: flex-end; gap: 9px; padding: 8px 9px 8px 12px; margin-bottom: 21px; }
+.temper-entry:focus-within { border-color: #cba893; box-shadow: 0 0 0 2px #f4e7de; }
+.temper-entry::before { content: '›'; color: var(--temper-accent); font-size: 18px; line-height: 22px; font-weight: 700; }
+.temper-entry textarea { flex: 1; min-width: 0; width: 100%; field-sizing: content; min-height: 22px; max-height: 160px; border: 0; outline: 0; resize: none; padding: 1px 0 0; margin: 0; background: none; color: var(--temper-ink); font: 12px/21px var(--temper-mono); overflow-y: auto; }
+@supports not (field-sizing: content) { .temper-entry textarea { height: 22px; } }
+.temper-entry button { position: relative; width: 25px; height: 25px; flex: none; padding: 0; border: 0; border-radius: 4px; background: #ba694e; color: transparent; overflow: hidden; }
+.temper-entry button::before { content: ''; position: absolute; inset: 5px; background: white; mask: url(files/send.svg) center / contain no-repeat; }
+.temper-entry button:hover { background: var(--temper-accent-dark); }
+/* .entry-hint: the start composer's true keyboard instruction. */
+.temper-hint { align-self: center; color: #aaa399; font-size: 10px; white-space: nowrap; margin: 0; }
+/* .chat-list and .chat-preview: one ruled box, title and metadata. */
+.temper-rows { display: grid; grid-template-columns: 1fr; gap: 0; list-style: none; padding: 0; margin: 0; border: 1px solid var(--temper-line); border-radius: 5px; background: var(--temper-paper); }
+.temper-row { position: relative; min-width: 0; border-bottom: 1px solid var(--temper-line); padding: 12px 16px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-rows: auto auto; column-gap: 12px; row-gap: 0; }
+.temper-row:last-child { border-bottom: 0; }
+.temper-row:first-child { border-radius: 5px 5px 0 0; }
+.temper-row:last-child { border-radius: 0 0 5px 5px; }
+.temper-row:hover { background: #faf7f2; }
+.temper-row > a { grid-column: 2; grid-row: 1; align-self: center; color: var(--temper-muted); font-size: 11px; }
+.temper-row > a::after { content: ''; position: absolute; inset: 0; border-radius: 4px; }
+.temper-row > a:focus-visible { outline: none; }
+.temper-row > a:focus-visible::after { outline: 2px solid var(--temper-accent); outline-offset: 2px; }
+.temper-row > p { margin: 0; }
+.temper-row > p:first-of-type { grid-column: 1 / 3; grid-row: 2; margin: 6px 0 3px; font-size: 12px; font-weight: 700; line-height: 1.35; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.temper-row > p:nth-of-type(2), .temper-row > p:nth-of-type(3) { text-align: right; color: var(--temper-muted); font-size: 11px; align-self: center; }
+.temper-row > p:nth-of-type(2) { grid-column: 3; grid-row: 1; }
+.temper-row > p:nth-of-type(3) { grid-column: 4; grid-row: 1; }
+.temper-time { grid-column: 3 / -1; grid-row: 2; align-self: center; color: var(--temper-muted); font-size: 11px; text-align: right; }
+/* .tag: status words with their five meaning colours. */
+.temper-row > [role=status] { grid-column: 1; grid-row: 1; justify-self: start; }
+.temper-status-yours, .temper-status-held, .temper-status-retrying, .temper-status-active, .temper-status-quiet { display: inline-flex; align-items: center; width: fit-content; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+.temper-status-yours { color: var(--temper-accent-dark); background: var(--temper-accent-pale); }
+.temper-status-held { color: var(--temper-red); background: var(--temper-red-pale); }
+.temper-status-retrying { color: var(--temper-amber); background: var(--temper-amber-pale); }
+.temper-status-active { color: var(--temper-green); background: var(--temper-green-pale); }
+.temper-status-quiet { color: #6d695f; background: #f3f1eb; }
+/* .filter: the real closed-page action. */
+.temper-main > .temper-rows + button { margin-top: 9px; border: 1px solid var(--temper-line); background: #f7f5f0; color: var(--temper-muted); border-radius: 4px; min-height: 28px; padding: 5px 9px; font: 600 11px/1.35 var(--temper-mono); }
+/* .card and .composer: existing chat-page tokens. */
+.temper-card { background: var(--temper-paper); border: 1px solid var(--temper-line); border-radius: 5px; padding: 12px 16px; }
 .temper-turn { white-space: pre-wrap; }
-/* .composer textarea: one line growing to 120px, a fixed 120px that scrolls where field-sizing is missing. */
-.temper-composer { field-sizing: content; min-height: 1lh; max-height: 120px; resize: none; overflow-y: auto; }
-@supports not (field-sizing: content) { .temper-composer { height: 120px; } }
+.temper-composer:not(.temper-entry textarea) { field-sizing: content; min-height: 1lh; max-height: 120px; resize: none; overflow-y: auto; }
+/* .terminal-topbar at 1100px: tighter spacing, all words retained. */
+@media (max-width: 1100px) {
+  .temper-banner { gap: 11px; padding-inline: 17px; }
+  .temper-navigation { gap: 0; margin-left: 0; }
+  .temper-navigation a { padding-inline: 8px; }
+}
+/* .terminal-topbar at 760px: visible navigation on its own scrolling row. */
+@media (max-width: 760px) {
+  .temper-banner { flex-wrap: wrap; gap: 8px 11px; padding-block: 12px 0; }
+  .temper-navigation { order: 1; flex: 0 0 100%; min-width: 0; overflow-x: auto; padding-bottom: 8px; }
+  .temper-banner > [data-region=temper-link] { margin-left: auto; }
+  .temper-main { width: calc(100% - 28px); padding-top: 16px; }
+  .temper-hint { display: none; }
+}
+/* .chat-preview at 600px: metadata below the title. */
+@media (max-width: 600px) {
+  .temper-row { grid-template-columns: auto minmax(0, 1fr); }
+  .temper-row > p:nth-of-type(2), .temper-row > p:nth-of-type(3) { grid-column: 1 / -1; grid-row: auto; text-align: left; }
+  .temper-row > p:nth-of-type(2) { margin-top: 6px; }
+  .temper-time { grid-column: 1 / -1; grid-row: auto; text-align: left; }
+}

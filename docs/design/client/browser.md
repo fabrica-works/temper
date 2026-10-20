@@ -222,12 +222,21 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   cards; the conversation's turns; the composers. The view sets them
   (`README.md`, 5.1); the terminal prints none.
 - **The bundle's stylesheets:** skein's `skein-ui.css`, then
-  `temper.css`, which takes its rules from `mockups/style.css`; the
-  mockups are not shipped. `temper.css` holds the mockups' palette as
-  variables under the prefix, the system's monospaced font, the compact
-  top navigation and quiet borders. Nothing a person must know is said
-  by style alone (skein's `ui.md`, section 8). The mockups' icons are
-  left out: each control is named by its words.
+  `temper.css`, which takes its rules from the mockups' terminal sheets
+  as they render (`terminal-chat.css` and `terminal-pages.css` over
+  `style.css`); the mockups are not shipped. These are the bundle's two
+  stylesheets; `jig.css` is not in it. `temper.css` holds the mockups'
+  palette as variables under the prefix, their monospaced stack, compact
+  top navigation and quiet borders. DM Sans, for the wordmark alone, is
+  self-hosted in the bundle's files with its SIL OFL licence beside it;
+  the page fetches nothing from another host. The mockups' icons are
+  decorative masks drawn by `temper.css` from the bundle's SVG files.
+  Every control keeps its words as its name. Nothing a person must know
+  is said by colour or icon alone (skein's `ui.md`, section 8): a status
+  is its word, and its colour only repeats it.
+- **The navigation** sits in the banner after the projects, as in the
+  mockups. At phone width the banner wraps and the navigation takes its
+  own row, scrolling sideways if needed; nothing is hidden behind a menu.
 - **Light only:** the mockups' palette is light, and `temper.css` sets
   `color-scheme: light`, where `skein-ui.css` follows the system's dark
   preference. A dark palette is open (section 5).
