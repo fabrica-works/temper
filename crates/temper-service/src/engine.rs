@@ -490,8 +490,13 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
             skein_forge_connection::Event::Installation { forge, installation, account, change } => {
                 crate::setup::lifecycle::installation(engine, forge, installation, account, change);
             }
-            // temper-02 handles git token values and installation access marks.
-            skein_forge_connection::Event::GitToken { .. } => {}
+            // temper-02 handles git token values and installation access marks, and gives the
+            // delivery log's origins and gaps meaning in the root.
+            skein_forge_connection::Event::GitToken { .. }
+            | skein_forge_connection::Event::Fact {
+                fact: skein_forge_connection::Fact::Origin { .. } | skein_forge_connection::Fact::Gap,
+                ..
+            } => {}
             skein_forge_connection::Event::Fact {
                 forge,
                 fact: skein_forge_connection::Fact::Unkept { installation },

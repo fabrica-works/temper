@@ -86,6 +86,7 @@ pub(crate) fn prepare(
         inner: f.inner,
         target_bytes: f.target_bytes,
         io: config.jig.limits.io,
+        tls: f.tls,
     };
     let crypto = CryptoRng::new(seed, 5).ok_or(problem(b"setup"))?;
     let mut layer = super::Layer::new(
@@ -202,6 +203,12 @@ pub(crate) fn problems(why: host::Unusable, found: &mut Problems) {
         Unusable::GitHubMetadata { .. } => &[b"forge_component.inner", b"forge_component.string_bytes"],
         Unusable::Stack { stacked, .. } => match stacked {
             Stacked::HttpOverIo => &[b"forge_component.chunk", b"io.intake", b"io.output"],
+            Stacked::HttpOverTls => {
+                &[b"forge_component.chunk", b"forge_component.tls.read", b"forge_component.tls.send"]
+            }
+            Stacked::TlsOverIo => {
+                &[b"forge_component.tls.read", b"forge_component.tls.send", b"io.intake", b"io.output"]
+            }
             Stacked::JsonOverHttp => &[b"forge_component.chunk"],
         },
         Unusable::Forges { .. } => &[b"forge_component.forges"],

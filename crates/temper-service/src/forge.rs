@@ -72,6 +72,7 @@ pub fn settings(
                 address: skein_io::Addr::Ip(endpoint.address),
                 transport,
                 access: file_access(forge),
+                log_origins: List::with_capacity(0),
             })
             .expect("configured forge capacity");
     }
@@ -149,6 +150,11 @@ pub fn small(forge: &forge::Limits) -> skein_forge_connection::Limits {
         token_bytes: 512,
         key_bytes: u32::try_from(skein_tls::RS256_KEY_BYTES).expect("RS256 key bound fits u32"),
         installations: limits::FORGE_INSTALLATIONS,
+        log_origins: 1,
+        log_poll: Duration::from_secs(86_400),
+        log_catch_up: Duration::from_secs(3600),
+        log_pages: 10,
+        delivery_bytes: 65_536,
         renew_before: Duration::from_secs(10 * 60),
         connections: forge.client.calls,
         head_bytes: 16_384,
@@ -304,7 +310,9 @@ pub fn problems(unusable: skein_forge_connection::Unusable, found: &mut Problems
                 b"io.output",
             ]
         }
-        Unusable::Zero | Unusable::Word => &[b"forge_component"],
+        Unusable::Zero | Unusable::Word | Unusable::LogOrigins { .. } | Unusable::Origin { .. } => {
+            &[b"forge_component"]
+        }
         Unusable::Duplicate { forge } => {
             found.push(forge_path(u32::from(forge)).member(b"number"), What::Unique);
             return;

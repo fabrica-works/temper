@@ -178,7 +178,7 @@ fn forge_component_limits_that_disagree_are_problems_naming_both() {
     ];
     for (refusal, expected) in rows {
         let mut found = jig_protocol_config::Problems::empty();
-        forge::problems(refusal, &mut found);
+        forge::problems(refusal.clone(), &mut found);
         assert_eq!(
             crate::startup::lines(&crate::startup::Problems::jig(found, &jig_protocol_config::Path::root())).as_ref(),
             expected,
@@ -280,7 +280,7 @@ fn the_component_s_new_refusals_are_problems_naming_their_members() {
         (skein_forge_connection::Unusable::PlaintextName { forge: 1 }, b"application.forges[1].api: past its bound\n"),
     ];
     for (refusal, expected) in rows {
-        assert_eq!(problem_lines(refusal).as_ref(), expected, "{refusal:?}");
+        assert_eq!(problem_lines(refusal.clone()).as_ref(), expected, "{refusal:?}");
     }
 }
 

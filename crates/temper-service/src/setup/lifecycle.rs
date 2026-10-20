@@ -322,10 +322,13 @@ pub(crate) fn installation(
     let suspended = match change {
         connection::Change::Suspended => true,
         connection::Change::Unsuspended => false,
-        connection::Change::Created | connection::Change::Renamed => match previous {
-            Some(info) => info.suspended,
-            None => false,
-        },
+        // A changed repository selection leaves the suspension as it was.
+        connection::Change::Created | connection::Change::Renamed | connection::Change::Repositories => {
+            match previous {
+                Some(info) => info.suspended,
+                None => false,
+            }
+        }
         connection::Change::Deleted => unreachable!("deleted above"),
     };
     let info = domain::Installation {

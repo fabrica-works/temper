@@ -15,7 +15,7 @@ pub fn fixture() -> crate::forge::Fixture {
             let mut setup = (crate::forge::fixture().setup)();
             setup.tree.iter_mut().find(|file| file.path.as_ref() == b"README.md").expect("README").content =
                 README.into();
-            setup.checks.cue = Some(api::Cue { path: b"README.md".as_slice().into(), green: EDIT.into() });
+            setup.checks.cue = Some(api::Cue::File { path: b"README.md".as_slice().into(), green: EDIT.into() });
             setup.protection = Some(api::Protection {
                 branch: b"main".as_slice().into(),
                 contexts: setup.checks.contexts.clone(),

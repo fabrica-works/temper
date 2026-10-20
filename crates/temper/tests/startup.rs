@@ -594,6 +594,13 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // grow 230,037 B; Store inline state +24 B; Service inline state +7,416 B;
     // worker-channel state +11,560 B; client documents +3,154,016 B;
     // accounts driver drops 1,009,024 B; empty D2/runtime state adds 1,832 B.
+    // skein 64e28b02 adds job-log origin state: configured Forge 136 -> 168 B
+    // across 4 list slots; Connection 1,384 -> 1,392 B and Waiting 528 -> 536 B
+    // (its origin route) across 2 slab slots each; the slots also grow 8 B each.
+    // Inline Service state grows 32,616 -> 32,648 B: skein 29f187c3's delivery-log
+    // limits grow its forge Env 160 -> 184 B; skein 90ed6c4e's setup TLS limits
+    // grow its host Env 128 -> 136 B. No GitHub forge is configured here, so
+    // the origin and puller heaps add nothing. Sum: 128 + 16 + 16 + 24 + 8 = 192 B.
     let engine_growth = 3_076 * root_growth
         + 50 * 263_168
         + 230_037 * 21_379_237
@@ -606,14 +613,20 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
         + 11_560
         + 3_154_016
         - 1_009_024
-        + 1_832;
-    // The jig repin adds 5,768,515,608,452 B: main totals 85,428,512,818,502 B.
+        + 1_832
+        + 4 * (168 - 136)
+        + 2 * (1_392 - 1_384)
+        + 2 * (536 - 528)
+        + (184 - 160)
+        + (136 - 128);
+    // The jig repin adds 5,768,515,608,452 B: main totals 85,428,512,818,502 B;
+    // skein 94495819's 192 B above bring it to 85,428,512,818,694 B.
     // 05b adds 2,536 B of volatile root connection/installation tables to each
     // of those 3,076 root/payload envelopes, 14,204 B of protocol-sized
     // connections, 514 B of wanted diagnostic names for this one configured
     // forge, and 200 B of inline service growth. Records retain main's term.
     let lifecycle_growth = 3_076 * 2_536 + 14_204 + 514 + 200;
-    // 05b delta +7,815,654 B; total 85,428,520,634,156 B.
+    // 05b delta +7,815,654 B; total 85,428,520,634,348 B.
     // JP10c-c: each bounded deployment gains two offers, their program names,
     // display names and manage targets, plus the header and two readiness rows.
     let document_growth = 2 * (96 + 2 * 16 + 2 * 32 + 128 + 2_048) + 56 + 2 * 24;
@@ -627,7 +640,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // Seven u32 wire bounds, 7*4 B plus 4 B alignment = 32 B.
     let wire_bounds_growth = 7 * 4 + 4;
     let catalogue_growth = 3_076 * (document_copies * document_growth + readiness_scratch) + wire_bounds_growth;
-    // Catalogue delta +580,059,808 B; total 85,429,100,693,964 B.
+    // Catalogue delta +580,059,808 B; total 85,429,100,694,156 B.
     assert_eq!(required.engine_bytes, 79_659_997_210_050_u64 + engine_growth + lifecycle_growth + catalogue_growth);
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
