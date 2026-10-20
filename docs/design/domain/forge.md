@@ -404,7 +404,7 @@ repository's health). Its calls meet `Missing`, `NotInstalled` or
 - **Commit statuses on GitHub:** temper's App reads statuses and writes
   none, so a project there that wants its gates' verdicts posted (8.3)
   is told at adoption that they stay temper's own, and that GitHub's
-  rules cannot require them (section 20).
+  rules cannot require them.
 
 ## 5. What it holds, and keeping up
 
@@ -778,8 +778,8 @@ starts from current code. It never updates only because its base moved.
   independently of temper. On GitHub, temper's App has `statuses: read`
   and no more, so the post, `Write::Status`, is refused `Forbidden`
   (skein's `forge-github.md`, 4.2): a project there that wants it is
-  told so at adoption (4.4), and the verdict stays temper's own
-  (section 20).
+  told so at adoption (4.4), and the verdict stays temper's own; the
+  App asks for no more (`../protocol/setup.md`, 17.1).
 - **When they run:** once CI passes on the head, by default, so a head
   CI fails costs no review; the change may ask to run them at once.
 
@@ -1398,11 +1398,6 @@ the group's commit.
 - **Signed commits required** on a landing branch (4.4): temper's
   workers do not sign. Default: landing there is a wait for someone
   else's merge, said at adoption; signing is later.
-- **Commit statuses on GitHub** (4.4, 8.3): temper's App has
-  `statuses: read`, so `Write::Status` is refused `Forbidden`. Default:
-  no gate's verdict is posted there, and the adoption says so. Open:
-  whether the App's manifest adds `statuses: write`
-  (`../protocol/setup.md`, 17.1).
 - **Connecting a forge as another user** (4.1): refused, since the keys
   and echoes already on the forge are the old user's. Moving a
   deployment to another App or user, and disconnecting a forge, are

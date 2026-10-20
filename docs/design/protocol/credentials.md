@@ -109,9 +109,9 @@ setup.md's (section 9). What is open is listed in section 8.
   rows are the root's, and hold none of them.
 - **The number** (`u64`): `family << 48 | forge << 16 | item`. Family 1 is
   a forge's records; other families, up to `0x7FFF`, are free for
-  temper's later records. temper's own numbers keep the top bit clear, so
-  they never fall in the sub-range jig reserves under temper's tag for
-  carried values, which jig numbers itself (section 2.2). `forge` is the
+  temper's later records. temper's own numbers keep the top bit clear,
+  below 2^63, where jig numbers carried values under temper's tag itself
+  (section 2.2). `forge` is the
   configured forge's `number` (`u16`; configuration.md, section 3), its
   explicit, stable id: reordering, adding or removing forges never moves
   one forge's records to another, and a forge given another number is a
@@ -205,25 +205,30 @@ setup.md's (section 9). What is open is listed in section 8.
   (one token or key). A GitHub App has no webhooks' secret: a pasted
   App's connect writes `AppId`, `AppSlug`, `AppKey` and `User`, and sets
   the App's hook to `https://<slug>.invalid/` (section 2).
-- **The number is jig's.** jig numbers each carried value itself, in a
-  sub-range of temper's tag it reserves for carried values, from a next
-  number it keeps durably and never reuses (section 8). The request names
-  no number and the client draws none; the core gets the number and the
-  digest. A number already holding a row is refused at decode, never
-  overwritten, and a refused or duplicate request erases only the value
-  its own decode just kept. A forge's records lie outside the sub-range
-  (section 2.1), so no request, refused or not, overwrites or erases
-  them.
+- **The number is jig's.** jig numbers each carried value itself, under
+  temper's tag from 2^63 up, from a next number it keeps durably in a
+  counter row and never reuses. The request names no number and the
+  client draws none; the core gets the number and the digest. A number
+  already holding a row is refused at decode, never overwritten. A
+  forge's records lie below 2^63 (section 2.1), so no request, refused
+  or not, overwrites or erases them.
+- **A carried value left unused** is named once: when the core leaves
+  one unused, its request refused, replayed, joined to another or cut
+  by a stop, it emits one output naming the number, and temper's root
+  forwards it to jig's clients' component, which erases the row.
 - **Only the core's decisions** replace or erase a kept value: a carried
-  row's erase at its run's end, and at start, is a decision of the
-  core's, which the routing carries out.
+  row's erase when it is left unused, at its run's end, and at start, is
+  a decision of the core's; the routing carries out those at a run's end
+  and at start.
 - **The value:** temper's bundle, versioned: `[1][count u8]`, then per
-  entry `[item u16][length u16][bytes]`, at most `records.value_bytes` in
-  all. It lives until its run ends.
+  entry `[item u16][length u16][bytes]`, at most 4 KiB in all, jig's
+  bound on a carried value, and at most `records.value_bytes`.
+  A pasted App's PEM key, under 2 KiB for GitHub's 2048-bit keys, fits.
+  It lives until its run ends.
 - **The core** keeps the number and the digest in the connect's own
   record, no secret, and checks the person's role, the forge's kind and
-  mode, and that no run holds the forge. Refused, it answers so, and jig
-  erases the value its decode kept.
+  mode, and that no run holds the forge. Refused, it answers so, and
+  names the value left unused (above).
 - **The run:** accepted, the root asks the routing to run the connect's
   plan with that number. The routing gets the row, checks its digest is
   the request's (else the run is refused, "the pasted value changed"),
@@ -232,8 +237,8 @@ setup.md's (section 9). What is open is listed in section 8.
   row's erase, which the routing carries out; on done, the items the run
   wrote are kept under the forge's family-1 numbers first.
 - **A restart** drops runs, whose states are in memory: the core decides
-  the erase of each carried row under temper's tag found at start (jig's
-  reserved sub-range, loaded from its first number), and a connect the
+  the erase of each carried row under temper's tag found at start
+  (loaded from 2^63), and a connect the
   root holds as running ends "interrupted; paste again".
 
 ## 3. LLM accounts
@@ -575,9 +580,6 @@ sources in its holder's order. temper configures the LLM providers
   about one generation an hour per installation. Default: standalone
   only; a fleet whose workers outlive the engine waits for generations
   kept across starts.
-- **jig's reserved sub-range for carried values.** Default: the numbers
-  with the top bit set under temper's tag; jig's `protocol/store.md`
-  is to name it, and temper's families stay outside it.
 - **Rows of a forge not configured.** Default: left as they are and
   named once in the log at start; erasing them waits for a request that
   disconnects a forge.

@@ -200,8 +200,8 @@ skein-io socket
   (credentials.md, the forges' records). `User` is the forge's user
   temper acts as: on Forgejo temper's user, on GitHub the App's bot
   user. temper's numbers keep the top
-  bit clear, outside the sub-range of temper's tag that jig reserves for
-  carried values and numbers itself (2.6).
+  bit clear, below 2^63, where jig numbers carried values under
+  temper's tag itself (2.6).
 - **Each item's bytes** are as skein's setup host writes them, pinned by
   skein's `forge-setup.md`, 6.4: tokens and secrets as text; `User` and
   `AppId` a `u64` little-endian, never 0; `AppSlug` text; `AppKey`
@@ -231,8 +231,8 @@ skein-io socket
 - **Rows of a forge the configuration does not name** are left as they
   are, and named once in the log; erasing them is disconnecting, later
   (section 14). Carried rows, pasted values whose run a restart cut, are
-  loaded from the first number of jig's sub-range; the core decides
-  their erase, which the routing carries out (2.6).
+  loaded from 2^63, where jig numbers them; the core decides their
+  erase, which the routing carries out (2.6).
 - **A managed or owned Forgejo starts connecting:** its access is `None`
   until the setup host's `Reconcile { forge, adopted }` is done, then
   `Request::Connect` (2.2). An owned forge runs `TakeOver { forge,
@@ -412,18 +412,20 @@ carries what passes between it, the root and the records.
   `Replace` may carry one value, temper's bundle of items. jig's
   clients' component strips it at decode and keeps it in the secrets'
   store under temper's tag before jig's core sees the request, at a
-  number jig gives it in the sub-range of temper's tag it reserves for
-  carried values; the core gets `{ number, digest }` (jig's
-  `protocol/client.md`). A request refused or a duplicate: jig erases
-  only the value its own decode kept. The root checks the request and
+  number jig gives it from 2^63 up, at most 4 KiB; the core gets
+  `{ number, digest }` (jig's `protocol/client.md`). A carried value the
+  core leaves unused, its request refused, replayed, joined to another
+  or cut by a stop, is named in one output of the core's, which temper's
+  root forwards to jig's clients' component to erase. The root checks
+  the request and
   asks the routing to run its plan with that number. The routing `Get`s
   the row and checks that its digest is the request's, or refuses the
   run, "the pasted value changed"; and serves each pasted item's
   `Need::Read` from it. When the run ends, done or failed, the core
   decides the carried row's erase, which the routing carries out, a
   `Done`'s writes being kept under the forge's family-1 numbers first.
-- **Carried rows found at start,** loaded from the first number of
-  jig's sub-range, are rows whose run a restart cut: the core decides
+- **Carried rows found at start,** loaded from 2^63, are rows whose
+  run a restart cut: the core decides
   each one's erase, which the routing carries out, and a connect the
   root still holds as running ends "interrupted; paste again".
 - **A run's `Done` or `Lacking`:** its writes kept and its carried
@@ -864,8 +866,11 @@ and 5's. What an owner owes the component is skein's
 jig owes the routing its secrets' store under temper's tag (`Keep`,
 `Erase`, `Get` and `Load`, each `Keep` answered once durable), and the
 request carrying a value (credentials.md, pasted values; jig's
-`protocol/client.md`): the value kept at decode under a number of jig's
-sub-range, only `{ number, digest }` reaching the core.
+`protocol/client.md`): the value, at most 4 KiB, kept at decode under a
+number jig gives it from 2^63 up and keeps the next of in a counter
+row, only `{ number, digest }` reaching the core; and the core's one
+output naming each carried value it leaves unused, which temper's root
+forwards to jig's clients' component to erase.
 
 ## 13. What temper relies on
 
@@ -925,8 +930,4 @@ temper's part:
     disconnecting, later (2.1).
   - **Generations across starts.** Default: generation 1 at each start,
     while no worker outlives its engine (2.5; credentials.md, its open
-    questions).
-  - **jig's sub-range for carried values.** Default: as jig names it;
-    until then the pages take it to be temper's numbers with the top bit
-    set, which temper's own never use (2.1; credentials.md, its open
     questions).

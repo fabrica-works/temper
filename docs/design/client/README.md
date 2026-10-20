@@ -400,11 +400,11 @@ keeps (`../protocol/configuration.md`, section 2).
   number for it and the client draws none: jig numbers the value as it
   keeps it (`../protocol/credentials.md`, pasted values). Answered
   unsent or lost, the page asks for the value again, and the second
-  send keeps the first's key. A value empty, or a bundle past 8 KiB
-  (the bound of `tools.md`, section 12), is refused before it is sent;
-  one the engine refuses, past the deployment's `records.value_bytes`
-  among them, shows its refusal (section 8). The client reads no
-  configuration, so its bound is its own (section 11).
+  send keeps the first's key. A value empty, or a bundle past 4 KiB,
+  jig's bound on a carried value (the bound of `tools.md`, section 12),
+  is refused before it is sent; one the engine refuses, past the
+  deployment's `records.value_bytes` among them, shows its refusal
+  (section 8). The client reads no configuration, so its bound is jig's.
 
 ## 4. The forge's client family
 
@@ -1263,12 +1263,14 @@ does for the client:
 - **A carried value, as jig carries it** (jig's `protocol/client.md`,
   section 5). jig's clients' component strips the value at decode and
   keeps it in the secrets' store under temper's tag, at a number it
-  gives it in the sub-range of temper's tag it reserves for carried
-  values (`../protocol/credentials.md`, its open questions), before the
-  core sees the request; the core gets the number and the value's
-  digest, and the value never reaches the core, a document or a log.
-  The request names no number and the client draws none. A request
-  refused, or a duplicate, has jig erase the value its own decode kept.
+  gives it from 2^63 up (`../protocol/credentials.md`, pasted values),
+  before the core sees the request; the core gets the number and the
+  value's digest, and the value never reaches the core, a document or a
+  log. The request names no number and the client draws none. A value
+  is at most 4 KiB, jig's bound on a carried value. A carried value the
+  core leaves unused, its request refused, replayed, joined to another
+  or cut by a stop, is named in one output of the core's, which temper's
+  root forwards to jig's clients' component to erase.
 - **Who may:** a person whose role holds the deployment's connectors;
   in standalone, the deployment's owner. jig admits each by key and
   refuses at admission as for any request, in jig's words; the root
@@ -1524,11 +1526,6 @@ own tests:
   is listed, and adopting one the project holds is refused by the
   engine as any adoption; the request naming the project, the engine
   leaving those out, is the candidate (`forge.md`, section 10).
-- **The client's bound on a pasted value:** the client reads no
-  configuration, so it cannot know the deployment's
-  `records.value_bytes`. Default: 8 KiB (3.6; `tools.md`, section 12),
-  which the deployment's `records.value_bytes` should be at least; a
-  larger one the engine refuses, and the page shows that refusal.
 - **A connect's end told:** the forges' page reads how a connect ended
   on the deployment's part. Default: that read, watched while the page
   is open; no notice in the inbox.

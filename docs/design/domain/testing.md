@@ -988,8 +988,8 @@ by the commands in `docs/development/workflow.md`. In temper:
   suite, never merged with another and never named as an exception: a
   real-loop story with CI and webhooks (2.4) is held to the 1 s as any
   other. If GitHub's stories would push the real loop's sum past 6 s,
-  the slowest real-loop stories move to the fuzzy suite, or the ceiling
-  goes to the user, as below.
+  the ceiling goes to the user, as below, and no real-loop story moves to
+  the fuzzy suite to make room for them unless the user so decides.
 - **The worlds' sums are measured as the suites' rules are:** each test's
   own time, run alone on the idle development machine (testing-strategy.md,
   section 8), with `--profile measure -j 1` through `heavy --gate`, the
