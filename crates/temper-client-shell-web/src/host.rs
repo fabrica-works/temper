@@ -116,6 +116,7 @@ impl Host {
                 }
             }
             Heard::StreamOpened => self.stream.opened(200, &mut above),
+            Heard::StreamRefused { status } => self.stream.opened(status, &mut above),
             Heard::Piece { bytes } => self.stream.body(&bytes, &mut above),
             Heard::StreamEnded => self.stream.ended(&mut above),
             Heard::Stored { .. } => self.client(jig_client::Event::Stored),
@@ -141,6 +142,7 @@ impl Host {
                 report @ (Heard::Answered { .. }
                 | Heard::Failed { .. }
                 | Heard::StreamOpened
+                | Heard::StreamRefused { .. }
                 | Heard::Piece { .. }
                 | Heard::StreamEnded) => self.heard(report),
             }

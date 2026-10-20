@@ -210,6 +210,7 @@ fn authority_limits() -> authority::Limits {
 fn authority_value(spend: u64, kinds: Box<[authority::Executor]>) -> authority::Authority {
     authority::Authority {
         tools: authority::Tools(1023),
+        models: authority::Models::ALL,
         grants: Box::new([]),
         delegation: authority::Delegation { kinds, tasks: 2, depth: 1 },
         budget: authority::Budget { spend, deadline: None },

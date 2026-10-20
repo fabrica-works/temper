@@ -164,10 +164,8 @@ fn signing_out_raises_no_trouble() {
 }
 
 /// browser.md 2.4: "(jig's sign-out clears the cookie)": a reload or an address typed signs in by no cookie.
-/// The 401 the sign-out's own stream is answered is expected here, so that the rest is played. Ignored: jig's
-/// client end hears that 401 as a drop, so a load with no cookie shows Offline (an accepted gap, not temper's).
+/// The 401 each load's stream is answered with is expected here: the client end hears it as signed out.
 #[test]
-#[ignore = "jig: the client end hears a stream refused signed out (401) as dropped, so a load with no cookie shows Offline; the director has it"]
 fn signing_out_clears_the_cookie_for_every_later_load() {
     let tier = Tier::new("qa-shell-sign-out");
     let states = tier.states();
