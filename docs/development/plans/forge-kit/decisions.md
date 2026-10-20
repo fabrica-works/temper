@@ -1756,6 +1756,13 @@ where its answer lands.
 
      Checked: hourly17-deadline-shape froze Skein33dbc782; drive_deadline is in tests/forge/machine/tests/machine.rs, not src/machine.rs. Its candidate mapped all seven cases/assertions and passed all-target Clippy,40focused/6fuzzy with browser selection0; split units18/16/25ms. Two submissions spent (one queue connection failure, then41s active). Formatting and the empty-browser invocation remained unrun after its accounting-parser failure; actual owner completes them in normal proofs, no further checker attempt is added. Inherited fuzzy_hooks0.539s misses its<0.5s reference aim and is retained as a miss, not a passed timing claim; no unchanged behavior/limit is altered to hide it. No Rust downstream copies were reached; plan/count users and W73overlap are mapped in scratch-hourly17-deadline-shape. Refresh further reached copies within this scope and list users.
 
+210. **Accounts record and key downstream custody** (hourly18 check of2026-10-20T05:41:29Z).
+     Extend README New Accounts-2 interfaces with hourly18's twelve newly reached Core::Accounts record/key match locations in Temper engine-domain archive.rs, decision.rs, restart.rs, route/escalation.rs, route/proposals.rs and store.rs. Keep their exact compiler-site/source/lock map with the existing199/205/207director custody request. These are observations of missing arms, not prescribed persistence, key or match behavior; infer no defaults from the compiler suggestion.
+
+     Obtain the actual downstream repair owner/disposition and recorded repair Step before the eventual owning repin consumes newer interfaces. Preserve committed compatible pins, payload meanings, all earlier Grant.form/Delegate.llm/Model.effort/efforts/Authority.models/Lacking::Models/people_v4/wirev9sites, both design questions, five195drops and full ready capacity. Introducing smith-sources/smith-01 is not a repair Step. No forced pin, dependency patch, duplicate adapter audit or diagnosis is authorized. Refresh further reached copies in the owning repair and list users.
+
+     Checked: scratch-hourly-18/temper-diagnostic-comparison.json lists12new sites and5unique Accounts messages against Temperbbcde306/Skein8a60888e/Smith9db44609/Jigf5166161, with exact locks retained. One bounded wrapper: Smith builds55.307s, Jig fails134.900s, Temper fails56.738s; unchanged-source/dependency Hearth failure reused23.154s with its existing Interrupt owner preserved. The checker ended/reaped and removed only its completed target. No new implementation scope or proof waiver is added.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

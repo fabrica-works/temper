@@ -441,6 +441,13 @@ chain.
   before consuming the newer interfaces; preserve the retained exact locks
   and diagnostics in `scratch-hourly-17`. The introducing interface step is
   not itself a downstream repair trailer.
+  Hourly18 also reaches twelve `Core::Accounts` record/key match sites in
+  Temper engine-domain `archive.rs`, `decision.rs`, `restart.rs`,
+  `route/escalation.rs`, `route/proposals.rs` and `store.rs`. Retain the
+  exact site/message/source/lock map in `scratch-hourly-18` under the same
+  pending owner/disposition; choose no persistence, key or match behavior
+  from the compiler's missing-arm suggestion. Refresh further reached
+  copies in the eventual owning repair and list users.
 - **Host grant forms:** Smith `a26eadcf50888eee56f5d4b453bbedd83981c5de`
   (smith-sources/smith-01) adds `Grant.form`. Its newly reached Jig users are
   `testing/jig-test-worker/src/translate.rs::grant` and `src/tests.rs`'s
