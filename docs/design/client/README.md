@@ -402,7 +402,8 @@ keeps (`../protocol/configuration.md`, section 2).
   unsent or lost, the page asks for the value again, and the second
   send keeps the first's key. A value empty, or a bundle past 4 KiB,
   jig's bound on a carried value (the bound of `tools.md`, section 12),
-  is refused before it is sent; one the engine refuses, past the
+  is refused before it is sent, in the words of `forge.md`, 5.4; one
+  the engine refuses, past the
   deployment's `records.value_bytes` among them, shows its refusal
   (section 8). The client reads no configuration, so its bound is jig's.
 

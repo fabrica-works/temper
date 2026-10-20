@@ -52,7 +52,7 @@ and what is still open (section 10).
 
 | Tier (testing-strategy.md, section 2) | In temper |
 |---|---|
-| step tests | every domain crate and every fake; every codec (golden bytes, bounds, fuzz targets) and each translation both ways; git's argument and environment builders, and git's output parsers against transcripts of real git (../protocol/git.md, section 9); Forgejo's decoders, skein's, against the conformance's transcripts (skein's `forge.md`, section 11), and GitHub's, skein's (skein's `forge-github.md`); the forges' records and a git identity's value, golden bytes and fuzz targets (../protocol/forge.md, 2.1; ../protocol/credentials.md, section 4); `temper-service`'s routing of the forges: start, connect, stop, installations, generations and pasted values (../protocol/forge.md, section 10); the setup's machines, files and specs, and the box's machine (../protocol/setup.md, 13.1); lib's are skein's |
+| step tests | every domain crate and every fake; every codec (golden bytes, bounds, fuzz targets) and each translation both ways; git's argument and environment builders, and git's output parsers against transcripts of real git (../protocol/git.md, section 9); Forgejo's decoders, skein's, against the conformance's transcripts (skein's `forge.md`, section 11), and GitHub's, skein's (skein's `forge-github.md`); the forges' records and a git identity's value, golden bytes and fuzz targets (../protocol/forge.md, 2.1; ../protocol/credentials.md, section 4); `temper-service`'s routing of the forges: start, connect, stop, installations, generations and pasted values, and GitHub's three routes on the clients' listener (../protocol/forge.md, section 10; 2.1); the setup's machines, files and specs, and the box's machine (../protocol/setup.md, 13.1); lib's are skein's |
 | domain worlds | each child domain with the world as its parent, and each component's root domain with its child domains; most of temper's tests |
 | system worlds | the engine, the worker and smith's agents together; temper's client joined to the engine's root (2.1) |
 | machine worlds | the git component against scripted process ends and outputs; the terminal shell's loop against a scripted stdin and stdout; skein's, for the machines it ships, the forge component among them (skein's `forge-connection.md`, section 10) |
@@ -742,7 +742,10 @@ loopback (section 5). temper's worlds add:
   is scheduled at its push and released later. Its adoption, with the first
   lost, shows that a lost delivery "costs latency, never liveness"
   (`forge.md`, 5.2).
-- **Its setup routes** serve reconcile's tests (../protocol/setup.md, 13.2).
+- **Its setup routes** serve reconcile's tests (../protocol/setup.md, 13.2),
+  and on GitHub's dialect its browser's pages serve the real loop's
+  connect (2.4). temper's own routes on the clients' listener are
+  tested in `temper-service`'s tests, against no fake (2.1).
 - **Its referee** drains the forge's observations (skein's
   `fake-forge.md`, 2.4; here, 5.2).
 - **Its git** is reached through its typed transport, never over HTTP:

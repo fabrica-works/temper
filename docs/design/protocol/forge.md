@@ -682,9 +682,10 @@ no address GitHub can reach.
   stop, reads back to the guid the component kept, as far as
   `log_catch_up` and `log_pages` allow (skein's `forge-connection.md`,
   6.5).
-- **A gap,** a poll ending on the component's bounds before it meets the
-  guid kept, is the component's diagnostic, said once, and the
-  installations are read again; the client's polling finds the rest.
+- **A gap,** a poll ending on `log_catch_up` or `log_pages` before it
+  meets the guid kept, is said once as `Fact::Gap`, which the routing
+  logs and nothing else (2.4), and the installations are read again; the
+  client's polling finds the rest.
 - **An installation's rows** read the installations again, and come up
   as `Event::Installation` (2.4); a row that hints is read whole within
   `delivery_bytes` and goes up as a Forgejo delivery's hint does, the
@@ -822,7 +823,12 @@ The tiers, the fakes and the layout are `../domain/testing.md`'s (sections 2,
     ending on its value, and generation 1 at each start;
   - **pasted values:** a digest that differs refuses the run, "the
     pasted value changed"; the carried row erased when its run ends,
-    done or failed, its items kept first on `Done`.
+    done or failed, its items kept first on `Done`;
+  - **GitHub's three routes** on the clients' listener (the manifest
+    page, the redirect and the setup address; `../client/forge.md`,
+    9.1): requests through `fixtures::http::Peer` to the service's
+    routes, each answer and its headers, and a state used, unknown or
+    past its life refused (`../domain/testing.md`, 2.1).
 
   The stories through temper's real loops, connecting, adopting and
   landing on each dialect, are `../domain/testing.md`'s (2.4).

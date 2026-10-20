@@ -295,7 +295,7 @@ reach:
 
 | The forge | Listed |
 |---|---|
-| GitHub | one accepted installation's repositories of temper's App (GitHub's `GET /installation/repositories`, on a token the setup's host mints for the page and drops), chosen by its account's login, the installations as the deployment's page reads them (5.4), marked "selected repositories" where its installation has chosen repositories and "suspended" where GitHub suspended it; read by the setup's host's `Reachable { forge, installation, page }` plan (skein's `forge-setup.md`, 4.8) |
+| GitHub | one accepted installation's repositories of temper's App (GitHub's `GET /installation/repositories`, on a token the setup's host mints for the page and drops), the installation shown by its account's login and asked for by its id, which the picker's request carries, the installations as the deployment's page reads them (5.4), marked "selected repositories" where its installation has chosen repositories and "suspended" where GitHub suspended it; read by the setup's host's `Reachable { forge, installation, page }` plan (skein's `forge-setup.md`, 4.8) |
 | Forgejo, connected | the repositories its API token can push to, read by the same plan, with no installation |
 | Forgejo, managed or owned | every repository the site admin can see, read by the setup's host's `Reachable { forge, installation?, page }` plan on the admin's token (skein's `forge-setup.md`, 4.8), by id ascending, its `reachable` rows given from `picker.page`, since adopting one grants the bot its access (`../protocol/forge.md`, the setup's host's `Reachable` and `Adopt`); the admin's token stays the setup's host's, and the picker gets the rows alone. The plan runs beside the forge's one writing run; a second read of the picker while one runs is refused busy, and so is one past `setup.runs`, which counts both. Its own refusals are the admin's token's, as the reconcile's first step has them (`forge-setup.md`, 4.3): "the admin's token is missing" and "NAME is not a site admin" |
 
@@ -397,11 +397,19 @@ configured forge, by its number, its kind and its `web` address, says:
   forge's one writing run is taken, or `setup.runs` runs are running),
   "the pasted value changed", "the API token
   and the git token answer as LOGIN and LOGIN", "LOGIN is not temper's
-  bot: add `temper:bot` to its full name on Forgejo" (5.5), on GitHub
-  an App lacking what temper needs, each permission and event named
-  (5.5), the forge unreachable, a `Manifest` or an `Install` that
+  bot: add `temper:bot` to its full name on Forgejo" (5.5), the forge
+  unreachable, a `Manifest` or an `Install` that
   stopped, its failure said here and never in its answer (`README.md`,
-  section 8), or "interrupted; paste again" after a restart.
+  section 8), or "interrupted; paste again" after a restart. A GitHub
+  App lacking what temper needs connects all the same (the setup's
+  host's `Lacking` is done): the row says it beside "Connected as LOGIN
+  (ID)", each permission and event named (5.5), until the forge's next
+  check of the App ends: a paste's (a connect or a Replace) or the
+  reconcile after each connect, the one at each start among them
+  (`../protocol/setup.md`, 17.5), which clears the line or names what
+  the App still lacks. The line is kept in memory alone: a restart
+  drops it, and the start's reconcile names it again while the App
+  still lacks it.
 - **Its mode** (`../protocol/setup.md`, the modes): owned, where the
   configuration's setup owns the forge; managed, where temper keeps a
   site admin's token for it; connected otherwise. Owned and managed say
@@ -440,7 +448,14 @@ section 8), offered by kind, mode and state:
 
 A pasted value is a field of its own (`README.md`, 3.6 and section 8),
 emptied as the request leaves and shown nowhere, then or after; the
-page shows that it was given, never what. The link a connect or an
+page shows that it was given, never what. Two refusals are the page's
+own, before anything is sent, the fields kept for the person to fix: a
+field the action needs left empty is marked invalid, "Required." (a
+Replace of a Forgejo's tokens with both empty: "Paste a new API token,
+git token or both."); and the bundle of the action's values past 4 KiB,
+jig's bound on a carried value (`tools.md`, section 12), shows "The
+pasted values are past 4 KiB, the most a request carries." under the
+action's button. The link a connect or an
 install answers is shown as text, and the client never opens it
 (`README.md`, 6.5).
 
@@ -461,7 +476,7 @@ page, the adoption form and its outcome, a change's panel and its hold.
 | `Stopped { why }`, told to the root | on the forge's row, "Stopped: WHY", with Replace (5.4); its calls answer `NotConnected` until its next connect, shown as that row says |
 | an installation suspended | "suspended" on the installation, on the forge's row and on each repository of it (5.2); its calls are refused as no access |
 | a stray installation | on the forge's row, "uninstalled at the next reconcile" |
-| `Lacking`, a GitHub App's `Paste` (a connect of an App of the person's own, or a Replace) whose App lacks permissions or events temper needs | on the forge's row, "temper's App lacks WHAT: grant them in the App's settings, then paste its key again.", WHAT each permission, with its level, and each event, as GitHub names them; with Replace where the forge is connected, Connect where it is not, and a link to the App's settings, `WEB/settings/apps/SLUG`, or `WEB/organizations/ORG/settings/apps/SLUG` for an organization's App |
+| `Lacking`, a GitHub App's `Paste` (a connect of an App of the person's own, or a Replace) whose App lacks permissions or events temper needs | on the forge's row, connected, "temper's App lacks WHAT: grant them in the App's settings, then paste its key again.", WHAT each permission, with its level, and each event, as GitHub names them, until the forge's next check of the App ends (5.4); meanwhile a call that needs what the App lacks is refused by GitHub, as no access; with Replace where the forge is connected, Connect where it is not, and a link to the App's settings, `WEB/settings/apps/SLUG`, or `WEB/organizations/ORG/settings/apps/SLUG` for an organization's App |
 | `Unmarked`, connecting as the admin a forge whose user lacks temper's mark | "LOGIN is not temper's bot: add `temper:bot` to its full name on Forgejo, then connect again." |
 
 The installation's page and the App's settings are built by the engine

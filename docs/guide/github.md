@@ -219,6 +219,9 @@ repository's rules.
   you add temper's App to the rule's bypass list, for pull requests
   only or always.
 - **Required checks** are CI, as the landing rule's.
+- **A gate's verdict cannot be required:** temper's App reads commit
+  statuses and writes none, so a gate's verdict stays temper's own and
+  no rule of GitHub's can require it. Each adoption on GitHub says so.
 - **Signed commits:** temper's workers do not sign their commits. Where
   GitHub refuses temper's merge for it, the change waits for a person's
   merge.
