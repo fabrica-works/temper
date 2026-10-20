@@ -22,6 +22,7 @@ members = [
     "crates/temper-service",
     "tests/worker/protocol-git",
     "crates/temper-forge-setup",
+    "crates/temper-init",
     "crates/temper-forge-setup-shell",
     "crates/temper-worker-protocol-git",
     "crates/temper-client-protocol-wire",
@@ -55,6 +56,7 @@ publish = false
 temper-box = { path = "crates/temper-box" }
 temper-forge-setup-shell = { path = "crates/temper-forge-setup-shell" }
 temper-forge-setup = { path = "crates/temper-forge-setup" }
+temper-init = { path = "crates/temper-init" }
 jig-boundary = { git = "https://github.com/fabrig-dev/jig.git" }
 temper-fake-git = { path = "testing/temper-fake-git" }
 skein-fake-peers = { git = "https://github.com/fabrig-dev/skein.git" }

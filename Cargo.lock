@@ -2653,6 +2653,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-init"
+version = "0.0.0"
+dependencies = [
+ "serde_json",
+ "skein-json",
+ "skein-lib",
+]
+
+[[package]]
 name = "temper-one-process-world"
 version = "0.0.0"
 dependencies = [

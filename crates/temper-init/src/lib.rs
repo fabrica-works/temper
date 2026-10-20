@@ -1,0 +1,127 @@
+//! The files temper init writes, and the default document (protocol/setup.md, 8.2 and 8.3).
+#![cfg_attr(not(test), no_std)]
+#![forbid(unsafe_code)]
+extern crate alloc;
+
+use alloc::boxed::Box;
+use core::num::NonZeroU16;
+use skein_lib::{Writer, bytes, sha256};
+
+mod hex;
+mod path;
+mod template;
+#[cfg(test)]
+mod tests;
+
+/// What the binary finds on the machine, each path absolute (setup.md, 8.2).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Facts<'a> {
+    /// The running temper's own path: the worker's agent's program.
+    pub binary: &'a [u8],
+    /// The git found on PATH: the worker's git.
+    pub git: &'a [u8],
+    /// The claude found on PATH, if any: Claude Code's program.
+    pub claude: Option<&'a [u8]>,
+    /// The browser's bundle, if one holds index.html: clients.bundle.
+    pub bundle: Option<&'a [u8]>,
+    /// The clients' listener's port on 127.0.0.1.
+    pub port: NonZeroU16,
+}
+
+/// The directories init writes into, each absolute (configuration.md, 12).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Directories<'a> {
+    pub config: &'a [u8],
+    pub data: &'a [u8],
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Directory {
+    Config,
+    Data,
+}
+
+/// One file to create new, in its directory.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct File {
+    pub directory: Directory,
+    /// Relative to its directory: `worker.secret`, `charters/chat.txt`.
+    pub name: &'static [u8],
+    pub bytes: Box<[u8]>,
+    /// 0o600 when private, else 0o644.
+    pub private: bool,
+}
+
+/// The fact or directory refused, and why; nothing is answered.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Refusal {
+    pub fact: Fact,
+    pub reason: Reason,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Fact {
+    Binary,
+    Git,
+    Claude,
+    Bundle,
+    Config,
+    Data,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Reason {
+    /// It does not begin with `/`.
+    Relative,
+    /// It is not UTF-8, which JSON's text cannot hold.
+    Text,
+    /// It, or a path joined from it (`<config>/agent.json`,
+    /// `<data>/programs`), passes 4096 bytes.
+    Bound,
+}
+
+/// The files of setup.md 8.2, in its table's order: `worker.secret`,
+/// `worker.digest` (data, private), `charters/chat.txt`,
+/// `charters/coding.txt`, `agent.json`, `temper.json` (config), the
+/// document last.
+pub fn files(facts: &Facts<'_>, directories: &Directories<'_>, secret: &[u8; 32]) -> Result<Box<[File]>, Refusal> {
+    path::check(Fact::Binary, facts.binary, b"")?;
+    path::check(Fact::Git, facts.git, b"")?;
+    if let Some(claude) = facts.claude {
+        path::check(Fact::Claude, claude, b"")?;
+    }
+    if let Some(bundle) = facts.bundle {
+        path::check(Fact::Bundle, bundle, b"")?;
+    }
+    path::check(Fact::Config, directories.config, b"agent.json")?;
+    path::check(Fact::Data, directories.data, b"programs")?;
+
+    let digits = hex::digits(secret);
+    let digest = hex::digits(&sha256::digest(&digits));
+    let (document, agent) = template::documents(facts, directories);
+    Ok(Box::new([
+        File { directory: Directory::Data, name: b"worker.secret", bytes: line(&digits), private: true },
+        File { directory: Directory::Data, name: b"worker.digest", bytes: line(&digest), private: true },
+        File {
+            directory: Directory::Config,
+            name: b"charters/chat.txt",
+            bytes: bytes::copy_of(template::CHAT),
+            private: false,
+        },
+        File {
+            directory: Directory::Config,
+            name: b"charters/coding.txt",
+            bytes: bytes::copy_of(template::CODING),
+            private: false,
+        },
+        File { directory: Directory::Config, name: b"agent.json", bytes: agent, private: false },
+        File { directory: Directory::Config, name: b"temper.json", bytes: document, private: false },
+    ]))
+}
+
+fn line(digits: &[u8]) -> Box<[u8]> {
+    let mut writer = Writer::new(digits.len().checked_add(1).expect("64 digits and a newline fit"));
+    writer.put(digits).expect("the digits were counted");
+    writer.put(b"\n").expect("the newline was counted");
+    writer.finish()
+}

@@ -1,0 +1,896 @@
+{
+  "engine": {
+    "limits": {
+      "profile": "small",
+      "overrides": {
+        "authority.segments": 8,
+        "tasks.hold_segments": 8,
+        "tasks.authority_segments": 8,
+        "documents.rows": 2,
+        "documents.lines": 2,
+        "documents.text_bytes": 128,
+        "views.watchers": 16,
+        "views.watchers_per_party": 16,
+        "authority.grants": 12,
+        "tasks.authority_grants": 12,
+        "notes.scopes": 15,
+        "tasks.authority_bytes": 512,
+        "tasks.batch": 1
+      }
+    },
+    "llm": {
+      "endpoints": [
+        {
+          "name": "codex",
+          "number": 1,
+          "dialect": 1,
+          "account": 1,
+          "provider": "codex",
+          "address": {
+            "host": "chatgpt.com",
+            "port": 443
+          },
+          "transport": "tls",
+          "headers": [],
+          "connect_ms": 10000,
+          "handshake_ms": 10000,
+          "server_name": "chatgpt.com"
+        }
+      ],
+      "models": [
+        {
+          "name": "gpt-6-luna",
+          "endpoint": "codex",
+          "window": 1048576,
+          "output": 8192,
+          "prices": {
+            "input": 1,
+            "cached": 1,
+            "output": 1,
+            "unit": 1000000
+          }
+        }
+      ],
+      "accounts": [
+        {
+          "number": 1,
+          "source": {
+            "handed_in": {
+              "file": "accounts/llm.json"
+            }
+          }
+        }
+      ]
+    },
+    "hosts": {
+      "workers": [
+        {
+          "name": "worker",
+          "digest": "worker.digest"
+        }
+      ],
+      "listener": [
+        {
+          "in_process": "workers"
+        }
+      ]
+    },
+    "charters": [
+      {
+        "number": 1,
+        "instructions": "charters/chat.txt",
+        "model": "gpt-6-luna",
+        "alternatives": [],
+        "hosts": "workers",
+        "waiting_ms": 10000,
+        "resume": true,
+        "turns": 8,
+        "time_ms": 120000,
+        "reserve_turns": 1,
+        "reserve_time_ms": 60000,
+        "spend": 20,
+        "inspect": true,
+        "modify": true,
+        "shell": false,
+        "agents": true,
+        "call_timeout_ms": 10000
+      },
+      {
+        "number": 2,
+        "instructions": "charters/coding.txt",
+        "model": "gpt-6-luna",
+        "alternatives": [],
+        "hosts": "workers",
+        "waiting_ms": 10000,
+        "resume": true,
+        "turns": 8,
+        "time_ms": 120000,
+        "reserve_turns": 1,
+        "reserve_time_ms": 60000,
+        "spend": 20,
+        "inspect": true,
+        "modify": true,
+        "shell": false,
+        "agents": true,
+        "call_timeout_ms": 10000
+      }
+    ],
+    "templates": [
+      {
+        "number": 1,
+        "name": "chat",
+        "executor": {
+          "charter": 1
+        },
+        "contract": {
+          "report": {
+            "words": 32
+          }
+        },
+        "shallower": 1,
+        "budget": {
+          "as_allowed": null
+        },
+        "deadline": "none",
+        "tracked": null,
+        "conversation": true,
+        "listed": false,
+        "retention": "kept",
+        "label": 1,
+        "grace_ms": 5000,
+        "llm": null
+      },
+      {
+        "number": 2,
+        "name": "goal",
+        "executor": "chosen",
+        "contract": {
+          "report": {
+            "words": 32
+          }
+        },
+        "shallower": 1,
+        "budget": "given",
+        "deadline": "given",
+        "tracked": {
+          "priority": 1
+        },
+        "conversation": false,
+        "listed": true,
+        "retention": "kept",
+        "label": 2,
+        "grace_ms": null,
+        "llm": null
+      }
+    ],
+    "clients": {
+      "heartbeat_ms": 10000,
+      "link": true
+    },
+    "deployment": {
+      "directory": "deployment",
+      "seed": 7
+    },
+    "owners": [
+      {
+        "provider": 1,
+        "subject": "owner-a"
+      }
+    ],
+    "providers": [
+      {
+        "number": 1,
+        "kind": "link"
+      },
+      {
+        "number": 2,
+        "kind": "deployment"
+      }
+    ],
+    "connectors": [
+      1
+    ],
+    "memory_bytes": 79649713754244,
+    "rules": {
+      "ceiling": {
+        "tools": 1,
+        "grants": [
+          {
+            "connector": 1,
+            "kind": 1,
+            "pattern": {
+              "segments": [
+                "forge",
+                "github.com"
+              ],
+              "last": "open",
+              "value": ""
+            }
+          },
+          {
+            "connector": 1,
+            "kind": 2,
+            "pattern": {
+              "segments": [
+                "forge",
+                "github.com"
+              ],
+              "last": "open",
+              "value": ""
+            }
+          },
+          {
+            "connector": 1,
+            "kind": 3,
+            "pattern": {
+              "segments": [
+                "forge",
+                "github.com"
+              ],
+              "last": "open",
+              "value": ""
+            }
+          },
+          {
+            "connector": 1,
+            "kind": 4,
+            "pattern": {
+              "segments": [
+                "forge",
+                "github.com"
+              ],
+              "last": "open",
+              "value": ""
+            }
+          },
+          {
+            "connector": 1,
+            "kind": 7,
+            "pattern": {
+              "segments": [
+                "forge",
+                "github.com"
+              ],
+              "last": "open",
+              "value": ""
+            }
+          },
+          {
+            "connector": 1,
+            "kind": 8,
+            "pattern": {
+              "segments": [
+                "forge",
+                "github.com"
+              ],
+              "last": "open",
+              "value": ""
+            }
+          },
+          {
+            "connector": 1,
+            "kind": 10,
+            "pattern": {
+              "segments": [
+                "forge",
+                "github.com"
+              ],
+              "last": "open",
+              "value": ""
+            }
+          },
+          {
+            "connector": 1,
+            "kind": 11,
+            "pattern": {
+              "segments": [
+                "forge",
+                "github.com"
+              ],
+              "last": "open",
+              "value": ""
+            }
+          },
+          {
+            "connector": 1,
+            "kind": 12,
+            "pattern": {
+              "segments": [
+                "forge",
+                "github.com"
+              ],
+              "last": "open",
+              "value": ""
+            }
+          },
+          {
+            "connector": 1,
+            "kind": 13,
+            "pattern": {
+              "segments": [
+                "forge",
+                "github.com"
+              ],
+              "last": "open",
+              "value": ""
+            }
+          }
+        ],
+        "delegation": {
+          "kinds": [
+            {
+              "kind": "charter",
+              "number": 1
+            },
+            {
+              "kind": "charter",
+              "number": 2
+            },
+            {
+              "kind": "procedure",
+              "number": 2
+            }
+          ],
+          "tasks": 8,
+          "depth": 4
+        },
+        "budget": {
+          "spend": 100,
+          "deadline_unix_seconds": null
+        },
+        "notes": 0,
+        "note_resources": []
+      },
+      "period_spend": 100,
+      "minimum_run_spend": 1,
+      "maximum_run_spend": 10,
+      "implies": [],
+      "requirements": []
+    },
+    "projects": [
+      {
+        "number": 1,
+        "roles": [
+          {
+            "connector": 1,
+            "permission": 1,
+            "role": 0
+          }
+        ],
+        "policy": {
+          "templates": [],
+          "escalation_role": 0,
+          "period_spend": 100,
+          "projections": [
+            {
+              "connector": 1,
+              "kind": 1,
+              "pattern": {
+                "segments": [
+                  "forge",
+                  "github.com"
+                ],
+                "last": "open",
+                "value": ""
+              }
+            },
+            {
+              "connector": 1,
+              "kind": 2,
+              "pattern": {
+                "segments": [
+                  "forge",
+                  "github.com"
+                ],
+                "last": "open",
+                "value": ""
+              }
+            },
+            {
+              "connector": 1,
+              "kind": 3,
+              "pattern": {
+                "segments": [
+                  "forge",
+                  "github.com"
+                ],
+                "last": "open",
+                "value": ""
+              }
+            },
+            {
+              "connector": 1,
+              "kind": 4,
+              "pattern": {
+                "segments": [
+                  "forge",
+                  "github.com"
+                ],
+                "last": "open",
+                "value": ""
+              }
+            },
+            {
+              "connector": 1,
+              "kind": 7,
+              "pattern": {
+                "segments": [
+                  "forge",
+                  "github.com"
+                ],
+                "last": "open",
+                "value": ""
+              }
+            },
+            {
+              "connector": 1,
+              "kind": 8,
+              "pattern": {
+                "segments": [
+                  "forge",
+                  "github.com"
+                ],
+                "last": "open",
+                "value": ""
+              }
+            },
+            {
+              "connector": 1,
+              "kind": 10,
+              "pattern": {
+                "segments": [
+                  "forge",
+                  "github.com"
+                ],
+                "last": "open",
+                "value": ""
+              }
+            },
+            {
+              "connector": 1,
+              "kind": 11,
+              "pattern": {
+                "segments": [
+                  "forge",
+                  "github.com"
+                ],
+                "last": "open",
+                "value": ""
+              }
+            },
+            {
+              "connector": 1,
+              "kind": 12,
+              "pattern": {
+                "segments": [
+                  "forge",
+                  "github.com"
+                ],
+                "last": "open",
+                "value": ""
+              }
+            },
+            {
+              "connector": 1,
+              "kind": 13,
+              "pattern": {
+                "segments": [
+                  "forge",
+                  "github.com"
+                ],
+                "last": "open",
+                "value": ""
+              }
+            }
+          ],
+          "requirements": [],
+          "ceiling": {
+            "tools": 1,
+            "grants": [
+              {
+                "connector": 1,
+                "kind": 1,
+                "pattern": {
+                  "segments": [
+                    "forge",
+                    "github.com"
+                  ],
+                  "last": "open",
+                  "value": ""
+                }
+              },
+              {
+                "connector": 1,
+                "kind": 2,
+                "pattern": {
+                  "segments": [
+                    "forge",
+                    "github.com"
+                  ],
+                  "last": "open",
+                  "value": ""
+                }
+              },
+              {
+                "connector": 1,
+                "kind": 3,
+                "pattern": {
+                  "segments": [
+                    "forge",
+                    "github.com"
+                  ],
+                  "last": "open",
+                  "value": ""
+                }
+              },
+              {
+                "connector": 1,
+                "kind": 4,
+                "pattern": {
+                  "segments": [
+                    "forge",
+                    "github.com"
+                  ],
+                  "last": "open",
+                  "value": ""
+                }
+              },
+              {
+                "connector": 1,
+                "kind": 7,
+                "pattern": {
+                  "segments": [
+                    "forge",
+                    "github.com"
+                  ],
+                  "last": "open",
+                  "value": ""
+                }
+              },
+              {
+                "connector": 1,
+                "kind": 8,
+                "pattern": {
+                  "segments": [
+                    "forge",
+                    "github.com"
+                  ],
+                  "last": "open",
+                  "value": ""
+                }
+              },
+              {
+                "connector": 1,
+                "kind": 10,
+                "pattern": {
+                  "segments": [
+                    "forge",
+                    "github.com"
+                  ],
+                  "last": "open",
+                  "value": ""
+                }
+              },
+              {
+                "connector": 1,
+                "kind": 11,
+                "pattern": {
+                  "segments": [
+                    "forge",
+                    "github.com"
+                  ],
+                  "last": "open",
+                  "value": ""
+                }
+              },
+              {
+                "connector": 1,
+                "kind": 12,
+                "pattern": {
+                  "segments": [
+                    "forge",
+                    "github.com"
+                  ],
+                  "last": "open",
+                  "value": ""
+                }
+              },
+              {
+                "connector": 1,
+                "kind": 13,
+                "pattern": {
+                  "segments": [
+                    "forge",
+                    "github.com"
+                  ],
+                  "last": "open",
+                  "value": ""
+                }
+              }
+            ],
+            "delegation": {
+              "kinds": [
+                {
+                  "kind": "charter",
+                  "number": 1
+                },
+                {
+                  "kind": "charter",
+                  "number": 2
+                },
+                {
+                  "kind": "procedure",
+                  "number": 2
+                }
+              ],
+              "tasks": 8,
+              "depth": 4
+            },
+            "budget": {
+              "spend": 100,
+              "deadline_unix_seconds": null
+            },
+            "notes": 0,
+            "note_resources": []
+          },
+          "roles": [
+            {
+              "number": 0,
+              "period_spend": 100,
+              "requests": 511,
+              "decides": 31,
+              "authority": {
+                "tools": 1,
+                "grants": [
+                  {
+                    "connector": 1,
+                    "kind": 1,
+                    "pattern": {
+                      "segments": [
+                        "forge",
+                        "github.com"
+                      ],
+                      "last": "open",
+                      "value": ""
+                    }
+                  },
+                  {
+                    "connector": 1,
+                    "kind": 2,
+                    "pattern": {
+                      "segments": [
+                        "forge",
+                        "github.com"
+                      ],
+                      "last": "open",
+                      "value": ""
+                    }
+                  },
+                  {
+                    "connector": 1,
+                    "kind": 3,
+                    "pattern": {
+                      "segments": [
+                        "forge",
+                        "github.com"
+                      ],
+                      "last": "open",
+                      "value": ""
+                    }
+                  },
+                  {
+                    "connector": 1,
+                    "kind": 4,
+                    "pattern": {
+                      "segments": [
+                        "forge",
+                        "github.com"
+                      ],
+                      "last": "open",
+                      "value": ""
+                    }
+                  },
+                  {
+                    "connector": 1,
+                    "kind": 7,
+                    "pattern": {
+                      "segments": [
+                        "forge",
+                        "github.com"
+                      ],
+                      "last": "open",
+                      "value": ""
+                    }
+                  },
+                  {
+                    "connector": 1,
+                    "kind": 8,
+                    "pattern": {
+                      "segments": [
+                        "forge",
+                        "github.com"
+                      ],
+                      "last": "open",
+                      "value": ""
+                    }
+                  },
+                  {
+                    "connector": 1,
+                    "kind": 10,
+                    "pattern": {
+                      "segments": [
+                        "forge",
+                        "github.com"
+                      ],
+                      "last": "open",
+                      "value": ""
+                    }
+                  },
+                  {
+                    "connector": 1,
+                    "kind": 11,
+                    "pattern": {
+                      "segments": [
+                        "forge",
+                        "github.com"
+                      ],
+                      "last": "open",
+                      "value": ""
+                    }
+                  },
+                  {
+                    "connector": 1,
+                    "kind": 12,
+                    "pattern": {
+                      "segments": [
+                        "forge",
+                        "github.com"
+                      ],
+                      "last": "open",
+                      "value": ""
+                    }
+                  },
+                  {
+                    "connector": 1,
+                    "kind": 13,
+                    "pattern": {
+                      "segments": [
+                        "forge",
+                        "github.com"
+                      ],
+                      "last": "open",
+                      "value": ""
+                    }
+                  }
+                ],
+                "delegation": {
+                  "kinds": [
+                    {
+                      "kind": "charter",
+                      "number": 1
+                    },
+                    {
+                      "kind": "charter",
+                      "number": 2
+                    },
+                    {
+                      "kind": "procedure",
+                      "number": 2
+                    }
+                  ],
+                  "tasks": 8,
+                  "depth": 4
+                },
+                "budget": {
+                  "spend": 40,
+                  "deadline_unix_seconds": null
+                },
+                "notes": 0,
+                "note_resources": []
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "workers": [
+    {
+      "engine": {
+        "in_process": "workers"
+      },
+      "name": "worker",
+      "secret": "worker.secret",
+      "slots": 1,
+      "graces": {
+        "grace_ms": 10000,
+        "agent_stop_ms": 5000,
+        "delivery_ms": 1000,
+        "save_ms": 1000
+      },
+      "agent": {
+        "program": "$binary",
+        "configuration": "$agent",
+        "arguments": [
+          "agent",
+          "$agent"
+        ]
+      },
+      "limits": {
+        "profile": "small",
+        "overrides": {
+          "hub.accounts": 4,
+          "hub.event_bytes": 598
+        }
+      },
+      "memory_bytes": 2343588716154
+    }
+  ],
+  "application": {
+    "forges": [
+      {
+        "number": 2,
+        "kind": "github",
+        "api": null,
+        "transport": null,
+        "git": null,
+        "web": null,
+        "log_origins": null
+      }
+    ],
+    "identities": [
+      {
+        "number": 1,
+        "forge": 2,
+        "login": null,
+        "author": null
+      }
+    ],
+    "landing": {
+      "deployment": [],
+      "projects": [
+        {
+          "project": 1,
+          "rules": [
+            {
+              "connector": 1,
+              "kind": 4,
+              "pattern": {
+                "segments": [
+                  "forge",
+                  "github.com"
+                ],
+                "last": "open",
+                "value": ""
+              },
+              "enforce": true,
+              "ci": true,
+              "up_to_date": true,
+              "gates": [],
+              "approvals": []
+            }
+          ]
+        }
+      ]
+    },
+    "charter": 2,
+    "clients": {
+      "listener": {
+        "socket": "$listener"
+      },
+      "bundle": "$bundle"
+    },
+    "webhooks": null,
+    "setup": [],
+    "limits": {
+      "profile": "small",
+      "overrides": {}
+    },
+    "workers": [
+      {
+        "root": "workspaces",
+        "git": "$git"
+      }
+    ]
+  }
+}
