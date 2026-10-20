@@ -60,7 +60,6 @@ skein-fake-llm-domain.workspace = true
 skein-llm.workspace = true
 skein-llm-world.workspace = true
 skein-fake-llm-protocol.workspace = true
-smith-agent-process-world.workspace = true
 jig-channel-world.workspace = true
 skein-tls-world.workspace = true
 serde_json.workspace = true

@@ -94,16 +94,20 @@ fn serve_command(directory: &Path) -> Command {
 }
 #[must_use]
 pub fn fake_llm(scripts: Box<[skein_fake_llm_domain::api::Script]>) -> skein_fake_peers::llm::Peer {
-    smith_agent_process_world::fake::configured_transport(
-        scripts,
-        skein_llm::Credential {
-            value: jig_channel_world::fixtures::KEY.into(),
-            scheme: skein_llm::Scheme::Key,
-            account_id: Box::new([]),
-        },
-        Duration::ZERO,
+    // The account's API key routes to /v1/responses: the real loop's recipe, on the fixture endpoint's
+    // TLS port. smith's configured peer keeps the Codex path, which refuses a key.
+    let recipe = temper_real_loop_world::llm::scripted(scripts);
+    skein_fake_peers::llm::Peer::new(
+        (std::net::Ipv4Addr::LOCALHOST, 34_443).into(),
         skein_fake_peers::Transport::Tls,
+        recipe.limits,
+        recipe.config,
+        recipe.credential,
+        recipe.protocol_limits,
+        recipe.domain,
+        recipe.domain_limits,
     )
+    .expect("configured independent peer")
 }
 #[must_use]
 pub fn printed_link(stdout: &[u8]) -> Option<&[u8]> {
