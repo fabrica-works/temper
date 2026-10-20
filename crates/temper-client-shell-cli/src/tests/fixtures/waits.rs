@@ -76,7 +76,10 @@ impl Frame {
     pub fn stream_live(&self) -> bool {
         self.stream.is_some_and(|fd| {
             self.sockets.get(&fd).is_some_and(|socket| socket.eof.is_none() && !socket.closed)
-                && self.held.iter().any(|submit| matches!(submit.kind, Op::Recv { fd: receiving, .. } if receiving == fd))
+                && self
+                    .held
+                    .iter()
+                    .any(|submit| matches!(submit.kind, Op::Recv { fd: receiving, .. } if receiving == fd))
         })
     }
     pub fn wait(words: &[&str]) -> Self {
