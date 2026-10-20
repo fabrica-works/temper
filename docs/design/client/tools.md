@@ -359,7 +359,7 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
   `wait accounts --until settled`, then the account's state in its
   answer. On `forges`, a connect or an install is in progress from its
   request's answer until its run ends: connected, refused, lacking, or
-  failed, or its link's state past its life (`setup.state_life`,
+  failed, or its link's state past its life (`setup.state_life_ms`,
   `../protocol/configuration.md`); `forge-connect 1 github --key gh`,
   then `wait forges --until settled`, then the forge's row in its
   answer. `connected:F` is met by a delivery where forge F is

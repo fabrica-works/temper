@@ -1023,10 +1023,13 @@ command.
   (`../protocol/credentials.md`, section 3); the page shows the sign-in's
   end when the `accounts` watch tells it.
 - **A forge's connect or install link** is printed the same way, as
-  `TEXT <URL>` with no number, and never opened. Its address is on the
-  clients' listener (`forge.md`, 9.1), for example
-  `http://127.0.0.1:PORT/forges/1/github/manifest?state=STATE`; the
-  person opens it in a browser that reaches that address, on the
+  `TEXT <URL>` with no number, and never opened. A connect link's
+  address is on the clients' listener (`forge.md`, 9.1), for example
+  `http://127.0.0.1:PORT/forges/1/github/manifest?state=STATE`; an
+  install link's is GitHub's,
+  `https://github.com/apps/SLUG/installations/new?state=STATE`, whose
+  end GitHub sends back to the clients' listener. The person opens
+  either in a browser that reaches the clients' listener, on the
   engine's machine in standalone, and the forges' page shows the
   connect's end when the engine tells it (`forge.md`, 5.4).
 - **A key's field,** a secret, prints `(hidden)` once written, and the
@@ -1192,7 +1195,7 @@ does for the client:
   names (`../protocol/forge.md`, the setup's host). Their answers, their
   headers, their `302`s and their refused pages are `forge.md`, 9.1's.
   The state is their only authenticator: 128 bits or more, good once,
-  for its life (`setup.state_life`), for that forge alone; they take no
+  for its life (`setup.state_life_ms`), for that forge alone; they take no
   cookie and no credential of jig's. A query past `routes.query_bytes`
   is refused, a method other than `GET` is answered `405`, and a forge
   not configured or not GitHub `404`. No client of temper's calls them:

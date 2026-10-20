@@ -228,20 +228,20 @@ repository's rules.
 ## 8. Job logs
 
 GitHub serves a job's log through a redirect to a storage host. temper
-follows it only to a host its forge's `log_origins` lists. `null` is
-GitHub's default host, `productionresultssa1.blob.core.windows.net:443`;
+follows it only to an origin its forge's `log_origins` lists. `null` is
+GitHub's default, `https://productionresultssa1.blob.core.windows.net`;
 `[]` fetches no job log.
 
-When **Forges** says "A job's log is on HOST:PORT, which temper does not
+When **Forges** says "A job's log is on ORIGIN, which temper does not
 read: add it to this forge's `log_origins` and restart.", list that
-host. A list replaces the default, so keep the default in it:
+origin. A list replaces the default, so keep the default in it:
 
 ```json
-"log_origins": ["productionresultssa1.blob.core.windows.net:443", "<host>:443"]
+"log_origins": ["https://productionresultssa1.blob.core.windows.net", "https://<host>"]
 ```
 
 Then restart `temper serve`. The list holds at most `forges.log_origins`
-hosts (`docs/design/protocol/configuration.md`, the limits).
+origins (`docs/design/protocol/configuration.md`, the limits).
 
 ## 9. Replace the App's key
 

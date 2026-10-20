@@ -210,7 +210,8 @@ connected  the forge component       ◄── its access, built from the record
   secret when given, one value, kept by jig until its run ends
   (credentials.md, pasted values). The setup host's `Check { forge }`
   (skein's `forge-setup.md`, 4.6) finds that both answer as one user,
-  not a site admin, and writes the records; the page then says
+  not a site admin, and writes that user, and the routing keeps the
+  tokens and the secret as the forge's records; the page then says
   "Connected as LOGIN (ID)". Tokens of two users stop it `OtherUser`, a
   site admin's `BotIsAdmin`, a refused token `Refused`, each named, and
   the forge stays as it was.
@@ -1242,8 +1243,9 @@ listener's (`../client/forge.md`, the browser's steps).
    `Convert { forge, code, state }` (5.2) exchanges the code for the
    App's id, slug and key, finds its bot user, and writes the records;
    the conversion's PEM, webhook secret and OAuth pair are never kept.
-   Once they are kept, the forge connects, and the browser goes on to
-   the App's install page.
+   Once they are kept, `Install` (5.4) answers the App's install link,
+   the browser goes on to it, and the forge connects (forge.md, the
+   setup's host).
 5. **Installing:** the person picks an account, and all or selected
    repositories; temper's client advises selected. GitHub sends the
    browser to `http://<listener>/forges/<n>/github/setup`, where
@@ -1304,7 +1306,10 @@ listener's (`../client/forge.md`, the browser's steps).
 - **`Reconcile { forge }`** (skein's `forge-setup.md`, 5.6) runs after
   each `Connected`: the App's key, permissions, events and installations
   checked. It repairs only its hook's address.
-- **A key GitHub refuses** stops the forge, named, with Replace (17.3).
+- **A key GitHub refuses** stops the forge: the forge component, which
+  signs with the same key, stops it (forge.md, 2.3), named, with
+  Replace (17.3); the reconcile's own `Stop` is named to the root and
+  changes nothing.
 - **A permission or event lacking** is named, `Lacking`, never refused:
   the person grants it in the App's settings and approves it on each
   installation, as GitHub asks.
@@ -1312,11 +1317,11 @@ listener's (`../client/forge.md`, the browser's steps).
 ### 17.6 Job logs, and the delivery log
 
 - **A job's log** lies behind a redirect to a storage host, which the
-  forge component follows only to a host its `log_origins` lists
+  forge component follows only to an origin its `log_origins` lists
   (configuration.md, section 3; forge.md, GitHub's API as temper uses
-  it): on GitHub one host by default; `[]` fetches no job log. A host
-  not listed is named on the deployment's page, and the person adds it
-  to the forge's `log_origins` and restarts.
+  it): on GitHub one origin by default; `[]` fetches no job log. An
+  origin not listed is named on the deployment's page, and the person
+  adds it to the forge's `log_origins` and restarts.
 - **The delivery log** is read by the forge component every
   `log_poll`, and its deliveries become hints as Forgejo's webhooks do
   (forge.md, a GitHub App's delivery log).

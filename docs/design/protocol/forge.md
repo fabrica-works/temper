@@ -146,7 +146,7 @@ skein-io socket
     fake;
   - its access, `Some` or `None` (2.1): the credential, the user it must
     stand for, and a Forgejo forge's webhook secret when it has one;
-  - its `log_origins`, the hosts a job log's redirect may reach (3.6).
+  - its `log_origins`, the origins a job log's redirect may reach (3.6).
 
   And `application.webhooks`, the listener's address, when configured.
   And temper's two values of its own: the word `temper`, which marks its
@@ -266,7 +266,9 @@ skein-io socket
   deployment's page says as whom (client/forge.md, the deployment's
   page). The connector then gives the forge client its writer, which the
   forge client keeps as its own record and restores at start (skein's
-  `forge-client.md`, 7.1; `../domain/forge.md`, 4.1). A GitHub forge's `Reconcile { forge }` runs next (2.6).
+  `forge-client.md`, 7.1; `../domain/forge.md`, 4.1). A GitHub forge's
+  `Reconcile { forge }` runs next, once the forge's writing run is free
+  (2.6); it ends in no connect.
 - **Until then** each call on the forge is answered `NotConnected` at
   once, at cost 0 (2.7). The root shows the forge connecting while a run
   holds it, and not connected otherwise.
@@ -304,7 +306,7 @@ skein-io socket
   an `account` being its id and login:
   - `Created`: nothing, unless accepted at the setup URL. One never
     accepted is a stray: shown on the deployment's page, and uninstalled
-    by reconcile after `setup.state_life` (skein's `forge-setup.md`).
+    by reconcile after `setup.state_life_ms` (skein's `forge-setup.md`).
   - `Deleted`: the `Accepted` row is rewritten without it and kept, then
     `Request::Installations`. The git identity's value loses that
     account's token (2.5).
@@ -393,13 +395,15 @@ carries what passes between it, the root and the records.
 - **`Reachable`** is skein's (`forge-setup.md`, 4.8). It runs on the admin's token,
   which stays the setup host's; since it writes nothing, it runs beside
   the forge's one writing plan.
-- **Outcomes.** A run ends `Done`, carrying `Reachable`'s page for that
-  plan; `Page`, the manifest page's bytes, at most `page_bytes`, which
-  temper holds in memory with the state while it lives and serves on
-  the clients' listener (client/README.md, the routes); `Link`, the
-  install link; or `Lacking`, the run done with each permission or
-  event the App lacks named, shown on the deployment's page and never
-  refused (client/forge.md, the deployment's page).
+- **Outcomes.** A run ends `Stop` with its failure, or `Done`, which
+  carries what temper serves or shows (skein's `forge-setup.md`, 4.2):
+  `Reachable`'s page for that plan; `Page`, the manifest page's bytes,
+  at most `page_bytes`, which temper holds in memory with its state
+  while the state lives and serves on the clients' listener
+  (client/README.md, the routes); `Link`, the install link; or
+  `Lacking`, each permission or event the App lacks, shown on the
+  deployment's page and never refused (client/forge.md, the
+  deployment's page).
 - **The redirect and setup addresses** temper gives the plans are whole
   URLs, built from the clients' listener's address:
   `http://<listener>/forges/<n>/github/redirect` and
@@ -424,21 +428,24 @@ carries what passes between it, the root and the records.
   run, "the pasted value changed"; and serves each pasted item's
   `Need::Read` from it. When the run ends, done or failed, the core
   decides the carried row's erase, which the routing carries out, a
-  `Done`'s writes being kept under the forge's family-1 numbers first.
+  `Done`'s writes, and each pasted item but `Pasted`, being kept under
+  the forge's family-1 numbers first (credentials.md, pasted values).
 - **Carried rows found at start,** loaded from 2^63, are rows whose
   run a restart cut: the core decides
   each one's erase, which the routing carries out, and a connect the
   root still holds as running ends "interrupted; paste again".
-- **A run's `Done` or `Lacking`:** its writes kept and its carried
-  row's erase carried out, then `Request::Connect` (2.2) after a plan
-  that connects (`Reconcile`, `Check`, `Convert`, `Paste`);
-  `Request::Installations` after an `Accept` (2.4); the adoption's reads
-  after an `Adopt`. **A run's `Stop`:** its failure named to the root,
-  and the forge as it was.
+- **A run's `Done`:** its writes kept and its carried row's erase
+  carried out, then `Request::Connect` (2.2) after a plan that connects
+  (a Forgejo's `Reconcile` or `Check`, GitHub's `Convert` or `Paste`),
+  and never after GitHub's `Reconcile`; after `Convert`'s, `Install`
+  first, whose link answers the browser (setup.md, 17.2);
+  `Request::Installations` after an `Accept` (2.4); the adoption's
+  reads after an `Adopt`. **A run's `Stop`:** its failure named to the
+  root, and the forge as it was.
 - **States** are the host's, in memory: at most `setup.states`, each
-  living `setup.state_life` (1 h, the conversion code's hour). A restart
-  forgets them, and a state used, unknown or expired is refused. Nothing
-  about a state is stored.
+  living `setup.state_life_ms` (1 h, the conversion code's hour). A
+  restart forgets them, and a state used, unknown or expired is
+  refused. Nothing about a state is stored.
 - **One writing run per forge at once,** and one `Reachable` beside it;
   a second of either is refused "busy", never queued, and so is a
   request past `setup.runs`, which counts both (skein's
@@ -507,16 +514,18 @@ Held by skein's `forge-github.md`: the dialect's paths, headers, paging,
 validators, pauses and failures, each a named fact (section 13). Of it,
 temper sets one thing, where a job log may be read from:
 
-- **A job log's redirect** is followed only to a host named in the
+- **A job log's redirect** is followed only to an origin named in the
   forge's `log_origins` (configuration.md, the forges), resolved at
-  start: at most `forges.log_origins` entries, each `host:port` over
-  TLS. GitHub's default names the one blob store GitHub's logs are
-  served from; empty, no job log is fetched, and a check's failure is
-  shown without its log.
-- **A redirect to any other host** is answered `Unavailable`, and the
-  component's diagnostic names that host once. The routing shows it on
-  the deployment's page, on that forge's row (client/forge.md, the
-  deployment's page), and in the log; the operator adds the host to
+  start: at most `forges.log_origins` entries, each an origin, `https`,
+  or `http` to a loopback host alone, matched as skein's component
+  matches a redirect's (scheme, host in ASCII case, port; skein's
+  `forge-connection.md`, 4.5). GitHub's default names the one blob
+  store GitHub's logs are served from; empty, no job log is fetched,
+  and a check's failure is shown without its log.
+- **A redirect to any other origin** is answered `Unavailable`, and the
+  component's diagnostic names that origin once. The routing shows it
+  on the deployment's page, on that forge's row (client/forge.md, the
+  deployment's page), and in the log; the operator adds the origin to
   `forges[].log_origins` and restarts (section 14).
 - **No document, example or test of temper's calls github.com:** GitHub's
   default addresses are named in the configuration, and every test points
@@ -707,7 +716,7 @@ its `limits` member (configuration.md, section 7), set in
   `Component::new` for every forge, none per forge and none in
   `forges[]`. `log_catch_up` bounds only a later start of a forge
   within one process.
-- **The setup's host:** `setup.states`, `setup.state_life` (1 h) and
+- **The setup's host:** `setup.states`, `setup.state_life_ms` (1 h) and
   `setup.runs` (2.6); its `Reachable` plan's `reachable` is the
   picker's `picker.page`.
 - **Beside this layer,** the clients' listener's `routes.query_bytes`
@@ -924,8 +933,8 @@ temper's part:
     6).
 - **GitHub's dialect and setup's open questions** are skein's
   (`forge-github.md`; `forge-setup.md`, GitHub's plans). temper's:
-  - **A job log's host learned at runtime.** Default: `log_origins` is
-    resolved at start; another host is named, and the operator adds it
+  - **A job log's origin learned at runtime.** Default: `log_origins` is
+    resolved at start; another origin is named, and the operator adds it
     and restarts (3.6).
   - **A Forgejo secret with no listener.** Default: handed none, the
     forge polls alone, named once in the log (section 5).

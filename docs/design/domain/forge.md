@@ -292,8 +292,11 @@ temper-engine-domain-forge              the connector's top: resources and holds
 - **The forge client keeps the writer as its own record** (skein's
   `forge-client.md`, 7.1): `Stored::Writer` under `Key::Writer(forge)`,
   in temper's small store under its tag 16 (`STORE_VERSION` 3), and
-  restored at start before any restored entry, so a restored effect
-  never meets `Forbidden` (section 16). The connector keeps no copy.
+  restored at start among the forge's rows, in any order: the client
+  takes them all before `Restored`, and runs no restored effect before
+  it, so a restored effect never meets `Forbidden` (skein's
+  `forge-client.md`, section 8; section 16). The connector keeps no
+  copy.
 
 ### 4.2 Access at adoption
 

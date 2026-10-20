@@ -130,6 +130,7 @@ setup.md's (section 9). What is open is listed in section 8.
   | 8 | `AppKey` | the App's private key, PKCS#1 DER, 2048 bits | GitHub |
   | 9 | `Accepted` | the accepted installations' ids, at most `forges.installations` | GitHub |
   | 10 | `Origin` | the forge's kind and `api` address the records were made for | both |
+  | 11 | `Pasted` | a pasted App key's PEM, in a pasted bundle alone (2.2), never a record: a row under 11 is unreadable | GitHub |
 
   Code 0 is never written, and a code never changes its meaning. temper
   maps skein's setup items to these codes; on GitHub, `User` is the
@@ -211,11 +212,12 @@ setup.md's (section 9). What is open is listed in section 8.
   the App's hook to `https://<slug>.invalid/` (section 2).
 - **The number is jig's.** jig numbers each carried value itself, under
   temper's tag from 2^63 up, from a next number it keeps durably in a
-  counter row and never reuses. The request names no number and the
-  client draws none; the core gets the number and the digest. A number
-  already holding a row is refused at decode, never overwritten. A
-  forge's records lie below 2^63 (section 2.1), so no request, refused
-  or not, overwrites or erases them.
+  counter row of its own, which is not one of temper's rows and never
+  reaches temper's `Load`, and never reuses. The request names no
+  number and the client draws none; the core gets the number and the
+  digest. A number already holding a row is refused at decode, never
+  overwritten. A forge's records lie below 2^63 (section 2.1), so no
+  request, refused or not, overwrites or erases them.
 - **A carried value left unused** is named once: when the core leaves
   one unused, its request refused, replayed, joined to another or cut
   by a stop, it emits one output naming the number, and temper's root
@@ -225,8 +227,10 @@ setup.md's (section 9). What is open is listed in section 8.
   a decision of the core's; the routing carries out those at a run's end
   and at start.
 - **The value:** temper's bundle, versioned: `[1][count u8]`, then per
-  entry `[item u16][length u16][bytes]`, at most 4 KiB in all, jig's
-  bound on a carried value, and at most `records.value_bytes`.
+  entry `[item u16][length u16][bytes]`, both `u16`s little-endian, the
+  item one of 2.1's codes (`Pasted` for a pasted App key's PEM), at
+  most 4 KiB in all, jig's bound on a carried value, and at most
+  `records.value_bytes`.
   A pasted App's PEM key, under 2 KiB for GitHub's 2048-bit keys, fits.
   It lives until its run ends.
 - **The core** keeps the number and the digest in the connect's own
@@ -239,7 +243,10 @@ setup.md's (section 9). What is open is listed in section 8.
   and serves the setup host's read of each pasted item from it before the
   forge's rows. When the run ends, done or failed, the core decides the
   row's erase, which the routing carries out; on done, the items the run
-  wrote are kept under the forge's family-1 numbers first.
+  wrote, and each pasted item but `Pasted` (the tokens and the secret
+  the plan was given, which it keeps: skein's `forge-setup.md`, 4.6),
+  are kept under the forge's family-1 numbers first, after the run's
+  writes.
 - **A restart** drops runs, whose states are in memory: the core decides
   the erase of each carried row under temper's tag found at start
   (loaded from 2^63), and a connect the

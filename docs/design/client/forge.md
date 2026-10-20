@@ -326,8 +326,9 @@ the landing branch's rules as the forge applies them, each with what it
 means for landing: a merge queue (temper enters it, 2.1), required
 approvals (a person approves, or temper's App may bypass), required
 status checks (CI as the landing rule's), code owners (a person
-reviews), signed commits (temper's pushes are refused, so its landings
-wait), linear history (a merge style that keeps it), and whether
+reviews), signed commits (temper's commits are unsigned, so where the
+forge refuses its merge for it, its landings wait), linear history (a
+merge style that keeps it), and whether
 temper's App may bypass the rules. Where a rule keeps temper from
 landing, the form names the one setting on the forge that would let it
 land, for the person to choose; until it is changed, its ready changes
@@ -384,7 +385,7 @@ configured forge, by its number, its kind and its `web` address, says:
   | State | The row says |
   |---|---|
   | not connected | "Not connected", with Connect; where its records say why, "Not connected: its records are unreadable" or "Not connected: its records were made for KIND at ADDRESS", and connecting again overwrites them (`../protocol/forge.md`, at start); an owned forge not prepared yet, "Not connected: prepare it with `temper forge prepare`" (`../protocol/setup.md`, owned), with no Connect |
-  | connecting | "Connecting": a run holds the forge, and what it waits for: a managed or owned Forgejo's reconcile, the forge's answers to a check, or the person's browser on GitHub until the link's state ends (`setup.state_life`) |
+  | connecting | "Connecting": a run holds the forge, and what it waits for: a managed or owned Forgejo's reconcile, the forge's answers to a check, or the person's browser on GitHub until the link's state ends (`setup.state_life_ms`) |
   | connected | "Connected as LOGIN (ID)", the user the records hold: the bot's on Forgejo, the App's on GitHub |
   | stopped | "Stopped: WHY", the component's reason in words (its key or token refused, a user other than its own, an access it finds invalid, a refusal that asking again would not mend), with Replace; the engine and every other forge run on |
 
@@ -407,8 +408,8 @@ configured forge, by its number, its kind and its `web` address, says:
   repositories" (linked to the installation's page, 5.5), "suspended"
   while GitHub suspends it, and a stray, an installation never accepted
   through temper's link, "uninstalled at the next reconcile".
-- **A job's log on a host temper does not read:** "A job's log is on
-  HOST:PORT, which temper does not read: add it to this forge's
+- **A job's log on an origin temper does not read:** "A job's log is on
+  ORIGIN, which temper does not read: add it to this forge's
   `log_origins` and restart." (`../protocol/configuration.md`, the
   forges' members), until a start names it; the same line is in the
   engine's log.
@@ -602,7 +603,7 @@ address, as temper builds the manifest from it
 - **The state is the only authenticator.** A route takes no cookie and
   no credential of jig's: the state, 128 bits or more drawn by the
   setup's host for one connect or one install, is good once, for its
-  life (`setup.state_life`), for that forge alone. The host keeps at
+  life (`setup.state_life_ms`), for that forge alone. The host keeps at
   most `setup.states` of them, in memory, so a restart forgets them
   (`../protocol/forge.md`, the setup's host).
 - **Refused:** a state used, unknown or past its life, or a code GitHub

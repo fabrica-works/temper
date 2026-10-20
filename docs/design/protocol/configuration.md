@@ -182,7 +182,7 @@ which bounds its writers. Each:
 | `transport` | `"plaintext"`, `{"tls": {"server_name": string, "trust": file or null}}`, or `null` | plaintext only when `api` is a socket address on loopback; `trust` null is the machine's roots. `null` on GitHub alone, for TLS to github.com's API with the machine's roots | the forge component's connections |
 | `git` | string, or `null` | an `http` or `https` URL: a host, an optional port and an optional path; no user, query, fragment or final `/`; `http` only to a loopback host. `null` on GitHub alone, for `https://github.com` | the base of each repository's remote, `<git>/<owner>/<name>.git`, which the engine's routing makes (channel.md, section 4); and the host segment of the forge's resource paths: `git`'s host, with `:port` when it names a port |
 | `web` | string, or `null` | on GitHub, a URL by `git`'s rule, `null` for `https://github.com`; on Forgejo, `null` | GitHub's browser pages: the manifest's form, the install link and an installation's pages (setup.md, connecting GitHub; `../client/forge.md`) |
-| `log_origins` | list of strings, or `null` | each a host's name and a port, `"host:port"`, reached over TLS and resolved at start; at most `forges.log_origins` (section 7). `null` is the kind's default: GitHub's `["productionresultssa1.blob.core.windows.net:443"]`, Forgejo's none | the hosts to which a job log's redirect is followed, to its host alone (forge.md, GitHub's API as temper uses it); `[]` fetches no job log |
+| `log_origins` | list of strings, or `null` | each an origin: `"https://<host>[:<port>]"`, TLS with `transport`'s trust (the machine's roots when it names none), or `"http://<host>[:<port>]"` to a loopback host alone, as skein's fake serves its logs; no path, user, query, fragment or final `/`; the port 443 or 80 when absent. Each host is resolved at start, and one that does not resolve refuses the start, naming the forge and the host; at most `forges.log_origins` (section 7). `null` is the kind's default: GitHub's `["https://productionresultssa1.blob.core.windows.net"]`, Forgejo's none | the origins to which a job log's redirect is followed (forge.md, GitHub's API as temper uses it); `[]` fetches no job log |
 
 - **A forge's number is its stable id,** never its place in the list:
   its records in jig's secrets' store and its repositories in the main
@@ -488,7 +488,7 @@ top-level `workers`, in the same order; standalone has one. Each:
   | `forges.installations` | the installations a GitHub forge accepts, its `Accepted` record's ids (credentials.md, 2.1) |
   | `forges.log_origins` | a forge's `log_origins`; at most 4 (section 3) |
   | `forge_component.installations` | the installations the component holds tokens for, per forge |
-  | `forge_component.log_origins` | the hosts a job log's redirect may reach, per forge |
+  | `forge_component.log_origins` | the origins a job log's redirect may reach, per forge |
   | `forge_component.token_bytes` | a forge's token: an API token, a git token or a site admin's token (skein's `forge-connection.md`, 7.2) |
   | `forge_component.key_bytes` | a GitHub App's key |
   | `forge_component.renew_before_ms` | `renew_before`: how long before an installation's token expires it is minted again (credentials.md, section 5) |
