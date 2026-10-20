@@ -7,6 +7,7 @@ pub mod facts;
 mod fixture;
 mod hooks;
 mod job_clone;
+pub mod json;
 pub mod mask;
 mod orgs;
 mod registration;

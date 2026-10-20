@@ -143,6 +143,7 @@ dependencies = [
  "skein-forge",
  "skein-forge-client",
  "skein-io",
+ "skein-json",
  "skein-lib",
  "skein-shell",
  "skein-throwaway-forgejo",

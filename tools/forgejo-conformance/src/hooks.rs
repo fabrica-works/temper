@@ -38,7 +38,18 @@ fn body(port: u16, path: &str, secret: &str, events: &[&str], active: bool, crea
     let kind = if create { "\"type\":\"forgejo\"," } else { "" };
     format!(
         "{{{kind}\"config\":{{\"url\":\"http://127.0.0.1:{port}/{path}\",\"content_type\":\"json\",\"secret\":\"{secret}\"}},\"events\":{},\"active\":{active}}}",
-        serde_json::to_string(events).expect("event names")
+        String::from_utf8(
+            crate::json::write(|out| {
+                out.array_start();
+                for event in events {
+                    out.string(event.as_bytes());
+                }
+                out.array_end();
+            })
+            .expect("event names")
+            .into_vec()
+        )
+        .expect("JSON UTF-8")
     )
 }
 pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {

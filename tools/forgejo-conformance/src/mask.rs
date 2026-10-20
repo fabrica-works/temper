@@ -174,10 +174,22 @@ fn sorted_units(bytes: &[u8]) -> Vec<u8> {
         let array = start + KEY.len() - 1;
         let Some(end) = rest[array..].iter().position(|byte| *byte == b']') else { break };
         let end = array + end + 1;
-        let Ok(mut units) = serde_json::from_slice::<Vec<String>>(&rest[array..end]) else { break };
-        units.sort();
+        let Ok(json) = crate::json::Json::parse(&rest[array..end]) else { break };
+        let Some(mut units) = json.root().items().iter().map(|item| item.str()).collect::<Option<Vec<_>>>() else {
+            break;
+        };
+        units.sort_unstable();
         out.extend_from_slice(&rest[..array]);
-        out.extend_from_slice(&serde_json::to_vec(&units).expect("unit strings"));
+        out.extend_from_slice(
+            &crate::json::write(|out| {
+                out.array_start();
+                for unit in &units {
+                    out.string(unit.as_bytes());
+                }
+                out.array_end();
+            })
+            .expect("unit strings"),
+        );
         rest = &rest[end..];
     }
     out.extend_from_slice(rest);

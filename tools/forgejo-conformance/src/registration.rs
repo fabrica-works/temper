@@ -159,9 +159,9 @@ fn offline(binary: &Path, scratch: &Path, secret: &Path, facts: &mut Vec<Fact>) 
         expected,
         &format!("codes {:?}, {:?}, {:?}", a.status.code(), b.status.code(), c.status.code()),
     );
-    let row: Value = serde_json::from_slice(&fs::read(file)?)?;
-    add(facts, NAMES[5], row["uuid"] == FACT_UUID, "runner file uuid differed");
-    add(facts, NAMES[6], row["token"] == FACT_SECRET, "runner file token differed");
+    let row = crate::json::Json::parse(&fs::read(file)?)?;
+    add(facts, NAMES[5], row.root().get("uuid").is(FACT_UUID), "runner file uuid differed");
+    add(facts, NAMES[6], row.root().get("token").is(FACT_SECRET), "runner file token differed");
     Ok(())
 }
 pub(crate) fn online(f: &Fixture) -> Result<bool> {
