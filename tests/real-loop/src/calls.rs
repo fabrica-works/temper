@@ -11,6 +11,8 @@ pub const D2: Dir = Dir(2);
 pub enum Arg {
     Lit(&'static str),
     Task(usize),
+    Delegate(usize),
+    Digest(usize),
     Number(u64),
 }
 impl From<&'static str> for Arg {
@@ -105,6 +107,23 @@ pub fn task(call: usize) -> Arg {
     Arg::Task(call)
 }
 #[must_use]
+pub fn delegate(call: usize) -> Arg {
+    Arg::Delegate(call)
+}
+#[must_use]
+pub fn digest(call: usize) -> Arg {
+    Arg::Digest(call)
+}
+fn delegate_number(stdout: &[u8]) -> u64 {
+    let value: serde_json::Value = serde_json::from_slice(stdout).expect("task tree JSON");
+    let tree = &value["tree"];
+    let root = tree["root"]["task"].as_u64().expect("tree root");
+    let mut children = tree["rows"].as_array().expect("tree rows").iter().filter(|node| node["parent"] == root);
+    let child = children.next().expect("one child task")["chip"]["task"].as_u64().expect("child task number");
+    assert!(children.next().is_none(), "one child task");
+    child
+}
+#[must_use]
 pub fn occurrences(bytes: &[u8], needle: &[u8]) -> usize {
     bytes.windows(needle.len()).filter(|part| *part == needle).count()
 }
@@ -120,6 +139,7 @@ pub(crate) fn task_number(stdout: &[u8]) -> u64 {
         .parse()
         .expect("created task number")
 }
+#[derive(Debug)]
 pub struct Called {
     pub locked: Option<Time>,
     pub released: Option<Time>,
@@ -270,6 +290,12 @@ impl Caller {
             words.push(match arg {
                 Arg::Lit(word) => word.as_bytes().into(),
                 Arg::Task(call) => task_number(&self.calls[*call].stdout).to_string().into_bytes().into(),
+                Arg::Delegate(call) => delegate_number(&self.calls[*call].stdout).to_string().into_bytes().into(),
+                Arg::Digest(call) => {
+                    let value: serde_json::Value =
+                        serde_json::from_slice(&self.calls[*call].stdout).expect("task JSON");
+                    value["task"]["digest"].as_str().expect("task digest").as_bytes().into()
+                }
                 Arg::Number(number) => number.to_string().into_bytes().into(),
             });
         }

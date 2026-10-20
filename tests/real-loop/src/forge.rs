@@ -62,6 +62,8 @@ pub struct Seen {
     deliveries: Vec<Delivery>,
     pub(crate) responses: Vec<u16>,
     observations: Vec<domain::Observation>,
+    merged_green: bool,
+    main: std::collections::BTreeMap<Vec<u8>, Vec<u8>>,
 }
 impl Seen {
     #[must_use]
@@ -71,6 +73,14 @@ impl Seen {
     #[must_use]
     pub fn responses(&self) -> &[u16] {
         &self.responses
+    }
+    #[must_use]
+    pub fn merged_green(&self) -> bool {
+        self.merged_green
+    }
+    #[must_use]
+    pub fn main_file(&self, path: &[u8]) -> &[u8] {
+        self.main.get(path).expect("main file")
     }
     pub(crate) fn collect(&mut self, peer: &Peer, handle: &Rc<RefCell<Forge>>) {
         self.deliveries = peer
@@ -87,7 +97,35 @@ impl Seen {
                 })
             })
             .collect();
-        while let Some(observed) = handle.borrow_mut().domain.pop_observation() {
+        loop {
+            let Some(observed) = handle.borrow_mut().domain.pop_observation() else { break };
+            if let domain::Observation::Merged { repository, head, .. } = &observed {
+                let forge = handle.borrow();
+                let api::Answer::Checks(checks) = forge
+                    .domain
+                    .inspect(&forge.config, repository, &api::Read::Checks { commit: *head })
+                    .expect("merged checks")
+                else {
+                    panic!("checks answer")
+                };
+                self.merged_green =
+                    !checks.is_empty() && checks.iter().all(|check| check.status.state == api::Check::Passed);
+                let api::Answer::Commit(main) = forge
+                    .domain
+                    .inspect(&forge.config, repository, &api::Read::Branch { branch: b"main".as_slice().into() })
+                    .expect("main head")
+                else {
+                    panic!("main commit")
+                };
+                self.main = forge
+                    .domain
+                    .object(main)
+                    .expect("main object")
+                    .tree
+                    .iter()
+                    .map(|(path, bytes)| (path.to_vec(), bytes.to_vec()))
+                    .collect();
+            }
             assert!(self.observations.len() < STORY_OBSERVATIONS as usize, "bounded domain observations");
             self.observations.push(observed);
         }
@@ -102,10 +140,18 @@ impl State {
     pub(crate) fn new(fixture: Fixture) -> (Self, Peer) {
         let setup = (fixture.setup)();
         let table = temper_fake_git::fixtures::table(&setup.name, setup.protection.as_ref().map(|p| p.branch.as_ref()));
-        let mut domain = domain::Domain::new(&temper_fake_git::fixtures::CONFIG, fixtures::SEED);
-        domain::repository(&mut domain, &temper_fake_git::fixtures::CONFIG, setup);
+        let mut config = temper_fake_git::fixtures::CONFIG;
+        // The HTTP peer admits four simultaneous calls, unlike the git-only fixture.
+        config.limits.calls = protocol_limits().calls;
+        // Forgejo timestamps are wall times; this peer runs on the real monotonic clock.
+        let now = skein_shell::Clock::new().now();
+        config.skew = domain::Skew::Ahead(Duration::from_nanos(
+            now.wall.as_nanos().checked_sub(now.now.as_nanos()).expect("wall time follows monotonic origin"),
+        ));
+        let mut domain = domain::Domain::new(&config, fixtures::SEED);
+        domain::repository(&mut domain, &config, setup);
         domain::grant(&mut domain, b"acme/app", 1, api::Permission::Write);
-        let handle = Rc::new(RefCell::new(Forge::new(domain, temper_fake_git::fixtures::CONFIG)));
+        let handle = Rc::new(RefCell::new(Forge::new(domain, config)));
         crate::git::share(Some(temper_fake_git::Transport::new(handle.clone(), &table)));
         let peer = Peer::new(
             ([127, 0, 0, 1], 0).into(),

@@ -20,7 +20,9 @@ pub(crate) fn agent(spawn: &Spawn, inherited: &Inherited) -> Proc {
                     seed: fixtures::SEED,
                     pid: 101,
                     trace: None,
-                    roots: Some(inherited.roots.iter().map(|(_, fd)| *fd).collect()),
+                    // Start carries the checkout paths after spawn. Open those paths in
+                    // Start order, just as the shipped process does on this filesystem.
+                    roots: None,
                 },
                 Box::new(errors),
             )
@@ -28,10 +30,6 @@ pub(crate) fn agent(spawn: &Spawn, inherited: &Inherited) -> Proc {
         ),
     ))
 }
-pub(crate) fn roots(spawn: &Spawn) -> Vec<StartupRoot> {
-    let config = Path::new(std::ffi::OsStr::from_bytes(&spawn.args[1]));
-    vec![StartupRoot {
-        name: b"worker".as_slice().into(),
-        path: config.parent().expect("agent parent").join("worker-root").as_os_str().as_bytes().into(),
-    }]
+pub(crate) fn roots(_spawn: &Spawn) -> Vec<StartupRoot> {
+    Vec::new()
 }

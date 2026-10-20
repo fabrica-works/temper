@@ -7,6 +7,47 @@ pub const README: &[u8] = b"# app\n";
 // A created member owns all ten grants, their segment boxes and executor kinds.
 const MEMBER_BYTES: u32 = 2048;
 
+#[must_use]
+pub fn fixture() -> crate::forge::Fixture {
+    crate::forge::Fixture {
+        setup: || {
+            use skein_fake_forge_domain::api;
+            let mut setup = (crate::forge::fixture().setup)();
+            setup.tree.iter_mut().find(|file| file.path.as_ref() == b"README.md").expect("README").content =
+                README.into();
+            setup.checks.cue = Some(api::Cue { path: b"README.md".as_slice().into(), green: EDIT.into() });
+            setup.protection = Some(api::Protection {
+                branch: b"main".as_slice().into(),
+                contexts: setup.checks.contexts.clone(),
+                approvals: 0,
+                dismiss_stale: false,
+            });
+            setup
+        },
+        configure: |value, agent, forge| {
+            let limits = &mut value["application"]["limits"]["overrides"];
+            // Shipped: poll 5 s, poll_max 30 s, slow 40 s, hinted 1 s.
+            for (name, millis) in [("poll_ms", 10), ("poll_max_ms", 50), ("slow_ms", 100), ("hinted_ms", 10)] {
+                limits[format!("forge.client.{name}")] = millis.into();
+            }
+            // Chat, repository polls and one fresh change chain share the client.
+            limits["forge.client.pending"] = 8.into();
+            limits["forge.client.calls"] = 4.into();
+            limits["forge_component.connections"] = 4.into();
+            // The tools request their shipped 32-row tree window; the base world allows two.
+            value["engine"]["limits"]["overrides"]["documents.rows"] = temper_client_tools::limits::ROWS.into();
+            // The sample profile allows 100 requests per 10 s; short polls need a shorter window.
+            value["application"]["limits"]["overrides"]["forge.client.window_ms"] = 100.into();
+            value["application"]["landing"]["projects"] = json!([{"project":1,"rules":[{
+                "connector":1,"kind":4,"pattern":{"segments":["forge",forge.to_string(),"acme","app","branch"],"last":"exact","value":"main"},
+                "enforce":true,"ci":true,"up_to_date":true,
+                "gates":[{"number":1,"blocking":true,"freshness":"exact"}],"approvals":[]
+            }]}]);
+            configure(value, agent, forge);
+        },
+    }
+}
+
 pub fn configure(value: &mut Value, agent: &mut Value, forge: SocketAddr) {
     let grant = |kind| json!({"connector":1,"kind":kind,"pattern":{"segments":["forge",forge.to_string()],"last":"open","value":"acme"}});
     let grants =
@@ -43,7 +84,8 @@ pub fn configure(value: &mut Value, agent: &mut Value, forge: SocketAddr) {
         ("authority.grants", 12),
         ("authority.segments", 9),
         ("authority.roles", 1),
-        ("authority.requirements", 2),
+        // CI, up-to-date and the review gate each produce one requirement.
+        ("authority.requirements", 3),
         ("notes.scopes", 15),
         ("brief.briefs", 2),
         ("brief.sections", 4),
@@ -111,7 +153,7 @@ pub fn scripts(forge: SocketAddr, repository: u64, readme: &[u8]) -> Box<[skein_
         tokens: 20,
     };
     let grant = |kind| json!({"connector":1,"kind":kind,"segments":["forge",forge.to_string()],"terminal":"open","last":"acme"});
-    let delegate = json!({"batch":[{"executor":{"kind":"procedure","connector":1,"code":2},"spec":{"words":"@coding Small fix","parameters":[{"name":1,"kind":"resource","connector":1,"resource":repository},{"name":2,"kind":"bytes","value":"main"}]},"contract":{"kind":"change","connector":1,"change_kind":1,"words":128},"authority":{"tools":1,"grants":[grant(2),grant(3),grant(4),grant(10),grant(11),grant(12)],"delegation":{"kinds":[{"kind":"agent","number":1}],"tasks":4,"depth":2},"budget":{"spend":10},"notes":0}}]});
+    let delegate = json!({"batch":[{"executor":{"kind":"procedure","connector":1,"code":2},"spec":{"words":"@coding Fix","parameters":[{"name":1,"kind":"resource","connector":1,"resource":repository},{"name":2,"kind":"bytes","value":"main"}]},"contract":{"kind":"change","connector":1,"change_kind":1,"words":128},"authority":{"tools":1,"grants":[grant(2),grant(3),grant(4),grant(10),grant(11),grant(12)],"delegation":{"kinds":[{"kind":"agent","number":1}],"tasks":4,"depth":2},"budget":{"spend":10},"notes":0}}]});
     let original = std::str::from_utf8(readme).expect("README UTF-8");
     let changed = format!("{original}{}", std::str::from_utf8(EDIT).expect("edit UTF-8"));
     Box::new([
@@ -127,10 +169,11 @@ pub fn scripts(forge: SocketAddr, repository: u64, readme: &[u8]) -> Box<[skein_
                     finish: Finish::ToolCalls,
                     tokens: 20,
                 },
+                call(b"finish", json!({"form":"report","text":"The change landed.","fields":{}})),
             ]),
         },
         Script {
-            cue: b"@coding Small fix".as_slice().into(),
+            cue: b"@coding Fix".as_slice().into(),
             turns: Box::new([
                 call(b"read", json!({"path":"README.md"})),
                 call(b"edit", json!({"path":"README.md","edits":[{"old":original,"new":changed}]})),
