@@ -37,7 +37,7 @@ pub struct Frame {
     pub link_root: Option<Fd>,
     pub link_leaf: Option<Box<[u8]>>,
     pub input_stat: Option<Stat>,
-    pub linked_leaf: Option<()>,
+    pub linked_leaf: Option<Error>,
     pub carried_keys: Vec<skein_lib::Secret>,
     pub refuse_link: Option<()>,
     pub again_links: u32,
@@ -310,8 +310,8 @@ impl Frame {
         }
         if path == b"call.json" || path == b"link-file" || path == b"link" {
             assert_eq!(how, OpenHow::ReadNoFollow, "check the file at its name");
-            if self.linked_leaf.is_some() {
-                return Err(Error::TooManyLinks);
+            if let Some(error) = self.linked_leaf {
+                return Err(error);
             }
             self.link_root = Some(root);
             self.link_leaf = Some(path.into());

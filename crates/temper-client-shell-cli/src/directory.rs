@@ -161,32 +161,11 @@ impl Directory {
             self.fail(format!("{part} is not private: {found:?}").as_bytes());
             return;
         }
+        self.answer_file(now, event);
+    }
+    fn answer_file(&mut self, now: Time, event: file::Event) {
         match (self.stage, event) {
-            (Stage::KeyOpen, file::Event::Opened { .. }) => self.stage = Stage::KeyStat,
-            (Stage::KeyStat, file::Event::Stated { stat, .. }) => {
-                if stat.kind != skein_io::kernel::Kind::File || stat.owner != self.user || stat.mode & 0o077 != 0 {
-                    self.fail(b"key file must be a private regular file owned by this user");
-                } else if stat.size > u64::from(self.link_max) {
-                    self.fail(b"key file is too large");
-                } else {
-                    self.key_bytes = Vec::with_capacity(usize::try_from(self.link_max).expect("key bound"));
-                    self.stage = Stage::KeyRead;
-                }
-            }
-            (Stage::KeyRead, file::Event::Read { bytes, .. }) => {
-                if self.key_bytes.len() + bytes.len() > usize::try_from(self.link_max).expect("key bound") {
-                    self.fail(b"key file is too large");
-                } else if bytes.is_empty() {
-                    self.stage = Stage::KeyClose;
-                } else {
-                    self.key_bytes.extend_from_slice(&bytes);
-                }
-            }
-            (Stage::KeyClose, file::Event::Closed { .. }) => {
-                self.key = None;
-                self.link = Some(std::mem::take(&mut self.key_bytes).into_boxed_slice());
-                self.stage = Stage::Ready;
-            }
+            (Stage::KeyOpen | Stage::KeyStat | Stage::KeyRead | Stage::KeyClose, event) => self.answer_key(event),
             (Stage::Link, file::Event::Loaded { bytes, .. }) => {
                 self.link = Some(bytes);
                 self.stage = Stage::Ready;
@@ -229,7 +208,74 @@ impl Directory {
             (Stage::Token, file::Event::Failed { error: Error::NotFound, .. }) => {
                 self.fail(b"DIRECTORY is not signed in");
             }
-            (_, event) => self.fail(format!("DIRECTORY could not be read: {event:?}").as_bytes()),
+            (stage, event) => match stage {
+                Stage::KeyOpen | Stage::KeyStat | Stage::KeyRead | Stage::KeyClose => self.answer_key(event),
+                Stage::Start
+                | Stage::Exists
+                | Stage::Checked
+                | Stage::Private
+                | Stage::Lock
+                | Stage::Address
+                | Stage::Token
+                | Stage::Link
+                | Stage::Store
+                | Stage::Ready
+                | Stage::Closing => self.fail(b"DIRECTORY could not be read"),
+            },
+        }
+    }
+    fn answer_key(&mut self, event: file::Event) {
+        match event {
+            file::Event::Failed { error, .. } => {
+                self.fail(if error == Error::NotFound {
+                    b"key file not found"
+                } else if error == Error::TooManyLinks {
+                    b"key file must not be a link"
+                } else {
+                    b"key file could not be read"
+                });
+            }
+            file::Event::Opened { .. } => self.stage = Stage::KeyStat,
+            file::Event::Stated { stat, .. } => {
+                if stat.kind != skein_io::kernel::Kind::File || stat.owner != self.user || stat.mode & 0o077 != 0 {
+                    self.fail(b"key file must be a private regular file owned by this user");
+                } else if stat.size > u64::from(self.link_max) {
+                    self.fail(b"key file is too large");
+                } else {
+                    self.key_bytes = Vec::with_capacity(usize::try_from(self.link_max).expect("key bound"));
+                    self.stage = Stage::KeyRead;
+                }
+            }
+            file::Event::Read { bytes, .. } => {
+                if self.key_bytes.len() + bytes.len() > usize::try_from(self.link_max).expect("key bound") {
+                    self.fail(b"key file is too large");
+                } else if bytes.is_empty() {
+                    self.stage = Stage::KeyClose;
+                } else {
+                    self.key_bytes.extend_from_slice(&bytes);
+                }
+            }
+            file::Event::Closed { .. } => {
+                self.key = None;
+                self.link = Some(std::mem::take(&mut self.key_bytes).into_boxed_slice());
+                self.stage = Stage::Ready;
+            }
+            file::Event::Locked { .. }
+            | file::Event::Busy { .. }
+            | file::Event::Made { .. }
+            | file::Event::Refused { .. }
+            | file::Event::Loaded { .. }
+            | file::Event::Scanned { .. }
+            | file::Event::Stored { .. }
+            | file::Event::Conflict { .. }
+            | file::Event::TooLarge { .. }
+            | file::Event::Written { .. }
+            | file::Event::Cut { .. }
+            | file::Event::Synced { .. }
+            | file::Event::Renamed { .. }
+            | file::Event::Removed { .. }
+            | file::Event::Listed { .. }
+            | file::Event::Cancelled { .. } => self.fail(b"key file could not be read"),
         }
     }
     pub(crate) fn progress(&mut self, now: Time) {
@@ -339,7 +385,14 @@ impl Directory {
         self.stage = Stage::Start;
     }
     pub(crate) fn load_key(&mut self, path: &[u8]) {
+        if self.file_root.is_none() {
+            self.fail(b"key file could not be read: file has no parent");
+            return;
+        }
         self.load_link(path);
+        if self.closing {
+            return;
+        }
         self.link_max = temper_client_tools::limits::KEY_BYTES + 1;
         self.stage = Stage::KeyOpen;
     }

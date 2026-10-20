@@ -11,6 +11,7 @@ pub(crate) struct Operation {
     pub to: Option<c::Recipient>,
     pub party: Option<u64>,
     pub retry: Option<Box<[u8]>>,
+    pub value_name: Option<crate::jig::key::Name>,
 }
 impl Operation {
     pub(crate) fn of(ask: &Ask) -> Self {
@@ -77,7 +78,7 @@ impl Operation {
                 ),
             },
         };
-        Self { word, task, to: None, party: None, retry: None }
+        Self { word, task, to: None, party: None, retry: None, value_name: None }
     }
 }
 pub(crate) fn print(
@@ -143,8 +144,8 @@ fn bytes(
         write.finish()
     }
 }
-fn client_reason(outcome: &Outcome) -> Option<&'static [u8]> {
-    match outcome {
+fn client_reason<'a>(operation: &'a Operation, outcome: &Outcome) -> Option<[&'a [u8]; 4]> {
+    let reason: Option<&[u8]> = match outcome {
         Outcome::NotKept => Some(b"request not kept"),
         Outcome::Unknown => Some(b"unknown past retention"),
         Outcome::Limit => Some(b"request limit"),
@@ -152,9 +153,15 @@ fn client_reason(outcome: &Outcome) -> Option<&'static [u8]> {
         Outcome::Unconfirmed => Some(b"tools' bug; unconfirmed request; report it as a finding"),
         Outcome::Answered(Answered::Family(_)) => Some(b"tools' bug; unexpected family answer; report it as a finding"),
         Outcome::Answered(Answered::Jig(_)) => None,
-        Outcome::Unsent => Some(b"unsent; supply the same --key and file again"),
-        Outcome::Lost => Some(b"lost; supply the same --key and file again"),
-    }
+        Outcome::Unsent => Some(b"unsent"),
+        Outcome::Lost => Some(b"lost"),
+    };
+    let reason = reason?;
+    let name = if let Outcome::Unsent | Outcome::Lost = outcome { operation.value_name.as_ref() } else { None };
+    Some(match name {
+        Some(name) => [reason, b"; supply --key ", name.bytes(), b" and the same file again"],
+        None => [reason, b"", b"", b""],
+    })
 }
 fn text(operation: &Operation, outcome: &Outcome, me: Option<&c::Me>, limits: &Limits, kept: bool, out: &mut Text) {
     if kept {
@@ -162,8 +169,10 @@ fn text(operation: &Operation, outcome: &Outcome, me: Option<&c::Me>, limits: &L
         out.put(operation.word);
         out.put(b", ");
     }
-    if let Some(reason) = client_reason(outcome) {
-        out.put(reason);
+    if let Some(reason) = client_reason(operation, outcome) {
+        for part in reason {
+            out.put(part);
+        }
         out.put(b"\n");
         return;
     }
@@ -266,10 +275,10 @@ fn encode(operation: &Operation, outcome: &Outcome, out: &mut Encoder, kept: boo
     out.key(b"operation");
     out.string(operation.word);
     out.key(b"outcome");
-    if let Some(reason) = client_reason(outcome) {
+    if let Some(reason) = client_reason(operation, outcome) {
         out.object_start();
         out.key(b"error");
-        out.string(reason);
+        out.string_parts(&reason);
         out.object_end();
     } else {
         let Outcome::Answered(Answered::Jig(answer)) = outcome else { unreachable!("client answers handled") };

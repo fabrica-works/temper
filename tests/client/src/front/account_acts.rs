@@ -31,13 +31,14 @@ fn fixture_root(seed: u64, tools: bool) -> (Joint, Root) {
         }]),
     };
     let mut engine_limits = engine_limits();
-    // The pin still seeds its legacy deployment account from Model.account; leave room for this party's account.
-    engine_limits.accounts.accounts = 2;
-    engine_limits.accounts.credentials = 2;
-    engine_limits.authority.accounts = 3;
-    engine_limits.fleet.grants = 4;
-    // Two extra grants add eight entries to the four fleet routing cohorts.
-    engine_limits.journal.writes = engine_limits.journal.writes.checked_add(8).expect("grant cohorts fit");
+    // Keep the legacy deployment account plus two party accounts for tools ordering.
+    engine_limits.accounts.accounts = 3;
+    engine_limits.accounts.holder_accounts = 2;
+    engine_limits.accounts.credentials = 3;
+    engine_limits.authority.accounts = 4;
+    engine_limits.fleet.grants = 6;
+    // Four extra grants add sixteen entries to the four fleet routing cohorts.
+    engine_limits.journal.writes = engine_limits.journal.writes.checked_add(16).expect("grant cohorts fit");
     let rules = config.core.authority.rules().clone();
     let policy = config.core.authority.policy(1).expect("fixture project").clone();
     let mut authority = auth::Domain::new(rules, engine_limits.authority).expect("account authority bounds");
@@ -123,6 +124,7 @@ pub fn kept(front: &mut Joint) -> u32 {
         .protocol
         .accounts
         .iter()
+        .rev()
         .find_map(|request| {
             if let a::Request::Signing(a::Signing::Keep { source, carried, .. }) = request {
                 Some((*source, *carried))
@@ -149,6 +151,7 @@ pub fn signing(front: &Joint) -> u32 {
         .protocol
         .accounts
         .iter()
+        .rev()
         .find_map(|request| {
             if let a::Request::Signing(a::Signing::SignIn { source, .. }) = request { Some(*source) } else { None }
         })

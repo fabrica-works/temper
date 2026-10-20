@@ -1,41 +1,26 @@
 //! Area 5 translates supplied holder/source facts; the engine owns account policy.
-use super::{Called, Out, Runner, acts, finish, reads};
+use super::{Called, Out, Runner, acts, reads};
 use crate::jig::{
     Limits,
     call::{Call, Value, number, value},
-    render,
 };
 use jig_client::{Client, contract as c};
 use skein_lib::{Env, Queue};
 
 pub(super) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, called: Called, out: &mut Queue<Out>) {
     let ask = match called.call.tool {
-        24 => Ok(c::Ask::SignIn { holder: c::AccountHolder::Own, provider: integer(&called.call, 0) }),
-        26 => match digest(&called) {
-            Err(why) => Err(why),
-            Ok(digest) => Ok(c::Ask::AccountChange {
-                holder: if value(&called.call, 3).is_some() {
-                    c::AccountHolder::Deployment
-                } else {
-                    c::AccountHolder::Own
-                },
-                change: c::AccountChange::AddKey {
-                    provider: integer(&called.call, 0),
-                    join: join(&called.call),
-                    digest,
-                },
-            }),
+        24 => acts::Request::Ask(c::Ask::SignIn { holder: c::AccountHolder::Own, provider: integer(&called.call, 0) }),
+        26 => acts::Request::AddKey {
+            holder: if value(&called.call, 3).is_some() { c::AccountHolder::Deployment } else { c::AccountHolder::Own },
+            provider: integer(&called.call, 0),
+            join: join(&called.call),
         },
         _ => unreachable!("direct account act"),
     };
-    send(runner, client, env, called, ask, out);
+    acts::prepared(runner, client, env, called, Ok((ask, None)), out);
 }
 fn integer(call: &Call, slot: usize) -> u32 {
     u32::try_from(number(call, slot).expect("parsed number")).expect("checked account number")
-}
-fn digest(called: &Called) -> Result<[u8; 32], &'static [u8]> {
-    let value = called.value.as_ref().ok_or(b"key file must be supplied again".as_slice())?;
-    Ok(skein_lib::sha256::digest(value.expose()))
 }
 pub(super) fn resolved(
     runner: &mut Runner,
@@ -44,10 +29,13 @@ pub(super) fn resolved(
     reading: reads::Reading,
     out: &mut Queue<Out>,
 ) {
-    let ask = build(&reading);
-    send(runner, client, env, reading.called, ask, out);
+    let request = match build(&reading) {
+        Ok(request) => Ok((request, None)),
+        Err(why) => Err(why),
+    };
+    acts::prepared(runner, client, env, reading.called, request, out);
 }
-fn build(reading: &reads::Reading) -> Result<c::Ask, &'static [u8]> {
+fn build(reading: &reads::Reading) -> Result<acts::Request, &'static [u8]> {
     let call = &reading.called.call;
     let account = integer(call, 0);
     let mut found = None;
@@ -127,10 +115,10 @@ fn build(reading: &reads::Reading) -> Result<c::Ask, &'static [u8]> {
         }
         let source = source.ok_or(b"source unavailable; read accounts again".as_slice())?;
         if call.tool == 25 || call.tool == 28 && source.kind != c::OwnerAccountKind::Key {
-            return Ok(c::Ask::SignOut { holder, source: source.number });
+            return Ok(acts::Request::Ask(c::Ask::SignOut { holder, source: source.number }));
         }
         match call.tool {
-            27 => c::AccountChange::ReplaceKey { source: source.number, digest: digest(&reading.called)? },
+            27 => return Ok(acts::Request::ReplaceKey { holder, source: source.number }),
             28 => c::AccountChange::RemoveKey { source: source.number },
             29 => c::AccountChange::MoveSource {
                 account,
@@ -141,25 +129,8 @@ fn build(reading: &reads::Reading) -> Result<c::Ask, &'static [u8]> {
             _ => unreachable!("account act"),
         }
     };
-    Ok(c::Ask::AccountChange { holder, change })
+    Ok(acts::Request::Ask(c::Ask::AccountChange { holder, change }))
 }
-fn send(
-    runner: &mut Runner,
-    client: &Client,
-    env: &Env<Limits>,
-    called: Called,
-    ask: Result<c::Ask, &'static [u8]>,
-    out: &mut Queue<Out>,
-) {
-    match ask {
-        Ok(ask) => acts::prepared(runner, client, env, called, Ok((ask, None)), out),
-        Err(why) => {
-            let printed = render::failure(why, called.json, 1);
-            finish(called, printed, out);
-        }
-    }
-}
-
 fn join(call: &Call) -> Option<u32> {
     Some(u32::try_from(number(call, 2)?).expect("checked number"))
 }

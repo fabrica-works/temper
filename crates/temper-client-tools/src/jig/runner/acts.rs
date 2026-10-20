@@ -50,7 +50,7 @@ pub(super) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, cal
     });
     runner.acts.insert(called.call_number, Reading { called, document: None });
 }
-type Prepared = Result<(c::Ask, Option<c::Recipient>), &'static [u8]>;
+type Prepared = Result<(Request, Option<c::Recipient>), &'static [u8]>;
 fn chat(call: &Call, me: &c::Me, limits: &Limits) -> Prepared {
     let project = super::reads::project(call, me).ok_or(b"unknown project".as_slice())?;
     let Ok(ask) = shapes::chat(me, project, words(call, 1, limits)?) else { return Err(b"chat not offered") };
@@ -72,11 +72,15 @@ fn chat(call: &Call, me: &c::Me, limits: &Limits) -> Prepared {
         llm: task.llm.clone(),
     };
     match shapes::fall(creating, &draft, task.deadline) {
-        shapes::Fall::Within => Ok((ask, None)),
+        shapes::Fall::Within => Ok((Request::Ask(ask), None)),
         shapes::Fall::Proposable(to) => {
             let c::Ask::Create { tasks, .. } = ask else { unreachable!("chat creates") };
             Ok((
-                c::Ask::Propose { project, action: c::ProposeAction::Batch { tasks }, reason: empty(limits) },
+                Request::Ask(c::Ask::Propose {
+                    project,
+                    action: c::ProposeAction::Batch { tasks },
+                    reason: empty(limits),
+                }),
                 Some(to),
             ))
         }
@@ -275,7 +279,7 @@ fn build(call: &Call, document: &c::ReadValue, me: &c::Me, limits: &Limits, proj
         },
         _ => unreachable!("act tool"),
     };
-    Ok((ask, to))
+    Ok((Request::Ask(ask), to))
 }
 fn chip_project(chip: &c::Chip) -> Option<u32> {
     match chip.details.as_ref() {
@@ -342,16 +346,21 @@ fn decision(call: &Call, limits: &Limits) -> Result<c::Decision, &'static [u8]> 
         _ => c::Decision::PassedUp,
     })
 }
+pub(super) enum Request {
+    Ask(c::Ask),
+    AddKey { holder: c::AccountHolder, provider: u32, join: Option<u32> },
+    ReplaceKey { holder: c::AccountHolder, source: u32 },
+}
 pub(super) fn prepared(
     runner: &mut Runner,
     client: &Client,
     _env: &Env<Limits>,
     mut called: Called,
-    ask: Prepared,
+    request: Prepared,
     out: &mut Queue<Out>,
 ) {
-    let (ask, to) = match ask {
-        Ok(ask) => ask,
+    let (request, to) = match request {
+        Ok(request) => request,
         Err(why) => {
             let printed = render::failure(why, called.json, 1);
             finish(called, printed, out);
@@ -364,13 +373,45 @@ pub(super) fn prepared(
         finish(called, printed, out);
         return;
     }
+    if called.value.is_some() && called.call.key.is_none() {
+        let mut bytes = [0; 32];
+        for chunk in bytes.chunks_mut(16) {
+            let hex = crate::jig::digest::Digest::from_bytes(runner.names.next_u64().to_le_bytes()).hex();
+            for (slot, byte) in chunk.iter_mut().zip(hex) {
+                *slot = byte;
+            }
+        }
+        called.call.key = Some(crate::jig::key::Name::new(&bytes).expect("drawn hexadecimal name"));
+    }
     let name = match &called.call.key {
         Some(name) => Some(crate::jig::key::named(runner.salt, name)),
         None => None,
     };
-    let mut operation = Operation::of(&jig_client::Ask::Jig(Box::new(ask.clone())));
+    let event = match request {
+        Request::Ask(ask) => Event::Send { key, name, request: jig_client::Ask::Jig(Box::new(ask)) },
+        Request::AddKey { holder, provider, join } => jig_client::accounts::add_key(
+            key,
+            name.expect("key request name"),
+            holder,
+            provider,
+            join,
+            called.value.take().expect("admitted value"),
+        ),
+        Request::ReplaceKey { holder, source } => jig_client::accounts::replace_key(
+            key,
+            name.expect("key request name"),
+            holder,
+            source,
+            called.value.take().expect("admitted value"),
+        ),
+    };
+    let (Event::Send { request, .. } | Event::Carry { request, .. }) = &event else { unreachable!("act event") };
+    let mut operation = Operation::of(request);
     operation.to = to;
     operation.retry = Some(render::outcome::retry(&called.call));
+    if called.call.tool == 26 || called.call.tool == 27 {
+        operation.value_name.clone_from(&called.call.key);
+    }
     if let Some(me) = me(runner, client) {
         operation.party = Some(me.party.number);
     }
@@ -381,24 +422,6 @@ pub(super) fn prepared(
     if called.call.tool >= 24 {
         operation.word = render::outcome::account_tool(called.call.tool).name;
     }
-    let request = jig_client::Ask::Jig(Box::new(ask));
-    let event = if let Some(value) = called.value.take() {
-        let name = match name {
-            Some(name) => name,
-            None => {
-                let mut name = [0; 16];
-                for chunk in name.chunks_mut(8) {
-                    for (slot, byte) in chunk.iter_mut().zip(runner.names.next_u64().to_le_bytes()) {
-                        *slot = byte;
-                    }
-                }
-                name
-            }
-        };
-        Event::Carry { key, name, request, value }
-    } else {
-        Event::Send { key, name, request }
-    };
     runner.sent.insert(key, Sent { called, operation });
     out.push(Out::Client { event });
 }

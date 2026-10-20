@@ -6,6 +6,7 @@ use temper_client_world::{
 };
 const KEY: &[u8] = b"test-private-key";
 const ADD: &[&[u8]] = &[b"add-key", b"17", b"file", b"--key", b"tools-key"];
+const SECOND: &[&[u8]] = &[b"add-key", b"17", b"file", b"--key", b"second-key"];
 fn call(front: &mut Joint, root: &mut Root, number: u32, words: &[&[u8]], value: Option<Secret>) {
     let Event::Call { call, json, .. } = fixtures::call(words) else { unreachable!() };
     accounts::event(front, root, Event::Call { number, call, json, value });
@@ -53,8 +54,17 @@ fn a_tools_connect_wait_settles_at_the_sign_in_end() {
 #[test]
 fn tools_rank_reaches_the_account_holder() {
     let (mut front, mut root, account) = key_fixture();
-    call(&mut front, &mut root, 3, &[b"rank", account.as_bytes(), b"1", b"--source", b"key"], None);
-    assert_eq!(root.agent().printed(3).expect("ranked").status, 0);
+    call(&mut front, &mut root, 3, SECOND, Some(Secret::new(KEY.into())));
+    accounts::kept(&mut front);
+    accounts::settle(&mut front, &mut root);
+    assert_eq!(root.agent().printed(3).expect("second key kept").status, 0);
+    call(&mut front, &mut root, 4, &[b"rank", account.as_bytes(), b"2"], None);
+    assert_eq!(root.agent().printed(4).expect("ranked").status, 0);
+    call(&mut front, &mut root, 5, &[b"accounts", b"--json"], None);
+    let after = std::str::from_utf8(&root.agent().printed(5).expect("ranked order").stdout).expect("JSON");
+    let first = after.find("\"place\":0,\"provider\":").expect("first account");
+    let moved = after.find(&format!("{{\"number\":{account},\"place\":1,\"provider\":")).expect("moved account");
+    assert!(first < moved, "{after}");
 }
 #[test]
 fn tools_retry_preserves_the_engines_not_limited_refusal() {

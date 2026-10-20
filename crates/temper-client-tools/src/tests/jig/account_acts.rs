@@ -26,6 +26,9 @@ fn account_forms_round_trip_through_the_table() {
         assert_eq!(f::back(&call), f::owned(words));
         assert_eq!(f::printed(&call), Parsed::Call { call, json: false });
     }
+}
+#[test]
+fn account_usage_is_refused_before_sending() {
     for words in [
         &["connect", "9"][..],
         &["add-key", "9", "file"],
@@ -178,7 +181,11 @@ fn replacement_draws_an_ephemeral_name() {
     let mut root = f::account_root(false);
     let call = root.submit_value(&["replace-key", "43", "file"], Some(Secret::new(KEY.into())));
     f::deliver_accounts(&mut root, f::accounts());
-    assert!(root.sent_name(call).is_some());
+    let first = root.sent_name(call).expect("drawn name");
+    root.done(call, c::Outcome::Owner(c::OwnerOutcome::AccountKeyKept { source: f::SOURCE }));
+    let next = root.submit_value(&["replace-key", "43", "file"], Some(Secret::new(KEY.into())));
+    f::deliver_accounts(&mut root, f::accounts());
+    assert_ne!(first, root.sent_name(next).expect("second drawn name"));
     assert!(root.saved.is_empty());
     assert_eq!(
         root.sends.get(&call).expect("replacement").2,
@@ -213,5 +220,42 @@ fn source_shorthand_resolves_the_supplied_kind() {
                 jig_client::Ask::Jig(Box::new(c::Ask::SignOut { holder: c::AccountHolder::Own, source: f::SOURCE }))
             );
         }
+    }
+}
+
+#[test]
+fn a_named_replacement_uses_the_supplied_name() {
+    let mut root = f::account_root(false);
+    let call = root.submit_value(&["replace-key", "43", "file", "--key", "replacement"], Some(Secret::new(KEY.into())));
+    f::deliver_accounts(&mut root, f::accounts());
+    assert_eq!(root.sent_name(call), Some(f::named("replacement")));
+}
+#[test]
+fn account_zero_reaches_its_holder() {
+    let mut root = f::account_root(false);
+    let call = root.submit(&["forget", "0"]);
+    let mut accounts = f::accounts();
+    accounts.accounts.get_mut(0).expect("account").number = 0;
+    f::deliver_accounts(&mut root, accounts);
+    assert!(root.sends.contains_key(&call));
+}
+#[test]
+fn a_lost_replacement_prints_its_recoverable_name() {
+    for envelope in [skein_lib::RequestEnvelope::Again, skein_lib::RequestEnvelope::Lost] {
+        let mut root = f::account_root(false);
+        let call = root.submit_value(&["replace-key", "43", "file"], Some(Secret::new(KEY.into())));
+        f::deliver_accounts(&mut root, f::accounts());
+        let (attempt, name, _) = root.sends.get(&call).expect("first replacement").clone();
+        root.client(jig_client::Event::Up {
+            up: jig_client::Up::Answer { attempt, envelope, answer: None, why: Some(jig_client::Retry::Busy) },
+        });
+        let printed = root.answer(call).expect("recovery instruction");
+        assert_eq!(printed.status, 1);
+        let start = skein_lib::bytes::find(&printed.stderr, b"supply --key ").expect("printed name");
+        let tail = printed.stderr.get(start.checked_add(13).expect("prefix fits")..).expect("name follows");
+        let end = skein_lib::bytes::find(tail, b" ").expect("name end");
+        let drawn = crate::jig::key::Name::new(tail.get(..end).expect("printed name")).expect("recoverable name");
+        assert!(skein_lib::bytes::find(tail, b" and the same file again").is_some());
+        assert_eq!(crate::jig::key::named(crate::key::TOOLS, &drawn), name);
     }
 }
