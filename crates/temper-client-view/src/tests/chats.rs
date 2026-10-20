@@ -343,6 +343,7 @@ pub(super) fn listed_root() -> temper_client_domain::Domain {
 #[test]
 fn nonempty_sections_have_lists_and_empty_sections_have_none() {
     let empty = fixtures::page_view(&fixtures::chats_root());
+    assert!(fixtures::find(empty.tree(), Role::Heading { level: 2 }, b"Closed chats").is_some());
     assert!(fixtures::styles(empty.tree(), Role::List).is_empty());
     let view = fixtures::page_view(&listed_root());
     assert_eq!(

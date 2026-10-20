@@ -447,7 +447,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::StartChat => (&[b"Start a chat"], &[]),
         Word::Start => (&[b"Start"], &[]),
         Word::LiveChats => (&[b"Live chats"], &[]),
-        Word::ClosedChats => (&[b"Closed"], &[]),
+        Word::ClosedChats => (&[b"Closed chats"], &[]),
         Word::MoreClosedChats => (&[b"More closed chats"], &[]),
         Word::Chat => (&[b"Chat ", b""], &[Number]),
         Word::ChatSpend => (&[b"Spent ", b"; delegates spent ", b""], &[Number, Number]),
