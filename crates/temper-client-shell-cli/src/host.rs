@@ -162,7 +162,7 @@ impl OneShot {
         self.status = Some(status);
         self.until = None;
         if let Some(transport) = &mut self.transport {
-            transport.close();
+            transport.close(self.env.now);
         }
         if let Some(signing) = &mut self.signing {
             signing.close();
@@ -503,7 +503,7 @@ impl OneShot {
                 | io::Event::Window { .. }
                 | io::Event::Shutdown { .. } => None,
             };
-            if owner.is_some_and(Memory::owns) {
+            if owner.is_some_and(|owner| self.transport.as_ref().is_some_and(|memory| memory.owns(owner))) {
                 self.transport.as_mut().expect("memory socket").event(now, event);
                 continue;
             }
@@ -609,9 +609,11 @@ impl Host for OneShot {
             self.link_progress(now, wall);
         }
         if let Some(transport) = &mut self.transport {
-            for request in transport.progress(now) {
-                self.request(request);
-            }
+            transport.progress(now);
+        }
+        while self.io.takes() && self.raw.room() >= io::MAX_OUT_DOWN.submissions {
+            let Some(request) = self.transport.as_mut().and_then(Memory::request) else { break };
+            self.request(request);
         }
         for request in self.output.requests() {
             self.request(request);
@@ -640,7 +642,7 @@ impl Host for OneShot {
             || self.io.is_due(now)
             || self.preparation_pending(now)
             || (!self.preparing || self.status.is_some()) && self.directory.pending(now)
-            || self.transport.as_ref().is_some_and(Memory::pending)
+            || self.transport.as_ref().is_some_and(|memory| memory.pending(now))
             || self.signing.as_ref().and_then(|s| s.shell.as_ref()).is_some_and(|s| s.work_pending(now))
             || self.status.is_none()
                 && (!self.requests.is_empty()

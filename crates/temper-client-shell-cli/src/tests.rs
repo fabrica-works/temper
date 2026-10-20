@@ -173,7 +173,8 @@ fn memory_saves_are_stored_in_order_without_file_operations() {
         assert_eq!(memory.events.pop(), Some(Event::Stored));
     }
     assert_eq!(memory.events.pop(), None);
-    assert!(memory.progress(Time::ZERO).is_empty());
+    memory.progress(Time::ZERO);
+    assert!(memory.request().is_none());
 }
 #[test]
 fn host_bounds_cover_its_holders() {
