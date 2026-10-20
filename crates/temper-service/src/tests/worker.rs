@@ -356,11 +356,9 @@ impl LinkPeer {
 }
 
 #[test]
-fn retained_program_metadata_is_priced_once_and_paths_are_bounded() {
+fn retained_program_metadata_is_priced_exactly_once_at_capacity() {
     use crate::settings::{Adapter, PROGRAM_PATH_BYTES, Program};
-    let settings = fixtures::worker_settings();
-    let mut agent = fixtures::worker_agent();
-    let limits = fixtures::worker_limits();
+    let (settings, mut agent, limits) = program_worker_settings();
     let without = worker_settings::worker_worst_case(&settings, &agent, &limits).unwrap();
     let empty_heap = worker_heap(&settings, &agent, &limits, without);
     let path: Box<[u8]> = Box::new([b'/'; PROGRAM_PATH_BYTES]);
@@ -369,7 +367,16 @@ fn retained_program_metadata_is_priced_once_and_paths_are_bounded() {
     assert_eq!(with - without, u64::try_from(2 * PROGRAM_PATH_BYTES + size_of::<Program>()).unwrap());
     let declared_heap = worker_heap(&settings, &agent, &limits, with);
     assert_eq!(declared_heap - empty_heap, with - without, "the retained copy is priced once");
-    agent.programs[0].path = Box::new([b'/'; PROGRAM_PATH_BYTES + 1]);
+}
+#[test]
+fn worker_preparation_refuses_a_program_path_past_capacity() {
+    use crate::settings::{Adapter, PROGRAM_PATH_BYTES, Program};
+    let (settings, mut agent, limits) = program_worker_settings();
+    agent.programs = Box::new([Program {
+        adapter: Adapter::ClaudeCode,
+        path: Box::new([b'/'; PROGRAM_PATH_BYTES + 1]),
+        directory: Box::new([b'/'; PROGRAM_PATH_BYTES]),
+    }]);
     worker_settings::prepare(&settings, &agent, &limits).unwrap_err();
 }
 
@@ -711,4 +718,8 @@ fn repeated(byte: u8, len: usize) -> Box<[u8]> {
     let mut bytes = skein_lib::bytes::zeroed(len);
     bytes.fill(byte);
     bytes
+}
+
+fn program_worker_settings() -> (crate::settings::Worker, crate::settings::Agent, crate::limits::Limits) {
+    (fixtures::worker_settings(), fixtures::worker_agent(), fixtures::worker_limits())
 }

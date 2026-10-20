@@ -4,7 +4,7 @@ use jig_client::contract as c;
 use skein_lib::List;
 
 #[test]
-fn account_reads_watch_only_authorized_documents_and_close_the_first_deliveries() {
+fn account_reads_close_authorized_watches_after_the_first_projection() {
     for owner in [false, true] {
         let mut root = f::account_root(owner);
         let call = root.submit(&["accounts", "--json"]);
@@ -32,7 +32,7 @@ fn account_reads_watch_only_authorized_documents_and_close_the_first_deliveries(
     }
 }
 #[test]
-fn account_digests_follow_reset_state_uses_order_and_loss() {
+fn account_digests_distinguish_changes_to_all_projected_account_facts() {
     let original = f::accounts();
     let read = f::account_read(&mut f::account_root(false), original.clone(), None);
     let digest = f::last_digest(&read.stdout);
@@ -110,7 +110,7 @@ fn models_group_only_project_authorized_models_without_guessing_provider_readine
     }
 }
 #[test]
-fn account_output_cuts_lists_and_escaped_text_within_the_result_window() {
+fn account_output_truncates_oversized_projections_within_the_result_window() {
     let mut value = f::accounts();
     let mut row = value.accounts.get(0).expect("row").clone();
     let mut escaped = skein_lib::Writer::new(usize::try_from(crate::limits::TEXT).expect("text fits"));

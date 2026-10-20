@@ -2,14 +2,18 @@ use super::*;
 use std::{ffi::OsString, os::unix::ffi::OsStringExt};
 
 #[test]
-fn source_names_use_smiths_length_and_alphabet() {
+fn source_names_accept_smiths_alphabet_within_the_length_bound() {
+    let max = smith_host_domain::SourceName::BYTES;
+    for (bytes, valid) in [(b"a".to_vec(), true), (vec![b'a'; max], true), (b"az09-".to_vec(), true)] {
+        assert_eq!(source_name(&OsString::from_vec(bytes.clone())).is_ok(), valid, "{bytes:?}");
+    }
+}
+#[test]
+fn source_names_refuse_values_outside_smiths_alphabet_or_length() {
     let max = smith_host_domain::SourceName::BYTES;
     for (bytes, valid) in [
         (vec![], false),
-        (b"a".to_vec(), true),
-        (vec![b'a'; max], true),
         (vec![b'a'; max + 1], false),
-        (b"az09-".to_vec(), true),
         (b"A".to_vec(), false),
         (b"a_b".to_vec(), false),
         (b"../a".to_vec(), false),
@@ -21,7 +25,7 @@ fn source_names_use_smiths_length_and_alphabet() {
 }
 
 #[test]
-fn smiths_terminal_command_keeps_os_paths_and_filters_the_callers_environment() {
+fn smiths_terminal_login_command_preserves_its_configured_process_contract() {
     let directory = std::env::temp_dir().join(format!("temper-login-command-{}", std::process::id()));
     std::fs::create_dir(&directory).expect("login command scratch");
     let executable = Path::new("/nonexistent/configured-claude");

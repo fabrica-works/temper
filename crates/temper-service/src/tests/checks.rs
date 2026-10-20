@@ -320,27 +320,23 @@ fn a_bundle_limit_of_zero_refuses_the_start() {
 }
 
 #[test]
-fn fixed_redirect_ports_compare_numbers_and_ignore_unreserved_listeners() {
-    use crate::startup::{Listener, RedirectPort};
-    let redirects = [7100, 7101].map(|port| RedirectPort {
-        port,
-        path: Path::root().member(b"redirect_port"),
-        redirect_path: b"callback".as_slice().into(),
-    });
-    for (port, listener, count) in [
-        (Some(7100), Listener::Clients, 1),
-        (Some(7101), Listener::Webhooks, 1),
-        (Some(7100), Listener::Owned(2), 1),
-        (Some(7102), Listener::Clients, 0),
-        (Some(0), Listener::Clients, 0),
-        (None, Listener::Webhooks, 0),
-    ] {
+fn fixed_redirect_ports_reject_listeners_on_the_reserved_number() {
+    use crate::startup::Listener;
+    for (port, listener) in [(7100, Listener::Clients), (7101, Listener::Webhooks), (7100, Listener::Owned(2))] {
         let mut problems = Problems::empty();
-        checks::redirect_ports(&redirects, port, listener, &mut problems);
-        assert_eq!(problems.problems.len(), count, "{listener:?} {port:?}");
-        if count != 0 {
-            assert_eq!(problems.problems.get(0).unwrap().what, What::Redirect(listener));
-        }
+        checks::redirect_ports(&fixed_redirects(), Some(port), listener, &mut problems);
+        assert_eq!(problems.problems.len(), 1, "{listener:?} {port:?}");
+        assert_eq!(problems.problems.get(0).unwrap().what, What::Redirect(listener));
+    }
+}
+#[test]
+fn fixed_redirect_ports_accept_listeners_without_a_reserved_number() {
+    use crate::startup::Listener;
+    for (port, listener) in [(Some(7102), Listener::Clients), (Some(0), Listener::Clients), (None, Listener::Webhooks)]
+    {
+        let mut problems = Problems::empty();
+        checks::redirect_ports(&fixed_redirects(), port, listener, &mut problems);
+        assert_eq!(problems.problems.len(), 0, "{listener:?} {port:?}");
     }
 }
 #[test]
@@ -418,7 +414,7 @@ fn every_offered_adapter_must_be_declared_by_the_agent() {
     }
 }
 #[test]
-fn agent_model_windows_and_outputs_are_checked_with_their_names() {
+fn agent_model_bounds_are_checked_under_the_configured_name() {
     for window in [true, false] {
         let engine = fixtures::engine().jig;
         let mut agent = fixtures::startup_agent();
@@ -488,4 +484,12 @@ fn configured_keys_use_the_key_ceiling_instead_of_the_oauth_token_bound() {
     let mut problems = Problems::empty();
     checks::grants(&engine, &worker, &agent, &mut problems);
     assert!(core::str::from_utf8(&lines(&problems)).unwrap().contains("program_value_name"));
+}
+
+fn fixed_redirects() -> [crate::startup::RedirectPort; 2] {
+    [7100, 7101].map(|port| crate::startup::RedirectPort {
+        port,
+        path: Path::root().member(b"redirect_port"),
+        redirect_path: b"callback".as_slice().into(),
+    })
 }

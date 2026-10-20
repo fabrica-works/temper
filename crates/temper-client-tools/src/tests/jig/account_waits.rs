@@ -4,7 +4,7 @@ use skein_lib::Time;
 const WAIT_ACCOUNTS: &[&str] = &["wait", "accounts"];
 
 #[test]
-fn account_read_and_wait_share_the_digest_and_recompute_on_either_joined_delivery() {
+fn account_waits_recompute_the_same_projection_as_account_reads() {
     for owner in [false, true] {
         let mut root = f::account_root(owner);
         let mut party = f::accounts();
@@ -33,29 +33,38 @@ fn account_read_and_wait_share_the_digest_and_recompute_on_either_joined_deliver
     }
 }
 #[test]
-fn usable_and_settled_follow_the_party_booleans_verbatim() {
+fn account_conditions_wait_for_the_owners_deployment_document() {
     for usable in [false, true] {
         for settled in [false, true] {
-            for (condition, expected) in [("usable", usable), ("settled", settled)] {
-                let mut root = f::account_root(true);
-                let call = root.submit(&["wait", "accounts", "--until", condition, "--json"]);
-                let mut party = f::accounts();
-                party.usable = usable;
-                party.settled = settled;
-                f::deliver_accounts(&mut root, party.clone());
+            for condition in ["usable", "settled"] {
+                let (mut root, call, _) = account_condition(condition, usable, settled);
                 assert!(root.answer(call).is_none(), "owner's deployment is still unknown");
-                f::deliver_deployment(&mut root, f::deployment());
-                if expected {
-                    assert_eq!(root.answer(call).expect("supplied true").status, 0);
-                } else {
-                    assert!(root.answer(call).is_none(), "deployment usability cannot satisfy party condition");
-                    party.usable = true;
-                    party.settled = true;
-                    f::deliver_accounts(&mut root, party);
-                    assert_eq!(root.answer(call).expect("now true").status, 0);
-                }
             }
         }
+    }
+}
+#[test]
+fn account_conditions_complete_when_the_party_boolean_is_true() {
+    for (usable, settled, condition) in
+        [(true, false, "usable"), (true, true, "usable"), (false, true, "settled"), (true, true, "settled")]
+    {
+        let (mut root, call, _) = account_condition(condition, usable, settled);
+        f::deliver_deployment(&mut root, f::deployment());
+        assert_eq!(root.answer(call).expect("supplied true").status, 0);
+    }
+}
+#[test]
+fn account_conditions_ignore_deployment_usability_until_the_party_changes() {
+    for (usable, settled, condition) in
+        [(false, false, "usable"), (false, true, "usable"), (false, false, "settled"), (true, false, "settled")]
+    {
+        let (mut root, call, mut party) = account_condition(condition, usable, settled);
+        f::deliver_deployment(&mut root, f::deployment());
+        assert!(root.answer(call).is_none(), "deployment usability cannot satisfy party condition");
+        party.usable = true;
+        party.settled = true;
+        f::deliver_accounts(&mut root, party);
+        assert_eq!(root.answer(call).expect("now true").status, 0);
     }
 }
 #[test]
@@ -85,7 +94,7 @@ fn a_behind_join_never_answers_from_its_cached_facts() {
     }
 }
 #[test]
-fn account_timeout_handles_unknown_facts_and_releases_both_watches() {
+fn account_timeouts_release_both_watches_without_retaining_a_deadline() {
     for delivered in [false, true] {
         let mut root = f::account_root(true);
         let call = root.submit(&["wait", "accounts", "--until", "usable", "--timeout", "1", "--json"]);
@@ -103,6 +112,9 @@ fn account_timeout_handles_unknown_facts_and_releases_both_watches() {
         assert_eq!(root.watches.len(), 1);
         assert_eq!(crate::root::next_deadline(&root.root), None);
     }
+}
+#[test]
+fn account_permission_loss_releases_both_joined_watches() {
     let mut root = f::account_root(true);
     let call = root.submit(&["wait", "accounts", "--until", "usable"]);
     root.watch_event(&f::ACCOUNT_WATCH, c::WatchEvent::Opened);
@@ -112,7 +124,7 @@ fn account_timeout_handles_unknown_facts_and_releases_both_watches() {
     assert_eq!(root.watches.len(), 1);
 }
 #[test]
-fn account_since_and_until_need_both_and_text_uses_the_same_read_form() {
+fn account_waits_need_a_changed_digest_with_a_met_condition() {
     let mut root = f::account_root(false);
     let mut party = f::accounts();
     let before = f::account_read(&mut root, party.clone(), None);
@@ -124,10 +136,26 @@ fn account_since_and_until_need_both_and_text_uses_the_same_read_form() {
     party.usable = true;
     f::deliver_accounts(&mut root, party.clone());
     assert_eq!(root.answer(call).expect("both hold").status, 0);
+}
+#[test]
+fn account_text_waits_append_the_condition_to_read_output() {
+    let mut root = f::account_root(false);
+    let mut party = f::accounts();
+    party.usable = true;
     let read = root.submit(&["accounts"]);
     f::deliver_accounts(&mut root, party.clone());
     let expected = root.answer(read).expect("text read");
     let wait = root.submit(&["wait", "accounts", "--until", "usable"]);
     f::deliver_accounts(&mut root, party);
     assert_eq!(root.answer(wait).expect("text wait").stdout, f::appended(&expected.stdout, b"met\n"));
+}
+
+fn account_condition(condition: &str, usable: bool, settled: bool) -> (f::Harness, u32, c::OwnerAccounts) {
+    let mut root = f::account_root(true);
+    let call = root.submit(&["wait", "accounts", "--until", condition, "--json"]);
+    let mut party = f::accounts();
+    party.usable = usable;
+    party.settled = settled;
+    f::deliver_accounts(&mut root, party.clone());
+    (root, call, party)
 }

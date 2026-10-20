@@ -645,7 +645,7 @@ fn program_login_checks_both_directory_names_before_creating_anything() {
 }
 
 #[test]
-fn program_login_creates_private_directories_and_accepts_linked_parents() {
+fn program_login_prepares_private_directories_through_each_supported_parent() {
     use support::program_login::{configuration, no_deployment_resources, refused};
     for row in ["missing", "private", "linked-parent"] {
         let scratch = support::Scratch::startup(&format!("login-create-{row}"));

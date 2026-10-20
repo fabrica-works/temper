@@ -183,7 +183,7 @@ fn fixed_sign_in_ports_are_checked_against_owned_listeners_only() {
 }
 
 #[test]
-fn a_programs_owner_refusal_keeps_the_path_and_owner() {
+fn a_programs_owner_refusal_identifies_the_directory_ownership_conflict() {
     use smith_agent_shell::program::{Refusal, Unsafe};
     let other = skein_shell::effective_user().wrapping_add(1);
     let why = super::agent::program_directory_refusal(&Refusal::Unsafe {
@@ -197,7 +197,7 @@ fn a_programs_owner_refusal_keeps_the_path_and_owner() {
 }
 
 #[test]
-fn program_login_takes_exactly_a_configuration_and_source_name() {
+fn program_login_refuses_arguments_outside_the_two_required_operands() {
     for arguments in [
         vec!["program-login"],
         vec!["program-login", "config.json"],
@@ -209,6 +209,9 @@ fn program_login_takes_exactly_a_configuration_and_source_name() {
             Err(format!("temper: invalid arguments\n{}\n", super::USAGE))
         );
     }
+}
+#[test]
+fn program_login_accepts_exactly_the_two_required_operands() {
     assert_eq!(
         configure(["program-login", "config.json", "source"].into_iter().map(Into::into)),
         Ok(super::Command::ProgramLogin { configuration: "config.json".into(), name: "source".into() })
