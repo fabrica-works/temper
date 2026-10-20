@@ -22,16 +22,24 @@ flush/stop boundary supplied separately as `flushed=True`, and actual object
 evidence. A checkpoint establishes a complete written prefix; EOF, polling,
 or perfect file content cannot establish that the owner reached the boundary.
 
-Await the director's exact launch/observation-read forms and the first-run
-owner's completed flush/stop evidence, identifying the captured observations
-file and boundary. Also await the supplied fake private git `objects` read
-form and listener: how to request the selected C and its first parent P and
-obtain their complete parent/merge-parent values and byte trees. The route
-can return graph-only ancestors, so P must be requested whole too. No CLI,
-configuration or credential inputs are guessed; unavailable objects remain
-`None` for `_judge`.
+Decision 278 supplies the launch and observation-read forms. Start the forge
+with `temper fake forge --document F --ready PREFIX --seed N --observations FILE`.
+Its ready stdout is PREFIX, then `127.0.0.1:PORT` and a newline, with no other
+stdout. FILE is the official codec's stream; no reply or delivery of a pass
+is sent before its observations are written. After the attended story, retain
+the observed completion or stopped-writer evidence and the complete checkpoint
+prefix being judged; no polling is needed.
 
-Keep ordinary per-run `run.json`, `drivertranscript.jsonl`, check result and
+Read C with `POST /.fake/git/objects` and body `{"commits":[C]}` at the fake
+forge's captured listener. This store read takes **no credential**. Tree entries
+have `path` and `content`, both base64. Do not use an admin token or a Forgejo
+content API. Serve removes `admin_token` when it takes the fake's handover.
+The route can return graph-only ancestors, so request the first parent P whole
+too. The complete success-response envelope and object parent/merge-parent
+fields await the producer's exact form or landed t18 source; no decoder for
+that envelope is invented here. Unavailable objects remain `None` for `_judge`.
+
+Keep ordinary per-run `run.json`, `driver-transcript.jsonl`, check result and
 findings, plus raw observations and object request/response evidence. Record
 the actual boundary evidence and any incomplete or refused read. These need
 no new record format or lifecycle. Driver prompt/ctl guidance belongs to the
