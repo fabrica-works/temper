@@ -128,6 +128,16 @@ chain.
 
 ## Rules of this plan
 
+- **Director's current priority (2026-10-20):** until temper05.2 lands,
+  limit new implementers to its critical path: finish the preserved
+  temper02.1 checkpoint, then temper05.2. Start another session only if
+  it is a required prerequisite or resolves an evidenced blocker for
+  that path. Preserve the other checkpoints and dirty drafts for later.
+  Rebase the owned work onto Accounts' compatible landed mains; reuse its
+  adapters and rederive complete fixture sums instead of retaining stale
+  deltas. Keep every required proof and limit. This run's Codex experiment
+  keeps kit d6d4abe and its local adapter; a kit move needs the director.
+
 - **Workspace license inheritance:** every new workspace member in skein or smith carries
   `license.workspace = true` in `[package]`, beside its other workspace-inherited fields.
   This includes a crate moved into either workspace: set the destination manifest explicitly;
