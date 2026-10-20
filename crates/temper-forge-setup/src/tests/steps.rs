@@ -5,7 +5,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 fn names(setup: &Setup, expected: &[(&[u8], bool)]) {
-    let steps = steps(setup, b"/abs/config.json");
+    let steps = steps(setup, &flags());
     assert_eq!(steps.len(), expected.len());
     for (step, (name, long)) in steps.iter().zip(expected) {
         assert_eq!(step.name(), *name);
@@ -25,14 +25,14 @@ fn a_managed_and_an_owned_forge_run_the_six_steps_of_the_design_tree() {
             (b"serve", true),
         ],
     );
-    let commands = steps(&fixtures::setup(), b"/abs/config.json");
+    let commands = steps(&fixtures::setup(), &flags());
     let expected: &[&[&[u8]]] = &[
-        &[b"forge", b"prepare", b"/abs/config.json", b"2"],
-        &[b"forge", b"run", b"/abs/config.json", b"2", b"forgejo"],
-        &[b"forge", b"run", b"/abs/config.json", b"2", b"runner"],
-        &[b"forge", b"reconcile", b"/abs/config.json", b"1"],
-        &[b"forge", b"reconcile", b"/abs/config.json", b"2"],
-        &[b"serve", b"/abs/config.json"],
+        &[b"forge", b"prepare", b"--config", b"/config", b"--data", b"/data", b"--cache", b"/cache", b"2"],
+        &[b"forge", b"run", b"--config", b"/config", b"--data", b"/data", b"--cache", b"/cache", b"2", b"forgejo"],
+        &[b"forge", b"run", b"--config", b"/config", b"--data", b"/data", b"--cache", b"/cache", b"2", b"runner"],
+        &[b"forge", b"reconcile", b"--config", b"/config", b"--data", b"/data", b"--cache", b"/cache", b"1"],
+        &[b"forge", b"reconcile", b"--config", b"/config", b"--data", b"/data", b"--cache", b"/cache", b"2"],
+        &[b"serve", b"--config", b"/config", b"--data", b"/data", b"--cache", b"/cache"],
     ];
     for (step, expected) in commands.iter().zip(expected) {
         assert_eq!(step.arguments().len(), expected.len());
@@ -67,4 +67,15 @@ fn a_managed_forge_alone_runs_reconcile_then_serve() {
 #[test]
 fn an_empty_setup_runs_serve_alone() {
     names(&Setup { entries: Box::new([]) }, &[(b"serve", true)]);
+}
+
+fn flags() -> Box<[Box<[u8]>]> {
+    Box::new([
+        Box::from(b"--config".as_slice()),
+        Box::from(b"/config".as_slice()),
+        Box::from(b"--data".as_slice()),
+        Box::from(b"/data".as_slice()),
+        Box::from(b"--cache".as_slice()),
+        Box::from(b"/cache".as_slice()),
+    ])
 }

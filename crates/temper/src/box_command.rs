@@ -6,10 +6,9 @@ use temper_box::host::{Service, Settings};
 
 /// Checks the document before starting its steps; refusals contain unprefixed lines.
 pub fn run(directories: &super::Directories) -> Result<Exit, String> {
-    let bytes = directories.read()?;
+    let bytes = configuration(directories)?;
     let (_, checked, limits) = super::setup::check(&bytes, &directories.jig())?;
     let directory = super::path(&directories.data);
-    let configuration = directories.document();
     let program = std::env::current_exe().map_err(|why| why.to_string())?;
     let environment = std::env::vars_os()
         .map(|(name, value)| {
@@ -19,7 +18,7 @@ pub fn run(directories: &super::Directories) -> Result<Exit, String> {
             entry.into_boxed_slice()
         })
         .collect();
-    let steps = temper_forge_setup::steps(&checked.setup, configuration.as_os_str().as_bytes());
+    let steps = temper_forge_setup::steps(&checked.setup, &directories.flags());
     let mut owned = Vec::new();
     let opened = (|| {
         let signals = skein_shell::open_termination_signals().map_err(|errno| format!("signals: errno {errno}"))?;
@@ -47,4 +46,23 @@ pub fn run(directories: &super::Directories) -> Result<Exit, String> {
         }
     };
     Ok(skein_shell::drive(&mut kernel, &Clock::new(), &mut service))
+}
+
+/// Prepare a first configuration, or read the existing one, before opening steps.
+pub fn configuration(directories: &super::Directories) -> Result<Box<[u8]>, String> {
+    let config = super::path(&directories.config);
+    let empty = match std::fs::read_dir(config) {
+        Ok(mut entries) => match entries.next() {
+            None => true,
+            Some(Ok(_)) => false,
+            Some(Err(why)) => return Err(format!("{}: {why}", config.display())),
+        },
+        Err(why) if why.kind() == std::io::ErrorKind::NotFound => true,
+        Err(why) => return Err(format!("{}: {why}", config.display())),
+    };
+    if empty {
+        super::init::core(directories)?;
+        eprintln!("box: wrote the configuration, {}", directories.document().display());
+    }
+    directories.read()
 }

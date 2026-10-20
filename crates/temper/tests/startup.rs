@@ -171,13 +171,17 @@ fn refused_box(scratch: &support::Scratch, value: &serde_json::Value) -> String 
         .expect_err("box refused")
 }
 #[test]
-fn a_box_configuration_that_is_absent_is_refused_naming_it() {
+fn a_nonempty_box_configuration_without_a_document_is_refused_naming_it() {
+    let scratch = support::Scratch::startup("box-absent-document");
+    fs::write(scratch.path().join("other"), b"kept").expect("nonempty configuration");
     assert_eq!(
-        temper::run(temper::Command::Box {
-            directories: support::configuration::directories(std::path::Path::new("/absent-temper"))
-        }),
-        Err("temper box: configuration /absent-temper/temper.json: absent; temper init writes one\n".into())
+        temper::run(temper::Command::Box { directories: support::configuration::directories(scratch.path()) }),
+        Err(format!(
+            "temper box: configuration {}: absent; temper init writes one\n",
+            scratch.path().join("temper.json").display()
+        ))
     );
+    scratch.remove();
 }
 #[test]
 fn a_box_configuration_missing_members_is_refused_one_line_each() {
@@ -737,4 +741,52 @@ fn init_prints_only_its_written_files_and_explicit_start_flags_on_stderr() {
     let path = scratch.path().display();
     assert!(lines.ends_with(&format!("init: start it with temper box --config {path} --data {path} --cache {path}\n")));
     scratch.remove();
+}
+
+#[test]
+fn box_initializes_only_absent_or_empty_configuration_directories() {
+    for row in ["absent", "empty", "nonempty"] {
+        let scratch = support::Scratch::startup(&format!("box-directory-{row}"));
+        let config = scratch.path().join("config");
+        let data = scratch.path().join("data");
+        let cache = scratch.path().join("cache");
+        let arguments: Vec<Box<[u8]>> = [
+            b"--config".as_slice(),
+            config.as_os_str().as_encoded_bytes(),
+            b"--data",
+            data.as_os_str().as_encoded_bytes(),
+            b"--cache",
+            cache.as_os_str().as_encoded_bytes(),
+        ]
+        .iter()
+        .map(|v| Box::from(*v))
+        .collect();
+        let (dirs, _) = temper::directories::resolve(&arguments, &[], b"/").expect("scratch directories");
+        if row != "absent" {
+            fs::create_dir(&config).expect("configuration");
+        }
+        if row == "nonempty" {
+            fs::write(config.join("other"), b"kept").expect("entry");
+        }
+        let result = temper::box_command::configuration(&dirs);
+        if row == "nonempty" {
+            assert_eq!(
+                result.expect_err("missing document"),
+                format!("configuration {}: absent; temper init writes one", dirs.document().display())
+            );
+            assert_eq!(fs::read(config.join("other")).expect("kept"), b"kept");
+            assert!(!data.exists());
+            assert!(!cache.exists());
+        } else {
+            let first = result.expect("initialization");
+            assert!(data.join("worker.secret").exists());
+            assert!(cache.is_dir());
+            assert_eq!(
+                temper::box_command::configuration(&dirs).expect("second read"),
+                first,
+                "existing configuration is kept"
+            );
+        }
+        scratch.remove();
+    }
 }

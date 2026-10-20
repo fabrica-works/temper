@@ -34,25 +34,32 @@ impl Step {
         &self.arguments
     }
 }
-fn forge(action: &[u8], config: &[u8], number: u16, run: Option<&[u8]>) -> Step {
+fn forge(action: &[u8], flags: &[Box<[u8]>], number: u16, run: Option<&[u8]>) -> Step {
     let digits = Decimal::of(u64::from(number));
     let n = digits.as_bytes();
-    let mut args = List::with_capacity(5);
-    for a in [b"forge".as_slice(), action, config, n] {
-        args.push(bytes::copy_of(a)).expect("five arguments");
+    let mut args = List::with_capacity(
+        u32::try_from(flags.len()).expect("bounded flags").checked_add(4).expect("bounded arguments"),
+    );
+    for a in [b"forge".as_slice(), action] {
+        args.push(bytes::copy_of(a)).expect("command words");
     }
+    for flag in flags {
+        args.push(flag.clone()).expect("flags counted");
+    }
+    args.push(bytes::copy_of(n)).expect("forge number");
     let name = match run {
         Some(which) => {
-            args.push(bytes::copy_of(which)).expect("fifth argument");
+            args.push(bytes::copy_of(which)).expect("run argument");
             joined(&[which, b" ", n])
         }
         None => joined(&[action, b" ", n]),
     };
     Step::new(name, args.into_boxed(), run.is_some())
 }
+/// Carries the box's absolute directory flags after each command's words.
 /// Commands in setup order: owned processes, every reconcile, then serve.
 #[must_use]
-pub fn steps(setup: &Setup, configuration: &[u8]) -> Box<[Step]> {
+pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Box<[Step]> {
     let count = u32::try_from(setup.entries.len()).expect("bounded entries");
     let mut out = List::with_capacity(
         count.checked_mul(4).expect("bounded step count").checked_add(1).expect("bounded step count"),
@@ -61,22 +68,24 @@ pub fn steps(setup: &Setup, configuration: &[u8]) -> Box<[Step]> {
         match &e.mode {
             Mode::Managed { .. } => {}
             Mode::Owned(o) => {
-                out.push(forge(b"prepare", configuration, e.forge, None)).expect("step capacity");
-                out.push(forge(b"run", configuration, e.forge, Some(b"forgejo"))).expect("step capacity");
+                out.push(forge(b"prepare", flags, e.forge, None)).expect("step capacity");
+                out.push(forge(b"run", flags, e.forge, Some(b"forgejo"))).expect("step capacity");
                 if o.runner.is_some() {
-                    out.push(forge(b"run", configuration, e.forge, Some(b"runner"))).expect("step capacity");
+                    out.push(forge(b"run", flags, e.forge, Some(b"runner"))).expect("step capacity");
                 }
             }
         }
     }
     for e in &setup.entries {
-        out.push(forge(b"reconcile", configuration, e.forge, None)).expect("step capacity");
+        out.push(forge(b"reconcile", flags, e.forge, None)).expect("step capacity");
     }
-    out.push(Step::new(
-        bytes::copy_of(b"serve"),
-        Box::new([bytes::copy_of(b"serve"), bytes::copy_of(configuration)]),
-        true,
-    ))
-    .expect("serve capacity");
+    let mut serve = List::with_capacity(
+        u32::try_from(flags.len()).expect("bounded flags").checked_add(1).expect("bounded arguments"),
+    );
+    serve.push(bytes::copy_of(b"serve")).expect("command word");
+    for flag in flags {
+        serve.push(flag.clone()).expect("flags counted");
+    }
+    out.push(Step::new(bytes::copy_of(b"serve"), serve.into_boxed(), true)).expect("serve capacity");
     out.into_boxed()
 }
