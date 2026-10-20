@@ -1,0 +1,137 @@
+use crate::jig::digest::Digest;
+use crate::tests::fixtures as f;
+use jig_client::contract as c;
+use skein_lib::List;
+
+#[test]
+fn account_reads_watch_only_authorized_documents_and_close_the_first_deliveries() {
+    for owner in [false, true] {
+        let mut root = f::account_root(owner);
+        let call = root.submit(&["accounts", "--json"]);
+        assert!(root.reads.is_empty(), "accounts has no ReadValue");
+        let mut deployment = false;
+        for watched in root.watches.values() {
+            deployment |= *watched == f::DEPLOYMENT_WATCH;
+        }
+        assert_eq!(deployment, owner);
+        f::deliver_accounts(&mut root, f::accounts());
+        if owner {
+            assert!(root.answer(call).is_none(), "owner waits for deployment too");
+            f::deliver_deployment(&mut root, f::deployment());
+        }
+        let printed = root.answer(call).expect("first deliveries");
+        assert_eq!(printed.status, 0, "{printed:?}");
+        for fact in
+            [b"\"number\":43".as_slice(), b"\"number\":71", b"\"provider\":9", b"\"until\":100", b"\"project\":1"]
+        {
+            assert!(f::json_has(&printed, fact), "{fact:?}");
+        }
+        assert_eq!(root.watches.len(), 1, "only shared me remains");
+        let common = f::json_without_digest(&printed.stdout);
+        assert_eq!(f::last_digest(&printed.stdout).as_ref(), Digest::of(&common).hex());
+    }
+}
+#[test]
+fn account_digests_follow_reset_state_uses_order_and_loss() {
+    let original = f::accounts();
+    let read = f::account_read(&mut f::account_root(false), original.clone(), None);
+    let digest = f::last_digest(&read.stdout);
+    for change in 0..6u8 {
+        let mut value = original.clone();
+        let row = value.accounts.get_mut(0).expect("account");
+        match change {
+            0 => row.sources.get_mut(0).expect("source").spent_until = Some(skein_lib::Wall::from_nanos(101)),
+            1 => row.sources.get_mut(0).expect("source").state = c::OwnerAccountState::Granted,
+            2 => row.uses = None,
+            3 => row.place = 2,
+            4 => row.cut = true,
+            _ => {
+                value.last_end = Some(c::OwnerAccountLastEnd {
+                    source: f::SOURCE,
+                    end: c::OwnerAccountEnd::Failed { failure: c::OwnerAccountFailure::MissingScope { scope: 7 } },
+                });
+            }
+        }
+        let changed = f::account_read(&mut f::account_root(false), value, None);
+        assert_ne!(f::last_digest(&changed.stdout), digest, "change {change}");
+    }
+}
+#[test]
+fn models_group_only_project_authorized_models_without_guessing_provider_readiness() {
+    let mut root = f::account_root(false);
+    let mut me = f::me(f::PARTY);
+    let project = me.projects.get_mut(0).expect("project");
+    project.models = List::with_capacity(3);
+    for (name, provider) in [(b"first".as_slice(), Some(f::PROVIDER)), (b"other", None), (b"last", Some(f::PROVIDER))] {
+        let mut efforts = List::with_capacity(1);
+        efforts.push(c::Text::new(b"low".as_slice().into(), 32).expect("effort")).expect("one effort");
+        project
+            .models
+            .push(c::MeModel {
+                name: c::Text::new(name.into(), 32).expect("model"),
+                provider,
+                window: 8192,
+                output: 1024,
+                efforts,
+            })
+            .expect("models");
+    }
+    root.deliver(c::Delivery::Me(Box::new(me)));
+    for project in ["absent", "999"] {
+        let call = root.submit(&["models", "--project", project]);
+        assert_eq!(root.answer(call).expect("membership error").status, 1);
+        assert_eq!(root.watches.len(), 1, "invalid projects open no watch");
+    }
+    for flags in [&["models", "--project", "shop", "--json"][..], &["models", "--json"]] {
+        let call = root.submit(flags);
+        f::deliver_accounts(&mut root, f::accounts());
+        let printed = root.answer(call).expect("models join");
+        for fact in
+            [b"\"window\":8192".as_slice(), b"\"output\":1024", b"first", b"other", b"last", b"\"efforts\":[\"low\"]"]
+        {
+            assert!(f::json_has(&printed, fact), "{fact:?}");
+        }
+        let mut groups = 0u32;
+        for window in printed.stdout.windows(b"\"provider\":9,\"models\"".len()) {
+            if window == b"\"provider\":9,\"models\"" {
+                groups += 1;
+            }
+        }
+        assert_eq!(groups, 1, "one group per supplied provider");
+        for absent in [b"needs an account".as_slice(), b"price", b"description", b"OpenAI"] {
+            assert!(!f::json_has(&printed, absent));
+        }
+        let accounts = f::account_read(&mut root, f::accounts(), None);
+        assert_ne!(
+            f::last_digest(&printed.stdout),
+            f::last_digest(&accounts.stdout),
+            "models is its own joined digest"
+        );
+    }
+}
+#[test]
+fn account_output_cuts_lists_and_escaped_text_within_the_result_window() {
+    let mut value = f::accounts();
+    let mut row = value.accounts.get(0).expect("row").clone();
+    let mut escaped = skein_lib::Writer::new(usize::try_from(crate::limits::TEXT).expect("text fits"));
+    for _ in 0..crate::limits::TEXT {
+        escaped.put(b"\"").expect("escaped text fits");
+    }
+    row.display = f::document_text(&escaped.finish());
+    value.accounts = List::with_capacity(crate::limits::ROWS + 1);
+    for _ in 0..=crate::limits::ROWS {
+        value.accounts.push(row.clone()).expect("one past window");
+        row.display = f::document_text(b"Work");
+    }
+    for json in [false, true] {
+        let mut root = f::account_root(false);
+        let flags = if json { &["accounts", "--json"][..] } else { &["accounts"][..] };
+        let call = root.submit(flags);
+        f::deliver_accounts(&mut root, value.clone());
+        let printed = root.answer(call).expect("cut result");
+        assert_eq!(printed.status, 0, "{printed:?}");
+        assert!(printed.stdout.len() <= usize::try_from(crate::limits::TEXT).expect("text fits"));
+        assert!(f::json_has(&printed, b"\"cut\":true"));
+        assert!(f::json_has(&printed, b"bytes_left"));
+    }
+}

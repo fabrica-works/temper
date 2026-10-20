@@ -338,6 +338,43 @@ pub(crate) fn reads(
             }
         }
     }
+    if reading.called.call.tool == 22 || reading.called.call.tool == 23 {
+        let current = match client.document(me) {
+            Some(document) => document.state == jig_client::State::Live,
+            None => false,
+        };
+        if !current {
+            return failure(b"me is not current", reading.called.json, 1);
+        }
+        let Some(Delivery::OwnerAccounts(accounts)) = reading.documents.get(&3) else {
+            return failure(b"accounts document missing", reading.called.json, 1);
+        };
+        let deployment = match reading.documents.get(&4) {
+            Some(Delivery::OwnerDeployment(value)) => Some(value.as_ref()),
+            _ => None,
+        };
+        let models = if reading.called.call.tool == 23 {
+            let Some(party) = party else { return failure(b"me document missing", reading.called.json, 1) };
+            let Ok(project) = crate::jig::runner::reads::model_project(&reading.called.call, party) else {
+                return failure(b"unknown project", reading.called.json, 1);
+            };
+            Some((party, project))
+        } else {
+            None
+        };
+        return document::print(
+            document::Document::Accounts(document::accounts::Accounts {
+                party: Some(accounts),
+                deployment,
+                models,
+                outcome: None,
+                current: true,
+            }),
+            reading.called.json,
+            limits,
+            owner_part,
+        );
+    }
     if reading.called.call.tool == 3 && reading.pages.len() == 1 && reading.documents.is_empty() {
         return read(reading.pages.get(&1).expect("task read"), client, me, reading.called.json, limits, owner_part);
     }

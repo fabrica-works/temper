@@ -104,6 +104,19 @@ pub(super) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, cal
             let what = c::Read::Turn { task, attempt: name.attempt, turn: name.number };
             read(runner, &mut reading, 1, what, out);
         }
+        22 | 23 => {
+            let Some(document) = client.document(runner.me()) else { return };
+            let Some(Latest::Jig(c::Delivery::Me(me))) = document.latest else { return };
+            if reading.called.call.tool == 23 && model_project(&reading.called.call, me).is_err() {
+                let printed = render::failure(b"unknown project", reading.called.json, 1);
+                finish(reading.called, printed, out);
+                return;
+            }
+            watch(runner, &mut reading, 3, c::Subject::Accounts, out);
+            if me.deployment_role == Some(c::HeldRole::Owner) {
+                watch(runner, &mut reading, 4, c::Subject::Deployment, out);
+            }
+        }
         7 => watch(runner, &mut reading, 4, c::Subject::Run { task, turn: None, offset: 0 }, out),
         _ => unreachable!("read tool"),
     }
@@ -171,6 +184,7 @@ pub(super) fn changed(runner: &mut Runner, client: &Client, env: &Env<Limits>, h
     let bit = 1u8.checked_shl(local).expect("fixed watch slot");
     if reading.pending & bit != 0
         && let Some(document) = client.document(handle)
+        && document.state == jig_client::State::Live
         && let Some(Latest::Jig(delivery)) = document.latest
     {
         reading.pending &= !bit;
@@ -289,4 +303,19 @@ pub(crate) fn task_query(call: &Call, me: &c::Me) -> Option<c::TaskQuery> {
             _ => c::QueryOrder::Number,
         },
     })
+}
+
+// Numeric project arguments require membership too; omission includes every
+// project in the supplied me document, never an engine-wide catalogue.
+pub(crate) fn model_project(call: &Call, me: &c::Me) -> Result<Option<u32>, ()> {
+    if value(call, 0).is_none() {
+        return Ok(None);
+    }
+    let selected = project(call, me).ok_or(())?;
+    for held in &me.projects {
+        if held.project == selected {
+            return Ok(Some(selected));
+        }
+    }
+    Err(())
 }

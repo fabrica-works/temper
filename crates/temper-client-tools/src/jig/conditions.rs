@@ -75,7 +75,13 @@ pub fn holds(condition: &Condition, facts: &Facts<'_>) -> Option<bool> {
         c::Delivery::OwnerAccounts(accounts) => match condition {
             Condition::Usable => Some(accounts.usable),
             Condition::Settled => Some(accounts.settled),
-            _ => None,
+            Condition::Waiting
+            | Condition::Updates
+            | Condition::Ended
+            | Condition::WaitingOnMe
+            | Condition::Held
+            | Condition::Replied
+            | Condition::Phase(_) => None,
         },
         c::Delivery::OwnerProject(_)
         | c::Delivery::OwnerProposal(_)

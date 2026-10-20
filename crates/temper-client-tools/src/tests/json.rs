@@ -79,6 +79,8 @@ fn json_uses_the_tables_close_reason() {
     }
 }
 const WAIT_OK: &[(&str, Option<&str>)] = &[
+    ("accounts", Some("usable")),
+    ("accounts", Some("settled")),
     ("me", Some("waiting")),
     ("inbox", Some("waiting")),
     ("inbox", Some("updates")),

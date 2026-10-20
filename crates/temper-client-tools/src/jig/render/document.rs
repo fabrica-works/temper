@@ -11,6 +11,7 @@ use skein_ui::phrases::{PhraseLimits, Phrasebook};
 #[derive(Debug)]
 pub(crate) enum Document<'a> {
     Me(&'a Me),
+    Accounts(accounts::Accounts<'a>),
     Task(&'a Task, Option<&'a Me>),
     HistoricalTask(&'a Task, &'a jig_client::contract::Result, Option<&'a Me>),
     ReadSet(&'a crate::jig::runner::reads::Reading, Option<&'a Me>),
@@ -24,10 +25,19 @@ pub(crate) fn print(
     limits: &Limits,
     owner_part: fn(&jig_client::contract::OwnerPart, &mut Text),
 ) -> Printed {
+    let accounts = match document {
+        Document::Accounts(_) => true,
+        Document::Me(_)
+        | Document::Task(..)
+        | Document::HistoricalTask(..)
+        | Document::ReadSet(..)
+        | Document::Wait(_)
+        | Document::SizedTurn { .. } => false,
+    };
     let stdout = if json {
         let bounds = skein_json::writer::Limits {
             depth: 32,
-            length: u32::try_from(limits.ask_bytes).expect("output bound fits"),
+            length: if accounts { limits.text } else { u32::try_from(limits.ask_bytes).expect("output bound fits") },
         };
         let mut measure = Encoder::measure(&bounds);
         encode(&document, limits, &mut measure);
@@ -40,6 +50,9 @@ pub(crate) fn print(
         let mut measure = Text::measure();
         text(&document, &book, limits, owner_part, &mut measure);
         let structural = measure.structural();
+        if accounts && structural > usize::try_from(limits.text).expect("text fits") {
+            return super::failure(b"result limit", false, 1);
+        }
         let mut measure = Text::bounded(limits, structural);
         text(&document, &book, limits, owner_part, &mut measure);
         let mut out = measure.writing(limits, structural);
@@ -57,6 +70,7 @@ fn text(
 ) {
     match document {
         Document::Wait(wait) => waiting::text(wait, book, limits, owner_part, out),
+        Document::Accounts(value) => accounts::text(*value, limits, out),
         Document::Me(me) => me_text(me, book, out),
         Document::Task(task, me) => task_text(task, *me, book, owner_part, out),
         Document::HistoricalTask(task, result, me) => {
@@ -71,7 +85,7 @@ fn text(
         Document::Task(task, _) | Document::HistoricalTask(task, _, _) => {
             subjects::text_digest(b"task", &super::Part::Task(task), limits, out);
         }
-        Document::ReadSet(..) | Document::SizedTurn { .. } | Document::Wait(_) => {}
+        Document::Accounts(_) | Document::ReadSet(..) | Document::SizedTurn { .. } | Document::Wait(_) => {}
     }
 }
 pub(crate) fn phrasebook(text: u32) -> Phrasebook {
@@ -351,6 +365,7 @@ fn encode(document: &Document<'_>, limits: &Limits, out: &mut Encoder) {
     };
     match document {
         Document::Wait(wait) => waiting::encode(wait, limits, out),
+        Document::Accounts(value) => accounts::encode(*value, limits, true, out),
         Document::Me(me) => subjects::encode(&super::Part::Me(me), limits, true, out),
         Document::Task(task, _) => subjects::encode(&super::Part::Task(task), limits, true, out),
         Document::HistoricalTask(task, result, _) => {
@@ -514,3 +529,5 @@ fn subject_end(digest: Option<crate::jig::digest::Digest>, out: &mut Encoder) {
 }
 
 pub(crate) mod waiting;
+
+pub(crate) mod accounts;
