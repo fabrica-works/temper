@@ -17,7 +17,8 @@ peer's shared `Forge`; the one-process world's port-0 hooks address).
 13.4 needs temper 05's acts, 13.5 its waits and `task --tree` read.
 Names said to be forge-kit's temper-05.2's are created there: check each
 as landed. Steps: `temper-13.1` to `temper-13.5`, then `temper-13.s2`
-(`13.s2-git-test-shapes.md`, ruling 142).
+(`13.s2-git-test-shapes.md`, ruling 142); `temper-13.s3`
+(`13.s3-wake-across-fresh-chain.md`, ruling 145) before 13.5 goes on.
 
 ## Read first
 
@@ -284,7 +285,8 @@ Removes: nothing.
 Scope: adopt, chat, delegate, then clone, edit, push, CI, review and
 land through the hosted agents, fake git and the peer (tools.md, 11.3;
 domain/forge.md, 8.2).
-Needs: 13.1 to 13.4; temper 05's waits and `task --tree` read.
+Needs: 13.1 to 13.4; temper 05's waits and `task --tree` read;
+temper-13.s3 (ruling 145).
 Files: `tests/real-loop/src/{landing.rs, calls.rs, forge.rs, lib.rs}`,
 `tests/real-loop/src/agent.rs` (`agent` and `roots`: each agent adopts,
 in Start order, the directory the service names for it, ruling 143),

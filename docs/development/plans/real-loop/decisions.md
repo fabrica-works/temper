@@ -837,6 +837,13 @@ pass:
 
      The director's security rule of 2026-10-20T13:04Z, to every owner and supervisor: heavy queues each task on pueue with its caller's whole environment, and `pueue status --json` and `pueue log` print every queued task's environment, other sessions' included; Codex tasks on another machine ran them, and local Claude messaging tokens reached Codex's context. Until o/hygiene's heavy fix lands on this machine, no prompt given to Codex or any other agent may run `pueue status`, `pueue log`, or read another process's environment (`/proc/*/environ`, `ps e`), and every Codex prompt says so; heavy's own output and its log path are read instead. The README's new rule "No other task's environment" holds it for every role of this run and each prompt it writes, until a ruling says the fix is in the run's kit.
 
+145. **temper-13.s3 keeps a wake that overtakes a fresh-read chain** (plan defect, temper 13's block of 2026-10-20T13:14:27Z).
+     Ruling 145: the cause 13.5 found lies in `temper-engine-domain-forge`, outside its Files, so, as ruling 140 says, this ruling adds the step that fixes it: `temper-13.s3`, "A wake that overtakes a fresh-read chain is kept" (`temper/13.s3-wake-across-fresh-chain.md`), in session 13, before 13.5 goes on.
+
+     - The defect: `domain.rs`'s `step_change` returns with no trace when a step for the same task is pending, so a wake during a fresh-read chain (OpenPull's `Made` outcome, or its item's hint) is lost, and the chain, which read the pull `Missing` before the pull was opened, decides on `pull = None`. domain/forge.md, 5.3: "Before a decision depends on a fact, the change child domain asks for it afresh". The fix keeps one such wake and steps again from a fresh read once the chain has finished; it is proved by a unit test in the domain's `src/tests.rs` and its counterpart.
+     - 13.5's fixes in its Files stay on its branch (the adapter of ruling 143, the title within the fixture's 16 bytes, the peer's clock skew, the domain's four calls and the client's matching connections, all through admitted overrides); each is named in its commit body, with the run that found it.
+     - Once 13.s3 has landed, 13.5 rebases onto it and its budget starts afresh, as ruling 143's did: a further symptom gets the README rule's three diagnostic runs, then eight runs and 40 minutes. Then its Proof, clippy, the dependent tests and the three measurements.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
