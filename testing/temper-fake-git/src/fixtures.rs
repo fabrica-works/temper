@@ -50,8 +50,9 @@ pub fn spawn_of(command: &Command) -> Spawn {
     }
 }
 
-use crate::{Answer, Forge, Transport, answer, check, id::id};
+use crate::{Answer, Transport, answer, check, id::id};
 use skein_fake_forge_domain::{self as domain, api};
+use skein_fake_peers::forge::Forge;
 use skein_lib::{Duration, List};
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 use temper_fake_checkout::{

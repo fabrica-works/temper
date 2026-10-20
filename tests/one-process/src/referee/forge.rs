@@ -68,7 +68,7 @@ impl Forge {
         self.pushed.iter().any(|push| !self.merge || push.parents == [fixtures::BRANCH_HEAD, fixtures::MOVED_BASE])
     }
 }
-fn green(forge: &temper_fake_git::Forge, repository: &[u8], head: u64) {
+fn green(forge: &skein_fake_peers::forge::Forge, repository: &[u8], head: u64) {
     let api::Answer::Checks(checks) = forge
         .domain
         .inspect(&forge.config, repository, &api::Read::Checks { commit: head })

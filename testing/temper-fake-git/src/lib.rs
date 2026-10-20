@@ -9,4 +9,4 @@ mod program;
 mod transport;
 pub use check::{Checked, Refusal, check};
 pub use program::Git;
-pub use transport::{Forge, Transport};
+pub use transport::Transport;

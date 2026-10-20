@@ -1,26 +1,11 @@
 //! Git reaches the same forge domain the HTTP service owns in the world.
 use crate::check::Credential;
 use skein_fake_forge_domain::{self as domain, api};
-use skein_lib::{Env, Queue, ReplyTo, Secret, Time, Token, Wall};
+use skein_fake_peers::forge::Forge;
+use skein_lib::{Env, ReplyTo, Secret, Wall};
 use std::{cell::RefCell, rc::Rc};
 use temper_fake_checkout::git::{Created, Fault, Pushed, Remote, Tree, Want, What};
 
-/// The world's one forge, shared by HTTP and every hosted git invocation.
-#[derive(Debug)]
-pub struct Forge {
-    pub domain: domain::Domain,
-    pub config: domain::Config,
-    pub now: Time,
-    /// Other replies and hooks remain the HTTP world's to route.
-    pub pending: Vec<domain::Request>,
-    serial: u64,
-}
-impl Forge {
-    #[must_use]
-    pub fn new(domain: domain::Domain, config: domain::Config) -> Self {
-        Self { domain, config, now: Time::ZERO, pending: Vec::new(), serial: 0 }
-    }
-}
 /// The known tokens and logins stay solely on this side of the boundary.
 #[derive(Debug, Clone)]
 pub struct Transport {
@@ -62,12 +47,12 @@ impl Transport {
         let user = self.user.ok_or(Fault::Refused)?;
         let remote = repository(remote);
         let mut forge = self.forge.borrow_mut();
-        forge.serial += 1;
-        let token = Token::new((7 << 60) + forge.serial);
+        assert!(forge.pending.room() >= domain::MAX_OUT, "reserve external domain output");
+        let token = forge.next_reply();
         let env = Env { now: forge.now, wall: Wall::EPOCH, limits: forge.config };
-        let mut out = Queue::with_capacity(domain::MAX_OUT);
+        let Forge { domain, pending, .. } = &mut *forge;
         domain::step(
-            &mut forge.domain,
+            domain,
             &env,
             domain::Event::Call {
                 reply_to: ReplyTo::new(token),
@@ -75,12 +60,14 @@ impl Transport {
                 repository: remote.into(),
                 op: api::Op::Git(operation),
             },
-            &mut out,
+            pending,
         );
-        domain::fire(&mut forge.domain, &env, &mut out);
+        assert!(pending.room() >= domain::MAX_OUT, "reserve external domain output");
+        domain::fire(domain, &env, pending);
         forge.domain.reclaim();
         let mut terminal = None;
-        while let Some(request) = out.pop() {
+        for _ in 0..forge.pending.len() {
+            let request = forge.pending.pop().expect("pending pass length");
             match request {
                 domain::Request::Reply { to, result } => {
                     let replied = to.into_token();

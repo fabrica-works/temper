@@ -8,7 +8,7 @@ use skein_io::{
 use skein_lib::{Env, Queue, Time, Token, Wall};
 use skein_shell::Host;
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
-type Shared = Rc<RefCell<temper_fake_git::Forge>>;
+type Shared = Rc<RefCell<skein_fake_peers::forge::Forge>>;
 thread_local! { static SHARED: RefCell<Option<temper_fake_git::Transport>> = const { RefCell::new(None) }; }
 pub(crate) fn set(transport: Option<temper_fake_git::Transport>) {
     SHARED.with(|shared| {
@@ -186,7 +186,7 @@ impl ForgeHost {
         while let Some(reply) = replies.pop() {
             forge.pending.push(reply);
         }
-        for reply in std::mem::take(&mut forge.pending) {
+        while let Some(reply) = forge.pending.pop() {
             if let Ok((owner, reply)) = self.service.target(reply) {
                 let connection = self.connections.get_mut(&owner).expect("live HTTP call");
                 protocol::down(

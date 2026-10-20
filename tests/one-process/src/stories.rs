@@ -157,7 +157,7 @@ pub(crate) fn forge(story: Story) -> temper_fake_git::Transport {
         fixtures::WORKER_USER,
         skein_fake_forge_domain::api::Permission::Write,
     );
-    let forge = std::rc::Rc::new(std::cell::RefCell::new(temper_fake_git::Forge::new(domain, config)));
+    let forge = std::rc::Rc::new(std::cell::RefCell::new(skein_fake_peers::forge::Forge::new(domain, config)));
     let mut transport = temper_fake_git::Transport::new(forge, &temper_fake_git::fixtures::table(b"acme/app", None));
     let identity = temper_fake_git::fixtures::identity();
     transport.authenticate(Some(&(identity.login, identity.token)));
@@ -191,10 +191,11 @@ pub(crate) fn forge(story: Story) -> temper_fake_git::Transport {
 pub(crate) fn prepare_merge_branch(transport: &temper_fake_git::Transport) {
     let mut forge = transport.forge.borrow_mut();
     let env = skein_lib::Env { now: forge.now, wall: skein_lib::Wall::EPOCH, limits: forge.config };
-    let mut replies = skein_lib::Queue::with_capacity(skein_fake_forge_domain::MAX_OUT);
-    let token = skein_lib::Token::new(1_u64 << 60);
+    assert!(forge.pending.room() >= skein_fake_forge_domain::MAX_OUT, "reserve external domain output");
+    let token = forge.next_reply();
+    let skein_fake_peers::forge::Forge { domain, pending, .. } = &mut *forge;
     skein_fake_forge_domain::step(
-        &mut forge.domain,
+        domain,
         &env,
         skein_fake_forge_domain::Event::Call {
             reply_to: skein_lib::ReplyTo::new(token),
@@ -205,11 +206,12 @@ pub(crate) fn prepare_merge_branch(transport: &temper_fake_git::Transport) {
                 commit: fixtures::BRANCH_HEAD,
             }),
         },
-        &mut replies,
+        pending,
     );
     let mut created = false;
     for _ in 0..32 {
-        while let Some(reply) = replies.pop() {
+        for _ in 0..forge.pending.len() {
+            let reply = forge.pending.pop().expect("pending pass length");
             match reply {
                 skein_fake_forge_domain::Request::Reply { to, result } => {
                     let destination = to.into_token();
@@ -235,7 +237,9 @@ pub(crate) fn prepare_merge_branch(transport: &temper_fake_git::Transport) {
         if created {
             break;
         }
-        skein_fake_forge_domain::fire(&mut forge.domain, &env, &mut replies);
+        assert!(forge.pending.room() >= skein_fake_forge_domain::MAX_OUT, "reserve external domain output");
+        let skein_fake_peers::forge::Forge { domain, pending, .. } = &mut *forge;
+        skein_fake_forge_domain::fire(domain, &env, pending);
     }
     forge.domain.reclaim();
     assert!(created, "the existing private merge branch answered");
