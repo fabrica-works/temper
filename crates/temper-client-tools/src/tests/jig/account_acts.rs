@@ -41,10 +41,10 @@ fn account_acts_preserve_the_resolved_source() {
     for (words, change) in [
         (&["forget", "43"][..], c::AccountChange::Remove { account: f::ACCOUNT }),
         (&["forget", "43", "--source", "key"], c::AccountChange::RemoveKey { source: f::SOURCE }),
-        (&["rank", "43", "2"], c::AccountChange::MoveAccount { account: f::ACCOUNT, place: 2 }),
+        (&["rank", "43", "2"], c::AccountChange::MoveAccount { account: f::ACCOUNT, place: 1 }),
         (
             &["rank", "43", "2", "--source", "key"],
-            c::AccountChange::MoveSource { account: f::ACCOUNT, source: f::SOURCE, place: 2 },
+            c::AccountChange::MoveSource { account: f::ACCOUNT, source: f::SOURCE, place: 1 },
         ),
         (&["retry", "43"], c::AccountChange::Resume { source: f::SOURCE }),
     ] {
@@ -84,21 +84,31 @@ fn ambiguous_sources_are_refused_before_sending() {
 }
 #[test]
 fn a_key_value_never_enters_the_request_store() {
-    let mut root = f::account_root(false);
-    let call = root.submit_value(ADD, Some(Secret::new(KEY.into())));
-    assert_eq!(root.carried.get(&call).expect("transient value").expose(), KEY);
-    let (_, name, ask) = root.sends.get(&call).expect("sent once");
-    assert_eq!(*name, f::named("add"));
-    assert_eq!(
-        ask,
-        &jig_client::Ask::Jig(Box::new(c::Ask::AccountChange {
-            holder: c::AccountHolder::Deployment,
-            change: c::AccountChange::AddKey { provider: 9, join: None, digest: skein_lib::sha256::digest(KEY) },
-        }))
-    );
-    assert!(root.saved.is_empty());
-    root.done(call, c::Outcome::Owner(c::OwnerOutcome::AccountKeyKept { source: f::SOURCE }));
-    assert_eq!(root.answer(call).expect("durable answer").status, 0);
+    for (words, holder, join) in [
+        (ADD, c::AccountHolder::Deployment, None),
+        (&["add-key", "9", "file", "--key", "add"][..], c::AccountHolder::Own, None),
+        (&["add-key", "9", "file", "--account", "43", "--key", "add"], c::AccountHolder::Own, Some(f::ACCOUNT)),
+    ] {
+        let mut root = f::account_root(false);
+        let call = root.submit_value(words, Some(Secret::new(KEY.into())));
+        assert_eq!(root.carried.get(&call).expect("transient value").expose(), KEY);
+        let (_, name, ask) = root.sends.get(&call).expect("sent once");
+        assert_eq!(*name, f::named("add"));
+        assert_eq!(
+            ask,
+            &jig_client::Ask::Jig(Box::new(c::Ask::AccountChange {
+                holder,
+                change: c::AccountChange::AddKey {
+                    provider: f::PROVIDER,
+                    join,
+                    digest: skein_lib::sha256::digest(KEY)
+                },
+            }))
+        );
+        assert!(root.saved.is_empty());
+        root.done(call, c::Outcome::Owner(c::OwnerOutcome::AccountKeyKept { source: f::SOURCE }));
+        assert_eq!(root.answer(call).expect("durable answer").status, 0);
+    }
 }
 #[test]
 fn connect_prints_the_watch_that_follows_its_address() {
@@ -117,9 +127,7 @@ fn connect_prints_the_watch_that_follows_its_address() {
     );
     let printed = root.answer(call).expect("durable start");
     assert_eq!(printed.status, 0);
-    assert!(
-        printed.stdout.windows(b"wait accounts --until settled".len()).any(|w| w == b"wait accounts --until settled")
-    );
+    assert!(skein_lib::bytes::find(&printed.stdout, b"wait accounts --until settled").is_some());
 }
 #[test]
 fn unconfirmed_disconnect_names_the_provider_settings() {
@@ -133,7 +141,7 @@ fn unconfirmed_disconnect_names_the_provider_settings() {
     root.done(call, c::Outcome::Owner(c::OwnerOutcome::AccountSignedOut { confirmed: false }));
     let printed = root.answer(call).expect("removed locally");
     assert_eq!(printed.status, 0);
-    assert!(printed.stdout.windows(b"provider's settings".len()).any(|w| w == b"provider's settings"));
+    assert!(skein_lib::bytes::find(&printed.stdout, b"provider's settings").is_some());
 }
 #[test]
 fn a_value_request_is_not_retried_automatically() {
@@ -163,7 +171,7 @@ fn an_engine_key_refusal_exits_two() {
     root.answered(call, c::Answer::Refused { refusal: c::Refusal::KeyConflict, at: None });
     let printed = root.answer(call).expect("engine refusal");
     assert_eq!(printed.status, 2);
-    assert!(!printed.stderr.windows(KEY.len()).any(|w| w == KEY));
+    assert!(skein_lib::bytes::find(&printed.stderr, KEY).is_none());
 }
 #[test]
 fn replacement_draws_an_ephemeral_name() {
@@ -188,5 +196,22 @@ fn out_of_bound_secrets_are_refused_at_call_admission() {
         let call = root.submit_value(ADD, Some(Secret::new(value)));
         assert_eq!(root.answer(call).expect("client bound").status, 1);
         assert!(root.sends.is_empty());
+    }
+}
+
+#[test]
+fn source_shorthand_resolves_the_supplied_kind() {
+    for (word, kind) in [("sign_in", c::OwnerAccountKind::SignIn), ("program", c::OwnerAccountKind::Program)] {
+        for tool in ["disconnect", "forget"] {
+            let mut root = f::account_root(false);
+            let call = root.submit(&[tool, "43", "--source", word]);
+            let mut accounts = f::accounts();
+            accounts.accounts.get_mut(0).expect("account").sources.get_mut(0).expect("source").kind = kind;
+            f::deliver_accounts(&mut root, accounts);
+            assert_eq!(
+                root.sends.get(&call).expect("resolved sign-out").2,
+                jig_client::Ask::Jig(Box::new(c::Ask::SignOut { holder: c::AccountHolder::Own, source: f::SOURCE }))
+            );
+        }
     }
 }

@@ -14,7 +14,14 @@ const CLIENT: ClientId = ClientId(0);
 pub const PROVIDER: u32 = 17;
 #[must_use]
 pub fn fixture(seed: u64) -> (Joint, Root) {
-    let limits = fixtures::domain_limits();
+    fixture_root(seed, false)
+}
+#[must_use]
+pub fn tools_fixture(seed: u64) -> (Joint, Root) {
+    fixture_root(seed, true)
+}
+fn fixture_root(seed: u64, tools: bool) -> (Joint, Root) {
+    let limits = if tools { temper_client_tools::limits::client() } else { fixtures::domain_limits() };
     let mut config = walking::config(seed);
     config.core.settings.llm_providers = a::Providers {
         providers: Box::new([a::Provider {
@@ -40,7 +47,11 @@ pub fn fixture(seed: u64) -> (Joint, Root) {
     let driver = Driver::with_repositories(Store::new(), config, &engine_limits, fixtures::REPOSITORIES);
     let mut front = Joint::with_engine(seed, &limits, driver, 1);
     front.bind(CLIENT, fixtures::PARTY);
-    let mut root = Root::Person(Box::new(temper_client_domain::unlinked(&limits, seed)));
+    let mut root = if tools {
+        crate::agent::new(seed).0
+    } else {
+        Root::Person(Box::new(temper_client_domain::unlinked(&limits, seed)))
+    };
     event(&mut front, &mut root, Temper::start(temper_client_domain::Address::Accounts, Vec::new(), 0));
     (front, root)
 }

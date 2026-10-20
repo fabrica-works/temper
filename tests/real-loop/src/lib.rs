@@ -96,7 +96,7 @@ pub fn run(
 }
 #[must_use]
 pub fn run_on(scratch: Scratch, recipe: impl FnOnce() -> llm::Recipe, steps: impl FnOnce() -> Vec<calls::Step>) -> Ran {
-    let outcome = world::run(&scratch, recipe, steps);
+    let outcome = world::run(&scratch, recipe, steps, false);
     checked(Ran { outcome: Outcome::Checked(outcome), scratch })
 }
 fn checked(ran: Ran) -> Ran {
@@ -117,4 +117,15 @@ pub fn run_forge(
     let scratch = Scratch::new("real-forge");
     let outcome = world::run_forge(&scratch, fixture, scripts, steps);
     checked(Ran { outcome: Outcome::Forge(outcome), scratch })
+}
+
+/// Run the private-key smoke on a standard `OpenAI` endpoint.
+#[must_use]
+pub fn run_key_on(
+    scratch: Scratch,
+    recipe: impl FnOnce() -> llm::Recipe,
+    steps: impl FnOnce() -> Vec<calls::Step>,
+) -> Ran {
+    let outcome = world::run(&scratch, recipe, steps, true);
+    checked(Ran { outcome: Outcome::Checked(outcome), scratch })
 }

@@ -24,6 +24,7 @@ pub struct ServiceHost {
     pub(crate) seen: crate::forge::Seen,
     cues: Vec<Cue>,
     links: u32,
+    direct_key: bool,
     path: PathBuf,
     signals: Fd,
     forge: Option<TcpListener>,
@@ -32,10 +33,15 @@ pub struct ServiceHost {
     submissions: Queue<Submit>,
 }
 impl ServiceHost {
-    pub(crate) fn new(path: PathBuf, signals: Fd) -> Self {
-        Self::configured(path, signals, None)
+    pub(crate) fn new(path: PathBuf, signals: Fd, direct_key: bool) -> Self {
+        Self::configured(path, signals, None, direct_key)
     }
-    pub(crate) fn configured(path: PathBuf, signals: Fd, fixture: Option<crate::forge::Fixture>) -> Self {
+    pub(crate) fn configured(
+        path: PathBuf,
+        signals: Fd,
+        fixture: Option<crate::forge::Fixture>,
+        direct_key: bool,
+    ) -> Self {
         let forge = fixture
             .is_none()
             .then(|| TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("held forge listener"));
@@ -43,6 +49,9 @@ impl ServiceHost {
             .as_ref()
             .map_or(([127, 0, 0, 1], 0).into(), |listener| listener.local_addr().expect("held forge address"));
         fixtures::write(&path, address, address).expect("stand-in standalone documents");
+        if direct_key {
+            fixtures::key_documents(&path).expect("standard key route");
+        }
         if let Some(fixture) = fixture {
             crate::forge::write(&path, address, &fixture).expect("forge documents");
         }
@@ -65,6 +74,7 @@ impl ServiceHost {
             seen: crate::forge::Seen::default(),
             cues: Vec::with_capacity(cue::CUES),
             links: 0,
+            direct_key,
             path,
             signals,
             forge,
@@ -111,6 +121,9 @@ impl Host for ServiceHost {
                 .forge_address
                 .unwrap_or_else(|| self.forge.as_ref().expect("held forge").local_addr().expect("forge address"));
             fixtures::write(&self.path, address, forge).expect("bound standalone documents");
+            if self.direct_key {
+                fixtures::key_documents(&self.path).expect("standard key route");
+            }
             if let Some(fixture) = self.fixture {
                 crate::forge::write(&self.path, forge, &fixture).expect("forge documents");
             }

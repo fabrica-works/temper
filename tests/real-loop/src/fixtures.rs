@@ -178,3 +178,24 @@ pub fn lost_chat() -> Vec<crate::calls::Step> {
     steps.extend([start(at, argv), held(LOST_NAME.as_bytes()), kill(LOST_CALL)]);
     steps
 }
+
+/// The key smoke uses the standard `OpenAI` route rather than the Codex account route.
+pub(crate) fn key_documents(directory: &Path) -> std::io::Result<()> {
+    let path = directory.join("agent.json");
+    let mut agent: serde_json::Value = serde_json::from_slice(&std::fs::read(&path)?)?;
+    agent["endpoints"][0]["provider"] = "openai".into();
+    agent["endpoints"][0]["dialect"] = 3.into();
+    let config_path = directory.join("config.json");
+    let mut config: serde_json::Value = serde_json::from_slice(&std::fs::read(&config_path)?)?;
+    config["engine"]["llm"]["endpoints"][0]["dialect"] = 3.into();
+    // Give the fixture owner a real deployment membership for the joined read.
+    let mut deployment = config["engine"]["projects"][0].clone();
+    deployment["number"] = 0.into();
+    config["engine"]["projects"].as_array_mut().expect("projects").push(deployment);
+    config["engine"]["limits"]["overrides"]["people.projects"] = 2.into();
+    config["engine"]["limits"]["overrides"]["authority.projects"] = 2.into();
+    // Each project needs its period and the owner's pool in the tasks ledger.
+    config["engine"]["limits"]["overrides"]["tasks.funders"] = 4.into();
+    private(&config_path, &serde_json::to_vec(&config)?)?;
+    private(&path, &serde_json::to_vec(&agent)?)
+}

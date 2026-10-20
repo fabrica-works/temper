@@ -294,7 +294,7 @@ pub fn check(table: &[&Tool], call: &Call, limits: &Limits) -> Result<(), Usage>
             {
                 return Err(Usage::Kind { argument: u8::try_from(index).expect("argument") });
             }
-            if arg.kind == Kind::File && matches!(slot, Some(Values::One(Value::Stdin))) {
+            if arg.kind == Kind::File && *slot == Some(Values::One(Value::Stdin)) {
                 return Err(Usage::Stdin);
             }
         }

@@ -14,6 +14,7 @@ pub enum Arg {
     Delegate(usize),
     Digest(usize),
     Number(u64),
+    File(&'static str),
 }
 impl From<&'static str> for Arg {
     fn from(word: &'static str) -> Self {
@@ -97,6 +98,10 @@ pub fn join(call: usize) -> Step {
 #[must_use]
 pub fn watching(call: usize) -> Step {
     Step::Watching { call }
+}
+#[must_use]
+pub fn file(name: &'static str) -> Arg {
+    Arg::File(name)
 }
 #[must_use]
 pub fn number(task: u64) -> Arg {
@@ -297,6 +302,7 @@ impl Caller {
                     value["task"]["digest"].as_str().expect("task digest").as_bytes().into()
                 }
                 Arg::Number(number) => number.to_string().into_bytes().into(),
+                Arg::File(name) => self.scratch.join(name).as_os_str().as_bytes().into(),
             });
         }
         words

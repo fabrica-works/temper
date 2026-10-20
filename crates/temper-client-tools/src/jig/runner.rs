@@ -98,7 +98,7 @@ pub fn call(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>,
         finish(called, printed, out);
         return;
     }
-    if called.value.is_some() != matches!(called.call.tool, 26 | 27) {
+    if called.value.is_some() != (called.call.tool == 26 || called.call.tool == 27) {
         let printed = render::failure(b"key file must be supplied only for add-key or replace-key", called.json, 1);
         finish(called, printed, out);
         return;
@@ -136,9 +136,8 @@ fn run(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, call
                 render::me(me, called.json, &env.limits, runner.owner_part.expect("host supplies part vocabulary"));
             finish(called, printed, out);
         }
-        1..=7 | 22 | 23 => reads::start(runner, client, env, called, out),
+        1..=7 | 22 | 23 | 25 | 27..=30 => reads::start(runner, client, env, called, out),
         24 | 26 => accounts::start(runner, client, env, called, out),
-        25 | 27..=30 => reads::start(runner, client, env, called, out),
         8..=15 => acts::start(runner, client, env, called, out),
         16 => wait::start(runner, client, env, called, out),
         _ => {

@@ -82,6 +82,7 @@ pub(crate) fn run(
     scratch: &skein_scratch::Scratch,
     recipe: impl FnOnce() -> llm::Recipe,
     steps: impl FnOnce() -> Vec<crate::calls::Step>,
+    direct_key: bool,
 ) -> CheckedOutcome<Proc> {
     let mut world = World::new_controlled_checked(|controls| Judge {
         controls,
@@ -93,7 +94,8 @@ pub(crate) fn run(
     });
     world
         .spawn(|| Proc::Llm(Box::new(Llm { peer: llm::peer(recipe()).expect("independent LLM peer"), scripts: None })));
-    world.spawn_signals(|signals| Proc::Service(Box::new(ServiceHost::new(scratch.path().into(), signals))));
+    world
+        .spawn_signals(|signals| Proc::Service(Box::new(ServiceHost::new(scratch.path().into(), signals, direct_key))));
     host(&mut world, scratch, steps);
     world.run(&skein_shell::Clock::new(), crate::PATIENCE)
 }
@@ -135,7 +137,7 @@ pub(crate) fn run_forge(
         }))
     });
     world.spawn_signals(|signals| {
-        Proc::Service(Box::new(ServiceHost::configured(scratch.path().into(), signals, Some(fixture))))
+        Proc::Service(Box::new(ServiceHost::configured(scratch.path().into(), signals, Some(fixture), false)))
     });
     host(&mut world, scratch, steps);
     world.spawn(|| {

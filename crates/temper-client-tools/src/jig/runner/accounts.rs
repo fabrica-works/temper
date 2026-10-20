@@ -21,10 +21,7 @@ pub(super) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, cal
                 },
                 change: c::AccountChange::AddKey {
                     provider: integer(&called.call, 0),
-                    join: match number(&called.call, 2) {
-                        Some(n) => Some(u32::try_from(n).expect("checked number")),
-                        None => None,
-                    },
+                    join: join(&called.call),
                     digest,
                 },
             }),
@@ -76,7 +73,19 @@ fn build(reading: &reads::Reading) -> Result<c::Ask, &'static [u8]> {
                     }
                 }
             }
-            _ => {}
+            c::Delivery::OwnerProject(_)
+            | c::Delivery::Me(_)
+            | c::Delivery::Task(_)
+            | c::Delivery::OwnerProposal(_)
+            | c::Delivery::Tree(_)
+            | c::Delivery::OwnerTree(_)
+            | c::Delivery::Chips(_)
+            | c::Delivery::Inbox(_)
+            | c::Delivery::OwnerInbox(_)
+            | c::Delivery::Tasks(_)
+            | c::Delivery::Run(_)
+            | c::Delivery::RunState(_)
+            | c::Delivery::Deployment(_) => {}
         }
     }
     let (holder, sources, cut) = found.ok_or(b"account unavailable; read accounts again".as_slice())?;
@@ -96,7 +105,7 @@ fn build(reading: &reads::Reading) -> Result<c::Ask, &'static [u8]> {
     let change = if call.tool == 28 && selected.is_none() {
         c::AccountChange::Remove { account }
     } else if call.tool == 29 && selected.is_none() {
-        c::AccountChange::MoveAccount { account, place: integer(call, 1) }
+        c::AccountChange::MoveAccount { account, place: integer(call, 1).checked_sub(1).expect("one-based position") }
     } else {
         if cut {
             return Err(b"source list is incomplete; read accounts again");
@@ -123,7 +132,11 @@ fn build(reading: &reads::Reading) -> Result<c::Ask, &'static [u8]> {
         match call.tool {
             27 => c::AccountChange::ReplaceKey { source: source.number, digest: digest(&reading.called)? },
             28 => c::AccountChange::RemoveKey { source: source.number },
-            29 => c::AccountChange::MoveSource { account, source: source.number, place: integer(call, 1) },
+            29 => c::AccountChange::MoveSource {
+                account,
+                source: source.number,
+                place: integer(call, 1).checked_sub(1).expect("one-based position"),
+            },
             30 => c::AccountChange::Resume { source: source.number },
             _ => unreachable!("account act"),
         }
@@ -145,4 +158,8 @@ fn send(
             finish(called, printed, out);
         }
     }
+}
+
+fn join(call: &Call) -> Option<u32> {
+    Some(u32::try_from(number(call, 2)?).expect("checked number"))
 }

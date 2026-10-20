@@ -95,8 +95,9 @@ pub(crate) fn print(
         | Outcome::Unknown
         | Outcome::Limit
         | Outcome::Unconfirmed
-        | Outcome::Held => 1,
-        Outcome::Unsent | Outcome::Lost => 1,
+        | Outcome::Held
+        | Outcome::Unsent
+        | Outcome::Lost => 1,
     };
     let bytes = bytes(operation, outcome, json, me, limits, false);
     if status == 0 {
@@ -374,6 +375,13 @@ fn account_follow_up(outcome: &Outcome) -> Option<&'static [u8]> {
             c::OwnerOutcome::AccountSignedOut { confirmed: false }
             | c::OwnerOutcome::AccountRemoved { confirmed: false },
         )))) => Some(b"Disconnect this application in the provider's settings, under Apps."),
-        _ => None,
+        Outcome::NotKept
+        | Outcome::Answered(_)
+        | Outcome::Unknown
+        | Outcome::Limit
+        | Outcome::Unconfirmed
+        | Outcome::Held
+        | Outcome::Unsent
+        | Outcome::Lost => None,
     }
 }

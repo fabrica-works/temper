@@ -387,8 +387,11 @@ pub(super) fn prepared(
             Some(name) => name,
             None => {
                 let mut name = [0; 16];
-                name[..8].copy_from_slice(&runner.names.next_u64().to_le_bytes());
-                name[8..].copy_from_slice(&runner.names.next_u64().to_le_bytes());
+                for chunk in name.chunks_mut(8) {
+                    for (slot, byte) in chunk.iter_mut().zip(runner.names.next_u64().to_le_bytes()) {
+                        *slot = byte;
+                    }
+                }
                 name
             }
         };

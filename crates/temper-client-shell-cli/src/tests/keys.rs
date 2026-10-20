@@ -62,7 +62,7 @@ fn a_key_file_requires_private_regular_owned_metadata() {
 #[test]
 fn a_key_file_refuses_a_link_at_its_name() {
     let mut f = fixtures::Frame::act(ADD);
-    f.linked_leaf = true;
+    f.linked_leaf = Some(());
     f.drain();
     assert_eq!(f.exit(), Some(Exit::Code(1)));
     assert!(!f.opened(b"directory"));
