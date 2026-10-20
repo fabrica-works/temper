@@ -36,7 +36,7 @@ fn allowed(path: &str) -> bool {
     for name in ["Steps", "Group", "Stage", "Step", "steps"] {
         if let Some(rest) = path.strip_prefix(name) {
             let rest = rest.trim_start();
-            return rest.starts_with(';') || rest.starts_with('(') || rest.starts_with("::");
+            return rest.starts_with(';') || rest.starts_with('(') || rest.starts_with('{') || rest.starts_with("::");
         }
     }
     false

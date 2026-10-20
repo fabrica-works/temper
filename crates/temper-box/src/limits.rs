@@ -99,5 +99,6 @@ pub fn worst_case(limits: &Limits, steps: u32) -> Option<u64> {
     let state = u64::try_from(size_of::<crate::machine::State>()).ok()?;
     let history = Queue::<Time>::worst_case(limits.restarts.checked_add(1)?)?;
     let timers = u64::try_from(size_of::<Option<Time>>()).ok()?.checked_mul(2)?;
-    state.checked_add(history)?.checked_add(timers)?.checked_mul(u64::from(steps))
+    let groups = u64::try_from(size_of::<crate::machine::GroupState>()).ok()?;
+    state.checked_add(groups)?.checked_add(history)?.checked_add(timers)?.checked_mul(u64::from(steps))
 }

@@ -1,9 +1,9 @@
 //! Steps, exits and timers in; process orders out (protocol/setup.md, 7.2).
+use crate::layout::Placed;
 use crate::limits::{Limits, Unfit, check};
 use alloc::boxed::Box;
 use skein_io::kernel::Exit;
 use skein_lib::{List, Queue, Time};
-use temper_forge_setup::Step;
 /// Inputs referring only to a step's index.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Input {
@@ -12,6 +12,9 @@ pub enum Input {
     Exited { step: usize, exit: Exit },
     Closed { step: usize },
     Terminate,
+    Ask { forge: u16 },
+    Written { forge: u16 },
+    NotWritten { forge: u16 },
 }
 /// Effects requested of the host.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -19,6 +22,40 @@ pub enum Order {
     Spawn { step: usize },
     Signal { step: usize },
     Close { step: usize },
+    Record { forge: u16 },
+    Say { said: Said },
+}
+/// Pipe replies name a placed step; formatting belongs to the host.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Said {
+    Step { step: usize },
+    Started { forge: u16 },
+    Failed { forge: u16, why: Why },
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Why {
+    Busy,
+    NotAsked,
+    Stopping,
+    Exited { step: usize, exit: Exit },
+    NotStarted { step: usize },
+    NotWritten,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Status {
+    Dormant,
+    Starting,
+    Recording { next: Option<usize> },
+    Started,
+    Failing { why: Why },
+}
+#[derive(Debug)]
+pub(crate) struct GroupState {
+    forge: u16,
+    first: usize,
+    end: usize,
+    chained: bool,
+    status: Status,
 }
 /// The result once all children are closed.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -40,6 +77,7 @@ enum Phase {
 #[derive(Debug)]
 pub(crate) struct State {
     long: bool,
+    group: Option<usize>,
     phase: Phase,
     exits: Queue<Time>,
 }
@@ -47,6 +85,7 @@ pub(crate) struct State {
 #[derive(Debug)]
 pub struct Machine {
     states: Box<[State]>,
+    groups: Box<[GroupState]>,
     limits: Limits,
     outcome: Option<Outcome>,
     forced: bool,
@@ -54,35 +93,94 @@ pub struct Machine {
 }
 impl Machine {
     /// Checks limits and allocates each step's bounded exit history.
-    pub fn new(limits: &Limits, steps: &[Step]) -> Result<Self, Unfit> {
+    pub fn new(limits: &Limits, steps: &[Placed]) -> Result<Self, Unfit> {
         check(limits)?;
         let mut states = List::with_capacity(u32::try_from(steps.len()).expect("steps fit u32"));
-        for step in steps {
+        let mut groups = List::with_capacity(u32::try_from(steps.len()).expect("bounded groups"));
+        for (index, step) in steps.iter().enumerate() {
+            let group = match step.asked {
+                Some(asked) => {
+                    let last = groups.len().checked_sub(1);
+                    let mut found = None;
+                    if let Some(last) = last {
+                        let previous: &mut GroupState = groups.get_mut(last).expect("last group");
+                        if previous.forge == asked.forge && previous.end == index {
+                            previous.end = index.saturating_add(1);
+                            found = Some(usize::try_from(last).expect("group index"));
+                        }
+                    }
+                    match found {
+                        Some(index) => Some(index),
+                        None => {
+                            let group = usize::try_from(groups.len()).expect("group index");
+                            groups
+                                .push(GroupState {
+                                    forge: asked.forge,
+                                    first: index,
+                                    end: index.saturating_add(1),
+                                    chained: false,
+                                    status: Status::Dormant,
+                                })
+                                .expect("bounded groups");
+                            Some(group)
+                        }
+                    }
+                }
+                None => None,
+            };
             states
                 .push(State {
-                    long: step.is_long(),
+                    long: step.step.is_long(),
+                    group,
                     phase: Phase::Dormant,
                     exits: Queue::with_capacity(limits.restarts.saturating_add(1)),
                 })
                 .expect("one state per step");
         }
-        Ok(Self { states: states.into_boxed(), limits: *limits, outcome: None, forced: false, begun: false })
+        Ok(Self {
+            states: states.into_boxed(),
+            groups: groups.into_boxed(),
+            limits: *limits,
+            outcome: None,
+            forced: false,
+            begun: false,
+        })
     }
-    /// One order per step is enough for every entry point.
+    /// Reserves spawns, closes, records and replies for every entry point.
     #[must_use]
     pub fn max_out(&self) -> u32 {
-        u32::try_from(self.states.len()).expect("steps fit u32").max(1)
+        u32::try_from(self.states.len()).expect("steps fit u32").saturating_mul(3).saturating_add(4)
     }
     /// Starts the first step once.
-    pub fn start(&mut self, _now: Time, orders: &mut Queue<Order>) {
+    pub fn start(&mut self, _now: Time, recorded: &[u16], orders: &mut Queue<Order>) {
         if !self.begun && self.outcome.is_none() {
             self.begun = true;
-            self.spawn(0, self.successor(0), orders);
+            for group in &mut self.groups {
+                if recorded.contains(&group.forge) {
+                    group.chained = true;
+                    group.status = Status::Started;
+                }
+            }
+            for first in 0..self.states.len() {
+                if self.chain(first).is_none() {
+                    self.spawn(first, self.successor(first), orders);
+                    break;
+                }
+            }
         }
     }
+    fn chain(&self, step: usize) -> Option<usize> {
+        let group = self.states.get(step).expect("step index").group?;
+        if self.groups.get(group).expect("group index").chained { None } else { Some(group) }
+    }
+    #[expect(clippy::manual_find, reason = "the programming model uses explicit loops rather than closures")]
     fn successor(&self, step: usize) -> Option<usize> {
-        let next = step.checked_add(1)?;
-        if next < self.states.len() { Some(next) } else { None }
+        for next in step.saturating_add(1)..self.states.len() {
+            if self.chain(step) == self.chain(next) {
+                return Some(next);
+            }
+        }
+        None
     }
     fn continuation(&self, step: usize) -> Option<usize> {
         match self.states.get(step)?.phase {
@@ -100,14 +198,40 @@ impl Machine {
         if let Some(state) = self.states.get_mut(step) {
             state.phase = Phase::Starting { next };
             orders.push(Order::Spawn { step });
+            if let Some(group) = state.group
+                && self.groups.get(group).expect("group index").status == Status::Starting
+            {
+                orders.push(Order::Say { said: Said::Step { step } });
+            }
         }
     }
     /// Takes one lifecycle or termination input.
     pub fn input(&mut self, now: Time, input: Input, orders: &mut Queue<Order>) {
         match input {
             Input::Terminate => self.stop(now, orders),
+            Input::Ask { forge } => self.ask(forge, orders),
+            Input::Written { forge } => self.written(forge, orders),
+            Input::NotWritten { forge } => {
+                if self.outcome.is_none()
+                    && let Some(group) = self.group(forge)
+                    && match self.groups.get(group).expect("group").status {
+                        Status::Recording { .. } => true,
+                        Status::Dormant | Status::Starting | Status::Started | Status::Failing { .. } => false,
+                    }
+                {
+                    self.fail(group, Why::NotWritten, orders);
+                }
+            }
             Input::Started { step } => self.started(now, step, orders),
             Input::NotStarted { step } => {
+                if self.outcome.is_none()
+                    && let Some(group) = self.starting_group(step)
+                {
+                    self.states.get_mut(step).expect("step").phase = Phase::Stopped;
+                    self.fail(group, Why::NotStarted { step }, orders);
+                    self.failed_if_closed(group, orders);
+                    return;
+                }
                 if let Some(state) = self.states.get_mut(step) {
                     let next = match state.phase {
                         Phase::Starting { next } => next,
@@ -123,7 +247,16 @@ impl Machine {
                 }
                 self.closed(now, step, orders);
             }
-            Input::Exited { step, exit } => self.exited(step, exit == Exit::Code(0), orders),
+            Input::Exited { step, exit } => {
+                if self.outcome.is_none()
+                    && let Some(group) = self.starting_group(step)
+                    && (self.states.get(step).expect("step").long || exit != Exit::Code(0))
+                {
+                    self.fail(group, Why::Exited { step, exit }, orders);
+                } else {
+                    self.exited(step, exit == Exit::Code(0), orders);
+                }
+            }
             Input::Closed { step } => self.closed(now, step, orders),
         }
     }
@@ -141,8 +274,23 @@ impl Machine {
                     } else {
                         self.stop_next(now, orders);
                     }
-                } else if state.long {
-                    state.phase = Phase::Live { next: None };
+                } else if let Some(group) = self.starting_group(step) {
+                    match self.groups.get(group).expect("group").status {
+                        Status::Failing { .. } => {
+                            self.states.get_mut(step).expect("step").phase =
+                                Phase::Closing { next: None, success: false };
+                            orders.push(Order::Close { step });
+                        }
+                        Status::Starting => {
+                            if self.states.get(step).expect("step").long {
+                                self.states.get_mut(step).expect("step").phase = Phase::Live { next: None };
+                                self.advance_group(group, next, orders);
+                            }
+                        }
+                        Status::Dormant | Status::Recording { .. } | Status::Started => {}
+                    }
+                } else if self.states.get(step).expect("step").long {
+                    self.states.get_mut(step).expect("step").phase = Phase::Live { next: None };
                     if let Some(next) = next {
                         self.spawn(next, self.continuation(next), orders);
                     }
@@ -178,12 +326,21 @@ impl Machine {
         let Some(state) = self.states.get_mut(step) else {
             return;
         };
+        let group = state.group;
         let phase = core::mem::replace(&mut state.phase, Phase::Stopped);
         match phase {
             Phase::Closing { next, success } => {
                 if self.outcome.is_some() {
                     self.stop_next(now, orders);
-                } else if state.long {
+                } else if let Some(group) = group
+                    && self.group_starting(group)
+                {
+                    match self.groups.get(group).expect("group").status {
+                        Status::Failing { .. } => self.failed_if_closed(group, orders),
+                        Status::Starting => self.advance_group(group, next, orders),
+                        Status::Dormant | Status::Recording { .. } | Status::Started => {}
+                    }
+                } else if self.states.get(step).expect("step").long {
                     self.restart(now, step, next, orders);
                 } else if success {
                     if let Some(next) = next {
@@ -203,6 +360,165 @@ impl Machine {
                 state.phase = phase;
             }
         }
+    }
+    fn group(&self, forge: u16) -> Option<usize> {
+        for (index, group) in self.groups.iter().enumerate() {
+            if group.forge == forge {
+                return Some(index);
+            }
+        }
+        None
+    }
+    fn group_starting(&self, group: usize) -> bool {
+        match self.groups.get(group).expect("group").status {
+            Status::Starting | Status::Recording { .. } | Status::Failing { .. } => true,
+            Status::Dormant | Status::Started => false,
+        }
+    }
+    fn starting_group(&self, step: usize) -> Option<usize> {
+        let group = self.states.get(step)?.group?;
+        if self.group_starting(group) { Some(group) } else { None }
+    }
+    fn ask(&mut self, forge: u16, orders: &mut Queue<Order>) {
+        let Some(index) = self.group(forge) else {
+            orders.push(Order::Say { said: Said::Failed { forge, why: Why::NotAsked } });
+            return;
+        };
+        if self.groups.get(index).expect("group").status == Status::Started {
+            orders.push(Order::Say { said: Said::Started { forge } });
+            return;
+        }
+        if self.outcome.is_some() {
+            orders.push(Order::Say { said: Said::Failed { forge, why: Why::Stopping } });
+            return;
+        }
+        if self.group_starting(index) {
+            return;
+        }
+        for group in 0..self.groups.len() {
+            if self.group_starting(group) {
+                orders.push(Order::Say { said: Said::Failed { forge, why: Why::Busy } });
+                return;
+            }
+        }
+        let group = self.groups.get_mut(index).expect("group");
+        group.status = Status::Starting;
+        let first = group.first;
+        self.advance_group(index, Some(first), orders);
+    }
+    fn advance_group(&mut self, index: usize, next: Option<usize>, orders: &mut Queue<Order>) {
+        // The first long step is the write barrier; once written, a live long
+        // predecessor proves the barrier has already passed.
+        let group = self.groups.get(index).expect("group");
+        let mut written = false;
+        for step in group.first..group.end {
+            let state = self.states.get(step).expect("group step");
+            if state.long
+                && match state.phase {
+                    Phase::Live { .. } => true,
+                    Phase::Dormant
+                    | Phase::Waiting { .. }
+                    | Phase::Starting { .. }
+                    | Phase::Closing { .. }
+                    | Phase::Backoff { .. }
+                    | Phase::Grace { .. }
+                    | Phase::Stopped => false,
+                }
+            {
+                written = true;
+            }
+        }
+        let needs_record = match next {
+            Some(step) => self.states.get(step).expect("step").long && !written,
+            None => !written,
+        };
+        if needs_record {
+            let group = self.groups.get_mut(index).expect("group");
+            group.status = Status::Recording { next };
+            orders.push(Order::Record { forge: group.forge });
+        } else if let Some(step) = next {
+            self.spawn(step, self.successor(step), orders);
+        } else {
+            self.group_started(index, orders);
+        }
+    }
+    fn group_started(&mut self, index: usize, orders: &mut Queue<Order>) {
+        let group = self.groups.get_mut(index).expect("group");
+        group.status = Status::Started;
+        orders.push(Order::Say { said: Said::Started { forge: group.forge } });
+    }
+    fn written(&mut self, forge: u16, orders: &mut Queue<Order>) {
+        if self.outcome.is_some() {
+            return;
+        }
+        let Some(index) = self.group(forge) else {
+            return;
+        };
+        let group = self.groups.get_mut(index).expect("group");
+        match group.status {
+            Status::Recording { next } => {
+                group.status = Status::Starting;
+                if let Some(step) = next {
+                    self.spawn(step, self.successor(step), orders);
+                } else {
+                    self.group_started(index, orders);
+                }
+            }
+            Status::Dormant | Status::Starting | Status::Started | Status::Failing { .. } => {}
+        }
+    }
+    fn fail(&mut self, index: usize, why: Why, orders: &mut Queue<Order>) {
+        let group = self.groups.get_mut(index).expect("group");
+        if match group.status {
+            Status::Failing { .. } => true,
+            Status::Dormant | Status::Starting | Status::Recording { .. } | Status::Started => false,
+        } {
+            return;
+        }
+        group.status = Status::Failing { why };
+        for step in group.first..group.end {
+            let state = self.states.get_mut(step).expect("group step");
+            match state.phase {
+                Phase::Live { .. } | Phase::Grace { .. } => {
+                    state.phase = Phase::Closing { next: None, success: false };
+                    orders.push(Order::Close { step });
+                }
+                Phase::Dormant
+                | Phase::Waiting { .. }
+                | Phase::Starting { .. }
+                | Phase::Closing { .. }
+                | Phase::Backoff { .. }
+                | Phase::Stopped => {}
+            }
+        }
+        self.failed_if_closed(index, orders);
+    }
+    fn failed_if_closed(&mut self, index: usize, orders: &mut Queue<Order>) {
+        let group = self.groups.get_mut(index).expect("group");
+        let why = match group.status {
+            Status::Failing { why } => why,
+            Status::Dormant | Status::Starting | Status::Recording { .. } | Status::Started => return,
+        };
+        for step in group.first..group.end {
+            match self.states.get(step).expect("group step").phase {
+                Phase::Dormant | Phase::Stopped => {}
+                Phase::Waiting { .. }
+                | Phase::Starting { .. }
+                | Phase::Live { .. }
+                | Phase::Closing { .. }
+                | Phase::Backoff { .. }
+                | Phase::Grace { .. } => return,
+            }
+        }
+        for step in group.first..group.end {
+            let state = self.states.get_mut(step).expect("group step");
+            state.phase = Phase::Dormant;
+            for _ in 0..state.exits.len() {
+                state.exits.pop();
+            }
+        }
+        group.status = Status::Dormant;
+        orders.push(Order::Say { said: Said::Failed { forge: group.forge, why } });
     }
     fn restart(&mut self, now: Time, step: usize, next: Option<usize>, orders: &mut Queue<Order>) {
         let state = self.states.get_mut(step).expect("known step");
@@ -289,6 +605,9 @@ impl Machine {
                 Phase::Backoff { at, next: following } if at <= now => {
                     let mut first = step;
                     for before in (0..step).rev() {
+                        if self.chain(before) != self.chain(step) {
+                            continue;
+                        }
                         if self.states.get(before).expect("bounded step").long {
                             break;
                         }

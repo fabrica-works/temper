@@ -33,10 +33,14 @@ pub struct Rig {
 }
 impl Rig {
     pub fn new(limits: &limits::Limits) -> Self {
-        let machine = Machine::new(limits, &owned_steps()).expect("valid limits");
+        let machine = Machine::new(
+            limits,
+            &crate::layout::flatten(temper_forge_setup::Steps { always: owned_steps(), asked: Box::new([]) }),
+        )
+        .expect("valid limits");
         let out = Queue::with_capacity(machine.max_out().saturating_mul(4));
         let mut rig = Self { machine, out, now: Time::ZERO };
-        rig.machine.start(rig.now, &mut rig.out);
+        rig.machine.start(rig.now, &[], &mut rig.out);
         rig
     }
     pub fn running() -> Self {

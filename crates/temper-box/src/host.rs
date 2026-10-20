@@ -87,7 +87,8 @@ pub struct Service {
 impl Service {
     /// Checks the policy limits and adopts the binary's descriptors.
     pub fn new(limits: &Limits, steps: Box<[Step]>, settings: Settings) -> Result<Self, Unfit> {
-        let machine = Machine::new(limits, &steps)?;
+        let placed = crate::layout::flatten(temper_forge_setup::Steps { always: steps.clone(), asked: Box::new([]) });
+        let machine = Machine::new(limits, &placed)?;
         let count = u32::try_from(steps.len()).expect("steps fit u32");
         let mut bounds = io_limits(count);
         let mut children = List::with_capacity(count);
@@ -279,6 +280,7 @@ impl Service {
     }
     fn order(&mut self, order: Order) {
         match order {
+            Order::Record { .. } | Order::Say { .. } => {}
             Order::Spawn { step } => self.children.get_mut(step).expect("machine step").spawn = true,
             Order::Signal { step } => {
                 if let Some(child) = self.children.get(step).expect("machine step").process {
@@ -448,7 +450,7 @@ impl skein_shell::Host for Service {
             }
         }
         if self.phase == Phase::New && self.orders.room() >= self.machine.max_out() {
-            self.machine.start(now, &mut self.orders);
+            self.machine.start(now, &[], &mut self.orders);
             self.phase = Phase::Running;
         }
         for _ in 0..self.told.len() {
