@@ -125,6 +125,6 @@ pub struct Worker {
     pub jig: jig_protocol_config::Worker,
     /// The worker's root directory: workspaces, trash and home under it.
     pub root: Box<[u8]>,
-    /// The absolute path of the git program.
-    pub git: Box<[u8]>,
+    /// The absolute path of the git program, or none on this machine.
+    pub git: Option<Box<[u8]>>,
 }

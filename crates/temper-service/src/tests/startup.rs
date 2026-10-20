@@ -51,7 +51,7 @@ fn the_standalone_example_reads_into_its_members() {
     assert_eq!(members.forges[0].user, application::User::File(b"secrets/forge-1.user".as_slice().into()));
     assert_eq!(members.forges[0].git.as_ref(), b"http://127.0.0.1:9");
     assert_eq!(members.identities[0].author.name.as_ref(), b"Temper");
-    assert_eq!(members.workers[0].git.as_ref(), b"/usr/bin/git");
+    assert_eq!(members.workers[0].git.as_deref(), Some(b"/usr/bin/git".as_slice()));
     assert_eq!(members.charter, 1);
     assert_eq!(application::files(&members, 4096, 8192).len(), 3, "all private files");
     let resolved = application::resolve(&members, &fixtures::files(), &mut Problems::empty()).unwrap();
@@ -204,7 +204,7 @@ fn jig_refusals_print_words() {
     }
 }
 #[test]
-fn malformed_members_and_references_are_named() {
+fn members_and_references_are_checked() {
     let jig = fixtures::engine().jig;
     let input = core::str::from_utf8(fixtures::APPLICATION).unwrap();
     for (from, to, expected) in [
@@ -221,6 +221,7 @@ fn malformed_members_and_references_are_named() {
             "application.forges[0].user: duplicate\n",
         ),
         ("\"git\":\"/usr/bin/git\"", "\"git\":\"git\"", "application.workers[0].git: must be an absolute path\n"),
+        ("\"git\":\"/usr/bin/git\"", "\"git\":null", ""),
         (
             "\"transport\":\"plaintext\"",
             "\"transport\":{\"tls\":{\"server_name\":\"forge\"}}",
@@ -228,8 +229,11 @@ fn malformed_members_and_references_are_named() {
         ),
     ] {
         let (members, problems) = application(input.replace(from, to).as_bytes(), &jig);
-        assert!(members.is_none(), "refused {from}");
+        assert_eq!(members.is_some(), expected.is_empty(), "row {from}: {to}");
         assert_eq!(&*lines(&problems), expected.as_bytes(), "row {from}");
+        if expected.is_empty() {
+            assert_eq!(members.unwrap().workers[0].git, None);
+        }
     }
 }
 #[test]

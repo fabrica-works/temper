@@ -14,7 +14,7 @@ fn absolute(length: usize) -> Box<[u8]> {
 fn assign<'a>(facts: &mut Facts<'a>, directories: &mut Directories<'a>, fact: Fact, path: &'a [u8]) {
     match fact {
         Fact::Binary => facts.binary = path,
-        Fact::Git => facts.git = path,
+        Fact::Git => facts.git = Some(path),
         Fact::Claude => facts.claude = Some(path),
         Fact::Bundle => facts.bundle = Some(path),
         Fact::Config => directories.config = path,
@@ -131,7 +131,7 @@ fn paths_join_once_and_accept_the_bound() {
     controls.get_mut(1..).expect("the path has 4096 bytes").fill(1);
     let facts = Facts {
         binary: &controls,
-        git: &controls,
+        git: Some(&controls),
         claude: Some(&controls),
         bundle: Some(&controls),
         ..fixtures::facts()

@@ -18,8 +18,8 @@ mod tests;
 pub struct Facts<'a> {
     /// The running temper's own path: the worker's agent's program.
     pub binary: &'a [u8],
-    /// The git found on PATH: the worker's git.
-    pub git: &'a [u8],
+    /// The git found on PATH, or none: the worker's git.
+    pub git: Option<&'a [u8]>,
     /// The claude found on PATH, if any: Claude Code's program.
     pub claude: Option<&'a [u8]>,
     /// The browser's bundle, if one holds index.html: clients.bundle.
@@ -86,7 +86,9 @@ pub enum Reason {
 /// document last.
 pub fn files(facts: &Facts<'_>, directories: &Directories<'_>, secret: &[u8; 32]) -> Result<Box<[File]>, Refusal> {
     path::check(Fact::Binary, facts.binary, b"")?;
-    path::check(Fact::Git, facts.git, b"")?;
+    if let Some(git) = facts.git {
+        path::check(Fact::Git, git, b"")?;
+    }
     if let Some(claude) = facts.claude {
         path::check(Fact::Claude, claude, b"")?;
     }

@@ -105,7 +105,7 @@ pub struct Identity {
 #[derive(Debug)]
 pub struct Worker {
     pub root: Box<[u8]>,
-    pub git: Box<[u8]>,
+    pub git: Option<Box<[u8]>>,
 }
 fn configured_limits(
     document: &Document,
@@ -444,12 +444,25 @@ fn workers(
             let path = read::index(&path.member(b"workers"), index);
             let Some(mut object) = read::object(document, *at, &path, problems) else { continue };
             let root = read::text(&mut object, document, b"root", &path, problems);
-            let git = read::text(&mut object, document, b"git", &path, problems);
+            let at = read::required(&mut object, document, b"git", &path, problems);
+            let mut git = None;
+            if let Some(at) = at {
+                let null = match document.token(at) {
+                    Some(token) => token.kind == Kind::Null,
+                    None => false,
+                };
+                if !null {
+                    match config::read::text(document, at, 1_048_576) {
+                        Ok(value) => git = Some(value),
+                        Err(what) => problems.push(path.member(b"git"), What::Jig(what)),
+                    }
+                }
+            }
             read::finish(object, document, &path, problems);
-            if let Some(git) = git
-                && let Some(root) = root
-            {
-                if !git.starts_with(b"/") {
+            if let Some(root) = root {
+                if let Some(git) = &git
+                    && !git.starts_with(b"/")
+                {
                     problems.push(path.member(b"git"), What::Absolute);
                 }
                 if let Some(root) = joined(directories, config::Directory::Data, &root, &path.member(b"root"), problems)

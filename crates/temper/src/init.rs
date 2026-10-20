@@ -134,6 +134,7 @@ fn io_error(why: Error) -> String {
 pub(crate) struct Written {
     pub paths: Vec<PathBuf>,
     pub missing_bundle: Option<PathBuf>,
+    pub missing_git: bool,
 }
 /// Refusals are checked before directories or files are created. The held
 /// listener reserves the chosen port until the files have all been answered.
@@ -153,7 +154,7 @@ pub(crate) fn write(
             Err(why) => return Err(format!("{}: {why}", destination.display())),
         }
     }
-    let git = find(environment, b"git").ok_or("git: not found on PATH")?;
+    let git = find(environment, b"git");
     let claude = find(environment, b"claude");
     let bundle_path = binary.parent().ok_or("binary: no parent directory")?.join("../share/temper/bundle");
     let bundle = bundle_path.join("index.html").is_file().then_some(&bundle_path);
@@ -164,7 +165,7 @@ pub(crate) fn write(
         let files = temper_init::files(
             &temper_init::Facts {
                 binary: binary.as_os_str().as_bytes(),
-                git: git.as_os_str().as_bytes(),
+                git: git.as_ref().map(|path| path.as_os_str().as_bytes()),
                 claude: claude.as_ref().map(|path| path.as_os_str().as_bytes()),
                 bundle: bundle.map(|path| path.as_os_str().as_bytes()),
                 port,
@@ -190,7 +191,11 @@ pub(crate) fn write(
                 .map_err(|why| format!("{}: {why}", destination.display()))?;
             paths.push(destination);
         }
-        Ok(Written { paths, missing_bundle: bundle.is_none().then_some(bundle_path.clone()) })
+        Ok(Written {
+            paths,
+            missing_bundle: bundle.is_none().then_some(bundle_path.clone()),
+            missing_git: git.is_none(),
+        })
     })();
     io.close(socket);
     result
@@ -203,6 +208,9 @@ pub(crate) fn run(directories: &Directories) -> Result<u8, String> {
     let written = core(directories)?;
     for path in written.paths {
         eprintln!("init: wrote {}", path.display());
+    }
+    if written.missing_git {
+        eprintln!("init: no git on PATH: a real forge's repositories need git 2.41 or later, set as workers[].git");
     }
     if let Some(path) = written.missing_bundle {
         eprintln!("init: no bundle at {}: the browser is not served", path.display());

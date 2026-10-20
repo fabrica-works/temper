@@ -166,7 +166,7 @@ pub fn worker_settings() -> crate::settings::Worker {
             memory: u64::MAX,
         },
         root: b"worker-root".as_slice().into(),
-        git: b"/usr/bin/git".as_slice().into(),
+        git: Some(b"/usr/bin/git".as_slice().into()),
     }
 }
 pub fn worker_limits() -> crate::limits::Limits {

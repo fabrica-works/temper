@@ -26,7 +26,7 @@ pub(crate) fn documents(facts: &Facts<'_>, directories: &Directories<'_>) -> (Bo
     let values = [
         (b"binary".as_slice(), json(Value::Text(Some(facts.binary)))),
         (b"agent".as_slice(), json(Value::Text(Some(&agent)))),
-        (b"git".as_slice(), json(Value::Text(Some(facts.git)))),
+        (b"git".as_slice(), json(Value::Text(facts.git))),
         (b"listener".as_slice(), json(Value::Text(Some(&listener)))),
         (b"bundle".as_slice(), json(Value::Text(facts.bundle))),
         (b"programs".as_slice(), json(Value::Programs { claude: facts.claude, directory: &programs })),

@@ -72,7 +72,13 @@ fn the_default_is_the_owned_example_so_edited() {
                     None => Value::Null,
                 },
             ),
-            ("/application/workers/0/git", json!(text(facts.git))),
+            (
+                "/application/workers/0/git",
+                match facts.git {
+                    Some(git) => json!(text(git)),
+                    None => Value::Null,
+                },
+            ),
             ("/application/landing/projects/0/rules/0/pattern", github()),
             ("/application/landing/projects/0/rules/0/gates", parse(b"[]")),
             ("/engine/charters/0/instructions", json!("charters/chat.txt")),

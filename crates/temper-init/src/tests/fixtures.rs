@@ -9,16 +9,17 @@ pub const DIRECTORIES: Directories<'static> = Directories { config: b"/c/temper"
 pub fn facts() -> Facts<'static> {
     Facts {
         binary: b"/opt/temper/bin/temper",
-        git: b"/usr/bin/git",
+        git: Some(b"/usr/bin/git"),
         claude: None,
         bundle: None,
         port: NonZeroU16::new(8367).expect("the default port is nonzero"),
     }
 }
 
-pub fn cases() -> [(&'static str, Facts<'static>); 4] {
+pub fn cases() -> [(&'static str, Facts<'static>); 5] {
     [
         ("neither, default port", facts()),
+        ("no git on PATH", Facts { git: None, ..facts() }),
         (
             "claude, kernel port",
             Facts {

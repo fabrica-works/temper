@@ -50,104 +50,97 @@ fn path_lookup_uses_only_absolute_executable_candidates_in_order() {
 }
 #[test]
 fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
+    let mut rows = Vec::new();
     for held in [false, true] {
         for claude in [false, true] {
             for bundle in [false, true] {
-                let row = format!("facts-{held}-{claude}-{bundle}");
-                let root = scratch(&row);
-                let dirs = directories(&root);
-                let env = environment(&root, claude);
-                let binary = root.join("bin/temper");
-                if bundle {
-                    fs::create_dir_all(root.join("share/temper/bundle")).expect("bundle");
-                    fs::write(root.join("share/temper/bundle/index.html"), b"page").expect("page");
-                }
-                let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred listener");
-                let preferred = listener.local_addr().expect("port").port();
-                let holder = if held {
-                    Some(listener)
-                } else {
-                    drop(listener);
-                    None
-                };
-                let written = write(&dirs, &env, &binary, preferred).expect("init");
-                let names = [
-                    "worker.secret",
-                    "worker.digest",
-                    "charters/chat.txt",
-                    "charters/coding.txt",
-                    "agent.json",
-                    "temper.json",
-                ];
-                let expected: Vec<_> = names
-                    .iter()
-                    .enumerate()
-                    .map(|(i, name)| path(if i < 2 { &dirs.data } else { &dirs.config }).join(name))
-                    .collect();
-                assert_eq!(written.paths, expected, "{row}: file order");
-                for (i, file) in written.paths.iter().enumerate() {
-                    assert_eq!(
-                        fs::metadata(file).expect("file").mode() & 0o777,
-                        if i < 2 { 0o600 } else { 0o644 },
-                        "{row}: {}",
-                        file.display()
-                    );
-                }
-                for directory in [&dirs.config, &dirs.data, &dirs.cache] {
-                    assert_eq!(fs::metadata(path(directory)).expect("directory").mode() & 0o777, 0o700);
-                }
-                assert_eq!(fs::metadata(path(&dirs.config).join("charters")).expect("charters").mode() & 0o777, 0o700);
-                let document: serde_json::Value =
-                    serde_json::from_slice(&fs::read(dirs.document()).expect("document")).expect("JSON");
-                let address: std::net::SocketAddr = document["application"]["clients"]["listener"]["socket"]
-                    .as_str()
-                    .expect("address")
-                    .parse()
-                    .expect("socket");
-                assert_eq!(address.port() == preferred, !held, "{row}");
-                assert!(TcpListener::bind(address).is_ok(), "{row}: reservation released");
-                assert_eq!(document["application"]["clients"]["bundle"].is_string(), bundle);
-                let agent: serde_json::Value =
-                    serde_json::from_slice(&fs::read(path(&dirs.config).join("agent.json")).expect("agent"))
-                        .expect("JSON");
-                assert_eq!(agent["programs"].as_object().expect("programs").contains_key("claude_code"), claude);
-                assert_eq!(written.missing_bundle.is_none(), bundle);
-                let declarations = crate::agent::read(&path(&dirs.config).join("agent.json"));
-                declarations.expect("written agent configuration parses");
-                drop(holder);
-                fs::remove_dir_all(root).expect("cleanup");
+                rows.push((held, claude, bundle, true));
             }
         }
     }
+    rows.push((false, false, false, false));
+    for (held, claude, bundle, git) in rows {
+        let row = format!("facts-{held}-{claude}-{bundle}-{git}");
+        let root = scratch(&row);
+        let dirs = directories(&root);
+        let env = environment(&root, claude);
+        if !git {
+            fs::remove_file(root.join("bin/git")).expect("no git on PATH");
+        }
+        let binary = root.join("bin/temper");
+        if bundle {
+            fs::create_dir_all(root.join("share/temper/bundle")).expect("bundle");
+            fs::write(root.join("share/temper/bundle/index.html"), b"page").expect("page");
+        }
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred listener");
+        let preferred = listener.local_addr().expect("port").port();
+        let holder = if held {
+            Some(listener)
+        } else {
+            drop(listener);
+            None
+        };
+        let written = write(&dirs, &env, &binary, preferred).expect("init");
+        let names =
+            ["worker.secret", "worker.digest", "charters/chat.txt", "charters/coding.txt", "agent.json", "temper.json"];
+        let expected: Vec<_> = names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| path(if i < 2 { &dirs.data } else { &dirs.config }).join(name))
+            .collect();
+        assert_eq!(written.paths, expected, "{row}: file order");
+        for (i, file) in written.paths.iter().enumerate() {
+            assert_eq!(
+                fs::metadata(file).expect("file").mode() & 0o777,
+                if i < 2 { 0o600 } else { 0o644 },
+                "{row}: {}",
+                file.display()
+            );
+        }
+        for directory in [&dirs.config, &dirs.data, &dirs.cache] {
+            assert_eq!(fs::metadata(path(directory)).expect("directory").mode() & 0o777, 0o700);
+        }
+        assert_eq!(fs::metadata(path(&dirs.config).join("charters")).expect("charters").mode() & 0o777, 0o700);
+        let document: serde_json::Value =
+            serde_json::from_slice(&fs::read(dirs.document()).expect("document")).expect("JSON");
+        let address: std::net::SocketAddr = document["application"]["clients"]["listener"]["socket"]
+            .as_str()
+            .expect("address")
+            .parse()
+            .expect("socket");
+        assert_eq!(address.port() == preferred, !held, "{row}");
+        assert!(TcpListener::bind(address).is_ok(), "{row}: reservation released");
+        assert_eq!(document["application"]["clients"]["bundle"].is_string(), bundle);
+        let agent: serde_json::Value =
+            serde_json::from_slice(&fs::read(path(&dirs.config).join("agent.json")).expect("agent")).expect("JSON");
+        assert_eq!(agent["programs"].as_object().expect("programs").contains_key("claude_code"), claude);
+        assert_eq!(written.missing_bundle.is_none(), bundle);
+        assert_eq!(written.missing_git, !git);
+        assert_eq!(document["application"]["workers"][0]["git"].is_null(), !git);
+        let declarations = crate::agent::read(&path(&dirs.config).join("agent.json"));
+        declarations.expect("written agent configuration parses");
+        drop(holder);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
 }
+
 #[test]
 fn init_refusals_leave_every_file_and_directory_untouched() {
-    for row in ["temper.json", "worker.secret", "worker.digest", "no git"] {
+    for row in ["temper.json", "worker.secret", "worker.digest"] {
         let root = scratch(row);
         let dirs = directories(&root);
-        let mut env = environment(&root, false);
+        let env = environment(&root, false);
         let destination = match row {
             "temper.json" => dirs.document(),
             _ => path(&dirs.data).join(row),
         };
-        if row == "no git" {
-            env.clear();
-        } else {
-            fs::create_dir(destination.parent().expect("parent")).expect("parent");
-            fs::write(&destination, b"kept").expect("existing file");
-        }
+        fs::create_dir(destination.parent().expect("parent")).expect("parent");
+        fs::write(&destination, b"kept").expect("existing file");
         let why = write(&dirs, &env, &root.join("bin/temper"), 0).expect_err("refused");
-        assert_eq!(
-            why,
-            if row == "no git" {
-                "git: not found on PATH".into()
-            } else {
-                format!("{}: already exists", destination.display())
-            }
-        );
+        assert_eq!(why, format!("{}: already exists", destination.display()));
         for directory in [&dirs.config, &dirs.data, &dirs.cache] {
             let directory = path(directory);
-            if directory == destination.parent().expect("parent") && row != "no git" {
+            if directory == destination.parent().expect("parent") {
                 assert_eq!(fs::read_dir(directory).expect("existing parent").count(), 1);
                 assert_eq!(fs::read(&destination).expect("kept"), b"kept");
             } else {
