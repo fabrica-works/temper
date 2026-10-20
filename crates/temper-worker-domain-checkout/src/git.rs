@@ -50,6 +50,8 @@ impl Commit {
 pub struct Place {
     pub workspace: Token,
     pub repository: Box<[u8]>,
+    /// The repository's program, carried to io, never read.
+    pub git: Option<Box<[u8]>>,
 }
 
 /// An operation, asked of io. Each ends in the terminals its documentation

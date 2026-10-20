@@ -49,7 +49,7 @@ fn repository(repository: wire::Repository) -> checkout::Repository {
             (Some(push), expected)
         }
     };
-    checkout::Repository { name, remote, start: self::start(start), identity, push, expected }
+    checkout::Repository { name, remote, git: None, start: self::start(start), identity, push, expected }
 }
 
 fn start(start: wire::Start) -> checkout::Start {

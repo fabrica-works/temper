@@ -29,7 +29,7 @@ impl Git {
             &own.git_component,
             &own.checkout,
             component::Settings {
-                git: worker.git.clone(),
+                git: Some(worker.git.clone()),
                 home: home.finish(),
                 root,
                 prefix: crate::tokens::git(0).ok_or(problem(b"git", What::Bound))?,

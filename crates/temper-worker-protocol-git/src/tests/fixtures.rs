@@ -46,7 +46,7 @@ pub fn make(owner: skein_lib::Token, workspace: skein_lib::Token) -> crate::Requ
     crate::Request::Io { owner, op: git::Op::Make { workspace }, deadline: DEADLINE, identity: None }
 }
 pub fn at() -> git::Place {
-    git::Place { workspace: WORKSPACE, repository: Box::from(&b"app"[..]) }
+    git::Place { git: None, workspace: WORKSPACE, repository: Box::from(&b"app"[..]) }
 }
 pub fn fetch(owner: skein_lib::Token, deadline: skein_lib::Time) -> crate::Request {
     crate::Request::Io {
@@ -78,7 +78,7 @@ pub fn push_op(expected: Option<git::Commit>) -> git::Op {
 }
 pub fn settings() -> crate::Settings {
     crate::Settings {
-        git: Box::from(&b"/bin/git"[..]),
+        git: Some(Box::from(&b"/bin/git"[..])),
         home: Box::from(HOME),
         root: skein_io::kernel::Fd::new(3),
         prefix: 6_u64 << 60_u32,
@@ -110,10 +110,18 @@ impl Below {
         component: &mut crate::Component,
         now: skein_lib::Time,
     ) -> (skein_lib::Token, Box<[skein_lib::Token]>) {
+        self.spawned_program(component, now, b"/bin/git")
+    }
+    pub fn spawned_program(
+        &mut self,
+        component: &mut crate::Component,
+        now: skein_lib::Time,
+        program: &[u8],
+    ) -> (skein_lib::Token, Box<[skein_lib::Token]>) {
         let request = self.out.io.pop().expect("spawn requested");
         let (owner, count) = match request {
             skein_io::Request::Spawn { owner, spawn } => {
-                assert_eq!(&*spawn.program, b"/bin/git");
+                assert_eq!(&*spawn.program, program);
                 (owner, spawn.pipes.len())
             }
             other @ (skein_io::Request::Listen { .. }

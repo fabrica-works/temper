@@ -42,7 +42,7 @@ pub fn limits() -> Limits {
 #[must_use]
 pub fn settings() -> Settings {
     Settings {
-        git: Box::from(&b"/bin/git"[..]),
+        git: Some(Box::from(&b"/bin/git"[..])),
         home: Box::from(&b"/worker/home"[..]),
         root: kernel::Fd::new(3),
         prefix: (6_u64 << 60) + (1_u64 << 48),
@@ -61,7 +61,7 @@ pub fn identity() -> Identity {
     }
 }
 fn at() -> git::Place {
-    git::Place { workspace: Token::new(7), repository: Box::from(&b"specimen"[..]) }
+    git::Place { git: None, workspace: Token::new(7), repository: Box::from(&b"specimen"[..]) }
 }
 fn remote() -> Box<[u8]> {
     Box::from(&b"https://forge.example.test/fixture/specimen.git"[..])

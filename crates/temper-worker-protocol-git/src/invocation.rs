@@ -40,6 +40,64 @@ pub enum Command {
     Push { remote: Box<[u8]>, commit: git::Commit, branch: Box<[u8]>, expected: Option<git::Commit> },
 }
 
+/// The item's program is carried by every operation except Make.
+pub(crate) fn item_program(op: &git::Op) -> Option<&[u8]> {
+    match op {
+        git::Op::Make { .. } => None,
+        git::Op::Clone { at, .. }
+        | git::Op::Fetch { at, .. }
+        | git::Op::Create { at, .. }
+        | git::Op::CheckOut { at, .. }
+        | git::Op::Merge { at, .. }
+        | git::Op::Commit { at, .. }
+        | git::Op::Push { at, .. } => at.git.as_deref(),
+    }
+}
+
+/// The synthetic fatal output uses the URL this invocation would pass git.
+pub(crate) fn no_program(op: &git::Op, command: &Command) -> Box<[u8]> {
+    let remote = match command {
+        Command::Clone { remote, .. }
+        | Command::Fetch { remote, .. }
+        | Command::Create { remote, .. }
+        | Command::Push { remote, .. } => Some(remote.as_ref()),
+        Command::IsAncestor { .. } => match op {
+            git::Op::Push { remote, .. } => Some(remote.as_ref()),
+            git::Op::Make { .. }
+            | git::Op::Clone { .. }
+            | git::Op::Fetch { .. }
+            | git::Op::Create { .. }
+            | git::Op::CheckOut { .. }
+            | git::Op::Merge { .. }
+            | git::Op::Commit { .. } => unreachable!("ancestry is part of a push"),
+        },
+        Command::Version
+        | Command::CheckOut { .. }
+        | Command::Clean
+        | Command::Merge { .. }
+        | Command::Unmerged
+        | Command::Add
+        | Command::DiffIndex { .. }
+        | Command::WriteTree
+        | Command::CommitTree { .. } => None,
+    };
+    let prefix = b"fatal: no git on this machine";
+    if let Some(remote) = remote {
+        let address = remote.strip_prefix(b"https://").or(remote.strip_prefix(b"http://")).unwrap_or(remote);
+        let mut end = address.len();
+        for (index, byte) in address.iter().enumerate() {
+            if *byte == b'/' {
+                end = index;
+                break;
+            }
+        }
+        let host = address.get(..end).expect("host within URL");
+        joined(&[prefix, b" for ", host])
+    } else {
+        Box::from(prefix.as_slice())
+    }
+}
+
 /// The source of a fetch refspec.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Source {

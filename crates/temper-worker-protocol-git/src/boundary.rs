@@ -17,7 +17,7 @@ pub struct Identity {
 /// Settings the service supplies; paths resolve beneath `root`.
 #[derive(Debug)]
 pub struct Settings {
-    pub git: Box<[u8]>,
+    pub git: Option<Box<[u8]>>,
     pub home: Box<[u8]>,
     pub root: kernel::Fd,
     pub prefix: u64,
@@ -28,6 +28,7 @@ pub struct Settings {
 
 /// Each Io request ends with exactly one Done echoing its owner.
 #[derive(Debug)]
+#[expect(clippy::large_enum_variant, reason = "bounded operation payloads remain inline and are counted in worst_case")]
 pub enum Request {
     Io { owner: Token, op: git::Op, deadline: Time, identity: Option<Identity> },
     CancelIo { owner: Token },

@@ -176,6 +176,7 @@ pub fn run(seed: u64, case: Case, facts: u32) -> Report {
     let spec = Spec {
         key: b"merge".as_slice().into(),
         repositories: Box::new([Repository {
+            git: None,
             name: b"temper".as_slice().into(),
             remote: b"forge/temper".as_slice().into(),
             start: Start::Merge { branch: b"topic".as_slice().into(), base: translate::commit(world.base) },
@@ -192,6 +193,7 @@ pub fn run(seed: u64, case: Case, facts: u32) -> Report {
     };
     assert!(world.forge.moves().is_empty(), "preparation moves no remote refs");
     let at = translate::path(&temper_worker_domain_checkout::git::Place {
+        git: None,
         workspace,
         repository: b"temper".as_slice().into(),
     });

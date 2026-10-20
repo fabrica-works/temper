@@ -540,6 +540,7 @@ impl World {
             let push = if writable { Some(base.clone().into()) } else { None };
             let identity = IDENTITY;
             let spec = Repository {
+                git: None,
                 expected: None,
                 name: name.clone().into(),
                 remote: remote.clone().into(),
@@ -567,6 +568,7 @@ impl World {
             match self.rng.below(7) {
                 0 => key = Vec::new(),
                 1 => repositories.push(Repository {
+                    git: None,
                     expected: None,
                     name: first.clone(),
                     remote: first,

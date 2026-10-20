@@ -158,7 +158,11 @@ fn each_command_s_arguments_are_git_md_s_vector() {
         (u64::MAX, b"workspaces/18446744073709551615/app"),
     ] {
         assert_eq!(
-            &*invocation::place(&git::Place { workspace: Token::new(workspace), repository: Box::from(&b"app"[..]) }),
+            &*invocation::place(&git::Place {
+                git: None,
+                workspace: Token::new(workspace),
+                repository: Box::from(&b"app"[..])
+            }),
             expected
         );
     }

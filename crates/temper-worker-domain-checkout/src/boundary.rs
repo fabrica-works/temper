@@ -103,6 +103,8 @@ pub struct Repository {
     /// The forge's address for it, which the protocol layer maps to a URL:
     /// never interpreted.
     pub remote: Box<[u8]>,
+    /// The program its item names, carried to io, never read.
+    pub git: Option<Box<[u8]>>,
     pub start: Start,
     /// Who the worker is to the forge for this repository, and who commits to
     /// it: a name the protocol layer maps to credentials and an author.

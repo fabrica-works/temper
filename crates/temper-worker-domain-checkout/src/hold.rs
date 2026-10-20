@@ -1254,7 +1254,7 @@ fn tips_mut(holding: &mut Holding, repository: u32) -> &mut Tips {
 }
 
 fn place(workspace: Token, repository: &Repository) -> Place {
-    Place { workspace, repository: copy_of(&repository.name) }
+    Place { workspace, repository: copy_of(&repository.name), git: repository.git.clone() }
 }
 
 /// The branch a push to `to` of `repository` goes to.

@@ -176,6 +176,7 @@ fn bytes(text: &[u8]) -> Box<[u8]> {
 fn repository(name: &[u8], writable: bool) -> Repository {
     let push = if writable { Some(bytes(b"main")) } else { None };
     Repository {
+        git: None,
         name: bytes(name),
         remote: remote(name),
         start: Start::Branch { branch: bytes(b"main") },
@@ -216,7 +217,7 @@ fn failed(fault: Fault) -> Done {
 }
 
 fn place(workspace: Token, repository: &[u8]) -> Place {
-    Place { workspace, repository: bytes(repository) }
+    Place { git: None, workspace, repository: bytes(repository) }
 }
 
 fn want_main() -> Want {

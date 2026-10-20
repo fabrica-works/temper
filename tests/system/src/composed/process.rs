@@ -361,7 +361,7 @@ fn mount(directories: &[agent::Directory], disk: &Checkout, mounted: &mut Disk) 
     }
     let mut mounts = Vec::with_capacity(directories.len());
     for directory in directories {
-        let place = Place { workspace: directory.root, repository: directory.name.clone() };
+        let place = Place { git: None, workspace: directory.root, repository: directory.name.clone() };
         let prefix = [git::path(&place).as_slice(), b"/"].concat();
         for (file, content) in disk.files() {
             if let Some(relative) = file.strip_prefix(prefix.as_slice()) {

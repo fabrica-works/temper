@@ -279,6 +279,7 @@ impl World {
         self.assign(start);
         self.say(agent::Up::Admitted);
         let place = temper_worker_domain::checkout::git::Place {
+            git: None,
             workspace: self.workspace.expect("prepared"),
             repository: Box::from(&b"app"[..]),
         };

@@ -79,21 +79,25 @@ impl Operation {
         self.io_owner = io_owner;
         self.command = command;
         self.phase = Phase::Spawning { failed: false };
-        let (directory, kind) = match &self.op {
-            Some(op) => match op {
-                git::Op::Clone { at, .. } => (
-                    invocation::joined(&[b"workspaces/", skein_lib::Decimal::of(at.workspace.raw()).as_bytes()]),
-                    Some(op.kind()),
-                ),
-                git::Op::Make { .. } => (Box::from(&b""[..]), Some(op.kind())),
-                git::Op::Fetch { at, .. }
-                | git::Op::Create { at, .. }
-                | git::Op::CheckOut { at, .. }
-                | git::Op::Merge { at, .. }
-                | git::Op::Commit { at, .. }
-                | git::Op::Push { at, .. } => (invocation::place(at), Some(op.kind())),
-            },
-            None => (Box::from(&b""[..]), None),
+        let (directory, kind) = if self.command == Command::Version {
+            (Box::from(&b""[..]), None)
+        } else {
+            match &self.op {
+                Some(op) => match op {
+                    git::Op::Clone { at, .. } => (
+                        invocation::joined(&[b"workspaces/", skein_lib::Decimal::of(at.workspace.raw()).as_bytes()]),
+                        Some(op.kind()),
+                    ),
+                    git::Op::Make { .. } => (Box::from(&b""[..]), Some(op.kind())),
+                    git::Op::Fetch { at, .. }
+                    | git::Op::Create { at, .. }
+                    | git::Op::CheckOut { at, .. }
+                    | git::Op::Merge { at, .. }
+                    | git::Op::Commit { at, .. }
+                    | git::Op::Push { at, .. } => (invocation::place(at), Some(op.kind())),
+                },
+                None => (Box::from(&b""[..]), None),
+            }
         };
         let mut pipes = skein_lib::List::with_capacity(3);
         if self.is_commit_tree() {
@@ -107,7 +111,7 @@ impl Operation {
             io::Request::Spawn {
                 owner: io_owner,
                 spawn: kernel::Spawn {
-                    program: settings.git.clone(),
+                    program: Box::from(self.program(settings).expect("program checked before spawning")),
                     args: invocation::arguments(&self.command),
                     env: invocation::environment(&settings.home, kind, self.identity.as_ref()),
                     root: settings.root,
@@ -116,6 +120,14 @@ impl Operation {
                 },
             },
         );
+    }
+    pub fn program<'a>(&'a self, settings: &'a Settings) -> Option<&'a [u8]> {
+        if let Some(op) = &self.op
+            && let Some(program) = invocation::item_program(op)
+        {
+            return Some(program);
+        }
+        settings.git.as_deref()
     }
     fn is_commit_tree(&self) -> bool {
         match self.command {
@@ -150,6 +162,7 @@ impl Operation {
         }
         if fault == git::Fault::Cancelled
             && !self.aborted
+            && self.command != Command::Version
             && let Some(next) = self.ready(checkout)
         {
             match next {

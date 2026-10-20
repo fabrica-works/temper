@@ -66,6 +66,7 @@ fn full_spec(limits: &Limits, n: u32) -> Spec {
     let mut repositories = Vec::new();
     for place in 0..limits.repositories {
         repositories.push(Repository {
+            git: None,
             expected: None,
             name: name(limits.name_bytes, place),
             remote: name(limits.name_bytes, place),

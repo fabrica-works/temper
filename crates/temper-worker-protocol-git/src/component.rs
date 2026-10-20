@@ -7,6 +7,7 @@ use crate::{
     operation::Operation,
     sequence::{self, Next},
 };
+use alloc::boxed::Box;
 use skein_io::{self as io, kernel};
 use skein_lib::{Id, Map, Slab, Time, Token};
 use temper_worker_domain_checkout::{self as checkout, git};
@@ -33,6 +34,10 @@ pub struct Component {
     shutting_down: bool,
     directories: Directories,
     background: Option<Task>,
+    checked: Option<(Box<[u8]>, Option<Version>)>,
+}
+fn usable(version: Option<Version>) -> bool {
+    version >= Some(Version { major: 2, minor: 41, patch: 0 })
 }
 fn event(out: &mut Outputs, event: Event) {
     out.events.push(event);
@@ -57,6 +62,7 @@ impl Component {
             shutting_down: false,
             directories,
             background: None,
+            checked: None,
         })
     }
     fn token(&mut self) -> Option<Token> {
@@ -75,6 +81,11 @@ impl Component {
     /// Start once with git's version check followed by a private, fresh layout.
     pub fn start(&mut self, _now: Time, out: &mut Outputs) {
         assert_eq!(self.start, Start::Idle, "start once");
+        if self.settings.git.is_none() {
+            self.start = Start::Layout;
+            self.background(Task::layout(), out);
+            return;
+        }
         self.start = Start::Checking;
         let token = self.token().expect("first invocation token");
         let mut operation = Operation::new(token, token, Time::from_nanos(u64::MAX), None, None, Command::Version);
@@ -139,7 +150,21 @@ impl Component {
             event(out, Event::Done { owner, done: git::Done::Failed { fault: git::Fault::Broken } });
             return;
         };
-        let next = sequence::first(&op);
+        let mut next = sequence::first(&op);
+        // Concurrent first uses check independently; only completed answers
+        // are reused, and the last completed check replaces the cache.
+        if let Some(program) = crate::invocation::item_program(&op) {
+            next = match &self.checked {
+                Some((checked, answer)) if checked.as_ref() == program => {
+                    if usable(*answer) {
+                        next
+                    } else {
+                        Next::End(git::Done::Failed { fault: git::Fault::Broken })
+                    }
+                }
+                Some(_) | None => Next::Run(Command::Version),
+            };
+        }
         let identity = if needs_identity { identity } else { None };
         let operation = Operation::new(owner, token, deadline, Some(op), identity, Command::Version);
         let id = self.insert(operation);
@@ -162,6 +187,7 @@ impl Component {
         };
         let operation = self.slots.get_mut(id).expect("live index");
         let startup = operation.op.is_none();
+        let checking = operation.command == Command::Version;
         let version = operation.found_version();
         if !startup && now >= operation.deadline {
             operation.cancel(git::Fault::TimedOut, &self.checkout, out);
@@ -176,7 +202,9 @@ impl Component {
                     self.maintain(false, out);
                     return;
                 }
-                if version >= Some(Version { major: 2, minor: 41, patch: 0 }) {
+                let program = self.settings.git.as_ref().expect("startup checked a configured program");
+                self.checked = Some((program.clone(), version));
+                if usable(version) {
                     self.start = Start::Layout;
                     self.background(Task::layout(), out);
                 } else {
@@ -184,6 +212,23 @@ impl Component {
                     event(out, Event::Unusable { why: Unusable::Version { found: version } });
                 }
             } else {
+                let next = if checking {
+                    if let Some(fault) = operation.stop {
+                        Next::End(git::Done::Failed { fault })
+                    } else {
+                        let op = operation.op.as_ref().expect("item operation");
+                        let program = crate::invocation::item_program(op).expect("item version check");
+                        self.checked = Some((Box::from(program), version));
+                        operation.ran = false;
+                        if usable(version) {
+                            sequence::first(op)
+                        } else {
+                            Next::End(git::Done::Failed { fault: git::Fault::Broken })
+                        }
+                    }
+                } else {
+                    next
+                };
                 self.advance(id, next, out);
                 self.maintain(false, out);
             }
@@ -202,6 +247,15 @@ impl Component {
     fn advance(&mut self, id: Id<Operation>, next: Next, out: &mut Outputs) {
         match next {
             Next::Run(command) => {
+                let operation = self.slots.get(id).expect("live index");
+                if operation.program(&self.settings).is_none() {
+                    let op = operation.op.as_ref().expect("no program is an operation failure");
+                    let diagnostic = crate::invocation::no_program(op, &command);
+                    let next = sequence::after(op, &command, 128, b"", &diagnostic, 0, &self.checkout);
+                    let Next::End(done) = next else { unreachable!("a fatal exit ends the operation") };
+                    self.finish(id, done, out);
+                    return;
+                }
                 let Some(token) = self.token() else {
                     self.finish(
                         id,
