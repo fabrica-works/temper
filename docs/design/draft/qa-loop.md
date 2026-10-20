@@ -7,7 +7,8 @@ by hand for now, but its records, its runner and its roles are the
 lab's (`factory.md`, section 8), so that they move into the lab
 application later and inform its design; `qa.md` is the inspiration.
 This draft covers the loop's mechanics and its first milestone, M1:
-simple stories on fake backends. M2 (a real forge, the fake LLM) and M3
+the loop's process and tooling, proven on the simplest story, on fake
+backends. M2 (a real forge, the fake LLM) and M3
 (real forges, real LLMs) are drafts of their own; the mapping of the
 owners' process onto temper is a session of its own.
 
@@ -21,8 +22,8 @@ owners' process onto temper is a session of its own.
   repository; a run executes it with a seed; the runs of a key are its
   evidence, judged into a verdict; a failure with a signature is a
   finding (section 3).
-- **The cluster is a list of processes,** not the box: M1's are skein's
-  fake LLM peer, skein's fake forge, and `temper serve`. A later cluster
+- **The cluster is a list of processes,** not the box: M1's are the fake
+  LLM, the fake forge, and `temper serve`. A later cluster
   adds an engine alone and workers by adding processes (section 4).
 - **A driver agent** (Codex) follows the experiment's charter through
   `temper ctl`, every call recorded (section 5).
@@ -37,8 +38,9 @@ owners' process onto temper is a session of its own.
   temper's `lab/`; runs and findings in `~/src/rust/tmp/lab/`
   (section 8).
 - **On demand,** a campaign at a time, by a lab owner (section 9).
-- **M1's bar:** three simple stories pass on several seeds, and a
-  planted fault comes out as a classed finding (section 10).
+- **M1's bar:** the process and the tooling work: one story, as simple
+  as it can be, passes on several seeds, and a planted fault comes out
+  as a classed finding (section 10).
 - **Before it:** the fakes as processes, and the fake forge serving git
   to real git (section 11).
 
@@ -55,7 +57,7 @@ owners' process onto temper is a session of its own.
 - **Not the box,** nor the first run: `temper box` and its steps would be
   an experiment of their own, checking the box's own work, not the
   system beneath it. The first run's suggested requests inspired M1's
-  stories (section 10); M1 does not check the first run.
+  story (section 10); M1 does not check the first run.
 - **Not domain corner cases,** which the worlds own
   (`testing-strategy.md`; `../domain/testing.md`). An experiment that keeps
   finding domain bugs says a world lacks stories.
@@ -123,8 +125,8 @@ M1's cluster:
 
 ```
 run R, seed S, scratch directory D
-├── fake-llm      skein's fake LLM peer, a process on loopback (TLS with skein's test root), the experiment's scripts
-├── fake-forge    skein's fake forge, a process on loopback: its API, deliveries, and git's smart HTTP (section 11)
+├── fake-llm      temper's fake LLM program over skein's peer, on loopback (TLS with skein's test root), the experiment's scripts
+├── fake-forge    temper's fake forge program over skein's peer, on loopback: its API, deliveries, and git's smart HTTP (section 11)
 ├── temper        temper serve, on D's directories, its configuration naming fake-llm and fake-forge
 └── seed          temper ctl: the LLM's key added, fake/widget adopted into a project
 ```
@@ -224,20 +226,15 @@ What says a run failed, beyond the agent thinking so (`qa.md`, 4.3):
 
 ## 10. M1
 
-**Stories,** each an experiment on one fake repository, `fake/widget`,
-inspired by the first run's suggested requests:
+M1's goal is the loop's process and tooling, and a first validation
+of temper end to end: the story is as simple as it can be, and more
+stories wait until the loop works.
 
-1. **Add CSV export:** a chat asked for a one-file change; the change
-   is proposed, its branch pushed, its CI passes, and it lands.
-2. **Add a dark theme:** a change across several files whose CI fails
-   first; the chat fixes it, and it lands.
-3. **Fix the empty search state:** a request the person follows to its
-   landing while asking the chat about it on the way, reading the
-   task's state through the tools.
-
-Each stays within the tools' area 1, a chat to a landed change
-(`../client/tools.md`, 5.5). The stories' exact scripts are the lab
-owner's.
+**One story,** on one fake repository, `fake/widget`, inspired by the
+first run's suggested requests: a chat is asked for a one-file change;
+the change is proposed, its branch pushed, its CI passes, and it lands.
+It stays within the tools' area 1, a chat to a landed change
+(`../client/tools.md`, 5.5). Its exact script is the lab owner's.
 
 **A planted fault:** an experiment whose cluster kills `temper serve`
 mid-run, or whose fake forge is set to break one of temper's promises,
@@ -246,7 +243,7 @@ class, and a fix checked again.
 
 **Its bar:**
 
-- each story's verdict is pass, on three seeds, from one command;
+- the story's verdict is pass, on three seeds, from one command;
 - the planted fault gives one finding, classed, reproduced from its key
   and seed;
 - every finding of the campaign is fixed with a lower test, or filed;
@@ -255,13 +252,15 @@ class, and a fix checked again.
 
 ## 11. Before M1
 
-1. **The fakes as processes,** shipped from skein: the fake LLM peer,
-   already a process of its own in the process tier
-   (`../domain/testing.md`, 2.6), and the fake forge peer, as a binary
-   that serves its API, its deliveries and its observations on
-   loopback. This is the piece of `first-run.md`'s 3.5 that moves the
-   fakes into product crates, pulled forward; the first run's
-   `temper fake` commands, if kept, wrap it.
+1. **The fakes as processes,** each a few lines of `main` in the
+   consumer, over skein's libraries: skein ships the fake LLM peer and
+   the fake forge peer as libraries that host on loopback, as now, and
+   no binary. temper adds its two programs (for example `temper fake
+   llm` and `temper fake forge`), with what it needs of its own: its
+   seed, its scripts' files, its configuration's addresses. The fake
+   forge serves its API, its deliveries and its observations. This is
+   the piece of `first-run.md`'s 3.5 that moves the fakes into product
+   crates, pulled forward.
 2. **The fake forge serving git's smart HTTP:** real-loop's later
    real-git bridge (`../STATUS.md`; `first-run.md`, section 8), so that
    temper's worker runs real git against it. Its CI stays by cue
@@ -275,7 +274,7 @@ class, and a fix checked again.
   then GitHub (draft of its own).
 - **M3:** real forges and real LLMs, Codex then Claude; verdicts become
   rates over many runs (draft of its own).
-- **Stories that grow** with the tools' areas 2 to 4, until
+- **More stories,** growing with the tools' areas 2 to 4, until
   temper-on-temper (a session of its own).
 - **Driver agents on documents alone:** no code, only the user-facing
   documents and the tools' guide, so their findings shape those
@@ -290,9 +289,6 @@ class, and a fix checked again.
 
 ## 13. Open questions
 
-- **The fake forge's binary:** skein's own, or `temper fake forge` as
-  `first-run.md`, 3.5 says. The lab's runner is generic, so a skein
-  binary fits it; temper may still wrap it.
 - **Reproducing on real processes:** how much a seed fixes once real
   scheduling and real git are in the run; whether M1 records enough to
   replay a failure that does not come back.
