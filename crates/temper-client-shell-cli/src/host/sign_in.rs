@@ -55,6 +55,14 @@ impl OneShot {
             self.root_event(jig_client::Event::SignIn { with: jig_client::With::Link(with) });
         }
     }
+    pub(super) fn signing_retry(&mut self) {
+        let Some(signing) = &mut self.signing else { return };
+        if signing.retry.is_some_and(|at| self.env.now >= at) && self.until.is_some_and(|until| self.env.now < until) {
+            signing.retry = None;
+            let with = signing.link.as_ref().expect("link sign-in").clone();
+            self.root_event(jig_client::Event::SignIn { with: jig_client::With::Link(with) });
+        }
+    }
     pub(super) fn signing_keep(&mut self) {
         if self.class != Class::SignIn {
             return;
@@ -64,6 +72,8 @@ impl OneShot {
         if signing.credential == Credential::New
             && let Some(credential) = self.root.client().link().credential
         {
+            signing.link = None;
+            signing.retry = None;
             shell.keep(Some(credential.clone()));
             signing.credential = Credential::Writing;
             self.directory.store_address(self.env.now, signing.address.take().expect("parsed address"));
@@ -83,4 +93,14 @@ impl OneShot {
             self.finish(0, false);
         }
     }
+}
+
+// Only a complete NotReady reply permits resending the same link.
+pub(super) fn not_ready(event: &jig_client::Event) -> bool {
+    let jig_client::Event::Reply { message, .. } = event else { return false };
+    let mut reader = skein_lib::Reader::new(message);
+    matches!(
+        jig_client_protocol_wire::SignInAnswer::decode(&jig_client_protocol_wire::CEILINGS, &mut reader),
+        Ok(jig_client_protocol_wire::SignInAnswer::NotReady)
+    ) && reader.is_empty()
 }

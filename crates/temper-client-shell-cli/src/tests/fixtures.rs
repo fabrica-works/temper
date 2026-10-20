@@ -37,6 +37,8 @@ pub struct Frame {
     pub link_root: Option<Fd>,
     pub link_leaf: Option<Box<[u8]>>,
     pub refuse_link: Option<()>,
+    pub again_links: u32,
+    pub link_posts: Vec<Box<[u8]>>,
     hold_stores: Option<()>,
     store: Option<Box<[u8]>>,
     offers: Option<()>,
@@ -101,6 +103,8 @@ impl Frame {
             link_root: None,
             link_leaf: None,
             refuse_link: None,
+            again_links: 0,
+            link_posts: Vec::new(),
             hold_stores: None,
             store: None,
             offers: None,
@@ -456,7 +460,11 @@ impl Frame {
         socket.answered = true;
         match path.as_slice() {
             b"/jig/v1/sign-in/link" => {
-                let answer = if self.refuse_link.is_some() {
+                self.link_posts.push(socket.request[end + 4..].into());
+                let answer = if self.again_links > 0 {
+                    self.again_links -= 1;
+                    w::SignInAnswer::NotReady
+                } else if self.refuse_link.is_some() {
                     w::SignInAnswer::Refused
                 } else {
                     w::SignInAnswer::SignedIn(

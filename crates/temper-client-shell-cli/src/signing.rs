@@ -2,7 +2,9 @@
 use crate::{directory, host::Startup, limits};
 use jig_client_shell_native::Shell;
 use skein_io::kernel::{Complete, Done, Fd, Op, OpenHow, Submit};
-use skein_lib::{Queue, Secret, Token};
+use skein_lib::{Duration, Queue, Secret, Time, Token};
+const FIRST: Duration = Duration::from_millis(100);
+const MOST: Duration = Duration::from_secs(2);
 const OPEN: Token = Token::new(1 << 59);
 #[derive(PartialEq, Eq)]
 pub(crate) enum Credential {
@@ -13,6 +15,9 @@ pub(crate) enum Credential {
 pub(crate) struct Signing {
     pub(crate) shell: Option<Shell>,
     pub(crate) with: Option<Secret>,
+    pub(crate) link: Option<Secret>,
+    pub(crate) retry: Option<Time>,
+    backoff: Duration,
     pub(crate) address: Option<Box<[u8]>>,
     pub(crate) credential: Credential,
     pub(crate) printed: Option<Box<[u8]>>,
@@ -37,6 +42,9 @@ impl Signing {
         Self {
             shell: Some(Shell::new(limits::settings(engine, leaf))),
             with: None,
+            link: None,
+            retry: None,
+            backoff: FIRST,
             address: None,
             credential: Credential::Kept,
             printed: None,
@@ -72,7 +80,10 @@ impl Signing {
         });
         Ok(Self {
             shell: Some(shell),
+            link: Some(with.clone()),
             with: Some(with),
+            retry: None,
+            backoff: FIRST,
             address: Some(address.into_boxed_slice()),
             credential: Credential::New,
             printed: None,
@@ -100,7 +111,13 @@ impl Signing {
             self.error = true;
         }
     }
+    pub(crate) fn again(&mut self, now: Time, until: Time) {
+        self.retry = Some(now.saturating_add(self.backoff).min(until));
+        self.backoff = self.backoff.saturating_mul(2).min(MOST);
+    }
     pub(crate) fn close(&mut self) {
+        self.link = None;
+        self.retry = None;
         self.closing = true;
         if !self.opening
             && let Some(shell) = &mut self.shell

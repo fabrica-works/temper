@@ -255,8 +255,11 @@ impl OneShot {
                     true
                 } else { false }
             });
+            let again = signed && sign_in::not_ready(&event);
             self.root_event(event);
-            if signed && self.root.client().link().credential.is_none() {
+            if again {
+                self.signing.as_mut().expect("link sign-in").again(self.env.now, self.until.expect("sign-in deadline"));
+            } else if signed && self.root.client().link().credential.is_none() {
                 self.fail(b"the sign-in link was refused");
                 return;
             }
@@ -301,6 +304,7 @@ impl OneShot {
         if root::next_deadline(&self.root).is_some_and(|at| self.env.now >= at) {
             root::fire(&mut self.root, &self.root_env, &mut self.requests);
         }
+        self.signing_retry();
         self.root_requests();
         if self.status.is_some() {
             return;
@@ -634,6 +638,7 @@ impl Host for OneShot {
             || self.signing.as_ref().and_then(|s| s.shell.as_ref()).is_some_and(|s| s.work_pending(now))
             || self.status.is_none()
                 && (!self.requests.is_empty()
+                    || self.signing.as_ref().and_then(|s| s.retry).is_some_and(|at| now >= at)
                     || self.until.is_some_and(|at| now >= at)
                     || root::next_deadline(&self.root).is_some_and(|at| now >= at))
     }
@@ -644,6 +649,7 @@ impl Host for OneShot {
             self.transport.as_ref().and_then(Memory::next_deadline),
             self.signing.as_ref().and_then(|s| s.shell.as_ref()).and_then(Shell::next_deadline),
             self.until,
+            self.signing.as_ref().and_then(|s| s.retry),
             self.status.is_none().then(|| root::next_deadline(&self.root)).flatten(),
         ]
         .into_iter()
@@ -651,10 +657,15 @@ impl Host for OneShot {
         .min()
     }
     fn next_policy_deadline(&self) -> Option<Time> {
-        [self.directory.retry(), self.until, self.status.is_none().then(|| root::next_deadline(&self.root)).flatten()]
-            .into_iter()
-            .flatten()
-            .min()
+        [
+            self.directory.retry(),
+            self.until,
+            self.signing.as_ref().and_then(|s| s.retry),
+            self.status.is_none().then(|| root::next_deadline(&self.root)).flatten(),
+        ]
+        .into_iter()
+        .flatten()
+        .min()
     }
     fn is_empty(&self) -> bool {
         self.status.is_some()

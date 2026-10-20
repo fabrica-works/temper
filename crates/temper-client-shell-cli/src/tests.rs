@@ -1,6 +1,7 @@
 mod fixtures;
 use crate::{directory, limits};
 use skein_io::kernel::{Exit, ServiceSignal};
+const SIGN_IN_FIRST: skein_lib::Duration = skein_lib::Duration::from_millis(100);
 const SIGN_IN_FILE_CALL: &[u8] = br#"{"tool":"sign-in","arguments":{"file":"link-file"}}"#;
 #[test]
 fn a_busy_directory_is_refused_after_60_s_of_retries() {
@@ -592,4 +593,39 @@ fn a_file_call_advertises_its_initial_work() {
     use skein_shell::Host;
     let f = fixtures::Frame::read(&["--call", "/elsewhere/call.json"]);
     assert!(f.host.work_pending(skein_lib::Time::ZERO));
+}
+
+#[test]
+fn a_link_answered_again_is_sent_after_backoff() {
+    let mut f = fixtures::Disk::act(&[b"sign-in", b"-"]);
+    f.input = fixtures::LINK;
+    f.again_links = 1;
+    f.answer_sign_in_then_me();
+    assert_eq!(f.next_deadline(), Some(skein_lib::Time::ZERO.saturating_add(SIGN_IN_FIRST)));
+    assert_eq!(f.link_posts.len(), 1);
+    f.advance_past(SIGN_IN_FIRST);
+    assert_eq!(f.link_posts.len(), 2);
+    assert_eq!(f.link_posts[0], f.link_posts[1]);
+    assert_eq!(f.stored(b"token"), Some(fixtures::TOKEN_BYTES));
+    assert_eq!(f.stderr(), b"");
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+}
+
+#[test]
+fn repeated_again_keeps_the_original_sign_in_deadline() {
+    let mut f = fixtures::Disk::act(&[b"sign-in", b"-"]);
+    f.input = fixtures::LINK;
+    f.again_links = u32::MAX;
+    f.drain();
+    let mut elapsed = skein_lib::Duration::ZERO;
+    let mut backoff = SIGN_IN_FIRST;
+    while elapsed < limits::DEADLINE {
+        let span = backoff
+            .min(skein_lib::Duration::from_nanos(limits::DEADLINE.as_nanos().saturating_sub(elapsed.as_nanos())));
+        f.advance_past(span);
+        elapsed = elapsed.saturating_add(span);
+        backoff = backoff.saturating_mul(2).min(skein_lib::Duration::from_secs(2));
+    }
+    assert_eq!(f.exit(), Some(Exit::Code(1)));
+    assert_eq!(f.stderr(), b"temper ctl: the engine at http://127.0.0.1:4000 did not answer within 30 s\n");
 }

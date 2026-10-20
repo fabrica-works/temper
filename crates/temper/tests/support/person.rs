@@ -1,4 +1,5 @@
 //! A real native client driven by jig's finite semantic-tree script.
+use jig_client_protocol_link::Signing;
 use skein_fake_person::{Doing, Find, Next, Step, Target, TreeFace};
 use skein_io::kernel::{Complete, Done, Fd, Op, Submit};
 use skein_lib::{Queue, Time, Token, Wall};
@@ -6,6 +7,8 @@ use skein_shell::Host;
 use temper_client_domain::Address;
 use temper_client_shell_terminal::client::{NativeClient, Settings, Start};
 const START_WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(20);
+const SIGN_IN_FIRST: skein_lib::Duration = skein_lib::Duration::from_millis(100);
+const SIGN_IN_MOST: skein_lib::Duration = skein_lib::Duration::from_secs(2);
 const PIPE: Token = Token::new(u64::MAX);
 const CLOSE: Token = Token::new(u64::MAX - 1);
 /// The script is separate from the client's production composition.
@@ -37,6 +40,9 @@ pub struct Person {
     closing: u32,
     bytes: Vec<u8>,
     wake: Option<Time>,
+    signing_until: Option<Time>,
+    signing_retry: Option<Time>,
+    signing_backoff: skein_lib::Duration,
     pub finished: bool,
     pub failed: Option<String>,
     resume: bool,
@@ -63,6 +69,9 @@ impl Person {
             closing: 0,
             bytes: Vec::new(),
             wake: None,
+            signing_until: None,
+            signing_retry: None,
+            signing_backoff: SIGN_IN_FIRST,
             finished: false,
             failed: None,
             resume: script.resume,
@@ -96,7 +105,7 @@ impl Person {
             self.client.as_mut().expect("native client").completions().push(complete);
         }
     }
-    fn start(&mut self) {
+    fn start(&mut self, now: Time) {
         if self.client.is_none()
             && let Some(link) = super::printed_link(&self.bytes)
         {
@@ -109,6 +118,7 @@ impl Person {
                 .expect("URL address")
                 .parse()
                 .expect("socket address");
+            self.signing_until = Some(now.saturating_add(START_WITHIN));
             self.client = Some(
                 NativeClient::new(
                     Settings {
@@ -131,10 +141,21 @@ impl Person {
         };
         client.iterate(now, wall);
         while let Some(signing) = client.signing() {
-            assert!(
-                matches!(signing, jig_client_protocol_link::Signing::SignedIn { .. }),
-                "native signing failed: {signing:?}"
-            );
+            match signing {
+                Signing::SignedIn { .. } => {
+                    self.signing_retry = None;
+                    self.signing_until = None;
+                }
+                Signing::Again => {
+                    let until = self.signing_until.expect("sign-in deadline");
+                    assert!(now < until, "native signing failed: {signing:?}");
+                    self.signing_retry = Some(now.saturating_add(self.signing_backoff).min(until));
+                    self.signing_backoff = self.signing_backoff.saturating_mul(2).min(SIGN_IN_MOST);
+                }
+                other @ (Signing::Refused | Signing::Lost | Signing::SignedOut) => {
+                    panic!("native signing failed: {other:?}");
+                }
+            }
         }
         while let Some(notice) = client.notices() {
             assert!(
@@ -158,6 +179,24 @@ impl Person {
             );
         }
         self.wake = None;
+        if self.signing_backoff != SIGN_IN_FIRST
+            && let Some(until) = self.signing_until
+        {
+            assert!(now < until, "native signing failed: Again");
+            self.wake = Some(until);
+        }
+        if let Some(retry) = self.signing_retry {
+            if now >= retry {
+                self.signing_retry = None;
+                // Start::Token installs a held credential locally; only link sign-ins have replies.
+                client
+                    .sign_in(super::printed_link(&self.bytes).expect("printed sign-in link"))
+                    .expect("printed sign-in link");
+            } else {
+                self.wake = Some(self.wake.map_or(retry, |at| at.min(retry)));
+            }
+        }
+        let signing_wake = self.wake;
         if client.started() && !self.finished && self.failed.is_none() {
             let before = self.actor.at();
             match self.actor.next(&mut TreeFace::new(client.tree()), now) {
@@ -177,6 +216,7 @@ impl Person {
                 self.wake = Some(now);
             }
         }
+        self.wake = [self.wake, signing_wake].into_iter().flatten().min();
         while let Some(submit) = client.submissions().pop() {
             self.submissions.push(submit);
         }
@@ -190,7 +230,7 @@ impl Host for Person {
         if let Some(fd) = self.input.take() {
             self.close(fd);
         }
-        self.start();
+        self.start(now);
         if !self.reading
             && let Some(fd) = self.output
         {
