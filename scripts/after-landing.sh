@@ -4,4 +4,4 @@
 # goes to the director (skein's owners.md, 4.5). Today the process tier.
 set -eu
 python3 -I -B -m unittest discover -s "$(dirname "$0")/../lab/tests/process" -v
-exec "$(dirname "$0")/proof-one-process.sh"
+exec "$(dirname "$0")/proof-one-process.sh" --no-fail-fast
