@@ -611,10 +611,10 @@ branches and tokens made by the probes were removed after. The scripts
 and their evidence are not kept; the live conformance records the
 facts for good (section 17). The App and the repositories are kept as
 its fixtures, with a spare repository, `freeekanayaka/temper-probe-2`,
-not granted to the App; the App's key, hook secret and a README are in
-the person's private `~/src/rust/tmp/github-conformance/`, never in a
-repository. Each fact is cited by its probe's number across this
-document.
+not granted to the App. The App's key, its hook secret, the person's
+tokens (section 17) and a README are in the person's private
+`~/src/rust/tmp/github-conformance/`, never in a repository. Each fact
+is cited by its probe's number across this document.
 
 - **Setup.** The manifest flow takes `http://127.0.0.1:<port>` as its
   `redirect_url` and `setup_url`; the conversion answers `id`, `slug`,
@@ -706,7 +706,10 @@ document.
   removed from a selected installation by its owner is reached, or not,
   at once by a token minted for the whole installation before the
   change; `installation_repositories` `added` and `removed` are
-  delivered.
+  delivered. A fine-grained token with "GitHub App installation
+  repository access" adds and removes one too (checked after the
+  probes), but is refused the installation's list of repositories,
+  which the App's token reads.
 - **P13, issues.** The App opens issues and comments; issues and pull
   requests share numbers; `/issues` lists pull requests, each with a
   `pull_request` member; a new issue was missing from the first listing
@@ -981,8 +984,15 @@ Each step lands working, and shows what it proved in the real loop
   one per owner since such a token has one, each limited to that
   owner's probe repositories, with administration, contents, pull
   requests and the App installation's repository access to write, and
-  metadata to read: the user provides them when the conformance is
-  built. The user's own classic token is never used.
+  metadata to read. The user made them on 2026-10-20, beside the App's
+  key, as `person-freeekanayaka.token` and `person-fabrig-dev.token`;
+  each was checked to write its own repositories and be refused the
+  other's. The user's own classic token is never used.
+- **Its credentials expire,** the person's tokens on their dates and
+  the App's key never: each run reads a token's expiry from GitHub's
+  `github-authentication-token-expiration` header, and names a token
+  that expires within the next month, so the user makes it again before
+  a run fails on it.
 
 ## 18. Later
 
