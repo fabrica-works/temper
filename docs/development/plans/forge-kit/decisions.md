@@ -1854,6 +1854,47 @@ where its answer lands.
 
      Checked: scratch-hourly-19/jig-wrapper-failure.json and task748 log identify the wrapper rewrite, trailing syntax error/exit2 and unavailable underlying completion; command-manifest.json preserves the submitted hash. Root validated each new compiler site against git show e6486e20:path, exact line text and full source SHA256, recorded in pump/hourly19-custody-premises.json. Six messages/source lines are retained in pump/hourly19-new-custody-sites.json and the full original inventory. The current plan already names separate downstream custody and immutable-proof preparation inputs; pinned plan provides ruling --text/ring. No code interface is changed or inferred.
 
+217. **TLS boundary gate and exhaustive every-byte verification** (designer answer, skein08.4 block of 2026-10-20T08:28:15Z).
+     Apply the landed designer answer, skein92b80253fdb9d1da23626739f948f53a571856f2 and temperaed58f2fa351d895a3d74fc9734ef59084324523.
+
+     Landed with `land --docs`: skein 92b80253fdb9d1da23626739f948f53a571856f2
+     (forge-connection.md 10) and temper aed58f2fa351d895a3d74fc9734ef59084324523
+     (plan skein/08-machine-world.md 08.4).
+
+     ### skein08.4: complete TLS byte sweep and measured aim
+
+     1. Cause, measured on the draft: each row is a fresh world with a real
+        handshake: "So its flight is its own, bound to its own hello, and no two
+        faults can share one". Its cryptography costs about 2.4 ms (the
+        component's TLS client 1.1, the peer's rustls 1.3), so the 4,241 rows past
+        the hello cost about 10 s whatever the driver does. Besides, the
+        Locate-response rows ticked 1,749 times, 1,598 busy only on an end waiting.
+     2. Fixed (08.4, Quiet): a peer whose only busy cause is `wire.eof &&
+        !wire.ended`, with nothing answered that tick, is not busy. On the draft:
+        1,749 ticks became 151, and all 4,709 rows passed.
+     3. Disposition, skein 10: "The gate's fuzzy suite cuts at the boundaries a
+        reader changes state at, each one byte either side, with EOF and reset
+        ... The every-byte sweep runs unchanged, with the same assertions, in the
+        exhaustive suite. The post-landing lane runs it after each push to main
+        and reports a failure against that push's commit": a stated departure from
+        testing-strategy.md 8. No budget is raised; 5 s binds the boundary sweep.
+     4. Map: `fuzzy_tls.rs::tls_faults_at_each_byte_end_once` moves unchanged to
+        `tests/exhaustive_tls.rs`, as `tls_cuts(7, Sweep::Every)`, with every exact
+        result, cost == written, (1, 1), the last Closed and the control. New:
+        `fuzzy_tls.rs::tls_faults_at_each_boundary_end_once`, `Sweep::Boundaries`,
+        through the same `outcome` and control: each record's start and header end
+        (a handshake cut names record, edge and delta, resolved in that trial's own
+        flight), the flight's end, and each HTTP line, head and body end, each
+        -1/0/+1, about 220 rows. Counts: 43 focused, 8 fuzzy, 1 exhaustive.
+     5. Owner: this step, in the world and `.config/nextest.toml`'s
+        `[profile.exhaustive]` (60 s; the default filter excludes `exhaustive_`).
+        The lane (`heavy cargo nextest run --workspace --profile exhaustive` after
+        each skein push) is the machine's, routed by the director.
+     6. Next, bounded: one narrow quiet check (the Locate response, EOF at its
+        length minus one), then the normal proofs once each, exhaustive included.
+        Return a boundary sweep past 5 s, an exhaustive past 60 s or an unproved
+        quiet premise; never sample, split or thin a sweep. Nothing is deferred.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
