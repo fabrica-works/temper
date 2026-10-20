@@ -76,20 +76,26 @@ Still required to finish S's canonical document/templates and runnable checks:
   configuration, polling variant or shortened fallback is substituted.
 - Fake-owned decimal u64 seed derivation and named 0600 key/token output
   interfaces. The runner will supply seeds and paths, never credential bytes.
-- First-run's actual observation encoding and complete flush reachable before
-  stop with explicit loss count 0; the forge promise-check wrapper/judgment.
+- First-run's observation writer and complete flush reachable before stop,
+  using skein `527480f3`'s encoding and explicit cumulative loss count 0.
+  The promises judge landed at skein `4f13123c`; its command wrapper and
+  Profile/Decision inputs remain first-run's, reviewed by github. Decision
+  records must come from temper's own record, never the merge being judged.
+  Decision 259 maps any retained breaches to exit 1, with fail lines and an
+  undecided reason if present; exit 2 has reasons only, exit 0 no stdout.
 - The designed private git `objects` route, including real request/response
   encoding and complete C/P trees. Then add the private decoder/route adapter
   and `checks/end-state`, stderr evidence and runner check result encoding.
-- Director-routed `add-key` and `wait forges --until connected:1`, plus the
+- Director-routed `wait forges --until connected:1`, plus the
   runner's ready captures, collection and command/check contracts. Then render
   `forge.json`, `llm.json`, serve/agent/charter/worker files and `experiment.json`
   against those exact landed contracts, and run S's three attended seeds.
 
-Concrete source mismatches at implementation base `998a5f054`:
-`crates/temper/src/lib.rs`
-accepts `serve CONFIG.json`, has no `fake` command, and ctl's
-`crates/temper-client-tools/src/table.rs` lacks `add-key`/`forges`.
+`add-key` is available at temper `dfc7cc70a` as
+`add-key PROVIDER FILE --deployment --key KEY`. It reads a private regular
+owned file and strips one final newline; it does not supply the fake's
+pending key-output interface. The cluster's three-directory serve/fake
+forms and the forge wait remain dependencies in qa.md, 11.1.
 The wrapper/story expect the full printed sign-in URL without a second scheme
 prefix, as qa.md, 5.1 specifies.
 The fake Observation (`observe.rs`: Merged.commit, Moved.to, Refused) and Object

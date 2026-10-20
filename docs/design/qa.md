@@ -244,6 +244,12 @@ serve  after  llm
 
 ### 5.1 H's and P's
 
+`temper ctl add-key` is available at temper `dfc7cc70a`, in the
+`add-key PROVIDER FILE --deployment --key KEY` form used below. Its
+file must be private, regular and owned by the caller; the host strips
+one final newline. The fake's key output remains first-run's pending
+interface, not a runner-generated value.
+
 Each is `{artifact.temper} ctl {dir.client}` and then:
 
 | Action | Arguments | For |
@@ -431,12 +437,31 @@ copied out of scratch so that the checks and findings read evidence
 
 ### 8.3 The forge's promises
 
-`promises`: `{artifact.temper} fake forge check
-{collected.observations}/observations.jsonl` (`protocol/setup.md`,
-8.4): the github owner's judgment of the stream, first-run's command,
-under skein's `lab.md`, 7.2; its signatures `promise/<promise>/<subject>`.
-Observations lost, or not known to be whole, are status 2, never a pass.
-The experiment judges no promise of its own.
+`promises` uses `{artifact.temper} fake forge check` (`protocol/setup.md`,
+8.4), first-run's wrapper of the github owner's landed judge
+(`skein_fake_forge_domain::promises`, skein `4f13123c`, `fake-forge.md`,
+2.5). It judges once, forced, foreign and order, under skein's `lab.md`,
+7.2; its signatures are `promise/<promise>/<subject>`. The experiment
+judges no promise of its own.
+
+Its inputs include `{collected.observations}/observations.jsonl`, a
+client `Profile` and independent `Decision` records naming repository,
+pull and exact head, with their completeness declared even when empty.
+The decisions come from temper's own record, never from the merge
+being judged (decision 259). First-run designs those inputs and the
+final command's argv, with github's review; these are named waits,
+not schemas or flags the lab invents.
+
+The judge keeps breaches even when other evidence is undecided. The
+wrapper preserves both through the existing check contract (259):
+
+- any breaches: status 1, their `fail` lines, plus an `undecided` line
+  when the judge has an incomplete-evidence reason;
+- no breaches and undecided: status 2, `undecided` lines only;
+- pass: status 0, no stdout.
+
+Loss or unknown completeness never gives a pass. Status 2 with a
+`fail` line would contradict skein's `lab.md`, 7.2.
 
 ### 8.4 The story's end
 
@@ -589,14 +614,13 @@ and arrives through the director.
 | the fake LLM's lab form taking cued scripts with tool calls (7.1) | first-run | the story |
 | the fake forge's lab form taking the domain's CI cue (7.2) | first-run | CI by content |
 | `fake/widget`'s number, and its seed holding no `NOTICE`, its own checks, if any, passing with it | first-run | the delegate, the change |
-| the observations' encoding, a complete flush boundary reachable before stop, with an explicit loss count including 0 | first-run | 8.3, 8.4 |
-| `temper fake forge check` | github's judgment, first-run's command | 8.3 |
+| the observation writer and complete flush boundary before stop, with explicit cumulative loss count including 0; encoding is skein `527480f3` | first-run | 8.3, 8.4 |
+| `temper fake forge check`, its Profile/Decision input design and temper-record decision source; judge landed at skein `4f13123c` | first-run's command and input design, github's review | 8.3; decision 259 |
 | the git route's `objects` (skein's `fake-forge.md`, section 4) | skein's fake forge | 8.4 |
 | TLS on the fake LLM with skein's test root, and the root's file to trust | first-run | M1; no plaintext variant |
 | fake forge deliveries across processes to the hook registered on serve's bound webhook address | first-run | M1's story |
 | serve's actual bound webhook address available to reconcile and a ready notification for its listeners | serve's CLI owner, routed from QA's S2 by the director | delivery readiness |
 | fake-owned key/token derivation from decimal u64 seeds and 0600 output files named by the experiment; exact interfaces | first-run, director 253's default | seed, setup handover; runner invents no bytes |
-| `add-key` (`client/tools.md`, 5.5, area 5) | accounts-2 | the seed |
 | `wait forges --until connected:1` (area 6) | github | the seed, as the demo's |
 | serve's link on its stdout, or a private channel for it | the director (the serve survey) | the seed's sign-in |
 
