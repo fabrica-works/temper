@@ -1690,6 +1690,23 @@ where its answer lands.
 
      Remove only stale active-memory wording from08's introduction/What the design asks, applying the already-landed director scope cut195. No08.5step or component-memory proof is restored. Final machine count41/8is unchanged;08.1requires06.2landed and supplies07.3exports. There is no new code, gate/AST mode, fixture value, bound or scope. Other dependency-ready starts remain unheld.
 
+203. **Refresh exact expectations from required recorded fixtures** (plan defect, skein06.3 block of 2026-10-20T03:42:04Z).
+     Refresh exact expected masked times/identities derived from the required fresh
+     recording, while preserving every inherited assertion, case and test name.
+     This repairs a plan dependency:06.3must read06.2's newly recorded corpus, so an
+     expectation of a captured field follows that field rather than an older recording.
+     Independently read the raw old/new captured bytes and perform the representation
+     conversion, never use the decoder's actual output as the expected value.
+     The checked actions-combined-status rows change updated_at expectations from
+     1577817013000000000/1577817014000000000 to1577817012000000000both, retaining
+     all other expected fields and comparisons. List each further reached recorded-field
+     literal/derived copy and its evidence in the commit body. No status/error/boundary,
+     ordering invariant, case or assertion structure is loosened, no corpus edited outside
+     recording, and no production decoder changed. A semantic difference returns.
+     The separate JSON-mutation adaptation bug stays within06.3's existing conversion
+     scope with every malformed case and expected error preserved. All proofs/counts
+     and the unrelated05.2design question remain.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

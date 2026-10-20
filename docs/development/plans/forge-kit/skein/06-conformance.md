@@ -277,6 +277,19 @@ Shape:
   temper-service profile lookup and avoiding a redundant qualification.
   Refresh further copies and derived values reached by these repairs, and list
   further users and lint adaptations in the commit body.
+  Required fresh-corpus expectations: in `tests/common/cases/files.rs`, the
+  `actions-combined-status` row keeps both complete expected statuses and every
+  assertion; only their captured `updated_at` literals follow06.2's recording.
+  The old13/14second masked values become12/12:
+  `1_577_817_013_000_000_000` and `1_577_817_014_000_000_000` each become
+  `1_577_817_012_000_000_000`, independently converted from the raw
+  `2020-01-01T00:00:12+05:30` fields. Follow the README Recorded fixture
+  expectations rule for further reached masked identities/times/derived values
+  in the moved case tables and after06.4's required recording; list changed users.
+  This does not change58inherited test names/cases/assertions or61focused/4fuzzy
+  final counts. Preserve every malformed mutation and its expected error;
+  repair the independent JSON mutation adaptation within its existing scope,
+  never by changing an expected error or a production decoder.
 Test shape: 55 focused + 3 fuzzy move. Add six table tests in `forgejo_bounds.rs`, reusing
   common::forgejo's limits/decoders and the moved seven case tables (share the tables, not copies):
 - `limits_accept_the_profile_and_reject_each_problem`: reference below; all eight zero fields, both
