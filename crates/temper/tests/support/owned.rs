@@ -623,6 +623,7 @@ impl Bounded {
     #[must_use]
     pub fn accounts() -> temper_service::AccountsRuntime {
         temper_service::AccountsRuntime {
+            providers: skein_lib::List::with_capacity(0),
             issuers: skein_lib::List::with_capacity(0),
             trust_roots: 0,
             trust_root_bytes: 0,

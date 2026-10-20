@@ -117,6 +117,8 @@ fn owner_outcome(b: &mut Builder, words: &Words, value: &c::OwnerOutcome) {
         | O::RolesSet { .. }
         | O::PolicyChanged { .. }
         | O::PoolSet { .. } => P::Applied,
+        O::AccountSignInStarted { .. } => P::AccountSignInStarted,
+        O::AccountSignedOut { .. } => P::AccountSignedOut,
     };
     status(b, words, word, &[]);
 }

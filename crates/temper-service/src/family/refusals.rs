@@ -49,6 +49,10 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
         p::Refusal::NoFurther => w::Refusal::NoFurther,
         p::Refusal::Unknown => w::Refusal::Unknown,
         p::Refusal::NotOffered => w::Refusal::NotOffered,
+        // The upstream client cannot encode this account-only refusal until w1d.
+        p::Refusal::Provider => {
+            return Err(w::Problem { path: w::Path::OwnedRecord, reason: skein_codec::Reason::Tag });
+        }
         p::Refusal::NoEscalationHolder => w::Refusal::NoEscalationHolder,
         p::Refusal::KeyConflict => w::Refusal::KeyConflict,
         // As jig's entrance facts: only a made or amended task's refusal names a model, by the

@@ -209,7 +209,8 @@ pub(super) fn run(delivery: &c::Delivery, text: Option<&c::RunText>, out: &mut T
         | c::Delivery::OwnerInbox(_)
         | c::Delivery::Tasks(_)
         | c::Delivery::Deployment(_)
-        | c::Delivery::OwnerDeployment(_) => unreachable!("run watch delivers a run"),
+        | c::Delivery::OwnerDeployment(_)
+        | c::Delivery::OwnerAccounts(_) => unreachable!("run watch delivers a run"),
     }
     if let Some(text) = text {
         out.put(b"provisional: ");

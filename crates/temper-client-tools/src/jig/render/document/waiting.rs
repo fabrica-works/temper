@@ -75,7 +75,8 @@ pub(super) fn text(
             | c::Delivery::OwnerProposal(_)
             | c::Delivery::Chips(_)
             | c::Delivery::Deployment(_)
-            | c::Delivery::OwnerDeployment(_) => unreachable!("wait subject"),
+            | c::Delivery::OwnerDeployment(_)
+            | c::Delivery::OwnerAccounts(_) => unreachable!("wait subject"),
         }
         if let Some(result) = wait.result {
             super::result_text(result, out);

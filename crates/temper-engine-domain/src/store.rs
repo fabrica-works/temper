@@ -532,6 +532,22 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                 .ok()?
                 .checked_mul(u64::try_from(size_of::<jig_domain_people::Holding>()).ok()?),
             jig_domain_people::Stored::Answer { ask, .. } => match ask.as_ref() {
+                jig_domain_people::Ask::AccountChange { change, .. } => {
+                    use jig_domain_people::AccountChange;
+                    let uses = match change {
+                        AccountChange::SetUses { uses, .. } => uses.as_deref().unwrap_or_default(),
+                        AccountChange::AddKey { .. }
+                        | AccountChange::ReplaceKey { .. }
+                        | AccountChange::RemoveKey { .. }
+                        | AccountChange::Resume { .. }
+                        | AccountChange::Remove { .. }
+                        | AccountChange::MoveAccount { .. }
+                        | AccountChange::MoveSource { .. } => &[],
+                    };
+                    u64::try_from(uses.len())
+                        .ok()?
+                        .checked_mul(u64::try_from(size_of::<jig_domain_people::Use>()).ok()?)
+                }
                 jig_domain_people::Ask::Compound { operations, .. } => people_bytes::compound(operations),
                 jig_domain_people::Ask::Create { batch, .. } => people_bytes::batch(batch),
                 jig_domain_people::Ask::Propose { action: jig_domain_people::Action::Batch(batch), reason, .. } => {

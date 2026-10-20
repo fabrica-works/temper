@@ -146,6 +146,7 @@ pub fn task_record(number: u64) -> jig_domain_tasks::TaskRecord {
         proposal_rows: Box::new([]),
         instructions: None,
         llm: None,
+        kept_account: None,
         refused: Box::new([]),
         grace: None,
         created_at: Wall::EPOCH,

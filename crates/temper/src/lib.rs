@@ -15,6 +15,7 @@ use temper_service::{
     settings::{Files, Seeds},
 };
 
+mod accounts_runtime;
 mod agent;
 pub mod box_command;
 pub mod bundle;
@@ -212,28 +213,9 @@ fn server_name(bytes: &[u8]) -> Result<skein_tls::Name, String> {
         .ok_or_else(|| "invalid server name".into())
 }
 fn accounts(directory: &Path, engine: &config::Engine) -> Result<service::AccountsRuntime, String> {
-    let mut issuers = List::with_capacity(u32::try_from(engine.llm.accounts.len()).expect("account count"));
-    let mut trust_roots = 0_u32;
-    let mut trust_root_bytes = 0_u32;
-    for account in &engine.llm.accounts {
-        if let config::Source::SignIn(source) = &account.source {
-            let address = address(&source.endpoint)?;
-            let transport = match &source.transport {
-                config::Transport::Plaintext => skein_oauth_accounts::Transport::Plaintext,
-                config::Transport::Tls { server_name: name, trust: file } => {
-                    let (trust, count, each) = trust(directory, file.as_deref())?;
-                    trust_roots = trust_roots.checked_add(count).ok_or("trust count")?;
-                    trust_root_bytes = trust_root_bytes.max(each);
-                    skein_oauth_accounts::Transport::Tls { server_name: server_name(name)?, trust }
-                }
-            };
-            issuers
-                .push((account.number, skein_oauth_accounts::Endpoint { address, transport }))
-                .expect("account count");
-        }
-    }
-    Ok(service::AccountsRuntime { issuers, trust_roots, trust_root_bytes })
+    accounts_runtime::resolve(directory, engine)
 }
+
 fn forges(directory: &Path, document: &skein_json::Document) -> Result<List<service::ForgeRuntime>, String> {
     use skein_forge_connection::settings::Transport;
     let application = member(document, 0, b"application");

@@ -222,7 +222,8 @@ pub(crate) fn plan(
         | c::Delivery::Run(_)
         | c::Delivery::RunState(_)
         | c::Delivery::Deployment(_)
-        | c::Delivery::OwnerDeployment(_) => {}
+        | c::Delivery::OwnerDeployment(_)
+        | c::Delivery::OwnerAccounts(_) => {}
     }
     b.close();
     b.close();

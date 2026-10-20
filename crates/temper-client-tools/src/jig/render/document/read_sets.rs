@@ -190,7 +190,8 @@ fn encode_documents(reading: &Reading, limits: &Limits, compound: bool, out: &mu
             | c::Delivery::OwnerInbox(_)
             | c::Delivery::Tasks(_)
             | c::Delivery::Deployment(_)
-            | c::Delivery::OwnerDeployment(_) => unreachable!("selected watch value"),
+            | c::Delivery::OwnerDeployment(_)
+            | c::Delivery::OwnerAccounts(_) => unreachable!("selected watch value"),
         }
     }
 }

@@ -16,6 +16,9 @@ pub fn to_root(event: core::Event) -> Result<root::PartyInput, Box<kit::Event>> 
         core::Event::People(people::Event::SignOut { reply_to, sign_in }) => {
             root::PartyInput::SignOut { reply_to, sign_in }
         }
+        core::Event::Key { reply_to, sign_in, key, ask, carried } => {
+            root::PartyInput::Key { reply_to, sign_in, key, ask, carried }
+        }
         core::Event::Read { reply, sign_in, read } => root::PartyInput::Read { reply_to: reply, sign_in, read },
         core::Event::Watch { watcher, sign_in, subject, window } => {
             root::PartyInput::Watch { watcher, sign_in, subject, window }
@@ -137,6 +140,7 @@ pub fn not_ready(input: root::PartyInput) -> Option<kit::Event> {
         root::PartyInput::SignedIn { reply_to, .. }
         | root::PartyInput::SignOut { reply_to, .. }
         | root::PartyInput::Ask { reply_to, .. }
+        | root::PartyInput::Key { reply_to, .. }
         | root::PartyInput::Application { reply_to, .. } => {
             Some(kit::Event::Reply { to: reply_to, reply: people::Reply::Again(people::Again::NotReady) })
         }

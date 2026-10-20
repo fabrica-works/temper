@@ -62,6 +62,8 @@ impl Operation {
                 c::Ask::MakeService { .. } => (b"make-service", None),
                 c::Ask::SetPool { .. } => (b"set-pool", None),
                 c::Ask::Withdraw { .. } => (b"withdraw", None),
+                c::Ask::SignIn { .. } => (b"connect", None),
+                c::Ask::SignOut { .. } => (b"disconnect", None),
             },
         };
         Self { word, task, to: None, party: None, retry: None }

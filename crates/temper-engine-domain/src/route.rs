@@ -112,6 +112,9 @@ pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, 
         Event::Party(crate::PartyInput::Ask { reply_to, sign_in, key, ask }) => {
             domain.work.push(Work::People(people::Event::Ask { reply_to, sign_in, key, ask }));
         }
+        Event::Party(crate::PartyInput::Key { reply_to, sign_in, key, ask, carried }) => {
+            domain.work.push(Work::Core(core::Event::Key { reply_to, sign_in, key, ask, carried }));
+        }
         Event::Party(crate::PartyInput::Read { reply_to, sign_in, read }) => {
             domain.work.push(Work::Core(core::Event::Read { reply: reply_to, sign_in, read }));
         }

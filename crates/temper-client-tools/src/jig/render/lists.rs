@@ -75,7 +75,8 @@ pub(super) fn tree(delivery: &c::Delivery, book: &Phrasebook, out: &mut Text) {
         | c::Delivery::Run(_)
         | c::Delivery::RunState(_)
         | c::Delivery::Deployment(_)
-        | c::Delivery::OwnerDeployment(_) => unreachable!("tree watch delivers a tree"),
+        | c::Delivery::OwnerDeployment(_)
+        | c::Delivery::OwnerAccounts(_) => unreachable!("tree watch delivers a tree"),
     }
 }
 pub(super) fn next(call: &Call, index: usize, cursor: Option<&c::Cursor>, out: &mut Text) {

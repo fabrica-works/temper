@@ -69,7 +69,8 @@ pub fn holds(condition: &Condition, facts: &Facts<'_>) -> Option<bool> {
         | c::Delivery::Run(_)
         | c::Delivery::RunState(_)
         | c::Delivery::Deployment(_)
-        | c::Delivery::OwnerDeployment(_) => None,
+        | c::Delivery::OwnerDeployment(_)
+        | c::Delivery::OwnerAccounts(_) => None,
     }
 }
 fn task_holds(condition: Condition, task: &c::Task, me: Option<&c::Me>) -> Option<bool> {

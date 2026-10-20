@@ -24,6 +24,9 @@ pub fn party(event: core::Event) -> engine::Event {
         }
         core::Event::People(people::Event::SignOut { reply_to, sign_in }) => PartyInput::SignOut { reply_to, sign_in },
         core::Event::People(event) => unsupported_people(&event),
+        core::Event::Key { reply_to, sign_in, key, ask, carried } => {
+            PartyInput::Key { reply_to, sign_in, key, ask, carried }
+        }
         core::Event::Read { reply, sign_in, read } => PartyInput::Read { reply_to: reply, sign_in, read },
         core::Event::Watch { watcher, sign_in, subject, window } => {
             PartyInput::Watch { watcher, sign_in, subject, window }

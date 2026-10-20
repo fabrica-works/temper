@@ -93,7 +93,7 @@ impl Service {
             return Err(start_problem(b"memory_bytes", what));
         }
         let room = max.checked_mul(6).expect("account routing room");
-        let accounts = accounts_driver(&settings, seeds, accounts, room, store_limits.secrets.value)?;
+        let accounts = accounts_driver(&settings, seeds, accounts, room, &store_limits.secrets)?;
         let mut values =
             values::Values::new(settings.jig.limits.driver.accounts, values::credential_bytes(&settings.jig));
         let wire = translate::limits(&settings.limits).ok_or(start_problem(b"limits", What::Bound))?;
@@ -374,12 +374,12 @@ fn accounts_driver(
     seeds: &settings::Seeds,
     runtime: Option<AccountsRuntime>,
     room: u32,
-    secret_bytes: u32,
+    secrets: &skein_kv::Limits,
 ) -> Result<Option<accounts::Accounts>, Problems> {
-    if settings.jig.llm.accounts.is_empty() {
+    if settings.jig.llm.accounts.is_empty() && settings.jig.llm.providers.is_empty() {
         return Ok(None);
     }
-    Ok(Some(accounts::Accounts::new(&settings.jig, &settings.files, seeds, runtime, room, secret_bytes)?))
+    Ok(Some(accounts::Accounts::new(&settings.jig, &settings.files, seeds, runtime, room, secrets)?))
 }
 fn read_charters(settings: &mut settings::Engine) -> Result<(), Problems> {
     for charter in &mut settings.jig.charters {
@@ -629,10 +629,11 @@ fn memory(
         .checked_add(
             u64::from(identities).checked_mul(temper_protocol_worker_wire::v1::Identity::worst_case_bytes(&wire)?)?,
         )?;
-    if !settings.jig.llm.accounts.is_empty() {
+    if !settings.jig.llm.accounts.is_empty() || !settings.jig.llm.providers.is_empty() {
         let driver = settings.jig.limits.driver;
-        bytes = bytes.checked_add(accounts::worst_case(&driver, queue.checked_mul(3)?)?)?;
+        bytes = bytes.checked_add(accounts::worst_case(&driver, queue.checked_mul(3)?, store.secrets.page.rows)?)?;
     }
+    bytes = bytes.checked_add(accounts::configured_bytes(&settings.jig)?)?;
     if let Some(runtime) = runtime {
         bytes = bytes.checked_add(skein_tls::roots_worst_case(runtime.trust_roots, runtime.trust_root_bytes)?)?;
     }

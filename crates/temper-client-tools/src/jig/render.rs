@@ -78,7 +78,8 @@ impl<'a> Part<'a> {
             | Delivery::OwnerProposal(_)
             | Delivery::Chips(_)
             | Delivery::Deployment(_)
-            | Delivery::OwnerDeployment(_) => None,
+            | Delivery::OwnerDeployment(_)
+            | Delivery::OwnerAccounts(_) => None,
         }
     }
 }

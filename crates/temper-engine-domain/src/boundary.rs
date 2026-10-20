@@ -386,6 +386,14 @@ pub enum PartyInput {
         /// Typed chat request with words bounded by people words before routing.
         ask: people::Ask,
     },
+    /// A keyed account ask whose value is already kept in the secrets store.
+    Key {
+        reply_to: ReplyTo,
+        sign_in: u64,
+        key: [u8; 16],
+        ask: Box<people::Ask>,
+        carried: core::Carried,
+    },
     /// One unkeyed read on a live sign-in, answered after every preceding commit.
     Read {
         reply_to: ReplyTo,

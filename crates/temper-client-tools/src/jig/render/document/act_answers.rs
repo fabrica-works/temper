@@ -197,6 +197,26 @@ pub(super) fn encode_owner_outcome(
     budget: &mut super::Cut,
 ) {
     match value {
+        jig_client::contract::OwnerOutcome::AccountSignInStarted { source, address } => {
+            out.object_start();
+            out.key(b"account_sign_in_started");
+            out.object_start();
+            out.key(b"source");
+            out.unsigned(u64::from(*source));
+            out.key(b"address");
+            out.string(address);
+            out.object_end();
+            out.object_end();
+        }
+        jig_client::contract::OwnerOutcome::AccountSignedOut { confirmed } => {
+            out.object_start();
+            out.key(b"account_signed_out");
+            out.object_start();
+            out.key(b"confirmed");
+            out.boolean(*confirmed);
+            out.object_end();
+            out.object_end();
+        }
         jig_client::contract::OwnerOutcome::Created { .. } => owner_created(value, out, budget),
         jig_client::contract::OwnerOutcome::Compound { .. } => owner_compound(value, out, budget),
         jig_client::contract::OwnerOutcome::MarkedSeen { .. } => owner_marked_seen(value, out, budget),

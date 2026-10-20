@@ -294,7 +294,8 @@ fn populate_page(
                     | Subject::Chips { .. }
                     | Subject::Inbox { .. }
                     | Subject::Tasks { .. }
-                    | Subject::Run { .. } => None,
+                    | Subject::Run { .. }
+                    | Subject::Accounts => None,
                 };
                 if let Some(delivery) = delivery {
                     client::step(

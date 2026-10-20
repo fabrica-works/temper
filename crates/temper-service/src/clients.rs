@@ -531,6 +531,9 @@ fn ended(key: &root::Key) -> Option<u64> {
 
 impl Clients {
     pub fn not_ready(&mut self, value: root::PartyInput) {
+        if let root::PartyInput::Key { carried, .. } = &value {
+            self.down(kit::Event::Application(kit::FromApplication::Unused { number: carried.number }));
+        }
         if let Some(event) = translation::not_ready(value) {
             self.down(event);
         }

@@ -322,7 +322,8 @@ pub(crate) fn changed_delivery(mut delivery: c::Delivery) -> c::Delivery {
         | c::Delivery::OwnerInbox(_)
         | c::Delivery::Run(_)
         | c::Delivery::Deployment(_)
-        | c::Delivery::OwnerDeployment(_) => panic!("fixture subject"),
+        | c::Delivery::OwnerDeployment(_)
+        | c::Delivery::OwnerAccounts(_) => panic!("fixture subject"),
     }
     delivery
 }
