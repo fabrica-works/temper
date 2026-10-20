@@ -91,9 +91,12 @@ pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words:
     builder.style(crate::look::BANNER);
     text(builder, Role::Paragraph, &words.say(crate::words::Word::Brand, &[]), Some(crate::look::BRAND));
     if let Some(word) = unavailable(root) {
+        builder.open(Role::Slot);
+        builder.style(crate::look::CORNER);
         builder.open(Role::Region);
         builder.region(link_region());
         text(builder, Role::Status, &words.say(word, &[]), None);
+        builder.close();
         builder.close();
         builder.close();
         return;
@@ -118,6 +121,8 @@ pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words:
         }
     }
     navigation(builder, root, words, bindings);
+    builder.open(Role::Slot);
+    builder.style(crate::look::CORNER);
     builder.open(Role::Region);
     builder.region(link_region());
     let (status, style) = match root.client().link().state {
@@ -153,6 +158,7 @@ pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words:
     if me.is_some() || root.client().link().sign_out_lost {
         action(builder, Role::Button, &words.say(crate::words::Word::SignOut, &[]), Act::SignOut, false, bindings);
     }
+    builder.close();
     builder.close();
 }
 pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::words::Words, bindings: &mut Bindings) {

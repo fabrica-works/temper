@@ -43,6 +43,8 @@ pub const STATUS_QUIET: Style = Style { owner: owner(), token: 18 };
 pub const TIME: Style = Style { owner: owner(), token: 19 };
 /// The start composer's keyboard hint.
 pub const HINT: Style = Style { owner: owner(), token: 20 };
+/// The banner's corner: link state, person and sign out.
+pub const CORNER: Style = Style { owner: owner(), token: 21 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -69,6 +71,7 @@ pub const NAMES: Names<'static> = Names {
         b"temper-status-quiet",
         b"temper-time",
         b"temper-hint",
+        b"temper-corner",
     ],
     regions: &[b"temper-link"],
 };

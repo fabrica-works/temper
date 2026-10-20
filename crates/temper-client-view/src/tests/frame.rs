@@ -233,3 +233,60 @@ fn the_navigation_marks_only_the_current_page() {
         assert_eq!(found, current);
     }
 }
+
+#[test]
+fn the_signed_in_corner_groups_link_person_and_sign_out_in_order() {
+    let mut root = fixtures::root_in_project(None);
+    let view = fixtures::page_view(&root);
+    assert_corner(&view, &[(Role::Region, None), (Role::Status, Some(b"Pat")), (Role::Button, Some(b"Sign out"))]);
+    fixtures::root_event(&mut root, temper_client_domain::Event::Act { action: Action::Pages(pages::Act::SignOut) });
+    fixtures::root_event(&mut root, temper_client_domain::Event::Client { event: jig_client::Event::SignOutLost });
+    let view = fixtures::page_view(&root);
+    assert_corner(
+        &view,
+        &[
+            (Role::Region, None),
+            (Role::Status, Some(b"Pat")),
+            (Role::Alert, Some(b"Sign out did not reach the engine.")),
+            (Role::Button, Some(b"Sign out")),
+        ],
+    );
+}
+#[test]
+fn the_unavailable_corner_holds_only_the_link_region() {
+    for root in [fixtures::signed_out(), fixtures::out_of_date()] {
+        let view = fixtures::page_view(&root);
+        assert_corner(&view, &[(Role::Region, None)]);
+    }
+}
+
+fn assert_corner(view: &crate::View, children: &[(Role, Option<&[u8]>)]) {
+    let nodes = view.tree().nodes();
+    let mut corner = None;
+    let mut banner_end = 0;
+    for (index, node) in nodes.iter().enumerate() {
+        if node.role == Role::Banner {
+            banner_end = index.checked_add(usize::try_from(node.size).expect("banner size")).expect("banner end");
+        }
+        if node.styles.as_slice().contains(&crate::look::CORNER) {
+            assert!(corner.is_none(), "one corner");
+            assert_eq!(node.role, Role::Slot);
+            assert!(index < banner_end, "corner is inside banner");
+            corner = Some(index);
+        }
+    }
+    let corner = corner.expect("corner");
+    let end = corner.checked_add(usize::try_from(nodes[corner].size).expect("corner size")).expect("corner end");
+    assert_eq!(end, banner_end, "corner finishes the banner");
+    let mut index = corner.checked_add(1).expect("first child");
+    for (role, name) in children {
+        let node = &nodes[index];
+        assert_eq!(node.role, *role);
+        assert_eq!(node.name.as_deref(), *name);
+        if *role == Role::Region {
+            assert_eq!(node.region, Some(crate::frame::link_region()));
+        }
+        index = index.checked_add(usize::try_from(node.size).expect("child size")).expect("next child");
+    }
+    assert_eq!(index, end, "no loose corner contents");
+}
