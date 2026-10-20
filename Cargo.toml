@@ -6,6 +6,7 @@ members = [
     "tests/real-loop",
     "crates/temper-box",
     "tools/live-login",
+    "tools/fake-claude",
     "tests/one-process",
     "testing/temper-fake-git",
     "crates/temper",

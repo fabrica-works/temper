@@ -12,6 +12,7 @@ pub fn configuration(directory: &Path, programs: Option<&Path>, executable: &Pat
     fs::write(directory.join("root.der"), skein_tls_world::pki::ROOT).expect("public trust");
 }
 
+#[must_use]
 pub fn refused(directory: &Path, name: &std::ffi::OsStr) -> String {
     temper::run(temper::Command::ProgramLogin { configuration: directory.join("config.json"), name: name.into() })
         .expect_err("login refused")

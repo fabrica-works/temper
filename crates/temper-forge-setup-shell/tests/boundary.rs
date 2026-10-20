@@ -6,6 +6,18 @@ fn forbidden(source: &str) -> bool {
         || compact.contains("process::") && compact.contains("usestd::{")
         || ["CommandExt", "try_lock", "lock_shared", ".lock()"].iter().any(|name| compact.contains(name))
 }
+fn forbidden_at(path: &Path, source: &str) -> bool {
+    let source = if path.ends_with("temper/src/main.rs") {
+        source.replace("std::process::ExitCode", "ExitCode").replace("process::ExitCode", "ExitCode")
+    } else if path.ends_with("temper/src/program_login.rs") {
+        // Terminal sign-in execs smith's command (protocol/credentials.md, 3).
+        // Other process types and every lock operation retain the same guard.
+        source.replace("std::process::Command", "TerminalCommand").replace("process::CommandExt", "TerminalExec")
+    } else {
+        source.into()
+    };
+    forbidden(&source)
+}
 fn scan(directory: &Path) {
     for entry in fs::read_dir(directory).expect("source directory") {
         let path = entry.expect("source entry").path();
@@ -19,17 +31,12 @@ fn scan(directory: &Path) {
                 continue;
             }
             let source = fs::read_to_string(&path).expect("Rust source");
-            let source = if path.ends_with("temper/src/main.rs") {
-                source.replace("std::process::ExitCode", "ExitCode").replace("process::ExitCode", "ExitCode")
-            } else {
-                source
-            };
-            assert!(!forbidden(&source), "process or lock outside its boundary: {}", path.display());
+            assert!(!forbidden_at(&path, &source), "process or lock outside its boundary: {}", path.display());
         }
     }
 }
 #[test]
-fn std_process_and_file_locks_appear_only_in_the_process_module() {
+fn process_and_file_locks_stay_in_their_declared_modules() {
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("crates");
     for entry in fs::read_dir(crates).expect("crates") {
         let source = entry.expect("crate").path().join("src");
@@ -40,13 +47,19 @@ fn std_process_and_file_locks_appear_only_in_the_process_module() {
 }
 #[test]
 fn the_scan_catches_each_form_and_passes_other_process_modules() {
-    for (source, expected) in [
-        ("use std::{fs, process::Child};", true),
-        ("std::process::exit(1)", true),
-        ("CommandExt", true),
-        ("try_lock", true),
-        ("smith::process::Event", false),
+    for (path, source, expected) in [
+        ("other.rs", "use std::{fs, process::Child};", true),
+        ("other.rs", "std::process::exit(1)", true),
+        ("other.rs", "CommandExt", true),
+        ("other.rs", "try_lock", true),
+        ("other.rs", "smith::process::Event", false),
+        ("temper/src/program_login.rs", "std::process::Command", false),
+        ("temper/src/program_login.rs", "use std::os::unix::process::CommandExt;", false),
+        ("temper/src/program_login.rs", "std::process::Child", true),
+        ("temper/src/program_login.rs", "std::process::exit(1)", true),
+        ("temper/src/program_login.rs", "try_lock", true),
+        ("other.rs", "std::process::Command", true),
     ] {
-        assert_eq!(forbidden(source), expected, "{source}");
+        assert_eq!(forbidden_at(Path::new(path), source), expected, "{path}: {source}");
     }
 }

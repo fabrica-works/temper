@@ -415,11 +415,19 @@ and 10).
 
 `program_login_execs_the_configured_fake_claude` and its refusal row run
 `temper program-login` against smith’s pinned `fake-claude`, with no engine
-or deployment secrets, each within five seconds. Build that binary through
-`heavy cargo build -p smith-fake-claude --bin fake-claude`, then pass its
-absolute path as `TEMPER_TEST_CLAUDE` when running these process tests.
+or deployment secrets, each within five seconds. `tools/fake-claude`
+(`temper-fake-claude`) supplies only an executable entry point calling
+`smith_fake_claude::main()` at the pinned smith revision. The process proof's
+`scripts/proof-one-process.sh` builds it beside temper with
+`cargo build -p temper --bin temper -p temper-fake-claude --bin fake-claude`
+and exports `TEMPER_TEST_CLAUDE="$(pwd)/target/debug/fake-claude"` before
+nextest. Run the proof through heavy; a focused login run uses that same
+build and absolute path with nextest's process profile and
+`-E 'test(/^program_login_/)'`.
 The shell’s lower tests cover validation, directory checks at each name,
 creation and the command’s arguments and environment before execution.
+The refusal story also checks a failed exec: only secret-free `smith: `
+diagnostics may precede temper's one final `temper program-login:` line.
 
 `crates/temper/tests/process.rs`, after jig's reference binary's (jig's
 `protocol/service.md`, section 8): temper as it ships, as processes.

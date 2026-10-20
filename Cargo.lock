@@ -2597,6 +2597,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-fake-claude"
+version = "0.0.0"
+dependencies = [
+ "smith-fake-claude",
+]
+
+[[package]]
 name = "temper-fake-git"
 version = "0.0.0"
 dependencies = [
