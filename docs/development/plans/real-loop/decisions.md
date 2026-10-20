@@ -899,6 +899,9 @@ pass:
 
      The adoption story alone is 22% of the sum. Work on it belongs to temper's owner, past this run (the director's message of 2026-10-20T10:03Z: new work goes to owners). The run is done either way (Done when 5).
 
+152. **The supervisor's scratch worktrees are removed** (process, the cleanup's block of 2026-10-20T16:06:53Z).
+     The supervisor's two ready-check scratch worktrees, wt/temper-09r and wt/temper-10r, held only the checks' sketches (09's at 28aef8f70, 10's at 60e76617d); the steps they checked landed long since (09.1 to 09.3, 10.1 and 10.2). The supervisor saved each diff to tmp/scratch-worktrees/ and removed both with `git worktree remove --force`. wt/ is empty: the release goes on.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
