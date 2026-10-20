@@ -832,6 +832,11 @@ pass:
      - The fixes inside 13.5's Files made under ruling 140 (the tools' row bound, the delegate decoder, the builder window) stay, each named in the commit body with the run that found it.
      - The budget starts afresh for what comes after this fix: a further symptom gets the README rule's three diagnostic runs, then eight runs and 40 minutes, through `heavy`, diagnostics removed before the commit. Then 13.5's Proof, clippy, the dependent tests and the three measurements, as its session file says.
 
+144. **No other task's environment** (the director's rule of 2026-10-20T13:04Z).
+     Amends: the README's "Rules of this plan" (new rule "No other task's environment").
+
+     The director's security rule of 2026-10-20T13:04Z, to every owner and supervisor: heavy queues each task on pueue with its caller's whole environment, and `pueue status --json` and `pueue log` print every queued task's environment, other sessions' included; Codex tasks on another machine ran them, and local Claude messaging tokens reached Codex's context. Until o/hygiene's heavy fix lands on this machine, no prompt given to Codex or any other agent may run `pueue status`, `pueue log`, or read another process's environment (`/proc/*/environ`, `ps e`), and every Codex prompt says so; heavy's own output and its log path are read instead. The README's new rule "No other task's environment" holds it for every role of this run and each prompt it writes, until a ruling says the fix is in the run's kit.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
