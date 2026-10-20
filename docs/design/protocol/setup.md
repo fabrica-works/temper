@@ -446,10 +446,13 @@ files: at a first preparation, and for a runner older than its pin
    admin with a password Forgejo draws and nobody keeps, and its token
    made by `admin user generate-access-token` into `admin_token`, the
    handover (section 3), with the scopes `write:admin`,
-   `write:organization` and `write:user` (the scopes the conformance
-   records reconcile's routes under; skein's `forge-setup.md`, section
-   8, says which route needs which), under a name that ends in a random
-   suffix, since Forgejo refuses a second token of one name; the
+   `write:organization`, `write:repository` and `write:user` (skein's
+   `forge-setup.md`, section 8, says which of reconcile's routes needs
+   which; it names none for the repositories' routes of `Adopt`,
+   reconcile's step 6 and the picker's read, its 4.5 and 4.8, which
+   Forgejo refuses 403 without `write:repository`), under a name that
+   ends in a random suffix, since Forgejo refuses a second token of one
+   name; the
    person's account, a site admin with a password Forgejo draws into
    `person_password`, to change at their first sign-in; the runner's
    secret drawn into `runner/secret` (40 hexadecimal digits, no line
@@ -1189,10 +1192,13 @@ Each is intended; what it needs is named with it.
   Default: refused, naming `application.setup`, since the bot's login
   and email are the configuration's (5.5).
 - **The scopes of a managed forge's admin's token.** Default: the
-  preparation's, `write:admin`, `write:organization` and `write:user`
-  (6.3), as `docs/guide/forgejo.md` asks; skein's facts (`forge-setup.md`, section 8)
-  name `write:admin` for the token routes and a user scope for `GET
-  /user`, and none for the repositories' routes `Adopt` calls.
+  preparation's, `write:admin`, `write:organization`,
+  `write:repository` and `write:user` (6.3), as `docs/guide/forgejo.md`
+  asks; skein's facts (`forge-setup.md`, section 8) name `write:admin`
+  for the token routes and a user scope for `GET /user`, and none for
+  the repositories' routes `Adopt` calls. Forgejo refuses those routes
+  403 to an admin's token without `write:repository`, so it is in the
+  list until skein records which scope they need.
 - **A start's reconcile that stops.** Default: that forge is not
   connected, named with its step, until the next start or a managed
   connect; the engine runs no reconcile again within a process.
