@@ -53,6 +53,11 @@ section 16; connecting GitHub, section 17.
   exits, and stops them in reverse order. It names no Forgejo request
   and nothing of setup but its steps. systemd, QA's environments or a
   test arrange the same commands another way (section 7).
+- **`temper init` writes a deployment that starts** into the three
+  directories (configuration.md, section 12): the default document, its
+  charters, its agent's configuration and the worker's secret; no
+  account and no credential, which are the client's. `temper box` runs
+  it first on an empty configuration directory (8.2, 8.3).
 - **Reconcile converges at every start** of a managed or owned Forgejo,
   in the engine: the bot user, made when missing and otherwise checked,
   never edited; its two tokens; an owned forge's person's orgs; and each
@@ -438,7 +443,7 @@ private, never edited by hand:
 
 ### 6.3 The preparation
 
-`temper forge prepare CONFIG.json FORGE`, before Forgejo runs. It takes
+`temper forge prepare [DIRECTORIES] FORGE`, before Forgejo runs. It takes
 Forgejo's lock (6.4), and the runner's too when it writes the runner's
 files: at a first preparation, and for a runner older than its pin
 (item 3) or added (item 4); checks the binaries; and decides by
@@ -521,7 +526,7 @@ files: at a first preparation, and for a runner older than its pin
 
 ### 6.4 Running
 
-`temper forge run CONFIG.json FORGE forgejo|runner`:
+`temper forge run [DIRECTORIES] FORGE forgejo|runner`:
 
 - **Checks** the binary, and that `state` records a preparation at the
   pinned versions, with a runner exactly when the setup has one;
@@ -588,18 +593,29 @@ files: at a first preparation, and for a runner older than its pin
 
 ### 7.1 What it runs
 
-`temper box CONFIG.json` runs the configuration's steps, which
+`temper box [DIRECTORIES]` runs the configuration's steps, which
 `temper-forge-setup`'s `steps` gives, each a command of the `temper`
-binary, as a child process:
+binary, as a child process given the box's three directories as flags,
+`--config C --data D --cache K`, each absolute (configuration.md,
+section 12), written `DIRS` below:
 
 ```
-temper box CONFIG.json
-├── temper forge prepare CONFIG.json 2        once, per owned forge
-├── forgejo web                               long: temper forge run CONFIG.json 2 forgejo
-├── forgejo-runner daemon                     long: temper forge run CONFIG.json 2 runner
-└── temper serve CONFIG.json                  long: its own tree (README.md, section 4); its setup
-                                              host takes each handover and reconciles (section 5)
+temper box
+├── temper forge prepare DIRS 2       once, per owned forge
+├── forgejo web                       long: temper forge run DIRS 2 forgejo
+├── forgejo-runner daemon             long: temper forge run DIRS 2 runner
+└── temper serve DIRS                 long: its own tree (README.md, section 4); its setup
+                                      host takes each handover and reconciles (section 5)
 ```
+
+- **An empty configuration directory,** absent or with no entry, is
+  written first by `temper init` (8.2), in the box's own process, before
+  the document is read; the box says so on stderr, `box: wrote the
+  configuration, <path>`, and goes on to its steps. Otherwise the box
+  never writes the document: a configuration directory with entries but
+  no document is refused as every command refuses it.
+- **The default document's steps** are `temper serve` alone: it has no
+  owned forge (8.3).
 
 ### 7.2 What it does
 
@@ -640,9 +656,10 @@ temper box CONFIG.json
 - **Steps only:** each step's name, its arguments and whether it is once
   or long. Its policy is a small machine of its own (steps, exits and
   timers in; spawns, signals and closes out), hosted on skein-io.
-- **The binary hands it the steps.** `temper box` checks the document as
-  section 8 says, asks `temper-forge-setup` for its steps, and gives them
-  to `temper-box`.
+- **The binary hands it the steps.** `temper box` resolves its three
+  directories, runs `temper init` when the configuration directory is
+  empty (7.1), checks the document as section 8 says, asks
+  `temper-forge-setup` for its steps, and gives them to `temper-box`.
 - **Checked:** a boundary test fails the gate when `temper-box` depends
   on a crate named `temper-*` but `temper-forge-setup`, or names an item
   of it but `steps` and `Step`.
@@ -666,8 +683,9 @@ Each needs nothing below the commands to change:
 
 ## 8. The configuration
 
-- **One document,** `temper serve`'s (configuration.md, section 2).
-  Every `temper forge` command and `temper box` read it whole, check it
+- **One document,** `temper serve`'s, `temper.json` in the
+  configuration directory (configuration.md, sections 2 and 12). Every
+  `temper forge` command and `temper box` read it whole, check it
   as configuration.md, section 8 says, `setup` among it, and act on
   their part: they read no file but their own part's.
 - **`application.setup`,** a list, at most one entry per forge:
@@ -693,10 +711,10 @@ Each needs nothing below the commands to change:
   | Member | Type | Bounds |
   |---|---|---|
   | `forge` | u16 | the `number` of one entry of `forges`, of kind Forgejo |
-  | `directory` | a path | when owned, and only then: a private directory (section 3), unique among `setup` |
+  | `directory` | a data path (configuration.md, section 12) | when owned, and only then: a private directory (section 3), unique among `setup` |
   | `bot` | `{"login", "email"}` | a Forgejo login; an email, the bot's when reconcile makes it (5.6) |
   | `mode` | `"managed"` or `{"owned": ...}` | managed: temper may be given a site admin's token for the forge from the client (5.5) |
-  | `owned.forgejo`, `owned.runner.binary` | absolute paths | checked against the pins of 6.1 |
+  | `owned.forgejo`, `owned.runner.binary` | cache paths (configuration.md, section 12) | checked against the pins of 6.1 |
   | `owned.runner` | the runner's members, or null for none | `capacity` at least 1; `labels` at least one, at most 8 |
   | `owned.listen` | an address, jig's format | a socket address on loopback; unique among the deployment's listeners and owned forges |
   | `owned.person` | `{"login", "email", "orgs"}` | a Forgejo login other than the bot's and `temper-admin`; `orgs` at least one, at most `setup.orgs`, each a Forgejo org name |
@@ -724,19 +742,24 @@ Each needs nothing below the commands to change:
   forge's handover (section 3).
 - **An owned example** ships for a person, a test or QA's host to start
   from (8.1).
+- **`temper init`** writes a deployment that starts (8.2), with the
+  default document (8.3).
 
 ### 8.1 The owned example
 
-`docs/examples/owned.json` is a whole document, `engine`, `workers` and
-`application`, for one owned forge with a runner, webhooks, one git
-identity, one worker and two LLM providers, with no LLM account: a
-person adds one from the client once the deployment has started
-(credentials.md, section 3). The files it names that hold no secret are
-beside it, in `docs/examples/owned/`: the agent's configuration and the
-charters, short texts a person edits. The files that hold a secret, the
-worker's secret and its digest, are never shipped: `docs/guide/box.md`
-says how each is made. A person, a test or QA's host
-starts from a copy, and `temper box CONFIG.json` runs it (section 7).
+`docs/examples/owned/` is a configuration directory (configuration.md,
+section 12). Its document, `temper.json`, is a whole one, `engine`,
+`workers` and `application`, for one owned forge with a runner,
+webhooks, one git identity, one worker and two LLM providers, with no
+LLM account: a person adds one from the client once the deployment has
+started (credentials.md, section 3). Beside it are the files it names
+that hold no secret: the agent's configuration, `agent.json`, and the
+charters, `charters/`, short texts a person edits. The files that hold
+a secret, the worker's secret and its digest, are data paths and never
+shipped: `docs/guide/box.md` says how each is made in the data
+directory. A person, a test or QA's host starts from a copy, edits the
+agent's absolute paths to the copy's, and `temper box --config COPY`
+runs it (section 7).
 
 - **Its forge,** forge 1, is owned, in `forge-1`, with a runner whose
   label is `temper-host:host`, the bot `temper`, and the person `ada`,
@@ -851,6 +874,105 @@ starts from a copy, and `temper box CONFIG.json` runs it (section 7).
   the clients' listener's (`127.0.0.1:7100`) and the webhooks'
   listener's (`127.0.0.1:7101`), are what a host changes to run several
   boxes on one machine, with each box's directories.
+
+### 8.2 `temper init`
+
+`temper init [DIRECTORIES]` writes a deployment that starts, from its
+three directories (configuration.md, section 12) and what it finds on
+the machine. `temper box` runs it first when the configuration
+directory is empty (7.1).
+
+- **Refused,** exit 1, before it writes anything, naming the file: when
+  the configuration directory holds `temper.json`, or the data
+  directory holds `worker.secret` or `worker.digest`, or no `git` is on
+  `PATH` (below). It never replaces a file; a person who starts again
+  removes them.
+- **Its directories:** the data and cache directories made and checked
+  as every command makes and checks them (configuration.md, section
+  12), and the configuration directory made the same way when absent;
+  an existing configuration directory is taken as it is.
+- **Its files,** each created new, in this order, the document last, so
+  that a configuration directory holding one holds them all:
+
+  | File | Directory | Mode | What it is |
+  |---|---|---|---|
+  | `worker.secret` | data | 0o600 | 32 bytes from the kernel's random source, as 64 lowercase hexadecimal digits and a newline |
+  | `worker.digest` | data | 0o600 | the SHA-256 of the secret's digits without its newline, as 64 lowercase hexadecimal digits and a newline, as `docs/guide/box.md` makes it |
+  | `charters/chat.txt`, `charters/coding.txt` | configuration | 0o644 | the charters' instructions, the owned example's |
+  | `agent.json` | configuration | 0o644 | smith's agent configuration (configuration.md, section 5): the owned example's endpoints, models and profile (8.1); Claude Code's program at the `claude` found on `PATH`, and its programs directory, `programs` in the data directory; with no `claude` on `PATH`, no program, and Anthropic's models by key alone |
+  | `temper.json` | configuration | 0o644 | the default document (8.3) |
+
+- **What it finds,** each written absolute:
+  - *the binary,* the running `temper`'s own path: the worker's agent's
+    `program`, with `arguments` `["agent", <configuration>/agent.json]`
+    and `configuration` that same path (configuration.md, section 5);
+  - *git,* the `git` found on `PATH`: the worker's `git`;
+  - *the bundle,* `<the binary's directory>/../share/temper/bundle` when
+    it holds `index.html`: `clients.bundle`; else `null`, and init says
+    the browser is not served;
+  - *the clients' listener's port:* 8367, when a socket binds
+    `127.0.0.1:8367`, else the port the kernel assigns to a bind of port
+    0; the socket is closed, and the port written fixed, as a GitHub
+    forge requires (configuration.md, section 3). A later start on a
+    port taken is refused, naming it and the document, as any start is.
+- **What it says,** on stderr: `init: wrote <path>` for each file;
+  `init: no bundle at <path>: the browser is not served` when there is
+  none; and last, `init: start it with temper box`, with the flags init
+  was given. Its stdout is empty; exit 0.
+- **Nothing else:** no account, no forge credential, no repository and
+  no store. The engine's first start makes its store; accounts, forges
+  and repositories are the client's (credentials.md, section 3;
+  `../client/forge.md`).
+- **Its code:** `temper-init`, step code (section 11): given the facts
+  above, the three directories and the secret's 32 bytes, it answers
+  the files, each with its directory, its name, its bytes and whether it
+  is private; it reads, writes and binds nothing. The binary's `init`
+  finds the facts, checks the refusals and writes the files, on
+  skein-io.
+- **Checked:** temper-init's step tests check that its `engine.llm` is
+  the owned example's, that the digest is the secret's, and the files'
+  names, directories and order. The binary's crate tests, on scratch
+  directories, check that the document init writes passes
+  configuration.md, section 8, as `temper serve` checks it, with the
+  agent's configuration it writes, at 8367 and at a kernel's port, with
+  and without `claude` and a bundle; each refusal writing nothing; and
+  the files' modes. The process tier starts a box on empty directories
+  (13.4).
+
+### 8.3 The default document
+
+A working minimum, for the mechanics and a person's first run; good
+defaults for a person's real work are open (section 16).
+
+- **Its forges,** each by its stable number (configuration.md, section
+  3): 2, GitHub, at GitHub's addresses, with one git identity whose
+  members are GitHub's defaults, not connected until the person
+  connects it from the client (section 17). The numbers 1 and 3 are
+  held, for a demo forge and for an owned Forgejo set up from the client
+  (temper's `draft/first-run.md`, 3.5 and 3.8), so that a later default
+  adds them under their numbers. No `setup` entry and no webhooks'
+  listener: GitHub's hints come from its App's delivery log.
+- **Its LLM providers:** the owned example's `engine.llm`, whole (8.1),
+  with no account.
+- **One project,** number 1, adopting nothing until the person adopts
+  a repository from the client. Its landing rule covers every
+  repository of the GitHub forge, the pattern `{"segments": ["forge",
+  "github.com"], "last": "open", "value": ""}`, `enforce`d, with `ci`
+  and `up_to_date`, and no gate or approval: a change lands on green CI
+  with no person in between. Its owner's grants, the rules' ceiling and
+  its projections are the owned example's, on that pattern in place of
+  the org's.
+- **Its charters and templates,** the owned example's: chat, 1, and
+  coding, 2, the one the forge's procedures start agents' work under
+  (`application.charter`); the templates `chat` and `goal`.
+- **One worker,** in the process, its `root` `workspaces` in the data
+  directory; the deployment's directory `deployment` in the data
+  directory; the clients' listener `127.0.0.1:<port>` (8.2).
+- **Its limits:** the owned example's (8.1). Its `memory_bytes` are
+  derived as the owned example's are, with its own strings at their
+  bounds, two literals of `temper-init`'s checked by its tests the same
+  way.
+- **Its box's steps:** `temper serve` alone (7.1).
 
 ## 9. Credentials
 
@@ -974,7 +1096,10 @@ temper-box                   the box's machine (step code) and its host (ordinar
 │                              subset's lints, its host written within the subset
 ├── temper-forge-setup
 └── skein-lib, skein-io, skein-shell
-temper                       the binary: temper forge prepare|run, temper box
+temper-init                  step code: the default document and the files temper init writes, from
+│                              the facts the binary finds (8.2, 8.3); reads, writes and binds nothing
+└── skein-lib, skein-json
+temper                       the binary: temper forge prepare|run, temper box, temper init
 ```
 
 - **The engine runs the setup host** in its protocol layer (5.1):
@@ -1122,6 +1247,10 @@ the preparation relies on stays here:
 The tier, its budget and its referee are `../domain/testing.md`'s (2.6). What
 it checks of this document:
 
+- **Its directories:** every command a test runs is given the three
+  directories' flags, each a scratch directory of the test's own; the
+  owned example is copied as a configuration directory (8.1). No test
+  resolves a default under `$HOME`.
 - **Owned in place of the test's support:** the test runs `temper forge
   prepare`, `run forgejo` and `run runner` itself, then `temper serve`,
   whose setup host takes the handover and reconciles, with the binaries
@@ -1138,6 +1267,9 @@ it checks of this document:
 - **`temper box`,** a test of its own on a scratch directory: the sign-in
   link on its stdout; Forgejo killed and restarted, with the engine still
   serving; a stop leaving no process it started.
+- **A first run,** a test of its own: `temper box` on three empty
+  scratch directories writes the configuration (8.2), says so, and
+  prints a sign-in link that signs the owner in.
 
 ## 15. Later
 
@@ -1169,8 +1301,9 @@ Each is intended; what it needs is named with it.
 
 ## 16. Open questions
 
-- **A command that writes the document** (`temper box init`). Default:
-  the owned example only.
+- **Good defaults for a person's real work:** charters, landing rules,
+  limits, the memory bound. Default: 8.3's working minimum, refined once
+  a first run works.
 - **Overrides of `app.ini`.** Default: none; the settings are temper's.
 - **A token for the person's scripts and agents.** Default: none; the
   person makes one on Forgejo's web, with the scopes they choose. A QA

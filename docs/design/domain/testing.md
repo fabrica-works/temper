@@ -510,11 +510,16 @@ and 10).
   (../protocol/setup.md, 13.4): `temper box` on the owned example prints the
   sign-in link on its stdout; Forgejo killed is restarted by the box, with
   the engine still serving; a stop leaves no process the box started.
+- **A first run,** a test of its own (../protocol/setup.md, 13.4):
+  `temper box` on three empty scratch directories writes the
+  configuration (../protocol/setup.md, 8.2), says so on stderr, and
+  prints a sign-in link that signs the owner in.
 - **`temper program-login`,** a sixth test, on a scratch directory of
   its own (../protocol/credentials.md, section 3): on the owned example
   with Claude Code's path at smith's fake `claude`, `temper
-  program-login CONFIG.json live` makes the programs directory and
-  `live` in it, each `0o700`, and replaces itself with the fake's `auth
+  program-login live`, given the test's three directories, makes the
+  programs directory and `live` in it, each `0o700`, and replaces
+  itself with the fake's `auth
   login`, which observes `CLAUDE_CONFIG_DIR` at that directory and none
   of the program's credential variables, and writes its login there;
   the command's exit status is the fake's. A name out of bounds, and a
@@ -570,8 +575,9 @@ and 10).
 section 8; testing-strategy.md, 2.9).
 
 - **What runs:** the process tier's binary, owned Forgejo, real git and
-  person, with a real model: the live configuration, `live.json`, is
-  the owned example's (../protocol/setup.md, 8.1), its LLM providers'
+  person, with a real model: the live configuration, a configuration
+  directory (../protocol/configuration.md, section 12), is the owned
+  example's (../protocol/setup.md, 8.1), its LLM providers'
   endpoints the providers' own and Claude Code's path the machine's
   `claude`. Each run is a fresh deployment, with no LLM account until
   the script adds one, in place of the process tier's key (2.6, step
@@ -580,7 +586,8 @@ section 8; testing-strategy.md, 2.9).
   account, Claude Code's login by default, since it needs nobody.
 - **Claude Code, unattended** (the default). The live configuration's
   programs directory is `~/.local/state/temper/live/programs`. The
-  developer runs `temper program-login live.json live` once on each
+  developer runs `temper program-login --config LIVE live`, `LIVE` the
+  live configuration's directory, once on each
   machine that runs the tier, and signs in as Claude Code asks
   (../protocol/credentials.md, section 3). Each run's deployment declares
   the program source `live` (`temper ctl DIRECTORY declare 2 claude_code

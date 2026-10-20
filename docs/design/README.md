@@ -68,7 +68,7 @@ CI and an agent's review, and lands with no person in between.
 
 One story:
 
-1. `temper serve CONFIG.json` runs on a deployment's directory,
+1. `temper serve` runs on a deployment's directories,
    configured for one Forgejo (with Actions, or with project checks), one
    git identity, one worker and its LLM providers, never an account
    (`protocol/configuration.md`; `protocol/credentials.md`, sections 3

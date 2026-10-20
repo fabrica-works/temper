@@ -146,19 +146,25 @@ from jig's reference binary. Its commands, `temper ctl`'s as
 `../client/tools.md` designs them:
 
 ```
-temper serve CONFIG.json
+temper serve [DIRECTORIES]
+temper init [DIRECTORIES]
 temper agent AGENT.json
 temper open DIRECTORY LINK_OR_ADDRESS
 temper ctl DIRECTORY TOOL [ARGUMENT...] [--json]
 temper ctl DIRECTORY --call FILE [--json]
 temper ctl help [TOOL]
-temper program-login CONFIG.json NAME
-temper forge prepare CONFIG.json FORGE
-temper forge run CONFIG.json FORGE forgejo|runner
-temper box CONFIG.json
+temper program-login [DIRECTORIES] NAME
+temper forge prepare [DIRECTORIES] FORGE
+temper forge run [DIRECTORIES] FORGE forgejo|runner
+temper box [DIRECTORIES]
 ```
 
-- **`temper serve CONFIG.json`:** reads the configuration (configuration.md,
+`DIRECTORIES` is `[--config DIR] [--data DIR] [--cache DIR]`, given
+anywhere among the command's arguments, each with its variable and its
+default; the document is `temper.json` in the configuration directory
+(configuration.md, section 12).
+
+- **`temper serve`:** reads the configuration (configuration.md,
   section 2), opens the store in the deployment's directory, and runs
   the engine's and the worker's services in one process on skein's
   `Host` and `drive` (jig's `protocol/service.md`, sections 4 and 10).
@@ -169,6 +175,9 @@ temper box CONFIG.json
     notes and the reason of a failure.
   - A first termination signal drains it (jig's `protocol/service.md`,
     section 5); a second turns the drain into an abort.
+- **`temper init`:** writes a deployment that starts, the default
+  document among it, into the three directories, refusing when the
+  configuration directory holds a document (setup.md, 8.2).
 - **`temper agent AGENT.json`:** smith's agent shell,
   `smith_agent_shell::run`, on smith's agent configuration
   (configuration.md, section 5). The worker's protocol layer spawns it,
@@ -178,7 +187,7 @@ temper box CONFIG.json
 - **`temper ctl DIRECTORY ...`:** the agents' tools, one call per
   process, over the same native transport as `temper open`
   (`../client/tools.md`, section 8). It reads no configuration file.
-- **`temper program-login CONFIG.json NAME`:** a program's login for
+- **`temper program-login NAME`:** a program's login for
   the program source NAME, on this host: it checks the document and the
   agent's configuration, makes the source's configuration directory, and
   replaces itself by the program's own sign-in (credentials.md, section
@@ -208,7 +217,7 @@ temper box CONFIG.json
 Standalone, one person's machine:
 
 ```
-temper serve CONFIG.json               one process, one loop: temper-service's system module
+temper serve                           one process, one loop: temper-service's system module
 ├── the engine's service               section 6
 │   ├── listens: the in-process name "workers"; the clients' listener and, when configured, the webhooks' listener, TCP on loopback
 │   └── connects: each configured forge's API (HTTP; TLS unless the forge is on loopback)
@@ -218,7 +227,7 @@ temper serve CONFIG.json               one process, one loop: temper-service's s
 └── git ...                              a child process per git invocation, in a process group of its own (git.md, section 7)
 temper open DIRECTORY LINK_OR_ADDRESS  a process of its own, reaching the engine on loopback
 temper ctl DIRECTORY TOOL ...          a process per call, reaching the engine on loopback
-temper program-login CONFIG.json NAME  run by hand on a host, replaced by the program's sign-in
+temper program-login NAME              run by hand on a host, replaced by the program's sign-in
 ```
 
 A box runs `temper serve` as one of its steps, after the forge's setup's

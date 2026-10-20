@@ -313,11 +313,12 @@ sources in its holder's order. temper configures the LLM providers
   every login kept on its host. A standalone deployment's one worker,
   on its person's machine, keeps that person's logins alone, and is
   unaffected.
-- **`temper program-login CONFIG.json NAME`:**
+- **`temper program-login [DIRECTORIES] NAME`:**
   - `NAME` is a program source's name, 1 to 32 of `a` to `z`, `0` to `9`
     and `-` (jig's `domain/accounts.md`, 3.4), as the accounts page and
     `temper ctl declare` give it with this command.
-  - It reads and checks `CONFIG.json` as `temper serve` does
+  - It reads and checks the document in its configuration directory
+    (configuration.md, section 12) as `temper serve` does
     (configuration.md, section 8), and the agent's configuration it
     names, reading no secret file; it opens no store, starts no service
     and sends nothing to the engine, which need not run.

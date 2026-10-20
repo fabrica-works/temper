@@ -319,7 +319,7 @@ keeps (`../protocol/configuration.md`, section 2).
   watch. Declaring a program's login asks its name, 1 to 32 of `a` to
   `z`, `0` to `9` and `-`, `claude-` and the person's first name by
   default (`claude-alice`), and shows the command to run
-  on each host, `temper program-login CONFIG.json NAME`
+  on each host, `temper program-login NAME`
   (`../protocol/credentials.md`, section 3).
 - **The forges' page** is the forge's part of the deployment's
   connectors (jig's `client/domain/pages.md`, section 7), on a page of

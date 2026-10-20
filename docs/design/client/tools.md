@@ -427,7 +427,7 @@ area lands with its stories (section 11).
    | `add-key PROVIDER FILE [--account A] [--deployment]` | adds a key read from FILE: to account A, or as a new key-only account; the deployment's with `--deployment`, by an owner | add a key | yes |
    | `replace-key ACCOUNT FILE` | replaces the account's key with the one read from FILE | replace a key | |
    | `forget ACCOUNT [--source S]` | removes a source, or the account with every source, each signed out as `disconnect` does | remove | |
-   | `declare PROVIDER ADAPTER NAME [--account A]` | declares a program's login under the source's NAME (1 to 32 of `a` to `z`, `0` to `9` and `-`): a new account, or a source of account A; the answer names the command to run on each host, `temper program-login CONFIG.json NAME` (`../protocol/credentials.md`, section 3) | declare a program's login | yes |
+   | `declare PROVIDER ADAPTER NAME [--account A]` | declares a program's login under the source's NAME (1 to 32 of `a` to `z`, `0` to `9` and `-`): a new account, or a source of account A; the answer names the command to run on each host, `temper program-login NAME` (`../protocol/credentials.md`, section 3) | declare a program's login | yes |
    | `verify ACCOUNT [--source S]` | has each host check a program source's login now; answered once asked, then `wait accounts --until settled` | check | |
    | `rank ACCOUNT POSITION [--source S]` | the account's place among its holder's accounts of its LLM provider, from 1; with `--source`, the source's place in the account's order | order | |
    | `retry ACCOUNT [--source S]` | resumes a limited source, so that the runs it holds start again | resume | |
@@ -912,7 +912,8 @@ The deployment an agent drives is an owned setup run by `temper box`
 (`../protocol/setup.md`, section 7), in a scratch directory of the QA
 harness's:
 
-- **Started:** `temper box CONFIG.json`; its stdout carries `temper
+- **Started:** `temper box`, given the harness's three directories
+  (`../protocol/configuration.md`, section 12); its stdout carries `temper
   serve`'s sign-in links, and the harness passes the first to `temper
   ctl DIRECTORY sign-in -` on stdin.
 - **The deployment's LLM key:** a fresh box has no LLM account, so no

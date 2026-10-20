@@ -18,6 +18,11 @@ document says what temper adds. What is open is listed in section 11.
   members, `engine` (jig's engine part), `workers` (jig's worker parts)
   and `application` (temper's members). Nothing else at the top level.
   The forge's setup's commands read the same document (section 8).
+- **Three directories,** configuration, data and cache, by skein's
+  arguments' rule: the document is always `temper.json` in the
+  configuration directory, each path in it is typed by the directory it
+  is relative to, and no secret sits in the configuration directory
+  (section 12).
 - **Read once, before the loop, and strict.** Unknown, missing,
   duplicate or out-of-bound members refuse the start, naming the path
   (jig's `protocol/configuration.md`, section 1). A change is a restart.
@@ -140,8 +145,10 @@ document says what temper adds. What is open is listed in section 11.
   write, 3 admin. An adoption gives a repository's collaborators the
   roles their permissions map to (`../domain/forge.md`, section 4).
 - **Reading,** by `temper serve`, in this order:
-  1. the file, whole, with skein's startup kit, within the bound jig's
-     reference binary sets on a configuration's bytes;
+  1. the three directories, resolved and checked (section 12); then
+     the document, `temper.json` in the configuration directory, whole,
+     with skein's startup kit, within the bound jig's reference binary
+     sets on a configuration's bytes;
   2. jig's parts, by `jig-protocol-config`; `application`, by
      `temper-service`'s startup, with `jig-protocol-config`'s readers, so
      every problem names its path the same way
@@ -164,9 +171,11 @@ document says what temper adds. What is open is listed in section 11.
   starts, before the forge component starts, and a forge whose records
   do not serve is not connected, never a refused start (section 8;
   credentials.md, 2.1).
-- **Paths** are resolved against the process's working directory, as
-  jig's reference binary resolves them, but the agent's, which are
-  absolute (section 5).
+- **Paths are typed:** each is a configuration, data or cache path,
+  relative to its directory or absolute, as jig's parts' are (jig's
+  `protocol/configuration.md`, section 10), or a path that must be
+  absolute; section 12 gives each member's. None is resolved against
+  the working directory.
 
 ## 3. temper's members for the engine
 
@@ -179,7 +188,7 @@ which bounds its writers. Each:
 | `number` | u16 | unique among `forges` | the domain's forge number: a repository's `forge`, a writer's, a git identity's; and the `forge` of the numbers its records are kept under in jig's secrets' store (credentials.md, 2.1) |
 | `kind` | string | `"forgejo"` or `"github"` | the documents the forge component speaks (forge.md, section 3); the records the forge takes (credentials.md, 2.1); the ways it is connected (setup.md) |
 | `api` | an address, jig's format, or `null` | a socket address, or a host's name and port; never an in-process name. `null` on GitHub alone, for github.com's: `api.github.com`, port 443 | where the forge component connects for the forge's REST API: Forgejo's under `/api/v1`, GitHub's at its root |
-| `transport` | `"plaintext"`, `{"tls": {"server_name": string, "trust": file or null}}`, or `null` | plaintext only when `api` is a socket address on loopback; `trust` null is the machine's roots. `null` on GitHub alone, for TLS to github.com's API with the machine's roots | the forge component's connections |
+| `transport` | `"plaintext"`, `{"tls": {"server_name": string, "trust": a configuration path or null}}`, or `null` | plaintext only when `api` is a socket address on loopback; `trust` null is the machine's roots. `null` on GitHub alone, for TLS to github.com's API with the machine's roots | the forge component's connections |
 | `git` | string, or `null` | an `http` or `https` URL: a host, an optional port and an optional path; no user, query, fragment or final `/`; `http` only to a loopback host. `null` on GitHub alone, for `https://github.com` | the base of each repository's remote, `<git>/<owner>/<name>.git`, which the engine's routing makes (channel.md, section 4); and the host segment of the forge's resource paths: `git`'s host, with `:port` when it names a port |
 | `web` | string, or `null` | on GitHub, a URL by `git`'s rule, `null` for `https://github.com`; on Forgejo, `null` | GitHub's browser pages: the manifest's form, the install link and an installation's pages (setup.md, connecting GitHub; `../client/forge.md`) |
 | `log_origins` | list of strings, or `null` | each an origin: `"https://<host>[:<port>]"`, TLS with `transport`'s trust (the machine's roots when it names none), or `"http://<host>[:<port>]"` to a loopback host alone, as skein's fake serves its logs; no path, user, query, fragment or final `/`; the port 443 or 80 when absent. Each host is resolved at start, and one that does not resolve refuses the start, naming the forge and the host; at most `forges.log_origins` (section 7). `null` is the kind's default: GitHub's `["https://productionresultssa1.blob.core.windows.net"]`, Forgejo's none | the origins to which a job log's redirect is followed (forge.md, GitHub's API as temper uses it); `[]` fetches no job log |
@@ -270,7 +279,7 @@ under; it must be the `number` of one of `engine.charters`. Feeds
 | Member | Type | Bounds | Feeds |
 |---|---|---|---|
 | `listener` | an address, jig's format | a socket address; on loopback (in `127.0.0.0/8`, or `::1`) in standalone, and wherever `engine.clients` enables the printed link (jig's `protocol/service.md`, section 3); a fixed port, never 0, when a forge of kind GitHub is configured | the listener on which jig's clients' component is mounted with jig's default HTTP mapping, under `/jig`; the mapping's Host allow-list; the address of the sign-in links `temper serve` prints (`../client/README.md`, section 7); and temper's forge routes beside it, whose addresses a GitHub App's redirect and setup URLs name (`../client/README.md`, the routes) |
-| `bundle` | a directory, or `null` | a bundle of skein's bundler: its page and its digest's directory, its files within `clients.bundle_files` and `clients.bundle_bytes` (section 7) | the browser's page and bundle, read at start and served on the clients' listener (`../client/browser.md`, 2.2); `null` serves no browser |
+| `bundle` | an absolute directory, or `null` | an installed bundle of skein's bundler, as `temper init` finds one (setup.md, 8.2): its page and its digest's directory, its files within `clients.bundle_files` and `clients.bundle_bytes` (section 7) | the browser's page and bundle, read at start and served on the clients' listener (`../client/browser.md`, 2.2); `null` serves no browser |
 
 - **A fixed port with a GitHub forge:** a GitHub App's `redirect_url`
   and `setup_url` name the clients' listener's address, and GitHub's API
@@ -336,7 +345,7 @@ top-level `workers`, in the same order; standalone has one. Each:
 
 | Member | Type | Bounds | Feeds |
 |---|---|---|---|
-| `root` | a directory | made private (0o700) if absent; an existing one must be the process's user's, private, and not reached through a link | the worker's workspace directory: every checkout's workspace is made under it (git.md, section 2; `../domain/worker.md`, section 5) |
+| `root` | a directory, a data path | made private (0o700) if absent; an existing one must be the process's user's, private, and not reached through a link | the worker's workspace directory: every checkout's workspace is made under it (git.md, section 2; `../domain/worker.md`, section 5) |
 | `git` | string | an absolute path to an executable file, checked at start, whose `git version` is at least the one git.md, section 3 names | the program the git component runs for each invocation, in the environment git.md, section 5 gives it |
 
 - **The worker's root takes the rest from jig's and smith's:** the hub's
@@ -357,7 +366,11 @@ top-level `workers`, in the same order; standalone has one. Each:
   - `arguments`: `["agent", <that same path>]`,
 
   so each agent process is `temper agent AGENT.json` (README.md,
-  section 4).
+  section 4). They are absolute because the worker spawns the agent
+  with its arguments as written (jig's `protocol/configuration.md`,
+  section 10); `temper init` writes them so, with smith's agent
+  configuration as `agent.json` in the configuration directory
+  (setup.md, 8.2).
 - **Read twice:** by `temper serve` at start, for smith's host limits,
   the channel's limits and the agent's bounds, as jig's reference binary
   reads it; and by each agent process as it starts.
@@ -367,7 +380,9 @@ top-level `workers`, in the same order; standalone has one. Each:
   the agent may run as a backend, by its adapter, with the program's
   absolute path and its programs directory, which holds a configuration
   directory for each program source, `<directory>/NAME`
-  (credentials.md, section 3). The owned example's agent configures
+  (credentials.md, section 3). Its paths are smith's, absolute; the
+  programs directory `temper init` writes is `programs` in the data
+  directory (section 12). The owned example's agent configures
   Claude Code's (setup.md, 8.1). A programs directory need not exist
   until `temper program-login` makes it; one that exists must be a
   directory of the user's own with no group or other bits, not reached
@@ -388,7 +403,7 @@ top-level `workers`, in the same order; standalone has one. Each:
 | File | Named by | Holds | Read by |
 |---|---|---|---|
 | an owned forge's handover: its admin's token | `admin_token` in the forge's setup directory, `application.setup[].directory` (setup.md, section 3) | the token's bytes | the engine's setup host, once, at the start that finds it (setup.md, the setup host in the engine) |
-| a worker's secret, its digest | jig's parts | jig's formats (jig's `protocol/configuration.md`, sections 7 and 10) | jig's components |
+| a worker's secret, its digest | jig's parts, data paths: `worker.secret` and `worker.digest` in the data directory as `temper init` writes them (setup.md, 8.2) | jig's formats (jig's `protocol/configuration.md`, sections 7 and 10) | jig's components |
 
 - **A secret file holds its bytes and nothing else** but a final
   newline, which is not part of the secret (jig's
@@ -639,7 +654,8 @@ top-level `workers`, in the same order; standalone has one. Each:
 
 ## 8. First start and every start
 
-- **Every command that reads the document checks it.** `temper serve`
+- **Every command that reads the document checks it,** once its three
+  directories are resolved and checked (section 12). `temper serve`
   checks it whole, as section 2 says. `temper program-login`, every
   `temper forge` command and `temper box` check its structure, its
   members, the limits and `setup`, and none of the checks that need a
@@ -734,14 +750,17 @@ top-level `workers`, in the same order; standalone has one. Each:
   constants of temper's client (`../client/README.md`, section 2).
 - **`temper ctl DIRECTORY ...`** takes none either (`../client/tools.md`,
   section 8).
-- **`temper program-login CONFIG.json NAME`** reads the same document as
-  `temper serve`, and the agent's configuration it names (credentials.md,
-  section 3).
+- **`temper program-login [DIRECTORIES] NAME`** reads the same document
+  as `temper serve`, and the agent's configuration it names
+  (credentials.md, section 3). `DIRECTORIES` is `[--config DIR] [--data
+  DIR] [--cache DIR]`, each with its variable and its default (section
+  12), given anywhere among the command's arguments.
 - **`temper agent AGENT.json`** reads smith's agent configuration
   (section 5).
-- **`temper forge prepare|run CONFIG.json FORGE`** and
-  **`temper box CONFIG.json`** read the same document as `temper serve`
-  (section 8; setup.md, sections 6 and 7). Reconcile is no command: the
+- **`temper forge prepare|run [DIRECTORIES] FORGE`** and **`temper box
+  [DIRECTORIES]`** read the same document as `temper serve` (section 8;
+  setup.md, sections 6 and 7); **`temper init [DIRECTORIES]`** writes
+  it (setup.md, 8.2). Reconcile is no command: the
   engine's setup host runs it, at each start and at a connect (setup.md,
   the setup host in the engine).
 
@@ -848,7 +867,7 @@ not itself valid JSON):
     "charters": [{"number": 1, ...}, {"number": 2, ...}],
     "templates": [{"number": 1, ...}, {"number": 2, ...}],
     "hosts": {
-      "workers": [{"name": "worker", "digest": "secrets/worker.digest"}],
+      "workers": [{"name": "worker", "digest": "worker.digest"}],
       "listener": [{"in_process": "workers"}]
     },
     "llm": ...,
@@ -860,12 +879,12 @@ not itself valid JSON):
   "workers": [{
     "engine": {"in_process": "workers"},
     "name": "worker",
-    "secret": "secrets/worker.secret",
+    "secret": "worker.secret",
     "slots": ..., "graces": ...,
     "agent": {
       "program": "/usr/local/bin/temper",
-      "configuration": "/home/me/temper/agent.json",
-      "arguments": ["agent", "/home/me/temper/agent.json"]
+      "configuration": "/home/me/.config/temper/agent.json",
+      "arguments": ["agent", "/home/me/.config/temper/agent.json"]
     },
     "limits": {"profile": "small", "overrides": {"hub.event_bytes": ..., ...}},
     "memory_bytes": ...
@@ -911,3 +930,63 @@ one owned forge, with its own values (setup.md, 8.1).
   not known. Default: the check as it stands.
 - **A configuration's format version** (jig's `protocol/configuration.md`,
   section 9). Default: none; unknown members refuse the start.
+- **A configuration directory moved or copied.** The agent's paths are
+  absolute (section 5), so they still name the old place: the agent's
+  configuration is read there, or the start is refused, naming the
+  member, when it is gone. Default: the person edits the two members;
+  standalone could derive them from its own binary and its
+  configuration directory, as no check can tell temper's binary from
+  another program today (section 2).
+
+## 12. The three directories
+
+Every command that reads the document takes three directories, by
+skein's arguments' rule (skein's `shell.md`, 6.5): a flag, else its
+variable, else its default.
+
+| Directory | Flag, variable | Default | Holds | Kept |
+|---|---|---|---|---|
+| configuration | `--config DIR`, `TEMPER_CONFIG` | `$XDG_CONFIG_HOME/temper` | the document, `temper.json`; smith's agent configuration, `agent.json`; the charters' instructions; trusted roots' files | as a person's own files are: copied, synced or published, so it holds no secret |
+| data | `--data DIR`, `TEMPER_DATA` | `$XDG_DATA_HOME/temper` | the deployment's directory, with the store, transcripts and jig's secrets' store; the worker's secret and its digest; the worker's root; each set-up forge's directory (setup.md, section 3); the programs directory | the deployment: backed up whole |
+| cache | `--cache DIR`, `TEMPER_CACHE` | `$XDG_CACHE_HOME/temper` | binaries fetched again at will, such as an owned forge's Forgejo and runner | never backed up |
+
+- **The document is `temper.json` in the configuration directory,**
+  always: no command takes a document's path. A command that finds none
+  there is refused, naming the path, and `temper init`, which writes one
+  (setup.md, 8.2); `temper box` alone, on an empty configuration
+  directory, runs `temper init` first (setup.md, 7.1).
+- **Resolved once, at start,** before the document is read: each
+  directory, from its flag, variable or default, is made absolute
+  against the working directory, by joining names, and every parser is
+  given the three (section 2; jig's `protocol/configuration.md`, section
+  10). Nothing later is resolved against the working directory.
+- **Checked at start:** the data and cache directories, and their
+  missing parents, are made private (0o700) when absent; an existing one
+  must be the process's user's, private, and not reached through a link
+  at its name, or the start is refused, naming it (skein's `io.md`,
+  5.3). A linked parent is accepted, as the programs directory's is
+  (section 5). The configuration directory must hold the document; only
+  `temper init` makes it.
+- **Each path member's kind:**
+  - *configuration paths:* jig's charters' instructions and trusted
+    roots' files, and each forge's `transport.tls.trust` (section 3); the
+    worker's agent's `configuration` is one in jig's parts, which
+    standalone requires absolute (below);
+  - *data paths:* jig's `engine.deployment.directory`, each of
+    `engine.hosts.workers`' `digest` and the worker's `secret`; each of
+    `application.workers`' `root` (section 4) and of
+    `application.setup`'s `directory` (setup.md, section 8);
+  - *cache paths:* an owned forge's `forgejo` and `runner.binary`
+    (setup.md, section 8);
+  - *absolute paths,* refused when relative: each of
+    `application.workers`' `git`, `application.clients.bundle`, and the
+    agent's `program`, `configuration` and `arguments` (section 5),
+    which are installed programs and files, or the spawn's own; every
+    path in smith's agent configuration, which is smith's format.
+- **No secret in the configuration directory:** a worker's secret and
+  its digest, an owned forge's handover and every set-up forge's file are
+  data paths, and jig's secrets' store is in the deployment's directory.
+- **The box passes its three on** to each step, as flags, each absolute
+  (setup.md, 7.1).
+- **Tests give all three,** each a directory of the test's own: no test
+  resolves a default under `$HOME` (`../domain/testing.md`).
