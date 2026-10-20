@@ -32,6 +32,9 @@ fn the_demo_banner_follows_the_frame_on_work_pages() {
                 {
                     roles.push(node.role).expect("frame, demo, main");
                 }
+                if node.role == Role::Region && node.name.as_deref() == Some(b"Demo") {
+                    assert_eq!(node.styles.as_slice(), [crate::look::ACCOUNTS], "{row}: the mockup's banner");
+                }
             }
             assert_eq!(roles.as_slice(), [Role::Banner, Role::Region, Role::Main], "{row}");
         }

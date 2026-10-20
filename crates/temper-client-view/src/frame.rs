@@ -222,6 +222,7 @@ pub(crate) fn demo_banner(b: &mut Builder, root: &Domain, words: &crate::words::
         return;
     }
     b.open(Role::Region);
+    b.style(crate::look::ACCOUNTS);
     b.name(&words.say(crate::words::Word::Demo, &[]));
     text(b, Role::Paragraph, &words.say(crate::words::Word::DemoModel, &[]), None);
     action(
