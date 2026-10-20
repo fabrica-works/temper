@@ -541,7 +541,8 @@ sources in its holder's order. temper configures the LLM providers
 - **Git's environment:** step tests of its builder: the header's bytes,
   the author's variables, and no credential in an argument or a URL
   (git.md, section 9).
-- **The routing,** in the forge's protocol world: start's load, where a
+- **The routing,** in `temper-service`'s own tests (forge.md, section
+  10): start's load, where a
   forge's unreadable row, records made for another forge, or an
   incomplete set leave it not connected, named, and the other forges
   running; a connect whose carried value is read by its run and erased

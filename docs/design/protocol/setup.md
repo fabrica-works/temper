@@ -1018,8 +1018,8 @@ relies on.
 The world is skein's (`forge-setup.md`, section 7): the plans on the
 fake forge's protocol layer, serving the setup's routes, and the host
 component's own waits and bounds. What is temper's is the engine's
-routing of the setup host, checked in temper's protocol world
-(`../domain/testing.md`) and by the process tier (13.4):
+routing of the setup host, checked in `temper-service`'s own tests
+(`forge.md`, section 10) and by the process tier (13.4):
 
 - a start's handover taken, its file removed only after `TakeOver`'s
   `Done`, and left when it stops; a handover readable by others

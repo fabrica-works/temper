@@ -773,8 +773,11 @@ The tiers, the fakes and the layout are `../domain/testing.md`'s (sections 2,
   signed, late, out of order or never, so its stories run with hints and
   without them; on GitHub's dialect they reach the App's log, read by
   the puller, with no listener.
-- **temper's routing, in the protocol world,** each forge's connection
-  as section 2 has it:
+- **temper's routing,** in `temper-service`'s own tests, not in the
+  protocol world, which runs the component without the service: the
+  store on skein-kv's in-memory mode, the component's and the setup
+  host's answers and events played to the routing, each forge's
+  connection as section 2 has it:
   - **at start:** a forge with no rows, an incomplete set, an unreadable
     row and a set made for another forge each start not connected,
     named, nothing erased, while every other forge serves; carried rows

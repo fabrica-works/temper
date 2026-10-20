@@ -52,11 +52,11 @@ and what is still open (section 10).
 
 | Tier (testing-strategy.md, section 2) | In temper |
 |---|---|
-| step tests | every domain crate and every fake; every codec (golden bytes, bounds, fuzz targets) and each translation both ways; git's argument and environment builders, and git's output parsers against transcripts of real git (../protocol/git.md, section 9); Forgejo's decoders, skein's, against the conformance's transcripts (skein's `forge.md`, section 11), and GitHub's, skein's (skein's `forge-github.md`); the forges' records and a git identity's value, golden bytes and fuzz targets (../protocol/forge.md, 2.1; ../protocol/credentials.md, section 4); the setup's machines, files and specs, and the box's machine (../protocol/setup.md, 13.1); lib's are skein's |
+| step tests | every domain crate and every fake; every codec (golden bytes, bounds, fuzz targets) and each translation both ways; git's argument and environment builders, and git's output parsers against transcripts of real git (../protocol/git.md, section 9); Forgejo's decoders, skein's, against the conformance's transcripts (skein's `forge.md`, section 11), and GitHub's, skein's (skein's `forge-github.md`); the forges' records and a git identity's value, golden bytes and fuzz targets (../protocol/forge.md, 2.1; ../protocol/credentials.md, section 4); `temper-service`'s routing of the forges: start, connect, stop, installations, generations and pasted values (../protocol/forge.md, section 10); the setup's machines, files and specs, and the box's machine (../protocol/setup.md, 13.1); lib's are skein's |
 | domain worlds | each child domain with the world as its parent, and each component's root domain with its child domains; most of temper's tests |
 | system worlds | the engine, the worker and smith's agents together; temper's client joined to the engine's root (2.1) |
 | machine worlds | the git component against scripted process ends and outputs; the terminal shell's loop against a scripted stdin and stdout; skein's, for the machines it ships, the forge component among them (skein's `forge-connection.md`, section 10) |
-| protocol worlds | the forge's: the forge component against the fake forge's protocol layer, deliveries included, and the routing's start, connect, stop, installations and generations; reconcile's is skein's (2.2) |
+| protocol worlds | the forge's: the forge component against the fake forge's protocol layer, deliveries included; reconcile's is skein's (2.2) |
 | io worlds | skein's: temper does not retest io |
 | simulated worlds | the one-process world: `temper-service` on skein's simulator (2.3, 2.5) |
 | real loop | the standalone service, hosted agents, native clients and fake peers in one loop over one real ring (2.4) |
@@ -120,11 +120,11 @@ in temper.
   connector world's stories (`tests/engine/forge`) through bytes, with
   the cost checks counted by HTTP request, and the fake forge's signed
   deliveries to the engine's webhooks' listener, late, out of order or
-  never (../protocol/forge.md, section 10). The routing's own cases run
-  here too, on the fake's Forgejo and GitHub layers: start's load of
-  each forge's records, a connect at runtime, a forge stopped, GitHub's
-  installations, git's tokens' generations and pasted values
-  (../protocol/forge.md, section 10).
+  never (../protocol/forge.md, section 10). The routing is not here:
+  start's load of each forge's records, a connect at runtime, a forge
+  stopped, GitHub's installations, git's tokens' generations and pasted
+  values are `temper-service`'s own tests (../protocol/forge.md, section
+  10).
 - **Reconcile's,** in skein (skein's `forge-setup.md`, section 7):
   reconcile's machine against the fake forge's protocol layer serving the
   setup's routes, through bytes: a forge converged from empty and again,
@@ -345,7 +345,8 @@ in the lower world that owns it, never here.
   - **Each at most 0.5 s,** half the tier's 1 s story guide, and the
     tier's sum within its 6 s ceiling (6.1). Their cases are tested below:
     the records' and the identity's codecs in step tests, the routing
-    in the forge's protocol world (2.2), GitHub's routes on the clients'
+    in `temper-service`'s own tests (../protocol/forge.md, section 10),
+    GitHub's routes on the clients'
     listener and the connector's state, picker and queue in the system
     worlds (2.1).
 
