@@ -699,3 +699,5 @@ fn core_rows(engine: &Driver) -> BTreeMap<jig_test_domain::Key, jig_test_domain:
 
 #[cfg(test)]
 mod tests;
+
+mod accounts;

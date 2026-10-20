@@ -755,3 +755,8 @@ pub fn cut(world: &mut World<Temper, Joint>, agent: jig_client_world::harness::C
     }
     panic!("answer was not cut");
 }
+
+#[must_use]
+pub fn accounts_world(seed: u64) -> World<Temper, Joint> {
+    world_with(seed, Joint::with_accounts(seed, domain_limits()))
+}

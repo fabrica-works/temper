@@ -69,7 +69,9 @@ pub(crate) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, cal
         until,
         since,
         first: None,
-        me: until == Some(Condition::WaitingOnMe) || until == Some(Condition::Replied),
+        me: until == Some(Condition::WaitingOnMe)
+            || until == Some(Condition::Replied)
+            || (subject == c::Subject::Accounts && me.deployment_role == Some(c::HeldRole::Owner)),
         stage: Stage::Watching,
         name,
     };
@@ -79,6 +81,9 @@ pub(crate) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, cal
     }
     // One timer per admitted call: bounded and priced by Deadlines::worst_case(rows).
     runner.wait_timers.as_mut().expect("wait timers").arm(number, deadline).expect("bounded calls");
+    if let Some(handle) = deployment_handle(&wait) {
+        out.push(Out::Client { event: Event::Watch { handle, subject: Watchable::Jig(c::Subject::Deployment) } });
+    }
     runner.waits.insert(number, wait);
     if handle == runner.me() {
         changed(runner, client, env, number, out);
@@ -146,7 +151,7 @@ pub(crate) fn told(runner: &mut Runner, client: &Client, env: &Env<Limits>, told
         };
         let Some((&number, wait)) = entry else { break };
         next = Some(number);
-        if wait.handle == handle || (handle == runner.me() && wait.me) {
+        if wait.handle == handle || deployment_handle(wait) == Some(handle) || (handle == runner.me() && wait.me) {
             changed(runner, client, env, number, out);
         }
     }
@@ -164,8 +169,16 @@ fn changed(runner: &mut Runner, client: &Client, env: &Env<Limits>, number: u32,
     let run = current_run(client, wait.handle);
     let Some(latest) = run.as_ref().or(document.latest) else { return };
     let Latest::Jig(delivery) = latest else { return };
-    let Some(part) = Part::delivery(delivery) else { return };
-    let digest = digest::part(&part, &env.limits);
+    let digest = if wait.name == b"accounts" {
+        let accounts = accounts(wait, client);
+        if !accounts.current {
+            return;
+        }
+        accounts.digest(&env.limits)
+    } else {
+        let Some(part) = Part::delivery(delivery) else { return };
+        digest::part(&part, &env.limits)
+    };
     let holds = match wait.until {
         Some(until) => conditions::holds(
             &until,
@@ -206,23 +219,36 @@ fn complete(
         Ok(digest) => (true, b"".as_slice(), digest),
         Err(why) => (false, why, None),
     };
-    let printed = render::waiting(
-        render::document::waiting::Waiting {
-            result: None,
-            delivery,
-            me: live_me(client, runner.me()),
-            name: wait.name,
-            met,
-            why,
-            digest,
-        },
-        wait.called.json,
-        &env.limits,
-        runner.owner_part.expect("host vocabulary"),
-    );
-    if wait.handle != runner.me() {
-        out.push(Out::Client { event: Event::Unwatch { handle: wait.handle } });
-    }
+    let printed = if wait.name == b"accounts" {
+        let mut value = accounts(&wait, client);
+        value.outcome = Some((met, why));
+        let mut printed = render::document::print(
+            render::document::Document::Accounts(value),
+            wait.called.json,
+            &env.limits,
+            runner.owner_part.expect("host vocabulary"),
+        );
+        if printed.status == 0 && !met {
+            printed.status = 3;
+        }
+        printed
+    } else {
+        render::waiting(
+            render::document::waiting::Waiting {
+                result: None,
+                delivery,
+                me: live_me(client, runner.me()),
+                name: wait.name,
+                met,
+                why,
+                digest,
+            },
+            wait.called.json,
+            &env.limits,
+            runner.owner_part.expect("host vocabulary"),
+        )
+    };
+    close(&wait, runner.me(), out);
     runner::finish(wait.called, printed, out);
 }
 pub(crate) fn fire(runner: &mut Runner, client: &Client, env: &Env<Limits>, out: &mut Queue<Out>) {
@@ -269,7 +295,10 @@ fn ended(
         };
         let Some((&number, wait)) = entry else { break };
         next = Some(number);
-        if wait.handle != handle && !(shared && (wait.me || why == Why::SignedOut)) {
+        if wait.handle != handle
+            && deployment_handle(wait) != Some(handle)
+            && !(shared && (wait.me || why == Why::SignedOut))
+        {
             continue;
         }
         consumed = true;
@@ -300,9 +329,7 @@ fn ended(
             };
             let wait = runner.waits.remove(&number).expect("active wait");
             runner.wait_timers.as_mut().expect("wait timers").cancel(number);
-            if wait.handle != runner.me() {
-                out.push(Out::Client { event: Event::Unwatch { handle: wait.handle } });
-            }
+            close(&wait, runner.me(), out);
             let printed = render::failure(reason, wait.called.json, status);
             runner::finish(wait.called, printed, out);
         }
@@ -354,4 +381,54 @@ fn page(
     };
     runner::finish(wait.called, printed, out);
     true
+}
+
+// The existing me dependency flag records the owner join for Accounts; no new
+// per-call retained document or allocation. Both watches live in jig-client.
+fn deployment_handle(wait: &Wait) -> Option<Handle> {
+    if wait.name == b"accounts" && wait.me {
+        Some(Handle { asker: wait.handle.asker, number: wait.handle.number | 1 })
+    } else {
+        None
+    }
+}
+fn close(wait: &Wait, me: Handle, out: &mut Queue<Out>) {
+    if let Some(handle) = deployment_handle(wait) {
+        out.push(Out::Client { event: Event::Unwatch { handle } });
+    }
+    if wait.handle != me {
+        out.push(Out::Client { event: Event::Unwatch { handle: wait.handle } });
+    }
+}
+fn accounts<'a>(wait: &Wait, client: &'a Client) -> render::document::accounts::Accounts<'a> {
+    let mut value = render::document::accounts::Accounts {
+        party: None,
+        deployment: None,
+        models: None,
+        outcome: None,
+        current: false,
+    };
+    if let Some(document) = client.document(wait.handle)
+        && let Some(Latest::Jig(c::Delivery::OwnerAccounts(party))) = document.latest
+    {
+        value.party = Some(party);
+        value.current = document.state == State::Live;
+    }
+    if let Some(handle) = deployment_handle(wait) {
+        value.current &= match live_me(client, Handle { asker: wait.handle.asker, number: 0 }) {
+            Some(me) => me.deployment_role == Some(c::HeldRole::Owner),
+            None => false,
+        };
+        match client.document(handle) {
+            Some(document) => {
+                value.current &= document.state == State::Live;
+                match document.latest {
+                    Some(Latest::Jig(c::Delivery::OwnerDeployment(deployment))) => value.deployment = Some(deployment),
+                    _ => value.current = false,
+                }
+            }
+            None => value.current = false,
+        }
+    }
+    value
 }

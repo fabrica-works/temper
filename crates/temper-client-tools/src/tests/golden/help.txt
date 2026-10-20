@@ -17,6 +17,7 @@ Read accounts without values; model names and limits are supplied facts:
   temper ctl DIRECTORY accounts
   temper ctl DIRECTORY models --project shop
   temper ctl DIRECTORY wait accounts --until usable
+models has its own joined digest; wait accounts uses the accounts read's digest.
 Settled follows party-requested sign-ins; program checks and provider readiness await upstream facts.
 
 Name keys for chat, message, close and adopt; other acts accept an optional --key NAME.

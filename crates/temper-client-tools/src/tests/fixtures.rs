@@ -551,7 +551,7 @@ const KEPT_KEY: skein_lib::RequestKey = [9; 16];
 /// Six calls are needed for sign-in, me, wait, inbox, task and message.
 pub(super) const GUIDE_CALLS: u32 = 9;
 /// One slot per guide line, including the final line; fewer loses that line.
-const GUIDE_LINES: u32 = 61;
+const GUIDE_LINES: u32 = 62;
 /// One slot per row and form; fewer omits decide's second form.
 pub(super) const TOOL_FORMS: u32 = 25;
 /// Exactly one example exercises each row and form; zero misses it entirely.
