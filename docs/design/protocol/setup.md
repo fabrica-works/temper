@@ -841,12 +841,12 @@ temper box
   closes, the pipe's lines and the groups' records out), hosted on
   skein-io.
 - **The steps in groups:** `Steps { always, asked }`, `always` the steps
-  run in order, and `asked` a list of `Group { forge, before, steps }`, each
-  dormant until asked (7.1). `before` is its place in the order: the
-  index in `always` it runs just before (its length puts it last). Each
-  step carries its `Stage`, whose word its `step` lines carry. The machine's step tests drive a group
-  from dormant to `started`, and to `failed`, by lines and exits alone
-  (13.1).
+  run in order, and `asked` a list of `Group { forge, before, steps }`,
+  each dormant until asked (7.1). `before` is its place in the order:
+  the index in `always` it runs just before (its length puts it last).
+  Each step carries its `Stage`, whose word its `step` lines carry. The
+  machine's step tests drive a group from dormant to `started`, and to
+  `failed`, by lines and exits alone (13.1).
 - **The binary hands it the steps.** `temper box` resolves its three
   directories, runs `temper init` when the configuration directory is
   empty (7.1), checks the document as section 8 says, asks `temper-fake`
@@ -1741,8 +1741,8 @@ relies on.
   FORGE WHY`, the group dormant again and the others running on; a
   second `start` while one runs answered busy, a re-ask of the starting
   forge answered by its own lines, an ask while stopping, a record not
-  written, a forge with no group
-  `not asked`, and a started one `started`; a start with the record
+  written, a forge with no group `not asked`, and a started one
+  `started`; a start with the record
   running the group as an always group; a line past `box.line_bytes`
   refused; `temper serve` restarted with a pipe afresh, an answer meant
   for the exited one dropped.

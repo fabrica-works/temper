@@ -87,7 +87,8 @@ fn forge(action: &[u8], flags: &[Box<[u8]>], number: u16, run: Option<&[u8]>) ->
     Step::new(name, args.into_boxed(), run.is_some())
 }
 /// Carries the box's absolute directory flags after each command's words.
-/// Commands in setup order: owned processes, every reconcile, then serve.
+/// Commands in setup order: owned processes, every reconcile, then serve;
+/// an asked forge's processes apart, in a group placed in that order.
 #[must_use]
 pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
     let count = u32::try_from(setup.entries.len()).expect("bounded entries");
