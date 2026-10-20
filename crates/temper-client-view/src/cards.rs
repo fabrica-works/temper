@@ -257,6 +257,13 @@ pub fn proposal(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32) 
     proposal::draw(b, page, words, rows);
 }
 
+pub(crate) fn proposal_reason(b: &mut Builder, page: &c::ReadValue) {
+    proposal::reason(b, page);
+}
+pub(crate) fn proposal_facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32) {
+    proposal::facts(b, page, words, rows);
+}
+
 pub fn hold(b: &mut Builder, value: &c::HoldCategory, words: &Words) {
     let number = match value {
         c::HoldCategory::Dependency { task } => Some(Hole::Number(*task)),

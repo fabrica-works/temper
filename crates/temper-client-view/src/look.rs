@@ -77,6 +77,34 @@ pub const MARKER: Style = Style { owner: owner(), token: 35 };
 pub const CARDS: Style = Style { owner: owner(), token: 36 };
 /// The chat composer and account area.
 pub const COMPOSER_AREA: Style = Style { owner: owner(), token: 37 };
+/// A list page main.
+pub const PAGE: Style = Style { owner: owner(), token: 38 };
+/// The page breadcrumb bar.
+pub const PAGEBAR: Style = Style { owner: owner(), token: 39 };
+/// A section heading row.
+pub const HEADING: Style = Style { owner: owner(), token: 40 };
+/// The heading row filters.
+pub const FILTERS: Style = Style { owner: owner(), token: 41 };
+/// The inbox updates list.
+pub const UPDATES: Style = Style { owner: owner(), token: 42 };
+/// A card kind and path.
+pub const META: Style = Style { owner: owner(), token: 43 };
+/// A card title.
+pub const TITLE: Style = Style { owner: owner(), token: 44 };
+/// A card supplied facts.
+pub const DETAILS: Style = Style { owner: owner(), token: 45 };
+/// An inbox proposal.
+pub const KIND_PROPOSAL: Style = Style { owner: owner(), token: 46 };
+/// An inbox question.
+pub const KIND_QUESTION: Style = Style { owner: owner(), token: 47 };
+/// An inbox held task.
+pub const KIND_HELD: Style = Style { owner: owner(), token: 48 };
+/// An inbox person task.
+pub const KIND_PERSON_TASK: Style = Style { owner: owner(), token: 49 };
+/// An inbox result.
+pub const KIND_RESULT: Style = Style { owner: owner(), token: 50 };
+/// An inbox reply.
+pub const KIND_REPLY: Style = Style { owner: owner(), token: 51 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -120,6 +148,20 @@ pub const NAMES: Names<'static> = Names {
         b"temper-marker",
         b"temper-cards",
         b"temper-composer-area",
+        b"temper-page",
+        b"temper-pagebar",
+        b"temper-heading",
+        b"temper-filters",
+        b"temper-updates",
+        b"temper-meta",
+        b"temper-title",
+        b"temper-details",
+        b"temper-kind-proposal",
+        b"temper-kind-question",
+        b"temper-kind-held",
+        b"temper-kind-person-task",
+        b"temper-kind-result",
+        b"temper-kind-reply",
     ],
     regions: &[b"temper-link"],
 };

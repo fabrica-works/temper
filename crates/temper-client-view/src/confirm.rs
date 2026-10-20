@@ -31,8 +31,16 @@ fn button(b: &mut Builder, bindings: &mut Bindings, words: &Words, word: Word, a
 }
 pub(crate) fn card(b: &mut Builder, root: &Domain, card: &Card, words: &Words, bindings: &mut Bindings, rows: u32) {
     let Some(page) = &card.page else { return };
-    crate::cards::proposal(b, page, words, rows);
+    crate::cards::proposal_reason(b, page);
+    facts(b, page, words, rows);
+    controls(b, root, card, words, bindings);
+}
+pub(crate) fn facts(b: &mut Builder, page: &ReadValue, words: &Words, rows: u32) {
+    crate::cards::proposal_facts(b, page, words, rows);
     crate::cards::decision(b, words, Some(page), ActKind::Accept);
+}
+pub(crate) fn controls(b: &mut Builder, root: &Domain, card: &Card, words: &Words, bindings: &mut Bindings) {
+    let Some(page) = &card.page else { return };
     if let Some(outcome) = &card.outcome {
         match outcome {
             Outcome::Answered(Answered::Jig(Answer::Done(outcome))) => words.outcome(b, outcome),

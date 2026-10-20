@@ -4,35 +4,65 @@ use crate::words::{Word, Words};
 use jig_client::contract as c;
 use skein_ui::{Builder, Role, phrases::Hole};
 pub(super) fn draw(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32) {
+    reason(b, page);
+    facts(b, page, words, rows);
+}
+pub(super) fn reason(b: &mut Builder, page: &c::ReadValue) {
     match page {
-        c::ReadValue::OwnerProposal(proposal) => {
-            super::document(b, &proposal.reason);
-            match &proposal.action {
-                c::OwnerProposalAction::Batch(tasks) => proposed(b, tasks, words, rows),
-                c::OwnerProposalAction::Effect { part, authority: value, .. }
-                | c::OwnerProposalAction::ProcedureEffect { part, authority: value, .. } => {
-                    crate::forge::owner_part(b, part, words);
-                    authority(b, value, words, rows);
-                }
-                c::OwnerProposalAction::Amend { task, before, after, .. } => {
-                    phrase(b, words, P::ProposalAmend, &[Hole::Number(task.number())]);
-                    specification(b, &after.spec, words);
-                    authority_change(b, &before.authority, &after.authority, words, rows);
-                }
-                c::OwnerProposalAction::Widen { task, before, after } => {
-                    phrase(b, words, P::ProposalTask, &[Hole::Number(task.number())]);
-                    authority_change(b, before, after, words, rows);
-                }
-                c::OwnerProposalAction::Release { task, hold } => {
-                    phrase(b, words, P::ProposalTask, &[Hole::Number(task.number())]);
-                    if let Some(hold) = hold {
-                        held(b, hold, words, rows);
-                    }
+        c::ReadValue::OwnerProposal(proposal) => super::document(b, &proposal.reason),
+        c::ReadValue::Proposal(proposal) => text(b, Role::Paragraph, proposal.why.bytes()),
+        c::ReadValue::Task(_)
+        | c::ReadValue::Tasks(_)
+        | c::ReadValue::OwnerProject(_)
+        | c::ReadValue::Historical(_)
+        | c::ReadValue::Me(_)
+        | c::ReadValue::Question(_)
+        | c::ReadValue::Escalation(_)
+        | c::ReadValue::OwnerEscalation(_)
+        | c::ReadValue::PersonTask(_)
+        | c::ReadValue::OwnerPersonTask(_)
+        | c::ReadValue::Result(_)
+        | c::ReadValue::Ended(_)
+        | c::ReadValue::OwnerEnded(_)
+        | c::ReadValue::History(_)
+        | c::ReadValue::Turn(_)
+        | c::ReadValue::Activity(_)
+        | c::ReadValue::Inbox(_)
+        | c::ReadValue::OwnerInbox(_)
+        | c::ReadValue::Spend(_)
+        | c::ReadValue::OwnerSpend(_)
+        | c::ReadValue::Project(_)
+        | c::ReadValue::Notes(_)
+        | c::ReadValue::Deployment(_)
+        | c::ReadValue::OwnerDeployment(_) => {}
+    }
+}
+pub(super) fn facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32) {
+    match page {
+        c::ReadValue::OwnerProposal(proposal) => match &proposal.action {
+            c::OwnerProposalAction::Batch(tasks) => proposed(b, tasks, words, rows),
+            c::OwnerProposalAction::Effect { part, authority: value, .. }
+            | c::OwnerProposalAction::ProcedureEffect { part, authority: value, .. } => {
+                crate::forge::owner_part(b, part, words);
+                authority(b, value, words, rows);
+            }
+            c::OwnerProposalAction::Amend { task, before, after, .. } => {
+                phrase(b, words, P::ProposalAmend, &[Hole::Number(task.number())]);
+                specification(b, &after.spec, words);
+                authority_change(b, &before.authority, &after.authority, words, rows);
+            }
+            c::OwnerProposalAction::Widen { task, before, after } => {
+                phrase(b, words, P::ProposalTask, &[Hole::Number(task.number())]);
+                authority_change(b, before, after, words, rows);
+            }
+            c::OwnerProposalAction::Release { task, hold } => {
+                phrase(b, words, P::ProposalTask, &[Hole::Number(task.number())]);
+                if let Some(hold) = hold {
+                    held(b, hold, words, rows);
                 }
             }
-        }
+        },
         c::ReadValue::Proposal(proposal) => {
-            text(b, Role::Paragraph, proposal.why.bytes());
             match &proposal.action {
                 c::ProposalAction::Batch { tasks, .. } => proposed(b, tasks, words, rows),
                 c::ProposalAction::Effect { part } => crate::forge::drawn(b, part, words),

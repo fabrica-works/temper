@@ -17,7 +17,7 @@ const PROPOSAL: c::ProposalKey =
 fn text(words: &[u8]) -> c::Text {
     c::Text::new(Box::from(words), TEXT_BYTES).expect("fixture text")
 }
-fn root(act: ActKind, admission: Admission) -> temper_client_domain::Domain {
+pub(super) fn root(act: ActKind, admission: Admission) -> temper_client_domain::Domain {
     let mut acts = List::with_capacity(SINGLE_OFFER);
     acts.push(c::Offered { act, admission, effect: None }).expect("one act");
     let mut funding = List::with_capacity(SINGLE_OFFER);
@@ -121,5 +121,63 @@ fn the_card_reports_client_outcomes_in_jigs_words() {
             fixtures::domain_limits().client.domain.rows,
         );
         assert!(contains(&fixtures::text(&builder.finish()), expected), "{expected:?}");
+    }
+}
+
+#[test]
+fn the_inbox_keeps_proposal_and_decision_facts_before_its_controls() {
+    let view = fixtures::page_view(&root(ActKind::Accept, Admission::Allowed));
+    let tree = view.tree();
+    let details = super::inbox::styled(tree, crate::look::DETAILS);
+    let facts = super::inbox::subtree(tree, details);
+    for expected in ACCEPT_WORDS {
+        assert!(facts.iter().any(|node| node.text.iter().any(|run| contains(&run.text, expected))), "{expected:?}");
+    }
+    let accept = fixtures::find(tree, Role::Button, b"Accept").expect("accept");
+    let control = tree.nodes().iter().position(|node| node.id == accept).expect("control position");
+    assert!(control >= details.checked_add(facts.len()).expect("facts end"));
+    assert!(facts.iter().all(|node| node.role != Role::Button && node.role != Role::TextArea));
+    let reason = tree
+        .nodes()
+        .iter()
+        .position(|node| node.text.iter().any(|run| run.text.as_ref() == b"Make a goal"))
+        .expect("reason");
+    assert!(reason < details);
+}
+
+#[test]
+fn chat_and_task_cards_keep_their_flat_reason_facts_and_controls() {
+    for (root, expected) in [
+        (
+            fixtures::chat::proposal_root(),
+            &[
+                Role::Paragraph,
+                Role::Text,
+                Role::Heading { level: 3 },
+                Role::Text,
+                Role::Button,
+                Role::TextArea,
+                Role::Button,
+            ][..],
+        ),
+        (fixtures::task::held_root(), &[Role::Paragraph, Role::Text, Role::Paragraph, Role::Text, Role::Button][..]),
+    ] {
+        let card = root.pages().cards().expect("cards").iter().find(|card| card.page.is_some()).expect("loaded card");
+        let limits = fixtures::tree_limits();
+        let mut builder = skein_ui::Builder::new(&limits);
+        crate::confirm::card(
+            &mut builder,
+            &root,
+            card,
+            &fixtures::words(),
+            &mut crate::frame::Bindings::new(limits.bindings),
+            fixtures::domain_limits().client.domain.rows,
+        );
+        let tree = builder.finish();
+        let mut roles = List::with_capacity(8);
+        for node in tree.nodes() {
+            roles.push(node.role).expect("flat card shape");
+        }
+        assert_eq!(roles.as_slice(), expected);
     }
 }

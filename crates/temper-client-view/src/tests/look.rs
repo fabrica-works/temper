@@ -5,7 +5,7 @@ use skein_ui::Role;
 #[test]
 fn the_frame_carries_its_tokens() {
     let view = fixtures::page_view(&fixtures::inbox_root());
-    for (role, token) in [(Role::Banner, BANNER), (Role::Navigation, NAVIGATION), (Role::Main, MAIN)] {
+    for (role, token) in [(Role::Banner, BANNER), (Role::Navigation, NAVIGATION)] {
         assert_eq!(fixtures::styles(view.tree(), role).as_ref(), [Box::from([token])], "{role:?}");
     }
 }
@@ -15,7 +15,7 @@ fn the_looks_names_pass_skeins_check() {
 }
 #[test]
 fn each_style_or_region_is_named_under_temper() {
-    let named: [(skein_ui::Style, &[u8]); 38] = [
+    let named: [(skein_ui::Style, &[u8]); 52] = [
         (BANNER, b"temper-banner"),
         (NAVIGATION, b"temper-navigation"),
         (MAIN, b"temper-main"),
@@ -54,6 +54,20 @@ fn each_style_or_region_is_named_under_temper() {
         (MARKER, b"temper-marker"),
         (CARDS, b"temper-cards"),
         (COMPOSER_AREA, b"temper-composer-area"),
+        (PAGE, b"temper-page"),
+        (PAGEBAR, b"temper-pagebar"),
+        (HEADING, b"temper-heading"),
+        (FILTERS, b"temper-filters"),
+        (UPDATES, b"temper-updates"),
+        (META, b"temper-meta"),
+        (TITLE, b"temper-title"),
+        (DETAILS, b"temper-details"),
+        (KIND_PROPOSAL, b"temper-kind-proposal"),
+        (KIND_QUESTION, b"temper-kind-question"),
+        (KIND_HELD, b"temper-kind-held"),
+        (KIND_PERSON_TASK, b"temper-kind-person-task"),
+        (KIND_RESULT, b"temper-kind-result"),
+        (KIND_REPLY, b"temper-kind-reply"),
     ];
     for (style, name) in named {
         assert_eq!(NAMES.style(style), Some(name));
@@ -62,10 +76,9 @@ fn each_style_or_region_is_named_under_temper() {
 }
 #[test]
 fn each_pages_main_carries_the_main_token() {
-    let builds: [fn() -> temper_client_domain::Domain; 6] = [
+    let builds: [fn() -> temper_client_domain::Domain; 5] = [
         fixtures::signed_out,
         fixtures::out_of_date,
-        fixtures::inbox_root,
         fixtures::adoption_root,
         fixtures::task::held_root,
         fixtures::chats_root,
@@ -74,6 +87,8 @@ fn each_pages_main_carries_the_main_token() {
         let view = fixtures::page_view(&build());
         assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN])]);
     }
+    let view = fixtures::page_view(&fixtures::inbox_root());
+    assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN, PAGE])]);
     let view = fixtures::page_view(&fixtures::account_root().0);
     assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN])]);
     let view = fixtures::page_view(&fixtures::chat::chat_root());
@@ -172,6 +187,43 @@ fn the_conversation_tokens_stay_on_their_roles() {
         let mut found = false;
         for tree in [&message_tree, proposal.tree(), composer.tree()] {
             for node in tree.nodes() {
+                if node.styles.as_slice().contains(&token) {
+                    assert_eq!(node.role, role);
+                    found = true;
+                }
+            }
+        }
+        assert!(found, "{token:?}");
+    }
+}
+
+#[test]
+fn the_inbox_tokens_stay_on_their_roles() {
+    let roots = [
+        fixtures::inbox_root(),
+        super::confirm::root(jig_client::contract::ActKind::Accept, jig_client::contract::Admission::Allowed),
+        super::inbox::question_root(),
+    ];
+    for (token, role) in [
+        (PAGE, Role::Main),
+        (PAGEBAR, Role::Slot),
+        (HEADING, Role::Slot),
+        (FILTERS, Role::Slot),
+        (UPDATES, Role::List),
+        (META, Role::Slot),
+        (TITLE, Role::Paragraph),
+        (DETAILS, Role::Slot),
+        (KIND_PROPOSAL, Role::Item),
+        (KIND_QUESTION, Role::Item),
+        (KIND_HELD, Role::Item),
+        (KIND_PERSON_TASK, Role::Item),
+        (KIND_RESULT, Role::Item),
+        (KIND_REPLY, Role::Item),
+    ] {
+        let mut found = false;
+        for root in &roots {
+            let view = fixtures::page_view(root);
+            for node in view.tree().nodes() {
                 if node.styles.as_slice().contains(&token) {
                     assert_eq!(node.role, role);
                     found = true;
