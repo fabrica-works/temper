@@ -207,6 +207,14 @@ Within the suites' budgets (`../domain/testing.md`, section 2):
   (`../domain/testing.md`, 2.4).
 - **No token across a domain boundary** (credentials.md, section 7).
 
+At jig f758ea6f and smith 6747e669, regression tests verify the existing
+notice route through the worker, fleet and accounts child, including an
+unknown reset and supplied zero. The composed proof uses the configured
+source. Two sources of one account in that proof wait for a jig repin
+past x1c's removal of configured accounts. Lower harnesses already check
+arbitrary source numbers. Program name conversion and codec agreement are
+tested; successful installation and execution remain an upstream wait.
+
 ## 7. Open questions
 
 - **jig's host tools' crates** (`jig-protocol-charter`,

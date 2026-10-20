@@ -110,3 +110,100 @@ fn acknowledged_answers_free_their_workspace_items() {
         h.run(Event::Link(host::LinkDown::Acknowledge { run: skein_lib::Token::new(run), attempt: ATTEMPT }));
     }
 }
+
+#[test]
+fn notices_keep_the_source_and_reset_and_do_not_replace_the_terminal() {
+    use skein_lib::Duration;
+    const SOURCE: u32 = 17;
+    for notice in [
+        agent::Up::Unauthorized { account: SOURCE, generation: 1 },
+        agent::Up::Limited { account: SOURCE, reset: None },
+        agent::Up::Limited { account: SOURCE, reset: Some(Duration::ZERO) },
+        agent::Up::Limited { account: SOURCE, reset: Some(Duration::from_secs(9)) },
+        agent::Up::Refused {
+            account: SOURCE,
+            code: b"quota".as_slice().into(),
+            reason: b"provider refused".as_slice().into(),
+        },
+    ] {
+        let expected = match &notice {
+            agent::Up::Unauthorized { account, generation } => {
+                host::LinkUp::Unauthorized { run: RUN, attempt: ATTEMPT, account: *account, generation: *generation }
+            }
+            agent::Up::Limited { account, reset } => {
+                host::LinkUp::Limited { run: RUN, attempt: ATTEMPT, account: *account, reset: *reset }
+            }
+            agent::Up::Refused { account, code, reason } => host::LinkUp::AccountRefused {
+                run: RUN,
+                attempt: ATTEMPT,
+                account: *account,
+                code: code.clone(),
+                reason: reason.clone(),
+            },
+            _ => unreachable!(),
+        };
+        let mut h = Harness::new();
+        h.run(Event::Link(host::LinkDown::Assign {
+            assignment: assignment(false, Box::new([grant(host::GrantTable::Accounts, SOURCE)])),
+        }));
+        h.say(agent::Up::Admitted);
+        let again = match &notice {
+            agent::Up::Unauthorized { account, generation } => {
+                agent::Up::Unauthorized { account: *account, generation: *generation }
+            }
+            agent::Up::Limited { account, reset } => agent::Up::Limited { account: *account, reset: *reset },
+            agent::Up::Refused { account, code, reason } => {
+                agent::Up::Refused { account: *account, code: code.clone(), reason: reason.clone() }
+            }
+            _ => unreachable!(),
+        };
+        assert!(h.say(again).contains(&Request::Link(expected)), "{notice:?}");
+        h.say(parked(0));
+        let ended = h.gone();
+        assert!(answered(&ended, &host::Ending::Parked { work: host::Work { left: None, saved: None } }));
+        let stale = h.run(Event::Process(Box::new(agent::process::Event::Received {
+            owner: h.agent.unwrap(),
+            message: notice,
+        })));
+        assert!(!stale.iter().any(|row| matches!(
+            row,
+            Request::Link(
+                host::LinkUp::Unauthorized { .. } | host::LinkUp::Limited { .. } | host::LinkUp::AccountRefused { .. }
+            )
+        )));
+        h.run(Event::Link(host::LinkDown::Acknowledge { run: RUN, attempt: ATTEMPT }));
+    }
+}
+
+#[test]
+fn a_terminal_authentication_failure_does_not_synthesize_an_account_notice() {
+    let mut h = Harness::new();
+    h.started();
+    let mut rows = h.say(agent::Up::Answer {
+        answer: agent::Answer {
+            read: None,
+            turns: 0,
+            spent: 0,
+            result: agent::RunResult::Failed {
+                failure: agent::RunFailure::Model(agent::ModelFault::Unauthorized { account: 17 }),
+            },
+        },
+    });
+    let mut ended = rows.into_vec();
+    ended.extend(h.gone());
+    rows = ended.into_boxed_slice();
+    assert!(answered(
+        &rows,
+        &host::Ending::Failed {
+            failure: host::Failure::Run(host::RunFailure::Model),
+            detail: Box::default(),
+            work: host::Work { left: None, saved: None }
+        }
+    ));
+    assert!(!rows.iter().any(|row| matches!(
+        row,
+        Request::Link(
+            host::LinkUp::Unauthorized { .. } | host::LinkUp::Limited { .. } | host::LinkUp::AccountRefused { .. }
+        )
+    )));
+}

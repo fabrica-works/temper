@@ -4109,3 +4109,24 @@ fn a_chat_made_from_the_chat_template_is_a_conversation_task() {
     let task = driver.task(1).expect("the chat's task");
     assert_eq!((task.label, task.flags.conversation), (1, true), "the chat template's label and flag");
 }
+
+#[test]
+fn link_notice_routes_its_source_and_generation_through_the_fleet() {
+    let (mut driver, assignment) = Driver::chat();
+    let grant = assignment.grants[0];
+    driver.send(protocol::up(
+        Token::new(7),
+        host::LinkUp::Unauthorized {
+            run: Token::new(assignment.task),
+            attempt: Token::new(assignment.attempt),
+            account: grant.account,
+            generation: grant.generation,
+        },
+        engine::Parts::none(),
+    ));
+    driver.settle();
+    assert!(driver.protocol.accounts.contains(&accounts::Request::Component(accounts::ToComponent::Rejected {
+        account: grant.account,
+        generation: grant.generation
+    })));
+}

@@ -440,3 +440,28 @@ fn a_job_request_is_not_a_turn() {
         Some(Problem::Type)
     );
 }
+
+#[test]
+fn account_notices_are_not_turns_and_terminal_failure_classes_stay_distinct() {
+    for notice in [
+        smith::Request::Unauthorized { grant: smith::GrantName { account: 17, generation: 3 } },
+        smith::Request::Limited { account: 17, reset: None },
+        smith::Request::Limited { account: 17, reset: Some(Duration::ZERO) },
+        smith::Request::Refused { account: 17, code: b"quota".as_slice().into(), reason: b"refused".as_slice().into() },
+    ] {
+        assert_eq!(turn(notice, Box::default()), Err(Problem::Type));
+    }
+    for (failure, class) in [
+        (run::Failure::Stale, tasks::Class::Transient),
+        (run::Failure::Transcript(run::TranscriptRefusal::Malformed), tasks::Class::Transient),
+        (run::Failure::Budget { exhausted: run::Exhausted::Turns, used: Some(2), bound: Some(2) }, tasks::Class::Run),
+        (run::Failure::Policy(run::Policy::Unfinished { nudges: 1, rejected: 1 }), tasks::Class::Run),
+        (run::Failure::Model(run::Fault::Provider), tasks::Class::Run),
+        (run::Failure::Cancelled, tasks::Class::Agent),
+    ] {
+        assert_eq!(
+            result(run::Answer::Failed { failure, spent: spend(13), turns: 2 }, None),
+            Ok(crate::Terminal { cumulative: 13, turns: 2, end: tasks::End::Failed(class) })
+        );
+    }
+}

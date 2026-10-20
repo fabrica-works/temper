@@ -416,3 +416,6 @@ fn grants(grants: &[agent::Grant]) -> Box<[smith::Grant]> {
     }
     translated.into_boxed_slice()
 }
+
+#[cfg(test)]
+mod notices;

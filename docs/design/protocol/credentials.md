@@ -301,7 +301,12 @@ sources in its holder's order. temper configures the LLM providers
   `protocol/programs.md`, section 3). Limited, refused and unauthorized
   travel back from the agent as notices, through smith's host half, the
   hub and the link, to the accounts child, fenced by attempt (jig's
-  `domain/accounts.md`, 3.5).
+  `domain/accounts.md`, 3.5). Unknown limit resets stay absent; an explicit
+  zero remains supplied. A notice does not replace the run's terminal answer.
+  At the current jig/smith pins, Bearer, Key and Withdrawn forms are checked
+  against the lent value at start and renewal. Program names cross smith's
+  codec without reading a credential table, but smith refuses installation;
+  successful program runs and jig's production of Program grants still wait.
 - **A host that keeps a person's program logins** runs only that
   person's work, until a run's process tree is contained from the
   programs directory (jig's `domain/accounts.md`, 3.4): a run can read
