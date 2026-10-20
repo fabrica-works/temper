@@ -70,6 +70,8 @@ impl Refused {
                     Why::OtherApp => "another app".into(),
                     Why::Missing => "missing".into(),
                     Why::Busy => "busy".into(),
+                    // temper-13 tells the root and the person about crowded installations.
+                    Why::Crowded => "crowded".into(),
                     Why::OtherUser => "another user".into(),
                     Why::Refused(status) => format!("HTTP {status}"),
                     Why::NotAdmin => "not a site admin".into(),

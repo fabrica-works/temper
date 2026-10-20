@@ -570,6 +570,12 @@ fn application_outcomes() -> Box<[forge::ApplicationOutcome]> {
         forge::Protection::Unknown,
         forge::Protection::Absent,
         forge::Protection::Rule(skein_forge::api::Protection {
+            queue: false,
+            signatures: false,
+            linear: false,
+            code_owners: false,
+            bypass: skein_forge::api::Bypass::Never,
+
             branch: Box::from(b"main".as_slice()),
             contexts: Box::new([Box::from(b"check".as_slice())]),
             approvals: 2,

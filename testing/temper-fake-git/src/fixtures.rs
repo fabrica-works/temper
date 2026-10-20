@@ -136,6 +136,10 @@ pub fn named(full: &[u8], protected: Option<&[u8]>) -> Scenario {
             contexts: Box::new([]),
             approvals: 0,
             dismiss_stale: false,
+            queue: false,
+            linear: false,
+            code_owners: false,
+            bypassing_users: Box::new([]),
         }),
         hooked: false,
     };

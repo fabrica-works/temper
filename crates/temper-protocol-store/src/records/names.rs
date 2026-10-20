@@ -78,7 +78,8 @@ pub(super) fn encode_protection(value: &d::Protection) -> w::RepositoryProtectio
         d::Protection::Unknown => w::RepositoryProtection::Unknown,
         d::Protection::Absent => w::RepositoryProtection::Absent,
         d::Protection::Rule(value) => {
-            let api::Protection { branch, contexts, approvals, dismiss_stale } = value;
+            // temper-05 connects GitHub; the current Forgejo source supplies false/Never for the new facts.
+            let api::Protection { branch, contexts, approvals, dismiss_stale, .. } = value;
             w::RepositoryProtection::Rule(
                 w::Protection::new(
                     &w::CEILINGS,
@@ -113,6 +114,11 @@ pub(super) fn decode_protection(value: w::RepositoryProtection, bounds: &Bounds)
         w::RepositoryProtection::Rule(value) => {
             let w::ProtectionParts { branch, contexts, approvals, dismiss_stale } = value.into_parts();
             d::Protection::Rule(api::Protection {
+                queue: false,
+                signatures: false,
+                linear: false,
+                code_owners: false,
+                bypass: api::Bypass::Never,
                 branch,
                 contexts: decode_contexts(&contexts, bounds)?,
                 approvals,

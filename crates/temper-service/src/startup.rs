@@ -364,7 +364,7 @@ fn checked_start(
         accounts,
         worker_operations,
         &io,
-        (prepared_forges.1, prepared_forges.2),
+        (prepared_forges.1, prepared_forges.2, &prepared_forges.0),
     ) {
         Ok(bytes) => bytes,
         Err(found) => return Err(Problems::jig(found, &Path::root())),

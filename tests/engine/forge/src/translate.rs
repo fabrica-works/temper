@@ -180,6 +180,8 @@ pub fn error(error: forge::Error, now: Time) -> client::Error {
         forge::Error::Closed => client::Error::Closed,
         forge::Error::Stale => client::Error::Stale,
         forge::Error::Conflict => client::Error::Conflict,
+        // temper-05 connects GitHub; this Forgejo world never enables the fake queue.
+        forge::Error::AlreadyQueued(_) => unreachable!("Forgejo fixtures never enqueue"),
         forge::Error::Protected => client::Error::Protected,
     }
 }
@@ -222,7 +224,7 @@ pub fn answer(asked: &client::Op, answer: forge::Answer, l: &Limits) -> client::
         forge::Answer::PullFiles { head, files, more } => {
             client::Answer::PullFiles { head: commit(head), files: files_in(files), more }
         }
-        forge::Answer::Comparison { base, head, contains_base, files, commits } => {
+        forge::Answer::Comparison { base, head, contains_base, files, commits, .. } => {
             let mut ids = List::with_capacity(u32::try_from(commits.len()).expect("bounded fake comparison"));
             for id in commits {
                 ids.push(commit(id)).expect("comparison capacity");
@@ -240,6 +242,11 @@ pub fn answer(asked: &client::Op, answer: forge::Answer, l: &Limits) -> client::
         forge::Answer::Job { job, steps } => job_answer(asked, &job, &steps),
         forge::Answer::Protection(protection) => client::Answer::Protection(match protection {
             Some(p) => Some(client::Protection {
+                queue: false,
+                signatures: false,
+                linear: false,
+                code_owners: false,
+                bypass: skein_forge::api::Bypass::Never,
                 branch: p.branch,
                 contexts: p.contexts,
                 approvals: p.approvals,
@@ -561,6 +568,8 @@ pub fn hint(repository: client::Repository, request: &skein_fake_forge_domain::R
             (Some(branch), _, _) => client::Change::Branch(branch.clone()),
             _ => return None,
         },
+        // temper-05 connects GitHub; queue groups cannot arise in this Forgejo world.
+        forge::Change::Group { .. } => unreachable!("Forgejo fixtures never enqueue"),
         forge::Change::Job => client::Change::Commit(commit(ended.as_ref()?.commit)),
         forge::Change::Issue | forge::Change::Pull | forge::Change::Comment | forge::Change::Review => {
             client::Change::Item((*number)?)

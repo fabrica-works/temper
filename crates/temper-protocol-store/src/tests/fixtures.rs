@@ -222,6 +222,12 @@ fn initial_rows(name: &top::Name) -> [(&'static str, top::Stored); 8] {
         (
             "repository rule",
             adopted(top::Protection::Rule(skein_forge::api::Protection {
+                queue: false,
+                signatures: false,
+                linear: false,
+                code_owners: false,
+                bypass: skein_forge::api::Bypass::Never,
+
                 branch: Box::from(b"main".as_slice()),
                 contexts: Box::new([Box::from(b"test".as_slice()), Box::from(b"build".as_slice())]),
                 approvals: 2,
@@ -486,6 +492,12 @@ pub fn answers_without_item_pieces() -> [skein_forge::api::Answer; 19] {
         },
         Answer::File { head: [15; 32], path: Box::new([16]), bytes: Box::new([17]), truncated: true },
         Answer::Protection(Some(Protection {
+            queue: false,
+            signatures: false,
+            linear: false,
+            code_owners: false,
+            bypass: skein_forge::api::Bypass::Never,
+
             branch: Box::new([18]),
             contexts: Box::new([Box::new([19]), Box::new([])]),
             approvals: 20,

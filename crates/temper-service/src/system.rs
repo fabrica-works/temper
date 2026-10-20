@@ -84,7 +84,7 @@ impl Service {
             accounts.as_ref(),
             worker_operations,
             &io_limits,
-            (forge_roots, forge_owned),
+            (forge_roots, forge_owned, &forge_settings),
         )?;
 
         if let Err(what) =
@@ -555,11 +555,11 @@ pub(crate) fn startup_worst_case(
     runtime: Option<&AccountsRuntime>,
     worker_operations: u32,
     io: &io::Limits,
-    forge_bytes: (u64, u64),
+    forge_bytes: (u64, u64, &skein_forge_connection::Settings),
 ) -> Result<u64, Problems> {
     let queue = temper_engine_domain::max_out(root).checked_mul(2).ok_or(start_problem(b"limits", What::Bound))?;
     let operations = startup_operations(io, queue, worker_operations).ok_or(start_problem(b"limits", What::Bound))?;
-    let bytes = memory(settings, root, store, runtime, operations, io, forge_bytes.1)
+    let bytes = memory(settings, root, store, runtime, operations, io, (forge_bytes.1, forge_bytes.2))
         .ok_or(start_problem(b"memory_bytes", What::Bound))?;
     bytes.checked_add(forge_bytes.0).ok_or(start_problem(b"memory_bytes", What::Bound))
 }
@@ -573,7 +573,7 @@ fn memory(
     runtime: Option<&AccountsRuntime>,
     operations: u32,
     io: &io::Limits,
-    forge_owned: u64,
+    forge: (u64, &skein_forge_connection::Settings),
 ) -> Option<u64> {
     let queue = temper_engine_domain::max_out(root).checked_mul(2)?;
     let payload = temper_engine_domain::worst_case(root)?;
@@ -610,14 +610,14 @@ fn memory(
         &root.journal,
     )?)?;
     bytes = bytes.checked_add(clients::bundle::worst_case(&settings.limits.clients)?)?;
-    let forges = u32::try_from(settings.forges.len()).ok()?;
+    let forges = skein_forge_connection::limits::Forges::of(forge.1)?;
     let batch = temper_engine_domain::max_out(root).checked_add(2)?;
     bytes = bytes
         .checked_add(skein_forge_connection::limits::worst_case(
             &settings.limits.forge_component,
             &crate::forge::shared(&settings.limits, &settings.jig.limits.io),
             forges,
-            forge_owned,
+            forge.0,
         )?)?
         .checked_add(Queue::<skein_forge_connection::Event>::worst_case(
             batch.checked_mul(skein_forge_connection::MAX_OUT.above)?,

@@ -283,7 +283,8 @@ pub(super) fn decode(value: w::Answer, bounds: &Bounds) -> Result<d::Answer, Und
     })
 }
 fn encode_protection(value: &d::Protection) -> w::Protection {
-    let d::Protection { branch, contexts, approvals, dismiss_stale } = value;
+    // temper-05 connects GitHub; the current Forgejo source supplies false/Never for the new facts.
+    let d::Protection { branch, contexts, approvals, dismiss_stale, .. } = value;
     w::Protection::new(
         &w::CEILINGS,
         w::ProtectionParts {
@@ -297,7 +298,17 @@ fn encode_protection(value: &d::Protection) -> w::Protection {
 }
 fn decode_protection(value: w::Protection, bounds: &Bounds) -> Result<d::Protection, Undecodable> {
     let w::ProtectionParts { branch, contexts, approvals, dismiss_stale } = value.into_parts();
-    Ok(d::Protection { branch, contexts: names::decode_contexts(&contexts, bounds)?, approvals, dismiss_stale })
+    Ok(d::Protection {
+        queue: false,
+        signatures: false,
+        linear: false,
+        code_owners: false,
+        bypass: skein_forge::api::Bypass::Never,
+        branch,
+        contexts: names::decode_contexts(&contexts, bounds)?,
+        approvals,
+        dismiss_stale,
+    })
 }
 
 fn encode_summaries(values: &[d::Summary]) -> Box<[u8]> {

@@ -663,6 +663,7 @@ pub fn fake_config() -> forge::Config {
             files: 4,
             statuses: 4,
             contexts: 4,
+            bypassing_users: 0,
             pages: 1,
             name_bytes: 64,
             title_bytes: 64,

@@ -45,6 +45,7 @@ pub const LIMITS: Limits = Limits {
     files: 256,
     statuses: 1,
     contexts: 1,
+    bypassing_users: 0,
     pages: 1,
     name_bytes: 256,
     title_bytes: 16,
@@ -247,7 +248,10 @@ impl Forge {
                     moves.push(Move { remote: repository.into(), branch: branch.into(), from, to });
                 }
                 Observation::Refused { .. } | Observation::Rejected { .. } => {}
-                Observation::Deleted { .. }
+                Observation::Enqueued { .. }
+                | Observation::Group { .. }
+                | Observation::Dequeued { .. }
+                | Observation::Deleted { .. }
                 | Observation::Opened { .. }
                 | Observation::Closed { .. }
                 | Observation::Reopened { .. }
@@ -367,6 +371,7 @@ fn fault(error: Error) -> Fault {
         Error::Missing(
             What::Item | What::Pull | What::Comment | What::Label | What::File | What::Page | What::Review | What::Job,
         )
+        | Error::AlreadyQueued(_)
         | Error::Unavailable
         | Error::Timeout
         | Error::RateLimited { .. }

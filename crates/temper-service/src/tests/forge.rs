@@ -40,8 +40,16 @@ fn a_stopped_forge_is_named_and_only_its_calls_are_not_connected() {
     assert_eq!(
         answers.as_ref(),
         [
-            skein_forge_connection::Answered { call: Token::new(7), cost: 0, result: Err(Error::NotConnected) },
             skein_forge_connection::Answered {
+                free: 0,
+                rate: None,
+                call: Token::new(7),
+                cost: 0,
+                result: Err(Error::NotConnected)
+            },
+            skein_forge_connection::Answered {
+                free: 0,
+                rate: None,
                 call: Token::new(8),
                 cost: 1,
                 result: Ok(Answer::Located { repository: 2 })
@@ -97,7 +105,13 @@ fn a_forge_call_waiting_past_its_deadline_reaches_the_root_unavailable() {
     };
     assert_eq!(
         answer,
-        skein_forge_connection::Answered { call, cost: 0, result: Err(skein_forge::api::Error::Unavailable) }
+        skein_forge_connection::Answered {
+            free: 0,
+            rate: None,
+            call,
+            cost: 0,
+            result: Err(skein_forge::api::Error::Unavailable)
+        }
     );
     let root::Event::Forge(event) = forge::event(answer) else {
         panic!("forge event");
@@ -114,6 +128,8 @@ fn an_answer_the_root_cannot_take_is_offered_again_next_pass() {
         }
     }
     let answer = skein_forge_connection::Answered {
+        free: 0,
+        rate: None,
         call: Token::new(7),
         cost: 0,
         result: Err(skein_forge::api::Error::Unavailable),
@@ -135,6 +151,8 @@ fn an_answer_returned_in_the_drain_is_never_offered_again() {
     fixtures::ForgeFace::returned(
         &mut service,
         skein_forge_connection::Answered {
+            free: 0,
+            rate: None,
             call: Token::new(7),
             cost: 0,
             result: Err(skein_forge::api::Error::Unavailable),

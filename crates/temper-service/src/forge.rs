@@ -112,8 +112,8 @@ pub fn shared(limits: &limits::Limits, io: &skein_io::Limits) -> skein_forge_con
 #[must_use]
 pub fn event(answer: skein_forge_connection::Answered) -> root::Event {
     root::Event::Forge(Box::new(forge::Event::Client(skein_forge_client::Event::Answered {
-        free: 0,
-        rate: None,
+        free: answer.free,
+        rate: answer.rate,
         call: answer.call,
         cost: answer.cost,
         result: answer.result,
@@ -126,8 +126,8 @@ pub fn hinted(hinted: skein_forge_connection::hooks::Hinted) -> root::Event {
 }
 /// Recover an answer refused by admission or returned during the drain.
 pub fn back(event: Box<forge::Event>) -> Result<skein_forge_connection::Answered, Box<forge::Event>> {
-    if let forge::Event::Client(skein_forge_client::Event::Answered { call, cost, result, .. }) = *event {
-        Ok(skein_forge_connection::Answered { call, cost, result })
+    if let forge::Event::Client(skein_forge_client::Event::Answered { call, cost, result, free, rate }) = *event {
+        Ok(skein_forge_connection::Answered { call, cost, result, free, rate })
     } else {
         Err(event)
     }

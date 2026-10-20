@@ -21,6 +21,10 @@ pub fn fixture() -> crate::forge::Fixture {
                 contexts: setup.checks.contexts.clone(),
                 approvals: 0,
                 dismiss_stale: false,
+                queue: false,
+                linear: false,
+                code_owners: false,
+                bypassing_users: Box::new([]),
             });
             setup
         },

@@ -200,6 +200,7 @@ fn fault(error: api::Error) -> Fault {
         | api::Error::Empty
         | api::Error::Closed
         | api::Error::Stale
+        | api::Error::AlreadyQueued(_)
         | api::Error::Conflict => panic!("unexpected git fault: {error:?}"),
     }
 }

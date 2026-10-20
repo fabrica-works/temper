@@ -260,6 +260,12 @@ fn an_adopted_repository_keeps_its_facts_in_the_answer() {
 #[test]
 fn an_adopted_repository_keeps_its_protection_rule() {
     let outcome = adopted(forge::Protection::Rule(skein_forge::api::Protection {
+        queue: false,
+        signatures: false,
+        linear: false,
+        code_owners: false,
+        bypass: skein_forge::api::Bypass::Never,
+
         branch: b"main".as_slice().into(),
         contexts: Box::new([b"ci/build".as_slice().into()]),
         approvals: 2,
