@@ -51,6 +51,11 @@ this session (README, Repin).
 Counts and Files describe the base, dd12b8e; each step edits origin/main as it
 stands at its start, where temper 01 to 06 have renamed imports and changed
 counts. Counts below are written "the count at the step's start minus N".
+The current conformance count is35: base25, the unset-variable refusal,
+and nine additions from06.2–06.4 including06.3's diagnostic test. Refresh
+further reached count copies and subtractions from the actual step-start
+listings and name their users in the commit body; historical base examples
+keep their original counts.
 
 - **Two increments, readers before the corpus.** The conformance's
   transcripts and deliveries are read by `tests/engine/protocol-forge`
@@ -213,9 +218,9 @@ Shape: nothing new. `tests/codecs` keeps `src/lib.rs` (`mutated`,
   worker_wire}.rs` (5 tests) with `fuzzy_{client_wire,store,worker_wire}.rs` (3).
 Test shape: no new test. Leaving, with their times at the base: 55 focused of
   codecs (forgejo_setup 22, writes 8, files 6, reviews 6, items 5, deliveries 4,
-  start 4; 0.154 s), 3 fuzzy (`fuzzy_forgejo`, 2.1 s) and the conformance's 34
+  start 4; 0.154 s), 3 fuzzy (`fuzzy_forgejo`, 2.1 s) and the conformance's 35
   at the step's start (the base's 25 in 0.122 s, temper 06.1's refusal test and 06.2 to
-  06.4's 8), whose
+  06.4's 9), whose
   recorder, document tests and facts are skein's. The refusal test leaves with
   the tool and has no counterpart: skein's tool reads no variable (answer 31).
 Proof:
@@ -224,8 +229,8 @@ Proof:
 - world: `heavy cargo nextest run -p temper-codecs-world --profile fuzzy`: 3
   passed, 0.10 s in the scratch tree (6 in 2.3 s at the base).
 - joint: `heavy cargo check --workspace --all-targets` prints Finished; then
-  `heavy --gate scripts/check.sh` exits 0: focused = the start's minus 89 (codecs'
-  55 and the conformance's 34, with temper 06.1 to 06.4's tests; 80 in the
+  `heavy --gate scripts/check.sh` exits 0: focused = the start's minus 90 (codecs'
+  55 and the conformance's 35, with temper 06.1 to 06.4's tests; 80 in the
   scratch worktree, which lacks them: 1791 -> 1711), fuzzy = the start's minus
   3 (42 -> 39). After both increments: 1879 -> 1711 and 50 -> 39 at the base.
 - The process tier does not run (07.1, Proof).
@@ -264,4 +269,4 @@ Each command runs once in a worktree of temper at `origin/main`.
 - `heavy cargo nextest run --workspace` and `--profile fuzzy` print the count at
   07.1's start minus the deleted packages' tests, and minus 11 for fuzzy: at
   the base minus 168 (88 + 55 + 25) and 11, 1711 passed and 39 passed; with
-  temper 06.1 to 06.4's nine tests, minus 177.
+  temper 06.1 to 06.4's ten tests, minus 178.
