@@ -1619,6 +1619,37 @@ where its answer lands.
      complete the increment's required actual-tree checks and gate after integration.
      Refresh further reached copies and list every changed user in the commit body.
 
+198. **Resume Temper05.2 with the designer stated frozen-history room** (designer answer to temper05.2 block of 2026-10-20T01:48:06Z).
+     Apply the landed designer answer, Skein3df1162668477e35d58f9bfea30504804d02e242 and Temper07172c9477fe6660c2834633d3c29b4586ff5cb8:
+
+     Landed with `land --docs`: skein 3df1162668477e35d58f9bfea30504804d02e242
+     (fake-forge.md 5) and temper 07172c9477fe6660c2834633d3c29b4586ff5cb8
+     (plan temper/05-fakes.md 05.2, later.md). This follows the director's lean.
+
+     1. The derived formula (400/404/1,610) is withdrawn. Its premises fail in
+        source, and three audits found no short correct derivation.
+     2. The frozen history already fails loudly at its cap. skein 5: "none is
+        dropped: a record past the world's caps fails the peer's assertion,
+        'frozen record count fits' or 'frozen payload admitted before copying',
+        and with it the story. So a world's caps are a stated room for a whole
+        story, each named for what it holds, with its reason".
+     3. The room is `fixtures.rs`' `STORY_OBSERVATIONS` (1,024) and
+        `STORY_OBSERVATION_BYTES` (2,097,152, within `u32`), "a whole story's
+        frozen peer records". Their comment gives the reason: about 16 times the
+        most a story has recorded (Adopt's 65), at skein's peer fixture's 2 KiB
+        a record. It is a room, not a derived bound.
+     4. A story that outgrows the room fails by the peer's own assertion, and
+        the step returns that as a finding naming the story. Never raise the room
+        past an overflow, catch it, or drop, drain or clear the history.
+        `Peer::new` refusing the sum also returns.
+     5. Deferred, with a later.md row: the room derived as a whole story's bound
+        (physical connections, heads and call snapshots apart, at most two per
+        head; startup `User`/`ApiSettings` outside the call budget; discarded and
+        paging debt; a `u32` byte envelope). It goes to the next plan that
+        changes the one-process world or skein's forge peer.
+     6. Unchanged from the last answer: the Listen-fd learner, Adopt's settled
+        end, and `[NoAddress, Written]`.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
