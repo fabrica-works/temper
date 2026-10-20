@@ -248,7 +248,7 @@ Each is `{artifact.temper} ctl {dir.client}` and then:
 
 | Action | Arguments | For |
 |---|---|---|
-| `sign-in` | `sign-in -`, stdin `http://{proc.serve.ready.link}` and a newline | the deployment's owner signs in by the printed link |
+| `sign-in` | `sign-in -`, stdin `{proc.serve.ready.link}` and a newline | the deployment's owner signs in by the full printed link |
 | `add-key` | `add-key 1 {proc.llm.dir}/llm.key --deployment --key lab-llm` | the fake model's key, the deployment's account (`client/tools.md`, 5.5, area 5) |
 | `usable` | `wait accounts --until usable --timeout 100` | the account usable |
 | `forge` | `wait forges --until connected:1 --timeout 100` | reconcile on the fake done (`protocol/setup.md`, 8.4) |

@@ -4,7 +4,7 @@
 `docs/design/qa.md` (amended design `998a5f054`), reusable by H/P. No
 `experiment.json` or configuration templates with guessed members are supplied.
 Python 3.11+ standard library is the authorized temporary lab implementation;
-none of this is product code or a temper world/gate test.
+none of this is product code or a temper world test.
 
 From the repository root, after the trusted seed has signed in:
 
@@ -52,8 +52,8 @@ it is **not an observation encoding or a public normalized schema**. No
 Exact checks, run from this directory's repository root, through heavy only:
 
 ```sh
-heavy -- /bin/bash -c 'time python3 -B -m unittest discover -s lab/tests/unit -v'
-heavy -- /bin/bash -c 'time python3 -B -m unittest discover -s lab/tests/process -v'
+heavy python3 -I -B -m unittest discover -s lab/tests/unit -v
+heavy python3 -I -B -m unittest discover -s lab/tests/process -v
 ```
 
 The unit tests use known binary content/trees, loss/incomplete/refused stories
@@ -62,14 +62,10 @@ and ctl output. Process tests use the real POSIX shell and `/bin/echo`,
 and refusal of malformed story output. They introduce no fake product/harness.
 No gate integration, cluster, model or paid calibration is run here.
 
-Validation in the implementation sandbox: both commands above were attempted
-with an outer shell `time`. Heavy exited 1 before queueing either test command:
-connecting to `/run/user/1000/pueue_free.socket` was denied (EPERM), taking
-0.206s for unit and 0.187s for process dispatch. **No tests started or passed;
-test execution times are unknown.** `/usr/bin/time` is absent here, so the
-commands use bash's builtin timing. Staging was also denied: the shared Git
-worktree index is on a read-only filesystem. Files remain for native testing,
-review, commit and branch push by the owner; no gate or land was attempted.
+Native validation through heavy: 18 unit tests passed in 0.003s and 14 process
+tests passed in 0.258s. The process tests exercise real shells and canary
+executables; they do not prove the product story, its containment or a full
+cluster. No paid driver or calibration run has started.
 
 Still required to finish S's canonical document/templates and runnable checks:
 
@@ -90,11 +86,12 @@ Still required to finish S's canonical document/templates and runnable checks:
   `forge.json`, `llm.json`, serve/agent/charter/worker files and `experiment.json`
   against those exact landed contracts, and run S's three attended seeds.
 
-Concrete source mismatches at this branch's base: `crates/temper/src/lib.rs`
+Concrete source mismatches at implementation base `998a5f054`:
+`crates/temper/src/lib.rs`
 accepts `serve CONFIG.json`, has no `fake` command, and ctl's
-`crates/temper-client-tools/src/table.rs` lacks `add-key`/`forges`. qa.md, 5.1's
-sign-in table prefixes `http://` to a capture described elsewhere as a full
-URL; the wrapper/story expect the full printed URL without doubling it.
+`crates/temper-client-tools/src/table.rs` lacks `add-key`/`forges`.
+The wrapper/story expect the full printed sign-in URL without a second scheme
+prefix, as qa.md, 5.1 specifies.
 The fake Observation (`observe.rs`: Merged.commit, Moved.to, Refused) and Object
 (`git.rs`: u64 counts, byte-path/content Tree) were source-read in skein's
 `testing/skein-fake-forge-domain/src/`; the designed route is skein's
