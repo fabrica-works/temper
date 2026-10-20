@@ -149,9 +149,10 @@ plan's own.
   (`--profile measure -j 1` through `heavy --gate`), the median of
   three runs:
   - the packages `temper-client-shell-terminal`, `temper-client-world`,
-    `temper-engine-protocol-forge-world`,
-    `temper-forge-setup-reconcile-world`, `temper-one-process-world` and
-    `temper-worker-protocol-git-world` together, against 6.1's 4 s;
+    `temper-engine-protocol-forge-world`, `temper-one-process-world` and
+    `temper-worker-protocol-git-world` together, against 6.1's 4 s
+    (reconcile's world is skein's since forge-kit's temper-07.1, ruling
+    150);
   - `temper-real-loop-world` alone, against 6.1's 6 s, with each story
     at its 1 s.
 
@@ -388,7 +389,7 @@ says.
    part:
 
    ```
-   P='-p temper-client-shell-terminal -p temper-client-world -p temper-engine-protocol-forge-world -p temper-forge-setup-reconcile-world -p temper-one-process-world -p temper-real-loop-world -p temper-worker-protocol-git-world'
+   P='-p temper-client-shell-terminal -p temper-client-world -p temper-engine-protocol-forge-world -p temper-one-process-world -p temper-real-loop-world -p temper-worker-protocol-git-world'
    heavy -- sh -c "cargo nextest run $P --no-run" && heavy --gate -- sh -c "export NEXTEST_DOUBLE_SPAWN=0; for i in 1 2 3 4; do cargo nextest run $P --profile measure -j 1 >below-\$i.log 2>&1; done"
    for i in 2 3 4; do sed -nE 's/^ *PASS \[ *([0-9.]+)s\] \([^)]*\) ([^ ]+) ([^ ]+).*/\1 \2 \3/p' below-$i.log | awk -v run=below-$i '{split($2, b, ":")} b[1] != "temper-real-loop-world" {o += $1; n++; next} {r += $1; m++} $1 > 1 {printf "%s: %s %s %.2f s, past its 1 s\n", run, $2, $3, $1} END {if (!n || !m) {print run ": no test read of the other worlds or of the real loop"; exit 1} printf "%s: the other worlds %.2f s against 4 s, the real loop %.2f s against 6 s\n", run, o, r}'; done
    ```

@@ -873,6 +873,19 @@ pass:
      - Name which stage is pending first: the review delegate not started, its scripted turn unanswered, its review not reaching the forge, the gate not reading it, or the parent chat's reply wait; one run's finding for each is enough to order them.
      - A cause whose fix lies inside 13.5's Files is fixed there and named in the commit body. One outside them (temper-client-tools, temper-service, temper-engine-*, temper-fake-git, skein's fake forge) is raised as a block with the cause found, before any such file is changed, as ruling 140 says. Keep 13.5 within its Size, "at most ~120 lines of `tests/real-loop/src`"; past it, say by how much in the report.
 
+150. **The Done when's misses, and the worlds' sums without reconcile's** (Done when, run of 2026-10-20T15:47:40Z).
+     Reverses: nothing.
+     Amends: the README's Rules, "The worlds' sums below the domain hold no step", and Done when 5's `P`: `temper-forge-setup-reconcile-world` leaves both; later.md gains a row for testing.md 6.1.
+
+     The Done when run of 2026-10-20T15:47:40Z, at temper 9f444b30c (done.md, "Done when, run 2026-10-20T15:47:40Z"), passed items 1, 4 (24 passed, Summary 107.784 s) and 5's suites (focused 14.44 s and fuzzy 19.65 s medians against the Pulse's aims of 37 s and 22 s), and failed five commands. Four are misses whose intent holds on main, recorded here with their reasons; the fifth is fixed by this ruling and measured again.
+
+     1. **Session 13, its second command:** `cue: Some(` and `@coding Small fix` print no line in tests/real-loop/src. The content cue is there as an assignment, `tests/real-loop/src/landing.rs:18: setup.checks.cue = Some(api::Cue { path: b"README.md"…`; 13.5 (fa7db32f6) renamed the coding brief to `cue: b"@coding Fix"` (landing.rs:176) "to keep the coding brief within the title bound", in its commit body. `git log -S'cue: Some(' origin/main -- tests/real-loop` lists no commit: the command's literal never matched a shape any increment wrote.
+     2. **Session 14, its seventh and eighth commands:** each prints two lines, not one. The second `global-timeout = "60s"` (.config/nextest.toml:63) is `[profile.browser]`'s, from browser-1's temper-04.1 (00e77f2cd); `[profile.fuzzy]`'s (line 21) is unchanged. The second `opt-level = 3` (Cargo.toml:204) is `[profile.dev.package.skein-ui-bundle]`'s, from browser-1's temper-02.3 (7719ba16a). Neither is this plan's.
+     3. **Item 3:** ten `_and_` names print, from 2a343d21e, 2a529b4f2, 3ceceb8ff and a438acc2c (accounts and program-login work, without this plan's `Plan:` trailer, none in its ledger), in directories this plan's diff shares. No test this plan's 36 ledger commits added is named with `_and_`.
+     4. **Item 5's worlds below the domain could not run:** `error: package ID specification `temper-forge-setup-reconcile-world` did not match any packages` (logs/20261020T155618-77.log). forge-kit's temper-07.1, "Remove forge worlds now owned by skein" (4b074713d), removed it during this run; temper's testing.md table of tiers says "reconcile's is skein's (2.2)". The six worlds left are temper's: the sum of the other worlds is theirs, against 4 s, and Done when 5's measurement runs again with the amended `P`, its results appended to done.md. testing.md 6.1's own list still names "reconcile worlds": a later.md row asks temper's design owner to reword it.
+
+     A further Done when command whose literal fails only on another plan's lines is recorded so, with the commit that wrote them, rather than amended after the run.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
