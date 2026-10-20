@@ -122,7 +122,7 @@ record Writable    { push: bytes  expected: option fixed 32 }
 | `start` | `ForgeStart::Base`, `Branch`, `Saved`, `Merge { branch, base }`; the engine never asks for a commit | `Start`, all five |
 | `access` | `push: Some(branch)` is `writable { push: branch, expected: none }`; `None` is `read_only` | `Access` |
 | `identity` | `identity`: the number of the forge's git identity, the credential jig grants the attempt (credentials.md, section 4) | `identity`, the grant's number in the application's table |
-| `account` | on a GitHub forge, the forge's id of the repository's owner's account; none on Forgejo | `account`, by which the worker's routing picks the identity's entry for each git operation on the repository (section 6) |
+| `account` | made by the routing, on a GitHub forge: the `account` of the entry in the forge's identity value, as the routing last made it (section 6), whose `account_login` equals `owner`, compared ASCII case-insensitively; none when no entry matches, and none on Forgejo | `account`, by which the worker's routing picks the identity's entry for each git operation on the repository (section 6) |
 | `save` | the saved-work branch, when the root asks for a save | `save` beside `Event::Assign` |
 
 - **Ids** are the full object id in 32 bytes: a SHA-256 id as it is, a
@@ -246,7 +246,8 @@ record Entry    { account: u64  account_login: text  token: secret  expires: u64
   and the author (git.md, sections 2 and 5): Forgejo's token, or on
   GitHub the entry whose `account` is the repository's item's `account`
   (section 4). With no such entry the operation fails `Refused` without
-  running git, named "temper's App is not installed on <account>". A
+  running git, named "temper's App is not installed on the account
+  owning <name>", `<name>` the item's (section 4). A
   value that does not decode, or breaks a field's rule, is dropped and
   counted; an operation that needs it fails `Broken`.
 - **Shown nowhere.** The record's `Debug` shows each token's length only

@@ -90,7 +90,8 @@ the worker's root directory     workers[].root
   without running git: grants arrive with the assignment, so this is a
   fault of the worker's side. One whose GitHub value has no entry for
   the owner's account fails `Refused` without running git, named
-  "temper's App is not installed on <account>".
+  "temper's App is not installed on the account owning <name>"
+  (channel.md, section 6).
 - **Each operation ends exactly once:** `Done` with its own terminal, or
   `Failed`/`FailedWithOutput` with a fault, and `Cancelled` only if the
   cancel won the race (section 7). Its `owner` token is echoed.

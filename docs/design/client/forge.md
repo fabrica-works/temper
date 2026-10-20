@@ -447,7 +447,7 @@ page, the adoption form and its outcome, a change's panel and its hold.
 | The forge answers or tells | It shows |
 |---|---|
 | `NotConnected` | on the forge's row, "Not connected", with Connect (5.4); the adoption form lists none of its repositories, and an adoption on it is refused, "Forge F is not connected." |
-| `NotInstalled`, no accepted installation on the owner | "temper's App is not installed on OWNER.", with "Install on another account"; a push to it is refused the same way |
+| `NotInstalled`, no accepted installation on the owner | "temper's App is not installed on OWNER.", with "Install on another account"; a push to it is refused, as "temper's App is not installed on the account owning NAME." (`../protocol/channel.md`, section 6) |
 | `Missing`, on a repository whose account has an installation of selected repositories | "OWNER/NAME is not granted to temper's App.", linked to the installation's page on GitHub: `WEB/settings/installations/ID` for a person's account, `WEB/organizations/ORG/settings/installations/ID` for an organization's, WEB the forge's configured `web` address and ID the installation's |
 | `Missing` otherwise | not found, as `README.md`, 4.7 says |
 | `Stopped { why }`, told to the root | on the forge's row, "Stopped: WHY", with Replace (5.4); its calls answer `NotConnected` until its next connect, shown as that row says |

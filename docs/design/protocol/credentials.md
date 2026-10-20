@@ -408,7 +408,8 @@ sources in its holder's order. temper configures the LLM providers
   holds it only while that operation is in flight; it never reads the
   table itself (git.md, sections 2 and 5). On GitHub the worker picks the
   entry whose account id is the repository's owner's; with none, the
-  push is refused, named "temper's App is not installed on <account>".
+  push is refused, named "temper's App is not installed on the account
+  owning <name>" (channel.md, section 6).
   An operation whose identity has no value in the table fails `Broken`
   without running git. An entry goes as jig's do (jig's
   `protocol/channel.md`, section 8): a newer generation pushes it out, or

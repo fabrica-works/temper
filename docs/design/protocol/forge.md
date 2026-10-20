@@ -354,7 +354,8 @@ and author are the configuration's, its value the forge's.
   (credentials.md, its open questions).
 - **The worker picks** the entry whose account id is the repository's
   owner's, which the workspace item carries; with none, the push is
-  refused, named "temper's App is not installed on <account>". The agent
+  refused, named "temper's App is not installed on the account owning
+  <name>" (channel.md, section 6). The agent
   never sees a token: jig's hub forwards no application's credential to
   it.
 - **The value's codec,** engine to worker, is temper's wire format,
