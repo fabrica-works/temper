@@ -441,6 +441,7 @@ impl Words {
     }
 }
 const DEMO_REQUEST: &[&[u8]] = &[b"Try a request in ", b"/", b". Follow the task from its branch to a landed change."];
+#[expect(clippy::too_many_lines, reason = "one exhaustive table of the client's English words")]
 fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
