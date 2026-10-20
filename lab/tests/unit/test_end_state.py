@@ -1,5 +1,7 @@
 """Known byte trees and the landed skein observation writer's JSON lines."""
 
+import base64
+import copy
 import json
 import sys
 import unittest
@@ -7,7 +9,7 @@ from pathlib import Path
 
 EXPERIMENT = Path(__file__).resolve().parents[2] / "chat-change-smoke"
 sys.path.insert(0, str(EXPERIMENT / "checks"))
-from _end_state import _CHANGED, _CONTENT, _NOT_LANDED, _Object, _Status, _judge, _project_observations
+from _end_state import _CHANGED, _CONTENT, _NOT_LANDED, _Object, _Status, _decode_objects, _judge, _project_observations
 
 NOTICE = b"Maintained by temper.\n"
 PARENT = {b"README.md": b"widget\n", b"src/a": b"\x00\xff\n"}
@@ -28,7 +30,85 @@ def judge(**changes):
     return _judge(**args)
 
 
+def object_reply(commit=12, parent=11):
+    def binary(raw):
+        return base64.b64encode(raw).decode("ascii")
+
+    def record(number, first_parent, tree):
+        # Intentionally different member order from the supplied contract.
+        tree = {**tree, b"\x00\xff/path": b"\xff\x00"}
+        return dict(message=binary(b"\x00\xffmessage\n"),
+                    tree=[dict(content=binary(value), path=binary(path)) for path, value in tree.items()],
+                    merge_parent=None, parent=first_parent, commit=number)
+
+    return dict(graph=[], objects=[record(commit, parent, CURRENT), record(parent, None, PARENT)])
+
+
 class EndStateTests(unittest.TestCase):
+    def test_object_reply_binary_u64_and_exact_notice_delta(self):
+        for commit, parent in ((12, 11), ((1 << 64) - 1, (1 << 64) - 2)):
+            for change, status, signatures in (
+                (None, _Status.PASS, ()),
+                (dict(path="b3RoZXI=", content="AP8="), _Status.FAIL, (_CHANGED,)),
+                (dict(path="Tk9USUNF", content="d3Jvbmc="), _Status.FAIL, (_CONTENT,)),
+            ):
+                with self.subTest(commit=commit, change=change):
+                    reply = object_reply(commit, parent)
+                    if change:
+                        entries = reply["objects"][0]["tree"]
+                        entries[:] = [entry for entry in entries if entry["path"] != change["path"]]
+                        entries.append(change)
+                    objects = _decode_objects(json.dumps(reply).encode(), [commit, parent])
+                    self.assertIsNotNone(objects)
+                    self.assertEqual(objects[parent].tree, {**PARENT, b"\x00\xff/path": b"\xff\x00"})
+                    verdict = judge(last_merged=commit, last_moved=commit, objects=objects)
+                    self.assertEqual((verdict.status, verdict.signatures), (status, signatures))
+        initial = object_reply()
+        initial["objects"].pop()
+        initial["graph"] = [dict(commit=11, parent=None, merge_parent=None)]
+        self.assertEqual(set(_decode_objects(json.dumps(initial).encode(), [12])), {12})
+
+    def test_partial_or_malformed_object_reply_never_supplies_evidence(self):
+        cases = []
+        for dropped in (0, 1):
+            reply = object_reply()
+            record = reply["objects"].pop(dropped)
+            cases.append((f"dropped asked {dropped}", json.dumps(reply).encode()))
+            reply["graph"].append({key: record[key] for key in ("commit", "parent", "merge_parent")})
+            cases.append((f"asked only in graph {dropped}", json.dumps(reply).encode()))
+        for field in ("commit", "parent", "merge_parent", "tree", "message"):
+            reply = object_reply()
+            del reply["objects"][0][field]
+            cases.append(("missing " + field, json.dumps(reply).encode()))
+        for value in (True, 12.0, "12", -1, 1 << 64):
+            for field in ("commit", "parent", "merge_parent"):
+                reply = object_reply()
+                reply["objects"][0][field] = value
+                cases.append((f"non-u64 {field} {value}", json.dumps(reply).encode()))
+        for field in ("path", "content", "message"):
+            for value in ("%%%", "YQ", "YQ===", "YR==", "_w==", "YQ==\n", 3, None):
+                reply = object_reply()
+                target = reply["objects"][0]
+                (target if field == "message" else target["tree"][0])[field] = value
+                cases.append((f"base64 {field} {value!r}", json.dumps(reply).encode()))
+        reply = object_reply()
+        reply["objects"].append(copy.deepcopy(reply["objects"][0]))
+        cases.append(("duplicate object", json.dumps(reply).encode()))
+        reply = object_reply()
+        reply["objects"][0]["tree"].append(copy.deepcopy(reply["objects"][0]["tree"][0]))
+        cases.append(("duplicate decoded path", json.dumps(reply).encode()))
+        good = json.dumps(object_reply()).encode()
+        cases.extend((
+            ("truncated", good[:-1]), ("invalid UTF8", b"\xff"),
+            ("repeated member", good.replace(b'"commit": 12', b'"commit": 12, "commit": 12')),
+            ("missing tree entry content", good.replace(b'"content": "d2lkZ2V0Cg==", ', b"")),
+        ))
+        for name, wire in cases:
+            with self.subTest(name=name):
+                objects = _decode_objects(wire, [12, 11])
+                self.assertIsNone(objects)
+                self.assertEqual(judge(objects=objects).status, _Status.UNDECIDED)
+
     def test_notice_file_is_exactly_22_bytes(self):
         self.assertEqual(len(NOTICE), 22)
         self.assertEqual((EXPERIMENT / "NOTICE").read_bytes(), NOTICE)

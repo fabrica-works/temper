@@ -1,10 +1,11 @@
-"""Private pure judgment for qa.md, 8.4; deliberately no wire adapter or CLI.
+"""Private pure decoding and judgment for qa.md, 8.4; no IO.
 
 The observation projection reads the landed skein writer's JSON lines.
-The eventual adapter must supply an owner-confirmed flush/stop boundary and
+The host must supply an owner-confirmed flush/stop boundary and
 complete objects from the private git `objects` route.
 """
 
+import base64
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -130,6 +131,54 @@ def _project_observations(data: bytes | None) -> dict:
         complete = False
     return dict(complete_lines=complete and checkpoint, loss_counts=tuple(losses),
                 last_merged=merged, last_moved=moved)
+
+
+def _decode_objects(data: bytes, commits: Sequence[int]) -> dict[int, _Object] | None:
+    """Whole asked objects only; graph entries never supply a missing tree.
+
+    Authority: Director280's provisional t18 contract, 23:29Z, supplied by
+    the parent. Referenced skein 118bdd2d is unavailable/unverified here.
+    Missing/partial/malformed evidence stays unavailable, including a later
+    asked object dropped from both lists when the answer room is exhausted.
+    """
+    def count(value):
+        if type(value) is not int or not 0 <= value < 1 << 64:
+            raise ValueError("count is not a u64")
+        return value
+
+    def parent(value):
+        return None if value is None else count(value)
+
+    def binary(value):
+        if type(value) is not str:
+            raise ValueError("bytes are not base64")
+        raw = base64.b64decode(value, validate=True)
+        if base64.b64encode(raw).decode("ascii") != value:
+            raise ValueError("bytes are not standard padded base64")
+        return raw
+
+    try:
+        asked = {count(commit) for commit in commits}
+        reply = json.loads(data.decode("utf-8"), object_pairs_hook=_observation_members,
+                           parse_int=_observation_number, parse_float=int, parse_constant=int)
+        if type(reply["objects"]) is not list or type(reply["graph"]) is not list:
+            return None
+        objects = {}
+        for record in reply["objects"]:
+            commit = count(record["commit"])
+            if commit in objects or commit not in asked or type(record["tree"]) is not list:
+                return None
+            tree = {}
+            for entry in record["tree"]:
+                path, content = binary(entry["path"]), binary(entry["content"])
+                if path in tree:
+                    return None
+                tree[path] = content
+            binary(record["message"])
+            objects[commit] = _Object(parent(record["parent"]), parent(record["merge_parent"]), tree)
+        return objects if set(objects) == asked else None
+    except (ValueError, UnicodeError, KeyError, TypeError, RecursionError):
+        return None
 
 
 def _tree_valid(tree: Mapping[bytes, bytes] | None) -> bool:

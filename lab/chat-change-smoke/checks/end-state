@@ -1,0 +1,131 @@
+#!/usr/bin/env -S python3 -I -B
+"""Host-only first-run check; the runner enforces the 120s total deadline."""
+
+import argparse
+import http.client
+import json
+import math
+from pathlib import Path
+import re
+import sys
+import time
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _end_state import _Status, _Verdict, _decode_objects, _judge, _project_observations
+
+
+def _remaining(deadline):
+    seconds = deadline - time.monotonic()
+    if seconds <= 0:
+        raise TimeoutError("command deadline reached")
+    return seconds
+
+
+def _read_objects(port, commits, evidence, number, deadline):
+    request = json.dumps({"commits": commits}, separators=(",", ":")).encode("ascii")
+    stem = evidence / f"objects-{number}"
+    stem.with_suffix(".request.json").write_bytes(request)
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=_remaining(deadline))
+    # HTTPConnection talks directly to the numeric listener: no proxy,
+    # redirect handling, credentials, retries or product configuration.
+    try:
+        with stem.with_suffix(".response.body").open("wb") as saved:
+            connection.connect()
+            sock = connection.sock
+            sock.settimeout(_remaining(deadline))
+            connection.request("POST", "/.fake/git/objects", body=request,
+                               headers={"Content-Type": "application/json"})
+            sock.settimeout(_remaining(deadline))
+            response = connection.getresponse()
+            print(f"objects-{number} HTTP {response.status}; commits={commits}", file=sys.stderr)
+            chunks = []
+            while not response.isclosed():
+                sock.settimeout(_remaining(deadline))
+                try:
+                    chunk = response.read1(65536)
+                except http.client.IncompleteRead as error:
+                    saved.write(error.partial)
+                    raise
+                if not chunk:
+                    break
+                saved.write(chunk)
+                saved.flush()
+                chunks.append(chunk)
+            if response.status != 200 or response.length not in (None, 0):
+                return None
+            return _decode_objects(b"".join(chunks), commits)
+    finally:
+        connection.close()
+
+
+def _run(args, deadline):
+    facts = _project_observations(args.observations.read_bytes())
+    notice = (Path(__file__).resolve().parent.parent / "NOTICE").read_bytes()
+    inputs = dict(**facts, flushed=args.boundary == "confirmed", notice=notice)
+    verdict = _judge(**inputs, objects=None)
+    if verdict.reason != "store unreadable":
+        return verdict
+    address = re.fullmatch(r"127\.0\.0\.1:([0-9]{1,5})", args.forge_address)
+    if address is None or not 1 <= int(address[1]) <= 65535:
+        return _Verdict(_Status.UNDECIDED, reason="forge address unavailable")
+    commit = facts["last_merged"]
+    first = _read_objects(int(address[1]), [commit], args.evidence_dir, 1, deadline)
+    if first is None:
+        return _judge(**inputs, objects=None)
+    parent = first[commit].parent
+    if parent is None:
+        return _judge(**inputs, objects=first)
+    objects = _read_objects(int(address[1]), [commit, parent], args.evidence_dir, 2, deadline)
+    # Never combine the first response with a partial second response.
+    return _judge(**inputs, objects=objects)
+
+
+class _Arguments(argparse.ArgumentParser):
+    def error(self, message):
+        raise ValueError(message)
+
+
+def main():
+    started = time.monotonic()
+    parser = _Arguments(description=__doc__)
+    parser.add_argument("observations", type=Path)
+    parser.add_argument("forge_address", help="127.0.0.1:PORT captured from forge ready line")
+    parser.add_argument("--boundary", choices=("confirmed", "unknown"), required=True,
+                        help="host's independently confirmed flush/stop boundary")
+    parser.add_argument("--deadline-monotonic", type=float, required=True,
+                        help="host's absolute time.monotonic() command deadline")
+    parser.add_argument("--evidence-dir", type=Path, required=True,
+                        help="existing run-owned directory for original object reply bodies")
+    parser.add_argument("--result", type=Path, required=True,
+                        help="run-owned file receiving the same JSON lines as stdout")
+    args = None
+    try:
+        args = parser.parse_args()
+        if not math.isfinite(args.deadline_monotonic):
+            raise ValueError("command deadline unavailable")
+        deadline = min(args.deadline_monotonic, started + 120)
+        _remaining(deadline)
+        verdict = _run(args, deadline)
+        _remaining(deadline)
+    except (OSError, ValueError, http.client.HTTPException) as error:
+        print(f"end-state: inputs/read unavailable ({type(error).__name__})", file=sys.stderr)
+        verdict = _Verdict(_Status.UNDECIDED, reason="end-state inputs/read unavailable")
+    for line in verdict.evidence:
+        print(line, file=sys.stderr)
+    lines = [dict(fail=signature, summary="end-state: " + signature) for signature in verdict.signatures]
+    if verdict.status == _Status.UNDECIDED:
+        lines.append(dict(undecided=verdict.reason))
+    output = "".join(json.dumps(line) + "\n" for line in lines)
+    if args is not None:
+        try:
+            args.result.write_text(output, encoding="utf-8")
+        except OSError:
+            print("end-state: result file unavailable", file=sys.stderr)
+            output = json.dumps(dict(undecided="result file unavailable")) + "\n"
+            verdict = _Verdict(_Status.UNDECIDED, reason="result file unavailable")
+    sys.stdout.write(output)
+    return int(verdict.status)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
