@@ -911,6 +911,27 @@ Each step lands working, and shows what it proved in the real loop
   the fake and, opt-in, on github.com, as skein's does for Forgejo
   (skein's `fake-forge.md`, section 7), so the fake's quirks are
   GitHub's.
+- **From the forge-kit plan, left to this work** (its ruling 189: part C
+  reshapes what they would test). Each lands in skein's kit worlds, on
+  part C's footing:
+  - *The setup's world* (forge-kit's skein 07.4), through HTTP bytes on
+    part C's reconcile: a token on page two replaced; a collaborator or
+    repository hook on page two neither repeated nor skipped; two
+    services keeping separate access on one forge; another service's
+    bot refused as unmarked; a listener off loopback making no hook and
+    no secret.
+  - *The component's worst case* (skein 08.5): every holder filled and
+    metered against `worst_case`, the credentials handed at runtime,
+    the App's key, the installations' tokens and the puller among them.
+  - *The protocol world* (skein 09.2–09.4): a scripted durable owner
+    with restart, in skein's `tests/forge/protocol`. Stories: a creation
+    lost on the wire found after the restart; listings following another
+    party's changes; deliveries, signed or read from the log, reaching
+    the owner. Invariants: one answer per call under cuts; a call's cost
+    charged as skein's design answers it (a request cut inside its head
+    is charged, not served); no credential in a record, a request line
+    or a fact, the handed, replaced and renewed ones too. temper's
+    protocol world covers these until then.
 - **The real loop** (`../domain/testing.md`, 2.4): GitHub connected
   through the manifest flow, the browser's steps driven as requests;
   repositories added to a project later; a direct landing, and one
