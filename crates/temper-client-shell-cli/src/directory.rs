@@ -18,6 +18,10 @@ enum Stage {
     Address,
     Token,
     Link,
+    KeyOpen,
+    KeyStat,
+    KeyRead,
+    KeyClose,
     Store,
     Ready,
     Closing,
@@ -36,6 +40,9 @@ pub(crate) struct Directory {
     closing: bool,
     link_path: Option<Box<[u8]>>,
     link_max: u32,
+    key: Option<Token>,
+    key_bytes: Vec<u8>,
+    user: u32,
     pub(crate) link: Option<Box<[u8]>>,
     pub(crate) stored: bool,
     pub(crate) engine: Option<Addr>,
@@ -78,6 +85,9 @@ impl Directory {
             closing: false,
             link_path: None,
             link_max: limits::LINK,
+            key: None,
+            key_bytes: Vec::new(),
+            user,
             link: None,
             stored: false,
             engine: None,
@@ -123,7 +133,9 @@ impl Directory {
     }
     fn answer(&mut self, now: Time, event: file::Event) {
         if let file::Event::Opened { file, .. } = &event {
-            if self.stage == Stage::Exists {
+            if self.stage == Stage::KeyOpen {
+                self.key = Some(*file);
+            } else if self.stage == Stage::Exists {
                 self.check = Some(*file);
             } else {
                 self.private = Some(*file);
@@ -136,6 +148,7 @@ impl Directory {
             let part = match self.stage {
                 Stage::Address | Stage::Store => "address",
                 Stage::Token => "token",
+                Stage::KeyOpen | Stage::KeyStat | Stage::KeyRead | Stage::KeyClose => "key file",
                 Stage::Link => "link",
                 Stage::Start
                 | Stage::Exists
@@ -149,6 +162,31 @@ impl Directory {
             return;
         }
         match (self.stage, event) {
+            (Stage::KeyOpen, file::Event::Opened { .. }) => self.stage = Stage::KeyStat,
+            (Stage::KeyStat, file::Event::Stated { stat, .. }) => {
+                if stat.kind != skein_io::kernel::Kind::File || stat.owner != self.user || stat.mode & 0o077 != 0 {
+                    self.fail(b"key file must be a private regular file owned by this user");
+                } else if stat.size > u64::from(self.link_max) {
+                    self.fail(b"key file is too large");
+                } else {
+                    self.key_bytes = Vec::with_capacity(usize::try_from(self.link_max).expect("key bound"));
+                    self.stage = Stage::KeyRead;
+                }
+            }
+            (Stage::KeyRead, file::Event::Read { bytes, .. }) => {
+                if self.key_bytes.len() + bytes.len() > usize::try_from(self.link_max).expect("key bound") {
+                    self.fail(b"key file is too large");
+                } else if bytes.is_empty() {
+                    self.stage = Stage::KeyClose;
+                } else {
+                    self.key_bytes.extend_from_slice(&bytes);
+                }
+            }
+            (Stage::KeyClose, file::Event::Closed { .. }) => {
+                self.key = None;
+                self.link = Some(std::mem::take(&mut self.key_bytes).into_boxed_slice());
+                self.stage = Stage::Ready;
+            }
             (Stage::Link, file::Event::Loaded { bytes, .. }) => {
                 self.link = Some(bytes);
                 self.stage = Stage::Ready;
@@ -206,8 +244,9 @@ impl Directory {
         }
         if self.closing {
             if let Some(file) = self
-                .check
+                .key
                 .take()
+                .or_else(|| self.check.take())
                 .or_else(|| self.private.take())
                 .or_else(|| self.file_root.take())
                 .or_else(|| self.root.take())
@@ -248,6 +287,19 @@ impl Directory {
                 self.stage = Stage::Ready;
                 return;
             }
+            Stage::KeyOpen => file::Request::OpenReadNoFollow {
+                owner: OWNER,
+                root: self.io.descriptor(self.file_root.expect("key parent")).expect("file parent"),
+                name: self.link_path.take().expect("key leaf"),
+            },
+            Stage::KeyStat => file::Request::Stat { owner: OWNER, file: self.key.expect("key file") },
+            Stage::KeyRead => file::Request::ReadAt {
+                owner: OWNER,
+                file: self.key.expect("key file"),
+                offset: u64::try_from(self.key_bytes.len()).expect("key offset"),
+                max: self.link_max + 1 - u32::try_from(self.key_bytes.len()).expect("key length"),
+            },
+            Stage::KeyClose => file::Request::Close { owner: OWNER, file: self.key.expect("key file") },
             Stage::Link => file::Request::Load {
                 owner: OWNER,
                 root: self.file_root.expect("FILE's parent"),
@@ -285,6 +337,11 @@ impl Directory {
     pub(crate) fn start(&mut self, class: Class) {
         self.class = class;
         self.stage = Stage::Start;
+    }
+    pub(crate) fn load_key(&mut self, path: &[u8]) {
+        self.load_link(path);
+        self.link_max = temper_client_tools::limits::KEY_BYTES + 1;
+        self.stage = Stage::KeyOpen;
     }
     pub(crate) fn load_call(&mut self, path: &[u8]) {
         self.load_link(path);

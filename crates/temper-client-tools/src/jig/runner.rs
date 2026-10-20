@@ -6,6 +6,7 @@ use jig_client::{
     contract::{Delivery, Subject},
 };
 use skein_lib::{Deadlines, Env, Queue};
+mod accounts;
 mod acts;
 pub(crate) mod reads;
 mod recovery;
@@ -23,6 +24,7 @@ pub struct Runner {
     pub(crate) waits: BTreeMap<u32, wait::Wait>,
     pub(crate) wait_timers: Option<Deadlines<u32>>,
     salt: &'static [u8],
+    names: skein_lib::Rng,
     acts: BTreeMap<u32, acts::Reading>,
     sent: BTreeMap<jig_client::Key, acts::Sent>,
     kept: BTreeMap<jig_client::Key, render::outcome::Operation>,
@@ -37,6 +39,7 @@ pub struct Called {
     pub call_number: u32,
     pub call: Call,
     pub json: bool,
+    pub value: Option<skein_lib::Secret>,
 }
 #[derive(Debug)]
 pub enum Out {
@@ -47,7 +50,7 @@ pub enum Out {
 }
 impl Runner {
     #[must_use]
-    pub fn new(asker: Asker, salt: &'static [u8]) -> Self {
+    pub fn new(asker: Asker, salt: &'static [u8], seed: u64) -> Self {
         Self {
             asker,
             waiting: BTreeMap::new(),
@@ -55,6 +58,7 @@ impl Runner {
             waits: BTreeMap::new(),
             wait_timers: None,
             salt,
+            names: skein_lib::Rng::new(seed ^ 0x4143_434F_554E_5453),
             acts: BTreeMap::new(),
             sent: BTreeMap::new(),
             kept: BTreeMap::new(),
@@ -87,6 +91,18 @@ impl Runner {
     }
 }
 pub fn call(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, called: Called, out: &mut Queue<Out>) {
+    if let Some(value) = &called.value
+        && (value.is_empty() || value.len() > usize::try_from(crate::jig::call::KEY_BYTES).expect("key bound"))
+    {
+        let printed = render::failure(b"key file must contain 1 to 4096 bytes", called.json, 1);
+        finish(called, printed, out);
+        return;
+    }
+    if called.value.is_some() != matches!(called.call.tool, 26 | 27) {
+        let printed = render::failure(b"key file must be supplied only for add-key or replace-key", called.json, 1);
+        finish(called, printed, out);
+        return;
+    }
     let count = runner
         .waiting
         .len()
@@ -121,6 +137,8 @@ fn run(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, call
             finish(called, printed, out);
         }
         1..=7 | 22 | 23 => reads::start(runner, client, env, called, out),
+        24 | 26 => accounts::start(runner, client, env, called, out),
+        25 | 27..=30 => reads::start(runner, client, env, called, out),
         8..=15 => acts::start(runner, client, env, called, out),
         16 => wait::start(runner, client, env, called, out),
         _ => {

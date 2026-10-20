@@ -18,7 +18,7 @@ pub(super) struct Sent {
     called: Called,
     operation: Operation,
 }
-fn me<'a>(runner: &Runner, client: &'a Client) -> Option<&'a c::Me> {
+pub(super) fn me<'a>(runner: &Runner, client: &'a Client) -> Option<&'a c::Me> {
     match client.document(runner.me())?.latest? {
         Latest::Jig(c::Delivery::Me(me)) => Some(me),
         Latest::Jig(_) | Latest::Family(_) => None,
@@ -342,11 +342,11 @@ fn decision(call: &Call, limits: &Limits) -> Result<c::Decision, &'static [u8]> 
         _ => c::Decision::PassedUp,
     })
 }
-fn prepared(
+pub(super) fn prepared(
     runner: &mut Runner,
     client: &Client,
     _env: &Env<Limits>,
-    called: Called,
+    mut called: Called,
     ask: Prepared,
     out: &mut Queue<Out>,
 ) {
@@ -378,8 +378,26 @@ fn prepared(
     if called.call.tool == 10 {
         operation.word = b"close";
     }
+    if called.call.tool >= 24 {
+        operation.word = render::outcome::account_tool(called.call.tool).name;
+    }
+    let request = jig_client::Ask::Jig(Box::new(ask));
+    let event = if let Some(value) = called.value.take() {
+        let name = match name {
+            Some(name) => name,
+            None => {
+                let mut name = [0; 16];
+                name[..8].copy_from_slice(&runner.names.next_u64().to_le_bytes());
+                name[8..].copy_from_slice(&runner.names.next_u64().to_le_bytes());
+                name
+            }
+        };
+        Event::Carry { key, name, request, value }
+    } else {
+        Event::Send { key, name, request }
+    };
     runner.sent.insert(key, Sent { called, operation });
-    out.push(Out::Client { event: Event::Send { key, name, request: jig_client::Ask::Jig(Box::new(ask)) } });
+    out.push(Out::Client { event });
 }
 pub(super) fn answered(
     runner: &mut Runner,

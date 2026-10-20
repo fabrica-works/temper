@@ -36,6 +36,9 @@ impl OneShot {
                 self.preparing = false;
                 self.finish(0, false);
             }
+            Parsed::Call { call, .. } if arguments::key_file(call).is_some() => {
+                self.directory.load_key(arguments::key_file(call).expect("key file"));
+            }
             Parsed::Call { call, .. } => {
                 if self.class != Class::SignIn && call.values.contains(&Some(Values::One(Value::Stdin))) {
                     self.input = Some(Vec::new());
@@ -50,7 +53,7 @@ impl OneShot {
         if !self.preparing || self.status.is_some() {
             return;
         }
-        if matches!(self.call, Some(Parsed::File { file: Source::Path(_), .. })) {
+        if self.file_input() {
             self.directory.progress(self.env.now);
         }
         let Some(bytes) = self.directory.link.take() else { return };
@@ -73,6 +76,17 @@ impl OneShot {
                 }
                 Err(_) => self.fail(b"usage: temper ctl DIRECTORY TOOL [ARGUMENT...]"),
             },
+            Parsed::Call { call, json } if arguments::key_file(&call).is_some() => {
+                let stripped = bytes.strip_suffix(b"\n").unwrap_or(&bytes);
+                if stripped.is_empty() || stripped.len() > temper_client_tools::limits::KEY_BYTES as usize {
+                    self.fail(b"key file must contain 1 to 4096 bytes after one final newline");
+                    return;
+                }
+                self.value = Some(skein_lib::Secret::new(stripped.into()));
+                self.directory.start(self.class);
+                self.call = Some(Parsed::Call { call, json });
+                self.preparing = false;
+            }
             Parsed::Call { mut call, json } => {
                 for slot in &mut call.values {
                     if *slot == Some(Values::One(Value::Stdin)) {
@@ -85,9 +99,14 @@ impl OneShot {
         }
     }
     pub(super) fn preparation_pending(&self, now: Time) -> bool {
-        self.preparing
-            && matches!(self.call, Some(Parsed::File { file: Source::Path(_), .. }))
-            && self.directory.pending(now)
+        self.preparing && self.file_input() && self.directory.pending(now)
+    }
+    fn file_input(&self) -> bool {
+        match &self.call {
+            Some(Parsed::File { file: Source::Path(_), .. }) => true,
+            Some(Parsed::Call { call, .. }) => arguments::key_file(call).is_some(),
+            _ => false,
+        }
     }
     fn input_limit(&self) -> u32 {
         if self.class == Class::SignIn && !matches!(self.call, Some(Parsed::File { .. })) {

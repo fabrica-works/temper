@@ -55,7 +55,7 @@ pub(crate) fn family_answer(outcome: w::Outcome) -> client::Answered {
 impl Harness {
     pub(crate) fn submit_call(&mut self, call: crate::jig::call::Call, json: bool) -> u32 {
         self.next = self.next.checked_add(1).expect("fixture correlation");
-        self.event(root::Event::Call { number: self.next, call, json });
+        self.event(root::Event::Call { number: self.next, call, json, value: None });
         self.next
     }
     pub(crate) fn adoption_answer(&mut self, call: u32, outcome: w::Outcome) {

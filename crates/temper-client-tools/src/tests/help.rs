@@ -23,6 +23,13 @@ const GOLDENS: &[(Option<u8>, &str)] = &[
 #[test]
 fn the_help_prints_as_its_golden_files() {
     for (tool, name) in GOLDENS {
+        if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some() {
+            std::fs::write(
+                std::path::Path::new("src/tests/golden").join(name).with_extension("txt"),
+                fixtures::help(*tool),
+            )
+            .expect("write help golden");
+        }
         assert_eq!(fixtures::help(*tool), fixtures::golden(name), "{name}");
     }
 }
@@ -52,6 +59,13 @@ const USAGES: &[&[u8]] = &[
     b"help [TOOL]\n",
     b"accounts\n",
     b"models [--project P]\n",
+    b"connect PROVIDER --key NAME\n",
+    b"disconnect ACCOUNT [--source sign_in|key|program] [--key NAME]\n",
+    b"add-key PROVIDER FILE [--account A] [--deployment] --key NAME\n",
+    b"replace-key ACCOUNT FILE [--key NAME]\n",
+    b"forget ACCOUNT [--source sign_in|key|program] [--key NAME]\n",
+    b"rank ACCOUNT POSITION [--source sign_in|key|program] [--key NAME]\n",
+    b"retry ACCOUNT [--source sign_in|key|program] [--key NAME]\n",
 ];
 #[test]
 fn a_tools_usage_reads_as_the_design_writes_it() {

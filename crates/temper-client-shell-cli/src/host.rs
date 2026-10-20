@@ -64,6 +64,7 @@ pub struct OneShot {
     signals: Option<Token>,
     stdin: Option<Token>,
     input: Option<Vec<u8>>,
+    value: Option<skein_lib::Secret>,
     preparing: bool,
     complete: Queue<Complete>,
     submit: Queue<Submit>,
@@ -103,6 +104,8 @@ impl OneShot {
             + Queue::<jig_client::Request>::worst_case(request_room).expect("ordered store writes")
             + u64::from(request_room) * u64::from(limits.connections.body_bytes) // Queued store records.
             + limits.root.tools.ask_bytes * 256 // Input and the JSON parser's per-byte token/document scratch.
+            + u64::from(limits.root.tools.rows) * (u64::from(temper_client_tools::limits::KEY_BYTES) + u64::try_from(size_of::<Option<skein_lib::Secret>>()).expect("secret holder"))
+            + 2 * (u64::from(temper_client_tools::limits::KEY_BYTES) + 2) // Key file buffer and its bounded read.
             + 8192; // Output lines and DIRECTORY's bounded path.
         let mut host = Self {
             directory: Directory::new(
@@ -132,6 +135,7 @@ impl OneShot {
             signals,
             stdin,
             input: None,
+            value: None,
             preparing: true,
             complete: Queue::with_capacity(ROOM),
             submit: Queue::with_capacity(ROOM),
@@ -160,6 +164,7 @@ impl OneShot {
     }
     fn finish(&mut self, status: u8, signal: bool) {
         self.status = Some(status);
+        self.value = None;
         self.until = None;
         if let Some(transport) = &mut self.transport {
             transport.close(self.env.now);
@@ -326,7 +331,7 @@ impl OneShot {
                 root::step(
                     &mut self.root,
                     &self.root_env,
-                    root::Event::Call { number: 1, call, json },
+                    root::Event::Call { number: 1, call, json, value: self.value.take() },
                     &mut self.requests,
                 );
             }
@@ -400,7 +405,7 @@ impl OneShot {
                         root::step(
                             &mut self.root,
                             &self.root_env,
-                            root::Event::Call { number: 1, call, json },
+                            root::Event::Call { number: 1, call, json, value: self.value.take() },
                             &mut self.requests,
                         );
                     }

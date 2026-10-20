@@ -1,4 +1,5 @@
 //! The tools' preset and host bounds (client/tools.md, 12).
+pub use crate::jig::call::KEY_BYTES;
 use skein_lib::{Duration, RequestLimits};
 use temper_client_domain as client;
 pub const ROWS: u32 = 32;

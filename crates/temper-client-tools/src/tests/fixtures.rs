@@ -80,6 +80,13 @@ pub(crate) const EVERY_TOOL: &[&[&str]] = &[
     &["help"],
     &["accounts"],
     &["models"],
+    &["connect", "9", "--key", "connect"],
+    &["disconnect", "43"],
+    &["add-key", "9", "key-file", "--key", "add"],
+    &["replace-key", "43", "key-file"],
+    &["forget", "43"],
+    &["rank", "43", "1"],
+    &["retry", "43"],
 ];
 
 /// Parse the printer's bytes back without re-creating argv in each test.
@@ -285,6 +292,7 @@ pub(crate) struct Harness {
     pub watches: BTreeMap<Token, client::Watchable>,
     pub answers: BTreeMap<u32, crate::jig::Printed>,
     pub sends: BTreeMap<u32, (Token, skein_lib::RequestKey, client::Ask)>,
+    pub carried: BTreeMap<u32, skein_lib::Secret>,
     pub saved: BTreeMap<u32, skein_lib::RequestKey>,
     pub kept_lines: List<Box<[u8]>>,
     pub facts: u32,
@@ -318,6 +326,7 @@ pub(crate) fn started_with_limits(
         answers: BTreeMap::new(),
         sends: BTreeMap::new(),
         saved: BTreeMap::new(),
+        carried: BTreeMap::new(),
         kept_lines: List::with_capacity(OUTPUTS),
         facts: 0,
         next: 0,
@@ -376,10 +385,13 @@ impl Harness {
                     assert!(self.answers.insert(number, printed).is_none(), "answered exactly once");
                 }
                 root::Request::Client {
-                    request: client::Request::Down { down: client::Down::Send { attempt, key, request, value: _ } },
+                    request: client::Request::Down { down: client::Down::Send { attempt, key, request, value } },
                 } => {
                     let call = self.serving.unwrap_or(self.next);
                     self.sends.insert(call, (attempt, key, request));
+                    if let Some(value) = value {
+                        self.carried.insert(call, value);
+                    }
                 }
                 root::Request::Client { request: client::Request::Down { down: client::Down::Save { record } } } => {
                     let call = self.serving.unwrap_or(self.next);
@@ -397,6 +409,9 @@ impl Harness {
         self.event(root::Event::Client { event });
     }
     pub fn submit(&mut self, words: &[&str]) -> u32 {
+        self.submit_value(words, None)
+    }
+    pub fn submit_value(&mut self, words: &[&str], value: Option<skein_lib::Secret>) -> u32 {
         self.next = self.next.checked_add(1).expect("fixture calls fit");
         let crate::jig::call::Parsed::Call { call, json } = parse(words).expect("fixture call") else {
             panic!("parsed call")
@@ -415,7 +430,7 @@ impl Harness {
         for _ in 0..count {
             self.pending_reads.push(self.next);
         }
-        self.event(root::Event::Call { number: self.next, call, json });
+        self.event(root::Event::Call { number: self.next, call, json, value });
         self.next
     }
     pub fn deliver(&mut self, delivery: c::Delivery) {
@@ -549,11 +564,11 @@ pub(crate) const UNKNOWN_ASKER: client::Asker = client::Asker(999);
 /// A stable stored request's engine key, unrelated to its client call prefix.
 const KEPT_KEY: skein_lib::RequestKey = [9; 16];
 /// Six calls are needed for sign-in, me, wait, inbox, task and message.
-pub(super) const GUIDE_CALLS: u32 = 9;
+pub(super) const GUIDE_CALLS: u32 = 12;
 /// One slot per guide line, including the final line; fewer loses that line.
-const GUIDE_LINES: u32 = 62;
+const GUIDE_LINES: u32 = 71;
 /// One slot per row and form; fewer omits decide's second form.
-pub(super) const TOOL_FORMS: u32 = 25;
+pub(super) const TOOL_FORMS: u32 = 32;
 /// Exactly one example exercises each row and form; zero misses it entirely.
 pub(super) const EXAMPLES_PER_FORM: u32 = 1;
 /// One missing byte exercises the first refused destination; zero would fit.

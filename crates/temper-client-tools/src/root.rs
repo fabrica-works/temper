@@ -20,7 +20,7 @@ pub struct Root {
 #[derive(Debug)]
 pub enum Event {
     Client { event: jig_client::Event },
-    Call { number: u32, call: jig::call::Call, json: bool },
+    Call { number: u32, call: jig::call::Call, json: bool, value: Option<skein_lib::Secret> },
 }
 #[derive(Debug)]
 pub enum Request {
@@ -34,15 +34,15 @@ impl Root {
     /// # Errors
     /// Refuses client limits that cannot be represented.
     pub fn new(limits: &Limits, seed: u64) -> Result<Self, jig_client::Unusable> {
-        Ok(Self::with_client(Client::new(&limits.domain.client, seed)?))
+        Ok(Self::with_client(Client::new(&limits.domain.client, seed)?, seed))
     }
     /// # Errors
     /// Refuses client limits that cannot be represented.
     pub fn unlinked(limits: &Limits, seed: u64) -> Result<Self, jig_client::Unusable> {
-        Ok(Self::with_client(Client::unlinked(&limits.domain.client, seed)?))
+        Ok(Self::with_client(Client::unlinked(&limits.domain.client, seed)?, seed))
     }
-    pub(crate) fn with_client(client: Client) -> Self {
-        let mut runner = runner::Runner::new(RUNNER.asker(), crate::key::TOOLS);
+    pub(crate) fn with_client(client: Client, seed: u64) -> Self {
+        let mut runner = runner::Runner::new(RUNNER.asker(), crate::key::TOOLS, seed);
         runner.parts(owner_part);
         Self { client, runner, adopter: crate::forge::Adopter::new(), next: Some(1) }
     }
@@ -69,12 +69,12 @@ pub fn step(root: &mut Root, env: &Env<Limits>, event: Event, out: &mut Queue<Re
             }
             root.client.step(env.now, env.wall, event, &mut client);
         }
-        Event::Call { number, call, json } => {
+        Event::Call { number, call, json, value } => {
             if let Some(call_number) = root.next {
                 root.next = call_number.checked_add(1);
                 let forge = crate::table::TOOLS.get(usize::from(call.tool)).expect("parsed tool").name
                     == crate::adopt::ROW.name;
-                let called = runner::Called { number, call_number, call, json };
+                let called = runner::Called { number, call_number, call, json, value };
                 if forge {
                     crate::forge::call(&mut root.adopter, &root.client, &env.limits, called, &mut child);
                 } else {

@@ -76,3 +76,15 @@ pub fn class(call: &Call) -> Class {
         Class::Read
     }
 }
+
+/// Key files have a separate purpose and never feed the ordinary text input.
+pub(crate) fn key_file(call: &Call) -> Option<&[u8]> {
+    let name = TOOLS.get(usize::from(call.tool))?.name;
+    if name != rows::ADD_KEY.name && name != rows::REPLACE_KEY.name {
+        return None;
+    }
+    match call.values.get(1)? {
+        Some(Values::One(Value::File(path))) => Some(path),
+        _ => None,
+    }
+}

@@ -43,7 +43,7 @@ pub enum View {
 #[derive(Debug)]
 pub enum Event {
     Root(domain::Event),
-    Call { number: u32, call: temper_client_tools::jig::call::Call, json: bool },
+    Call { number: u32, call: temper_client_tools::jig::call::Call, json: bool, value: Option<skein_lib::Secret> },
     Start { address: Address, kept: List<skein_lib::RequestRecord<jig_client::Held>> },
 }
 impl From<domain::Event> for Event {

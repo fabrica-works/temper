@@ -20,8 +20,17 @@ Read accounts without values; model names and limits are supplied facts:
   temper ctl DIRECTORY wait accounts --until usable
 models has its own joined digest; wait accounts uses the accounts read's digest.
 Settled follows party-requested sign-ins; program checks and provider readiness await upstream facts.
+  temper ctl DIRECTORY connect 1 --key connect-llm
+  temper ctl DIRECTORY add-key 1 FILE --deployment --key add-llm
+  temper ctl DIRECTORY replace-key 43 FILE --key replace-llm
+Keys use private files, never stdin or arguments; 1 to 4096 bytes after stripping one final newline.
+Value requests are sent once, never kept or automatically replayed. Unsent/lost exits 1;
+rerun with the same --key and file to recover the original answer. Only engine refusals exit 2.
+disconnect, forget, rank and retry resolve a unique --source sign_in|key|program from accounts.
+forget without --source removes the whole account; rank without it moves the account.
+connect prints a browser address and wait accounts --until settled, then exits once durable.
 
-Name keys for chat, message, close and adopt; other acts accept an optional --key NAME.
+Name keys for chat, message, close, adopt, connect and add-key; other acts accept an optional --key NAME.
 Names are one to 64 lower-case letters, digits or hyphens.
 Give each agent a distinct prefix, such as investigate-41; reads and waits need no key.
 A repeat keeps its name, party and ask within retention. A changed template or bound in me

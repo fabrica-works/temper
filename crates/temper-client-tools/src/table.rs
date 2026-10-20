@@ -30,6 +30,13 @@ pub const TOOLS: &[&Tool] = &[
     &rows::HELP,
     &rows::ACCOUNTS,
     &rows::MODELS,
+    &rows::CONNECT,
+    &rows::DISCONNECT,
+    &rows::ADD_KEY,
+    &rows::REPLACE_KEY,
+    &rows::FORGET,
+    &rows::RANK,
+    &rows::RETRY,
 ];
 pub fn parse(words: &[&[u8]]) -> Result<Parsed, Usage> {
     argv::parse(TOOLS, words, &crate::limits::tools())

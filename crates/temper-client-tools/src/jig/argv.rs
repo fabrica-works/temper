@@ -287,6 +287,18 @@ pub fn check(table: &[&Tool], call: &Call, limits: &Limits) -> Result<(), Usage>
         Keyed::Never | Keyed::Optional | Keyed::Required => {}
     }
     check_values(table, args, &call.values, limits)?;
+    if tool.area == 5 && tool.keyed != Keyed::Never {
+        for (index, (arg, slot)) in args.iter().zip(&call.values).enumerate() {
+            if let Some(Values::One(Value::Number(n))) = slot
+                && ((*n == 0 && arg.name == b"position") || u32::try_from(*n).is_err())
+            {
+                return Err(Usage::Kind { argument: u8::try_from(index).expect("argument") });
+            }
+            if arg.kind == Kind::File && matches!(slot, Some(Values::One(Value::Stdin))) {
+                return Err(Usage::Stdin);
+            }
+        }
+    }
     if tool.name == b"inbox" {
         check_inbox(call)?;
     }

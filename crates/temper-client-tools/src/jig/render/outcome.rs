@@ -64,7 +64,17 @@ impl Operation {
                 c::Ask::Withdraw { .. } => (b"withdraw", None),
                 c::Ask::SignIn { .. } => (b"connect", None),
                 c::Ask::SignOut { .. } => (b"disconnect", None),
-                c::Ask::AccountChange { .. } => (b"account-change", None),
+                c::Ask::AccountChange { change, .. } => (
+                    match change {
+                        c::AccountChange::AddKey { .. } => b"add-key".as_slice(),
+                        c::AccountChange::ReplaceKey { .. } => b"replace-key",
+                        c::AccountChange::Resume { .. } => b"retry",
+                        c::AccountChange::MoveAccount { .. } | c::AccountChange::MoveSource { .. } => b"rank",
+                        c::AccountChange::Remove { .. } | c::AccountChange::RemoveKey { .. } => b"forget",
+                        c::AccountChange::SetUses { .. } => b"account-change",
+                    },
+                    None,
+                ),
             },
         };
         Self { word, task, to: None, party: None, retry: None }
@@ -86,7 +96,7 @@ pub(crate) fn print(
         | Outcome::Limit
         | Outcome::Unconfirmed
         | Outcome::Held => 1,
-        Outcome::Unsent | Outcome::Lost => unreachable!("the tools' requests carry no value"),
+        Outcome::Unsent | Outcome::Lost => 1,
     };
     let bytes = bytes(operation, outcome, json, me, limits, false);
     if status == 0 {
@@ -141,7 +151,8 @@ fn client_reason(outcome: &Outcome) -> Option<&'static [u8]> {
         Outcome::Unconfirmed => Some(b"tools' bug; unconfirmed request; report it as a finding"),
         Outcome::Answered(Answered::Family(_)) => Some(b"tools' bug; unexpected family answer; report it as a finding"),
         Outcome::Answered(Answered::Jig(_)) => None,
-        Outcome::Unsent | Outcome::Lost => unreachable!("the tools' requests carry no value"),
+        Outcome::Unsent => Some(b"unsent; supply the same --key and file again"),
+        Outcome::Lost => Some(b"lost; supply the same --key and file again"),
     }
 }
 fn text(operation: &Operation, outcome: &Outcome, me: Option<&c::Me>, limits: &Limits, kept: bool, out: &mut Text) {
@@ -174,6 +185,17 @@ fn text(operation: &Operation, outcome: &Outcome, me: Option<&c::Me>, limits: &L
             decision(how, out);
             out.put(b", ");
             document::utc(*at, out);
+        }
+        c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountSignInStarted { address, .. })) => {
+            out.put(b"Open this address in a browser on the engine's machine:\n");
+            out.put(address);
+            out.put(b"\nwait accounts --until settled");
+        }
+        c::Answer::Done(c::Outcome::Owner(
+            c::OwnerOutcome::AccountSignedOut { confirmed: false }
+            | c::OwnerOutcome::AccountRemoved { confirmed: false },
+        )) => {
+            out.put(b"Removed locally; disconnect this application in the provider's settings, under Apps.");
         }
         c::Answer::Done(done) => {
             out.put(b"done: ");
@@ -252,6 +274,10 @@ fn encode(operation: &Operation, outcome: &Outcome, out: &mut Encoder, kept: boo
         let Outcome::Answered(Answered::Jig(answer)) = outcome else { unreachable!("client answers handled") };
         document::answer_json(answer, out);
     }
+    if let Some(next) = account_follow_up(outcome) {
+        out.key(b"next");
+        out.string(next);
+    }
     if !kept {
         out.key(b"task");
         match operation.task {
@@ -303,6 +329,7 @@ pub(crate) fn retry(call: &crate::jig::call::Call) -> Box<[u8]> {
         13 => &rows::RELEASE,
         14 => &rows::STOP,
         15 => &rows::CANCEL,
+        24..=30 => account_tool(call.tool),
         _ => unreachable!("act tool"),
     };
     let mut call = call.clone();
@@ -321,5 +348,32 @@ fn retry_words(words: &[Box<[u8]>], out: &mut Text) {
             out.put(b" ");
         }
         super::lists::argument(word, out);
+    }
+}
+
+pub(crate) fn account_tool(tool: u8) -> &'static crate::jig::table::Tool {
+    use crate::jig::rows;
+    match tool {
+        24 => &rows::CONNECT,
+        25 => &rows::DISCONNECT,
+        26 => &rows::ADD_KEY,
+        27 => &rows::REPLACE_KEY,
+        28 => &rows::FORGET,
+        29 => &rows::RANK,
+        30 => &rows::RETRY,
+        _ => unreachable!("account tool"),
+    }
+}
+
+fn account_follow_up(outcome: &Outcome) -> Option<&'static [u8]> {
+    match outcome {
+        Outcome::Answered(Answered::Jig(c::Answer::Done(c::Outcome::Owner(
+            c::OwnerOutcome::AccountSignInStarted { .. },
+        )))) => Some(b"wait accounts --until settled"),
+        Outcome::Answered(Answered::Jig(c::Answer::Done(c::Outcome::Owner(
+            c::OwnerOutcome::AccountSignedOut { confirmed: false }
+            | c::OwnerOutcome::AccountRemoved { confirmed: false },
+        )))) => Some(b"Disconnect this application in the provider's settings, under Apps."),
+        _ => None,
     }
 }

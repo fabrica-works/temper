@@ -271,3 +271,75 @@ pub const MODELS: Tool = Tool {
     keyed: Keyed::Never,
     area: 5,
 };
+
+/// Account source shorthand is resolved against the current accounts watch.
+const SOURCE: super::table::Argument =
+    flag(b"source", b"S", Kind::Word { set: &[b"sign_in", b"key", b"program"] }, Optional, b"One source by kind");
+pub const CONNECT: Tool = Tool {
+    name: b"connect",
+    line: b"Start an LLM provider sign-in",
+    result: b"connect",
+    forms: &[&[positional(b"provider", b"PROVIDER", Kind::Number, Required, b"LLM provider number")]],
+    keyed: Keyed::Required,
+    area: 5,
+};
+pub const DISCONNECT: Tool = Tool {
+    name: b"disconnect",
+    line: b"Sign an account source out",
+    result: b"disconnect",
+    forms: &[&[positional(b"account", b"ACCOUNT", Kind::Number, Required, b"Account number"), SOURCE]],
+    keyed: Keyed::Optional,
+    area: 5,
+};
+pub const ADD_KEY: Tool = Tool {
+    name: b"add-key",
+    line: b"Add a key from a private file",
+    result: b"add_key",
+    forms: &[&[
+        positional(b"provider", b"PROVIDER", Kind::Number, Required, b"LLM provider number"),
+        positional(b"file", b"FILE", Kind::File, Required, b"Private key file; never stdin"),
+        flag(b"account", b"A", Kind::Number, Optional, b"Join an account"),
+        switch(b"deployment", b"Deployment holder, by an owner"),
+    ]],
+    keyed: Keyed::Required,
+    area: 5,
+};
+pub const REPLACE_KEY: Tool = Tool {
+    name: b"replace-key",
+    line: b"Replace an account's key from a private file",
+    result: b"replace_key",
+    forms: &[&[
+        positional(b"account", b"ACCOUNT", Kind::Number, Required, b"Account number"),
+        positional(b"file", b"FILE", Kind::File, Required, b"Private key file; never stdin"),
+    ]],
+    keyed: Keyed::Optional,
+    area: 5,
+};
+pub const FORGET: Tool = Tool {
+    name: b"forget",
+    line: b"Remove an account or one source",
+    result: b"forget",
+    forms: &[&[positional(b"account", b"ACCOUNT", Kind::Number, Required, b"Account number"), SOURCE]],
+    keyed: Keyed::Optional,
+    area: 5,
+};
+pub const RANK: Tool = Tool {
+    name: b"rank",
+    line: b"Move an account or source to a one-based position",
+    result: b"rank",
+    forms: &[&[
+        positional(b"account", b"ACCOUNT", Kind::Number, Required, b"Account number"),
+        positional(b"position", b"POSITION", Kind::Number, Required, b"Place from one"),
+        SOURCE,
+    ]],
+    keyed: Keyed::Optional,
+    area: 5,
+};
+pub const RETRY: Tool = Tool {
+    name: b"retry",
+    line: b"Resume a limited source",
+    result: b"retry",
+    forms: &[&[positional(b"account", b"ACCOUNT", Kind::Number, Required, b"Account number"), SOURCE]],
+    keyed: Keyed::Optional,
+    area: 5,
+};

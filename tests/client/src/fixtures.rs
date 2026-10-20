@@ -553,7 +553,7 @@ pub fn agent(world: &mut World<Temper, Joint>) -> jig_client_world::harness::Cli
 pub fn call(words: &[&[u8]]) -> crate::app::Event {
     match temper_client_tools::table::parse(words).unwrap_or_else(|error| panic!("agent call usage: {error:?}")) {
         temper_client_tools::jig::call::Parsed::Call { call, json } => {
-            crate::app::Event::Call { number: 0, call, json }
+            crate::app::Event::Call { number: 0, call, json, value: None }
         }
         temper_client_tools::jig::call::Parsed::File { .. } => panic!("agent call is a file"),
     }
@@ -571,7 +571,7 @@ pub fn give(world: &mut World<Temper, Joint>, agent: jig_client_world::harness::
     assert!(world.root(agent).agent().ready() && world.root(agent).agent().kept() == 0, "agent ready before call");
     let number = world.root(agent).agent().calls() + 1;
     let crate::app::Event::Call { call, json, .. } = call(words) else { unreachable!() };
-    world.event(agent, crate::app::Event::Call { number, call, json });
+    world.event(agent, crate::app::Event::Call { number, call, json, value: None });
     number
 }
 pub fn answered(

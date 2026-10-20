@@ -126,9 +126,9 @@ pub fn step(agent: &mut Agent, env: &Env<domain::Limits>, event: Event, out: &mu
         }
         Event::Root(domain::Event::Went { .. }) => {}
         Event::Root(event) => panic!("agent received person event: {event:?}"),
-        Event::Call { number, call, json } => {
+        Event::Call { number, call, json, value } => {
             agent.calls = number;
-            root::step(&mut agent.root, &env, root::Event::Call { number, call, json }, &mut requests);
+            root::step(&mut agent.root, &env, root::Event::Call { number, call, json, value }, &mut requests);
         }
     }
     drain(agent, &mut requests, out);

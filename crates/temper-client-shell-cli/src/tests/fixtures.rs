@@ -36,6 +36,9 @@ pub struct Frame {
     pub input: &'static [u8],
     pub link_root: Option<Fd>,
     pub link_leaf: Option<Box<[u8]>>,
+    pub input_stat: Option<Stat>,
+    pub linked_leaf: bool,
+    pub carried_keys: Vec<skein_lib::Secret>,
     pub refuse_link: Option<()>,
     pub again_links: u32,
     pub link_posts: Vec<Box<[u8]>>,
@@ -104,6 +107,9 @@ impl Frame {
             input: b"",
             link_root: None,
             link_leaf: None,
+            input_stat: None,
+            linked_leaf: false,
+            carried_keys: Vec::new(),
             refuse_link: None,
             again_links: 0,
             link_posts: Vec::new(),
@@ -261,6 +267,11 @@ impl Frame {
         panic!("host did not settle");
     }
     fn stat(&self, fd: Fd) -> Done {
+        if fd == LINK_FILE
+            && let Some(stat) = self.input_stat
+        {
+            return Done::Stat(stat);
+        }
         let (kind, size, mode, links) = if fd == DIRECTORY {
             (Kind::Directory, 0, if self.refused { 0o777 } else { 0o700 }, 2)
         } else {
@@ -298,6 +309,10 @@ impl Frame {
             return Ok(Done::Fd(fd));
         }
         if path == b"call.json" || path == b"link-file" || path == b"link" {
+            assert_eq!(how, OpenHow::ReadNoFollow, "check the file at its name");
+            if self.linked_leaf {
+                return Err(Error::TooManyLinks);
+            }
             self.link_root = Some(root);
             self.link_leaf = Some(path.into());
             return Ok(Done::Fd(LINK_FILE));

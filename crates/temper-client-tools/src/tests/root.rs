@@ -58,6 +58,7 @@ fn every_call_handle_uses_its_prefix_under_one_owner() {
                 call_number: prefix,
                 call: fixtures::call(fixtures::TASK_CALL),
                 json: false,
+                value: None,
             },
             &mut out,
         );
