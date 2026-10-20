@@ -520,13 +520,8 @@ pub mod chat {
 
     pub fn chat_header() -> skein_ui::Tree {
         let mut b = Builder::new(&fixtures::tree_limits());
-        let root = fixtures::root_in_project(Some(fixtures::PROJECT));
-        crate::pages::chat::header(
-            &mut b,
-            &fixtures::task::document(),
-            root.pages().me(root.client()),
-            &fixtures::words(),
-        );
+        let mut bindings = crate::frame::Bindings::new(fixtures::tree_limits().bindings);
+        crate::pages::chat::main(&mut b, &chat_root(), &fixtures::words(), &mut bindings, LINES, TEXT);
         b.finish()
     }
     pub fn provisional() -> Thread {

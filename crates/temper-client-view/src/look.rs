@@ -49,6 +49,34 @@ pub const CORNER: Style = Style { owner: owner(), token: 21 };
 pub const ACCOUNTS: Style = Style { owner: owner(), token: 22 };
 /// The composer's account and model line.
 pub const ACCOUNT_LINE: Style = Style { owner: owner(), token: 23 };
+/// The conversation page main.
+pub const CHAT: Style = Style { owner: owner(), token: 24 };
+/// The chat identity and controls.
+pub const CHATBAR: Style = Style { owner: owner(), token: 25 };
+/// The conversation and its tail.
+pub const THREAD: Style = Style { owner: owner(), token: 26 };
+/// One message in a conversation turn.
+pub const MESSAGE: Style = Style { owner: owner(), token: 27 };
+/// A message spoken by a person.
+pub const BY_PERSON: Style = Style { owner: owner(), token: 28 };
+/// A message spoken by the agent.
+pub const BY_AGENT: Style = Style { owner: owner(), token: 29 };
+/// A message spoken by a tool.
+pub const BY_TOOL: Style = Style { owner: owner(), token: 30 };
+/// A message containing instructions.
+pub const BY_SYSTEM: Style = Style { owner: owner(), token: 31 };
+/// The speaker and message state.
+pub const WHO: Style = Style { owner: owner(), token: 32 };
+/// The contents of a message.
+pub const SAYS: Style = Style { owner: owner(), token: 33 };
+/// A tool call or result line.
+pub const WORK: Style = Style { owner: owner(), token: 34 };
+/// A run or omission marker.
+pub const MARKER: Style = Style { owner: owner(), token: 35 };
+/// The chat proposal and departure list.
+pub const CARDS: Style = Style { owner: owner(), token: 36 };
+/// The chat composer and account area.
+pub const COMPOSER_AREA: Style = Style { owner: owner(), token: 37 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -78,6 +106,20 @@ pub const NAMES: Names<'static> = Names {
         b"temper-corner",
         b"temper-accounts",
         b"temper-account-line",
+        b"temper-chat",
+        b"temper-chatbar",
+        b"temper-thread",
+        b"temper-message",
+        b"temper-by-person",
+        b"temper-by-agent",
+        b"temper-by-tool",
+        b"temper-by-system",
+        b"temper-who",
+        b"temper-says",
+        b"temper-work",
+        b"temper-marker",
+        b"temper-cards",
+        b"temper-composer-area",
     ],
     regions: &[b"temper-link"],
 };

@@ -15,7 +15,7 @@ fn the_looks_names_pass_skeins_check() {
 }
 #[test]
 fn each_style_or_region_is_named_under_temper() {
-    let named: [(skein_ui::Style, &[u8]); 24] = [
+    let named: [(skein_ui::Style, &[u8]); 38] = [
         (BANNER, b"temper-banner"),
         (NAVIGATION, b"temper-navigation"),
         (MAIN, b"temper-main"),
@@ -40,6 +40,20 @@ fn each_style_or_region_is_named_under_temper() {
         (CORNER, b"temper-corner"),
         (ACCOUNTS, b"temper-accounts"),
         (ACCOUNT_LINE, b"temper-account-line"),
+        (CHAT, b"temper-chat"),
+        (CHATBAR, b"temper-chatbar"),
+        (THREAD, b"temper-thread"),
+        (MESSAGE, b"temper-message"),
+        (BY_PERSON, b"temper-by-person"),
+        (BY_AGENT, b"temper-by-agent"),
+        (BY_TOOL, b"temper-by-tool"),
+        (BY_SYSTEM, b"temper-by-system"),
+        (WHO, b"temper-who"),
+        (SAYS, b"temper-says"),
+        (WORK, b"temper-work"),
+        (MARKER, b"temper-marker"),
+        (CARDS, b"temper-cards"),
+        (COMPOSER_AREA, b"temper-composer-area"),
     ];
     for (style, name) in named {
         assert_eq!(NAMES.style(style), Some(name));
@@ -48,17 +62,22 @@ fn each_style_or_region_is_named_under_temper() {
 }
 #[test]
 fn each_pages_main_carries_the_main_token() {
-    let builds: [fn() -> temper_client_domain::Domain; 5] = [
+    let builds: [fn() -> temper_client_domain::Domain; 6] = [
         fixtures::signed_out,
+        fixtures::out_of_date,
+        fixtures::inbox_root,
         fixtures::adoption_root,
         fixtures::task::held_root,
         fixtures::chats_root,
-        fixtures::chat::chat_root,
     ];
     for build in builds {
         let view = fixtures::page_view(&build());
         assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN])]);
     }
+    let view = fixtures::page_view(&fixtures::account_root().0);
+    assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN])]);
+    let view = fixtures::page_view(&fixtures::chat::chat_root());
+    assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN, CHAT])]);
 }
 #[test]
 fn the_composers_carry_the_composer_token() {
@@ -121,4 +140,44 @@ fn assert_status_token(view: &crate::View, token: skein_ui::Style) {
         }
     }
     panic!("status token {token:?} absent");
+}
+
+#[test]
+fn the_conversation_tokens_stay_on_their_roles() {
+    let message_tree = fixtures::chat::tree(&super::chat::structured_thread());
+    let proposal = fixtures::page_view(&fixtures::chat::proposal_root());
+    let composer = fixtures::page_view(&fixtures::chat::messaging_root());
+    for token in [
+        CHAT,
+        CHATBAR,
+        THREAD,
+        MESSAGE,
+        BY_PERSON,
+        BY_AGENT,
+        BY_TOOL,
+        BY_SYSTEM,
+        WHO,
+        SAYS,
+        WORK,
+        MARKER,
+        CARDS,
+        COMPOSER_AREA,
+    ] {
+        let role = match token {
+            CHAT => Role::Main,
+            MARKER => Role::Region,
+            CARDS => Role::List,
+            _ => Role::Slot,
+        };
+        let mut found = false;
+        for tree in [&message_tree, proposal.tree(), composer.tree()] {
+            for node in tree.nodes() {
+                if node.styles.as_slice().contains(&token) {
+                    assert_eq!(node.role, role);
+                    found = true;
+                }
+            }
+        }
+        assert!(found, "{token:?}");
+    }
 }

@@ -1,5 +1,5 @@
 //! The chat follows jig-client's thread in chronological order.
-use crate::cards::P;
+use crate::{cards::P, look};
 use crate::{
     frame::Bindings,
     words::{Word, Words},
@@ -28,32 +28,61 @@ fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], ac
 }
 pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32, text_limit: u32) {
     b.open(Role::Main);
-    b.style(crate::look::MAIN);
+    b.style(look::MAIN);
+    b.style(look::CHAT);
     if let Some(chat) = root.pages().chat()
         && let Some(task) = chat.task(root.client())
     {
+        b.open(Role::Slot);
+        b.style(look::CHATBAR);
+        b.open(Role::Slot);
         text(b, Role::Heading { level: 1 }, &words.say(Word::Chat, &[Hole::Number(chat.task)]));
         text(b, Role::Paragraph, task.chip.title.bytes());
-        header(b, task, root.pages().me(root.client()), words);
+        if let Some(me) = root.pages().me(root.client()) {
+            super::chats::status(b, &task.chip, &task.waits_on, task.project, me, words);
+        }
+        b.close();
+        b.open(Role::Slot);
+        spend(b, task, words);
+        if temper_client_domain::pages::chat::allowed(task, c::ActKind::Stop) {
+            control(b, bindings, Role::Button, &words.say(Word::Stop, &[]), Act::Stop);
+        }
+        if temper_client_domain::pages::chat::allowed(task, c::ActKind::Cancel) {
+            control(b, bindings, Role::Button, &words.say(Word::Close, &[]), Act::Close);
+        }
+        control(b, bindings, Role::Button, &words.say(Word::MarkSeen, &[]), Act::Seen);
+        b.close();
+        b.close();
+        b.open(Role::Slot);
+        b.style(look::THREAD);
+        if let jig_client::thread::window::Edge::More(_) = chat.thread.lines.edges.after {
+            control(b, bindings, Role::Button, &words.say(Word::Older, &[]), Act::Older);
+        }
         conversation(b, &chat.thread, words, rows, text_limit);
+        if !chat.cards.is_empty() || !chat.departures().is_empty() {
+            b.open(Role::List);
+            b.style(look::CARDS);
+        }
         for card in &chat.cards {
             b.open(Role::Item);
-            b.style(crate::look::CARD);
+            b.style(look::CARD);
             b.key(super::inbox::card_key(card.object));
             crate::confirm::card(b, root, card, words, bindings, rows);
             b.close();
         }
         for object in chat.departures() {
             b.open(Role::Item);
-            b.style(crate::look::CARD);
+            b.style(look::CARD);
             b.key(super::inbox::card_key(*object));
             words.status(b, P::CardLeft, &[]);
+            b.close();
+        }
+        if !chat.cards.is_empty() || !chat.departures().is_empty() {
             b.close();
         }
         if let Some(result) = &task.result {
             result_text(b, result, words);
         }
-        composer(b, chat, task, words, bindings, temper_client_domain::pages::shown(root.pages()));
         for (key, _) in &chat.pending {
             if let Some(pending) = root.client().pending(*key) {
                 crate::confirm::progress_text(b, words, pending.progress);
@@ -62,6 +91,8 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         if let Some(outcome) = &chat.outcome {
             super::chats::outcome_text(b, words, outcome, 0);
         }
+        b.close();
+        composer(b, chat, task, words, bindings, temper_client_domain::pages::shown(root.pages()));
     }
     crate::confirm::main(b, root, words, bindings, rows);
     b.close();
@@ -83,10 +114,7 @@ fn result_text(b: &mut Builder, result: &c::TaskResult, words: &Words) {
         },
     }
 }
-pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words: &Words) {
-    if let Some(me) = me {
-        super::chats::status(b, &task.chip, &task.waits_on, task.project, me, words);
-    }
+fn spend(b: &mut Builder, task: &c::Task, words: &Words) {
     text(
         b,
         Role::Paragraph,
@@ -98,24 +126,24 @@ pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words:
 }
 fn composer(b: &mut Builder, chat: &Chat, task: &c::Task, words: &Words, bindings: &mut Bindings, shown: u64) {
     if temper_client_domain::pages::chat::allowed(task, c::ActKind::Message) {
+        b.open(Role::Slot);
+        b.style(look::COMPOSER_AREA);
+        b.open(Role::Slot);
+        b.style(look::ENTRY);
         b.open(Role::TextArea);
         b.name(&words.say(Word::Message, &[]));
         b.state(State::SubmitsOnEnter);
-        b.style(crate::look::COMPOSER);
+        b.style(look::COMPOSER);
         b.value(&chat.words, shown);
         b.bind(bindings.insert(Act::MessageWords { words: Box::default() }));
         b.close();
+        b.open(Role::Paragraph);
+        b.style(look::HINT);
+        words.text(b, Word::ChatSendHint, &[]);
+        b.close();
         control(b, bindings, Role::Button, &words.say(Word::Send, &[]), Act::Send);
-    }
-    if temper_client_domain::pages::chat::allowed(task, c::ActKind::Stop) {
-        control(b, bindings, Role::Button, &words.say(Word::Stop, &[]), Act::Stop);
-    }
-    if temper_client_domain::pages::chat::allowed(task, c::ActKind::Cancel) {
-        control(b, bindings, Role::Button, &words.say(Word::Close, &[]), Act::Close);
-    }
-    control(b, bindings, Role::Button, &words.say(Word::MarkSeen, &[]), Act::Seen);
-    if let jig_client::thread::window::Edge::More(_) = chat.thread.lines.edges.after {
-        control(b, bindings, Role::Button, &words.say(Word::Older, &[]), Act::Older);
+        b.close();
+        b.close();
     }
 }
 pub(crate) fn conversation(b: &mut Builder, thread: &Thread, words: &Words, rows: u32, text_limit: u32) {
@@ -123,13 +151,17 @@ pub(crate) fn conversation(b: &mut Builder, thread: &Thread, words: &Words, rows
     b.name(&words.say_card(P::ConversationLog, &[]));
     for line in thread.lines().into_boxed() {
         b.open(Role::Region);
-        b.style(crate::look::TURN);
+        b.style(look::TURN);
         match line {
             Line::Words { by, words: message, state } => {
+                b.open(Role::Slot);
+                b.style(look::MESSAGE);
+                b.style(look::BY_PERSON);
+                b.open(Role::Slot);
+                b.style(look::WHO);
                 if let Some(by) = by {
                     text(b, Role::Paragraph, by.name.bytes());
                 }
-                text(b, Role::Paragraph, message);
                 words.status(
                     b,
                     match state {
@@ -139,14 +171,30 @@ pub(crate) fn conversation(b: &mut Builder, thread: &Thread, words: &Words, rows
                     },
                     &[],
                 );
+                b.close();
+                b.open(Role::Slot);
+                b.style(look::SAYS);
+                text(b, Role::Paragraph, message);
+                b.close();
+                b.close();
             }
             Line::Turn { turn, .. } => committed(b, turn, words, rows, text_limit),
             Line::Provisional { text, cut, .. } => {
+                b.open(Role::Slot);
+                b.style(look::MESSAGE);
+                b.style(look::BY_AGENT);
+                b.open(Role::Slot);
+                b.style(look::WHO);
                 words.status(b, P::Provisional, &[]);
+                b.close();
+                b.open(Role::Slot);
+                b.style(look::SAYS);
                 markdown(b, text, words, text_limit);
                 if cut {
                     words.status(b, P::TurnCut, &[]);
                 }
+                b.close();
+                b.close();
             }
             Line::Undecoded { why, .. } => match why {
                 c::TurnProblem::Version { found } => {
@@ -156,12 +204,15 @@ pub(crate) fn conversation(b: &mut Builder, thread: &Thread, words: &Words, rows
                 c::TurnProblem::TooLarge { .. } => words.status(b, P::TurnUnreadTooLarge, &[]),
             },
             Line::RunBegan { attempt } => {
+                b.style(look::MARKER);
                 text(b, Role::Paragraph, &words.say(Word::RunBegan, &[Hole::Number(attempt)]));
             }
             Line::RunEnded { attempt } => {
+                b.style(look::MARKER);
                 text(b, Role::Paragraph, &words.say(Word::RunEnded, &[Hole::Number(attempt)]));
             }
             Line::Left { lines } => {
+                b.style(look::MARKER);
                 text(b, Role::Status, &words.say(Word::LinesLeft, &[Hole::Number(u64::from(lines))]));
             }
             Line::Activity { line } => match &line.event {
@@ -185,6 +236,16 @@ pub(crate) fn conversation(b: &mut Builder, thread: &Thread, words: &Words, rows
 }
 fn committed(b: &mut Builder, turn: &c::Turn, words: &Words, rows: u32, text_limit: u32) {
     for message in prefix(b, turn.messages.as_slice(), rows, words) {
+        b.open(Role::Slot);
+        b.style(look::MESSAGE);
+        b.style(match message.speaker {
+            c::Speaker::Person => look::BY_PERSON,
+            c::Speaker::Assistant => look::BY_AGENT,
+            c::Speaker::Tool => look::BY_TOOL,
+            c::Speaker::System => look::BY_SYSTEM,
+        });
+        b.open(Role::Slot);
+        b.style(look::WHO);
         words.card_text(
             b,
             match message.speaker {
@@ -195,18 +256,27 @@ fn committed(b: &mut Builder, turn: &c::Turn, words: &Words, rows: u32, text_lim
             },
             &[],
         );
+        b.close();
+        b.open(Role::Slot);
+        b.style(look::SAYS);
         for block in prefix(b, message.blocks.as_slice(), rows, words) {
             match block {
                 c::Block::Text(value) => markdown(b, value.bytes(), words, text_limit),
                 c::Block::Call(call) => {
+                    b.open(Role::Slot);
+                    b.style(look::WORK);
                     text(b, Role::Paragraph, call.tool.bytes());
                     if let Some(summary) = &call.outcome {
                         text(b, Role::Paragraph, summary.bytes());
                     }
+                    b.close();
                 }
                 c::Block::Result { summary, failed, .. } => {
+                    b.open(Role::Slot);
+                    b.style(look::WORK);
                     words.card_text(b, if *failed { P::CallFailed } else { P::CallCompleted }, &[]);
                     text(b, Role::Paragraph, summary.bytes());
+                    b.close();
                 }
                 c::Block::Opaque { dialect, size } => {
                     words.card_text(b, P::OpaqueDialect, &[crate::cards::name(dialect.bytes())]);
@@ -214,6 +284,8 @@ fn committed(b: &mut Builder, turn: &c::Turn, words: &Words, rows: u32, text_lim
                 }
             }
         }
+        b.close();
+        b.close();
     }
     if turn.cut {
         words.status(b, P::TurnCut, &[]);

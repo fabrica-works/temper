@@ -212,3 +212,371 @@ fn each_turn_carries_the_turn_token() {
     assert_eq!(turns.len(), 1);
     assert_eq!(turns.as_ref(), [Box::from([crate::look::TURN])]);
 }
+
+fn style_position(nodes: &[skein_ui::Node], token: skein_ui::Style) -> Option<usize> {
+    for (index, node) in nodes.iter().enumerate() {
+        if node.styles.as_slice().contains(&token) {
+            return Some(index);
+        }
+    }
+    None
+}
+fn named_position(nodes: &[skein_ui::Node], role: Role, name: Option<&[u8]>) -> Option<usize> {
+    for (index, node) in nodes.iter().enumerate() {
+        if node.role == role && (name.is_none() || node.name.as_deref() == name) {
+            return Some(index);
+        }
+    }
+    None
+}
+fn styled(tree: &skein_ui::Tree, token: skein_ui::Style) -> usize {
+    style_position(tree.nodes(), token).expect("styled node")
+}
+fn subtree(tree: &skein_ui::Tree, at: usize) -> &[skein_ui::Node] {
+    let from = at.checked_add(1).expect("child index");
+    let through = at.checked_add(usize::try_from(tree.nodes()[at].size).expect("size")).expect("subtree end");
+    &tree.nodes()[from..through]
+}
+#[test]
+fn the_chat_bar_contains_identity_spend_and_acts() {
+    use temper_client_domain::Event;
+    let root = messaging_root();
+    // The standard task fixture offers Close; a checked task delivery adds Stop.
+    let mut task = root.pages().chat().expect("chat").task(root.client()).expect("task").clone();
+    let mut offers = List::with_capacity(3);
+    for act in [c::ActKind::Message, c::ActKind::Stop, c::ActKind::Cancel] {
+        offers.push(c::Offered { act, admission: c::Admission::Allowed, effect: None }).expect("offer");
+    }
+    task.acts = offers;
+    // Re-enter with a task watch whose token is supplied by the fixture.
+    let (mut fresh, _, watch) =
+        fixtures::root_at(temper_client_domain::Address::Chat { task: TASK }, &fixtures::domain_limits());
+    fixtures::root_event(
+        &mut fresh,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch: watch.expect("task watch"),
+                    event: c::WatchEvent::Delivered(c::Delivery::Task(Box::new(task))),
+                },
+            },
+        },
+    );
+    let view = fixtures::page_view(&fresh);
+    let bar = styled(view.tree(), crate::look::CHATBAR);
+    assert_eq!(view.tree().nodes()[bar].role, Role::Slot);
+    let nodes = subtree(view.tree(), bar);
+    for (role, name) in [
+        (Role::Heading { level: 1 }, b"Chat 9".as_slice()),
+        (Role::Paragraph, b"Spent 7; delegates spent 2"),
+        (Role::Status, b"Parked"),
+        (Role::Button, b"Stop"),
+        (Role::Button, b"Close"),
+        (Role::Button, b"Mark seen"),
+    ] {
+        assert!(named_position(nodes, role, Some(name)).is_some(), "{name:?}");
+    }
+    assert!(named_position(nodes, Role::Paragraph, Some(fixtures::task::document().chip.title.bytes())).is_some());
+}
+#[test]
+fn the_chat_entry_has_the_true_hint_between_message_and_send() {
+    let view = fixtures::page_view(&messaging_root());
+    let tree = view.tree();
+    let area = styled(tree, crate::look::COMPOSER_AREA);
+    let entry = styled(tree, crate::look::ENTRY);
+    assert_eq!(tree.nodes()[area].role, Role::Slot);
+    assert!(entry > area);
+    let nodes = subtree(tree, entry);
+    assert_eq!(nodes[0].role, Role::TextArea);
+    assert!(nodes[0].states.as_slice().contains(&skein_ui::State::SubmitsOnEnter));
+    assert_eq!(nodes[1].role, Role::Paragraph);
+    assert!(nodes[1].styles.as_slice().contains(&crate::look::HINT));
+    let send = 1_usize.checked_add(usize::try_from(nodes[1].size).expect("hint size")).expect("send index");
+    assert_eq!(nodes[send].role, Role::Button);
+    assert_eq!(nodes[send].name.as_deref(), Some(b"Send".as_slice()));
+    assert_eq!(
+        fixtures::words().say(crate::words::Word::ChatSendHint, &[]).as_ref(),
+        b"Enter to send \xc2\xb7 Shift+Enter for a new line"
+    );
+}
+#[test]
+fn a_chat_without_message_has_no_composer_area() {
+    let view = fixtures::page_view(&chat_root());
+    assert!(style_position(view.tree().nodes(), crate::look::COMPOSER_AREA).is_none());
+}
+#[test]
+fn chat_cards_are_items_of_the_cards_list_after_the_log() {
+    let view = fixtures::page_view(&proposal_root());
+    let tree = view.tree();
+    let cards = styled(tree, crate::look::CARDS);
+    assert_eq!(tree.nodes()[cards].role, Role::List);
+    let card = style_position(subtree(tree, cards), crate::look::CARD).expect("card");
+    assert_eq!(subtree(tree, cards)[card].role, Role::Item);
+    assert!(named_position(tree.nodes(), Role::Log, None).expect("log") < cards);
+}
+
+pub(super) fn structured_thread() -> Thread {
+    let mut thread = Thread::new(TASK, &jig_client::thread::Limits { lines: 12, bytes: BYTES, text: 128 });
+    thread.reading = Some(jig_client::thread::Reading::Latest { known: 0 });
+    let mut messages = List::with_capacity(4);
+    for speaker in [c::Speaker::Person, c::Speaker::Assistant, c::Speaker::Tool, c::Speaker::System] {
+        let mut blocks = List::with_capacity(2);
+        blocks
+            .push(c::Block::Call(c::Call {
+                number: 1,
+                tool: c::Text::new(Box::from(*b"Read"), TEXT).expect("tool"),
+                input: c::Text::new(Box::from([]), TEXT).expect("input"),
+                outcome: None,
+                failed: false,
+                objects: List::with_capacity(0),
+                parts: List::with_capacity(0),
+            }))
+            .expect("call");
+        blocks
+            .push(c::Block::Result {
+                call: 1,
+                summary: c::Text::new(Box::from(*b"Done"), TEXT).expect("summary"),
+                failed: false,
+            })
+            .expect("result");
+        messages.push(c::Message { speaker, blocks }).expect("message");
+    }
+    let mut rows = List::with_capacity(5);
+    for (position, event) in [
+        (5, c::Activity::RunEnded { attempt: ATTEMPT, how: c::RunEnding::Parked, spent: 0 }),
+        (
+            4,
+            c::Activity::Turn {
+                name: c::TurnName { attempt: ATTEMPT, number: 1 },
+                turn: c::TurnRead::Decoded(c::Turn {
+                    messages,
+                    used: c::Usage { input: 0, output: 0, cached: 0, cache_written: 0 },
+                    spent: 0,
+                    read_through: None,
+                    cut: false,
+                }),
+            },
+        ),
+        (
+            3,
+            c::Activity::Words {
+                by: c::Party {
+                    number: PARTY,
+                    kind: c::PartyKind::Person,
+                    name: c::Text::new(Box::from(*b"Pat"), TEXT).expect("person"),
+                },
+                message: 1,
+                words: c::Text::new(Box::from(*b"Hello"), TEXT).expect("words"),
+            },
+        ),
+        (
+            2,
+            c::Activity::RunBegan {
+                attempt: ATTEMPT,
+                how: c::RunBeginning::Fresh { tail: 0 },
+                why: c::Text::new(Box::from(*b"Hello"), TEXT).expect("why"),
+            },
+        ),
+    ] {
+        rows.push(c::ActivityLine { position, at: Wall::EPOCH, event }).expect("line");
+    }
+    thread.page(c::ActivityPage {
+        rows,
+        after: None,
+        before: Some(c::Cursor::new(Box::from(*b"older"), TEXT).expect("cursor")),
+        cut: true,
+    });
+    thread.left = 1;
+    thread
+}
+#[test]
+fn messages_keep_speaker_who_says_and_work_slots() {
+    use crate::look;
+    let tree = tree(&structured_thread());
+    for speaker in [look::BY_PERSON, look::BY_AGENT, look::BY_TOOL, look::BY_SYSTEM] {
+        let at = styled(&tree, speaker);
+        assert_eq!(tree.nodes()[at].role, Role::Slot);
+        assert!(tree.nodes()[at].styles.as_slice().contains(&look::MESSAGE));
+        let nodes = subtree(&tree, at);
+        let who = style_position(nodes, look::WHO).expect("who");
+        let says = style_position(nodes, look::SAYS).expect("says");
+        assert!(who < says);
+        assert_eq!(nodes[who].role, Role::Slot);
+        assert_eq!(nodes[says].role, Role::Slot);
+    }
+    let mut works = 0_u32;
+    for (at, node) in tree.nodes().iter().enumerate() {
+        if node.styles.as_slice().contains(&look::WORK) {
+            assert_eq!(node.role, Role::Slot);
+            assert!(named_position(subtree(&tree, at), Role::Paragraph, None).is_some());
+            works = works.checked_add(1).expect("work count");
+        }
+    }
+    assert_eq!(works, 8);
+}
+#[test]
+fn run_and_omission_markers_keep_the_turn_region() {
+    let tree = tree(&structured_thread());
+    let mut markers = 0_u32;
+    for node in tree.nodes() {
+        if node.styles.as_slice().contains(&crate::look::MARKER) {
+            assert_eq!(node.role, Role::Region);
+            assert!(node.styles.as_slice().contains(&crate::look::TURN));
+            markers = markers.checked_add(1).expect("marker count");
+        }
+    }
+    assert_eq!(markers, 3);
+}
+
+fn chat_event(
+    root: &mut temper_client_domain::Domain,
+    event: temper_client_domain::Event,
+    out: &mut skein_lib::Queue<temper_client_domain::Request>,
+) {
+    temper_client_domain::step(
+        root,
+        &skein_lib::Env { now: skein_lib::Time::ZERO, wall: Wall::EPOCH, limits: fixtures::domain_limits() },
+        event,
+        out,
+    );
+}
+fn chat_with_history() -> temper_client_domain::Domain {
+    use temper_client_domain::{Address, Event, Place, Request};
+    let (mut root, _, _) = fixtures::root_at(
+        Address::Inbox { filter: temper_client_domain::address::Filter::ALL },
+        &fixtures::domain_limits(),
+    );
+    let mut out = skein_lib::Queue::with_capacity(temper_client_domain::max_out(&fixtures::domain_limits()));
+    chat_event(&mut root, Event::Went { place: Place::Address(Address::Chat { task: TASK }) }, &mut out);
+    let mut watch = None;
+    let mut activity = None;
+    while let Some(request) = out.pop() {
+        match request {
+            Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down:
+                            jig_client::Down::Open {
+                                watch: token,
+                                subject: jig_client::Watchable::Jig(c::Subject::Task { .. }),
+                            },
+                    },
+            } => watch = Some(token),
+            Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down: jig_client::Down::Read { read, what: jig_client::Readable::Jig(c::Read::Activity { .. }) },
+                    },
+            } => activity = Some(read),
+            Request::Client { .. }
+            | Request::Show { .. }
+            | Request::SignOut
+            | Request::Dropped { .. }
+            | Request::Fact { .. } => {}
+        }
+    }
+    let template = messaging_root();
+    let mut task = template.pages().chat().expect("chat").task(template.client()).expect("task").clone();
+    task.activity = 4;
+    chat_event(
+        &mut root,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch: watch.expect("watch"),
+                    event: c::WatchEvent::Delivered(c::Delivery::Task(Box::new(task))),
+                },
+            },
+        },
+        &mut out,
+    );
+    let mut rows = List::with_capacity(1);
+    rows.push(c::ActivityLine {
+        position: 4,
+        at: Wall::EPOCH,
+        event: c::Activity::Words {
+            by: c::Party {
+                number: PARTY,
+                kind: c::PartyKind::Person,
+                name: c::Text::new(Box::from(*b"Pat"), TEXT).expect("name"),
+            },
+            message: 1,
+            words: c::Text::new(Box::from(*b"Hello"), TEXT).expect("words"),
+        },
+    })
+    .expect("line");
+    chat_event(
+        &mut root,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::ReadDone {
+                    read: activity.expect("activity"),
+                    result: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(Box::new(
+                        c::ActivityPage {
+                            rows,
+                            before: Some(c::Cursor::new(Box::from(*b"older"), TEXT).expect("cursor")),
+                            after: None,
+                            cut: false,
+                        },
+                    )))),
+                },
+            },
+        },
+        &mut out,
+    );
+    root
+}
+#[test]
+fn older_precedes_the_log_in_the_thread() {
+    let view = fixtures::page_view(&chat_with_history());
+    let nodes = subtree(view.tree(), styled(view.tree(), crate::look::THREAD));
+    assert_eq!(nodes[0].role, Role::Button);
+    assert_eq!(nodes[0].name.as_deref(), Some(b"Older".as_slice()));
+    assert_eq!(nodes[1].role, Role::Log);
+}
+#[test]
+fn pending_progress_and_the_answer_stay_before_the_composer() {
+    use temper_client_domain::{Action, Event, Request, pages::Act};
+    let mut root = chat_with_history();
+    let mut out = skein_lib::Queue::with_capacity(temper_client_domain::max_out(&fixtures::domain_limits()));
+    for act in [Act::MessageWords { words: Box::from(*b"Hello") }, Act::Send] {
+        chat_event(&mut root, Event::Act { action: Action::Pages(act) }, &mut out);
+    }
+    assert_eq!(root.pages().chat().expect("chat").pending.len(), 1);
+    let pending = fixtures::page_view(&root);
+    let thread = styled(pending.tree(), crate::look::THREAD);
+    let area = styled(pending.tree(), crate::look::COMPOSER_AREA);
+    let log = named_position(pending.tree().nodes(), Role::Log, None).expect("log");
+    let end = log.checked_add(usize::try_from(pending.tree().nodes()[log].size).expect("log size")).expect("log end");
+    assert!(named_position(&pending.tree().nodes()[end..area], Role::Status, None).is_some());
+    assert!(thread < log && end < area);
+    chat_event(&mut root, Event::Client { event: jig_client::Event::Stored }, &mut out);
+    let mut attempt = None;
+    for request in &out {
+        if let Request::Client {
+            request: jig_client::Request::Down { down: jig_client::Down::Send { attempt: token, .. } },
+        } = request
+        {
+            attempt = Some(*token);
+        }
+    }
+    let attempt = attempt.expect("attempt");
+    chat_event(
+        &mut root,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Answer {
+                    attempt,
+                    envelope: skein_lib::RequestEnvelope::Final,
+                    answer: Some(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Changed))),
+                    why: None,
+                },
+            },
+        },
+        &mut out,
+    );
+    let answered = fixtures::page_view(&root);
+    let applied = fixtures::words().say_card(crate::cards::P::Applied, &[]);
+    let status = named_position(answered.tree().nodes(), Role::Status, Some(&applied)).expect("applied outcome");
+    assert!(status < styled(answered.tree(), crate::look::COMPOSER_AREA));
+}

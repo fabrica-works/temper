@@ -55,6 +55,7 @@ pub enum Word {
     ChatDelegates,
     ChatTime,
     ChatHint,
+    ChatSendHint,
     Accept,
     Reject,
     Answer,
@@ -100,7 +101,7 @@ pub enum Word {
     SignOutLost,
     Unshowable,
 }
-const ALL: [Word; 87] = [
+const ALL: [Word; 88] = [
     Word::TaskHeader,
     Word::Asked,
     Word::Plan,
@@ -145,6 +146,7 @@ const ALL: [Word; 87] = [
     Word::ChatDelegates,
     Word::ChatTime,
     Word::ChatHint,
+    Word::ChatSendHint,
     Word::Accept,
     Word::Reject,
     Word::Answer,
@@ -241,6 +243,7 @@ impl Word {
             Self::ChatDelegates => 145,
             Self::ChatTime => 184,
             Self::ChatHint => 185,
+            Self::ChatSendHint => 186,
             Self::Accept => 125,
             Self::Reject => 126,
             Self::Answer => 127,
@@ -453,6 +456,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::ChatSpend => (&[b"Spent ", b"; delegates spent ", b""], &[Number, Number]),
         Word::ChatDelegates => (&[b"Live delegates ", b""], &[Number]),
         Word::ChatTime => (&[b"", b""], &[Name]),
+        Word::ChatSendHint => (&[b"Enter to send \xc2\xb7 Shift+Enter for a new line"], &[]),
         Word::ChatHint => (&[b"Enter to start \xc2\xb7 Shift+Enter for a new line"], &[]),
         Word::Accept => (&[b"Accept"], &[]),
         Word::Reject => (&[b"Reject with reason"], &[]),
