@@ -16,7 +16,8 @@ delivery; landed, inside the start pin) and forge-kit's temper-05.2 (fake git's 
 peer's shared `Forge`; the one-process world's port-0 hooks address).
 13.4 needs temper 05's acts, 13.5 its waits and `task --tree` read.
 Names said to be forge-kit's temper-05.2's are created there: check each
-as landed. Steps: `temper-13.1` to `temper-13.5`.
+as landed. Steps: `temper-13.1` to `temper-13.5`, then `temper-13.s2`
+(`13.s2-git-test-shapes.md`, ruling 142).
 
 ## Read first
 

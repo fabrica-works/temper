@@ -814,6 +814,16 @@ pass:
 
      `heavy -- <run>/kit/scripts/dev/test-plan` passed at 9ab88f69 (logs/20261020T123633-3831.log). Gates keep the default settling wait; a `land` exit 9 is a refusal to resolve, never a failed gate to diagnose.
 
+142. **The git stories' shapes, and the gate's check of them** (steer of 2026-10-20T12:27:37Z).
+     Amends: new `temper/13.s2-git-test-shapes.md`; `temper/13-landing.md`'s Steps; the README's order of steps.
+
+     From the hourly check of 2026-10-20T12:27:37Z: "One behaviour per test" sent a third time for assertions on the way (ruling 117 at 14:50:52Z; the steer of 18:10:00Z, lost.rs), and the named sizes of ruling 137, are both seen again on origin/main in `tests/real-loop/tests/git.rs`:
+     - `git.rs:55: assert_eq!((added.exit, tree.exit, result.exit), (0, 0, 0));` and `git.rs:78: assert_eq!((checked.exit, cleaned.exit), (0, 0));`;
+     - `git.rs:91-92`: the commits' numbers `3` and `4`; `git.rs:101: assert_eq!(object.tree.len(), 1, …)`; `git.rs:35`: `body_bytes = 8192`;
+     - `let commit = |number| invocation::object(&temper_fake_git::id::id(number))…` at `git.rs:41`, `:71` and `:86`.
+
+     So, as development.md 14.4 says for a test-shape rule a script can test, sent a second time, step `temper-13.s2` (`temper/13.s2-git-test-shapes.md`), in session 13 after temper-13.5 (both change `scripts/check.sh`), fixes these and adds a check to temper's gate for the two forms a script finds: a tuple of exits asserted together, and a length asserted against a bare integer, in `tests/real-loop/tests` (`grep -rnE 'assert_eq!\(\([a-z_]+\.exit, [a-z_]+\.exit|\.len\(\), [0-9]+[,)]' tests/real-loop/tests` on origin/main: the three lines above). An assertion of a setup's exit alone, before the act, is no form a script can tell from the act's own; it stays the rule's, for the checks to read. temper is the most downstream repository: no repin.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
