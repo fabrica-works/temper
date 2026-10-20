@@ -514,6 +514,10 @@ fn startup_records() -> skein_lib::List<(u64, skein_lib::Secret)> {
 }
 #[test]
 #[expect(clippy::disallowed_methods, reason = "ordinary routing tests inspect store requests and HTTP fixture bytes")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one paged startup proves routing and retention beside its existing handoffs"
+)]
 fn records_start_routes_two_pages_without_erasing_or_reading_carried_values() {
     use jig_protocol_store::{SecretOwner, Secrets};
     use skein_lib::List;
@@ -539,6 +543,7 @@ fn records_start_routes_two_pages_without_erasing_or_reading_carried_values() {
     }
     assert!(service.engine.forge_records.done());
     assert!(service.engine.forge_records.rows.forge(2).is_some(), "setup retains the loaded rows");
+    assert!(service.engine.forge_records.rows.forge(77).is_none(), "unconfigured values are not retained");
     assert_eq!(service.engine.store.forge_loads.len(), 2);
     for cursor in &service.engine.store.forge_loads {
         assert!(cursor.is_none_or(|number| number < records::CARRIED));
@@ -590,6 +595,13 @@ fn records_start_routes_two_pages_without_erasing_or_reading_carried_values() {
     }
     assert_eq!(notes.len(), 8);
     assert!(notes.as_slice().contains(&crate::Note::ForgeUnconfigured { number: 77 }));
+    let mut unconfigured = 0_u32;
+    for note in &notes {
+        if *note == (crate::Note::ForgeUnconfigured { number: 77 }) {
+            unconfigured = unconfigured.checked_add(1).unwrap();
+        }
+    }
+    assert_eq!(unconfigured, 1, "all of the unconfigured forge's rows name it once");
     face.select(1);
     assert!(
         face.sent().windows(b"GET /api/v1/user ".len()).any(|part| part == b"GET /api/v1/user "),

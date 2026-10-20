@@ -670,8 +670,6 @@ fn memory(
     if let Some(runtime) = runtime {
         bytes = bytes.checked_add(skein_tls::roots_worst_case(runtime.trust_roots, runtime.trust_root_bytes)?)?;
     }
-    bytes = bytes
-        .checked_add(crate::forge::records::worst_case(settings)?)?
-        .checked_add(List::<u16>::worst_case(u32::try_from(settings.forges.len()).ok()?)?)?;
+    bytes = bytes.checked_add(crate::forge::records::worst_case(settings)?)?;
     Some(bytes)
 }

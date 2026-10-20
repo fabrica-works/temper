@@ -49,7 +49,7 @@ impl Engine {
         values: crate::values::Values,
         first_periods: List<(u32, u64)>,
     ) -> Self {
-        let forge_records = crate::forge::records::Loader::new(&children.limits);
+        let forge_records = crate::forge::records::Loader::new(&children.limits, &children.workers.forges);
         let Children { accounts, workers, clients, forge, setup, notes, limits: _ } = children;
         let max_out = root::max_out(limits);
         let capacity = max_out.checked_mul(2).expect("root routing room");

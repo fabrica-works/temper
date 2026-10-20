@@ -359,9 +359,13 @@ fn setup_memory_figures_remain_separate_from_the_host_admission() {
     assert_eq!(settings.user_agent.as_ref(), crate::forge::USER_AGENT.as_bytes());
     let given = settings.forges.get(0).unwrap().github().unwrap();
     let machines = skein_forge_setup::github::worst_case(given, 8, 8).unwrap();
-    let rows = records::Rows::worst_case(config.limits.records.value_bytes).unwrap();
+    let rows = crate::forge::records::Rows::worst_case(
+        u32::try_from(config.forges.len()).unwrap(),
+        config.limits.records.value_bytes,
+    )
+    .unwrap();
     let pages = 8_u64.checked_mul(u64::from(given.limits.page_bytes)).unwrap();
-    assert_eq!((machines, rows, pages), (630_744, 2_710_360_832, 131_072));
+    assert_eq!((machines, rows, pages), (630_744, 1_825_634, 131_072));
     assert_eq!(accounted(8, 8), accounted(1, 1), "runtime 55: no partial Host charge");
 }
 #[test]

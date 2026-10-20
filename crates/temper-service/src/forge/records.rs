@@ -1,9 +1,58 @@
 //! Application records before forge IO and the root's Restart (protocol/forge.md, 2.1).
 use alloc::boxed::Box;
 use jig_protocol_store::{Event, SecretOwner, Secrets};
-use skein_lib::{List, Token};
-use temper_protocol_records::{self as records, Rows};
+use skein_lib::{List, Map, Secret, Token};
+use temper_protocol_records as records;
 pub(crate) const LOAD: Token = Token::new(crate::tokens::FORGE | 1);
+const FORGES: u32 = 65536;
+/// The service retains values only for its configured forges. The codec's
+/// general-purpose Rows is filled solely through this holder's checked push.
+#[derive(Debug)]
+pub(crate) struct Rows {
+    values: records::Rows,
+    configured: List<u16>,
+    unconfigured: Map<u16, ()>,
+}
+impl Rows {
+    fn new(forges: &[crate::settings::Forge]) -> Self {
+        let mut configured = List::with_capacity(u32::try_from(forges.len()).expect("configured forges"));
+        for forge in forges {
+            configured.push(forge.number).expect("configured forges");
+        }
+        Self { values: records::Rows::new(), configured, unconfigured: Map::with_capacity(FORGES) }
+    }
+    pub(crate) fn push(&mut self, number: u64, bytes: Secret, value_bytes: u32) {
+        if number >= records::CARRIED || number >> 48_u32 != u64::from(records::FAMILY_FORGE) {
+            return;
+        }
+        let Ok(forge) = u16::try_from((number >> 16_u32) & 0xffff_ffff) else { return };
+        if !self.configured.as_slice().contains(&forge) {
+            self.unconfigured.insert(forge, ()).expect("all u16 forge numbers fit");
+            return;
+        }
+        self.values.push(number, bytes, value_bytes);
+    }
+    pub(crate) fn forge(&self, forge: u16) -> Option<&records::ForgeRows> {
+        self.values.forge(forge)
+    }
+    fn next_unconfigured(&self, after: u32, configured: &[u16]) -> Option<u16> {
+        let after = u16::try_from(after).ok()?;
+        for (number, ()) in self.unconfigured.range(after..) {
+            if !configured.contains(number) {
+                return Some(*number);
+            }
+        }
+        None
+    }
+    pub(crate) fn worst_case(forges: u32, value_bytes: u32) -> Option<u64> {
+        // The codec map allocates as it fills; push bounds it to configured forges.
+        Map::<u16, records::ForgeRows>::worst_case(forges)?
+            .checked_add(u64::from(forges).checked_mul(10)?.checked_mul(u64::from(value_bytes))?)?
+            .checked_add(List::<u16>::worst_case(forges)?)?
+            .checked_add(Map::<u16, ()>::worst_case(FORGES)?)
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Loader {
     #[cfg(test)]
@@ -21,11 +70,11 @@ enum Phase {
     Done,
 }
 impl Loader {
-    pub(crate) fn new(limits: &crate::limits::Limits) -> Self {
+    pub(crate) fn new(limits: &crate::limits::Limits, forges: &[crate::settings::Forge]) -> Self {
         Self {
             #[cfg(test)]
             inspected: List::with_capacity(128),
-            rows: Rows::new(),
+            rows: Rows::new(forges),
             phase: Phase::Load { after: None },
             value_bytes: limits.records.value_bytes,
             bounds: skein_forge_setup::item::Bounds {
@@ -120,17 +169,8 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
             engine.forge_records.phase = Phase::Connect { index: index.checked_add(1).expect("configured forges") };
         }
         Phase::Name { after } => {
-            let mut configured = List::with_capacity(u32::try_from(engine.workers.forges.len()).expect("forges"));
-            for forge in &engine.workers.forges {
-                configured.push(forge.number).expect("configured forges");
-            }
-            let mut found = None;
-            for number in engine.forge_records.rows.unconfigured(configured.as_slice()) {
-                if u32::from(number) >= after {
-                    found = Some(number);
-                    break;
-                }
-            }
+            let rows = &engine.forge_records.rows;
+            let found = rows.next_unconfigured(after, rows.configured.as_slice());
             match found {
                 Some(number) => {
                     if engine.notes.room() == 0 {
@@ -149,7 +189,7 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
     }
 }
 
-/// All u16 forge groups, diagnostics and a single access/origin handoff.
+/// Configured forge values, unconfigured numbers, diagnostics and one access/origin handoff.
 pub(crate) fn worst_case(settings: &crate::settings::Engine) -> Option<u64> {
     let own = &settings.limits;
     let value = u64::from(own.records.value_bytes);
@@ -159,11 +199,47 @@ pub(crate) fn worst_case(settings: &crate::settings::Engine) -> Option<u64> {
             address = address.max(u64::try_from(name.len()).ok()?.checked_add(6)?);
         }
     }
-    Rows::worst_case(own.records.value_bytes)?
+    Rows::worst_case(u32::try_from(settings.forges.len()).ok()?, own.records.value_bytes)?
         .checked_add(u64::try_from(settings.forges.len()).ok()?.checked_mul(value)?)?
         .checked_add(address.checked_mul(2)?)?
         .checked_add(value)?
         .checked_add(u64::from(own.forge_component.key_bytes))?
         .checked_add(u64::from(own.forge.name_bytes))?
         .checked_add(u64::from(own.forges.installations).checked_mul(8)?)
+}
+
+#[cfg(test)]
+#[test]
+fn unconfigured_numbers_resume_at_the_cursor_without_retaining_values() {
+    let settings = crate::tests::fixtures::engine();
+    let mut rows = Rows::new(&settings.forges);
+    for forge in [u16::MAX, 77, 0, 77] {
+        for item in [records::Item::AppKey, records::Item::Origin] {
+            rows.push(records::number(forge, item), Secret::new(Box::from([2, 255])), 4096);
+        }
+        assert!(rows.forge(forge).is_none());
+    }
+    // Unknown item codes still identify an unconfigured forge without reading bytes.
+    rows.push((u64::from(records::FAMILY_FORGE) << 48) | (78 << 16) | 0x000b, Secret::new(Box::from([])), 4096);
+    assert_eq!(rows.unconfigured.len(), 4);
+    assert_eq!(rows.next_unconfigured(0, &[1]), Some(0));
+    assert_eq!(rows.next_unconfigured(1, &[1]), Some(77));
+    assert_eq!(rows.next_unconfigured(78, &[1]), Some(78));
+    assert_eq!(rows.next_unconfigured(78, &[1, 78]), Some(u16::MAX));
+    assert_eq!(rows.next_unconfigured(u32::from(u16::MAX), &[1]), Some(u16::MAX));
+    assert_eq!(rows.next_unconfigured(FORGES, &[1]), None);
+    assert_eq!(rows.next_unconfigured(u32::MAX, &[1]), None);
+    rows.push(records::number(1, records::Item::User), Secret::new(Box::from([1, 9])), 4096);
+    assert!(rows.forge(1).is_some());
+    assert_eq!(rows.unconfigured.len(), 4);
+}
+
+#[cfg(test)]
+#[test]
+fn retained_values_are_priced_only_at_the_configured_forge_count() {
+    for forges in [0, 1, 9, FORGES] {
+        let small = Rows::worst_case(forges, 4096).unwrap();
+        let large = Rows::worst_case(forges, 4097).unwrap();
+        assert_eq!(large.checked_sub(small), u64::from(forges).checked_mul(10));
+    }
 }
