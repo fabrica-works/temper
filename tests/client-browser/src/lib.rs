@@ -1,9 +1,9 @@
 //! The browser tier (client/browser.md, 4.3): Chromium against `temper serve`, on a scratch deployment whose
 //! forge and LLM endpoint are unreached, serving the bundle the gate builds. Its helpers are jig's
 //! `tests/client-browser/src/lib.rs`'s, for temper's binary and bundle.
-use skein_fake_person::Find;
+use skein_fake_person::{Find, Step as PersonStep};
 use skein_fake_person_browser::{
-    Setup,
+    Setup, Step,
     harness::{Names, Output, Printed},
 };
 use skein_ui::Role;
@@ -14,6 +14,10 @@ mod configuration;
 pub const WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(5);
 /// How long a story watches for what a page must not show.
 pub const ABSENT: skein_lib::Duration = skein_lib::Duration::from_secs(1);
+/// The heading of the first chat a story starts.
+pub const FIRST_CHAT: &[u8] = b"Chat 1";
+/// Its address.
+pub const FIRST_CHAT_ADDRESS: &[u8] = b"/chats/1";
 
 /// The `temper` binary beside the test executable.
 #[must_use]
@@ -53,6 +57,23 @@ pub fn bundle() -> PathBuf {
     );
     path.canonicalize().expect("absolute bundle")
 }
+/// From a signed-in page, start the first chat with `words` and see it.
+#[must_use]
+pub fn start_chat(words: &[u8]) -> Vec<Step> {
+    let see = |find| Step::Person(PersonStep::See { find, within: WITHIN });
+    let composer = || Find::exactly_named(Role::TextArea, b"Start a chat");
+    vec![
+        see(live()),
+        Step::Person(PersonStep::Press { find: Find::exactly_named(Role::Link, b"Chats") }),
+        see(composer()),
+        Step::Person(PersonStep::Type { find: composer(), words: Box::from(words) }),
+        Step::Person(PersonStep::Press { find: Find::exactly_named(Role::Button, b"Start") }),
+        see(Find::exactly_named(Role::Heading { level: 1 }, FIRST_CHAT)),
+    ]
+}
+fn live() -> Find {
+    Find::exactly_named(Role::Status, b"Live")
+}
 
 /// A scratch deployment for one story's `temper serve`.
 pub struct Tier {
@@ -82,7 +103,7 @@ impl Tier {
     #[must_use]
     pub fn states(&self) -> jig_client_fake_person_browser::States {
         jig_client_fake_person_browser::States {
-            live: Find::exactly_named(Role::Status, b"Live"),
+            live: live(),
             offline: Find::exactly_named(Role::Status, b"Offline"),
             signed_out: Find::text(b"Signed out. To sign in, open a sign-in link temper serve printed."),
         }
