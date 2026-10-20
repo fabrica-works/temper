@@ -3,11 +3,11 @@ pub use crate::joint::REPO;
 use crate::{fixtures, joint::Joint};
 use skein_fake_forge_domain::{self as forge, api as raw};
 use skein_fake_forge_protocol::{Faults, Route, Tally};
+use skein_forge_connection::Component;
 use skein_lib::{Duration, Env, List, Map, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::{BTreeMap, BTreeSet};
 use temper_engine_domain_forge as top;
 use temper_engine_forge_world::LIMITS;
-use temper_engine_protocol_forge::Component;
 
 /// A top, transport, fake service and independently scripted people.
 pub struct Protocol {
@@ -269,7 +269,7 @@ impl Protocol {
         terminal.now = terminal.now.saturating_add(terminal.limits.deadline);
         self.joint.component.fire(&terminal, &mut self.joint.above, &mut self.joint.below);
         while let Some(event) = self.joint.above.pop() {
-            if let temper_engine_protocol_forge::Event::Answered(answer) = event {
+            if let skein_forge_connection::Event::Answered(answer) = event {
                 assert!(self.joint.answers.insert(answer.call.raw(), answer).is_none(), "one terminal");
             }
         }

@@ -226,7 +226,7 @@ pub fn reconcile_settings(
     checked: &temper_forge_setup::check::Checked,
     number: u16,
 ) -> Result<temper_forge_setup_shell::reconcile::Settings, String> {
-    use temper_engine_protocol_forge::{conventions, limits};
+    use skein_forge_connection::limits;
     let forge = named.forges.iter().find(|forge| forge.number == number).ok_or("the setup has no entry for it")?;
     if !matches!(forge.transport, temper_service::startup::Transport::Plaintext) {
         return Err("its transport is TLS, and reconcile speaks plaintext to loopback alone".into());
@@ -258,7 +258,7 @@ pub fn reconcile_settings(
         given: temper_forge_setup::given::values(entry, webhook_listener(named)?, &checked.limits),
         address,
         host: skein_forge::host::host(address, None).expect("checked address"),
-        user_agent: conventions::USER_AGENT,
+        user_agent: temper_service::forge::USER_AGENT,
         directory,
         admin_token,
         token_bytes: profile.forge_component.token_bytes,

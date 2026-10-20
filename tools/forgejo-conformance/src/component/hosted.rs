@@ -4,13 +4,13 @@ use crate::{
     fixture::Fixture,
 };
 use skein_forge::api;
+use skein_forge_connection::{Component, Event, Request, Stopped};
 use skein_io::{
     Io,
     kernel::{Complete, Submit},
 };
 use skein_lib::{Duration, Env, List, Queue, Secret, Time, Token, Wall, stream::Down};
 use skein_shell::{Clock, Host, Kernel, Wait};
-use temper_engine_protocol_forge::{self as kit, Component, Event, Request, Stopped};
 /// Counts request lines, never retaining a send's authentication bytes.
 pub(crate) fn sent_requests(bytes: &[u8]) -> u64 {
     bytes
@@ -26,7 +26,7 @@ pub(crate) fn sent_requests(bytes: &[u8]) -> u64 {
 }
 pub(super) struct Hosted {
     component: Component,
-    env: Env<kit::Limits>,
+    env: Env<skein_forge_connection::Limits>,
     io: Io,
     io_env: Env<skein_io::Limits>,
     above: Queue<Event>,
@@ -36,7 +36,7 @@ pub(super) struct Hosted {
     submit: Queue<Submit>,
     kernel: Option<Kernel>,
     clock: Clock,
-    answer: Option<kit::Answered>,
+    answer: Option<skein_forge_connection::Answered>,
     stopped: Option<Stopped>,
     closed: bool,
     serial: u64,
@@ -45,7 +45,7 @@ pub(super) struct Hosted {
     pub(super) costs: u64,
 }
 impl Hosted {
-    fn limits() -> (skein_io::Limits, skein_forge_client::Limits, kit::Limits) {
+    fn limits() -> (skein_io::Limits, skein_forge_client::Limits, skein_forge_connection::Limits) {
         let io_limits = skein_io::Limits {
             sockets: 8,
             names: 0,
@@ -85,7 +85,7 @@ impl Hosted {
             settle: Duration::from_secs(30),
             facts: 16,
         };
-        let limits = kit::Limits {
+        let limits = skein_forge_connection::Limits {
             forges: 1,
             token_bytes: 512,
             connections: 2,
@@ -117,18 +117,34 @@ impl Hosted {
         let (io_limits, client, limits) = Self::limits();
         let mut forges = List::with_capacity(1);
         forges
-            .push(kit::settings::Forge {
+            .push(skein_forge_connection::settings::Forge {
                 number: 1,
-                kind: kit::settings::Kind::Forgejo,
+                kind: skein_forge_connection::settings::Kind::Forgejo,
                 address: skein_io::Addr::Ip(([127, 0, 0, 1], f.instance.port()).into()),
-                transport: kit::settings::Transport::Plaintext,
-                host: format!("127.0.0.1:{}", f.instance.port()).into_bytes().into(),
+                transport: skein_forge_connection::settings::Transport::Plaintext { name: None },
                 credential: skein_forge::credential::Credential::Token(Secret::new(token.value().as_bytes().into())),
                 user: f.writer.id,
             })
             .expect("one forge");
-        let shared = kit::Shared { client, name_bytes: 256, repositories: 2, io: io_limits };
-        let heap = kit::limits::worst_case(&limits, &shared, 1).ok_or("component heap")?
+        let shared = skein_forge_connection::Shared {
+            calls: client.calls,
+            rows: client.rows,
+            answer_bytes: client.answer_bytes,
+            op_bytes: client.op_bytes,
+            lifetime: client.lifetime,
+            name_bytes: 256,
+            repositories: 2,
+            io: io_limits,
+        };
+        let settings = skein_forge_connection::Settings {
+            forges,
+            webhooks: None,
+            word: Box::from(b"temper".as_slice()),
+            user_agent: Box::from(b"temper/0.0.0".as_slice()),
+        };
+        let owned_bytes = skein_forge_connection::settings::owned_bytes(&settings).ok_or("component owner bytes")?;
+        let heap = skein_forge_connection::limits::worst_case(&limits, &shared, 1, owned_bytes)
+            .ok_or("component heap")?
             + skein_io::worst_case(&io_limits).ok_or("io heap")?
             + 256
                 * (std::mem::size_of::<Event>()
@@ -137,12 +153,7 @@ impl Hosted {
                     + std::mem::size_of::<Complete>()
                     + std::mem::size_of::<Submit>()) as u64
             + 256 * (u64::from(client.answer_bytes) + 2 * u64::from(io_limits.output));
-        let component = Component::new(
-            kit::Settings { forges, webhooks: None, word: Box::from(b"temper".as_slice()) },
-            &limits,
-            &shared,
-        )
-        .map_err(|e| format!("component limits: {e:?}"))?;
+        let component = Component::new(settings, &limits, &shared).map_err(|e| format!("component limits: {e:?}"))?;
         let clock = Clock::new();
         let now = clock.now();
         let mut host = Self {
@@ -176,7 +187,8 @@ impl Hosted {
         self.iterate(now.now, now.wall);
         let wait = if self.answer.is_some()
             || self.stopped.is_some()
-            || (self.serial == 0 && matches!(self.component.start(1), Some(kit::start::Start::Ready { .. })))
+            || (self.serial == 0
+                && matches!(self.component.start(1), Some(skein_forge_connection::start::Start::Ready { .. })))
             || self.work_pending(now.now)
         {
             Wait::No
@@ -187,7 +199,9 @@ impl Hosted {
     }
     pub(super) fn started(&mut self, name: &'static str, expected: Option<Stopped>) -> Result<Fact> {
         let end = self.env.now.saturating_add(Duration::from_secs(12));
-        while !matches!(self.component.start(1), Some(kit::start::Start::Ready { .. })) && self.stopped.is_none() {
+        while !matches!(self.component.start(1), Some(skein_forge_connection::start::Start::Ready { .. }))
+            && self.stopped.is_none()
+        {
             if self.env.now >= end {
                 return Err("component start did not settle".into());
             }

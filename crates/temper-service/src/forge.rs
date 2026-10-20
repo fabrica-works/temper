@@ -5,13 +5,16 @@ use jig_protocol_config::{Path, Problems, Segment, What};
 use skein_lib::{Duration, Env, List, Queue, Time, Wall};
 use temper_engine_domain as root;
 use temper_engine_domain_forge as forge;
-use temper_engine_protocol_forge as kit;
+
+/// The user agent every forge request carries; a test pins it.
+pub const USER_AGENT: &str = "temper/0.0.0";
+const WORD: &[u8] = b"temper";
 /// A forge's resolved endpoint and configured TLS transport, supplied by the shell.
 #[derive(Debug)]
 pub struct ForgeRuntime {
     pub number: u16,
     pub address: core::net::SocketAddr,
-    pub transport: kit::settings::Transport,
+    pub transport: skein_forge_connection::settings::Transport,
     /// The prepared trust configuration, priced once for this forge.
     pub trust_roots: u32,
     pub trust_root_bytes: u32,
@@ -20,9 +23,9 @@ pub struct ForgeRuntime {
 pub fn settings(
     forges: &[settings::Forge],
     runtime: List<ForgeRuntime>,
-    webhooks: Option<settings::Webhooks>,
+    webhooks: Option<skein_forge_connection::hooks::Webhooks>,
     found: &mut Problems,
-) -> Option<kit::settings::Settings> {
+) -> Option<skein_forge_connection::settings::Settings> {
     let mut endpoints = List::with_capacity(runtime.len());
     for endpoint in runtime.into_boxed() {
         endpoints.push(Some(endpoint)).expect("runtime capacity");
@@ -45,24 +48,25 @@ pub fn settings(
             continue;
         };
         let name = match &forge.api {
-            jig_protocol_config::Address::Host { name, .. } => Some(name.as_ref()),
+            jig_protocol_config::Address::Host { name, .. } => Some(name.clone()),
             jig_protocol_config::Address::Addr(skein_io::Addr::Ip(_)) => None,
             jig_protocol_config::Address::Addr(skein_io::Addr::InProcess(_)) => {
                 found.push(path, What::Plaintext);
                 continue;
             }
         };
-        let Some(host) = skein_forge::host::host(endpoint.address, name) else {
-            found.push(path, What::Bound);
-            continue;
+        let transport = match endpoint.transport {
+            skein_forge_connection::settings::Transport::Plaintext { .. } => {
+                skein_forge_connection::settings::Transport::Plaintext { name }
+            }
+            transport @ skein_forge_connection::settings::Transport::Tls { .. } => transport,
         };
         configured
-            .push(kit::settings::Forge {
+            .push(skein_forge_connection::settings::Forge {
                 number: forge.number,
-                kind: kit::settings::Kind::Forgejo,
+                kind: skein_forge_connection::settings::Kind::Forgejo,
                 address: skein_io::Addr::Ip(endpoint.address),
-                transport: endpoint.transport,
-                host,
+                transport,
                 credential: skein_forge::credential::Credential::Token(forge.api_token.clone()),
                 user: forge.user,
             })
@@ -74,7 +78,12 @@ pub fn settings(
         }
     }
     if found.is_empty() {
-        Some(kit::settings::Settings { forges: configured, webhooks, word: Box::from(b"temper".as_slice()) })
+        Some(skein_forge_connection::settings::Settings {
+            forges: configured,
+            webhooks,
+            word: Box::from(WORD),
+            user_agent: Box::from(USER_AGENT.as_bytes()),
+        })
     } else {
         None
     }
@@ -84,9 +93,13 @@ fn forge_path(index: u32) -> Path {
 }
 /// Limits shared with the domain client and io.
 #[must_use]
-pub fn shared(limits: &limits::Limits, io: &skein_io::Limits) -> kit::Shared {
-    kit::Shared {
-        client: limits.forge.client,
+pub fn shared(limits: &limits::Limits, io: &skein_io::Limits) -> skein_forge_connection::Shared {
+    skein_forge_connection::Shared {
+        calls: limits.forge.client.calls,
+        rows: limits.forge.client.rows,
+        answer_bytes: limits.forge.client.answer_bytes,
+        op_bytes: limits.forge.client.op_bytes,
+        lifetime: limits.forge.client.lifetime,
         name_bytes: limits.forge.name_bytes,
         repositories: limits.forge.repositories,
         io: *io,
@@ -94,7 +107,7 @@ pub fn shared(limits: &limits::Limits, io: &skein_io::Limits) -> kit::Shared {
 }
 /// Wrap the client's terminal without bringing protocol state into the root.
 #[must_use]
-pub fn event(answer: kit::Answered) -> root::Event {
+pub fn event(answer: skein_forge_connection::Answered) -> root::Event {
     root::Event::Forge(Box::new(forge::Event::Client(skein_forge_client::Event::Answered {
         call: answer.call,
         cost: answer.cost,
@@ -103,21 +116,21 @@ pub fn event(answer: kit::Answered) -> root::Event {
 }
 /// Hand a verified delivery hint to root admission.
 #[must_use]
-pub fn hinted(hinted: kit::hooks::Hinted) -> root::Event {
+pub fn hinted(hinted: skein_forge_connection::hooks::Hinted) -> root::Event {
     root::Event::Forge(Box::new(forge::Event::Hint { hint: hinted.hint }))
 }
 /// Recover an answer refused by admission or returned during the drain.
-pub fn back(event: Box<forge::Event>) -> Result<kit::Answered, Box<forge::Event>> {
+pub fn back(event: Box<forge::Event>) -> Result<skein_forge_connection::Answered, Box<forge::Event>> {
     if let forge::Event::Client(skein_forge_client::Event::Answered { call, cost, result }) = *event {
-        Ok(kit::Answered { call, cost, result })
+        Ok(skein_forge_connection::Answered { call, cost, result })
     } else {
         Err(event)
     }
 }
 /// The small profile's component room, derived from the forge where they agree.
 #[must_use]
-pub fn small(forge: &forge::Limits) -> kit::Limits {
-    kit::Limits {
+pub fn small(forge: &forge::Limits) -> skein_forge_connection::Limits {
+    skein_forge_connection::Limits {
         forges: 4,
         token_bytes: 512,
         connections: forge.client.calls,
@@ -127,7 +140,7 @@ pub fn small(forge: &forge::Limits) -> kit::Limits {
         depth: 16,
         chunk: 4096,
         string_bytes: 512.max(forge.name_bytes),
-        body_bytes: 16_384.max(forge.client.op_bytes.saturating_mul(2).saturating_add(21)),
+        body_bytes: 16_384.max(skein_forge::marker::length(WORD, forge.client.op_bytes).unwrap_or(u32::MAX)),
         inner: 32,
         target_bytes: 4096,
         repositories: forge.repositories,
@@ -146,34 +159,36 @@ pub fn small(forge: &forge::Limits) -> kit::Limits {
 }
 /// Engine-owned queues and component, with its own output reservations.
 pub(crate) struct Layer {
-    pub(crate) component: kit::Component,
-    pub(crate) env: Env<kit::Limits>,
-    pub(crate) above: Queue<kit::Event>,
+    pub(crate) component: skein_forge_connection::Component,
+    pub(crate) env: Env<skein_forge_connection::Limits>,
+    pub(crate) above: Queue<skein_forge_connection::Event>,
     pub(crate) io: Queue<skein_io::Request>,
     pub(crate) closed: bool,
     begun: bool,
 }
 impl Layer {
     pub(crate) fn new(
-        settings: kit::settings::Settings,
-        limits: kit::Limits,
-        shared: &kit::Shared,
+        settings: skein_forge_connection::settings::Settings,
+        limits: skein_forge_connection::Limits,
+        shared: &skein_forge_connection::Shared,
         batch: u32,
-    ) -> Result<Self, kit::Unusable> {
+    ) -> Result<Self, skein_forge_connection::Unusable> {
         Ok(Self {
-            component: kit::Component::new(settings, &limits, shared)?,
+            component: skein_forge_connection::Component::new(settings, &limits, shared)?,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
-            above: Queue::with_capacity(batch.checked_mul(kit::MAX_OUT.above).expect("forge above room")),
-            io: Queue::with_capacity(batch.checked_mul(kit::MAX_OUT.below).expect("forge io room")),
+            above: Queue::with_capacity(
+                batch.checked_mul(skein_forge_connection::MAX_OUT.above).expect("forge above room"),
+            ),
+            io: Queue::with_capacity(batch.checked_mul(skein_forge_connection::MAX_OUT.below).expect("forge io room")),
             closed: false,
             begun: false,
         })
     }
     pub(crate) fn room(&self, batch: u32) -> bool {
-        self.above.room() >= batch.checked_mul(kit::MAX_OUT.above).expect("forge batch above")
-            && self.io.room() >= batch.checked_mul(kit::MAX_OUT.below).expect("forge batch io")
+        self.above.room() >= batch.checked_mul(skein_forge_connection::MAX_OUT.above).expect("forge batch above")
+            && self.io.room() >= batch.checked_mul(skein_forge_connection::MAX_OUT.below).expect("forge batch io")
     }
-    pub(crate) fn down(&mut self, request: kit::Request) {
+    pub(crate) fn down(&mut self, request: skein_forge_connection::Request) {
         self.component.down(&self.env, request, &mut self.above, &mut self.io);
     }
     pub(crate) fn up(&mut self, event: skein_io::Event) {
@@ -206,8 +221,8 @@ impl Layer {
     }
 }
 /// Report every member involved in the component's refusal.
-pub fn problems(unusable: kit::Unusable, found: &mut Problems) {
-    use kit::limits::{Stacked, Unusable};
+pub fn problems(unusable: skein_forge_connection::Unusable, found: &mut Problems) {
+    use skein_forge_connection::limits::{Stacked, Unusable};
     let names: &[&[u8]] = match unusable {
         Unusable::Connections { .. } => &[b"forge_component.connections", b"forge.client.calls"],
         Unusable::Deadline { .. } => &[b"forge_component.deadline_ms", b"forge.client.lifetime_ms"],
@@ -247,7 +262,7 @@ pub fn problems(unusable: kit::Unusable, found: &mut Problems) {
         Unusable::Request { .. } => {
             &[b"forge_component.target_bytes", b"forge_component.token_bytes", b"forge_component.tls.send"]
         }
-        Unusable::Zero => &[b"forge_component"],
+        Unusable::Zero | Unusable::Word => &[b"forge_component"],
         Unusable::Duplicate { forge } => {
             found.push(forge_path(u32::from(forge)).member(b"number"), What::Unique);
             return;
@@ -258,6 +273,10 @@ pub fn problems(unusable: kit::Unusable, found: &mut Problems) {
         }
         Unusable::User { forge } => {
             found.push(forge_path(u32::from(forge)).member(b"user"), What::Bound);
+            return;
+        }
+        Unusable::PlaintextName { forge } => {
+            found.push(forge_path(u32::from(forge)).member(b"api"), What::Bound);
             return;
         }
         Unusable::Address { forge } => {
@@ -281,13 +300,17 @@ pub(crate) fn tag(mut request: skein_io::Request) -> skein_io::Request {
     request
 }
 
-pub(crate) fn indexed(unusable: kit::Unusable, forges: &[settings::Forge]) -> kit::Unusable {
+pub(crate) fn indexed(
+    unusable: skein_forge_connection::Unusable,
+    forges: &[settings::Forge],
+) -> skein_forge_connection::Unusable {
     let mut unusable = unusable;
-    if let kit::Unusable::Duplicate { forge }
-    | kit::Unusable::Secret { forge }
-    | kit::Unusable::Token { forge }
-    | kit::Unusable::User { forge }
-    | kit::Unusable::Address { forge } = &mut unusable
+    if let skein_forge_connection::Unusable::Duplicate { forge }
+    | skein_forge_connection::Unusable::Secret { forge }
+    | skein_forge_connection::Unusable::Token { forge }
+    | skein_forge_connection::Unusable::User { forge }
+    | skein_forge_connection::Unusable::PlaintextName { forge }
+    | skein_forge_connection::Unusable::Address { forge } = &mut unusable
     {
         for (index, configured) in forges.iter().enumerate() {
             if configured.number == *forge {
@@ -302,7 +325,7 @@ pub(crate) fn indexed(unusable: kit::Unusable, forges: &[settings::Forge]) -> ki
 pub(crate) fn prepare(
     config: &settings::Engine,
     runtime: List<ForgeRuntime>,
-) -> Result<(kit::settings::Settings, u64), Problems> {
+) -> Result<(skein_forge_connection::settings::Settings, u64), Problems> {
     let mut found = Problems::empty();
     let bytes = match roots(config, &runtime) {
         Ok(bytes) => bytes,
@@ -312,9 +335,11 @@ pub(crate) fn prepare(
         }
     };
     let prepared = settings(&config.forges, runtime, config.webhooks.clone(), &mut found).ok_or(found)?;
-    if let Err(why) =
-        kit::limits::check(&config.limits.forge_component, &shared(&config.limits, &config.jig.limits.io), &prepared)
-    {
+    if let Err(why) = skein_forge_connection::limits::check(
+        &config.limits.forge_component,
+        &shared(&config.limits, &config.jig.limits.io),
+        &prepared,
+    ) {
         let mut found = Problems::empty();
         problems(indexed(why, &config.forges), &mut found);
         return Err(found);
@@ -325,7 +350,7 @@ pub(crate) fn roots(config: &settings::Engine, runtime: &List<ForgeRuntime>) -> 
     let mut bytes = 0_u64;
     let mut found = Problems::empty();
     for endpoint in runtime {
-        if let kit::settings::Transport::Tls { .. } = endpoint.transport {
+        if let skein_forge_connection::settings::Transport::Tls { .. } = endpoint.transport {
             let mut index = 0_u32;
             for (at, forge) in config.forges.iter().enumerate() {
                 if forge.number == endpoint.number {

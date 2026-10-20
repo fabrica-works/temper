@@ -88,6 +88,7 @@ jig-client-shell-native = { git = "https://github.com/fabrig-dev/jig.git" }
 skein-tls = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-http = { git = "https://github.com/fabrig-dev/skein.git" }
 temper-engine-protocol-forge = { path = "crates/temper-engine-protocol-forge" }
+skein-forge-connection = { git = "https://github.com/fabrig-dev/skein.git" }
 jig-protocol-transcript = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-client-test-kit = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-client-world = { git = "https://github.com/fabrig-dev/jig.git" }

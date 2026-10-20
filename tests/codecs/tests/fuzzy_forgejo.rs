@@ -34,7 +34,7 @@ fn forgejo_server_routes_answer_every_mutated_request_without_panicking() {
 #[test]
 fn forgejo_delivery_decoders_answer_every_mutated_delivery_without_panicking() {
     let mut rng = Rng::new(0x04_02);
-    let limits = temper_engine_protocol_forge::limits::documents(
+    let limits = skein_forge_connection::limits::documents(
         &temper_service::limits::profile(temper_service::limits::Profile::Small).forge_component,
     );
     for (case, _) in forgejo::delivery_cases() {

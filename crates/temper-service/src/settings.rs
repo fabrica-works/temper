@@ -66,7 +66,6 @@ pub struct Seeds {
 }
 
 /// The listener and secrets stay within the forge component.
-pub use temper_engine_protocol_forge::hooks::Webhooks;
 
 /// The engine's settings: jig's part, typed by jig-protocol-config, and
 /// temper's members (protocol/configuration.md, sections 2 and 3).
@@ -74,7 +73,7 @@ pub use temper_engine_protocol_forge::hooks::Webhooks;
 pub struct Engine {
     pub jig: jig_protocol_config::Engine,
     pub clients: crate::startup::application::Clients,
-    pub webhooks: Option<Webhooks>,
+    pub webhooks: Option<skein_forge_connection::hooks::Webhooks>,
     pub files: Files,
     pub forges: Box<[Forge]>,
     pub identities: Box<[Identity]>,

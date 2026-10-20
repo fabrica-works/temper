@@ -34,15 +34,12 @@ pub fn run(forgejo: &Forgejo, scratch: &Path) -> Result<Vec<Fact>> {
         (
             "component-start-other-user-stops",
             &f.stranger.token,
-            temper_engine_protocol_forge::Stopped::OtherUser { user: f.stranger.id },
+            skein_forge_connection::Stopped::OtherUser { user: f.stranger.id },
         ),
         (
             "component-start-wrong-token-stops",
             &skein_throwaway_forgejo::Token::new("0".repeat(40)),
-            temper_engine_protocol_forge::Stopped::Refused {
-                read: temper_engine_protocol_forge::StartRead::User,
-                status: 401,
-            },
+            skein_forge_connection::Stopped::Refused { read: skein_forge_connection::StartRead::User, status: 401 },
         ),
     ] {
         let mut other = Hosted::new(&f, token)?;

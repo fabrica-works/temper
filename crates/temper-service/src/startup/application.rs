@@ -608,7 +608,7 @@ pub fn files(members: &Members, api_token_bytes: u32, token_bytes: u32) -> Box<[
 }
 #[derive(Debug)]
 pub struct Resolved {
-    pub webhooks: Option<settings::Webhooks>,
+    pub webhooks: Option<skein_forge_connection::hooks::Webhooks>,
     pub forges: Box<[settings::Forge]>,
     pub identities: Box<[settings::Identity]>,
 }
@@ -714,7 +714,7 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
     if let Some(value) = &members.webhooks
         && let config::Address::Addr(listener) = &value.listener
     {
-        webhooks = Some(settings::Webhooks { listener: *listener, secrets });
+        webhooks = Some(skein_forge_connection::hooks::Webhooks { listener: *listener, secrets });
     }
     Some(Resolved { forges: forges.into_boxed(), identities: identities.into_boxed(), webhooks })
 }

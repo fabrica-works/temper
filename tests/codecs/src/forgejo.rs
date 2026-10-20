@@ -413,7 +413,7 @@ pub fn transcript_cases() -> Vec<String> {
 
 #[must_use]
 pub fn profile_limits() -> Limits {
-    temper_engine_protocol_forge::limits::documents(
+    skein_forge_connection::limits::documents(
         &temper_service::limits::profile(temper_service::limits::Profile::Small).forge_component,
     )
 }

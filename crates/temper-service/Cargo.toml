@@ -8,7 +8,7 @@ publish.workspace = true
 
 [dependencies]
 skein-forge.workspace = true
-temper-engine-protocol-forge.workspace = true
+skein-forge-connection.workspace = true
 temper-client-protocol-wire.workspace = true
 jig-protocol-engine-clients.workspace = true
 jig-protocol-engine-clients-http.workspace = true

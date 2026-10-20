@@ -18,7 +18,7 @@ skein-json.workspace = true
 
 [dev-dependencies]
 temper-service.workspace = true
-temper-engine-protocol-forge.workspace = true
+skein-forge-connection.workspace = true
 jig-protocol-config.workspace = true
 
 [lints.rust]

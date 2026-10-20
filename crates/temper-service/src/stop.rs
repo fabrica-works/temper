@@ -25,7 +25,7 @@ pub(crate) fn drained(engine: &mut Engine) {
         return;
     }
     drain.closing = true;
-    engine.forge.down(temper_engine_protocol_forge::Request::Close);
+    engine.forge.down(skein_forge_connection::Request::Close);
     engine.clients.down(jig_protocol_engine_clients::Event::Close);
     engine.workers.close(engine.env.now, &mut engine.events);
     if engine.accounts.is_some() {
@@ -75,7 +75,7 @@ pub(crate) fn unavailable(engine: &mut Engine, member: &[u8]) {
     engine.end = Some(End::Stopped(Stop::Start(problems)));
 }
 
-pub(crate) fn forge(engine: &mut Engine, number: u16, why: temper_engine_protocol_forge::Stopped) {
+pub(crate) fn forge(engine: &mut Engine, number: u16, why: skein_forge_connection::Stopped) {
     if engine.drain.is_none() {
         shutdown(engine);
     }

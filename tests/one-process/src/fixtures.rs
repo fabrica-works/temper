@@ -238,7 +238,7 @@ pub(crate) fn forges() -> List<temper_service::ForgeRuntime> {
         .push(temper_service::ForgeRuntime {
             number: 1,
             address: ([127, 0, 0, 1], 3000).into(),
-            transport: temper_engine_protocol_forge::settings::Transport::Plaintext,
+            transport: skein_forge_connection::settings::Transport::Plaintext { name: None },
             trust_roots: 0,
             trust_root_bytes: 0,
         })

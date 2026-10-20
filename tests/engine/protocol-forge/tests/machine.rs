@@ -1,6 +1,6 @@
 use skein_forge::api::{Answer as ResultAnswer, Error, Op, Read};
+use skein_forge_connection::{StartRead, Stopped};
 use skein_lib::Duration;
-use temper_engine_protocol_forge::{StartRead, Stopped};
 use temper_engine_protocol_forge_world::{
     fixtures,
     machine::{self, Answer, Connect, Machine, Response},

@@ -1,6 +1,6 @@
 use skein_forge::api::{Change, Repository};
+use skein_forge_connection::Request;
 use skein_lib::{Duration, bytes};
-use temper_engine_protocol_forge::Request;
 use temper_engine_protocol_forge_world::{
     fixtures,
     hooks::{self as deliveries, Listener},

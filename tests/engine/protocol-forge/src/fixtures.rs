@@ -1,6 +1,6 @@
 //! The component's small limits and configured forge.
+use skein_forge_connection::Limits;
 use skein_lib::Duration;
-use temper_engine_protocol_forge::Limits;
 pub const WRITER: u64 = 2;
 #[must_use]
 pub fn limits() -> Limits {
@@ -34,43 +34,22 @@ pub fn limits() -> Limits {
 
 use core::net::{Ipv4Addr, SocketAddr};
 use skein_forge::api;
-use skein_lib::{List, Secret};
-use temper_engine_protocol_forge::{
+use skein_forge_connection::{
     Settings, Shared,
     settings::{Forge, Kind, Transport},
 };
+use skein_lib::{List, Secret};
 pub const FORGE: u16 = 1;
 pub const REPO: api::Repository = api::Repository { forge: 1, repository: 1 };
 pub const TOKEN: &[u8] = b"0123456789abcdef0123456789abcdef01234567";
 #[must_use]
 pub fn shared() -> Shared {
     Shared {
-        client: skein_forge_client::Limits {
-            pending: 4,
-            calls: 2,
-            rate: 100,
-            reserve: 0,
-            window: Duration::from_secs(10),
-            op_bytes: 512,
-            answer_bytes: 65_536,
-            rows: 8,
-            inbox: 16,
-            read_attempts: 3,
-            backoff: Duration::from_secs(1),
-            backoff_max: Duration::from_secs(4),
-            entries: 8,
-            write_attempts: 3,
-            lifetime: Duration::from_secs(10),
-            clock_margin: Duration::from_secs(1),
-            resources: 8,
-            repositories: 2,
-            poll: Duration::from_secs(5),
-            poll_max: Duration::from_secs(30),
-            hinted: Duration::from_secs(1),
-            slow: Duration::from_secs(40),
-            settle: Duration::from_secs(30),
-            facts: 16,
-        },
+        calls: 2,
+        rows: 8,
+        answer_bytes: 65_536,
+        op_bytes: 512,
+        lifetime: Duration::from_secs(10),
         name_bytes: 128,
         repositories: 2,
         io: skein_io::Limits {
@@ -96,13 +75,17 @@ pub fn settings() -> Settings {
             number: FORGE,
             kind: Kind::Forgejo,
             address: skein_io::Addr::Ip(SocketAddr::from((Ipv4Addr::LOCALHOST, 3000))),
-            transport: Transport::Plaintext,
-            host: Box::from(&b"127.0.0.1:3000"[..]),
+            transport: Transport::Plaintext { name: None },
             credential: skein_forge::credential::Credential::Token(Secret::new(Box::from(TOKEN))),
             user: WRITER,
         })
         .expect("one forge");
-    Settings { forges, webhooks: None, word: Box::from(b"temper".as_slice()) }
+    Settings {
+        forges,
+        webhooks: None,
+        word: Box::from(b"temper".as_slice()),
+        user_agent: Box::from(b"temper/0.0.0".as_slice()),
+    }
 }
 /// Makes a literal HTTP answer for scenarios independent of recorded cases.
 #[must_use]
@@ -175,7 +158,15 @@ pub fn writer_settings() -> Settings {
 /// Component bounds use exactly the top's client limits.
 #[must_use]
 pub fn protocol_shared() -> Shared {
-    Shared { client: temper_engine_forge_world::LIMITS.client, ..shared() }
+    let client = temper_engine_forge_world::LIMITS.client;
+    Shared {
+        calls: client.calls,
+        rows: client.rows,
+        answer_bytes: client.answer_bytes,
+        op_bytes: client.op_bytes,
+        lifetime: client.lifetime,
+        ..shared()
+    }
 }
 #[must_use]
 pub fn goal_view() -> temper_engine_domain_forge_issues::GoalView {
@@ -220,7 +211,7 @@ pub fn hook_settings() -> Settings {
     let mut settings = settings();
     let mut secrets = List::with_capacity(2);
     secrets.push((FORGE, Secret::new(Box::from(HOOK_SECRET)))).expect("secret");
-    settings.webhooks = Some(temper_engine_protocol_forge::hooks::Webhooks {
+    settings.webhooks = Some(skein_forge_connection::hooks::Webhooks {
         listener: skein_io::Addr::Ip(([127, 0, 0, 1], 7200).into()),
         secrets,
     });

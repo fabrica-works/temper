@@ -275,6 +275,10 @@ pub fn startup(
         Path::root().member(b"engine").member(b"limits").member(b"io"),
         What::Jig(config::What::Bound),
     ))?;
+    let prepared_forges =
+        crate::forge::prepare(&engine, forges).map_err(|found| Problems::jig(found, &Path::root()))?;
+    let forge_owned = skein_forge_connection::settings::owned_bytes(&prepared_forges.0)
+        .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Jig(config::What::Bound)))?;
     let engine_bytes = match crate::system::startup_worst_case(
         &engine,
         &root,
@@ -282,10 +286,7 @@ pub fn startup(
         accounts.as_ref(),
         worker_operations,
         &io,
-        match crate::forge::roots(&engine, &forges) {
-            Ok(bytes) => bytes,
-            Err(found) => return Err(Problems::jig(found, &Path::root())),
-        },
+        (prepared_forges.1, forge_owned),
     ) {
         Ok(bytes) => bytes,
         Err(found) => return Err(Problems::jig(found, &Path::root())),
@@ -298,7 +299,7 @@ pub fn startup(
         Ok(worker) => worker,
         Err(found) => return Err(Problems::jig(found, &Path::root())),
     };
-    match Service::new(engine, seeds, accounts, forges, Some(worker), bytes, io) {
+    match Service::prepared(engine, seeds, accounts, prepared_forges, Some(worker), bytes, io) {
         Ok(service) => Ok(service),
         Err(found) => Err(Problems::jig(found, &Path::root())),
     }

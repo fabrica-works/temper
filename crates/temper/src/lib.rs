@@ -284,7 +284,7 @@ fn accounts(
     Ok(service::AccountsRuntime { root, effective_user: user, issuers, trust_roots, trust_root_bytes })
 }
 fn forges(directory: &Path, document: &skein_json::Document) -> Result<List<service::ForgeRuntime>, String> {
-    use temper_engine_protocol_forge::settings::Transport;
+    use skein_forge_connection::settings::Transport;
     let application = member(document, 0, b"application");
     let list =
         read::list(document, member(document, application, b"forges"), document.len()).expect("named checked forges");
@@ -300,7 +300,7 @@ fn forges(directory: &Path, document: &skein_json::Document) -> Result<List<serv
             read::integer(document, member(document, *at, b"number"), u64::from(u16::MAX)).expect("checked number");
         let at = member(document, *at, b"transport");
         let (transport, trust_roots, trust_root_bytes) = if read::text(document, at, 32).is_ok() {
-            (Transport::Plaintext, 0, 0)
+            (Transport::Plaintext { name: None }, 0, 0)
         } else {
             let tls = member(document, at, b"tls");
             let name = read::text(document, member(document, tls, b"server_name"), 253).expect("checked TLS name");

@@ -1,6 +1,6 @@
 use skein_io as io;
 use skein_lib::{Time, Token, Wall};
-use temper_engine_protocol_forge as kit;
+
 /// A forge's component face, with each connection's demand answered through Wire.
 pub struct ForgeFace {
     owner: Option<Token>,
@@ -20,6 +20,9 @@ impl ForgeFace {
             }
         }
         panic!("start request sent");
+    }
+    pub fn sent(&self) -> &[u8] {
+        &self.wire.received
     }
     pub fn answer(&mut self, service: &mut crate::Service, bytes: &[u8]) {
         self.wire.write(bytes);
@@ -117,7 +120,7 @@ impl ForgeFace {
     pub fn pending(service: &crate::Service) -> u32 {
         service.engine.forge.above.len()
     }
-    pub fn returned(service: &mut crate::Service, answer: kit::Answered) {
+    pub fn returned(service: &mut crate::Service, answer: skein_forge_connection::Answered) {
         let temper_engine_domain::Event::Forge(event) = crate::forge::event(answer) else {
             panic!("forge event");
         };
@@ -125,7 +128,7 @@ impl ForgeFace {
     }
 }
 /// Install a real listener connection and return its first verified hint.
-pub fn hook(service: &mut crate::Service) -> kit::hooks::Hinted {
+pub fn hook(service: &mut crate::Service) -> skein_forge_connection::hooks::Hinted {
     use skein_lib::{List, Secret, Writer};
     const SECRET: &[u8] = b"fixture-hook-secret";
     const BODY: &[u8] = b"{\"repository\":{\"id\":2},\"number\":7}";
@@ -135,11 +138,17 @@ pub fn hook(service: &mut crate::Service) -> kit::hooks::Hinted {
         crate::forge::settings(&config.forges, super::forge_runtime(), None, &mut found).expect("settings");
     let mut secrets = List::with_capacity(1);
     secrets.push((1, Secret::new(Box::from(SECRET)))).expect("secret");
-    settings.webhooks = Some(kit::hooks::Webhooks { listener: io::Addr::Ip(([127, 0, 0, 1], 7200).into()), secrets });
+    settings.webhooks = Some(skein_forge_connection::hooks::Webhooks {
+        listener: io::Addr::Ip(([127, 0, 0, 1], 7200).into()),
+        secrets,
+    });
     let layer = &mut service.engine.forge;
-    layer.component =
-        kit::Component::new(settings, &layer.env.limits, &crate::forge::shared(&config.limits, &config.jig.limits.io))
-            .expect("component");
+    layer.component = skein_forge_connection::Component::new(
+        settings,
+        &layer.env.limits,
+        &crate::forge::shared(&config.limits, &config.jig.limits.io),
+    )
+    .expect("component");
     while layer.io.pop().is_some() {}
     layer.component.begin(&layer.env, &mut layer.above, &mut layer.io);
     let listener = Token::new(1_u64 << 59_u32);
@@ -186,7 +195,7 @@ pub fn hook(service: &mut crate::Service) -> kit::hooks::Hinted {
         if let Some(up) = wire.answer() {
             layer.up(io::Event::Stream { owner: owner.expect("bound hook"), up });
         }
-        if let Some(kit::Event::Hint(hint)) = layer.above.pop() {
+        if let Some(skein_forge_connection::Event::Hint(hint)) = layer.above.pop() {
             return hint;
         }
     }

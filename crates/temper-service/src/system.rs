@@ -40,7 +40,7 @@ impl Service {
     }
     /// Join the configured engine and worker in one io, with their checked memory envelopes.
     pub(crate) fn new(
-        mut settings: settings::Engine,
+        settings: settings::Engine,
         seeds: &settings::Seeds,
         accounts: Option<AccountsRuntime>,
         forges: List<crate::ForgeRuntime>,
@@ -48,9 +48,23 @@ impl Service {
         worker_bytes: u64,
         io_limits: io::Limits,
     ) -> Result<Self, Problems> {
+        let forges = crate::forge::prepare(&settings, forges)?;
+        Self::prepared(settings, seeds, accounts, forges, worker, worker_bytes, io_limits)
+    }
+    pub(crate) fn prepared(
+        mut settings: settings::Engine,
+        seeds: &settings::Seeds,
+        accounts: Option<AccountsRuntime>,
+        forges: (skein_forge_connection::Settings, u64),
+        worker: Option<Worker>,
+        worker_bytes: u64,
+        io_limits: io::Limits,
+    ) -> Result<Self, Problems> {
         let limits =
             limits::engine(&settings.jig.limits, &settings.limits).ok_or(start_problem(b"limits", What::Bound))?;
-        let (forge_settings, forge_roots) = crate::forge::prepare(&settings, forges)?;
+        let (forge_settings, forge_roots) = forges;
+        let forge_owned = skein_forge_connection::settings::owned_bytes(&forge_settings)
+            .ok_or(start_problem(b"memory_bytes", What::Bound))?;
         let shared = crate::forge::shared(&settings.limits, &settings.jig.limits.io);
         read_charters(&mut settings)?;
         let store_limits = store::limits(&limits, &settings.jig.limits.core, &limits.forge, &settings.jig.limits.store)
@@ -70,7 +84,7 @@ impl Service {
             accounts.as_ref(),
             worker_operations,
             &io_limits,
-            forge_roots,
+            (forge_roots, forge_owned),
         )?;
 
         if let Err(what) =
@@ -540,13 +554,13 @@ pub(crate) fn startup_worst_case(
     runtime: Option<&AccountsRuntime>,
     worker_operations: u32,
     io: &io::Limits,
-    forge_roots: u64,
+    forge_bytes: (u64, u64),
 ) -> Result<u64, Problems> {
     let queue = temper_engine_domain::max_out(root).checked_mul(2).ok_or(start_problem(b"limits", What::Bound))?;
     let operations = startup_operations(io, queue, worker_operations).ok_or(start_problem(b"limits", What::Bound))?;
-    let bytes = memory(settings, root, store, runtime, queue, operations, io)
+    let bytes = memory(settings, root, store, runtime, operations, io, forge_bytes.1)
         .ok_or(start_problem(b"memory_bytes", What::Bound))?;
-    bytes.checked_add(forge_roots).ok_or(start_problem(b"memory_bytes", What::Bound))
+    bytes.checked_add(forge_bytes.0).ok_or(start_problem(b"memory_bytes", What::Bound))
 }
 fn startup_operations(io: &io::Limits, queue: u32, worker_operations: u32) -> Option<u32> {
     io::operations(io)?.checked_add(queue.checked_mul(4)?)?.checked_add(worker_operations)
@@ -556,10 +570,11 @@ fn memory(
     root: &temper_engine_domain::Limits,
     store: &jig_protocol_store::Limits,
     runtime: Option<&AccountsRuntime>,
-    queue: u32,
     operations: u32,
     io: &io::Limits,
+    forge_owned: u64,
 ) -> Option<u64> {
+    let queue = temper_engine_domain::max_out(root).checked_mul(2)?;
     let payload = temper_engine_domain::worst_case(root)?;
     let events = queue.checked_mul(engine::route_out())?;
     let mut bytes = payload
@@ -596,21 +611,20 @@ fn memory(
     let forges = u32::try_from(settings.forges.len()).ok()?;
     let batch = temper_engine_domain::max_out(root).checked_add(2)?;
     bytes = bytes
-        .checked_add(temper_engine_protocol_forge::limits::worst_case(
+        .checked_add(skein_forge_connection::limits::worst_case(
             &settings.limits.forge_component,
             &crate::forge::shared(&settings.limits, &settings.jig.limits.io),
             forges,
+            forge_owned,
         )?)?
-        .checked_add(Queue::<temper_engine_protocol_forge::Event>::worst_case(
-            batch.checked_mul(temper_engine_protocol_forge::MAX_OUT.above)?,
+        .checked_add(Queue::<skein_forge_connection::Event>::worst_case(
+            batch.checked_mul(skein_forge_connection::MAX_OUT.above)?,
         )?)?
         .checked_add(
-            u64::from(batch.checked_mul(temper_engine_protocol_forge::MAX_OUT.above)?)
+            u64::from(batch.checked_mul(skein_forge_connection::MAX_OUT.above)?)
                 .checked_mul(u64::from(settings.limits.forge.client.answer_bytes))?,
         )?
-        .checked_add(Queue::<io::Request>::worst_case(
-            batch.checked_mul(temper_engine_protocol_forge::MAX_OUT.below)?,
-        )?)?;
+        .checked_add(Queue::<io::Request>::worst_case(batch.checked_mul(skein_forge_connection::MAX_OUT.below)?)?)?;
     let identities = u32::try_from(settings.identities.len()).ok()?;
     let wire = translate::limits(&settings.limits)?;
     bytes = bytes

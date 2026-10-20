@@ -150,7 +150,7 @@ impl Engine {
     }
     pub(crate) fn abort_if_ended(&mut self) {
         if self.end.is_some() && self.forge.room(1) {
-            self.forge.down(temper_engine_protocol_forge::Request::Close);
+            self.forge.down(skein_forge_connection::Request::Close);
         }
         if let Some(End::Aborted | End::Stopped(_)) = self.end
             && self.aborted.is_none()
@@ -238,7 +238,7 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     }
     release(engine);
     if engine.forge.room(1) {
-        engine.forge.down(temper_engine_protocol_forge::Request::Offer);
+        engine.forge.down(skein_forge_connection::Request::Offer);
     }
     clients_pass(engine);
 }
@@ -383,27 +383,26 @@ fn watcher(event: &root::Event) -> Option<skein_lib::Token> {
 }
 
 pub(crate) fn forge_pass(engine: &mut Engine) {
-    use temper_engine_protocol_forge as kit;
     for _ in 0..engine.forge.above.len() {
         if !engine.forge.room(1) || engine.end.is_none() && !engine.room() {
             break;
         }
         match engine.forge.above.pop().expect("forge outputs") {
-            kit::Event::Answered(answer) => {
+            skein_forge_connection::Event::Answered(answer) => {
                 if engine.end.is_some() {
-                    engine.forge.down(kit::Request::Returned(answer));
+                    engine.forge.down(skein_forge_connection::Request::Returned(answer));
                     continue;
                 }
                 if let Err(root::Event::Forge(event)) =
                     root::try_step(&mut engine.domain, &engine.env, crate::forge::event(answer))
                 {
-                    engine.forge.down(kit::Request::Refused(
+                    engine.forge.down(skein_forge_connection::Request::Refused(
                         crate::forge::back(event).expect("the routing hands the root only the component's answers"),
                     ));
                 }
                 engine.drain_facts();
             }
-            kit::Event::Hint(hinted) => {
+            skein_forge_connection::Event::Hint(hinted) => {
                 if engine.drain.is_some() || engine.end.is_some() {
                     continue;
                 }
@@ -414,13 +413,15 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
                     let temper_engine_domain_forge::Event::Hint { hint } = *event else {
                         unreachable!("hint retained by admission")
                     };
-                    engine.forge.down(kit::Request::RefusedHint(kit::hooks::Hinted { connection, hint }));
+                    engine.forge.down(skein_forge_connection::Request::RefusedHint(
+                        skein_forge_connection::hooks::Hinted { connection, hint },
+                    ));
                 }
                 engine.drain_facts();
             }
-            kit::Event::ListenerLost => stop::hooks(engine),
-            kit::Event::Stopped { forge, why } => stop::forge(engine, forge, why),
-            kit::Event::Closed => engine.forge.closed = true,
+            skein_forge_connection::Event::ListenerLost => stop::hooks(engine),
+            skein_forge_connection::Event::Stopped { forge, why } => stop::forge(engine, forge, why),
+            skein_forge_connection::Event::Closed => engine.forge.closed = true,
         }
     }
 }

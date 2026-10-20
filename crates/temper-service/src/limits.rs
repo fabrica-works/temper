@@ -27,7 +27,7 @@ pub struct Clients {
 /// Temper's domain limits, each under its owner's prefix.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
-    pub forge_component: temper_engine_protocol_forge::Limits,
+    pub forge_component: skein_forge_connection::Limits,
     pub root: Root,
     pub forge: forge::Limits,
     pub checkout: checkout::Limits,

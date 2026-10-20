@@ -142,13 +142,13 @@ dependencies = [
  "serde_json",
  "skein-forge",
  "skein-forge-client",
+ "skein-forge-connection",
  "skein-io",
  "skein-json",
  "skein-lib",
  "skein-shell",
  "skein-throwaway-forgejo",
  "skein-tls",
- "temper-engine-protocol-forge",
 ]
 
 [[package]]
@@ -1397,6 +1397,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "skein-forge-connection"
+version = "0.0.0"
+source = "git+https://github.com/fabrig-dev/skein.git#e880245aea3ceae8b36c83299414407418719860"
+dependencies = [
+ "skein-forge",
+ "skein-http",
+ "skein-io",
+ "skein-json",
+ "skein-lib",
+ "skein-tls",
+]
+
+[[package]]
 name = "skein-forge-setup"
 version = "0.0.0"
 source = "git+https://github.com/fabrig-dev/skein.git#e880245aea3ceae8b36c83299414407418719860"
@@ -2139,6 +2152,7 @@ dependencies = [
  "skein-fake-peers",
  "skein-fake-person",
  "skein-forge",
+ "skein-forge-connection",
  "skein-io",
  "skein-json",
  "skein-lib",
@@ -2165,7 +2179,6 @@ dependencies = [
  "temper-client-shell-terminal",
  "temper-client-tools",
  "temper-engine-domain",
- "temper-engine-protocol-forge",
  "temper-forge-setup",
  "temper-forge-setup-shell",
  "temper-protocol-store",
@@ -2365,13 +2378,13 @@ dependencies = [
  "skein-codegen",
  "skein-forge",
  "skein-forge-client",
+ "skein-forge-connection",
  "skein-json",
  "skein-lib",
  "temper-client-protocol-wire",
  "temper-engine-domain-forge",
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-issues",
- "temper-engine-protocol-forge",
  "temper-protocol-store",
  "temper-protocol-worker-wire",
  "temper-service",
@@ -2540,6 +2553,7 @@ dependencies = [
  "skein-fake-forge-protocol",
  "skein-forge",
  "skein-forge-client",
+ "skein-forge-connection",
  "skein-http",
  "skein-io",
  "skein-json",
@@ -2550,7 +2564,6 @@ dependencies = [
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-issues",
  "temper-engine-forge-world",
- "temper-engine-protocol-forge",
  "temper-service",
 ]
 
@@ -2633,13 +2646,13 @@ version = "0.0.0"
 dependencies = [
  "jig-protocol-config",
  "skein-forge",
+ "skein-forge-connection",
  "skein-forge-setup",
  "skein-http",
  "skein-io",
  "skein-json",
  "skein-lib",
  "skein-shell",
- "temper-engine-protocol-forge",
  "temper-forge-setup",
  "temper-service",
 ]
@@ -2669,6 +2682,7 @@ dependencies = [
  "skein-fake-machine",
  "skein-fake-peers",
  "skein-fake-person",
+ "skein-forge-connection",
  "skein-io",
  "skein-kv",
  "skein-lib",
@@ -2690,7 +2704,6 @@ dependencies = [
  "temper-client-shell-terminal",
  "temper-engine-domain",
  "temper-engine-domain-forge",
- "temper-engine-protocol-forge",
  "temper-engine-protocol-forge-world",
  "temper-engine-smith",
  "temper-fake-checkout",
@@ -2778,6 +2791,7 @@ dependencies = [
  "skein-codec",
  "skein-forge",
  "skein-forge-client",
+ "skein-forge-connection",
  "skein-http",
  "skein-io",
  "skein-json",

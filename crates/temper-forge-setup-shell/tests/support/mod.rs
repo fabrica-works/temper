@@ -85,8 +85,8 @@ pub fn settings(address: std::net::SocketAddr) -> temper_forge_setup_shell::reco
         admin_token: scratch.path().join("admin_token"),
         token_bytes: profile.token_bytes,
         hook_secret_bytes: profile.hook_secret_bytes,
-        http: temper_engine_protocol_forge::limits::http(&profile, false, &io),
-        documents: temper_engine_protocol_forge::limits::documents(&profile),
+        http: skein_forge_connection::limits::http(&profile, false, &io),
+        documents: skein_forge_connection::limits::documents(&profile),
         io,
     }
 }

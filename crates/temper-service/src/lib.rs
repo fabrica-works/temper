@@ -54,7 +54,7 @@ pub enum Stop {
     Hooks,
     Forge {
         number: u16,
-        why: temper_engine_protocol_forge::Stopped,
+        why: skein_forge_connection::Stopped,
     },
 }
 use jig_protocol_config::Problems;

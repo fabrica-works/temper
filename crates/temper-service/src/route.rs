@@ -1,7 +1,6 @@
 //! Exhaustive root routing to its protocol components.
 use crate::{engine::Engine, stop};
 use temper_engine_domain as root;
-use temper_engine_protocol_forge as forge;
 
 pub(crate) fn request(engine: &mut Engine, request: root::Request) {
     match request {
@@ -19,11 +18,11 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
             }
         }
         root::Request::Forge { call, repository, op } => {
-            engine.forge.down(forge::Request::Call { call, repository, op });
+            engine.forge.down(skein_forge_connection::Request::Call { call, repository, op });
         }
         root::Request::ToChild(released) => engine.events.push(root::Event::Released(released)),
         root::Request::Busy(event) => {
-            engine.forge.down(forge::Request::Returned(
+            engine.forge.down(skein_forge_connection::Request::Returned(
                 crate::forge::back(event).expect("the routing hands the root only the component's answers"),
             ));
         }
