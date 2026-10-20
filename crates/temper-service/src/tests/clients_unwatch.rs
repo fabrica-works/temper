@@ -199,6 +199,8 @@ fn the_accounts_watch_reaches_the_root_and_returns_whole_cut_facts() {
         })
         .unwrap();
     let document = d::Document::Accounts(Box::new(d::Accounts {
+        readiness: List::with_capacity(0),
+        readiness_cut: false,
         accounts,
         signing: List::with_capacity(0),
         last_end: Some(d::LastEnd { source: 9001, end: a::End::Failed { failure: a::Failure::SignInAgain } }),

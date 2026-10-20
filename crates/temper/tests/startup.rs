@@ -614,7 +614,21 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // forge, and 200 B of inline service growth. Records retain main's term.
     let lifecycle_growth = 3_076 * 2_536 + 14_204 + 514 + 200;
     // 05b delta +7,815,654 B; total 85,428,520,634,156 B.
-    assert_eq!(required.engine_bytes, 79_659_997_210_050_u64 + engine_growth + lifecycle_growth);
+    // JP10c-c: each bounded deployment gains two offers, their program names,
+    // display names and manage targets, plus the header and two readiness rows.
+    let document_growth = 2 * (96 + 2 * 16 + 2 * 32 + 128 + 2_048) + 56 + 2 * 24;
+    // Core: one construction, sixteen watches, four act scratch documents,
+    // two load slots and one five-document answer. Root: two more such answers.
+    let document_copies = 1 + 16 + 4 + 2 + (2 + 3) + 2 * (2 + 3);
+    // Pending/roles/coverage/candidate numbers coexist with the largest temporary.
+    // Hosts + one model need and its name (4,520 B) exceed ranking (4*32 B)
+    // and source facts ((4*3)*64 B).
+    let readiness_scratch = 2 * 32 + 2 * 12 + 4 * 8 + 4 * 4 + (2 + 8) * 40 + 24 + 4_096;
+    // Seven u32 wire bounds, 7*4 B plus 4 B alignment = 32 B.
+    let wire_bounds_growth = 7 * 4 + 4;
+    let catalogue_growth = 3_076 * (document_copies * document_growth + readiness_scratch) + wire_bounds_growth;
+    // Catalogue delta +580,059,808 B; total 85,429,100,693,964 B.
+    assert_eq!(required.engine_bytes, 79_659_997_210_050_u64 + engine_growth + lifecycle_growth + catalogue_growth);
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
     // Other causes: root program-source state +117,552 B; serialized source

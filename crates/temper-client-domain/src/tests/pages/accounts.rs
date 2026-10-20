@@ -48,6 +48,8 @@ fn document(signing: bool) -> c::WatchEvent {
         .unwrap();
     }
     c::WatchEvent::Delivered(c::Delivery::OwnerAccounts(Box::new(c::OwnerAccounts {
+        readiness: List::with_capacity(0),
+        readiness_cut: false,
         accounts: List::with_capacity(0),
         signing: rows,
         last_end: None,
@@ -644,7 +646,16 @@ fn typed_account_lists_outlive_the_task_window() {
             })
             .unwrap();
     }
-    let doc = c::OwnerAccounts { accounts: rows, signing, last_end: None, usable: true, settled: false, cut: false };
+    let doc = c::OwnerAccounts {
+        readiness: List::with_capacity(0),
+        readiness_cut: false,
+        accounts: rows,
+        signing,
+        last_end: None,
+        usable: true,
+        settled: false,
+        cut: false,
+    };
     deliver(&mut root, watch, c::WatchEvent::Delivered(c::Delivery::OwnerAccounts(Box::new(doc.clone()))));
     assert_eq!(accounts::document(root.client()), Some(&doc));
 }

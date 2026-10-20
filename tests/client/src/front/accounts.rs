@@ -20,12 +20,6 @@ impl Joint {
         };
         let row = engine::Record::Core(jig_domain_core::Record::People(membership));
         first.store.seed(Box::new([row]), Box::new([]));
-        let engine = Driver::with_repositories(
-            first.store,
-            [walking::config(seed), walking::config(seed)],
-            &bounds,
-            fixtures::REPOSITORIES,
-        );
-        Self::with_engine(seed, &limits, engine, 1)
+        Self::with_engine(seed, &limits, first.store, [walking::config(seed), walking::config(seed)], &bounds, 1)
     }
 }

@@ -68,7 +68,9 @@ pub fn outcome(value: &owner::ApplicationOutcome) -> forge::Answer {
                 }),
             },
         }),
-        owner::ApplicationOutcome::CoreRefused(why) => forge::Answer::CoreRefused(wire::refusals::refusal(*why)),
+        owner::ApplicationOutcome::CoreRefused(why) => {
+            forge::Answer::CoreRefused(wire::refusals::refusal(*why).expect("representable application refusal"))
+        }
         owner::ApplicationOutcome::ForgeRefused(why) => forge::Answer::ForgeRefused(match why {
             owner::AdoptionRefusal::NoSuchForge => forge::Reason::NoSuchForge,
             owner::AdoptionRefusal::NotFound => forge::Reason::NotFound,
@@ -171,6 +173,7 @@ pub fn request(
 pub fn incoming(
     transport: &mut Transport,
     request: engine::Request,
+    limits: &jig_client::DomainLimits,
 ) -> Result<Option<(ClientId, client::Event)>, Box<engine::Request>> {
     let delivery = match request {
         engine::Request::Party(PartyRequest::Deliver(delivery)) => delivery,
@@ -198,8 +201,10 @@ pub fn incoming(
             if !matches!(transport.reply(token), Some(Reply::Keyed { owner: KeyedOwner::Application { .. }, .. })) {
                 return Err(Box::new(engine::Request::Party(PartyRequest::Deliver(Delivery::WebReply { to, reply }))));
             }
-            let (envelope, answer) =
-                wire::answers::keyed(wire::answers::reply(reply)).expect("application admission disposition");
+            let (envelope, answer) = wire::answers::keyed(
+                wire::answers::reply(reply, &transport.models, limits).expect("bounded application admission reply"),
+            )
+            .expect("application admission disposition");
             let Reply::Keyed { client, attempt, .. } = transport.take_reply(to.into_token()).expect("original route")
             else {
                 panic!("keyed route")

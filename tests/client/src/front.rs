@@ -74,13 +74,14 @@ impl Joint {
     }
     #[must_use]
     pub fn new(seed: u64, limits: client::Limits) -> Joint {
-        let engine = Driver::with_repositories(
+        Self::with_engine(
+            seed,
+            &limits,
             Store::new(),
             [walking::config(seed), walking::config(seed)],
             &engine_limits(),
-            fixtures::REPOSITORIES,
-        );
-        Self::with_engine(seed, &limits, engine, 1)
+            1,
+        )
     }
     /// The small profile carries a whole turn while an activity page can size it.
     #[must_use]
@@ -92,13 +93,14 @@ impl Joint {
         engine_limits.loads.bytes = profile.loads.bytes;
         engine_limits.loads.reply_bytes = profile.loads.reply_bytes;
         engine_limits.loads.transcript_bytes = profile.loads.transcript_bytes;
-        let engine = Driver::with_repositories(
+        Self::with_engine(
+            seed,
+            limits,
             Store::with_transcript_bytes(profile.journal.transcript_bytes),
             [walking::config(seed), walking::config(seed)],
             &engine_limits,
-            fixtures::REPOSITORIES,
-        );
-        Self::with_engine(seed, limits, engine, 1)
+            1,
+        )
     }
     /// A chat's allotment leaves pool funding for the goal it proposes.
     #[must_use]
@@ -127,9 +129,7 @@ impl Joint {
             engine_limits.journal.held = 192;
             (config, engine_limits)
         });
-        let engine =
-            Driver::with_repositories(Store::new(), [bootstrap, config], &engine_limits, fixtures::REPOSITORIES);
-        Self::with_engine(seed, &limits, engine, 2)
+        Self::with_engine(seed, &limits, Store::new(), [bootstrap, config], &engine_limits, 2)
     }
     pub(crate) fn with_questions(seed: u64, limits: &client::Limits) -> Self {
         use jig_domain_authority as authority;
@@ -159,12 +159,7 @@ impl Joint {
             engine_limits.journal.held = 192;
             (config, engine_limits)
         });
-        Self::with_engine(
-            seed,
-            limits,
-            Driver::with_repositories(Store::new(), [bootstrap, config], &engine_limits, fixtures::REPOSITORIES),
-            2,
-        )
+        Self::with_engine(seed, limits, Store::new(), [bootstrap, config], &engine_limits, 2)
     }
     /// A real forge procedure is admitted by this scenario's policy.
     #[must_use]
@@ -194,11 +189,23 @@ impl Joint {
             engine_limits.authority = authority_limits;
             (config, engine_limits)
         });
-        let engine =
-            Driver::with_repositories(Store::new(), [bootstrap, config], &engine_limits, fixtures::REPOSITORIES);
-        Self::with_engine(seed, limits, engine, SLOTS)
+        Self::with_engine(seed, limits, Store::new(), [bootstrap, config], &engine_limits, SLOTS)
     }
-    fn with_engine(seed: u64, limits: &client::Limits, mut engine: Driver, slots: u32) -> Self {
+    fn with_engine(
+        seed: u64,
+        limits: &client::Limits,
+        store: Store,
+        configs: [engine::Config; 2],
+        engine_limits: &engine::Limits,
+        slots: u32,
+    ) -> Self {
+        let mut transport = Transport::new(jig_client::contract::VersionRange {
+            first: jig_client_protocol_wire::VERSION,
+            last: jig_client_protocol_wire::VERSION,
+        });
+        transport.models.clone_from(&configs[1].core.settings.models);
+        transport.providers = configs[1].core.settings.llm_providers.clone();
+        let mut engine = Driver::with_repositories(store, configs, engine_limits, fixtures::REPOSITORIES);
         engine.send(temper_engine_domain_world::protocol::hello_slots(fixtures::QUESTION_WORKER, slots, Box::new([])));
         engine.settle();
         let last_commit = engine.store.header().commits;
@@ -213,10 +220,7 @@ impl Joint {
             keyed_fault: None,
             reads: 0,
             read_loads: BTreeSet::new(),
-            transport: Transport::new(jig_client::contract::VersionRange {
-                first: jig_client_protocol_wire::VERSION,
-                last: jig_client_protocol_wire::VERSION,
-            }),
+            transport,
             limits: *limits,
             client_limits: BTreeMap::new(),
             next_limits: None,
@@ -352,8 +356,12 @@ impl Joint {
             ));
             return;
         }
-        for event in translate::request(&mut self.transport, who, &mut request, &self.client_limits[&who].client.domain)
-        {
+        let (events, refusal) =
+            translate::request(&mut self.transport, who, &mut request, &self.client_limits[&who].client.domain);
+        if let Some(packet) = refusal {
+            self.incoming(packet);
+        }
+        for event in events {
             self.send(event);
         }
     }
@@ -395,7 +403,7 @@ impl Joint {
         }
     }
     fn packet(&mut self, request: engine::Request) {
-        match translate::forge::incoming(&mut self.transport, request) {
+        match translate::forge::incoming(&mut self.transport, request, &self.limits.client.domain) {
             Ok(Some((client, event))) => {
                 if self.lose_answers != 0 {
                     self.lose_answers -= 1;
@@ -645,9 +653,13 @@ impl Front<Temper> for Joint {
                     })
                     .collect();
                 let store = std::mem::replace(&mut self.engine.store, Store::new());
+                let config = walking::config(self.seed);
+                // The restarted engine runs the walking settings: judge asks by the same ones, as jig's kit does.
+                self.transport.models.clone_from(&config.core.settings.models);
+                self.transport.providers = config.core.settings.llm_providers.clone();
                 self.engine = Driver::with_repositories(
                     store,
-                    [walking::config(self.seed), walking::config(self.seed)],
+                    [walking::config(self.seed), config],
                     &limits,
                     fixtures::REPOSITORIES,
                 );

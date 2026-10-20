@@ -57,6 +57,9 @@ pub fn env(limits: &Limits) -> Env<Limits> {
 }
 pub fn frame(party: u64) -> WatchEvent {
     WatchEvent::Delivered(Delivery::Me(Box::new(Me {
+        providers: List::with_capacity(0),
+        providers_cut: false,
+        key_bytes: 256,
         party: MeParty {
             number: party,
             kind: PartyKind::Person,

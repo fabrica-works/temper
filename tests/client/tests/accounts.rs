@@ -118,3 +118,28 @@ fn a_client_shows_a_third_account_at_two_rows() {
         view.tree().nodes().iter().flat_map(|node| node.text.iter().flat_map(|run| run.text.iter().copied())).collect();
     assert!(String::from_utf8(text).expect("view text").contains(&format!("Account {third}")));
 }
+
+#[test]
+fn me_carries_the_configured_provider_offer() {
+    let (_, root) = accounts::fixture(fixtures::SEED);
+    let me = d::pages::accounts::current_me(root.person().client()).expect("authenticated me");
+    let offer = me.providers.get(0).expect("configured provider");
+    assert_eq!(
+        (
+            (me.providers.len(), me.key_bytes, me.providers_cut),
+            (
+                offer.provider,
+                offer.name.bytes(),
+                offer.sign_in,
+                offer.key,
+                offer.programs.len(),
+                offer.programs_cut,
+                offer.none,
+                offer.signed_in_plan,
+                offer.manage_usage.as_deref(),
+                offer.key_bytes,
+            ),
+        ),
+        ((1, 256, false), (accounts::PROVIDER, b"Scripted".as_slice(), true, true, 0, false, false, false, None, 256))
+    );
+}

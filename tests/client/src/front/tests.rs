@@ -145,3 +145,60 @@ fn the_referee_reads_live_from_tempers_link_region() {
     Temper::build(&mut view, &root, &mut patches);
     assert!(Temper::seen(Temper::tree(&view)).contains(&jig_client_world::harness::Seen::Link { live: true }));
 }
+
+#[test]
+fn an_unconfigured_model_is_answered_immediately() {
+    use jig_client::contract as c;
+    let limits = fixtures::domain_limits();
+    let mut front = Joint::new(fixtures::SEED, limits);
+    front.bind(CLIENT, fixtures::PARTY);
+    let (mut root, _) = Temper::new(fixtures::SEED);
+    settle_root(&mut front, &mut root, &limits, Vec::new());
+    let text = |bytes: &[u8]| c::Text::new(bytes.into(), limits.client.domain.text).expect("fixture text");
+    let me = client::pages::accounts::current_me(root.person().client()).expect("authenticated me");
+    let mut ask = jig_client::shapes::chat(me, 1, text(b"chosen chat")).expect("chat template");
+    let c::Ask::Create { tasks, .. } = &mut ask else { panic!("chat creation") };
+    tasks.get_mut(0).expect("one chat").llm = Some(c::LlmChoice {
+        account: None,
+        main: c::ModelEffort { model: text(b"missing"), effort: None },
+        subagents: skein_lib::List::with_capacity(0),
+    });
+    let attempt = Token::new(91);
+    front.request(
+        CLIENT,
+        Request::Client {
+            request: jig_client::Request::Down {
+                down: jig_client::Down::Send {
+                    attempt,
+                    key: [31; 16],
+                    request: jig_client::Ask::Jig(Box::new(ask)),
+                    value: None,
+                },
+            },
+        },
+    );
+    let [
+        (
+            who,
+            Event::Root(RootEvent::Client {
+                event: jig_client::Event::Up { up: jig_client::Up::Answer { attempt: actual, envelope, answer, why } },
+            }),
+        ),
+    ] = front.callbacks.as_slice()
+    else {
+        panic!("one immediate callback")
+    };
+    assert_eq!(
+        (*who, *actual, *envelope, answer.clone(), *why),
+        (
+            CLIENT,
+            attempt,
+            RequestEnvelope::Final,
+            Some(jig_client::Answered::Jig(c::Answer::Refused {
+                refusal: c::Refusal::Llm { model: text(b"missing"), why: c::LlmWhy::Unconfigured },
+                at: None,
+            })),
+            None
+        )
+    );
+}

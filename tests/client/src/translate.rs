@@ -122,32 +122,42 @@ pub fn request(
     who: ClientId,
     request: &mut Request,
     limits: &jig_client::DomainLimits,
-) -> Vec<engine::Event> {
+) -> (Vec<engine::Event>, Option<packets::Incoming>) {
     let mut events = Vec::new();
     let Request::Client { request: jig_client::Request::Down { down } } = request else { panic!("typed wire request") };
     match down {
         Down::Send { attempt, key, request: ask, value } => {
-            let carried = value.take().map(|value| {
-                let digest = skein_lib::sha256::digest(value.expose());
-                core::Carried { number: transport.carry(value), digest }
-            });
             let sign_in = transport.sign_in(who).expect("authenticated keyed request");
             let ask = match ask {
                 Ask::Jig(ask) => ask,
                 Ask::Family { record: ask, scope } => {
-                    assert!(carried.is_none(), "this fixture serves account values only");
+                    assert!(value.is_none(), "this fixture serves account values only");
                     events.push(forge::request(transport, who, *attempt, *key, *scope, ask));
-                    return events;
+                    return (events, None);
                 }
             };
-            let ask = wire::asks::ask(ask).expect("whole jig ask translates");
+            let refusal = wire::asks::refused(ask, &transport.models).expect("bounded jig refusal");
             let reply_to =
                 transport.reply_to(Reply::Keyed { client: who, attempt: *attempt, key: *key, owner: KeyedOwner::Jig });
+            if let Some(answer) = refusal {
+                let packet = packets::keyed_refusal(transport, reply_to.into_token(), answer, limits)
+                    .expect("original jig keyed route");
+                return (events, Some(packet));
+            }
+            let request = wire::asks::request(ask, &transport.models).expect("whole jig ask translates");
+            let carried = value.take().map(|value| {
+                let digest = skein_lib::sha256::digest(value.expose());
+                core::Carried { number: transport.carry(value), digest }
+            });
             events.push(party(match carried {
-                Some(carried) => core::Event::Key { reply_to, sign_in, key: *key, ask: Box::new(ask), carried },
-                None => {
-                    core::Event::People(people::Event::Ask { models: Box::new([]), reply_to, sign_in, key: *key, ask })
-                }
+                Some(carried) => core::Event::Key { reply_to, sign_in, key: *key, ask: Box::new(request.ask), carried },
+                None => core::Event::People(people::Event::Ask {
+                    models: request.models,
+                    reply_to,
+                    sign_in,
+                    key: *key,
+                    ask: request.ask,
+                }),
             }));
         }
 
@@ -180,7 +190,7 @@ pub fn request(
         Down::Open { subject: Watchable::Family { .. }, .. } => panic!("no forge watches"),
         Down::Save { .. } | Down::Erase { .. } => panic!("shell duty never goes on wire"),
     }
-    events
+    (events, None)
 }
 /// A released root output reaches the kit through its original party route.
 #[must_use]
@@ -306,3 +316,6 @@ pub fn callback(event: jig_client_test_domain::Event) -> Event {
         | jig_client_test_domain::Event::First(_) => panic!("no test application event belongs to temper"),
     }
 }
+
+#[cfg(test)]
+mod tests;

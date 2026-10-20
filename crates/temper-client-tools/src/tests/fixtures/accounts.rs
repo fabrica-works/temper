@@ -38,6 +38,8 @@ pub(crate) fn accounts() -> c::OwnerAccounts {
         })
         .expect("one account");
     c::OwnerAccounts {
+        readiness: List::with_capacity(0),
+        readiness_cut: false,
         accounts,
         signing: List::with_capacity(0),
         last_end: None,

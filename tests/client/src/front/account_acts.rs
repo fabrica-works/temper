@@ -9,7 +9,7 @@ use jig_domain_accounts as a;
 use jig_domain_authority as auth;
 use skein_lib::{Duration, Env, Queue, Wall};
 use temper_engine_domain as engine;
-use temper_engine_domain_world::{direct::Driver, store::Store, walking};
+use temper_engine_domain_world::{store::Store, walking};
 const CLIENT: ClientId = ClientId(0);
 pub const PROVIDER: u32 = 17;
 pub const SMALL_ROWS: u32 = 2;
@@ -61,8 +61,7 @@ fn fixture_root(seed: u64, tools: bool, own_accounts: u32, rows: Option<u32>) ->
         config.core.authority = authority;
         (config, engine_limits)
     });
-    let driver = Driver::with_repositories(Store::new(), [bootstrap, config], &engine_limits, fixtures::REPOSITORIES);
-    let mut front = Joint::with_engine(seed, &limits, driver, 1);
+    let mut front = Joint::with_engine(seed, &limits, Store::new(), [bootstrap, config], &engine_limits, 1);
     front.bind(CLIENT, fixtures::PARTY);
     let mut root = if tools {
         crate::agent::new(seed).0

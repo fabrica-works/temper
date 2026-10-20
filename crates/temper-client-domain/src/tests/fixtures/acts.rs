@@ -266,6 +266,9 @@ pub fn live_client() -> jig_client::Client {
     let me = w::Me::new(
         &w::CEILINGS,
         w::MeParts {
+            providers: Box::new([]),
+            providers_cut: false,
+            key_bytes: 256,
             party,
             projects: Box::from([]),
             needs: w::Needs::new(

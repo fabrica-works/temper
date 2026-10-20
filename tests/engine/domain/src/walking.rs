@@ -269,6 +269,7 @@ pub fn config(seed: u64) -> engine::Config {
             }]),
             authority: domain,
             settings: jig_domain_core::Settings {
+                key_bytes: 256,
                 templates: crate::fixtures::templates(),
                 deployment_provider: 1,
                 charters: Box::new([charter()]),

@@ -135,7 +135,16 @@ fn accounts(provider: Option<u32>, usable: bool, cut: bool) -> c::OwnerAccounts 
             cut,
         })
         .unwrap();
-    c::OwnerAccounts { accounts, signing: List::with_capacity(0), last_end: None, usable, settled: true, cut: false }
+    c::OwnerAccounts {
+        readiness: List::with_capacity(0),
+        readiness_cut: false,
+        accounts,
+        signing: List::with_capacity(0),
+        last_end: None,
+        usable,
+        settled: true,
+        cut: false,
+    }
 }
 #[test]
 fn the_model_half_waits_for_complete_accounts_and_no_other_usable_provider() {

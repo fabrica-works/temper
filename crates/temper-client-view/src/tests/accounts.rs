@@ -60,7 +60,16 @@ fn document(count: u32) -> c::OwnerAccounts {
             })
             .unwrap();
     }
-    c::OwnerAccounts { accounts, signing, last_end: None, usable: true, settled: false, cut: true }
+    c::OwnerAccounts {
+        readiness: List::with_capacity(0),
+        readiness_cut: false,
+        accounts,
+        signing,
+        last_end: None,
+        usable: true,
+        settled: false,
+        cut: true,
+    }
 }
 fn deliver(root: &mut d::Domain, watch: Token, doc: c::OwnerAccounts) {
     fixtures::root_event(

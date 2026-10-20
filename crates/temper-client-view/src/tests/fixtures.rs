@@ -786,6 +786,9 @@ fn fixture_me(project_name: &[u8]) -> c::Me {
     second.name = Some(DocumentText::complete(contract::Text::new(Box::from(*b"Second"), 32).expect("name fits")));
     projects.push(second).expect("second project");
     Me {
+        providers: List::with_capacity(0),
+        providers_cut: false,
+        key_bytes: 256,
         party: MeParty {
             number: 73,
             kind: PartyKind::Person,
@@ -880,6 +883,8 @@ fn deliver_demo(root: &mut temper_client_domain::Domain, read: Token, watch: Tok
         },
     );
     let accounts = c::OwnerAccounts {
+        readiness: List::with_capacity(0),
+        readiness_cut: false,
         accounts: List::with_capacity(0),
         signing: List::with_capacity(0),
         last_end: None,
