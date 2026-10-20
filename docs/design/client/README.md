@@ -59,6 +59,13 @@ not contract. What is still open is listed in section 11.
   model the work runs on. The terminal prints a sign-in's address and
   opens no browser (6.5). The accounts are jig's, kept by its engine
   (`../protocol/credentials.md`, section 3).
+- **A first run's demo.** When the deployment runs the demo
+  (`../protocol/setup.md`, 8.4), the client reads it from the engine
+  (4.8): a banner on every page says the deployment is a demo and offers
+  to connect a real model and a real forge, and the demo's project's
+  chats page suggests the requests its model plays (5.6). The printed
+  link's sign-in in a browser lands on the chats page (`browser.md`,
+  2.4).
 - **The forge's family.** Its words for the connector, a repository, a
   branch, a pull request and each kind of write need no document (4.1).
   Its other parts are documents its client side reads, with requests of
@@ -270,7 +277,9 @@ credential.
 - **temper's pages keep no record of their own:** a client closed on
   any page opens at the inbox, and a composer's words not sent, or a
   form's values, are not kept across a restart (section 11). A browser
-  opens at its address (`browser.md`, 2.3).
+  opens at its address (`browser.md`, 2.3), and after the printed
+  link's sign-in at the chats page, where a first run starts
+  (`browser.md`, 2.4).
 
 ### 3.5 Its pages
 
@@ -284,7 +293,7 @@ keeps (`../protocol/configuration.md`, section 2).
 | Address | Mockup | Shows | Watches and reads | Acts |
 |---|---|---|---|---|
 | `Inbox` (home) | `inbox.html` | what needs the person, across projects, filtered by project, kind and goal (its root): proposals, questions, held tasks, person tasks; then updates (results, replies) | `inbox` with its filters; the `proposal` or `task` an entry's card needs | accept, reject with a reason, answer, release, leave held, take, hand back; seen |
-| `Chats` | `chats.html` | a composer to start a chat; the person's chats, live or closed, newest activity first, each with its status, spend and delegates | `tasks{query}`: requester the person, the chat label, by last activity | start a chat |
+| `Chats` | `chats.html`, `first-run.html` | a composer to start a chat; in the demo's project while the demo's model half holds, its suggested requests (4.8, 5.6); the person's chats, live or closed, newest activity first, each with its status, spend and delegates | `tasks{query}`: requester the person, the chat label, by last activity; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request |
 | `Chat { task }` | `index.html` | the conversation: committed turns, the person's words, work summaries, provisional text; the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer | `task`, `activity` a page at a time, `run` while one is live; each `proposal` its `task` names | message, stop, close, accept or reject a proposal in place; seen |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
 | `Task { task }` | `task.html`, `agent-task.html` | a goal: its header, what was asked, its plan as a tree, its latest activity and history, its budget and authority, with Amend, Stop and Cancel; an agent's task: its transcript and a composer, with Amend and Stop | `task`, `tree`, `activity`; `run` while one is live | amend, stop, cancel, release a held task of the plan, message an agent's task |
@@ -332,6 +341,12 @@ keeps (`../protocol/configuration.md`, section 2).
   says; a pasted key or token is a secret field (3.6), and a connect's
   or an install's link is shown as an external link (6.5). How a
   connect ends is read on the page, never assumed from its answer.
+- **A suggested request** (`first-run.html`) starts a chat with the
+  cue's words as its first message, as the composer's send does: one
+  act, one request (3.6), the suggestions and the send disabled while
+  it is pending. The demo model finds the cue in that message (skein's
+  `fake-llm.md`, 2.4), so the chat plays the cue's script; the
+  composer's text is left as it was.
 - **The work's account and model.** A chat's composer names the
   account and model its next run takes, and offers the models `me`
   serves for the project (jig's `client/domain/contract.md`, 5.3), each
@@ -413,8 +428,8 @@ The forge's client side is the client root's child for the forge
 connector, an owner numbered as its connector (jig's
 `client/domain/root.md`, sections 2 and 15). It shows the forge's parts
 that need no document, reads the documents of the others (`forge.md`),
-holds one form, the adoption, with its picker, and sends the forges'
-page's requests (section 8).
+holds one form, the adoption, with its picker, sends the forges'
+page's requests (section 8), and reads the demo (4.8).
 
 ### 4.1 Words that need no document
 
@@ -621,7 +636,8 @@ for its kind, its user's login and its installations. Its nodes:
   plan, at its first landing that changes one of these records, and
   shared by plans that run at once. A request, an outcome or a field
   added to the family (the FORGE requests of section 8, the picker's
-  ids in `Adopt`, the forge's kind in the adopted outcome) changes
+  ids in `Adopt`, the forge's kind in the adopted outcome, the demo's
+  read) changes
   them, so it is such a move, never a second version served beside the
   first. The engine serves exactly one version (jig's
   `protocol/client.md`, section 9): a client of another is out of date
@@ -662,6 +678,14 @@ for its kind, its user's login and its installations. Its nodes:
 - **The FORGE requests and their outcomes:** `Connect`, `Install`,
   `Replace`, `Forget`, `SetUp` and `Reachable`, beside `Adopt` (section
   8).
+- **The demo's read, `Demo`:** of the deployment's scope, with no
+  fields, and no subject: what it answers changes only with the
+  configuration, which changes only at a restart. Its answer is none,
+  for a deployment without the demo, or the demo: its project (u32);
+  its forge's number (u16); its model's LLM provider (u32); its
+  repository's owner and name (byte strings, bounded as `Adopt`'s);
+  and its cues, at most 8, each 1 to 256 bytes of text, in the
+  configuration's order (section 8).
 - **The forge's documents' records:** its reads, subjects and
   documents, and its other requests, beside `Adopt` (`forge.md`,
   section 9).
@@ -697,6 +721,34 @@ issues; create and delete branches. STYLE is "merge", "squash" or
 reasons (section 8). The links are the forge's configured addresses,
 shown as external links and never opened by the client (6.5).
 
+### 4.8 The demo
+
+A first run's deployment is a demo, on a demo model and a demo forge
+(`../protocol/setup.md`, 8.4), until the person connects a real one
+of each (`../draft/first-run.md`, 3.6).
+
+- **Read once a link is live.** The forge's side reads `Demo` (4.6)
+  when the link first becomes live, and again each time it becomes
+  live after it was not. It keeps the last answer, and drops the
+  answer of a read it has replaced. None, and no answer yet, both
+  mean no demo is shown.
+- **The model's half** holds while the demo is answered and no account
+  of the `accounts` document, the one the accounts' banner keeps (5.1),
+  of an LLM provider other than the demo's is usable. While that
+  document is not delivered, or is cut, the half does not hold.
+- **The forge's half** holds while the demo is answered and the
+  deployment's part (`forge.md`, 5.4) shows no forge connected but the
+  demo's. That part is read only for a person whose role holds the
+  deployment's forges (3.5); for any other person, and while the part
+  is not served, the half does not hold.
+- **What shows:** the demo's banner, while either half holds (5.1); the
+  suggested requests, on the chats page, while the model's half holds
+  and the person is in the demo's project (3.5). Each is worded in 5.6.
+  Nothing hides them but their halves (section 11).
+- **State:** the last answer, the pending read's key, at most one, and
+  whether the link was live at the last pass. Bounded by the record's
+  bounds (4.6).
+
 ## 5. The view
 
 ### 5.1 Its shape
@@ -724,6 +776,9 @@ shown as external links and never opened by the client (6.5).
     is usable (the `accounts` watch; jig's
     `client/domain/contract.md`, 7.1): its words and three buttons
     (5.5), on every page but the accounts page;
+  - *the demo's banner,* while either of the demo's halves holds
+    (4.8): a region named "Demo", its words and its links (5.6), on
+    every page but the accounts and the forges pages;
   - *the main:* the page at the address (3.5), its title its level-1
     heading.
 
@@ -895,6 +950,27 @@ configuration's, OpenAI's and ChatGPT's in the owned example
   not.
 - **Plain words:** temper says that it runs Claude Code, and names no
   page, button or feature after it (jig's `domain/providers.md`, 3.2).
+
+### 5.6 The demo's words
+
+temper's phrasebook words the demo (4.8; `mockups/first-run.html`);
+OWNER/NAME is the demo's repository, and the cues the demo's, copied in:
+
+- **The banner:** "This is a demo, running on a demo model and a demo
+  forge." while both halves hold, "This is a demo, running on a demo
+  model." or "This is a demo, running on a demo forge." while one
+  does; then "Connect a model", a link to `Accounts`, while the model's
+  half holds, and "Connect a forge", a link to `Forges`, while the
+  forge's half holds.
+- **The suggestions,** on the chats page, after the level-1 heading and
+  before the composer: the heading "What shall we change?"; "Try a
+  request in OWNER/NAME. Follow the task from its branch to a landed
+  change."; a group named "Suggested requests" of one button per cue,
+  each named by its cue's words; and "The demo model plays these
+  requests from a script."
+- **The composer's line,** on the demo's account: "Using NAME · MODEL",
+  NAME the demo provider's name in the configuration ("Demo model" in
+  the box's).
 
 ## 6. The terminal shell
 
@@ -1348,6 +1424,12 @@ does for the client:
   no record for does not decode: the routing answers the read with no
   record (unknown) and refuses the watch as unknown, without the root,
   as jig's reference service answers an undecodable one.
+- **The demo's read** (4.6, 4.8) is answered by the routing from the
+  configuration alone, without the root, to any signed-in party:
+  none while `application.demo` is null, and otherwise its `project`,
+  its `forge`, its `llm.provider`, that fake forge's `fake.owner` and
+  its first of `fake.repositories`, and its `llm.asked` cues in order
+  (`../protocol/setup.md`, 8.4).
 
 ## 10. Testing
 
@@ -1547,3 +1629,8 @@ own tests:
 - **A connect's end told:** the forges' page reads how a connect ended
   on the deployment's part. Default: that read, watched while the page
   is open; no notice in the inbox.
+- **Hiding the demo** (`../draft/first-run.md`, 2.2): the banner and
+  the suggestions show while their halves hold (4.8). Default: nothing
+  hides them, and nothing is kept to dismiss them.
+- **"Reset demo"** (`mockups/first-run.html`): the demo's chats and
+  their work set aside for a fresh start. Default: not offered.

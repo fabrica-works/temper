@@ -591,8 +591,9 @@ and subjects, under the forge's owner number, each naming its scope, a
 project or the deployment (jig's `client/domain/contract.md`, 7.5; jig's
 `client/domain/root.md`, section 7), their records in
 `temper-client-protocol-wire` beside `Adopt` (`README.md`, 4.6).
-The first part served is the deployment's, its forges (5.4); a change's
-result and its hold (2.5) follow.
+The first read served is the demo's (`README.md`, 4.6 and 4.8), from
+the configuration alone; the first part, the deployment's, its forges
+(5.4); a change's result and its hold (2.5) follow.
 
 | The client | jig's part and slot | The domain |
 |---|---|---|
@@ -608,6 +609,7 @@ result and its hold (2.5) follow.
 | the picker (5.1) | temper's `Adopt` page, through the `Reachable` request (`README.md`, section 8) | `../protocol/forge.md`, the setup's host's `Reachable`; `../domain/forge.md`, section 4 |
 | each forge's connection, its mode, installations and actions (5.4, 5.5) | temper's `Forges` page; the deployment's part | `../protocol/forge.md`, at start, connecting at runtime, a forge stopped, GitHub's installations and the setup's host; `../protocol/credentials.md`, the forges' records |
 | the browser's steps of a connect (9.1) | none of jig's: temper's routes on the clients' listener | `../protocol/forge.md`, the setup's host |
+| the demo: its project, forge, repository and suggested requests | the deployment's read, `Demo` (`README.md`, 4.6), for the demo's banner and the chats page | `../protocol/setup.md`, 8.4 |
 
 ### 9.1 The browser's steps, on the clients' listener
 

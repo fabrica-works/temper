@@ -200,10 +200,12 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   `http://HOST:PORT/jig/v1/sign-in/link?secret=SECRET`, opened in a
   browser on the engine's machine (`README.md`, section 7): temper's
   server answers its `GET` with the page (2.2); jig's sign-in part takes
-  the secret and replaces the address with `/` before anything is sent;
-  the client signs in with it (`SignIn { with: Link(secret) }`), and the
-  mapping's answer sets its cookie, which the client never sees (jig's
-  `protocol/browser.md`, section 11). The inbox follows.
+  the secret and replaces the address with `/chats`, temper's home for
+  a sign-in, before anything is sent; the client signs in with it
+  (`SignIn { with: Link(secret) }`), and the mapping's answer sets its
+  cookie, which the client never sees (jig's `protocol/browser.md`,
+  section 11). The chats page follows, where a first run's demo
+  suggests its requests (`README.md`, 4.8).
 - **A reload, or another tab,** signs in with `Transport`, by the cookie
   (jig's `client/domain/client.md`, section 12).
 - **Signed out,** by the banner's "Sign out" (jig's sign-out clears the

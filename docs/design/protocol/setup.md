@@ -1280,7 +1280,7 @@ demo's own work pushes nothing yet.
   | `llm.listen` | an address, jig's format | a socket address on loopback; unique among the deployment's listeners and owned and fake forges |
   | `llm.provider` | u32 | the number of one of `engine.llm`'s providers (configuration.md, section 2), whose endpoints are each at `llm.listen`, plaintext, OpenAI's dialect on its public route, and whose source is a key alone |
   | `llm.key` | a data path (configuration.md, section 12) | a secret's file, 0o600 (section 9): the key is its bytes less a final newline |
-  | `llm.asked` | a list of `{"cue", "turns"}` | at most 8; each `cue` non-empty text, unique; `turns` 1 to 8 turns (below) |
+  | `llm.asked` | a list of `{"cue", "turns"}` | at most 8; each `cue` non-empty text of at most 256 bytes, unique, the words of a request the client suggests (`../client/README.md`, 4.8); `turns` 1 to 8 turns (below) |
   | `llm.otherwise` | a list of turns | 1 to 8 |
   | `forge` | u16 | the `forge` of one fake `setup` entry (section 8) |
   | `project` | u32 | the number of one of `engine.projects` (configuration.md, section 2) |
