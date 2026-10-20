@@ -35,7 +35,8 @@ and what is still open (section 10).
   layer, GitHub's** (skein's `fake-forge.md`, section 10), one world per
   forge kind, API and git in one store, so a branch the worker pushes is
   the head the engine reads. Its protocol layer serves the dialect's
-  API; its git is reached by the fake git program, never over HTTP.
+  API; its git is reached by the fake git program, through the forge's
+  own calls, never git's protocol over HTTP.
 - **Checks follow content.** The machine's sh is a small subset of POSIX
   sh, in which fake repositories write their checks (4.3), and the fake
   forge's CI follows a cue in the pushed tree (4.2), so a change that is
@@ -249,10 +250,11 @@ in the lower world that owns it, never here.
   stay available until their clients have settled.
 - **The forge and git:** skein's forge peer (skein's `fake-forge.md`,
   section 5), which the one-process world hosts too, serves the fake forge on a
-  loopback listener and shares its forge with the fake git program
-  (4.3). Stories that clone, push or land run on the fake git program
-  over that forge, with neither an owned Forgejo nor its runner. Real
-  git against the fake forge is an open question (section 10).
+  loopback listener, its git route among its routes, which the fake
+  git program reaches (4.3). Stories that clone, push or land run on the
+  fake git program over that route, with neither an owned Forgejo nor
+  its runner. Real git against the fake forge is an open question
+  (section 10).
 - **CI and webhooks.** CI follows the fake forge's content cue (skein's
   `fake-forge.md`, section 2); CI that runs a workflow's steps in the
   shell subset is an open question (section 10). The forge peer
@@ -755,14 +757,16 @@ loopback (section 5). temper's worlds add:
   tested in `temper-service`'s tests, against no fake (2.1).
 - **Its referee** drains the forge's observations (skein's
   `fake-forge.md`, 2.4; here, 5.2).
-- **Its git** is reached through its typed transport, never over HTTP:
-  by the fake git program in the one-process world (4.3), as by the fake
-  checkout in the domain worlds. Real git meets an owned Forgejo in the
+- **Its git** is reached through the fake forge's own calls, never
+  git's protocol over HTTP: through its typed transport by the fake git
+  program in the one-process world (4.3), as by the fake checkout in the
+  domain worlds; and over its git route (skein's `fake-forge.md`,
+  section 4) by the fake git program in the real loop (2.4), as in the
+  QA loop's processes and the demo's (`../draft/qa-loop.md`, section
+  11; ../protocol/setup.md, 8.4). Real git meets an owned Forgejo in the
   process and live tiers, and skein's throwaway Forgejo in temper's
-  transcripts (2.6). The real-loop world's repository stories run on the
-  fake git program too (2.4), as the QA loop's processes do, across
-  processes (`../draft/qa-loop.md`, section 11); a real-git bridge is an
-  open question (section 10).
+  transcripts (2.6); a real-git bridge is an open question (section
+  10).
 - **CI follows content,** by the fake forge's cue (skein's
   `fake-forge.md`, 2.3; here, 2.4). CI that runs a repository's checks
   in the shell subset (4.3) on the pushed tree, so that a change that is
@@ -806,16 +810,22 @@ between them; the transport and the remote boundary are skein's
 (skein's `fake-forge.md`, section 3, and skein's `fake-checkout.md`,
 section 4).
 
-**The fake git program,** `testing/temper-fake-git`, is git as the
-machine runs it below the git component: a program on skein's fake
-machine whose protocol is its command line. skein's fake machine runs
-no program of an application's, so it is a program hosted by skein's
-world harness (its `HostedProgram`, spawned by name), acting on the
-fake machine's files. It stays temper's, as it fakes temper's git
-component's program, and is built on skein's fake forge: it reaches the
-forge through the typed transport of the fake forge's domain (skein's
-`fake-forge.md`, section 3), and shares that forge with the forge peer
-(skein's `fake-forge.md`, section 5) where a world hosts both (2.4, 2.5).
+**The fake git program** is git as the machine runs it below the git
+component: a program whose protocol is its command line. Its step core
+asks for file operations as io's kernel does, so the same core runs
+three ways: hosted by skein's world harness (its `HostedProgram`,
+spawned by name) on skein's fake machine, which runs no program of an
+application's; hosted on the real file system by the real loop; and as
+a process of its own, `temper fake git`, the demo's and the QA loop's
+git. It stays temper's, as it fakes temper's git component's program,
+and is built on skein's fake forge, whose domain is its only remote
+state. It reaches that forge in one of two ways (skein's
+`fake-forge.md`, section 3): through the typed transport of the fake
+forge's domain, sharing the forge with the forge peer (skein's
+`fake-forge.md`, section 5) where a world hosts both in one ring
+(2.5); or over the forge's git route on the forge's listener (skein's
+`fake-forge.md`, section 4), from the real loop (2.4) and from another
+process.
 
 - **What it takes:** the invocations of ../protocol/git.md, section 4, with
   their settings (../protocol/git.md, section 3) and their environment
@@ -842,8 +852,64 @@ forge through the typed transport of the fake forge's domain (skein's
 - **Checked against real git:** its answers to the transcripts of
   `tools/git-transcripts` match real git's, masked (../protocol/git.md,
   section 9).
-- **Where it runs:** the one-process world (2.5) and the real loop
-  (2.4). The domain worlds keep the fake checkout at the domain face.
+- **Where it runs:** the one-process world (2.5) on the typed
+  transport; the real loop (2.4) over the git route of the forge peer it
+  hosts, so that the gate runs the route; `temper fake git` in the demo,
+  the QA loop and the process tier. The domain worlds keep the fake
+  checkout at the domain face.
+
+**Over the git route,** the program is the same core with a remote of
+its own:
+
+- **Its calls:** skein's fake checkout asks its remote synchronously
+  (skein's `fake-checkout.md`, section 4), and the route is across a
+  network, so the program replays. It answers the kit from what it has:
+  the objects it fetched, kept in a cache, and a log of the other
+  calls' answers, in order. A call it lacks gets a placeholder answer
+  (no commit, an empty tree or message, a refusal), and that run is
+  thrown away; the program makes the call, then runs the command again
+  from a fresh copy of the checkout it scanned. A run that replays must
+  ask the logged calls in the same order, and the program asserts it
+  does. A write (a push, a branch made, a commit, a merge or a commit's
+  tree stored) is made once, never again by a replay. A command's calls
+  share one connection.
+- **Its network is io's:** the core makes each call through skein's
+  HTTP client on the kernel's sockets, as it reads files, and never
+  blocks, so a ring that hosts both the program and the forge peer, as
+  the real loop's does, serves both.
+- **Its forge:** the listener is the host of the remote URL on git's
+  command line, for a command that names its remote; for a local one,
+  the URL its clone wrote in `.git/temper-remote`, which holds no
+  secret. The credential is the `Authorization` git's `http.extraHeader`
+  carries (../protocol/git.md, section 5), forwarded as it is; the
+  store's calls carry none (skein's `fake-forge.md`, section 4).
+- **Its exits:** what real git exits, for what real git does or
+  refuses; 128 and a `fatal:` line, as git's on a network failure, when
+  the route is out of reach or fails; 125 and `temper fake git: broken:
+  <rule>` on stderr for a spawn that breaks what it checks (above),
+  which the hosted program asserts; and, for a remote whose host serves
+  no git route, 128 and `fatal: <host> serves no fake git route`. An
+  assertion of skein's kit ends the process as a panic (101).
+- **How the binary is it:** `temper` is `temper fake git` when its
+  `argv[0]`'s last component is `git`, before it reads a command of its
+  own: a link named `git` to the binary, which the worker spawns by the
+  absolute path `workers[].git` gives (../protocol/setup.md, 8.2), with
+  git's command line as it is.
+- **Its crates:** the core, `crates/temper-fake-git`, ordinary Rust
+  (programming-model.md, 10.2) with no test dependency, since the
+  binary ships it: the checks, the answers, the step core, the replay
+  and both transports; over `skein-fake-checkout`, the fake forge's
+  domain, protocol layer and peer, and `skein-http`, each in skein's
+  `crates/` (skein's `testing.md`, section 6). Its hosted half,
+  `testing/temper-fake-git-hosted`: the program as skein's world hosts
+  it, from the world's `Inherited`, with the fixtures and scenarios the
+  worlds share.
+- **Checked:** the core's step tests, by a scripted remote: each call
+  missed and replayed, a replay that asks out of order, each write made
+  once, the listener found from the URL and from `.git/temper-remote`,
+  and each exit. The transcripts run on the core whatever its remote.
+  The real loop's stories run the route against skein's forge peer; the
+  process tier (2.6) runs `temper fake git` from the demo's link.
 
 **The shell subset.** An LLM can type any command, and no fake can run a
 real build. The machine's sh interprets a small subset of POSIX sh: a few
@@ -1102,7 +1168,8 @@ crates/temper/tests/process.rs      the process tier (2.6): the story, the termi
 crates/temper/tests/live.rs         the live tier (2.7), nextest profile live
 tests/client-browser                temper-client-browser-world: the browser tier (../client/browser.md, section 4), Chromium against temper serve on the bundle the gate builds; nextest profile browser
 crates/temper-client-shell-terminal/tests  the terminal's machine world (../client/README.md, section 10)
-testing/temper-fake-git             the fake git program, on skein's fake machine (4.3)
+crates/temper-fake-git              the fake git program's core: temper fake git (4.3)
+testing/temper-fake-git-hosted      the fake git program hosted by skein's world, with its fixtures (4.3)
 tests/<component>/<child>           a child domain's world, temper-<component>-<child>-world
 tests/<component>/domain            a component's world: the engine's, the worker's
 tests/engine/forge                  the forge connector's world
@@ -1134,8 +1201,9 @@ scripts/after-landing.sh            the process tier, after each landing
   `testing/skein-fake-peers`), the throwaway Forgejo
   (`testing/skein-throwaway-forgejo`), its tests in ordinary Rust, and
   the conformance (`tests/forge/conformance`). Reconcile's world is
-  in skein's `forge-setup.md`, section 7. temper's fake git program, in
-  `testing/temper-fake-git`, sits on the fake forge (4.3).
+  in skein's `forge-setup.md`, section 7. temper's fake git program,
+  its core in `crates/temper-fake-git` and its hosted half in
+  `testing/temper-fake-git-hosted`, sits on the fake forge (4.3).
 - **Machine worlds live beside what they test:** the forge component's is
   in skein's `forge-connection.md`, section 10; the git component's is in
   `tests/worker/protocol-git` (../protocol/git.md, section 9); the terminal's
@@ -1169,7 +1237,7 @@ scripts/after-landing.sh            the process tier, after each landing
   domain's commit, and a merge the domain makes is written to the mirror
   with a fixed author and time, so its id is the same on every run.
   Default: the real loop's clone, push and landing stories run on the
-  fake git program over the shared forge (2.4), real git meets a forge
+  fake git program over the fake forge's git route (2.4), real git meets a forge
   in the process tier (2.6) and the QA loop's M2, and no story waits for
   the bridge.
 - **What the real loop leaves out:** the real-git bridge (above),

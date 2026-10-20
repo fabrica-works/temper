@@ -618,8 +618,9 @@ checks this document's contract:
   cancel; every child is closed before its operation's terminal; no
   credential in an argument; memory within `worst_case`. Its scripted
   outputs are the transcripts.
-- **The fake git program,** `testing/temper-fake-git`
-  (`../domain/testing.md`, 4.3), answers this document's invocations as real
+- **The fake git program,** its core `crates/temper-fake-git` and its
+  hosted half `testing/temper-fake-git-hosted` (`../domain/testing.md`,
+  4.3), answers this document's invocations as real
   git does, and is checked against the same transcripts: each
   transcript's arguments and environment, run on the fake over the
   equivalent fixture, give the same exit status, the same stdout once

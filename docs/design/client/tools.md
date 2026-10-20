@@ -1033,14 +1033,16 @@ in as the same party, asks under the same name and is answered the first
 answer; the party has one chat. One signed in again as another party:
 the first party's kept request stays unsent, and the call goes on. The
 forge's stories adopt a repository, and clone, push and land through the
-fake git program on the shared in-memory fake forge, with CI by the fake
+fake git program over the forge peer's git route, with CI by the fake
 forge's content marker and its webhooks delivered to the engine
 (`../domain/testing.md`, 2.4). Real git meets a forge in the process
 tier (11.4). The forge's stories run on `skein-world`'s
-`World::new_controlled`, unchecked: fake git's memory in the shared fake
-forge outlives the git program that made it, which the checked world
-fails (skein's `testing-strategy.md`, section 6; skein's
-`fake-forge.md`, section 5). Every other story here is checked.
+`World::new_controlled`, unchecked, while the fake git program shares
+the fake forge in memory: its memory there outlives the git program
+that made it, which the checked world fails (skein's
+`testing-strategy.md`, section 6; skein's `fake-forge.md`, section 5).
+Over the git route the program shares nothing, and they run checked.
+Every other story here is checked.
 
 Until area 5's tools (5.5), the deployment's credential is handed in as
 a `handed_in` file of the configuration the test writes, the engine's

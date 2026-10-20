@@ -129,7 +129,7 @@ binary (`jig-test`).
 | the bundle | the browser shell's module, glue and stylesheets, skein's bundler's output, which the clients' listener serves (`../client/browser.md`, 2.2) |
 | the tools | the agents' interface to temper, `temper ctl`: `temper-client-tools` and `temper-client-shell-cli` (`../client/tools.md`, section 4) |
 | the clients' listener | `temper-service`'s listener for clients, on which jig's clients' component is mounted with jig's default HTTP mapping, under `/jig` (`../client/README.md`, section 8) |
-| the fake git program | `testing/temper-fake-git` (`../domain/testing.md`, 4.3) |
+| the fake git program | git as the worker runs it, faked: its core `crates/temper-fake-git`, `temper fake git`, and its hosted half `testing/temper-fake-git-hosted` (`../domain/testing.md`, 4.3) |
 | the throwaway Forgejo | a Forgejo started by a test script on loopback, with SQLite in a scratch directory, removed after (`../domain/testing.md`, 2.6) |
 | locate | the forge connector's read of a repository's id by owner and name (skein's `forge.md`, 5.2) |
 | the webhooks' listener | the forge component's own listener for Forgejo's signed deliveries, plaintext on loopback, one path per forge (skein's `forge-connection.md`, section 6; forge.md, section 5) |
@@ -290,8 +290,8 @@ jig's accounts; `skein-ui`, under temper's view, and
 simulator, fake machine, fake LLM peer, fake issuer and fake person.
 
 **temper's own,** each step code under the subset but the binary, the
-terminal's host, `temper ctl`'s host, `temper-forge-setup-shell` and the
-box's host:
+terminal's host, `temper ctl`'s host, `temper-forge-setup-shell`, the
+box's host and the fake git program's core:
 
 | Crate | Kind | Holds | Depends on |
 |---|---|---|---|
@@ -300,6 +300,7 @@ box's host:
 | `crates/temper-forge-setup` | step code | the forge's setup, but for reconcile, which is skein's (`skein-forge-setup`): its types and checks, and the setup mapped onto reconcile's given values, with the kit's check of them; the preparation's machine; `app.ini` and the runner's files; the processes' specs; the configuration's steps, `steps` and `Step`. Names no host | setup.md, section 11 |
 | `crates/temper-forge-setup-shell` | hosts | ordinary Rust: the hosts of `temper forge prepare` and `run`: commands, files, the forge's locks and the exec (setup.md, 6.4); HTTP on skein-http over skein-io | setup.md, section 11 |
 | `crates/temper-box` | machine, host | the box's machine, step code, and its host, ordinary Rust, on skein-io's processes; nothing of the setup but its steps (setup.md, 7.3) | setup.md, section 11 |
+| `crates/temper-fake-git` | program | the fake git program's core, ordinary Rust, which the binary runs as `temper fake git`: its checks, answers, step core, replay and two remotes (`../domain/testing.md`, 4.3) | setup.md, section 11 |
 | `crates/temper-worker-protocol-git` | component | the git component: each `git::Op` of `temper-worker-domain-checkout` as a fixed sequence of git invocations, their arguments, environment, output and failures; the operations in flight, their processes, pipes and deadlines; `Make` as file operations (git.md) | `skein-lib`, `skein-io`, the checkout's vocabulary |
 | `crates/temper-protocol-worker-wire` | codecs | temper's parts on jig's channel, and a git identity's value, from a schema; `PAYLOAD_VERSION` (channel.md) | `skein-lib`, `skein-codec` |
 | `crates/temper-protocol-store` | codecs, keys | temper's families: key encoders, codecs from a schema, `STORE_VERSION`, the restart's interval (store.md) | `skein-lib`, `skein-codec`, `skein-kv`, `jig-protocol-store`, the forge's records |
@@ -589,7 +590,7 @@ revisions temper's `Cargo.lock` pins.
   application's (jig's `client/domain/client.md`), on skein's UI kit and
   text shell (`../client/README.md`, sections 5 and 6); and, where something
   would be better upstream, as jig's design allows, the fake git
-  program, on skein's fake machine; and `temper program-login`, the
+  program, on skein's fake checkout and fake forge; and `temper program-login`, the
   application's command a program source's holder runs on each host
   (jig's `domain/accounts.md`, section 5).
 - **Not used:** `jig-protocol-charter` and `jig-protocol-tools` (llm.md);

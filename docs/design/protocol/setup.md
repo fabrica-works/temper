@@ -32,8 +32,8 @@ section 16; connecting GitHub, section 17.
   token, or on GitHub makes temper's App from its manifest in their
   browser. Owned: temper runs Forgejo and its runner. A fourth, fake,
   is the default document's and never chosen: temper runs its fake
-  Forgejo in place of Forgejo, with no runner and no git, and sets it up
-  as an owned one (8.4).
+  Forgejo in place of Forgejo, with no runner and its git a route of its
+  own, and sets it up as an owned one (8.4).
 - **Each mode is a layer that makes the inputs of the one below.**
   Owned's preparation makes a Forgejo and an admin's token, managed's
   input, and hands the token over in a file; managed's plans make the
@@ -944,14 +944,14 @@ directory is empty (7.1).
 
 - **Refused,** exit 1, before it writes anything, naming the file: when
   the configuration directory holds `temper.json`, or the data
-  directory holds `worker.secret`, `worker.digest` or `demo/llm.key`, or
-  no `git` is on `PATH` (below). It never replaces a file; a person who starts again
+  directory holds `worker.secret`, `worker.digest`, `demo/llm.key` or
+  `demo/bin/git`. It never replaces a file; a person who starts again
   removes them.
 - **Its directories:** the data and cache directories made and checked
   as every command makes and checks them (configuration.md, section
   12), and the configuration directory made the same way when absent;
   an existing configuration directory is taken as it is; and the data
-  directory's `demo/`, made private (0o700).
+  directory's `demo/` and `demo/bin/`, made private (0o700).
 - **Its files,** each created new, in this order, the document last, so
   that a configuration directory holding one holds them all:
 
@@ -960,6 +960,7 @@ directory is empty (7.1).
   | `worker.secret` | data | 0o600 | 32 bytes from the kernel's random source, as 64 lowercase hexadecimal digits and a newline |
   | `worker.digest` | data | 0o600 | the SHA-256 of the secret's digits without its newline, as 64 lowercase hexadecimal digits and a newline, as `docs/guide/box.md` makes it |
   | `demo/llm.key` | data | 0o600 | the demo model's key (8.4): 32 bytes from the kernel's random source, as 64 lowercase hexadecimal digits and a newline |
+  | `demo/bin/git` | data | a link | the demo's git, `temper fake git` (8.4): a symbolic link to the binary |
   | `charters/chat.txt`, `charters/coding.txt` | configuration | 0o644 | the charters' instructions, the owned example's |
   | `agent.json` | configuration | 0o644 | smith's agent configuration (configuration.md, section 5): the owned example's endpoints, models and profile (8.1), and the demo's endpoint and model (8.3); Claude Code's program at the `claude` found on `PATH`, and its programs directory, `programs` in the data directory; with no `claude` on `PATH`, no program, and Anthropic's models by key alone |
   | `temper.json` | configuration | 0o644 | the default document (8.3) |
@@ -967,8 +968,11 @@ directory is empty (7.1).
 - **What it finds,** each written absolute:
   - *the binary,* the running `temper`'s own path: the worker's agent's
     `program`, with `arguments` `["agent", <configuration>/agent.json]`
-    and `configuration` that same path (configuration.md, section 5);
-  - *git,* the `git` found on `PATH`: the worker's `git`;
+    and `configuration` that same path (configuration.md, section 5),
+    and the demo's link's target;
+  - *git,* the demo's link, `<data>/demo/bin/git`: the worker's `git`,
+    so that the demo's git is `temper fake git` (8.4) whatever git the
+    machine has, or none;
   - *the bundle,* `<the binary's directory>/../share/temper/bundle` when
     it holds `index.html`: `clients.bundle`; else `null`, and init says
     the browser is not served;
@@ -1004,9 +1008,9 @@ directory is empty (7.1).
   init writes passes configuration.md, section 8, as `temper serve`
   checks it, with the agent's configuration it writes, at the fixed
   ports and at kernel's ports, the three always distinct, with and
-  without `claude` and a bundle; each refusal writing nothing; and the
-  files' modes. The process tier starts a box on empty directories
-  (13.4).
+  without `claude` and a bundle; each refusal writing nothing; the
+  files' modes; and the link's target. The process tier starts a box on
+  empty directories (13.4).
 
 ### 8.3 The default document
 
@@ -1046,8 +1050,9 @@ defaults for a person's real work are open (section 16).
   models end with `demo`: chat, 1, and coding, 2, the one the forge's procedures start agents' work under
   (`application.charter`); the templates `chat` and `goal`.
 - **One worker,** in the process, its `root` `workspaces` in the data
-  directory; the deployment's directory `deployment` in the data
-  directory; the clients' listener `127.0.0.1:<port>` (8.2).
+  directory, its `git` the demo's link (8.2); the deployment's directory
+  `deployment` in the data directory; the clients' listener
+  `127.0.0.1:<port>` (8.2).
 - **Its limits:** the owned example's (8.1). Its `memory_bytes` are
   derived as the owned example's are, with its own strings at their
   bounds, two literals of `temper-init`'s checked by its tests the same
@@ -1063,8 +1068,10 @@ A person's first run is a demo (`../draft/first-run.md`, 3.5, 3.6 and
 own binary, the engine sets itself up on the fake as on an owned one,
 and a seed adds the demo model's key and adopts the demo's repository
 through the client's protocol. Its bar: a chat that works on the demo
-model, and the demo forge connected and its repository adopted, with no
-git on it yet.
+model, and the demo forge connected and its repository adopted. Its git
+is `temper fake git`, on the fake forge's git route, so a worker's
+clone and push reach the fake; the demo model answers in text, so the
+demo's own work pushes nothing yet.
 
 - **`application.demo`,** or null for none:
 
@@ -1107,8 +1114,8 @@ git on it yet.
   key file before it binds, and refuses to start without it, naming
   the file; it accepts that one credential, and refuses every other
   request as the provider would. It serves `llm.provider`'s models, at
-  their windows and outputs; no failure and no latency is seeded, and
-  its limits are `temper-fake`'s constants.
+  their windows and outputs; no failure and no latency is configured,
+  and its limits are `temper-fake`'s constants.
 - **`temper forge prepare DIRS N` on a fake entry,** a once step: its
   directory made private; `admin_token` written when absent, 20 bytes
   from the kernel's random source as 40 lowercase hexadecimal digits,
@@ -1132,8 +1139,48 @@ git on it yet.
 
   The bot is reconcile's, and its access to a repository the adoption's
   collaborator grant, which reaches the fake's domain (skein's
-  `fake-forge.md`, section 4): the seed grants nothing. It sends no
-  delivery, serves no git and keeps no state across its starts.
+  `fake-forge.md`, section 4): the seed grants nothing. It serves its
+  git route among its routes (skein's `fake-forge.md`, section 4), and
+  no git smart HTTP; it sends no delivery and keeps no state across its
+  starts.
+- **`temper fake git`,** no step: the worker's git, which the worker
+  spawns by `workers[].git`, the demo's link (8.2), as it spawns real
+  git (git.md, section 5), and which a start checks as it checks real
+  git, by `git version`. It is the fake git program (`../domain/testing.md`,
+  4.3): the fake checkout's `.git` in the worker's working trees; its
+  remote the fake forge's git route, at the host of the clone URL the
+  engine gives; its credential the bot's, from git's
+  `http.extraHeader`; its store the fake's domain, so a push is the
+  head the engine reads.
+- **Its programs' flags,** for the box and the QA loop's runner alike
+  (`../draft/qa-loop.md`, sections 4 and 11), after the operands:
+  - `--ready PREFIX`: once its listener is bound, the program writes
+    PREFIX, then the bound address as `127.0.0.1:<port>`, then a
+    newline on stdout, flushed; nothing else is on its stdout;
+  - `--seed N`: its domain's seed, a u64 (skein's `fake-llm.md`'s
+    `Domain::played`; skein's `fake-forge.md`'s `Service::new`), 0 when
+    absent, as the box runs it;
+  - `--observations FILE`, the fake forge's alone: each observation its
+    domain makes (skein's `fake-forge.md`, 2.4), drained as a referee
+    drains it, appended to FILE, created new at 0o600, as one JSON line
+    in skein's encoding of the domain's observations, flushed at each
+    pass, and a last line with the count lost (`observations_lost`) at
+    its stop. Without it, the program drains and drops them.
+
+  Both peers run `without_records`, with the flags or without them.
+- **From a document of its own,** `temper fake llm --document FILE` and
+  `temper fake forge --document FILE`, the QA loop's form, which reads
+  no deployment: FILE is a fake's configuration as `temper-fake` derives
+  it from the deployment's document in the box's form. The LLM's:
+  `listen`, `key` (an absolute path), the provider's `models` (each
+  name, window and output), `asked` and `otherwise`. The forge's:
+  `listen`, `admin_token` (an absolute path, written by its runner as
+  the preparation writes it), `owner` and `repositories` (each `name`
+  and `landing`). Each `listen` is a loopback socket address, port 0
+  for the kernel's; the rest is checked as the deployment's members are
+  (above). So a runner starts the fakes first, learns their
+  addresses from their ready lines, then writes temper's document
+  naming them, and starts `temper serve`.
 - **`temper serve`** takes the fake's handover and reconciles it as an
   owned forge's (5.1, 6.5): `TakeOver`, then `Reconcile`, which makes the
   bot and its tokens on the fake. A fake not yet bound when the start's
@@ -1160,22 +1207,31 @@ git on it yet.
   draws a new handover, the engine's start takes it and reconciles,
   which makes the bot, its tokens and each adopted repository's access
   again (5.3, step 6), and the seed finds its acts done but the sign-in
-  and the link. The engine's records of the demo's work outlive the
-  fake's state: with no git there is no change to lose yet.
+  and the link. The fake seeds its repositories the same at every
+  start, so a worker's clone of one still matches it; a branch an agent
+  pushed is lost with the fake's state, and the engine's records of it
+  outlive it, until the fake keeps its state across starts (below).
 - **Its code:** `temper-fake`, step code (section 11): the member's
   types and checks; the fake LLM's and the fake forge's configurations
-  and seeds, from the document; `steps`, the box's steps for the
-  document; and the seed's plan, its acts as client calls with what each
-  reads to find itself done. It names no host. Its dependencies:
+  and seeds, from the deployment's document or from one of their own;
+  `steps`, the box's steps for the document; and the seed's plan, its
+  acts as client calls with what each reads to find itself done. It
+  names no host. Its dependencies:
   `temper-forge-setup`, `skein-fake-forge-domain`,
   `skein-fake-forge-protocol`, `skein-fake-llm-domain`,
   `skein-fake-peers`, `jig-protocol-config`, `skein-lib` and
   `skein-json`. The binary's `crates/temper/src/fake.rs` hosts the
-  peers and the seed on skein-shell. `Mode::Fake` and the link step's
-  kind are `temper-forge-setup`'s.
+  peers and the seed on skein-shell, and `temper fake git` is
+  `temper-fake-git`'s core on the real file system (`../domain/testing.md`,
+  4.3), which `main` runs when its `argv[0]`'s last component is `git`.
+  `Mode::Fake` and the link step's kind are `temper-forge-setup`'s.
 - **Not yet:** git's smart HTTP on the fake, its deliveries, its pages,
-  and its state across starts; each is the demo's follow-up or the QA
-  loop's (`../draft/qa-loop.md`, section 11).
+  and its state across starts; TLS on the fake LLM, with skein's test
+  root; and `temper fake forge check FILE`, which judges an
+  observations file by the forge's promises under the QA loop's contract
+  for a check (its exits 0, 1 and 2, its signatures as JSON lines); each
+  is the demo's follow-up or the QA loop's (`../draft/qa-loop.md`,
+  sections 4 and 11).
 
 ## 9. Credentials
 
@@ -1309,8 +1365,12 @@ temper-fake                  step code: the demo's member, its types and checks;
 ├── temper-forge-setup
 ├── skein-fake-forge-domain, skein-fake-forge-protocol, skein-fake-llm-domain, skein-fake-peers
 └── jig-protocol-config, skein-lib, skein-json
+temper-fake-git              ordinary Rust: the fake git program's core, temper fake git, its replay and
+│                              its two remotes (../domain/testing.md, 4.3)
+├── skein-fake-checkout, skein-fake-forge-domain, skein-fake-forge-protocol, skein-fake-peers
+└── skein-lib, skein-io, skein-http, skein-json
 temper                       the binary: temper forge prepare|run, temper box, temper init,
-                               temper fake llm|forge|seed
+                               temper fake llm|forge|git|seed
 ```
 
 - **The engine runs the setup host** in its protocol layer (5.1):
@@ -1491,9 +1551,10 @@ it checks of this document:
   scratch directories writes the configuration (8.2), says so, and
   prints one sign-in link, which signs the owner in; the demo forge is
   connected, `demo/widget` adopted into project 1, and the project's
-  chat answers a suggested request on the demo model (8.4). A second
-  box on the same directories does the same, its seed finding its acts
-  done.
+  chat answers a suggested request on the demo model (8.4); and the
+  test's own clone of `demo/widget` by the demo's link, run as the
+  worker runs git, holds the fake's landing head. A second box on the
+  same directories does the same, its seed finding its acts done.
 
 ## 15. Later
 
@@ -1563,6 +1624,17 @@ Each is intended; what it needs is named with it.
   a managed connect; Replace is a connected forge's alone.
 - **The owned example's agent, sized for a person's work.** Default: the
   process tier's profile (8.1), sized for the live tier's stories.
+- **One worker for the demo forge and a real one.** The demo's worker
+  runs `temper fake git` for every repository, and a fake git reaches a
+  fake forge alone: once the person adopts a repository of GitHub or of
+  an owned Forgejo, its first git command fails, `fatal:` naming the
+  host that serves no fake git route (8.4). Default: a git for each
+  kind of forge: `workers[].git` real git, `null` on a machine with
+  none, and a fake `setup` entry's own link, the git component taking
+  the program by the repository's forge; built with the first run's
+  step 4 (`../draft/first-run.md`, section 5). Else the fake git hands a
+  real forge's commands to real git, or the person sets `workers[].git`
+  and restarts.
 - **The owned example's `memory_bytes`** are `small`'s worst cases with
   its strings at their bounds (8.1): 78,669,036,604,974 bytes for the
   engine and 1,989,738,112,203 for the worker, more than any machine
