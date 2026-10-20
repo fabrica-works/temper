@@ -172,6 +172,7 @@ fn parse(input: &[u8], directories: &config::Directories) -> Result<Parsed, Prob
     );
     checks::webhooks(&application, &mut problems);
     check_redirects(engine.as_ref().expect("required engine checked"), &application, &mut problems);
+    checks::records(engine.as_ref().expect("required engine checked"), &application.limits, &mut problems);
     checks::limits(&application.limits, &application.limits.git_component, &mut problems);
     let mut base = 0;
     for forge in &application.forges {

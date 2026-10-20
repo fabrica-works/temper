@@ -149,3 +149,69 @@ fn the_hook_limits_have_dotted_overrides() {
         assert_eq!(read(&own), expected, "{name:?}");
     }
 }
+
+#[test]
+#[expect(clippy::disallowed_methods, reason = "ordinary tests inspect diagnostic text")]
+fn records_and_installations_override_and_check_both_bounds() {
+    let jig = fixtures::engine().jig;
+    let defaults = limits::profile(limits::Profile::Small);
+    assert_eq!(defaults.records.value_bytes, 4096);
+    assert_eq!(defaults.forges.installations, 8);
+    assert_eq!(defaults.forge_component.installations, 8);
+    assert_eq!(defaults.forge_component.key_bytes, u32::try_from(skein_tls::RS256_KEY_BYTES).unwrap());
+    assert_eq!(defaults.forge_component.renew_before, Duration::from_secs(600));
+    for (name, value, other) in [
+        (b"records.value_bytes".as_slice(), 0, b"forge_component.key_bytes".as_slice()),
+        (
+            b"records.value_bytes",
+            u64::from(crate::startup::checks::secret_value_bound(&jig, &defaults).unwrap()) + 1,
+            b"engine.limits.store.value",
+        ),
+        (b"records.value_bytes", u64::from(defaults.forge_component.key_bytes), b"forge_component.key_bytes"),
+        (b"forges.installations", 512, b"records.value_bytes"),
+        (b"forges.installations", 0, b"forge_component.installations"),
+        (b"forges.installations", 9, b"forge_component.installations"),
+        (b"forge_component.installations", 7, b"forges.installations"),
+    ] {
+        let mut own = defaults;
+        limits::apply(&mut own, name, value).unwrap();
+        let mut problems = crate::startup::Problems::empty();
+        crate::startup::checks::records(&jig, &own, &mut problems);
+        let lines = crate::startup::lines(&problems);
+        assert!(lines.windows(name.len()).any(|part| part == name), "{name:?}");
+        assert!(lines.windows(other.len()).any(|part| part == other), "{other:?}");
+    }
+    let mut own = defaults;
+    for (name, value) in [(b"forge_component.key_bytes".as_slice(), 2000), (b"forge_component.renew_before_ms", 60_000)]
+    {
+        limits::apply(&mut own, name, value).unwrap();
+    }
+    assert_eq!(own.forge_component.key_bytes, 2000);
+    assert_eq!(own.forge_component.renew_before, Duration::from_secs(60));
+    let mut problems = crate::startup::Problems::empty();
+    crate::startup::checks::records(&jig, &own, &mut problems);
+    assert!(problems.is_empty());
+}
+#[test]
+#[expect(clippy::disallowed_methods, reason = "ordinary tests inspect diagnostic text")]
+fn github_component_checks_key_deadline_and_renewal() {
+    for (name, value, expected) in [
+        (b"forge_component.key_bytes".as_slice(), 1195, "forge_component.key_bytes"),
+        (b"forge_component.deadline_ms", 271_000, "forge_component.deadline_ms"),
+        (b"forge_component.renew_before_ms", 19_999, "forge_component.renew_before_ms"),
+        (b"forge_component.renew_before_ms", 1_800_001, "forge_component.renew_before_ms"),
+        (b"forge_component.installations", 0, "forge_component"),
+    ] {
+        let mut config = fixtures::engine();
+        config.forges[0].kind = crate::settings::Kind::GitHub;
+        config.forges[0].api_token = None;
+        limits::apply(&mut config.limits, name, value).unwrap();
+        if name == b"forge_component.deadline_ms" {
+            config.limits.forge.client.lifetime = Duration::from_secs(300);
+        }
+        let Err(found) = crate::forge::prepare(&config, fixtures::forge_runtime()) else { panic!("{expected}") };
+        let found = crate::startup::Problems::jig(found, &jig_protocol_config::Path::root());
+        let lines = crate::startup::lines(&found);
+        assert!(core::str::from_utf8(&lines).unwrap().contains(expected), "{expected}: {lines:?}");
+    }
+}

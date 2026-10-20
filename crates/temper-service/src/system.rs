@@ -120,7 +120,7 @@ impl Service {
         )
         .expect("checked forge limits");
         for configured in &mut settings.forges {
-            configured.api_token = skein_lib::Secret::new(Box::new([]));
+            configured.api_token = None;
         }
         let notes = Queue::with_capacity(u32::try_from(settings.forges.len()).expect("configured forges"));
         let workers = workers::Workers::configured(&mut settings, seeds.deployment, max)?;

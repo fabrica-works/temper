@@ -1,8 +1,10 @@
 // Fixture parsing without a deployment keeps written paths.
 #![expect(clippy::disallowed_methods, reason = "ordinary test code edits UTF-8 configuration fixtures")]
 use super::fixtures;
+use crate::settings;
 use crate::startup::{Problems, What, application, lines};
 use jig_protocol_config::{self as config, Path, Segment};
+use skein_lib::List;
 
 const REFUSED_TEMPLATE: u32 = 7;
 
@@ -55,7 +57,7 @@ fn the_standalone_example_reads_into_its_members() {
     assert_eq!(members.charter, 1);
     assert_eq!(application::files(&members, 4096, 8192).len(), 3, "all private files");
     let resolved = application::resolve(&members, &fixtures::files(), &mut Problems::empty()).unwrap();
-    assert_eq!(resolved.forges[0].api_token.expose(), b"api-token");
+    assert_eq!(resolved.forges[0].api_token.as_ref().unwrap().expose(), b"api-token");
     assert_eq!(resolved.identities[0].token.expose(), b"git-token");
     assert!(!fixtures::document().is_empty(), "complete example bytes");
     let document = fixtures::parsed();
@@ -383,13 +385,13 @@ fn a_workers_missing_or_oversized_secret_keeps_its_absolute_path() {
 fn a_worker_secret_at_its_bound_excludes_its_final_newline() {
     let mut worker = fixtures::worker_settings();
     worker.jig.limits.link.secret = 4;
-    let mut entries = skein_lib::List::with_capacity(1);
+    let mut entries = List::with_capacity(1);
     entries.push((b"worker-secret".as_slice().into(), skein_lib::Secret::new(b"four\n".as_slice().into()))).unwrap();
     let made = crate::Worker::new(
         &worker,
         &fixtures::worker_agent(),
         &fixtures::worker_limits(),
-        &crate::settings::Files { entries },
+        &settings::Files { entries },
         fixtures::worker_runtime(),
         7,
     );
@@ -593,4 +595,82 @@ fn paths_are_resolved_by_kind_and_absolute_only_members_refuse_relative_values()
             if trust == br#""roots.der""# { b"/configuration/roots.der".as_slice() } else { b"/kept/roots.der" }
         );
     }
+}
+
+fn github_application() -> Box<str> {
+    core::str::from_utf8(fixtures::APPLICATION).unwrap()
+                .replace("\"kind\":\"forgejo\"", "\"kind\":\"github\"")
+        .replace("\"api\":{\"socket\":\"127.0.0.1:9\"}", "\"api\":null")
+        .replace("\"transport\":\"plaintext\"", "\"transport\":null")
+        .replace("\"git\":\"http://127.0.0.1:9\"", "\"git\":null,\"web\":null")
+        .replace(",\"webhook_secret\":null,\"api_token\":\"secrets/forge-1.api-token\",\"user\":{\"file\":\"secrets/forge-1.user\"},\"identity\":1", "")
+        .replace("\"token\":\"secrets/forge-1.git-token\",\"login\":\"temper\",\"author\":{\"name\":\"Temper\",\"email\":\"temper@example.test\"}", "\"forge\":1,\"login\":null,\"author\":null").into_boxed_str()
+}
+#[test]
+fn github_defaults_and_the_identity_join_need_no_credential_files() {
+    use crate::settings::Kind;
+    let jig = fixtures::engine().jig;
+    let (members, problems) = application(github_application().as_bytes(), &jig);
+    assert_eq!(lines(&problems).as_ref(), b"");
+    let members = members.unwrap();
+    let forge = &members.forges[0];
+    assert_eq!(forge.kind, Kind::GitHub);
+    assert_eq!(forge.api, config::Address::Host { name: Box::from(b"api.github.com".as_slice()), port: 443 });
+    match &forge.transport {
+        application::Transport::Tls { server_name, trust } => {
+            assert_eq!(server_name.as_ref(), b"api.github.com");
+            assert!(trust.is_none());
+        }
+        application::Transport::Plaintext => panic!("GitHub defaults to TLS"),
+    }
+    assert_eq!(forge.git.as_ref(), b"https://github.com");
+    assert_eq!(forge.web.as_deref(), Some(b"https://github.com".as_slice()));
+    assert_eq!(forge.identity, 1);
+    assert_eq!(members.identities[0].forge, Some(1));
+    assert!(application::files(&members, 4096, 8192).is_empty());
+    let resolved =
+        application::resolve(&members, &settings::Files { entries: List::with_capacity(0) }, &mut Problems::empty())
+            .unwrap();
+    assert!(resolved.forges[0].api_token.is_none());
+    assert_eq!(resolved.identities[0].forge, 1);
+    let input = github_application()
+        .replace("\"api\":null", "\"api\":{\"socket\":\"127.0.0.1:9\"}")
+        .replace("\"transport\":null", "\"transport\":\"plaintext\"")
+        .replace("\"web\":null", "\"web\":\"http://127.0.0.1:9/web\"");
+    let (members, problems) = application(input.as_bytes(), &jig);
+    assert_eq!(lines(&problems).as_ref(), b"");
+    assert_eq!(members.unwrap().forges[0].web.as_deref(), Some(b"http://127.0.0.1:9/web".as_slice()));
+}
+#[test]
+fn github_refusals_name_the_configured_member() {
+    let jig = fixtures::engine().jig;
+    for (needle, replacement, path) in [
+        ("\"kind\":\"github\"", "\"kind\":\"other\"", "forges[0].kind"),
+        ("\"web\":null", "\"web\":\"https://bad/\"", "forges[0].web"),
+        ("\"web\":null", "\"web\":null,\"api_token\":\"file\"", "forges[0].api_token"),
+        ("\"web\":null", "\"web\":null,\"user\":42", "forges[0].user"),
+        ("\"web\":null", "\"web\":null,\"webhook_secret\":null", "forges[0].webhook_secret"),
+        ("\"forge\":1", "\"forge\":1,\"token\":null", "identities[0].token"),
+        ("127.0.0.1:7100", "127.0.0.1:0", "clients.listener"),
+        ("\"forge\":1", "\"forge\":2", "forges[0].identity"),
+        ("\"forge\":1,", "", "forges[0].identity"),
+        ("\"web\":null", "\"web\":null,\"identity\":1", "forges[0].identity"),
+        ("\"web\":null", "\"web\":null,\"identity\":0", "forges[0].identity"),
+        (
+            "\"identities\":[",
+            "\"identities\":[{\"number\":2,\"forge\":1,\"login\":null,\"author\":null},",
+            "forges[0].identity",
+        ),
+    ] {
+        let input = github_application().replace(needle, replacement);
+        let (members, problems) = application(input.as_bytes(), &jig);
+        assert!(members.is_none(), "{path}");
+        assert!(core::str::from_utf8(&lines(&problems)).unwrap().contains(path), "{path}: {:?}", lines(&problems));
+    }
+    let input = core::str::from_utf8(fixtures::APPLICATION)
+        .unwrap()
+        .replace("\"kind\":\"forgejo\"", "\"kind\":\"forgejo\",\"web\":\"https://forge.example\"");
+    let (members, problems) = application(input.as_bytes(), &jig);
+    assert!(members.is_none());
+    assert!(core::str::from_utf8(&lines(&problems)).unwrap().contains("forges[0].web"));
 }

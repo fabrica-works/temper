@@ -538,9 +538,16 @@ pub fn worst_case(settings: &crate::settings::Engine, room: u32) -> Option<u64> 
         bytes = bytes.checked_add(u64::try_from(endpoint.name.len()).ok()?)?;
     }
     for forge in &settings.forges {
-        bytes = bytes
-            .checked_add(u64::try_from(forge.git.len()).ok()?)?
-            .checked_add(u64::try_from(forge.api_token.expose().len()).ok()?)?;
+        if let Some(web) = &forge.web {
+            bytes = bytes.checked_add(u64::try_from(web.len()).ok()?)?;
+        }
+        bytes = bytes.checked_add(u64::try_from(forge.git.len()).ok()?)?.checked_add(
+            u64::try_from(match &forge.api_token {
+                Some(token) => token.expose().len(),
+                None => 0,
+            })
+            .ok()?,
+        )?;
         if let config::Address::Host { name, .. } = &forge.api {
             bytes = bytes.checked_add(u64::try_from(name.len()).ok()?)?;
         }

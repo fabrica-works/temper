@@ -27,12 +27,23 @@ pub struct Clients {
 /// Temper's domain limits, each under its owner's prefix.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
+    pub records: Records,
+    pub forges: Forges,
     pub forge_component: skein_forge_connection::Limits,
     pub root: Root,
     pub forge: forge::Limits,
     pub checkout: checkout::Limits,
     pub git_component: temper_worker_protocol_git::Limits,
     pub clients: Clients,
+}
+/// Routing bounds (protocol/configuration.md, 7).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Records {
+    pub value_bytes: u32,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Forges {
+    pub installations: u32,
 }
 /// Refusal of an override; the caller retains its name.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -268,6 +279,8 @@ pub const SOCKETS: u32 = 48;
 pub fn profile(profile: Profile) -> Limits {
     match profile {
         Profile::Small => Limits {
+            records: Records { value_bytes: 4096 },
+            forges: Forges { installations: FORGE_INSTALLATIONS },
             forge_component: crate::forge::small(&FORGE),
             root: ROOT,
             forge: FORGE,

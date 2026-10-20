@@ -64,14 +64,13 @@ pub fn settings(
         configured
             .push(skein_forge_connection::settings::Forge {
                 number: forge.number,
-                kind: skein_forge_connection::settings::Kind::Forgejo,
+                kind: match forge.kind {
+                    settings::Kind::Forgejo => skein_forge_connection::settings::Kind::Forgejo,
+                    settings::Kind::GitHub => skein_forge_connection::settings::Kind::GitHub,
+                },
                 address: skein_io::Addr::Ip(endpoint.address),
                 transport,
-                access: Some(skein_forge_connection::Access {
-                    credential: skein_forge::credential::Credential::Token(forge.api_token.clone()),
-                    user: forge.user,
-                    webhook_secret: forge.webhook_secret.clone(),
-                }),
+                access: file_access(forge),
             })
             .expect("configured forge capacity");
     }
@@ -90,6 +89,15 @@ pub fn settings(
     } else {
         None
     }
+}
+// Transitional Forgejo files; temper-15 replaces them with records.
+fn file_access(forge: &settings::Forge) -> Option<skein_forge_connection::Access> {
+    let token = forge.api_token.as_ref()?;
+    Some(skein_forge_connection::Access {
+        credential: skein_forge::credential::Credential::Token(token.clone()),
+        user: forge.user,
+        webhook_secret: forge.webhook_secret.clone(),
+    })
 }
 fn forge_path(index: u32) -> Path {
     Path::root().member(b"application").member(b"forges").child(Segment::Index(index))

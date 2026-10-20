@@ -96,6 +96,7 @@ pub fn engine() -> settings::Engine {
         forges: forges(),
         identities: Box::new([settings::Identity {
             number: 1,
+            forge: 1,
             token: Secret::new(Box::from(&b"forge-token-1234"[..])),
             login: Box::from(&b"temper"[..]),
             author: settings::Author {
@@ -119,7 +120,8 @@ pub fn forges() -> Box<[settings::Forge]> {
         api: jig_protocol_config::Address::Host { name: Box::from(&b"forge.example"[..]), port: 443 },
         transport: settings::Transport::Plaintext,
         git: Box::from(&b"https://forge.example"[..]),
-        api_token: Secret::new(Box::from(&b"api-token"[..])),
+        web: None,
+        api_token: Some(Secret::new(Box::from(&b"api-token"[..]))),
         webhook_secret: None,
         user: 42,
         identity: 1,
@@ -390,10 +392,10 @@ fn start_with_worker(
         let mut second = forges().into_iter().next().unwrap();
         second.number = 2;
         second.api_token =
-            Secret::new(Box::from(skein_lib::Decimal::of(skein_lib::Rng::new(104).next_u64()).as_bytes()));
+            Some(Secret::new(Box::from(skein_lib::Decimal::of(skein_lib::Rng::new(104).next_u64()).as_bytes())));
         let mut first = settings.forges.into_iter().next().unwrap();
         first.api_token =
-            Secret::new(Box::from(skein_lib::Decimal::of(skein_lib::Rng::new(105).next_u64()).as_bytes()));
+            Some(Secret::new(Box::from(skein_lib::Decimal::of(skein_lib::Rng::new(105).next_u64()).as_bytes())));
         settings.forges = Box::new([first, second]);
         let first = runtime.into_boxed().into_iter().next().unwrap();
         let second = crate::ForgeRuntime {

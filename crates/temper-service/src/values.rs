@@ -80,6 +80,10 @@ impl Values {
         use jig_protocol_config::What;
         self.identities = Map::with_capacity(u32::try_from(identities.len()).expect("identity count"));
         for identity in identities {
+            // GitHub's git-token generation and bot defaults arrive in temper-02.
+            if identity.token.expose().is_empty() {
+                continue;
+            }
             let value = crate::translate::identity(identity, limits).or(Err(identity_problem(What::Bound)))?;
             let previous = self.identities.insert(identity.number, value).or(Err(identity_problem(What::Bound)))?;
             if previous.is_some() {

@@ -12,8 +12,9 @@ pub struct Forge {
     pub transport: Transport,
     /// The base of each remote and the host of the forge's resource paths.
     pub git: Box<[u8]>,
+    pub web: Option<Box<[u8]>>,
     /// The API token, read from its private file: the forge component's alone.
-    pub api_token: Secret,
+    pub api_token: Option<Secret>,
     pub webhook_secret: Option<Secret>,
     /// The forge user the API token belongs to: the forge writer.
     pub user: u64,
@@ -25,6 +26,7 @@ pub struct Forge {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Kind {
     Forgejo,
+    GitHub,
 }
 
 /// A forge component's connections.
@@ -40,6 +42,7 @@ pub enum Transport {
 #[derive(Debug)]
 pub struct Identity {
     pub number: u32,
+    pub forge: u16,
     pub token: Secret,
     pub login: Box<[u8]>,
     pub author: Author,

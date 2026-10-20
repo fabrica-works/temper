@@ -638,3 +638,25 @@ pub(super) fn raw_worker(document: &skein_json::Document, at: u32, path: &Path, 
         problems.push(path.member(b"agent").member(b"configuration"), What::Absolute);
     }
 }
+
+/// Application records fit the store and the component's configured item bounds.
+pub fn records(jig: &config::Engine, limits: &limits::Limits, problems: &mut Problems) {
+    let value = limits.records.value_bytes;
+    if value == 0 || value > secret_value_bound(jig, limits).unwrap_or(0) {
+        against(problems, b"records.value_bytes", b"engine.limits.store.value");
+    }
+    if value <= limits.forge_component.key_bytes {
+        against(problems, b"records.value_bytes", b"forge_component.key_bytes");
+    }
+    if u64::from(value) <= u64::from(limits.forges.installations).checked_mul(8).expect("u32 installations") {
+        against(problems, b"records.value_bytes", b"forges.installations");
+    }
+    if limits.forges.installations == 0 || limits.forges.installations > limits.forge_component.installations {
+        against(problems, b"forges.installations", b"forge_component.installations");
+    }
+}
+
+pub(crate) fn secret_value_bound(jig: &config::Engine, own: &limits::Limits) -> Option<u32> {
+    let root = limits::engine(&jig.limits, own)?;
+    Some(crate::store::limits(&root, &jig.limits.core, &root.forge, &jig.limits.store)?.secrets.value)
+}
