@@ -128,15 +128,17 @@ chain.
 
 ## Rules of this plan
 
-- **Director's current priority (2026-10-20):** until temper05.2 lands,
-  limit new implementers to its critical path: finish the preserved
-  temper02.1 checkpoint, then temper05.2. Start another session only if
-  it is a required prerequisite or resolves an evidenced blocker for
-  that path. Preserve the other checkpoints and dirty drafts for later.
-  Rebase the owned work onto Accounts' compatible landed mains; reuse its
+- **Director's parallel capacity instruction (2026-10-20 00:20Z):** run
+  every dependency-ready session the coordinator can hold, in parallel,
+  within the normal resource limits. Give temper05.2's critical path
+  priority when slots are scarce; it does not hold unrelated ready work.
+  Resume preserved checkpoints and dirty drafts with their fresh owners.
+  Rebase owned work onto Accounts' compatible landed mains; reuse its
   adapters and rederive complete fixture sums instead of retaining stale
   deltas. Keep every required proof and limit. This run's Codex experiment
   keeps kit d6d4abe and its local adapter; a kit move needs the director.
+  If Codex actually runs out, pause under development.md7.6; the director
+  resumes it. Do not reserve capacity solely because of subscription usage.
 
 - **Workspace license inheritance:** every new workspace member in skein or smith carries
   `license.workspace = true` in `[package]`, beside its other workspace-inherited fields.
