@@ -328,6 +328,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             u64::try_from(size_of::<forge::Event>()).ok()?.checked_add(u64::from(limits.forge.client.answer_bytes))?,
         )?)?
         .checked_add(Queue::<Work>::worst_case(routes)?)?
+        // One admitted client ask moves its original names into Work::People and drains
+        // in this route. Child callbacks do not enqueue more client asks. Restored answers
+        // are already covered by row_bound below; core/people price their retained contexts.
+        .checked_add(people::model_names_worst_case()?)?
         .checked_add(u64::from(routes).checked_mul(row_bound(limits)?)?)?;
     let pushed =
         u64::from(limits.forge.resources_per_task).checked_mul(u64::try_from(size_of::<forge::Pushed>()).ok()?)?;
@@ -367,6 +371,19 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Queue::<Output>::worst_case(1)?)?
         .checked_add(Queue::<loads::Request>::worst_case(1)?)?;
     Some(bytes)
+}
+/// Conservative heap envelope for one input, output or restored page. The root's
+/// complete state is an upper bound, but its independently retained model-name
+/// contexts cannot also be owned by that message. People holds one per completed
+/// ask and two per pending ask; core prices two synchronous transit contexts
+/// (jig's people limits.rs and core memory.rs). Keep the root's one incoming
+/// context: it covers an Ask's names, and restored names are bounded by page bytes.
+#[must_use]
+pub fn payload_worst_case(limits: &Limits) -> Option<u64> {
+    let retained = u64::from(limits.people.requests)
+        .checked_add(u64::from(limits.people.pending).checked_mul(2)?)?
+        .checked_add(2)?;
+    worst_case(limits)?.checked_sub(retained.checked_mul(people::model_names_worst_case()?)?)
 }
 
 pub(crate) fn role_scratch_bytes(limits: &Limits) -> Option<u64> {

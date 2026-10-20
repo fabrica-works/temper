@@ -7,8 +7,8 @@ use temper_real_loop_world::{
     calls::{D1, call, file, number, sign_in, task},
     llm, run_key_on, scripts,
 };
-// Legacy account/source 1 is seeded. The add allocates source 2, then account 3.
-const ADDED_ACCOUNT: u64 = 3;
+// The cold providers-only store allocates source 0, then account 1.
+const ADDED_ACCOUNT: u64 = 1;
 const CHAT: usize = 4; // Sign-in, add, rank and usable wait precede the chat.
 const KEY: &[u8] = b"private-file-smoke-llm-key";
 #[test]

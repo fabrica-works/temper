@@ -188,6 +188,7 @@ fn a_notes_page_waiting_for_its_owner() -> crate::Service {
     service.engine.step(root::Event::Party(root::PartyInput::Delivered { watcher: WATCHER }));
     fixtures::settle_root(&mut service, &mut Queue::with_capacity(32));
     service.engine.step(root::Event::Party(root::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(101)),
         sign_in: 1,
         key: [31; 16],

@@ -412,6 +412,9 @@ fn application(outcome: forge::ApplicationOutcome) -> forge::Stored {
 fn application_refusals() -> Box<[jig_domain_people::Refusal]> {
     use jig_domain_people as p;
     let mut rows = skein_lib::List::with_capacity(192);
+    for why in [p::AccountWhy::Unknown, p::AccountWhy::Provider, p::AccountWhy::Uses, p::AccountWhy::Limited] {
+        rows.push(p::Refusal::Account { account: 43, why }).expect("account refusal rows fit");
+    }
     for row in [
         p::Refusal::Role { held: None },
         p::Refusal::Taken { by: u64::MAX },

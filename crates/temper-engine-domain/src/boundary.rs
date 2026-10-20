@@ -403,6 +403,7 @@ pub enum PartyInput {
         key: [u8; 16],
         /// Typed chat request with words bounded by people words before routing.
         ask: people::Ask,
+        models: Box<[Box<[u8]>]>,
     },
     /// A keyed account ask whose value is already kept in the secrets store.
     Key {
@@ -673,6 +674,7 @@ pub(crate) fn delivery_output(delivery: Delivery) -> Request {
         | Delivery::Read { .. }
         | Delivery::Document { .. }
         | Delivery::WatchEnded { .. }
+        | Delivery::SourceSignedOut { .. }
         | Delivery::Result { .. }) => Request::Party(PartyRequest::Deliver(delivery)),
         Delivery::ReadLoad { load, range } => Request::Store(StoreRequest::Read { load, range }),
         Delivery::Drained => Request::Drained,

@@ -7,14 +7,20 @@ use temper_engine_domain::{self as engine, Delivery, PartyInput};
 use temper_engine_domain_world::{direct::Driver, store::Store, walking};
 
 fn driver() -> Driver {
-    let mut config = walking::config(91);
-    config.core.settings.llm_providers = accounts::Providers {
-        providers: Box::new([accounts::Provider {
-            number: 3,
-            models: Box::new([]),
-            offers: accounts::Offers { sign_in: true, key: true, programs: Box::new([]) },
-        }]),
-    };
+    let config = std::array::from_fn(|_| {
+        let mut config = walking::config(91);
+        config.core.settings.llm_providers = accounts::Providers {
+            providers: Box::new([accounts::Provider {
+                number: 3,
+                name: Box::from(b"Issuer".as_slice()),
+                signed_in_plan: false,
+                manage_usage: None,
+                models: Box::new([]),
+                offers: accounts::Offers { sign_in: true, key: true, programs: Box::new([]) },
+            }]),
+        };
+        config
+    });
     let mut driver = Driver::configured(Store::new(), config, &walking::limits());
     driver.settle();
     driver.sign_in();
@@ -45,6 +51,7 @@ fn a_refused_key_envelope_returns_its_value_before_its_answer() {
 fn signing_and_the_accounts_watch_cross_the_root_without_losing_their_facts() {
     let mut driver = driver();
     driver.send(engine::Event::Party(PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(95)),
         sign_in: driver.session(),
         key: [95; 16],

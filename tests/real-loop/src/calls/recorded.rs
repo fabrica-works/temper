@@ -3,6 +3,7 @@ use skein_io::kernel::{Complete, Done, Error, Exit, Fd, Op, Submit};
 use skein_lib::{Queue, Time, Token, Wall};
 use skein_shell::Host;
 pub(crate) struct Recorded {
+    pub(crate) setup: bool,
     pub(crate) host: temper_client_shell_cli::host::OneShot,
     pub(crate) call: usize,
     pub(crate) locked: Option<Time>,
@@ -12,8 +13,8 @@ pub(crate) struct Recorded {
     descriptor: Option<Fd>,
 }
 impl Recorded {
-    pub(crate) fn new(host: temper_client_shell_cli::host::OneShot, call: usize) -> Self {
-        Self { host, call, locked: None, released: None, busy: 0, lock: None, descriptor: None }
+    pub(crate) fn new(host: temper_client_shell_cli::host::OneShot, call: usize, setup: bool) -> Self {
+        Self { setup, host, call, locked: None, released: None, busy: 0, lock: None, descriptor: None }
     }
 }
 impl Host for Recorded {

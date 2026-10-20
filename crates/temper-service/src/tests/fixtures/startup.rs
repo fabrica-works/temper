@@ -38,7 +38,7 @@ pub fn parsed() -> skein_json::Document {
     .unwrap()
 }
 pub fn files() -> settings::Files {
-    let mut entries = List::with_capacity(9);
+    let mut entries = List::with_capacity(8);
     for (path, value) in [
         (b"secrets/forge-1.webhook-secret".as_slice(), b"fixture-hook-secret\n".as_slice()),
         (b"secrets/forge-1.user".as_slice(), b"42\n".as_slice()),
@@ -50,7 +50,6 @@ pub fn files() -> settings::Files {
             b"8f7be71db3941de11249a5e3fba7750a41c7d9958083ef522cb79e9fd7822878".as_slice(),
         ),
         (b"charters/chat.txt".as_slice(), b"Answer briefly".as_slice()),
-        (b"accounts/chat.json".as_slice(), super::ACCOUNT),
         (super::AGENT_JSON, b"{}".as_slice()),
     ] {
         entries.push((path.into(), Secret::new(value.into()))).unwrap();

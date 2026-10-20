@@ -127,6 +127,7 @@ fn worker(engine: &mut Engine, request: root::WorkerRequest) {
             | root::Delivery::Read { .. }
             | root::Delivery::Document { .. }
             | root::Delivery::WatchEnded { .. }
+            | root::Delivery::SourceSignedOut { .. }
             | root::Delivery::Result { .. }
             | root::Delivery::ForgeCommitted { .. }
             | root::Delivery::ForgeCall { .. }

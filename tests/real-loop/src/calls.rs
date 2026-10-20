@@ -25,19 +25,50 @@ pub struct Argv(pub Vec<Arg>);
 #[macro_export]
 macro_rules! argv { ($($word:expr),* $(,)?) => { $crate::calls::Argv(vec![$($crate::calls::Arg::from($word)),*]) }; }
 pub enum Step {
+    /// Finish runtime fixture provisioning before recording the story calls.
+    FixtureReady,
     Advance,
-    Probe { at: Dir },
-    Release { at: Dir },
-    Contended { calls: &'static [usize] },
-    SignIn { at: Dir },
-    SameParty { at: Dir },
-    Held { name: &'static [u8] },
-    Kill { call: usize },
-    Call { at: Dir, argv: Argv },
-    Start { at: Dir, argv: Argv },
-    Join { call: usize },
-    Watching { call: usize },
-    Until { at: Dir, argv: Argv, holds: &'static [u8], early: &'static [u8] },
+    Probe {
+        at: Dir,
+    },
+    Release {
+        at: Dir,
+    },
+    Contended {
+        calls: &'static [usize],
+    },
+    SignIn {
+        at: Dir,
+    },
+    SameParty {
+        at: Dir,
+    },
+    Held {
+        name: &'static [u8],
+    },
+    Kill {
+        call: usize,
+    },
+    Call {
+        at: Dir,
+        argv: Argv,
+    },
+    Start {
+        at: Dir,
+        argv: Argv,
+    },
+    Join {
+        call: usize,
+    },
+    Watching {
+        call: usize,
+    },
+    Until {
+        at: Dir,
+        argv: Argv,
+        holds: &'static [u8],
+        early: &'static [u8],
+    },
 }
 #[must_use]
 pub fn advance() -> Step {
@@ -168,7 +199,13 @@ struct Running {
     stdout: Option<Fd>,
     stderr: Option<Fd>,
 }
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Recording {
+    Fixture,
+    Story,
+}
 pub(crate) struct Caller {
+    recording: Recording,
     pub(crate) released: bool,
     pub(crate) advanced: Cell<bool>,
     pub(crate) held: Cell<bool>,
@@ -197,7 +234,8 @@ impl Caller {
     pub(crate) fn held_names(&self) -> impl Iterator<Item = &[u8]> {
         self.steps.iter().filter_map(|step| match step {
             Step::Held { name } => Some(*name),
-            Step::Advance
+            Step::FixtureReady
+            | Step::Advance
             | Step::SignIn { .. }
             | Step::SameParty { .. }
             | Step::Kill { .. }
@@ -220,12 +258,32 @@ impl Caller {
     pub(crate) fn requested_kills(&self) -> usize {
         self.steps.iter().filter(|step| matches!(step, Step::Kill { .. })).count()
     }
+    pub(crate) fn provisioned(mut steps: Vec<Step>, scratch: PathBuf, root: Fd) -> Self {
+        let Some((position, at)) = steps
+            .iter()
+            .enumerate()
+            .find_map(|(index, step)| if let Step::SignIn { at } = step { Some((index, *at)) } else { None })
+        else {
+            return Self::new(steps, scratch, root);
+        };
+        // A real keyed request follows the story's first sign-in. Its setup result
+        // is consumed here; the story keeps its original named call positions.
+        steps.insert(
+            position + 1,
+            call(at, crate::argv!["add-key", "1", file("fixture.key"), "--deployment", "--key", "fixture-llm"]),
+        );
+        steps.insert(position + 2, Step::FixtureReady);
+        let mut caller = Self::new(steps, scratch, root);
+        caller.recording = Recording::Fixture;
+        caller
+    }
     pub(crate) fn new(steps: Vec<Step>, scratch: PathBuf, root: Fd) -> Self {
         let memory = u64::try_from((steps.len() + 1) * (OUTPUT * 4 + 4096)).expect("caller memory")
             + Queue::<Complete>::worst_case(ROOM).expect("completions")
             + Queue::<Submit>::worst_case(ROOM).expect("submissions");
         let count = steps.len();
         Self {
+            recording: Recording::Story,
             released: false,
             advanced: Cell::new(false),
             held: Cell::new(false),
@@ -281,7 +339,8 @@ impl Caller {
                 ];
             }
             Step::Call { at, argv } | Step::Start { at, argv } | Step::Until { at, argv, .. } => (at, argv),
-            Step::Advance
+            Step::FixtureReady
+            | Step::Advance
             | Step::Join { .. }
             | Step::Watching { .. }
             | Step::Held { .. }
@@ -318,7 +377,11 @@ impl Caller {
             Spawn {
                 program: fixtures::CTL.into(),
                 args,
-                env: vec![format!("CALL={index}").into_bytes().into_boxed_slice()].into_boxed_slice(),
+                env: vec![
+                    format!("CALL={index}").into_bytes().into_boxed_slice(),
+                    format!("FIXTURE={}", self.setup()).into_bytes().into_boxed_slice(),
+                ]
+                .into_boxed_slice(),
                 root: self.root.expect("launch root"),
                 dir: Box::new([]),
                 pipes: [(0, Way::In), (1, Way::Out), (2, Way::Out)]
@@ -483,6 +546,16 @@ impl Caller {
             self.submit(usize::MAX, Op::Close { fd });
         }
     }
+    pub(crate) fn setup(&self) -> bool {
+        self.recording == Recording::Fixture
+    }
+    fn fixture_ready(&mut self) {
+        assert!(self.running.iter().all(Option::is_none), "fixture commands settled");
+        let key = self.calls.pop().expect("runtime key call");
+        assert_eq!(key.exit, Some(Exit::Code(0)), "runtime key provisioned: {}", String::from_utf8_lossy(&key.stderr));
+        self.running.pop().expect("settled key call");
+        self.recording = Recording::Story;
+    }
     fn advance(&mut self, now: Time) {
         if matches!(self.steps.get(self.next), Some(Step::Held { .. })) && self.held.get() {
             // Issue the following kill in this pass, before the hosted caller's next turn.
@@ -493,6 +566,7 @@ impl Caller {
             return;
         };
         match step {
+            Step::FixtureReady => self.fixture_ready(),
             Step::Advance => {
                 if !self.advanced.get() {
                     return;

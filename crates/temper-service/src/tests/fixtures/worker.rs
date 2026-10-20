@@ -127,6 +127,9 @@ pub fn worker_settings() -> crate::settings::Worker {
     use jig_protocol_config as config;
     let mut limits = super::engine().jig.limits;
     limits.hub = jig_domain_host::Limits {
+        program_sources: 12,
+        source_interval: skein_lib::Duration::from_secs(60),
+        source_timeout: skein_lib::Duration::from_secs(10),
         slots: 1,
         accounts: 2,
         charter_bytes: 65_536,

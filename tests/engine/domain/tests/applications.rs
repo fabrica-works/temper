@@ -26,6 +26,7 @@ fn a_partys_own_adopt_ask_is_refused_as_not_offered() {
     )
     .expect("adoption");
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(95)),
         sign_in: driver.session(),
         key: [95; 16],
@@ -71,6 +72,7 @@ fn a_repository_adopted_seeds_its_collaborators_into_roles() {
 fn policy_maps_connector_permissions_to_seeded_roles_after_restart() {
     let mut driver = driver();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(94)),
         sign_in: driver.session(),
         key: [94; 16],
@@ -194,8 +196,11 @@ fn an_adoption_sent_again_after_a_restart_is_answered_its_kept_outcome() {
     adopt(&mut first, fixtures::adoption(1), 95);
     let outcome = outcomes(&first)[0].clone();
     let calls = first.forge.as_ref().expect("forge stand").calls;
-    let mut restarted =
-        Driver::configured(first.store, temper_engine_domain_world::walking::config(71), &fixtures::forge_limits());
+    let mut restarted = Driver::configured(
+        first.store,
+        [temper_engine_domain_world::walking::config(71), temper_engine_domain_world::walking::config(71)],
+        &fixtures::forge_limits(),
+    );
     restarted.forge = first.forge;
     restarted.settle();
     restarted.sign_in();

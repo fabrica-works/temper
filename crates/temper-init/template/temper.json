@@ -23,6 +23,7 @@
         {
           "name": "codex",
           "number": 1,
+          "signed_in_plan": false,
           "models": ["gpt-6-luna"],
           "sources": {"keys": true}
         }
@@ -32,7 +33,6 @@
           "name": "codex",
           "number": 1,
           "dialect": 1,
-          "account": 1,
           "provider": "codex",
           "address": {
             "host": "chatgpt.com",
@@ -56,16 +56,6 @@
             "cached": 1,
             "output": 1,
             "unit": 1000000
-          }
-        }
-      ],
-      "accounts": [
-        {
-          "number": 1,
-          "source": {
-            "handed_in": {
-              "file": "accounts/llm.json"
-            }
           }
         }
       ]
@@ -198,7 +188,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 79659997210050,
+    "memory_bytes": 85428512818502,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -831,7 +821,7 @@
           "hub.event_bytes": 598
         }
       },
-      "memory_bytes": 2343551746598
+      "memory_bytes": 3280140765187
     }
   ],
   "application": {

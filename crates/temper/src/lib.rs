@@ -316,6 +316,13 @@ fn prepare(directories: &Directories, bytes: &[u8], owned: &mut Vec<Fd>) -> Resu
         forges,
     )
     .map_err(|why| String::from_utf8_lossy(&service::startup::lines(&why)).into_owned())?;
+    if let Some(program) = agent.programs.first() {
+        // Source commands use the agent's explicit command environment.
+        let environment = smith_agent_shell::config::read(path(&named.agent))?.service.environment.command_entries();
+        let resources = service::program_sources::Resources::configured(program, environment)
+            .ok_or("workers[0].agent.configuration: program source resources exceed their bounds")?;
+        service.configure_program_sources(resources).map_err(|_| "worker refused program source resources")?;
+    }
     let root = skein_shell::make_root(path(&named.deployment), 0o700)
         .map_err(|errno| format!("engine.deployment.directory: errno {errno}"))?;
     owned.push(root);

@@ -1,55 +1,75 @@
 use super::fixtures;
+use jig_domain_accounts::{Holder, Kind, Stored};
 use jig_protocol_store::{Event as StoreEvent, SecretOwner, Secrets};
 use skein_lib::{Time, Token};
+use temper_engine_domain::{Record, Write};
 
 const TOKEN: &[u8] = b"test-token";
 
 #[test]
-fn a_handed_in_record_is_kept_before_its_value_is_lent() {
+fn a_restored_key_is_durable_before_its_value_is_lent() {
     let mut service = fixtures::started();
-    let get = || Secrets::Get { owner: SecretOwner::Source, number: 1 };
-    // The accounts are wanted once the core's ranges are restored (as
-    // jig-test-domain at the restart's LoadInbox), past temper's restart.
+    let mut rows = skein_lib::List::with_capacity(3);
+    for row in [
+        Stored::Account {
+            number: 0,
+            provider: 1,
+            holder: Holder::Deployment,
+            place: 0,
+            uses: None,
+            subject: Box::new([]),
+            display: Box::new([]),
+        },
+        Stored::Source { account: 0, number: 1, place: 0, kind: Kind::Key, name: Box::new([]), held: None },
+        Stored::Next { number: 2 },
+    ] {
+        rows.push(Write::Save(Record::Core(jig_domain_core::Record::Accounts(row)))).unwrap();
+    }
+    fixtures::commit(&mut service.engine.store, 1, rows.into_boxed());
+    let _kept = service.engine.store.secrets(
+        Token::new(crate::tokens::ACCOUNTS | 1),
+        Secrets::Replace {
+            owner: SecretOwner::Source,
+            number: 1,
+            value: skein_lib::Secret::new(TOKEN.into()),
+            replaces: None,
+        },
+    );
+    while service.engine.store.above.pop().is_some() {}
     for _ in 0_u32..24 {
         fixtures::turn(&mut service);
         let lent = service.engine.values.accounts.value(1, 1, Time::from_nanos(1)).is_some();
-        let Some(StoreEvent::Secret { value, .. }) = service.engine.store.secrets(Token::new(99), get()) else {
+        let Some(StoreEvent::Secret { value, .. }) =
+            service.engine.store.secrets(Token::new(99), Secrets::Get { owner: SecretOwner::Source, number: 1 })
+        else {
             panic!("a get is answered at once");
         };
         assert!(!lent || value.is_some(), "no value is lent before its record is kept");
     }
-    let Some(StoreEvent::Secret { value: Some(kept), .. }) = service.engine.store.secrets(Token::new(99), get()) else {
-        panic!("the handed-in record is kept");
-    };
-    let Ok(record) = skein_oauth::decode_record(kept.expose(), &fixtures::engine().jig.limits.driver.client.document)
-    else {
-        panic!("a kept record decodes");
-    };
-    assert_eq!((record.key, &*record.access_token), (1, TOKEN));
-    let value = service.engine.values.accounts.value(1, 1, Time::from_nanos(1)).expect("lent value");
+    let value = service.engine.values.accounts.value(1, 1, Time::from_nanos(1)).expect("restored key");
     assert_eq!(value.token.expose(), TOKEN);
-    let id = skein_lib::Secret::new(b"acc".as_slice().into());
-    assert_eq!(value.scheme, jig_protocol_accounts::table::Scheme::Withdrawn { id });
+    assert_eq!(value.scheme, jig_protocol_accounts::table::Scheme::Key);
 }
 
+fn replaced(input: &[u8], from: &[u8], to: &[u8]) -> Box<[u8]> {
+    let at = skein_lib::bytes::find(input, from).expect("fixture member");
+    let end = at.checked_add(from.len()).unwrap();
+    let length = input.len().checked_sub(from.len()).unwrap().checked_add(to.len()).unwrap();
+    let mut out = skein_lib::Writer::new(length);
+    out.put(input.get(..at).unwrap()).unwrap();
+    out.put(to).unwrap();
+    out.put(input.get(end..).unwrap()).unwrap();
+    out.finish()
+}
 #[test]
-fn a_signed_in_source_without_runtime_is_refused_at_its_path() {
-    let mut settings = fixtures::engine();
-    settings.jig.llm.accounts[0].source = fixtures::signed_in_source();
-    fixtures::fill_files(&mut settings);
-    let Err(found) = crate::Service::engine(settings, &fixtures::seeds(), None, fixtures::forge_runtime()) else {
-        panic!("runtime absent");
-    };
-    assert_eq!(
-        found.problems.get(0),
-        Some(&jig_protocol_config::Problem {
-            path: jig_protocol_config::Path::root()
-                .member(b"engine")
-                .member(b"llm")
-                .member(b"accounts")
-                .child(jig_protocol_config::Segment::Index(0))
-                .member(b"source"),
-            what: jig_protocol_config::What::Refers,
-        })
-    );
+fn configured_accounts_are_refused_at_their_path() {
+    let document = replaced(&fixtures::document(), br#""llm": {"#, br#""llm": {"accounts": [],"#);
+    let found = crate::named(&document, &jig_protocol_config::Directories::working()).unwrap_err();
+    assert_eq!(&*crate::startup::lines(&found), b"engine.llm.accounts: unknown member\n");
+}
+#[test]
+fn an_endpoint_account_is_refused_at_its_path() {
+    let document = replaced(&fixtures::document(), br#""dialect": 1,"#, br#""dialect": 1,"account": 1,"#);
+    let found = crate::named(&document, &jig_protocol_config::Directories::working()).unwrap_err();
+    assert_eq!(&*crate::startup::lines(&found), b"engine.llm.endpoints[0].account: unknown member\n");
 }

@@ -117,7 +117,11 @@ pub(crate) fn provider(story: Story) -> skein_fake_peers::llm::Peer {
                 turns: Box::new([call(b"shell", br#"{"command":"echo fixed > conflict.txt"}"#), finish]),
             },
         ]),
-        skein_llm::Credential::bearer(jig_channel_world::fixtures::TOKEN.into()),
+        skein_llm::Credential {
+            value: jig_channel_world::fixtures::KEY.into(),
+            scheme: skein_llm::Scheme::Key,
+            account_id: Box::new([]),
+        },
         Duration::ZERO,
         skein_fake_peers::Transport::Plaintext,
         skein_fake_llm_protocol::documents::Provider::OpenAi,

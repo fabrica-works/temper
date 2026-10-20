@@ -9,7 +9,7 @@ pub(crate) const FORGE: SocketAddr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::
 pub const HOOK_SECRET: &[u8] = b"world-webhook-secret";
 pub const SEED: u64 = 7;
 pub const ANSWER: &[u8] = b"World answer";
-pub const LLM_TOKEN: &[u8] = channel::TOKEN;
+pub const LLM_TOKEN: &[u8] = channel::KEY;
 pub const GIT_TOKEN: &[u8] = temper_fake_git::fixtures::TOKEN;
 pub const API_TOKEN: &[u8] = temper_fake_git::fixtures::TOKEN;
 #[must_use]
@@ -131,7 +131,7 @@ pub(crate) fn document() -> Vec<u8> {
     for (name, count) in [
         ("people.amendment_bytes", 512),
         ("tasks.hold_bytes", 256),
-        ("tasks.funders", 2),
+        ("tasks.funders", 4),
         ("tasks.dependencies", 2),
         ("tasks.charters", 2),
         ("notes.entries_per_scope", 2),
@@ -142,6 +142,13 @@ pub(crate) fn document() -> Vec<u8> {
     ] {
         value["engine"]["limits"]["overrides"][name] = count.into();
     }
+    // The native deployment account controls use the real membership in project zero.
+    let mut deployment = value["engine"]["projects"][0].clone();
+    deployment["number"] = 0.into();
+    value["engine"]["projects"].as_array_mut().expect("projects").push(deployment);
+    value["engine"]["limits"]["overrides"]["people.projects"] = 2.into();
+    value["engine"]["limits"]["overrides"]["authority.projects"] = 2.into();
+    value["engine"]["limits"]["overrides"]["tasks.funders"] = 4.into();
     serde_json::to_vec(&value).expect("deployment JSON")
 }
 pub(crate) fn files() -> temper_service::settings::Files {
@@ -262,7 +269,7 @@ pub(crate) fn provider() -> skein_fake_peers::llm::Peer {
     script.result = br#"{"form":"report","text":"World answer","fields":{}}"#.as_slice().into();
     channel::provider(
         Box::new([skein_fake_llm_domain::api::Script { cue: Box::default(), turns: channel::provider_turns(&script) }]),
-        skein_llm::Credential::bearer(channel::TOKEN.into()),
+        skein_llm::Credential { value: channel::KEY.into(), scheme: skein_llm::Scheme::Key, account_id: Box::new([]) },
         Duration::ZERO,
         skein_fake_peers::Transport::Plaintext,
         skein_fake_llm_protocol::documents::Provider::OpenAi,
@@ -292,7 +299,7 @@ pub(crate) fn read_then_wait_provider() -> skein_fake_peers::llm::Peer {
                 },
             ]),
         }]),
-        skein_llm::Credential::bearer(channel::TOKEN.into()),
+        skein_llm::Credential { value: channel::KEY.into(), scheme: skein_llm::Scheme::Key, account_id: Box::new([]) },
         Duration::ZERO,
         skein_fake_peers::Transport::Plaintext,
         skein_fake_llm_protocol::documents::Provider::OpenAi,
@@ -372,4 +379,19 @@ pub(crate) fn forge_limits() -> skein_fake_forge_protocol::Limits {
             target_bytes: 4096,
         },
     }
+}
+
+/// Provision a deployment source through the native client before each fresh story.
+pub(crate) fn account_steps() -> Box<[skein_fake_person::Step<temper_client_domain::Address>]> {
+    use skein_fake_person::{Find, Step};
+    use skein_ui::Role;
+    Box::new([
+        Step::Go { address: temper_client_domain::Address::Accounts },
+        Step::See { find: Find::named(Role::Button, b"Use deployment accounts"), within: PERSON_WAIT },
+        Step::Press { find: Find::named(Role::Button, b"Use deployment accounts") },
+        Step::Type { find: Find::named(Role::TextField, b"Provider number"), words: b"1".as_slice().into() },
+        Step::Type { find: Find::named(Role::TextField, b"Key (pasted once)"), words: channel::KEY.into() },
+        Step::Press { find: Find::named(Role::Button, b"Add key") },
+        Step::See { find: Find::text(b"Key kept as source"), within: PERSON_WAIT },
+    ])
 }

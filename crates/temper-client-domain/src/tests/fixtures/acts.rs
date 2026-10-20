@@ -97,6 +97,7 @@ pub fn person(act: ActKind) -> ReadValue {
 }
 pub fn held(act: ActKind) -> ReadValue {
     let authority = OwnerAuthorityDocument::complete(OwnerAuthority {
+        models: None,
         tools: NO_TOOLS,
         grants: List::with_capacity(EMPTY_LIST),
         delegation: OwnerDelegation {

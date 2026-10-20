@@ -14,12 +14,13 @@ fn configured_document_rows_reach_the_cores_limits() {
         let configured = temper_service::limits::engine(&jig, &own).expect("configured root bounds");
         let mut limits = walking::limits();
         limits.documents = configured.documents;
-        let mut driver = Driver::configured(Store::new(), walking::config(91), &limits);
+        let mut driver = Driver::configured(Store::new(), [walking::config(91), walking::config(91)], &limits);
         advance(&mut driver);
         driver.sign_in();
         advance(&mut driver);
         for key in [31, 32] {
             driver.send(Event::Party(PartyInput::Ask {
+                models: Box::new([]),
                 reply_to: ReplyTo::new(Token::new(u64::from(key))),
                 sign_in: driver.session(),
                 key: [key; 16],

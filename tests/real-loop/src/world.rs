@@ -96,7 +96,7 @@ pub(crate) fn run(
         .spawn(|| Proc::Llm(Box::new(Llm { peer: llm::peer(recipe()).expect("independent LLM peer"), scripts: None })));
     world
         .spawn_signals(|signals| Proc::Service(Box::new(ServiceHost::new(scratch.path().into(), signals, direct_key))));
-    host(&mut world, scratch, steps);
+    host(&mut world, scratch, steps, direct_key);
     world.run(&skein_shell::Clock::new(), crate::PATIENCE)
 }
 type Scripts = fn(std::net::SocketAddr) -> Box<[skein_fake_llm_domain::api::Script]>;
@@ -139,7 +139,7 @@ pub(crate) fn run_forge(
     world.spawn_signals(|signals| {
         Proc::Service(Box::new(ServiceHost::configured(scratch.path().into(), signals, Some(fixture), false)))
     });
-    host(&mut world, scratch, steps);
+    host(&mut world, scratch, steps, false);
     world.spawn(|| {
         let (forge, peer) = forge::State::new(fixture);
         *state.borrow_mut() = Some(forge);
@@ -154,9 +154,16 @@ fn host<R: Referee<Proc>>(
     world: &mut World<Proc, R>,
     scratch: &skein_scratch::Scratch,
     steps: impl FnOnce() -> Vec<crate::calls::Step>,
+    direct_key: bool,
 ) {
     let root = skein_shell::open_root(scratch.path()).expect("caller launch root");
-    world.spawn_with_fds(vec![root], || Proc::Caller(Box::new(Caller::new(steps(), scratch.path().into(), root))));
+    world.spawn_with_fds(vec![root], || {
+        Proc::Caller(Box::new(if direct_key {
+            Caller::new(steps(), scratch.path().into(), root)
+        } else {
+            Caller::provisioned(steps(), scratch.path().into(), root)
+        }))
+    });
     let limits = temper_client_shell_cli::limits::native();
     world.host_roots(
         HostedProgram {
@@ -203,6 +210,9 @@ impl Referee<Proc> for Judge {
         }
         for proc in children.iter_mut() {
             if let Proc::Ctl(recorded) = proc {
+                if recorded.setup && !caller.setup() {
+                    continue;
+                }
                 let result = &mut caller.calls[recorded.call];
                 result.locked = recorded.locked;
                 result.released = recorded.released;
@@ -260,6 +270,9 @@ impl Referee<Proc> for Judge {
         caller.links.set(service.links());
         let lock_changed = procs[3..].iter().any(|proc| match proc {
             Proc::Ctl(recorded) => {
+                if recorded.setup && !caller.setup() {
+                    return false;
+                }
                 caller.calls[recorded.call].busy != recorded.busy
                     || caller.calls[recorded.call].locked != recorded.locked
                     || caller.calls[recorded.call].released != recorded.released

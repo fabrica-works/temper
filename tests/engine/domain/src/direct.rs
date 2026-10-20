@@ -41,17 +41,30 @@ pub struct Driver {
 impl Driver {
     #[must_use]
     pub fn new(store: Store) -> Driver {
-        Driver::configured(store, config(91), &limits())
+        Driver::configured(store, [config(91), config(91)], &limits())
     }
     #[must_use]
     pub fn forge() -> Driver {
-        let mut driver = Driver::configured(Store::new(), config(71), &crate::fixtures::forge_limits());
+        let mut driver = Driver::configured(Store::new(), [config(71), config(71)], &crate::fixtures::forge_limits());
         driver.forge = Some(crate::forge_stand::ForgeStand::new());
         driver
     }
 
+    /// Independent constructions of the same full configuration: bootstrap and cold restore.
+    /// Fixture-only array builders keep that constructor in one place rather than cloning
+    /// jig's Config field by field (a test-only closure departure from programming-model.md, 1).
     #[must_use]
-    pub fn configured(store: Store, config: engine::Config, limits: &engine::Limits) -> Driver {
+    pub fn configured(mut store: Store, configs: [engine::Config; 2], limits: &engine::Limits) -> Driver {
+        let [bootstrap, config] = configs;
+        if store.rows.is_empty() {
+            store = crate::fixtures::restored_over(store, bootstrap, limits);
+        }
+        Self::cold(store, config, limits)
+    }
+
+    /// An empty deployment for stories that exercise the real first-start cut itself.
+    #[must_use]
+    pub fn cold(store: Store, config: engine::Config, limits: &engine::Limits) -> Driver {
         Driver {
             creating: jig_core_world::fixtures::Creating::new(&config.core, limits.tasks.tree_tasks),
             forge: None,
@@ -76,11 +89,11 @@ impl Driver {
     #[must_use]
     pub fn with_repositories(
         store: Store,
-        config: engine::Config,
+        configs: [engine::Config; 2],
         limits: &engine::Limits,
         repositories: &[(&[u8], &[u8], u32)],
     ) -> Driver {
-        let mut driver = Self::configured(store, config, limits);
+        let mut driver = Self::configured(store, configs, limits);
         driver.forge = Some(crate::forge_stand::ForgeStand::with(repositories));
         driver
     }
@@ -140,7 +153,9 @@ impl Driver {
                     }
                 }
                 engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
-                | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => self.delivered.push(delivery),
+                | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => {
+                    self.delivered.push(delivery);
+                }
                 engine::Request::Forge { call, repository, op } => {
                     self.forge.as_mut().expect("root route fixture has a forge").call(
                         call,
@@ -248,18 +263,22 @@ impl Driver {
     /// A signed-in owner's chat, assigned to the one worker on channel 7.
     #[must_use]
     pub fn chat() -> (Driver, engine::Assignment) {
-        Self::configured_chat(config(91), &limits())
+        Self::configured_chat([config(91), config(91)], &limits())
     }
 
     /// A chat with the story's bounded configuration.
     #[must_use]
-    pub fn configured_chat(configuration: engine::Config, bounds: &engine::Limits) -> (Driver, engine::Assignment) {
+    pub fn configured_chat(
+        configuration: [engine::Config; 2],
+        bounds: &engine::Limits,
+    ) -> (Driver, engine::Assignment) {
         let mut driver = Driver::configured(Store::new(), configuration, bounds);
         driver.hello(Token::new(7));
         driver.settle();
         driver.sign_in();
         driver.settle();
         driver.send(engine::Event::Party(engine::PartyInput::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(1001)),
             sign_in: driver.session(),
             key: [31; 16],
@@ -363,6 +382,7 @@ impl Driver {
 #[must_use]
 pub fn say_ask(sign_in: u64, task: u64, key: u8) -> engine::Event {
     engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(2000 + u64::from(key))),
         sign_in,
         key: [key; 16],

@@ -220,7 +220,8 @@ pub fn incoming(
                 },
             )));
         }
-        delivery @ (Delivery::Result { .. }
+        delivery @ (Delivery::SourceSignedOut { .. }
+        | Delivery::Result { .. }
         | Delivery::Host(_)
         | Delivery::Link { .. }
         | Delivery::ForgeCommitted { .. }

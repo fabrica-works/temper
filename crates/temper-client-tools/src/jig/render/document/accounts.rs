@@ -100,6 +100,8 @@ fn party_fields(
             row.number,
             row.place,
             row.provider,
+            row.provider_name.as_ref(),
+            row.manage_usage.as_deref(),
             row.plan,
             &row.display,
             row.holder,
@@ -158,6 +160,8 @@ fn deployment(deployment: Option<&c::OwnerDeployment>, out: &mut Encoder, cut: &
                 row.number,
                 row.place,
                 row.provider,
+                row.provider_name.as_ref(),
+                row.manage_usage.as_deref(),
                 row.plan,
                 &row.display,
                 row.holder,
@@ -193,6 +197,8 @@ fn line(
     number_: u32,
     place: u32,
     supplied_provider: Option<u32>,
+    provider_name: Option<&c::DocumentText>,
+    manage_usage: Option<&[u8]>,
     plan: bool,
     display: &c::DocumentText,
     held: c::OwnerAccountHolder,
@@ -206,6 +212,17 @@ fn line(
     number(b"number", u64::from(number_), out);
     number(b"place", u64::from(place), out);
     provider(supplied_provider, out);
+    out.key(b"provider_name");
+    match provider_name {
+        Some(name) => super::encode_document_text(name, out, cut),
+        None => out.null(),
+    }
+    out.key(b"manage_usage");
+    match manage_usage {
+        Some(uri) => cut.words(uri, out),
+        None => out.null(),
+    }
+
     out.key(b"plan");
     out.boolean(plan);
     out.key(b"display");
@@ -286,7 +303,7 @@ fn holder(value: c::OwnerAccountHolder, out: &mut Encoder) {
     }
     out.object_end();
 }
-fn unloaded(at: c::OwnerAccountPlace, why: c::OwnerAccountUnread, out: &mut Encoder) {
+pub(super) fn unloaded(at: c::OwnerAccountPlace, why: c::OwnerAccountUnread, out: &mut Encoder) {
     out.key(b"at");
     out.string(match at {
         c::OwnerAccountPlace::Directory => b"directory",
@@ -354,7 +371,6 @@ fn end(value: c::OwnerAccountEnd, out: &mut Encoder) {
         E::Refused { refusal } => {
             out.key(b"refused");
             out.string(match refusal {
-                R::Configured => b"configured",
                 R::NotLimited => b"not_limited",
                 R::Uses => b"uses",
                 R::NotKept { .. } => b"not_kept",
@@ -395,14 +411,7 @@ fn end(value: c::OwnerAccountEnd, out: &mut Encoder) {
                         c::OwnerAccountKind::None => b"none",
                     });
                 }
-                R::Configured
-                | R::NotLimited
-                | R::Uses
-                | R::Subject
-                | R::Unknown
-                | R::Numbers
-                | R::Closing
-                | R::NotStarted => {}
+                R::NotLimited | R::Uses | R::Subject | R::Unknown | R::Numbers | R::Closing | R::NotStarted => {}
             }
         }
     }

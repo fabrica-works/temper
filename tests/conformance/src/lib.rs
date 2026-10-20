@@ -115,6 +115,7 @@ pub struct Peers {
     /// The period and the git identity's credential were sent to this start.
     started: bool,
     applied: u64,
+    first_start: Option<r::Snapshot>,
     observed: Vec<r::Observed>,
     /// The protocol layer this world plays: decodes, renders, outcomes, accounts.
     protocol: Protocol,
@@ -187,8 +188,14 @@ impl Application for Temper {
         }
     }
     fn store(config: &Config) -> Store {
-        Store::with_limits(&config.limits)
+        let configuration = config::root(config.seed, config.scenario, config.story).0;
+        temper_engine_domain_world::fixtures::restored_over(
+            Store::with_limits(&config.limits),
+            configuration,
+            &config.limits,
+        )
     }
+
     fn systems(config: &Config, _: u64) -> systems::FakeForge {
         let mut system = systems::FakeForge::new_with_ci(
             config.seed,
@@ -253,6 +260,13 @@ impl Application for Temper {
                 _ => Box::new([workers::Script::Wait]),
             }
         };
+        // The referee must see receipt one and receipt two separately, even though
+        // both are durable before the harness begins restoring the live root.
+        let first = temper_engine_domain_world::fixtures::first_start_over(
+            Store::with_limits(&config.limits),
+            config::root(config.seed, config.scenario, config.story).0,
+            &config.limits,
+        );
         Peers {
             seed: config.seed,
             scenario: config.scenario,
@@ -273,6 +287,7 @@ impl Application for Temper {
             chatted: false,
             started: false,
             applied: 0,
+            first_start: Some(observations::snapshot(&first)),
             observed: Vec::new(),
             protocol: Protocol::default(),
             requests: std::collections::BTreeMap::new(),
@@ -406,7 +421,7 @@ impl Application for Temper {
     fn inbound(peers: &mut Peers, _: &Store, _: Clock, input: &mut Event) {
         let Event::Root(input) = input else { return };
         match input {
-            engine::Event::Party(engine::PartyInput::Ask { reply_to, sign_in, key, ask }) => {
+            engine::Event::Party(engine::PartyInput::Ask { models: _, reply_to, sign_in, key, ask }) => {
                 let call = destination(reply_to);
                 peers.requests.insert(call, *key);
                 peers.ask_bodies.insert(call, (*sign_in, *key, ask.clone()));
@@ -544,6 +559,7 @@ impl Application for Temper {
                 peers.ask_retries.remove(&call);
                 if let Some((sign_in, key, ask)) = peers.ask_bodies.get(&call) {
                     events.push(engine::Event::Party(engine::PartyInput::Ask {
+                        models: Box::new([]),
                         reply_to: ReplyTo::new(Token::new(call)),
                         sign_in: *sign_in,
                         key: *key,
@@ -594,6 +610,7 @@ impl Application for Temper {
                 if peers.adopted && !peers.chatted {
                     peers.chatted = true;
                     events.push(engine::Event::Party(engine::PartyInput::Ask {
+                        models: Box::new([]),
                         reply_to: ReplyTo::new(Token::new(92)),
                         sign_in,
                         key: [92; 16],
@@ -621,6 +638,10 @@ impl Application for Temper {
     }
     fn observed(peers: &mut Peers, systems: &systems::FakeForge, store: &Store, _: Clock) -> Vec<r::Observed> {
         let mut observations = Vec::new();
+        if let Some(snapshot) = peers.first_start.take() {
+            observations.push(r::Observed::Durable { number: 1, snapshot });
+            peers.applied = 1;
+        }
         if peers.applied != store.applied {
             peers.applied = store.applied;
             let mut snapshot = observations::snapshot(store);

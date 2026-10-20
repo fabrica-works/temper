@@ -626,6 +626,10 @@ fn typed_account_lists_outlive_the_task_window() {
             uses: None,
             plan: false,
             provider: Some(PROVIDER),
+            provider_name: Some(c::DocumentText::complete(
+                c::Text::new(Box::from(b"Scripted".as_slice()), 32).unwrap(),
+            )),
+            manage_usage: None,
             display: c::DocumentText::complete(c::Text::new(Box::from(b"Account".as_slice()), 32).unwrap()),
             holder: c::OwnerAccountHolder::Party(fixtures::PARTY),
             sources,

@@ -465,6 +465,7 @@ fn a_release_naming_an_old_hold_revision_is_answered_moved() {
 
 fn stop_delegate(driver: &mut temper_engine_domain_world::direct::Driver, child: u64, key: [u8; 16]) {
     driver.send(temper_engine_domain::Event::Party(temper_engine_domain::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: skein_lib::ReplyTo::new(Token::new(STOP_REPLY)),
         sign_in: driver.session(),
         key,

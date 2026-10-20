@@ -44,6 +44,7 @@ fn a_person_stops_a_smith_run_and_releases_the_chat() {
     let task = world.assignment.task;
     let attempt = world.assignment.attempt;
     world.root.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(980)),
         sign_in: world.root.session(),
         key: [80; 16],
@@ -58,6 +59,7 @@ fn a_person_stops_a_smith_run_and_releases_the_chat() {
     assert!(matches!(world.agent.answer(), run::Answer::Failed { failure: run::Failure::Cancelled, .. }));
     let revision = world.root.task(task).expect("held chat").revisions.hold;
     world.root.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(981)),
         sign_in: world.root.session(),
         key: [81; 16],

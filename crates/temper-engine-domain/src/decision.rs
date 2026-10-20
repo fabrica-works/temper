@@ -51,6 +51,12 @@ pub struct Limits {
 /// resumed by the root and never passed to the protocol as child events.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Delivery {
+    SourceSignedOut {
+        to: ReplyTo,
+        channel: Token,
+        name: jig_domain_fleet::SourceName,
+        result: Option<jig_domain_fleet::SignOutResult>,
+    },
     Application {
         to: ReplyTo,
         outcome: Option<temper_engine_domain_forge::ApplicationOutcome>,
@@ -379,7 +385,8 @@ impl Decision {
             }
             Delivery::Assigned { assignment, .. } => assignment_within(assignment, limits),
             Delivery::Host(host) => host_within(host, limits),
-            Delivery::Link { .. }
+            Delivery::SourceSignedOut { .. }
+            | Delivery::Link { .. }
             | Delivery::ForgeCommitted { .. }
             | Delivery::ForgeCall { .. }
             | Delivery::Procedure { .. }
@@ -637,7 +644,12 @@ fn fleet_delivery_within(event: &jig_domain_fleet::Event) -> bool {
         | Event::Acknowledge { .. }
         | Event::Cancel { .. }
         | Event::Relayed { .. } => true,
-        Event::Inbound { .. }
+        Event::Sources { .. }
+        | Event::Check { .. }
+        | Event::SignOut { .. }
+        | Event::Logins { .. }
+        | Event::SignedOut { .. }
+        | Event::Inbound { .. }
         | Event::Relay { .. }
         | Event::Adopt { .. }
         | Event::Loaded

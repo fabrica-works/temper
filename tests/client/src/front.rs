@@ -74,8 +74,12 @@ impl Joint {
     }
     #[must_use]
     pub fn new(seed: u64, limits: client::Limits) -> Joint {
-        let engine =
-            Driver::with_repositories(Store::new(), walking::config(seed), &engine_limits(), fixtures::REPOSITORIES);
+        let engine = Driver::with_repositories(
+            Store::new(),
+            [walking::config(seed), walking::config(seed)],
+            &engine_limits(),
+            fixtures::REPOSITORIES,
+        );
         Self::with_engine(seed, &limits, engine, 1)
     }
     /// The small profile carries a whole turn while an activity page can size it.
@@ -90,7 +94,7 @@ impl Joint {
         engine_limits.loads.transcript_bytes = profile.loads.transcript_bytes;
         let engine = Driver::with_repositories(
             Store::with_transcript_bytes(profile.journal.transcript_bytes),
-            walking::config(seed),
+            [walking::config(seed), walking::config(seed)],
             &engine_limits,
             fixtures::REPOSITORIES,
         );
@@ -99,54 +103,66 @@ impl Joint {
     /// A chat's allotment leaves pool funding for the goal it proposes.
     #[must_use]
     pub fn with_goal_proposals(seed: u64, limits: client::Limits) -> Self {
-        let mut config = walking::config(seed);
-        let rules = config.core.authority.rules().clone();
-        let mut policy = config.core.authority.policy(1).expect("fixture project").clone();
-        policy.roles[0].authority.budget.spend = 150;
-        let mut domain =
-            jig_domain_authority::Domain::new(rules, *config.core.authority.limits()).expect("goal authority");
-        let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
-        jig_domain_authority::step(&mut domain, jig_domain_authority::Event::Policy { project: 1, policy }, &mut out);
-        assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
-        config.core.authority = domain;
-        let mut engine_limits = engine_limits();
-        engine_limits.people.sign_ins = 3;
-        engine_limits.fleet.slots = 2;
-        engine_limits.fleet.attempts = 4;
-        engine_limits.journal.writes = 4096;
-        engine_limits.journal.deliveries = 64;
-        engine_limits.journal.held = 192;
-        let engine = Driver::with_repositories(Store::new(), config, &engine_limits, fixtures::REPOSITORIES);
+        let [(bootstrap, engine_limits), (config, _)] = std::array::from_fn(|_| {
+            let mut config = walking::config(seed);
+            let rules = config.core.authority.rules().clone();
+            let mut policy = config.core.authority.policy(1).expect("fixture project").clone();
+            policy.roles[0].authority.budget.spend = 150;
+            let mut domain =
+                jig_domain_authority::Domain::new(rules, *config.core.authority.limits()).expect("goal authority");
+            let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
+            jig_domain_authority::step(
+                &mut domain,
+                jig_domain_authority::Event::Policy { project: 1, policy },
+                &mut out,
+            );
+            assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
+            config.core.authority = domain;
+            let mut engine_limits = engine_limits();
+            engine_limits.people.sign_ins = 3;
+            engine_limits.fleet.slots = 2;
+            engine_limits.fleet.attempts = 4;
+            engine_limits.journal.writes = 4096;
+            engine_limits.journal.deliveries = 64;
+            engine_limits.journal.held = 192;
+            (config, engine_limits)
+        });
+        let engine =
+            Driver::with_repositories(Store::new(), [bootstrap, config], &engine_limits, fixtures::REPOSITORIES);
         Self::with_engine(seed, &limits, engine, 2)
     }
     pub(crate) fn with_questions(seed: u64, limits: &client::Limits) -> Self {
         use jig_domain_authority as authority;
-        let mut config = walking::config(seed);
-        let mut rules = config.core.authority.rules().clone();
-        rules.ceiling.delegation.depth = 2;
-        let mut policy = config.core.authority.policy(fixtures::QUESTION_PROJECT).expect("fixture project").clone();
-        policy.ceiling.delegation.depth = 2;
-        policy.roles[0].authority.delegation.depth = 2;
-        let mut domain = authority::Domain::new(rules, *config.core.authority.limits()).expect("question authority");
-        let mut out = skein_lib::Queue::with_capacity(authority::POLICY_MAX_OUT);
-        authority::step(
-            &mut domain,
-            authority::Event::Policy { project: fixtures::QUESTION_PROJECT, policy },
-            &mut out,
-        );
-        assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: fixtures::QUESTION_PROJECT }));
-        config.core.authority = domain;
-        let mut engine_limits = engine_limits();
-        engine_limits.tasks.inbox_bytes = 512;
-        engine_limits.fleet.slots = 2;
-        engine_limits.fleet.attempts = 4;
-        engine_limits.journal.writes = 4096;
-        engine_limits.journal.deliveries = 64;
-        engine_limits.journal.held = 192;
+        let [(bootstrap, engine_limits), (config, _)] = std::array::from_fn(|_| {
+            let mut config = walking::config(seed);
+            let mut rules = config.core.authority.rules().clone();
+            rules.ceiling.delegation.depth = 2;
+            let mut policy = config.core.authority.policy(fixtures::QUESTION_PROJECT).expect("fixture project").clone();
+            policy.ceiling.delegation.depth = 2;
+            policy.roles[0].authority.delegation.depth = 2;
+            let mut domain =
+                authority::Domain::new(rules, *config.core.authority.limits()).expect("question authority");
+            let mut out = skein_lib::Queue::with_capacity(authority::POLICY_MAX_OUT);
+            authority::step(
+                &mut domain,
+                authority::Event::Policy { project: fixtures::QUESTION_PROJECT, policy },
+                &mut out,
+            );
+            assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: fixtures::QUESTION_PROJECT }));
+            config.core.authority = domain;
+            let mut engine_limits = engine_limits();
+            engine_limits.tasks.inbox_bytes = 512;
+            engine_limits.fleet.slots = 2;
+            engine_limits.fleet.attempts = 4;
+            engine_limits.journal.writes = 4096;
+            engine_limits.journal.deliveries = 64;
+            engine_limits.journal.held = 192;
+            (config, engine_limits)
+        });
         Self::with_engine(
             seed,
             limits,
-            Driver::with_repositories(Store::new(), config, &engine_limits, fixtures::REPOSITORIES),
+            Driver::with_repositories(Store::new(), [bootstrap, config], &engine_limits, fixtures::REPOSITORIES),
             2,
         )
     }
@@ -159,23 +175,27 @@ impl Joint {
         const EXECUTORS: u32 = 1;
         const POLICY_OUT: u32 = a::POLICY_MAX_OUT;
         const SLOTS: u32 = 1;
-        let mut config = walking::config(seed);
-        let mut rules = config.core.authority.rules().clone();
-        let mut policy = config.core.authority.policy(PROJECT).expect("project").clone();
-        let kinds: Box<[a::Executor]> = Box::new([a::Executor::Procedure(PROCEDURE)]);
-        rules.ceiling.delegation.kinds.clone_from(&kinds);
-        policy.ceiling.delegation.kinds.clone_from(&kinds);
-        policy.roles[0].authority.delegation.kinds = kinds;
-        let mut authority_limits = *config.core.authority.limits();
-        authority_limits.executors = EXECUTORS;
-        let mut domain = a::Domain::new(rules, authority_limits).expect("procedure policy limits");
-        let mut out = skein_lib::Queue::with_capacity(POLICY_OUT);
-        a::step(&mut domain, a::Event::Policy { project: PROJECT, policy }, &mut out);
-        assert_eq!(out.pop(), Some(a::PolicyFact::Added { project: PROJECT }));
-        config.core.authority = domain;
-        let mut engine_limits = engine_limits();
-        engine_limits.authority = authority_limits;
-        let engine = Driver::with_repositories(Store::new(), config, &engine_limits, fixtures::REPOSITORIES);
+        let [(bootstrap, engine_limits), (config, _)] = std::array::from_fn(|_| {
+            let mut config = walking::config(seed);
+            let mut rules = config.core.authority.rules().clone();
+            let mut policy = config.core.authority.policy(PROJECT).expect("project").clone();
+            let kinds: Box<[a::Executor]> = Box::new([a::Executor::Procedure(PROCEDURE)]);
+            rules.ceiling.delegation.kinds.clone_from(&kinds);
+            policy.ceiling.delegation.kinds.clone_from(&kinds);
+            policy.roles[0].authority.delegation.kinds = kinds;
+            let mut authority_limits = *config.core.authority.limits();
+            authority_limits.executors = EXECUTORS;
+            let mut domain = a::Domain::new(rules, authority_limits).expect("procedure policy limits");
+            let mut out = skein_lib::Queue::with_capacity(POLICY_OUT);
+            a::step(&mut domain, a::Event::Policy { project: PROJECT, policy }, &mut out);
+            assert_eq!(out.pop(), Some(a::PolicyFact::Added { project: PROJECT }));
+            config.core.authority = domain;
+            let mut engine_limits = engine_limits();
+            engine_limits.authority = authority_limits;
+            (config, engine_limits)
+        });
+        let engine =
+            Driver::with_repositories(Store::new(), [bootstrap, config], &engine_limits, fixtures::REPOSITORIES);
         Self::with_engine(seed, limits, engine, SLOTS)
     }
     fn with_engine(seed: u64, limits: &client::Limits, mut engine: Driver, slots: u32) -> Self {
@@ -625,8 +645,12 @@ impl Front<Temper> for Joint {
                     })
                     .collect();
                 let store = std::mem::replace(&mut self.engine.store, Store::new());
-                self.engine =
-                    Driver::with_repositories(store, walking::config(self.seed), &limits, fixtures::REPOSITORIES);
+                self.engine = Driver::with_repositories(
+                    store,
+                    [walking::config(self.seed), walking::config(self.seed)],
+                    &limits,
+                    fixtures::REPOSITORIES,
+                );
                 self.engine.send(temper_engine_domain_world::protocol::hello_slots(
                     fixtures::QUESTION_WORKER,
                     limits.fleet.slots,

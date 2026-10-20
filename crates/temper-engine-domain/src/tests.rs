@@ -289,6 +289,7 @@ fn deep_child_rows_and_arbitrary_internal_payloads_are_refused_before_retention(
     assert_eq!(crate::record_bytes(&row), Some(13));
     assert!(decision.write(&limits, Write::Save(row)).is_err());
     let roster_answer = Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
+        models: Box::new([]),
         key: people::RequestKey { person: 1, key: [1; 16] },
         ask: Box::new(people::Ask::SetRoles {
             project: 1,
@@ -390,7 +391,6 @@ fn held_assignment() -> crate::Assignment {
                 reserve_time: skein_lib::Duration::from_secs(1),
                 model: crate::Model {
                     dialect: 1,
-                    account: 1,
                     endpoint: 1,
                     name: b"m".as_slice().into(),
                     window: 1,
@@ -440,4 +440,18 @@ fn held_assignment() -> crate::Assignment {
             valid: skein_lib::Duration::from_secs(1),
         }]),
     }
+}
+
+#[test]
+fn a_retained_model_context_counts_its_owned_names() {
+    use jig_domain_people as people;
+    let row = Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
+        key: people::RequestKey { person: 1, key: [1; 16] },
+        ask: Box::new(people::Ask::SetRoles { project: 1, holdings: Box::new([]) }),
+        models: Box::new([Box::from(b"small".as_slice())]),
+        outcome: people::Outcome::RolesSet { project: 1 },
+        at: Wall::EPOCH,
+    }));
+    let expected = u64::try_from(size_of::<Box<[u8]>>() + b"small".len()).expect("one name fits");
+    assert_eq!(crate::record_bytes(&row), Some(expected));
 }

@@ -377,6 +377,18 @@ fn task_problem(text: &mut Text, problem: &jig_domain_tasks::Problem) -> Result<
         text.add(b" ")?;
     }
     match problem.why {
+        Refusal::Account { account, why } => {
+            text.add(b"account ")?;
+            text.number(u64::from(account))?;
+            text.add(b": ")?;
+            text.add(match why {
+                jig_domain_tasks::AccountWhy::Unknown => b"not found",
+                jig_domain_tasks::AccountWhy::Provider => b"belongs to another provider",
+                jig_domain_tasks::AccountWhy::Uses => b"does not serve the payer",
+                jig_domain_tasks::AccountWhy::Limited => b"is limited",
+            })
+        }
+
         Refusal::NotReady => text.add(b"not ready"),
         Refusal::Unknown => text.add(b"unknown"),
         Refusal::Busy => text.add(b"busy"),

@@ -574,9 +574,9 @@ pub fn example_document(directory: &Path, owned: &Owned) -> Vec<u8> {
         .replace("/usr/local/bin/temper", env!("CARGO_BIN_EXE_temper"))
         .into_bytes()
 }
-/// The guide's copied files and private credentials, with the fake peer's account.
+/// The guide's copied files and private forge credentials.
 pub fn lay(directory: &Path, owned: &Owned) {
-    for name in ["owned/charters", "secrets", "accounts"] {
+    for name in ["owned/charters", "secrets"] {
         let path = directory.join(name);
         fs::create_dir_all(&path).expect("example directory");
         fs::set_permissions(path, fs::Permissions::from_mode(0o700)).expect("private directory");
@@ -595,10 +595,6 @@ pub fn lay(directory: &Path, owned: &Owned) {
     super::write_private(
         &directory.join("secrets/worker.digest"),
         b"6fb46f7a92742970166379ed5195e79c4493a7cc5664280c039cfd4095ba5faf\n",
-    );
-    super::write_private(
-        &directory.join("accounts/llm.json"),
-        br#"{"access_token":"token","expires_at":4102444800,"account_id":"acc"}"#,
     );
 }
 
@@ -633,7 +629,7 @@ impl Bounded {
     pub fn accounts() -> temper_service::AccountsRuntime {
         temper_service::AccountsRuntime {
             providers: skein_lib::List::with_capacity(0),
-            issuers: skein_lib::List::with_capacity(0),
+            d2: temper_service::D2::empty(),
             trust_roots: 0,
             trust_root_bytes: 0,
         }
@@ -705,40 +701,42 @@ pub fn bounded(directory: &Path) -> Bounded {
     }
 }
 
-/// Only this drift check writes the two literals, and only in the established explicit mode.
+/// Only this drift check writes both examples' memory literals, in the established explicit mode.
 pub fn check_memory(required: temper_service::startup::Requirements) {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/examples/owned.json");
-    let mut text = fs::read_to_string(&path).expect("owned example");
-    let value: serde_json::Value = serde_json::from_str(&text).expect("owned JSON");
-    let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
-    let again =
-        "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper --test startup -E 'test(owned_memory_figures)'";
-    for (previous, required, name) in [
-        (
-            value["engine"]["memory_bytes"].as_u64().expect("engine memory_bytes"),
-            required.engine_bytes,
-            "engine.memory_bytes",
-        ),
-        (
-            value["workers"][0]["memory_bytes"].as_u64().expect("worker memory_bytes"),
-            required.worker_bytes,
-            "workers[0].memory_bytes",
-        ),
-    ] {
-        if write {
-            let literal = format!("\"memory_bytes\": {previous}");
-            assert_eq!(text.matches(&literal).count(), 1, "one literal per envelope");
-            text = text.replace(&literal, &format!("\"memory_bytes\": {required}"));
-        } else {
-            assert_eq!(previous, required, "{name} drifted; {again}");
+    for relative in ["../../docs/examples/owned.json", "../temper-init/template/temper.json"] {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative);
+        let mut text = fs::read_to_string(&path).expect("owned example");
+        let value: serde_json::Value = serde_json::from_str(&text).expect("owned JSON");
+        let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
+        let again = "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper --test startup -E 'test(owned_memory_figures)'";
+        for (previous, required, name) in [
+            (
+                value["engine"]["memory_bytes"].as_u64().expect("engine memory_bytes"),
+                required.engine_bytes,
+                "engine.memory_bytes",
+            ),
+            (
+                value["workers"][0]["memory_bytes"].as_u64().expect("worker memory_bytes"),
+                required.worker_bytes,
+                "workers[0].memory_bytes",
+            ),
+        ] {
+            if write {
+                let literal = format!("\"memory_bytes\": {previous}");
+                assert_eq!(text.matches(&literal).count(), 1, "one literal per envelope");
+                text = text.replace(&literal, &format!("\"memory_bytes\": {required}"));
+            } else {
+                assert_eq!(previous, required, "{name} drifted; {again}");
+            }
         }
+        if write {
+            fs::write(&path, text).expect("write only owned memory literals");
+        }
+        let value: serde_json::Value =
+            serde_json::from_slice(&fs::read(path).expect("owned example")).expect("owned JSON");
+        assert_eq!(value["engine"]["memory_bytes"].as_u64(), Some(required.engine_bytes));
+        assert_eq!(value["workers"][0]["memory_bytes"].as_u64(), Some(required.worker_bytes));
     }
-    if write {
-        fs::write(&path, text).expect("write only owned memory literals");
-    }
-    let value: serde_json::Value = serde_json::from_slice(&fs::read(path).expect("owned example")).expect("owned JSON");
-    assert_eq!(value["engine"]["memory_bytes"].as_u64(), Some(required.engine_bytes));
-    assert_eq!(value["workers"][0]["memory_bytes"].as_u64(), Some(required.worker_bytes));
 }
 /// Stands for skein's Adopt (forge-setup.md, 4.5 and 4.8); temper-14 removes it.
 /// Uses the kept webhook secret, drawing one only when absent.

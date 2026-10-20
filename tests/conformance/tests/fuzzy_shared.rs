@@ -1,52 +1,56 @@
 use jig_conformance::{
-    Cut,
+    Application, Cut,
     scenarios::{self, Scenario},
 };
-use temper_conformance_world::Temper;
+use temper_conformance_world::{Config, Temper};
 
-/// Crash one shared scenario at every durable commit of its baseline.
-fn crashed_at_every_commit(scenario: Scenario) {
+/// Crash one shared scenario at every live durable commit after the two fixture receipts.
+fn crashed_at_every_live_commit(scenario: Scenario) {
     let baseline = scenarios::run::<Temper>(scenario, Cut::None, 101).expect("baseline").expect("applicable");
     eprintln!("{scenario:?}: {} durable commit cuts", baseline.commits);
-    for cut in 1..=baseline.commits {
-        scenarios::run::<Temper>(scenario, Cut::AfterCommit(cut), 101)
-            .unwrap_or_else(|error| panic!("{scenario:?}, cut {cut}: {error:?}"));
+    // Setup's real first-start cut is exercised by the engine-domain world.
+    let first_live = Temper::store(&Config::new(101, Some(scenario))).applied + 1;
+    for cut in first_live..=baseline.commits {
+        let outcome = scenarios::run::<Temper>(scenario, Cut::AfterCommit(cut), 101)
+            .unwrap_or_else(|error| panic!("{scenario:?}, cut {cut}: {error:?}"))
+            .expect("applicable");
+        assert!(outcome.crashes.contains(&cut), "{scenario:?} cut {cut} did not fire");
     }
 }
 
 #[test]
-fn a_late_copy_is_crashed_at_every_commit() {
-    crashed_at_every_commit(Scenario::LateCopy);
+fn a_late_copy_is_crashed_at_every_live_commit() {
+    crashed_at_every_live_commit(Scenario::LateCopy);
 }
 
 #[test]
-fn another_hand_is_crashed_at_every_commit() {
-    crashed_at_every_commit(Scenario::OtherHand);
+fn another_hand_is_crashed_at_every_live_commit() {
+    crashed_at_every_live_commit(Scenario::OtherHand);
 }
 
 #[test]
-fn uncertain_restarts_are_crashed_at_every_commit() {
-    crashed_at_every_commit(Scenario::UncertainRestarts);
+fn uncertain_restarts_are_crashed_at_every_live_commit() {
+    crashed_at_every_live_commit(Scenario::UncertainRestarts);
 }
 
 #[test]
-fn a_changed_judge_is_crashed_at_every_commit() {
-    crashed_at_every_commit(Scenario::ChangedJudge);
+fn a_changed_judge_is_crashed_at_every_live_commit() {
+    crashed_at_every_live_commit(Scenario::ChangedJudge);
 }
 
 #[test]
-fn a_narrowing_policy_is_crashed_at_every_commit() {
-    crashed_at_every_commit(Scenario::NarrowingPolicy);
+fn a_narrowing_policy_is_crashed_at_every_live_commit() {
+    crashed_at_every_live_commit(Scenario::NarrowingPolicy);
 }
 
 #[test]
-fn a_standing_task_is_crashed_at_every_commit() {
-    crashed_at_every_commit(Scenario::StandingTask);
+fn a_standing_task_is_crashed_at_every_live_commit() {
+    crashed_at_every_live_commit(Scenario::StandingTask);
 }
 
 #[test]
-fn a_run_budget_is_crashed_at_every_commit() {
-    crashed_at_every_commit(Scenario::RunBudget);
+fn a_run_budget_is_crashed_at_every_live_commit() {
+    crashed_at_every_live_commit(Scenario::RunBudget);
 }
 
 #[test]

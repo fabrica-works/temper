@@ -1,4 +1,7 @@
 //! The same native stories with fake or borrowed-provider completions.
+//! D2 fallback D: live startup is disabled until JP13 proves a real sign-in.
+//! A separate test-only host needs shell startup and store-preseed support;
+//! the production binary accepts no D2 input.
 use super::{Process, Seen, forgejo::Throwaway, person, write_private};
 use jig_protocol_store::{codec, transcripts};
 use serde_json::{Value, json};
@@ -17,7 +20,8 @@ use std::{
 #[derive(Debug)]
 pub enum Mode {
     Fake,
-    Live { account_file: PathBuf, model: String, address: SocketAddr },
+    // Retained for JP13 only: accounts-2/later.md, fallback-D row 42: "Temper live stays disabled until JP13".
+    Live { model: String, address: SocketAddr },
 }
 #[must_use]
 pub fn mode() -> Mode {
@@ -26,13 +30,7 @@ pub fn mode() -> Mode {
     if !directory.join("live-account.json").exists() {
         return Mode::Fake;
     }
-    let value: Value = serde_json::from_slice(&fs::read(directory.join("live-config.json")).expect("live settings"))
-        .expect("public live settings JSON");
-    Mode::Live {
-        account_file: value["account_file"].as_str().expect("account path").into(),
-        model: value["model"].as_str().expect("model").into(),
-        address: value["address"].as_str().expect("provider address").parse().expect("IPv4 provider"),
-    }
+    panic!("D2 fallback D: live tier off until JP13 proves live sign-in");
 }
 #[must_use]
 pub fn configure(directory: &Path, mode: &Mode, forge: &Throwaway) -> Option<skein_fake_peers::llm::Peer> {
@@ -43,9 +41,8 @@ pub fn configure(directory: &Path, mode: &Mode, forge: &Throwaway) -> Option<ske
     let agent_path = directory.join("agent.json");
     let mut agent: Value = serde_json::from_slice(&fs::read(&agent_path).expect("agent")).expect("agent JSON");
     agent["profile"]["policy"]["max_turns"] = 5.into();
-    if let Mode::Live { account_file, model, address } = mode {
+    if let Mode::Live { model, address } = mode {
         let engine = &mut value["engine"];
-        engine["llm"]["accounts"][0]["source"]["handed_in"]["file"] = json!(account_file);
         let endpoint = &mut engine["llm"]["endpoints"][0];
         endpoint["provider"] = "codex".into();
         endpoint["address"] = json!({"socket":address.to_string()});

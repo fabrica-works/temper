@@ -26,10 +26,10 @@ enum Notice {
 impl Notice {
     fn message(self) -> agent::Up {
         match self {
-            Self::Unauthorized => agent::Up::Unauthorized { account: 0, generation: 1 },
-            Self::Limited { reset } => agent::Up::Limited { account: 0, reset },
+            Self::Unauthorized => agent::Up::Unauthorized { account: 1, generation: 1 },
+            Self::Limited { reset } => agent::Up::Limited { account: 1, reset },
             Self::Refused => agent::Up::Refused {
-                account: 0,
+                account: 1,
                 code: b"quota".as_slice().into(),
                 reason: b"provider refused".as_slice().into(),
             },
@@ -46,14 +46,14 @@ fn composed_notices_reach_the_accounts_child_before_the_attempt_ends() {
         Notice::Limited { reset: Some(Duration::from_secs(9)) },
         Notice::Refused,
     ] {
-        let mut world = World::chat(930, report_script(true));
+        let mut world = World::signed_in_chat(930, report_script(true));
         world.until_call();
         assert_eq!(world.observed.answers, 0);
         world.process.up.push_front(notice.message());
         world.run();
         match notice {
             Notice::Unauthorized => assert!(world.protocol.accounts.contains(&accounts::Request::Component(
-                accounts::ToComponent::Rejected { account: 0, generation: 1 }
+                accounts::ToComponent::Rejected { account: 1, generation: 1 }
             ))),
             Notice::Limited { reset } => {
                 if reset == Some(Duration::ZERO) {
@@ -70,7 +70,7 @@ fn composed_notices_reach_the_accounts_child_before_the_attempt_ends() {
                         .find_map(|record| match record {
                             accounts::Stored::Source {
                                 account: 0,
-                                number: 0,
+                                number: 1,
                                 held: Some(accounts::Held::Limited { reset }),
                                 ..
                             } => Some(reset),
@@ -87,7 +87,7 @@ fn composed_notices_reach_the_accounts_child_before_the_attempt_ends() {
             }
             Notice::Refused => assert!(saves(&world).iter().any(|record| matches!(
                 record,
-                accounts::Stored::Source { account: 0, number: 0, held: Some(accounts::Held::Refused), .. }
+                accounts::Stored::Source { account: 0, number: 1, held: Some(accounts::Held::Refused), .. }
             ))),
         }
         assert_eq!(world.observed.answers, 1, "notice does not replace the terminal");
@@ -96,7 +96,7 @@ fn composed_notices_reach_the_accounts_child_before_the_attempt_ends() {
         let up = host::LinkUp::Unauthorized {
             run: Token::new(assignment.task),
             attempt: Token::new(assignment.attempt),
-            account: 0,
+            account: 1,
             generation: 2,
         };
         world.root_step(temper_engine_domain_world::protocol::up(CHANNEL, up, engine::Parts::none()));
@@ -107,16 +107,16 @@ fn composed_notices_reach_the_accounts_child_before_the_attempt_ends() {
 #[test]
 fn composed_notice_fences_drop_old_channels_attempts_sources_and_generations() {
     for (channel, old_attempt, source, generation, renewed) in [
-        (Token::new(99), false, 0, 1, false),
-        (CHANNEL, true, 0, 1, false),
+        (Token::new(99), false, 1, 1, false),
+        (CHANNEL, true, 1, 1, false),
         (CHANNEL, false, 17, 1, false),
-        (CHANNEL, false, 0, 1, true),
+        (CHANNEL, false, 1, 1, true),
     ] {
-        let mut world = World::chat(931, report_script(true));
+        let mut world = World::signed_in_chat(931, report_script(true));
         world.until_call();
         if renewed {
             world.root_step(engine::Event::Account(accounts::Event::Component(accounts::FromComponent::Granted {
-                account: 0,
+                account: 1,
                 generation: 2,
                 valid: Duration::from_secs(3600),
                 form: accounts::Form::Credential(accounts::Scheme::Bearer),

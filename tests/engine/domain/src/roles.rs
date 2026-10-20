@@ -309,6 +309,7 @@ impl World {
     fn dispatch(&mut self, to: Token, input: &Input) {
         self.queue(
             engine::Event::Party(engine::PartyInput::Ask {
+                models: Box::new([]),
                 reply_to: ReplyTo::new(to),
                 sign_in: self.sessions[input.owner],
                 key: input.key,

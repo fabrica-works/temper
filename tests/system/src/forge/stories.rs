@@ -64,6 +64,7 @@ fn start_change_world(passes: u32) -> (World, engine::Assignment) {
     world.adopt();
     world.send(smith_world::hello(2));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
         key: [92; 16],

@@ -37,6 +37,9 @@ pub(crate) const fn agent_env(env: &Env<Limits>) -> Env<agent::Limits> {
 /// Hands one of the protocol's events to the child domain it is for.
 pub(crate) fn event(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::SourceAnswered { owner, answer } => {
+            host_step(domain, env, host::Event::SourceAnswered { owner, answer });
+        }
         Event::Assign { assignment, items, save } => assign(domain, env, assignment, items, save, out),
         Event::Link(host::LinkDown::Assign { assignment }) => {
             let items = wire::Workspace { repositories: Box::new([]) };
@@ -58,7 +61,7 @@ pub(crate) fn event(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &
             };
             host_step(domain, env, opened);
         }
-        Event::Lost => {}
+        Event::Lost => host_step(domain, env, host::Event::SourceLost),
         Event::GracePassed => {
             domain.past = true;
             host_step(domain, env, host::Event::CancelAll { reason: host::Reason::Contact });
@@ -207,6 +210,10 @@ fn from_host(domain: &mut Domain, env: &Env<Limits>, request: host::Request, out
         Err(request) => request,
     };
     match request {
+        host::Request::Source { owner, name, operation, deadline } => {
+            out.push(Request::Source { owner, name, operation, deadline });
+        }
+        host::Request::SourceFault => out.push(Request::SourceFault),
         host::Request::Up(host::LinkUp::Answer { run, attempt, answer }) => answered(domain, run, attempt, answer, out),
         host::Request::Up(up) => out.push(Request::Link(up)),
         host::Request::Hello { hello } => {

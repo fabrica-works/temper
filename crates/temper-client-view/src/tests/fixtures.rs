@@ -814,6 +814,7 @@ pub fn demo_root(address: temper_client_domain::Address, project: u32, model: bo
     me.projects.get_mut(0).expect("demo project").creating = Some(c::Creating {
         within: c::CreateBounds {
             authority: Box::new(c::OwnerAuthorityDocument::complete(c::OwnerAuthority {
+                models: None,
                 tools: 0,
                 grants: List::with_capacity(0),
                 delegation: c::OwnerDelegation { kinds: List::with_capacity(0), tasks: 1, depth: 2 },

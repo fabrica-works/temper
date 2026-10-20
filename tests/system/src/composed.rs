@@ -145,8 +145,7 @@ pub fn crossed_script() -> Script {
 /// hub window of two turns, and room to resume a conversation.
 fn config(seed: u64) -> engine::Config {
     let mut config = crate::world::config(seed);
-    let mut charter = crate::world::charter();
-    charter.policy.model.account = 0;
+    let charter = crate::world::charter();
     config.core.settings.models = Box::new([charter.policy.model.clone()]);
     config.core.settings.charters = Box::new([charter]);
     config.core.settings.resume_bytes = 32768;
@@ -198,17 +197,102 @@ impl World {
         Self::configured(seed, script, true)
     }
 
+    #[cfg(test)]
+    pub(crate) fn signed_in_chat(seed: u64, script: Script) -> Self {
+        use jig_domain_accounts::{Holder, Kind, Stored};
+        let mut world = Self::chat(seed, script);
+        let rows = world
+            .store
+            .rows
+            .values()
+            .filter_map(|row| {
+                let engine::Record::Core(jig_domain_core::Record::Accounts(mut row)) = row.clone() else {
+                    return None;
+                };
+                match &mut row {
+                    Stored::Account { holder, .. } => *holder = Holder::Party(1),
+                    Stored::Source { kind, .. } => *kind = Kind::SignIn,
+                    Stored::Next { .. } => (),
+                }
+                Some(engine::Record::Core(jig_domain_core::Record::Accounts(row)))
+            })
+            .collect();
+        world.store.seed(rows, Box::new([]));
+        world.protocol.sign_in_sources.insert(1);
+        world
+    }
+
+    /// Two real durable source identities belonging to one billing account.
+    #[must_use]
+    pub fn two_source_chat(seed: u64, script: Script) -> Self {
+        use jig_domain_accounts::{Holder, Kind, Stored};
+        let mut world = Self::chat(seed, script);
+        let erases = world
+            .store
+            .rows
+            .values()
+            .filter_map(|row| {
+                if let engine::Record::Core(jig_domain_core::Record::Accounts(_)) = row {
+                    Some(row.key())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let rows = [
+            Stored::Account {
+                number: BILLING_ACCOUNT,
+                provider: 1,
+                holder: Holder::Deployment,
+                place: 0,
+                uses: None,
+                subject: Box::new([]),
+                display: Box::new([]),
+            },
+            Stored::Source {
+                account: BILLING_ACCOUNT,
+                number: FIRST_SOURCE,
+                place: 0,
+                kind: Kind::Key,
+                name: Box::new([]),
+                held: None,
+            },
+            Stored::Source {
+                account: BILLING_ACCOUNT,
+                number: SECOND_SOURCE,
+                place: 1,
+                kind: Kind::Key,
+                name: Box::new([]),
+                held: None,
+            },
+            Stored::Next { number: SECOND_SOURCE + 1 },
+        ]
+        .into_iter()
+        .map(|row| engine::Record::Core(jig_domain_core::Record::Accounts(row)))
+        .collect();
+        world.store.seed(rows, erases);
+        world
+    }
+
+    /// Feed the agent channel's notice through the worker's real process boundary.
+    pub fn notice(&mut self, notice: worker::agent::Up) {
+        self.process.notice(notice);
+    }
+
     fn configured(seed: u64, script: Script, repository: bool) -> Self {
-        let mut config = config(seed);
-        let mut limits = walking::limits();
-        limits.journal.transcript_bytes = 32768;
-        limits.loads.transcript_bytes = 32768;
-        limits.fleet.turns = 64;
-        limits.tasks.inbox_bytes = 1024;
-        limits.journal.result_bytes = 4096;
-        if repository {
-            grant_read(&mut config, &mut limits);
-        }
+        let [(bootstrap, mut limits), (config, _)] = std::array::from_fn(|_| {
+            let mut config = config(seed);
+            let mut limits = walking::limits();
+            limits.journal.transcript_bytes = 32768;
+            limits.loads.transcript_bytes = 32768;
+            limits.fleet.turns = 64;
+            limits.tasks.inbox_bytes = 1024;
+            limits.journal.result_bytes = 4096;
+            if repository {
+                grant_read(&mut config, &mut limits);
+            }
+            (config, limits)
+        });
         let mut forge = Forge::new(seed);
         forge.repository(
             b"org/repo",
@@ -226,6 +310,7 @@ impl World {
         limits.fleet.grace = worker_limits.stop_bound.saturating_add(Duration::from_secs(1));
         assert!(engine::worst_case(&limits).is_some());
         assert!(worker::worst_case(&worker_limits).is_some());
+        let store = temper_engine_domain_world::fixtures::restored_store(bootstrap, &limits);
         Self {
             seed,
             creating: jig_core_world::fixtures::Creating::new(&config.core, limits.tasks.tree_tasks),
@@ -233,7 +318,7 @@ impl World {
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             root_out: Queue::with_capacity(engine::max_out(&limits)),
             root_events: VecDeque::from([engine::Event::Restart]),
-            store: Store::new(),
+            store,
             party: parties::Party::new(
                 1,
                 parties::Role::Owner,
@@ -408,6 +493,14 @@ impl World {
         self.party.extend(Box::new([parties::Act::Request { key, ask }]));
     }
 
+    /// A notice crosses worker output, link, engine input and durable acknowledgement.
+    /// Each boundary may have a complete output cohort queued ahead of it.
+    #[must_use]
+    pub fn notice_steps(&self) -> u32 {
+        const BOUNDARIES: u32 = 4;
+        BOUNDARIES * (worker::max_out(&self.worker_env.limits) + engine::max_out(&self.env.limits))
+    }
+
     /// Wait until the process receives the first Smith host operation.
     pub fn until_call(&mut self) {
         for _ in 0..10000 {
@@ -466,6 +559,7 @@ impl World {
                     | parties::Ask::Decision { .. }) => panic!("unscripted party request: {other:?}"),
                 };
                 engine::Event::Party(engine::PartyInput::Ask {
+                    models: Box::new([]),
                     reply_to: ReplyTo::new(Token::new(to)),
                     sign_in,
                     key,
@@ -572,6 +666,7 @@ impl World {
 
     fn delivery(&mut self, delivery: Delivery) {
         match delivery {
+            Delivery::SourceSignedOut { .. } => panic!("this story requests no source sign-out"),
             Delivery::Application { to, outcome } => {
                 assert_eq!(to.into_token(), ADOPTION);
                 assert!(matches!(outcome, Some(temper_engine_domain_forge::ApplicationOutcome::Adopted(_))));
@@ -656,12 +751,17 @@ impl World {
     /// protocol layer's routing, to io's git, or to the agent process.
     fn worker_request(&mut self, request: worker::Request) {
         match request {
+            worker::Request::Source { .. } | worker::Request::SourceFault => {
+                panic!("this fixture declares no program sources")
+            }
             worker::Request::Hello(hello) => self.up(engine::Link::Hello(hello)),
             worker::Request::Link(up) => {
                 match &up {
                     host::LinkUp::Turn { .. } => self.observed.turns += 1,
                     host::LinkUp::Call { .. } => self.observed.relays += 1,
-                    host::LinkUp::Activity { .. }
+                    host::LinkUp::Logins { .. }
+                    | host::LinkUp::SignedOut { .. }
+                    | host::LinkUp::Activity { .. }
                     | host::LinkUp::Unauthorized { .. }
                     | host::LinkUp::Limited { .. }
                     | host::LinkUp::AccountRefused { .. }
@@ -819,3 +919,8 @@ fn say(project: u32, task: u64, words: Box<[u8]>, release: Option<u64>) -> peopl
         None => people::Ask::Say { project, task, words },
     }
 }
+
+// Independent durable identities exercise the account/source translation in both roots.
+pub const BILLING_ACCOUNT: u32 = 43;
+pub const FIRST_SOURCE: u32 = 17;
+pub const SECOND_SOURCE: u32 = 71;

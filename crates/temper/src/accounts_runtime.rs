@@ -1,24 +1,15 @@
 //! Resolve configured sign-in transports before starting the accounts component.
-use crate::{address, config, server_name, service, trust};
+use crate::{config, server_name, service, trust};
 use skein_lib::List;
 use skein_oauth_accounts as driver;
 
 pub(super) fn resolve(engine: &config::Engine) -> Result<service::AccountsRuntime, String> {
     let mut runtime = service::AccountsRuntime {
-        issuers: List::with_capacity(u32::try_from(engine.llm.accounts.len()).expect("account count")),
+        d2: service::D2::empty(),
         providers: List::with_capacity(u32::try_from(engine.llm.providers.len()).expect("provider count")),
         trust_roots: 0,
         trust_root_bytes: 0,
     };
-    for account in &engine.llm.accounts {
-        if let config::Source::SignIn(source) = &account.source {
-            let transport = transport(&source.transport, &mut runtime)?;
-            runtime
-                .issuers
-                .push((account.number, driver::Endpoint { address: address(&source.endpoint)?, transport }))
-                .expect("account count");
-        }
-    }
     for provider in &engine.llm.providers {
         let Some(registration) = &provider.sign_in else { continue };
         let endpoint = endpoint(&registration.token, &registration.endpoint_transport, &mut runtime)?;

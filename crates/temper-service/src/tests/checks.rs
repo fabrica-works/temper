@@ -160,7 +160,7 @@ fn a_channel_limit_past_a_ceiling_names_the_limit() {
 fn one_ios_entities_hold_both_services_and_their_children() {
     let document = fixtures::with(&fixtures::document(), b"application.limits.overrides", br#"{"checkout.name_bytes":600,"checkout.repositories":4,"git_component.stdout_bytes":2048,"git_component.operations":9}"#);
     let found = crate::named(&document, &jig_protocol_config::Directories::working()).unwrap_err();
-    assert_eq!(&*lines(&found), b"engine.limits.io.sockets: 53 bytes, past its bound of 48\n".as_slice());
+    assert_eq!(&*lines(&found), b"engine.limits.io.sockets: 52 bytes, past its bound of 48\n".as_slice());
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -298,7 +298,7 @@ fn hook_connections_past_the_process_sockets_are_refused() {
         fixtures::with(&fixtures::webhook_document(), b"application.limits.overrides", br#"{"checkout.name_bytes":600,"checkout.repositories":4,"git_component.stdout_bytes":2048,"forge_component.hooks":40}"#);
     assert_eq!(
         &*lines(&crate::named(&document, &jig_protocol_config::Directories::working()).unwrap_err()),
-        b"engine.limits.io.sockets: 70 bytes, past its bound of 48\n"
+        b"engine.limits.io.sockets: 69 bytes, past its bound of 48\n"
     );
 }
 #[test]
@@ -346,8 +346,9 @@ fn fixed_redirect_ports_accept_listeners_without_a_reserved_number() {
 }
 #[test]
 fn provider_redirect_ports_are_checked_before_files_are_read() {
-    const PROVIDERS: &[u8] = br#"[{"name":"Fake","number":1,"models":["small"],"sources":{"sign_in":{"issuer":"https://issuer.example","client":"client","scopes":[],"authorization":"https://issuer.example/auth","token":"https://issuer.example/token","keys":"https://issuer.example/keys","transport":"tls","server_name":"issuer.example","must_grant":[],"redirect_path":"callback","redirect_port":7100}}}]"#;
+    const PROVIDERS: &[u8] = br#"[{"name":"Fake","number":1,"signed_in_plan":false,"models":["small"],"sources":{"sign_in":{"issuer":"https://issuer.example","client":"client","scopes":[],"authorization":"https://issuer.example/auth","token":"https://issuer.example/token","keys":"https://issuer.example/keys","transport":"tls","server_name":"issuer.example","must_grant":[],"redirect_path":"callback","redirect_port":7100}}}]"#;
     let input = fixtures::with(&fixtures::document(), b"engine.llm.providers", PROVIDERS);
+    let input = fixtures::with(&input, b"application.limits.overrides", br#"{"checkout.name_bytes":600,"checkout.repositories":4,"git_component.stdout_bytes":2048,"git_component.operations":2,"checkout.workspaces":2,"forge_component.hooks":1}"#);
     let input = core::str::from_utf8(&input).unwrap();
     for (listener, expected) in [
         (r#"{"socket":"127.0.0.1:7100"}"#, true),
@@ -384,7 +385,7 @@ fn every_offered_adapter_must_be_declared_by_the_agent() {
     let document = fixtures::with(
         &fixtures::document(),
         b"engine.llm.providers",
-        br#"[{"name":"Fake","number":1,"models":["small"],"sources":{"programs":["claude_code"]}}]"#,
+        br#"[{"name":"Fake","number":1,"manage_usage":"https://claude.ai/settings/usage","models":["small"],"sources":{"programs":["claude_code"]}}]"#,
     );
     let document = jig_protocol_config::document(
         &document,

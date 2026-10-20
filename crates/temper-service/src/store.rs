@@ -515,5 +515,5 @@ pub(crate) fn worst_case(application: &root::Limits, limits: &protocol::Limits) 
         .checked_add(Map::<Token, ()>::worst_case(handles(limits))?.checked_mul(3)?)?
         .checked_add(route::worst_case(application, limits.store.key)?)?
         .checked_add(u64::from(max_read(limits)).checked_mul(u64::from(room))?.checked_mul(6)?)?
-        .checked_add(root::worst_case(application)?.checked_mul(u64::from(room))?)
+        .checked_add(root::payload_worst_case(application)?.checked_mul(u64::from(room))?)
 }

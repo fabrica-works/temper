@@ -1046,10 +1046,7 @@ that made it, which the checked world fails (skein's
 Over the git route the program shares nothing, and they run checked.
 Every other story here is checked.
 
-Until area 5's tools (5.5), the deployment's credential is handed in as
-a `handed_in` file of the configuration the test writes, the engine's
-handed-in account (`../domain/testing.md`, 2.4). With area 5, every story
-first adds a key the fake LLM peer accepts, `add-key` from a scratch
+Every story whose agents run first adds a key the fake LLM peer accepts, `add-key` from a scratch
 file, as section 10's harness does, and waits for `usable`. Area 5's
 stories (`../domain/testing.md`, 2.4):
 
@@ -1115,8 +1112,7 @@ where possible; its seed does not replay the kernel's schedule.
 (`../domain/testing.md`, 2.6), on a scratch directory of their own, for
 what needs the executable: argv through `main`, printed output, the OS's
 exit statuses, the printed link read on stdin (`sign-in -`), the
-deployment's credential (a `handed_in` file until area 5's tools, as in
-11.3; with them, its key added from a private file as the first act,
+deployment's credential (its key added from a private file as the first act,
 section 10, and a key's file refused when it is not private, as a
 forge's pasted value's file is), an act
 cut by a termination signal, its status 128 plus the signal's number

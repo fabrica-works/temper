@@ -27,12 +27,13 @@ fn a_link_printed_on_the_first_clock_tick_is_live() {
 #[test]
 fn a_chat_ask_reaches_the_root_as_a_party_ask() {
     let ask = core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: REPLY,
         sign_in: 3,
         key: [5; 16],
         ask: super::fixtures::chat(1, b"question"),
     });
-    let Ok(root::PartyInput::Ask { reply_to, sign_in, key, ask }) = translation::to_root(ask) else {
+    let Ok(root::PartyInput::Ask { models: _, reply_to, sign_in, key, ask }) = translation::to_root(ask) else {
         panic!("party ask")
     };
     assert_eq!(reply_to, REPLY);
@@ -60,6 +61,7 @@ fn not_ready_uses_the_clients_reply_vocabulary() {
         (
             "ask",
             root::PartyInput::Ask {
+                models: Box::new([]),
                 reply_to: REPLY,
                 sign_in: 3,
                 key: [5; 16],
@@ -241,4 +243,20 @@ fn a_clients_listener_failure_stops_the_engine() {
     service.told.push(skein_io::Event::Closed { owner: Token::new(crate::tokens::SERVER) });
     super::fixtures::turn(&mut service);
     assert_eq!(service.end(), Some(&crate::End::Stopped(crate::Stop::Listener)));
+}
+
+#[test]
+fn original_model_names_reach_the_root() {
+    let mut ask = super::fixtures::chat(1, b"question");
+    let people::Ask::Create { batch, .. } = &mut ask else { panic!("fixture creates a chat") };
+    batch[0].authority.models = Some(people::Models::Named(1));
+    let event = core::Event::People(people::Event::Ask {
+        reply_to: REPLY,
+        sign_in: 3,
+        key: [5; 16],
+        ask,
+        models: Box::new([Box::from(b"small".as_slice())]),
+    });
+    let Ok(root::PartyInput::Ask { models, .. }) = translation::to_root(event) else { panic!("party ask") };
+    assert_eq!(models.as_ref(), &[Box::<[u8]>::from(b"small".as_slice())]);
 }

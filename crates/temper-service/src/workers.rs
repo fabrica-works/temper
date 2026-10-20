@@ -311,7 +311,10 @@ fn delivery(now: Time, channel: Token, down: host::LinkDown, values: &Values) ->
     let grants = match &down {
         host::LinkDown::Assign { assignment } => values.grants(&assignment.assignment.grants, now),
         host::LinkDown::Grant { grant, .. } => values.grants(::core::slice::from_ref(grant), now),
-        host::LinkDown::Message { .. }
+        host::LinkDown::Sources { .. }
+        | host::LinkDown::Check { .. }
+        | host::LinkDown::SignOut { .. }
+        | host::LinkDown::Message { .. }
         | host::LinkDown::Relayed { .. }
         | host::LinkDown::TurnKept { .. }
         | host::LinkDown::Acknowledge { .. }
@@ -396,7 +399,9 @@ pub fn parts(up: &host::LinkUp, parts: &[Part], limits: &wire::Limits) -> Option
             ),
             host::Ending::Refused(_) => (None, None),
         },
-        host::LinkUp::Activity { .. }
+        host::LinkUp::Logins { .. }
+        | host::LinkUp::SignedOut { .. }
+        | host::LinkUp::Activity { .. }
         | host::LinkUp::Unauthorized { .. }
         | host::LinkUp::Limited { .. }
         | host::LinkUp::AccountRefused { .. }
@@ -469,6 +474,7 @@ pub fn limits(settings: &crate::settings::Engine) -> Option<kit::Limits> {
     let link = jig.link;
     let ceilings = jig_protocol_worker_wire::CEILINGS;
     let sizes = jig_protocol_worker_wire::sizes::Sizes {
+        program_sources: core.fleet.program_sources,
         charter: u32::try_from(hub.charter_bytes).ok()?,
         transcript: u32::try_from(hub.transcript_bytes).ok()?,
         turn: u32::try_from(hub.turn_bytes).ok()?,

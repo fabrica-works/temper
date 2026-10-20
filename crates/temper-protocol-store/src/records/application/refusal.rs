@@ -302,6 +302,18 @@ pub(super) fn decode_limit_kind(value: w::LimitKind) -> p::LimitKind {
 }
 pub(super) fn encode_refusal(value: &p::Refusal, l: &w::Limits) -> Result<w::Refusal, w::Problem> {
     Ok(match value {
+        p::Refusal::Account { account, why } => w::Refusal::Account(w::RefusalAccount::new(
+            l,
+            w::RefusalAccountParts {
+                account: *account,
+                why: match why {
+                    p::AccountWhy::Unknown => w::AccountWhy::Unknown,
+                    p::AccountWhy::Provider => w::AccountWhy::Provider,
+                    p::AccountWhy::Uses => w::AccountWhy::Uses,
+                    p::AccountWhy::Limited => w::AccountWhy::Limited,
+                },
+            },
+        )?),
         p::Refusal::NotWellFormed { at, why } => w::Refusal::NotWellFormed(w::RefusalNotWellFormed::new(
             l,
             w::RefusalNotWellFormedParts {
@@ -360,6 +372,15 @@ pub(super) fn encode_refusal(value: &p::Refusal, l: &w::Limits) -> Result<w::Ref
 }
 pub(super) fn decode_refusal(value: w::Refusal) -> p::Refusal {
     match value {
+        w::Refusal::Account(value) => p::Refusal::Account {
+            account: value.account(),
+            why: match value.why() {
+                w::AccountWhy::Unknown => p::AccountWhy::Unknown,
+                w::AccountWhy::Provider => p::AccountWhy::Provider,
+                w::AccountWhy::Uses => p::AccountWhy::Uses,
+                w::AccountWhy::Limited => p::AccountWhy::Limited,
+            },
+        },
         w::Refusal::NotWellFormed(value) => p::Refusal::NotWellFormed {
             at: value.at(),
             why: match value.why() {

@@ -42,28 +42,16 @@ The digest hashes the secret without its final newline. Keep both files
 private; the worker receives the secret and the engine receives its digest.
 
 ```sh
-mkdir -m 700 -p secrets accounts
+mkdir -m 700 -p secrets
 secret=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
 printf '%s\n' "$secret" > secrets/worker.secret
 printf %s "$secret" | sha256sum | cut -d' ' -f1 > secrets/worker.digest
 unset secret
 ```
 
-## Step 4. Hand in your LLM account
+## Step 4. LLM sign-in (off until JP13)
 
-Build `tools/live-login` from the checkout and put `live-login` on your
-PATH. With your existing Codex login at `~/.codex/auth.json`, run:
-
-```sh
-TEMPER_LIVE_MODEL=gpt-6-luna live-login ~/.codex/auth.json "$PWD/accounts"
-mv accounts/live-account.json accounts/llm.json
-chmod 600 accounts/llm.json
-```
-
-The file has jig's `access_token`, `expires_at` (Unix seconds), and
-`account_id` members. An account handed in is never refreshed: a lapsed
-one is handed in again. The real account and the work requested in
-steps 4 and 8 belong to the dogfood run.
+Off until JP13 (fallback D): the owned example's Codex adapter needs a signed-in account and refuses deployment API keys; configured account files are no longer read.
 
 ## Step 5. Start the box and keep its terminal
 
@@ -128,13 +116,10 @@ to `1`. Keep **It runs CI** checked. Choose **Adopt** and wait for
 collaborator on the repository and adds its webhook. Type `q` to leave
 the client.
 
-## Step 8. Ask for work, stop, and start again
+## Step 8. Ask for work (off until JP13)
 
-Open the client again with the link, choose the repository, and ask for
-a small change. The agent uses the coding charter, pushes its branch,
-and waits for CI and the rule's review before landing. These requests
-use the real account from step 4.
+Off until JP13 (fallback D): live work needs the signed-in account deferred in step 4.
 
 Stop the box with Ctrl-C in its terminal. Start it again with the same
-command; use its new link to reopen the client and find the work. Your
+command; use its new link to reopen the client. Your
 backups are yours: copy the forge directory and `state` with the box stopped.

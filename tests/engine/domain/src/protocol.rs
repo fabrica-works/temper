@@ -106,6 +106,7 @@ fn link(channel: Token, link: engine::Link) -> engine::Event {
 /// runs' terminals by outcome bytes, and every typed answer it rendered.
 #[derive(Debug, Default)]
 pub struct Protocol {
+    pub sign_in_sources: BTreeSet<u32>,
     calls: BTreeMap<Box<[u8]>, engine::Call>,
     undecodable: BTreeSet<Box<[u8]>>,
     ends: BTreeMap<Box<[u8]>, tasks::End>,
@@ -188,6 +189,13 @@ impl Protocol {
     /// Returns the request when it is not the protocol layer's to answer.
     pub fn play(&mut self, request: engine::Request) -> Result<Vec<engine::Event>, Box<engine::Request>> {
         match request {
+            engine::Request::Worker(engine::WorkerRequest::Deliver(engine::Delivery::Link {
+                channel,
+                down: host::LinkDown::Sources { sources },
+            })) => {
+                assert!(sources.is_empty(), "this worker fixture has no configured program sources");
+                Ok(vec![up(channel, host::LinkUp::Logins { logins: Box::new([]) }, engine::Parts::none())])
+            }
             engine::Request::Worker(engine::WorkerRequest::Host(host_request)) => match *host_request {
                 engine::HostRequest::Decode { to, task, attempt, call } => match self.calls.get(&call.name) {
                     Some(body) => {
@@ -231,10 +239,10 @@ impl Protocol {
                 self.accounts.push(request.clone());
                 Ok(match request {
                     accounts::Request::Component(accounts::ToComponent::Want { account }) => {
-                        vec![granted(account, 1)]
+                        vec![granted(account, 1, self.sign_in_sources.contains(&account))]
                     }
                     accounts::Request::Component(accounts::ToComponent::Rejected { account, generation }) => {
-                        vec![granted(account, generation + 1)]
+                        vec![granted(account, generation + 1, self.sign_in_sources.contains(&account))]
                     }
                     accounts::Request::Component(
                         accounts::ToComponent::Release { .. } | accounts::ToComponent::Close,
@@ -260,9 +268,9 @@ impl Protocol {
     }
 }
 
-fn granted(account: u32, generation: u64) -> engine::Event {
+fn granted(account: u32, generation: u64, sign_in: bool) -> engine::Event {
     engine::Event::Account(accounts::Event::Component(accounts::FromComponent::Granted {
-        form: accounts::Form::Credential(accounts::Scheme::Bearer),
+        form: accounts::Form::Credential(if sign_in { accounts::Scheme::Bearer } else { accounts::Scheme::Key }),
         account,
         generation,
         valid: Duration::from_secs(3600),

@@ -70,34 +70,37 @@ fn configured() -> Driver {
     limits.journal.held = 1536;
     limits.journal.transcript_bytes = 32768;
     limits.journal.result_bytes = 1024;
-    let mut config = world::config(903);
-    let mut rules = config.core.authority.rules().clone();
-    // Leave the standing goal and chat room to fund their planned delegates.
-    rules.maximum_run_spend = 10;
-    rules.ceiling.tools = authority::Tools(3);
-    rules.ceiling.delegation.depth = 2;
-    rules.ceiling.delegation.tasks = 4;
-    let mut domain = authority::Domain::new(rules, limits.authority).expect("larger authority");
-    let mut policy = config.core.authority.policy(1).expect("configured project").clone();
-    policy.ceiling.tools = authority::Tools(3);
-    policy.ceiling.delegation.depth = 2;
-    policy.ceiling.delegation.tasks = 4;
-    let mut owner = policy.roles[0].clone();
-    owner.authority.tools = authority::Tools(3);
-    owner.authority.delegation.depth = 2;
-    owner.authority.delegation.tasks = 4;
-    let mut maintainer = owner.clone();
-    maintainer.number = 1;
-    let mut member = owner.clone();
-    member.number = 2;
-    member.authority.budget.spend = 100;
-    member.period_spend = 500;
-    member.decides = authority::Proposals(0);
-    policy.roles = Box::new([owner, maintainer, member]);
-    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
-    assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    config.core.authority = domain;
+    let config = std::array::from_fn(|_| {
+        let mut config = world::config(903);
+        let mut rules = config.core.authority.rules().clone();
+        // Leave the standing goal and chat room to fund their planned delegates.
+        rules.maximum_run_spend = 10;
+        rules.ceiling.tools = authority::Tools(3);
+        rules.ceiling.delegation.depth = 2;
+        rules.ceiling.delegation.tasks = 4;
+        let mut domain = authority::Domain::new(rules, limits.authority).expect("larger authority");
+        let mut policy = config.core.authority.policy(1).expect("configured project").clone();
+        policy.ceiling.tools = authority::Tools(3);
+        policy.ceiling.delegation.depth = 2;
+        policy.ceiling.delegation.tasks = 4;
+        let mut owner = policy.roles[0].clone();
+        owner.authority.tools = authority::Tools(3);
+        owner.authority.delegation.depth = 2;
+        owner.authority.delegation.tasks = 4;
+        let mut maintainer = owner.clone();
+        maintainer.number = 1;
+        let mut member = owner.clone();
+        member.number = 2;
+        member.authority.budget.spend = 100;
+        member.period_spend = 500;
+        member.decides = authority::Proposals(0);
+        policy.roles = Box::new([owner, maintainer, member]);
+        let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
+        authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
+        assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
+        config.core.authority = domain;
+        config
+    });
     Driver::configured(Store::new(), config, &limits)
 }
 
@@ -165,6 +168,7 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
     let (maintainer, maintainer_session) = sign_in(&mut driver, 8, 302);
     let (member, member_session) = sign_in(&mut driver, 9, 303);
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(304)),
         sign_in: owner_session,
         key: [34; 16],
@@ -179,6 +183,7 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
     }));
     driver.settle();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(305)),
         sign_in: member_session,
         key: [35; 16],
@@ -203,6 +208,7 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
             .any(|row| matches!(row, Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(_)))))
     );
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(306)),
         sign_in: maintainer_session,
         key: [36; 16],
@@ -364,6 +370,7 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
     driver.settle();
     let (_, owner_session) = sign_in(&mut driver, 7, 401);
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(402)),
         sign_in: owner_session,
         key: [42; 16],
@@ -396,6 +403,7 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
     world::run_assignment(&mut driver, &first, &mut planner);
     assert!(matches!(planner.answer(), run::Answer::Parked { .. }));
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(403)),
         sign_in: owner_session,
         key: [43; 16],

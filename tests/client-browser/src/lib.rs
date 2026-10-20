@@ -114,8 +114,12 @@ impl Tier {
             format!("http://{socket}/bundle/{}/issuer.webmanifest", digest.file_name().to_str().expect("digest"));
         value["application"]["clients"]["bundle"] = serde_json::json!(private_bundle);
         value["engine"]["limits"]["overrides"]["accounts.sign_in_deadline_ms"] = 2000.into();
+        // Keep git concurrency at one so the small profile's 48 sockets hold the accounts' driver,
+        // which this provider's sign-in adds.
+        value["application"]["limits"]["overrides"]["git_component.operations"] = 1.into();
+        value["application"]["limits"]["overrides"]["checkout.workspaces"] = 1.into();
         value["engine"]["llm"]["providers"] = serde_json::json!([{
-            "name":"Test provider", "number":17, "models":["fake"],
+            "name":"Test provider", "number":17, "signed_in_plan":false, "models":["fake"],
             "sources":{"keys":true,"sign_in":{
                 "issuer":"http://127.0.0.1:9", "client":"temper-test", "scopes":["openid","chat"],
                 "authorization":"http://127.0.0.1:9/authorize", "token":"http://127.0.0.1:9/token",

@@ -193,6 +193,9 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     }
     if let Some(accounts) = &mut engine.accounts {
         accounts.iterate(now, wall, &mut engine.values, &mut engine.events, &mut engine.store);
+        if let Some(problems) = accounts.startup_problem() {
+            engine.end = Some(End::Stopped(crate::Stop::Start(problems)));
+        }
     }
     engine.forge.env.now = now;
     engine.forge.env.wall = wall;
@@ -316,7 +319,7 @@ fn release(engine: &mut Engine) {
     engine.domain.reclaim();
     stop::advance(engine);
 }
-fn answer(engine: &mut Engine) {
+pub(crate) fn answer(engine: &mut Engine) {
     if engine.end.is_some() {
         for _ in 0..engine.store.above.len() {
             let _late = engine.store.above.pop();

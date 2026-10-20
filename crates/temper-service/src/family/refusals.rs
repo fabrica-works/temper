@@ -5,6 +5,18 @@ use jig_domain_people as p;
 use skein_lib::Writer;
 pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusal, w::Problem> {
     Ok(match value {
+        p::Refusal::Account { account, why } => w::Refusal::Account(w::RefusalAccount::new(
+            limits,
+            w::RefusalAccountParts {
+                account,
+                why: match why {
+                    p::AccountWhy::Unknown => w::AccountWhy::Unknown,
+                    p::AccountWhy::Provider => w::AccountWhy::Provider,
+                    p::AccountWhy::Uses => w::AccountWhy::Uses,
+                    p::AccountWhy::Limited => w::AccountWhy::Limited,
+                },
+            },
+        )?),
         p::Refusal::NotWellFormed { at, why } => w::Refusal::Malformed(w::RefusalMalformed::new(
             limits,
             w::RefusalMalformedParts {
@@ -49,10 +61,7 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
         p::Refusal::NoFurther => w::Refusal::NoFurther,
         p::Refusal::Unknown => w::Refusal::Unknown,
         p::Refusal::NotOffered => w::Refusal::NotOffered,
-        // The upstream client cannot encode this account-only refusal until w1d.
-        p::Refusal::Provider => {
-            return Err(w::Problem { path: w::Path::OwnedRecord, reason: skein_codec::Reason::Tag });
-        }
+        p::Refusal::Provider => w::Refusal::Provider,
         p::Refusal::NoEscalationHolder => w::Refusal::NoEscalationHolder,
         p::Refusal::KeyConflict => w::Refusal::KeyConflict,
         // As jig's entrance facts: only a made or amended task's refusal names a model, by the

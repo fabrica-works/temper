@@ -164,6 +164,7 @@ pub fn held_chat(front: &mut Joint) -> u64 {
     driver.sign_in();
     driver.settle();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: skein_lib::ReplyTo::new(Token::new(1001)),
         sign_in: driver.session(),
         key: [31; 16],
@@ -275,6 +276,7 @@ pub fn question(front: &mut Joint, words: &[u8]) -> u64 {
     driver.sign_in();
     driver.settle();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: skein_lib::ReplyTo::new(QUESTION_CHAT_REPLY),
         sign_in: driver.session(),
         key: QUESTION_CHAT_KEY,
@@ -355,6 +357,7 @@ pub fn chat(front: &mut Joint, words: &[u8]) -> u64 {
     driver.sign_in();
     driver.settle();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: skein_lib::ReplyTo::new(CHAT_REPLY),
         sign_in: driver.session(),
         key: CHAT_KEY,
@@ -478,6 +481,7 @@ fn make_goal(front: &mut Joint, procedure: bool) -> u64 {
             jig_domain_people::Contract::Change { connector: FORGE_CONNECTOR, kind: FORGE_CHANGE, words: REPORT_BYTES };
     }
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: skein_lib::ReplyTo::new(GOAL_REPLY),
         sign_in: driver.session(),
         key: GOAL_KEY,

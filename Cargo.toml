@@ -114,6 +114,7 @@ temper = { path = "crates/temper" }
 skein-scratch = { git = "https://github.com/fabrig-dev/skein.git" }
 temper-service = { path = "crates/temper-service" }
 jig-protocol-config = { git = "https://github.com/fabrig-dev/jig.git" }
+smith-protocol-program = { git = "https://github.com/fabrig-dev/smith.git" }
 smith-host-protocol = { git = "https://github.com/fabrig-dev/smith.git" }
 temper-worker-protocol-git-world = { path = "tests/worker/protocol-git" }
 temper-worker-protocol-git = { path = "crates/temper-worker-protocol-git" }

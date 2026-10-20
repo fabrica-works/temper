@@ -137,6 +137,13 @@ pub(crate) fn assigned(peers: &mut Peers, channel: Token, assignment: engine::As
 /// receipts its release requires.
 pub(crate) fn down(peers: &mut Peers, now: Time, down: host::LinkDown) -> Vec<r::Receipt> {
     match down {
+        host::LinkDown::Sources { sources } => {
+            assert!(sources.is_empty(), "this fixture declares no program sources");
+            Vec::new()
+        }
+        host::LinkDown::Check { .. } | host::LinkDown::SignOut { .. } => {
+            panic!("this fixture declares no program sources")
+        }
         host::LinkDown::TurnKept { run, attempt, turn } => {
             peers.worker.acknowledge_turn(run.raw(), attempt.raw(), turn);
             vec![r::Receipt::Turn(run.raw(), attempt.raw(), turn)]

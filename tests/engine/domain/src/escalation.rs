@@ -211,6 +211,7 @@ impl World {
     pub fn new(settings: Settings) -> World {
         let limits = limits();
         let config = config(settings.seed);
+        let store = crate::fixtures::restored_store(self::config(settings.seed), &limits);
         let mut world = World {
             domain: engine::Domain::new(config, &limits),
             environment: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
@@ -233,7 +234,7 @@ impl World {
             clock_offset: 0,
             recovery: Recovery::None,
             frozen_cut: None,
-            store: Store::new(),
+            store,
             referee: Referee::new(settings.story),
             unplaced_referee: None,
             trace: Vec::new(),
@@ -283,6 +284,7 @@ impl World {
     fn ask_input(&mut self, to: Token, input: &AskInput) {
         self.queue(
             engine::Event::Party(engine::PartyInput::Ask {
+                models: Box::new([]),
                 reply_to: ReplyTo::new(to),
                 sign_in: self.sessions[input.owner].expect("authenticated outside owner"),
                 key: input.key,
@@ -681,6 +683,7 @@ impl World {
     )]
     fn delivery(&mut self, delivery: Delivery) {
         match delivery {
+            Delivery::SourceSignedOut { .. } => panic!("this story issues no source sign-out"),
             Delivery::WebReply {
                 to,
                 reply: reply @ (people::Reply::Again(_) | people::Reply::Outcome(people::Outcome::Again(_))),
@@ -695,6 +698,7 @@ impl World {
                 } else {
                     self.queue(
                         engine::Event::Party(engine::PartyInput::Ask {
+                            models: Box::new([]),
                             reply_to: ReplyTo::new(Token::new(103)),
                             sign_in: self.sessions[0].expect("requester signed in"),
                             key: [5; 16],

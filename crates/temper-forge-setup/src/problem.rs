@@ -53,7 +53,6 @@ impl Problems {
                 | config::What::HandedIn
                 | config::What::Reserve { .. }
                 | config::What::Budget { .. }
-                | config::What::Accounts { .. }
                 | config::What::Grace { .. }
                 | config::What::Operations { .. }
                 | config::What::Message

@@ -89,3 +89,32 @@ fn a_sign_in_started_answer_is_followed_by_its_actual_end_on_the_accounts_watch(
     assert!(d::pages::accounts::document(root.client()).expect("account fixture state").last_end.is_some());
     assert_eq!(root.pages().accounts().expect("account fixture state").sign_in_address(root.client()), None);
 }
+
+#[test]
+fn a_client_shows_a_third_account_at_two_rows() {
+    // Three independently keyed adds exercise one row beyond the client's two-row bound.
+    const NAMES: [[u8; 16]; 3] = [[113; 16], [114; 16], [115; 16]];
+    let (mut front, mut root) = accounts::small_rows_fixture(fixtures::SEED);
+    accounts::event(&mut front, &mut root, select());
+    for name in NAMES {
+        accounts::event(
+            &mut front,
+            &mut root,
+            d::Event::AccountKey { value: Secret::new(Box::from(b"test-private-key".as_slice())) }.into(),
+        );
+        accounts::event(&mut front, &mut root, act(Act::Submit { name, operation: Operation::AddKey }));
+        accounts::kept(&mut front);
+        accounts::settle(&mut front, &mut root);
+    }
+    let doc = d::pages::accounts::document(root.person().client()).expect("accounts document");
+    let third = doc.accounts.get(2).expect("third account decoded whole").number;
+    let mut limits = fixtures::domain_limits();
+    limits.client.domain.rows = accounts::SMALL_ROWS;
+    let words = fixtures::phrasebooks(&limits);
+    let bounds = fixtures::view_bounds(&limits, &words);
+    let mut view = temper_client_view::View::new(&bounds, &limits, words, fixtures::FORGE);
+    temper_client_view::build(&mut view, root.person(), &mut skein_lib::Queue::with_capacity(bounds.tree.patches));
+    let text: Vec<u8> =
+        view.tree().nodes().iter().flat_map(|node| node.text.iter().flat_map(|run| run.text.iter().copied())).collect();
+    assert!(String::from_utf8(text).expect("view text").contains(&format!("Account {third}")));
+}

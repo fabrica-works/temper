@@ -17,6 +17,9 @@ pub const ACCOUNT_RESET: Duration = Duration::from_millis(5);
 pub fn limits() -> Limits {
     Limits {
         host: host::Limits {
+            program_sources: 12,
+            source_interval: Duration::from_secs(60),
+            source_timeout: Duration::from_secs(10),
             slots: 2,
             accounts: 4,
             charter_bytes: 8_192,

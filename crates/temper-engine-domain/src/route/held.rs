@@ -11,6 +11,42 @@ use jig_domain_host as host;
 #[expect(clippy::too_many_lines, reason = "one exhaustive dispatcher releases every held core output")]
 pub(crate) fn held(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decision, held: core::Held) {
     match held {
+        core::Held::Sources { channel, sources } => {
+            let mut names = skein_lib::List::with_capacity(u32::try_from(sources.len()).expect("bounded sources"));
+            for name in sources {
+                names
+                    .push(host::SourceName::new(name.as_bytes()).expect("same source grammar"))
+                    .expect("one name per source");
+            }
+            emit(
+                decision,
+                &env.limits,
+                Delivery::Link { channel, down: host::LinkDown::Sources { sources: names.into_boxed() } },
+            );
+        }
+        core::Held::CheckSource { channel, name } => emit(
+            decision,
+            &env.limits,
+            Delivery::Link {
+                channel,
+                down: host::LinkDown::Check {
+                    name: host::SourceName::new(name.as_bytes()).expect("same source grammar"),
+                },
+            },
+        ),
+        core::Held::SignOutSource { channel, name } => emit(
+            decision,
+            &env.limits,
+            Delivery::Link {
+                channel,
+                down: host::LinkDown::SignOut {
+                    name: host::SourceName::new(name.as_bytes()).expect("same source grammar"),
+                },
+            },
+        ),
+        core::Held::SourceSignedOut { to, channel, name, result } => {
+            emit(decision, &env.limits, Delivery::SourceSignedOut { to, channel, name, result });
+        }
         core::Held::Load(load) => super::now::now(domain, env, decision, *load),
         core::Held::SettledCall { to, call, .. } => {
             host_route::settled(domain, &env.limits, decision, to, call);

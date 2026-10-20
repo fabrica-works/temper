@@ -91,187 +91,190 @@ impl World {
         documents: Option<jig_domain_core::documents::DocumentLimits>,
     ) -> Self {
         let paths::Gate { approval, agent: agent_gate, owner: owner_gate } = gate;
-        let mut limits = walking::limits();
-        limits.people.amendment_bytes =
-            jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.people.amendment_bytes;
-        limits.people.people = 4;
-        limits.people.holdings = 4;
-        if owner_gate {
-            limits.people.amendment_bytes = 2048;
-        }
-        limits.journal.writes += (people::max_out(&limits.people) - people::max_out(&walking::limits().people)) * 4;
-        let mut config = walking::config(71);
-        if approval.is_some() || agent_gate || owner_gate {
-            limits.authority.roles = 3;
-        }
-        if documents.is_some() {
-            limits.authority.roles = 2;
-        }
-        if with_change {
-            limits.authority.requirements = 8;
-            limits.authority.facts = 8;
-        }
-        if with_change {
-            limits.brief.gather = Duration::from_secs(5);
-            limits.brief.read_bytes = 512;
-            limits.brief.budgets.pull = 384;
-            limits.brief.budgets.ci = 384;
-            limits.brief.brief_bytes = 768;
-            limits.tasks.tasks = 12;
-            limits.tasks.project_tasks = 12;
-            limits.tasks.delegates = 4;
-            limits.tasks.tree_tasks = 12;
-            limits.tasks.depth = 3;
-            limits.tasks.parameters = 8;
-            limits.tasks.spec_bytes = 512;
-            limits.tasks.executor_kinds = 2;
-            limits.tasks.authority_grants = 10;
-            limits.journal.run_bytes = 8192;
-            limits.tasks.authority_segments = 9;
-            limits.tasks.authority_bytes = 512;
-            limits.tasks.contract_choices = 2;
-            limits.tasks.inbox_messages = 8;
-            limits.tasks.inbox_bytes = 1024;
-            limits.authority.executors = 2;
-            limits.authority.batch = 2;
-            limits.authority.grants = 10;
-            limits.authority.segments = 9;
-            limits.authority.segment_bytes = 64;
-            limits.authority.writes = 2;
-            limits.journal.writes += 64;
-            // The tasks child's whole route grew with jig's task families.
-            limits.journal.writes = 8192;
-            limits.journal.deliveries = 256;
-            limits.journal.held = 1024;
-            limits.journal.result_bytes = 4096;
-            limits.journal.transcript_bytes = 32_768;
-            limits.fleet.slots = 2;
-            limits.fleet.workstreams = 2;
-            // The core's inbox census and waiting entries cover every live task.
-            limits.people.inbox_tasks = 24;
-            limits.people.inbox_recipients = 32;
-        }
-        if with_read {
-            limits.tasks.inbox_bytes = limits.tasks.inbox_bytes.max(256);
-            if !with_change {
-                limits.authority.grants = 4;
+        let [(bootstrap, mut limits), (config, _)] = std::array::from_fn(|_| {
+            let mut limits = walking::limits();
+            limits.people.amendment_bytes =
+                jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.people.amendment_bytes;
+            limits.people.people = 4;
+            limits.people.holdings = 4;
+            if owner_gate {
+                limits.people.amendment_bytes = 2048;
             }
-            limits.authority.segments = 9;
-            limits.authority.segment_bytes = 64;
-            if !with_change {
-                limits.tasks.authority_grants = 2;
-            }
-            limits.tasks.authority_segments = 9;
-            if !with_change {
-                limits.tasks.authority_bytes = 64;
-            }
-            let grant = authority::Grant {
-                connector: 0,
-                kind: 1,
-                pattern: authority::Pattern {
-                    segments: Box::new([
-                        Box::from(&b"forge"[..]),
-                        Box::from(&b"forge.example"[..]),
-                        Box::from(&b"org"[..]),
-                    ]),
-                    last: authority::Last::Open(Box::from(&b"repo"[..])),
-                },
-            };
-            let effect_grant = authority::Grant { kind: 8, ..grant.clone() };
-            let mut rules = config.core.authority.rules().clone();
-            if with_change {
-                // The chat's 100-unit allotment must retain room for its 20-unit delegate
-                // after the run reserves its capped allowance at claim.
-                rules.maximum_run_spend = 60;
-            }
-            rules.ceiling.tools = authority::Tools(1023);
-            let grants: Box<[authority::Grant]> = if with_change {
-                Box::new([
-                    grant.clone(),
-                    effect_grant.clone(),
-                    authority::Grant { kind: 2, ..grant.clone() },
-                    authority::Grant { kind: 3, ..grant.clone() },
-                    authority::Grant { kind: 4, ..grant.clone() },
-                    authority::Grant { kind: 10, ..grant.clone() },
-                    authority::Grant { kind: 11, ..grant.clone() },
-                    authority::Grant { kind: 12, ..grant.clone() },
-                ])
-            } else {
-                Box::new([grant.clone(), effect_grant.clone()])
-            };
-            let mut ceiling_grants = List::with_capacity(limits.authority.grants);
-            for grant in &grants {
-                ceiling_grants.push(grant.clone()).expect("configured task grants");
-            }
-            ceiling_grants.push(authority::Grant { kind: 7, ..grant.clone() }).expect("projection comments");
-            ceiling_grants.push(authority::Grant { kind: 13, ..grant.clone() }).expect("projection issue sets");
-            rules.ceiling.grants = ceiling_grants.into_boxed();
+            limits.journal.writes += (people::max_out(&limits.people) - people::max_out(&walking::limits().people)) * 4;
+            let mut config = walking::config(71);
             if approval.is_some() || agent_gate || owner_gate {
-                let landing: Box<[engine::LandingRule]> = Box::new([engine::LandingRule {
+                limits.authority.roles = 3;
+            }
+            if documents.is_some() {
+                limits.authority.roles = 2;
+            }
+            if with_change {
+                limits.authority.requirements = 8;
+                limits.authority.facts = 8;
+            }
+            if with_change {
+                limits.brief.gather = Duration::from_secs(5);
+                limits.brief.read_bytes = 512;
+                limits.brief.budgets.pull = 384;
+                limits.brief.budgets.ci = 384;
+                limits.brief.brief_bytes = 768;
+                limits.tasks.tasks = 12;
+                limits.tasks.project_tasks = 12;
+                limits.tasks.delegates = 4;
+                limits.tasks.tree_tasks = 12;
+                limits.tasks.depth = 3;
+                limits.tasks.parameters = 8;
+                limits.tasks.spec_bytes = 512;
+                limits.tasks.executor_kinds = 2;
+                limits.tasks.authority_grants = 10;
+                limits.journal.run_bytes = 8192;
+                limits.tasks.authority_segments = 9;
+                limits.tasks.authority_bytes = 512;
+                limits.tasks.contract_choices = 2;
+                limits.tasks.inbox_messages = 8;
+                limits.tasks.inbox_bytes = 1024;
+                limits.authority.executors = 2;
+                limits.authority.batch = 2;
+                limits.authority.grants = 10;
+                limits.authority.segments = 9;
+                limits.authority.segment_bytes = 64;
+                limits.authority.writes = 2;
+                limits.journal.writes += 64;
+                // The tasks child's whole route grew with jig's task families.
+                limits.journal.writes = 8192;
+                limits.journal.deliveries = 256;
+                limits.journal.held = 1024;
+                limits.journal.result_bytes = 4096;
+                limits.journal.transcript_bytes = 32_768;
+                limits.fleet.slots = 2;
+                limits.fleet.workstreams = 2;
+                // The core's inbox census and waiting entries cover every live task.
+                limits.people.inbox_tasks = 24;
+                limits.people.inbox_recipients = 32;
+            }
+            if with_read {
+                limits.tasks.inbox_bytes = limits.tasks.inbox_bytes.max(256);
+                if !with_change {
+                    limits.authority.grants = 4;
+                }
+                limits.authority.segments = 9;
+                limits.authority.segment_bytes = 64;
+                if !with_change {
+                    limits.tasks.authority_grants = 2;
+                }
+                limits.tasks.authority_segments = 9;
+                if !with_change {
+                    limits.tasks.authority_bytes = 64;
+                }
+                let grant = authority::Grant {
                     connector: 0,
-                    kind: 4,
-                    enforce: !owner_gate,
+                    kind: 1,
                     pattern: authority::Pattern {
                         segments: Box::new([
                             Box::from(&b"forge"[..]),
                             Box::from(&b"forge.example"[..]),
                             Box::from(&b"org"[..]),
-                            Box::from(&b"repo"[..]),
-                            Box::from(&b"branch"[..]),
                         ]),
-                        last: authority::Last::Exact(Box::from(&b"main"[..])),
+                        last: authority::Last::Open(Box::from(&b"repo"[..])),
                     },
-                    ci: true,
-                    up_to_date: true,
-                    gates: if agent_gate || owner_gate {
-                        Box::new([engine::Gate { number: 1, blocking: true, freshness: engine::Freshness::Exact }])
-                    } else {
-                        Box::new([])
-                    },
-                    approvals: match approval {
-                        Some(freshness) => Box::new([engine::Approval { role: 2, people: 1, freshness }]),
-                        None => Box::new([]),
-                    },
-                }]);
-                if !owner_gate {
-                    config.landing.deployment.clone_from(&landing);
+                };
+                let effect_grant = authority::Grant { kind: 8, ..grant.clone() };
+                let mut rules = config.core.authority.rules().clone();
+                if with_change {
+                    // The chat's 100-unit allotment must retain room for its 20-unit delegate
+                    // after the run reserves its capped allowance at claim.
+                    rules.maximum_run_spend = 60;
                 }
-                assert!(config.landing.projects.insert(1, landing).is_ok());
+                rules.ceiling.tools = authority::Tools(1023);
+                let grants: Box<[authority::Grant]> = if with_change {
+                    Box::new([
+                        grant.clone(),
+                        effect_grant.clone(),
+                        authority::Grant { kind: 2, ..grant.clone() },
+                        authority::Grant { kind: 3, ..grant.clone() },
+                        authority::Grant { kind: 4, ..grant.clone() },
+                        authority::Grant { kind: 10, ..grant.clone() },
+                        authority::Grant { kind: 11, ..grant.clone() },
+                        authority::Grant { kind: 12, ..grant.clone() },
+                    ])
+                } else {
+                    Box::new([grant.clone(), effect_grant.clone()])
+                };
+                let mut ceiling_grants = List::with_capacity(limits.authority.grants);
+                for grant in &grants {
+                    ceiling_grants.push(grant.clone()).expect("configured task grants");
+                }
+                ceiling_grants.push(authority::Grant { kind: 7, ..grant.clone() }).expect("projection comments");
+                ceiling_grants.push(authority::Grant { kind: 13, ..grant.clone() }).expect("projection issue sets");
+                rules.ceiling.grants = ceiling_grants.into_boxed();
+                if approval.is_some() || agent_gate || owner_gate {
+                    let landing: Box<[engine::LandingRule]> = Box::new([engine::LandingRule {
+                        connector: 0,
+                        kind: 4,
+                        enforce: !owner_gate,
+                        pattern: authority::Pattern {
+                            segments: Box::new([
+                                Box::from(&b"forge"[..]),
+                                Box::from(&b"forge.example"[..]),
+                                Box::from(&b"org"[..]),
+                                Box::from(&b"repo"[..]),
+                                Box::from(&b"branch"[..]),
+                            ]),
+                            last: authority::Last::Exact(Box::from(&b"main"[..])),
+                        },
+                        ci: true,
+                        up_to_date: true,
+                        gates: if agent_gate || owner_gate {
+                            Box::new([engine::Gate { number: 1, blocking: true, freshness: engine::Freshness::Exact }])
+                        } else {
+                            Box::new([])
+                        },
+                        approvals: match approval {
+                            Some(freshness) => Box::new([engine::Approval { role: 2, people: 1, freshness }]),
+                            None => Box::new([]),
+                        },
+                    }]);
+                    if !owner_gate {
+                        config.landing.deployment.clone_from(&landing);
+                    }
+                    assert!(config.landing.projects.insert(1, landing).is_ok());
+                }
+                if with_change {
+                    rules.ceiling.delegation.kinds =
+                        Box::new([authority::Executor::Charter(1), authority::Executor::Procedure(2)]);
+                    rules.ceiling.delegation.tasks = 12;
+                    rules.ceiling.delegation.depth = 3;
+                }
+                let mut policy = config.core.authority.policy(1).expect("walk policy").clone();
+                policy.ceiling.tools = authority::Tools(1023);
+                policy.ceiling.grants.clone_from(&rules.ceiling.grants);
+                policy.projections.clone_from(&rules.ceiling.grants);
+                if approval.is_some() || agent_gate || owner_gate {
+                    let mut maintainer = policy.roles[0].clone();
+                    maintainer.number = 1;
+                    let mut member = maintainer.clone();
+                    member.number = 2;
+                    policy.roles = Box::new([policy.roles[0].clone(), maintainer, member]);
+                }
+                policy.roles[0].authority.tools = authority::Tools(1023);
+                policy.roles[0].authority.grants.clone_from(&grants);
+                if with_change {
+                    policy.ceiling.delegation = rules.ceiling.delegation.clone();
+                    policy.roles[0].authority.delegation = rules.ceiling.delegation.clone();
+                }
+                if documents.is_some() {
+                    paths::add_reader(&mut policy);
+                }
+                let mut domain = authority::Domain::new(rules, limits.authority).expect("read authority rules");
+                let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
+                authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut facts);
+                assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project: 1 }));
+                // A chat's authority is its role's, one level shallower (jig a2616181).
+                config.core.authority = domain;
             }
-            if with_change {
-                rules.ceiling.delegation.kinds =
-                    Box::new([authority::Executor::Charter(1), authority::Executor::Procedure(2)]);
-                rules.ceiling.delegation.tasks = 12;
-                rules.ceiling.delegation.depth = 3;
-            }
-            let mut policy = config.core.authority.policy(1).expect("walk policy").clone();
-            policy.ceiling.tools = authority::Tools(1023);
-            policy.ceiling.grants.clone_from(&rules.ceiling.grants);
-            policy.projections.clone_from(&rules.ceiling.grants);
-            if approval.is_some() || agent_gate || owner_gate {
-                let mut maintainer = policy.roles[0].clone();
-                maintainer.number = 1;
-                let mut member = maintainer.clone();
-                member.number = 2;
-                policy.roles = Box::new([policy.roles[0].clone(), maintainer, member]);
-            }
-            policy.roles[0].authority.tools = authority::Tools(1023);
-            policy.roles[0].authority.grants.clone_from(&grants);
-            if with_change {
-                policy.ceiling.delegation = rules.ceiling.delegation.clone();
-                policy.roles[0].authority.delegation = rules.ceiling.delegation.clone();
-            }
-            if documents.is_some() {
-                paths::add_reader(&mut policy);
-            }
-            let mut domain = authority::Domain::new(rules, limits.authority).expect("read authority rules");
-            let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-            authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut facts);
-            assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-            // A chat's authority is its role's, one level shallower (jig a2616181).
-            config.core.authority = domain;
-        }
-        limits.notes.scopes = 3 + limits.authority.grants;
+            limits.notes.scopes = 3 + limits.authority.grants;
+            (config, limits)
+        });
         let mut fake_config = forge_world::fake_config();
         fake_config.limits.repositories = 2;
         let mut fake = fake::Domain::new(&fake_config, 71);
@@ -304,13 +307,14 @@ impl World {
         if let Some(documents) = documents {
             limits.documents = paths::document_limits(documents, &limits);
         }
+        let store = temper_engine_domain_world::fixtures::restored_store(bootstrap, &limits);
         Self {
             creating: jig_core_world::fixtures::Creating::new(&config.core, limits.tasks.tree_tasks),
             root: engine::Domain::new(config, &limits),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(engine::max_out(&limits)),
             events: VecDeque::from([engine::Event::Restart]),
-            store: Store::new(),
+            store,
             fake,
             fake_env,
             fake_out: Queue::with_capacity(fake::MAX_OUT),
@@ -731,6 +735,7 @@ fn change_world_in(
             last: people::Last::Exact(Box::from(&b"main"[..])),
         };
         world.send(engine::Event::Party(engine::PartyInput::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(900)),
             sign_in: world.signed_in.expect("owner session"),
             key: [90; 16],
@@ -785,6 +790,7 @@ fn change_world_in(
         world.chat(1, &b"make the fix"[..])
     };
     world.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
         key: [92; 16],
@@ -1454,6 +1460,7 @@ fn an_amendment_while_gathering_discards_the_old_brief_without_claiming() {
         )
     });
     world.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(790)),
         sign_in: world.signed_in.expect("owner signed in"),
         key: [79; 16],
@@ -2121,6 +2128,7 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
     );
     world.send(protocol::hello_slots(Token::new(7), 2, Box::new([])));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(99)),
         sign_in: world.signed_in.expect("owner session"),
         key: [99; 16],
@@ -2141,6 +2149,7 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
         world.tick();
     }
     world.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(100)),
         sign_in: world.signed_in.expect("owner session"),
         key: [100; 16],
@@ -2165,6 +2174,7 @@ fn a_goal_ending_while_its_issue_is_opening_eventually_closes_that_issue() {
     world.adopt();
     world.send(protocol::hello_slots(Token::new(7), 2, Box::new([])));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(94)),
         sign_in: world.signed_in.expect("owner session"),
         key: [94; 16],
@@ -2208,6 +2218,7 @@ fn a_goal_subscription_receives_the_connectors_landing_news() {
     world.adopt();
     world.send(protocol::hello_slots(Token::new(7), 1, Box::new([])));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
         key: [92; 16],
@@ -2260,6 +2271,7 @@ fn a_goal_subscription_receives_the_connectors_landing_news() {
 fn subscribe_chat(world: &mut World, topic: forge_top::Topic, key: u8) -> u64 {
     world.send(protocol::hello_slots(Token::new(7), 1, Box::new([])));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(u64::from(key))),
         sign_in: world.signed_in.expect("owner session"),
         key: [key; 16],
@@ -2459,6 +2471,7 @@ fn an_authorized_forge_read_returns_a_bounded_typed_answer() {
     world.adopt();
     world.send(protocol::hello_slots(Token::new(7), 1, Box::new([])));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
         key: [92; 16],
@@ -2533,6 +2546,7 @@ fn a_named_forge_effect_is_committed_before_its_write_and_made_once() {
     world.adopt();
     world.send(protocol::hello_slots(Token::new(7), 1, Box::new([])));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
         key: [92; 16],
@@ -2615,6 +2629,7 @@ fn an_explicit_forge_effect_proposal_is_retained_until_its_holder_accepts() {
     world.adopt();
     world.send(protocol::hello_slots(Token::new(7), 1, Box::new([])));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
         key: [92; 16],
@@ -2654,6 +2669,7 @@ fn an_explicit_forge_effect_proposal_is_retained_until_its_holder_accepts() {
     assert!(world.store.rows.values().any(|record| matches!(record, Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::ProposedEffect(effect) if effect.number == proposal))));
     assert_eq!(issue_count(&mut world), 0);
     world.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(94)),
         sign_in: world.signed_in.expect("owner session"),
         key: [94; 16],
@@ -2671,6 +2687,7 @@ fn an_explicit_forge_effect_proposal_is_retained_until_its_holder_accepts() {
     }
     assert_eq!(issue_count(&mut world), 1);
     world.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(95)),
         sign_in: world.signed_in.expect("owner session"),
         key: [94; 16],
@@ -2715,6 +2732,7 @@ fn pending_issue_effect() -> (World, engine::Assignment) {
     world.adopt();
     world.send(protocol::hello_slots(Token::new(7), 1, Box::new([])));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
         key: [92; 16],

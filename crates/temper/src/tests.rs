@@ -109,7 +109,6 @@ fn the_standalone_envelope_retains_no_descriptors() {
     ] {
         write(name, bytes);
     }
-    write("accounts/chat.json", br#"{"access_token":"token","expires_at":4102444800,"account_id":"acc"}"#);
     let (agent, document) = configuration::documents(&directory, "/fixture/temper");
     write("agent.json", &agent);
     assert_eq!(configuration::flags(&directory).len(), 6);
@@ -154,13 +153,17 @@ fn fixed_sign_in_ports_are_checked_against_owned_listeners_only() {
     let example = include_bytes!("../../../docs/examples/owned.json");
     let mut value: serde_json::Value = serde_json::from_slice(example).expect("owned JSON");
     value["engine"]["llm"]["providers"] = serde_json::json!([{
-        "name":"OpenAI", "number":1, "models":["gpt-6-luna"], "sources":{
+        "name":"OpenAI", "number":1, "signed_in_plan":false, "models":["gpt-6-luna"], "sources":{
             "sign_in": {"issuer":"https://issuer.example", "client":"client", "scopes":[],
                 "authorization":"https://issuer.example/auth", "token":"https://issuer.example/token",
                 "keys":"https://issuer.example/keys", "transport":"tls", "server_name":"issuer.example",
                 "must_grant":[], "redirect_path":"callback", "redirect_port":3000}
         }
     }]);
+    // Keep git concurrency at one so the small profile's 48 sockets reach the
+    // redirect-port check after this fixture adds an OAuth listener.
+    value["application"]["limits"]["overrides"]["git_component.operations"] = 1.into();
+    value["application"]["limits"]["overrides"]["checkout.workspaces"] = 1.into();
     let bytes = serde_json::to_vec(&value).expect("owned JSON");
     assert_eq!(
         super::setup::check(&bytes, &jig_protocol_config::Directories::working()).expect_err("owned listen conflict"),

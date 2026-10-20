@@ -16,44 +16,48 @@ const DELEGATE: u64 = 90;
 
 #[expect(clippy::wildcard_enum_match_arm, reason = "the script selects one delivery from the closed vocabulary")]
 fn chat(seed: u64, child: bool) -> (Driver, engine::Assignment) {
-    let mut bounds = limits();
-    let mut configuration = config(seed);
-    if child {
-        bounds.tasks.tasks = 4;
-        bounds.people.inbox_tasks = 8;
-        bounds.tasks.project_tasks = 4;
-        bounds.tasks.tree_tasks = 4;
-        bounds.tasks.depth = 1;
-        bounds.tasks.delegates = 2;
-        bounds.tasks.batch = 2;
-        bounds.authority.batch = 2;
-        let mut rules = configuration.core.authority.rules().clone();
-        rules.maximum_run_spend = 60;
-        rules.ceiling.delegation.tasks = 4;
-        rules.ceiling.delegation.depth = 2;
-        let mut policy = configuration.core.authority.policy(1).expect("project policy").clone();
-        policy.ceiling.delegation.tasks = 4;
-        policy.ceiling.delegation.depth = 2;
-        policy.roles[0].authority.delegation.tasks = 4;
-        policy.roles[0].authority.delegation.depth = 2;
-        let mut domain = authority::Domain::new(rules, bounds.authority).expect("authority bounds");
-        let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
-        authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
-        assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-        configuration.core.authority = domain;
-    }
-    bounds.fleet.attempts = 5;
-    bounds.call_records = 4;
-    bounds.brief.sections = 5;
-    bounds.journal.writes = 3000;
-    bounds.journal.deliveries = 100;
-    bounds.journal.held = 300;
-    let mut driver = Driver::configured(Store::new(), configuration, &bounds);
+    let [(bootstrap, bounds), (configuration, _)] = std::array::from_fn(|_| {
+        let mut bounds = limits();
+        let mut configuration = config(seed);
+        if child {
+            bounds.tasks.tasks = 4;
+            bounds.people.inbox_tasks = 8;
+            bounds.tasks.project_tasks = 4;
+            bounds.tasks.tree_tasks = 4;
+            bounds.tasks.depth = 1;
+            bounds.tasks.delegates = 2;
+            bounds.tasks.batch = 2;
+            bounds.authority.batch = 2;
+            let mut rules = configuration.core.authority.rules().clone();
+            rules.maximum_run_spend = 60;
+            rules.ceiling.delegation.tasks = 4;
+            rules.ceiling.delegation.depth = 2;
+            let mut policy = configuration.core.authority.policy(1).expect("project policy").clone();
+            policy.ceiling.delegation.tasks = 4;
+            policy.ceiling.delegation.depth = 2;
+            policy.roles[0].authority.delegation.tasks = 4;
+            policy.roles[0].authority.delegation.depth = 2;
+            let mut domain = authority::Domain::new(rules, bounds.authority).expect("authority bounds");
+            let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
+            authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
+            assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
+            configuration.core.authority = domain;
+        }
+        bounds.fleet.attempts = 5;
+        bounds.call_records = 4;
+        bounds.brief.sections = 5;
+        bounds.journal.writes = 3000;
+        bounds.journal.deliveries = 100;
+        bounds.journal.held = 300;
+        (configuration, bounds)
+    });
+    let mut driver = Driver::configured(Store::new(), [bootstrap, configuration], &bounds);
     driver.hello(Token::new(7));
     driver.settle();
     driver.sign_in();
     driver.settle();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(401)),
         sign_in: driver.session(),
         key: [5; 16],
@@ -175,6 +179,7 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
             }
             3 => {
                 driver.send(engine::Event::Party(engine::PartyInput::Ask {
+                    models: Box::new([]),
                     reply_to: ReplyTo::new(Token::new(501)),
                     sign_in: driver.session(),
                     key: [6; 16],

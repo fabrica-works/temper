@@ -199,10 +199,11 @@ in the lower world that owns it, never here.
   a story whose agents run adds a key the fake LLM peer accepts, from
   the client, before its first task, and waits for its account to be
   usable: a key needs no sign-in to drive (jig's `domain/accounts.md`,
-  3.4; ../client/tools.md, 11.3). Until those tools, the real loop and
-  the process tier (2.6) hand the deployment's credential in as a
-  `handed_in` file of the configuration the test writes, the engine's
-  handed-in account.
+  3.4; ../client/tools.md, 11.3). The real loop and process tier (2.6)
+  use runtime key adoption. Lower domain worlds first keep temper's real
+  first-start rows at receipt one, then preseed restored fixture keys at receipt two; configuration
+  names providers only. D2 is private fixture input, never configuration;
+  fallback D leaves the live tier off until JP13.
 - **LLM accounts' stories** (../protocol/credentials.md, section 7),
   one path per source beside the key every story adds first (above),
   each scripted on the fake peers, never by chance:
@@ -458,8 +459,7 @@ and 10).
 - **The story,** one test:
   1. the person signs in by the link the binary prints, and adds the
      test's key as the deployment's on the accounts page
-     (../client/README.md, 3.6), which shows its account usable; until
-     area 5's tools, the key is handed in instead (2.4);
+     (../client/README.md, 3.6), which shows its account usable (2.4);
   2. a chat is answered;
   3. a repository is adopted through temper's client, as above;
   4. a goal is given whose change, its CI passed, lands on the owned
@@ -543,8 +543,7 @@ and 10).
   outlives it: none runs at a stopped binary's exit, and none of the
   crashed tree when the binary starts again.
 - **Credentials:** none borrowed. The fake LLM peer accepts a key the test
-  makes; until area 5's tools it is handed in as a `handed_in` file
-  (2.4). With them, the person adds it from the client once signed in,
+  makes. The person adds it from the client once signed in (2.4),
   as the deployment's, and the agents' tools' test with `temper ctl
   add-key` (../client/tools.md, 11.4); it is then kept in jig's secrets'
   store, and no file the configuration names holds an LLM account
@@ -572,6 +571,12 @@ and 10).
   (../protocol/setup.md, 13.4).
 
 ### 2.7 The live tier
+
+**Off until JP13 (fallback D).** The retained test is ignored and
+`scripts/proof-live.sh` exits nonzero before live-login or any credential
+copy. Production accepts no D2 input; JP13 must prove live sign-in before
+this tier can run. The following describes that deferred tier (accounts-2
+`later.md`, JP13 and "live tier off until JP13").
 
 `crates/temper/tests/live.rs`, after jig's (jig's `protocol/service.md`,
 section 8; testing-strategy.md, 2.9).

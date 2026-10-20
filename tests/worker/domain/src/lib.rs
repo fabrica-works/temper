@@ -43,6 +43,9 @@ pub fn limits() -> Limits {
     let (encoded, owned) = turn_bytes();
     Limits {
         host: host::Limits {
+            program_sources: 12,
+            source_interval: skein_lib::Duration::from_secs(60),
+            source_timeout: skein_lib::Duration::from_secs(10),
             accounts: 4,
             slots: 3,
             charter_bytes: 8_192,

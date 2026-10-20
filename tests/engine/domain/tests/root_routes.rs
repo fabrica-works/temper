@@ -77,7 +77,10 @@ fn messages_to(driver: &Driver, run: &engine::Assignment) -> Vec<(u64, Box<[u8]>
             {
                 Some((name.raw(), words.clone()))
             }
-            host::LinkDown::Message { .. }
+            host::LinkDown::Sources { .. }
+            | host::LinkDown::Check { .. }
+            | host::LinkDown::SignOut { .. }
+            | host::LinkDown::Message { .. }
             | host::LinkDown::Assign { .. }
             | host::LinkDown::Relayed { .. }
             | host::LinkDown::TurnKept { .. }
@@ -296,13 +299,14 @@ fn signed_in(driver: &Driver, reply: u64) -> (u64, u64) {
 }
 
 fn people_roles_driver() -> (Driver, u64, u64, u64, u64, u64) {
-    let (config, limits) = people_roles_config(219);
-    let mut driver = Driver::configured(Store::new(), config, &limits);
+    let [(bootstrap, limits), (config, _)] = [people_roles_config(219), people_roles_config(219)];
+    let mut driver = Driver::configured(Store::new(), [bootstrap, config], &limits);
     driver.settle();
     let (owner, owner_session) = sign_in_person(&mut driver, 7, 2001);
     let (maintainer, maintainer_session) = sign_in_person(&mut driver, 8, 2002);
     let (member, member_session) = sign_in_person(&mut driver, 9, 2003);
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(2004)),
         sign_in: owner_session,
         key: [200; 16],
@@ -324,6 +328,7 @@ fn a_member_starts_a_chat_and_an_observer_is_refused() {
     let (mut driver, owner_session, maintainer, _, member, member_session) = people_roles_driver();
     let (observer, observer_session) = sign_in_person(&mut driver, 11, 2030);
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(2031)),
         sign_in: owner_session,
         key: [207; 16],
@@ -339,6 +344,7 @@ fn a_member_starts_a_chat_and_an_observer_is_refused() {
     }));
     driver.settle();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(2033)),
         sign_in: observer_session,
         key: [209; 16],
@@ -352,6 +358,7 @@ fn a_member_starts_a_chat_and_an_observer_is_refused() {
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::Refused(found)), .. } if *found == refused
     )));
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(2032)),
         sign_in: member_session,
         key: [208; 16],
@@ -390,6 +397,7 @@ fn a_person_answers_a_numbered_question_from_their_task() {
         panic!("numbered question committed")
     };
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(2036)),
         sign_in: driver.session(),
         key: [210; 16],
@@ -414,6 +422,7 @@ fn a_person_amends_their_live_task_and_the_change_reaches_its_run() {
     let (mut driver, assignment) = batch_fixture();
     let amendment = person_amendment(Some(b"revised goal"), None, b"new context");
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(2044)),
         sign_in: driver.session(),
         key: [215; 16],
@@ -432,15 +441,18 @@ fn a_person_amends_their_live_task_and_the_change_reaches_its_run() {
 #[test]
 fn a_requester_may_amend_and_cancel_without_role_control_bits() {
     let bounds = limits();
-    let mut configuration = config(2045);
-    let mut policy = configuration.core.authority.policy(1).expect("project policy").clone();
-    policy.roles[0].requests = authority::Requests(1 | 4);
-    let mut authority = authority::Domain::new(configuration.core.authority.rules().clone(), bounds.authority)
-        .expect("valid authority");
-    let mut output = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut authority, authority::Event::Policy { project: 1, policy }, &mut output);
-    assert_eq!(output.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    configuration.core.authority = authority;
+    let configuration = std::array::from_fn(|_| {
+        let mut configuration = config(2045);
+        let mut policy = configuration.core.authority.policy(1).expect("project policy").clone();
+        policy.roles[0].requests = authority::Requests(1 | 4);
+        let mut authority = authority::Domain::new(configuration.core.authority.rules().clone(), bounds.authority)
+            .expect("valid authority");
+        let mut output = Queue::with_capacity(authority::POLICY_MAX_OUT);
+        authority::step(&mut authority, authority::Event::Policy { project: 1, policy }, &mut output);
+        assert_eq!(output.pop(), Some(authority::PolicyFact::Added { project: 1 }));
+        configuration.core.authority = authority;
+        configuration
+    });
     let mut driver = Driver::configured(Store::new(), configuration, &bounds);
     driver.settle();
     driver.sign_in();
@@ -452,6 +464,7 @@ fn a_requester_may_amend_and_cancel_without_role_control_bits() {
     let task = assigned(&driver).task;
     let amendment = person_amendment(Some(b"requester edit"), None, b"requester decides");
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(2046)),
         sign_in: driver.session(),
         key: [47; 16],
@@ -460,6 +473,7 @@ fn a_requester_may_amend_and_cancel_without_role_control_bits() {
     driver.settle();
     assert!(replied(&driver, &people::Outcome::Amended { task, released: false }));
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(2047)),
         sign_in: driver.session(),
         key: [48; 16],
@@ -480,6 +494,7 @@ fn wider_amendment() -> (Driver, u64, u64, u64, u64, people::Authority) {
     driver.send(hello_with(Token::new(WIDER_WORKER), 2, WIDER_STOP, Box::new([])));
     driver.settle();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(WIDER_GOAL_REQUEST)),
         sign_in: member_session,
         key: [216; 16],
@@ -495,13 +510,14 @@ fn wider_amendment() -> (Driver, u64, u64, u64, u64, people::Authority) {
         deadline: None,
         notes: 0,
         note_resources: Box::new([]),
-        models: 0,
+        models: Some(jig_domain_people::Models::ALL),
     };
     (driver, maintainer_session, member_session, member, task, wider)
 }
 
 fn propose_wider_amendment(driver: &mut Driver, member_session: u64, task: u64, wider: people::Authority) {
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(PROPOSE_WIDER_REQUEST)),
         sign_in: member_session,
         key: [217; 16],
@@ -525,6 +541,7 @@ fn a_members_wider_amendment_waits_for_a_maintainer_to_accept() {
     let proposal = proposed(&driver);
     assert_eq!(live(&driver, task).authority.budget.spend, 50);
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(ACCEPT_WIDER_REQUEST)),
         sign_in: maintainer_session,
         key: [218; 16],
@@ -550,6 +567,7 @@ fn a_members_goal_past_their_allotment_becomes_a_proposal_a_maintainer_accepts()
     hello(&mut driver);
     driver.settle();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(2010)),
         sign_in: member_session,
         key: [201; 16],
@@ -565,6 +583,7 @@ fn a_members_goal_past_their_allotment_becomes_a_proposal_a_maintainer_accepts()
             .any(|row| matches!(row, Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(_)))))
     );
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(2011)),
         sign_in: maintainer_session,
         key: [202; 16],
@@ -601,6 +620,7 @@ fn two_maintainers_decide_one_proposal_and_the_second_is_told_by_whom_and_how() 
     driver.settle();
     let (second, second_session) = sign_in_person(&mut driver, 10, 2020);
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(2021)),
         sign_in: owner_session,
         key: [203; 16],
@@ -616,6 +636,7 @@ fn two_maintainers_decide_one_proposal_and_the_second_is_told_by_whom_and_how() 
     }));
     driver.settle();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(2022)),
         sign_in: member_session,
         key: [204; 16],
@@ -631,6 +652,7 @@ fn two_maintainers_decide_one_proposal_and_the_second_is_told_by_whom_and_how() 
         let ask = people::Ask::DecideProposal { project: 1, proposer, proposal, decision };
         let to = ReplyTo::new(Token::new(reply));
         driver.send(engine::Event::Party(engine::PartyInput::Ask {
+            models: Box::new([]),
             reply_to: to,
             sign_in: session,
             key: [key; 16],
@@ -655,6 +677,7 @@ fn durable_start_turn_and_answer_callbacks_survive_full_journal_pressure() {
     driver.sign_in();
     driver.settle();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(201)),
         sign_in: driver.session(),
         key: [8; 16],
@@ -727,6 +750,7 @@ fn a_person_task_addressed_to_a_role_taken_by_one_handed_back_answered_by_anothe
     ] {
         let to = ReplyTo::new(Token::new(reply));
         driver.send(engine::Event::Party(engine::PartyInput::Ask {
+            models: Box::new([]),
             reply_to: to,
             sign_in: session,
             key: [key; 16],
@@ -740,6 +764,7 @@ fn a_person_task_addressed_to_a_role_taken_by_one_handed_back_answered_by_anothe
     let result = people::PersonResult::Verdict { code: 2, words: b"second".as_slice().into() };
     let revision = live(&driver, task).revisions.person;
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(977)),
         sign_in: second,
         key: [77; 16],
@@ -755,6 +780,7 @@ fn a_person_stops_a_run_and_releases_it() {
     let (mut driver, assignment) = running_fixture();
     let session = driver.session();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(980)),
         sign_in: session,
         key: [80; 16],
@@ -771,6 +797,7 @@ fn a_person_stops_a_run_and_releases_it() {
     driver.settle();
     let revision = live(&driver, assignment.task).revisions.hold;
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(981)),
         sign_in: session,
         key: [81; 16],
@@ -788,6 +815,7 @@ fn hello(driver: &mut Driver) {
 
 fn chat(driver: &mut Driver, key: u8) {
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(401)),
         sign_in: driver.session(),
         key: [key; 16],
@@ -819,6 +847,11 @@ fn an_ungranted_account_retains_the_chat_until_its_grant() {
     assert_eq!(
         driver.protocol.accounts,
         [
+            accounts::Request::Signing(accounts::Signing::Restore {
+                source: 1,
+                provider: 1,
+                kind: accounts::Kind::Key
+            }),
             accounts::Request::Signing(accounts::Signing::Restored),
             accounts::Request::Component(accounts::ToComponent::Want { account: 1 }),
         ]
@@ -832,10 +865,10 @@ fn an_ungranted_account_retains_the_chat_until_its_grant() {
     driver.events.extend(withheld);
     driver.settle();
     let grant = accounts::Grant {
-        form: accounts::Form::Credential(accounts::Scheme::Bearer),
+        form: accounts::Form::Credential(accounts::Scheme::Key),
         account: 1,
         generation: 1,
-        valid: Duration::from_secs(3600),
+        valid: accounts::KEY_VALID,
     };
     assert_eq!(assigned(&driver).grants.as_ref(), [grant]);
     assert_eq!(driver.delivered.iter().filter(|delivery| matches!(delivery, Delivery::Assigned { .. })).count(), 1);
@@ -895,7 +928,7 @@ fn refused_terminal_clears_fleet_handoff_without_charging_rejected_spend() {
 fn a_refused_assignment_spends_no_try() {
     let mut limits = two_slot_limits();
     limits.fleet.attempts = 1;
-    let mut driver = Driver::configured(Store::new(), sharing_config(94), &limits);
+    let mut driver = Driver::configured(Store::new(), [sharing_config(94), sharing_config(94)], &limits);
     // Placement has room; the one-entry attempt table refuses the second claim.
     driver.send(protocol::hello_slots(Token::new(7), 2, Box::new([])));
     driver.settle();
@@ -921,13 +954,16 @@ fn a_refused_assignment_spends_no_try() {
 #[test]
 fn static_authority_waits_are_durable_holds_and_do_not_spin_the_ready_pass() {
     for deadline in [false, true] {
-        let mut configuration = config(95);
-        with_policy(&mut configuration, |policy| {
-            if deadline {
-                policy.roles[0].authority.budget.deadline = Some(Wall::EPOCH);
-            } else {
-                policy.roles[0].authority.budget.spend = 1;
-            }
+        let configuration = std::array::from_fn(|_| {
+            let mut configuration = config(95);
+            with_policy(&mut configuration, |policy| {
+                if deadline {
+                    policy.roles[0].authority.budget.deadline = Some(Wall::EPOCH);
+                } else {
+                    policy.roles[0].authority.budget.spend = 1;
+                }
+            });
+            configuration
         });
         let mut driver = Driver::configured(Store::new(), configuration, &limits());
         driver.env.wall = Wall::from_nanos(1);
@@ -1013,7 +1049,7 @@ fn root_configuration_refuses_a_decoded_page_larger_than_synchronous_route_room(
 
 #[test]
 fn an_early_worker_hello_does_not_number_a_commit_before_the_durable_header() {
-    let mut driver = Driver::configured(Store::new(), config(98), &limits());
+    let mut driver = Driver::configured(Store::new(), [config(98), config(98)], &limits());
     driver.hello(Token::new(7));
     assert!(driver.transactions.is_empty(), "the cold load must precede commit numbering");
     assert!(driver.delivered.is_empty(), "the core accepts a valid early worker");
@@ -1026,10 +1062,11 @@ fn an_early_worker_hello_does_not_number_a_commit_before_the_durable_header() {
 fn maximum_cold_hello_batch_and_duplicate_losses_fit_one_startup_decision() {
     let mut limits = limits();
     limits.fleet.workers = 4;
+    limits.fleet.program_sources = 0; // This callback story has no program sources.
     // Each worker's fleet outputs take route and delivery room (jig's fleet `max_out`).
-    limits.journal.writes += 4;
+    limits.journal.writes += 4 * (4 - 1);
     limits.journal.deliveries = 25;
-    let mut driver = Driver::configured(Store::new(), config(97), &limits);
+    let mut driver = Driver::configured(Store::new(), [config(97), config(97)], &limits);
     for channel in 1..=4 {
         driver.send(hello_with(Token::new(channel), 1, Duration::from_secs(5), Box::new([])));
         driver.send(protocol::lost(Token::new(channel)));
@@ -1080,23 +1117,26 @@ fn unavailable_call(driver: &mut Driver, assignment: &engine::Assignment, call: 
 
 // A chat's delegation comes from its role's, one level shallower (jig a2616181).
 fn delegate_fixture() -> (Driver, engine::Assignment) {
-    let mut configuration = config(91);
-    let mut rules = configuration.core.authority.rules().clone();
-    rules.maximum_run_spend = 60;
-    rules.ceiling.delegation.depth = 2;
-    let mut policy = configuration.core.authority.policy(1).expect("fixture project").clone();
-    policy.ceiling.delegation.depth = 2;
-    policy.roles[0].authority.delegation.depth = 2;
-    let mut authority = jig_domain_authority::Domain::new(rules, *configuration.core.authority.limits())
-        .expect("expanded fixture authority");
-    let mut policy_out = Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
-    jig_domain_authority::step(
-        &mut authority,
-        jig_domain_authority::Event::Policy { project: 1, policy },
-        &mut policy_out,
-    );
-    assert_eq!(policy_out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
-    configuration.core.authority = authority;
+    let configuration = std::array::from_fn(|_| {
+        let mut configuration = config(91);
+        let mut rules = configuration.core.authority.rules().clone();
+        rules.maximum_run_spend = 60;
+        rules.ceiling.delegation.depth = 2;
+        let mut policy = configuration.core.authority.policy(1).expect("fixture project").clone();
+        policy.ceiling.delegation.depth = 2;
+        policy.roles[0].authority.delegation.depth = 2;
+        let mut authority = jig_domain_authority::Domain::new(rules, *configuration.core.authority.limits())
+            .expect("expanded fixture authority");
+        let mut policy_out = Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
+        jig_domain_authority::step(
+            &mut authority,
+            jig_domain_authority::Event::Policy { project: 1, policy },
+            &mut policy_out,
+        );
+        assert_eq!(policy_out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
+        configuration.core.authority = authority;
+        configuration
+    });
     let mut driver = Driver::configured(Store::new(), configuration, &limits());
     hello(&mut driver);
     driver.settle();
@@ -1169,59 +1209,63 @@ fn batch_fixture_custom(
     bounds.journal.writes = 4096;
     bounds.journal.deliveries = 100;
     bounds.journal.held = 300;
-    let mut configuration = config(92);
-    if second_owner {
-        configuration.core.owners = Box::new([
-            people::InitialOwner {
-                project: 1,
-                identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
-            },
-            people::InitialOwner {
-                project: 1,
-                identity: people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },
-            },
-        ]);
-    }
-    // A run's budget holds its finishing reserve (jig a020bf1c); as jig's
-    // fixtures do, the charter's price unit keeps a run budget of 5 fundable.
-    let mut cheaper = charter();
-    cheaper.policy.model.price_unit = 2000;
-    configuration.core.settings.charters = Box::new([cheaper]);
-    let mut rules = configuration.core.authority.rules().clone();
-    // Each claimed run leaves room in its task allotment for delegates made during the run.
-    rules.maximum_run_spend = 5;
-    if procedure || person {
-        rules.ceiling.delegation.kinds = Box::new([
-            jig_domain_authority::Executor::Charter(1),
-            if procedure {
-                jig_domain_authority::Executor::Procedure(1)
-            } else {
-                jig_domain_authority::Executor::Role(0)
-            },
-        ]);
-    }
-    rules.ceiling.delegation.tasks = 4;
-    rules.ceiling.delegation.depth = depth + 1;
-    let mut policy = configuration.core.authority.policy(1).expect("fixture project").clone();
-    if procedure || person {
-        policy.ceiling.delegation.kinds.clone_from(&rules.ceiling.delegation.kinds);
-        policy.roles[0].authority.delegation.kinds.clone_from(&rules.ceiling.delegation.kinds);
-    }
-    policy.ceiling.delegation.tasks = 4;
-    policy.ceiling.delegation.depth = depth + 1;
-    policy.roles[0].authority.delegation.tasks = 4;
-    policy.roles[0].authority.delegation.depth = depth + 1;
-    policy.roles[0].authority.budget.spend = 150;
-    policy.roles[0].period_spend = pool_budget;
-    let mut authority = jig_domain_authority::Domain::new(rules, bounds.authority).expect("larger fixture authority");
-    let mut policy_out = Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
-    jig_domain_authority::step(
-        &mut authority,
-        jig_domain_authority::Event::Policy { project: 1, policy },
-        &mut policy_out,
-    );
-    assert_eq!(policy_out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
-    configuration.core.authority = authority;
+    let configuration = std::array::from_fn(|_| {
+        let mut configuration = config(92);
+        if second_owner {
+            configuration.core.owners = Box::new([
+                people::InitialOwner {
+                    project: 1,
+                    identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
+                },
+                people::InitialOwner {
+                    project: 1,
+                    identity: people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },
+                },
+            ]);
+        }
+        // A run's budget holds its finishing reserve (jig a020bf1c); as jig's
+        // fixtures do, the charter's price unit keeps a run budget of 5 fundable.
+        let mut cheaper = charter();
+        cheaper.policy.model.price_unit = 2000;
+        configuration.core.settings.charters = Box::new([cheaper]);
+        let mut rules = configuration.core.authority.rules().clone();
+        // Each claimed run leaves room in its task allotment for delegates made during the run.
+        rules.maximum_run_spend = 5;
+        if procedure || person {
+            rules.ceiling.delegation.kinds = Box::new([
+                jig_domain_authority::Executor::Charter(1),
+                if procedure {
+                    jig_domain_authority::Executor::Procedure(1)
+                } else {
+                    jig_domain_authority::Executor::Role(0)
+                },
+            ]);
+        }
+        rules.ceiling.delegation.tasks = 4;
+        rules.ceiling.delegation.depth = depth + 1;
+        let mut policy = configuration.core.authority.policy(1).expect("fixture project").clone();
+        if procedure || person {
+            policy.ceiling.delegation.kinds.clone_from(&rules.ceiling.delegation.kinds);
+            policy.roles[0].authority.delegation.kinds.clone_from(&rules.ceiling.delegation.kinds);
+        }
+        policy.ceiling.delegation.tasks = 4;
+        policy.ceiling.delegation.depth = depth + 1;
+        policy.roles[0].authority.delegation.tasks = 4;
+        policy.roles[0].authority.delegation.depth = depth + 1;
+        policy.roles[0].authority.budget.spend = 150;
+        policy.roles[0].period_spend = pool_budget;
+        let mut authority =
+            jig_domain_authority::Domain::new(rules, bounds.authority).expect("larger fixture authority");
+        let mut policy_out = Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
+        jig_domain_authority::step(
+            &mut authority,
+            jig_domain_authority::Event::Policy { project: 1, policy },
+            &mut policy_out,
+        );
+        assert_eq!(policy_out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
+        configuration.core.authority = authority;
+        configuration
+    });
     let mut driver = Driver::configured(Store::new(), configuration, &bounds);
     driver.send(hello_with(Token::new(7), slots, Duration::from_secs(1), Box::new([])));
     driver.settle();
@@ -1250,7 +1294,7 @@ fn note_config() -> engine::Config {
 }
 
 fn note_fixture() -> (Driver, engine::Assignment) {
-    let mut driver = Driver::configured(Store::new(), note_config(), &limits());
+    let mut driver = Driver::configured(Store::new(), [note_config(), note_config()], &limits());
     hello(&mut driver);
     driver.settle();
     driver.sign_in();
@@ -1278,7 +1322,7 @@ fn new_note(description: &[u8], body: &[u8], author: notes::Author) -> engine::T
 
 #[test]
 fn a_new_runs_brief_carries_the_durable_note_index() {
-    let mut driver = Driver::configured(Store::new(), note_config(), &limits());
+    let mut driver = Driver::configured(Store::new(), [note_config(), note_config()], &limits());
     driver.settle();
     let mut store = driver.store;
     let scope = notes::Scope::Project { project: 1 };
@@ -1304,7 +1348,7 @@ fn a_new_runs_brief_carries_the_durable_note_index() {
         })))]),
         Box::new([]),
     );
-    let mut driver = Driver::configured(store, note_config(), &limits());
+    let mut driver = Driver::configured(store, [note_config(), note_config()], &limits());
     hello(&mut driver);
     driver.settle();
     driver.sign_in();
@@ -1323,8 +1367,11 @@ fn a_new_runs_brief_carries_the_durable_note_index() {
 // A chat's tool families are its role's (jig a2616181).
 #[test]
 fn a_note_tool_without_its_family_is_refused_with_an_authority_finding() {
-    let mut configuration = note_config();
-    with_policy(&mut configuration, |policy| policy.roles[0].authority.tools = authority::Tools(1023 & !128));
+    let configuration = std::array::from_fn(|_| {
+        let mut configuration = note_config();
+        with_policy(&mut configuration, |policy| policy.roles[0].authority.tools = authority::Tools(1023 & !128));
+        configuration
+    });
     let mut driver = Driver::configured(Store::new(), configuration, &limits());
     hello(&mut driver);
     driver.settle();
@@ -1367,6 +1414,7 @@ fn a_note_written_corrected_by_a_person_and_recalled_is_durable() {
         recalled: 1,
     };
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(3102)),
         sign_in: driver.session(),
         key: [31; 16],
@@ -1384,7 +1432,7 @@ fn a_note_written_corrected_by_a_person_and_recalled_is_durable() {
         Some(engine::CallAnswer::NoteRecalled { entries, more: false })
             if entries.len() == 1 && entries[0].revision == 2 && entries[0].body.as_ref() == b"second body"
     ));
-    let mut restarted = Driver::configured(driver.store, note_config(), &limits());
+    let mut restarted = Driver::configured(driver.store, [note_config(), note_config()], &limits());
     let hosting = protocol::hosting(assignment.task, assignment.attempt, host::Phase::Active);
     restarted.send(hello_with(Token::new(7), 1, Duration::from_secs(1), Box::new([hosting])));
     restarted.settle();
@@ -1416,6 +1464,7 @@ fn a_person_deletes_a_note_only_in_its_authorized_scope_and_after_commit() {
         (3112, people::NoteScope::Project, people::Outcome::NoteEdited { name }),
     ] {
         driver.send(engine::Event::Party(engine::PartyInput::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(request)),
             sign_in: driver.session(),
             key: [u8::try_from(request - 3000).expect("small request"); 16],
@@ -1452,7 +1501,7 @@ fn a_pending_note_reserves_its_named_answer_until_the_store_returns() {
     let mut bound = limits();
     bound.call_records = 1;
     bound.fleet.calls = 2;
-    let mut driver = Driver::configured(Store::new(), note_config(), &bound);
+    let mut driver = Driver::configured(Store::new(), [note_config(), note_config()], &bound);
     hello(&mut driver);
     driver.settle();
     driver.sign_in();
@@ -1584,6 +1633,7 @@ fn a_chats_goal_accepted_as_its_persons_outlives_the_chat() {
     let person = signed_in(&driver, 101).0;
     assert!(proposal_waits_at(&driver, child, tasks::ProposalHolder::Person(person)));
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(406)),
         sign_in: driver.session(),
         key: [66; 16],
@@ -1667,6 +1717,7 @@ fn a_proposal_routed_past_a_procedure_to_a_person_is_accepted() {
     let person = signed_in(&driver, 101).0;
     assert!(proposal_waits_at(&driver, child, tasks::ProposalHolder::Person(person)));
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(603)),
         sign_in: driver.session(),
         key: [67; 16],
@@ -1721,7 +1772,7 @@ fn a_recurring_procedure_uses_the_root_period_route() {
     authority.budget.spend = 30;
     // The deployment's one model, which the template's members take
     // (jig's domain/authority.md, section 5).
-    authority.models = tasks::Models(1);
+    authority.models = tasks::Models::Named(1);
     driver.send(engine::Event::Party(engine::PartyInput::StartRecurring {
         project: 1,
         authority,
@@ -2549,7 +2600,7 @@ fn escalation_archive_driver() -> (Driver, temper_engine_domain::EscalationDecis
         })
         .expect("actual completed escalation archive");
     let configured = escalation::limits();
-    let mut driver = Driver::configured(world.store, config(9200), &configured);
+    let mut driver = Driver::configured(world.store, [config(9200), config(9200)], &configured);
     driver.settle();
     (driver, archive)
 }
@@ -2562,6 +2613,7 @@ fn failed_named_escalation_history_read_closes_once_and_same_key_retries() {
     driver.delivered.clear();
     driver.fail_archive_once = true;
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(900)),
         sign_in: session,
         key: [9; 16],
@@ -2584,6 +2636,7 @@ fn failed_named_escalation_history_read_closes_once_and_same_key_retries() {
     ));
     driver.delivered.clear();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(901)),
         sign_in: session,
         key: [9; 16],
@@ -2616,7 +2669,7 @@ fn held_waiting_store() -> Store {
 
 fn held_driver(store: Store) -> Driver {
     let configured = temper_engine_domain_world::escalation::limits();
-    Driver::configured(store, config(9202), &configured)
+    Driver::configured(store, [config(9202), config(9202)], &configured)
 }
 
 #[test]
@@ -2657,6 +2710,7 @@ fn release_rejudges_a_still_expired_deadline_and_escalates_the_new_hold() {
     driver.env.wall = Wall::from_nanos(1);
     driver.delivered.clear();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(990)),
         sign_in,
         key: [90; 16],
@@ -2728,12 +2782,10 @@ fn restored_waiting_rechecks_snapshot_membership_and_same_holder_changes_nothing
     assert!(!changed.stopped);
     // Rerouting keeps the hold's revision (jig 00de0b8c).
     assert!(changed.store.rows.values().any(|row| matches!(row, Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(task))) if matches!(task.escalation, tasks::Escalation::Waiting { revision: 1, holder: tasks::EscalationHolder::Role { project: 1, role: 0 }, .. }))));
-    assert!(
-        !changed
-            .delivered
-            .iter()
-            .any(|delivery| matches!(delivery, Delivery::Assigned { .. } | Delivery::Result { .. }))
-    );
+    assert!(!changed.delivered.iter().any(|delivery| matches!(
+        delivery,
+        Delivery::Assigned { .. } | Delivery::SourceSignedOut { .. } | Delivery::Result { .. }
+    )));
 }
 
 // The escalation reads that followed the restart are the core's now (jig
@@ -2751,7 +2803,7 @@ fn a_rejected_hold_stays_rejected_across_a_restart() {
     let mut configured = escalation::limits();
     configured.people.people = 3;
     configured.people.sign_ins = 3;
-    let mut driver = Driver::configured(world.store, config(9203), &configured);
+    let mut driver = Driver::configured(world.store, [config(9203), config(9203)], &configured);
     driver.settle();
     assert_eq!(driver.store.rows, before, "rejection never reopens or reroutes at startup");
     assert!(driver.delivered.is_empty());
@@ -2794,11 +2846,12 @@ fn coalesced_history_waiters_survive_simultaneous_io_completion_under_full_journ
     insufficient.journal.deliveries -= 1;
     assert_eq!(engine::worst_case(&insufficient), None, "startup prices every pending flight's duplicate waiters");
     let session = world.store.header().sign_ins;
-    let mut driver = Driver::configured(world.store, config(9204), &configured);
+    let mut driver = Driver::configured(world.store, [config(9204), config(9204)], &configured);
     driver.settle();
     for key in 9_u8..11 {
         for waiter in 0_u64..8 {
             driver.send(engine::Event::Party(engine::PartyInput::Ask {
+                models: Box::new([]),
                 reply_to: ReplyTo::new(Token::new(950 + u64::from(key - 9) * 8 + waiter)),
                 sign_in: session,
                 key: [key; 16],
@@ -2880,6 +2933,7 @@ fn restored_unreported_claim_spends_no_try_without_committed_work() {
         original.sign_in();
         original.settle();
         original.send(engine::Event::Party(engine::PartyInput::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(501)),
             sign_in: original.session(),
             key: [18; 16],
@@ -2986,7 +3040,8 @@ fn administration_config(seed: u64) -> engine::Config {
 // later chat takes the changed role's tools, an earlier one keeps its grant.
 #[test]
 fn a_policy_change_applies_to_later_decisions_only() {
-    let mut driver = Driver::configured(Store::new(), administration_config(9401), &limits());
+    let mut driver =
+        Driver::configured(Store::new(), [administration_config(9401), administration_config(9401)], &limits());
     driver.settle();
     driver.sign_in();
     driver.settle();
@@ -2997,6 +3052,7 @@ fn a_policy_change_applies_to_later_decisions_only() {
         batch[0].authority.spend = 25;
         let ask = people::Ask::Create { project, batch };
         engine::Event::Party(engine::PartyInput::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(reply)),
             sign_in: session,
             key: [key; 16],
@@ -3018,13 +3074,14 @@ fn a_policy_change_applies_to_later_decisions_only() {
             deadline: None,
             notes: 0,
             note_resources: Box::new([]),
-            models: 0,
+            models: Some(jig_domain_people::Models::ALL),
         },
         period_spend: 50,
         requests: 1 | 4 | 256,
         decides: authority::Proposals::ALL.0,
     };
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(9403)),
         sign_in: session,
         key: [42; 16],
@@ -3038,7 +3095,8 @@ fn a_policy_change_applies_to_later_decisions_only() {
         Some(Record::Core(jig_domain_core::Record::People(people::Stored::Policy { project: 1, value }))) if value.roles[0].period_spend == 50
     ));
     assert_eq!(live(&driver, 1).authority, first, "existing task keeps its grant");
-    let mut restarted = Driver::configured(driver.store, administration_config(9401), &limits());
+    let mut restarted =
+        Driver::configured(driver.store, [administration_config(9401), administration_config(9401)], &limits());
     for _ in 0..30 {
         restarted.advance(true);
     }
@@ -3060,13 +3118,15 @@ fn a_policy_change_applies_to_later_decisions_only() {
 // change leaves it as it was.
 #[test]
 fn a_policy_change_beyond_the_deployments_rules_is_refused() {
-    let mut driver = Driver::configured(Store::new(), administration_config(9411), &limits());
+    let mut driver =
+        Driver::configured(Store::new(), [administration_config(9411), administration_config(9411)], &limits());
     driver.settle();
     driver.sign_in();
     driver.settle();
     let policy = Key::Core(jig_domain_core::Key::People(people::Key::Policy(1)));
     let before = driver.store.rows.get(&policy).cloned();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(9412)),
         sign_in: driver.session(),
         key: [44; 16],
@@ -3086,12 +3146,14 @@ fn a_policy_change_beyond_the_deployments_rules_is_refused() {
 
 #[test]
 fn a_policy_change_survives_a_restart() {
-    let mut driver = Driver::configured(Store::new(), administration_config(9413), &limits());
+    let mut driver =
+        Driver::configured(Store::new(), [administration_config(9413), administration_config(9413)], &limits());
     driver.settle();
     driver.sign_in();
     driver.settle();
     let session = driver.session();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(9414)),
         sign_in: session,
         key: [45; 16],
@@ -3100,9 +3162,11 @@ fn a_policy_change_survives_a_restart() {
     driver.settle();
     assert!(matches!(driver.store.rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Policy(1)))),
         Some(Record::Core(jig_domain_core::Record::People(people::Stored::Policy { value, .. }))) if value.period_spend == 800));
-    let mut restarted = Driver::configured(driver.store, administration_config(9413), &limits());
+    let mut restarted =
+        Driver::configured(driver.store, [administration_config(9413), administration_config(9413)], &limits());
     restarted.settle();
     restarted.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(9415)),
         sign_in: session,
         key: [46; 16],
@@ -3117,7 +3181,8 @@ fn a_policy_change_survives_a_restart() {
 
 #[test]
 fn an_owner_changes_a_pool_once_with_a_key() {
-    let mut driver = Driver::configured(Store::new(), administration_config(9411), &limits());
+    let mut driver =
+        Driver::configured(Store::new(), [administration_config(9411), administration_config(9411)], &limits());
     driver.settle();
     driver.sign_in();
     driver.settle();
@@ -3125,6 +3190,7 @@ fn an_owner_changes_a_pool_once_with_a_key() {
     let person = signed_in(&driver, 101).0;
     let ask = people::Ask::SetPool { project: 1, person, budget: 300 };
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(9412)),
         sign_in: session,
         key: [44; 16],
@@ -3136,6 +3202,7 @@ fn an_owner_changes_a_pool_once_with_a_key() {
         Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ledger(row)))) if row.numbers.budget == 300));
     let before = driver.transactions.len();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(9413)),
         sign_in: session,
         key: [44; 16],
@@ -3144,6 +3211,7 @@ fn an_owner_changes_a_pool_once_with_a_key() {
     driver.settle();
     assert_eq!(driver.transactions.len(), before, "saved answer does not carve again");
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(9414)),
         sign_in: session,
         key: [45; 16],
@@ -3171,13 +3239,15 @@ fn held_cohort() -> (Driver, [u64; 2], [u64; 2], Vec<tasks::TaskRecord>) {
         + temper_engine_domain_forge::max_out(&configured.forge)
         + configured.tasks.tasks
         + 6;
-    let mut driver = Driver::configured(prior.store, administration_config(9310), &configured);
+    let mut driver =
+        Driver::configured(prior.store, [administration_config(9310), administration_config(9310)], &configured);
     driver.settle();
     // The held chat took its person's whole pool, so a second chat of theirs
     // is held at its start and waits at them too (jig a2616181).
     let people::Ask::Create { project, mut batch } = driver.chat_ask(1, QUESTION) else { unreachable!() };
     batch[0].budget = people::Budget::Named;
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(1200)),
         sign_in: sessions[0],
         key: [120; 16],
@@ -3223,6 +3293,7 @@ fn multiple_waiting_recipients_preflight_together_and_a_full_journal_hands_the_a
     let (returned, transactions) = (driver.returned, driver.transactions.len());
     let to = ReplyTo::new(Token::new(1201));
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: to,
         sign_in: sessions[1],
         key: [121; 16],
@@ -3579,6 +3650,7 @@ fn a_delegate_held_past_its_tries_is_escalated_two_levels_to_a_person_released_a
         other => panic!("held delegate row: {other:?}"),
     };
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(605)),
         sign_in: driver.session(),
         key: [65; 16],
@@ -3630,6 +3702,7 @@ fn a_moved_task_is_funded_anew_by_its_new_requester() {
     driver.settle();
     let person = signed_in(&driver, 101).0;
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(622)),
         sign_in: driver.session(),
         key: [62; 16],
@@ -3688,6 +3761,7 @@ fn a_move_the_new_funder_cannot_cover_is_refused_whole() {
     let pool = tasks::Funder::Pool { project: 1, person: signed_in(&driver, 101).0, period: 1 };
     let before_pool = driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ledger(pool)))).cloned();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(631)),
         sign_in: driver.session(),
         key: [63; 16],
@@ -3730,6 +3804,7 @@ fn a_move_carves_the_new_persons_pool_in_the_same_commit() {
     let pool = tasks::Funder::Pool { project: 1, person, period: 1 };
     assert!(!driver.store.rows.contains_key(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ledger(pool)))));
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(642)),
         sign_in: session,
         key: [64; 16],
@@ -3785,6 +3860,7 @@ fn moving_a_held_delegate_rechecks_its_escalation_recipient() {
         tasks::Escalation::Waiting { holder: tasks::EscalationHolder::Task(parent), .. } if parent == root.task))
     );
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(651)),
         sign_in: driver.session(),
         key: [65; 16],
@@ -3826,6 +3902,7 @@ fn moving_a_proposer_rechecks_its_decision_holder() {
             tasks::ProposalState::Pending { holder: tasks::ProposalHolder::Task(holder), .. } if holder == root.task)))
     );
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(662)),
         sign_in: driver.session(),
         key: [66; 16],
@@ -4024,7 +4101,7 @@ fn a_typed_call_replay_uses_the_settled_record_without_rendering_again() {
 #[test]
 fn restart_refuses_live_tasks_or_claims_past_lowered_limits_without_dropping_them() {
     let bounds = two_slot_limits();
-    let mut driver = Driver::configured(Store::new(), sharing_config(91), &bounds);
+    let mut driver = Driver::configured(Store::new(), [sharing_config(91), sharing_config(91)], &bounds);
     driver.send(protocol::hello_slots(Token::new(7), 2, Box::new([])));
     driver.settle();
     driver.sign_in();
@@ -4068,7 +4145,7 @@ fn restart_refuses_live_tasks_or_claims_past_lowered_limits_without_dropping_the
         [(task_bounds, jig_domain_core::RestartStep::LoadCore), (claim_bounds, jig_domain_core::RestartStep::AdoptRuns)]
     {
         let store = driver.store.fork();
-        let mut restarted = Driver::configured(store, sharing_config(91), &bounds);
+        let mut restarted = Driver::configured(store, [sharing_config(91), sharing_config(91)], &bounds);
         for _ in 0..100 {
             restarted.advance(true);
         }
@@ -4115,12 +4192,13 @@ const TEMPLATE_CHAT_REPLY: Token = Token::new(6001);
 const TEMPLATE_CHAT_KEY: [u8; 16] = [201; 16];
 #[test]
 fn a_chat_made_from_the_chat_template_is_a_conversation_task() {
-    let mut driver = Driver::configured(Store::new(), config(91), &limits());
+    let mut driver = Driver::configured(Store::new(), [config(91), config(91)], &limits());
     hello(&mut driver);
     driver.settle();
     driver.sign_in();
     driver.settle();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(TEMPLATE_CHAT_REPLY),
         sign_in: driver.session(),
         key: TEMPLATE_CHAT_KEY,
@@ -4146,8 +4224,91 @@ fn link_notice_routes_its_source_and_generation_through_the_fleet() {
         engine::Parts::none(),
     ));
     driver.settle();
-    assert!(driver.protocol.accounts.contains(&accounts::Request::Component(accounts::ToComponent::Rejected {
-        account: grant.account,
-        generation: grant.generation
-    })));
+    assert!(driver.store.rows.values().any(|row| matches!(row,
+        Record::Core(jig_domain_core::Record::Accounts(accounts::Stored::Source { number, held: Some(accounts::Held::Refused), .. })) if *number == grant.account)));
+
+    // A signed-in source can renew; its old generation must not refuse the current one.
+    let bootstrap = Driver::new(Store::new());
+    let mut store = bootstrap.store.fork();
+    store.seed(
+        Box::new([Record::Core(jig_domain_core::Record::Accounts(accounts::Stored::Source {
+            account: 0,
+            number: grant.account,
+            place: 0,
+            kind: accounts::Kind::SignIn,
+            name: Box::new([]),
+            held: None,
+        }))]),
+        Box::new([]),
+    );
+    let mut driver = Driver::configured(store, [config(91), config(91)], &limits());
+    driver.protocol.sign_in_sources.insert(grant.account);
+    driver.hello(Token::new(7));
+    driver.settle();
+    driver.sign_in();
+    driver.settle();
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
+        reply_to: ReplyTo::new(Token::new(1001)),
+        sign_in: driver.session(),
+        key: [72; 16],
+        ask: driver.chat_ask(1, b"next chat"),
+    }));
+    driver.settle();
+    let assignment = driver.last_assignment();
+    let grant = assignment.grants[0];
+    // A stale notice must not hold the current source before its matching notice arrives.
+    driver.send(protocol::up(
+        Token::new(7),
+        host::LinkUp::Unauthorized {
+            run: Token::new(assignment.task),
+            attempt: Token::new(assignment.attempt),
+            account: grant.account,
+            generation: grant.generation.checked_sub(1).expect("the current generation follows a stale one"),
+        },
+        engine::Parts::none(),
+    ));
+    driver.settle();
+    let source = driver.store.rows.values().find(|row| matches!(row,
+        Record::Core(jig_domain_core::Record::Accounts(accounts::Stored::Source { number, .. })) if *number == grant.account));
+    let Some(Record::Core(jig_domain_core::Record::Accounts(accounts::Stored::Source { held, .. }))) = source else {
+        panic!("current source is durable");
+    };
+    assert_eq!(*held, None, "a mismatched generation leaves the current source unheld");
+    // Positive control: the current signed-in generation reaches renewal unchanged.
+    // Otherwise dropping every generation to zero would also pass the stale case.
+    let before = driver.protocol.accounts.len();
+    driver.send(protocol::up(
+        Token::new(7),
+        host::LinkUp::Unauthorized {
+            run: Token::new(assignment.task),
+            attempt: Token::new(assignment.attempt),
+            account: grant.account,
+            generation: grant.generation,
+        },
+        engine::Parts::none(),
+    ));
+    driver.settle();
+    assert!(driver.protocol.accounts[before..].iter().any(|request| matches!(request,
+        accounts::Request::Component(accounts::ToComponent::Rejected { account, generation })
+            if *account == grant.account && *generation == grant.generation)));
+}
+
+#[test]
+fn an_empty_deployment_recovers_after_its_first_start_commit() {
+    let bounds = limits();
+    let mut driver = Driver::cold(Store::with_limits(&bounds), config(91), &bounds);
+    driver.period_sent = true;
+    until_pending(&mut driver);
+    let cut = driver.store.apply();
+    assert_eq!(cut, 1, "the first-start transaction is receipt one");
+    let first = driver.store.rows.clone();
+    // Lose the acknowledgement and all volatile root state immediately after durability.
+    let mut store = driver.store;
+    store.crash(91);
+    let mut recovered = Driver::cold(store, config(91), &bounds);
+    recovered.period_sent = true;
+    recovered.settle();
+    assert!(recovered.root.ready());
+    assert_eq!(recovered.store.rows, first, "recovery does not reseed the first-start rows");
 }

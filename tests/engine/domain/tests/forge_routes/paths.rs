@@ -60,6 +60,7 @@ fn sign_in_reader(world: &mut World) {
         people::Holding { person: *person, role: people::Role::Observer },
     ]);
     world.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(SET_READERS),
         sign_in: owner,
         key: SET_READERS_KEY,

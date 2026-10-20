@@ -208,9 +208,11 @@ pub(crate) struct Person {
     client: Option<NativeClient>,
     root: Option<Fd>,
     actor: skein_fake_person::Person<temper_client_domain::Address>,
+    provision: Option<skein_fake_person::Person<temper_client_domain::Address>>,
     wake: Option<Time>,
     pub(crate) signed_in: u32,
     pub(crate) finished: bool,
+    project_selected: bool,
     completions: Queue<Complete>,
     submissions: Queue<Submit>,
     offset: usize,
@@ -253,9 +255,11 @@ impl Person {
             client: None,
             root: Some(root),
             actor: skein_fake_person::Person::new(remaining.into_boxed_slice()),
+            provision: (offset == 0).then(|| skein_fake_person::Person::new(fixtures::account_steps())),
             wake: None,
             signed_in: 0,
             finished: false,
+            project_selected: false,
             completions: Queue::with_capacity(512),
             submissions: Queue::with_capacity(512),
             offset,
@@ -287,11 +291,46 @@ impl Person {
         }
     }
 }
+// Select the story's project and provision its real account before its own acts.
+fn prepare_account(
+    client: &mut NativeClient,
+    selected: &mut bool,
+    provision: &mut Option<skein_fake_person::Person<temper_client_domain::Address>>,
+    wake: &mut Option<Time>,
+    now: Time,
+) -> bool {
+    if !*selected
+        && let Some(node) = client
+            .tree()
+            .nodes()
+            .iter()
+            .find(|node| {
+                node.role == skein_ui::Role::Button
+                    && node.name.as_deref() == Some(b"Project".as_slice())
+                    && !node.states.iter().any(|state| *state == skein_ui::State::Selected)
+            })
+            .map(|node| node.id)
+    {
+        assert!(client.act(node, skein_ui::Act::Press), "offered project selection");
+        *selected = true;
+    }
+    let Some(actor) = provision else { return false };
+    match actor.next(&mut TreeFace::new(client.tree()), now) {
+        Next::Do(Doing::Act { node, act }) => assert!(client.act(node, act), "offered account setup act"),
+        Next::Do(Doing::Go { address }) => client.go(address),
+        Next::Do(Doing::Reload) => panic!("account setup has no reload"),
+        Next::Wait { until } => *wake = until,
+        Next::Done => {
+            *provision = None;
+            *wake = Some(now);
+        }
+        Next::Failed { step, why } => panic!("account setup step {step}: {why:?}"),
+    }
+    true
+}
 impl Host for Person {
     fn iterate(&mut self, now: Time, wall: Wall) {
-        let Some(client) = &mut self.client else {
-            return;
-        };
+        let Some(client) = &mut self.client else { return };
         while let Some(complete) = self.completions.pop() {
             self.cache.complete(&complete);
             let received = self.wire.received.len();
@@ -335,7 +374,10 @@ impl Host for Person {
             );
         }
         self.wake = None;
-        if client.started() && !self.finished {
+        let preparing = client.started()
+            && !self.finished
+            && prepare_account(client, &mut self.project_selected, &mut self.provision, &mut self.wake, now);
+        if client.started() && self.project_selected && !self.finished && !preparing {
             let before = self.actor.at();
             let mut face = TreeFace::new(client.tree());
             let next = if self.cutting

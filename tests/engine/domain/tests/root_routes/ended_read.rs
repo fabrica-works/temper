@@ -9,6 +9,7 @@ fn ended_conversation() -> Store {
         driver.settle();
         if number == 1 {
             driver.send(engine::Event::Party(engine::PartyInput::Ask {
+                models: Box::new([]),
                 reply_to: ReplyTo::new(MARK),
                 sign_in: driver.session(),
                 key: [32; 16],

@@ -32,6 +32,7 @@ pub struct Worker {
     pub(crate) env: Env<root::Limits>,
     pub(crate) git: crate::worker_git::Git,
     agent: Agent,
+    sources: crate::program_sources::Component,
     link: link::Component,
     link_out: Queue<link::Request>,
     out: Queue<root::Request>,
@@ -94,6 +95,7 @@ impl Worker {
         }
         Ok(Self {
             git,
+            sources: crate::program_sources::Component::new(config.limits.hub.detail_bytes),
             root: root::Domain::new(&prepared.root),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: prepared.root },
             agent: Agent {
@@ -136,6 +138,12 @@ impl Worker {
             aborted: None,
         })
     }
+    pub fn configure_program_sources(
+        &mut self,
+        resources: crate::program_sources::Resources,
+    ) -> Result<(), crate::program_sources::Resources> {
+        self.sources.configure(resources)
+    }
     pub fn stop(&mut self) {
         if !self.stopping {
             self.stopping = true;
@@ -159,6 +167,9 @@ impl Worker {
             let _request = self.out.pop();
         }
         self.link_down(self.env.now, link::Event::Abort);
+        if let Some(at) = self.sources.next_deadline() {
+            self.sources.fire(at, &mut self.events, &mut self.io);
+        }
         for (entity, _) in &self.entities {
             self.io.push(io::Request::Abort { entity: *entity });
         }
@@ -170,7 +181,8 @@ impl Worker {
         }
         match crate::workers::owner(event) {
             Some(owner) => {
-                owner == Token::new(self.prefix)
+                self.sources.owns(owner)
+                    || owner == Token::new(self.prefix)
                     || self.owners.get(&owner).is_some()
                     || self.entities.get(&owner).is_some()
             }
@@ -189,6 +201,10 @@ impl Worker {
             return;
         }
         let owner = crate::workers::owner(&event).expect("routed owner");
+        if self.sources.owns(owner) {
+            self.sources.from_io(event, &mut self.events, &mut self.io);
+            return;
+        }
         if owner == Token::new(self.prefix) {
             match event {
                 io::Event::Connecting { socket, .. } => {
@@ -353,6 +369,22 @@ impl Worker {
     }
     pub(crate) fn route(&mut self, request: root::Request) {
         match request {
+            root::Request::Source { owner, name, operation, deadline } => {
+                let io_owner = Token::new(self.prefix.checked_add(self.next).expect("source owner range"));
+                self.next = self.next.checked_add(1).expect("source owner sequence");
+                assert!(self.next < (1_u64 << 48_u32), "worker owner range");
+                self.sources.start(
+                    owner,
+                    io_owner,
+                    name,
+                    operation,
+                    self.directory.expect("worker root"),
+                    deadline,
+                    &mut self.events,
+                    &mut self.io,
+                );
+            }
+            root::Request::SourceFault => self.link_down(self.env.now, link::Event::SourceFault),
             root::Request::Hello(hello) => self.link_down(self.env.now, link::Event::Hello { hello }),
             root::Request::Link(up) => self.link_down(self.env.now, link::Event::Up { up, parts: Box::default() }),
             root::Request::Answer { run, attempt, answer, work, preparation } => {
@@ -488,6 +520,7 @@ impl Worker {
     pub fn iterate(&mut self, now: Time, wall: Wall) {
         self.env.now = now;
         self.env.wall = wall;
+        self.sources.fire(now, &mut self.events, &mut self.io);
         if !self.started {
             self.started = true;
         }
@@ -588,10 +621,16 @@ impl Worker {
             return None;
         }
         let link = if self.git.ready { self.link.next_deadline() } else { None };
-        let mut next = [self.root.next_deadline(), link, self.values.next_expiry(), self.git.component.next_deadline()]
-            .into_iter()
-            .flatten()
-            .min();
+        let mut next = [
+            self.root.next_deadline(),
+            link,
+            self.values.next_expiry(),
+            self.git.component.next_deadline(),
+            self.sources.next_deadline(),
+        ]
+        .into_iter()
+        .flatten()
+        .min();
         for (_, process) in &self.processes {
             if let Some(at) = process.next_deadline() {
                 next = Some(match next {
@@ -616,7 +655,7 @@ impl Worker {
             }
     }
     pub(super) fn closed(&self) -> bool {
-        self.closed && self.processes.is_empty() && self.io.is_empty()
+        self.closed && self.sources.settled() && self.processes.is_empty() && self.io.is_empty()
     }
     #[must_use]
     pub fn is_empty(&self) -> bool {

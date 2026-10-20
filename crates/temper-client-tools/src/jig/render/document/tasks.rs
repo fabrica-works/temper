@@ -152,6 +152,7 @@ fn encode_task_from_label(value: &jig_client::contract::Task, out: &mut Encoder,
     out.array_end();
     out.key(b"spec");
     super::encode_specification_document(&value.spec, out, budget);
+    super::llm::encode_task(value, out, budget);
     out.key(b"spec_revision");
     super::encode_revision(value.spec_revision, out, budget);
 }

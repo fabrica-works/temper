@@ -5,4 +5,4 @@ waiting on: you: question of task 42 · 1 waiting
 acts:
   take (no tool)
   cancel 41 REASON --key NAME
-digest: task e9a0e1a12ad335c2
+digest: task 0f247de4dcf4574c

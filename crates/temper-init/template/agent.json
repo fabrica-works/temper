@@ -20,7 +20,6 @@
       "name": "codex",
       "number": 1,
       "dialect": 1,
-      "account": 1,
       "provider": "codex",
       "address": "chatgpt.com:443",
       "transport": "tls",

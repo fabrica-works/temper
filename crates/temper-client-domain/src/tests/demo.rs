@@ -127,6 +127,8 @@ fn accounts(provider: Option<u32>, usable: bool, cut: bool) -> c::OwnerAccounts 
             uses: None,
             plan: false,
             provider,
+            provider_name: None,
+            manage_usage: None,
             display: c::DocumentText::complete(f::acts::text(b"Model")),
             holder: c::OwnerAccountHolder::Party(f::PARTY),
             sources,

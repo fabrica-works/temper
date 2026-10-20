@@ -52,6 +52,7 @@ pub(crate) fn ask(world: &mut World, key: u8, ask: people::Ask) {
     send(
         world,
         engine::Event::Party(engine::PartyInput::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(6_000 + u64::from(key))),
             sign_in: world.peers.sign_in.expect("owner signed in"),
             key: [key; 16],

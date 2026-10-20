@@ -80,9 +80,7 @@ pub(super) fn encode_refusal(value: &jig_client::contract::Refusal, out: &mut En
             out.object_start();
             out.key(b"held");
             match held {
-                Some(item_1) => {
-                    super::encode_held_role(*(item_1), out, budget);
-                }
+                Some(item_1) => super::encode_held_role(*(item_1), out, budget),
                 None => out.null(),
             }
             out.object_end();
@@ -144,6 +142,7 @@ pub(super) fn encode_refusal(value: &jig_client::contract::Refusal, out: &mut En
             out.object_end();
             out.object_end();
         }
+        jig_client::contract::Refusal::Account { account, why } => super::llm::refusal(*account, *why, out),
         jig_client::contract::Refusal::Llm { model, why } => {
             out.object_start();
             out.key(b"llm");

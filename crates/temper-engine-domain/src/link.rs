@@ -108,6 +108,25 @@ fn phase(phase: host::Phase) -> fleet::Phase {
 /// Retain a worker's bytes and temper's parts; translate only their metadata.
 fn up(domain: &mut Domain, channel: Token, up: host::LinkUp, parts: Parts) -> Option<fleet::Event> {
     Some(match up {
+        host::LinkUp::Logins { logins } => {
+            let mut rows = List::with_capacity(u32::try_from(logins.len()).expect("bounded source rows"));
+            for login in logins {
+                rows.push(fleet::Login { name: source_name(login.name), state: source_login(login.state) })
+                    .expect("one source row per input");
+            }
+            fleet::Event::Logins { channel, logins: rows.into_boxed() }
+        }
+        host::LinkUp::SignedOut { name, result } => fleet::Event::SignedOut {
+            channel,
+            name: source_name(name),
+            result: match result {
+                host::SignOutResult::SignedOut => fleet::SignOutResult::SignedOut,
+                host::SignOutResult::Failed { reason, detail } => {
+                    fleet::SignOutResult::Failed { reason: source_failure(reason), detail }
+                }
+            },
+        },
+
         host::LinkUp::Turn { run, attempt, turn } => {
             let number = turn.turn;
             let body = payload(
@@ -399,5 +418,33 @@ fn sender(value: tasks::Party) -> Box<[u8]> {
     match value {
         tasks::Party::Task(number) | tasks::Party::Person(number) => Box::from(Decimal::of(number).as_bytes()),
         tasks::Party::Deployment { .. } => Box::from(&b"deployment"[..]),
+    }
+}
+
+fn source_name(name: host::SourceName) -> fleet::SourceName {
+    fleet::SourceName::new(name.as_bytes()).expect("same source name grammar")
+}
+
+fn source_login(state: host::LoginState) -> fleet::LoginState {
+    match state {
+        host::LoginState::Usable => fleet::LoginState::Usable,
+        host::LoginState::NotSignedIn => fleet::LoginState::NotSignedIn,
+        host::LoginState::SignedInOtherwise(method) => fleet::LoginState::SignedInOtherwise(
+            fleet::LoginMethod::new(method.as_bytes()).expect("same printable method grammar"),
+        ),
+        host::LoginState::Failed { reason, detail } => {
+            fleet::LoginState::Failed { reason: source_failure(reason), detail }
+        }
+    }
+}
+const fn source_failure(reason: host::SourceFailure) -> fleet::SourceFailure {
+    match reason {
+        host::SourceFailure::Missing => fleet::SourceFailure::Missing,
+        host::SourceFailure::Deadline => fleet::SourceFailure::Deadline,
+        host::SourceFailure::Unreadable => fleet::SourceFailure::Unreadable,
+        host::SourceFailure::Exited => fleet::SourceFailure::Exited,
+        host::SourceFailure::Unconfigured => fleet::SourceFailure::Unconfigured,
+        host::SourceFailure::Unknown => fleet::SourceFailure::Unknown,
+        host::SourceFailure::Closed => fleet::SourceFailure::Closed,
     }
 }

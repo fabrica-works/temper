@@ -230,3 +230,17 @@ fn preparation_rows() -> [(&'static str, wire::Preparation, Option<v1::Preparati
         ("transient", wire::Preparation::Transient, None),
     ]
 }
+
+#[test]
+#[expect(clippy::disallowed_macros, reason = "formatting Debug is necessary to prove it omits command secrets")]
+fn program_resource_debug_exposes_only_counts() {
+    let resources = crate::program_sources::Resources::new(
+        smith_protocol_program::Programs {
+            claude: b"/private/program".as_slice().into(),
+            directory: b"/private/logins".as_slice().into(),
+        },
+        Box::new([Box::from(b"API_KEY=private-value".as_slice())]),
+    )
+    .expect("explicit command resources fit");
+    assert_eq!(format!("{resources:?}"), "Resources { programs: 1, environment_entries: 1 }");
+}

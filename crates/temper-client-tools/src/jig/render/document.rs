@@ -232,6 +232,7 @@ fn task_text(
             utc(wall, out);
         }
     }
+    llm::text_wait(task.run_wait, out);
     out.put(b"\nwaiting on: ");
     waiting(&task.waits_on, me, book, out);
     out.put(b"\n");
@@ -396,6 +397,7 @@ mod hold_reasons;
 mod hold_states;
 mod holds;
 mod limits;
+mod llm;
 mod me;
 mod outcomes;
 mod owner_authority;

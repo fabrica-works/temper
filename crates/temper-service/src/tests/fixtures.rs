@@ -13,7 +13,6 @@ pub const ENGINE: &[u8] = br#"{
 "name": "fake",
 "number": 1,
 "dialect": 1,
-"account": 1,
 "provider": "fake-provider",
 "address": {"socket": "127.0.0.1:7101"},
 "transport": "plaintext",
@@ -27,10 +26,6 @@ pub const ENGINE: &[u8] = br#"{
 "window": 8192,
 "output": 1024,
 "prices": {"input": 1, "cached": 1, "output": 1, "unit": 1000}
-}],
-"accounts": [{
-"number": 1,
-"source": {"handed_in": {"file": "accounts/chat.json"}}
 }]
 },
 "hosts": {
@@ -318,26 +313,8 @@ pub fn load(
     rows
 }
 
-pub const ACCOUNT: &[u8] = br#"{"access_token":"test-token","expires_at":120,"account_id":"acc"}"#;
 pub fn seeds() -> settings::Seeds {
     settings::Seeds { deployment: [7; 16], installation: [9; 16], seed: 7, crypto: Secret::new(Box::new([7; 32])) }
-}
-
-/// A sign-in source on the issuer the tests' runtime names.
-pub fn signed_in_source() -> jig_protocol_config::Source {
-    jig_protocol_config::Source::SignIn(jig_protocol_config::SignIn {
-        client: Box::from(&b"client"[..]),
-        secret: None,
-        authorization: Box::from(&b"http://127.0.0.1:7102/authorize"[..]),
-        token: Box::from(&b"http://127.0.0.1:7102/token"[..]),
-        endpoint: jig_protocol_config::Address::Addr(skein_io::Addr::Ip(core::net::SocketAddr::from((
-            [127, 0, 0, 1],
-            7102,
-        )))),
-        transport: jig_protocol_config::Transport::Plaintext,
-        redirect: Box::from(&b"http://127.0.0.1:7103/callback"[..]),
-        scope: Box::from(&b"read"[..]),
-    })
 }
 
 pub fn root() -> (temper_engine_domain::Domain, skein_lib::Env<temper_engine_domain::Limits>) {
@@ -360,15 +337,14 @@ pub fn root() -> (temper_engine_domain::Domain, skein_lib::Env<temper_engine_dom
     )
 }
 
-/// The files the engine document names: its charter, account and worker digests.
+/// The files the engine document names: its charter and worker digests.
 pub fn fill_files(settings: &mut settings::Engine) {
-    settings.files.entries = skein_lib::List::with_capacity(4);
+    settings.files.entries = skein_lib::List::with_capacity(3);
     settings
         .files
         .entries
         .push((b"charters/chat.txt".as_slice().into(), Secret::new(b"Answer briefly".as_slice().into())))
         .unwrap();
-    settings.files.entries.push((b"accounts/chat.json".as_slice().into(), Secret::new(ACCOUNT.into()))).unwrap();
     for worker in &settings.jig.hosts.workers {
         settings.files.entries.push((worker.digest.clone(), Secret::new(WORKER_DIGEST.into()))).unwrap();
     }
@@ -458,7 +434,7 @@ fn start_with_worker(
     if worker.is_some() {
         settings.jig.limits.hub = worker_settings().jig.limits.hub;
         settings.limits.checkout = worker_limits().checkout;
-        settings.files.entries.get_mut(2).unwrap().1 =
+        settings.files.entries.get_mut(1).unwrap().1 =
             Secret::new(b"8f7be71db3941de11249a5e3fba7750a41c7d9958083ef522cb79e9fd7822878".as_slice().into());
     }
     let root = limits::engine(&settings.jig.limits, &settings.limits).unwrap();
@@ -681,16 +657,7 @@ pub fn settle_root(
             }
         }
         engine.store.iterate();
-        for _ in 0..engine.store.above.len() {
-            let event = engine.store.above.pop().unwrap();
-            crate::store::route::up(&mut engine.store.routes, event, &mut engine.store.routed);
-        }
-        for _ in 0..engine.store.routed.len() {
-            match engine.store.routed.pop().unwrap() {
-                crate::store::route::Up::Root(event) => engine.events.push(*event),
-                crate::store::route::Up::Ask(request) => engine.store.ask(request),
-            }
-        }
+        crate::engine::answer(engine);
         if let Some(accounts) = &mut engine.accounts {
             accounts.iterate(
                 engine.env.now,
@@ -707,9 +674,53 @@ pub fn settle_root(
     }
     panic!("chat settled");
 }
+// A restored deployment key, with the first-start people and periods kept by the
+// service itself. Ordinary cold-start fixtures stay empty for startup proofs.
+fn restored_key() -> crate::Service {
+    use jig_domain_accounts::{Holder, Kind, Stored};
+    use jig_protocol_store::{SecretOwner, Secrets};
+    use temper_engine_domain::{Record, StoreRequest, Write};
+    let mut bootstrap = ready();
+    let mut header = bootstrap.engine.domain.deployment();
+    header.commits = header.commits.checked_add(1).unwrap();
+    let mut writes = skein_lib::List::with_capacity(4);
+    writes
+        .push(Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(header)))))
+        .unwrap();
+    for row in [
+        Stored::Account {
+            number: 1,
+            provider: 1,
+            holder: Holder::Deployment,
+            place: 0,
+            uses: None,
+            subject: Box::new([]),
+            display: Box::new([]),
+        },
+        Stored::Source { account: 1, number: 0, place: 0, kind: Kind::Key, name: Box::new([]), held: None },
+        Stored::Next { number: 2 },
+    ] {
+        writes.push(Write::Save(Record::Core(jig_domain_core::Record::Accounts(row)))).unwrap();
+    }
+    assert!(bootstrap.engine.store.down(StoreRequest::Commit { number: header.commits, writes: writes.into_boxed() }));
+    let _later = bootstrap.engine.store.secrets(
+        Token::new(crate::tokens::ACCOUNTS),
+        Secrets::Replace {
+            owner: SecretOwner::Source,
+            number: 0,
+            value: Secret::new(b"fixture-key".as_slice().into()),
+            replaces: None,
+        },
+    );
+    while bootstrap.engine.store.above.pop().is_some() {}
+    let mut service = start_with_store(&[(1, 100)], Some(bootstrap.engine.store));
+    restart(&mut service);
+    service
+}
+
 pub fn signed_worker() -> crate::Service {
     use temper_engine_domain as root;
-    let mut service = ready();
+    let mut service = restored_key();
     service.engine.step(root::Event::Worker(root::WorkerInput::Link {
         channel: Token::new(7),
         link: root::Link::Hello(host::Hello {
@@ -731,6 +742,11 @@ pub fn signed_worker() -> crate::Service {
         }),
     }));
     settle_root(&mut service, &mut skein_lib::Queue::with_capacity(32));
+    service.engine.step(root::Event::Worker(root::WorkerInput::Link {
+        channel: Token::new(7),
+        link: root::Link::Up { up: host::LinkUp::Logins { logins: Box::new([]) }, parts: root::Parts::none() },
+    }));
+    settle_root(&mut service, &mut skein_lib::Queue::with_capacity(32));
     service.engine.step(root::Event::Party(root::PartyInput::SignedIn {
         reply_to: skein_lib::ReplyTo::new(Token::new(100)),
         identity: jig_domain_people::Identity {
@@ -746,6 +762,7 @@ pub fn claimed_chat() -> (crate::Service, temper_engine_domain::Assignment) {
     use temper_engine_domain as root;
     let mut service = signed_worker();
     service.engine.step(root::Event::Party(root::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: skein_lib::ReplyTo::new(Token::new(101)),
         sign_in: 1,
         key: [31; 16],
@@ -822,7 +839,7 @@ pub fn people_member(words: &[u8], spend: u64) -> jig_domain_people::Member {
         contract: people::Contract::Report { words: 16 },
         authority: people::Authority {
             tools: 0,
-            models: 0,
+            models: None,
             grants: Box::new([]),
             delegation: people::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
             spend,

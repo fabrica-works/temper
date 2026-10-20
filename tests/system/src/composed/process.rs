@@ -60,6 +60,9 @@ pub(crate) struct Around<'a> {
 }
 
 impl Process {
+    pub(crate) fn notice(&mut self, notice: agent::Up) {
+        self.up.push_front(notice);
+    }
     pub(crate) fn new(seed: u64, script: Script) -> Process {
         Process {
             seed,

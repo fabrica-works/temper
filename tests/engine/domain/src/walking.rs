@@ -97,6 +97,8 @@ pub fn limits() -> engine::Limits {
         room_refusals: 2,
     };
     let fleet = fleet::Limits {
+        program_sources: 12,
+        source_detail_bytes: 4096,
         workers: 1,
         needs_bytes: 65_536,
         engine_slots: 0,
@@ -276,8 +278,11 @@ pub fn config(seed: u64) -> engine::Config {
                 llm_providers: accounts::Providers {
                     providers: Box::new([accounts::Provider {
                         number: 1,
+                        name: Box::from(b"Scripted".as_slice()),
+                        signed_in_plan: false,
+                        manage_usage: None,
                         models: Box::new([charter().policy.model.name]),
-                        offers: accounts::Offers { sign_in: true, key: false, programs: Box::new([]) },
+                        offers: accounts::Offers { sign_in: true, key: true, programs: Box::new([]) },
                     }]),
                 },
             },
@@ -341,7 +346,6 @@ pub fn charter() -> engine::Charter {
             reserve_time: Duration::from_secs(10),
             model: engine::Model {
                 dialect: 1,
-                account: 1,
                 endpoint: 1,
                 name: b"scripted".as_slice().into(),
                 window: 1024,
@@ -452,12 +456,14 @@ impl World {
     pub fn new(settings: Settings) -> World {
         assert!(!(settings.restart && settings.terminal_restart), "one chosen process cut per story");
         let limits = limits();
+        let config = config(settings.seed);
+        let store = crate::fixtures::restored_store(self::config(settings.seed), &limits);
         let mut world = World {
-            domain: engine::Domain::new(config(settings.seed), &limits),
+            domain: engine::Domain::new(config, &limits),
             environment: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(engine::max_out(&limits)),
             events: VecDeque::new(),
-            store: Store::new(),
+            store,
             referee: WalkingReferee::default(),
             trace: Vec::new(),
             restarts: 0,
@@ -728,11 +734,13 @@ impl World {
 
     fn delivery(&mut self, delivery: Delivery) {
         match delivery {
+            Delivery::SourceSignedOut { .. } => panic!("this story issues no source sign-out"),
             Delivery::WebReply { reply: people::Reply::SignedIn { person, sign_in, .. }, .. } => {
                 self.referee.signed_in(&self.store.rows, person, sign_in).expect("durable sign-in");
                 self.session = Some(sign_in);
                 self.queue(
                     engine::Event::Party(engine::PartyInput::Ask {
+                        models: Box::new([]),
                         reply_to: ReplyTo::new(Token::new(102)),
                         sign_in,
                         key: [5; 16],

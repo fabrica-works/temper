@@ -12,40 +12,56 @@ use temper_engine_domain as engine;
 use temper_engine_domain_world::{direct::Driver, store::Store, walking};
 const CLIENT: ClientId = ClientId(0);
 pub const PROVIDER: u32 = 17;
+pub const SMALL_ROWS: u32 = 2;
 #[must_use]
 pub fn fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, false)
+    fixture_root(seed, false, 2, None)
 }
 #[must_use]
 pub fn tools_fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, true)
+    fixture_root(seed, true, 2, None)
 }
-fn fixture_root(seed: u64, tools: bool) -> (Joint, Root) {
-    let limits = if tools { temper_client_tools::limits::client() } else { fixtures::domain_limits() };
-    let mut config = walking::config(seed);
-    config.core.settings.llm_providers = a::Providers {
-        providers: Box::new([a::Provider {
-            number: PROVIDER,
-            models: Box::new([Box::from(b"scripted".as_slice())]),
-            offers: a::Offers { sign_in: true, key: true, programs: Box::new([]) },
-        }]),
-    };
-    let mut engine_limits = engine_limits();
-    // Keep the legacy deployment account plus two party accounts for tools ordering.
-    engine_limits.accounts.accounts = 3;
-    engine_limits.accounts.holder_accounts = 2;
-    engine_limits.accounts.credentials = 3;
-    engine_limits.authority.accounts = 4;
-    engine_limits.fleet.grants = 6;
-    // Four extra grants add sixteen entries to the four fleet routing cohorts.
-    engine_limits.journal.writes = engine_limits.journal.writes.checked_add(16).expect("grant cohorts fit");
-    let rules = config.core.authority.rules().clone();
-    let policy = config.core.authority.policy(1).expect("fixture project").clone();
-    let mut authority = auth::Domain::new(rules, engine_limits.authority).expect("account authority bounds");
-    let mut out = Queue::with_capacity(auth::POLICY_MAX_OUT);
-    auth::step(&mut authority, auth::Event::Policy { project: 1, policy }, &mut out);
-    config.core.authority = authority;
-    let driver = Driver::with_repositories(Store::new(), config, &engine_limits, fixtures::REPOSITORIES);
+#[must_use]
+pub fn small_rows_fixture(seed: u64) -> (Joint, Root) {
+    fixture_root(seed, false, 3, Some(SMALL_ROWS))
+}
+fn fixture_root(seed: u64, tools: bool, own_accounts: u32, rows: Option<u32>) -> (Joint, Root) {
+    let mut limits = if tools { temper_client_tools::limits::client() } else { fixtures::domain_limits() };
+    if let Some(rows) = rows {
+        limits.client.domain.rows = rows;
+    }
+    let [(bootstrap, engine_limits), (config, _)] = std::array::from_fn(|_| {
+        let mut config = walking::config(seed);
+        config.core.settings.llm_providers = a::Providers {
+            providers: Box::new([a::Provider {
+                number: PROVIDER,
+                name: Box::from(b"Scripted".as_slice()),
+                signed_in_plan: false,
+                manage_usage: None,
+                models: Box::new([Box::from(b"scripted".as_slice())]),
+                offers: a::Offers { sign_in: true, key: true, programs: Box::new([]) },
+            }]),
+        };
+        let mut engine_limits = engine_limits();
+        // Restore one deployment account and leave the requested room for party accounts.
+        engine_limits.documents.lines = engine_limits.documents.lines.max(own_accounts);
+        engine_limits.accounts.accounts = own_accounts + 1;
+        engine_limits.accounts.holder_accounts = own_accounts;
+        engine_limits.accounts.credentials = own_accounts + 1;
+        engine_limits.authority.accounts = 4;
+        engine_limits.fleet.grants = (own_accounts + 1) * 2;
+        // Each extra grant adds one entry to each of the four fleet routing cohorts.
+        engine_limits.journal.writes =
+            engine_limits.journal.writes.checked_add((engine_limits.fleet.grants - 2) * 4).expect("grant cohorts fit");
+        let rules = config.core.authority.rules().clone();
+        let policy = config.core.authority.policy(1).expect("fixture project").clone();
+        let mut authority = auth::Domain::new(rules, engine_limits.authority).expect("account authority bounds");
+        let mut out = Queue::with_capacity(auth::POLICY_MAX_OUT);
+        auth::step(&mut authority, auth::Event::Policy { project: 1, policy }, &mut out);
+        config.core.authority = authority;
+        (config, engine_limits)
+    });
+    let driver = Driver::with_repositories(Store::new(), [bootstrap, config], &engine_limits, fixtures::REPOSITORIES);
     let mut front = Joint::with_engine(seed, &limits, driver, 1);
     front.bind(CLIENT, fixtures::PARTY);
     let mut root = if tools {

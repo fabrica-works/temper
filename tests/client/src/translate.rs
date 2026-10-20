@@ -19,8 +19,8 @@ pub mod forge;
 pub fn party(event: core::Event) -> engine::Event {
     engine::Event::Party(match event {
         core::Event::SignIn { reply_to, identity } => PartyInput::SignedIn { reply_to, identity },
-        core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask }) => {
-            PartyInput::Ask { reply_to, sign_in, key, ask }
+        core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask, models }) => {
+            PartyInput::Ask { reply_to, sign_in, key, ask, models }
         }
         core::Event::People(people::Event::SignOut { reply_to, sign_in }) => PartyInput::SignOut { reply_to, sign_in },
         core::Event::People(event) => unsupported_people(&event),
@@ -145,7 +145,9 @@ pub fn request(
                 transport.reply_to(Reply::Keyed { client: who, attempt: *attempt, key: *key, owner: KeyedOwner::Jig });
             events.push(party(match carried {
                 Some(carried) => core::Event::Key { reply_to, sign_in, key: *key, ask: Box::new(ask), carried },
-                None => core::Event::People(people::Event::Ask { reply_to, sign_in, key: *key, ask }),
+                None => {
+                    core::Event::People(people::Event::Ask { models: Box::new([]), reply_to, sign_in, key: *key, ask })
+                }
             }));
         }
 
@@ -216,6 +218,27 @@ pub fn incoming(
         | engine::Request::Stop => None,
     }
 }
+// The joint world's older translation helper uses rows for every collection.
+// Account lists have independent bounds in temper; retain their actual whole capacities.
+fn account_document_limits(
+    document: &jig_domain_core::documents::Document,
+    limits: &jig_client::DomainLimits,
+) -> jig_client::DomainLimits {
+    let mut whole = *limits;
+    if let jig_domain_core::documents::Document::Frame(value) = document {
+        whole.rows = whole.rows.max(value.projects.capacity());
+    }
+    if let jig_domain_core::documents::Document::Accounts(value) = document {
+        whole.rows = whole.rows.max(value.accounts.capacity()).max(value.signing.capacity());
+        for row in &value.accounts {
+            whole.rows = whole.rows.max(row.sources.capacity());
+            if let Some(uses) = &row.uses {
+                whole.rows = whole.rows.max(uses.capacity());
+            }
+        }
+    }
+    whole
+}
 fn delivery_packet(
     transport: &mut Transport,
     delivery: Delivery,
@@ -237,7 +260,7 @@ fn delivery_packet(
             })
         }
         Delivery::Document { watcher, document } => transport.watch(watcher).is_some().then(|| {
-            packets::document(transport, watcher, &document, limits)
+            packets::document(transport, watcher, &document, &account_document_limits(&document, limits))
                 .unwrap_or_else(|error| panic!("whole jig document translates: {error:?}; original {document:?}"))
         }),
         Delivery::WatchEnded { watcher, why } => transport
@@ -250,6 +273,7 @@ fn delivery_packet(
         }
         // Jig has no separate live requester Result; the task document carries it.
         Delivery::Application { .. }
+        | Delivery::SourceSignedOut { .. }
         | Delivery::Result { .. }
         | Delivery::Host(_)
         | Delivery::Link { .. }

@@ -28,6 +28,15 @@ pub struct Service {
     links: Queue<Box<[u8]>>,
 }
 impl Service {
+    pub fn configure_program_sources(
+        &mut self,
+        resources: crate::program_sources::Resources,
+    ) -> Result<(), crate::program_sources::Resources> {
+        match &mut self.worker {
+            Some(worker) => worker.configure_program_sources(resources),
+            None => Err(resources),
+        }
+    }
     /// Construct the root, its deployment store and its configured accounts.
     pub fn engine(
         settings: settings::Engine,
@@ -404,10 +413,10 @@ fn accounts_driver(
     room: u32,
     secrets: &skein_kv::Limits,
 ) -> Result<Option<accounts::Accounts>, Problems> {
-    if settings.jig.llm.accounts.is_empty() && settings.jig.llm.providers.is_empty() {
+    if settings.jig.llm.providers.is_empty() {
         return Ok(None);
     }
-    Ok(Some(accounts::Accounts::new(&settings.jig, &settings.files, seeds, runtime, room, secrets)?))
+    Ok(Some(accounts::Accounts::new(&settings.jig, seeds, runtime, room, secrets)?))
 }
 fn read_charters(settings: &mut settings::Engine) -> Result<(), Problems> {
     for charter in &mut settings.jig.charters {
@@ -603,9 +612,10 @@ fn memory(
     forge: (u64, &skein_forge_connection::Settings),
 ) -> Option<u64> {
     let queue = temper_engine_domain::max_out(root).checked_mul(2)?;
-    let payload = temper_engine_domain::worst_case(root)?;
+    let retained = temper_engine_domain::worst_case(root)?;
+    let payload = temper_engine_domain::payload_worst_case(root)?;
     let events = queue.checked_mul(engine::route_out())?;
-    let mut bytes = payload
+    let mut bytes = retained
         .checked_add(u64::try_from(size_of::<Service>()).ok()?)?
         .checked_add(skein_io::worst_case(io)?)?
         .checked_add(store::worst_case(root, store)?)?
@@ -662,13 +672,15 @@ fn memory(
         .checked_add(
             u64::from(identities).checked_mul(temper_protocol_worker_wire::v1::Identity::worst_case_bytes(&wire)?)?,
         )?;
-    if !settings.jig.llm.accounts.is_empty() || !settings.jig.llm.providers.is_empty() {
+    if !settings.jig.llm.providers.is_empty() {
         let driver = settings.jig.limits.driver;
         bytes = bytes.checked_add(accounts::worst_case(&driver, queue.checked_mul(3)?, store.secrets.page.rows)?)?;
     }
     bytes = bytes.checked_add(accounts::configured_bytes(&settings.jig)?)?;
     if let Some(runtime) = runtime {
-        bytes = bytes.checked_add(skein_tls::roots_worst_case(runtime.trust_roots, runtime.trust_root_bytes)?)?;
+        bytes = bytes
+            .checked_add(skein_tls::roots_worst_case(runtime.trust_roots, runtime.trust_root_bytes)?)?
+            .checked_add(runtime.d2.worst_case(&settings.jig.limits.driver.client.document)?)?;
     }
     bytes = bytes.checked_add(crate::forge::records::worst_case(settings)?)?;
     Some(bytes)

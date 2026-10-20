@@ -93,17 +93,24 @@ pub fn revision_delegate() -> (Driver, engine::Assignment, u64) {
     bounds.journal.deliveries = 100;
     bounds.tasks.depth = 2;
     bounds.brief.sections = 5;
-    let mut configuration = config(92);
-    let mut rules = configuration.core.authority.rules().clone();
-    rules.ceiling.delegation.depth = 2;
-    let mut policy = configuration.core.authority.policy(1).expect("fixture project").clone();
-    policy.ceiling.delegation.depth = 2;
-    policy.roles[0].authority.delegation.depth = 2;
-    let mut authority = jig_domain_authority::Domain::new(rules, bounds.authority).expect("fixture authority");
-    let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
-    jig_domain_authority::step(&mut authority, jig_domain_authority::Event::Policy { project: 1, policy }, &mut out);
-    assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
-    configuration.core.authority = authority;
+    let configuration = std::array::from_fn(|_| {
+        let mut configuration = config(92);
+        let mut rules = configuration.core.authority.rules().clone();
+        rules.ceiling.delegation.depth = 2;
+        let mut policy = configuration.core.authority.policy(1).expect("fixture project").clone();
+        policy.ceiling.delegation.depth = 2;
+        policy.roles[0].authority.delegation.depth = 2;
+        let mut authority = jig_domain_authority::Domain::new(rules, bounds.authority).expect("fixture authority");
+        let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
+        jig_domain_authority::step(
+            &mut authority,
+            jig_domain_authority::Event::Policy { project: 1, policy },
+            &mut out,
+        );
+        assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
+        configuration.core.authority = authority;
+        configuration
+    });
     let (mut driver, parent) = Driver::configured_chat(configuration, &bounds);
     let mut member = report_delegate(b"first", Box::new([]));
     member.authority.budget.spend = 100;
@@ -149,4 +156,72 @@ pub fn templates() -> Box<[jig_domain_core::Template]> {
             llm: None,
         },
     ])
+}
+
+#[must_use]
+pub fn account_rows(providers: &jig_domain_accounts::Providers) -> Box<[engine::Record]> {
+    use jig_domain_accounts::{Holder, Kind, Stored};
+    let mut rows = Vec::new();
+    for (index, entry) in providers.providers.iter().filter(|p| !p.offers.none()).enumerate() {
+        let index = u32::try_from(index).expect("bounded fixture value");
+        let (account, source) = if index == 0 { (0, 1) } else { (2 * index + 1, 2 * index) };
+        let provider = entry.number;
+        {
+            for row in [
+                Stored::Account {
+                    number: account,
+                    provider,
+                    holder: Holder::Deployment,
+                    place: index,
+                    uses: None,
+                    subject: Box::new([]),
+                    display: Box::new([]),
+                },
+                Stored::Source { account, number: source, place: 0, kind: Kind::Key, name: Box::new([]), held: None },
+            ] {
+                rows.push(engine::Record::Core(jig_domain_core::Record::Accounts(row)));
+            }
+        }
+    }
+    if !rows.is_empty() {
+        rows.push(engine::Record::Core(jig_domain_core::Record::Accounts(Stored::Next {
+            number: u32::try_from(rows.len()).expect("bounded fixture value"),
+        })));
+    }
+    rows.into_boxed_slice()
+}
+
+/// Keep temper's actual first-start transaction, then account rows at receipt two.
+/// Callers construct a second identical configuration for their cold root; no domain
+/// configuration is cloned by hand and no account/session request precedes the story.
+#[must_use]
+pub fn restored_store(config: engine::Config, limits: &engine::Limits) -> crate::store::Store {
+    restored_over(crate::store::Store::new(), config, limits)
+}
+
+/// Same bootstrap over the caller's chosen real store codec bounds.
+#[must_use]
+pub fn restored_over(
+    store: crate::store::Store,
+    config: engine::Config,
+    limits: &engine::Limits,
+) -> crate::store::Store {
+    let accounts = account_rows(&config.core.settings.llm_providers);
+    let mut store = first_start_over(store, config, limits);
+    store.seed(accounts, Box::new([]));
+    store
+}
+
+/// Real first-start rows alone, also used by conformance's independent receipt observer.
+#[must_use]
+pub fn first_start_over(
+    store: crate::store::Store,
+    config: engine::Config,
+    limits: &engine::Limits,
+) -> crate::store::Store {
+    let mut driver = Driver::cold(store, config, limits);
+    driver.period_sent = true;
+    driver.settle();
+    assert_eq!(driver.store.applied, 1, "temper's real first start is receipt one");
+    driver.store
 }

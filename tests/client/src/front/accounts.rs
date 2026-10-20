@@ -4,7 +4,12 @@ impl Joint {
     pub(crate) fn with_accounts(seed: u64, limits: client::Limits) -> Self {
         let mut bounds = engine_limits();
         bounds.people.projects = 2; // Project membership and the deployment role row.
-        let mut first = Driver::with_repositories(Store::new(), walking::config(seed), &bounds, fixtures::REPOSITORIES);
+        let mut first = Driver::with_repositories(
+            Store::new(),
+            [walking::config(seed), walking::config(seed)],
+            &bounds,
+            fixtures::REPOSITORIES,
+        );
         first.settle();
         let membership = jig_domain_people::Stored::Roles {
             project: 0,
@@ -15,7 +20,12 @@ impl Joint {
         };
         let row = engine::Record::Core(jig_domain_core::Record::People(membership));
         first.store.seed(Box::new([row]), Box::new([]));
-        let engine = Driver::with_repositories(first.store, walking::config(seed), &bounds, fixtures::REPOSITORIES);
+        let engine = Driver::with_repositories(
+            first.store,
+            [walking::config(seed), walking::config(seed)],
+            &bounds,
+            fixtures::REPOSITORIES,
+        );
         Self::with_engine(seed, &limits, engine, 1)
     }
 }

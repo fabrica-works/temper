@@ -29,6 +29,11 @@ pub fn answered_chat(words: &[u8], answer: &[u8]) -> Script {
         ]),
     }
 }
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ProjectSelection {
+    Pending,
+    Selected,
+}
 /// Stdout and the client share one host; the link comes only from the binary.
 pub struct Person {
     pub client: Option<NativeClient>,
@@ -44,6 +49,7 @@ pub struct Person {
     signing_retry: Option<Time>,
     signing_backoff: skein_lib::Duration,
     pub finished: bool,
+    project: ProjectSelection,
     pub failed: Option<String>,
     resume: bool,
     completions: Queue<Complete>,
@@ -59,10 +65,29 @@ impl Person {
     }
     #[must_use]
     pub fn new(root: Fd, input: Fd, output: Fd, script: Script) -> Self {
+        let steps = if script.resume {
+            script.steps
+        } else {
+            use skein_ui::Role;
+            let mut setup = vec![
+                Step::Go { address: Address::Accounts },
+                Step::See { find: Find::named(Role::Button, b"Use deployment accounts"), within: START_WITHIN },
+                Step::Press { find: Find::named(Role::Button, b"Use deployment accounts") },
+                Step::Type { find: Find::named(Role::TextField, b"Provider number"), words: b"1".as_slice().into() },
+                Step::Type {
+                    find: Find::named(Role::TextField, b"Key (pasted once)"),
+                    words: jig_channel_world::fixtures::KEY.into(),
+                },
+                Step::Press { find: Find::named(Role::Button, b"Add key") },
+                Step::See { find: Find::text(b"Key kept as source"), within: START_WITHIN },
+            ];
+            setup.extend(script.steps);
+            setup.into_boxed_slice()
+        };
         Self {
             client: None,
             root: Some(root),
-            actor: skein_fake_person::Person::new(script.steps),
+            actor: skein_fake_person::Person::new(steps),
             input: Some(input),
             output: Some(output),
             reading: false,
@@ -73,6 +98,7 @@ impl Person {
             signing_retry: None,
             signing_backoff: SIGN_IN_FIRST,
             finished: false,
+            project: ProjectSelection::Pending,
             failed: None,
             resume: script.resume,
             completions: Queue::with_capacity(512),
@@ -196,8 +222,27 @@ impl Person {
                 self.wake = Some(self.wake.map_or(retry, |at| at.min(retry)));
             }
         }
+        // These fixtures give project zero its real deployment membership. Choose
+        // the other offered project (one) before executing the story's own acts.
+        if client.started()
+            && self.project == ProjectSelection::Pending
+            && let Some(node) = client
+                .tree()
+                .nodes()
+                .iter()
+                .find(|node| {
+                    node.role == skein_ui::Role::Button
+                        && node.name.as_deref() == Some(b"Project".as_slice())
+                        && !node.states.iter().any(|state| *state == skein_ui::State::Selected)
+                })
+                .map(|node| node.id)
+        {
+            assert!(client.act(node, skein_ui::Act::Press), "offered project selection");
+            self.project = ProjectSelection::Selected;
+            self.wake = Some(now);
+        }
         let signing_wake = self.wake;
-        if client.started() && !self.finished && self.failed.is_none() {
+        if client.started() && self.project == ProjectSelection::Selected && !self.finished && self.failed.is_none() {
             let before = self.actor.at();
             match self.actor.next(&mut TreeFace::new(client.tree()), now) {
                 Next::Do(Doing::Act { node, act }) => assert!(client.act(node, act), "offered person act"),

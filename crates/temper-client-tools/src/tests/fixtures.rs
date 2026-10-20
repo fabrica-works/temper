@@ -485,6 +485,7 @@ const AUTHORITY_DEPTH: u32 = 1;
 const AUTHORITY_ENTRIES: u32 = 1;
 pub(crate) fn bounded_offer(beyond: c::Beyond) -> c::Admission {
     let authority = c::OwnerAuthorityDocument::complete(c::OwnerAuthority {
+        models: None,
         tools: 5,
         grants: List::with_capacity(EMPTY),
         delegation: c::OwnerDelegation { kinds: List::with_capacity(EMPTY), tasks: 3, depth: AUTHORITY_DEPTH },

@@ -135,3 +135,60 @@ fn task_json_names_the_nested_contract_fields() {
     }
     assert!(found);
 }
+
+#[test]
+fn a_source_wait_keeps_its_unknown_deadline() {
+    use jig_client::contract as c;
+    for (state, expected) in [
+        (c::TaskSourceState::Later { until: None }, b"later until unknown".as_slice()),
+        (c::TaskSourceState::Limited { until: None }, b"limited until unknown".as_slice()),
+    ] {
+        let (mut root, call, mut task) = fixtures::task_read();
+        task.run_wait =
+            Some(c::TaskRunWait::Account { account: Some(43), source: Some(17), why: c::TaskWaitWhy::Source(state) });
+        root.serve(call, fixtures::task_result(task));
+        let answer = root.answer(call).expect("read answered");
+        assert!(skein_lib::bytes::find(&answer.stdout, expected).is_some());
+    }
+}
+
+#[test]
+fn a_task_read_retains_its_named_payer() {
+    let (mut root, call) = fixtures::read_call(fixtures::TASK_JSON_CALL);
+    let mut task = fixtures::goal(fixtures::TASK, fixtures::waiting_on_me());
+    task.kept_account = Some(43);
+
+    root.serve(call, fixtures::task_result(task));
+    let answer = root.answer(call).expect("read answered");
+    assert!(skein_lib::bytes::find(&answer.stdout, br#""kept_account":43"#).is_some());
+}
+
+#[test]
+fn a_task_read_retains_its_account_wait_reason() {
+    use jig_client::contract as c;
+    let (mut root, call) = fixtures::read_call(fixtures::TASK_JSON_CALL);
+    let mut task = fixtures::goal(fixtures::TASK, fixtures::waiting_on_me());
+    task.run_wait = Some(c::TaskRunWait::Account {
+        account: Some(43),
+        source: Some(17),
+        why: c::TaskWaitWhy::Invalid(c::AccountWhy::Limited),
+    });
+    root.serve(call, fixtures::task_result(task));
+    let answer = root.answer(call).expect("read answered");
+    let field = br#""run_wait":{"account":{"account":43,"source":17,"why":{"invalid":"limited"}}}"#;
+    assert!(skein_lib::bytes::find(&answer.stdout, field).is_some());
+}
+
+#[test]
+fn a_source_wait_prints_a_null_json_deadline() {
+    use jig_client::contract as c;
+    for state in [c::TaskSourceState::Later { until: None }, c::TaskSourceState::Limited { until: None }] {
+        let (mut root, call) = fixtures::read_call(fixtures::TASK_JSON_CALL);
+        let mut task = fixtures::goal(fixtures::TASK, fixtures::waiting_on_me());
+        task.run_wait =
+            Some(c::TaskRunWait::Account { account: Some(43), source: Some(17), why: c::TaskWaitWhy::Source(state) });
+        root.serve(call, fixtures::task_result(task));
+        let answer = root.answer(call).expect("read answered");
+        assert!(skein_lib::bytes::find(&answer.stdout, br#""until":null"#).is_some());
+    }
+}

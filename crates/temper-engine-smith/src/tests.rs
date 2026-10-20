@@ -40,7 +40,6 @@ fn assignment() -> engine::Assignment {
                 reserve_time: Duration::from_secs(10),
                 model: engine::Model {
                     dialect: 1,
-                    account: 1,
                     endpoint: 1,
                     name: b"scripted".as_slice().into(),
                     window: 8192,
@@ -117,7 +116,6 @@ fn selected_llm_bindings_reach_smith() {
     assignment.run.policy.model.effort = Some(b"high".as_slice().into());
     let alternative = engine::Model {
         name: b"alternative".as_slice().into(),
-        account: 2,
         effort: Some(b"low".as_slice().into()),
         ..assignment.run.policy.model.clone()
     };
@@ -516,4 +514,48 @@ fn not_installed_names_the_forge_refusal() {
     let rendered = answer(&engine::CallAnswer::ForgeEffectRefused(skein_forge::api::Error::NotInstalled));
     assert_eq!(rendered.text(), b"Forge effect refused: not installed");
     assert!(rendered.error());
+}
+
+#[test]
+fn a_delegate_keeps_its_llm_preference() {
+    let call = decoded(
+        b"delegate",
+        br#"{"batch":[{
+        "executor":{"kind":"agent","charter":1},"spec":{"words":"work"},
+        "contract":{"kind":"report","words":32},
+        "authority":{"tools":0,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},
+            "budget":{"spend":0},"notes":0},
+        "llm":{"main":{"model":2,"effort":1},"subagents":[{"model":3}],"account":43}
+    }]}"#,
+    )
+    .expect("valid delegate");
+    let engine::Tool::Delegate { batch } = call.tool else { panic!("delegate") };
+    assert_eq!(
+        batch[0].llm,
+        Some(tasks::LlmChoice {
+            account: Some(43),
+            main: tasks::ModelEffort { model: 2, effort: Some(1) },
+            subagents: Box::new([tasks::ModelEffort { model: 3, effort: None }]),
+        })
+    );
+}
+
+#[test]
+fn an_amendment_keeps_its_llm_preference() {
+    let call = decoded(
+        b"amend",
+        br#"{"target":23,"revision":7,"amendment":{
+        "reason":"change payer","llm":{"main":{"model":2,"effort":1},"subagents":[{"model":3}],"account":43}
+    }}"#,
+    )
+    .expect("valid amendment");
+    let engine::Tool::Amend { amendment, .. } = call.tool else { panic!("amendment") };
+    assert_eq!(
+        amendment.llm,
+        Some(tasks::LlmChoice {
+            account: Some(43),
+            main: tasks::ModelEffort { model: 2, effort: Some(1) },
+            subagents: Box::new([tasks::ModelEffort { model: 3, effort: None }]),
+        })
+    );
 }

@@ -44,8 +44,7 @@ pub(crate) fn delegate(value: &Value) -> Result<engine::Delegate, Problem> {
         spec,
         contract,
         authority,
-        // The tool names no LLM choice: the core resolves its charter's default (tasks.md, 3).
-        llm: None,
+        llm: llm(value.field(b"llm")?)?,
         symbolic_grants,
         dependencies,
         wake,
@@ -92,7 +91,7 @@ pub(crate) fn amendment(value: &Value) -> Result<tasks::Amendment, Problem> {
         wake,
         dependencies,
         authority,
-        llm: None,
+        llm: llm(value.field(b"llm")?)?,
         reason: value.required(b"reason")?.text()?,
     })
 }
@@ -310,4 +309,43 @@ fn texts(value: &Value) -> Result<Box<[Box<[u8]>]>, Problem> {
         let Ok(()) = out.push(item.text()?) else { return Err(Problem::TooLarge) };
     }
     Ok(out.into_boxed())
+}
+
+// Model indices name the configured order; account numbers name durable accounts.
+fn llm(value: Option<&Value>) -> Result<Option<tasks::LlmChoice>, Problem> {
+    let Some(value) = value else { return Ok(None) };
+    let subagents: Box<[tasks::ModelEffort]> = match value.field(b"subagents")? {
+        None => Box::new([]),
+        Some(values) => {
+            let items = values.array()?;
+            let count = u32::try_from(items.len()).or(Err(Problem::TooLarge))?;
+            if count > tasks::MODELS {
+                return Err(Problem::TooLarge);
+            }
+            let mut out = List::with_capacity(count);
+            for item in items {
+                if out.push(model_effort(item)?).is_err() {
+                    return Err(Problem::TooLarge);
+                }
+            }
+            out.into_boxed()
+        }
+    };
+    Ok(Some(tasks::LlmChoice {
+        account: match value.field(b"account")? {
+            Some(value) => Some(value.small()?),
+            None => None,
+        },
+        main: model_effort(value.required(b"main")?)?,
+        subagents,
+    }))
+}
+fn model_effort(value: &Value) -> Result<tasks::ModelEffort, Problem> {
+    Ok(tasks::ModelEffort {
+        model: u8::try_from(value.required(b"model")?.small()?).or(Err(Problem::Range))?,
+        effort: match value.field(b"effort")? {
+            Some(value) => Some(u8::try_from(value.small()?).or(Err(Problem::Range))?),
+            None => None,
+        },
+    })
 }

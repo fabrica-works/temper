@@ -331,6 +331,8 @@ pub(crate) fn worst_case(limits: &engine::Limits, key: u32) -> Option<u64> {
     Map::<Token, Flight>::worst_case(limits.loads.loads)?
         .checked_add(Map::<Token, Token>::worst_case(limits.loads.loads)?)?
         .checked_add(
-            engine::worst_case(limits)?.checked_add(u64::from(key))?.checked_mul(u64::from(limits.loads.loads))?,
+            engine::payload_worst_case(limits)?
+                .checked_add(u64::from(key))?
+                .checked_mul(u64::from(limits.loads.loads))?,
         )
 }

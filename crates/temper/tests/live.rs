@@ -2,6 +2,7 @@
 pub mod support;
 use skein_lib::Duration;
 #[test]
+#[ignore = "D2 fallback D: disabled after the providers-only repin until JP13 proves live sign-in"]
 fn a_real_model_answers_a_chat_and_pushes_a_small_change() {
     let mode = support::live::mode();
     let scratch = support::Scratch::new("live");

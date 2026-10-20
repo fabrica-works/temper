@@ -110,8 +110,8 @@ pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, 
             let admission = applications::Admission { reply_to, sign_in, key, digest, scope, carried };
             applications::start(domain, admission, request);
         }
-        Event::Party(crate::PartyInput::Ask { reply_to, sign_in, key, ask }) => {
-            domain.work.push(Work::People(people::Event::Ask { reply_to, sign_in, key, ask }));
+        Event::Party(crate::PartyInput::Ask { reply_to, sign_in, key, ask, models }) => {
+            domain.work.push(Work::People(people::Event::Ask { reply_to, sign_in, key, ask, models }));
         }
         Event::Party(crate::PartyInput::Key { reply_to, sign_in, key, ask, carried }) => {
             domain.work.push(Work::Core(core::Event::Key { reply_to, sign_in, key, ask, carried }));

@@ -12,7 +12,6 @@ pub(crate) const UNREACHED: &str = "127.0.0.1:9";
 const RELATIVE: &[&str] = &[
     "charters/chat.txt",
     "secrets/worker-a.digest",
-    "accounts/chat.json",
     "app.secret",
     "worker.secret",
     "secrets/forge-1.user",
@@ -27,7 +26,7 @@ pub(crate) fn documents(directory: &Path, program: &Path, bundle: &Path) -> (Box
         "profile":{"name":"standard","declared":{"memory":2_147_483_648_u64,"tool_payload":600,"read_window":256,
             "conversations":1,"calls_per_response":1},
             "policy":{"max_turns":5,"group_stop":10,"inbox":8,"unacknowledged":8}},
-        "endpoints":[{"name":"fake","number":0,"dialect":1,"account":1,"provider":"codex",
+        "endpoints":[{"name":"fake","number":0,"dialect":1,"provider":"codex",
             "address":UNREACHED,"transport":"tls","server_name":"skein.test","trust_der":directory.join("root.der"),
             "identity":"plain","connect":1000,"handshake":1000,
             "models":[{"name":"fake","prices":{"input":1,"cached":1,"output":1,"unit":1_000_000},"window":1_048_576,"output":1024,"reasoning_item":64,"head":60000,"idle":30000}]}],
@@ -108,10 +107,6 @@ pub(crate) fn write(directory: &Path, program: &Path, bundle: &Path) {
         private(&directory.join(std::str::from_utf8(&name).expect("fixture path")), bytes.expose());
     }
     private(&directory.join("worker.secret"), b"worker-secret");
-    private(
-        &directory.join("accounts/chat.json"),
-        br#"{"access_token":"token","expires_at":4102444800,"account_id":"acc"}"#,
-    );
     private(&directory.join("secrets/forge-1.user"), b"42\n");
     private(&directory.join("secrets/forge-1.api-token"), b"forge-1-api-token-value");
     private(&directory.join("secrets/forge-1.git-token"), b"forge-1-git-token-value");

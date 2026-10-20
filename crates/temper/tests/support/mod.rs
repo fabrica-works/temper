@@ -29,10 +29,6 @@ pub fn configuration(directory: &Path, forge: &Forge<'_>) {
         write_private(&directory.join(std::str::from_utf8(&name).expect("fixture path")), bytes.expose());
     }
     write_private(&directory.join("worker.secret"), b"worker-secret");
-    write_private(
-        &directory.join("accounts/chat.json"),
-        br#"{"access_token":"token","expires_at":4102444800,"account_id":"acc"}"#,
-    );
     write_private(&directory.join("secrets/forge-1.user"), b"42\n");
     write_private(&directory.join("secrets/forge-1.api-token"), b"forge-1-api-token-value");
     write_private(&directory.join("secrets/forge-1.git-token"), b"forge-1-git-token-value");
@@ -100,7 +96,11 @@ fn serve_command(directory: &Path) -> Command {
 pub fn fake_llm(scripts: Box<[skein_fake_llm_domain::api::Script]>) -> skein_fake_peers::llm::Peer {
     smith_agent_process_world::fake::configured_transport(
         scripts,
-        skein_llm::Credential::codex(b"token".as_slice().into(), b"acc".as_slice().into()),
+        skein_llm::Credential {
+            value: jig_channel_world::fixtures::KEY.into(),
+            scheme: skein_llm::Scheme::Key,
+            account_id: Box::new([]),
+        },
         Duration::ZERO,
         skein_fake_peers::Transport::Tls,
     )

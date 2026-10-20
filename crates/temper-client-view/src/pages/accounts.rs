@@ -262,7 +262,6 @@ fn end(b: &mut Builder, w: &Words, end: &c::OwnerAccountEnd) {
 fn refused(b: &mut Builder, w: &Words, refusal: c::OwnerAccountRefusal) {
     use c::OwnerAccountRefusal as R;
     let word = match refusal {
-        R::Configured => W::Configured,
         R::NotLimited => W::NotLimited,
         R::Uses => W::UsesRefused,
         R::NotKept { why } => match why {

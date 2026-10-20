@@ -698,6 +698,7 @@ fn released_into(domain: &mut Domain, _env: &Env<Limits>, released: Released, ou
         | Delivery::Drained
         | Delivery::Refuse { .. }
         | Delivery::TurnBusy { .. }
+        | Delivery::SourceSignedOut { .. }
         | Delivery::Result { .. }) => out.push(crate::boundary::delivery_output(delivery)),
     }
 }

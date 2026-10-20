@@ -42,6 +42,10 @@ fn document(count: u32) -> c::OwnerAccounts {
                 uses: None,
                 plan: true,
                 provider: Some(PROVIDER),
+                provider_name: Some(c::DocumentText::complete(
+                    c::Text::new(Box::from(b"Scripted".as_slice()), 32).unwrap(),
+                )),
+                manage_usage: None,
                 display: c::DocumentText::complete(c::Text::new(Box::from(b"Pat".as_slice()), 32).unwrap()),
                 holder: c::OwnerAccountHolder::Party(73),
                 sources,

@@ -511,8 +511,12 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
         Record::Core(jig_domain_core::Record::Tasks(row)) => jig_domain_tasks::stored_bytes(row),
         Record::Core(jig_domain_core::Record::Accounts(row)) => match row {
             jig_domain_accounts::Stored::Next { .. } => Some(0),
-            jig_domain_accounts::Stored::Account { subject, display, .. } => {
-                u64::try_from(subject.len()).ok()?.checked_add(u64::try_from(display.len()).ok()?)
+            jig_domain_accounts::Stored::Account { subject, display, uses, .. } => {
+                u64::try_from(subject.len()).ok()?.checked_add(u64::try_from(display.len()).ok()?)?.checked_add(
+                    u64::try_from(uses.as_deref().unwrap_or_default().len())
+                        .ok()?
+                        .checked_mul(u64::try_from(size_of::<jig_domain_accounts::Use>()).ok()?)?,
+                )
             }
             jig_domain_accounts::Stored::Source { name, .. } => u64::try_from(name.len()).ok(),
         },
@@ -531,115 +535,122 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
             jig_domain_people::Stored::Roles { holdings, .. } => u64::try_from(holdings.len())
                 .ok()?
                 .checked_mul(u64::try_from(size_of::<jig_domain_people::Holding>()).ok()?),
-            jig_domain_people::Stored::Answer { ask, .. } => match ask.as_ref() {
-                jig_domain_people::Ask::AccountChange { change, .. } => {
-                    use jig_domain_people::AccountChange;
-                    let uses = match change {
-                        AccountChange::SetUses { uses, .. } => uses.as_deref().unwrap_or_default(),
-                        AccountChange::AddKey { .. }
-                        | AccountChange::ReplaceKey { .. }
-                        | AccountChange::RemoveKey { .. }
-                        | AccountChange::Resume { .. }
-                        | AccountChange::Remove { .. }
-                        | AccountChange::MoveAccount { .. }
-                        | AccountChange::MoveSource { .. } => &[],
-                    };
-                    u64::try_from(uses.len())
-                        .ok()?
-                        .checked_mul(u64::try_from(size_of::<jig_domain_people::Use>()).ok()?)
-                }
-                jig_domain_people::Ask::Compound { operations, .. } => people_bytes::compound(operations),
-                jig_domain_people::Ask::Create { batch, .. } => people_bytes::batch(batch),
-                jig_domain_people::Ask::Propose { action: jig_domain_people::Action::Batch(batch), reason, .. } => {
-                    people_bytes::batch(batch)?.checked_add(u64::try_from(reason.len()).ok()?)
-                }
-                jig_domain_people::Ask::Propose {
-                    action: jig_domain_people::Action::Amend { amendment, .. },
-                    reason,
-                    ..
-                } => jig_domain_people::amendment_bytes(amendment)?.checked_add(u64::try_from(reason.len()).ok()?),
-                jig_domain_people::Ask::EditNote { scope, change, .. } => {
-                    let scope_bytes = match scope.as_ref() {
-                        jig_domain_people::NoteScope::Deployment
-                        | jig_domain_people::NoteScope::Project
-                        | jig_domain_people::NoteScope::Goal { .. } => 0,
-                        jig_domain_people::NoteScope::Resources { pattern, .. } => {
-                            let mut bytes = u64::try_from(pattern.segments.len())
+            jig_domain_people::Stored::Answer { ask, models, .. } => {
+                let payload = match ask.as_ref() {
+                    jig_domain_people::Ask::AccountChange { change, .. } => {
+                        use jig_domain_people::AccountChange;
+                        let uses = match change {
+                            AccountChange::SetUses { uses, .. } => uses.as_deref().unwrap_or_default(),
+                            AccountChange::AddKey { .. }
+                            | AccountChange::ReplaceKey { .. }
+                            | AccountChange::RemoveKey { .. }
+                            | AccountChange::Resume { .. }
+                            | AccountChange::Remove { .. }
+                            | AccountChange::MoveAccount { .. }
+                            | AccountChange::MoveSource { .. } => &[],
+                        };
+                        u64::try_from(uses.len())
+                            .ok()?
+                            .checked_mul(u64::try_from(size_of::<jig_domain_people::Use>()).ok()?)
+                    }
+                    jig_domain_people::Ask::Compound { operations, .. } => people_bytes::compound(operations),
+                    jig_domain_people::Ask::Create { batch, .. } => people_bytes::batch(batch),
+                    jig_domain_people::Ask::Propose {
+                        action: jig_domain_people::Action::Batch(batch), reason, ..
+                    } => people_bytes::batch(batch)?.checked_add(u64::try_from(reason.len()).ok()?),
+                    jig_domain_people::Ask::Propose {
+                        action: jig_domain_people::Action::Amend { amendment, .. },
+                        reason,
+                        ..
+                    } => jig_domain_people::amendment_bytes(amendment)?.checked_add(u64::try_from(reason.len()).ok()?),
+                    jig_domain_people::Ask::EditNote { scope, change, .. } => {
+                        let scope_bytes = match scope.as_ref() {
+                            jig_domain_people::NoteScope::Deployment
+                            | jig_domain_people::NoteScope::Project
+                            | jig_domain_people::NoteScope::Goal { .. } => 0,
+                            jig_domain_people::NoteScope::Resources { pattern, .. } => {
+                                let mut bytes = u64::try_from(pattern.segments.len())
+                                    .ok()?
+                                    .checked_mul(u64::try_from(size_of::<Box<[u8]>>()).ok()?)?;
+                                for segment in &pattern.segments {
+                                    bytes = bytes.checked_add(u64::try_from(segment.len()).ok()?)?;
+                                }
+                                let last = match &pattern.last {
+                                    jig_domain_people::Last::Exact(bytes) | jig_domain_people::Last::Open(bytes) => {
+                                        bytes.len()
+                                    }
+                                };
+                                bytes.checked_add(u64::try_from(last).ok()?)?
+                            }
+                        };
+                        let change_bytes = match change.as_ref() {
+                            jig_domain_people::NoteChange::Correct { description, body, references, .. } => {
+                                u64::try_from(description.len())
+                                    .ok()?
+                                    .checked_add(u64::try_from(body.len()).ok()?)?
+                                    .checked_add(u64::try_from(references.len()).ok()?.checked_mul(8)?)?
+                            }
+                            jig_domain_people::NoteChange::Delete { .. } => 0,
+                        };
+                        scope_bytes.checked_add(change_bytes)
+                    }
+                    jig_domain_people::Ask::MakeService { name, .. } => u64::try_from(name.len()).ok(),
+                    jig_domain_people::Ask::Adopt { adoption, .. } => {
+                        let mut bytes =
+                            u64::try_from(adoption.resource.path.len().checked_add(adoption.options.len())?)
                                 .ok()?
                                 .checked_mul(u64::try_from(size_of::<Box<[u8]>>()).ok()?)?;
-                            for segment in &pattern.segments {
-                                bytes = bytes.checked_add(u64::try_from(segment.len()).ok()?)?;
-                            }
-                            let last = match &pattern.last {
-                                jig_domain_people::Last::Exact(bytes) | jig_domain_people::Last::Open(bytes) => {
-                                    bytes.len()
-                                }
-                            };
-                            bytes.checked_add(u64::try_from(last).ok()?)?
+                        for segment in &adoption.resource.path {
+                            bytes = bytes.checked_add(u64::try_from(segment.len()).ok()?)?;
                         }
-                    };
-                    let change_bytes = match change.as_ref() {
-                        jig_domain_people::NoteChange::Correct { description, body, references, .. } => {
-                            u64::try_from(description.len())
-                                .ok()?
-                                .checked_add(u64::try_from(body.len()).ok()?)?
-                                .checked_add(u64::try_from(references.len()).ok()?.checked_mul(8)?)?
+                        for option in &adoption.options {
+                            bytes = bytes.checked_add(u64::try_from(option.len()).ok()?)?;
                         }
-                        jig_domain_people::NoteChange::Delete { .. } => 0,
-                    };
-                    scope_bytes.checked_add(change_bytes)
-                }
-                jig_domain_people::Ask::MakeService { name, .. } => u64::try_from(name.len()).ok(),
-                jig_domain_people::Ask::Adopt { adoption, .. } => {
-                    let mut bytes = u64::try_from(adoption.resource.path.len().checked_add(adoption.options.len())?)
+                        Some(bytes)
+                    }
+                    jig_domain_people::Ask::SetRoles { holdings, .. } => u64::try_from(holdings.len())
                         .ok()?
-                        .checked_mul(u64::try_from(size_of::<Box<[u8]>>()).ok()?)?;
-                    for segment in &adoption.resource.path {
-                        bytes = bytes.checked_add(u64::try_from(segment.len()).ok()?)?;
+                        .checked_mul(u64::try_from(size_of::<jig_domain_people::Holding>()).ok()?),
+                    jig_domain_people::Ask::Amend { amendment, .. } => jig_domain_people::amendment_bytes(amendment),
+                    jig_domain_people::Ask::ChangePolicy { change, .. } => {
+                        jig_domain_people::policy_change_bytes(change)
                     }
-                    for option in &adoption.options {
-                        bytes = bytes.checked_add(u64::try_from(option.len()).ok()?)?;
+                    jig_domain_people::Ask::Say { words, .. }
+                    | jig_domain_people::Ask::AnswerQuestion { words, .. } => u64::try_from(words.len()).ok(),
+                    jig_domain_people::Ask::Move { reason, .. } | jig_domain_people::Ask::Cancel { reason, .. } => {
+                        u64::try_from(reason.len()).ok()
                     }
-                    Some(bytes)
-                }
-                jig_domain_people::Ask::SetRoles { holdings, .. } => u64::try_from(holdings.len())
-                    .ok()?
-                    .checked_mul(u64::try_from(size_of::<jig_domain_people::Holding>()).ok()?),
-                jig_domain_people::Ask::Amend { amendment, .. } => jig_domain_people::amendment_bytes(amendment),
-                jig_domain_people::Ask::ChangePolicy { change, .. } => jig_domain_people::policy_change_bytes(change),
-                jig_domain_people::Ask::Say { words, .. } | jig_domain_people::Ask::AnswerQuestion { words, .. } => {
-                    u64::try_from(words.len()).ok()
-                }
-                jig_domain_people::Ask::Move { reason, .. } | jig_domain_people::Ask::Cancel { reason, .. } => {
-                    u64::try_from(reason.len()).ok()
-                }
-                jig_domain_people::Ask::Withdraw { .. }
-                | jig_domain_people::Ask::MarkSeen { .. }
-                | jig_domain_people::Ask::Application { .. }
-                | jig_domain_people::Ask::TakePerson { .. }
-                | jig_domain_people::Ask::SetPool { .. }
-                | jig_domain_people::Ask::HandBackPerson { .. }
-                | jig_domain_people::Ask::Stop { .. }
-                | jig_domain_people::Ask::Release { .. }
-                | jig_domain_people::Ask::AccountSignIn { .. }
-                | jig_domain_people::Ask::AccountSignOut { .. } => Some(0),
-                jig_domain_people::Ask::AnswerPerson { result, .. } => match result {
-                    jig_domain_people::PersonResult::Report { words }
-                    | jig_domain_people::PersonResult::Verdict { words, .. } => u64::try_from(words.len()).ok(),
-                    jig_domain_people::PersonResult::Failure { reason } => u64::try_from(reason.len()).ok(),
-                    jig_domain_people::PersonResult::Approved { state, words } => {
-                        u64::try_from(state.len()).ok()?.checked_add(match words {
-                            Some(words) => u64::try_from(words.len()).ok()?,
-                            None => 0,
-                        })
-                    }
-                },
-                jig_domain_people::Ask::DecideEscalation { decision, .. } => decision_bytes(decision),
-                jig_domain_people::Ask::DecideProposal { decision, .. } => match decision {
-                    jig_domain_people::ProposalDecision::Accept | jig_domain_people::ProposalDecision::Pass => Some(0),
-                    jig_domain_people::ProposalDecision::Reject { reason } => u64::try_from(reason.len()).ok(),
-                },
-            },
+                    jig_domain_people::Ask::Withdraw { .. }
+                    | jig_domain_people::Ask::MarkSeen { .. }
+                    | jig_domain_people::Ask::Application { .. }
+                    | jig_domain_people::Ask::TakePerson { .. }
+                    | jig_domain_people::Ask::SetPool { .. }
+                    | jig_domain_people::Ask::HandBackPerson { .. }
+                    | jig_domain_people::Ask::Stop { .. }
+                    | jig_domain_people::Ask::Release { .. }
+                    | jig_domain_people::Ask::AccountSignIn { .. }
+                    | jig_domain_people::Ask::AccountSignOut { .. } => Some(0),
+                    jig_domain_people::Ask::AnswerPerson { result, .. } => match result {
+                        jig_domain_people::PersonResult::Report { words }
+                        | jig_domain_people::PersonResult::Verdict { words, .. } => u64::try_from(words.len()).ok(),
+                        jig_domain_people::PersonResult::Failure { reason } => u64::try_from(reason.len()).ok(),
+                        jig_domain_people::PersonResult::Approved { state, words } => {
+                            u64::try_from(state.len()).ok()?.checked_add(match words {
+                                Some(words) => u64::try_from(words.len()).ok()?,
+                                None => 0,
+                            })
+                        }
+                    },
+                    jig_domain_people::Ask::DecideEscalation { decision, .. } => decision_bytes(decision),
+                    jig_domain_people::Ask::DecideProposal { decision, .. } => match decision {
+                        jig_domain_people::ProposalDecision::Accept | jig_domain_people::ProposalDecision::Pass => {
+                            Some(0)
+                        }
+                        jig_domain_people::ProposalDecision::Reject { reason } => u64::try_from(reason.len()).ok(),
+                    },
+                }?;
+                model_context_bytes(models)?.checked_add(payload)
+            }
             jig_domain_people::Stored::SignIn { .. }
             | jig_domain_people::Stored::ReadResults { .. }
             | jig_domain_people::Stored::EndedRead { .. }
@@ -766,3 +777,11 @@ pub(crate) fn call_answer_bytes(answer: &CallAnswer) -> Option<u64> {
 }
 
 mod people_bytes;
+
+fn model_context_bytes(models: &[Box<[u8]>]) -> Option<u64> {
+    let mut bytes = u64::try_from(models.len()).ok()?.checked_mul(u64::try_from(size_of::<Box<[u8]>>()).ok()?)?;
+    for name in models {
+        bytes = bytes.checked_add(u64::try_from(name.len()).ok()?)?;
+    }
+    Some(bytes)
+}

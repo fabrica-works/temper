@@ -99,6 +99,7 @@ pub fn link_limits(worker: &config::Worker, payload: &v1::Limits) -> Option<link
     let ceilings = jig_protocol_worker_wire::CEILINGS;
     let largest = payload::largest(payload)?;
     let sizes = jig_protocol_worker_wire::sizes::Sizes {
+        program_sources: core.fleet.program_sources,
         charter: u32::try_from(hub.charter_bytes).ok()?,
         transcript: u32::try_from(hub.transcript_bytes).ok()?,
         turn: u32::try_from(hub.turn_bytes).ok()?,
@@ -187,6 +188,7 @@ pub fn worker_worst_case(worker: &settings::Worker, agent: &settings::Agent, own
     }
     root::worst_case(&prepared.root)?
         .checked_add(programs_worst_case(&agent.programs)?)?
+        .checked_add(crate::program_sources::worst_case(jig.limits.hub.detail_bytes)?)?
         .checked_add(
             host::process_worst_case(&agent.limits, agent.host_limits.detail_bytes)?
                 .checked_mul(u64::from(jig.slots))?,

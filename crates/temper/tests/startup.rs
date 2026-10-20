@@ -350,13 +350,7 @@ fn the_owned_example_is_named_without_a_problem() {
     assert_eq!(named.agent.as_ref(), b"/home/me/temper/owned/agent.json");
     assert_eq!(named.worker_root.as_ref(), b"workspaces");
     assert_eq!(named.deployment.as_ref(), b"state");
-    for path in [
-        b"forge-1/api_token".as_slice(),
-        b"forge-1/user",
-        b"forge-1/webhook_secret",
-        b"forge-1/git_token",
-        b"accounts/llm.json",
-    ] {
+    for path in [b"forge-1/api_token".as_slice(), b"forge-1/user", b"forge-1/webhook_secret", b"forge-1/git_token"] {
         assert_eq!(
             named.files.iter().find(|file| file.path.as_ref() == path).map(|file| file.private),
             Some(true),
@@ -573,6 +567,58 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     let scratch = support::Scratch::startup("owned-memory-figures");
     let bounded = support::owned::bounded(scratch.path());
     let required = bounded.requirements();
+    // Against main fcfd657f7 (79,659,997,210,050 B engine; 2,343,551,746,598 B worker).
+    // Compared with the prior base, configured-forge retention and the setup-host/store-v3
+    // changes lower both engine sums by 2,708,534,096 B. Their bounds cancel in this
+    // repin delta; setup unions fit the existing carriers. Worker inputs are unchanged.
+    // Root envelopes: 1 actual root + 2,817 service handoffs + 256 store queue slots
+    // + 2 restored-page flights = 3,076 (the previous 3,074 omitted those last two).
+    // Main's root/envelope was 19,829,474,639 B; now the root is 19,850,945,039 B
+    // and a handoff is 19,837,786,639 B. Only the root owns the 50 independently
+    // retained contexts (32 completed asks + 2*8 pending asks + 2 core transits).
+    // Each handoff can own one incoming context; multiplying all retained contexts
+    // by the queue capacities would charge names where they cannot be held.
+    // Per-envelope growth, by owner/cause (all figures bytes):
+    //   one incoming names array: 263,168; people ask headers: 9,008;
+    //   fleet program-source state: 157,120; task state: 1,744; authority: 152;
+    //   core routed payload/document bounds: 7,549,224;
+    //   four new root callbacks: 4*(576 B Work + 65,536 B row envelope);
+    //   retained root read/document and typed carrier envelopes: 67,136. Sum: 8,312,000 B.
+    let root_growth = 263_168 + 9_008 + 157_120 + 1_744 + 152 + 7_549_224 + 4 * (576 + 65_536) + 67_136;
+    // Stored task/people LLM fields enlarge the encoded row ceiling by 230,037 B
+    // (885,491 -> 1,115,528). Every extra encoded byte adds 21,379,237 B across
+    // KV buffers, chunks and decoded-page carrier bounds. Decoded row heaps grow
+    // 929,808 B = 2*(263,192 task + 201,704 people + 8 TaskRecord header);
+    // 886,803 prior page carriers + 4 joins hold them, plus 16 B fixed decoder state.
+    // Beside those: 3 FileIo layers * 5 buffers grow by 230,037 B each; 6*256 raw read buffers each
+    // grow 230,037 B; Store inline state +24 B; Service inline state +7,416 B;
+    // worker-channel state +11,560 B; client documents +3,154,016 B;
+    // accounts driver drops 1,009,024 B; empty D2/runtime state adds 1,832 B.
+    let engine_growth = 3_076 * root_growth
+        + 50 * 263_168
+        + 230_037 * 21_379_237
+        + (886_803 + 4) * 929_808
+        + 16
+        + 3 * 5 * 230_037
+        + 6 * 256 * 230_037
+        + 24
+        + 7_416
+        + 11_560
+        + 3_154_016
+        - 1_009_024
+        + 1_832;
+    // Delta +5,768,515,608,452 B; total 85,428,512,818,502 B.
+    assert_eq!(required.engine_bytes, 79_659_997_210_050_u64 + engine_growth);
+    // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
+    // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
+    // Other causes: root program-source state +117,552 B; serialized source
+    // command/resources +230,981 B; larger source-inventory link frames +199,784 B;
+    // extra root Request/Event/ProcessEvent slots 224/544/32 B and lower IO
+    // cohorts 9,984 B per room slot (the link's 48 outputs * 208 B IO request).
+    let worker_growth = 8_736 * 107_206_624_u64 + 117_552 + 230_981 + 199_784 + 2_912 * (224 + 544 + 32 + 9_984);
+    // Delta +936,589,018,589 B (31,951,325 B outside host copies); total 3,280,140,765,187 B.
+    assert_eq!(required.worker_bytes, 2_343_551_746_598_u64 + worker_growth);
+
     support::owned::check_memory(required);
     eprintln!("owned requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
     let mut value: serde_json::Value = serde_json::from_slice(&bounded.document).expect("bounded JSON");

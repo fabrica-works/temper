@@ -144,6 +144,7 @@ impl World {
 
     fn take(&mut self, request: Request) {
         match request {
+            Request::Source { .. } | Request::SourceFault => panic!("this fixture declares no program sources"),
             Request::Hello(hello) => {
                 assert!(hello.hosting.len() <= 1);
                 self.report.stop_bound = hello.stop_bound;
@@ -177,7 +178,9 @@ impl World {
     fn link(up: &host::LinkUp) {
         match up {
             host::LinkUp::Activity { run, attempt, .. } => assert_eq!((*run, *attempt), (RUN, ATTEMPT)),
-            host::LinkUp::Turn { .. }
+            host::LinkUp::Logins { .. }
+            | host::LinkUp::SignedOut { .. }
+            | host::LinkUp::Turn { .. }
             | host::LinkUp::Call { .. }
             | host::LinkUp::Unauthorized { .. }
             | host::LinkUp::Limited { .. }

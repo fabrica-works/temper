@@ -54,6 +54,8 @@ use temper_worker_domain_checkout::git;
 #[derive(PartialEq, Eq, Debug)]
 #[expect(clippy::large_enum_variant, reason = "an assignment crosses whole, as jig's reference root takes it")]
 pub enum Event {
+    /// Terminal of one source command, correlated by its request owner.
+    SourceAnswered { owner: Token, answer: host::sources::Answer },
     /// From the engine: an assignment, jig's record, with temper's workspace
     /// items and the saved-work branch beside it (jig's `protocol/channel.md`,
     /// 6.2). The record's workspace, if it has one, names the workstream the
@@ -90,6 +92,10 @@ pub enum Event {
 /// domain -> protocol
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    /// Run one bounded program sign-in/sign-out command below the root (jig's domain/hosts.md, 5.1).
+    Source { owner: Token, name: host::SourceName, operation: host::sources::Operation, deadline: Time },
+    /// The source-command component violated its contract; stop this worker.
+    SourceFault,
     /// What the worker says first on every channel to the engine.
     Hello(host::Hello),
     /// Anything else up the link, but an answer.

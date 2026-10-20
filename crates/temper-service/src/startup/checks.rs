@@ -559,19 +559,15 @@ fn socket_count(
     if members.webhooks.is_some() {
         required = required.checked_add(1)?.checked_add(u64::from(members.limits.forge_component.hooks))?;
     }
-    if !engine.llm.accounts.is_empty() {
-        required = required.checked_add(u64::try_from(engine.llm.accounts.len()).ok()?)?;
-        for account in &engine.llm.accounts {
-            match &account.source {
-                config::Source::SignIn(_) => {
-                    required = required
-                        .checked_add(u64::from(engine.limits.driver.exchanges))?
-                        .checked_add(u64::from(engine.limits.driver.listeners))?;
-                    break;
-                }
-                config::Source::HandedIn { .. } => {}
-            }
-        }
+    let mut sign_in = false;
+    for provider in &engine.llm.providers {
+        sign_in |= provider.sign_in.is_some();
+    }
+    if sign_in {
+        required = required
+            .checked_add(u64::from(engine.limits.driver.accounts))?
+            .checked_add(u64::from(engine.limits.driver.exchanges))?
+            .checked_add(u64::from(engine.limits.driver.listeners))?;
     }
     required
         .checked_add(1)?

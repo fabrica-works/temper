@@ -6,7 +6,7 @@ pub fn documents(directory: &Path, program: &str) -> (Vec<u8>, Vec<u8>) {
         "profile":{"name":"standard","declared":{"memory":2_147_483_648_u64,"tool_payload":600,"read_window":256,
             "conversations":1,"calls_per_response":1},
             "policy":{"max_turns":5,"group_stop":10,"inbox":8,"unacknowledged":8}},
-        "endpoints":[{"name":"fake","number":0,"dialect":1,"account":1,"provider":"codex",
+        "endpoints":[{"name":"fake","number":0,"dialect":3,"provider":"openai",
             "address":"127.0.0.1:34443","transport":"tls","server_name":"skein.test","trust_der":directory.join("root.der"),
             "identity":"plain","connect":1000,"handshake":1000,
             "models":[{"name":"fake","prices":{"input":1,"cached":1,"output":1,"unit":1_000_000},"window":1_048_576,"output":1024,"reasoning_item":64,"head":60000,"idle":30000}]}],
@@ -25,6 +25,7 @@ pub fn documents(directory: &Path, program: &str) -> (Vec<u8>, Vec<u8>) {
     value["workers"][0]["limits"]["overrides"]["hub.event_bytes"] = 598.into();
     value["engine"]["hosts"]["listener"] = serde_json::json!([{"in_process":"workers"}]);
     value["engine"]["connectors"] = serde_json::json!([1]);
+    value["engine"]["llm"]["endpoints"][0]["dialect"] = 3.into();
     value["engine"]["llm"]["endpoints"][0]["address"] = serde_json::json!({"socket":"127.0.0.1:34443"});
     value["engine"]["limits"]["overrides"]["core.load_slots"] = 8.into();
     value["engine"]["limits"]["overrides"]["documents.rows"] = 2.into();
@@ -33,6 +34,13 @@ pub fn documents(directory: &Path, program: &str) -> (Vec<u8>, Vec<u8>) {
     value["engine"]["limits"]["overrides"]["people.sign_ins"] = 2.into();
     value["engine"]["limits"]["overrides"]["views.watchers"] = 16.into();
     value["engine"]["limits"]["overrides"]["views.watchers_per_party"] = 16.into();
+    // The native deployment account controls use the real membership in project zero.
+    let mut deployment = value["engine"]["projects"][0].clone();
+    deployment["number"] = 0.into();
+    value["engine"]["projects"].as_array_mut().expect("projects").push(deployment);
+    value["engine"]["limits"]["overrides"]["people.projects"] = 2.into();
+    value["engine"]["limits"]["overrides"]["authority.projects"] = 2.into();
+    value["engine"]["limits"]["overrides"]["tasks.funders"] = 4.into();
     value["application"] = serde_json::json!({
         "webhooks":null,
 "clients":{"listener":{"socket":"127.0.0.1:0"},"bundle":null},

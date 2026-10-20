@@ -74,9 +74,13 @@ fn remaining_shared_scenarios_use_real_forge_and_people_operations() {
 
 /// Crash one shared scenario at its configured entry, middle and closing
 /// receipt cuts; its baseline runs in the focused cases above and in the
-/// fuzzy sweep. Each chosen cut must fire.
+/// fuzzy sweep. Fixture startup runs the real first start, then preseeds restored keys;
+/// offsets below count live receipts after that durable setup. The empty-store
+/// cut at receipt one is covered by the engine world's first-start recovery story.
 fn crashed_at(scenario: jig_conformance::scenarios::Scenario, cuts: [u64; 3]) {
+    let setup = <Temper as Application>::store(&Config::new(91, Some(scenario))).applied;
     for cut in cuts {
+        let cut = cut + setup - 1;
         let outcome = jig_conformance::scenarios::run::<Temper>(scenario, jig_conformance::Cut::AfterCommit(cut), 91)
             .unwrap_or_else(|error| panic!("{scenario:?} at {cut}: {error:?}"))
             .expect("applicable");
@@ -86,37 +90,37 @@ fn crashed_at(scenario: jig_conformance::scenarios::Scenario, cuts: [u64; 3]) {
 
 #[test]
 fn a_late_copy_keeps_its_promises_at_focused_crash_cuts() {
-    crashed_at(jig_conformance::scenarios::Scenario::LateCopy, [1, 6, 12]);
+    crashed_at(jig_conformance::scenarios::Scenario::LateCopy, [2, 6, 12]);
 }
 
 #[test]
 fn another_hand_keeps_its_promises_at_focused_crash_cuts() {
-    crashed_at(jig_conformance::scenarios::Scenario::OtherHand, [1, 15, 30]);
+    crashed_at(jig_conformance::scenarios::Scenario::OtherHand, [2, 15, 30]);
 }
 
 #[test]
 fn uncertain_restarts_keep_their_promises_at_focused_crash_cuts() {
-    crashed_at(jig_conformance::scenarios::Scenario::UncertainRestarts, [1, 7, 15]);
+    crashed_at(jig_conformance::scenarios::Scenario::UncertainRestarts, [2, 7, 15]);
 }
 
 #[test]
 fn a_changed_judge_keeps_its_promises_at_focused_crash_cuts() {
-    crashed_at(jig_conformance::scenarios::Scenario::ChangedJudge, [1, 22, 45]);
+    crashed_at(jig_conformance::scenarios::Scenario::ChangedJudge, [2, 22, 45]);
 }
 
 #[test]
 fn a_narrowing_policy_keeps_its_promises_at_focused_crash_cuts() {
-    crashed_at(jig_conformance::scenarios::Scenario::NarrowingPolicy, [1, 12, 24]);
+    crashed_at(jig_conformance::scenarios::Scenario::NarrowingPolicy, [2, 12, 24]);
 }
 
 #[test]
 fn a_standing_task_keeps_its_promises_at_focused_crash_cuts() {
-    crashed_at(jig_conformance::scenarios::Scenario::StandingTask, [1, 12, 24]);
+    crashed_at(jig_conformance::scenarios::Scenario::StandingTask, [2, 12, 24]);
 }
 
 #[test]
 fn a_run_budget_keeps_its_promises_at_focused_crash_cuts() {
-    crashed_at(jig_conformance::scenarios::Scenario::RunBudget, [1, 10, 21]);
+    crashed_at(jig_conformance::scenarios::Scenario::RunBudget, [2, 10, 21]);
 }
 
 #[test]

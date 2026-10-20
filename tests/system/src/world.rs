@@ -34,7 +34,6 @@ pub fn charter() -> engine::Charter {
     let mut charter = walking::charter();
     charter.policy.model = engine::Model {
         dialect: temper_worker_domain_world::DIALECT,
-        account: 1,
         endpoint: 0,
         name: b"fake-1".as_slice().into(),
         window: 65_536,
@@ -110,12 +109,13 @@ pub fn hello(slots: u32) -> engine::Event {
 /// translated charter to the in-process Smith domain and scripted fake LLM.
 #[must_use]
 pub fn chat(words: &[u8], job: Job) -> World {
-    let mut root = Driver::configured(Store::new(), config(901), &walking::limits());
+    let mut root = Driver::configured(Store::new(), [config(901), config(901)], &walking::limits());
     root.send(hello(1));
     root.settle();
     root.sign_in();
     root.settle();
     root.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(401)),
         sign_in: root.session(),
         key: [41; 16],
@@ -245,6 +245,7 @@ impl World {
     pub fn say_and_resume(&mut self, words: &[u8], key: u8, job: Job) {
         let transcript = transcript(&self.agent);
         self.root.send(engine::Event::Party(engine::PartyInput::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(2000 + u64::from(key))),
             sign_in: self.root.session(),
             key: [key; 16],

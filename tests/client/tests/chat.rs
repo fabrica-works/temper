@@ -101,6 +101,7 @@ fn a_prepared_close_expires_through_the_fronts_clock() {
     let mut front = temper_client_world::front::Joint::new(fixtures::SEED, fixtures::domain_limits());
     let task = fixtures::chat(&mut front, b"A chat to close");
     front.engine.send(engine::Event::Party(PartyInput::Ask {
+        models: Box::new([]),
         reply_to: skein_lib::ReplyTo::new(CLOSE_REQUEST),
         sign_in: front.engine.session(),
         key: CLOSE_KEY,

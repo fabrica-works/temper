@@ -185,6 +185,8 @@ fn the_accounts_watch_reaches_the_root_and_returns_whole_cut_facts() {
     let mut accounts = List::with_capacity(1);
     accounts
         .push(d::AccountLine {
+            provider_name: Some(d::Text { bytes: b"Scripted".as_slice().into(), cut: false }),
+            manage_usage: None,
             number: 7,
             place: 3,
             uses: None,

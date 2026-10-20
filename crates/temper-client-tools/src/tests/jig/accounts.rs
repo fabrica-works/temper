@@ -21,9 +21,15 @@ fn account_reads_close_authorized_watches_after_the_first_projection() {
         }
         let printed = root.answer(call).expect("first deliveries");
         assert_eq!(printed.status, 0, "{printed:?}");
-        for fact in
-            [b"\"number\":43".as_slice(), b"\"number\":71", b"\"provider\":9", b"\"until\":100", b"\"project\":1"]
-        {
+        for fact in [
+            b"\"number\":43".as_slice(),
+            b"\"number\":71",
+            b"\"provider\":9",
+            b"\"until\":100",
+            b"\"project\":1",
+            b"\"provider_name\":",
+            b"https://provider.example/usage",
+        ] {
             assert!(f::json_has(&printed, fact), "{fact:?}");
         }
         assert_eq!(root.watches.len(), 1, "only shared me remains");

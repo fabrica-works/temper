@@ -15,7 +15,7 @@ pub fn documents(directory: &Path, llm: SocketAddr, forge: SocketAddr) -> (serde
         "profile":{"name":"standard","declared":{"memory":2_147_483_648_u64,"tool_payload":600,"read_window":256,
             "conversations":1,"calls_per_response":1},
             "policy":{"max_turns":5,"group_stop":10,"inbox":8,"unacknowledged":8}},
-        "endpoints":[{"name":"fake","number":0,"dialect":1,"account":1,"provider":"codex",
+        "endpoints":[{"name":"fake","number":0,"dialect":3,"provider":"openai",
             "address":llm.to_string(),"transport":"plaintext",
             "identity":"plain","connect":1000,"handshake":1000,
             "models":[{"name":"fake","prices":{"input":1,"cached":1,"output":1,"unit":1_000_000},"window":1_048_576,"output":1024,"reasoning_item":64,"head":60000,"idle":30000}]}],
@@ -38,12 +38,13 @@ pub fn documents(directory: &Path, llm: SocketAddr, forge: SocketAddr) -> (serde
     value["engine"]["templates"][0]["grace_ms"] = 1.into();
     value["engine"]["hosts"]["listener"] = serde_json::json!([{"in_process":"workers"}]);
     value["engine"]["connectors"] = serde_json::json!([1]);
+    value["engine"]["llm"]["endpoints"][0]["dialect"] = 3.into();
     value["engine"]["llm"]["endpoints"][0]["address"] = serde_json::json!({"socket":llm.to_string()});
     value["engine"]["limits"]["overrides"]["core.load_slots"] = 8.into();
     value["engine"]["limits"]["overrides"]["documents.rows"] = 2.into();
     value["engine"]["limits"]["overrides"]["documents.lines"] = 2.into();
     value["engine"]["limits"]["overrides"]["documents.text_bytes"] = 128.into();
-    value["engine"]["limits"]["overrides"]["people.sign_ins"] = 2.into();
+    value["engine"]["limits"]["overrides"]["people.sign_ins"] = 4.into();
     // Two concurrent acts each need one task and half the project purse.
     value["engine"]["limits"]["overrides"]["tasks.project_tasks"] = 2.into();
     value["engine"]["templates"][0]["budget"] = serde_json::json!({"as_allowed":50});
@@ -73,12 +74,7 @@ pub fn write(directory: &Path, llm: SocketAddr, forge: SocketAddr) -> std::io::R
         private(&directory.join(std::str::from_utf8(&name).expect("fixture path")), bytes.expose())?;
     }
     private(&directory.join("worker.secret"), b"worker-secret")?;
-    private(
-        &directory.join("accounts/chat.json"),
-        &serde_json::to_vec(&serde_json::json!({
-            "access_token":std::str::from_utf8(TOKEN).expect("token"), "expires_at":4_102_444_800_u64,"account_id":"acc"
-        }))?,
-    )?;
+    private(&directory.join("fixture.key"), jig_channel_world::fixtures::KEY)?;
     private(&directory.join("secrets/forge-1.user"), b"42\n")?;
     private(&directory.join("secrets/forge-1.api-token"), b"forge-1-api-token-value")?;
     private(&directory.join("secrets/forge-1.git-token"), b"forge-1-git-token-value")?;
@@ -147,6 +143,7 @@ pub(crate) fn ctl(spawn: &skein_io::kernel::Spawn, inherited: &skein_world::Inhe
             .expect("call index")
             .parse()
             .expect("call index"),
+        spawn.env.get(1).is_some_and(|value| value.as_ref() == b"FIXTURE=true"),
     )))
 }
 

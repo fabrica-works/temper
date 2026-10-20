@@ -186,7 +186,6 @@ fn jig_refusals_print_words() {
         (config::What::HandedIn, b"at: invalid handed-in account\n"),
         (config::What::Reserve { charter: 7 }, b"at: reserve does not fit charter 7\n"),
         (config::What::Budget { charter: 7 }, b"at: budget does not fit charter 7\n"),
-        (config::What::Accounts { charter: 7 }, b"at: accounts do not fit charter 7\n"),
         (config::What::Grace { template: REFUSED_TEMPLATE }, b"at: grace does not fit template 7\n"),
         (
             config::What::Operations { operations: 4, delegates: 4, goals: 8 },
@@ -266,11 +265,10 @@ fn application_files_keep_paths_bounds_privacy_and_resolution_refusals() {
 #[test]
 fn named_lists_each_file_with_its_bound_and_privacy() {
     let named = crate::named(&fixtures::document(), &jig_protocol_config::Directories::working()).unwrap();
-    assert_eq!(named.files.len(), 8, "all files listed");
+    assert_eq!(named.files.len(), 7, "all files listed");
     for (name, path, max, private) in [
         (b"charters/chat.txt".as_slice(), b"engine.charters[0].instructions".as_slice(), 16_070, false),
         (b"secrets/worker-a.digest", b"engine.hosts.workers[0].digest", 65, true),
-        (b"accounts/chat.json", b"engine.llm.accounts[0].source.handed_in.file", 65_536, true),
         (b"worker-secret", b"workers[0].secret", 257, true),
         (fixtures::AGENT_JSON, b"workers[0].agent.configuration", 1_048_576, false),
         (b"secrets/forge-1.api-token", b"application.forges[0].api_token", 4096, true),
