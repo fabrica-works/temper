@@ -423,6 +423,17 @@ chain.
   independent starts; this requires no early pin or duplicate adapter sweep.
   Refresh further reached copies within the owning repair and list users in
   its commit body; only actual-tree compilation establishes compatibility.
+  Retain hourly17's additional Temper diagnostics under that pending custody:
+  engine-domain `route/forge_route.rs`'s `Delegate.llm` and `tests.rs`'s
+  `Model.effort`/`efforts` and `Authority.models`; protocol-store
+  `records/application.rs` and `records/application/refusal.rs`'s unavailable
+  `people_v4`; client-tools `jig/render/document/limits.rs`'s `Lacking::Models`;
+  client-tools, client-view and client-domain test fixtures' unavailable wire
+  `v9`. These name reached sites, not chosen defaults or target versions.
+  Obtain the director's actual downstream owner/disposition and repair Step
+  before consuming the newer interfaces; preserve the retained exact locks
+  and diagnostics in `scratch-hourly-17`. The introducing interface step is
+  not itself a downstream repair trailer.
 - **Host grant forms:** Smith `a26eadcf50888eee56f5d4b453bbedd83981c5de`
   (smith-sources/smith-01) adds `Grant.form`. Its newly reached Jig users are
   `testing/jig-test-worker/src/translate.rs::grant` and `src/tests.rs`'s
@@ -432,6 +443,9 @@ chain.
   withdrawn form; do not guess a mapping, force a new pin or repeat the
   adapter sweep. Keep exact diagnostics/locks, refresh further reached copies
   within that owning repair and list users. Actual-tree compilation remains required.
+  Hourly17 also reaches Temper's worker-domain `agents.rs`,
+  `tests/fixtures.rs` and `tests/lifecycle.rs` grant literals. Retain these
+  with the Jig sites under the same director routing; choose no form here.
 - **Settled smith adapters at the next repin:** smith's live-text
   decisions2.2/answer4 and For the user9 settle v3 paths, `live: None`
   and ignored `OpenEvent::Live`; its later.md expressly assigns them to

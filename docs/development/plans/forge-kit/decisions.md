@@ -1733,6 +1733,13 @@ where its answer lands.
 
      Keep the prescribed ambiguous Answering deadline and owner-Close rows unresolved and unproved until that answer. Retain the failed-run evidence, original expectations, draft and bounded driver. Do not land08.3, omit a row, accept a nonzero initial hint for its zero row, add a private diagnostic/control seam, or change shipped code under this interim ruling. No extra diagnostic attempt or budget is added. Once the answer lands, the owning step must finish its normal actual-tree proofs with the plan's counts and caps. Temper05.2 remains independently blocked.
 
+207. **Additional downstream fixture and codec custody** (hourly17 check of2026-10-20T04:35:15Z).
+     Extend README New Accounts-2 interfaces and Host grant forms with hourly17's reached Temper diagnostics: Grant.form in worker-domain agents/tests, Delegate.llm in engine-domain route/forge_route, Model.effort/efforts and Authority.models in engine-domain tests, Lacking::Models in client-tools document rendering, unavailable people_v4 in protocol-store application records, and unavailable wire v9 in client-tools/view/domain test fixtures. These are source/lock/compiler observations, not migration defaults or chosen version targets.
+
+     Retain them under the existing199/205director custody request. The director must identify the actual downstream repair owner/disposition and recorded repair Step before an owning repin consumes the newer interfaces. Introducing smith-sources/smith-01 is not that repair trailer. Preserve committed compatible pins, payload/refusal meanings, full independent capacity and both pending design questions. No adapter sweep, dependency patch, forced early pin, guessed form or extra diagnostic attempt is authorized. Refresh further reached copies within the eventual owning repair and list users.
+
+     Checked: scratch-hourly-17/temper-check.log and temper-diagnostic-comparison.json retain the exact additional sites/messages against frozen Temperc7e7392f with Skein33dbc782/Smith3fb2c826/Jig8aa241fd and the before/after lock map. One bounded wrapper found Smith builds57.343s, Jig fails152.862s, Hearth fails23.154s and Temper fails62.460s. The pre-existing Hearth Interrupt repair remains assigned by2c2fe04 to its next repin; no duplicate repair is added. Existing Accounts-2 errors remain separate from the new sites.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
