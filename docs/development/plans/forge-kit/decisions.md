@@ -1488,6 +1488,15 @@ where its answer lands.
 
      Keep W54's owned increment running. Apply ruling188's full dependency-ready parallel capacity without subscription throttling. The supervisor owns refreshed primary indexes; use README's existing source fallback beyond reported graph inputs until completion is announced. A future primary drift is handled by the standing rule now added: only clean, ancestry-forward primary main may be synchronized, and only the failed alignment/dry-run checks need repeat for that correction; dirty or divergent primary state returns a report. The pinned d6d4abe kit/local adapter, session worktrees, drafts, failed artifacts and actual-tree proof obligations stay intact. Refresh further reached copies/derived values within the owning implementation and list users in its commit body.
 
+190. **Skein07 fixture copies and recovery input** (started recheck of skein-07.1).
+     Reverses: nothing. Amends skein/07-worlds.md07.1–07.3 and README Rules, World migration fixture copies.
+
+     Complete the namespace-copy locators for07.1 (simulation issue/post and fuzzy key seeds); landed a0e6f46 already contains these corrections and needs no repeated implementation. For07.2, use participating:false on the branch recovery watch; preserve its durable Writer claim, saved attempt, paused-write rule and every expected completion. For07.3, name fixtures::given and the further seed_token Item parameter; preserve Given values, the private decoder and08.1 machine-support prerequisite. Refresh further reached copies/derived values and list users in the owning commit body.
+
+     The start-recheck corrected client/world/fake specimen passed267 focused and2 fuzzy; browser selection was empty. The remaining setup File parameter failed compilation; its final scratch correction and six future scenario sketches remain uncompiled/unproved. A fresh root checker gets at most2 pinned-heavy script wrappers/15 active minutes to complete this residual setup coverage on landed interfaces, without fabricating08.1 exports. Setup proof is due before07.3 starts, not a question to defer until reached. Existing07.2 and other starts stay unheld. No limits, assertions, identities, ceilings or required gates change.
+
+     Checked: git -C skein show e880245:crates/skein-forge-client/src/keep.rs, validation: participating Branch/Repository returns Error::Refused. git -C temper show2a739880:tests/forge-setup/reconcile/src/fixtures.rs names given(owned:bool) and seed_token's old place::File. git -C skein grep a0e6f46 confirms simulation/fuzzy version1,length3,kit frames. Evidence/copy maps and120 client/103 setup assertion mapping: scratch-recheck-skein-07-start, report pump/recheck-skein-07-start.md. Pinned kit scripts/dev/plan has bg/ruling/ring; no new tool assumed.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

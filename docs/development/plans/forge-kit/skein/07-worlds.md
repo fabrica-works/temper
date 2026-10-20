@@ -79,6 +79,9 @@ Shape: set `license.workspace = true` in the destination Cargo.toml's `[package]
   `translate::KEY` and its golden marker become `<!-- kit:key `;
   `world::configured` uses namespace `b"kit"`. The five `worldold` key
   fixtures become version 1, length 3, `kitold`; sizes follow the word.
+  The same frame correction reaches `tests/simulation.rs::{issue,post}` and
+  `tests/fuzzy_simulation.rs::seeded_faults_restarts_and_keyed_effects`: use
+  version 1, length 3, `kit`, preserving each identity suffix and assertion.
   Keep the independent marker encoder/decoder, not the code under test's.
   No change to restart's sequence, outcome handling or referee here.
 Test shape: 29 focused tests (25 simulation, 2 locate, 1 job_answer,
@@ -142,7 +145,9 @@ Test shape: reuse `Settings::calm`, `LIMITS`, `REPO`, `translate::commit`
   and extracted branch-entry fixtures; no client-state reads. Add exactly
   2 focused tests in `tests/recovery.rs`:
   `restart_reads_afresh_before_settling_the_outbox`: one live branch and
-  attempted write, durable Writer claim, restart; completions `(1, 1)`,
+  attempted write, durable Writer claim, restart; the branch watch is
+  `participating: false` (participation admits only Issue/Pull resources).
+  Keep completions `(1, 1)`,
   the saved attempt unchanged, no write while paused, one creation total.
   `a_held_branch_is_written_again_only_after_remake`: seed 50, existing
   late-copy/delete scenario; hold beyond its deadline with writes `1`,
@@ -205,7 +210,9 @@ Shape: set `license.workspace = true` in the destination Cargo.toml's `[package]
   with `expect` for valid fixture values before `Begin`.
   Store keys and `file`/`put` use `Item`; the driver takes `Need::Read(item)`
   and `Need::Write { item, bytes }` instead of `place::File` and `file`.
-  In skein, `fixtures::entry` constructs Given directly, dropping
+  `fixtures::seed_token` also takes `skein_forge_setup::item::Item` instead
+  of `temper_forge_setup::place::File`, retaining its existing seeded rows.
+  In skein, `fixtures::given` constructs Given directly, dropping
   Setup/JSON/mode parsing. Its `owned: bool` selects `org_owner`:
   `Some(b"ada".as_slice().into())` when owned, `None` when managed;
   no independent make flag (Design question 23, answered).
