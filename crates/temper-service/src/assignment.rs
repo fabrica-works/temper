@@ -98,12 +98,16 @@ fn messages(words: &[tasks::Word]) -> Box<[host::StartMessage]> {
 fn grants(grants: &[accounts::Grant]) -> Box<[host::Grant]> {
     let mut filled = List::with_capacity(u32::try_from(grants.len()).expect("bounded grants"));
     for grant in grants {
-        let table = match grant.table {
-            accounts::GrantTable::Accounts => host::GrantTable::Accounts,
-            accounts::GrantTable::Application => host::GrantTable::Application,
+        let form = match grant.form {
+            accounts::Form::Credential(scheme) => host::Form::Credential(match scheme {
+                accounts::Scheme::Bearer => host::Scheme::Bearer,
+                accounts::Scheme::Key => host::Scheme::Key,
+            }),
+            accounts::Form::Withdrawn => host::Form::Withdrawn,
+            accounts::Form::Application => host::Form::Application,
         };
         filled
-            .push(host::Grant { table, account: grant.account, generation: grant.generation, valid: grant.valid })
+            .push(host::Grant { form, account: grant.account, generation: grant.generation, valid: grant.valid })
             .expect("bounded grants");
     }
     filled.into_boxed()

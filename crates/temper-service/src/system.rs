@@ -95,7 +95,7 @@ impl Service {
         let room = max.checked_mul(6).expect("account routing room");
         let accounts = accounts_driver(&settings, seeds, accounts, room, store_limits.secrets.value)?;
         let mut values = values::Values::new(
-            limits.accounts.accounts.checked_add(1).expect("numbered accounts"),
+            settings.jig.limits.driver.accounts,
             settings.jig.limits.driver.client.document.token_bytes,
         );
         let wire = translate::limits(&settings.limits).ok_or(start_problem(b"limits", What::Bound))?;
@@ -580,7 +580,7 @@ fn memory(
         .checked_add(skein_io::worst_case(io)?)?
         .checked_add(store::worst_case(root, store)?)?
         .checked_add(jig_protocol_accounts::table::worst_case(
-            root.accounts.accounts.checked_add(1)?,
+            settings.jig.limits.driver.accounts,
             settings.jig.limits.driver.client.document.token_bytes,
         )?)?
         .checked_add(List::<(u32, u64)>::worst_case(root.authority.projects)?)?
@@ -632,8 +632,7 @@ fn memory(
             u64::from(identities).checked_mul(temper_protocol_worker_wire::v1::Identity::worst_case_bytes(&wire)?)?,
         )?;
     if !settings.jig.llm.accounts.is_empty() {
-        let mut driver = settings.jig.limits.driver;
-        driver.accounts = root.accounts.accounts.checked_add(1)?;
+        let driver = settings.jig.limits.driver;
         bytes = bytes.checked_add(accounts::worst_case(&driver, queue.checked_mul(3)?)?)?;
     }
     if let Some(runtime) = runtime {

@@ -151,7 +151,15 @@ pub fn refused(why: &[u8]) -> Request {
 
 /// A grant of `account` in `table`.
 pub const fn grant(table: host::GrantTable, account: u32) -> host::Grant {
-    host::Grant { table, account, generation: 1, valid: Duration::from_secs(60) }
+    host::Grant {
+        form: match table {
+            host::GrantTable::Accounts => host::Form::Credential(host::Scheme::Bearer),
+            host::GrantTable::Application => host::Form::Application,
+        },
+        account,
+        generation: 1,
+        valid: Duration::from_secs(60),
+    }
 }
 
 /// smith's typed delivery fields, each a name and its value.
@@ -216,7 +224,7 @@ pub fn start(run: Token, source: &host::Start) -> agent::Start {
     }
     let mut grants = List::with_capacity(u32::try_from(source.grants.len()).expect("a few grants"));
     for grant in &source.grants {
-        let grant = agent::Grant { account: grant.account, generation: grant.generation, valid: grant.valid };
+        let grant = crate::translate::grant(*grant).expect("account grant");
         grants.push(grant).expect("room for each grant");
     }
     agent::Start {

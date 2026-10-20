@@ -78,7 +78,7 @@ fn assignment() -> engine::Assignment {
         answered: Box::new([]),
         settled: Box::new([]),
         grants: Box::new([accounts::Grant {
-            table: accounts::GrantTable::Accounts,
+            form: accounts::Form::Credential(accounts::Scheme::Bearer),
             account: 1,
             generation: 2,
             valid: Duration::from_secs(30),

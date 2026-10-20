@@ -504,7 +504,7 @@ impl World {
                 | engine::Request::Party(engine::PartyRequest::Deliver(Delivery::WebReply { to, reply, .. })) => {
                     let token = to.into_token();
                     assert_eq!(
-                        self.referee.replied(&self.store.rows, token, reply),
+                        self.referee.replied(&self.store.rows, token, reply.clone()),
                         Ok(()),
                         "exact durable role terminal: {token:?} {reply:?}"
                     );

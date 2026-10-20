@@ -59,9 +59,13 @@ pub(crate) fn held(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisi
         }
         core::Held::Grant { channel, run, attempt, grant } => {
             let grant = host::Grant {
-                table: match grant.table {
-                    fleet::GrantTable::Accounts => host::GrantTable::Accounts,
-                    fleet::GrantTable::Application => host::GrantTable::Application,
+                form: match grant.form {
+                    fleet::Form::Credential(scheme) => host::Form::Credential(match scheme {
+                        fleet::Scheme::Bearer => host::Scheme::Bearer,
+                        fleet::Scheme::Key => host::Scheme::Key,
+                    }),
+                    fleet::Form::Withdrawn => host::Form::Withdrawn,
+                    fleet::Form::Application => host::Form::Application,
                 },
                 account: grant.account,
                 generation: grant.generation,

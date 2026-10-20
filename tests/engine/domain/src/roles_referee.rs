@@ -135,7 +135,7 @@ impl Referee {
                     ..
                 }))) => {
                     if let people::Ask::SetRoles { .. } = ask.as_ref() {
-                        Some((*key, ask.as_ref(), *outcome))
+                        Some((*key, ask.as_ref(), outcome.clone()))
                     } else {
                         None
                     }
@@ -175,7 +175,7 @@ impl Referee {
                 obligation.person == key.person
                     && obligation.key == key.key
                     && obligation.ask == **ask
-                    && obligation.reply == people::Reply::Outcome(*outcome)
+                    && obligation.reply == people::Reply::Outcome(outcome.clone())
             })
         });
         if !role_rows.is_empty() && expected.is_none() {

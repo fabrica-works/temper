@@ -11,7 +11,7 @@ pub struct Values {
     pub identities: Map<u32, Secret>,
 }
 impl Values {
-    /// Numbered account slots, including the unused zero slot.
+    /// Named source slots, bounded by the accounts driver.
     #[must_use]
     pub fn new(accounts: u32, token_bytes: u32) -> Self {
         Self { accounts: Table::new(accounts, token_bytes), identities: Map::with_capacity(0) }
@@ -24,7 +24,7 @@ impl Values {
     pub fn grants(&self, grants: &[host::Grant], now: Time) -> Box<[Option<GrantValue>]> {
         let mut values = List::with_capacity(u32::try_from(grants.len()).expect("bounded grants"));
         for grant in grants {
-            let value = match grant.table {
+            let value = match grant.form.table() {
                 host::GrantTable::Accounts => account_grant(self.accounts.value(grant.account, grant.generation, now)),
                 host::GrantTable::Application if grant.generation == 1 => {
                     identity_grant(self.identities.get(&grant.account))

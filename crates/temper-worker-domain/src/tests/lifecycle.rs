@@ -29,13 +29,21 @@ fn a_run_with_no_repository_starts_smith_with_no_workspace() {
 
 #[test]
 fn only_the_llm_accounts_grants_reach_smith() {
-    let mut h = Harness::new();
-    let grants = Box::new([grant(host::GrantTable::Accounts, 1), grant(host::GrantTable::Application, 7)]);
-    let assign = Event::Assign { assignment: assignment(true, grants), items: Ok(items(&[])), save: None };
-    let rows = h.run(assign);
-    let llm = grant(host::GrantTable::Accounts, 1);
-    let expected = agent::Grant { account: llm.account, generation: llm.generation, valid: llm.valid };
-    assert_eq!(&*sent_start(&rows).grants, [expected]);
+    for (form, expected_form) in [
+        (host::Form::Credential(host::Scheme::Bearer), agent::Form::Credential(agent::Scheme::Bearer)),
+        (host::Form::Credential(host::Scheme::Key), agent::Form::Credential(agent::Scheme::Key)),
+        (host::Form::Withdrawn, agent::Form::Withdrawn),
+    ] {
+        let mut h = Harness::new();
+        let mut llm = grant(host::GrantTable::Accounts, 1);
+        llm.form = form;
+        let grants = Box::new([llm, grant(host::GrantTable::Application, 7)]);
+        let assign = Event::Assign { assignment: assignment(true, grants), items: Ok(items(&[])), save: None };
+        let rows = h.run(assign);
+        let expected =
+            agent::Grant { account: llm.account, generation: llm.generation, valid: llm.valid, form: expected_form };
+        assert_eq!(&*sent_start(&rows).grants, [expected]);
+    }
 }
 
 #[test]

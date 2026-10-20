@@ -175,13 +175,8 @@ pub fn decode(run: Token, source: hub::Start, agent: &crate::settings::Agent) ->
     }
     let mut grants = List::with_capacity(u32::try_from(source.grants.len()).or(Err(Invalid::Charter))?);
     for grant in source.grants {
-        match grant.table {
-            hub::GrantTable::Accounts => {
-                grants
-                    .push(smith::Grant { account: grant.account, generation: grant.generation, valid: grant.valid })
-                    .expect("grant count");
-            }
-            hub::GrantTable::Application => {}
+        if let Some(grant) = smith_grant(grant) {
+            grants.push(grant).expect("grant count");
         }
     }
     Ok(Box::new(smith::Start {
@@ -408,4 +403,14 @@ pub fn answer_parts(
         parts.push(Part { token, bytes: payload::preparation(&preparation) }).expect("three parts");
     }
     parts.into_boxed()
+}
+
+const fn smith_grant(value: hub::Grant) -> Option<smith::Grant> {
+    let form = match value.form {
+        hub::Form::Credential(hub::Scheme::Bearer) => smith::Form::Credential(smith::Scheme::Bearer),
+        hub::Form::Credential(hub::Scheme::Key) => smith::Form::Credential(smith::Scheme::Key),
+        hub::Form::Withdrawn => smith::Form::Withdrawn,
+        hub::Form::Application => return None,
+    };
+    Some(smith::Grant { account: value.account, generation: value.generation, valid: value.valid, form })
 }

@@ -322,7 +322,7 @@ pub fn turn(
         host_run: Token::new(assignment.task),
         number,
         position: record.sequence,
-        opens_window: matches!(record.kind, record::Kind::First { .. }),
+        opens_window: matches!(record.kind, record::Kind::First(_)),
         read,
         spent,
         turn: record.clone(),

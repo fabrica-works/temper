@@ -304,3 +304,13 @@ pub(crate) fn summarize(push: Box<[wire::Landing]>) -> wire::Push {
         wire::Push::Nothing
     }
 }
+
+pub(crate) const fn grant(value: host::Grant) -> Option<agent::Grant> {
+    let form = match value.form {
+        host::Form::Credential(host::Scheme::Bearer) => agent::Form::Credential(agent::Scheme::Bearer),
+        host::Form::Credential(host::Scheme::Key) => agent::Form::Credential(agent::Scheme::Key),
+        host::Form::Withdrawn => agent::Form::Withdrawn,
+        host::Form::Application => return None,
+    };
+    Some(agent::Grant { account: value.account, generation: value.generation, valid: value.valid, form })
+}

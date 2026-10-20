@@ -549,7 +549,7 @@ pub fn values_with_identity(number: u32, token: &[u8]) -> crate::values::Values 
 }
 pub fn application_grant(account: u32, generation: u64) -> jig_domain_host::Grant {
     jig_domain_host::Grant {
-        table: jig_domain_host::GrantTable::Application,
+        form: jig_domain_host::Form::Application,
         account,
         generation,
         valid: skein_lib::Duration::from_secs(30),

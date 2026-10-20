@@ -484,6 +484,10 @@ fn service(inherited: &Inherited) -> Proc {
         families,
     }))
 }
+#[expect(
+    clippy::zero_sized_map_values,
+    reason = "smith's endpoint program selections use the sole adapter name as the map's value"
+)]
 fn agent(_spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {
     let stderr = inherited.pipes.iter().find(|(child, _)| *child == 2).expect("stderr").1;
     let (errors, capture) = smith_agent_process_world::AgentErrors::pipe(stderr);
@@ -496,6 +500,8 @@ fn agent(_spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {
                     trace: None,
                     profile: fixtures::agent_profile(),
                     declarations: fixtures::agent_declarations(),
+                    programs: std::collections::BTreeMap::new(),
+                    endpoint_programs: std::collections::BTreeMap::new(),
                 },
                 smith_agent_shell::Resources {
                     input: inherited.pipes.iter().find(|(child, _)| *child == 0).expect("stdin").1,

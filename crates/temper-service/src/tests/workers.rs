@@ -58,7 +58,7 @@ fn an_accounts_grant_uses_the_lent_generation_until_it_expires() {
         )
         .unwrap();
     let mut grant = fixtures::application_grant(1, 2);
-    grant.table = jig_domain_host::GrantTable::Accounts;
+    grant.form = jig_domain_host::Form::Withdrawn;
     for (now, generation, expected) in [(8, 2, true), (9, 2, false), (8, 1, false)] {
         grant.generation = generation;
         let filled = values.grants(&[grant], Time::from_nanos(now));
@@ -74,7 +74,7 @@ fn an_accounts_grant_uses_the_lent_generation_until_it_expires() {
 fn assignment_with_identity() -> temper_engine_domain::Assignment {
     let mut assignment = fixtures::assignment_with(fixtures::repository(7, b"acme", b"shop"));
     assignment.grants = Box::new([jig_domain_accounts::Grant {
-        table: jig_domain_accounts::GrantTable::Application,
+        form: jig_domain_accounts::Form::Application,
         account: 1,
         generation: 1,
         valid: skein_lib::Duration::from_secs(30),

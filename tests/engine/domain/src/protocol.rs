@@ -261,6 +261,7 @@ impl Protocol {
 
 fn granted(account: u32, generation: u64) -> engine::Event {
     engine::Event::Account(accounts::Event::Component(accounts::FromComponent::Granted {
+        form: accounts::Form::Credential(accounts::Scheme::Bearer),
         account,
         generation,
         valid: Duration::from_secs(3600),

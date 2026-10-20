@@ -36,7 +36,7 @@ pub struct AccountsRuntime {
     reason = "one phase per service, and the sources it loads move once into the driver"
 )]
 enum Phase {
-    Loading { configured: List<driver::Account>, crypto: CryptoRng, after: Option<u64>, asked: bool },
+    Loading { configured: Map<u32, driver::Account>, crypto: CryptoRng, after: Option<u64>, asked: bool },
     HandingIn,
     Running,
 }
@@ -45,7 +45,7 @@ pub struct Accounts {
     component: Option<driver::Component>,
     phase: Phase,
     env: Env<driver::Limits>,
-    ids: List<Secret>,
+    ids: Map<u32, Secret>,
     records: records::Records,
     handed: Queue<(u32, oauth::SavedToken)>,
     early: Queue<driver::Request>,
@@ -144,19 +144,14 @@ impl Accounts {
         room: u32,
         secret_bytes: u32,
     ) -> Result<Self, Problems> {
-        let mut limits = config.limits.driver;
-        limits.accounts = config.limits.core.accounts.accounts.checked_add(1).expect("numbered account slots");
+        let limits = config.limits.driver;
         if limits.client.document.record_bytes > secret_bytes {
             return Err(problem(0, What::Bound));
         }
         let mut issuers = issuers(runtime, &limits)?;
-        let mut configured = List::with_capacity(limits.accounts);
-        let mut ids = List::with_capacity(limits.accounts);
+        let mut configured = Map::with_capacity(limits.accounts);
+        let mut ids = Map::with_capacity(limits.accounts);
         let mut handed = Queue::with_capacity(limits.accounts);
-        for _ in 0..limits.accounts {
-            configured.push(driver::Account::HandedIn).or(Err(problem(0, What::Bound)))?;
-            ids.push(Secret::new(Box::default())).expect("account id slots");
-        }
         for (index, account) in config.llm.accounts.iter().enumerate() {
             let mut account_id = Secret::new(Box::default());
             let source = match &account.source {
@@ -214,12 +209,12 @@ impl Accounts {
                     }
                 }
             };
-            *configured.get_mut(account.number).ok_or(problem(index, What::Bound))? = source;
-            *ids.get_mut(account.number).expect("account id slot") = account_id;
+            configured.insert(account.number, source).or(Err(problem(index, What::Bound)))?;
+            ids.insert(account.number, account_id).expect("configured account id place");
         }
         let crypto = CryptoRng::new(&seeds.crypto, 1).ok_or(problem(0, What::Bound))?;
         let mut check = List::with_capacity(limits.accounts);
-        for account in &configured {
+        for (_, account) in &configured {
             check.push(unkept(account)).or(Err(problem(0, What::Bound)))?;
         }
         let checked = driver::Component::new(check, &limits, crypto.clone()).or(Err(problem(0, What::Form)))?;
@@ -355,17 +350,23 @@ impl Accounts {
                 break;
             }
             let event = self.above.pop().expect("account events");
-            let event = match self.records.up(event, now) {
-                translate::Up::Granted { event, account, generation, value, expires } => {
+            let event = match self.records.up(event, now, b"") {
+                translate::Up::Granted { mut event, account, generation, value, expires } => {
                     // An account with a provider account id goes out as its
                     // bearer beside the id until JP13 (as jig's reference
                     // application does).
-                    let id = self.ids.get(account).expect("configured account id");
+                    let id = self.ids.get(&account).expect("configured account id");
                     let value = if id.expose().is_empty() {
                         value
                     } else {
                         table::Value { token: value.token, scheme: table::Scheme::Withdrawn { id: id.clone() } }
                     };
+                    match &mut event {
+                        domain::FromComponent::Granted { form, .. } => *form = translate::form(&value.scheme),
+                        domain::FromComponent::Expiring { .. }
+                        | domain::FromComponent::Failed { .. }
+                        | domain::FromComponent::Closed => unreachable!("a lent value accompanies its grant"),
+                    }
                     values
                         .accounts
                         .granted(account, generation, value, expires)
@@ -373,6 +374,11 @@ impl Accounts {
                     event
                 }
                 translate::Up::Child(event) => event,
+                translate::Up::Visited { .. }
+                | translate::Up::SignedIn { .. }
+                | translate::Up::SignInFailed { .. }
+                | translate::Up::SignedOut { .. }
+                | translate::Up::Removed { .. } => unreachable!("account sign-ins are not configured"),
                 translate::Up::Keep { account, record } => {
                     if self.aborting {
                         continue;
@@ -450,15 +456,18 @@ impl Accounts {
             let Ok(account) = u32::try_from(row.number) else {
                 continue;
             };
+            if !configured.contains_key(&account) {
+                continue;
+            }
             let Some(record) = self.records.load(account, row.value.expose(), &self.env.limits.client.document) else {
                 continue;
             };
-            if let Some(driver::Account::SignIn { keeper, .. }) = configured.get_mut(account) {
+            if let Some(driver::Account::SignIn { keeper, .. }) = configured.get_mut(&account) {
                 let id = match &record.metadata {
                     Some(id) => Secret::new(id.clone()),
                     None => Secret::new(Box::default()),
                 };
-                *self.ids.get_mut(account).expect("configured account id slot") = id;
+                *self.ids.get_mut(&account).expect("configured account id slot") = id;
                 *keeper = driver::Keeper::Owner { kept: Some(record) };
             }
         }
@@ -471,14 +480,18 @@ impl Accounts {
         else {
             unreachable!("loading");
         };
-        for account in 0..configured.len() {
-            if let Some(driver::Account::SignIn { registration, .. }) = configured.get_mut(account) {
+        let mut component =
+            driver::Component::new(List::with_capacity(0), &self.env.limits, crypto).expect("startup checked driver");
+        for _ in 0..configured.len() {
+            let (&number, _) = configured.first().expect("configured sources");
+            let mut account = configured.remove(&number).expect("configured source");
+            if let driver::Account::SignIn { registration, .. } = &mut account {
                 registration.terms = Some(installation::terms(kept));
             }
+            component.add(&self.env, number, account, &mut self.above);
+            assert!(self.above.is_empty(), "startup checked configured source");
+            self.records.admit(number).expect("configured record place");
         }
-        let Ok(component) = driver::Component::new(configured, &self.env.limits, crypto) else {
-            unreachable!("startup checked the sources, and each record read encodes");
-        };
         self.component = Some(component);
     }
     /// Asks for the next page of records, hands in the handed-in records
@@ -662,11 +675,11 @@ pub(crate) fn worst_case(limits: &driver::Limits, room: u32) -> Option<u64> {
         .checked_add(Queue::<driver::Event>::worst_case(room)?)?
         .checked_add(Queue::<driver::FileLower>::worst_case(room)?)?
         .checked_add(Queue::<driver::Request>::worst_case(room)?)?
-        .checked_add(List::<driver::Account>::worst_case(limits.accounts)?)?
+        .checked_add(Map::<u32, driver::Account>::worst_case(limits.accounts)?)?
         .checked_add(Queue::<(u32, oauth::SavedToken)>::worst_case(limits.accounts)?)?
         .checked_add(u64::from(limits.accounts).checked_mul(record)?)?
         .checked_add(records::worst_case(limits.accounts, &limits.client.document)?)?
-        .checked_add(List::<Secret>::worst_case(limits.accounts)?)?
+        .checked_add(Map::<u32, Secret>::worst_case(limits.accounts)?)?
         .checked_add(u64::from(limits.accounts).checked_mul(u64::from(table::ACCOUNT_ID_BYTES))?)?
         .checked_add(u64::from(room).checked_mul(record.checked_add(4096)?)?)
 }

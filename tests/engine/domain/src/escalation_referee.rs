@@ -198,7 +198,8 @@ impl Referee {
             panic!("key-conflict probe follows its durable winning answer");
         };
         assert_ne!(saved_ask.as_ref(), &ask, "conflicting probe changes the request under the original key");
-        let terminal = ExpectedTerminal::KeyConflict { saved_ask: saved_ask.as_ref().clone(), saved_outcome: *outcome };
+        let terminal =
+            ExpectedTerminal::KeyConflict { saved_ask: saved_ask.as_ref().clone(), saved_outcome: outcome.clone() };
         assert!(self.asks.insert(to, AskReply { person, key, ask, terminal }).is_none(), "fresh conflict reply right");
     }
 
@@ -488,7 +489,7 @@ impl Referee {
                         matches!(ask.as_ref(), people::Ask::DecideEscalation { project, task, revision, decision: asked }
                             if key.person == *by && *project == 1 && *task == archive.task
                                 && *revision == archive.revision && *asked == *decision
-                                && undated(*outcome) == (people::Outcome::EscalationDecided {
+                                && undated(outcome.clone()) == (people::Outcome::EscalationDecided {
                                     task: archive.task, revision: archive.revision, by: *by,
                                     at: skein_lib::Wall::EPOCH, choice: choice(decision),
                                 }))
@@ -581,7 +582,7 @@ impl Referee {
                 let people::Reply::Outcome(replied) = reply else {
                     return Err("keyed terminal differs from independently expected outcome wrapper");
                 };
-                if undated(replied) != undated(*outcome) {
+                if undated(replied.clone()) != undated(outcome.clone()) {
                     return Err("keyed terminal differs from independently expected outcome wrapper");
                 }
                 if ask.as_ref() != &expected.ask || *saved != replied {
@@ -610,7 +611,7 @@ impl Referee {
     ///
     /// # Errors
     /// Rejects an unsolicited terminal, a non-busy reply, or a reused reply right.
-    pub fn ask_refused(&mut self, to: Token, reply: people::Reply, retry: Token) -> Result<(), &'static str> {
+    pub fn ask_refused(&mut self, to: Token, reply: &people::Reply, retry: Token) -> Result<(), &'static str> {
         if !matches!(reply, people::Reply::Again(_) | people::Reply::Outcome(people::Outcome::Again(_))) {
             return Err("named query pressure requires an unsaved retry answer");
         }

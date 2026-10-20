@@ -62,7 +62,7 @@ pub(crate) fn to_agent(domain: &mut Domain, env: &Env<Limits>, request: host::To
         // domain/hosts.md, 6.2; jig 7ca3c388): the table needs no reading.
         host::ToAgent::Grant { agent, grant } => smith::parent::Event::Grant {
             agent,
-            grant: smith::Grant { account: grant.account, generation: grant.generation, valid: grant.valid },
+            grant: translate::grant(grant).expect("the hub forwards only account grants"),
         },
         host::ToAgent::Answer { agent, call: name, reply } => {
             let mut found = None;

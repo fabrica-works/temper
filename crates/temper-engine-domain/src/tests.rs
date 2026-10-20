@@ -405,7 +405,7 @@ fn held_assignment_checks_owned_bytes_and_section_backing_before_acceptance() {
         answered: Box::new([]),
         settled: Box::new([]),
         grants: Box::new([accounts::Grant {
-            table: accounts::GrantTable::Accounts,
+            form: accounts::Form::Credential(accounts::Scheme::Bearer),
             account: 1,
             generation: 1,
             valid: skein_lib::Duration::from_secs(1),

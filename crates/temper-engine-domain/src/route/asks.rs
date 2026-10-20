@@ -326,9 +326,13 @@ fn fleet_grants(grants: &[jig_domain_accounts::Grant]) -> Box<[fleet::Grant]> {
     for grant in grants {
         translated
             .push(fleet::Grant {
-                table: match grant.table {
-                    jig_domain_accounts::GrantTable::Accounts => fleet::GrantTable::Accounts,
-                    jig_domain_accounts::GrantTable::Application => fleet::GrantTable::Application,
+                form: match grant.form {
+                    jig_domain_accounts::Form::Credential(scheme) => fleet::Form::Credential(match scheme {
+                        jig_domain_accounts::Scheme::Bearer => fleet::Scheme::Bearer,
+                        jig_domain_accounts::Scheme::Key => fleet::Scheme::Key,
+                    }),
+                    jig_domain_accounts::Form::Withdrawn => fleet::Form::Withdrawn,
+                    jig_domain_accounts::Form::Application => fleet::Form::Application,
                 },
                 account: grant.account,
                 generation: grant.generation,

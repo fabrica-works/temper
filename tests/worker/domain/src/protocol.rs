@@ -59,11 +59,11 @@ pub fn charter() -> Box<[u8]> {
 #[must_use]
 pub fn session_turn(sequence: u32, spent: u64, length: usize, first: bool) -> record::Turn {
     let kind = if first {
-        record::Kind::First {
+        record::Kind::First(Box::new(record::Opener {
             affinity: llm::Affinity { key: [5; 16], thread: 0 },
             account: Some(0),
             backend: record::Backend::Direct,
-        }
+        }))
     } else {
         record::Kind::Ordinary
     };
@@ -144,11 +144,8 @@ pub fn decode(run: Token, source: host::Start, limits: &agent::Limits) -> Result
     }
     let mut grants = Vec::with_capacity(source.grants.len());
     for grant in source.grants {
-        match grant.table {
-            host::GrantTable::Accounts => {
-                grants.push(agent::Grant { account: grant.account, generation: grant.generation, valid: grant.valid });
-            }
-            host::GrantTable::Application => {}
+        if let Some(grant) = smith_grant(grant) {
+            grants.push(grant);
         }
     }
     Ok(Box::new(agent::Start {
@@ -263,4 +260,14 @@ pub fn report(text: &[u8]) -> agent::RunResult {
     let report = smith_domain_run::outcome::Report { text: Box::from(text), fields: Box::new([]) };
     let declared = smith_domain_run::outcome::Declared::Report(report);
     agent::RunResult::Accepted { outcome: agent::Declared::new(declared, u64::MAX).expect("a bounded result") }
+}
+
+const fn smith_grant(value: host::Grant) -> Option<agent::Grant> {
+    let form = match value.form {
+        host::Form::Credential(host::Scheme::Bearer) => agent::Form::Credential(agent::Scheme::Bearer),
+        host::Form::Credential(host::Scheme::Key) => agent::Form::Credential(agent::Scheme::Key),
+        host::Form::Withdrawn => agent::Form::Withdrawn,
+        host::Form::Application => return None,
+    };
+    Some(agent::Grant { account: value.account, generation: value.generation, valid: value.valid, form })
 }

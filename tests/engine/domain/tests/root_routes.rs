@@ -813,7 +813,7 @@ fn an_ungranted_account_retains_the_chat_until_its_grant() {
     driver.events.extend(withheld);
     driver.settle();
     let grant = accounts::Grant {
-        table: accounts::GrantTable::Accounts,
+        form: accounts::Form::Credential(accounts::Scheme::Bearer),
         account: 1,
         generation: 1,
         valid: Duration::from_secs(3600),

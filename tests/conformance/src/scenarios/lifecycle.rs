@@ -160,10 +160,10 @@ pub(crate) fn delivered(peers: &mut Peers, delivery: &root::Delivery) {
     if let root::Delivery::WebReply { to, reply: people::Reply::Outcome(outcome) } = delivery
         && *to == COMPOUND_REPLY
     {
-        if let Some(previous) = peers.lifecycle.answer {
-            assert_eq!(*outcome, previous, "a compound retry must repeat its keyed answer");
+        if let Some(previous) = &peers.lifecycle.answer {
+            assert_eq!(outcome, previous, "a compound retry must repeat its keyed answer");
         }
-        peers.lifecycle.answer = Some(*outcome);
+        peers.lifecycle.answer = Some(outcome.clone());
         if peers.scenario == Some(Scenario::Compound) {
             peers.observed.push(jig_conformance::referee::Observed::Compound {
                 tasks: peers.children.clone(),

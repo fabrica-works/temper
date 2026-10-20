@@ -297,7 +297,7 @@ impl Process {
             let record = agent.turns()[index].clone();
             self.up.push_back(agent::Up::Turn {
                 turn: agent::Turn {
-                    opens_window: matches!(record.kind, record::Kind::First { .. }),
+                    opens_window: matches!(record.kind, record::Kind::First(_)),
                     number: *number,
                     spent: spent.units,
                     read: *read,

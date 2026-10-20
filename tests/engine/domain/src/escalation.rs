@@ -292,7 +292,7 @@ impl World {
         );
     }
 
-    fn retry_ask(&mut self, to: Token, reply: people::Reply) {
+    fn retry_ask(&mut self, to: Token, reply: &people::Reply) {
         assert!(self.next_ask < 416, "bounded named-query pressure retries");
         let fresh = Token::new(self.next_ask);
         self.next_ask += 1;
@@ -445,7 +445,7 @@ impl World {
 
     fn after_choice(&mut self, outcome: people::Outcome) {
         let (owner, revision, decision, key) = self.first_choice.clone().expect("outside winning ask retained");
-        self.ask(230, owner, key, revision, decision.clone(), outcome);
+        self.ask(230, owner, key, revision, decision.clone(), outcome.clone());
         self.ask(231, 0, 14, revision, decision.clone(), outcome);
         let different = match decision {
             people::EscalationDecision::Release | people::EscalationDecision::Pass => {
@@ -683,7 +683,7 @@ impl World {
             Delivery::WebReply {
                 to,
                 reply: reply @ (people::Reply::Again(_) | people::Reply::Outcome(people::Outcome::Again(_))),
-            } => self.retry_ask(to.into_token(), reply),
+            } => self.retry_ask(to.into_token(), &reply),
             Delivery::WebReply { to, reply: people::Reply::SignedIn { person, sign_in: session, .. } } => {
                 let index = usize::try_from(to.into_token().raw() - 101).expect("two named sign-in reply rights");
                 self.referee.signed_in(&self.store.rows, index, person, session).expect("durable exact owner sign-in");
@@ -716,7 +716,7 @@ impl World {
             }
             Delivery::WebReply { to, reply: people::Reply::Outcome(outcome), .. } => {
                 let token = to.into_token();
-                let checked = self.referee.replied(&self.store.rows, token, people::Reply::Outcome(outcome));
+                let checked = self.referee.replied(&self.store.rows, token, people::Reply::Outcome(outcome.clone()));
                 assert!(checked.is_ok(), "keyed terminal: {checked:?}; {:?}; {token:?}: {outcome:?}", self.settings);
                 self.asks.remove(&token).expect("one pending outside ask terminal");
                 let logical = self.ask_rights.remove(&token).unwrap_or(token);

@@ -141,16 +141,15 @@ fn sender(from: tasks::Party) -> Box<[u8]> {
 fn grants(grants: &[accounts::Grant]) -> Box<[host::Grant]> {
     let mut translated = Vec::with_capacity(grants.len());
     for grant in grants {
-        let table = match grant.table {
-            accounts::GrantTable::Accounts => host::GrantTable::Accounts,
-            accounts::GrantTable::Application => host::GrantTable::Application,
+        let form = match grant.form {
+            accounts::Form::Credential(scheme) => host::Form::Credential(match scheme {
+                accounts::Scheme::Bearer => host::Scheme::Bearer,
+                accounts::Scheme::Key => host::Scheme::Key,
+            }),
+            accounts::Form::Withdrawn => host::Form::Withdrawn,
+            accounts::Form::Application => host::Form::Application,
         };
-        translated.push(host::Grant {
-            table,
-            account: grant.account,
-            generation: grant.generation,
-            valid: grant.valid,
-        });
+        translated.push(host::Grant { form, account: grant.account, generation: grant.generation, valid: grant.valid });
     }
     translated.into_boxed_slice()
 }

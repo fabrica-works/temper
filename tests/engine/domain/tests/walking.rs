@@ -214,7 +214,7 @@ fn walking_referee_rejects_wrong_task_or_uncommitted_or_duplicate_assignment() {
         answered: Box::new([]),
         settled: Box::new([]),
         grants: Box::new([Grant {
-            table: jig_domain_accounts::GrantTable::Accounts,
+            form: jig_domain_accounts::Form::Credential(jig_domain_accounts::Scheme::Bearer),
             account: 1,
             generation: 1,
             valid: Duration::from_secs(3600),
