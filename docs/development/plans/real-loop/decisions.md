@@ -850,6 +850,14 @@ pass:
 
      From the hourly check of 2026-10-20T13:33:20Z: 13.s3's commit cf16adacb grows `crates/temper-engine-domain-forge/src/tests.rs` from 785 lines on `main` (`git show origin/main:crates/temper-engine-domain-forge/src/tests.rs | wc -l`) to 828, past the README's `file-lines: 800`. 13.s3's Files gain `src/tests/change.rs`, a module beside `tests/adoption.rs`, `tests/fixtures.rs` and `tests/purpose.rs` (`git ls-tree --name-only origin/main crates/temper-engine-domain-forge/src/tests/`), for this step's tests; any further test the step adds goes there too. Its two tests also take testing-strategy.md, section 10's "A setup written once" (they repeat `fixtures::opening()`, `fixtures::missing_pull` and the Created answer) and "Named fixtures and sizes" (the expected `Wall::from_nanos(130_000_000_000)`), as the steer of this check says.
 
+147. **kit a46635c8** (kit fix).
+     Reverses: ruling 144's "until a ruling says the fix is in the run's kit" (2026-10-20T13:04Z), which has come.
+     Amends: the README's "Rules of this plan": "No other task's environment" becomes "No other process's environment".
+
+     The kit moves from skein 9ab88f69 to a46635c8, "fix(heavy): omit credentials from queued task environments", for the defect the run met in ruling 144: heavy queued each task with its caller's whole environment, and pueue printed it to every client. a46635c8 leaves credential-shaped names (CLAUDE_CODE_*, *TOKEN*, *SECRET*, *PASSWORD*, *PASSWD*, *API_KEY*, *CREDENTIAL*) out of `pueue add`. The kit's heavy already held that blob (98b753b9), patched in place at 13:19:59Z; the kit's HEAD now names it. It changes nothing else the run uses: `git diff --stat 9ab88f69 a46635c8 -- scripts/dev docs/foundation` lists scripts/dev/heavy and scripts/dev/test-plan-numbers.sh only. `kit/scripts/dev/test-plan` failed once in the build lane on time alone ("the process layer ran 88 s, past 40 s and its 5 s margin", after 138 s waiting behind builds, logs/20261020T133850-11.log), and passed run alone in the gate lane (logs/20261020T134046-18.log).
+
+     The director, 2026-10-20T13:34Z, to every owner: the pueue stopgap is lifted; heavy's fix is on all five machines and o/hygiene cleaned pueue of credential-shaped variables. "pueue status and pueue log are allowed again, though heavy's own output and log paths are still the better read. Two rules stand for good: never read another process's environment (/proc/*/environ, ps e), and launch Codex with umask 077 so its logs are private." The README's rule now says that. Each prompt a role writes for an agent keeps the line on other processes' environments; a further copy of the old rule's text (a context file, a prompt) takes the new rule's.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

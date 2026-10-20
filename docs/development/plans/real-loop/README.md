@@ -206,13 +206,14 @@ plan's own.
   `Cargo.toml` already uses, never retypes it: Cargo treats two
   spellings of one URL as two sources. Every Cargo line names fabrig-dev
   since temper `5ecc737ca`.
-- **No other task's environment** (the director's rule of 2026-10-20T13:04Z,
-  ruling 144). `pueue status --json` and `pueue log` print every queued
-  task's environment, other sessions' included: no role runs them, nor
-  reads another process's environment (`/proc/*/environ`, `ps e`), and
-  every prompt a role writes for an agent says so. Read heavy's own
-  output and the log path it prints instead. It holds until a ruling
-  says o/hygiene's heavy fix is in the run's kit.
+- **No other process's environment** (the director's rules of
+  2026-10-20T13:04Z and 13:34Z, rulings 144 and 147). No role reads
+  another process's environment (`/proc/*/environ`, `ps e`), and every
+  prompt a role writes for an agent says so. Codex runs under `umask
+  077`, so its logs and reports are private. The run's kit has heavy's
+  fix (skein a46635c8), which leaves credential-shaped names out of
+  queued tasks: `pueue status` and `pueue log` may be read again, though
+  heavy's own output and the log path it prints are the better read.
 
 ## Hotspots
 
