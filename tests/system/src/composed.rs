@@ -1,5 +1,6 @@
-//! Engine and worker roots with Smith's agent and fake LLM, on jig's store
-//! and party fakes (jig's domain/testing.md, sections 2 and 8).
+//! Engine and worker roots with Smith's agent and fake LLM, on jig's real
+//! store and fake parties and skein's fake forge (jig's domain/testing.md,
+//! sections 2 and 8).
 //!
 //! The world plays what the two sides' own worlds play: the channel between
 //! the roots, the protocol layers' translations and hand-outs (`link`), and

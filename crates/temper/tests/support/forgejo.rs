@@ -13,8 +13,9 @@ const MEMBER_BYTES: u32 = 2048;
 // The landing story gathers its agent's brief before the person's next command.
 const BRIEF_GATHER_MS: u64 = 5000;
 
-/// The owned Forgejo of domain/testing.md 2.6, prepared and run by temper's
-/// commands and attached through skein's Instance.
+/// The owned Forgejo of domain/testing.md 2.6, prepared, run and reconciled
+/// by temper's commands with its runner, attached through skein's `Instance`,
+/// with the person's token and repository.
 pub struct Throwaway {
     instance: Instance,
     pid: u32,

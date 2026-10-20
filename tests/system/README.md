@@ -1,9 +1,10 @@
 # temper's composed system world
 
 `composed::World` drives the actual engine root, actual worker root and
-smith's actual agent domain over fake LLM IO. The store and authenticated
-person are jig's fakes. temper's fake forge serves both the engine's API
-and the worker's git operations from one repository state. This follows
+smith's actual agent domain over fake LLM IO. The store is jig's real store
+over test files, and the authenticated person is jig's fake. skein's fake
+forge serves both the engine's API and the worker's git operations from one
+repository state. This follows
 jig's `domain/testing.md`, sections 2 and 8, and temper's `domain/testing.md`,
 section 2.1.
 

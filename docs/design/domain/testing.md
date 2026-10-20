@@ -1072,6 +1072,7 @@ crates/*/src/tests.rs               step tests
 tests/codecs                        temper-codecs-world: the generated codecs and the foreign documents' decoders
 crates/temper/tests/process.rs      the process tier (2.6): the story, the terminal, the server's guards, the hinted story, `temper box`; nextest profile process
 crates/temper/tests/live.rs         the live tier (2.7), nextest profile live
+tests/client-browser                temper-client-browser-world: the browser tier (../client/browser.md, section 4), Chromium against temper serve on the bundle the gate builds; nextest profile browser
 crates/temper-client-shell-terminal/tests  the terminal's machine world (../client/README.md, section 10)
 testing/temper-fake-git             the fake git program, on skein's fake machine (4.3)
 tests/<component>/<child>           a child domain's world, temper-<component>-<child>-world

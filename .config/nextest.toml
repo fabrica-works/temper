@@ -1,8 +1,9 @@
 # The two test suites (docs/development/workflow.md): the focused one, every
-# test but the fuzzy ones, within 15 seconds; and the fuzzy one, the test
-# binaries named fuzzy_* beside each world's focused tests, within 1 minute. A
-# suite past its budget fails, naming the tests it stopped; a test past its
-# slow period is flagged SLOW as it runs.
+# test but the fuzzy ones and the tiers' binaries below, within 15 seconds; and
+# the fuzzy one, the test binaries named fuzzy_* beside each world's focused
+# tests, within 1 minute. A suite past its budget fails, naming the tests it
+# stopped; a test past its slow period is flagged SLOW as it runs. The process,
+# live, QA and browser tiers have profiles of their own, at the end.
 
 [profile.default]
 default-filter = "not binary(/^fuzzy_/) & not binary(/^(process|live)$/) & not binary(/^qa_/) & not binary(/^browser_/)"
@@ -33,6 +34,9 @@ global-timeout = "1h"
 slow-timeout = { period = "60s" }
 
 [profile.process]
+# The process tier (docs/design/domain/testing.md, 2.6): crates/temper's
+# process binary alone, one test at a time, which scripts/proof-one-process.sh
+# runs.
 default-filter = "binary(=process)"
 global-timeout = "10m"
 test-threads = 1
@@ -40,7 +44,7 @@ test-threads = 1
 [profile.live]
 # The live tier (docs/design/domain/testing.md, 2.7): crates/temper's live binary
 # alone, one test at a time, which scripts/proof-live.sh runs.
-default-filter = "binary(/^(process|live)$/) & not binary(=process)"
+default-filter = "binary(=live)"
 global-timeout = "20m"
 test-threads = 1
 retries = 0
