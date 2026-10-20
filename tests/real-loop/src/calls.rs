@@ -22,6 +22,7 @@ pub struct Argv(pub Vec<Arg>);
 #[macro_export]
 macro_rules! argv { ($($word:expr),* $(,)?) => { $crate::calls::Argv(vec![$($crate::calls::Arg::from($word)),*]) }; }
 pub enum Step {
+    Advance,
     Probe { at: Dir },
     Release { at: Dir },
     Contended { calls: &'static [usize] },
@@ -34,6 +35,10 @@ pub enum Step {
     Join { call: usize },
     Watching { call: usize },
     Until { at: Dir, argv: Argv, holds: &'static [u8], early: &'static [u8] },
+}
+#[must_use]
+pub fn advance() -> Step {
+    Step::Advance
 }
 #[must_use]
 pub fn probe(at: Dir) -> Step {
@@ -140,6 +145,7 @@ struct Running {
 }
 pub(crate) struct Caller {
     pub(crate) released: bool,
+    pub(crate) advanced: Cell<bool>,
     pub(crate) held: Cell<bool>,
     pub(crate) links: Cell<u32>,
     retry_link: Option<u32>,
@@ -166,7 +172,8 @@ impl Caller {
     pub(crate) fn held_names(&self) -> impl Iterator<Item = &[u8]> {
         self.steps.iter().filter_map(|step| match step {
             Step::Held { name } => Some(*name),
-            Step::SignIn { .. }
+            Step::Advance
+            | Step::SignIn { .. }
             | Step::SameParty { .. }
             | Step::Kill { .. }
             | Step::Call { .. }
@@ -178,6 +185,9 @@ impl Caller {
             | Step::Release { .. }
             | Step::Contended { .. } => None,
         })
+    }
+    pub(crate) fn advancing(&self) -> bool {
+        matches!(self.steps.get(self.next), Some(Step::Advance))
     }
     pub(crate) fn held_index(&self) -> usize {
         self.steps[..self.next].iter().filter(|step| matches!(step, Step::Held { .. })).count()
@@ -192,6 +202,7 @@ impl Caller {
         let count = steps.len();
         Self {
             released: false,
+            advanced: Cell::new(false),
             held: Cell::new(false),
             links: Cell::new(0),
             retry_link: None,
@@ -245,7 +256,8 @@ impl Caller {
                 ];
             }
             Step::Call { at, argv } | Step::Start { at, argv } | Step::Until { at, argv, .. } => (at, argv),
-            Step::Join { .. }
+            Step::Advance
+            | Step::Join { .. }
             | Step::Watching { .. }
             | Step::Held { .. }
             | Step::Kill { .. }
@@ -432,20 +444,28 @@ impl Caller {
         }
         true
     }
+    fn finish(&mut self) {
+        if self.running.iter().all(Option::is_none)
+            && let Some(fd) = self.root.take()
+        {
+            self.submit(usize::MAX, Op::Close { fd });
+        }
+    }
     fn advance(&mut self, now: Time) {
         if matches!(self.steps.get(self.next), Some(Step::Held { .. })) && self.held.get() {
             // Issue the following kill in this pass, before the hosted caller's next turn.
             self.next += 1;
         }
         let Some(step) = self.steps.get(self.next) else {
-            if self.running.iter().all(Option::is_none)
-                && let Some(fd) = self.root.take()
-            {
-                self.submit(usize::MAX, Op::Close { fd });
-            }
+            self.finish();
             return;
         };
         match step {
+            Step::Advance => {
+                if !self.advanced.get() {
+                    return;
+                }
+            }
             Step::Held { .. } => return,
             Step::Kill { call } => {
                 let index = *call;
@@ -533,6 +553,7 @@ impl Caller {
     }
     fn can_advance(&self) -> bool {
         match self.steps.get(self.next) {
+            Some(Step::Advance) => self.advanced.get(),
             Some(Step::Held { .. }) => self.held.get(),
             Some(Step::SameParty { .. }) if self.retry_link.is_some() => {
                 self.retry_link.is_some_and(|link| self.links.get() > link)

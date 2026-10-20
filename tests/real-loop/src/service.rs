@@ -1,5 +1,6 @@
 //! Deferred standalone preparation with its original admission envelope.
 mod cue;
+mod hooks;
 mod watch;
 use crate::fixtures;
 pub use cue::Cue;
@@ -16,6 +17,11 @@ pub struct ServiceHost {
     pub(crate) address: Option<SocketAddr>,
     pub(crate) link: Vec<u8>,
     watch: watch::Watch,
+    hook_wire: hooks::Hooks,
+    pub(crate) hooks: Option<SocketAddr>,
+    pub(crate) forge_address: Option<SocketAddr>,
+    pub(crate) fixture: Option<crate::forge::Fixture>,
+    pub(crate) seen: crate::forge::Seen,
     cues: Vec<Cue>,
     links: u32,
     path: PathBuf,
@@ -27,21 +33,41 @@ pub struct ServiceHost {
 }
 impl ServiceHost {
     pub(crate) fn new(path: PathBuf, signals: Fd) -> Self {
-        let forge = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("held forge listener");
-        let address = forge.local_addr().expect("held forge address");
+        Self::configured(path, signals, None)
+    }
+    pub(crate) fn configured(path: PathBuf, signals: Fd, fixture: Option<crate::forge::Fixture>) -> Self {
+        let forge = fixture
+            .is_none()
+            .then(|| TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("held forge listener"));
+        let address = forge
+            .as_ref()
+            .map_or(([127, 0, 0, 1], 0).into(), |listener| listener.local_addr().expect("held forge address"));
         fixtures::write(&path, address, address).expect("stand-in standalone documents");
+        if let Some(fixture) = fixture {
+            crate::forge::write(&path, address, &fixture).expect("forge documents");
+        }
         let config = std::fs::read(path.join("config.json")).expect("standalone document");
-        let envelope = temper::envelope_in(&path, &config).expect("standalone admission envelope");
+        let mut envelope = temper::envelope_in(&path, &config).expect("standalone admission envelope");
+        // The deferred document names port 0 in its LLM, API and git addresses.
+        // Each kernel-assigned port can add four decimal digits at preparation.
+        if fixture.is_some() {
+            envelope.0 += 3 * 4;
+        }
         Self {
             service: None,
             address: None,
             link: Vec::new(),
             watch: watch::Watch::default(),
+            hook_wire: hooks::Hooks::default(),
+            hooks: None,
+            forge_address: None,
+            fixture,
+            seen: crate::forge::Seen::default(),
             cues: Vec::with_capacity(cue::CUES),
             links: 0,
             path,
             signals,
-            forge: Some(forge),
+            forge,
             envelope,
             completions: Queue::with_capacity(1),
             submissions: Queue::with_capacity(1),
@@ -78,17 +104,35 @@ impl ServiceHost {
 impl Host for ServiceHost {
     fn iterate(&mut self, now: Time, wall: Wall) {
         if self.service.is_none()
+            && self.fixture.is_none_or(|_| self.forge_address.is_some())
             && let Some(address) = self.address
         {
-            let forge = self.forge.as_ref().expect("held forge").local_addr().expect("forge address");
+            let forge = self
+                .forge_address
+                .unwrap_or_else(|| self.forge.as_ref().expect("held forge").local_addr().expect("forge address"));
             fixtures::write(&self.path, address, forge).expect("bound standalone documents");
+            if let Some(fixture) = self.fixture {
+                crate::forge::write(&self.path, forge, &fixture).expect("forge documents");
+            }
             let mut service = temper::prepare_in(&self.path).expect("standalone preparation");
-            assert_eq!((service.worst_case(), service.operations()), self.envelope, "preparation preserves admission");
+            if self.fixture.is_some() {
+                assert!(service.worst_case() <= self.envelope.0, "bound ports fit deferred admission");
+                assert_eq!(service.operations(), self.envelope.1, "preparation preserves operations");
+            } else {
+                assert_eq!(
+                    (service.worst_case(), service.operations()),
+                    self.envelope,
+                    "preparation preserves admission"
+                );
+            }
             service.adopt_signals(self.signals).expect("service signal pipe");
             self.service = Some(service);
         }
         if let Some(service) = &mut self.service {
             for complete in service.completions().iter() {
+                if self.fixture.is_some() {
+                    self.hook_wire.complete(complete, self.hooks, &mut self.seen.responses);
+                }
                 self.watch.complete(complete);
                 for cue in &mut self.cues {
                     cue.complete(complete);
@@ -102,6 +146,7 @@ impl Host for ServiceHost {
                 self.link.push(b'\n');
                 fixtures::private(&self.path.join("link"), &self.link).expect("private printed link");
             }
+            self.hooks = self.hook_wire.address(&self.link);
             if service.is_empty() {
                 self.forge = None;
             }
@@ -120,7 +165,11 @@ impl Host for ServiceHost {
         }
     }
     fn work_pending(&self, now: Time) -> bool {
-        self.service.as_ref().map_or(self.address.is_some(), |service| service.work_pending(now))
+        self.service
+            .as_ref()
+            .map_or(self.address.is_some() && self.fixture.is_none_or(|_| self.forge_address.is_some()), |service| {
+                service.work_pending(now)
+            })
     }
     fn next_deadline(&self) -> Option<Time> {
         self.service.as_ref().and_then(temper_service::Service::next_deadline)
@@ -132,7 +181,10 @@ impl Host for ServiceHost {
         self.service.as_ref().is_some_and(temper_service::Service::is_empty)
     }
     fn worst_case(&self) -> u64 {
-        self.envelope.0 + watch::Watch::memory() + cue::CUES as u64 * Cue::memory()
+        self.envelope.0
+            + watch::Watch::memory()
+            + cue::CUES as u64 * Cue::memory()
+            + if self.fixture.is_some() { hooks::Hooks::memory() } else { 0 }
     }
     fn operations(&self) -> u32 {
         self.envelope.1

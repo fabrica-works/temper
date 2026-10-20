@@ -1,0 +1,189 @@
+//! Skein's forge peer shares its domain with hosted git (domain/testing.md, 2.4).
+use crate::fixtures;
+use skein_fake_forge_domain::{self as domain, api};
+use skein_fake_peers::forge::{Delivery, Forge, Observation, Peer};
+use skein_lib::{Duration, Env, Secret, Time, Wall};
+use std::{cell::RefCell, net::SocketAddr, path::Path, rc::Rc};
+
+pub const ID: u32 = 2;
+pub const OTHER: u64 = 2;
+pub const HOOK_SECRET: &[u8] = b"real-loop-hook-secret";
+#[derive(Clone, Copy)]
+pub struct Fixture {
+    pub setup: fn() -> api::Setup,
+    pub configure: fn(&mut serde_json::Value, &mut serde_json::Value, SocketAddr),
+}
+#[must_use]
+pub fn fixture() -> Fixture {
+    Fixture { setup, configure: |_, _, _| {} }
+}
+fn setup() -> api::Setup {
+    api::Setup {
+        id: ID,
+        name: b"acme/app".as_slice().into(),
+        default: b"main".as_slice().into(),
+        tree: [(b"conflict.txt".as_slice(), b"base\n".as_slice()), (b"README.md".as_slice(), b"# app\n".as_slice())]
+            .map(|(path, content)| api::File { path: path.into(), content: content.into() })
+            .into(),
+        labels: Box::new([]),
+        checks: api::Checks {
+            contexts: vec![b"check".as_slice().into()].into(),
+            latency_min: Duration::ZERO,
+            latency_max: Duration::ZERO,
+            silent: 0,
+            passes: 1000,
+            reruns: 0,
+            cue: None,
+        },
+        protection: None,
+        hooked: true,
+    }
+}
+pub fn write(scratch: &Path, forge: SocketAddr, fixture: &Fixture) -> std::io::Result<()> {
+    let mut config: serde_json::Value = serde_json::from_slice(&std::fs::read(scratch.join("config.json"))?)?;
+    let mut agent: serde_json::Value = serde_json::from_slice(&std::fs::read(scratch.join("agent.json"))?)?;
+    config["application"]["webhooks"] = serde_json::json!({"listener":{"socket":"127.0.0.1:0"}});
+    config["application"]["forges"][0]["webhook_secret"] = "secrets/forge-1.webhook-secret".into();
+    config["application"]["identities"][0]["login"] = "worker".into();
+    (fixture.configure)(&mut config, &mut agent, forge);
+    for (name, bytes) in [
+        ("forge-1.api-token", temper_fake_git::fixtures::TOKEN),
+        ("forge-1.git-token", temper_fake_git::fixtures::TOKEN),
+        ("forge-1.user", b"1\n"),
+        ("forge-1.webhook-secret", HOOK_SECRET),
+    ] {
+        fixtures::private(&scratch.join("secrets").join(name), bytes)?;
+    }
+    fixtures::private(&scratch.join("config.json"), &serde_json::to_vec(&config)?)?;
+    fixtures::private(&scratch.join("agent.json"), &serde_json::to_vec(&agent)?)
+}
+#[derive(Default)]
+pub struct Seen {
+    deliveries: Vec<Delivery>,
+    pub(crate) responses: Vec<u16>,
+    observations: Vec<domain::Observation>,
+}
+impl Seen {
+    #[must_use]
+    pub fn deliveries(&self) -> &[Delivery] {
+        &self.deliveries
+    }
+    #[must_use]
+    pub fn responses(&self) -> &[u16] {
+        &self.responses
+    }
+    pub(crate) fn collect(&mut self, peer: &Peer, handle: &Rc<RefCell<Forge>>) {
+        self.deliveries = peer
+            .observations()
+            .iter()
+            .filter_map(|record| {
+                let Observation::Delivery { outcome, .. } = record else { return None };
+                Some(match outcome {
+                    Delivery::Written => Delivery::Written,
+                    Delivery::NoAddress => Delivery::NoAddress,
+                    Delivery::NoRoom => Delivery::NoRoom,
+                    Delivery::Refused => Delivery::Refused,
+                    Delivery::Reset => Delivery::Reset,
+                })
+            })
+            .collect();
+        while let Some(observed) = handle.borrow_mut().domain.pop_observation() {
+            assert!(self.observations.len() < STORY_OBSERVATIONS as usize, "bounded domain observations");
+            self.observations.push(observed);
+        }
+    }
+}
+pub(crate) struct State {
+    pub(crate) handle: Rc<RefCell<Forge>>,
+    pub(crate) moved: bool,
+    pub(crate) hooked: bool,
+}
+impl State {
+    pub(crate) fn new(fixture: Fixture) -> (Self, Peer) {
+        let setup = (fixture.setup)();
+        let table = temper_fake_git::fixtures::table(&setup.name, setup.protection.as_ref().map(|p| p.branch.as_ref()));
+        let mut domain = domain::Domain::new(&temper_fake_git::fixtures::CONFIG, fixtures::SEED);
+        domain::repository(&mut domain, &temper_fake_git::fixtures::CONFIG, setup);
+        domain::grant(&mut domain, b"acme/app", 1, api::Permission::Write);
+        let handle = Rc::new(RefCell::new(Forge::new(domain, temper_fake_git::fixtures::CONFIG)));
+        crate::git::share(Some(temper_fake_git::Transport::new(handle.clone(), &table)));
+        let peer = Peer::new(
+            ([127, 0, 0, 1], 0).into(),
+            peer_limits(),
+            table,
+            protocol_limits(),
+            handle.clone(),
+            fixtures::SEED,
+        )
+        .expect("configured forge peer");
+        (Self { handle, moved: false, hooked: false }, peer)
+    }
+    pub(crate) fn hand_hooks(&mut self, address: SocketAddr) {
+        self.handle.borrow_mut().hooks = Some(skein_fake_forge_protocol::delivery::Endpoint {
+            forge: 1,
+            host: address.to_string().into_bytes().into(),
+            secret: Secret::new(HOOK_SECRET.into()),
+        });
+        self.hooked = true;
+    }
+    pub(crate) fn advance(&mut self, now: Time, wall: Wall) {
+        let mut forge = self.handle.borrow_mut();
+        let env = Env { now, wall, limits: forge.config };
+        domain::advance(&mut forge.domain, &env, b"acme/app", b"main", b"conflict.txt", b"other\n", OTHER)
+            .expect("another party's push");
+        self.moved = true;
+    }
+}
+
+// A whole story's frozen peer records: room for the largest story, about
+// 16 times Adopt's 65 recorded observations, at the skein peer fixture's 2 KiB per record.
+const STORY_OBSERVATIONS: u32 = 1_024;
+const STORY_OBSERVATION_BYTES: u32 = 2_097_152;
+#[must_use]
+pub fn peer_limits() -> skein_fake_peers::Limits {
+    skein_fake_peers::Limits {
+        io: skein_io::Limits {
+            sockets: 16,
+            names: 0,
+            refusals: 8,
+            intake: 65_536,
+            receive: 1024,
+            output: 65_536,
+            sends: 8,
+            accepts: 4,
+            backlog: 8,
+            close_timeout: Duration::from_secs(1),
+            retry: Duration::from_millis(1),
+        },
+        connections: 4,
+        queue: 64,
+        plaintext: 32_768,
+        ciphertext: 32_768,
+        observations: STORY_OBSERVATIONS,
+        observation_bytes: STORY_OBSERVATION_BYTES,
+    }
+}
+#[must_use]
+pub fn protocol_limits() -> skein_fake_forge_protocol::Limits {
+    skein_fake_forge_protocol::Limits {
+        calls: 4,
+        connections: 4,
+        raw_bytes: 4096,
+        http: skein_http::server::Limits {
+            head: 4096,
+            headers: 16,
+            body: 16384,
+            read: 1024,
+            response: 4096,
+            send: 1024,
+        },
+        documents: skein_forge::forgejo::limits::Limits {
+            json: skein_json::tokenizer::Limits { chunk: 1024, string: 16384, number: 32, depth: 16, length: 65536 },
+            writer: skein_json::writer::Limits { depth: 16, length: 65536 },
+            string_bytes: 512,
+            body_bytes: 16384,
+            inner: 32,
+            target_bytes: 4096,
+        },
+    }
+}

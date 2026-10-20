@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 pub mod fixtures;
+pub mod forge;
 pub mod git;
 pub mod llm;
 pub mod scripts;
@@ -19,10 +20,27 @@ pub use temper_service::End;
 
 /// The checked result retains its owners until assertions finish.
 pub struct Ran {
-    outcome: skein_world::real::CheckedOutcome<world::Proc>,
+    outcome: Outcome,
     scratch: Scratch,
 }
+enum Outcome {
+    Checked(skein_world::real::CheckedOutcome<world::Proc>),
+    Forge(skein_world::real::Outcome<world::Proc>),
+}
+impl std::ops::Deref for Outcome {
+    type Target = skein_world::real::Outcome<world::Proc>;
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Checked(outcome) => outcome,
+            Self::Forge(outcome) => outcome,
+        }
+    }
+}
 impl Ran {
+    #[must_use]
+    pub fn forge(&self) -> &forge::Seen {
+        &self.service().seen
+    }
     #[must_use]
     pub fn calls(&self) -> &[calls::Called] {
         let world::Proc::Caller(caller) = &self.outcome.procs[2] else { panic!("caller root") };
@@ -52,7 +70,7 @@ impl Ran {
     #[must_use]
     pub fn llm(&self) -> &[skein_fake_peers::llm::Observation] {
         let world::Proc::Llm(peer) = &self.outcome.procs[0] else { panic!("LLM root") };
-        peer.observations()
+        peer.peer.observations()
     }
     #[must_use]
     pub fn killed(&self) -> &[skein_world::real::Killed] {
@@ -78,11 +96,24 @@ pub fn run(
 #[must_use]
 pub fn run_on(scratch: Scratch, recipe: impl FnOnce() -> llm::Recipe, steps: impl FnOnce() -> Vec<calls::Step>) -> Ran {
     let outcome = world::run(&scratch, recipe, steps);
-    let ran = Ran { outcome, scratch };
+    checked(Ran { outcome: Outcome::Checked(outcome), scratch })
+}
+fn checked(ran: Ran) -> Ran {
     assert_eq!(ran.served(), Some(&End::Drained), "service end {:?}", ran.served());
     assert_eq!(ran.killed().len(), ran.requested_kills(), "only requested kills: {:?}", ran.killed());
     for killed in ran.killed() {
         assert_eq!(killed.exit, Exit::Signal(9), "requested kill");
     }
     ran
+}
+
+#[must_use]
+pub fn run_forge(
+    fixture: forge::Fixture,
+    scripts: fn(std::net::SocketAddr) -> Box<[skein_fake_llm_domain::api::Script]>,
+    steps: impl FnOnce() -> Vec<calls::Step>,
+) -> Ran {
+    let scratch = Scratch::new("real-forge");
+    let outcome = world::run_forge(&scratch, fixture, scripts, steps);
+    checked(Ran { outcome: Outcome::Forge(outcome), scratch })
 }
