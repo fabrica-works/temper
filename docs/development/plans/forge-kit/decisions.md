@@ -1513,6 +1513,15 @@ where its answer lands.
 
      The preserved two post-repair recordings and matching stable digest satisfy this recording obligation once their exact diff is recorded under this rule; do not rerun them solely to change the old expected file count. Retain all original logs and artifacts. Resume the clean JSON candidate from a71a3fffcf22594a7506eea010bf605edfb7de4c; record this framing disposition and complete the required landing gate before continuing06.3/06.4. No gate, proof count, corpus or production behavior is waived or changed.
 
+193. **Newest-Jig authority fixture compatibility** (hourly14 of 2026-10-20T01:17:16Z).
+     Reverses: nothing. Amends README Rules, Authority models in newer Jig repins.
+
+     Assign the newly reached walking::authority_value field repair to the first existing Forge-kit repin taking Jig31b0db486 or later. Its unrestricted ceiling/policy/role values use models: authority::Models::ALL; preserve Models::run_by's empty procedure policy, fields, assertions and normal budgets. Jig domain/authority.md3 says models are every configured model unless rules/policy/role narrow them; value.rs defines ALL as what names no narrowing. Refresh further reached literals/derived accounting and list users in that repin's commit; keep its required actual-tree checks and gate. No extra step/await, premature Jig repin, dependency patch or hold on existing starts.
+
+     Hourly14's current-main committed pin is not the newest-pin experiment. Smith/Hearth passed; Jig's timeout remains incomplete; Temper822f2022 with experimental Jige666ac6a fails E0063 on this field. Existing gates do not certify newest-upstream compatibility. All errors, full source/pin hashes, before/intermediate/final locks and registry/source audits stay under scratch-hourly-14. No compiler retry/repair was made there.
+
+     Checked: current primary Jig crates/jig-domain-authority/src/value.rs names Models(u64), Models::ALL=u64::MAX and run_by(Procedure)=>NONE. domain/authority.md3 states the default. Temper tests/engine/domain/src/walking.rs::authority_value constructs ceiling and policy/role without models, with no narrower model choice; its config callers and known further Authority literal locators are retained by the hourly audit. Primary graph was stale for this addition; bounded exact-source verification used, root owns refresh. No new API invented or execution result claimed.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

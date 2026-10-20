@@ -403,6 +403,8 @@ chain.
   newer compatible pins, the full skein update, all assertions and limits.
   Refresh any further reached copy or derived value and name it in the
   commit body; a further structural/design difference returns a report.
+- **Authority models in newer Jig repins:** the first owning Forge-kit repin taking Jig's models authority (31b0db486 or a later compatible revision) also adapts `tests/engine/domain/src/walking.rs::authority_value` with `models: authority::Models::ALL`. This fixture builds the unrestricted rules ceiling and policy/role values; Jig domain/authority.md3 defaults to every configured model unless rules/policy/role narrow it. Preserve the downstream procedure restriction through `Models::run_by`, existing assertions, grants, budgets and kinds. Refresh further reached Authority literals/derived accounting, list users in the repin commit, and run its existing actual-tree checks/profiles/gate. This is no demand for an early Jig pin or a claim that current-main gates prove newest-source compatibility.
+
 - **Mechanical repairs during repins** belong to the existing repin commit.
   Follow landed upstream renames, paths, signatures and generated-version
   moves through their whole sweep, including source, tests, schema comments,
