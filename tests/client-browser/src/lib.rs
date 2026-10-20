@@ -7,7 +7,11 @@ use skein_fake_person_browser::{
     harness::{Names, Output, Printed},
 };
 use skein_ui::Role;
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    net::TcpListener,
+    path::{Path, PathBuf},
+};
 mod configuration;
 mod forgery;
 
@@ -87,6 +91,19 @@ impl Tier {
         let scratch = skein_scratch::Scratch::new(name);
         configuration::write(scratch.path(), &temper(), &bundle());
         Self { scratch, forged: forgery::request() }
+    }
+    /// A tier whose server listens at a loopback port reserved beforehand, so that a restart opens the same
+    /// address and a page reconnects to it. Jig's tier has the same hook.
+    #[must_use]
+    pub fn reserved(name: &str) -> Self {
+        let tier = Self::new(name);
+        let listener = TcpListener::bind("127.0.0.1:0").expect("reserve restart port");
+        let address = listener.local_addr().expect("restart address");
+        let path = tier.scratch.path().join("config.json");
+        let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("deployment")).expect("JSON");
+        value["application"]["clients"]["listener"]["socket"] = serde_json::json!(address.to_string());
+        configuration::private(&path, &serde_json::to_vec(&value).expect("reserved deployment JSON"));
+        tier
     }
     #[must_use]
     pub fn setup(&self) -> Setup<'_> {

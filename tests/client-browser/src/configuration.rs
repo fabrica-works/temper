@@ -94,7 +94,7 @@ fn absolute_paths(value: &mut serde_json::Value, directory: &Path) {
         | serde_json::Value::String(_) => {}
     }
 }
-fn private(path: &Path, bytes: &[u8]) {
+pub(crate) fn private(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).expect("fixture file");
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).expect("private fixture");
 }
