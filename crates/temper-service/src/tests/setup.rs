@@ -2,6 +2,7 @@ use super::*;
 use crate::tests::fixtures;
 use skein_forge_setup::github::manifest::Target;
 use skein_lib::{List, Rng};
+use temper_protocol_records as records;
 
 fn service(states: u32, life: Duration) -> crate::Service {
     let mut config = fixtures::engine();
@@ -32,6 +33,23 @@ fn service(states: u32, life: Duration) -> crate::Service {
     advance(&mut service.engine);
     assert!(service.engine.setup.component.is_some());
     assert!(service.engine.forge_records.done());
+    for _ in 0..service.engine.notes.len() {
+        let _startup_note = service.engine.notes.pop();
+    }
+    // These routing tests fake the listeners, leaving the host and forge as their real components.
+    for _ in 0..service.engine.workers.io.len() {
+        let skein_io::Request::Listen { owner, addr } = service.engine.workers.io.pop().unwrap() else {
+            panic!("worker listener")
+        };
+        assert!(service.engine.workers.up(
+            Time::ZERO,
+            skein_io::Event::Listening { owner, listener: Token::new(78), addr },
+            &mut service.engine.events
+        ));
+    }
+    let ready = fixtures::ready();
+    service.engine.env.limits = ready.engine.env.limits;
+    service.engine.domain = ready.engine.domain;
     service
 }
 fn start(service: &mut crate::Service, run: u64, plan: host::Plan) {
@@ -43,8 +61,12 @@ fn terminal(service: &mut crate::Service) -> root::SetupEnd {
     for _ in 0_u32..4 {
         advance(&mut service.engine);
     }
-    let Some(root::Event::Setup { end, .. }) = service.engine.events.pop() else { panic!("setup terminal") };
-    end
+    for _ in 0..service.engine.events.len() {
+        if let Some(root::Event::Setup { end, .. }) = service.engine.events.pop() {
+            return end;
+        }
+    }
+    panic!("setup terminal")
 }
 fn manifest(service: &mut crate::Service, run: u64) -> Box<[u8]> {
     start(service, run, host::Plan::Manifest { forge: 1, target: Target::Personal });
@@ -135,6 +157,9 @@ fn an_install_can_evict_a_manifests_state_while_its_page_lives() {
     start(&mut service, 2, host::Plan::Install { forge: 1 });
     assert!(let_done(terminal(&mut service)));
     assert!(service.setup_page(1, &state, Time::ZERO).is_some());
+    // The slug above only made an Install-purpose state; no App remains in this host-state fixture.
+    service.engine.forge_records.rows =
+        crate::forge::records::Loader::new(&fixtures::engine().limits, &service.engine.workers.forges).rows;
     start(&mut service, 3, host::Plan::Convert { forge: 1, code: code(), state });
     let root::SetupEnd::Stopped { forge, reason } = terminal(&mut service) else { panic!("evicted state refused") };
     assert_eq!(forge, 1);
@@ -277,6 +302,10 @@ fn written_is_answered_only_after_kept_and_the_routing_rows_follow_each_keep() {
         service.engine.forge_records.rows.forge(1).unwrap().get(expected).unwrap();
         face.turn(&mut service);
     }
+    advance(&mut service.engine);
+    let owner = *service.engine.setup.writes.first().unwrap().0;
+    assert_eq!(service.engine.setup.writes.get(&owner).unwrap().number, records::number(1, Item::Origin));
+    answer(&mut service.engine, StoreEvent::Kept { owner });
     assert!(let_done(terminal(&mut service)));
 }
 #[test]
@@ -433,3 +462,6 @@ fn accounted(runs: u32, states: u32) -> u64 {
     fixtures::fill_files(&mut config);
     crate::Service::engine(config, &fixtures::seeds(), None, fixtures::forge_runtime()).unwrap().worst_case()
 }
+
+#[path = "setup_lifecycle.rs"]
+mod lifecycle_tests;

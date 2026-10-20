@@ -607,8 +607,14 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
         + 3_154_016
         - 1_009_024
         + 1_832;
-    // Delta +5,768,515,608,452 B; total 85,428,512,818,502 B.
-    assert_eq!(required.engine_bytes, 79_659_997_210_050_u64 + engine_growth);
+    // The jig repin adds 5,768,515,608,452 B: main totals 85,428,512,818,502 B.
+    // 05b adds 2,536 B of volatile root connection/installation tables to each
+    // of those 3,076 root/payload envelopes, 14,204 B of protocol-sized
+    // connections, 514 B of wanted diagnostic names for this one configured
+    // forge, and 200 B of inline service growth. Records retain main's term.
+    let lifecycle_growth = 3_076 * 2_536 + 14_204 + 514 + 200;
+    // 05b delta +7,815,654 B; total 85,428,520,634,156 B.
+    assert_eq!(required.engine_bytes, 79_659_997_210_050_u64 + engine_growth + lifecycle_growth);
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
     // Other causes: root program-source state +117,552 B; serialized source

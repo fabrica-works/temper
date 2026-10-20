@@ -54,3 +54,24 @@ fn queued_effect_outcomes_and_merge_answers_round_trip_durably() {
         assert_eq!(records::decode(&bytes, &bounds), Ok(value));
     }
 }
+
+#[test]
+fn not_installed_call_and_application_reasons_round_trip_distinctly_at_v3() {
+    use temper_engine_domain_forge::{AdoptionRefusal, ApplicationOutcome};
+    let bounds = temper_protocol_store::bounds(&fixture::LIMITS).expect("fixture bounds");
+    for value in [
+        Stored::Call {
+            key: NamedCall { task: 1, attempt: 2, completion: 3, position: 4 },
+            answer: CallPayload::Read(Box::new(Err(skein_forge::api::Error::NotInstalled))),
+        },
+        Stored::Application {
+            token: 1,
+            until: skein_lib::Wall::EPOCH,
+            outcome: ApplicationOutcome::ForgeRefused(AdoptionRefusal::NotInstalled),
+        },
+    ] {
+        let bytes = records::encode(&value);
+        assert_eq!(STORE_VERSION, 3);
+        assert_eq!(records::decode(&bytes, &bounds), Ok(value));
+    }
+}

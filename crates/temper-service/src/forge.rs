@@ -430,22 +430,11 @@ pub(crate) fn config(
     deployment: [u8; 16],
 ) -> (skein_forge_client::Config, Box<[forge::GitIdentity]>) {
     let count = u32::try_from(settings.forges.len()).expect("configured forges");
-    // temper-05 replaces configured writers with the runtime Connected entry.
-    let mut writers = List::with_capacity(count);
     let mut identities = List::with_capacity(count);
     for forge in &settings.forges {
-        // GitHub's writer is unknown until Connected; temper-05 gives it to the client.
-        if forge.kind == settings::Kind::Forgejo {
-            writers
-                .push(skein_forge_client::Writer { forge: forge.number, author: forge.user })
-                .expect("forge writers");
-        }
         identities
             .push(forge::GitIdentity { forge: forge.number, credential: forge.identity })
             .expect("forge identities");
     }
-    (
-        skein_forge_client::Config { namespace: Box::new(deployment), writers: writers.into_boxed() },
-        identities.into_boxed(),
-    )
+    (skein_forge_client::Config { namespace: Box::new(deployment), writers: Box::new([]) }, identities.into_boxed())
 }

@@ -31,3 +31,16 @@ fn landing_words_are_the_merge_id_cut_to_the_contract_bound() {
         assert_eq!(landing_words(&merge, bound).as_ref(), expected, "merge {merge:?}, bound {bound}");
     }
 }
+
+#[test]
+fn not_installed_ends_the_roots_adoption_part_as_missing_access() {
+    use jig_domain_people as people;
+    assert_eq!(
+        super::adoption_failure(skein_forge::api::Error::NotInstalled),
+        people::Outcome::Refused(people::Refusal::Authority {
+            lacking: people::Lack::ResourceAccess,
+            proposable: None
+        })
+    );
+    assert_eq!(super::adoption_failure(skein_forge::api::Error::Busy), people::Outcome::Again(people::Again::Busy));
+}

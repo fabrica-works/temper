@@ -350,3 +350,13 @@ fn a_family_request_keeps_its_supplied_admission_scope() {
     let root::Event::Party(root::PartyInput::Application { scope, .. }) = event else { panic!("application") };
     assert_eq!(scope, people::ApplicationScope::Deployment);
 }
+
+#[test]
+fn not_installed_projects_to_no_access_until_temper_07_adds_its_wire_reason() {
+    let w::Outcome::ForgeRefused(answer) =
+        encoded(Some(forge::ApplicationOutcome::ForgeRefused(forge::AdoptionRefusal::NotInstalled)))
+    else {
+        panic!("forge refusal")
+    };
+    assert_eq!(answer.reason(), &w::ForgeReason::NoAccess);
+}

@@ -172,6 +172,7 @@ pub enum AdoptionRefusal {
     InFlight,
     TooLarge,
     Unreachable,
+    NotInstalled,
     InvalidAnswer,
 }
 /// Project a forge call's refusal into the adoption's terminal reason.
@@ -183,8 +184,8 @@ pub const fn reason(error: skein_forge::api::Error) -> AdoptionRefusal {
         skein_forge::api::Error::Refused => AdoptionRefusal::Refused,
         skein_forge::api::Error::Busy => AdoptionRefusal::InFlight,
         skein_forge::api::Error::TooLarge | skein_forge::api::Error::Full => AdoptionRefusal::TooLarge,
-        skein_forge::api::Error::NotInstalled
-        | skein_forge::api::Error::NotConnected
+        skein_forge::api::Error::NotInstalled => AdoptionRefusal::NotInstalled,
+        skein_forge::api::Error::NotConnected
         | skein_forge::api::Error::Unavailable
         | skein_forge::api::Error::Timeout
         | skein_forge::api::Error::RateLimited { .. } => AdoptionRefusal::Unreachable,
@@ -501,67 +502,187 @@ pub enum RestartStage {
     /// Every uncertain restored entry has been looked for.
     Settled,
 }
+/// Volatile connection information, rebuilt from routing at every start (domain/forge.md, 4.1).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Connection {
+    NotConnected,
+    Connecting,
+    Connected { id: u64, login: Box<[u8]> },
+    Stopped { reason: Box<[u8]> },
+}
+/// Installation information for the deployment's page (protocol/forge.md, 2.4).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Installation {
+    pub account: Option<(u64, Box<[u8]>)>,
+    pub stray: bool,
+    pub suspended: bool,
+}
 /// A parent or child input to the connector top.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
+    Connection {
+        forge: u16,
+        state: Connection,
+    },
+    Installation {
+        forge: u16,
+        installation: u64,
+        state: Option<Installation>,
+    },
     /// Decide one core-admitted keyed adoption and keep its outcome.
-    Application { request: Token, token: Token, retention: skein_lib::Duration, adoption: Adoption },
+    Application {
+        request: Token,
+        token: Token,
+        retention: skein_lib::Duration,
+        adoption: Adoption,
+    },
     /// The core's answer to the application's adoption part.
-    ApplicationAnswered { request: Token, outcome: jig_domain_people::Outcome },
+    ApplicationAnswered {
+        request: Token,
+        outcome: jig_domain_people::Outcome,
+    },
     /// Drop a projection only after the core has settled its closing feed.
-    ForgetProjection { goal: u64 },
+    ForgetProjection {
+        goal: u64,
+    },
     /// Keep a connector-owned section source while the core budgets its brief.
-    PlanBrief { section: Token, source: BriefSource },
+    PlanBrief {
+        section: Token,
+        source: BriefSource,
+    },
     /// Gather a planned section with the core's allotted budget.
-    GatherPlanned { section: Token, parts: u32, bytes: u32, ci_budget: u32 },
+    GatherPlanned {
+        section: Token,
+        parts: u32,
+        bytes: u32,
+        ci_budget: u32,
+    },
     /// Gather one pinned, connector-owned section for a run brief.
-    GatherBrief { owner: Token, source: BriefSource, parts: u32, bytes: u32, max_job_bytes: u32 },
+    GatherBrief {
+        owner: Token,
+        source: BriefSource,
+        parts: u32,
+        bytes: u32,
+        max_job_bytes: u32,
+    },
     /// Gather a section and retain its rendered bytes until the root takes or drops its token.
-    GatherBriefHeld { section: Token, source: BriefSource, parts: u32, bytes: u32, max_job_bytes: u32 },
+    GatherBriefHeld {
+        section: Token,
+        source: BriefSource,
+        parts: u32,
+        bytes: u32,
+        max_job_bytes: u32,
+    },
     /// Cut retained words to the brief's allotment, preserving this source's end.
-    CutBrief { section: Token, bytes: u32 },
+    CutBrief {
+        section: Token,
+        bytes: u32,
+    },
     /// Transfer retained words to the root for a completed assignment.
-    TakeBrief { section: Token },
+    TakeBrief {
+        section: Token,
+    },
     /// Release a section, including one still gathering.
-    DropBrief { section: Token },
+    DropBrief {
+        section: Token,
+    },
     /// Read current permissions, settings, protection and collaborators.
-    Adopt { request: Token },
+    Adopt {
+        request: Token,
+    },
     /// Withdraw a just-adopted repository when its parent cannot commit the role seed.
-    ForgetAdoption { repository: skein_forge::api::Repository, restore: Option<Repository> },
+    ForgetAdoption {
+        repository: skein_forge::api::Repository,
+        restore: Option<Repository>,
+    },
     /// Replace the resources this live task names.
-    Names { task: u64, resources: Box<[Name]> },
+    Names {
+        task: u64,
+        resources: Box<[Name]>,
+    },
     /// Remove all resources and subscriptions of an ended task.
-    Unnamed { task: u64 },
+    Unnamed {
+        task: u64,
+    },
     /// Take a hold or hand one down from its current holder.
-    Hold { task: u64, resource: Name, from: Option<u64> },
+    Hold {
+        task: u64,
+        resource: Name,
+        from: Option<u64>,
+    },
     /// Claim writer slots for one task's attempt.
-    Claim { task: u64, attempt: u64, writes: Box<[Name]>, holders: Box<[u64]> },
+    Claim {
+        task: u64,
+        attempt: u64,
+        writes: Box<[Name]>,
+        holders: Box<[u64]>,
+    },
     /// Release slots and confirm any pushed heads.
-    Answered { task: u64, attempt: u64, pushed: Box<[(Name, skein_forge::api::Commit)]> },
+    Answered {
+        task: u64,
+        attempt: u64,
+        pushed: Box<[(Name, skein_forge::api::Commit)]>,
+    },
     /// Read a lost writer's resource afresh before making its slot available.
-    Lost { task: u64, attempt: u64 },
+    Lost {
+        task: u64,
+        attempt: u64,
+    },
     /// Retain an explicitly proposed agent effect without making it.
-    KeepProposedEffect { row: ProposedEffect },
+    KeepProposedEffect {
+        row: ProposedEffect,
+    },
     /// Remove the payload of a terminal proposal.
-    DropProposedEffect { number: u64 },
+    DropProposedEffect {
+        number: u64,
+    },
     /// Enqueue a checked effect in the same decision as its cause.
-    Enqueue { entry: skein_forge_client::Entry },
+    Enqueue {
+        entry: skein_forge_client::Entry,
+    },
     /// Keep a projection candidate after core admission.
-    KeepProjection { row: IssueRow, entry: skein_forge_client::Entry },
+    KeepProjection {
+        row: IssueRow,
+        entry: skein_forge_client::Entry,
+    },
     /// Describe the next write for a goal projection.
-    Project { entry: u64, repository: skein_forge::api::Repository, view: issues::GoalView },
+    Project {
+        entry: u64,
+        repository: skein_forge::api::Repository,
+        view: issues::GoalView,
+    },
     /// Continue the latest authorized snapshot after an outbox outcome or interval.
-    ProjectDesired { entry: u64, goal: u64 },
+    ProjectDesired {
+        entry: u64,
+        goal: u64,
+    },
     /// Register one activated change task with its held branch.
-    Change { row: ChangeRow },
+    Change {
+        row: ChangeRow,
+    },
     /// Commit the deployment repair identity beside the task creation decision.
-    QueueRepairStarted { owner: u64, repair: u64 },
+    QueueRepairStarted {
+        owner: u64,
+        repair: u64,
+    },
     /// Remember a committed procedure child and its role in this change.
-    Delegated { task: u64, child: u64, kind: change::Delegate },
+    Delegated {
+        task: u64,
+        child: u64,
+        kind: change::Delegate,
+    },
     /// A proposed child was refused by tasks before creation; keep a releasable state.
-    DelegateRefused { task: u64, child: u64 },
+    DelegateRefused {
+        task: u64,
+        child: u64,
+    },
     /// Resolve the named child's terminal result before stepping again.
-    DelegateResult { task: u64, child: u64, status: change::Status, words: Box<[u8]> },
+    DelegateResult {
+        task: u64,
+        child: u64,
+        status: change::Status,
+        words: Box<[u8]>,
+    },
     /// Gather fresh forge facts and step one registered change.
     StepChange {
         task: u64,
@@ -571,36 +692,74 @@ pub enum Event {
         queue_repair_active: bool,
     },
     /// A person released a drift-held change after inspecting the new head.
-    ReleaseChange { task: u64 },
+    ReleaseChange {
+        task: u64,
+    },
     /// Wait for a closing task's prior effects before cleanup begins.
-    SettleEffects { task: u64, root: u64, ending: ReleaseEnding },
+    SettleEffects {
+        task: u64,
+        root: u64,
+        ending: ReleaseEnding,
+    },
     /// Release a closing task's holds after prior effects settled.
-    Release { task: u64, root: u64, ending: ReleaseEnding, entry: u64 },
+    Release {
+        task: u64,
+        root: u64,
+        ending: ReleaseEnding,
+        entry: u64,
+    },
     /// Continue a release after one of its outbox effects settles.
-    ContinueRelease { task: u64, entry: u64 },
+    ContinueRelease {
+        task: u64,
+        entry: u64,
+    },
     /// Lift a held projection after a person resolves its permanent failure.
-    ReleaseProjection { goal: u64 },
+    ReleaseProjection {
+        goal: u64,
+    },
     /// The root has durably committed this entry.
-    Committed { entry: u64 },
+    Committed {
+        entry: u64,
+    },
     /// A person settled a held entry: make it again, or record it not made
     /// (domain/forge.md, 6; jig's `domain/connectors.md`, 4.3).
-    Resolve { entry: u64, again: bool },
+    Resolve {
+        entry: u64,
+        again: bool,
+    },
     /// Withdraw an entry whose write has not gone out.
-    Withdraw { entry: u64 },
+    Withdraw {
+        entry: u64,
+    },
     /// Root authority vetoed a new, unsent change effect in this decision.
-    VetoChange { task: u64, entry: u64, prior: change::Change },
+    VetoChange {
+        task: u64,
+        entry: u64,
+        prior: change::Change,
+    },
     /// Subscribe a live task to a topic.
-    Subscribe { subscription: Subscriber },
+    Subscribe {
+        subscription: Subscriber,
+    },
     /// Unsubscribe a task from a topic.
-    Unsubscribe { task: u64, topic: Topic },
+    Unsubscribe {
+        task: u64,
+        topic: Topic,
+    },
     /// One provider hint passed from the protocol.
-    Hint { hint: skein_forge::api::Hint },
+    Hint {
+        hint: skein_forge::api::Hint,
+    },
     /// A client event returned after an earlier connector request.
     Client(skein_forge_client::Event),
     /// Restore one durable connector record.
-    Restore { record: Stored },
+    Restore {
+        record: Stored,
+    },
     /// Finish restoration and reconcile loaded entries.
-    Restored { clock: skein_forge_client::RecoveryClock },
+    Restored {
+        clock: skein_forge_client::RecoveryClock,
+    },
     /// Read the system's live resources before procedures step.
     ReadAfresh,
     /// Look for each restored uncertain entry before procedures step.

@@ -1,12 +1,15 @@
 //! Durable setup needs and held manifest pages (protocol/forge.md, 2.6).
+pub(crate) mod diagnostics;
+pub(crate) mod lifecycle;
 mod settings;
 use alloc::boxed::Box;
-use jig_protocol_store::{Event as StoreEvent, SecretOwner, Secrets};
+use jig_protocol_store::Event as StoreEvent;
+use lifecycle::{Kind, Purpose, Run};
 pub(crate) use settings::prepare;
 use skein_forge_setup::{host, reconcile};
 use skein_lib::{CryptoRng, Duration, Env, Map, Queue, Secret, Time, Token, Wall};
 use temper_engine_domain as root;
-use temper_protocol_records::{self as records, Item};
+use temper_protocol_records::Item;
 
 /// Plans are staged in the protocol layer: the root names them, never their credentials.
 pub(crate) struct Layer {
@@ -20,7 +23,8 @@ pub(crate) struct Layer {
     served: Map<u16, ()>,
     unserved: Map<u16, &'static [u8]>,
     pub(crate) staged: Map<Token, host::Plan>,
-    runs: Map<Token, u16>,
+    runs: Map<Token, Run>,
+    lifecycle: lifecycle::Lifecycle,
     writes: Map<Token, Write>,
     next_write: u64,
     pages: Queue<Page>,
@@ -30,7 +34,7 @@ pub(crate) struct Layer {
     pub(crate) answers: Queue<(Token, host::Answer)>,
 }
 struct Write {
-    run: Token,
+    purpose: Purpose,
     number: u64,
     value: Secret,
 }
@@ -48,6 +52,7 @@ impl Layer {
         life: Duration,
         value_bytes: u32,
         batch: u32,
+        installations: u32,
     ) -> Self {
         let mut served = Map::with_capacity(limits.forges);
         for forge in &settings.forges {
@@ -65,7 +70,8 @@ impl Layer {
             unserved: Map::with_capacity(limits.forges),
             staged: Map::with_capacity(limits.runs),
             runs: Map::with_capacity(limits.runs),
-            writes: Map::with_capacity(limits.runs),
+            lifecycle: lifecycle::Lifecycle::new(limits.forges, installations),
+            writes: Map::with_capacity(limits.runs.checked_add(limits.forges).expect("setup writes")),
             next_write: 1,
             pages: Queue::with_capacity(limits.states),
             life,
@@ -132,6 +138,11 @@ impl Layer {
     pub(crate) fn work_pending(&self, now: Time) -> bool {
         !self.above.is_empty() || !self.io.is_empty() || due(self.next_deadline(), now)
     }
+    pub(crate) fn lifecycle_ready(&self, engine: &crate::engine::Engine) -> bool {
+        !self.closing
+            && self.component.is_some()
+            && self.lifecycle.ready(&self.runs, self.env.limits.runs, &engine.domain)
+    }
     /// A served page stays available for reload, until its own clock/count evicts it.
     pub(crate) fn page(&self, forge: u16, state: &[u8], now: Time) -> Option<&[u8]> {
         for page in &self.pages {
@@ -178,15 +189,45 @@ pub(crate) fn request(engine: &mut crate::engine::Engine, run: Token) {
             None => b"setup host has no entry for this forge",
         };
         ended(engine, run, root::SetupEnd::Stopped { forge: number, reason: Box::from(reason) });
-    } else if engine.setup.runs.len() == engine.setup.env.limits.runs {
+    } else if matches_app_plan(&plan) && lifecycle::has_app(engine, number) {
+        ended(
+            engine,
+            run,
+            root::SetupEnd::Stopped {
+                forge: number,
+                reason: Box::from(b"forge holds App records; Forget before making a new App".as_slice()),
+            },
+        );
+    } else if lifecycle::busy(engine, number) || engine.setup.runs.len() == engine.setup.env.limits.runs {
         ended(
             engine,
             run,
             root::SetupEnd::Stopped { forge: number, reason: Box::from(b"setup host: busy".as_slice()) },
         );
     } else {
-        engine.setup.runs.insert(run, number).expect("admitted host run");
+        let kind = lifecycle::kind(&plan);
+        engine
+            .setup
+            .runs
+            .insert(run, Run { forge: number, kind, internal: false, previous: engine.domain.forge_connection(number) })
+            .expect("admitted host run");
+        if kind == Kind::Convert {
+            lifecycle::state(engine, number, temper_engine_domain_forge::Connection::Connecting);
+        }
         engine.setup.down(host::Request::Run { run, plan });
+    }
+}
+fn matches_app_plan(plan: &host::Plan) -> bool {
+    match plan {
+        host::Plan::Manifest { .. } | host::Plan::Convert { .. } => true,
+        host::Plan::Install { .. }
+        | host::Plan::Accept { .. }
+        | host::Plan::Reconcile { .. }
+        | host::Plan::Paste { .. }
+        | host::Plan::Check { .. }
+        | host::Plan::TakeOver { .. }
+        | host::Plan::Adopt { .. }
+        | host::Plan::Reachable { .. } => false,
     }
 }
 fn ended(engine: &mut crate::engine::Engine, run: Token, end: root::SetupEnd) {
@@ -232,7 +273,13 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
         host.fire(&engine.setup.env, &mut engine.setup.above, &mut engine.setup.io);
     }
     for _ in 0..engine.setup.above.len() {
-        if !engine.setup.room() || !engine.store.room() || engine.events.room() == 0 {
+        if !engine.setup.room()
+            || !engine.store.room()
+            || !engine.forge.room(2)
+            || engine.events.room()
+                < engine.forge_records.bounds.installations.checked_add(4).expect("setup event room")
+            || engine.notes.room() == 0
+        {
             break;
         }
         let event = engine.setup.above.pop().expect("host output count");
@@ -241,7 +288,7 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
         }
         match event {
             host::Event::Need { run, need } => {
-                let forge = *engine.setup.runs.get(&run).expect("live setup run");
+                let forge = engine.setup.runs.get(&run).expect("live setup run").forge;
                 match need {
                     host::Need::Read(item) => {
                         let item = item_record(item);
@@ -256,62 +303,26 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
                         engine.setup.down(host::Request::Answer { run, answer });
                     }
                     host::Need::Write { item, bytes } => {
-                        let number = records::number(forge, item_record(item));
-                        let value = Secret::new(records::encode(bytes.expose()).into_boxed_slice());
-                        if value.expose().len() > usize::try_from(engine.setup.value_bytes).expect("value bound") {
-                            crate::stop::unavailable(engine, b"forge records");
-                            return;
-                        }
-                        assert!(engine.setup.next_write < (1_u64 << 60_u32), "setup write names fit prefix");
-                        let owner = Token::new(crate::tokens::SETUP | engine.setup.next_write);
-                        engine.setup.next_write = engine.setup.next_write.checked_add(1).expect("setup write names");
-                        engine
-                            .setup
-                            .writes
-                            .insert(owner, Write { run, number, value: value.clone() })
-                            .ok()
-                            .expect("one write per run");
-                        if let Some(terminal) = engine
-                            .store
-                            .secrets(owner, Secrets::Keep { owner: SecretOwner::Application, number, value })
-                        {
-                            answer(engine, terminal);
-                        }
+                        lifecycle::keep(engine, forge, item_record(item), bytes.expose(), Purpose::Host(run));
                     }
                 }
             }
-            host::Event::Done { run, outcome } => {
-                let forge = engine.setup.runs.remove(&run).expect("ended setup run");
-                let outcome = match outcome {
-                    reconcile::Outcome::Manifest { state, page } => {
-                        engine.setup.hold(forge, state.clone(), page);
-                        root::SetupOutcome::Manifest { state }
-                    }
-                    reconcile::Outcome::Install { state, url } => root::SetupOutcome::Install { state, url },
-                    reconcile::Outcome::Nothing | reconcile::Outcome::Lacking { .. } => root::SetupOutcome::Done, // 05b logs the names; temper-13 shows them.
-                    reconcile::Outcome::Identity { .. } | reconcile::Outcome::Reachable { .. } => {
-                        unreachable!("later plans are not staged")
-                    }
-                };
-                ended(engine, run, root::SetupEnd::Done { forge, outcome });
-            }
-            host::Event::Stop { run, failure } => {
-                let _ended = engine.setup.runs.remove(&run).expect("stopped setup run");
-                ended(engine, run, root::SetupEnd::Stopped { forge: failure.forge, reason: failure_text(&failure) });
-            }
+            host::Event::Done { run, outcome } => lifecycle::done(engine, run, outcome),
+            host::Event::Stop { run, failure } => lifecycle::stopped(engine, run, failure),
             host::Event::Closed => engine.setup.closed = true,
         }
         if engine.end.is_some() {
             break;
         }
     }
+    lifecycle::advance(engine);
 }
 pub(crate) fn answer(engine: &mut crate::engine::Engine, event: StoreEvent) {
     if let StoreEvent::Kept { owner } = event {
         let write = engine.setup.writes.remove(&owner).expect("setup keep owner");
         engine.forge_records.rows.push(write.number, write.value, engine.setup.value_bytes);
         if !engine.setup.closing {
-            engine.setup.down(host::Request::Answer { run: write.run, answer: host::Answer::Written });
+            lifecycle::kept(engine, write.purpose);
         }
     } else {
         crate::stop::unavailable(engine, b"forge records");

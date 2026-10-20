@@ -2,6 +2,7 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+use alloc::boxed::Box;
 pub mod forge;
 pub use forge::ForgeRuntime;
 pub mod limits;
@@ -63,6 +64,7 @@ use jig_protocol_config::Problems;
 /// Operator diagnostics taken by the shell (protocol/forge.md, 2.3).
 #[derive(PartialEq, Eq, Debug)]
 pub enum Note {
+    ForgeLacking { number: u16, names: Box<[u8]> },
     ForgeStopped { number: u16, why: skein_forge_connection::Stopped },
     ForgeNotConnected { number: u16, why: NotConnected },
     ForgeUnconfigured { number: u16 },

@@ -95,6 +95,7 @@ pub(crate) fn prepare(
         own.setup.state_life,
         own.records.value_bytes,
         batch,
+        own.forge_component.installations,
     );
     for forge in &config.forges {
         if !layer.served.contains_key(&forge.number) {

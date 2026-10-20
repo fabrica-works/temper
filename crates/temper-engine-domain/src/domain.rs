@@ -69,6 +69,20 @@ pub struct Domain {
 }
 
 impl Domain {
+    /// Routing capacities are fixed before the first input and priced by the service.
+    pub fn connection_limits(&mut self, forges: u32, installations: u32) {
+        self.forge.connection_limits(forges, installations);
+    }
+    /// The routing's latest connection information; no connection state is restored.
+    #[must_use]
+    pub fn forge_connection(&self, forge: u16) -> forge::Connection {
+        self.forge.connection(forge)
+    }
+    #[must_use]
+    pub fn forge_installation(&self, forge: u16, installation: u64) -> Option<&forge::Installation> {
+        self.forge.installation(forge, installation)
+    }
+
     /// Allocate the root and fixed child room from shell-supplied configuration and validated
     /// cross-child limits. Checks bounded authority/bootstrap configuration; issues no request.
     /// Startup pages/account setup begin only on `Event::Restart`.

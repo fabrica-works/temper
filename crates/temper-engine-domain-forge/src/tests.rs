@@ -800,3 +800,65 @@ fn a_ci_sections_words_keep_their_end_and_others_their_start() {
         );
     }
 }
+
+#[test]
+fn routing_connection_states_are_volatile_and_connected_gives_the_writer_once() {
+    let mut d = Domain::new(
+        &LIMITS,
+        4,
+        skein_forge_client::Config { namespace: Box::from(b"test".as_slice()), writers: Box::new([]) },
+        &[GitIdentity { forge: 1, credential: 1 }],
+    )
+    .unwrap();
+    assert_eq!(d.connection(1), Connection::NotConnected);
+    for state in [Connection::Connecting, Connection::Stopped { reason: Box::from(b"key refused".as_slice()) }] {
+        assert!(outputs(&mut d, Event::Connection { forge: 1, state: state.clone() }).is_empty());
+        assert_eq!(d.connection(1), state);
+    }
+    let state = Connection::Connected { id: 7, login: Box::from(b"writer".as_slice()) };
+    let first = outputs(&mut d, Event::Connection { forge: 1, state: state.clone() });
+    assert_eq!(
+        first.as_ref(),
+        [Request::Save {
+            record: Stored::Writer(skein_forge_client::Writer { forge: 1, author: 7 }),
+            release: None,
+            read_afresh: None
+        }]
+    );
+    assert_eq!(d.connection(1), state);
+    assert!(outputs(&mut d, Event::Connection { forge: 1, state }).is_empty(), "writer given twice saves once");
+    let mut restarted = domain();
+    outputs(
+        &mut restarted,
+        Event::Restore { record: Stored::Writer(skein_forge_client::Writer { forge: 1, author: 7 }) },
+    );
+    assert_eq!(restarted.connection(1), Connection::NotConnected, "restored writer is no connection claim");
+}
+#[test]
+fn routing_installations_keep_their_stray_and_suspended_states_without_durable_rows() {
+    let mut d = domain();
+    let state = Installation { account: Some((42, Box::from(b"account".as_slice()))), stray: true, suspended: true };
+    for _ in 0_u32..2 {
+        assert!(
+            outputs(&mut d, Event::Installation { forge: 1, installation: 11, state: Some(state.clone()) }).is_empty()
+        );
+    }
+    assert_eq!(d.installation(1, 11), Some(&state));
+    assert!(outputs(&mut d, Event::Installation { forge: 1, installation: 11, state: None }).is_empty());
+    assert_eq!(d.installation(1, 11), None);
+}
+
+#[test]
+fn routing_tables_take_every_installation_with_the_connection_components_bounds() {
+    let mut d = domain();
+    d.connection_limits(2, 8);
+    for forge in 1..=2 {
+        for installation in 1..=8 {
+            let state = Installation { account: None, stray: true, suspended: false };
+            assert!(outputs(&mut d, Event::Installation { forge, installation, state: Some(state) }).is_empty());
+        }
+    }
+    assert!(d.installation(2, 8).unwrap().stray);
+    assert!(connection_worst_case(2, 8, LIMITS.name_bytes).is_some());
+    assert_eq!(connection_worst_case(u32::MAX, u32::MAX, LIMITS.name_bytes), None);
+}

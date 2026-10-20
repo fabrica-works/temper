@@ -50,16 +50,18 @@ impl Engine {
         first_periods: List<(u32, u64)>,
     ) -> Self {
         let forge_records = crate::forge::records::Loader::new(&children.limits, &children.workers.forges);
-        let Children { accounts, workers, clients, forge, setup, notes, limits: _ } = children;
+        let Children { accounts, workers, clients, forge, setup, notes, limits: own } = children;
         let max_out = root::max_out(limits);
         let capacity = max_out.checked_mul(2).expect("root routing room");
         let mut credentials = List::with_capacity(values.identities.len());
         for (number, _value) in &values.identities {
             credentials.push(*number).expect("configured identities");
         }
+        let mut domain = root::Domain::new(config, limits);
+        domain.connection_limits(own.forge_component.forges, own.forge_component.installations);
         Self {
             credentials,
-            domain: root::Domain::new(config, limits),
+            domain,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
             store,
             accounts,
@@ -136,6 +138,11 @@ impl Engine {
     pub(crate) fn work_pending(&self, now: Time) -> bool {
         let components = (self.store.opened || self.end.is_some()) && self.clients.work_pending(now)
             || (self.store.opened || self.end.is_some()) && self.setup.work_pending(now)
+            || self.setup.lifecycle_ready(self)
+                && self.setup.room()
+                && self.store.room()
+                && self.forge.room(2)
+                && self.events.room() >= 4
             || self.store.work_pending(now)
             || (self.store.opened || self.end.is_some()) && self.forge.work_pending(now)
             || (self.store.opened || self.end.is_some()) && self.workers.work_pending(now)
@@ -479,10 +486,12 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
                 }
                 engine.drain_facts();
             }
-            // temper-02 gives these events meaning in the root.
-            skein_forge_connection::Event::Connected { .. }
-            | skein_forge_connection::Event::Installation { .. }
-            | skein_forge_connection::Event::GitToken { .. } => {}
+            skein_forge_connection::Event::Connected { forge } => crate::setup::lifecycle::connected(engine, forge),
+            skein_forge_connection::Event::Installation { forge, installation, account, change } => {
+                crate::setup::lifecycle::installation(engine, forge, installation, account, change);
+            }
+            // temper-02 handles git token values and installation access marks.
+            skein_forge_connection::Event::GitToken { .. } => {}
             skein_forge_connection::Event::Fact {
                 forge,
                 fact: skein_forge_connection::Fact::Unkept { installation },
@@ -493,6 +502,14 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
             }
             skein_forge_connection::Event::ListenerLost => stop::hooks(engine),
             skein_forge_connection::Event::Stopped { forge, why } => {
+                crate::setup::lifecycle::stopped_connection(engine, forge);
+                crate::setup::lifecycle::state(
+                    engine,
+                    forge,
+                    temper_engine_domain_forge::Connection::Stopped {
+                        reason: crate::setup::lifecycle::stopped_text(why),
+                    },
+                );
                 // At most once per connect generation, possibly after Connected. temper-02 revisits
                 // dropping a full queue when runtime reconnects are routed.
                 if engine.notes.room() > 0 {

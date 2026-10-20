@@ -83,6 +83,9 @@ impl skein_shell::Host for Host {
 
 fn note_line(note: temper_service::Note) -> String {
     match note {
+        temper_service::Note::ForgeLacking { number, names } => {
+            format!("temper serve: forge {number}: App lacks {}\n", String::from_utf8_lossy(&names))
+        }
         temper_service::Note::ForgeStopped { number, why } => stopped_line(number, why),
         temper_service::Note::ForgeNotConnected { number, why } => {
             format!("temper serve: forge {number}: not connected: {why}\n")

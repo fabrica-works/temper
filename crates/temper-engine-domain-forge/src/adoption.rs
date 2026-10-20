@@ -74,8 +74,24 @@ pub(crate) fn start(
         return again(request, people::Again::Busy, out);
     }
     let pending = Pending { token, retention, observed: None };
-    if !d.writers.contains_key(&adoption.forge) {
+    if !d.identities.contains_key(&adoption.forge) && !d.writers.contains_key(&adoption.forge) {
         return finish(d, env, request, pending, ApplicationOutcome::ForgeRefused(AdoptionRefusal::NoSuchForge), out);
+    }
+    let connected = match d.connection(adoption.forge) {
+        crate::Connection::Connected { .. } => true,
+        crate::Connection::Connecting | crate::Connection::Stopped { .. } => false,
+        // Direct domain worlds may supply writers; the service configures none.
+        crate::Connection::NotConnected => d.writers.contains_key(&adoption.forge),
+    };
+    if !connected {
+        return finish(
+            d,
+            env,
+            request,
+            pending,
+            ApplicationOutcome::ForgeRefused(reason(api::Error::NotConnected)),
+            out,
+        );
     }
     assert!(d.application.pending.insert(request, pending).is_ok(), "reserved application flight");
     if invalid_fields(&adoption, &env.limits) {

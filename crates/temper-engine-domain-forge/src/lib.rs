@@ -34,7 +34,7 @@ pub use brief::hex;
 pub use domain::{Domain, fire, max_out, resume, step, writer};
 pub use gates::{GateCandidate, GateLast, GatePattern, GatePolicy, GateTemplate};
 pub use judge::{Criterion, Freshness as JudgeFreshness, Judges, Reviewer, Verdict as JudgeVerdict};
-pub use limits::{Limits, worst_case};
+pub use limits::{Limits, connection_worst_case, worst_case};
 /// Connector-owned access to one exact effect on an adopted resource.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Access {

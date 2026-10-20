@@ -88,6 +88,10 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
     crate::adoption::worst_case(l)?
         .checked_add(skein_forge_client::worst_case(&l.client)?)?
         .checked_add(Map::<skein_forge::api::Repository, Repository>::worst_case(l.repositories)?)?
+        .checked_add(Map::<u16, crate::Connection>::worst_case(l.client.repositories)?)?
+        .checked_add(u64::from(l.client.repositories).checked_mul(u64::from(l.name_bytes).checked_add(5)?.max(128))?)?
+        .checked_add(Map::<(u16, u64), crate::Installation>::worst_case(l.client.rows)?)?
+        .checked_add(u64::from(l.client.rows).checked_mul(u64::from(l.name_bytes))?)?
         // Each forge's writer and git identity.
         .checked_add(Map::<u16, u64>::worst_case(l.client.repositories)?)?
         .checked_add(Map::<u16, u32>::worst_case(l.repositories)?)?
@@ -186,4 +190,14 @@ fn issue_payload(l: &Limits) -> Option<u64> {
             .checked_add(plan)?
             .checked_add(milestones)?,
     )
+}
+
+/// Volatile tables when the protocol owner supplies its own connection bounds.
+#[must_use]
+pub fn connection_worst_case(forges: u32, installations: u32, name_bytes: u32) -> Option<u64> {
+    let count = forges.checked_mul(installations)?;
+    Map::<u16, crate::Connection>::worst_case(forges)?
+        .checked_add(u64::from(forges).checked_mul(u64::from(name_bytes).checked_add(5)?.max(128))?)?
+        .checked_add(Map::<(u16, u64), crate::Installation>::worst_case(count)?)?
+        .checked_add(u64::from(count).checked_mul(u64::from(name_bytes))?)
 }

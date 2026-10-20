@@ -96,6 +96,7 @@ fn store_decoders_never_panic_and_reencode_the_same() {
             outcome: Some(skein_forge_client::Outcome::Queued),
         },
         forge::CallPayload::Read(Box::new(Ok(skein_forge::api::Answer::Queued))),
+        forge::CallPayload::Read(Box::new(Err(skein_forge::api::Error::NotInstalled))),
     ] {
         let row =
             forge::Stored::Call { key: forge::NamedCall { task: 1, attempt: 2, completion: 3, position: 4 }, answer };
@@ -104,6 +105,16 @@ fn store_decoders_never_panic_and_reencode_the_same() {
         for _ in 0..8 {
             record(&temper_codecs_world::mutated(&mut rng, &bytes), &bounds);
         }
+    }
+    let row = forge::Stored::Application {
+        token: 1,
+        until: skein_lib::Wall::EPOCH,
+        outcome: forge::ApplicationOutcome::ForgeRefused(forge::AdoptionRefusal::NotInstalled),
+    };
+    let bytes = records::encode(&row);
+    record(&bytes, &bounds);
+    for _ in 0..8 {
+        record(&temper_codecs_world::mutated(&mut rng, &bytes), &bounds);
     }
     for bytes in &goldens {
         golden(bytes, &bounds);

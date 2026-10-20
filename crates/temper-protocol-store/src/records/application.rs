@@ -67,6 +67,7 @@ pub(super) fn decode(value: w::Application, bounds: &Bounds) -> Result<d::Stored
 }
 fn encode_reason(v: d::AdoptionRefusal) -> w::ForgeReason {
     match v {
+        d::AdoptionRefusal::NotInstalled => w::ForgeReason::NotInstalled,
         d::AdoptionRefusal::NoSuchForge => w::ForgeReason::NoSuchForge,
         d::AdoptionRefusal::NotFound => w::ForgeReason::NotFound,
         d::AdoptionRefusal::NoAccess => w::ForgeReason::NoAccess,
@@ -79,6 +80,7 @@ fn encode_reason(v: d::AdoptionRefusal) -> w::ForgeReason {
 }
 fn decode_reason(v: w::ForgeReason) -> d::AdoptionRefusal {
     match v {
+        w::ForgeReason::NotInstalled => d::AdoptionRefusal::NotInstalled,
         w::ForgeReason::NoSuchForge => d::AdoptionRefusal::NoSuchForge,
         w::ForgeReason::NotFound => d::AdoptionRefusal::NotFound,
         w::ForgeReason::NoAccess => d::AdoptionRefusal::NoAccess,

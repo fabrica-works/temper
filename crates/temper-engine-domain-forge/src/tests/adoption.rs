@@ -154,3 +154,82 @@ fn an_outcome_past_its_retention_is_erased_at_the_next_application() {
     assert!(requests.contains(&Request::Erase { key: Key::Application(9) }));
     assert_eq!(d.application_outcome(Token::new(9)), None);
 }
+
+#[test]
+fn not_installed_is_a_terminal_application_refusal_rather_than_a_retry() {
+    let mut d = domain();
+    outputs(
+        &mut d,
+        Event::Application {
+            request: Token::new(4),
+            token: Token::new(9),
+            retention: Duration::from_secs(60),
+            adoption: fixtures::adoption(),
+        },
+    );
+    let sent = ready(&mut d);
+    let [Request::Call { call, .. }] = sent.as_ref() else { panic!("locate call") };
+    let requests = outputs(
+        &mut d,
+        Event::Client(skein_forge_client::Event::Answered {
+            call: *call,
+            cost: 0,
+            free: 0,
+            rate: None,
+            result: Err(skein_forge::api::Error::NotInstalled),
+        }),
+    );
+    assert!(requests.contains(&Request::ApplicationDone { request: Token::new(4), token: Token::new(9) }));
+    assert_eq!(
+        d.application_outcome(Token::new(9)),
+        Some(&ApplicationOutcome::ForgeRefused(AdoptionRefusal::NotInstalled))
+    );
+}
+
+#[test]
+fn a_configured_forge_without_a_writer_refuses_adoption_before_any_read() {
+    let mut d = Domain::new(
+        &LIMITS,
+        4,
+        skein_forge_client::Config { namespace: Box::from(b"test".as_slice()), writers: Box::new([]) },
+        &[GitIdentity { forge: 1, credential: 1 }],
+    )
+    .unwrap();
+    outputs(
+        &mut d,
+        Event::Application {
+            request: Token::new(4),
+            token: Token::new(9),
+            retention: Duration::from_secs(60),
+            adoption: fixtures::adoption(),
+        },
+    );
+    assert_eq!(
+        d.application_outcome(Token::new(9)),
+        Some(&ApplicationOutcome::ForgeRefused(AdoptionRefusal::Unreachable))
+    );
+    assert!(ready(&mut d).is_empty(), "no Locate before Connected");
+}
+#[test]
+fn a_stopped_forge_keeps_its_writer_but_refuses_adoption_before_a_read() {
+    let mut d = domain();
+    outputs(
+        &mut d,
+        Event::Connection { forge: 1, state: Connection::Stopped { reason: Box::from(b"key refused".as_slice()) } },
+    );
+    outputs(
+        &mut d,
+        Event::Application {
+            request: Token::new(4),
+            token: Token::new(9),
+            retention: Duration::from_secs(60),
+            adoption: fixtures::adoption(),
+        },
+    );
+    assert_eq!(
+        d.application_outcome(Token::new(9)),
+        Some(&ApplicationOutcome::ForgeRefused(AdoptionRefusal::Unreachable))
+    );
+    assert_eq!(d.writers.get(&1), Some(&7));
+    assert!(ready(&mut d).is_empty());
+}

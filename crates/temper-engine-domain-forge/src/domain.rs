@@ -84,6 +84,8 @@ pub(crate) struct Outboxed {
 /// The bounded forge connector subtree.
 #[derive(Debug)]
 pub struct Domain {
+    connections: Map<u16, crate::Connection>,
+    installations: Map<(u16, u64), crate::Installation>,
     pub(crate) repositories: Map<skein_forge::api::Repository, Repository>,
     names: Map<u64, Box<[Name]>>,
     holds: Map<Name, Hold>,
@@ -130,6 +132,25 @@ pub struct Domain {
 }
 
 impl Domain {
+    /// Before the first input, size the volatile routing tables by the connection component's bounds.
+    /// The caller charges `connection_worst_case` beside the ordinary domain bound.
+    pub fn connection_limits(&mut self, forges: u32, installations: u32) {
+        assert!(self.connections.is_empty() && self.installations.is_empty(), "connection limits before inputs");
+        self.connections = Map::with_capacity(forges);
+        self.installations = Map::with_capacity(forges.checked_mul(installations).expect("connection bounds"));
+    }
+    #[must_use]
+    pub fn connection(&self, forge: u16) -> crate::Connection {
+        match self.connections.get(&forge) {
+            Some(state) => state.clone(),
+            None => crate::Connection::NotConnected,
+        }
+    }
+    #[must_use]
+    pub fn installation(&self, forge: u16, installation: u64) -> Option<&crate::Installation> {
+        self.installations.get(&(forge, installation))
+    }
+
     pub fn gate_policy(&mut self, policy: crate::GatePolicy, limits: &Limits) -> bool {
         if !crate::gates::within(&policy, limits) {
             return false;
@@ -294,6 +315,8 @@ impl Domain {
             }
         }
         Ok(Domain {
+            connections: Map::with_capacity(l.client.repositories),
+            installations: Map::with_capacity(l.client.rows),
             repositories: Map::with_capacity(l.repositories),
             names: Map::with_capacity(l.tasks),
             holds: Map::with_capacity(l.holds),
@@ -683,6 +706,27 @@ pub const fn max_out(l: &Limits) -> u32 {
 #[expect(clippy::too_many_lines, reason = "one exhaustive connector input dispatcher")]
 pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::Connection { forge, state } => {
+            match &state {
+                crate::Connection::Connected { id, .. } => {
+                    assert!(
+                        writer(d, env, skein_forge_client::Writer { forge, author: *id }, out),
+                        "same forge writer"
+                    );
+                }
+                crate::Connection::NotConnected | crate::Connection::Connecting | crate::Connection::Stopped { .. } => {
+                }
+            }
+            d.connections.insert(forge, state).expect("configured forge connections");
+        }
+        Event::Installation { forge, installation, state } => match state {
+            Some(state) => {
+                d.installations.insert((forge, installation), state).expect("bounded installations");
+            }
+            None => {
+                let _gone = d.installations.remove(&(forge, installation));
+            }
+        },
         Event::Application { request, token, retention, adoption } => {
             adoption::start(d, env, request, token, retention, adoption, out);
         }

@@ -207,7 +207,8 @@ impl ForgeRows {
         value(self.values.get(index).expect("ten codes").as_ref().ok_or(NotConnected::Incomplete)?.expose())
             .or(Err(NotConnected::Unreadable))
     }
-    fn has(&self, item: Item) -> bool {
+    #[must_use]
+    pub fn has(&self, item: Item) -> bool {
         self.get(item) != Err(NotConnected::Incomplete)
     }
 }

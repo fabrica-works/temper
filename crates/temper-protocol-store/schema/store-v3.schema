@@ -73,7 +73,7 @@ record ProposedEffect { number: u64 resource: What entry: Entry }
 
 # 04.3b: named effects, errors and reads without answer-item pieces.
 record RateLimited { after: duration }
-enum Error { unavailable, timeout, rate_limited: RateLimited, forbidden, missing, missing_job, too_large, empty, full, exists, nothing_to_merge, closed, stale, conflict, protected, refused, invalid_answer, busy }
+enum Error { unavailable, timeout, rate_limited: RateLimited, forbidden, missing, missing_job, too_large, empty, full, exists, nothing_to_merge, closed, stale, conflict, protected, refused, invalid_answer, busy, not_installed }
 record ErrorValue { error: Error }
 enum Made { created: Number, commented: Number, reviewed: Number, merged: Commit, updated: Commit, branch: Commit, set }
 record OutcomeMade { made: Made found: bool }
@@ -176,7 +176,7 @@ record IssueRow { goal: u64 repository: Repository state: Projected number: opti
 record ApplicationAdopted { repository: Repository owner: bytes 4096 name: bytes 4096 role: Role home: bool kinds: Kinds protection: RepositoryProtection }
 # jig-protocol-store's people_v5 Refusal: at most 24 bytes, all facts preserved.
 record CoreRefused { refusal: bytes 24 }
-enum ForgeReason { no_such_forge, not_found, no_access, refused, in_flight, too_large, unreachable, invalid_answer }
+enum ForgeReason { no_such_forge, not_found, no_access, refused, in_flight, too_large, unreachable, invalid_answer, not_installed }
 record ForgeRefused { reason: ForgeReason }
 enum ApplicationOutcome { adopted: ApplicationAdopted, core_refused: CoreRefused, forge_refused: ForgeRefused }
 record Application { token: u64 until: u64 outcome: ApplicationOutcome }

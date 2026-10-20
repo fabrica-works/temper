@@ -2079,41 +2079,7 @@ pub(crate) fn outputs(
                     }
                     Err(error) => {
                         // The forge's adoption errors as jig's facts (brief D12).
-                        let outcome = match error {
-                            skein_forge::api::Error::NotInstalled
-                            | skein_forge::api::Error::NotConnected
-                            | skein_forge::api::Error::Busy
-                            | skein_forge::api::Error::Unavailable
-                            | skein_forge::api::Error::Timeout
-                            | skein_forge::api::Error::RateLimited { .. } => {
-                                people::Outcome::Again(people::Again::Busy)
-                            }
-                            skein_forge::api::Error::TooLarge | skein_forge::api::Error::Full => {
-                                people::Outcome::Refused(people::Refusal::Limit { which: people::LimitKind::Resource })
-                            }
-                            skein_forge::api::Error::Forbidden
-                            | skein_forge::api::Error::Protected
-                            | skein_forge::api::Error::Refused => {
-                                people::Outcome::Refused(people::Refusal::Authority {
-                                    lacking: people::Lack::ResourceAccess,
-                                    proposable: None,
-                                })
-                            }
-                            skein_forge::api::Error::Missing => people::Outcome::Refused(people::Refusal::Authority {
-                                lacking: people::Lack::ResourceUnavailable,
-                                proposable: None,
-                            }),
-                            skein_forge::api::Error::MissingJob
-                            | skein_forge::api::Error::Empty
-                            | skein_forge::api::Error::Exists
-                            | skein_forge::api::Error::NothingToMerge
-                            | skein_forge::api::Error::Closed
-                            | skein_forge::api::Error::Stale
-                            | skein_forge::api::Error::Conflict
-                            | skein_forge::api::Error::InvalidAnswer => {
-                                people::Outcome::Refused(people::Refusal::Unknown)
-                            }
-                        };
+                        let outcome = adoption_failure(error);
                         domain.work.push(Work::People(people::Event::Decided { request: reply_to, outcome }));
                     }
                 }
@@ -2379,6 +2345,39 @@ pub(crate) enum EffectFlight {
         task: u64,
         evidence: Box<forge::ChangeEvidence>,
     },
+}
+
+/// Installation is missing access, not a transient busy adoption (domain/forge.md, 4.3).
+fn adoption_failure(error: skein_forge::api::Error) -> people::Outcome {
+    match error {
+        skein_forge::api::Error::NotConnected
+        | skein_forge::api::Error::Busy
+        | skein_forge::api::Error::Unavailable
+        | skein_forge::api::Error::Timeout
+        | skein_forge::api::Error::RateLimited { .. } => people::Outcome::Again(people::Again::Busy),
+        skein_forge::api::Error::TooLarge | skein_forge::api::Error::Full => {
+            people::Outcome::Refused(people::Refusal::Limit { which: people::LimitKind::Resource })
+        }
+        skein_forge::api::Error::NotInstalled
+        | skein_forge::api::Error::Forbidden
+        | skein_forge::api::Error::Protected
+        | skein_forge::api::Error::Refused => people::Outcome::Refused(people::Refusal::Authority {
+            lacking: people::Lack::ResourceAccess,
+            proposable: None,
+        }),
+        skein_forge::api::Error::Missing => people::Outcome::Refused(people::Refusal::Authority {
+            lacking: people::Lack::ResourceUnavailable,
+            proposable: None,
+        }),
+        skein_forge::api::Error::MissingJob
+        | skein_forge::api::Error::Empty
+        | skein_forge::api::Error::Exists
+        | skein_forge::api::Error::NothingToMerge
+        | skein_forge::api::Error::Closed
+        | skein_forge::api::Error::Stale
+        | skein_forge::api::Error::Conflict
+        | skein_forge::api::Error::InvalidAnswer => people::Outcome::Refused(people::Refusal::Unknown),
+    }
 }
 
 fn effect_owner(domain: &mut Domain) -> Token {

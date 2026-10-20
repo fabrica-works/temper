@@ -615,7 +615,13 @@ fn memory(
     let retained = temper_engine_domain::worst_case(root)?;
     let payload = temper_engine_domain::payload_worst_case(root)?;
     let events = queue.checked_mul(engine::route_out())?;
+    let connections = temper_engine_domain_forge::connection_worst_case(
+        settings.limits.forge_component.forges,
+        settings.limits.forge_component.installations,
+        settings.limits.forge.name_bytes.max(temper_protocol_worker_wire::v1::CEILINGS.identity_login),
+    )?;
     let mut bytes = retained
+        .checked_add(connections)?
         .checked_add(u64::try_from(size_of::<Service>()).ok()?)?
         .checked_add(skein_io::worst_case(io)?)?
         .checked_add(store::worst_case(root, store)?)?
@@ -632,6 +638,7 @@ fn memory(
         .checked_add(Queue::<io::Event>::worst_case(queue)?)?
         .checked_add(Queue::<Box<[u8]>>::worst_case(queue)?)?
         .checked_add(Queue::<crate::Note>::worst_case(u32::try_from(settings.forges.len()).ok()?)?)?
+        .checked_add(u64::try_from(settings.forges.len()).ok()?.checked_mul(crate::setup::diagnostics::worst_case()?)?)?
         .checked_add(u64::from(queue).checked_mul(u64::from(io.output).checked_add(512)?)?)?
         .checked_add(Map::<Token, (Token, Option<Token>)>::worst_case(operations)?)?
         .checked_add(Map::<Token, Token>::worst_case(operations)?)?;

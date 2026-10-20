@@ -167,7 +167,8 @@ fn encode_reviewers(values: &[u64]) -> List<u64> {
 
 pub(crate) fn encode_error(value: d::Error) -> w::Error {
     match value {
-        d::Error::NotInstalled | d::Error::NotConnected | d::Error::Unavailable => w::Error::Unavailable,
+        d::Error::NotInstalled => w::Error::NotInstalled,
+        d::Error::NotConnected | d::Error::Unavailable => w::Error::Unavailable,
         d::Error::Timeout => w::Error::Timeout,
         d::Error::RateLimited { after } => {
             w::Error::RateLimited(w::RateLimited::new(&w::CEILINGS, w::RateLimitedParts { after }).expect(FITS))
@@ -191,6 +192,7 @@ pub(crate) fn encode_error(value: d::Error) -> w::Error {
 }
 pub(super) fn decode_error(value: w::Error) -> d::Error {
     match value {
+        w::Error::NotInstalled => d::Error::NotInstalled,
         w::Error::Unavailable => d::Error::Unavailable,
         w::Error::Timeout => d::Error::Timeout,
         w::Error::RateLimited(value) => d::Error::RateLimited { after: value.after() },

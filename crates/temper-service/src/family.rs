@@ -153,7 +153,10 @@ pub fn answer(
                     reason: match reason {
                         forge::AdoptionRefusal::NoSuchForge => w::ForgeReason::NoSuchForge,
                         forge::AdoptionRefusal::NotFound => w::ForgeReason::NotFound,
-                        forge::AdoptionRefusal::NoAccess => w::ForgeReason::NoAccess,
+                        // temper-07 adds not_installed to the client wire.
+                        forge::AdoptionRefusal::NotInstalled | forge::AdoptionRefusal::NoAccess => {
+                            w::ForgeReason::NoAccess
+                        }
                         forge::AdoptionRefusal::Refused => w::ForgeReason::Refused,
                         forge::AdoptionRefusal::InFlight => w::ForgeReason::InFlight,
                         forge::AdoptionRefusal::TooLarge => w::ForgeReason::TooLarge,
