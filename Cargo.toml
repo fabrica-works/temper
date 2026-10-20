@@ -33,7 +33,6 @@ members = [
     "crates/temper-engine-domain",
     "crates/temper-engine-smith",
     "crates/temper-engine-domain-forge-change",
-    "crates/temper-engine-protocol-forge",
     "crates/temper-engine-domain-forge-issues",
     "crates/temper-engine-domain-forge",
     "crates/temper-worker-domain",
@@ -87,7 +86,6 @@ jig-client-protocol-link = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-client-shell-native = { git = "https://github.com/fabrig-dev/jig.git" }
 skein-tls = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-http = { git = "https://github.com/fabrig-dev/skein.git" }
-temper-engine-protocol-forge = { path = "crates/temper-engine-protocol-forge" }
 skein-forge-connection = { git = "https://github.com/fabrig-dev/skein.git" }
 jig-protocol-transcript = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-client-test-kit = { git = "https://github.com/fabrig-dev/jig.git" }

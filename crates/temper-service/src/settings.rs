@@ -65,8 +65,6 @@ pub struct Seeds {
     pub crypto: Secret,
 }
 
-/// The listener and secrets stay within the forge component.
-
 /// The engine's settings: jig's part, typed by jig-protocol-config, and
 /// temper's members (protocol/configuration.md, sections 2 and 3).
 #[derive(Debug)]

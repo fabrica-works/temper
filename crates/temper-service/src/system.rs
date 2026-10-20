@@ -48,23 +48,23 @@ impl Service {
         worker_bytes: u64,
         io_limits: io::Limits,
     ) -> Result<Self, Problems> {
-        let forges = crate::forge::prepare(&settings, forges)?;
-        Self::prepared(settings, seeds, accounts, forges, worker, worker_bytes, io_limits)
+        let (forges, roots) = crate::forge::prepare(&settings, forges)?;
+        let owned = skein_forge_connection::settings::owned_bytes(&forges)
+            .ok_or(start_problem(b"memory_bytes", What::Bound))?;
+        Self::prepared(settings, seeds, accounts, (forges, roots, owned), worker, worker_bytes, io_limits)
     }
     pub(crate) fn prepared(
         mut settings: settings::Engine,
         seeds: &settings::Seeds,
         accounts: Option<AccountsRuntime>,
-        forges: (skein_forge_connection::Settings, u64),
+        forges: (skein_forge_connection::Settings, u64, u64),
         worker: Option<Worker>,
         worker_bytes: u64,
         io_limits: io::Limits,
     ) -> Result<Self, Problems> {
         let limits =
             limits::engine(&settings.jig.limits, &settings.limits).ok_or(start_problem(b"limits", What::Bound))?;
-        let (forge_settings, forge_roots) = forges;
-        let forge_owned = skein_forge_connection::settings::owned_bytes(&forge_settings)
-            .ok_or(start_problem(b"memory_bytes", What::Bound))?;
+        let (forge_settings, forge_roots, forge_owned) = forges;
         let shared = crate::forge::shared(&settings.limits, &settings.jig.limits.io);
         read_charters(&mut settings)?;
         let store_limits = store::limits(&limits, &settings.jig.limits.core, &limits.forge, &settings.jig.limits.store)

@@ -2531,20 +2531,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "temper-engine-protocol-forge"
-version = "0.0.0"
-dependencies = [
- "skein-forge",
- "skein-forge-client",
- "skein-http",
- "skein-io",
- "skein-json",
- "skein-lib",
- "skein-tls",
- "skein-world",
-]
-
-[[package]]
 name = "temper-engine-protocol-forge-world"
 version = "0.0.0"
 dependencies = [
@@ -2813,7 +2799,6 @@ dependencies = [
  "temper-engine-domain-forge",
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-issues",
- "temper-engine-protocol-forge",
  "temper-engine-smith",
  "temper-protocol-store",
  "temper-protocol-worker-wire",
