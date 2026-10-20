@@ -488,9 +488,9 @@ For temper, which has no `docs/development/tech-debt.md`, and for its owner. "Li
 
 | Proposal | Decision | Where |
 |---|---|---|
-| 1 | open | |
-| 2 | open | |
-| 3 | open | |
-| 4 | open | |
-| 5 | open | |
-| 6 | open | |
+| 1 | accepted: heavy names each row's task, and each count reads its own rows | o/hygiene (skein's heavy) |
+| 2 | accepted: land refuses `_and_` names a landing adds, on every landing | o/hygiene (skein's land), after o/accounts-2 renames the ten |
+| 3 | declined: under owners.md the owner judges a diagnosis's length | — |
+| 4 | accepted | skein 1303838e, owners.md 4.3 |
+| 5 | declined: owners report the landings others await, and the director relays them | — |
+| 6 | accepted | skein 1303838e, owners.md 4.2 |
