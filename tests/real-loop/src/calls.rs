@@ -159,6 +159,8 @@ pub(crate) struct Caller {
     submissions: Queue<Submit>,
     serial: u64,
     memory: u64,
+    command: Option<Spawn>,
+    input: Box<[u8]>,
 }
 impl Caller {
     pub(crate) fn held_names(&self) -> impl Iterator<Item = &[u8]> {
@@ -209,7 +211,18 @@ impl Caller {
             submissions: Queue::with_capacity(ROOM),
             serial: 0,
             memory,
+            command: None,
+            input: Box::new([]),
         }
+    }
+    pub(crate) fn command(mut spawn: Spawn, input: &[u8], root: Fd) -> Self {
+        assert!(input.len() <= OUTPUT, "bounded command input");
+        spawn.root = root;
+        let mut caller = Self::new(Vec::new(), PathBuf::new(), root);
+        caller.command = Some(spawn);
+        caller.input = input.into();
+        caller.released = true;
+        caller
     }
     fn submit(&mut self, call: usize, kind: Op) {
         self.serial += 1;
@@ -255,6 +268,22 @@ impl Caller {
         if matches!(self.steps[self.next], Step::SameParty { .. }) && self.current.is_none() {
             self.retry_link = Some(self.links.get());
         }
+        self.launch(
+            now,
+            index,
+            Spawn {
+                program: fixtures::CTL.into(),
+                args,
+                env: vec![format!("CALL={index}").into_bytes().into_boxed_slice()].into_boxed_slice(),
+                root: self.root.expect("launch root"),
+                dir: Box::new([]),
+                pipes: [(0, Way::In), (1, Way::Out), (2, Way::Out)]
+                    .map(|(child, way)| Pipe { child, way, parent: None })
+                    .into(),
+            },
+        );
+    }
+    fn launch(&mut self, now: Time, index: usize, spawn: Spawn) {
         if self.calls.len() == index {
             self.calls.push(Called {
                 locked: None,
@@ -276,27 +305,13 @@ impl Caller {
         call.exit = None;
         call.tries += 1;
         self.running[index] = Some(Running::default());
-        if matches!(self.steps[self.next], Step::Start { .. })
+        if matches!(self.steps.get(self.next), Some(Step::Start { .. }))
             && matches!(self.steps.get(self.next + 1), Some(Step::Watching { call }) if *call == index)
         {
             // Arm before the spawned host can connect; release still waits for its task delivery.
             self.watching = Some(index);
         }
-        self.submit(
-            index,
-            Op::Spawn {
-                spawn: Box::new(Spawn {
-                    program: fixtures::CTL.into(),
-                    args,
-                    env: vec![format!("CALL={index}").into_bytes().into_boxed_slice()].into_boxed_slice(),
-                    root: self.root.expect("launch root"),
-                    dir: Box::new([]),
-                    pipes: [(0, Way::In), (1, Way::Out), (2, Way::Out)]
-                        .map(|(child, way)| Pipe { child, way, parent: None })
-                        .into(),
-                }),
-            },
-        );
+        self.submit(index, Op::Spawn { spawn: Box::new(spawn) });
     }
     fn complete(&mut self, complete: Complete, now: Time) {
         let index = self.owners.remove(&complete.op).expect("operation owner");
@@ -322,7 +337,10 @@ impl Caller {
                 for pipe in spawn.pipes {
                     let fd = pipe.parent.expect("parent pipe");
                     match pipe.child {
-                        0 => self.submit(index, Op::Close { fd }),
+                        0 => {
+                            let bytes = std::mem::take(&mut self.input);
+                            self.write(index, fd, bytes, 0);
+                        }
                         1 => {
                             self.running[index].as_mut().expect("running command").stdout = Some(fd);
                             self.read(index, fd);
@@ -334,6 +352,9 @@ impl Caller {
                         _ => panic!("standard pipes"),
                     }
                 }
+            }
+            (Op::PipeWrite { fd, bytes, from }, Done::Count(count)) => {
+                self.write(index, fd, bytes, from + count);
             }
             (Op::PipeRead { fd, buf }, Done::Count(count)) => {
                 if count == 0 {
@@ -363,6 +384,13 @@ impl Caller {
             }
             (Op::Close { .. } | Op::Signal { .. }, Done::Nothing) => {}
             (kind, done) => panic!("caller completion {kind:?}: {done:?}"),
+        }
+    }
+    fn write(&mut self, index: usize, fd: Fd, bytes: Box<[u8]>, from: u32) {
+        if usize::try_from(from).expect("input offset") == bytes.len() {
+            self.submit(index, Op::Close { fd });
+        } else {
+            self.submit(index, Op::PipeWrite { fd, bytes, from });
         }
     }
     fn settle(&mut self) {
@@ -528,7 +556,11 @@ impl Host for Caller {
         }
         self.settle();
         if self.released {
-            self.advance(now);
+            if let Some(spawn) = self.command.take() {
+                self.launch(now, 0, spawn);
+            } else {
+                self.advance(now);
+            }
         }
     }
     fn completions(&mut self) -> &mut Queue<Complete> {

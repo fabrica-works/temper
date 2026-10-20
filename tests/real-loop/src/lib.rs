@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 pub mod fixtures;
+pub mod git;
 pub mod llm;
 pub mod scripts;
 

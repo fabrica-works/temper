@@ -14,6 +14,7 @@ pub(crate) enum Proc {
     Caller(Box<Caller>),
     Ctl(Box<crate::calls::Recorded>),
     Agent(Box<skein_world::PipeHost<smith_agent_shell::Agent>>),
+    Git(Box<temper_fake_git::Git>),
 }
 impl Proc {
     fn host(&self) -> &dyn Host {
@@ -23,6 +24,7 @@ impl Proc {
             Self::Caller(h) => h.as_ref(),
             Self::Ctl(h) => h.as_ref(),
             Self::Agent(h) => h.as_ref(),
+            Self::Git(h) => h.as_ref(),
         }
     }
     fn host_mut(&mut self) -> &mut dyn Host {
@@ -32,6 +34,7 @@ impl Proc {
             Self::Caller(h) => h.as_mut(),
             Self::Ctl(h) => h.as_mut(),
             Self::Agent(h) => h.as_mut(),
+            Self::Git(h) => h.as_mut(),
         }
     }
 }
@@ -167,7 +170,7 @@ impl Referee<Proc> for Judge {
                     || caller.calls[recorded.call].locked != recorded.locked
                     || caller.calls[recorded.call].released != recorded.released
             }
-            Proc::Llm(_) | Proc::Service(_) | Proc::Caller(_) | Proc::Agent(_) => false,
+            Proc::Llm(_) | Proc::Service(_) | Proc::Caller(_) | Proc::Agent(_) | Proc::Git(_) => false,
         });
         if lock_changed
             || (peer.address().is_some() && service.address.is_none())

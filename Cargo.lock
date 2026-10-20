@@ -2735,7 +2735,9 @@ dependencies = [
  "temper",
  "temper-client-shell-cli",
  "temper-client-tools",
+ "temper-fake-git",
  "temper-service",
+ "temper-worker-protocol-git",
 ]
 
 [[package]]
