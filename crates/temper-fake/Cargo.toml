@@ -16,13 +16,13 @@ skein-fake-llm-protocol.workspace = true
 skein-llm.workspace = true
 skein-http.workspace = true
 skein-forge.workspace = true
-skein-forge-client.workspace = true
 skein-fake-peers.workspace = true
 jig-protocol-config.workspace = true
 skein-lib.workspace = true
 skein-json.workspace = true
 
 [dev-dependencies]
+skein-forge-client.workspace = true
 temper-engine-domain-forge-change.workspace = true
 temper-engine-domain-forge-issues.workspace = true
 skein-shell.workspace = true

@@ -1589,15 +1589,16 @@ demo's own work pushes nothing yet.
   `skein-fake-forge-protocol`, `skein-fake-llm-domain`,
   `skein-fake-llm-protocol`, `skein-llm`, `skein-http`, `skein-forge`,
   `skein-fake-peers`, `jig-protocol-config`, `skein-lib` and
-  `skein-json`; and for the check, `temper-protocol-store`,
-  `temper-engine-domain-forge` and `skein-forge-client`, since the
-  check's derivation is `temper-fake`'s too: from the store's rows to
-  the judge's profile and decisions, and from its verdict to the
-  check's lines. Its table fixtures also name
-  `temper-engine-domain-forge-change` and `temper-engine-domain-forge-issues`.
-  The binary's `crates/temper/src/fake.rs` hosts the peers and the seed
-  on skein-shell, reads the check's files and opens
-  the store's copy at the limits `temper-service`'s `store::limits`
+  `skein-json`; and for the check, `temper-protocol-store` and
+  `temper-engine-domain-forge`, since the check's derivation is
+  `temper-fake`'s too: from the store's rows to the judge's profile
+  and decisions, and from its verdict to the check's lines. Its table
+  fixtures also name `skein-forge-client`,
+  `temper-engine-domain-forge-change` and
+  `temper-engine-domain-forge-issues`. The binary's
+  `crates/temper/src/fake.rs` hosts the peers and the seed on
+  skein-shell, reads the check's files and opens the store's copy at
+  the limits `temper-service`'s `store::limits`
   derives from the document, and `temper fake git` is
   `temper-fake-git`'s core on the real file system (`../domain/testing.md`,
   4.3), which `main` runs when its `argv[0]`'s last component is `git`.
