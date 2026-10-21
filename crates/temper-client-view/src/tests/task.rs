@@ -284,11 +284,21 @@ fn the_title_sits_between_the_headers_two_meta_rows_without_a_title_paragraph() 
     let second = subtree(&tree, parts[3]);
     assert!(named(second, Role::Paragraph, b"Asked by Pat"));
     assert_eq!(second[1].role, Role::Status);
-    assert!(named(
-        second,
-        Role::Paragraph,
-        &fixtures::words().say(crate::words::Word::Deadline, &[skein_ui::phrases::Hole::Wall(skein_lib::Wall::EPOCH)])
-    ));
+    assert!(named(second, Role::Paragraph, b"Due Jan 1"));
+}
+#[test]
+fn a_deadline_names_the_utc_date_and_keeps_the_time_unless_it_is_midnight() {
+    let rows: [(u64, &[u8]); 4] = [
+        (0, b"Due Jan 1"),
+        (86_399, b"Due Jan 1, 23:59 UTC"),
+        (86_400, b"Due Jan 2"),
+        (86_401, b"Due Jan 2, 00:00 UTC"),
+    ];
+    for (seconds, expected) in rows {
+        let mut task = titled();
+        task.budget.deadline = Some(skein_lib::Wall::from_nanos(seconds * 1_000_000_000));
+        assert!(named(header(&task, None).nodes(), Role::Paragraph, expected), "deadline {seconds}");
+    }
 }
 #[test]
 fn the_first_meta_omits_absent_priority_and_uses_the_project_fallback_and_procedure_part() {
@@ -481,14 +491,7 @@ fn activity_rows_have_the_time_first_and_words_in_a_slot_and_no_empty_list() {
         let parts = children(&tree, *item);
         assert_eq!(parts.len(), 2);
         assert_eq!(tree.nodes()[parts.as_slice()[0]].role, Role::Paragraph);
-        assert_eq!(
-            tree.nodes()[parts.as_slice()[0]].name.as_deref(),
-            Some(
-                fixtures::words()
-                    .say(crate::words::Word::ActivityAt, &[skein_ui::phrases::Hole::Wall(skein_lib::Wall::EPOCH)])
-                    .as_ref()
-            )
-        );
+        assert_eq!(tree.nodes()[parts.as_slice()[0]].name.as_deref(), Some(b"Jan 1, 00:00".as_slice()));
         assert_eq!(tree.nodes()[parts.as_slice()[1]].role, Role::Slot);
         assert!(
             named(subtree(&tree, parts.as_slice()[1]), Role::Text, b"Ready for review")

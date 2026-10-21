@@ -281,7 +281,7 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 .temper-filters button, .temper-filters > div > div { border: 1px solid var(--temper-line); background: #f7f5f0; border-radius: 4px; min-height: 28px; padding: 5px 9px; font: 600 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--temper-muted); }
 .temper-filters button[aria-pressed=true] { background: #eae4d9; border-color: #eae4d9; color: var(--temper-ink); }
 .temper-filters > div > div { display: flex; align-items: center; gap: 7px; }
-.temper-filters > div > div::before { content: "Goal" / ""; }
+.temper-filters > div > div > label[for] { display: inline; font: inherit; color: inherit; }
 .temper-filters input { min-width: 0; width: 5ch; border: 0; border-radius: 0; background: transparent; padding: 0; color: var(--temper-ink); font: inherit; }
 .temper-heading > button { min-height: 28px; border: 0; background: transparent; padding: 5px 9px; color: var(--temper-muted); font: 600 11px/1.35 var(--temper-mono); }
 .temper-heading > button:hover { color: var(--temper-accent-dark); }
@@ -387,11 +387,11 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 .temper-plan-row > :nth-child(n+4) { grid-column: 1; grid-row: 2; color: var(--temper-muted); }
 .temper-plan-row a:hover { color: var(--temper-accent-dark); text-decoration: underline; }
 /* .tree: nested names have silent branches; the root has none. */
-.temper-plan [role=treeitem] > [role=treeitem] { margin-left: 20px; }
-.temper-plan [role=treeitem] > [role=treeitem] > .temper-plan-row > div:first-child::before { content: '├─' / ''; flex: none; color: #b6aa9d; font-family: monospace; white-space: pre; }
-.temper-plan [role=treeitem] > [role=treeitem]:last-of-type > .temper-plan-row > div:first-child::before { content: '└─' / ''; }
-.temper-plan [role=treeitem]:last-of-type:not(:has(> [role=treeitem])) > .temper-plan-row { border-bottom: 0; }
-.temper-plan [role=treeitem] > [role=treeitem] > .temper-plan-row > :nth-child(n+4) { padding-left: calc(2ch + 9px); }
+.temper-plan [role=treeitem] > [role=group] > [role=treeitem] { margin-left: 20px; }
+.temper-plan [role=treeitem] > [role=group] > [role=treeitem] > .temper-plan-row > div:first-child::before { content: '├─' / ''; flex: none; color: #b6aa9d; font-family: monospace; white-space: pre; }
+.temper-plan [role=treeitem] > [role=group] > [role=treeitem]:last-of-type > .temper-plan-row > div:first-child::before { content: '└─' / ''; }
+.temper-plan [role=treeitem]:last-of-type:not(:has(> [role=group] > [role=treeitem])) > .temper-plan-row { border-bottom: 0; }
+.temper-plan [role=treeitem] > [role=group] > [role=treeitem] > .temper-plan-row > :nth-child(n+4) { padding-left: calc(2ch + 9px); }
 /* .phase, .phase.held and .phase.good: phase words remain visible without tags. */
 .temper-plan-row > [role=status] { grid-column: 3; grid-row: 1; display: block; width: auto; padding: 0; border-radius: 0; background: transparent; color: var(--temper-muted); font-size: 11px; font-weight: 400; white-space: normal; }
 .temper-plan-row > .temper-status-active { color: var(--temper-ink); }
@@ -439,5 +439,5 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
   .temper-plan-row > p { grid-column: 1; grid-row: 2; }
   .temper-plan-row > [role=status] { grid-column: 2; grid-row: 2; }
   .temper-plan-row > :nth-child(n+4) { grid-column: 1 / -1; grid-row: 3; }
-  .temper-plan [role=treeitem] > [role=treeitem], .temper-plan [role=treeitem] > p, .temper-plan [role=treeitem] > [role=status] { margin-left: 10px; }
+  .temper-plan [role=treeitem] > [role=group] > [role=treeitem], .temper-plan [role=treeitem] > p, .temper-plan [role=treeitem] > [role=status] { margin-left: 10px; }
 }

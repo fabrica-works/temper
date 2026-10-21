@@ -91,7 +91,7 @@ pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words:
     phase(b, task.chip.phase, words);
     requester(b, task.requester, me, words);
     if let Some(deadline) = task.budget.deadline {
-        text(b, Role::Paragraph, &words.say(Word::Deadline, &[Hole::Wall(deadline)]));
+        text(b, Role::Paragraph, &words.deadline(deadline));
     }
     b.close();
     b.close();

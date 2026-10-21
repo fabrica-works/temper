@@ -52,7 +52,7 @@ pub fn page() -> skein_ui::Tree {
     b.close();
     region(&mut b, b"Latest activity");
     b.open(Role::Item);
-    text(&mut b, Role::Paragraph, b"At 0");
+    text(&mut b, Role::Paragraph, b"Jan 1, 00:00");
     text(&mut b, Role::Paragraph, b"The review needs attention.");
     b.close();
     b.close();

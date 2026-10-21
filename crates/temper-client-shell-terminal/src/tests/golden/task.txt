@@ -36,5 +36,5 @@ Plan:
     * Held below: 1
 Latest activity:
   ## Latest activity
-  - At 0
+  - Jan 1, 00:00
     The review needs attention.

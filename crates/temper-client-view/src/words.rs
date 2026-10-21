@@ -50,6 +50,7 @@ pub enum Word {
     AskedByTask,
     AskedByDeployment,
     Deadline,
+    DeadlineMoment,
     Priority,
     Folded,
     HeldBelow,
@@ -137,7 +138,7 @@ pub enum Word {
     SignOutLost,
     Unshowable,
 }
-const ALL: [Word; 124] = [
+const ALL: [Word; 125] = [
     Word::WaitInvalid,
     Word::ChoiceDraft,
     Word::ChoiceDraftDefault,
@@ -178,6 +179,7 @@ const ALL: [Word; 124] = [
     Word::AskedByTask,
     Word::AskedByDeployment,
     Word::Deadline,
+    Word::DeadlineMoment,
     Word::Priority,
     Word::Folded,
     Word::HeldBelow,
@@ -311,6 +313,7 @@ impl Word {
             Self::AskedByTask => 169,
             Self::AskedByDeployment => 170,
             Self::Deadline => 171,
+            Self::DeadlineMoment => 194,
             Self::Priority => 172,
             Self::Folded => 173,
             Self::HeldBelow => 174,
@@ -492,6 +495,11 @@ impl Words {
     pub fn say(&self, word: Word, holes: &[Hole]) -> Box<[u8]> {
         self.book.say(self.language, word.id(self.connector), holes).expect("checked forge phrase").text
     }
+    #[expect(clippy::manual_is_multiple_of, reason = "keep the UTC midnight remainder test explicit")]
+    pub(crate) fn deadline(&self, at: skein_lib::Wall) -> Box<[u8]> {
+        let word = if at.as_secs() % 86_400 == 0 { Word::Deadline } else { Word::DeadlineMoment };
+        self.say(word, &[Hole::Wall(at)])
+    }
     #[must_use]
     pub fn say_word(&self, word: jig_client::words::Word, holes: &[Hole]) -> Box<[u8]> {
         self.book.say(self.language, word.id(), holes).expect("checked jig word").text
@@ -574,11 +582,12 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::AskedByPerson => (&[b"Asked by person ", b""], &[Number]),
         Word::AskedByTask => (&[b"Asked by task ", b""], &[Number]),
         Word::AskedByDeployment => (&[b"Asked by deployment of project ", b""], &[Number]),
-        Word::Deadline => (&[b"Due ", b""], &[HoleKind::Wall]),
+        Word::Deadline => (&[b"Due ", b""], &[HoleKind::Date]),
+        Word::DeadlineMoment => (&[b"Due ", b" UTC"], &[HoleKind::Moment]),
         Word::Priority => (&[b"Priority ", b""], &[Number]),
         Word::Folded => (&[b"Folded: ", b" ", b""], &[Number, Name]),
         Word::HeldBelow => (&[b"Held below: ", b""], &[Number]),
-        Word::ActivityAt => (&[b"At ", b""], &[HoleKind::Wall]),
+        Word::ActivityAt => (&[b"", b""], &[HoleKind::Moment]),
         Word::DecisionMade => (&[b"Decision made"], &[]),
         Word::UnreadTurn => (&[b"Turn could not be decoded"], &[]),
         Word::Opaque => (&[b"Opaque content: ", b" bytes"], &[Number]),

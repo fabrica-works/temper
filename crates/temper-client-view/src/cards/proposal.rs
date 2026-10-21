@@ -174,7 +174,7 @@ fn authority(b: &mut Builder, document: &c::OwnerAuthorityDocument, words: &Word
         &[Hole::Number(u64::from(value.delegation.tasks)), Hole::Number(u64::from(value.delegation.depth))],
     );
     if let Some(deadline) = value.deadline {
-        words.text(b, Word::Deadline, &[Hole::Wall(deadline)]);
+        b.text(skein_ui::Run::Plain, &words.deadline(deadline));
     }
     for kind in window(b, words, value.delegation.kinds.as_slice(), rows) {
         let (word, number) = match kind {
