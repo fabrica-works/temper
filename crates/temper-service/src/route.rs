@@ -23,9 +23,28 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
         }
         root::Request::ToChild(released) => engine.events.push(root::Event::Released(released)),
         root::Request::Busy(event) => {
-            engine.forge.down(skein_forge_connection::Request::Returned(
-                crate::forge::back(event).expect("the routing hands the root only the component's answers"),
-            ));
+            use temper_engine_domain_forge::Event;
+            #[expect(
+                clippy::wildcard_enum_match_arm,
+                reason = "only the four routing producers below cross this boundary"
+            )]
+            match *event {
+                Event::Client(skein_forge_client::Event::Answered { call, cost, result, free, rate }) => {
+                    engine.forge.down(skein_forge_connection::Request::Returned(skein_forge_connection::Answered {
+                        call,
+                        cost,
+                        result,
+                        free,
+                        rate,
+                    }));
+                }
+                // skein's forge-connection.md, section 2: no returned-hint request; never offer it again.
+                // protocol/forge.md, 2: these views are not kept; restart publishes connections and skein's forge-connection.md, 4.4's baseline.
+                Event::Hint { .. } | Event::Connection { .. } | Event::Installation { .. } => {}
+                other => unreachable!(
+                    "only forge::{{event,hinted}} and setup::lifecycle::{{state,installation_event}} produce root forge inputs: {other:?}"
+                ),
+            }
         }
         root::Request::Drained => stop::drained(engine),
         root::Request::Stop => stop::unavailable(engine, b"deployment"),

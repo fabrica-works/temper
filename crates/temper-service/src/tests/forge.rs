@@ -170,6 +170,39 @@ fn an_answer_returned_in_the_drain_is_never_offered_again() {
     assert_eq!(service.engine.forge.above.len(), 0);
 }
 #[test]
+fn routing_news_and_hints_returned_during_the_drain_are_dropped() {
+    for hint in [false, true] {
+        let mut service = fixtures::ready();
+        service.shutdown();
+        if hint {
+            // forge_pass skips hints once drain is set; exercise the returned root boundary too.
+            service.engine.events.push(forge::hinted(skein_forge_connection::hooks::Hinted {
+                connection: Token::new(7),
+                hint: skein_forge::api::Hint {
+                    repository: skein_forge::api::Repository { forge: 1, repository: 2 },
+                    change: skein_forge::api::Change::Item(7),
+                    key: None,
+                },
+            }));
+        } else {
+            crate::setup::lifecycle::state(
+                &mut service.engine,
+                1,
+                temper_engine_domain_forge::Connection::Connected { id: 42, login: Box::from(b"temper".as_slice()) },
+            );
+        }
+        for _ in 0_u32..256 {
+            fixtures::turn(&mut service);
+            if service.end().is_some() {
+                break;
+            }
+        }
+        assert_eq!(service.end(), Some(&End::Drained));
+        assert_eq!(service.engine.forge.returned, 0, "no news or hint is returned to the component");
+        assert!(service.engine.forge.closed);
+    }
+}
+#[test]
 fn forge_component_limits_that_disagree_are_problems_naming_both() {
     let rows: [(skein_forge_connection::Unusable, &[u8]); 3] = [
         (skein_forge_connection::Unusable::Connections { connections: 3, calls: 2 }, b"application.limits.overrides.forge_component.connections: past its bound\napplication.limits.overrides.forge.client.calls: past its bound\n"),

@@ -192,6 +192,8 @@ pub(crate) struct Layer {
     pub(crate) starts: List<(u16, skein_forge_connection::Access)>,
     #[cfg(test)]
     pub(crate) accepted: List<(u16, Box<[u64]>)>,
+    #[cfg(test)]
+    pub(crate) returned: u32,
 }
 impl Layer {
     pub(crate) fn new(
@@ -213,6 +215,8 @@ impl Layer {
             starts: List::with_capacity(limits.forges),
             #[cfg(test)]
             accepted: List::with_capacity(limits.forges),
+            #[cfg(test)]
+            returned: 0,
         })
     }
     pub(crate) fn room(&self, batch: u32) -> bool {
@@ -220,6 +224,13 @@ impl Layer {
             && self.io.room() >= batch.checked_mul(skein_forge_connection::MAX_OUT.below).expect("forge batch io")
     }
     pub(crate) fn down(&mut self, request: skein_forge_connection::Request) {
+        #[cfg(test)]
+        if let skein_forge_connection::Request::Returned(_)
+        | skein_forge_connection::Request::Refused(_)
+        | skein_forge_connection::Request::RefusedHint(_) = &request
+        {
+            self.returned = self.returned.checked_add(1).expect("test return count");
+        }
         #[cfg(test)]
         if let skein_forge_connection::Request::Connect { forge, access } = &request {
             self.starts.push((*forge, access.clone())).expect("test starts");

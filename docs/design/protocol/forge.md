@@ -178,6 +178,11 @@ skein-io socket
   returns during its drain (its `Request::Busy`) is never offered
   again: it goes when the component closes, and the next process reads
   afresh and settles its outbox (`../domain/forge.md`, section 16). The
+  routing's own news of a connection or an installation that the root
+  returns during its drain is dropped. The root's view of them is not
+  kept, so the next process's root starts from what a fresh start
+  publishes: each connection afresh, and the installations by the
+  baseline listing (skein's `forge-connection.md`, section 4.4). The
   routing closes the component after the root's drain (jig's
   `protocol/service.md`, section 5); calls in flight end with their
   connections, and no answer goes up once the root has stopped.
