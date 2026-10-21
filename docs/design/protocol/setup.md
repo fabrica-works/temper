@@ -1526,10 +1526,15 @@ demo's own work pushes nothing yet.
     `client unknown`; `marker` temper's key's delimiters,
     `<!-- temper:key ` and ` -->` with its line feed (forge.md,
     section 4); `owned_branches` the `prefix` of each of forge N's
-    `Repository` rows; `allowed` `Comment`, `Merge` and `Close`, the
-    writes temper makes on items it did not open; `bounds` the
-    decisions' count, and `temper-fake`'s constant for the objects,
-    past which the judge is undecided: `judge full`.
+    `Repository` rows; `allowed` the writes temper makes on items it
+    did not open: `Comment`, `Merge` and `Close`, and `Review` and
+    `Request` when one of those rows' `kinds` grants `review`, since a
+    task reviews an outside contribution and sets its reviewers
+    (`../domain/forge.md`, section 13), while an update of one stays
+    foreign, since temper updates only its own change's branch
+    (section 10 there); `bounds` the decisions' count, and
+    `temper-fake`'s constant for the objects, past which the judge is
+    undecided: `judge full`.
   - *The decisions,* each merge temper decided on forge N, as the
     judge's `Decision`: its repository `owner/name`, its pull and its
     head. They are read from two families (store.md, section 2):
