@@ -69,7 +69,7 @@ fn arguments() {
         );
     }
     for (words, expected) in [
-        (vec!["fake"], "temper fake: expected llm, forge or git\n"),
+        (vec!["fake"], "temper fake: expected llm, forge, seed or git\n"),
         (vec!["fake", "other"], "temper fake: unknown fake other\n"),
         (
             vec!["fake", "llm"],

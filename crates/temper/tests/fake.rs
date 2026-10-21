@@ -357,13 +357,15 @@ fn refused_deployment_start(root: &Path) {
         assert_eq!(snapshot(&dir), before, "{name}: refused startup leaves directories unchanged");
     }
     let bound = usize::try_from(temper_fake::demo::KEY_FILE_BYTES).expect("key file bound");
-    for (name, demo, file, mode, extra, reason, names_file) in [
-        ("llm_null", false, None, 0o600, false, "application.demo is null: the deployment has no demo".to_owned(), false),
-        ("llm_absent", true, None, 0o600, false, "absent".to_owned(), true),
-        ("llm_public", true, Some(TOKEN.to_vec()), 0o644, false, "readable by others or reached through a link".to_owned(), true),
-        ("llm_empty", true, Some(b"\n".to_vec()), 0o600, false, "holds no key".to_owned(), true),
-        ("llm_long", true, Some(vec![b'k'; bound + 1]), 0o600, false, format!("past {bound} bytes"), true),
-        ("llm_word", true, None, 0o600, true, "usage: temper fake llm [DIRECTORIES] [--ready PREFIX] [--seed N] | temper fake llm --document FILE [--ready PREFIX] [--seed N]".to_owned(), false),
+    for (name, kind, demo, file, mode, extra, reason, names_file) in [
+        ("llm_null", "llm", false, None, 0o600, false, "application.demo is null: the deployment has no demo".to_owned(), false),
+        ("llm_absent", "llm", true, None, 0o600, false, "absent".to_owned(), true),
+        ("llm_public", "llm", true, Some(TOKEN.to_vec()), 0o644, false, "readable by others or reached through a link".to_owned(), true),
+        ("llm_empty", "llm", true, Some(b"\n".to_vec()), 0o600, false, "holds no key".to_owned(), true),
+        ("llm_long", "llm", true, Some(vec![b'k'; bound + 1]), 0o600, false, format!("past {bound} bytes"), true),
+        ("llm_word", "llm", true, None, 0o600, true, "usage: temper fake llm [DIRECTORIES] [--ready PREFIX] [--seed N] | temper fake llm --document FILE [--ready PREFIX] [--seed N]".to_owned(), false),
+        ("seed_null", "seed", false, None, 0o600, false, "application.demo is null: the deployment has no demo".to_owned(), false),
+        ("seed_word", "seed", true, None, 0o600, true, "usage: temper fake seed [DIRECTORIES]".to_owned(), false),
     ] {
         let dir = directory.join(name);
         fs::create_dir(&dir).expect("case directory");
@@ -378,7 +380,7 @@ fn refused_deployment_start(root: &Path) {
             support::write_private(&path, &file);
             fs::set_permissions(&path, fs::Permissions::from_mode(mode)).expect("key mode");
         }
-        let mut command = deployment_command("llm", &dir);
+        let mut command = deployment_command(kind, &dir);
         if extra {
             command.arg("extra");
         }
@@ -387,7 +389,7 @@ fn refused_deployment_start(root: &Path) {
         assert_eq!(output.status.code(), Some(1), "{name}");
         assert!(output.stdout.is_empty(), "{name}");
         let location = if names_file { format!("{}: ", path.display()) } else { String::new() };
-        assert_eq!(output.stderr, format!("temper fake llm: {location}{reason}\n").as_bytes(), "{name}");
+        assert_eq!(output.stderr, format!("temper fake {kind}: {location}{reason}\n").as_bytes(), "{name}");
         assert_eq!(snapshot(&dir), before, "{name}: refused startup leaves directories unchanged");
     }
 }
@@ -1082,5 +1084,219 @@ fn check_run() {
     );
     assert!(!data.exists());
     assert!(!cache.exists());
+    scratch.remove();
+}
+
+struct SeedServe {
+    child: Option<Child>,
+    stdout: std::io::BufReader<std::process::ChildStdout>,
+}
+impl SeedServe {
+    fn start(directory: &Path) -> Self {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_temper"))
+            .env_clear()
+            .arg("serve")
+            .args(support::configuration::flags(directory))
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("serve starts");
+        let stdout = std::io::BufReader::new(child.stdout.take().expect("serve stdout"));
+        Self { child: Some(child), stdout }
+    }
+    fn link(&mut self) -> Vec<u8> {
+        use std::io::BufRead;
+        let mut line = Vec::new();
+        self.stdout.read_until(b'\n', &mut line).expect("serve link");
+        if line.is_empty() {
+            let mut error = String::new();
+            self.child
+                .as_mut()
+                .expect("serve")
+                .stderr
+                .as_mut()
+                .expect("stderr")
+                .read_to_string(&mut error)
+                .expect("serve failure");
+            panic!("serve ended before its link: {error}");
+        }
+        assert!(line.starts_with(b"http://127.0.0.1:"), "{}", String::from_utf8_lossy(&line));
+        line
+    }
+    fn stop(mut self) {
+        let child = self.child.take().expect("running serve");
+        assert!(
+            Command::new("/bin/kill")
+                .args(["-TERM", &child.id().to_string()])
+                .status()
+                .expect("signal serve")
+                .success()
+        );
+        let ended = child.wait_with_output().expect("serve ends");
+        assert_eq!(ended.status.code(), Some(0), "{}", String::from_utf8_lossy(&ended.stderr));
+    }
+}
+impl Drop for SeedServe {
+    fn drop(&mut self) {
+        if let Some(child) = &mut self.child {
+            let _killed = child.kill();
+            let _reaped = child.wait();
+        }
+    }
+}
+fn seed_call(directory: &Path, link: &[u8]) -> std::process::Output {
+    let mut child = deployment_command("seed", directory).stdin(Stdio::piped()).spawn().expect("seed starts");
+    child.stdin.take().expect("seed stdin").write_all(link).expect("seed link written");
+    child.wait_with_output().expect("seed ends")
+}
+fn seed_demo(name: &str) -> (support::Scratch, Running, Running, SeedServe) {
+    let scratch = support::Scratch::new(name);
+    let dir = scratch.path();
+    support::configuration(dir, &support::Forge::Unreached);
+    let [listen, forge_listen] = support::free_addresses::<2>(&[]);
+    let mut config = support::configuration::demo_document(dir, &listen.to_string());
+    config["application"]["forges"][0]["api"] = json!({"socket":forge_listen.to_string()});
+    config["application"]["forges"][0]["git"] = json!(format!("http://{forge_listen}"));
+    config["application"]["setup"][0]["mode"]["fake"]["listen"] = json!({"socket":forge_listen.to_string()});
+    document(&dir.join("temper.json"), &config);
+    let agent_path = dir.join("agent.json");
+    let mut agent: Value = serde_json::from_slice(&fs::read(&agent_path).expect("agent document")).expect("agent JSON");
+    let mut endpoint = agent["endpoints"][0].clone();
+    endpoint["name"] = "demo".into();
+    endpoint["number"] = 3.into();
+    endpoint["address"] = listen.to_string().into();
+    endpoint["transport"] = "plaintext".into();
+    endpoint.as_object_mut().expect("endpoint").remove("server_name");
+    endpoint.as_object_mut().expect("endpoint").remove("trust_der");
+    endpoint["models"][0]["name"] = "qa".into();
+    agent["endpoints"].as_array_mut().expect("agent endpoints").push(endpoint);
+    document(&agent_path, &agent);
+    // Serve still reads Forgejo's private files before starting (temper-15).
+    let prepared = support::owned::prepare(dir, 1);
+    assert_eq!(prepared.status.code(), Some(0), "{}", String::from_utf8_lossy(&prepared.stderr));
+    let mut command = deployment_command("forge", dir);
+    command.arg("1");
+    let forge = Running::command(command, None);
+    let reconciled = Command::new(env!("CARGO_BIN_EXE_temper"))
+        .env_clear()
+        .args(["forge", "reconcile"])
+        .args(support::configuration::flags(dir))
+        .arg("1")
+        .output()
+        .expect("reconciled fake");
+    assert_eq!(reconciled.status.code(), Some(0), "{}", String::from_utf8_lossy(&reconciled.stderr));
+    fs::create_dir(dir.join("demo")).expect("demo directory");
+    support::write_private(
+        &dir.join("demo/llm.key"),
+        b"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n",
+    );
+    let llm = Running::command(deployment_command("llm", dir), None);
+    let serve = SeedServe::start(dir);
+    (scratch, llm, forge, serve)
+}
+#[test]
+fn seed_runs_fresh_then_finds_the_deployment_key() {
+    let (scratch, llm, forge, mut serve) = seed_demo("fake_seed");
+    let dir = scratch.path();
+    let first = serve.link();
+    let path = first.split(|byte| *byte == b'?').next().expect("printed link path");
+    let wrong = [path, b"?secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n"].concat();
+    let prefix = "temper fake seed: act 1: signed in\n";
+    let tail = "temper fake seed: act 3: accounts are usable\ntemper fake seed: act 4: the demo's repository is not adopted and the forges are not waited on; both wait on temper-14\ntemper fake seed: act 5: signed out\ntemper fake seed: act 6: the spent link was refused\n";
+    let bound = usize::try_from(temper_box::host::LINE_BYTES).expect("link bound");
+    let at_bound = vec![b'x'; bound];
+    let past_bound = vec![b'x'; bound + 1];
+    for (name, input, code, expected) in [
+        (
+            "fresh",
+            Some(first.as_slice()),
+            0,
+            format!("{prefix}temper fake seed: act 2: the deployment's key was added\n{tail}"),
+        ),
+        (
+            "at link bound",
+            Some(at_bound.as_slice()),
+            1,
+            "temper fake seed: act 1: call failed (status 1, stderr \"temper ctl: input is too large\")\n".into(),
+        ),
+        (
+            "past link bound",
+            Some(past_bound.as_slice()),
+            1,
+            "temper fake seed: act 1: stdin link past LINE_BYTES (status signal, stderr \"\")\n".into(),
+        ),
+        ("again", None, 0, format!("{prefix}temper fake seed: act 2: the deployment's key was found\n{tail}")),
+        (
+            "empty",
+            Some(b"".as_slice()),
+            1,
+            "temper fake seed: act 1: stdin holds no link (status signal, stderr \"\")\n".into(),
+        ),
+        (
+            "wrong",
+            Some(wrong.as_slice()),
+            1,
+            "temper fake seed: act 1: call failed (status 1, stderr \"temper ctl: the sign-in link was refused\")\n"
+                .into(),
+        ),
+    ] {
+        let next = input.map_or_else(|| serve.link(), <[u8]>::to_vec);
+        let output = seed_call(dir, &next);
+        assert_eq!(output.status.code(), Some(code), "{name}: {}", String::from_utf8_lossy(&output.stderr));
+        assert!(output.stdout.is_empty(), "{name}");
+        assert_eq!(output.stderr, expected.as_bytes(), "{name}");
+    }
+    serve.stop();
+    llm.stop();
+    forge.stop();
+    scratch.remove();
+}
+
+fn process_signal(pid: u32, signal: &str) {
+    assert!(Command::new("/bin/kill").args([signal, &pid.to_string()]).status().expect("process signal").success());
+}
+fn seed_child_pid(child: &mut Child) -> u32 {
+    // The child list supplies synchronization without inspecting any environment.
+    let pid = child.id();
+    let path = format!("/proc/{pid}/task/{pid}/children");
+    let clock = skein_shell::Clock::new();
+    let until = clock.now().now.saturating_add(skein_lib::Duration::from_secs(2));
+    loop {
+        if let Some(pid) = fs::read_to_string(&path).ok().and_then(|text| text.split_whitespace().next()?.parse().ok())
+        {
+            return pid;
+        }
+        if clock.now().now >= until {
+            let _killed = child.kill();
+            let _reaped = child.wait();
+            panic!("seed did not start its ctl child");
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+}
+#[test]
+fn seed_signals_reap_the_tool_waiting_for_serve() {
+    let (scratch, llm, forge, mut serve) = seed_demo("fake_seed_signals");
+    let link = serve.link();
+    let serve_pid = serve.child.as_ref().expect("serve").id();
+    // A key is usable without its provider, so hold a real sign-in call
+    // at serve instead of inventing an endpoint check for the key's wait.
+    process_signal(serve_pid, "-STOP");
+    for (signal, status) in [("-TERM", 143), ("-INT", 130)] {
+        let mut child = deployment_command("seed", scratch.path()).stdin(Stdio::piped()).spawn().expect("seed");
+        child.stdin.take().expect("seed stdin").write_all(&link).expect("link sent");
+        let ctl = seed_child_pid(&mut child);
+        process_signal(child.id(), signal);
+        let ended = child.wait_with_output().expect("seed reaped");
+        assert_eq!(ended.status.code(), Some(status), "{}", String::from_utf8_lossy(&ended.stderr));
+        assert!(ended.stderr.is_empty());
+        assert!(ended.stdout.is_empty());
+        assert!(!Path::new(&format!("/proc/{ctl}")).exists(), "ctl was reaped before seed exited");
+    }
+    process_signal(serve_pid, "-CONT");
+    serve.stop();
+    llm.stop();
+    forge.stop();
     scratch.remove();
 }

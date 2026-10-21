@@ -1,6 +1,7 @@
 //! The deployment and document forms' files and peer loop (protocol/setup.md, 8.4).
 pub(crate) mod check;
 pub mod git;
+pub(crate) mod seed;
 use skein_fake_peers::{forge as forge_peer, llm as llm_peer};
 use skein_io::kernel::{Complete, Done, Exit, Fd, Op, Submit};
 use skein_lib::{List, Queue, Time, Token, Wall};
@@ -111,8 +112,16 @@ pub fn configure(
     working: &[u8],
 ) -> Result<super::Command, String> {
     let Some((verb, arguments)) = arguments.split_first() else {
-        return Err("temper fake: expected llm, forge or git\n".into());
+        return Err("temper fake: expected llm, forge, seed or git\n".into());
     };
+    if verb.as_ref() == b"seed" {
+        let (directories, rest) = super::directories::resolve(arguments, environment, working)
+            .map_err(|why| super::prefixed("temper fake seed", &why.to_string()))?;
+        if !rest.is_empty() {
+            return Err(super::prefixed("temper fake seed", SEED_USAGE));
+        }
+        return Ok(super::Command::FakeSeed { directories });
+    }
     if verb.as_ref() == b"git" {
         return Ok(super::Command::FakeGit { arguments: arguments.into() });
     }
@@ -175,6 +184,7 @@ pub fn configure(
     Ok(super::Command::Fake { arguments: Arguments { kind, source, ready, seed, observations } })
 }
 
+pub const SEED_USAGE: &str = "usage: temper fake seed [DIRECTORIES]";
 const LLM_USAGE: &str = "usage: temper fake llm [DIRECTORIES] [--ready PREFIX] [--seed N] | temper fake llm --document FILE [--ready PREFIX] [--seed N]";
 const FORGE_USAGE: &str = "usage: temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE]";
 fn forge_number(number: &[u8]) -> Result<u16, &'static str> {
