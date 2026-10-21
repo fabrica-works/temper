@@ -1346,13 +1346,15 @@ since the box has no webhooks' listener (8.3).
        (`tests/real-loop`'s `landing.rs`), its grants on the project's
        pattern (8.3) and its delegation to the coding charter's agents,
        `{"kind": "agent", "number": 2}`;
-    2. the text "A coding agent is making this change in demo/widget: it
-       will push a branch, open a pull request, check CI and land into
-       main on Demo forge.", then `{"call": "wait", "arguments": {}}`;
+    2. the text "I’ll delegate this change in demo/widget. It will push
+       a branch, open a pull request, check CI and land into main on
+       Demo forge.", then `{"call": "wait", "arguments": {}}`;
     3. once the change's result wakes the chat, the text "CSV export is
-       available from widget's table: the change landed into main on
-       Demo forge. This was a scripted demo change.", then the same
-       `wait`.
+       available from widget’s table. The change landed on Demo forge.
+       This was a scripted demo change.", then the same `wait`.
+
+    The two texts are the mockup's (`../client/mockups/first-run.js`),
+    its typographic apostrophes kept, less the task's number.
 
     It never calls `finish`: the chat stays open, its composer with it,
     and the chat's 32-byte report bound (`engine.templates`' `chat`)
@@ -1584,7 +1586,13 @@ since the box has no webhooks' listener (8.3).
      has not yet connected (`temper ctl adopt`'s exit 2, the forge did
      not answer) is made again every 250 ms, each under the next key,
      `demo-adopt-2`, `demo-adopt-3` and on, until the setup's deadline
-     (`setup.deadline_ms`), the first refusal named on its stderr;
+     (`setup.deadline_ms`), the first refusal named on its stderr. The
+     act walks its keys in that order whatever their answers' age: a
+     key whose answer is the adoption, made now or recorded, ends the
+     act; one whose answer is that refusal moves to the next; any other
+     answer fails the step. So on a second box on the same directories
+     the first box's keys replay its refusals, then its adoption, and
+     the act ends at that key, adopting nothing again;
   5. sign out;
   6. present the link's secret again: it is refused as spent, and
      serve writes a fresh link to its stdout, the box's, which is the
