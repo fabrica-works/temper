@@ -1,12 +1,11 @@
 //! A git process reads and changes the fake machine through kernel operations.
 use crate::answer::path;
 use crate::{Answer, Checked, Refusal, Transport, answer, check};
+use skein_fake_checkout::{Checkout, Kind};
 use skein_io::kernel::{self as k, Complete, Done, Exit, Fd, Op, OpenHow, Submit};
 use skein_lib::{Queue, Time, Token, Wall};
 use skein_shell::Host;
-use skein_world::Inherited;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use temper_fake_checkout::{Checkout, Kind};
 use temper_worker_protocol_git::invocation::Command;
 
 #[derive(Debug)]
@@ -39,6 +38,16 @@ enum Pending {
     Pipe(Fd),
     Close(Fd),
 }
+/// Descriptors lent to one invocation; the program closes all of them.
+#[derive(Debug)]
+pub struct Start {
+    /// The root beneath which working-tree paths are resolved.
+    pub root: Fd,
+    /// Child pipe numbers paired with the program's descriptors.
+    pub pipes: Box<[(u32, Fd)]>,
+    /// Every descriptor the program owns, including roots, appends and signals.
+    pub owned: Box<[Fd]>,
+}
 /// One hosted invocation; every descriptor closes before its terminal exit.
 #[derive(Debug)]
 pub struct Git {
@@ -61,17 +70,23 @@ pub struct Git {
 }
 impl Git {
     #[must_use]
-    pub fn new(spawn: &k::Spawn, inherited: &Inherited, transport: Transport) -> Self {
+    pub fn new(spawn: &k::Spawn, start: Start, transport: Transport) -> Self {
+        let mut broken = None;
         let checked = match check(spawn) {
             Ok(value) => Some(value),
             Err(Refusal::Usage) => None,
-            Err(Refusal::Broken(rule)) => panic!("git's spawn broke {rule}"),
+            Err(Refusal::Broken(rule)) => {
+                broken = Some(Answer {
+                    exit: 125,
+                    stdout: Vec::new(),
+                    stderr: format!("temper fake git: broken: {rule}\n").into_bytes(),
+                });
+                None
+            }
         };
-        let root = inherited.roots.iter().find(|(name, _)| name.as_ref() == b"worker").expect("git worker root").1;
-        let pipes: BTreeMap<_, _> = inherited.pipes.iter().copied().collect();
-        let mut owned: BTreeSet<_> = pipes.values().copied().collect();
-        owned.insert(inherited.signal);
-        owned.extend(inherited.roots.iter().chain(&inherited.appends).map(|(_, fd)| *fd));
+        let root = start.root;
+        let pipes: BTreeMap<_, _> = start.pipes.into_vec().into_iter().collect();
+        let owned = start.owned.into_vec().into_iter().collect();
         let mut jobs = VecDeque::new();
         if let Some(checked) = &checked {
             if matches!(checked.command, Command::CommitTree { .. }) {
@@ -107,7 +122,7 @@ impl Git {
             files: BTreeMap::new(),
             jobs,
             pending: None,
-            answer: None,
+            answer: broken,
             closing: false,
             finished: false,
             serial: 0,

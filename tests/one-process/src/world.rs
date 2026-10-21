@@ -137,7 +137,7 @@ impl Host for ServiceHost {
 pub(crate) enum Proc {
     Service(Box<ServiceHost>),
     Agent(Box<skein_world::PipeHost<smith_agent_shell::Agent>>),
-    Git(Box<temper_fake_git::Git>),
+    Git(Box<temper_fake_git_hosted::Git>),
     Shell(Box<stories::Shell>),
     Peer(Box<SignalHost<skein_fake_peers::llm::Peer>>),
     Forge(Box<SignalHost<Peer>>),
@@ -565,7 +565,7 @@ fn agent(_spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {
     ))
 }
 fn git(spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {
-    Proc::Git(Box::new(temper_fake_git::Git::new(spawn, inherited, transport())))
+    Proc::Git(Box::new(temper_fake_git_hosted::git(spawn, inherited, transport())))
 }
 fn shell(spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {
     Proc::Shell(Box::new(stories::Shell::new(spawn, inherited)))
@@ -678,18 +678,18 @@ fn hooks_address(bound: &mut Option<(Fd, SocketAddr)>, complete: &Complete) -> O
         _ => None,
     }
 }
-thread_local! { static SHARED: RefCell<Option<temper_fake_git::Transport>> = const { RefCell::new(None) }; }
-fn share(transport: Option<temper_fake_git::Transport>) {
+thread_local! { static SHARED: RefCell<Option<temper_fake_git_hosted::Transport>> = const { RefCell::new(None) }; }
+fn share(transport: Option<temper_fake_git_hosted::Transport>) {
     SHARED.with(|shared| *shared.borrow_mut() = transport);
 }
-fn transport() -> temper_fake_git::Transport {
+fn transport() -> temper_fake_git_hosted::Transport {
     SHARED.with(|shared| shared.borrow().as_ref().expect("world's forge").clone())
 }
 fn peer() -> Peer {
     Peer::new(
         fixtures::FORGE,
         fixtures::peer_limits(),
-        temper_fake_git::fixtures::table(b"acme/app", None),
+        temper_fake_git_hosted::fixtures::table(b"acme/app", None),
         fixtures::forge_limits(),
         transport().forge,
         fixtures::SEED,

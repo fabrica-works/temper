@@ -1,4 +1,4 @@
-use temper_fake_git::fixtures::{self, Fault};
+use temper_fake_git_hosted::fixtures::{self, Fault};
 use temper_worker_domain_checkout::git;
 use temper_worker_protocol_git::output;
 use temper_worker_protocol_git_world::transcripts;
@@ -85,7 +85,7 @@ fn a_wrong_token_is_answered_as_forgejo_answers_it() {
 }
 #[test]
 fn cloning_an_unborn_repository_imports_no_local_objects() {
-    use temper_fake_git::{answer, check};
+    use temper_fake_git_hosted::{answer, check};
     use temper_worker_protocol_git::invocation::Command;
     let mut scenario = fixtures::named(b"fixture/empty", None);
     let spawn = fixtures::spawn_of(&Command::Clone {
@@ -106,7 +106,7 @@ use skein_lib::{Time, Wall};
 use skein_shell::Host;
 use skein_world::Inherited;
 use std::collections::BTreeSet;
-use temper_fake_git::{Answer, Git};
+use temper_fake_git_hosted::Answer;
 use temper_worker_protocol_git::invocation::{self, Command};
 
 #[derive(Debug)]
@@ -149,7 +149,7 @@ impl Disk {
         };
         let mut held: BTreeSet<_> = inherited.pipes.iter().map(|(_, fd)| *fd).collect();
         held.insert(inherited.signal);
-        let mut host = Git::new(&spawn, &inherited, scenario.transport.clone());
+        let mut host = temper_fake_git_hosted::git(&spawn, &inherited, scenario.transport.clone());
         let mut answer = Answer { exit: 0, stdout: Vec::new(), stderr: Vec::new() };
         let mut input = input;
         for _ in 0..20_000 {
@@ -306,7 +306,7 @@ impl Drop for Disk {
     }
 }
 fn commit(number: u64) -> temper_worker_domain_checkout::git::Commit {
-    invocation::object(&temper_fake_git::id::id(number)).expect("counted id")
+    invocation::object(&temper_fake_git_hosted::id::id(number)).expect("counted id")
 }
 
 #[test]

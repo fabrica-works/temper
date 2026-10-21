@@ -2730,6 +2730,22 @@ dependencies = [
 name = "temper-fake-git"
 version = "0.0.0"
 dependencies = [
+ "skein-fake-checkout",
+ "skein-fake-forge-domain",
+ "skein-fake-forge-protocol",
+ "skein-fake-machine",
+ "skein-fake-peers",
+ "skein-io",
+ "skein-lib",
+ "skein-shell",
+ "temper-worker-domain-checkout",
+ "temper-worker-protocol-git",
+]
+
+[[package]]
+name = "temper-fake-git-hosted"
+version = "0.0.0"
+dependencies = [
  "skein-fake-forge-domain",
  "skein-fake-forge-protocol",
  "skein-fake-machine",
@@ -2739,6 +2755,7 @@ dependencies = [
  "skein-shell",
  "skein-world",
  "temper-fake-checkout",
+ "temper-fake-git",
  "temper-worker-checkout-world",
  "temper-worker-domain-checkout",
  "temper-worker-protocol-git",
@@ -2835,7 +2852,7 @@ dependencies = [
  "temper-engine-domain-forge",
  "temper-engine-smith",
  "temper-fake-checkout",
- "temper-fake-git",
+ "temper-fake-git-hosted",
  "temper-protocol-store",
  "temper-service",
 ]
@@ -2909,7 +2926,7 @@ dependencies = [
  "temper-client-shell-cli",
  "temper-client-tools",
  "temper-engine-domain",
- "temper-fake-git",
+ "temper-fake-git-hosted",
  "temper-protocol-store",
  "temper-service",
  "temper-worker-domain-checkout",

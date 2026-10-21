@@ -1,6 +1,6 @@
 [package]
 name = "temper-fake-git"
-description = "Git invocations hosted on the world's files and fake forge"
+description = "The fake git program's core: its checks, answers, step core and transports"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,15 +10,12 @@ publish.workspace = true
 skein-lib.workspace = true
 skein-io.workspace = true
 skein-shell.workspace = true
-skein-world.workspace = true
-temper-fake-checkout.workspace = true
+skein-fake-checkout.workspace = true
 skein-fake-forge-domain.workspace = true
 skein-fake-forge-protocol.workspace = true
 skein-fake-peers.workspace = true
 temper-worker-protocol-git.workspace = true
 temper-worker-domain-checkout.workspace = true
-temper-worker-checkout-world.workspace = true
-temper-worker-protocol-git-world.workspace = true
 
 [dev-dependencies]
 skein-fake-machine = { git = "https://github.com/fabrig-dev/skein.git" }

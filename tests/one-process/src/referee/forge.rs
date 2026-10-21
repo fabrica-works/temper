@@ -7,7 +7,7 @@ use skein_fake_forge_domain::{Observation, api};
 use std::collections::BTreeMap;
 
 pub(crate) struct Forge {
-    transport: temper_fake_git::Transport,
+    transport: temper_fake_git_hosted::Transport,
     tree: BTreeMap<Vec<u8>, Vec<u8>>,
     pub(crate) pushed: Vec<Pushed>,
     merge: bool,
@@ -16,7 +16,7 @@ pub(crate) struct Forge {
     hooks: Option<std::net::SocketAddr>,
 }
 impl Forge {
-    pub(crate) fn new(transport: temper_fake_git::Transport, story: Story) -> Self {
+    pub(crate) fn new(transport: temper_fake_git_hosted::Transport, story: Story) -> Self {
         let content: &[u8] = if matches!(story, Story::Merge) { b"topic\n" } else { b"base\n" };
         Self {
             transport,

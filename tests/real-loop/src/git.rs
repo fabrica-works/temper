@@ -2,7 +2,7 @@
 use crate::{calls::Caller, world::Proc};
 use skein_world::{HostedProgram, Inherited, StartupRoot, real::World};
 use std::{cell::RefCell, ffi::OsStr, os::unix::ffi::OsStrExt, path::PathBuf};
-use temper_fake_git::{Answer, Transport, fixtures::Scenario};
+use temper_fake_git_hosted::{Answer, Transport, fixtures::Scenario};
 use temper_worker_protocol_git::invocation::Command;
 
 pub struct Disk {
@@ -44,7 +44,7 @@ impl Disk {
         share(Some(self.scenario.transport.clone()));
         let mut world = World::new_controlled(|_| Judge);
         let root = skein_shell::open_root(self.scratch.path()).expect("git launch root");
-        let mut spawn = temper_fake_git::fixtures::spawn_of(command);
+        let mut spawn = temper_fake_git_hosted::fixtures::spawn_of(command);
         spawn.dir = self.scenario.at.clone().into();
         world.spawn_with_fds(vec![root], || Proc::Caller(Box::new(Caller::command(spawn, input, root))));
         world.host_roots(program(), roots);
@@ -80,7 +80,7 @@ pub fn transport() -> Transport {
     SHARED.with(|shared| shared.borrow().as_ref().expect("world's forge").clone())
 }
 fn git(spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {
-    Proc::Git(Box::new(temper_fake_git::Git::new(spawn, inherited, transport())))
+    Proc::Git(Box::new(temper_fake_git_hosted::git(spawn, inherited, transport())))
 }
 pub(crate) fn program() -> HostedProgram<Proc> {
     HostedProgram { program: b"/usr/bin/git".as_slice().into(), make: git, instances: 1, operations: 1 }

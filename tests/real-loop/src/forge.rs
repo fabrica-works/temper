@@ -47,8 +47,8 @@ pub fn write(scratch: &Path, forge: SocketAddr, fixture: &Fixture) -> std::io::R
     config["application"]["identities"][0]["login"] = "worker".into();
     (fixture.configure)(&mut config, &mut agent, forge);
     for (name, bytes) in [
-        ("forge-1.api-token", temper_fake_git::fixtures::TOKEN),
-        ("forge-1.git-token", temper_fake_git::fixtures::TOKEN),
+        ("forge-1.api-token", temper_fake_git_hosted::fixtures::TOKEN),
+        ("forge-1.git-token", temper_fake_git_hosted::fixtures::TOKEN),
         ("forge-1.user", b"1\n"),
         ("forge-1.webhook-secret", HOOK_SECRET),
     ] {
@@ -139,8 +139,9 @@ pub(crate) struct State {
 impl State {
     pub(crate) fn new(fixture: Fixture) -> (Self, Peer) {
         let setup = (fixture.setup)();
-        let table = temper_fake_git::fixtures::table(&setup.name, setup.protection.as_ref().map(|p| p.branch.as_ref()));
-        let mut config = temper_fake_git::fixtures::CONFIG;
+        let table =
+            temper_fake_git_hosted::fixtures::table(&setup.name, setup.protection.as_ref().map(|p| p.branch.as_ref()));
+        let mut config = temper_fake_git_hosted::fixtures::CONFIG;
         // The HTTP peer admits four simultaneous calls, unlike the git-only fixture.
         config.limits.calls = protocol_limits().calls;
         // Forgejo timestamps are wall times; this peer runs on the real monotonic clock.
@@ -152,7 +153,7 @@ impl State {
         domain::repository(&mut domain, &config, setup);
         domain::grant(&mut domain, b"acme/app", 1, api::Permission::Write);
         let handle = Rc::new(RefCell::new(Forge::new(domain, config)));
-        crate::git::share(Some(temper_fake_git::Transport::new(handle.clone(), &table)));
+        crate::git::share(Some(temper_fake_git_hosted::Transport::new(handle.clone(), &table)));
         let peer = Peer::new(
             ([127, 0, 0, 1], 0).into(),
             peer_limits(),

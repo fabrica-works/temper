@@ -15,7 +15,7 @@ pub(crate) enum Proc {
     Caller(Box<Caller>),
     Ctl(Box<crate::calls::Recorded>),
     Agent(Box<skein_world::PipeHost<smith_agent_shell::Agent>>),
-    Git(Box<temper_fake_git::Git>),
+    Git(Box<temper_fake_git_hosted::Git>),
 }
 impl Proc {
     fn host(&self) -> &dyn Host {

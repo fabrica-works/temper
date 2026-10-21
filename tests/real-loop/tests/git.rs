@@ -1,6 +1,6 @@
 //! The fake's hosted file operations against the real kernel.
 use skein_world::domain::heap::Counting;
-use temper_fake_git::fixtures;
+use temper_fake_git_hosted::fixtures;
 use temper_real_loop_world::git::Disk;
 use temper_worker_domain_checkout::git;
 use temper_worker_protocol_git::invocation::{self, Command};
@@ -25,7 +25,7 @@ const NEW_FILES: usize = 12;
 const TREE_FILES: u32 = 13;
 
 fn commit(number: u64) -> git::Commit {
-    invocation::object(&temper_fake_git::id::id(number)).expect("counted id")
+    invocation::object(&temper_fake_git_hosted::id::id(number)).expect("counted id")
 }
 
 #[test]

@@ -1,4 +1,4 @@
-use temper_fake_git::{Refusal, check, fixtures};
+use temper_fake_git_hosted::{Refusal, check, fixtures};
 use temper_worker_protocol_git::invocation::{self, Command, Source};
 #[test]
 fn an_argument_vector_the_builders_did_not_make_exits_129() {
@@ -38,8 +38,8 @@ fn a_remote_over_plaintext_off_loopback_is_refused() {
 fn each_builder_vector_is_admitted_with_its_whole_environment() {
     let branch = b"main".as_slice();
     let remote = b"https://forge.example/acme/app".as_slice();
-    let one = invocation::object(&temper_fake_git::id::id(1)).expect("counted id");
-    let two = invocation::object(&temper_fake_git::id::id(2)).expect("counted id");
+    let one = invocation::object(&temper_fake_git_hosted::id::id(1)).expect("counted id");
+    let two = invocation::object(&temper_fake_git_hosted::id::id(2)).expect("counted id");
     let rows = [
         ("version", Command::Version),
         ("clone", Command::Clone { remote: remote.into(), directory: b"app".as_slice().into() }),
@@ -90,4 +90,93 @@ fn an_admitted_credential_is_absent_from_debug_output() {
     let text = format!("{checked:?}");
     assert!(!text.as_bytes().windows(fixtures::TOKEN.len()).any(|part| part == fixtures::TOKEN));
     assert!(!text.contains("ZmFrZS1naXQtaWRlbnRpdHktdG9rZW4="));
+}
+
+mod core {
+    use super::fixtures;
+    use skein_io::kernel::{self as k, Complete, Done, Exit, Fd, Op};
+    use skein_lib::{Time, Wall};
+    use skein_shell::Host;
+    use std::collections::BTreeSet;
+    use temper_fake_git::{Git, Start};
+    use temper_worker_protocol_git::invocation::{self, Command};
+
+    #[test]
+    fn broken_spawns_report_the_rule_and_close_every_descriptor() {
+        // Root, stdout, stderr, signal and an append inherited by this invocation.
+        const DESCRIPTORS: [i32; 5] = [1, 2, 3, 4, 5];
+        let rows = [
+            (Box::new([]) as Box<[Box<[u8]>]>, invocation::environment(b"/home", None, None), "git settings"),
+            (invocation::arguments(&Command::Version), Box::new([]), "fixed environment value"),
+        ];
+        for (args, env, rule) in rows {
+            let spawn = k::Spawn {
+                program: b"/git".as_slice().into(),
+                args,
+                env,
+                root: Fd::new(1),
+                dir: Box::new([]),
+                pipes: Box::new([]),
+            };
+            let mut held: BTreeSet<_> = DESCRIPTORS.map(Fd::new).into_iter().collect();
+            let start = Start {
+                root: Fd::new(1),
+                pipes: Box::new([(1, Fd::new(2)), (2, Fd::new(3))]),
+                owned: held.iter().copied().collect(),
+            };
+            let mut git = Git::new(&spawn, start, fixtures::scenario().transport);
+            let mut stderr: Vec<u8> = Vec::new();
+            for _ in 0..32 {
+                git.iterate(Time::ZERO, Wall::EPOCH);
+                if let Some(exit) = git.exit() {
+                    assert_eq!(exit, Exit::Code(125), "{rule}");
+                    break;
+                }
+                let submit = git.submissions().pop().expect("broken invocation progresses");
+                let result = match &submit.kind {
+                    Op::PipeWrite { fd, bytes, from } => {
+                        assert_eq!(*fd, Fd::new(3), "{rule}: stderr only");
+                        stderr.extend(&bytes[usize::try_from(*from).expect("offset")..]);
+                        Ok(Done::Count(u32::try_from(bytes.len()).expect("short diagnostic") - from))
+                    }
+                    Op::Close { fd } => {
+                        assert!(held.remove(fd), "{rule}: closes once");
+                        Ok(Done::Nothing)
+                    }
+                    other @ (Op::Socket { .. }
+                    | Op::Bind { .. }
+                    | Op::Listen { .. }
+                    | Op::Accept { .. }
+                    | Op::Connect { .. }
+                    | Op::Recv { .. }
+                    | Op::Send { .. }
+                    | Op::Shutdown { .. }
+                    | Op::Open { .. }
+                    | Op::Read { .. }
+                    | Op::Write { .. }
+                    | Op::Append { .. }
+                    | Op::Truncate { .. }
+                    | Op::Sync { .. }
+                    | Op::Lock { .. }
+                    | Op::Stat { .. }
+                    | Op::Rename { .. }
+                    | Op::Remove { .. }
+                    | Op::MakeDirectory { .. }
+                    | Op::List { .. }
+                    | Op::Spawn { .. }
+                    | Op::Wait { .. }
+                    | Op::Signal { .. }
+                    | Op::Usage
+                    | Op::Window { .. }
+                    | Op::ReadSignal { .. }
+                    | Op::PipeRead { .. }
+                    | Op::Cancel { .. }) => panic!("broken invocation requested {other:?}"),
+                };
+                git.completions().push(Complete { op: submit.op, kind: submit.kind, result });
+            }
+            assert!(git.is_empty(), "{rule}: settled");
+            assert!(held.is_empty(), "{rule}: all inherited descriptors closed");
+            assert_eq!(stderr, format!("temper fake git: broken: {rule}\n").as_bytes());
+        }
+    }
 }

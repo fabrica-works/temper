@@ -1,10 +1,10 @@
 //! Git reaches the same forge domain the HTTP service owns in the world.
 use crate::check::Credential;
+use skein_fake_checkout::git::{Created, Fault, Pushed, Remote, Tree, Want, What};
 use skein_fake_forge_domain::{self as domain, api};
 use skein_fake_peers::forge::Forge;
 use skein_lib::{Env, ReplyTo, Secret, Wall};
 use std::{cell::RefCell, rc::Rc};
-use temper_fake_checkout::git::{Created, Fault, Pushed, Remote, Tree, Want, What};
 
 /// The known tokens and logins stay solely on this side of the boundary.
 #[derive(Debug, Clone)]

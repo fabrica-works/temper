@@ -1203,11 +1203,11 @@ scripts/after-landing.sh            the process tier, after each landing
   (`skein-fake-machine`), the fake checkout, the fake LLM and its peer,
   the fake issuer. temper's fakes sit on them.
 - **The fake forge is skein's** (skein's `fake-forge.md`): its domain
-  (`testing/skein-fake-forge-domain`), its protocol layer
-  (`testing/skein-fake-forge-protocol`), its forge peer (in
-  `testing/skein-fake-peers`), the throwaway Forgejo
+  (`crates/skein-fake-forge-domain`), its protocol layer
+  (`crates/skein-fake-forge-protocol`), its forge peer (in
+  `crates/skein-fake-peers`), the throwaway Forgejo
   (`testing/skein-throwaway-forgejo`), its tests in ordinary Rust, and
-  the conformance (`tests/forge/conformance`). Reconcile's world is
+  the conformance (`testing/skein-forge-conformance`). Reconcile's world is
   in skein's `forge-setup.md`, section 7. temper's fake git program,
   its core in `crates/temper-fake-git` and its hosted half in
   `testing/temper-fake-git-hosted`, sits on the fake forge (4.3).

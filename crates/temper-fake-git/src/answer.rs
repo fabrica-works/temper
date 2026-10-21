@@ -1,6 +1,6 @@
 //! Git's plumbing outputs over a checkout; no invocation starts a program.
 use crate::{Checked, Transport, id::id};
-use temper_fake_checkout::{
+use skein_fake_checkout::{
     Checkout,
     git::{self, Created, Fault, Pushed, Remote, Tree, Want, What},
     in_git,
