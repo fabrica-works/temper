@@ -569,19 +569,79 @@ fn an_amendment_keeps_its_llm_preference() {
     );
 }
 
+fn refusal_words(why: tasks::Refusal, blocked: Option<Box<[u64]>>, expected: &[u8]) {
+    let value =
+        engine::CallAnswer::ControlRefused(tasks::Problem { task: Some(99), capacity: None, why, blocked_by: blocked });
+    let rendered = answer(&value);
+    assert_eq!(rendered.text(), expected);
+    assert!(rendered.error());
+}
+
 #[test]
-fn dependency_refusals_keep_their_blocked_tasks() {
-    for (why, expected) in [
-        (tasks::Refusal::Circle { cut: false }, b"Refused: circle 23".as_slice()),
-        (tasks::Refusal::DependencyEnded { how: tasks::Status::Failed }, b"Refused: dependency 23"),
-        (tasks::Refusal::Kept, b"Refused: kept 23"),
-    ] {
-        let value = engine::CallAnswer::ControlRefused(tasks::Problem {
-            task: None,
-            capacity: None,
-            why,
-            blocked_by: Some(Box::new([CALL_TASK])),
-        });
-        assert_eq!(answer(&value).text(), expected);
+fn a_circle_names_its_tasks() {
+    refusal_words(
+        tasks::Refusal::Circle { cut: false },
+        Some(Box::new([3, 5, 7])),
+        b"Refused: these tasks would wait for one another: T3, T5, T7",
+    );
+}
+
+#[test]
+fn a_cut_circle_says_its_lists_are_incomplete() {
+    refusal_words(
+        tasks::Refusal::Circle { cut: true },
+        Some(Box::new([3, 5, 7])),
+        b"Refused: these tasks would wait for one another: T3, T5, T7; some task lists are incomplete",
+    );
+}
+
+#[test]
+fn a_failed_dependency_is_named() {
+    refusal_words(
+        tasks::Refusal::DependencyEnded { how: tasks::Status::Failed },
+        Some(Box::new([4])),
+        b"Refused: dependency T4 failed",
+    );
+}
+
+#[test]
+fn a_cancelled_dependency_is_named() {
+    refusal_words(
+        tasks::Refusal::DependencyEnded { how: tasks::Status::Cancelled },
+        Some(Box::new([4])),
+        b"Refused: dependency T4 was cancelled",
+    );
+}
+
+#[test]
+fn a_done_dependency_is_named() {
+    refusal_words(
+        tasks::Refusal::DependencyEnded { how: tasks::Status::Done },
+        Some(Box::new([4])),
+        b"Refused: T4 is done",
+    );
+}
+
+#[test]
+fn kept_names_each_dependency() {
+    refusal_words(
+        tasks::Refusal::Kept,
+        Some(Box::new([4, 6])),
+        b"Refused: kept until T4 is done, kept until T6 is done",
+    );
+}
+
+#[test]
+fn dependency_refusals_without_tasks_are_plain_lines() {
+    let lists: [Option<Box<[u64]>>; 2] = [None, Some(Box::new([]))];
+    for blocked in lists {
+        for (why, expected) in [
+            (tasks::Refusal::Circle { cut: false }, b"Refused: these tasks would wait for one another".as_slice()),
+            (tasks::Refusal::Circle { cut: true }, b"Refused: these tasks would wait for one another"),
+            (tasks::Refusal::DependencyEnded { how: tasks::Status::Failed }, b"Refused: a dependency has ended"),
+            (tasks::Refusal::Kept, b"Refused: kept by its dependencies"),
+        ] {
+            refusal_words(why, blocked.clone(), expected);
+        }
     }
 }

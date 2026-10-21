@@ -194,7 +194,9 @@ in the lower world that owns it, never here.
   and a signed-in DIRECTORY private to its user (../client/tools.md,
   11.3); a repository adopted, a hooked repository's webhook delivered,
   and a chat's change cloned, pushed and landed on the fake git program
-  (below); and GitHub's, one per feature of a GitHub forge (below).
+  (below); a chat adding a landing dependency to its live report delegate,
+  kept until the change lands and started after Met (`fuzzy_landing`); and GitHub's, one
+  per feature of a GitHub forge (below).
 - **An account first,** with area 5's tools (../client/tools.md, 5.5):
   a story whose agents run adds a key the fake LLM peer accepts, from
   the client, before its first task, and waits for its account to be

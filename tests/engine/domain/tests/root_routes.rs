@@ -4355,3 +4355,6 @@ fn a_hello_keeps_its_configured_worker_position() {
     driver.settle();
     assert!(driver.protocol.sources.contains(&Token::new(7)), "position one joins while position zero is occupied");
 }
+
+#[path = "root_routes/added_dependencies.rs"]
+mod added_dependencies;

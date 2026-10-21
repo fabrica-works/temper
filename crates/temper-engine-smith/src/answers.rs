@@ -369,8 +369,50 @@ fn finding_text(text: &mut Text, finding: jig_domain_authority::Finding) -> Resu
     }
 }
 
+// These refusals name their tasks, matching jig-protocol-tools' render vocabulary.
+fn dependency_problem(text: &mut Text, problem: &jig_domain_tasks::Problem) -> Result<(), Problem> {
+    use jig_domain_tasks::Refusal;
+    let blocked = problem.blocked_by.as_deref().unwrap_or(&[]);
+    if let Refusal::Circle { cut } = problem.why {
+        text.add(b"these tasks would wait for one another")?;
+        for (index, task) in blocked.iter().enumerate() {
+            text.add(if index == 0 { b": T" } else { b", T" })?;
+            text.number(*task)?;
+        }
+        if cut && !blocked.is_empty() {
+            text.add(b"; some task lists are incomplete")?;
+        }
+        return Ok(());
+    }
+    if let Refusal::DependencyEnded { how } = problem.why {
+        let Some(task) = blocked.first() else { return text.add(b"a dependency has ended") };
+        if how != jig_domain_tasks::Status::Done {
+            text.add(b"dependency ")?;
+        }
+        text.add(b"T")?;
+        text.number(*task)?;
+        return text.add(match how {
+            jig_domain_tasks::Status::Failed => b" failed",
+            jig_domain_tasks::Status::Cancelled => b" was cancelled",
+            jig_domain_tasks::Status::Done => b" is done",
+        });
+    }
+    if blocked.is_empty() {
+        return text.add(b"kept by its dependencies");
+    }
+    for (index, task) in blocked.iter().enumerate() {
+        text.add(if index == 0 { b"kept until T" } else { b", kept until T" })?;
+        text.number(*task)?;
+        text.add(b" is done")?;
+    }
+    Ok(())
+}
+
 fn task_problem(text: &mut Text, problem: &jig_domain_tasks::Problem) -> Result<(), Problem> {
     use jig_domain_tasks::Refusal;
+    if let Refusal::Circle { .. } | Refusal::DependencyEnded { .. } | Refusal::Kept = problem.why {
+        return dependency_problem(text, problem);
+    }
     if let Some(task) = problem.task {
         text.add(b"task ")?;
         text.number(task)?;
