@@ -98,7 +98,8 @@ pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
     let mut asked = List::with_capacity(count);
     for e in &setup.entries {
         match &e.mode {
-            Mode::Managed { .. } => {}
+            // Fake processes and their preparation come later; keep their reconcile below.
+            Mode::Managed { .. } | Mode::Fake(_) => {}
             Mode::Owned(o) => {
                 let mut group = List::with_capacity(3);
                 group.push((Stage::Prepare, forge(b"prepare", flags, e.forge, None))).expect("prepare");

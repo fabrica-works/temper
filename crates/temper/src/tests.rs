@@ -148,7 +148,7 @@ fn ctl_is_configured() {
 }
 
 #[test]
-fn fixed_sign_in_ports_are_checked_against_owned_listeners_only() {
+fn fixed_sign_in_ports_are_checked_against_owned_and_fake_listeners() {
     // Fixture parsing without a deployment keeps written paths.
     let example = include_bytes!("../../../docs/examples/owned.json");
     let mut value: serde_json::Value = serde_json::from_slice(example).expect("owned JSON");
@@ -164,11 +164,27 @@ fn fixed_sign_in_ports_are_checked_against_owned_listeners_only() {
     // redirect-port check after this fixture adds an OAuth listener.
     value["application"]["limits"]["overrides"]["git_component.operations"] = 1.into();
     value["application"]["limits"]["overrides"]["checkout.workspaces"] = 1.into();
-    let bytes = serde_json::to_vec(&value).expect("owned JSON");
-    assert_eq!(
-        super::setup::check(&bytes, &jig_protocol_config::Directories::working()).expect_err("owned listen conflict"),
-        "engine.llm.providers[0].sources.sign_in.redirect_port: fixed port conflicts with application.setup[0].mode.owned.listen\n"
-    );
+    let mut fake = value.clone();
+    configuration::fake_entry(&mut fake["application"]["setup"][0], "127.0.0.1:3000");
+    for (document, expected) in [
+        (
+            &value,
+            "engine.llm.providers[0].sources.sign_in.redirect_port: fixed port conflicts with application.setup[0].mode.owned.listen\n",
+        ),
+        (
+            &fake,
+            "engine.llm.providers[0].sources.sign_in.redirect_port: fixed port conflicts with application.setup[0].mode.fake.listen\n",
+        ),
+    ] {
+        assert_eq!(
+            super::setup::check(
+                &serde_json::to_vec(document).expect("local JSON"),
+                &jig_protocol_config::Directories::working()
+            )
+            .expect_err("local listen conflict"),
+            expected
+        );
+    }
     // The same API on a connected forge belongs to the remote peer, not this process.
     value["application"]["setup"] = serde_json::json!([]);
     assert!(
@@ -223,4 +239,39 @@ fn configure_program_login(arguments: &[&str]) -> Result<super::Command, String>
         &[(Box::from(b"HOME".as_slice()), Box::from(b"/home/test".as_slice()))],
         b"/",
     )
+}
+
+#[test]
+fn forge_commands_refuse_managed_and_fake_entries_by_name() {
+    use std::os::unix::fs::DirBuilderExt;
+    let directory = std::env::temp_dir().join(format!("temper-not-owned-{}", std::process::id()));
+    std::fs::DirBuilder::new().mode(0o700).create(&directory).expect("command scratch");
+    let (_, document) = configuration::documents(&directory, "/fixture/temper");
+    let mut managed: serde_json::Value = serde_json::from_slice(&document).expect("document");
+    managed["application"]["setup"] = serde_json::json!([{
+        "forge":1, "directory":"forge-1", "bot":{"login":"temper","email":"temper@example.test"},
+        "orgs":["acme"], "mode":{"managed":{"admin_token":"admin_token"}}
+    }]);
+    managed["application"]["forges"][0]["api_token"] = "forge-1/api_token".into();
+    managed["application"]["forges"][0]["user"] = serde_json::json!({"file":"forge-1/user"});
+    managed["application"]["identities"][0]["token"] = "forge-1/git_token".into();
+    let mut fake = managed.clone();
+    configuration::fake_entry(&mut fake["application"]["setup"][0], "127.0.0.1:9");
+    for (document, arguments, expected) in [
+        (&managed, vec!["prepare", "1"], "temper forge prepare: forge 1: it is managed, not owned\n"),
+        (&fake, vec!["prepare", "1"], "temper forge prepare: forge 1: it is fake, not owned\n"),
+        (&managed, vec!["run", "1", "forgejo"], "temper forge run: forge 1: it is managed, not owned\n"),
+        (&fake, vec!["run", "1", "forgejo"], "temper forge run: forge 1: it is fake, not owned\n"),
+    ] {
+        std::fs::write(directory.join("temper.json"), serde_json::to_vec(document).expect("document"))
+            .expect("write document");
+        let refused = super::forge::start(
+            &configuration::directories(&directory),
+            &arguments.iter().map(std::ffi::OsString::from).collect::<Vec<_>>(),
+        )
+        .expect_err("not owned");
+        assert_eq!(refused.line(), expected);
+    }
+    assert!(!directory.join("forge-1").exists());
+    std::fs::remove_dir_all(directory).expect("remove command scratch");
 }

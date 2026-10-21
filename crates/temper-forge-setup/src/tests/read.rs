@@ -21,6 +21,37 @@ fn an_owned_entry_with_a_runner_reads_into_its_members() {
     assert_eq!(owned.runner.as_ref().unwrap().capacity, 1);
 }
 #[test]
+fn a_fake_entry_reads_every_member_and_joins_data_paths() {
+    let directories = jig_protocol_config::Directories::given(b"/configuration", b"/data", b"/cache").unwrap();
+    let mut problems = Problems::empty();
+    let setup =
+        Setup::read(&fixtures::document(&fixtures::three()), 0, &limits::small(), &directories, &mut problems).unwrap();
+    let entry = setup.entry(3).unwrap();
+    assert_eq!(
+        entry,
+        &crate::setup::Entry {
+            forge: 3,
+            directory: b"/data/demo/forge".as_slice().into(),
+            bot: crate::setup::Account {
+                login: b"temper".as_slice().into(),
+                email: b"temper@example.invalid".as_slice().into()
+            },
+            orgs: Box::new([]),
+            asked: false,
+            mode: Mode::Fake(crate::setup::Fake {
+                listen: SocketAddr::from((Ipv4Addr::LOCALHOST, 8369)),
+                git: b"/data/demo/bin/git".as_slice().into(),
+                owner: b"demo".as_slice().into(),
+                repositories: Box::new([crate::setup::Repository {
+                    name: b"widget".as_slice().into(),
+                    landing: b"main".as_slice().into()
+                }]),
+            }),
+        }
+    );
+    assert!(problems.is_empty());
+}
+#[test]
 fn a_managed_entry_reads_its_admin_token_file() {
     let setup = fixtures::setup();
     assert_eq!(setup.entry(1).unwrap().mode, Mode::Managed { admin_token: b"secrets/forgejo-admin".as_slice().into() });
@@ -73,12 +104,43 @@ fn an_entry_past_the_orgs_limit_is_refused() {
     assert_eq!(&*problem::lines(&problems), b"application.setup[0].orgs: past its bound\n");
 }
 #[test]
+#[expect(clippy::too_many_lines, reason = "one table names each malformed member and its refusal path")]
+#[expect(
+    clippy::disallowed_macros,
+    clippy::disallowed_methods,
+    reason = "ordinary Rust test fixtures (programming-model.md, 10.2)"
+)]
 fn a_member_outside_its_bounds_is_refused_naming_its_path() {
+    // protocol/setup.md, 8: eight repositories, names 100 bytes, branches 256.
+    const NAME_BYTES: usize = 100;
+    const BRANCH_BYTES: usize = 256;
+    const REPOSITORIES: usize = 8;
+    let long_name = format!("\"name\":\"{}\"", "x".repeat(NAME_BYTES + 1));
+    let long_branch = format!("\"landing\":\"{}\"", "x".repeat(BRANCH_BYTES + 1));
+    let too_many =
+        format!("\"repositories\":[{}]", [r#"{"name":"widget","landing":"main"}"#; REPOSITORIES + 1].join(","));
+    let document = fixtures::three();
     for (from, to, expected) in [
         (
             br#""forge":2"#.as_slice(),
             br#""forge":2,"start":"now""#.as_slice(),
             b"application.setup[1].start: invalid form\n".as_slice(),
+        ),
+        (br#""managed":{"admin_token":"secrets/forgejo-admin"}"#, b"", b"application.setup[0].mode: invalid form\n"),
+        (
+            br#""managed":{"admin_token":"secrets/forgejo-admin"}"#,
+            br#""managed":{},"owned":{}"#,
+            b"application.setup[0].mode: invalid form\n",
+        ),
+        (
+            br#""managed":{"admin_token":"secrets/forgejo-admin"}"#,
+            br#""managed":{},"fake":{}"#,
+            b"application.setup[0].mode: invalid form\n",
+        ),
+        (
+            br#""managed":{"admin_token":"secrets/forgejo-admin"}"#,
+            br#""managed":{},"owned":{},"fake":{}"#,
+            b"application.setup[0].mode: invalid form\n",
         ),
         (br#""forge":1"#, br#""forge":1,"start":"asked""#, b"application.setup[0].start: invalid form\n"),
         (br#""forge":2"#, br#""forge":2,"start":true"#, b"application.setup[1].start: wrong value kind\n"),
@@ -103,8 +165,87 @@ fn a_member_outside_its_bounds_is_refused_naming_its_path() {
             br#""binary":"""#,
             b"application.setup[1].mode.owned.runner.binary: invalid form\n",
         ),
+        (
+            br#""socket":"127.0.0.1:8369""#,
+            br#""socket":"192.0.2.1:8369""#,
+            b"application.setup[2].mode.fake.listen: invalid form\n",
+        ),
+        (
+            br#""socket":"127.0.0.1:8369""#,
+            br#""host":"localhost","port":8369"#,
+            b"application.setup[2].mode.fake.listen: invalid form\n",
+        ),
+        (br#""git":"demo/bin/git""#, br#""git":"""#, b"application.setup[2].mode.fake.git: invalid form\n"),
+        (br#""owner":"demo""#, br#""owner":"bad/name""#, b"application.setup[2].mode.fake.owner: invalid form\n"),
+        (
+            br#""repositories":[{"name":"widget","landing":"main"}]"#,
+            br#""repositories":[]"#,
+            b"application.setup[2].mode.fake.repositories: invalid form\n",
+        ),
+        (
+            br#""name":"widget""#,
+            br#""name":"bad/name""#,
+            b"application.setup[2].mode.fake.repositories[0].name: invalid form\n",
+        ),
+        (
+            br#""landing":"main""#,
+            br#""landing":"bad..branch""#,
+            b"application.setup[2].mode.fake.repositories[0].landing: invalid form\n",
+        ),
+        (
+            br#""repositories":[{"name":"widget","landing":"main"}]"#,
+            br#""repositories":[{"name":"widget","landing":"main"},{"name":"widget","landing":"other"}]"#,
+            b"application.setup[2].mode.fake.repositories[1].name: invalid form\n",
+        ),
+        (
+            br#""owner":"demo""#,
+            br#""owner":"demo","extra":0"#,
+            b"application.setup[2].mode.fake.extra: unknown member\n",
+        ),
+        (
+            br#""name":"widget""#,
+            br#""name":"widget","extra":0"#,
+            b"application.setup[2].mode.fake.repositories[0].extra: unknown member\n",
+        ),
+        (br#""mode":{"fake":"#, br#""mode":{"owned":{},"fake":"#, b"application.setup[2].mode: invalid form\n"),
+        (br#""forge":3"#, br#""forge":3,"start":"asked""#, b"application.setup[2].start: invalid form\n"),
+        (br#""forge":3"#, br#""forge":3,"orgs":[]"#, b"application.setup[2].orgs: invalid form\n"),
+        (br#""owner":"demo","#, b"", b"application.setup[2].mode.fake.owner: missing\n"),
+        (br#""owner":"demo""#, br#""owner":true"#, b"application.setup[2].mode.fake.owner: wrong value kind\n"),
+        (br#""name":"widget","#, b"", b"application.setup[2].mode.fake.repositories[0].name: missing\n"),
+        (
+            br#""landing":"main""#,
+            br#""landing":null"#,
+            b"application.setup[2].mode.fake.repositories[0].landing: wrong value kind\n",
+        ),
+        (
+            br#""repositories":[{"name":"widget","landing":"main"}]"#,
+            br#""repositories":{}"#,
+            b"application.setup[2].mode.fake.repositories: wrong value kind\n",
+        ),
+        (
+            br#""repositories":[{"name":"widget","landing":"main"}]"#,
+            br#""repositories":[false]"#,
+            b"application.setup[2].mode.fake.repositories[0]: wrong value kind\n",
+        ),
+        (
+            br#""name":"widget""#,
+            long_name.as_bytes(),
+            b"application.setup[2].mode.fake.repositories[0].name: past its bound\n",
+        ),
+        (
+            br#""landing":"main""#,
+            long_branch.as_bytes(),
+            b"application.setup[2].mode.fake.repositories[0].landing: past its bound\n",
+        ),
+        (
+            br#""repositories":[{"name":"widget","landing":"main"}]"#,
+            too_many.as_bytes(),
+            b"application.setup[2].mode.fake.repositories: past its bound\n",
+        ),
+        (br#""orgs":["work"],"#, b"", b"application.setup[1].orgs: missing\n"),
     ] {
-        refused(&fixtures::changed(from, to), expected);
+        refused(&fixtures::changed_in(&document, from, to), expected);
     }
 }
 
@@ -195,5 +336,69 @@ fn an_owned_entry_reads_start_absent_or_asked() {
         )
         .unwrap();
         assert_eq!(setup.entry(2).unwrap().asked, asked);
+    }
+}
+
+#[test]
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    clippy::disallowed_methods,
+    reason = "ordinary Rust test fixtures (programming-model.md, 10.2)"
+)]
+fn a_fake_entry_accepts_the_repository_and_name_bounds() {
+    // protocol/setup.md, 8: eight repositories; names 100 and branches 256 bytes.
+    const REPOSITORIES: usize = 8;
+    const NAME_BYTES: usize = 100;
+    const BRANCH_BYTES: usize = 256;
+    let repositories = (0..REPOSITORIES)
+        .map(|index| {
+            format!(r#"{{"name":"{}{index}","landing":"{}"}}"#, "x".repeat(NAME_BYTES - 1), "x".repeat(BRANCH_BYTES))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let bytes = fixtures::changed_in(
+        &fixtures::three(),
+        br#""repositories":[{"name":"widget","landing":"main"}]"#,
+        format!("\"repositories\":[{repositories}]").as_bytes(),
+    );
+    let mut problems = Problems::empty();
+    let setup = Setup::read(
+        &fixtures::document(&bytes),
+        0,
+        &limits::small(),
+        &jig_protocol_config::Directories::working(),
+        &mut problems,
+    )
+    .unwrap();
+    let Mode::Fake(fake) = &setup.entry(3).unwrap().mode else { panic!("fake") };
+    assert_eq!(fake.repositories.len(), REPOSITORIES);
+    assert!(problems.is_empty());
+}
+#[test]
+fn a_fake_git_path_keeps_absolute_values_and_refuses_escape() {
+    let directories = jig_protocol_config::Directories::given(b"/configuration", b"/data", b"/cache").unwrap();
+    for (path, expected) in [
+        (br#""git":"/kept/git""#.as_slice(), Ok(b"/kept/git".as_slice())),
+        (
+            br#""git":"../git""#.as_slice(),
+            Err(b"application.setup[2].mode.fake.git: relative path must be non-empty with no .. component\n"
+                .as_slice()),
+        ),
+    ] {
+        let bytes = fixtures::changed_in(&fixtures::three(), br#""git":"demo/bin/git""#, path);
+        let mut problems = Problems::empty();
+        let found = match Setup::read(&fixtures::document(&bytes), 0, &limits::small(), &directories, &mut problems) {
+            Some(setup) => match setup.entry(3).unwrap().mode.clone() {
+                Mode::Fake(fake) => Ok(fake.git),
+                Mode::Managed { .. } | Mode::Owned(_) => panic!("fake"),
+            },
+            None => Err(problem::lines(&problems)),
+        };
+        let found = match &found {
+            Ok(path) => Ok(path.as_ref()),
+            Err(why) => Err(why.as_ref()),
+        };
+        assert_eq!(found, expected);
     }
 }

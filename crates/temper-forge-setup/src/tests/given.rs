@@ -70,6 +70,14 @@ fn a_managed_setup_maps_every_given_value() {
 }
 
 #[test]
+fn a_fake_setup_maps_every_given_value() {
+    let setup = super::fixtures::fake_setup();
+    let given = crate::given::values(setup.entry(3).unwrap(), None, &crate::limits::small());
+    assert_eq!(given, skein_forge_setup::given::Given { forge: 3, ..expected_given() });
+    assert_eq!(skein_forge_setup::given::check(&given), Ok(()));
+}
+
+#[test]
 fn an_owned_setup_maps_every_given_value() {
     let setup = super::fixtures::setup();
     let listener = super::fixtures::listener();

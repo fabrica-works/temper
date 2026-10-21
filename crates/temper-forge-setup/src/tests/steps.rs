@@ -42,11 +42,27 @@ fn a_managed_and_an_owned_forge_run_the_six_steps_of_the_design_tree() {
     }
 }
 #[test]
+fn a_fake_forge_keeps_its_reconcile_without_process_steps() {
+    names(
+        &fixtures::fake_setup(),
+        &[
+            (b"prepare 2", false),
+            (b"forgejo 2", true),
+            (b"runner 2", true),
+            (b"reconcile 1", false),
+            (b"reconcile 2", false),
+            (b"reconcile 3", false),
+            (b"serve", true),
+        ],
+    );
+    assert!(steps(&fixtures::fake_setup(), &flags()).asked.is_empty());
+}
+#[test]
 fn an_owned_forge_without_a_runner_has_no_runner_step() {
     let mut setup = fixtures::setup();
     match &mut setup.entries[1].mode {
         Mode::Owned(owned) => owned.runner = None,
-        Mode::Managed { .. } => panic!("owned"),
+        Mode::Managed { .. } | Mode::Fake(_) => panic!("owned"),
     }
     names(
         &setup,

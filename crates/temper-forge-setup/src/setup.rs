@@ -31,11 +31,26 @@ pub struct Owned {
     pub listen: SocketAddr,
     pub person: Account,
 }
+/// One of a fake forge's repositories.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Repository {
+    pub name: Box<[u8]>,
+    pub landing: Box<[u8]>,
+}
+/// The demo's fake forge, which temper runs (protocol/setup.md, 8.4).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Fake {
+    pub listen: SocketAddr,
+    pub git: Box<[u8]>,
+    pub owner: Box<[u8]>,
+    pub repositories: Box<[Repository]>,
+}
 /// A person's Forgejo or one temper runs.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Mode {
     Managed { admin_token: Box<[u8]> },
     Owned(Owned),
+    Fake(Fake),
 }
 /// One forge's directory, bot, orgs and mode.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -82,6 +97,13 @@ impl Setup {
                         config::Directory::Data,
                         admin_token,
                         p.member(b"mode").member(b"managed").member(b"admin_token"),
+                        &mut ps,
+                    ),
+                    Mode::Fake(fake) => resolve_path(
+                        directories,
+                        config::Directory::Data,
+                        &mut fake.git,
+                        p.member(b"mode").member(b"fake").member(b"git"),
                         &mut ps,
                     ),
                     Mode::Owned(owned) => {
@@ -132,8 +154,18 @@ fn object(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<
     }
 }
 fn text(d: &Document, o: &mut read::Object, name: &[u8], p: &Path, ps: &mut config::Problems) -> Option<Box<[u8]>> {
+    bounded_text(d, o, name, 4096, p, ps)
+}
+fn bounded_text(
+    d: &Document,
+    o: &mut read::Object,
+    name: &[u8],
+    max: u32,
+    p: &Path,
+    ps: &mut config::Problems,
+) -> Option<Box<[u8]>> {
     let at = o.required(d, name, p, ps)?;
-    match read::text(d, at, 4096) {
+    match read::text(d, at, max) {
         Ok(v) => Some(v),
         Err(w) => {
             ps.push(p.member(name), w);
@@ -228,7 +260,13 @@ fn owned(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<O
     } else {
         Some(runner(d, runner_at, &p.member(b"runner"), ps)?)
     };
-    let address = config::address::read(d, listen_at?, &p.member(b"listen"), ps)?;
+    let listen = listen(d, listen_at?, &p.member(b"listen"), ps)?;
+    let forgejo = forgejo?;
+    valid(path(&forgejo), p.member(b"forgejo"), ps);
+    Some(Owned { forgejo, runner, listen, person: account(d, person_at?, &p.member(b"person"), ps)? })
+}
+fn listen(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<SocketAddr> {
+    let address = config::address::read(d, at, p, ps)?;
     let listen = match address {
         config::Address::Addr(a) => a.socket(),
         config::Address::Host { .. } => None,
@@ -236,20 +274,64 @@ fn owned(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<O
     let listen = match listen {
         Some(a) if a.ip().is_loopback() => a,
         Some(_) | None => {
-            ps.push(p.member(b"listen"), config::What::Form);
+            ps.push(p.clone(), config::What::Form);
             return None;
         }
     };
-    let forgejo = forgejo?;
-    valid(path(&forgejo), p.member(b"forgejo"), ps);
-    Some(Owned { forgejo, runner, listen, person: account(d, person_at?, &p.member(b"person"), ps)? })
+    Some(listen)
+}
+fn fake(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<Fake> {
+    let mut o = object(d, at, p, ps)?;
+    let listen_at = o.required(d, b"listen", p, ps);
+    let git = text(d, &mut o, b"git", p, ps);
+    let owner = text(d, &mut o, b"owner", p, ps);
+    let repositories_at = o.required(d, b"repositories", p, ps);
+    o.finish(d, p, ps);
+    let listen = listen(d, listen_at?, &p.member(b"listen"), ps)?;
+    let git = git?;
+    let owner = owner?;
+    valid(path(&git), p.member(b"git"), ps);
+    valid(login(&owner), p.member(b"owner"), ps);
+    let rp = p.member(b"repositories");
+    let items = match read::list(d, repositories_at?, 8) {
+        Ok(items) => items,
+        Err(what) => {
+            ps.push(rp, what);
+            return None;
+        }
+    };
+    valid(!items.is_empty(), rp.clone(), ps);
+    let mut repositories = List::<Repository>::with_capacity(items.len());
+    for (index, at) in items.iter().enumerate() {
+        let p = rp.child(config::Segment::Index(u32::try_from(index).expect("eight repositories")));
+        let mut o = object(d, *at, &p, ps)?;
+        let name = bounded_text(d, &mut o, b"name", 100, &p, ps);
+        let landing = bounded_text(d, &mut o, b"landing", 256, &p, ps);
+        o.finish(d, &p, ps);
+        let name = name?;
+        let landing = landing?;
+        valid(crate::name::repository(&name), p.member(b"name"), ps);
+        valid(crate::name::branch(&landing), p.member(b"landing"), ps);
+        for prev in &repositories {
+            if prev.name == name {
+                ps.push(p.member(b"name"), config::What::Form);
+                break;
+            }
+        }
+        repositories.push(Repository { name, landing }).expect("eight repositories");
+    }
+    Some(Fake { listen, git, owner, repositories: repositories.into_boxed() })
 }
 fn mode(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<Mode> {
     let mut o = object(d, at, p, ps)?;
     let managed = o.member(d, b"managed");
     let owned_at = o.member(d, b"owned");
+    let fake_at = o.member(d, b"fake");
     o.finish(d, p, ps);
-    if managed.is_some() == owned_at.is_some() {
+    let count = u8::from(managed.is_some())
+        .saturating_add(u8::from(owned_at.is_some()))
+        .saturating_add(u8::from(fake_at.is_some()));
+    if count != 1 {
         ps.push(p.clone(), config::What::Form);
         return None;
     }
@@ -261,8 +343,10 @@ fn mode(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<Mo
         let admin_token = admin_token?;
         valid(path(&admin_token), p.member(b"admin_token"), ps);
         Some(Mode::Managed { admin_token })
+    } else if let Some(at) = owned_at {
+        Some(Mode::Owned(owned(d, at, &p.member(b"owned"), ps)?))
     } else {
-        Some(Mode::Owned(owned(d, owned_at?, &p.member(b"owned"), ps)?))
+        Some(Mode::Fake(fake(d, fake_at?, &p.member(b"fake"), ps)?))
     }
 }
 fn entry(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Problems) -> Option<Entry> {
@@ -270,11 +354,23 @@ fn entry(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Prob
     let forge_at = o.required(d, b"forge", p, ps);
     let directory = text(d, &mut o, b"directory", p, ps);
     let bot_at = o.required(d, b"bot", p, ps);
-    let orgs_at = o.required(d, b"orgs", p, ps);
     let mode_at = o.required(d, b"mode", p, ps);
     let start_at = o.member(d, b"start");
-    o.finish(d, p, ps);
     let mode = mode(d, mode_at?, &p.member(b"mode"), ps)?;
+    let orgs: Option<Box<[Box<[u8]>]>> = match &mode {
+        Mode::Fake(_) => {
+            valid(o.member(d, b"orgs").is_none(), p.member(b"orgs"), ps);
+            Some(Box::new([]))
+        }
+        Mode::Managed { .. } | Mode::Owned(_) => {
+            let at = o.required(d, b"orgs", p, ps);
+            match at {
+                Some(at) => strings(d, at, limits.orgs, true, &p.member(b"orgs"), ps),
+                None => None,
+            }
+        }
+    };
+    o.finish(d, p, ps);
     let asked = if let Some(at) = start_at {
         let value = match read::text(d, at, 4096) {
             Ok(value) => value,
@@ -287,7 +383,7 @@ fn entry(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Prob
             value.as_ref() == b"asked"
                 && match mode {
                     Mode::Owned(_) => true,
-                    Mode::Managed { .. } => false,
+                    Mode::Managed { .. } | Mode::Fake(_) => false,
                 },
             p.member(b"start"),
             ps,
@@ -305,14 +401,7 @@ fn entry(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Prob
     };
     let directory = directory?;
     valid(path(&directory) && !directory.ends_with(b"/"), p.member(b"directory"), ps);
-    Some(Entry {
-        forge,
-        directory,
-        bot: account(d, bot_at?, &p.member(b"bot"), ps)?,
-        orgs: strings(d, orgs_at?, limits.orgs, true, &p.member(b"orgs"), ps)?,
-        mode,
-        asked,
-    })
+    Some(Entry { forge, directory, bot: account(d, bot_at?, &p.member(b"bot"), ps)?, orgs: orgs?, mode, asked })
 }
 fn list(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Problems) -> Option<Setup> {
     let items = match read::list(d, at, 65_536) {

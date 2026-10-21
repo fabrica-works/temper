@@ -13,6 +13,15 @@ pub const TWO: &[u8] = br#"[
 {"forge":1,"directory":"forge-1","bot":{"login":"temper","email":"temper@example.invalid"},"orgs":["acme"],"mode":{"managed":{"admin_token":"secrets/forgejo-admin"}}},
 {"forge":2,"directory":"forge-2","bot":{"login":"temper","email":"temper@example.invalid"},"orgs":["work"],"mode":{"owned":{"forgejo":"/opt/forgejo/forgejo","runner":{"binary":"/opt/forgejo/forgejo-runner","labels":["temper-host:host"],"capacity":1,"path":"/usr/local/bin:/usr/bin:/bin"},"listen":{"socket":"127.0.0.1:3000"},"person":{"login":"ada","email":"ada@example.invalid"}}}}
 ]"#;
+/// TWO followed by the demo's fake entry (protocol/setup.md, 8).
+pub fn three() -> Box<[u8]> {
+    changed(b"\n]", br#",
+{"forge":3,"directory":"demo/forge","bot":{"login":"temper","email":"temper@example.invalid"},"mode":{"fake":{"listen":{"socket":"127.0.0.1:8369"},"git":"demo/bin/git","owner":"demo","repositories":[{"name":"widget","landing":"main"}]}}}
+]"#)
+}
+pub fn fake_setup() -> Setup {
+    read_setup(&three())
+}
 pub fn document(bytes: &[u8]) -> Document {
     jig_protocol_config::document(
         bytes,
@@ -21,8 +30,11 @@ pub fn document(bytes: &[u8]) -> Document {
     .expect("test JSON")
 }
 pub fn setup() -> Setup {
+    read_setup(TWO)
+}
+fn read_setup(bytes: &[u8]) -> Setup {
     Setup::read(
-        &document(TWO),
+        &document(bytes),
         0,
         &limits::small(),
         &jig_protocol_config::Directories::working(),
@@ -55,16 +67,30 @@ pub fn members() -> Members {
                 identity_token: bytes::copy_of(b"forge-2/git_token"),
                 identity_login: bytes::copy_of(b"temper"),
             },
+            Forge {
+                number: 3,
+                api: Some(SocketAddr::from((Ipv4Addr::LOCALHOST, 8369))),
+                plaintext: true,
+                git: bytes::copy_of(b"http://127.0.0.1:8369"),
+                user: User::File(bytes::copy_of(b"demo/forge/user")),
+                webhook_secret: None,
+                api_token: bytes::copy_of(b"demo/forge/api_token"),
+                identity_token: bytes::copy_of(b"demo/forge/git_token"),
+                identity_login: bytes::copy_of(b"temper"),
+            },
         ]),
         listeners: Box::new([]),
     }
 }
 pub fn changed(from: &[u8], to: &[u8]) -> Box<[u8]> {
-    let at = bytes::find(TWO, from).expect("fixture text exists");
+    changed_in(TWO, from, to)
+}
+pub fn changed_in(source: &[u8], from: &[u8], to: &[u8]) -> Box<[u8]> {
+    let at = bytes::find(source, from).expect("fixture text exists");
     let after = at.checked_add(from.len()).unwrap();
-    let len = TWO.len().checked_sub(from.len()).unwrap().checked_add(to.len()).unwrap();
+    let len = source.len().checked_sub(from.len()).unwrap().checked_add(to.len()).unwrap();
     let mut w = Writer::new(len);
-    for part in [TWO.get(..at).unwrap(), to, TWO.get(after..).unwrap()] {
+    for part in [source.get(..at).unwrap(), to, source.get(after..).unwrap()] {
         w.put(part).unwrap();
     }
     w.finish()
@@ -72,7 +98,7 @@ pub fn changed(from: &[u8], to: &[u8]) -> Box<[u8]> {
 pub fn owned() -> crate::setup::Owned {
     match setup().entries[1].mode.clone() {
         crate::setup::Mode::Owned(owned) => owned,
-        crate::setup::Mode::Managed { .. } => panic!("owned fixture"),
+        crate::setup::Mode::Managed { .. } | crate::setup::Mode::Fake(_) => panic!("owned fixture"),
     }
 }
 pub fn place() -> crate::place::Place {

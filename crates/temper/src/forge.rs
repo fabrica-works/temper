@@ -175,8 +175,10 @@ pub(crate) fn start(directories: &super::Directories, arguments: &[OsString]) ->
             });
     }
     let entry = checked.setup.entry(number).ok_or_else(|| refused("the setup has no entry for it".into()))?;
-    let Mode::Owned(owned) = &entry.mode else {
-        return Err(refused("it is managed, not owned".into()));
+    let owned = match &entry.mode {
+        Mode::Owned(owned) => owned,
+        Mode::Managed { .. } => return Err(refused("it is managed, not owned".into())),
+        Mode::Fake(_) => return Err(refused("it is fake, not owned".into())),
     };
     let directory = super::path(&entry.directory);
     if which.is_none() && !directory.exists() {
@@ -239,7 +241,7 @@ pub fn reconcile_settings(
     let address = super::address(&forge.api)?;
     let admin_token = match &entry.mode {
         Mode::Managed { admin_token } => super::path(admin_token).to_path_buf(),
-        Mode::Owned(_) => directory.join("admin_token"),
+        Mode::Owned(_) | Mode::Fake(_) => directory.join("admin_token"),
     };
     let mut profile = temper_service::limits::profile(temper_service::limits::Profile::Small);
     for (name, value) in &named.overrides {

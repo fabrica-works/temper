@@ -98,13 +98,13 @@ pub fn values(
         bot_email: entry.bot.email.clone(),
         // temper-15 moves owned orgs under mode.owned.person.orgs; managed still parses them.
         orgs: match &entry.mode {
-            crate::setup::Mode::Managed { .. } => Box::new([]),
+            crate::setup::Mode::Managed { .. } | crate::setup::Mode::Fake(_) => Box::new([]),
             crate::setup::Mode::Owned(_) => entry.orgs.clone(),
         },
         // None adopted until temper-14a gives the owned forge’s adopted list.
         adopted: Box::new([]),
         org_owner: match &entry.mode {
-            crate::setup::Mode::Managed { .. } => None,
+            crate::setup::Mode::Managed { .. } | crate::setup::Mode::Fake(_) => None,
             crate::setup::Mode::Owned(owned) => Some(owned.person.login.clone()),
         },
         listener,

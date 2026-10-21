@@ -2,7 +2,7 @@
 use crate::{
     given, limits,
     problem::{Problems, What},
-    setup::{Mode, Setup},
+    setup::{Entry, Mode, Setup},
 };
 use alloc::boxed::Box;
 use core::net::SocketAddr;
@@ -106,17 +106,39 @@ pub fn members(setup: &Setup, members: &Members, webhooks: bool, ps: &mut Proble
                     op.member(b"person").member(b"login"),
                     ps,
                 );
-                require(f.api == Some(o.listen), fp.member(b"api"), ps);
-                require(f.plaintext, fp.member(b"transport"), ps);
-                require(git_listen(&f.git, o.listen), fp.member(b"git"), ps);
-                require(!members.listeners.contains(&o.listen), op.member(b"listen"), ps);
-                for prev in setup.entries.iter().take(i) {
-                    match &prev.mode {
-                        Mode::Owned(other) => require(o.listen != other.listen, op.member(b"listen"), ps),
-                        Mode::Managed { .. } => {}
-                    }
-                }
+                local_forge(o.listen, f, &fp, &op, members, setup.entries.get(..i).expect("earlier entries"), ps);
             }
+            Mode::Fake(fake) => {
+                let op = p.member(b"mode").member(b"fake");
+                require(!e.asked, p.member(b"start"), ps);
+                require(fake.owner != e.bot.login && fake.owner.as_ref() != b"temper-admin", op.member(b"owner"), ps);
+                local_forge(fake.listen, f, &fp, &op, members, setup.entries.get(..i).expect("earlier entries"), ps);
+            }
+        }
+    }
+}
+fn local_forge(
+    listen: SocketAddr,
+    forge: &Forge,
+    fp: &Path,
+    mode_path: &Path,
+    members: &Members,
+    previous: &[Entry],
+    ps: &mut Problems,
+) {
+    let lp = mode_path.member(b"listen");
+    require(forge.api == Some(listen), fp.member(b"api"), ps);
+    require(forge.plaintext, fp.member(b"transport"), ps);
+    require(git_listen(&forge.git, listen), fp.member(b"git"), ps);
+    require(!members.listeners.contains(&listen), lp.clone(), ps);
+    for prev in previous {
+        let other = match &prev.mode {
+            Mode::Owned(other) => Some(other.listen),
+            Mode::Fake(other) => Some(other.listen),
+            Mode::Managed { .. } => None,
+        };
+        if let Some(other) = other {
+            require(listen != other, lp.clone(), ps);
         }
     }
 }

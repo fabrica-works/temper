@@ -8,6 +8,18 @@ use temper_box::host::{Service, Settings};
 pub fn run(directories: &super::Directories) -> Result<Exit, String> {
     let bytes = configuration(directories)?;
     let (_, checked, limits) = super::setup::check(&bytes, &directories.jig())?;
+    let mut refusals = Vec::new();
+    for (index, entry) in checked.setup.entries.iter().enumerate() {
+        match &entry.mode {
+            temper_forge_setup::setup::Mode::Fake(_) => {
+                refusals.push(format!("application.setup[{index}].mode.fake: the box runs no fake forge yet"));
+            }
+            temper_forge_setup::setup::Mode::Managed { .. } | temper_forge_setup::setup::Mode::Owned(_) => {}
+        }
+    }
+    if !refusals.is_empty() {
+        return Err(refusals.join("\n"));
+    }
     let directory = super::path(&directories.data);
     let program = std::env::current_exe().map_err(|why| why.to_string())?;
     let environment = std::env::vars_os()

@@ -59,13 +59,16 @@ pub(crate) fn check(
         .map_err(|why| String::from_utf8_lossy(&problem::lines(&why)).into_owned())?;
     let mut problems = temper_service::startup::Problems::empty();
     for (index, entry) in checked.setup.entries.iter().enumerate() {
-        if let temper_forge_setup::setup::Mode::Owned(owned) = &entry.mode {
-            temper_service::startup::redirect_ports(
-                &named.redirects,
-                Some(owned.listen.port()),
-                temper_service::startup::Listener::Owned(u32::try_from(index).expect("bounded setup")),
-                &mut problems,
-            );
+        use temper_forge_setup::setup::Mode;
+        use temper_service::startup::Listener;
+        let index = u32::try_from(index).expect("bounded setup");
+        let local = match &entry.mode {
+            Mode::Managed { .. } => None,
+            Mode::Owned(owned) => Some((owned.listen, Listener::Owned(index))),
+            Mode::Fake(fake) => Some((fake.listen, Listener::Fake(index))),
+        };
+        if let Some((listen, listener)) = local {
+            temper_service::startup::redirect_ports(&named.redirects, Some(listen.port()), listener, &mut problems);
         }
     }
     if !problems.is_empty() {

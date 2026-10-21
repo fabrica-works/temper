@@ -76,3 +76,12 @@ pub fn flags(directory: &Path) -> Vec<std::ffi::OsString> {
     use std::os::unix::ffi::OsStringExt;
     directories(directory).flags().into_vec().into_iter().map(|v| std::ffi::OsString::from_vec(v.into_vec())).collect()
 }
+
+/// Replace an owned entry's mode with the demo's, keeping its forge and paths.
+pub fn fake_entry(entry: &mut serde_json::Value, listen: &str) {
+    entry.as_object_mut().expect("setup entry").remove("orgs");
+    entry["mode"] = serde_json::json!({"fake": {
+        "listen": {"socket": listen}, "git": "demo/bin/git", "owner": "demo",
+        "repositories": [{"name": "widget", "landing": "main"}]
+    }});
+}

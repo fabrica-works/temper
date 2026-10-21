@@ -25,6 +25,7 @@ pub enum Listener {
     Clients,
     Webhooks,
     Owned(u32),
+    Fake(u32),
 }
 fn redirects(engine: &config::Engine) -> Box<[RedirectPort]> {
     let mut redirects = List::with_capacity(u32::try_from(engine.llm.providers.len()).expect("bounded providers"));
