@@ -341,12 +341,18 @@ impl<T: Transport> Git<T> {
                 self.transport.begin();
                 let result =
                     answer(self.checked.as_ref().expect("checked invocation"), &mut self.checkout, &mut self.transport);
-                if let Some(call) = self.transport.missed() {
-                    self.restore();
-                    self.request(call);
-                    return;
+                match self.transport.missed() {
+                    crate::Missing::None => result,
+                    crate::Missing::Call(call) => {
+                        self.restore();
+                        self.request(call);
+                        return;
+                    }
+                    crate::Missing::Unsendable => {
+                        self.restore();
+                        crate::exchange::broken("request")
+                    }
                 }
-                result
             }
         } else {
             Answer::usage()

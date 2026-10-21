@@ -1,5 +1,5 @@
 //! Git reaches the same forge domain the HTTP service owns in the world.
-use crate::check::Credential;
+use crate::{Missing, check::Credential};
 use skein_fake_checkout::git::{Created, Fault, Pushed, Remote, Tree, Want, What};
 use skein_fake_forge_domain::{self as domain, api};
 use skein_fake_peers::forge::Forge;
@@ -47,8 +47,8 @@ pub trait Transport: Remote {
     fn commit_tree(&mut self, parent: u64, merging: Option<u64>, tree: Tree, message: &[u8]) -> u64;
     /// Set the forge's input clock before the run makes any call.
     fn set_time(&mut self, now: Time);
-    /// Take the first call this run lacked; the typed transport never lacks one.
-    fn missed(&mut self) -> Option<skein_fake_forge_protocol::git::Call>;
+    /// Take the first miss, including an encoding refusal; typed calls miss none.
+    fn missed(&mut self) -> Missing;
 }
 
 /// The known tokens and logins stay solely on this side of the boundary.
@@ -269,7 +269,7 @@ impl Transport for Typed {
     fn set_time(&mut self, now: Time) {
         self.forge.borrow_mut().now = now;
     }
-    fn missed(&mut self) -> Option<skein_fake_forge_protocol::git::Call> {
-        None
+    fn missed(&mut self) -> Missing {
+        Missing::None
     }
 }

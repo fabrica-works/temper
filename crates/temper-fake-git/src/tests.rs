@@ -1,5 +1,5 @@
 //! The route's requests and machine effects, observed across discarded runs.
-use crate::{Route, Transport};
+use crate::{Missing, Route, Transport};
 use skein_fake_checkout::{
     Checkout,
     git::{self as kit, Remote, Tree},
@@ -331,23 +331,30 @@ fn repository_refusals_keep_whether_the_route_named_the_identity() {
 #[test]
 fn failures_without_a_fault_result_end_with_the_requested_git_diagnostic() {
     let local = Command::IsAncestor { expected: commit(BASE), commit: commit(TOPIC) };
+    let message = b"message\n".as_slice();
+    let oversized = vec![b'x'; usize::try_from(BODY_BYTES).expect("body bytes") + 1];
+    let unreachable = (128, temper_worker_domain_checkout::git::Fault::Unreachable);
+    let broken = (125, temper_worker_domain_checkout::git::Fault::Broken);
     let rows=[
-        ("status",local.clone(),vec![(ancestor(),Response::Raw(503,vec![]))],false,b"fatal: unable to access 'http://127.0.0.1:3000/acme/app.git': The requested URL returned error: 503\n".as_slice()),
-        ("refused",local.clone(),vec![],true,b"fatal: unable to access 'http://127.0.0.1:3000/acme/app.git': Failed to connect to 127.0.0.1 port 3000: Couldn't connect to server\n"),
-        ("reset",local.clone(),vec![(ancestor(),Response::Reset)],false,b"fatal: unable to access 'http://127.0.0.1:3000/acme/app.git': Failed to connect to 127.0.0.1 port 3000: Couldn't connect to server\n"),
-        ("early close",local,vec![(ancestor(),Response::Close)],false,b"fatal: unable to access 'http://127.0.0.1:3000/acme/app.git': Failed to connect to 127.0.0.1 port 3000: Couldn't connect to server\n"),
-        ("store status",commit_tree(),vec![(commit_tree_call(),Response::Error(507,api::Error::Full))],false,b"fatal: unable to access 'http://127.0.0.1:3000/acme/app.git': The requested URL returned error: 507\n"),
+        ("status",local.clone(),vec![(ancestor(),Response::Raw(503,vec![]))],false,message,unreachable,b"fatal: unable to access 'http://127.0.0.1:3000/acme/app.git': The requested URL returned error: 503\n".as_slice()),
+        ("refused",local.clone(),vec![],true,message,unreachable,b"fatal: unable to access 'http://127.0.0.1:3000/acme/app.git': Failed to connect to 127.0.0.1 port 3000: Couldn't connect to server\n"),
+        ("reset",local.clone(),vec![(ancestor(),Response::Reset)],false,message,unreachable,b"fatal: unable to access 'http://127.0.0.1:3000/acme/app.git': Failed to connect to 127.0.0.1 port 3000: Couldn't connect to server\n"),
+        ("early close",local,vec![(ancestor(),Response::Close)],false,message,unreachable,b"fatal: unable to access 'http://127.0.0.1:3000/acme/app.git': Failed to connect to 127.0.0.1 port 3000: Couldn't connect to server\n"),
+        ("store status",commit_tree(),vec![(commit_tree_call(),Response::Error(507,api::Error::Full))],false,message,unreachable,b"fatal: unable to access 'http://127.0.0.1:3000/acme/app.git': The requested URL returned error: 507\n"),
+        ("oversized message",commit_tree(),vec![],false,oversized.as_slice(),broken,b"temper fake git: broken: request\n"),
     ];
-    for (name, command, script, refused, stderr) in rows {
+    for (name, command, script, refused, input, (exit, fault), stderr) in rows {
         let mut disk = Disk::new(&files(REMOTE));
+        let expected_calls: Vec<_> = script.iter().map(|(call, _)| call.clone()).collect();
         let mut net = Net::new(script);
         net.refused = refused;
-        let answer = disk.run(spawn(&command), &mut net, b"message\n");
-        assert_eq!(answer.exit, 128, "{name}");
+        let answer = disk.run(spawn(&command), &mut net, input);
+        assert_eq!(answer.exit, exit, "{name}");
         assert_eq!(answer.stderr, stderr, "{name}");
+        assert_eq!(net.seen, expected_calls, "{name}: only scripted requests sent");
         assert_eq!(
             output::classify(&answer.stderr, temper_worker_domain_checkout::git::Kind::Fetch),
-            temper_worker_domain_checkout::git::Fault::Unreachable,
+            fault,
             "{name}: classifier"
         );
     }
@@ -479,7 +486,7 @@ fn commits_and_merges_discard_their_placeholders_before_keeping_output_or_files(
                     kit::commit(&mut route, &mut checkout, b"repo", BASE, b"message\n").expect("locally present parent")
                 }
             };
-            if let Some(missing) = route.missed() {
+            if let Missing::Call(missing) = route.missed() {
                 assert_eq!(result, placeholder, "{name}: kit accepts placeholder");
                 assert!(first, "{name}: one write miss");
                 first = false;
@@ -522,7 +529,7 @@ fn object_reads_cache_whole_objects_and_the_ancestry_graph() {
                 route.message(TOPIC);
             }
         }
-        let missing = route.missed().expect("first read misses");
+        let Missing::Call(missing) = route.missed() else { panic!("first read misses") };
         assert_eq!(missing, object_call(TOPIC));
         let mut net = Net::new(vec![(missing.clone(), objects(TOPIC))]);
         let mut connection = route.connection().expect("connection");
@@ -534,7 +541,7 @@ fn object_reads_cache_whole_objects_and_the_ancestry_graph() {
         assert_eq!(route.parent(BASE), None);
         assert_eq!(route.tree(TOPIC), Tree::from([(b"file".to_vec(), b"topic\n".to_vec())]));
         assert_eq!(route.message(TOPIC), b"message");
-        assert_eq!(route.missed(), None);
+        assert_eq!(route.missed(), Missing::None);
     }
 }
 #[test]

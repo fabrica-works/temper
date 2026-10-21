@@ -14,7 +14,7 @@ pub use transport::{Transport, Typed};
 pub mod connection;
 
 mod route;
-pub use route::{MAX_RUNS, Route};
+pub use route::{MAX_RUNS, Missing, Route};
 mod exchange;
 
 #[cfg(test)]
