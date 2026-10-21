@@ -76,6 +76,7 @@ fn change_step_task(
         heard: change::Heard { delegate: heard, effect: change::EffectResult::None, released, cancelled: false },
         gates,
         queue_repair_active: false,
+        kept: false,
     });
     world.run_for(1);
     let mut decision = None;
@@ -333,6 +334,7 @@ fn step_change(world: &mut Protocol, entry: u64, delegate: change::Status, relea
         heard: change::Heard { delegate, effect: change::EffectResult::None, released, cancelled: false },
         gates: Box::new([]),
         queue_repair_active: false,
+        kept: false,
     });
 }
 

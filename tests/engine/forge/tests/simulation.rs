@@ -491,6 +491,7 @@ fn a_broken_landing_branch_pauses_the_queue_for_one_repair() {
         },
         gates: report,
         queue_repair_active: true,
+        kept: false,
     });
     world.run_for(1);
     assert!(world.seen().iter().any(|event| matches!(
@@ -536,7 +537,7 @@ fn an_aged_low_priority_change_takes_its_turn_ahead_of_later_work() {
     world.event(top::Event::Change { row: high });
     let review = Box::new([change::GateReport { number: 7, head: head52, status: change::Status::Passed }]);
     assert_eq!(
-        change_step_task(&mut world, 52, 1, change::Status::Passed, review.clone(), false),
+        change_step_task(&mut world, 52, 1, change::Status::Passed, review.clone(), false, false),
         change::Decision::Wait { until: None }
     );
     assert_eq!(world.writes(), 0);
@@ -546,14 +547,14 @@ fn an_aged_low_priority_change_takes_its_turn_ahead_of_later_work() {
     ));
     assert_eq!(world.writes(), 1);
     assert!(matches!(
-        change_step_task(&mut world, 52, 3, change::Status::Passed, review.clone(), false),
+        change_step_task(&mut world, 52, 3, change::Status::Passed, review.clone(), false, false),
         change::Decision::Effect(change::Effect::Update { .. })
     ));
     let new_head = temper_engine_forge_world::translate::commit(world.branch(b"temper/52"));
     assert_ne!(new_head, head52);
     let mut finished = false;
     for entry in 4..16 {
-        let decided = change_step_task(&mut world, 52, entry, change::Status::Passed, review.clone(), false);
+        let decided = change_step_task(&mut world, 52, entry, change::Status::Passed, review.clone(), false, false);
         assert!(!matches!(decided, change::Decision::Delegate(change::Delegate::Gate { .. })));
         if let change::Decision::Finish { .. } = decided {
             finished = true;
@@ -562,6 +563,99 @@ fn an_aged_low_priority_change_takes_its_turn_ahead_of_later_work() {
     }
     assert!(finished);
     assert_eq!(world.writes(), 3);
+}
+
+#[test]
+fn a_kept_change_leaves_the_queue_and_comes_back_at_its_place() {
+    let mut world = World::new(84);
+    world.adopt();
+    let earliest = Wall::EPOCH;
+    for (task, branch, path, ready_since) in [
+        (51, &b"temper/51"[..], &b"first"[..], earliest),
+        (52, &b"temper/52"[..], &b"second"[..], Wall::from_nanos(1_000_000_000)),
+        (53, &b"temper/53"[..], &b"third"[..], Wall::from_nanos(2_000_000_000)),
+    ] {
+        world.produce_file(branch, path, b"change");
+        world.status(branch, skein_fake_forge_domain::api::Check::Passed);
+        let pull = world.open_pull(branch, b"main");
+        let head = translate::commit(world.branch(branch));
+        let mut row = change_row();
+        row.task = task;
+        row.change.task = task;
+        row.branch = Box::from(branch);
+        row.pull = Some(pull);
+        row.change.last_head = Some(head);
+        row.change.ready_since = Some(ready_since);
+        row.change.owns_turn = task == 51;
+        row.change.state = if task == 51 {
+            change::State::First { head, ready_since }
+        } else {
+            change::State::Queued { head, ready_since }
+        };
+        world.event(top::Event::Change { row });
+    }
+    world.take_seen();
+    world.event(top::Event::StepChange {
+        task: 51,
+        entry: 1,
+        heard: change::Heard {
+            delegate: change::Status::Passed,
+            effect: change::EffectResult::None,
+            released: false,
+            cancelled: false,
+        },
+        gates: Box::new([]),
+        queue_repair_active: false,
+        kept: true,
+    });
+    world.run_for(1);
+    assert!(world.seen().iter().any(|event| matches!(
+        event,
+        top::Request::ChangeDecision { task: 51, decision: change::Decision::Wait { until: None }, .. }
+    )));
+    assert!(world.seen().iter().any(|event| matches!(event, top::Request::WakeProcedure { task: 52 })));
+    assert_eq!(world.writes(), 0);
+    let Some(top::Stored::Change(kept)) = world.stored().get(&top::Key::Change(51)) else { panic!("kept row") };
+    assert!(matches!(kept.change.state, change::State::Gating { .. }));
+    assert_eq!(kept.change.ready_since, Some(earliest));
+    assert!(!kept.change.owns_turn);
+    assert!(matches!(
+        change_step_task(&mut world, 52, 2, change::Status::Passed, Box::new([]), false, false),
+        change::Decision::Effect(change::Effect::Merge { .. })
+    ));
+    assert_eq!(world.writes(), 1);
+    assert_eq!(change_step(&mut world, 3, change::Status::Passed, Box::new([])), change::Decision::Ready);
+    let Some(top::Stored::Change(back)) = world.stored().get(&top::Key::Change(51)) else { panic!("ready row") };
+    assert!(matches!(back.change.state, change::State::Queued { ready_since, .. } if ready_since == earliest));
+    assert_eq!(
+        change_step_task(&mut world, 53, 4, change::Status::Passed, Box::new([]), false, false),
+        change::Decision::Wait { until: None }
+    );
+    for task in [51, 53] {
+        let mut merged = false;
+        let mut finished = false;
+        for offset in 0..8 {
+            let decision = change_step_task(
+                &mut world,
+                task,
+                task * 100 + offset,
+                change::Status::Passed,
+                Box::new([]),
+                false,
+                false,
+            );
+            assert!(!matches!(decision, change::Decision::Delegate(_)));
+            if matches!(decision, change::Decision::Effect(change::Effect::Merge { .. })) {
+                merged = true;
+            }
+            if matches!(decision, change::Decision::Finish { .. }) {
+                finished = true;
+                break;
+            }
+        }
+        assert!(merged && finished, "change {task} lands in order");
+    }
+    assert_eq!(world.writes(), 5); // three merges and two clean updates
 }
 
 #[test]
@@ -615,6 +709,7 @@ fn a_change_produced_opened_checked_queued_and_landed() {
         },
         gates: Box::new([]),
         queue_repair_active: false,
+        kept: false,
     });
     world.run_for(1);
     assert!(world.seen().iter().any(|request| matches!(
@@ -634,6 +729,7 @@ fn a_change_produced_opened_checked_queued_and_landed() {
         },
         gates: Box::new([]),
         queue_repair_active: false,
+        kept: false,
     });
     world.run_for(1);
     assert!(world.seen().iter().any(|request| matches!(
@@ -663,6 +759,7 @@ fn a_change_produced_opened_checked_queued_and_landed() {
             },
             gates: Box::new([]),
             queue_repair_active: false,
+            kept: false,
         });
         world.run_for(1);
         let replies = world.take_seen();
@@ -1270,6 +1367,7 @@ fn an_external_move_of_a_held_branch_is_reported_as_drift() {
         },
         gates: Box::new([]),
         queue_repair_active: false,
+        kept: false,
     });
     world.run_for(1);
     assert!(world.seen().iter().any(|event| matches!(
@@ -1289,6 +1387,7 @@ fn an_external_move_of_a_held_branch_is_reported_as_drift() {
         },
         gates: Box::new([]),
         queue_repair_active: false,
+        kept: false,
     });
     world.run_for(1);
     assert!(!world.seen().iter().any(|event| matches!(

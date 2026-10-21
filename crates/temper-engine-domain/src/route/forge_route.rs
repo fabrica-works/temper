@@ -1650,6 +1650,7 @@ pub(crate) fn start_change(domain: &mut Domain, env: &Env<Limits>, context: &tas
     domain.work.push(Work::Forge(forge::Event::StepChange {
         task,
         entry,
+        kept: domain.core.tasks.waiting_effect_problem(task).is_some(),
         heard: forge_change::Heard {
             delegate: forge_change::Status::Unknown,
             effect: forge_change::EffectResult::None,

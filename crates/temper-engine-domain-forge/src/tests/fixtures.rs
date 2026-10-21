@@ -167,6 +167,7 @@ pub fn step_change(d: &mut Domain) {
             },
             gates: Box::new([]),
             queue_repair_active: false,
+            kept: false,
         },
     );
 }

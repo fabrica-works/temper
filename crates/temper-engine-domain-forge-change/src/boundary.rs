@@ -184,6 +184,8 @@ pub struct Facts {
     pub first: bool,
     pub may_merge: bool,
     pub queue_repair_active: bool,
+    /// The task has a pending dependency (jig's `domain/tasks.md`, 5.7), so it is not ready.
+    pub kept: bool,
     /// The end of the window Forgejo is still settling in, when open.
     pub settling: Option<Wall>,
 }

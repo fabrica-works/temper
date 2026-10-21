@@ -426,6 +426,9 @@ fn gating(mut change: Change, head: [u8; 32], asked: &[u64], facts: &Facts, now:
     if !ci_passed || waiting_gate {
         return waiting(change, now, limits);
     }
+    if facts.kept {
+        return Stepped { change, decision: Decision::Wait { until: None } };
+    }
     let since = match change.ready_since {
         Some(since) => since,
         None => {
@@ -445,7 +448,11 @@ fn queued(mut change: Change, head: [u8; 32], ready_since: Wall, facts: &Facts) 
     if facts.branch != Some(head) {
         return hold(change, Hold::BranchMoved);
     }
-    if facts.ci.head != head || facts.ci.status != Status::Passed || !blocking_gates_pass(&change, facts, head) {
+    if facts.kept
+        || facts.ci.head != head
+        || facts.ci.status != Status::Passed
+        || !blocking_gates_pass(&change, facts, head)
+    {
         change.state = State::Gating { head, asked: Box::new([]) };
         change.owns_turn = false;
         return Stepped { change, decision: Decision::None };
@@ -472,7 +479,11 @@ fn first(mut change: Change, head: [u8; 32], ready_since: Wall, facts: &Facts, n
     if facts.branch != Some(head) {
         return hold(change, Hold::BranchMoved);
     }
-    if facts.ci.head != head || facts.ci.status != Status::Passed || !blocking_gates_pass(&change, facts, head) {
+    if facts.kept
+        || facts.ci.head != head
+        || facts.ci.status != Status::Passed
+        || !blocking_gates_pass(&change, facts, head)
+    {
         change.state = State::Gating { head, asked: Box::new([]) };
         change.owns_turn = false;
         return Stepped { change, decision: Decision::None };

@@ -57,7 +57,7 @@ pub fn change_step_with_release(
     gates: Box<[change::GateReport]>,
     released: bool,
 ) -> change::Decision {
-    change_step_task(world, 51, entry, heard, gates, released)
+    change_step_task(world, 51, entry, heard, gates, released, false)
 }
 
 pub fn change_step_task(
@@ -67,6 +67,7 @@ pub fn change_step_task(
     heard: change::Status,
     gates: Box<[change::GateReport]>,
     released: bool,
+    kept: bool,
 ) -> change::Decision {
     world.take_seen();
     world.event(top::Event::StepChange {
@@ -75,6 +76,7 @@ pub fn change_step_task(
         heard: change::Heard { delegate: heard, effect: change::EffectResult::None, released, cancelled: false },
         gates,
         queue_repair_active: false,
+        kept,
     });
     world.run_for(1);
     let mut decision = None;

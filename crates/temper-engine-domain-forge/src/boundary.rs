@@ -690,6 +690,7 @@ pub enum Event {
         heard: change::Heard,
         gates: Box<[change::GateReport]>,
         queue_repair_active: bool,
+        kept: bool,
     },
     /// A person released a drift-held change after inspecting the new head.
     ReleaseChange {

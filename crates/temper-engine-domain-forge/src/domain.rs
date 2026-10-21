@@ -46,6 +46,7 @@ enum StepStage {
 }
 
 /// One sequence of fresh reads before a level-triggered change step.
+#[expect(clippy::struct_excessive_bools, reason = "independent facts and progress of one fresh-read chain")]
 #[derive(Debug)]
 pub(crate) struct PendingStep {
     task: u64,
@@ -54,6 +55,7 @@ pub(crate) struct PendingStep {
     heard: change::Heard,
     gates: Box<[change::GateReport]>,
     queue_repair_active: bool,
+    kept: bool,
     branch: Option<skein_forge::api::Commit>,
     base_tip: Option<skein_forge::api::Commit>,
     pull: Option<skein_forge::api::Pull>,
@@ -70,6 +72,7 @@ struct StepInput {
     heard: change::Heard,
     gates: Box<[change::GateReport]>,
     queue_repair_active: bool,
+    kept: bool,
 }
 
 /// One committed outbox entry. A held one is out of the client's outbox and
@@ -824,8 +827,8 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
         Event::DelegateResult { task, child, status, words } => {
             delegate_result(d, env, task, child, status, &words, out);
         }
-        Event::StepChange { task, entry, heard, gates, queue_repair_active } => {
-            step_change(d, env, StepInput { task, entry, heard, gates, queue_repair_active }, out);
+        Event::StepChange { task, entry, heard, gates, queue_repair_active, kept } => {
+            step_change(d, env, StepInput { task, entry, heard, gates, queue_repair_active, kept }, out);
         }
         Event::ReleaseChange { task } => release_change(d, task, out),
         Event::SettleEffects { task, root, ending } => settle_effects(d, env, task, root, ending, out),
@@ -1746,7 +1749,7 @@ fn delegate_result(
 }
 
 fn step_change(d: &mut Domain, env: &Env<Limits>, input: StepInput, out: &mut Queue<Request>) {
-    let StepInput { task, entry, heard, gates, queue_repair_active } = input;
+    let StepInput { task, entry, heard, gates, queue_repair_active, kept } = input;
     let Some(row) = d.changes.get(&task) else {
         emit(out, Request::Refused { task });
         return;
@@ -1785,6 +1788,7 @@ fn step_change(d: &mut Domain, env: &Env<Limits>, input: StepInput, out: &mut Qu
         },
         gates: if gates.is_empty() { row.verdicts.clone() } else { gates },
         queue_repair_active,
+        kept,
         branch: None,
         base_tip: None,
         pull: None,
@@ -2034,6 +2038,7 @@ fn finish_step(d: &mut Domain, env: &Env<Limits>, pending: PendingStep, out: &mu
                 heard: pending.heard,
                 gates: pending.gates,
                 queue_repair_active: pending.queue_repair_active,
+                kept: pending.kept,
             },
             out,
         );
@@ -2103,6 +2108,9 @@ fn decide_step(d: &mut Domain, env: &Env<Limits>, pending: &PendingStep, out: &m
             | change::Decision::Cancel
             | change::Decision::Hold(_)) => {
                 d.changes.insert(row.task, row.clone()).expect("replaces change");
+                if in_queue(&prior.state) && !in_queue(&row.change.state) {
+                    wake_queue(d, &row);
+                }
                 emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(row.clone()) });
                 topics::head_changed(d, row.task, out);
                 topics::refresh(d, env, row.task, out);
@@ -2120,6 +2128,36 @@ fn decide_step(d: &mut Domain, env: &Env<Limits>, pending: &PendingStep, out: &m
         }
     }
     emit(out, Request::Refused { task: row.task });
+}
+
+fn in_queue(state: &change::State) -> bool {
+    match state {
+        change::State::Queued { .. } | change::State::First { .. } => true,
+        change::State::Producing { .. }
+        | change::State::Opening { .. }
+        | change::State::Recreating { .. }
+        | change::State::Reopening { .. }
+        | change::State::Checking { .. }
+        | change::State::Gating { .. }
+        | change::State::Updating { .. }
+        | change::State::Resolving { .. }
+        | change::State::Repairing { .. }
+        | change::State::Landing { .. }
+        | change::State::Landed { .. }
+        | change::State::Held { .. } => false,
+    }
+}
+
+fn wake_queue(d: &mut Domain, row: &ChangeRow) {
+    for (_, other) in &d.changes {
+        if other.task != row.task
+            && other.repository == row.repository
+            && other.base == row.base
+            && in_queue(&other.change.state)
+        {
+            d.procedure_wakes.insert(other.task, true).expect("one pending wake per change");
+        }
+    }
 }
 
 #[expect(clippy::manual_map, reason = "step code uses concrete matches, without callbacks")]
@@ -2186,6 +2224,7 @@ fn change_facts(
         first: queue_first(d, row, env.wall, &env.limits),
         may_merge,
         queue_repair_active: pending.queue_repair_active,
+        kept: pending.kept,
         settling: match window {
             Some((_, end)) => Some(end),
             None => None,

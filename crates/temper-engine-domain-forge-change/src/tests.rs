@@ -47,6 +47,7 @@ fn facts() -> Facts {
         first: false,
         may_merge: true,
         queue_repair_active: false,
+        kept: false,
         settling: None,
     }
 }
@@ -55,6 +56,60 @@ fn heard() -> Heard {
 }
 fn decide(change: &Change, facts: &Facts, heard: &Heard) -> crate::Stepped {
     step(change, facts, heard, at(1), &LIMITS)
+}
+
+#[test]
+fn a_kept_queued_or_first_change_leaves_the_queue_without_losing_its_ready_time() {
+    let mut f = facts();
+    f.kept = true;
+    f.first = true;
+    for state in [State::Queued { head: HEAD, ready_since: at(0) }, State::First { head: HEAD, ready_since: at(0) }] {
+        let mut c = change(state);
+        c.ready_since = Some(at(0));
+        c.owns_turn = true;
+        let next = decide(&c, &f, &heard());
+        assert_eq!(next.change.state, State::Gating { head: HEAD, asked: Box::new([]) });
+        assert_eq!(next.change.ready_since, Some(at(0)));
+        assert!(!next.change.owns_turn);
+        assert_eq!(next.decision, Decision::None);
+    }
+}
+
+#[test]
+fn a_kept_gating_change_waits_without_a_stall_deadline_or_a_ready_time() {
+    let mut f = facts();
+    f.kept = true;
+    let c = change(State::Gating { head: HEAD, asked: Box::new([]) });
+    let next = step(&c, &f, &heard(), at(60), &LIMITS);
+    assert_eq!(next.decision, Decision::Wait { until: None });
+    assert_eq!(next.change.state, c.state);
+    assert_eq!(next.change.ready_since, None);
+}
+
+#[test]
+fn an_unkept_change_is_ready_again_at_its_old_time_with_its_gate_verdict() {
+    let mut c = change(State::First { head: HEAD, ready_since: at(0) });
+    c.ready_since = Some(at(0));
+    c.owns_turn = true;
+    c.gates = Box::new([Gate {
+        number: 9,
+        kind: GateKind::Agent,
+        blocking: true,
+        freshness: Freshness::Exact,
+        eager: false,
+    }]);
+    let mut f = facts();
+    f.kept = true;
+    f.gates = Box::new([GateReport { number: 9, head: HEAD, status: Status::Passed }]);
+    let left = decide(&c, &f, &heard());
+    let waiting = step(&left.change, &f, &heard(), at(60), &LIMITS);
+    assert_eq!(waiting.decision, Decision::Wait { until: None });
+    f.kept = false;
+    let ready = step(&waiting.change, &f, &heard(), at(61), &LIMITS);
+    assert_eq!(ready.decision, Decision::Ready);
+    assert_eq!(ready.change.state, State::Queued { head: HEAD, ready_since: at(0) });
+    assert_eq!(ready.change.ready_since, Some(at(0)));
+    assert!(!ready.change.owns_turn);
 }
 #[test]
 fn a_change_is_produced_opened_checked_queued_and_landed() {
