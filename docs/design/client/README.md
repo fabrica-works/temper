@@ -293,8 +293,8 @@ keeps (`../protocol/configuration.md`, section 2).
 | Address | Mockup | Shows | Watches and reads | Acts |
 |---|---|---|---|---|
 | `Inbox` (home) | `inbox.html` | what needs the person, across projects, filtered by project, kind and goal (its root): proposals, questions, held tasks, person tasks; then updates (results, replies) | `inbox` with its filters; the `proposal` or `task` an entry's card needs | accept, reject with a reason, answer, release, leave held, take, hand back; seen |
-| `Chats` | `chats.html`, `first-run.html` | a composer to start a chat; in the demo's project while the demo's model half holds, its suggested requests (4.8, 5.6); the person's chats, live or closed, newest activity first, each with its status, spend and delegates | `tasks{query}`: requester the person, the chat label, by last activity; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request |
-| `Chat { task }` | `index.html` | the conversation: committed turns, the person's words, work summaries, provisional text; each task it delegated as that task's card, at the call that made it or else at the result it sent back (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer | `task`, `activity` a page at a time, `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls and results name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
+| `Chats` | `chats.html`, `first-run.html` | a composer to start a chat; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats, live or closed, newest activity first, each with its status, spend and delegates | `tasks{query}`: requester the person, the chat label, by last activity; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request |
+| `Chat { task }` | `index.html`, `first-run.html` | its chatbar: its number and title, its status, its spend and acts; in the demo's project while the demo is answered, the demo's banner and the context line (5.6); the conversation: committed turns, the person's words, work summaries, provisional text; each task it delegated as that task's card, at the call that made it or else at the result it sent back (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer | `task`, `activity` a page at a time, `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls and results name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
 | `Task { task }` | `task.html`, `agent-task.html` | a goal: its header, what was asked, its plan as a tree, its latest activity and history, its budget and authority, with Amend, Stop and Cancel; an agent's task: its transcript and a composer, with Amend and Stop | `task`, `tree`, `activity`; `run` while one is live | amend, stop, cancel, release a held task of the plan, message an agent's task |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
@@ -308,6 +308,17 @@ keeps (`../protocol/configuration.md`, section 2).
   "Parked"); a conversation from jig's thread model; jig's enums and a
   decision's facts in jig's words, under temper's phrasebook (5.1);
   each card temper's own (section 1).
+- **A chat's chatbar** (`index.html`, `first-run.html`): its level-1
+  heading "TN · TITLE", the chat's task number and its title (a
+  chat's first message); its status; then "Demo model" while the
+  demo's model half holds and the chat is in the demo's project (5.6),
+  its spend, and its acts.
+- **A conversation's turns** are named "You" when the turn is the
+  person's own, "Temper" when it is the agent's, and by the party's
+  name otherwise (`first-run.html`), on every page that draws a
+  conversation. A chip's executor keeps jig's "Agent". The mockup's
+  time beside each turn ("Just now") is not drawn: the view keeps no
+  clock (section 11).
 - **A task's page** is of its kind: a tracked task's, as `task.html`
   lays it out; an agent's task's, as `agent-task.html`. A task with the
   chat label opens as `Chat { task }`. A procedure's task or a person
@@ -742,11 +753,15 @@ of each (`../draft/first-run.md`, 3.6).
   deployment's part (`forge.md`, 5.4) shows no forge connected but the
   demo's. That part is read only for a person whose role holds the
   deployment's forges (3.5); for any other person, and while the part
-  is not served, the half does not hold.
+  is not served, the half does not hold. *Until the forge's side reads
+  that part* (o/github's), the half holds while the demo is answered:
+  a departure, kept in the domain's `halves` alone (section 11).
 - **What shows:** the demo's banner, while either half holds (5.1); the
-  suggested requests, on the chats page, while the model's half holds
-  and the person is in the demo's project (3.5). Each is worded in 5.6.
-  Nothing hides them but their halves (section 11).
+  demo's start, on the chats page, while the model's half holds and
+  the person is in the demo's project (3.5); the context line, on the
+  demo's start and on a chat's page in the demo's project, while the
+  demo is answered. Each is worded in 5.6. Nothing hides them but
+  their halves (section 11).
 - **State:** the last answer, the pending read's key, at most one, and
   whether the link was live at the last pass. Bounded by the record's
   bounds (4.6).
@@ -780,7 +795,9 @@ of each (`../draft/first-run.md`, 3.6).
     (5.5), on every page but the accounts page;
   - *the demo's banner,* while either of the demo's halves holds
     (4.8): a region named "Demo", its words and its links (5.6), on
-    every page but the accounts and the forges pages;
+    every page but the accounts and the forges pages; on a chat's page
+    and the demo's start, the page draws it after its chatbar, as the
+    mockup does, and the frame does not;
   - *the main:* the page at the address (3.5), its title its level-1
     heading.
 
@@ -964,16 +981,34 @@ OWNER/NAME is the demo's repository, and the cues the demo's, copied in:
   model." or "This is a demo, running on a demo forge." while one
   does; then "Connect a model", a link to `Accounts`, while the model's
   half holds, and "Connect a forge", a link to `Forges`, while the
-  forge's half holds.
-- **The suggestions,** on the chats page, after the level-1 heading and
-  before the composer: the heading "What shall we change?"; "Try a
-  request in OWNER/NAME. Follow the task from its branch to a landed
-  change."; a list named "Suggested requests" of one button per cue,
-  each named by its cue's words; and "The demo model plays these
-  requests from a script."
-- **The composer's line,** on the demo's account: "Using NAME · MODEL",
-  NAME the demo provider's name in the configuration ("Demo model" in
-  the box's).
+  forge's half holds. The client has no forges' page yet (o/github's):
+  until it does, "Connect a forge" is a disabled button.
+- **The demo's start,** on the chats page, in place of its level-1
+  heading "Chats" (`first-run.html` as it loads): a chatbar, "New
+  chat", the status "Ready", and "Demo model"; the banner; the context
+  line; the level-1 heading "What shall we change?"; "Try a request in
+  OWNER/NAME. Follow the task from its branch to a landed change."; a
+  list named "Suggested requests" of one button per cue, each named by
+  its cue's words; "The demo model plays these requests from a
+  script."; then the page's composer and the person's chats, as on any
+  chats page. A chat starts with its first message, so the start has
+  no task and no number; once a suggestion or the composer starts the
+  chat, its page keeps the frame (3.5).
+- **The context line,** after the banner: "PROJECT · OWNER/NAME on Demo
+  forge", PROJECT the project as the banner names it; then "Signed in
+  as the deployment's owner" while `me`'s role on the deployment is
+  `Owner`, else "Signed in as the project's owner" while the person's
+  role on the project is `Owner`, else "Signed in as NAME", the
+  person's name as the banner shows it.
+- **The composer's line,** while the model's half holds and the draft
+  is for the demo's project: "Using Demo model · MODEL", MODEL the
+  requested model's name, or "Default" while none is requested, in
+  place of the line naming what the next run takes.
+- **Its names:** the configuration names the demo's provider, model
+  and forge by identifiers ("demo"), so the phrasebook names them
+  "Demo model" and "Demo forge", as the demo's scripted words do.
+- **Not drawn:** the mockup's placeholder, "Try a suggested request…"
+  (skein-ui's text area has none), and "Reset demo" (section 11).
 
 ### 5.7 A delegation's card
 
@@ -1720,6 +1755,21 @@ own tests:
   hides them, and nothing is kept to dismiss them.
 - **"Reset demo"** (`mockups/first-run.html`): the demo's chats and
   their work set aside for a fresh start. Default: not offered.
+- **The demo's forge half** (4.8): the forge's side does not read the
+  deployment's part yet, so the half holds while the demo is answered,
+  even once a real forge is connected. Default: that rule, in the
+  domain's `halves` alone, until the forge's side reads the part
+  (o/github's); "Connect a forge" a disabled button until the client
+  has the forges' page.
+- **"Signed in as the deployment's owner"** (5.6) reads `me`'s role on
+  the deployment, which the engine gives only once it seeds the
+  deployment's owner (jig's t31a). Default: the project's role
+  meanwhile ("Signed in as the project's owner").
+- **The composer's placeholder** ("Try a suggested request…",
+  `mockups/first-run.html`): skein-ui's text area has none, and adding
+  one is a change to skein's API and a repin. Default: not drawn.
+- **A turn's time** ("Just now", `mockups/first-run.html`): the view
+  keeps no clock to say it against. Default: not drawn.
 - **A delegation's tasks, keyed** (5.7): jig's thread keeps a
   `delegate` call's `objects` empty, so the domain reads the tasks
   from temper's acknowledgement and, at a result, from temper's inbox
