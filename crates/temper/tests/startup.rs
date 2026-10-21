@@ -202,18 +202,6 @@ fn a_setup_naming_no_forge_refuses_the_box_before_it_starts() {
     scratch.remove();
 }
 #[test]
-fn a_fake_entry_refuses_the_box_before_it_starts() {
-    let scratch = support::Scratch::startup("box-fake");
-    let mut value = managed(scratch.path(), true);
-    support::configuration::fake_entry(&mut value["application"]["setup"][0], "127.0.0.1:9");
-    assert_eq!(
-        refused_box(&scratch, &value),
-        "temper box: application.setup[0].mode.fake: the box runs no fake forge yet\n"
-    );
-    assert!(!scratch.path().join("forge-1/admin_token").exists());
-    scratch.remove();
-}
-#[test]
 fn a_box_maximum_backoff_below_its_base_is_refused() {
     let scratch = support::Scratch::startup("box-backoff");
     let mut value = box_document(&scratch);

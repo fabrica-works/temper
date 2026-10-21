@@ -7,19 +7,7 @@ use temper_box::host::{Service, Settings};
 /// Checks the document before starting its steps; refusals contain unprefixed lines.
 pub fn run(directories: &super::Directories) -> Result<Exit, String> {
     let bytes = configuration(directories)?;
-    let super::setup::Deployment { checked, limits, .. } = super::setup::check(&bytes, &directories.jig())?;
-    let mut refusals = Vec::new();
-    for (index, entry) in checked.setup.entries.iter().enumerate() {
-        match &entry.mode {
-            temper_forge_setup::setup::Mode::Fake(_) => {
-                refusals.push(format!("application.setup[{index}].mode.fake: the box runs no fake forge yet"));
-            }
-            temper_forge_setup::setup::Mode::Managed { .. } | temper_forge_setup::setup::Mode::Owned(_) => {}
-        }
-    }
-    if !refusals.is_empty() {
-        return Err(refusals.join("\n"));
-    }
+    let super::setup::Deployment { checked, demo, limits, .. } = super::setup::check(&bytes, &directories.jig())?;
     let directory = super::path(&directories.data);
     let program = std::env::current_exe().map_err(|why| why.to_string())?;
     let environment = std::env::vars_os()
@@ -30,7 +18,7 @@ pub fn run(directories: &super::Directories) -> Result<Exit, String> {
             entry.into_boxed_slice()
         })
         .collect();
-    let steps = temper_forge_setup::steps(&checked.setup, &directories.flags());
+    let steps = temper_fake::steps(&checked.setup, demo.as_ref(), &directories.flags());
     let mut owned = Vec::new();
     let opened = (|| {
         let signals = skein_shell::open_termination_signals().map_err(|errno| format!("signals: errno {errno}"))?;
