@@ -9,6 +9,7 @@ use skein_lib::{Env, Queue, Time};
 pub mod accounts;
 pub mod chat;
 pub mod chats;
+pub mod choice;
 pub mod inbox;
 pub mod task;
 #[derive(Debug)]
@@ -22,6 +23,7 @@ pub struct Pages {
     chat: Option<chat::Chat>,
     task: Option<task::Task>,
     accounts: accounts::Accounts,
+    pub(crate) choice: choice::Draft,
     accounts_open: bool,
     party: Option<u64>,
     next: u64,
@@ -34,6 +36,7 @@ pub enum Act {
     Project {
         project: u32,
     },
+    Choice(choice::Act),
     SignOut,
     Accounts(accounts::Act),
     ChatWords {
@@ -110,6 +113,7 @@ impl Pages {
             chat: None,
             task: None,
             accounts: accounts::Accounts::default(),
+            choice: choice::Draft::default(),
             accounts_open: false,
             party: None,
             next: 1,
@@ -117,6 +121,10 @@ impl Pages {
             seen: None,
             confirm: None,
         }
+    }
+    #[must_use]
+    pub fn choice(&self) -> &choice::Draft {
+        &self.choice
     }
     #[must_use]
     pub fn accounts(&self) -> Option<&accounts::Accounts> {
@@ -194,7 +202,7 @@ impl Pages {
     pub(crate) fn suggest(&mut self, env: &Env<Limits>, client: &Client, words: &[u8], out: &mut Queue<Request>) {
         let me = self.me(client);
         if let Some(chats) = &mut self.chats {
-            chats.suggest(env, me, self.project, words, &mut self.serial, out);
+            chats.suggest(env, me, self.project, words, &self.choice, &mut self.serial, out);
             self.shown = self.shown.checked_add(1).expect("pages shown fits");
         }
     }
@@ -255,17 +263,13 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
             pages.accounts.leave(out);
             pages.accounts_open = false;
         }
+        Event::Act { act: Act::Choice(act) } => choice::act(pages, client, act, out),
         Event::Act { act: Act::ChatWords { words } } => {
             if let Some(chats) = &mut pages.chats {
                 chats.write(words, &env.limits);
             }
         }
-        Event::Act { act: Act::StartChat } => {
-            let me = pages.me(client);
-            if let Some(chats) = &mut pages.chats {
-                chats.start(env, me, pages.project, &mut pages.serial, out);
-            }
-        }
+        Event::Act { act: Act::StartChat } => start_chat(pages, env, client, out),
         Event::Act { act: Act::Suggest { .. } } => unreachable!("suggestions are resolved by the root"),
         Event::Act { act: Act::ClosedChats } => {
             if let Some(chats) = &pages.chats {
@@ -301,7 +305,7 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
         Event::Told { told: Told::Changed { handle } } if handle == me_handle() => me_changed(pages, client, out),
         Event::Link { link } => link_changed(pages, link, out),
         Event::Told { told } => {
-            if crate::acts::told(pages, &told) {
+            if pages.choice.told(&told) || crate::acts::told(pages, &told) {
                 pages.shown = pages.shown.checked_add(1).expect("pages shown fits");
                 return;
             }
@@ -320,6 +324,7 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
     if let Some(chats) = &mut pages.chats {
         chats.configure(me, pages.project, &env.limits, out);
     }
+    choice::refresh(pages, client);
     redirect_chat(pages, client, out);
     pages.shown = pages.shown.checked_add(1).expect("pages shown count fits");
 }
@@ -376,6 +381,7 @@ fn went(pages: &mut Pages, env: &Env<Limits>, address: Address, out: &mut Queue<
         if let Address::Inbox { filter } = address {
             pages.inbox = Some(inbox::Inbox::new(filter, pages.next, &env.limits, out));
         }
+        pages.choice = choice::Draft::default();
         pages.seen = None;
         pages.confirm = None;
     }
@@ -471,7 +477,8 @@ fn confirmation(pages: &mut Pages, env: &Env<Limits>, client: &Client, act: Act,
         act @ (Act::Decide { .. } | Act::CardWords { .. } | Act::Again { .. } | Act::Confirm) => {
             crate::acts::step(pages, env, act, out);
         }
-        Act::Project { .. }
+        Act::Choice(_)
+        | Act::Project { .. }
         | Act::Accounts(_)
         | Act::SignOut
         | Act::ChatWords { .. }
@@ -531,6 +538,9 @@ fn me_changed(pages: &mut Pages, client: &Client, out: &mut Queue<Request>) {
                 subject: Watchable::Jig(Subject::Accounts),
             }));
         }
+        if pages.party != Some(me.party.number) {
+            pages.choice = choice::Draft::default();
+        }
         pages.party = Some(me.party.number);
     }
     if let Some(me) = pages.me(client)
@@ -552,6 +562,7 @@ fn link_changed(pages: &mut Pages, link: Link, out: &mut Queue<Request>) {
             }
             pages.accounts.leave(out);
             pages.accounts = accounts::Accounts::default();
+            pages.choice = choice::Draft::default();
             pages.party = None;
             pages.project = None;
         }
@@ -568,5 +579,12 @@ fn link_changed(pages: &mut Pages, link: Link, out: &mut Queue<Request>) {
                 }));
             }
         }
+    }
+}
+
+fn start_chat(pages: &mut Pages, env: &Env<Limits>, client: &Client, out: &mut Queue<Request>) {
+    let me = pages.me(client);
+    if let Some(chats) = &mut pages.chats {
+        chats.start(env, me, pages.project, &pages.choice, &mut pages.serial, out);
     }
 }

@@ -14,8 +14,22 @@ fn starting_a_chat_sends_the_chat_template_filled_once() {
     let mut out = Queue::with_capacity(OUTPUTS);
     let mut serial = SERIAL;
     chats.write(Box::from(*b"Hello"), &limits);
-    chats.start(&fixtures::env(&limits), Some(&me), Some(fixtures::PROJECT), &mut serial, &mut out);
-    chats.start(&fixtures::env(&limits), Some(&me), Some(fixtures::PROJECT), &mut serial, &mut out);
+    chats.start(
+        &fixtures::env(&limits),
+        Some(&me),
+        Some(fixtures::PROJECT),
+        &crate::pages::choice::Draft::default(),
+        &mut serial,
+        &mut out,
+    );
+    chats.start(
+        &fixtures::env(&limits),
+        Some(&me),
+        Some(fixtures::PROJECT),
+        &crate::pages::choice::Draft::default(),
+        &mut serial,
+        &mut out,
+    );
     let expected = jig_client::shapes::chat(&me, fixtures::PROJECT, fixtures::acts::text(b"Hello")).expect("template");
     assert_eq!(fixtures::acts::sent(&mut out).as_ref(), [expected]);
 }
@@ -89,7 +103,14 @@ fn starting_a_chat_waits_for_the_first_words() {
     let mut chats = Chats::new(FIRST);
     let mut out = Queue::with_capacity(OUTPUTS);
     let mut serial = SERIAL;
-    chats.start(&fixtures::env(&limits), Some(&me), Some(fixtures::PROJECT), &mut serial, &mut out);
+    chats.start(
+        &fixtures::env(&limits),
+        Some(&me),
+        Some(fixtures::PROJECT),
+        &crate::pages::choice::Draft::default(),
+        &mut serial,
+        &mut out,
+    );
     assert_eq!(fixtures::acts::sent(&mut out).len(), 0);
 }
 #[test]

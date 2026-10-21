@@ -142,7 +142,13 @@ pub(super) fn step(pages: &mut Pages, env: &Env<Limits>, act: Act, out: &mut Que
         | Act::StartChat
         | Act::Suggest { .. }
         | Act::ClosedChats => unreachable!("chat acts routed to chats"),
-        Act::Accounts(_) | Act::Project { .. } | Act::SignOut | Act::Filter { .. } | Act::Seen | Act::Go { .. } => {
+        Act::Choice(_)
+        | Act::Accounts(_)
+        | Act::Project { .. }
+        | Act::SignOut
+        | Act::Filter { .. }
+        | Act::Seen
+        | Act::Go { .. } => {
             unreachable!("only deciding acts routed here")
         }
     }

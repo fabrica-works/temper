@@ -101,28 +101,39 @@ impl Chats {
         env: &Env<Limits>,
         me: Option<&Me>,
         project: Option<u32>,
+        choice: &super::choice::Draft,
         serial: &mut u64,
         out: &mut Queue<Request>,
     ) {
-        self.send(env, me, project, self.words.clone(), serial, out);
+        self.send(env, me, project, self.words.clone(), choice, serial, out);
     }
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "suggested words share the composer's identity, choice and send state"
+    )]
     pub(crate) fn suggest(
         &mut self,
         env: &Env<Limits>,
         me: Option<&Me>,
         project: Option<u32>,
         words: &[u8],
+        choice: &super::choice::Draft,
         serial: &mut u64,
         out: &mut Queue<Request>,
     ) {
-        self.send(env, me, project, words.into(), serial, out);
+        self.send(env, me, project, words.into(), choice, serial, out);
     }
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "both entry paths supply their words and borrow the same bounded draft"
+    )]
     fn send(
         &mut self,
         env: &Env<Limits>,
         me: Option<&Me>,
         project: Option<u32>,
         words: Box<[u8]>,
+        choice: &super::choice::Draft,
         serial: &mut u64,
         out: &mut Queue<Request>,
     ) {
@@ -130,9 +141,18 @@ impl Chats {
             return;
         }
         let (Some(me), Some(project)) = (me, project) else { return };
+        if !choice.valid(me) {
+            return;
+        }
         let Ok(words) = Text::new(words, env.limits.client.domain.text) else { return };
         match jig_client::shapes::chat(me, project, words) {
-            Ok(ask) => {
+            Ok(mut ask) => {
+                if let c::Ask::Create { tasks, .. } = &mut ask
+                    && let Some(task) = tasks.get_mut(0)
+                    && choice.context.is_some()
+                {
+                    task.llm.clone_from(&choice.requested);
+                }
                 *serial = serial.checked_add(1).expect("page keys fit");
                 let key = Key { asker: Owner::Pages.asker(), number: *serial };
                 self.start = Some(key);

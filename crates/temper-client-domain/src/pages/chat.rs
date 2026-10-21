@@ -345,7 +345,8 @@ impl Chat {
             Act::Send => self.send(env, client, Sending::Message, serial, out),
             Act::Stop => self.send(env, client, Sending::Stop, serial, out),
             Act::Seen => self.send(env, client, Sending::Seen, serial, out),
-            Act::Accounts(_)
+            Act::Choice(_)
+            | Act::Accounts(_)
             | Act::Project { .. }
             | Act::SignOut
             | Act::ChatWords { .. }
