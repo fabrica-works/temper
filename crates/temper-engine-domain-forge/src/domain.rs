@@ -1433,11 +1433,13 @@ fn lost(d: &mut Domain, env: &Env<Limits>, task: u64, attempt: u64, out: &mut Qu
             skein_forge_client::What::Repository
             | skein_forge_client::What::Pull(_)
             | skein_forge_client::What::Issue(_) => {
+                lost_release(d, name, true, out);
                 emit(out, Request::Refused { task });
                 continue;
             }
         };
         let Some(sequence) = d.sequence.checked_add(1) else {
+            lost_release(d, name, true, out);
             emit(out, Request::Refused { task });
             return;
         };
@@ -1447,6 +1449,7 @@ fn lost(d: &mut Domain, env: &Env<Limits>, task: u64, attempt: u64, out: &mut Qu
             .insert(owner, PendingLost { task, attempt, name: name.clone(), comparison: None, asked: true })
             .is_err()
         {
+            lost_release(d, name, true, out);
             emit(out, Request::Refused { task });
             return;
         }
@@ -1546,6 +1549,7 @@ fn lost_read(
             None
         }
         (_, Ok(_) | Err(_)) => {
+            lost_release(d, &pending.name, true, out);
             emit(out, Request::Refused { task: pending.task });
             return;
         }
@@ -1560,6 +1564,7 @@ fn lost_read(
     if undrifted && let Some(commit) = observed {
         let head = BranchHead { name: pending.name.clone(), commit, owned: true };
         if d.heads.insert(pending.name.clone(), head.clone()).is_err() {
+            lost_release(d, &pending.name, true, out);
             emit(out, Request::Refused { task: pending.task });
             return;
         }
@@ -1567,6 +1572,17 @@ fn lost_read(
         child(d, env, skein_forge_client::Event::Pushed { resource: resource.clone(), commit }, out);
     }
     child(d, env, skein_forge_client::Event::Writer { resource, taken: false }, out);
+    lost_release(d, &pending.name, false, out);
+}
+
+/// Wake the holder's existing release after its lost writer's reread ends.
+fn lost_release(d: &Domain, name: &Name, failed: bool, out: &mut Queue<Request>) {
+    let Some(hold) = d.holds.get(name) else { return };
+    let task = hold.task;
+    let Some(row) = d.releases.get(&task) else { return };
+    if row.releasing && !row.failed && row.pending.is_none() {
+        emit(out, if failed { Request::ReleaseFailed { task } } else { Request::ContinueRelease { task } });
+    }
 }
 
 fn enqueue(d: &mut Domain, env: &Env<Limits>, entry: skein_forge_client::Entry, out: &mut Queue<Request>) {
@@ -2563,6 +2579,13 @@ fn continue_release(d: &mut Domain, env: &Env<Limits>, task: u64, entry: u64, ou
             }
         }
         if let Some((name, writer)) = selected {
+            if let Some(Writer::Lost { task: lost_task, attempt }) = writer {
+                for (_, pending) in &d.lost {
+                    if pending.name == name && pending.task == lost_task && pending.attempt == attempt {
+                        return;
+                    }
+                }
+            }
             if writer.is_some() {
                 emit(out, Request::ReleaseFailed { task });
                 return;

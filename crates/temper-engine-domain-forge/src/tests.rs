@@ -784,6 +784,112 @@ fn a_lost_writers_read_refused_for_room_is_asked_again_when_room_frees() {
 }
 
 #[test]
+fn a_release_waits_for_its_lost_writers_reread_even_after_restart() {
+    for restart in [false, true] {
+        for refused in [false, true] {
+            let mut d = domain();
+            outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+            outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
+            outputs(&mut d, Event::ReadAfresh);
+            outputs(&mut d, Event::SettleOutbox);
+            let name = run_branch(b"7");
+            outputs(&mut d, Event::Hold { task: 7, resource: name.clone(), from: None });
+            outputs(
+                &mut d,
+                Event::Claim { task: 9, attempt: 1, writes: Box::new([name.clone()]), holders: Box::new([7]) },
+            );
+            outputs(&mut d, Event::Lost { task: 9, attempt: 1 });
+            let (mut call, _) = fixtures::next_call(&mut d);
+            assert_eq!(d.hold(&name).unwrap().writer, Some(Writer::Lost { task: 9, attempt: 1 }));
+            let closing = outputs(&mut d, Event::Release { task: 7, root: 7, ending: ReleaseEnding::Done, entry: 20 });
+            assert!(!closing.contains(&Request::ReleaseFailed { task: 7 }), "wait for the reread");
+            if restart {
+                let hold = d.hold(&name).unwrap().clone();
+                d = domain();
+                outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+                outputs(&mut d, Event::Restore { record: Stored::Hold(hold) });
+                for request in closing {
+                    if let Request::Save { record: row @ Stored::Release(_), .. } = request {
+                        outputs(&mut d, Event::Restore { record: row });
+                    }
+                }
+                outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
+                outputs(&mut d, Event::ReadAfresh);
+                (call, _) = fixtures::next_call(&mut d);
+            }
+            let error = if refused { skein_forge::api::Error::Refused } else { skein_forge::api::Error::Missing };
+            let answered = fixtures::answer(&mut d, call, Err(error));
+            if refused {
+                assert!(answered.contains(&Request::ReleaseFailed { task: 7 }));
+                assert!(!answered.contains(&Request::ContinueRelease { task: 7 }));
+            } else {
+                assert!(!answered.contains(&Request::ReleaseFailed { task: 7 }));
+                assert!(answered.contains(&Request::ContinueRelease { task: 7 }));
+                assert_eq!(d.hold(&name).unwrap().writer, None);
+                let continued = outputs(&mut d, Event::ContinueRelease { task: 7, entry: 21 });
+                let mut deleting = false;
+                for request in continued {
+                    if let Request::Save { record: Stored::Entry { entry, .. }, .. } = request
+                        && let skein_forge::api::Write::DeleteBranch { branch } = entry.effect.write
+                    {
+                        assert_eq!(entry.task, 7);
+                        assert_eq!(branch.as_ref(), b"temper/7");
+                        deleting = true;
+                    }
+                }
+                assert!(deleting, "release enqueues its branch deletion");
+            }
+        }
+    }
+}
+
+#[test]
+fn a_release_waits_while_its_lost_writer_is_waiting_for_read_room() {
+    let mut d = four_writers();
+    outputs(&mut d, Event::Lost { task: 9, attempt: 1 });
+    ready(&mut d);
+    ready(&mut d);
+    // Branch temper/10 sorts first; its comparison waits for call room.
+    branch_at(&mut d, 1, 4);
+    let closing = outputs(&mut d, Event::Release { task: 10, root: 10, ending: ReleaseEnding::Done, entry: 20 });
+    assert!(!closing.contains(&Request::ReleaseFailed { task: 10 }));
+    ready(&mut d);
+    ready(&mut d);
+    branch_at(&mut d, 2, 2);
+    ready(&mut d);
+    branch_at(&mut d, 3, 2);
+    let (call, _) = fixtures::next_call(&mut d);
+    let answered = fixtures::answer(
+        &mut d,
+        call,
+        Ok(skein_forge::api::Answer::Compare {
+            before: [2; 32],
+            after: [4; 32],
+            contains_before: true,
+            files: Box::new([]),
+            commits: Box::new([]),
+        }),
+    );
+    assert!(answered.contains(&Request::ContinueRelease { task: 10 }));
+}
+
+#[test]
+fn a_release_still_fails_for_a_running_writer_or_a_lost_writer_without_a_read() {
+    for writer in [Writer::Run { task: 9, attempt: 1 }, Writer::Lost { task: 9, attempt: 1 }] {
+        let mut d = domain();
+        outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+        outputs(
+            &mut d,
+            Event::Restore {
+                record: Stored::Hold(Hold { name: run_branch(b"7"), task: 7, writer: Some(writer), drift: None }),
+            },
+        );
+        let closing = outputs(&mut d, Event::Release { task: 7, root: 7, ending: ReleaseEnding::Done, entry: 20 });
+        assert!(closing.contains(&Request::ReleaseFailed { task: 7 }));
+    }
+}
+
+#[test]
 fn a_ci_sections_words_keep_their_end_and_others_their_start() {
     for (tail, gathered, cut) in [(true, b"cdefghij", b"ghij"), (false, b"abcdefgh", b"abcd")] {
         let mut words = brief::BriefWords::with_capacity(8, tail);

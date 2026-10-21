@@ -1077,7 +1077,8 @@ adoption says so, 4.4) lands through that queue. Forgejo keeps none.
 - **Deleted as their tasks close,** as the release of their holds (jig's
   `domain/tasks.md`, 6.5): a landed change's branch, a cancelled one's,
   and a task's saved work. A failed change's branch is kept for a person
-  to read, and deleted as its tree's root closes.
+  to read, and deleted as its tree's root closes. A release waits for a lost
+  writer's reread, and fails only if that reread fails.
 
 ### 11.1 A branch per goal
 
