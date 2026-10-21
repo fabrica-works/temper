@@ -144,6 +144,7 @@ fn party_fields(
             out.object_end();
         }
     }
+    super::account_programs::hosts(&party.program_hosts, out, cut, window);
     super::offers::readiness(&party.readiness, party.readiness_cut, limits, out, window);
     deployment(extra, out, cut, window);
     out.key(b"deployment_facts");
@@ -272,6 +273,11 @@ fn line(
         out.object_start();
         number(b"number", u64::from(source.number), out);
         number(b"place", u64::from(source.place), out);
+        out.key(b"name");
+        match &source.name {
+            Some(name) => cut.words(name, out),
+            None => out.null(),
+        }
         out.key(b"kind");
         out.string(match source.kind {
             c::OwnerAccountKind::SignIn => b"sign_in",

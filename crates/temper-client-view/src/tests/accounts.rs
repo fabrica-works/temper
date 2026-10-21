@@ -17,6 +17,7 @@ const SOURCE: u32 = 43;
 const ADDRESS: &[u8] = b"https://issuer.example/visit";
 fn source(number: u32) -> c::OwnerAccountSource {
     c::OwnerAccountSource {
+        name: None,
         number,
         place: number,
         kind: c::OwnerAccountKind::Key,
@@ -61,6 +62,7 @@ fn document(count: u32) -> c::OwnerAccounts {
             .unwrap();
     }
     c::OwnerAccounts {
+        program_hosts: List::with_capacity(0),
         readiness: List::with_capacity(0),
         readiness_cut: false,
         accounts,
@@ -687,4 +689,35 @@ fn typing_a_key_keeps_the_write_revision() {
     );
     fixtures::build(&mut view, &root);
     assert_eq!(key_field(&view).value.as_ref().unwrap().written, before);
+}
+
+#[test]
+fn accounts_show_the_configured_workers_program_observation() {
+    let mut doc = document(1);
+    let mut programs = List::with_capacity(1);
+    programs
+        .push(c::OwnerProgramLogin {
+            name: b"work-login".as_slice().into(),
+            state: Some(c::OwnerProgramState::SignedInOtherwise { method: b"other-method".as_slice().into() }),
+            sign_out: None,
+            cleanup: false,
+            cut: false,
+        })
+        .unwrap();
+    doc.program_hosts = List::with_capacity(1);
+    doc.program_hosts
+        .push(c::OwnerProgramHost {
+            name: b"configured-worker".as_slice().into(),
+            channel: 17,
+            connected: true,
+            awaiting_logins: false,
+            programs,
+            cut: false,
+        })
+        .unwrap();
+    let text = shown(doc);
+    assert!(
+        text.contains("configured-worker") && text.contains("work-login") && text.contains("other-method"),
+        "{text}"
+    );
 }

@@ -1,4 +1,5 @@
 //! temper's own page content.
+mod account_programs;
 pub(crate) mod accounts;
 pub(crate) mod chat;
 pub(crate) mod chats;

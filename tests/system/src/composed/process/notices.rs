@@ -75,6 +75,7 @@ fn composed_notices_reach_the_accounts_child_before_the_attempt_ends() {
                                 ..
                             } => Some(reset),
                             accounts::Stored::Source { .. }
+                            | accounts::Stored::Issued { .. }
                             | accounts::Stored::Account { .. }
                             | accounts::Stored::Next { .. } => None,
                         })

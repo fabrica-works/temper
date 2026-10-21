@@ -40,13 +40,16 @@ pub fn hello(channel: Token, hosting: Box<[host::Hosting]>) -> engine::Event {
 pub fn hello_slots(channel: Token, slots: u32, hosting: Box<[host::Hosting]>) -> engine::Event {
     link(
         channel,
-        engine::Link::Hello(host::Hello {
-            slots,
-            stop_bound: Duration::from_millis(100),
-            workstreams: Box::new([]),
-            hosting,
-            bounds: bounds(),
-        }),
+        engine::Link::Hello {
+            worker: 0,
+            hello: host::Hello {
+                slots,
+                stop_bound: Duration::from_millis(100),
+                workstreams: Box::new([]),
+                hosting,
+                bounds: bounds(),
+            },
+        },
     )
 }
 
@@ -115,6 +118,8 @@ pub struct Protocol {
     pub answers: Vec<(Box<[u8]>, engine::CallAnswer)>,
     /// Each account component request the root made.
     pub accounts: Vec<accounts::Request>,
+    /// Worker channels that received their program-source inventory.
+    pub sources: Vec<Token>,
     /// Core read loads the world answered as gone.
     pub reads: Vec<core::reads::Range>,
 }
@@ -193,6 +198,7 @@ impl Protocol {
                 channel,
                 down: host::LinkDown::Sources { sources },
             })) => {
+                self.sources.push(channel);
                 assert!(sources.is_empty(), "this worker fixture has no configured program sources");
                 Ok(vec![up(channel, host::LinkUp::Logins { logins: Box::new([]) }, engine::Parts::none())])
             }
@@ -247,6 +253,9 @@ impl Protocol {
                     accounts::Request::Component(
                         accounts::ToComponent::Release { .. } | accounts::ToComponent::Close,
                     )
+                    | accounts::Request::Programs { .. }
+                    | accounts::Request::CheckProgram { .. }
+                    | accounts::Request::SignOutProgram { .. }
                     | accounts::Request::Granted { .. }
                     | accounts::Request::Save { .. }
                     | accounts::Request::Erase { .. }

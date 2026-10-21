@@ -95,13 +95,16 @@ pub fn bounds() -> host::Bounds {
 pub fn hello(slots: u32) -> engine::Event {
     engine::Event::Worker(engine::WorkerInput::Link {
         channel: CHANNEL,
-        link: engine::Link::Hello(host::Hello {
-            slots,
-            stop_bound: Duration::from_secs(1),
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-            bounds: bounds(),
-        }),
+        link: engine::Link::Hello {
+            worker: 0,
+            hello: host::Hello {
+                slots,
+                stop_bound: Duration::from_secs(1),
+                workstreams: Box::new([]),
+                hosting: Box::new([]),
+                bounds: bounds(),
+            },
+        },
     })
 }
 

@@ -9,6 +9,7 @@ pub(crate) fn accounts() -> c::OwnerAccounts {
     let mut sources = List::with_capacity(1);
     sources
         .push(c::OwnerAccountSource {
+            name: None,
             place: 1,
             number: SOURCE,
             kind: c::OwnerAccountKind::Key,
@@ -38,6 +39,7 @@ pub(crate) fn accounts() -> c::OwnerAccounts {
         })
         .expect("one account");
     c::OwnerAccounts {
+        program_hosts: List::with_capacity(0),
         readiness: List::with_capacity(0),
         readiness_cut: false,
         accounts,

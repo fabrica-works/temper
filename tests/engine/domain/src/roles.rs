@@ -264,7 +264,7 @@ impl World {
         let initial_rows = store.rows.clone();
         let limits = limits();
         let mut world = World {
-            domain: engine::Domain::new(config(settings), &limits),
+            domain: engine::Domain::new(config(settings), &limits).expect("valid engine configuration"),
             environment: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(engine::max_out(&limits)),
             events: VecDeque::new(),
@@ -444,7 +444,8 @@ impl World {
         self.commit_wait = self.settings.commit_delay;
         if self.settings.cut && self.restarts == 0 && roles {
             assert!(self.store.pending.is_empty(), "cut follows one complete role cohort");
-            self.domain = engine::Domain::new(config(self.settings), &self.environment.limits);
+            self.domain = engine::Domain::new(config(self.settings), &self.environment.limits)
+                .expect("valid engine configuration");
             self.out = Queue::with_capacity(engine::max_out(&self.environment.limits));
             self.events.clear();
             self.frozen_cut = false;

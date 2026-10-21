@@ -13,10 +13,10 @@ use temper_client_domain::{
     Domain,
     pages::accounts::{self, Act, Broken, Operation},
 };
-fn run(b: &mut Builder, w: &Words, word: W) {
+pub(super) fn run(b: &mut Builder, w: &Words, word: W) {
     b.run(Run::Plain, &words::say(w, word, &[]));
 }
-fn number(b: &mut Builder, w: &Words, value: u64) {
+pub(super) fn number(b: &mut Builder, w: &Words, value: u64) {
     b.run(Run::Plain, &words::say(w, W::Number, &[Hole::Number(value)]));
 }
 fn text(b: &mut Builder, w: &Words, role: Role, word: W) {
@@ -218,6 +218,10 @@ fn account(
         number(b, w, u64::from(source.place));
         b.run(Run::Plain, b" \xc2\xb7 ");
         kind(b, w, source.kind);
+        if let Some(name) = &source.name {
+            b.run(Run::Plain, b" ");
+            b.run(Run::Plain, name);
+        }
         b.run(Run::Plain, b" \xc2\xb7 ");
         state(b, w, source);
         b.close();
@@ -333,6 +337,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
             b.close();
         }
         omitted(b, w, W::SignInsOmitted, doc.signing.len(), counts.sign_ins);
+        super::account_programs::hosts(b, w, &doc.program_hosts, counts, text_per_node);
         if doc.settled {
             text(b, w, Role::Status, W::Settled);
         }
@@ -505,11 +510,17 @@ fn outcome(b: &mut Builder, root: &Domain, w: &Words, form: &accounts::Accounts,
             Some(jig_client::Outcome::Lost) => text(b, w, Role::Alert, W::Lost),
             Some(jig_client::Outcome::Unsent) => text(b, w, Role::Alert, W::Unsent),
             Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
-                c::OwnerOutcome::AccountSignedOut { confirmed },
-            ))))) => text(b, w, Role::Status, if *confirmed { W::Confirmed } else { W::Unconfirmed }),
+                c::OwnerOutcome::AccountSignedOut { confirmed, failed_hosts },
+            ))))) => {
+                text(b, w, Role::Status, if *confirmed { W::Confirmed } else { W::Unconfirmed });
+                super::account_programs::failures(b, w, failed_hosts, text_per_node);
+            }
             Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
-                c::OwnerOutcome::AccountRemoved { confirmed },
-            ))))) => text(b, w, Role::Status, if *confirmed { W::Removed } else { W::RemovedUnconfirmed }),
+                c::OwnerOutcome::AccountRemoved { confirmed, failed_hosts },
+            ))))) => {
+                text(b, w, Role::Status, if *confirmed { W::Removed } else { W::RemovedUnconfirmed });
+                super::account_programs::failures(b, w, failed_hosts, text_per_node);
+            }
             Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
                 c::OwnerOutcome::AccountKeyKept { source },
             ))))) => fact(b, w, W::Saved, u64::from(*source)),
@@ -632,7 +643,7 @@ fn is_owner(root: &Domain) -> bool {
     }
 }
 
-fn omitted(b: &mut Builder, w: &Words, word: W, actual: u32, limit: u32) {
+pub(super) fn omitted(b: &mut Builder, w: &Words, word: W, actual: u32, limit: u32) {
     if actual > limit {
         fact(b, w, word, u64::from(actual.saturating_sub(limit)));
     }

@@ -432,6 +432,10 @@ pub fn root(
     let landing_path = Path::root().member(b"application").member(b"landing");
     for refused in domain::refused(config, limits) {
         let (path, what) = match refused {
+            domain::Refused::Workers(problem) => {
+                let (path, what) = membership(problem);
+                (path, What::Jig(what))
+            }
             domain::Refused::Run { charter, bytes } => (
                 at(charter, engine_path.member(b"charters")),
                 match bytes {
@@ -655,4 +659,15 @@ pub fn records(jig: &config::Engine, limits: &limits::Limits, problems: &mut Pro
 pub(crate) fn secret_value_bound(jig: &config::Engine, own: &limits::Limits) -> Option<u32> {
     let root = limits::engine(&jig.limits, own)?;
     Some(crate::store::limits(&root, &jig.limits.core, &root.forge, &jig.limits.store)?.secrets.value)
+}
+
+/// Translate the kit's configured membership refusal into its startup path.
+pub(crate) fn membership(problem: fleet::WorkerProblem) -> (Path, config::What) {
+    let hosts = Path::root().member(b"engine").member(b"hosts").member(b"workers");
+    match problem {
+        fleet::WorkerProblem::Workers { .. } => (hosts, config::What::Bound),
+        fleet::WorkerProblem::WorkerName { worker, .. } => {
+            (hosts.child(Segment::Index(worker)).member(b"name"), config::What::Bound)
+        }
+    }
 }

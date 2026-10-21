@@ -248,9 +248,11 @@ impl Workers {
                         });
                     }
                 }
-                kit::Request::Hello { channel, hello } => {
-                    events
-                        .push(root::Event::Worker(root::WorkerInput::Link { channel, link: root::Link::Hello(hello) }));
+                kit::Request::Hello { channel, worker, hello } => {
+                    events.push(root::Event::Worker(root::WorkerInput::Link {
+                        channel,
+                        link: root::Link::Hello { worker, hello },
+                    }));
                 }
                 kit::Request::Up { channel, up, parts } => {
                     self.received(channel, up, &parts, events);
@@ -593,5 +595,34 @@ impl Workers {
             max.checked_mul(jig_protocol_engine_workers::MAX_OUT_DOWN).expect("worker routing room"),
         )?;
         Ok(workers)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_hello_forwards_a_nonzero_configured_worker_position() {
+        let mut service = crate::tests::fixtures::started();
+        let channel = Token::new(7);
+        let hello = host::Hello {
+            slots: 1,
+            stop_bound: skein_lib::Duration::from_millis(100),
+            workstreams: Box::new([]),
+            hosting: Box::new([]),
+            bounds: crate::tests::fixtures::worker_agent().bounds,
+        };
+        let mut events = Queue::with_capacity(1);
+        service.engine.workers.out.push(kit::Request::Hello { channel, worker: 1, hello });
+        service.engine.workers.drain(&mut events);
+        let Some(root::Event::Worker(root::WorkerInput::Link {
+            channel: forwarded_channel,
+            link: root::Link::Hello { worker, .. },
+        })) = events.pop()
+        else {
+            panic!("hello reaches the root");
+        };
+        assert_eq!((forwarded_channel, worker), (channel, 1));
     }
 }

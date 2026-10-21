@@ -35,7 +35,7 @@ fn until_pending(driver: &mut Driver) {
 /// A worker's hello with its own slots, stop bound and hosted runs.
 fn hello_with(channel: Token, slots: u32, stop_bound: Duration, hosting: Box<[host::Hosting]>) -> engine::Event {
     let hello = host::Hello { slots, stop_bound, workstreams: Box::new([]), hosting, bounds: protocol::bounds() };
-    engine::Event::Worker(engine::WorkerInput::Link { channel, link: engine::Link::Hello(hello) })
+    engine::Event::Worker(engine::WorkerInput::Link { channel, link: engine::Link::Hello { worker: 0, hello } })
 }
 
 /// Every hub record the root sent down a worker channel, in order.
@@ -1062,10 +1062,12 @@ fn an_early_worker_hello_does_not_number_a_commit_before_the_durable_header() {
 fn maximum_cold_hello_batch_and_duplicate_losses_fit_one_startup_decision() {
     let mut limits = limits();
     limits.fleet.workers = 4;
-    limits.fleet.program_sources = 0; // This callback story has no program sources.
+    // Core's worst_case requires accounts.program_names <= fleet.program_sources.
+    limits.fleet.program_sources = limits.accounts.program_names;
     // Each worker's fleet outputs take route and delivery room (jig's fleet `max_out`).
     limits.journal.writes += 4 * (4 - 1);
-    limits.journal.deliveries = 25;
+    limits.journal.deliveries = limits.fleet.workers * fleet::max_out(&limits.fleet) + 1;
+    limits.journal.held = 3 * limits.journal.deliveries + 16;
     let mut driver = Driver::configured(Store::new(), [config(97), config(97)], &limits);
     for channel in 1..=4 {
         driver.send(hello_with(Token::new(channel), 1, Duration::from_secs(5), Box::new([])));
@@ -4311,4 +4313,45 @@ fn an_empty_deployment_recovers_after_its_first_start_commit() {
     recovered.settle();
     assert!(recovered.root.ready());
     assert_eq!(recovered.store.rows, first, "recovery does not reseed the first-start rows");
+}
+
+#[test]
+fn root_startup_returns_the_worker_membership_problem() {
+    let mut config = config(91);
+    let limits = limits();
+    config.core.worker_names =
+        Box::new([vec![b'w'; usize::try_from(limits.fleet.worker_name_bytes + 1).expect("worker name bound fits")]
+            .into_boxed_slice()]);
+    assert!(matches!(
+        engine::Domain::new(config, &limits),
+        Err(fleet::WorkerProblem::WorkerName { worker: 0, limit }) if limit == limits.fleet.worker_name_bytes
+    ));
+}
+
+#[test]
+fn a_hello_keeps_its_configured_worker_position() {
+    let mut limits = limits();
+    limits.fleet.configured_workers = 2;
+    limits.fleet.workers = 2;
+    limits.people.program_hosts = 3;
+    limits.accounts.program_hosts = 3;
+    limits.journal.deliveries = limits.fleet.workers * fleet::max_out(&limits.fleet) + 1;
+    limits.journal.held = 3 * limits.journal.deliveries + 16;
+    let configs = [config(91), config(91)].map(|mut config| {
+        config.core.worker_names = Box::new([b"first-worker".as_slice().into(), b"second-worker".as_slice().into()]);
+        config
+    });
+    let mut driver = Driver::configured(Store::new(), configs, &limits);
+    driver.settle();
+    driver.send(protocol::hello(Token::new(8), Box::new([])));
+    driver.settle();
+    let mut hello = protocol::hello(Token::new(7), Box::new([]));
+    let engine::Event::Worker(engine::WorkerInput::Link { link: engine::Link::Hello { worker, .. }, .. }) = &mut hello
+    else {
+        unreachable!("hello fixture")
+    };
+    *worker = 1;
+    driver.send(hello);
+    driver.settle();
+    assert!(driver.protocol.sources.contains(&Token::new(7)), "position one joins while position zero is occupied");
 }

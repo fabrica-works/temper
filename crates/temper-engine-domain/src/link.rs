@@ -41,7 +41,7 @@ pub(crate) fn settled_resource(heads: &[(forge::Name, skein_forge::api::Commit)]
 /// ([`crate::try_step`]) hands back first, and its host sends again.
 pub(crate) fn receive(domain: &mut Domain, channel: Token, link: Link) -> Option<core::Event> {
     Some(core::Event::Fleet(match link {
-        Link::Hello(hello) => fleet::Event::Hello { channel, hello: self::hello(hello) },
+        Link::Hello { worker, hello } => fleet::Event::Hello { channel, worker, hello: self::hello(hello) },
         Link::Up { up, parts } => self::up(domain, channel, up, parts)?,
         Link::Lost => fleet::Event::Lost { channel },
     }))

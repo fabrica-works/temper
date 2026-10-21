@@ -188,7 +188,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 85429100694156,
+    "memory_bytes": 85507095639812,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -805,6 +805,9 @@
         "agent_stop_ms": 5000,
         "delivery_ms": 1000,
         "save_ms": 1000
+      },
+      "programs": {
+        "check_interval_ms": 60000
       },
       "agent": {
         "program": "/usr/local/bin/temper",

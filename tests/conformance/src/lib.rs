@@ -181,7 +181,7 @@ impl Application for Temper {
             }
         }
         Domain {
-            root: engine::Domain::new(configuration, &limits),
+            root: engine::Domain::new(configuration, &limits).expect("valid engine configuration"),
             outputs: Queue::with_capacity(engine::max_out(&limits)),
             probed: false,
             returned: None,

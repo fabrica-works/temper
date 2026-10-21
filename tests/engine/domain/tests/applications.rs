@@ -91,7 +91,8 @@ fn policy_maps_connector_permissions_to_seeded_roles_after_restart() {
         driver.store.rows.contains_key(&engine::Key::Core(jig_domain_core::Key::People(people::Key::Policy(1)))),
         "permission policy committed"
     );
-    driver.root = engine::Domain::new(temper_engine_domain_world::walking::config(71), &driver.env.limits);
+    driver.root = engine::Domain::new(temper_engine_domain_world::walking::config(71), &driver.env.limits)
+        .expect("valid engine configuration");
     driver.delivered.clear();
     driver.send(engine::Event::Restart);
     driver.settle();

@@ -206,13 +206,25 @@ pub(super) fn encode_owner_outcome(
             out.object_end();
             out.object_end();
         }
+        jig_client::contract::OwnerOutcome::AccountProgramDeclared { source, name } => {
+            out.object_start();
+            out.key(b"account_program_declared");
+            out.object_start();
+            out.key(b"source");
+            out.unsigned(u64::from(*source));
+            out.key(b"name");
+            budget.words(name, out);
+            out.object_end();
+            out.object_end();
+        }
         jig_client::contract::OwnerOutcome::AccountChanged => out.string(b"account_changed"),
-        jig_client::contract::OwnerOutcome::AccountRemoved { confirmed } => {
+        jig_client::contract::OwnerOutcome::AccountRemoved { confirmed, failed_hosts } => {
             out.object_start();
             out.key(b"account_removed");
             out.object_start();
             out.key(b"confirmed");
             out.boolean(*confirmed);
+            encode_failed_hosts(failed_hosts, out, budget);
             out.object_end();
             out.object_end();
         }
@@ -227,12 +239,13 @@ pub(super) fn encode_owner_outcome(
             out.object_end();
             out.object_end();
         }
-        jig_client::contract::OwnerOutcome::AccountSignedOut { confirmed } => {
+        jig_client::contract::OwnerOutcome::AccountSignedOut { confirmed, failed_hosts } => {
             out.object_start();
             out.key(b"account_signed_out");
             out.object_start();
             out.key(b"confirmed");
             out.boolean(*confirmed);
+            encode_failed_hosts(failed_hosts, out, budget);
             out.object_end();
             out.object_end();
         }
@@ -606,4 +619,22 @@ pub(super) fn encode_seen_through(
             out.object_end();
         }
     }
+}
+
+fn encode_failed_hosts(hosts: &[jig_client::contract::AccountHostFailure], out: &mut Encoder, budget: &mut super::Cut) {
+    out.key(b"failed_hosts");
+    out.array_start();
+    for host in hosts {
+        out.object_start();
+        out.key(b"name");
+        budget.words(&host.name, out);
+        out.key(b"why");
+        out.string(match host.why {
+            jig_client::contract::AccountHostWhy::NotInContact => b"not_in_contact",
+            jig_client::contract::AccountHostWhy::Lost => b"lost",
+            jig_client::contract::AccountHostWhy::Failed => b"failed",
+        });
+        out.object_end();
+    }
+    out.array_end();
 }

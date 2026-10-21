@@ -282,7 +282,10 @@ pub enum StoreInput {
 /// `domain/hosts.md`, 2 and 6.4).
 #[derive(Debug)]
 pub enum Link {
-    Hello(host::Hello),
+    Hello {
+        worker: u32,
+        hello: host::Hello,
+    },
     /// One hub record; temper's parts ride beside an answer and are empty otherwise.
     Up {
         up: host::LinkUp,

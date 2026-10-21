@@ -332,7 +332,7 @@ pub fn root() -> (temper_engine_domain::Domain, skein_lib::Env<temper_engine_dom
         forge_charter: settings.charter,
     };
     (
-        root::Domain::new(config, &limits),
+        root::Domain::new(config, &limits).expect("valid engine configuration"),
         skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits },
     )
 }
@@ -723,23 +723,30 @@ pub fn signed_worker() -> crate::Service {
     let mut service = restored_key();
     service.engine.step(root::Event::Worker(root::WorkerInput::Link {
         channel: Token::new(7),
-        link: root::Link::Hello(host::Hello {
-            slots: 1,
-            stop_bound: skein_lib::Duration::from_millis(100),
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-            bounds: host::Bounds {
-                models: Box::new([host::ModelBound { name: b"small".as_slice().into(), window: 8192, output: 1024 }]),
-                turns: 8,
-                spend: 1000,
-                time: skein_lib::Duration::from_secs(60),
-                waiting: skein_lib::Duration::from_secs(60),
-                checks: skein_lib::Duration::from_secs(1),
-                message_bytes: 512,
-                inbox: 8,
-                unacknowledged: 32,
+        link: root::Link::Hello {
+            worker: 0,
+            hello: host::Hello {
+                slots: 1,
+                stop_bound: skein_lib::Duration::from_millis(100),
+                workstreams: Box::new([]),
+                hosting: Box::new([]),
+                bounds: host::Bounds {
+                    models: Box::new([host::ModelBound {
+                        name: b"small".as_slice().into(),
+                        window: 8192,
+                        output: 1024,
+                    }]),
+                    turns: 8,
+                    spend: 1000,
+                    time: skein_lib::Duration::from_secs(60),
+                    waiting: skein_lib::Duration::from_secs(60),
+                    checks: skein_lib::Duration::from_secs(1),
+                    message_bytes: 512,
+                    inbox: 8,
+                    unacknowledged: 32,
+                },
             },
-        }),
+        },
     }));
     settle_root(&mut service, &mut skein_lib::Queue::with_capacity(32));
     service.engine.step(root::Event::Worker(root::WorkerInput::Link {

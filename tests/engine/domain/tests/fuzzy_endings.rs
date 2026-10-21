@@ -9,7 +9,7 @@ use temper_engine_domain as engine;
 use temper_engine_domain::{Delivery, Key, Record};
 use temper_engine_domain_world::direct::Driver;
 use temper_engine_domain_world::store::Store;
-use temper_engine_domain_world::walking::{config, limits};
+use temper_engine_domain_world::walking::{config, limits, writes};
 
 const WORKER: Token = Token::new(7);
 const DELEGATE: u64 = 90;
@@ -46,7 +46,7 @@ fn chat(seed: u64, child: bool) -> (Driver, engine::Assignment) {
         bounds.fleet.attempts = 5;
         bounds.call_records = 4;
         bounds.brief.sections = 5;
-        bounds.journal.writes = 3000;
+        bounds.journal.writes = writes(&bounds);
         bounds.journal.deliveries = 100;
         bounds.journal.held = 300;
         (configuration, bounds)

@@ -172,6 +172,7 @@ fn the_accounts_watch_reaches_the_root_and_returns_whole_cut_facts() {
     let mut sources = List::with_capacity(1);
     sources
         .push(d::SourceLine {
+            name: None,
             number: 9001,
             place: 2,
             kind: a::Kind::Key,
@@ -199,6 +200,7 @@ fn the_accounts_watch_reaches_the_root_and_returns_whole_cut_facts() {
         })
         .unwrap();
     let document = d::Document::Accounts(Box::new(d::Accounts {
+        program_hosts: List::with_capacity(0),
         readiness: List::with_capacity(0),
         readiness_cut: false,
         accounts,

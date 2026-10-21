@@ -255,7 +255,7 @@ impl World {
         let store = temper_engine_domain_world::fixtures::restored_store(bootstrap, &limits);
         Self {
             creating: jig_core_world::fixtures::Creating::new(&config.core, limits.tasks.tree_tasks),
-            root: engine::Domain::new(config, &limits),
+            root: engine::Domain::new(config, &limits).expect("valid engine configuration"),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(engine::max_out(&limits)),
             events: VecDeque::from([engine::Event::Restart]),

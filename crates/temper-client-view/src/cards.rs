@@ -122,6 +122,11 @@ fn owner_outcome(b: &mut Builder, words: &Words, value: &c::OwnerOutcome) {
         | O::AccountKeyKept { .. }
         | O::AccountChanged
         | O::AccountRemoved { .. } => P::Applied,
+        O::AccountProgramDeclared { name: declared, .. } => {
+            status(b, words, P::Applied, &[]);
+            b.text(Run::Plain, declared);
+            return;
+        }
         O::AccountSignInStarted { .. } => P::AccountSignInStarted,
         O::AccountSignedOut { .. } => P::AccountSignedOut,
     };

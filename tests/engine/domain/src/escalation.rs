@@ -213,7 +213,7 @@ impl World {
         let config = config(settings.seed);
         let store = crate::fixtures::restored_store(self::config(settings.seed), &limits);
         let mut world = World {
-            domain: engine::Domain::new(config, &limits),
+            domain: engine::Domain::new(config, &limits).expect("valid engine configuration"),
             environment: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(engine::max_out(&limits)),
             events: VecDeque::new(),
@@ -487,7 +487,8 @@ impl World {
 
     fn restart(&mut self) {
         assert!(self.store.pending.is_empty(), "cut follows a whole transaction with no later submitted commit");
-        self.domain = engine::Domain::new(config(self.settings.seed), &self.environment.limits);
+        self.domain = engine::Domain::new(config(self.settings.seed), &self.environment.limits)
+            .expect("valid engine configuration");
         self.events.clear();
         self.out = Queue::with_capacity(engine::max_out(&self.environment.limits));
         self.frozen_cut = None;

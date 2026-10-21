@@ -518,7 +518,9 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                         .checked_mul(u64::try_from(size_of::<jig_domain_accounts::Use>()).ok()?)?,
                 )
             }
-            jig_domain_accounts::Stored::Source { name, .. } => u64::try_from(name.len()).ok(),
+            jig_domain_accounts::Stored::Issued { name, .. } | jig_domain_accounts::Stored::Source { name, .. } => {
+                u64::try_from(name.len()).ok()
+            }
         },
         Record::Core(jig_domain_core::Record::Notes(row)) => match row {
             jig_domain_notes::Record::Entry(entry) => note_entry_bytes(entry),
@@ -535,23 +537,26 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
             jig_domain_people::Stored::Roles { holdings, .. } => u64::try_from(holdings.len())
                 .ok()?
                 .checked_mul(u64::try_from(size_of::<jig_domain_people::Holding>()).ok()?),
-            jig_domain_people::Stored::Answer { ask, models, .. } => {
+            jig_domain_people::Stored::Answer { ask, models, outcome, .. } => {
                 let payload = match ask.as_ref() {
                     jig_domain_people::Ask::AccountChange { change, .. } => {
                         use jig_domain_people::AccountChange;
-                        let uses = match change {
-                            AccountChange::SetUses { uses, .. } => uses.as_deref().unwrap_or_default(),
-                            AccountChange::AddKey { .. }
+                        match change {
+                            AccountChange::DeclareProgram { name, .. } => u64::try_from(name.len()).ok(),
+                            AccountChange::SetUses { uses, .. } => {
+                                u64::try_from(uses.as_deref().unwrap_or_default().len())
+                                    .ok()?
+                                    .checked_mul(u64::try_from(size_of::<jig_domain_people::Use>()).ok()?)
+                            }
+                            AccountChange::CheckProgram { .. }
+                            | AccountChange::AddKey { .. }
                             | AccountChange::ReplaceKey { .. }
                             | AccountChange::RemoveKey { .. }
                             | AccountChange::Resume { .. }
                             | AccountChange::Remove { .. }
                             | AccountChange::MoveAccount { .. }
-                            | AccountChange::MoveSource { .. } => &[],
-                        };
-                        u64::try_from(uses.len())
-                            .ok()?
-                            .checked_mul(u64::try_from(size_of::<jig_domain_people::Use>()).ok()?)
+                            | AccountChange::MoveSource { .. } => Some(0),
+                        }
                     }
                     jig_domain_people::Ask::Compound { operations, .. } => people_bytes::compound(operations),
                     jig_domain_people::Ask::Create { batch, .. } => people_bytes::batch(batch),
@@ -649,7 +654,7 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                         jig_domain_people::ProposalDecision::Reject { reason } => u64::try_from(reason.len()).ok(),
                     },
                 }?;
-                model_context_bytes(models)?.checked_add(payload)
+                model_context_bytes(models)?.checked_add(payload)?.checked_add(program_answer_bytes(outcome)?)
             }
             jig_domain_people::Stored::SignIn { .. }
             | jig_domain_people::Stored::ReadResults { .. }
@@ -784,4 +789,52 @@ fn model_context_bytes(models: &[Box<[u8]>]) -> Option<u64> {
         bytes = bytes.checked_add(u64::try_from(name.len()).ok()?)?;
     }
     Some(bytes)
+}
+
+/// Newly owned program answer fields, beside the retained ask and model context.
+fn program_answer_bytes(outcome: &jig_domain_people::Outcome) -> Option<u64> {
+    use jig_domain_people::Outcome;
+    match outcome {
+        Outcome::AccountProgramDeclared { name, .. } => u64::try_from(name.len()).ok(),
+        Outcome::AccountRemoved { failed_hosts, .. } | Outcome::AccountSignedOut { failed_hosts, .. } => {
+            let mut bytes = u64::try_from(failed_hosts.len())
+                .ok()?
+                .checked_mul(u64::try_from(size_of::<jig_domain_people::AccountHostFailure>()).ok()?)?;
+            for host in &**failed_hosts {
+                bytes = bytes.checked_add(u64::try_from(host.name.len()).ok()?)?;
+            }
+            Some(bytes)
+        }
+        Outcome::Compound { .. }
+        | Outcome::CompoundRefused { .. }
+        | Outcome::Created { .. }
+        | Outcome::MarkedSeen { .. }
+        | Outcome::Applied { .. }
+        | Outcome::Again(_)
+        | Outcome::SignedOut
+        | Outcome::NoteEdited { .. }
+        | Outcome::ServiceMade { .. }
+        | Outcome::Adopted { .. }
+        | Outcome::Proposed { .. }
+        | Outcome::Withdrawn { .. }
+        | Outcome::Stopped { .. }
+        | Outcome::Cancelled { .. }
+        | Outcome::Released { .. }
+        | Outcome::PersonTaken { .. }
+        | Outcome::PersonHandedBack { .. }
+        | Outcome::PersonAnswered { .. }
+        | Outcome::Moved { .. }
+        | Outcome::ProposalDecided { .. }
+        | Outcome::Said { .. }
+        | Outcome::QuestionAnswered { .. }
+        | Outcome::Amended { .. }
+        | Outcome::RolesSet { .. }
+        | Outcome::PolicyChanged { .. }
+        | Outcome::PoolSet { .. }
+        | Outcome::EscalationDecided { .. }
+        | Outcome::AccountSignInStarted { .. }
+        | Outcome::AccountKeyKept { .. }
+        | Outcome::AccountChanged
+        | Outcome::Refused(_) => Some(0),
+    }
 }

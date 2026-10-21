@@ -307,6 +307,7 @@ fn deep_child_rows_and_arbitrary_internal_payloads_are_refused_before_retention(
         "saved keyed roster has separately owned bounded bytes"
     );
     let callback = Delivery::Fleet(fleet::Event::Hello {
+        worker: 0,
         channel: Token::new(1),
         hello: fleet::Hello {
             stop_bound: skein_lib::Duration::from_secs(0),
@@ -454,4 +455,54 @@ fn a_retained_model_context_counts_its_owned_names() {
     }));
     let expected = u64::try_from(size_of::<Box<[u8]>>() + b"small".len()).expect("one name fits");
     assert_eq!(crate::record_bytes(&row), Some(expected));
+}
+
+#[test]
+fn a_program_declaration_counts_both_retained_names_and_models() {
+    use jig_domain_people as people;
+    let name = b"work-login";
+    let row = Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
+        key: people::RequestKey { person: 1, key: [1; 16] },
+        ask: Box::new(people::Ask::AccountChange {
+            holder: people::AccountHolder::Own,
+            change: people::AccountChange::DeclareProgram { provider: 1, join: None, name: name.as_slice().into() },
+        }),
+        models: Box::new([Box::from(b"small".as_slice())]),
+        outcome: people::Outcome::AccountProgramDeclared { source: 1, name: name.as_slice().into() },
+        at: Wall::EPOCH,
+    }));
+    let expected = size_of::<Box<[u8]>>() + b"small".len() + 2 * name.len();
+    assert_eq!(crate::record_bytes(&row), Some(u64::try_from(expected).expect("bounded owned bytes")));
+}
+#[test]
+fn an_issued_program_counts_its_retained_name() {
+    let name = b"work-login";
+    let row = Record::Core(jig_domain_core::Record::Accounts(jig_domain_accounts::Stored::Issued {
+        number: 1,
+        holder: jig_domain_accounts::Holder::Party(1),
+        name: name.as_slice().into(),
+        signed_out: true,
+    }));
+    assert_eq!(crate::record_bytes(&row), Some(u64::try_from(name.len()).expect("bounded name bytes")));
+}
+
+#[test]
+fn a_program_sign_out_counts_its_retained_worker_failures() {
+    use jig_domain_people as people;
+    let name = b"worker-a";
+    let row = Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
+        key: people::RequestKey { person: 1, key: [1; 16] },
+        ask: Box::new(people::Ask::AccountSignOut { holder: people::AccountHolder::Own, source: 1 }),
+        models: Box::new([]),
+        outcome: people::Outcome::AccountSignedOut {
+            confirmed: false,
+            failed_hosts: Box::new([people::AccountHostFailure {
+                name: name.as_slice().into(),
+                why: people::AccountHostWhy::NotInContact,
+            }]),
+        },
+        at: Wall::EPOCH,
+    }));
+    let expected = size_of::<people::AccountHostFailure>() + name.len();
+    assert_eq!(crate::record_bytes(&row), Some(u64::try_from(expected).expect("bounded owned bytes")));
 }

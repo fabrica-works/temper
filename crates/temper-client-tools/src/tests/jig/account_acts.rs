@@ -141,7 +141,10 @@ fn unconfirmed_disconnect_names_the_provider_settings() {
         root.sends.get(&call).expect("disconnect").2,
         jig_client::Ask::Jig(Box::new(c::Ask::SignOut { holder: c::AccountHolder::Own, source: f::SOURCE }))
     );
-    root.done(call, c::Outcome::Owner(c::OwnerOutcome::AccountSignedOut { confirmed: false }));
+    root.done(
+        call,
+        c::Outcome::Owner(c::OwnerOutcome::AccountSignedOut { confirmed: false, failed_hosts: Box::new([]) }),
+    );
     let printed = root.answer(call).expect("removed locally");
     assert_eq!(printed.status, 0);
     assert!(skein_lib::bytes::find(&printed.stdout, b"provider's settings").is_some());

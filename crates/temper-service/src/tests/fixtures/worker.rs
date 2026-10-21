@@ -149,6 +149,7 @@ pub fn worker_settings() -> crate::settings::Worker {
     };
     crate::settings::Worker {
         jig: config::Worker {
+            check_interval: limits.hub.source_interval,
             engine: config::Address::Addr(skein_io::Addr::InProcess(skein_io::Name::new(b"workers").unwrap())),
             name: b"worker-a".as_slice().into(),
             secret: b"worker-secret".as_slice().into(),

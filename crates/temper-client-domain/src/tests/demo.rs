@@ -109,6 +109,7 @@ fn accounts(provider: Option<u32>, usable: bool, cut: bool) -> c::OwnerAccounts 
     let mut sources = List::with_capacity(1);
     sources
         .push(c::OwnerAccountSource {
+            name: None,
             number: 1,
             place: 1,
             kind: c::OwnerAccountKind::Key,
@@ -136,6 +137,7 @@ fn accounts(provider: Option<u32>, usable: bool, cut: bool) -> c::OwnerAccounts 
         })
         .unwrap();
     c::OwnerAccounts {
+        program_hosts: List::with_capacity(0),
         readiness: List::with_capacity(0),
         readiness_cut: false,
         accounts,

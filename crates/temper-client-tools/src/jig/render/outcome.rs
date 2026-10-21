@@ -67,6 +67,8 @@ impl Operation {
                 c::Ask::SignOut { .. } => (b"disconnect", None),
                 c::Ask::AccountChange { change, .. } => (
                     match change {
+                        c::AccountChange::DeclareProgram { .. } => b"declare-program".as_slice(),
+                        c::AccountChange::CheckProgram { .. } => b"check-program",
                         c::AccountChange::AddKey { .. } => b"add-key".as_slice(),
                         c::AccountChange::ReplaceKey { .. } => b"replace-key",
                         c::AccountChange::Resume { .. } => b"retry",
@@ -196,16 +198,31 @@ fn text(operation: &Operation, outcome: &Outcome, me: Option<&c::Me>, limits: &L
             out.put(b", ");
             document::utc(*at, out);
         }
+        c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountProgramDeclared { source, name })) => {
+            out.put(b"Program source ");
+            out.number(u64::from(*source));
+            out.put(b": ");
+            out.put(name);
+        }
         c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountSignInStarted { address, .. })) => {
             out.put(b"Open this address in a browser on the engine's machine:\n");
             out.put(address);
             out.put(b"\nwait accounts --until settled");
         }
         c::Answer::Done(c::Outcome::Owner(
-            c::OwnerOutcome::AccountSignedOut { confirmed: false }
-            | c::OwnerOutcome::AccountRemoved { confirmed: false },
+            c::OwnerOutcome::AccountSignedOut { confirmed: false, failed_hosts }
+            | c::OwnerOutcome::AccountRemoved { confirmed: false, failed_hosts },
         )) => {
             out.put(b"Removed locally; disconnect this application in the provider's settings, under Apps.");
+            for host in &**failed_hosts {
+                out.put(b"\n");
+                out.put(&host.name);
+                out.put(match host.why {
+                    c::AccountHostWhy::NotInContact => b": not in contact",
+                    c::AccountHostWhy::Lost => b": contact lost",
+                    c::AccountHostWhy::Failed => b": failed",
+                });
+            }
         }
         c::Answer::Done(done) => {
             out.put(b"done: ");
@@ -382,8 +399,8 @@ fn account_follow_up(outcome: &Outcome) -> Option<&'static [u8]> {
             c::OwnerOutcome::AccountSignInStarted { .. },
         )))) => Some(b"wait accounts --until settled"),
         Outcome::Answered(Answered::Jig(c::Answer::Done(c::Outcome::Owner(
-            c::OwnerOutcome::AccountSignedOut { confirmed: false }
-            | c::OwnerOutcome::AccountRemoved { confirmed: false },
+            c::OwnerOutcome::AccountSignedOut { confirmed: false, .. }
+            | c::OwnerOutcome::AccountRemoved { confirmed: false, .. },
         )))) => Some(b"Disconnect this application in the provider's settings, under Apps."),
         Outcome::NotKept
         | Outcome::Answered(_)

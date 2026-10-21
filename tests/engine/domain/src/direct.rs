@@ -68,7 +68,7 @@ impl Driver {
         Driver {
             creating: jig_core_world::fixtures::Creating::new(&config.core, limits.tasks.tree_tasks),
             forge: None,
-            root: engine::Domain::new(config, limits),
+            root: engine::Domain::new(config, limits).expect("valid engine configuration"),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
             out: Queue::with_capacity(engine::max_out(limits)),
             events: VecDeque::from([engine::Event::Restart]),

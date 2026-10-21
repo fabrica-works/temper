@@ -158,7 +158,7 @@ impl Service {
                 engine::Children { accounts, workers, clients, forge, setup, notes, limits: settings.limits },
                 values,
                 first_periods,
-            ),
+            )?,
             io: Io::new(&io_limits),
             io_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: io_limits },
             completions: Queue::with_capacity(queue),

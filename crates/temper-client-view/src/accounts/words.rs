@@ -117,6 +117,17 @@ pub(crate) enum Word {
     OwnHolder,
     DeploymentHolder,
     UnknownAccount,
+    Worker,
+    AwaitingLogins,
+    NotInContact,
+    SignedInOtherwise,
+    SignedOut,
+    Cleanup,
+    Missing,
+    Deadline,
+    Exited,
+    Unconfigured,
+    ProgramsOmitted,
 }
 const ROWS: &[(Word, &[u8])] = &[
     (Word::AccountsOmitted, b"Accounts left out: "),
@@ -233,6 +244,17 @@ const ROWS: &[(Word, &[u8])] = &[
     (Word::ConfirmAccount, b"Remove this account and all its sources?"),
     (Word::OmittedDisplay, b"Display name omitted."),
     (Word::UsageUntil, b"Usage limited until "),
+    (Word::Worker, b"Worker "),
+    (Word::AwaitingLogins, b"Waiting for login observations"),
+    (Word::NotInContact, b"Not in contact"),
+    (Word::SignedInOtherwise, b"Signed in by another method: "),
+    (Word::SignedOut, b"Signed out"),
+    (Word::Cleanup, b"Cleanup requested"),
+    (Word::Missing, b"Program missing"),
+    (Word::Deadline, b"Check deadline elapsed"),
+    (Word::Exited, b"Program exited"),
+    (Word::Unconfigured, b"Program not configured"),
+    (Word::ProgramsOmitted, b"Program observations left out: "),
 ];
 fn id(number: u16) -> PhraseId {
     PhraseId { owner: super::owner(), number }

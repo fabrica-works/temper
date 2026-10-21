@@ -48,7 +48,7 @@ pub fn hello(service: &Service) -> Option<(skein_lib::Token, &jig_domain_host::H
     for event in &service.engine.events {
         if let temper_engine_domain::Event::Worker(temper_engine_domain::WorkerInput::Link {
             channel,
-            link: temper_engine_domain::Link::Hello(hello),
+            link: temper_engine_domain::Link::Hello { hello, .. },
         }) = event
         {
             return Some((*channel, hello));

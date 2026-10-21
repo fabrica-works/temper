@@ -268,7 +268,10 @@ impl Accounts {
             domain::Request::Component(_) | domain::Request::Signing(_) => {
                 self.early.push(request);
             }
-            domain::Request::Granted { .. }
+            domain::Request::Programs { .. }
+            | domain::Request::CheckProgram { .. }
+            | domain::Request::SignOutProgram { .. }
+            | domain::Request::Granted { .. }
             | domain::Request::Save { .. }
             | domain::Request::Erase { .. }
             | domain::Request::Answer { .. }
@@ -358,7 +361,10 @@ impl Accounts {
                     self.down(driver::Request::SignIn { account: source, subject: None });
                 }
             },
-            domain::Request::Granted { .. }
+            domain::Request::Programs { .. }
+            | domain::Request::CheckProgram { .. }
+            | domain::Request::SignOutProgram { .. }
+            | domain::Request::Granted { .. }
             | domain::Request::Save { .. }
             | domain::Request::Erase { .. }
             | domain::Request::Answer { .. }

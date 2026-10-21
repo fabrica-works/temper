@@ -1,4 +1,5 @@
 //! Step-local document rendering; no borrowed document survives a step.
+mod account_programs;
 use super::{Text, acts};
 use crate::jig::{Limits, runner::Printed};
 use alloc::boxed::Box;

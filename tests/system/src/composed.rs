@@ -212,7 +212,7 @@ impl World {
                 match &mut row {
                     Stored::Account { holder, .. } => *holder = Holder::Party(1),
                     Stored::Source { kind, .. } => *kind = Kind::SignIn,
-                    Stored::Next { .. } => (),
+                    Stored::Issued { .. } | Stored::Next { .. } => (),
                 }
                 Some(engine::Record::Core(jig_domain_core::Record::Accounts(row)))
             })
@@ -314,7 +314,7 @@ impl World {
         Self {
             seed,
             creating: jig_core_world::fixtures::Creating::new(&config.core, limits.tasks.tree_tasks),
-            root: engine::Domain::new(config, &limits),
+            root: engine::Domain::new(config, &limits).expect("valid engine configuration"),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             root_out: Queue::with_capacity(engine::max_out(&limits)),
             root_events: VecDeque::from([engine::Event::Restart]),
@@ -754,7 +754,7 @@ impl World {
             worker::Request::Source { .. } | worker::Request::SourceFault => {
                 panic!("this fixture declares no program sources")
             }
-            worker::Request::Hello(hello) => self.up(engine::Link::Hello(hello)),
+            worker::Request::Hello(hello) => self.up(engine::Link::Hello { worker: 0, hello }),
             worker::Request::Link(up) => {
                 match &up {
                     host::LinkUp::Turn { .. } => self.observed.turns += 1,

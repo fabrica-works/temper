@@ -35,7 +35,11 @@ impl Limits {
             .checked_mul(2)?
             .checked_add(counts.sign_ins.checked_mul(2)?)?
             .checked_add(receiving.projects.checked_mul(4)?)?
-            .checked_add(128)?;
+            .checked_add(128)?
+            // Worker and program observations, omission rows and retained sign-out failures.
+            .checked_add(counts.accounts.checked_mul(counts.sources.checked_add(2)?)?.checked_mul(2)?)?
+            .checked_add(2)?
+            .checked_add(128_u32.checked_mul(2)?)?;
         // Catalogue: me_project_models x (1 Item + 1 Button + 2 Paragraphs),
         // plus me_model_efforts x 1 Button for the selected model. Fixed room:
         // 2 Slots + 1 List + 18 Paragraphs (including pending/refusal room)

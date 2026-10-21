@@ -884,6 +884,7 @@ fn deliver_demo(root: &mut temper_client_domain::Domain, read: Token, watch: Tok
         },
     );
     let accounts = c::OwnerAccounts {
+        program_hosts: List::with_capacity(0),
         readiness: List::with_capacity(0),
         readiness_cut: false,
         accounts: List::with_capacity(0),

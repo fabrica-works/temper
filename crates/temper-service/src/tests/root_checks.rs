@@ -208,3 +208,16 @@ fn a_deployment_provider_0_refuses_the_start() {
         b"engine.providers[1].number: the deployment's provider must not be 0, the forge's sign-in provider\n"
     );
 }
+
+#[test]
+fn configured_worker_count_past_membership_refuses_startup() {
+    let mut limits = root_limits();
+    limits.fleet.configured_workers = 1;
+    assert_eq!(&*root(&limits), b"engine.hosts.workers: past its bound\n");
+}
+#[test]
+fn configured_worker_name_past_membership_names_its_startup_path() {
+    let mut limits = root_limits();
+    limits.fleet.worker_name_bytes = 1;
+    assert_eq!(&*root(&limits), b"engine.hosts.workers[0].name: past its bound\n");
+}

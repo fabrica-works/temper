@@ -86,9 +86,10 @@ impl Domain {
     /// Allocate the root and fixed child room from shell-supplied configuration and validated
     /// cross-child limits. Checks bounded authority/bootstrap configuration; issues no request.
     /// Startup pages/account setup begin only on `Event::Restart`.
-    #[must_use]
+    /// # Errors
+    /// A configured worker count or name exceeds its priced membership bound.
     #[expect(clippy::too_many_lines, reason = "the root allocates every child and bounded handoff table together")]
-    pub fn new(mut config: Config, limits: &Limits) -> Domain {
+    pub fn new(mut config: Config, limits: &Limits) -> Result<Domain, fleet::WorkerProblem> {
         assert!(worst_case(limits).is_some(), "root limits are valid");
         assert!(
             config.core.settings.deployment_provider != 0,
@@ -209,7 +210,7 @@ impl Domain {
         .expect("landing gate templates bounded");
         assert!(forge.gate_policy(gate_policy, &limits.forge), "forge owns bounded landing templates");
         let root_config = RootConfig { forge_connector, forge_charter: config.forge_charter };
-        let mut core = Core::new(config.core, &core_limits(limits));
+        let mut core = Core::new(config.core, &core_limits(limits))?;
         let core_env = Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: core_limits(limits) };
         let configured = jig_domain_core::step(
             &mut core,
@@ -243,7 +244,7 @@ impl Domain {
                 assert!(output.is_empty(), "configuration emits no request");
             }
         }
-        Domain {
+        Ok(Domain {
             journal: Journal::new(&root_journal_limits(limits)),
             stop_pending: false,
             door_pass: false,
@@ -288,7 +289,7 @@ impl Domain {
             facts_lost: 0,
             config: root_config,
             limits: *limits,
-        }
+        })
     }
 
     /// Identify the core's refused restart step, including a live range that
@@ -717,10 +718,13 @@ fn released_into(domain: &mut Domain, _env: &Env<Limits>, released: Released, ou
     }
 }
 
-/// Configuration `Domain::new` asserts against, refused at start before the
-/// root is made (domain/root.md, 6), each naming the part that breaks it.
+/// Configuration `Domain::new` asserts against (or, for `Workers`, returns),
+/// refused at start before the root is made (domain/root.md, 6), each naming
+/// the part that breaks it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Refused {
+    /// Configured worker membership exceeds its priced count or name bound.
+    Workers(fleet::WorkerProblem),
     /// The charter at this index: its run policy's bytes, `None` past `u64`,
     /// beyond `journal.run_bytes`.
     Run { charter: usize, bytes: Option<u64> },
@@ -753,8 +757,15 @@ pub fn refused(mut config: Config, limits: &Limits) -> Box<[Refused]> {
         .expect("bounded configuration")
         .saturating_add(config.core.permission_roles.len())
         .saturating_add(config.landing.projects.len())
-        .saturating_add(6);
+        .saturating_add(7);
     let mut refused = List::with_capacity(room);
+    if let Err(problem) = fleet::Membership::check(
+        &config.core.worker_names,
+        limits.fleet.configured_workers,
+        limits.fleet.worker_name_bytes,
+    ) {
+        refused.push(Refused::Workers(problem)).expect("counted refusals");
+    }
     for (charter, configured) in config.core.settings.charters.iter().enumerate() {
         let bytes = run_policy_bound(&configured.policy, limits);
         let fits = match bytes {

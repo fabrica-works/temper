@@ -41,6 +41,8 @@ pub(crate) struct Children {
     pub(crate) notes: Queue<crate::Note>,
 }
 impl Engine {
+    /// Membership errors are unreachable after `startup::checks::root`; keep the
+    /// typed refusal for callers constructing an engine directly.
     pub(crate) fn new(
         config: root::Config,
         limits: &root::Limits,
@@ -48,7 +50,7 @@ impl Engine {
         children: Children,
         values: crate::values::Values,
         first_periods: List<(u32, u64)>,
-    ) -> Self {
+    ) -> Result<Self, jig_protocol_config::Problems> {
         let forge_records = crate::forge::records::Loader::new(&children.limits, &children.workers.forges);
         let Children { accounts, workers, clients, forge, setup, notes, limits: own } = children;
         let max_out = root::max_out(limits);
@@ -57,9 +59,17 @@ impl Engine {
         for (number, _value) in &values.identities {
             credentials.push(*number).expect("configured identities");
         }
-        let mut domain = root::Domain::new(config, limits);
+        let mut domain = match root::Domain::new(config, limits) {
+            Ok(domain) => domain,
+            Err(problem) => {
+                let (path, what) = crate::startup::checks::membership(problem);
+                let mut problems = jig_protocol_config::Problems::empty();
+                problems.push(path, what);
+                return Err(problems);
+            }
+        };
         domain.connection_limits(own.forge_component.forges, own.forge_component.installations);
-        Self {
+        Ok(Self {
             credentials,
             domain,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
@@ -85,7 +95,7 @@ impl Engine {
             ready: true,
             aborted: None,
             max_out,
-        }
+        })
     }
     pub(crate) fn room(&self) -> bool {
         self.setup.batch_room(self.max_out)

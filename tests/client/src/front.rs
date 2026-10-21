@@ -218,7 +218,8 @@ impl Joint {
             .collect();
         let mut hello =
             temper_engine_domain_world::protocol::hello_slots(fixtures::QUESTION_WORKER, slots, Box::new([]));
-        let engine::Event::Worker(engine::WorkerInput::Link { link: engine::Link::Hello(value), .. }) = &mut hello
+        let engine::Event::Worker(engine::WorkerInput::Link { link: engine::Link::Hello { hello: value, .. }, .. }) =
+            &mut hello
         else {
             unreachable!("worker hello")
         };

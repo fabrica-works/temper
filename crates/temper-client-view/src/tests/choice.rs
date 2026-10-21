@@ -26,6 +26,7 @@ fn banner(usable: Option<bool>) -> (d::Domain, Token) {
             &mut root,
             watch,
             c::Delivery::OwnerAccounts(Box::new(c::OwnerAccounts {
+                program_hosts: List::with_capacity(0),
                 accounts: List::with_capacity(0),
                 signing: List::with_capacity(0),
                 last_end: None,
@@ -138,6 +139,7 @@ fn account_facts(ready: Option<c::PayerReadiness>, accounts: List<c::OwnerAccoun
         &mut root,
         accounts_watch.unwrap(),
         c::Delivery::OwnerAccounts(Box::new(c::OwnerAccounts {
+            program_hosts: List::with_capacity(0),
             accounts,
             signing: List::with_capacity(0),
             last_end: None,

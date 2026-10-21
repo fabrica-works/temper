@@ -48,6 +48,7 @@ fn document(signing: bool) -> c::WatchEvent {
         .unwrap();
     }
     c::WatchEvent::Delivered(c::Delivery::OwnerAccounts(Box::new(c::OwnerAccounts {
+        program_hosts: List::with_capacity(0),
         readiness: List::with_capacity(0),
         readiness_cut: false,
         accounts: List::with_capacity(0),
@@ -611,6 +612,7 @@ fn typed_account_lists_outlive_the_task_window() {
         for source in 1..=count {
             sources
                 .push(c::OwnerAccountSource {
+                    name: None,
                     place: source,
                     number: source,
                     kind: c::OwnerAccountKind::Key,
@@ -647,6 +649,7 @@ fn typed_account_lists_outlive_the_task_window() {
             .unwrap();
     }
     let doc = c::OwnerAccounts {
+        program_hosts: List::with_capacity(0),
         readiness: List::with_capacity(0),
         readiness_cut: false,
         accounts: rows,

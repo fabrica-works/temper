@@ -78,6 +78,8 @@ pub fn limits() -> engine::Limits {
         batch: 4,
         operations: 2,
         people: 2,
+        program_hosts: 2,
+        program_host_name_bytes: 32,
         inbox_entries: 2,
         inbox_tasks: 4,
         inbox_recipients: 16,
@@ -97,6 +99,8 @@ pub fn limits() -> engine::Limits {
         room_refusals: 2,
     };
     let fleet = fleet::Limits {
+        configured_workers: 1,
+        worker_name_bytes: 32,
         program_sources: 12,
         source_detail_bytes: 4096,
         workers: 1,
@@ -114,14 +118,8 @@ pub fn limits() -> engine::Limits {
         facts: 2,
         history: 2,
     };
-    let writes = tasks::max_out(&tasks) * 8
-        + people::max_out(&people) * 4
-        + people.pending * 2
-        + fleet::max_out(&fleet) * 4
-        + temper_engine_domain_forge::max_out(&temper_engine_forge_world::LIMITS)
-        + tasks.tasks
-        + 6;
-    engine::Limits {
+    let deliveries = 20_u32.max(fleet::max_out(&fleet).checked_add(1).expect("fleet burst plus continuation"));
+    let mut limits = engine::Limits {
         templates: jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.templates,
         documents: jig_domain_core::documents::DocumentLimits {
             roles: jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.documents.roles,
@@ -138,9 +136,9 @@ pub fn limits() -> engine::Limits {
         authority: authority_limits(),
         journal: JournalLimits {
             commits: 3,
-            held: 76,
-            writes,
-            deliveries: 20,
+            held: deliveries * 3 + 16,
+            writes: 0,
+            deliveries,
             transcript_bytes: 8192,
             result_bytes: 384,
             run_bytes: 4096,
@@ -174,6 +172,8 @@ pub fn limits() -> engine::Limits {
             sources: 3,
             sign_ins: 1,
             credentials: 1,
+            program_names: 3,
+            program_hosts: 2,
             backoff_base: Duration::from_millis(10),
             backoff_max: Duration::from_secs(1),
             retry: Duration::from_millis(10),
@@ -192,7 +192,22 @@ pub fn limits() -> engine::Limits {
             recalled: 1,
         },
         forge: temper_engine_forge_world::LIMITS,
-    }
+    };
+    limits.journal.writes = writes(&limits);
+    limits
+}
+
+/// Root route room for these bounds, including continuations and call records.
+#[must_use]
+pub fn writes(limits: &engine::Limits) -> u32 {
+    tasks::max_out(&limits.tasks) * 8
+        + people::max_out(&limits.people) * 4
+        + limits.people.pending * 2
+        + fleet::max_out(&limits.fleet) * 4
+        + temper_engine_domain_forge::max_out(&limits.forge)
+        + limits.tasks.tasks
+        + 4
+        + limits.call_records
 }
 
 fn authority_limits() -> authority::Limits {
@@ -262,6 +277,7 @@ pub fn config(seed: u64) -> engine::Config {
             seed,
             // The worlds' workers run apart from the engine (domain/root.md, 2).
             workers_in_process: false,
+            worker_names: Box::new([Box::from(b"worker".as_slice())]),
             hub_turns: HUB_TURNS,
             owners: Box::new([people::InitialOwner {
                 project: 1,
@@ -460,7 +476,7 @@ impl World {
         let config = config(settings.seed);
         let store = crate::fixtures::restored_store(self::config(settings.seed), &limits);
         let mut world = World {
-            domain: engine::Domain::new(config, &limits),
+            domain: engine::Domain::new(config, &limits).expect("valid engine configuration"),
             environment: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(engine::max_out(&limits)),
             events: VecDeque::new(),
@@ -515,7 +531,8 @@ impl World {
 
     fn restart(&mut self, terminal: bool) {
         assert!(self.store.pending.is_empty(), "cut has no later submitted commit");
-        self.domain = engine::Domain::new(config(self.settings.seed), &self.environment.limits);
+        self.domain = engine::Domain::new(config(self.settings.seed), &self.environment.limits)
+            .expect("valid engine configuration");
         self.events.clear();
         self.restarts += 1;
         self.trace.push(

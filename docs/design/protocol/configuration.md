@@ -919,6 +919,7 @@ not itself valid JSON):
     "name": "worker",
     "secret": "worker.secret",
     "slots": ..., "graces": ...,
+    "programs": {"check_interval_ms": ...},
     "agent": {
       "program": "/usr/local/bin/temper",
       "configuration": "/home/me/.config/temper/agent.json",

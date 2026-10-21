@@ -252,3 +252,37 @@ fn deployment_offers_share_the_accounts_result_window() {
         assert!(f::json_has(&printed, b"\"cut\":true"));
     }
 }
+
+#[test]
+fn account_projection_includes_configured_worker_login_facts() {
+    let mut accounts = f::accounts();
+    let mut programs = List::with_capacity(1);
+    programs
+        .push(c::OwnerProgramLogin {
+            name: b"work-login".as_slice().into(),
+            state: Some(c::OwnerProgramState::SignedInOtherwise { method: b"other-method".as_slice().into() }),
+            sign_out: None,
+            cleanup: false,
+            cut: false,
+        })
+        .unwrap();
+    accounts.program_hosts = List::with_capacity(1);
+    accounts
+        .program_hosts
+        .push(c::OwnerProgramHost {
+            name: b"configured-worker".as_slice().into(),
+            channel: 17,
+            connected: true,
+            awaiting_logins: false,
+            programs,
+            cut: false,
+        })
+        .unwrap();
+    let mut root = f::account_root(false);
+    let call = root.submit(&["accounts", "--json"]);
+    f::deliver_accounts(&mut root, accounts);
+    let printed = root.answer(call).expect("account projection");
+    for fact in [b"configured-worker".as_slice(), b"work-login", b"other-method"] {
+        assert!(skein_lib::bytes::find(&printed.stdout, fact).is_some(), "{printed:?}");
+    }
+}

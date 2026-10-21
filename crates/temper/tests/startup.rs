@@ -641,7 +641,51 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     let wire_bounds_growth = 7 * 4 + 4;
     let catalogue_growth = 3_076 * (document_copies * document_growth + readiness_scratch) + wire_bounds_growth;
     // Catalogue delta +580,059,808 B; total 85,429,100,694,156 B.
-    assert_eq!(required.engine_bytes, 79_659_997_210_050_u64 + engine_growth + lifecycle_growth + catalogue_growth);
+    // y1b's original lifecycle: issued names, pending operations, removal unions;
+    // fleet channel/pending/check/result state and detail bytes; scratch/cleanup
+    // names, target snapshot and configured names. Then history/host views and
+    // one validating answer copy. These bounds match jig's small profile.
+    // Review adds typed Issued/Pending entries, joined fleet pending replies,
+    // four scratch queues, 32 core routes and 32 milestones per projection cache.
+    // Temper has one connector (three caches/task), and its routed payload is
+    // 616,192 B. Its two-line document grows by two hosts' names/login lists and
+    // four source names: 2*(4096 + 2*(88 + 32 + 2*128)) + 2*2*(16 + 32) = 9,888 B.
+    // Document copies: construction + watches + acts + loads + one read answer
+    // + two root read answers. Sixteen root routes add Work/row envelopes.
+    let envelope_growth = (3 * 600 + 12 * 32)
+        + (3 * 512 + 12 * 9 * 8 + 9 * 8)
+        + (4 * 352 + 11 * 32)
+        + (2 * 72 + 2 * 3 * 176 + 2 * 3 * 480 + 2 * 3 * 744 + 2 * 12 * 4_096)
+        + 2 * 12 * 33
+        + 9 * 4
+        + 8 * (16 + 32)
+        + 2 * 11 * 8
+        + 3 * (2 + 8) * 8
+        + 9 * (24 + 32)
+        + (3 * 11 * 16 - 12 * 32)
+        + 3 * 11 * 24
+        + 2 * 3 * 11 * 8
+        + 4 * 4 * 88
+        + 32 * (536 + 240 + 616_192)
+        + 8 * (1 + 2) * 32 * (168 + 4_096 + 2 * 512)
+        + (1 + 16 + 4 + 2 + (2 + 3) + 2 * (2 + 3)) * 9_888
+        + 16 * (576 + 65_536);
+    // Sum 25,355,964 B. Against y1b's review-only +25,870,392 B: one fewer
+    // connector saves 1,353,728 B of caches; smaller payloads save 709,632 B.
+    // Original lifecycle +115,396, documents +375,744 and root routes +1,057,792
+    // offset those savings, leaving temper 514,428 B below that review delta.
+    // Fixed carriers: accounts' two 32 B maps + fleet's 16 B cleanup Box
+    // and 16 B Membership;
+    // root and engine-env copies of three +8 B child limits; three kit Store
+    // carriers each add those limits + five u32 codec bounds + 4 B alignment;
+    // two store-env limits copies; fourteen u32 client wire bounds. Sum 392 B.
+    let carriers = 2 * 32 + 2 * 16 + 2 * (8 + 8 + 8) + 3 * (24 + 5 * 4 + 4) + 2 * 24 + 14 * 4;
+    let programs_growth = 3_076 * envelope_growth + carriers;
+    // Programs delta +77,994,945,656 B; total 85,507,095,639,812 B.
+    assert_eq!(
+        required.engine_bytes,
+        79_659_997_210_050_u64 + engine_growth + lifecycle_growth + catalogue_growth + programs_growth
+    );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
     // Other causes: root program-source state +117,552 B; serialized source
