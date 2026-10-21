@@ -1000,8 +1000,8 @@ the change's chip in a chat (`forge.md`, 2.4 and 2.5).
   left of the delegation. Those words name a person's number as well
   as a task's: a result shows a card only once its task's document
   says this chat requested it (its `requester`), and keeps its work
-  summary otherwise; until the document arrives, the number holds one
-  of the watches.
+  summary otherwise; such a number still takes one of the watches
+  while the thread names it.
 - **What it reads.** The chat page watches each such task's document
   (`Subject::Task`), as the task's own page does: its chip, its result
   contract, its hold and its result, which stay readable once it has
