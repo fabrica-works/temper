@@ -24,6 +24,7 @@ mod agent;
 pub mod box_command;
 pub mod bundle;
 pub mod ctl;
+pub mod fake;
 pub mod forge;
 mod host;
 mod init;
@@ -31,7 +32,7 @@ pub mod open;
 mod program_login;
 mod setup;
 pub use host::Host;
-pub const USAGE: &str = "usage: temper init [DIRECTORIES] | temper serve [DIRECTORIES] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
+pub const USAGE: &str = "usage: temper init [DIRECTORIES] | temper serve [DIRECTORIES] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper fake llm --document FILE [--ready PREFIX] [--seed N] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE] | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
 const CONFIG_BYTES: u32 = 1 << 20;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -43,12 +44,17 @@ pub enum Command {
     Agent { configuration: PathBuf },
     Open { arguments: Vec<OsString> },
     Ctl { arguments: Vec<OsString> },
+    Fake { arguments: fake::Arguments },
     Forge { directories: Directories, arguments: Vec<OsString> },
 }
 #[must_use]
 pub fn usage() -> String {
     let mut help = format!("{USAGE}\nDIRECTORIES: [--config DIR] [--data DIR] [--cache DIR]\n").into_bytes();
     skein_shell::help(&directories::SETTINGS, &mut help);
+    help.extend_from_slice(b"\ntemper fake llm --document FILE [--ready PREFIX] [--seed N]\n");
+    skein_shell::help(&fake::LLM_SETTINGS, &mut help);
+    help.extend_from_slice(b"\ntemper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE]\n");
+    skein_shell::help(&fake::FORGE_SETTINGS, &mut help);
     String::from_utf8(help).expect("help is UTF-8")
 }
 fn prefixed(command: &str, why: &str) -> String {
@@ -77,6 +83,7 @@ pub fn configure_with(
     let os =
         |args: &[Box<[u8]>]| args.iter().map(|arg| std::ffi::OsStr::from_bytes(arg).to_owned()).collect::<Vec<_>>();
     match command.as_ref() {
+        b"fake" => return fake::configure(arguments, environment).map(|arguments| Command::Fake { arguments }),
         b"ctl" => return Ok(Command::Ctl { arguments: os(arguments) }),
         b"open" => return Ok(Command::Open { arguments: os(arguments) }),
         b"agent" => {
@@ -133,6 +140,7 @@ pub fn run(command: Command) -> Result<u8, String> {
             return program_login::run(&directories, &name)
                 .map_err(|why| prefixed("temper program-login", &why.lines().collect::<Vec<_>>().join("; ")));
         }
+        Command::Fake { arguments } => return fake::run(&arguments),
         Command::Forge { directories, arguments } => return Ok(forge::run(&directories, &arguments)),
         Command::Ctl { arguments } => return Ok(ctl::run(&arguments, &Clock::new())),
         Command::Open { arguments } => return Ok(open::run(&arguments, &Clock::new())),

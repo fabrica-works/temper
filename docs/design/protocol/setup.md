@@ -1403,6 +1403,13 @@ demo's own work pushes nothing yet.
     caused, finds in FILE what the pass observed. Without the flag, the
     program drains and drops them, and sends as it serves.
 
+  A write failure stops the program with exit 1. After the first failed
+  write it writes nothing more to FILE, including at stop: it drains and
+  drops observations and refuses every later pass's sends. A drain past
+  its byte bound has the same rule. FILE retains its earlier writes and
+  whatever bytes the failed write left, with no later checkpoint to
+  certify lines it lost.
+
   Both peers run `without_records`, with the flags or without them.
 - **From a document of its own,** `temper fake llm --document FILE` and
   `temper fake forge --document FILE`, the QA loop's form, which reads

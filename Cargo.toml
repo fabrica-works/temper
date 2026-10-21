@@ -55,6 +55,7 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+rustls = { version = "=0.23.41", default-features = false, features = ["std", "ring", "tls12"] }
 temper-fake = { path = "crates/temper-fake" }
 temper-protocol-records = { path = "crates/temper-protocol-records" }
 skein-fake-forge-github = { git = "https://github.com/fabrig-dev/skein.git" }
