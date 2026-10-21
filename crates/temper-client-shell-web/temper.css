@@ -95,8 +95,16 @@ a { color: inherit; text-decoration: none; }
 .temper-status-retrying { color: var(--temper-amber); background: var(--temper-amber-pale); }
 .temper-status-active { color: var(--temper-green); background: var(--temper-green-pale); }
 .temper-status-quiet { color: #6d695f; background: #f3f1eb; }
-/* Expand native suggestion targets while retaining their row footprint. */
-.temper-main > .temper-rows > .temper-row > button { min-height: 28px; padding-block: 2px calc(22px - 1lh); margin-block: -1px calc(1lh + 7px - 28px); }
+/* .first-run-empty: one invitation and a wrapping row of paper suggestions. */
+.temper-invitation { margin: 42px 0; }
+.temper-invitation > h2 { margin: 0; font: 700 18px/1.4 var(--temper-mono); letter-spacing: -.025em; }
+.temper-invitation > p { margin: 12px 0 0; color: var(--temper-muted); font-size: 12px; }
+.temper-invitation > ul { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; list-style: none; padding: 0; margin: 13px 0 0; border: 0; }
+.temper-invitation > ul > li { min-width: 0; max-width: 100%; padding: 0; border: 0; }
+.temper-invitation button { max-width: 100%; min-height: 28px; padding: 5px 9px; border: 1px solid #ddd6cb; border-radius: 5px; background: var(--temper-paper); color: #6a6258; font: 600 11px/1.35 var(--temper-mono); overflow-wrap: anywhere; }
+.temper-invitation button:hover { border-color: #ba9c89; color: var(--temper-accent-dark); }
+.temper-invitation button:disabled { opacity: .55; cursor: default; }
+.temper-invitation > p:last-child { margin-top: 14px; font-size: 10px; }
 /* .filter: the real closed-page action. */
 .temper-main > .temper-rows + button { margin-top: 9px; border: 1px solid var(--temper-line); background: #f7f5f0; color: var(--temper-muted); border-radius: 4px; min-height: 28px; padding: 5px 9px; font: 600 11px/1.35 var(--temper-mono); }
 /* .card and .composer: existing chat-page tokens. */

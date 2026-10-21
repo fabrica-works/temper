@@ -191,6 +191,8 @@ fn suggestions(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bin
         return;
     }
     let Some(chats) = root.pages().chats() else { return };
+    b.open(Role::Slot);
+    b.style(crate::look::INVITATION);
     text(b, Role::Heading { level: 2 }, &words.say(Word::DemoHeading, &[]));
     text(
         b,
@@ -199,10 +201,8 @@ fn suggestions(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bin
     );
     b.open(Role::List);
     b.name(&words.say(Word::SuggestedRequests, &[]));
-    b.style(crate::look::ROWS);
     for (cue, value) in demo.cues.iter().enumerate() {
         b.open(Role::Item);
-        b.style(crate::look::ROW);
         b.open(Role::Button);
         b.name(value);
         if chats.start.is_some() {
@@ -214,4 +214,5 @@ fn suggestions(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bin
     }
     b.close();
     text(b, Role::Paragraph, &words.say(Word::DemoScript, &[]));
+    b.close();
 }

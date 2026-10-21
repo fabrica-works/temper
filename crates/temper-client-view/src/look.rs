@@ -125,6 +125,8 @@ pub const CHOICE: Style = Style { owner: owner(), token: 59 };
 pub const ACCOUNTS_PAGE: Style = Style { owner: owner(), token: 60 };
 /// The repository adoption page body.
 pub const ADOPTION_PAGE: Style = Style { owner: owner(), token: 61 };
+/// The demo heading, request, suggestions and script note.
+pub const INVITATION: Style = Style { owner: owner(), token: 62 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -192,6 +194,7 @@ pub const NAMES: Names<'static> = Names {
         b"temper-choice",
         b"temper-accounts-page",
         b"temper-adoption-page",
+        b"temper-invitation",
     ],
     regions: &[b"temper-link"],
 };
