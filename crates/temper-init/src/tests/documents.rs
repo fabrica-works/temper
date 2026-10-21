@@ -173,30 +173,36 @@ fn demo(port: u16) -> Value {
                 {
                     "cue": "Add CSV export to widget",
                     "turns": [
-                        "I would add an Export CSV button to widget's table, writing the rows on screen with their column names as the first line, so the table opens in any spreadsheet. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done."
+                        demo_turn("I would add an Export CSV button to widget's table, writing the rows on screen with their column names as the first line, so the table opens in any spreadsheet. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.")
                     ]
                 },
                 {
                     "cue": "Add a dark theme to widget",
                     "turns": [
-                        "I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done."
+                        demo_turn("I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.")
                     ]
                 },
                 {
                     "cue": "Fix widget's empty search state",
                     "turns": [
-                        "I would have widget say when a search finds nothing, name the words searched for and offer to clear them, in place of an empty table that looks broken. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done."
+                        demo_turn("I would have widget say when a search finds nothing, name the words searched for and offer to clear them, in place of an empty table that looks broken. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.")
                     ]
                 }
             ],
             "otherwise": [
-                "I am the demo model: I answer only the suggested requests, from a script. To ask for other work, connect a model from Accounts: a ChatGPT plan, a Claude subscription or an API key."
+                demo_turn("I am the demo model: I answer only the suggested requests, from a script. To ask for other work, connect a model from Accounts: a ChatGPT plan, a Claude subscription or an API key.")
             ]
         },
         "forge": 1,
         "project": 1,
         "client": "demo/client"
     })
+}
+
+fn demo_turn(text: &str) -> Value {
+    json!({"lines": [{"text": text}, {"call": "finish", "arguments": {
+        "form": "report", "text": "The demo changes nothing.", "fields": {}
+    }}], "finish": "tool_calls", "tokens": text.len().div_ceil(4)})
 }
 
 fn demo_model() -> Value {
