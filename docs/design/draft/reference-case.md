@@ -22,7 +22,9 @@ short (section 6).
   guarantee).
 - **The cast:**
   - the person, who is today's user, with the director as their chat;
-  - two owners: A, a Claude owner, and B, a Codex owner;
+  - three owners: A, a Claude owner; B, a Codex owner from the old
+    shape; and C, a fresh Codex owner that takes B's work on as a
+    mission;
   - two repositories: kit, upstream, and app, which pins kit;
   - three workers: ws, the person's workstation, and two servers, s1
     and s2;
@@ -31,7 +33,8 @@ short (section 6).
   1. the old shape at work (section 4);
   2. the change of shape (section 5);
   3. the new shape, with A's milestones (section 6);
-  4. two owners at once, after B resumes (section 7).
+  4. two owners at once, after B wraps up and C takes its work on
+     (section 7).
 - **What temper lacks for it** (section 9):
   - temper-on-temper.md's gaps: adding a dependency to a live task,
     which jig has designed and is building; parking by the director;
@@ -40,7 +43,8 @@ short (section 6).
     change's head too; a repair that adopts work in flight; the cap
     against delegates' deadlines; a fresh run at a milestone's end; a
     goal stopped while its delegates go on; retiring a charter, and
-    changing one under live tasks.
+    changing one under live tasks; a goal's notes and news passed to
+    its successor.
 - **Its readers:**
   - the web client's mockups, which show this story;
   - the lab, which runs it on the fake forge and the fake LLM, with
@@ -86,8 +90,11 @@ short (section 6).
   fake server, the flaky tests and the build path. It takes taste from
   one-shot Opus advisors, and brings its significant decisions to the
   director.
-- **Implementers, surveys and investigations** run on Codex. Advisors
-  are Opus one-shots. A tester is a Codex task.
+- **C,** a Codex owner like B, starts in act 4 with a mission: the part
+  of Harness that the person's first priority needs.
+- **Implementers, surveys and investigations** run on Codex, at medium
+  or high by the task. Advisors are Opus one-shots. A tester is a Codex
+  task.
 - **The repositories:**
   - kit, the upstream;
   - app, which pins kit. app has a slow tier that runs after each
@@ -239,11 +246,14 @@ the build queue's environment.
 
 ## 5. Act 2: the change of shape (hours 8 to 12)
 
-### 5.1 The person holds the director and rewrites the rules (T 334-336)
+### 5.1 The person holds the director and rewrites the rules (T 334-336, 351)
 
 The person stops the director's chat for four hours and rewrites the
 process documents into the new shape:
-- a draft is reached through milestones of 2 to 3 hours, under a
+- an owner takes one mission, a draft or part of one with a defined
+  end, in at most four milestones, and then stops; the next mission
+  gets a fresh owner, and no owner is standing;
+- a mission is reached through milestones of 2 to 3 hours, under a
   4-hour cap;
 - each milestone has a sub-owner;
 - the plan comes first;
@@ -287,7 +297,7 @@ their charter is retired.
     check, 6.8);
   - retiring a charter that still has tasks (to check, 6.8).
 - **Adds:** a stopped goal's news waits for its release, so nothing is
-  relayed by hand when it resumes.
+  relayed by hand. Its reaching a successor instead is 7.1's.
 
 ### 5.3 A moves to the new shape (T 340, 341)
 
@@ -327,6 +337,9 @@ A, so it waits on no paused owner." So:
 ### 5.5 A's plan and its first milestone (T 343, N)
 
 A's plan, in 15 lines:
+- a nearer end: Export needs more than four milestones, so this mission
+  ends at the end-to-end story, and the rest of Export goes to a later
+  mission;
 - M1, the path through app and kit's fake;
 - M2, the rest of the story;
 - each 2 to 3 hours;
@@ -338,6 +351,8 @@ with a 4-hour deadline.
 
 - **Must:**
   - a question and its answer (exact);
+  - a mission's size: a count of milestones by convention, or a goal's
+    deadline at about 16 hours as its rail (sugar);
   - a sub-owner delegated with a deadline (exact);
   - an owner resumed within a milestone and fresh at its end (sugar,
     6.8: a charter policy, or a call for a fresh next run);
@@ -446,11 +461,13 @@ goes up four levels: A1 asks A, A asks the director, and the director
 asks the person, since budgets are theirs. The recommendation: no
 raise, make it cheaper. The person agrees.
 
-a5, a Codex investigation, finds no cause in two tries. An Opus advisor
-reads its report and its evidence, and names the cause.
+a5, a Codex investigation at medium, finds no cause. Raised to high, it
+finds none again. An Opus advisor reads its report and its evidence,
+and names the cause.
 
 - **Must:**
   - an escalation up four levels to the person's inbox (exact);
+  - a delegate's effort raised for its next try (exact);
   - a one-shot advisor (exact).
 - **Adds:** the question's path is in the tree, with each level's
   answer.
@@ -459,7 +476,7 @@ reads its report and its evidence, and names the cause.
 
 The director is unsure whether e1 is the person's to decide, since B's
 stop was theirs, so it asks. The answer comes an hour later: yes, and
-tell B when it resumes. Then:
+tell whoever takes B's work on. Then:
 - e1 lands in kit;
 - app's repin to it lands;
 - a3 and a4 land.
@@ -512,39 +529,50 @@ A1 lands the fixes and closes with its note.
 
 ## 7. Act 4: two owners at once (hours 17 to 24)
 
-### 7.1 B resumes, in the new shape (T 347, R 5.5)
+### 7.1 B wraps up, and C takes its work on (T 347, 351, 353; R 5.5)
 
-The person: "resume B, on s2." The person releases B, and the director
-amends its instructions: the new shape, with its milestones toward
-priority 1 first. B's run reads its kept news:
-- A's changes in its files;
+The person: "B wraps up; the part of Harness that priority 1 needs
+becomes a mission, on s2." The person releases B, and the director
+amends its instructions to a wrap-up: land what is held and ready,
+write the closing note with what is left, and stop. B lands h2, names
+its parked benchmark branch in the note, and completes.
+
+The director starts C, a fresh Codex owner on s2. C's mission is the
+part of Harness that priority 1 needs, with its end, and its input is
+B's notes and closing note. C needs what was kept for B:
+- A's changes in B's files;
 - e1's approval;
 - the clock and F2 findings.
 
-B proposes one milestone, N1, which it drives itself. N1 is its old
-plan reordered toward priority 1, with a date its draft must meet. It
+C proposes one milestone, N1, which it drives itself: B's old plan,
+reordered toward priority 1, with a date its mission must meet. It
 takes its API's shape from an Opus one-shot. The director gives N1 a
 green light.
 
 - **Must:**
   - Release, the person's (exact);
   - amendment (exact);
+  - a goal that completes with what is left in its result (exact);
+  - a new goal with the last one's notes and closing note as its input,
+    and the news kept for B reaching C (design, 6.8: a goal's notes
+    and news are its own);
   - a goal's deadline (exact);
   - a Codex owner taking taste from an advisor and bringing its design
     to the director (exact).
-- **Adds:** nothing that B missed needs relaying.
+- **Adds:** what B leaves is its result, which C takes as input, so it
+  isn't a file someone must remember to read.
 
 ### 7.2 Two owners, one repin (R 5.2)
 
-M2 needs B's kit change k2: A2's a6 depends on k2's landing. Both B's
-b2 and A2's a6 need app's repin of kit. The director orders a single
+M2 needs C's kit change k2: A2's a6 depends on k2's landing. Both C's
+c2 and A2's a6 need app's repin of kit. The director orders a single
 repin:
-- B's repin goes first and carries both adaptations;
+- C's repin goes first and carries both adaptations;
 - if it is more than an hour out, A2 repins first instead.
 
 It lands early, and a6 starts with no relay. A2's branch then conflicts
 in app's lock, and a conflict resolution takes main's lock and updates
-again. The director introduces A2 and B to each other, to settle k2's
+again. The director introduces A2 and C to each other, to settle k2's
 API between them.
 
 - **Must:**
@@ -560,17 +588,19 @@ API between them.
 ### 7.3 The end (S)
 
 M2 lands. It is A's last milestone, so there is no handover: A2's
-report, its QA pass, then A's closing note. The note gives:
+report, its QA pass, then A's closing note, and A completes. The note
+gives:
 - each milestone's time against the cap;
 - how the plan moved, and why;
 - the QA passes;
-- the spend.
+- the spend;
+- what is left of Export, for the next mission's brief.
 
-B ends N1 with its own note. The director compares the two notes and
+C ends N1 with its own note. The director compares the notes and
 proposes one change to the process documents.
 
 - **Must:**
-  - results (exact);
+  - results, and a goal that completes when its mission does (exact);
   - notes (exact);
   - spend per goal (exact).
 - **Adds:** cost per owner, per milestone and per landing, which the
@@ -585,6 +615,8 @@ of shape added, with the steps that hold it.
 |---|---|
 | The director as the person's chat, its notes, its helpers | 4.1, 5.1, 5.6 |
 | Starting an owner: brief, input, priority, host kind, pool, models | 4.1 |
+| An owner per mission, at most four milestones; a nearer end in the plan | 5.1, 5.5 |
+| An owner wrapped up; its work taken on by a fresh owner, with its notes | 7.1 |
 | A Codex owner, its advisor, its decisions to the director | 7.1 |
 | Implementers, surveys, investigations, advisors | 6.1, 6.5 |
 | A tester that can't land | 6.8 |
@@ -614,10 +646,10 @@ of shape added, with the steps that hold it.
 | The two-hour check and its report | 4.3, 4.4 |
 | Escalation to the person: the pace, a budget, a call the director doubts | 4.4, 6.5, 6.6 |
 | Learning: an answer kept as a standing rule | 4.4, 5.6 |
-| Claude for taste, Codex for the rest | 4.4 |
+| Claude for taste, Codex for the rest, its effort by the task | 4.4, 6.5 |
 | Logouts, limits, switching subscriptions | 4.4, 4.5 |
 | Pacing against a plan's window | 4.4 |
-| Parking and pausing an owner; resuming it | 5.2, 7.1 |
+| Parking and pausing an owner; releasing it | 5.2, 7.1 |
 | Moving an owner between machines; placement by load and disk | 4.3 |
 | A worker lost; duplicates, orphans and hangs | 4.6 |
 | Credentials and secrets on workers | 4.5, 4.6 |
@@ -630,8 +662,8 @@ of shape added, with the steps that hold it.
 | Work moved off paused owners into the live one | 5.4 |
 | Retiring the old shape's charters and their tasks | 5.2 |
 | An informative message misread; a delegate cancelled | 5.6 |
-| Resumes one at a time, each moved to the new shape, its plan reordered | 7.1 |
-| Closing notes, compared; spend per owner | 7.3 |
+| Resumes one at a time, each to a mission or a wrap-up, toward priority 1 | 7.1 |
+| Closing notes with what is left, compared; spend per owner | 7.1, 7.3 |
 
 ## 9. What the case asks of temper
 
@@ -664,6 +696,9 @@ New with the change of shape and the new shape's first milestone
   queued changes land, as pausing needs (5.2).
 - **The old shape retired:** a charter withdrawn while tasks still use
   it, and a charter's new policy reaching live tasks (5.2, 5.3).
+- **A goal's successor:** a goal's notes are its subtree's, and its
+  kept news its own. A fresh goal that takes on an ended one's work
+  starts with neither (7.1).
 
 ## 10. Left out, and why
 

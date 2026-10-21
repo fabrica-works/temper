@@ -11,9 +11,10 @@ a trace of 25 hours of the real execution, kept in
 (section 6); drafts in jig, smith or temper follow when the user agrees.
 On 2026-10-21 owners.md and director.md moved to a new shape: owners
 reach their drafts through milestones under a cap, each on a fresh
-session. Sections 4.2, 4.4 and 6 take it in. `reference-case.md`
-condenses this analysis, the change of shape and the new shape's first
-milestone into one story.
+session. Since that evening each owner takes one mission of at most
+four milestones, and then stops. Sections 4.2, 4.4 and 6 take it in.
+`reference-case.md` condenses this analysis, the change of shape and
+the new shape's first milestone into one story.
 
 ## 1. In one page
 
@@ -52,13 +53,14 @@ milestone into one story.
 
   Whether an owner resumes its session or starts fresh is the charter's
   choice already; which works better is an experiment (section 6). The
-  new shape adds six (6.8):
+  new shape adds seven (6.8):
   - an open finding at a change's head;
   - a repair that adopts work in flight;
   - the cap against delegates' deadlines;
   - a fresh run at a milestone's end;
   - a stopped goal's delegates;
-  - retiring a charter.
+  - retiring a charter;
+  - a goal's successor.
 - **What temper does better:**
   - Sessions can't be orphaned or duplicated.
   - Releases need no relay, and landing conflicts get repair tasks.
@@ -254,6 +256,14 @@ milestone into one story.
     busy past a fresh start.
 - **An owner is a goal,** a tracked task with a priority (jig's
   `domain/core.md`, 6.2), which the director delegates per draft.
+  - Since 10-21 there is one goal per mission: a draft, or part of one,
+    with a defined end, reached in at most four milestones. The mission
+    ends with its closing note as the goal's result, and the goal
+    completes. No goal is standing: recurring work, such as hygiene,
+    becomes missions too. The next mission is a new goal, and its input
+    carries the last one's notes and closing note (6.8). A goal's
+    deadline at about 16 hours would make a mission's size a rail, where
+    today it is a count of milestones.
   - Its charter: `owners.md`'s part for owners.
   - Its instructions: the brief, with the draft as an input
     (repository, path, commit). The user's order of drafts becomes the
@@ -702,8 +712,8 @@ Each of these needs assessment and design, in a draft of its own.
 ### 6.8 From the new shape
 
 The change of shape on 10-21 and the new shape's first milestone
-(o/first-run's D1) showed six more. `reference-case.md` names the step
-each comes from.
+(o/first-run's D1) showed seven more. `reference-case.md` names the
+step each comes from.
 
 - **An open finding at a change's head.**
   - CI failing at a change's head starts a repair (4.3). In D1, 8 of 9
@@ -745,6 +755,19 @@ each comes from.
     a charter's changed policy reaches tasks already running. An
     amendment replaces a task's instructions whole (`domain/tasks.md`,
     section 7), but nothing says what a charter change does.
+- **A goal's successor.**
+  - Owners take missions now, so a draft passes from goal to goal. Some
+    owners paused under the old shape were released only to wrap up:
+    land what was ready, write a closing note with what was left, and
+    stop. Fresh missions took their work on, with briefs built from
+    their notes.
+  - In jig, a goal's notes are scoped to its subtree (`domain/core.md`,
+    6.2), and its kept news, footprint and grants are its own. So a
+    successor goal starts with none of them.
+  - To design: what passes from a goal that ended to the goal that
+    takes its work on: notes, kept news, grants on another owner's
+    files, parked branches. And whether that takes a new operation, or
+    an input and a note scope that the director passes on.
 
 ## 7. Where it does better
 
