@@ -148,9 +148,9 @@ says so; otherwise it never writes the document.
 The first default is a working minimum, for the mechanics and the
 experience; good defaults for a person's real work are open (section 8).
 
-- **LLM providers:** Codex's and Claude's, as the owned example's
-  (setup.md, 8.1), with no account; and the demo model, an endpoint on
-  loopback in plaintext, as the real loop's fake LLM peer is reached.
+- **LLM providers:** OpenAI's, as the owned example's (setup.md, 8.1),
+  with no account; and the demo model, an endpoint on loopback in
+  plaintext, as the real loop's fake LLM peer is reached.
 - **Forges,** each by its stable number: 1 the demo forge, 2 GitHub, 3
   an owned Forgejo, dormant (3.8). GitHub's addresses are its defaults;
   it starts not connected (`draft/github.md`, section 4).
