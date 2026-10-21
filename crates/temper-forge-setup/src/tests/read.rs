@@ -208,6 +208,11 @@ fn a_member_outside_its_bounds_is_refused_naming_its_path() {
             b"application.setup[2].mode.fake.repositories[1].name: invalid form\n",
         ),
         (
+            br#""repositories":[{"name":"widget","landing":"main"}]"#,
+            br#""repositories":[{"name":"widget","landing":"main"},{"name":"Widget","landing":"other"}]"#,
+            b"application.setup[2].mode.fake.repositories[1].name: invalid form\n",
+        ),
+        (
             br#""owner":"demo""#,
             br#""owner":"demo","extra":0"#,
             b"application.setup[2].mode.fake.extra: unknown member\n",

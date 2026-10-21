@@ -929,7 +929,7 @@ running its commands, and the client names them (6.5).
   | `fake.listen` | an address, jig's format | as `owned.listen` |
   | `fake.git` | a data path | the demo's git, a link to `temper fake git` (8.2, 8.4): the program the engine names in each of the forge's repositories' records, for the worker to spawn in place of `workers[].git` (channel.md, section 4) |
   | `fake.owner` | a Forgejo login | other than the bot's and `temper-admin`: the user who owns the fake's repositories |
-  | `fake.repositories` | a list of `{"name", "landing"}` | at least 1, at most 8, each `name` a Forgejo repository name, unique, and `landing` a branch name; their contents are `temper-fake`'s (8.4) |
+  | `fake.repositories` | a list of `{"name", "landing"}` | at least 1, at most 8, each `name` a Forgejo repository name, unique ignoring ASCII case as Forgejo's are, and `landing` a branch name; their contents are `temper-fake`'s (8.4) |
 
   The code's entry keeps `orgs` at the entry and the fake entry has none,
   until the entry's form is brought to this table (temper-15).

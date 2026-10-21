@@ -313,7 +313,8 @@ fn fake(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<Fa
         valid(crate::name::repository(&name), p.member(b"name"), ps);
         valid(crate::name::branch(&landing), p.member(b"landing"), ps);
         for prev in &repositories {
-            if prev.name == name {
+            // Forgejo keeps a repository name unique ignoring ASCII case.
+            if prev.name.eq_ignore_ascii_case(&name) {
                 ps.push(p.member(b"name"), config::What::Form);
                 break;
             }
