@@ -37,7 +37,12 @@ pub fn refusal(b: &mut Builder, words: &Words, value: &c::Refusal) {
         | c::Refusal::KeyConflict
         | c::Refusal::Provider => None,
     };
-    text(b, Role::Status, &words.say_word(jig_client::words::Word::refusal(value), hole.as_slice()));
+    let name = words.say_word(jig_client::words::Word::refusal(value), hole.as_slice());
+    b.open(Role::Status);
+    b.style(crate::look::REFUSAL);
+    b.name(&name);
+    b.text(Run::Plain, &name);
+    b.close();
     if let c::Refusal::Role { held: None } = value {
         phrase(b, words, P::NoHeldRole, &[]);
     }

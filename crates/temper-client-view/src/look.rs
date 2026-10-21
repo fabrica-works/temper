@@ -127,6 +127,8 @@ pub const ACCOUNTS_PAGE: Style = Style { owner: owner(), token: 60 };
 pub const ADOPTION_PAGE: Style = Style { owner: owner(), token: 61 };
 /// The demo heading, request, suggestions and script note.
 pub const INVITATION: Style = Style { owner: owner(), token: 62 };
+/// A supplied refusal, still announced as a status.
+pub const REFUSAL: Style = Style { owner: owner(), token: 63 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -195,6 +197,7 @@ pub const NAMES: Names<'static> = Names {
         b"temper-accounts-page",
         b"temper-adoption-page",
         b"temper-invitation",
+        b"temper-refusal",
     ],
     regions: &[b"temper-link"],
 };

@@ -568,3 +568,6 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
   .temper-accounts-page form, .temper-adoption-page > .temper-card > .temper-card:has(> .temper-card) { grid-template-columns: minmax(0, 1fr); }
   :is(.temper-accounts-page, .temper-adoption-page) .temper-pagebar { padding-inline: 16px; }
 }
+
+/* Supplied refusals keep Status semantics and share the Accounts alert colour. */
+.temper-main [role=status].temper-refusal { color: var(--temper-red); font-size: 11px; overflow-wrap: anywhere; }

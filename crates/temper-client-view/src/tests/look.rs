@@ -15,7 +15,7 @@ fn the_looks_names_pass_skeins_check() {
 }
 #[test]
 fn each_style_or_region_is_named_under_temper() {
-    let named: [(skein_ui::Style, &[u8]); 63] = [
+    let named: [(skein_ui::Style, &[u8]); 64] = [
         (BANNER, b"temper-banner"),
         (NAVIGATION, b"temper-navigation"),
         (MAIN, b"temper-main"),
@@ -79,6 +79,7 @@ fn each_style_or_region_is_named_under_temper() {
         (ACCOUNTS_PAGE, b"temper-accounts-page"),
         (ADOPTION_PAGE, b"temper-adoption-page"),
         (INVITATION, b"temper-invitation"),
+        (REFUSAL, b"temper-refusal"),
     ];
     for (style, name) in named {
         assert_eq!(NAMES.style(style), Some(name));
