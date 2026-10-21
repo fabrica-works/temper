@@ -1,4 +1,6 @@
 //! The owned example, with only setup.md 8.3's edits, and whole JSON string placeholders.
+//! The pinned jig and smith parsers require positive prices, so demo uses their
+//! minimum (one per million) until they admit setup.md 8.3's zero prices.
 //! Embedding these fixed templates is init's job (setup.md, 8.2); they are not runtime inputs.
 #![expect(
     clippy::disallowed_macros,
@@ -18,20 +20,26 @@ pub(crate) const CODING: &[u8] = include_bytes!("../template/charters/coding.txt
 pub(crate) fn documents(facts: &Facts<'_>, directories: &Directories<'_>) -> (Box<[u8]>, Box<[u8]>) {
     let agent = path::join(directories.config, b"agent.json");
     let programs = path::join(directories.data, b"programs");
-    let port = Decimal::of(u64::from(facts.port.get()));
-    let mut listener = Writer::new(10_usize.checked_add(port.as_bytes().len()).expect("a socket address fits"));
-    listener.put(b"127.0.0.1:").expect("the host and colon were counted");
-    listener.put(port.as_bytes()).expect("the port was counted");
-    let listener = listener.finish();
+    let llm = listener(facts.ports.llm);
+    let listener = listener(facts.ports.clients);
     let values = [
         (b"binary".as_slice(), json(Value::Text(Some(facts.binary)))),
         (b"agent".as_slice(), json(Value::Text(Some(&agent)))),
         (b"git".as_slice(), json(Value::Text(facts.git))),
         (b"listener".as_slice(), json(Value::Text(Some(&listener)))),
+        (b"llm".as_slice(), json(Value::Text(Some(&llm)))),
         (b"bundle".as_slice(), json(Value::Text(facts.bundle))),
         (b"programs".as_slice(), json(Value::Programs { claude: facts.claude, directory: &programs })),
     ];
     (fill(TEMPER, &values), fill(AGENT, &values))
+}
+
+fn listener(port: core::num::NonZeroU16) -> Box<[u8]> {
+    let port = Decimal::of(u64::from(port.get()));
+    let mut listener = Writer::new(10_usize.checked_add(port.as_bytes().len()).expect("a socket address fits"));
+    listener.put(b"127.0.0.1:").expect("the host and colon were counted");
+    listener.put(port.as_bytes()).expect("the port was counted");
+    listener.finish()
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -26,6 +26,13 @@
           "signed_in_plan": false,
           "models": ["gpt-6-luna"],
           "sources": {"keys": true}
+        },
+        {
+          "name": "demo",
+          "number": 3,
+          "signed_in_plan": false,
+          "models": ["demo"],
+          "sources": {"keys": true}
         }
       ],
       "endpoints": [
@@ -43,6 +50,19 @@
           "connect_ms": 10000,
           "handshake_ms": 10000,
           "server_name": "api.openai.com"
+        },
+        {
+          "name": "demo",
+          "number": 3,
+          "dialect": 3,
+          "provider": "demo",
+          "address": {
+            "socket": "$llm"
+          },
+          "transport": "plaintext",
+          "headers": [],
+          "connect_ms": 10000,
+          "handshake_ms": 10000
         }
       ],
       "models": [
@@ -50,6 +70,18 @@
           "name": "gpt-6-luna",
           "endpoint": "openai",
           "window": 1048576,
+          "output": 8192,
+          "prices": {
+            "input": 1,
+            "cached": 1,
+            "output": 1,
+            "unit": 1000000
+          }
+        },
+        {
+          "name": "demo",
+          "endpoint": "demo",
+          "window": 131072,
           "output": 8192,
           "prices": {
             "input": 1,
@@ -78,7 +110,7 @@
         "number": 1,
         "instructions": "charters/chat.txt",
         "model": "gpt-6-luna",
-        "alternatives": [],
+        "alternatives": ["demo"],
         "hosts": "workers",
         "waiting_ms": 10000,
         "resume": true,
@@ -188,7 +220,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 85508847661825,
+    "memory_bytes": 85510306965947,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -824,7 +856,7 @@
           "hub.event_bytes": 4096
         }
       },
-      "memory_bytes": 3283176427773
+      "memory_bytes": 3266333819083
     }
   ],
   "application": {

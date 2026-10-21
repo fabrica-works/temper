@@ -907,8 +907,13 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // startup measurement remains 3,283,176,427,773 B.
     assert_eq!(required.worker_bytes, 2_343_551_746_598_u64 + worker_growth + admission_growth + grant_growth);
 
-    support::owned::check_memory(required);
+    support::owned::check_memory("../../docs/examples/owned.json", required);
     eprintln!("owned requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
+    check_bounded_startup(&bounded, required);
+    scratch.remove();
+}
+
+fn check_bounded_startup(bounded: &support::owned::Bounded, required: temper_service::startup::Requirements) {
     let mut value: serde_json::Value = serde_json::from_slice(&bounded.document).expect("bounded JSON");
     value["engine"]["memory_bytes"] = required.engine_bytes.into();
     value["workers"][0]["memory_bytes"] = required.worker_bytes.into();
@@ -935,6 +940,16 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             format!("{path}: the worst case passes memory_bytes by 1 bytes\n")
         );
     }
+}
+
+#[test]
+fn owned_memory_figures_for_init_match_its_own_document() {
+    let scratch = support::Scratch::startup("init-memory-figures");
+    let bounded = support::owned::bounded_template(scratch.path());
+    let required = bounded.requirements();
+    support::owned::check_memory("../temper-init/template/temper.json", required);
+    eprintln!("init requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
+    check_bounded_startup(&bounded, required);
     scratch.remove();
 }
 
@@ -1071,9 +1086,16 @@ fn init_prints_written_files_account_guidance_and_explicit_start_flags_on_stderr
         assert!(output.stdout.is_empty());
         let lines = String::from_utf8(output.stderr).expect("init lines");
         let mut expected = String::new();
-        for name in
-            ["worker.secret", "worker.digest", "charters/chat.txt", "charters/coding.txt", "agent.json", "temper.json"]
-        {
+        for name in [
+            "worker.secret",
+            "worker.digest",
+            "demo/llm.key",
+            "demo/bin/git",
+            "charters/chat.txt",
+            "charters/coding.txt",
+            "agent.json",
+            "temper.json",
+        ] {
             writeln!(expected, "init: wrote {}", scratch.path().join(name).display()).expect("string");
         }
         assert!(lines.starts_with(&expected), "files are reported in write order");

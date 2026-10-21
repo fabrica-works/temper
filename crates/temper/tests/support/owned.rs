@@ -600,22 +600,27 @@ pub fn lay(directory: &Path, owned: &Owned) {
         let text = edited(bytes, owned).replace("/home/me/temper", directory.to_str().expect("deployment path"));
         fs::write(directory.join(name), text).expect("shipped file");
     }
-    let path = directory.join("owned/agent.json");
-    let mut agent: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("agent")).expect("agent JSON");
-    // Metadata reads must never resolve a shipped provider's real address.
-    // Preserve every endpoint's provider identity and declared quantities.
-    for endpoint in agent["endpoints"].as_array_mut().expect("agent endpoints") {
-        endpoint["address"] = owned.llm.to_string().into();
-    }
-    agent["endpoints"][0]["server_name"] = "skein.test".into();
-    agent["endpoints"][0]["trust_der"] = serde_json::json!(directory.join("root.der"));
-    fs::write(path, serde_json::to_vec(&agent).expect("agent JSON")).expect("fake agent");
-    super::write_private(&directory.join("root.der"), skein_tls_world::pki::ROOT);
+    local_agent(directory, "owned/agent.json", owned.llm);
     super::write_private(&directory.join("secrets/worker.secret"), b"worker-secret\n");
     super::write_private(
         &directory.join("secrets/worker.digest"),
         b"6fb46f7a92742970166379ed5195e79c4493a7cc5664280c039cfd4095ba5faf\n",
     );
+}
+
+/// Metadata reads use loopback and fixture trust, never DNS or the machine's root bundle.
+fn local_agent(directory: &Path, relative: &str, address: SocketAddr) {
+    let path = directory.join(relative);
+    let mut agent: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("agent")).expect("agent JSON");
+    for endpoint in agent["endpoints"].as_array_mut().expect("agent endpoints") {
+        if endpoint["transport"] == "tls" {
+            endpoint["address"] = address.to_string().into();
+            endpoint["server_name"] = "skein.test".into();
+            endpoint["trust_der"] = serde_json::json!(directory.join("root.der"));
+        }
+    }
+    fs::write(path, serde_json::to_vec(&agent).expect("agent JSON")).expect("fake agent");
+    super::write_private(&directory.join("root.der"), skein_tls_world::pki::ROOT);
 }
 
 // Reuse the shell's conversion without making a second public configuration API.
@@ -628,19 +633,26 @@ pub struct Bounded {
     pub files: temper_service::settings::Files,
     pub agent: temper_service::settings::Agent,
     pub seeds: temper_service::settings::Seeds,
-    forge: std::net::SocketAddr,
+    forge: temper_service::ForgeRuntime,
 }
 impl Bounded {
     #[must_use]
     pub fn forges(&self) -> skein_lib::List<temper_service::ForgeRuntime> {
+        use skein_forge_connection::settings::Transport;
         let mut forges = skein_lib::List::with_capacity(1);
+        let transport = match &self.forge.transport {
+            Transport::Plaintext { name } => Transport::Plaintext { name: name.clone() },
+            Transport::Tls { server_name, trust } => {
+                Transport::Tls { server_name: server_name.clone(), trust: trust.clone() }
+            }
+        };
         forges
             .push(temper_service::ForgeRuntime {
-                number: 1,
-                address: self.forge,
-                transport: skein_forge_connection::settings::Transport::Plaintext { name: None },
-                trust_roots: 0,
-                trust_root_bytes: 0,
+                number: self.forge.number,
+                address: self.forge.address,
+                transport,
+                trust_roots: self.forge.trust_roots,
+                trust_root_bytes: self.forge.trust_root_bytes,
             })
             .expect("one forge");
         forges
@@ -683,12 +695,78 @@ impl Bounded {
 /// One owned forge's longest base; small's token bound; two worker paths and two program paths.
 #[must_use]
 pub fn bounded(directory: &Path) -> Bounded {
-    use skein_lib::{List, Secret};
-    use temper_service::settings::{Files, PROGRAM_PATH_BYTES, Seeds};
     let owned = Owned { forgejo: "127.255.255.254:65535".parse().expect("longest owned forge"), ..Owned::example() };
     lay(directory, &owned);
-    let mut value: serde_json::Value =
-        serde_json::from_slice(&example_document(directory, &owned)).expect("example JSON");
+    let value = serde_json::from_slice(&example_document(directory, &owned)).expect("example JSON");
+    bounded_document(
+        directory,
+        value,
+        temper_service::ForgeRuntime {
+            number: 1,
+            address: owned.forgejo,
+            transport: skein_forge_connection::settings::Transport::Plaintext { name: None },
+            trust_roots: 0,
+            trust_root_bytes: 0,
+        },
+    )
+}
+
+/// Init's own document and agent, with the same counted paths at their bounds.
+#[must_use]
+pub fn bounded_template(directory: &Path) -> Bounded {
+    use std::num::NonZeroU16;
+    use temper_init::{Content, Directories, Facts, Ports};
+    let files = temper_init::files(
+        &Facts {
+            binary: b"/usr/local/bin/temper",
+            git: Some(b"/usr/bin/git"),
+            claude: Some(b"/usr/bin/claude"),
+            bundle: None,
+            ports: Ports {
+                clients: NonZeroU16::new(8367).expect("clients port"),
+                llm: NonZeroU16::new(8370).expect("LLM port"),
+            },
+        },
+        &Directories { config: directory.as_os_str().as_bytes(), data: directory.as_os_str().as_bytes() },
+        &[7; 32],
+        &[8; 32],
+    )
+    .expect("template files");
+    for file in files {
+        match file.content {
+            Content::Bytes { bytes, .. } => {
+                let path = directory.join(std::ffi::OsStr::from_bytes(file.name));
+                fs::create_dir_all(path.parent().expect("file parent")).expect("template directories");
+                fs::write(path, bytes).expect("template file");
+            }
+            Content::Link { .. } => {}
+        }
+    }
+    local_agent(directory, "agent.json", "127.0.0.1:8370".parse().expect("LLM stand-in"));
+    let value =
+        serde_json::from_slice(&fs::read(directory.join("temper.json")).expect("template")).expect("template JSON");
+    let (trust, _) = skein_tls::Config::from_der(&[skein_tls_world::pki::ROOT.into()], &[]).expect("fixture trust");
+    bounded_document(
+        directory,
+        value,
+        temper_service::ForgeRuntime {
+            number: 2,
+            address: "127.255.255.254:65535".parse().expect("resolved GitHub stand-in"),
+            transport: skein_forge_connection::settings::Transport::Tls {
+                server_name: skein_tls::Name::new("api.github.com").expect("GitHub name"),
+                trust,
+            },
+            // The binary's trust() admits at most 1024 roots of 65536 bytes each.
+            // Price those bounds, independent of this machine's root bundle.
+            trust_roots: 1024,
+            trust_root_bytes: 65_536,
+        },
+    )
+}
+
+fn bounded_document(directory: &Path, mut value: serde_json::Value, forge: temper_service::ForgeRuntime) -> Bounded {
+    use skein_lib::{List, Secret};
+    use temper_service::settings::{Files, PROGRAM_PATH_BYTES, Seeds};
     let path = format!("/{}", "p".repeat(PROGRAM_PATH_BYTES - 1));
     value["workers"][0]["agent"]["program"] = path.clone().into();
     value["workers"][0]["agent"]["arguments"][1] = path.clone().into();
@@ -717,46 +795,44 @@ pub fn bounded(directory: &Path) -> Bounded {
         files: Files { entries },
         agent,
         seeds: Seeds { deployment: [7; 16], installation: [8; 16], seed: 7, crypto: Secret::new(Box::new([9; 32])) },
-        forge: owned.forgejo,
+        forge,
     }
 }
 
-/// Only this drift check writes both examples' memory literals, in the established explicit mode.
-pub fn check_memory(required: temper_service::startup::Requirements) {
-    for relative in ["../../docs/examples/owned.json", "../temper-init/template/temper.json"] {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative);
-        let mut text = fs::read_to_string(&path).expect("owned example");
-        let value: serde_json::Value = serde_json::from_str(&text).expect("owned JSON");
-        let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
-        let again = "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper --test startup -E 'test(owned_memory_figures)'";
-        for (previous, required, name) in [
-            (
-                value["engine"]["memory_bytes"].as_u64().expect("engine memory_bytes"),
-                required.engine_bytes,
-                "engine.memory_bytes",
-            ),
-            (
-                value["workers"][0]["memory_bytes"].as_u64().expect("worker memory_bytes"),
-                required.worker_bytes,
-                "workers[0].memory_bytes",
-            ),
-        ] {
-            if write {
-                let literal = format!("\"memory_bytes\": {previous}");
-                assert_eq!(text.matches(&literal).count(), 1, "one literal per envelope");
-                text = text.replace(&literal, &format!("\"memory_bytes\": {required}"));
-            } else {
-                assert_eq!(previous, required, "{name} drifted; {again}");
-            }
-        }
+/// Only this drift check writes the document's memory literals, in the established explicit mode.
+pub fn check_memory(relative: &str, required: temper_service::startup::Requirements) {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative);
+    let mut text = fs::read_to_string(&path).expect("owned example");
+    let value: serde_json::Value = serde_json::from_str(&text).expect("owned JSON");
+    let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
+    let again =
+        "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper --test startup -E 'test(owned_memory_figures)'";
+    for (previous, required, name) in [
+        (
+            value["engine"]["memory_bytes"].as_u64().expect("engine memory_bytes"),
+            required.engine_bytes,
+            "engine.memory_bytes",
+        ),
+        (
+            value["workers"][0]["memory_bytes"].as_u64().expect("worker memory_bytes"),
+            required.worker_bytes,
+            "workers[0].memory_bytes",
+        ),
+    ] {
         if write {
-            fs::write(&path, text).expect("write only owned memory literals");
+            let literal = format!("\"memory_bytes\": {previous}");
+            assert_eq!(text.matches(&literal).count(), 1, "one literal per envelope");
+            text = text.replace(&literal, &format!("\"memory_bytes\": {required}"));
+        } else {
+            assert_eq!(previous, required, "{name} drifted; {again}");
         }
-        let value: serde_json::Value =
-            serde_json::from_slice(&fs::read(path).expect("owned example")).expect("owned JSON");
-        assert_eq!(value["engine"]["memory_bytes"].as_u64(), Some(required.engine_bytes));
-        assert_eq!(value["workers"][0]["memory_bytes"].as_u64(), Some(required.worker_bytes));
     }
+    if write {
+        fs::write(&path, text).expect("write only owned memory literals");
+    }
+    let value: serde_json::Value = serde_json::from_slice(&fs::read(path).expect("owned example")).expect("owned JSON");
+    assert_eq!(value["engine"]["memory_bytes"].as_u64(), Some(required.engine_bytes));
+    assert_eq!(value["workers"][0]["memory_bytes"].as_u64(), Some(required.worker_bytes));
 }
 /// Stands for skein's Adopt (forge-setup.md, 4.5 and 4.8); temper-14 removes it.
 /// Uses the kept webhook secret, drawing one only when absent.

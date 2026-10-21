@@ -1,4 +1,4 @@
-use super::fixtures::{self, DIRECTORIES, cases, file, parse, text};
+use super::fixtures::{self, DIRECTORIES, cases, content, parse, text};
 use crate::{files, template};
 use serde_json::{Value, json};
 use skein_lib::{Stack, bytes};
@@ -75,11 +75,33 @@ fn the_owned_example_offers_openai_keys_at_the_public_api() {
 fn the_default_is_the_owned_example_so_edited() {
     let owned = parse(fixtures::OWNED);
     for (row, facts) in cases() {
-        let answered = files(&facts, &DIRECTORIES, &[0; 32]).expect("valid facts");
-        let actual = parse(&file(&answered, b"temper.json").bytes);
+        let answered = files(&facts, &DIRECTORIES, &[0; 32], &[0xab; 32]).expect("valid facts");
+        let actual = parse(content(&answered, b"temper.json"));
         let mut expected = owned.clone();
         assert_eq!(replace_org_patterns(&mut expected), 40, "{row}");
         for (path, value) in [
+            (
+                "/engine/llm/providers",
+                json!([
+                    owned["engine"]["llm"]["providers"][0],
+                    {"name": "demo", "number": 3_u64, "signed_in_plan": false,
+                     "models": ["demo"], "sources": {"keys": true}}
+                ]),
+            ),
+            (
+                "/engine/llm/endpoints",
+                json!([
+                    owned["engine"]["llm"]["endpoints"][0],
+                    {"name": "demo", "number": 3_u64, "dialect": 3_u64, "provider": "demo",
+                     "address": {"socket": format!("127.0.0.1:{}", facts.ports.llm)},
+                     "transport": "plaintext", "headers": parse(b"[]"), "connect_ms": 10_000_u64, "handshake_ms": 10_000_u64}
+                ]),
+            ),
+            ("/engine/llm/models", json!([owned["engine"]["llm"]["models"][0], demo_model()])),
+            ("/engine/charters/0/alternatives", json!(["demo"])),
+            // Written by startup's owned_memory_figures_for_init drift check, at bounded strings.
+            ("/engine/memory_bytes", json!(85_510_306_965_947_u64)),
+            ("/workers/0/memory_bytes", json!(3_266_333_819_083_u64)),
             (
                 "/application/forges",
                 json!([{"number": 2_u16, "kind": "github", "api": null, "transport": null, "git": null, "web": null}]),
@@ -87,14 +109,7 @@ fn the_default_is_the_owned_example_so_edited() {
             ("/application/identities", json!([{"number": 1_u32, "forge": 2_u16, "login": null, "author": null}])),
             ("/application/setup", parse(b"[]")),
             ("/application/webhooks", Value::Null),
-            (
-                "/application/clients/listener/socket",
-                json!(match facts.port.get() {
-                    8367 => "127.0.0.1:8367",
-                    41023 => "127.0.0.1:41023",
-                    _ => unreachable!("the table's ports"),
-                }),
-            ),
+            ("/application/clients/listener/socket", json!(format!("127.0.0.1:{}", facts.ports.clients))),
             (
                 "/application/clients/bundle",
                 match facts.bundle {
@@ -126,18 +141,33 @@ fn the_default_is_the_owned_example_so_edited() {
     }
 }
 
+fn demo_model() -> Value {
+    json!({"name": "demo", "endpoint": "demo", "window": 131_072_u64, "output": 8_192_u64,
+           "prices": {"input": 1_u64, "cached": 1_u64, "output": 1_u64, "unit": 1_000_000_u64}})
+}
+
+fn demo_agent(port: u16) -> Value {
+    json!({"name": "demo", "number": 3_u64, "dialect": 3_u64, "provider": "openai",
+           "address": format!("127.0.0.1:{port}"), "transport": "plaintext",
+           "identity": "plain", "connect": 10_000_u64, "handshake": 10_000_u64, "headers": parse(b"[]"),
+           "models": [{"name": "demo", "window": 131_072_u64, "output": 8_192_u64,
+                       "prices": {"input": 1_u64, "cached": 1_u64, "output": 1_u64, "unit": 1_000_000_u64},
+                       "reasoning_item": 2_048_u64, "head": 60_000_u64, "idle": 30_000_u64}]})
+}
+
 #[test]
 fn the_agent_configuration_is_the_owned_examples_but_its_programs() {
     let owned = parse(fixtures::AGENT);
     for (row, facts) in cases() {
-        let answered = files(&facts, &DIRECTORIES, &[0; 32]).expect("valid facts");
+        let answered = files(&facts, &DIRECTORIES, &[0; 32], &[0xab; 32]).expect("valid facts");
         let mut expected = owned.clone();
         let programs = match facts.claude {
             Some(claude) => json!({"claude_code": {"path": text(claude), "directory": "/d/temper/programs"}}),
             None => json!({}),
         };
         set(&mut expected, "/programs", programs);
-        assert_eq!(parse(&file(&answered, b"agent.json").bytes), expected, "{row}");
+        set(&mut expected, "/endpoints", json!([owned["endpoints"][0], demo_agent(facts.ports.llm.get())]));
+        assert_eq!(parse(content(&answered, b"agent.json")), expected, "{row}");
     }
 }
 
@@ -156,10 +186,12 @@ fn facts_are_written_as_json_text() {
         ),
     ] {
         let facts = crate::Facts { binary, ..fixtures::facts() };
-        let answered = files(&facts, &DIRECTORIES, &[0; 32]).expect("valid text paths");
-        let document = &file(&answered, b"temper.json").bytes;
+        let answered = files(&facts, &DIRECTORIES, &[0; 32], &[0xab; 32]).expect("valid text paths");
+        let document = content(&answered, b"temper.json");
         assert!(bytes::find(document, escaped).is_some(), "{row}: JSON escaped the path");
         let parsed = parse(document);
+        assert_eq!(parsed["engine"]["llm"]["endpoints"][1]["address"], json!({"socket": "127.0.0.1:8370"}), "{row}");
+        assert_eq!(parse(content(&answered, b"agent.json"))["endpoints"][1], demo_agent(8370), "{row}");
         assert_eq!(
             parsed
                 .pointer("/workers/0/agent/program")
@@ -176,9 +208,9 @@ fn facts_are_written_as_json_text() {
 #[test]
 fn no_placeholder_is_left() {
     for (row, facts) in cases() {
-        let answered = files(&facts, &DIRECTORIES, &[0; 32]).expect("valid facts");
+        let answered = files(&facts, &DIRECTORIES, &[0; 32], &[0xab; 32]).expect("valid facts");
         for name in [b"temper.json".as_slice(), b"agent.json".as_slice()] {
-            assert_eq!(bytes::find(&file(&answered, name).bytes, b"\"$"), None, "{row}: {name:?}");
+            assert_eq!(bytes::find(content(&answered, name), b"\"$"), None, "{row}: {name:?}");
         }
     }
     for (row, source, expected) in [
@@ -191,10 +223,11 @@ fn no_placeholder_is_left() {
                 (b"\"$git\"".as_slice(), 1),
                 (b"\"$listener\"".as_slice(), 1),
                 (b"\"$bundle\"".as_slice(), 1),
+                (b"\"$llm\"".as_slice(), 1),
             ]
             .as_slice(),
         ),
-        ("agent", template::AGENT, [(b"\"$programs\"".as_slice(), 1_u32)].as_slice()),
+        ("agent", template::AGENT, [(b"\"$programs\"".as_slice(), 1_u32), (b"\"$llm\"".as_slice(), 1)].as_slice()),
     ] {
         // Exact token counts catch missing, extra and misspelled placeholders.
         let mut count = 0_u32;

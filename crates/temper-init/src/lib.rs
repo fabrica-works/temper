@@ -24,8 +24,14 @@ pub struct Facts<'a> {
     pub claude: Option<&'a [u8]>,
     /// The browser's bundle, if one holds index.html: clients.bundle.
     pub bundle: Option<&'a [u8]>,
-    /// The clients' listener's port on 127.0.0.1.
-    pub port: NonZeroU16,
+    /// The listeners' ports on 127.0.0.1.
+    pub ports: Ports,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Ports {
+    pub clients: NonZeroU16,
+    pub llm: NonZeroU16,
 }
 
 /// The directories init writes into, each absolute (configuration.md, 12).
@@ -47,9 +53,19 @@ pub struct File {
     pub directory: Directory,
     /// Relative to its directory: `worker.secret`, `charters/chat.txt`.
     pub name: &'static [u8],
-    pub bytes: Box<[u8]>,
+    pub content: Content,
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Content {
     /// 0o600 when private, else 0o644.
-    pub private: bool,
+    Bytes {
+        bytes: Box<[u8]>,
+        private: bool,
+    },
+    Link {
+        target: Box<[u8]>,
+    },
 }
 
 /// The fact or directory refused, and why; nothing is answered.
@@ -81,10 +97,16 @@ pub enum Reason {
 }
 
 /// The files of setup.md 8.2, in its table's order: `worker.secret`,
-/// `worker.digest` (data, private), `charters/chat.txt`,
+/// `worker.digest`, `demo/llm.key` (data, private), `demo/bin/git`
+/// (data, a link), `charters/chat.txt`,
 /// `charters/coding.txt`, `agent.json`, `temper.json` (config), the
 /// document last.
-pub fn files(facts: &Facts<'_>, directories: &Directories<'_>, secret: &[u8; 32]) -> Result<Box<[File]>, Refusal> {
+pub fn files(
+    facts: &Facts<'_>,
+    directories: &Directories<'_>,
+    secret: &[u8; 32],
+    demo_key: &[u8; 32],
+) -> Result<Box<[File]>, Refusal> {
     path::check(Fact::Binary, facts.binary, b"")?;
     if let Some(git) = facts.git {
         path::check(Fact::Git, git, b"")?;
@@ -102,22 +124,46 @@ pub fn files(facts: &Facts<'_>, directories: &Directories<'_>, secret: &[u8; 32]
     let digest = hex::digits(&sha256::digest(&digits));
     let (document, agent) = template::documents(facts, directories);
     Ok(Box::new([
-        File { directory: Directory::Data, name: b"worker.secret", bytes: line(&digits), private: true },
-        File { directory: Directory::Data, name: b"worker.digest", bytes: line(&digest), private: true },
+        File {
+            directory: Directory::Data,
+            name: b"worker.secret",
+            content: Content::Bytes { bytes: line(&digits), private: true },
+        },
+        File {
+            directory: Directory::Data,
+            name: b"worker.digest",
+            content: Content::Bytes { bytes: line(&digest), private: true },
+        },
+        File {
+            directory: Directory::Data,
+            name: b"demo/llm.key",
+            content: Content::Bytes { bytes: line(&hex::digits(demo_key)), private: true },
+        },
+        File {
+            directory: Directory::Data,
+            name: b"demo/bin/git",
+            content: Content::Link { target: bytes::copy_of(facts.binary) },
+        },
         File {
             directory: Directory::Config,
             name: b"charters/chat.txt",
-            bytes: bytes::copy_of(template::CHAT),
-            private: false,
+            content: Content::Bytes { bytes: bytes::copy_of(template::CHAT), private: false },
         },
         File {
             directory: Directory::Config,
             name: b"charters/coding.txt",
-            bytes: bytes::copy_of(template::CODING),
-            private: false,
+            content: Content::Bytes { bytes: bytes::copy_of(template::CODING), private: false },
         },
-        File { directory: Directory::Config, name: b"agent.json", bytes: agent, private: false },
-        File { directory: Directory::Config, name: b"temper.json", bytes: document, private: false },
+        File {
+            directory: Directory::Config,
+            name: b"agent.json",
+            content: Content::Bytes { bytes: agent, private: false },
+        },
+        File {
+            directory: Directory::Config,
+            name: b"temper.json",
+            content: Content::Bytes { bytes: document, private: false },
+        },
     ]))
 }
 

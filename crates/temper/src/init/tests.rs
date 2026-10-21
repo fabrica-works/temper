@@ -54,13 +54,14 @@ fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
     for held in [false, true] {
         for claude in [false, true] {
             for bundle in [false, true] {
-                rows.push((held, claude, bundle, true));
+                rows.push((held, claude, bundle, true, false));
             }
         }
     }
-    rows.push((false, false, false, false));
-    for (held, claude, bundle, git) in rows {
-        let row = format!("facts-{held}-{claude}-{bundle}-{git}");
+    rows.push((false, false, false, false, false));
+    rows.push((false, false, false, true, true));
+    for (held, claude, bundle, git, same) in rows {
+        let row = format!("facts-{held}-{claude}-{bundle}-{git}-{same}");
         let root = scratch(&row);
         let dirs = directories(&root);
         let env = environment(&root, claude);
@@ -72,35 +73,22 @@ fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
             fs::create_dir_all(root.join("share/temper/bundle")).expect("bundle");
             fs::write(root.join("share/temper/bundle/index.html"), b"page").expect("page");
         }
-        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred listener");
-        let preferred = listener.local_addr().expect("port").port();
+        let listeners = [
+            TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred clients listener"),
+            TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred LLM listener"),
+        ];
+        let mut preferred = listeners.each_ref().map(|listener| listener.local_addr().expect("port").port());
+        if same {
+            preferred[1] = preferred[0];
+        }
         let holder = if held {
-            Some(listener)
+            Some(listeners)
         } else {
-            drop(listener);
+            drop(listeners);
             None
         };
         let written = write(&dirs, &env, &binary, preferred).expect("init");
-        let names =
-            ["worker.secret", "worker.digest", "charters/chat.txt", "charters/coding.txt", "agent.json", "temper.json"];
-        let expected: Vec<_> = names
-            .iter()
-            .enumerate()
-            .map(|(i, name)| path(if i < 2 { &dirs.data } else { &dirs.config }).join(name))
-            .collect();
-        assert_eq!(written.paths, expected, "{row}: file order");
-        for (i, file) in written.paths.iter().enumerate() {
-            assert_eq!(
-                fs::metadata(file).expect("file").mode() & 0o777,
-                if i < 2 { 0o600 } else { 0o644 },
-                "{row}: {}",
-                file.display()
-            );
-        }
-        for directory in [&dirs.config, &dirs.data, &dirs.cache] {
-            assert_eq!(fs::metadata(path(directory)).expect("directory").mode() & 0o777, 0o700);
-        }
-        assert_eq!(fs::metadata(path(&dirs.config).join("charters")).expect("charters").mode() & 0o777, 0o700);
+        check_files(&dirs, &binary, &written, &row);
         let document: serde_json::Value =
             serde_json::from_slice(&fs::read(dirs.document()).expect("document")).expect("JSON");
         let address: std::net::SocketAddr = document["application"]["clients"]["listener"]["socket"]
@@ -108,54 +96,134 @@ fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
             .expect("address")
             .parse()
             .expect("socket");
-        assert_eq!(address.port() == preferred, !held, "{row}");
+        assert_eq!(address.port() == preferred[0], !held, "{row}");
         assert!(TcpListener::bind(address).is_ok(), "{row}: reservation released");
         assert_eq!(document["application"]["clients"]["bundle"].is_string(), bundle);
         let agent: serde_json::Value =
             serde_json::from_slice(&fs::read(path(&dirs.config).join("agent.json")).expect("agent")).expect("JSON");
+        let llm: std::net::SocketAddr =
+            agent["endpoints"][1]["address"].as_str().expect("LLM address").parse().expect("LLM socket");
+        assert_ne!(address.port(), llm.port(), "{row}: held reservations differ");
+        assert_eq!(
+            document["engine"]["llm"]["endpoints"][1]["address"],
+            serde_json::json!({"socket": llm.to_string()}),
+            "{row}"
+        );
+        assert_eq!(llm.port() == preferred[1], !held && !same, "{row}");
+        assert!(TcpListener::bind(llm).is_ok(), "{row}: LLM reservation released");
         assert_eq!(agent["programs"].as_object().expect("programs").contains_key("claude_code"), claude);
         assert_eq!(written.missing_bundle.is_none(), bundle);
         assert_eq!(written.missing_git, !git);
         assert_eq!(document["application"]["workers"][0]["git"].is_null(), !git);
-        let declarations = crate::agent::read(&path(&dirs.config).join("agent.json"));
-        declarations.expect("written agent configuration parses");
+        check_agent(&dirs, agent);
         drop(holder);
         fs::remove_dir_all(root).expect("cleanup");
     }
 }
 
+fn check_agent(dirs: &Directories, mut document: serde_json::Value) {
+    let config = path(&dirs.config);
+    // The generated route is asserted above; metadata preflight needs no public DNS
+    // or machine trust bundle (as in tests/support/owned.rs's local_agent).
+    document["endpoints"][0]["address"] = "127.0.0.1:443".into();
+    document["endpoints"][0]["trust_der"] = serde_json::json!(config.join("root.der"));
+    fs::write(config.join("root.der"), skein_tls_world::pki::ROOT).expect("fixture trust");
+    let checked = config.join("agent-check.json");
+    fs::write(&checked, serde_json::to_vec(&document).expect("agent JSON")).expect("metadata fixture");
+    crate::agent::read(&checked).expect("written agent configuration parses");
+}
+
+fn check_files(dirs: &Directories, binary: &Path, written: &Written, row: &str) {
+    let names = [
+        ("worker.secret", true, Some(0o600)),
+        ("worker.digest", true, Some(0o600)),
+        ("demo/llm.key", true, Some(0o600)),
+        ("demo/bin/git", true, None),
+        ("charters/chat.txt", false, Some(0o644)),
+        ("charters/coding.txt", false, Some(0o644)),
+        ("agent.json", false, Some(0o644)),
+        ("temper.json", false, Some(0o644)),
+    ];
+    let expected: Vec<_> =
+        names.iter().map(|(name, data, _)| path(if *data { &dirs.data } else { &dirs.config }).join(name)).collect();
+    assert_eq!(written.paths, expected, "{row}: file order");
+    for (file, (_, _, mode)) in written.paths.iter().zip(names) {
+        match mode {
+            Some(mode) => {
+                assert_eq!(fs::metadata(file).expect("file").mode() & 0o777, mode, "{row}: {}", file.display());
+            }
+            None => assert_eq!(fs::read_link(file).expect("git link"), binary, "{row}"),
+        }
+    }
+    let key = fs::read(path(&dirs.data).join("demo/llm.key")).expect("demo key");
+    assert_eq!(key.len(), 65, "{row}: 64 digits and newline");
+    assert!(key[..64].iter().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(byte)), "{row}");
+    assert_eq!(key[64], b'\n', "{row}");
+    for directory in ["demo", "demo/bin"] {
+        assert_eq!(
+            fs::metadata(path(&dirs.data).join(directory)).expect("demo directory").mode() & 0o777,
+            0o700,
+            "{row}"
+        );
+    }
+    for directory in [&dirs.config, &dirs.data, &dirs.cache] {
+        assert_eq!(fs::metadata(path(directory)).expect("directory").mode() & 0o777, 0o700);
+    }
+    assert_eq!(fs::metadata(path(&dirs.config).join("charters")).expect("charters").mode() & 0o777, 0o700);
+}
+
 #[test]
 fn init_refusals_leave_every_file_and_directory_untouched() {
-    for row in ["temper.json", "worker.secret", "worker.digest"] {
-        let root = scratch(row);
+    for (row, data, dangling) in [
+        ("temper.json", false, false),
+        ("worker.secret", true, false),
+        ("worker.digest", true, false),
+        ("demo/llm.key", true, false),
+        ("demo/bin/git", true, true),
+    ] {
+        let root = scratch(&row.replace('/', "-"));
         let dirs = directories(&root);
         let env = environment(&root, false);
-        let destination = match row {
-            "temper.json" => dirs.document(),
-            _ => path(&dirs.data).join(row),
-        };
-        fs::create_dir(destination.parent().expect("parent")).expect("parent");
-        fs::write(&destination, b"kept").expect("existing file");
-        let why = write(&dirs, &env, &root.join("bin/temper"), 0).expect_err("refused");
-        assert_eq!(why, format!("{}: already exists", destination.display()));
-        for directory in [&dirs.config, &dirs.data, &dirs.cache] {
-            let directory = path(directory);
-            if directory == destination.parent().expect("parent") {
-                assert_eq!(fs::read_dir(directory).expect("existing parent").count(), 1);
-                assert_eq!(fs::read(&destination).expect("kept"), b"kept");
-            } else {
-                assert!(!directory.exists(), "{row}: {}", directory.display());
-            }
+        let destination = path(if data { &dirs.data } else { &dirs.config }).join(row);
+        fs::create_dir_all(destination.parent().expect("parent")).expect("parent");
+        if dangling {
+            std::os::unix::fs::symlink("/nonexistent/temper-init-demo", &destination).expect("dangling link");
+        } else {
+            fs::write(&destination, b"kept").expect("existing file");
         }
+        let before = snapshot(&root);
+        let why = write(&dirs, &env, &root.join("bin/temper"), [0, 0]).expect_err("refused");
+        assert_eq!(why, format!("{}: already exists", destination.display()));
+        assert_eq!(snapshot(&root), before, "{row}: every file and directory untouched");
         fs::remove_dir_all(root).expect("cleanup");
     }
 }
+
+fn snapshot(root: &Path) -> Vec<(PathBuf, u32, Vec<u8>)> {
+    let mut pending = vec![root.to_path_buf()];
+    let mut entries = Vec::new();
+    while let Some(path) = pending.pop() {
+        let metadata = fs::symlink_metadata(&path).expect("entry");
+        let content = if metadata.is_dir() {
+            pending.extend(fs::read_dir(&path).expect("directory").map(|entry| entry.expect("child").path()));
+            Vec::new()
+        } else if metadata.is_symlink() {
+            fs::read_link(&path).expect("link").as_os_str().as_bytes().to_vec()
+        } else {
+            fs::read(&path).expect("file")
+        };
+        entries.push((path, metadata.mode(), content));
+    }
+    entries.sort();
+    entries
+}
+
 #[test]
 fn generated_configuration_passes_the_same_checks_as_serve() {
     let root = scratch("acceptance");
     let dirs = directories(&root);
     let env = environment(&root, true);
-    write(&dirs, &env, &root.join("bin/temper"), 0).expect("init");
+    write(&dirs, &env, &root.join("bin/temper"), [0, 0]).expect("init");
     let bytes = fs::read(dirs.document()).expect("document");
     crate::setup::check(&bytes, &dirs.jig()).expect("init document passes setup and named");
     fs::remove_dir_all(root).expect("cleanup");
