@@ -1,7 +1,7 @@
 //! The fake git core on this process's files, pipes and forge route (domain/testing.md, 4.3).
 use skein_io::kernel::{Exit, Fd, Spawn};
 use skein_shell::Host as _;
-use std::{env, ffi::OsStr, os::unix::ffi::OsStrExt, path::Path, process::ExitCode};
+use std::{env, ffi::OsStr, os::unix::ffi::OsStrExt, path::Path};
 use temper_fake_git::{Git, Route, Start};
 
 /// A link named `git` selects the fake before temper reads any of its own flags.
@@ -10,13 +10,8 @@ pub fn is_git(program: &OsStr) -> bool {
     Path::new(program).file_name() == Some(OsStr::new("git"))
 }
 
-/// Run as git, taking every argument after this process's program name.
-#[must_use]
-pub fn main() -> ExitCode {
-    ExitCode::from(run(&skein_shell::arguments()))
-}
-
-/// Run the same program through the `temper fake git` verb, with git's argv.
+/// Run as git with git's argv: every argument after the program name of a
+/// link named `git`, or after the `temper fake git` verb.
 #[must_use]
 pub fn run(arguments: &[Box<[u8]>]) -> u8 {
     match start(arguments) {

@@ -4,7 +4,7 @@ use std::{env, process::ExitCode};
 
 fn main() -> ExitCode {
     if env::args_os().next().as_deref().is_some_and(temper::fake::git::is_git) {
-        return temper::fake::git::main();
+        return ExitCode::from(temper::fake::git::run(&skein_shell::arguments()));
     }
     if env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new(smith_agent_shell::relay::FLAG)) {
         return smith_agent_shell::relay::main();
