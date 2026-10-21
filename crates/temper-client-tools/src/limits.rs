@@ -4,6 +4,8 @@ use skein_lib::{Duration, RequestLimits};
 use temper_client_domain as client;
 pub const ROWS: u32 = 32;
 pub const TEXT: u32 = 32_768;
+/// jig's portable login-directory name and configured adapter-name bounds.
+pub use crate::jig::call::{PROGRAM_ADAPTER, PROGRAM_NAME};
 pub const PART: u32 = 16_384;
 pub const DOCUMENT: u64 = 1_048_576;
 pub const DEADLINE: Duration = Duration::from_secs(30);
@@ -66,6 +68,8 @@ pub fn tools() -> crate::jig::Limits {
     let client = client().client.domain;
     crate::jig::Limits {
         rows: client.rows,
+        program_login: b"temper program-login",
+        application: b"temper",
         ask_bytes: client.ask_bytes,
         text: TEXT,
         part: PART,

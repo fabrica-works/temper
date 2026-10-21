@@ -365,3 +365,26 @@ pub const AMEND: Tool = Tool {
     keyed: Keyed::Optional,
     area: 2,
 };
+
+/// Appended so existing keyed tool identities stay stable.
+pub const DECLARE: Tool = Tool {
+    name: b"declare",
+    line: b"Declare a program login; the answer names the command for each host",
+    result: b"declare",
+    forms: &[&[
+        positional(b"provider", b"PROVIDER", Kind::Number, Required, b"LLM provider number from me"),
+        positional(b"adapter", b"ADAPTER", Kind::Text, Required, b"Program offered by the provider in me"),
+        positional(b"name", b"NAME", Kind::Text, Required, b"1 to 32 lower-case letters, digits or hyphens"),
+        flag(b"account", b"A", Kind::Number, Optional, b"Join an account"),
+    ]],
+    keyed: Keyed::Required,
+    area: 5,
+};
+pub const VERIFY: Tool = Tool {
+    name: b"verify",
+    line: b"Ask hosts to check a program login; then wait accounts --until settled",
+    result: b"verify",
+    forms: &[&[positional(b"account", b"ACCOUNT", Kind::Number, Required, b"Account number"), SOURCE]],
+    keyed: Keyed::Optional,
+    area: 5,
+};

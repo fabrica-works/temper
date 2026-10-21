@@ -68,6 +68,8 @@ const USAGES: &[&[u8]] = &[
     b"rank ACCOUNT POSITION [--source sign_in|key|program] [--key NAME]\n",
     b"retry ACCOUNT [--source sign_in|key|program] [--key NAME]\n",
     b"amend N --spec R --model M [--effort E] REASON [--key NAME]\n",
+    b"declare PROVIDER ADAPTER NAME [--account A] --key NAME\n",
+    b"verify ACCOUNT [--source sign_in|key|program] [--key NAME]\n",
 ];
 #[test]
 fn a_tools_usage_reads_as_the_design_writes_it() {

@@ -104,7 +104,7 @@ pub(super) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, cal
             let what = c::Read::Turn { task, attempt: name.attempt, turn: name.number };
             read(runner, &mut reading, 1, what, out);
         }
-        22 | 23 | 25 | 27..=30 => {
+        22 | 23 | 25 | 27..=30 | 33 => {
             let Some(document) = client.document(runner.me()) else { return };
             let Some(Latest::Jig(c::Delivery::Me(me))) = document.latest else { return };
             if reading.called.call.tool == 23 && model_project(&reading.called.call, me).is_err() {

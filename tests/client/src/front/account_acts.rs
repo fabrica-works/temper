@@ -43,6 +43,8 @@ fn fixture_root(seed: u64, tools: bool, own_accounts: u32, rows: Option<u32>) ->
             }]),
         };
         if tools {
+            config.core.settings.llm_providers.providers.get_mut(0).expect("fixture provider").offers.programs =
+                Box::new([Box::from(b"claude_code".as_slice())]);
             let mut model = walking::charter().policy.model;
             model.name = Box::from(b"effort-model".as_slice());
             model.efforts = Box::new([Box::from(b"high".as_slice())]);

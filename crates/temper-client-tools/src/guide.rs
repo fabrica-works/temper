@@ -23,6 +23,12 @@ Settled follows party-requested sign-ins; program checks and provider readiness 
   temper ctl DIRECTORY connect 1 --key connect-llm
   temper ctl DIRECTORY add-key 1 FILE --deployment --key add-llm
   temper ctl DIRECTORY replace-key 43 FILE --key replace-llm
+  temper ctl DIRECTORY declare 1 claude_code claude-work --key declare-llm
+  temper ctl DIRECTORY verify 43 --source program
+ADAPTER must appear in the provider's programs in me; the declare request carries no adapter binding.
+NAME is 1 to 32 lower-case letters, digits or hyphens.
+declare prints temper program-login NAME to run on each host; the tools never run it.
+verify accepts only a program source, answers once asked, then prints wait accounts --until settled.
 Keys use private files, never stdin or arguments; 1 to 4096 bytes after stripping one final newline.
 Value requests are sent once, never kept or automatically replayed. Unsent/lost exits 1;
 rerun with the same --key and file to recover the original answer. Only engine refusals exit 2.
@@ -39,7 +45,7 @@ Without these flags the template's choice or engine default is sent unchanged.
 A model change preserves the supplied account and sub-agent choices; there is no --account flag.
 Unknown model or effort names fail locally (exit 1), without sending.
 
-Name keys for chat, message, close, adopt, connect and add-key; other acts accept an optional --key NAME.
+Name keys for chat, message, close, adopt, connect, add-key and declare; other acts accept an optional --key NAME.
 Names are one to 64 lower-case letters, digits or hyphens.
 Give each agent a distinct prefix, such as investigate-41; reads and waits need no key.
 A repeat keeps its name, party and ask within retention. A changed template or bound in me

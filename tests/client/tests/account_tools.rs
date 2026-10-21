@@ -139,3 +139,32 @@ fn a_tools_chat_effort_reaches_its_task_document() {
     let text = std::str::from_utf8(&printed.stdout).expect("JSON");
     assert!(text.contains("\"main\":{\"model\":\"effort-model\",\"effort\":\"high\"}"), "{text}");
 }
+
+#[test]
+fn a_tools_declaration_is_visible_with_its_host_in_accounts() {
+    let (mut front, mut root) = accounts::tools_fixture(fixtures::SEED);
+    call(
+        &mut front,
+        &mut root,
+        1,
+        &[b"declare", b"17", b"claude_code", b"claude-work", b"--key", b"declare-login"],
+        None,
+    );
+    let declared = root.agent().printed(1).expect("durable declaration");
+    assert_eq!(declared.status, 0, "{declared:?}");
+    assert!(skein_lib::bytes::find(&declared.stdout, b"temper program-login claude-work").is_some());
+    call(&mut front, &mut root, 2, &[b"accounts", b"--json"], None);
+    let printed = root.agent().printed(2).expect("declared source and hosts");
+    assert_eq!(printed.status, 0);
+    let text = std::str::from_utf8(&printed.stdout).expect("accounts JSON");
+    for fact in [
+        "Scripted",
+        "\"kind\":\"program\"",
+        "\"name\":\"claude-work\"",
+        "\"program_hosts\":[{\"name\":\"worker\"",
+        "\"connected\":true",
+        "\"programs\":[{\"name\":\"claude-work\",\"state\":null",
+    ] {
+        assert!(text.contains(fact), "missing {fact}: {text}");
+    }
+}

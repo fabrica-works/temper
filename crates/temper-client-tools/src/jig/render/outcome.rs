@@ -67,8 +67,8 @@ impl Operation {
                 c::Ask::SignOut { .. } => (b"disconnect", None),
                 c::Ask::AccountChange { change, .. } => (
                     match change {
-                        c::AccountChange::DeclareProgram { .. } => b"declare-program".as_slice(),
-                        c::AccountChange::CheckProgram { .. } => b"check-program",
+                        c::AccountChange::DeclareProgram { .. } => b"declare".as_slice(),
+                        c::AccountChange::CheckProgram { .. } => b"verify",
                         c::AccountChange::AddKey { .. } => b"add-key".as_slice(),
                         c::AccountChange::ReplaceKey { .. } => b"replace-key",
                         c::AccountChange::Resume { .. } => b"retry",
@@ -132,10 +132,10 @@ fn bytes(
             length: u32::try_from(limits.ask_bytes).expect("output bytes fit"),
         };
         let mut measure = Encoder::measure(&bounds);
-        encode(operation, outcome, &mut measure, kept);
+        encode(operation, outcome, &mut measure, kept, limits);
         let Ok(size) = measure.measured() else { return super::failure(b"result limit", true, 1).stderr };
         let mut write = Encoder::write(size, &bounds);
-        encode(operation, outcome, &mut write, kept);
+        encode(operation, outcome, &mut write, kept, limits);
         let bytes = write.finish();
         if kept { newline(&bytes) } else { bytes }
     } else {
@@ -203,6 +203,13 @@ fn text(operation: &Operation, outcome: &Outcome, me: Option<&c::Me>, limits: &L
             out.number(u64::from(*source));
             out.put(b": ");
             out.put(name);
+            out.put(b"\nRun on each host: ");
+            out.put(limits.program_login);
+            out.put(b" ");
+            out.put(name);
+        }
+        c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountChanged)) if operation.word == b"verify" => {
+            out.put(b"asked\nwait accounts --until settled");
         }
         c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountSignInStarted { address, .. })) => {
             out.put(b"Open this address in a browser on the engine's machine:\n");
@@ -287,7 +294,7 @@ fn decision(how: &c::Decision, out: &mut Text) {
         c::Decision::LeftHeld { .. } => b"left held",
     });
 }
-fn encode(operation: &Operation, outcome: &Outcome, out: &mut Encoder, kept: bool) {
+fn encode(operation: &Operation, outcome: &Outcome, out: &mut Encoder, kept: bool, limits: &Limits) {
     out.object_start();
     out.key(b"operation");
     out.string(operation.word);
@@ -301,7 +308,14 @@ fn encode(operation: &Operation, outcome: &Outcome, out: &mut Encoder, kept: boo
         let Outcome::Answered(Answered::Jig(answer)) = outcome else { unreachable!("client answers handled") };
         document::answer_json(answer, out);
     }
-    if let Some(next) = account_follow_up(outcome) {
+    if let Outcome::Answered(Answered::Jig(c::Answer::Done(c::Outcome::Owner(
+        c::OwnerOutcome::AccountProgramDeclared { name, .. },
+    )))) = outcome
+    {
+        out.key(b"next");
+        out.string_parts(&[b"Run on each host: ", limits.program_login, b" ", name]);
+    }
+    if let Some(next) = account_follow_up(operation, outcome) {
         out.key(b"next");
         out.string(next);
     }
@@ -356,7 +370,7 @@ pub(crate) fn retry(call: &crate::jig::call::Call) -> Box<[u8]> {
         13 => &rows::RELEASE,
         14 => &rows::STOP,
         15 => &rows::CANCEL,
-        24..=30 => account_tool(call.tool),
+        24..=30 | 32 | 33 => account_tool(call.tool),
         31 => &rows::AMEND,
         _ => unreachable!("act tool"),
     };
@@ -389,15 +403,22 @@ pub(crate) fn account_tool(tool: u8) -> &'static crate::jig::table::Tool {
         28 => &rows::FORGET,
         29 => &rows::RANK,
         30 => &rows::RETRY,
+        32 => &rows::DECLARE,
+        33 => &rows::VERIFY,
         _ => unreachable!("account tool"),
     }
 }
 
-fn account_follow_up(outcome: &Outcome) -> Option<&'static [u8]> {
+fn account_follow_up(operation: &Operation, outcome: &Outcome) -> Option<&'static [u8]> {
     match outcome {
         Outcome::Answered(Answered::Jig(c::Answer::Done(c::Outcome::Owner(
             c::OwnerOutcome::AccountSignInStarted { .. },
         )))) => Some(b"wait accounts --until settled"),
+        Outcome::Answered(Answered::Jig(c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountChanged))))
+            if operation.word == b"verify" =>
+        {
+            Some(b"wait accounts --until settled")
+        }
         Outcome::Answered(Answered::Jig(c::Answer::Done(c::Outcome::Owner(
             c::OwnerOutcome::AccountSignedOut { confirmed: false, .. }
             | c::OwnerOutcome::AccountRemoved { confirmed: false, .. },

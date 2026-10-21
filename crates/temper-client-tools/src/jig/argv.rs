@@ -306,6 +306,20 @@ pub fn check(table: &[&Tool], call: &Call, limits: &Limits) -> Result<(), Usage>
             }
         }
     }
+    if tool.name == b"declare" {
+        for (index, bound) in [(1, crate::jig::call::PROGRAM_ADAPTER), (2, crate::jig::call::PROGRAM_NAME)] {
+            let argument = u8::try_from(index).expect("argument");
+            let Some(Value::Text(bytes)) = crate::jig::call::value(call, index) else {
+                return Err(Usage::Kind { argument });
+            };
+            if bytes.len() > usize::try_from(bound).expect("name bound fits") {
+                return Err(Usage::Long { argument });
+            }
+            if index == 2 && !jig_client::contract::valid_program_name(bytes) {
+                return Err(Usage::Kind { argument });
+            }
+        }
+    }
     if tool.name == b"inbox" {
         check_inbox(call)?;
     }

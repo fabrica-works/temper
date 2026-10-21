@@ -8,6 +8,12 @@ use jig_client::{Client, contract as c};
 use skein_lib::{Env, Queue};
 
 pub(super) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, called: Called, out: &mut Queue<Out>) {
+    if called.call.tool == 32 {
+        let Some(me) = acts::me(runner, client) else { return };
+        let request = declare(&called.call, me);
+        acts::prepared(runner, client, env, called, request, out);
+        return;
+    }
     let ask = match called.call.tool {
         24 => acts::Request::Ask(c::Ask::SignIn { holder: c::AccountHolder::Own, provider: integer(&called.call, 0) }),
         26 => acts::Request::AddKey {
@@ -118,6 +124,12 @@ fn build(reading: &reads::Reading) -> Result<acts::Request, &'static [u8]> {
             return Ok(acts::Request::Ask(c::Ask::SignOut { holder, source: source.number }));
         }
         match call.tool {
+            33 => {
+                if source.kind != c::OwnerAccountKind::Program {
+                    return Err(b"verify needs a program source; sign-in and key sources have no host login to check");
+                }
+                return Ok(acts::Request::CheckProgram { holder, source: source.number });
+            }
             27 => return Ok(acts::Request::ReplaceKey { holder, source: source.number }),
             28 => c::AccountChange::RemoveKey { source: source.number },
             29 => c::AccountChange::MoveSource {
@@ -133,4 +145,39 @@ fn build(reading: &reads::Reading) -> Result<acts::Request, &'static [u8]> {
 }
 fn join(call: &Call) -> Option<u32> {
     Some(u32::try_from(number(call, 2)?).expect("checked number"))
+}
+
+fn declare(call: &Call, me: &c::Me) -> Result<(acts::Request, Option<c::Recipient>), acts::Failed> {
+    let Some(Value::Text(adapter)) = value(call, 1) else { unreachable!("parsed adapter") };
+    let Some(Value::Text(name)) = value(call, 2) else { unreachable!("parsed program name") };
+    let provider = integer(call, 0);
+    let mut offered = false;
+    let mut cut = me.providers_cut;
+    for offer in &me.providers {
+        if offer.provider == provider {
+            cut |= offer.programs_cut || offer.name.cut;
+            for program in &offer.programs {
+                offered |= program.bytes() == adapter.as_ref();
+            }
+        }
+    }
+    if !offered {
+        if cut {
+            return Err(acts::Failed::Fixed(b"provider offers cut in me; adapter unchecked; read me again"));
+        }
+        return Err(acts::Failed::Fixed(b"adapter not offered by this provider in me; read me again"));
+    }
+    // DeclareProgram carries no adapter: this validates the offer locally, without binding one in the ask.
+    Ok((
+        acts::Request::DeclareProgram {
+            holder: c::AccountHolder::Own,
+            provider,
+            join: match number(call, 3) {
+                Some(n) => Some(u32::try_from(n).expect("checked account")),
+                None => None,
+            },
+            name: name.clone(),
+        },
+        None,
+    ))
 }

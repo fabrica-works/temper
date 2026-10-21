@@ -196,10 +196,11 @@ impl Protocol {
         match request {
             engine::Request::Worker(engine::WorkerRequest::Deliver(engine::Delivery::Link {
                 channel,
-                down: host::LinkDown::Sources { sources },
+                down: host::LinkDown::Sources { sources: _ },
             })) => {
                 self.sources.push(channel);
-                assert!(sources.is_empty(), "this worker fixture has no configured program sources");
+                // This scripted worker supplies an empty inventory, including for newly
+                // declared sources: no login has been observed on it.
                 Ok(vec![up(channel, host::LinkUp::Logins { logins: Box::new([]) }, engine::Parts::none())])
             }
             engine::Request::Worker(engine::WorkerRequest::Host(host_request)) => match *host_request {

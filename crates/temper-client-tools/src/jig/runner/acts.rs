@@ -362,6 +362,8 @@ pub(super) enum Request {
     Ask(c::Ask),
     AddKey { holder: c::AccountHolder, provider: u32, join: Option<u32> },
     ReplaceKey { holder: c::AccountHolder, source: u32 },
+    DeclareProgram { holder: c::AccountHolder, provider: u32, join: Option<u32>, name: Box<[u8]> },
+    CheckProgram { holder: c::AccountHolder, source: u32 },
 }
 pub(super) fn prepared(
     runner: &mut Runner,
@@ -389,7 +391,8 @@ pub(super) fn prepared(
         finish(called, printed, out);
         return;
     }
-    if called.value.is_some() && called.call.key.is_none() {
+    // Tool 33 draws a key because check_program requires one even when verify omits --key.
+    if (called.value.is_some() || called.call.tool == 33) && called.call.key.is_none() {
         let mut bytes = [0; 32];
         for chunk in bytes.chunks_mut(16) {
             let hex = crate::jig::digest::Digest::from_bytes(runner.names.next_u64().to_le_bytes()).hex();
@@ -404,6 +407,12 @@ pub(super) fn prepared(
         None => None,
     };
     let event = match request {
+        Request::DeclareProgram { holder, provider, join, name: program } => {
+            jig_client::accounts::declare_program(key, name.expect("declaration name"), holder, provider, join, program)
+        }
+        Request::CheckProgram { holder, source } => {
+            jig_client::accounts::check_program(key, name.expect("check name"), holder, source)
+        }
         Request::Ask(ask) => Event::Send { key, name, request: jig_client::Ask::Jig(Box::new(ask)) },
         Request::AddKey { holder, provider, join } => jig_client::accounts::add_key(
             key,
@@ -435,7 +444,7 @@ pub(super) fn prepared(
     if called.call.tool == 10 {
         operation.word = b"close";
     }
-    if (24..=30).contains(&called.call.tool) {
+    if (24..=30).contains(&called.call.tool) || called.call.tool == 32 || called.call.tool == 33 {
         operation.word = render::outcome::account_tool(called.call.tool).name;
     }
     runner.sent.insert(key, Sent { called, operation });
