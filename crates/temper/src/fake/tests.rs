@@ -214,7 +214,7 @@ fn observation_write_failure_drains_the_peer_and_keeps_its_outputs() {
             let records = String::from_utf8(before).expect("JSON lines");
             assert_eq!(records.lines().last(), Some("{\"observations_lost\":0}"));
         } else {
-            assert!(before.is_empty(), "{name}: the first write failed");
+            assert_eq!(before, b"{\"observations_lost\":0}\n", "{name}: the first drain failed");
         }
         assert!(document.exists());
         assert!(directory.join("forge/admin_token").exists());

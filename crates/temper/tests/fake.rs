@@ -271,7 +271,7 @@ fn forge_run() {
     private_hex(&dir.join("forge/admin_token"), &token);
     assert_eq!(fs::metadata(dir.join("forge")).expect("valid fixture").permissions().mode() & 0o777, 0o700);
     assert_eq!(fs::metadata(&observations).expect("valid fixture").permissions().mode() & 0o777, 0o600);
-    assert!(fs::read(&observations).expect("valid fixture").is_empty(), "no seed observations");
+    assert_eq!(fs::read(&observations).expect("valid fixture"), b"{\"observations_lost\":0}\n", "no seed observations");
     let auth = format!("token {}", std::str::from_utf8(&token).expect("valid fixture"));
     let user = request(run.address, "GET", "/api/v1/user", &auth, b"");
     assert!(user.starts_with(b"HTTP/1.1 200"));

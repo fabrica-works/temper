@@ -129,7 +129,7 @@ pub fn configure(arguments: &[Bytes], environment: &[EnvironmentEntry]) -> Resul
     })
 }
 
-/// Creates every output before opening the peer or kernel. A refused start rolls
+/// Creates the peer outputs before readiness. A refused start rolls
 /// back only what this invocation created; a running peer leaves every file.
 pub fn run(arguments: &Arguments) -> Result<u8, String> {
     let command = arguments.kind.command();
@@ -190,7 +190,7 @@ impl Created {
 fn start(arguments: &Arguments, created: &mut Created) -> Result<(Host, skein_shell::Kernel), String> {
     let bytes = skein_shell::read_file(&arguments.document, temper_fake::DOCUMENT_BYTES)
         .map_err(|why| format!("{}: {}", arguments.document.display(), super::unread(why)))?;
-    let (peer, shared, observations) = match arguments.kind {
+    let (peer, shared, observations, writer, buffer) = match arguments.kind {
         Kind::Llm => {
             let document =
                 llm::Document::decode(&bytes).map_err(|why| String::from_utf8_lossy(&why.line()).into_owned())?;
@@ -202,7 +202,13 @@ fn start(arguments: &Arguments, created: &mut Created) -> Result<(Host, skein_sh
             let observations = arguments.observations.as_ref().map(|path| created.file(path, b"")).transpose()?;
             let peer = llm::peer(llm::configuration(&document, &key, arguments.seed))
                 .map_err(|why| format!("peer: {why:?}"))?;
-            (Peer::Llm(peer), None, observations)
+            let writer = arguments
+                .observations
+                .as_ref()
+                .map(|_| skein_fake_forge_protocol::observations::Writer::new(&forge::LIMITS.limits));
+            let buffer =
+                List::with_capacity(if arguments.observations.is_some() { limits::OBSERVATION_BYTES } else { 0 });
+            (Peer::Llm(peer), None, observations, writer, buffer)
         }
         Kind::Forge => {
             let document =
@@ -211,10 +217,23 @@ fn start(arguments: &Arguments, created: &mut Created) -> Result<(Host, skein_sh
             let path = super::path(document.admin_token());
             created.directory(path.parent().expect("absolute token file"))?;
             created.file(path, &token)?;
-            let observations = arguments.observations.as_ref().map(|path| created.file(path, b"")).transpose()?;
             let (peer, shared) =
                 forge::peer(&document, &token, arguments.seed).map_err(|why| format!("peer: {why:?}"))?;
-            (Peer::Forge(peer), Some(shared), observations)
+            let mut buffer =
+                List::with_capacity(if arguments.observations.is_some() { limits::OBSERVATION_BYTES } else { 0 });
+            let (observations, writer) = match &arguments.observations {
+                Some(path) => {
+                    let mut writer = skein_fake_forge_protocol::observations::Writer::new(&forge::LIMITS.limits);
+                    writer
+                        .stop(&mut shared.borrow_mut().domain, &mut buffer)
+                        .map_err(|why| format!("first checkpoint: {why:?}"))?;
+                    let file = created.file(path, buffer.as_slice())?;
+                    buffer.clear();
+                    (Some(file), Some(writer))
+                }
+                None => (None, None),
+            };
+            (Peer::Forge(peer), Some(shared), observations, writer, buffer)
         }
     };
     let signals = skein_shell::open_termination_signals().map_err(|why| format!("signals: errno {why}"))?;
@@ -230,11 +249,8 @@ fn start(arguments: &Arguments, created: &mut Created) -> Result<(Host, skein_sh
         ready: arguments.ready.clone(),
         observation_path: arguments.observations.clone(),
         observations,
-        writer: arguments
-            .observations
-            .as_ref()
-            .map(|_| skein_fake_forge_protocol::observations::Writer::new(&forge::LIMITS.limits)),
-        buffer: List::with_capacity(if arguments.observations.is_some() { limits::OBSERVATION_BYTES } else { 0 }),
+        writer,
+        buffer,
         stopped: false,
         peer_submissions: 0,
         checkpoint: false,
