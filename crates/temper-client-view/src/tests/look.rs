@@ -15,7 +15,7 @@ fn the_looks_names_pass_skeins_check() {
 }
 #[test]
 fn each_style_or_region_is_named_under_temper() {
-    let named: [(skein_ui::Style, &[u8]); 52] = [
+    let named: [(skein_ui::Style, &[u8]); 59] = [
         (BANNER, b"temper-banner"),
         (NAVIGATION, b"temper-navigation"),
         (MAIN, b"temper-main"),
@@ -68,6 +68,13 @@ fn each_style_or_region_is_named_under_temper() {
         (KIND_PERSON_TASK, b"temper-kind-person-task"),
         (KIND_RESULT, b"temper-kind-result"),
         (KIND_REPLY, b"temper-kind-reply"),
+        (TASK_HEADING, b"temper-task-heading"),
+        (TASK_CARD, b"temper-task-card"),
+        (PLAN, b"temper-plan"),
+        (PLAN_ROW, b"temper-plan-row"),
+        (PLAN_HOLD, b"temper-plan-hold"),
+        (EVENTS, b"temper-events"),
+        (STATUS_DONE, b"temper-status-done"),
     ];
     for (style, name) in named {
         assert_eq!(NAMES.style(style), Some(name));
@@ -76,17 +83,14 @@ fn each_style_or_region_is_named_under_temper() {
 }
 #[test]
 fn each_pages_main_carries_the_main_token() {
-    let builds: [fn() -> temper_client_domain::Domain; 5] = [
-        fixtures::signed_out,
-        fixtures::out_of_date,
-        fixtures::adoption_root,
-        fixtures::task::held_root,
-        fixtures::chats_root,
-    ];
+    let builds: [fn() -> temper_client_domain::Domain; 4] =
+        [fixtures::signed_out, fixtures::out_of_date, fixtures::adoption_root, fixtures::chats_root];
     for build in builds {
         let view = fixtures::page_view(&build());
         assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN])]);
     }
+    let view = fixtures::page_view(&fixtures::task::held_root());
+    assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN, PAGE])]);
     let view = fixtures::page_view(&fixtures::inbox_root());
     assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN, PAGE])]);
     let view = fixtures::page_view(&fixtures::account_root().0);
@@ -225,6 +229,37 @@ fn the_inbox_tokens_stay_on_their_roles() {
         for root in &roots {
             let view = fixtures::page_view(root);
             for node in view.tree().nodes() {
+                if node.styles.as_slice().contains(&token) {
+                    assert_eq!(node.role, role);
+                    found = true;
+                }
+            }
+        }
+        assert!(found, "{token:?}");
+    }
+}
+
+#[test]
+fn the_task_tokens_stay_on_their_roles() {
+    let view = fixtures::page_view(&fixtures::task::held_root());
+    let mut builder = skein_ui::Builder::new(&fixtures::tree_limits());
+    let mut task = fixtures::task::document();
+    task.chip.phase = jig_client::contract::Phase::Done;
+    crate::pages::task::header(&mut builder, &task, None, &fixtures::words());
+    let done = builder.finish();
+    let activity = super::task::activity_tree(true);
+    for (token, role) in [
+        (TASK_HEADING, Role::Region),
+        (TASK_CARD, Role::Region),
+        (PLAN, Role::Tree),
+        (PLAN_ROW, Role::Slot),
+        (PLAN_HOLD, Role::List),
+        (EVENTS, Role::List),
+        (STATUS_DONE, Role::Status),
+    ] {
+        let mut found = false;
+        for tree in [view.tree(), &done, &activity] {
+            for node in tree.nodes() {
                 if node.styles.as_slice().contains(&token) {
                     assert_eq!(node.role, role);
                     found = true;

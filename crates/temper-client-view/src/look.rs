@@ -105,6 +105,20 @@ pub const KIND_PERSON_TASK: Style = Style { owner: owner(), token: 49 };
 pub const KIND_RESULT: Style = Style { owner: owner(), token: 50 };
 /// An inbox reply.
 pub const KIND_REPLY: Style = Style { owner: owner(), token: 51 };
+/// The task page header region.
+pub const TASK_HEADING: Style = Style { owner: owner(), token: 52 };
+/// A task page card region.
+pub const TASK_CARD: Style = Style { owner: owner(), token: 53 };
+/// The plan tree.
+pub const PLAN: Style = Style { owner: owner(), token: 54 };
+/// One plan row's own parts.
+pub const PLAN_ROW: Style = Style { owner: owner(), token: 55 };
+/// The list around a held row card.
+pub const PLAN_HOLD: Style = Style { owner: owner(), token: 56 };
+/// The task activity list.
+pub const EVENTS: Style = Style { owner: owner(), token: 57 };
+/// A done task phase.
+pub const STATUS_DONE: Style = Style { owner: owner(), token: 58 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -162,6 +176,13 @@ pub const NAMES: Names<'static> = Names {
         b"temper-kind-person-task",
         b"temper-kind-result",
         b"temper-kind-reply",
+        b"temper-task-heading",
+        b"temper-task-card",
+        b"temper-plan",
+        b"temper-plan-row",
+        b"temper-plan-hold",
+        b"temper-events",
+        b"temper-status-done",
     ],
     regions: &[b"temper-link"],
 };

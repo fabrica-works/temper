@@ -1,6 +1,7 @@
 //! A task's header, specification, supplied subtree and latest committed activity.
 use crate::{
     frame::Bindings,
+    look,
     words::{Word, Words},
 };
 use jig_client::{Latest, contract as c};
@@ -23,11 +24,18 @@ fn region(b: &mut Builder, word: Word, words: &Words) {
 }
 pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32) {
     b.open(Role::Main);
-    b.style(crate::look::MAIN);
+    b.style(look::MAIN);
+    b.style(look::PAGE);
     if let Some(page) = root.pages().task()
         && let Some(task) = page.document(root.client())
     {
-        text(b, Role::Heading { level: 1 }, task.chip.title.bytes());
+        b.open(Role::Slot);
+        b.style(look::PAGEBAR);
+        if let c::OwnerRequester::Task(number) = task.requester {
+            task_link(b, number, words, bindings);
+        }
+        text(b, Role::Paragraph, &words.say(Word::Task, &[Hole::Number(task.chip.task)]));
+        b.close();
         header(b, task, root.pages().me(root.client()), words);
         if page.shape == Shape::Tracked {
             asked(b, task, words);
@@ -46,15 +54,16 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
 }
 pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words: &Words) {
     region(b, Word::TaskHeader, words);
-    text(b, Role::Paragraph, &words.say(Word::Task, &[Hole::Number(task.chip.task)]));
-    text(b, Role::Paragraph, task.chip.title.bytes());
-    executor(b, task.chip.executor, words);
-    if let c::ChipPhase::Owner { details, .. } = task.chip.details.as_ref()
-        && let Some(part) = &details.procedure
-    {
-        crate::forge::owner_part(b, part, words);
+    b.style(look::TASK_HEADING);
+    b.open(Role::Slot);
+    b.style(look::META);
+    if let Some(priority) = task.priority {
+        text(b, Role::Paragraph, &words.say(Word::Priority, &[Hole::Number(u64::from(priority))]));
     }
-    phase(b, task.chip.phase, words);
+    b.open(Role::Slot);
+    text(b, Role::Paragraph, &words.say(Word::Task, &[Hole::Number(task.chip.task)]));
+    executor(b, task.chip.executor, words);
+    b.close();
     let mut named = false;
     if let Some(me) = me {
         for project in &me.projects {
@@ -69,15 +78,24 @@ pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words:
     if !named {
         text(b, Role::Paragraph, &words.say(Word::Project, &[Hole::Number(u64::from(task.project))]));
     }
+    if let c::ChipPhase::Owner { details, .. } = task.chip.details.as_ref()
+        && let Some(part) = &details.procedure
+    {
+        crate::forge::owner_part(b, part, words);
+    }
+    b.close();
+    text(b, Role::Heading { level: 1 }, task.chip.title.bytes());
+    b.open(Role::Slot);
+    b.style(look::META);
+    phase(b, task.chip.phase, words);
     requester(b, task.requester, me, words);
     if let Some(deadline) = task.budget.deadline {
         text(b, Role::Paragraph, &words.say(Word::Deadline, &[Hole::Wall(deadline)]));
     }
-    if let Some(priority) = task.priority {
-        text(b, Role::Paragraph, &words.say(Word::Priority, &[Hole::Number(u64::from(priority))]));
-    }
+    b.close();
     b.close();
 }
+
 fn executor(b: &mut Builder, executor: c::Executor, words: &Words) {
     let word = match executor {
         c::Executor::Agent { .. } => Word::Agent,
@@ -103,11 +121,39 @@ fn requester(b: &mut Builder, by: c::OwnerRequester, me: Option<&c::Me>, words: 
     text(b, Role::Paragraph, &words.say(word, &[Hole::Number(number)]));
 }
 fn phase(b: &mut Builder, phase: c::Phase, words: &Words) {
-    text(b, Role::Status, &words.say_word(jig_client::words::Word::Phase(phase), &[]));
+    b.open(Role::Status);
+    b.style(phase_token(phase));
+    let name = words.say_word(jig_client::words::Word::Phase(phase), &[]);
+    b.name(&name);
+    b.text(Run::Plain, &name);
+    b.close();
+}
+fn phase_token(phase: c::Phase) -> skein_ui::Style {
+    match phase {
+        c::Phase::Due | c::Phase::Preparing | c::Phase::Claimed | c::Phase::Running | c::Phase::Active => {
+            look::STATUS_ACTIVE
+        }
+        c::Phase::Done => look::STATUS_DONE,
+        c::Phase::Held | c::Phase::Failed => look::STATUS_HELD,
+        c::Phase::BackingOff => look::STATUS_RETRYING,
+        c::Phase::Waiting | c::Phase::Idle | c::Phase::Closing | c::Phase::Ended | c::Phase::Cancelled => {
+            look::STATUS_QUIET
+        }
+    }
 }
 pub(crate) fn asked(b: &mut Builder, task: &c::Task, words: &Words) {
     region(b, Word::Asked, words);
+    b.style(look::TASK_CARD);
     skein_ui::markdown::read(task.spec.specification.words.bytes(), 3, b);
+    let parts = !task.resources.is_empty()
+        || match &task.context {
+            Some(context) => !context.parts.is_empty(),
+            None => false,
+        };
+    if parts {
+        b.open(Role::Slot);
+        b.style(look::META);
+    }
     for resource in &task.resources {
         match resource {
             c::TaskResource::Part(part) => crate::forge::drawn(b, part, words),
@@ -119,18 +165,20 @@ pub(crate) fn asked(b: &mut Builder, task: &c::Task, words: &Words) {
             crate::forge::drawn(b, part, words);
         }
     }
+    if parts {
+        b.close();
+    }
     b.close();
 }
 fn chip(b: &mut Builder, chip: &c::Chip, words: &Words, bindings: &mut Bindings) {
-    let name = words.say(Word::Task, &[Hole::Number(chip.task)]);
     b.open(Role::TreeItem);
-    b.name(&name);
-    b.open(Role::Link);
-    b.name(&name);
-    b.text(Run::Plain, &name);
-    b.bind(bindings.insert(Act::Go { address: Address::Task { task: chip.task } }));
-    b.close();
+    b.name(&words.say(Word::Task, &[Hole::Number(chip.task)]));
+    b.open(Role::Slot);
+    b.style(look::PLAN_ROW);
+    b.open(Role::Slot);
+    task_link(b, chip.task, words, bindings);
     text(b, Role::Paragraph, chip.title.bytes());
+    b.close();
     executor(b, chip.executor, words);
     phase(b, chip.phase, words);
     if let c::ChipPhase::Owner { details, .. } = chip.details.as_ref()
@@ -138,6 +186,15 @@ fn chip(b: &mut Builder, chip: &c::Chip, words: &Words, bindings: &mut Bindings)
     {
         crate::forge::owner_part(b, part, words);
     }
+    b.close();
+}
+fn task_link(b: &mut Builder, task: u64, words: &Words, bindings: &mut Bindings) {
+    let name = words.say(Word::Task, &[Hole::Number(task)]);
+    b.open(Role::Link);
+    b.name(&name);
+    b.text(Run::Plain, &name);
+    b.bind(bindings.insert(Act::Go { address: Address::Task { task } }));
+    b.close();
 }
 fn parent(b: &mut Builder, stack: &mut List<u64>, parent: Option<u64>) {
     let mut keep = 0;
@@ -180,7 +237,9 @@ pub(crate) fn plan(
     rows: u32,
 ) {
     region(b, Word::Plan, words);
+    b.style(look::TASK_CARD);
     b.open(Role::Tree);
+    b.style(look::PLAN);
     b.name(&words.say(Word::Plan, &[]));
     match tree {
         c::Delivery::OwnerTree(tree) => {
@@ -232,9 +291,12 @@ fn controls(b: &mut Builder, chip: &c::Chip, root: &Domain, words: &Words, bindi
     if let Some(page) = root.pages().task() {
         for card in &page.cards {
             if card.object == c::ObjectKey::Task(chip.task) && (chip.phase == c::Phase::Held || card.key.is_some()) {
+                b.open(Role::List);
+                b.style(look::PLAN_HOLD);
                 b.open(Role::Item);
                 b.key(super::inbox::card_key(c::ObjectKey::Escalation(chip.task)));
                 crate::confirm::card(b, root, card, words, bindings, rows);
+                b.close();
                 b.close();
             }
         }
@@ -285,13 +347,21 @@ fn counts(b: &mut Builder, f: c::PhaseCounts, held: u32, words: &Words) {
 }
 pub(crate) fn latest(b: &mut Builder, page: Option<&c::ActivityPage>, words: &Words) {
     region(b, Word::Latest, words);
-    if let Some(page) = page {
+    b.style(look::TASK_CARD);
+    if let Some(page) = page
+        && !page.rows.is_empty()
+    {
+        b.open(Role::List);
+        b.style(look::EVENTS);
         for row in &page.rows {
             b.open(Role::Item);
             text(b, Role::Paragraph, &words.say(Word::ActivityAt, &[Hole::Wall(row.at)]));
+            b.open(Role::Slot);
             activity(b, &row.event, words);
             b.close();
+            b.close();
         }
+        b.close();
     }
     b.close();
 }

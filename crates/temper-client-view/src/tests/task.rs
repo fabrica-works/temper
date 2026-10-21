@@ -61,7 +61,7 @@ fn a_plans_chip_links_to_its_tasks_page_by_number() {
         }))
     );
 }
-fn asked(part: c::Part) -> skein_ui::Tree {
+fn asked(part: c::Part) -> Tree {
     let mut task = f::document();
     task.resources = List::with_capacity(ONE);
     task.resources.push(c::TaskResource::Part(part)).expect("one part");
@@ -183,7 +183,7 @@ fn a_held_plans_release_has_its_public_escalation_card_identity() {
     let tree = fixtures::build(&mut view, &root);
     assert!(has_release_card(tree));
 }
-fn has_release_card(tree: &skein_ui::Tree) -> bool {
+fn has_release_card(tree: &Tree) -> bool {
     for node in tree.nodes() {
         if node.role == Role::Item
             && node.key == Some(skein_ui::Key { owner: crate::frame::owner(), kind: 2, a: TASK, b: 0 })
@@ -217,4 +217,306 @@ fn a_released_plans_item_keeps_its_decision_result_while_running() {
         fixtures::domain_limits().client.domain.rows,
     );
     assert!(has_release_card(&builder.finish()));
+}
+
+use super::inbox::{styled, subtree};
+use crate::look;
+use skein_ui::{Node, Tree};
+fn children(tree: &Tree, parent: usize) -> List<usize> {
+    let nodes = tree.nodes();
+    let end = parent.checked_add(usize::try_from(nodes[parent].size).expect("subtree")).expect("subtree end");
+    let mut result = List::with_capacity(nodes[parent].size);
+    let mut index = parent.checked_add(1).expect("first child");
+    while index < end {
+        result.push(index).expect("children bounded by nodes");
+        index = index.checked_add(usize::try_from(nodes[index].size).expect("child size")).expect("next child");
+    }
+    result
+}
+fn named(nodes: &[Node], role: Role, name: &[u8]) -> bool {
+    for node in nodes {
+        if node.role == role && node.name.as_deref() == Some(name) {
+            return true;
+        }
+    }
+    false
+}
+fn header(task: &c::Task, me: Option<&c::Me>) -> Tree {
+    let mut builder = Builder::new(&fixtures::tree_limits());
+    crate::pages::task::header(&mut builder, task, me, &fixtures::words());
+    builder.finish()
+}
+fn titled() -> c::Task {
+    let mut task = f::document();
+    task.chip.task = TASK;
+    task.chip.title =
+        c::DocumentText::complete(c::Text::new(Box::from(*b"Refresh token handling"), 32).expect("title"));
+    task.project = fixtures::PROJECT;
+    task
+}
+#[test]
+fn the_title_sits_between_the_headers_two_meta_rows_without_a_title_paragraph() {
+    let mut task = titled();
+    task.priority = Some(PRIORITY);
+    task.requester = c::OwnerRequester::Person(PARTY);
+    task.budget.deadline = Some(skein_lib::Wall::EPOCH);
+    let root = f::held_root();
+    let tree = header(&task, root.pages().me(root.client()));
+    let heading = styled(&tree, look::TASK_HEADING);
+    let parts = children(&tree, heading);
+    assert_eq!(parts.len(), 4);
+    let nodes = tree.nodes();
+    let parts = parts.as_slice();
+    assert_eq!(nodes[parts[0]].role, Role::Heading { level: 2 });
+    assert_eq!(nodes[parts[1]].styles.as_slice(), [look::META]);
+    assert_eq!(nodes[parts[2]].role, Role::Heading { level: 1 });
+    assert_eq!(nodes[parts[2]].name.as_deref(), Some(task.chip.title.bytes()));
+    assert_eq!(nodes[parts[3]].styles.as_slice(), [look::META]);
+    assert!(!named(nodes, Role::Paragraph, task.chip.title.bytes()));
+    let first = subtree(&tree, parts[1]);
+    assert!(named(first, Role::Paragraph, b"Priority 1"));
+    assert!(named(first, Role::Paragraph, b"Shop"));
+    let meta = children(&tree, parts[1]);
+    let chip = subtree(&tree, meta.as_slice()[1]);
+    assert_eq!(chip[0].role, Role::Slot);
+    assert!(named(chip, Role::Paragraph, b"Task 9"));
+    assert!(named(chip, Role::Paragraph, b"Agent"));
+    let second = subtree(&tree, parts[3]);
+    assert!(named(second, Role::Paragraph, b"Asked by Pat"));
+    assert_eq!(second[1].role, Role::Status);
+    assert!(named(
+        second,
+        Role::Paragraph,
+        &fixtures::words().say(crate::words::Word::Deadline, &[skein_ui::phrases::Hole::Wall(skein_lib::Wall::EPOCH)])
+    ));
+}
+#[test]
+fn the_first_meta_omits_absent_priority_and_uses_the_project_fallback_and_procedure_part() {
+    let mut task = titled();
+    task.priority = None;
+    let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() else { panic!("owner") };
+    details.procedure = Some(c::OwnerPart {
+        connector: fixtures::FORGE,
+        kind: c::OwnerPartKind::Procedure,
+        key: c::OwnerPartKey::Number(1),
+    });
+    let tree = header(&task, None);
+    let first = subtree(&tree, styled(&tree, look::META));
+    assert!(!named(first, Role::Paragraph, b"Priority 1"));
+    assert!(named(
+        first,
+        Role::Paragraph,
+        &fixtures::words()
+            .say(crate::words::Word::Project, &[skein_ui::phrases::Hole::Number(u64::from(task.project))])
+    ));
+    assert!(skein_lib::bytes::find(&fixtures::text(&tree), b"Shown on the forge.").is_some());
+    let root = f::held_root();
+    let mut me = root.pages().me(root.client()).expect("me").clone();
+    for index in 0..me.projects.len() {
+        me.projects.get_mut(index).expect("project").name = None;
+    }
+    let tree = header(&task, Some(&me));
+    assert!(named(
+        tree.nodes(),
+        Role::Paragraph,
+        &fixtures::words()
+            .say(crate::words::Word::Project, &[skein_ui::phrases::Hole::Number(u64::from(task.project))])
+    ));
+}
+#[test]
+fn the_bar_links_only_a_requesting_task_before_the_current_task_paragraph() {
+    use temper_client_domain::{Action, Address, Event, pages::Act};
+    for requester in [
+        c::OwnerRequester::Task(7),
+        c::OwnerRequester::Person(PARTY),
+        c::OwnerRequester::Deployment { project: fixtures::PROJECT },
+    ] {
+        let limits = fixtures::domain_limits();
+        let (mut root, _, watch, _) = fixtures::root_at_with_tree(Address::Task { task: TASK }, &limits);
+        let mut task = titled();
+        task.requester = requester;
+        fixtures::root_event(
+            &mut root,
+            Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Watched {
+                        watch: watch.expect("task watch"),
+                        event: c::WatchEvent::Delivered(c::Delivery::Task(Box::new(task))),
+                    },
+                },
+            },
+        );
+        let mut view = fixtures::page_view(&root);
+        let tree = view.tree();
+        let mut main = None;
+        for (index, node) in tree.nodes().iter().enumerate() {
+            if node.role == Role::Main {
+                main = Some(index);
+            }
+        }
+        let main = main.expect("main");
+        let bar = children(tree, main).as_slice()[0];
+        assert_eq!(tree.nodes()[bar].styles.as_slice(), [look::PAGEBAR]);
+        let parts = children(tree, bar);
+        let expected = if requester == c::OwnerRequester::Task(7) { 2 } else { 1 };
+        assert_eq!(parts.len(), expected);
+        let current = &tree.nodes()[*parts.as_slice().last().expect("current")];
+        assert_eq!(current.role, Role::Paragraph);
+        assert_eq!(current.name.as_deref(), Some(b"Task 9".as_slice()));
+        if expected == 2 {
+            let link = &tree.nodes()[parts.as_slice()[0]];
+            assert_eq!(link.role, Role::Link);
+            assert_eq!(link.name.as_deref(), Some(b"Task 7".as_slice()));
+            let id = link.id;
+            assert_eq!(
+                crate::act(&mut view, id, skein_ui::Act::Press),
+                Some(Action::Pages(Act::Go { address: Address::Task { task: 7 } }))
+            );
+        }
+    }
+}
+const PHASES: [(c::Phase, skein_ui::Style); 14] = [
+    (c::Phase::Due, look::STATUS_ACTIVE),
+    (c::Phase::Preparing, look::STATUS_ACTIVE),
+    (c::Phase::Claimed, look::STATUS_ACTIVE),
+    (c::Phase::Running, look::STATUS_ACTIVE),
+    (c::Phase::Active, look::STATUS_ACTIVE),
+    (c::Phase::Done, look::STATUS_DONE),
+    (c::Phase::Held, look::STATUS_HELD),
+    (c::Phase::Failed, look::STATUS_HELD),
+    (c::Phase::BackingOff, look::STATUS_RETRYING),
+    (c::Phase::Waiting, look::STATUS_QUIET),
+    (c::Phase::Idle, look::STATUS_QUIET),
+    (c::Phase::Closing, look::STATUS_QUIET),
+    (c::Phase::Ended, look::STATUS_QUIET),
+    (c::Phase::Cancelled, look::STATUS_QUIET),
+];
+#[test]
+fn every_phase_has_the_same_status_token_in_the_header_and_its_plan_row() {
+    let root = f::held_root();
+    for (phase, token) in PHASES {
+        let mut task = titled();
+        task.chip.phase = phase;
+        let header = header(&task, None);
+        assert_eq!(fixtures::styles(&header, Role::Status).as_ref(), [Box::from([token])]);
+        let mut delivery = f::tree();
+        let c::Delivery::OwnerTree(tree) = &mut delivery else { panic!("owner") };
+        tree.root = task.chip;
+        let mut builder = Builder::new(&fixtures::tree_limits());
+        crate::pages::task::plan(
+            &mut builder,
+            &delivery,
+            &root,
+            &fixtures::words(),
+            &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+            fixtures::domain_limits().client.domain.rows,
+        );
+        let tree = builder.finish();
+        for (index, node) in tree.nodes().iter().enumerate() {
+            if node.role == Role::TreeItem {
+                let row = children(&tree, index).as_slice()[0];
+                assert_eq!(tree.nodes()[row].styles.as_slice(), [look::PLAN_ROW]);
+                let parts = subtree(&tree, row);
+                assert!(named(parts, Role::Link, b"Task 9"));
+                let mut count = 0_u32;
+                for status in parts {
+                    if status.role == Role::Status {
+                        count = count.checked_add(1).expect("bounded statuses");
+                        assert_eq!(status.styles.as_slice(), [token]);
+                    }
+                }
+                assert_eq!(count, 1);
+            }
+        }
+    }
+}
+#[test]
+fn the_held_card_keeps_its_key_in_a_list_after_its_plan_row() {
+    let view = fixtures::page_view(&f::held_root());
+    let tree = view.tree();
+    let hold = styled(tree, look::PLAN_HOLD);
+    assert_eq!(tree.nodes()[hold].role, Role::List);
+    let items = children(tree, hold);
+    assert_eq!(items.len(), 1);
+    let item = &tree.nodes()[items.as_slice()[0]];
+    assert_eq!(item.role, Role::Item);
+    assert_eq!(item.key, Some(skein_ui::Key { owner: crate::frame::owner(), kind: 2, a: TASK, b: 0 }));
+    let mut parent = None;
+    for (index, node) in tree.nodes().iter().enumerate() {
+        if node.role == Role::TreeItem {
+            parent = Some(index);
+            break;
+        }
+    }
+    let parent = parent.expect("parent");
+    let parts = children(tree, parent);
+    assert_eq!(parts.as_slice(), [styled(tree, look::PLAN_ROW), hold]);
+}
+pub(super) fn activity_tree(rows: bool) -> Tree {
+    let mut page = c::ActivityPage { rows: List::with_capacity(1), after: None, before: None, cut: false };
+    if rows {
+        page.rows
+            .push(c::ActivityLine {
+                position: 1,
+                at: skein_lib::Wall::EPOCH,
+                event: c::Activity::News {
+                    topic: 1,
+                    summary: c::Text::new(Box::from(*b"Ready for review"), 32).expect("news"),
+                    part: None,
+                },
+            })
+            .expect("row");
+    }
+    let mut builder = Builder::new(&fixtures::tree_limits());
+    crate::pages::task::latest(&mut builder, Some(&page), &fixtures::words());
+    builder.finish()
+}
+#[test]
+fn activity_rows_have_the_time_first_and_words_in_a_slot_and_no_empty_list() {
+    let tree = activity_tree(true);
+    let events = styled(&tree, look::EVENTS);
+    assert_eq!(tree.nodes()[events].role, Role::List);
+    for item in children(&tree, events).as_slice() {
+        assert_eq!(tree.nodes()[*item].role, Role::Item);
+        let parts = children(&tree, *item);
+        assert_eq!(parts.len(), 2);
+        assert_eq!(tree.nodes()[parts.as_slice()[0]].role, Role::Paragraph);
+        assert_eq!(
+            tree.nodes()[parts.as_slice()[0]].name.as_deref(),
+            Some(
+                fixtures::words()
+                    .say(crate::words::Word::ActivityAt, &[skein_ui::phrases::Hole::Wall(skein_lib::Wall::EPOCH)])
+                    .as_ref()
+            )
+        );
+        assert_eq!(tree.nodes()[parts.as_slice()[1]].role, Role::Slot);
+        assert!(
+            named(subtree(&tree, parts.as_slice()[1]), Role::Text, b"Ready for review")
+                || skein_lib::bytes::find(&fixtures::text(&tree), b"Ready for review").is_some()
+        );
+    }
+    for node in activity_tree(false).nodes() {
+        assert!(!node.styles.as_slice().contains(&look::EVENTS));
+    }
+}
+#[test]
+fn asked_resources_have_a_meta_row_only_when_there_are_parts() {
+    let tree = asked(c::Part::Panel { connector: fixtures::FORGE, task: TASK });
+    let meta = styled(&tree, look::META);
+    assert_eq!(tree.nodes()[meta].role, Role::Slot);
+    let mut found = false;
+    for node in subtree(&tree, meta) {
+        for run in &node.text {
+            found |= run.text.as_ref() == b"Shown on the forge.";
+        }
+    }
+    assert!(found);
+    let mut builder = Builder::new(&fixtures::tree_limits());
+    let mut task = titled();
+    task.resources = List::with_capacity(0);
+    task.context = None;
+    crate::pages::task::asked(&mut builder, &task, &fixtures::words());
+    for node in builder.finish().nodes() {
+        assert!(!node.styles.as_slice().contains(&look::META));
+    }
 }
