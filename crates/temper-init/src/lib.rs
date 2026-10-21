@@ -31,6 +31,7 @@ pub struct Facts<'a> {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Ports {
     pub clients: NonZeroU16,
+    pub forge: NonZeroU16,
     pub llm: NonZeroU16,
 }
 

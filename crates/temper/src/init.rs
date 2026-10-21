@@ -94,6 +94,21 @@ impl Io {
         }
         result
     }
+    fn ports(&mut self, preferred: [u16; 3]) -> Result<temper_init::Ports, String> {
+        let (clients_socket, clients) = self.port(preferred[0])?;
+        let result = (|| {
+            let (forge_socket, forge) = self.port(preferred[1])?;
+            let result = (|| {
+                let (llm_socket, llm) = self.port(preferred[2])?;
+                self.close(llm_socket);
+                Ok(temper_init::Ports { clients, forge, llm })
+            })();
+            self.close(forge_socket);
+            result
+        })();
+        self.close(clients_socket);
+        result
+    }
     fn close(&mut self, fd: Fd) {
         let result = self.perform(Op::Close { fd });
         debug_assert!(result.is_ok(), "startup descriptor closes");
@@ -140,12 +155,12 @@ pub(crate) struct Written {
     pub missing_git: bool,
 }
 /// Refusals are checked before directories or files are created. The held
-/// listeners reserve the chosen ports until the files have all been answered.
+/// listeners reserve all three ports until they have all been chosen, then close.
 pub(crate) fn write(
     directories: &Directories,
     environment: &[EnvironmentEntry],
     binary: &Path,
-    preferred: [u16; 2],
+    preferred: [u16; 3],
 ) -> Result<Written, String> {
     let document = directories.document();
     for destination in [
@@ -166,69 +181,56 @@ pub(crate) fn write(
     let bundle_path = binary.parent().ok_or("binary: no parent directory")?.join("../share/temper/bundle");
     let bundle = bundle_path.join("index.html").is_file().then_some(&bundle_path);
     let mut io = Io::open()?;
-    let (clients_socket, clients) = io.port(preferred[0])?;
-    let result = (|| {
-        let (llm_socket, llm) = io.port(preferred[1])?;
-        let result = (|| {
-            let secret = skein_shell::crypto_seed().map_err(|errno| format!("random secret: errno {errno}"))?;
-            let demo_key = skein_shell::crypto_seed().map_err(|errno| format!("random demo key: errno {errno}"))?;
-            let files = temper_init::files(
-                &temper_init::Facts {
-                    binary: binary.as_os_str().as_bytes(),
-                    git: git.as_ref().map(|path| path.as_os_str().as_bytes()),
-                    claude: claude.as_ref().map(|path| path.as_os_str().as_bytes()),
-                    bundle: bundle.map(|path| path.as_os_str().as_bytes()),
-                    ports: temper_init::Ports { clients, llm },
-                },
-                &temper_init::Directories { config: &directories.config, data: &directories.data },
-                secret.expose().try_into().expect("32-byte seed"),
-                demo_key.expose().try_into().expect("32-byte seed"),
-            )
-            .map_err(|why| format!("{:?}: {:?}", why.fact, why.reason))?;
-            directories.open(skein_shell::effective_user())?;
-            let data = path(&directories.data);
-            make_private(&data.join("demo"), skein_shell::effective_user())?;
-            make_private(&data.join("demo/bin"), skein_shell::effective_user())?;
-            let config = path(&directories.config);
-            if !config.exists() {
-                make_private(config, skein_shell::effective_user())?;
+    let ports = io.ports(preferred)?;
+    let secret = skein_shell::crypto_seed().map_err(|errno| format!("random secret: errno {errno}"))?;
+    let demo_key = skein_shell::crypto_seed().map_err(|errno| format!("random demo key: errno {errno}"))?;
+    let files = temper_init::files(
+        &temper_init::Facts {
+            binary: binary.as_os_str().as_bytes(),
+            git: git.as_ref().map(|path| path.as_os_str().as_bytes()),
+            claude: claude.as_ref().map(|path| path.as_os_str().as_bytes()),
+            bundle: bundle.map(|path| path.as_os_str().as_bytes()),
+            ports,
+        },
+        &temper_init::Directories { config: &directories.config, data: &directories.data },
+        secret.expose().try_into().expect("32-byte seed"),
+        demo_key.expose().try_into().expect("32-byte seed"),
+    )
+    .map_err(|why| format!("{:?}: {:?}", why.fact, why.reason))?;
+    directories.open(skein_shell::effective_user())?;
+    let data = path(&directories.data);
+    make_private(&data.join("demo"), skein_shell::effective_user())?;
+    make_private(&data.join("demo/bin"), skein_shell::effective_user())?;
+    let config = path(&directories.config);
+    if !config.exists() {
+        make_private(config, skein_shell::effective_user())?;
+    }
+    make_private(&config.join("charters"), skein_shell::effective_user())?;
+    let mut paths = Vec::with_capacity(files.len());
+    for file in files {
+        let root = match file.directory {
+            temper_init::Directory::Config => config,
+            temper_init::Directory::Data => path(&directories.data),
+        };
+        let destination = root.join(path(file.name));
+        let result = match file.content {
+            temper_init::Content::Bytes { bytes, private } => {
+                io.write(&destination, bytes, if private { 0o600 } else { 0o644 })
             }
-            make_private(&config.join("charters"), skein_shell::effective_user())?;
-            let mut paths = Vec::with_capacity(files.len());
-            for file in files {
-                let root = match file.directory {
-                    temper_init::Directory::Config => config,
-                    temper_init::Directory::Data => path(&directories.data),
-                };
-                let destination = root.join(path(file.name));
-                let result = match file.content {
-                    temper_init::Content::Bytes { bytes, private } => {
-                        io.write(&destination, bytes, if private { 0o600 } else { 0o644 })
-                    }
-                    // skein-io at the pin has no symlink operation; like exact modes above,
-                    // creating the link stays in this startup shell (setup.md, 8.2).
-                    temper_init::Content::Link { target } => {
-                        std::os::unix::fs::symlink(path(&target), &destination).map_err(|why| why.to_string())
-                    }
-                };
-                result.map_err(|why| format!("{}: {why}", destination.display()))?;
-                paths.push(destination);
+            // skein-io at the pin has no symlink operation; like exact modes above,
+            // creating the link stays in this startup shell (setup.md, 8.2).
+            temper_init::Content::Link { target } => {
+                std::os::unix::fs::symlink(path(&target), &destination).map_err(|why| why.to_string())
             }
-            Ok(Written {
-                paths,
-                missing_bundle: bundle.is_none().then_some(bundle_path.clone()),
-                missing_git: git.is_none(),
-            })
-        })();
-        io.close(llm_socket);
-        result
-    })();
-    io.close(clients_socket);
-    result
+        };
+        result.map_err(|why| format!("{}: {why}", destination.display()))?;
+        paths.push(destination);
+    }
+    Ok(Written { paths, missing_bundle: bundle.is_none().then_some(bundle_path.clone()), missing_git: git.is_none() })
 }
 pub(crate) fn core(directories: &Directories) -> Result<Written, String> {
     let binary = std::env::current_exe().map_err(|why| why.to_string())?;
-    write(directories, &skein_shell::environment(), &binary, [8367, 8370])
+    write(directories, &skein_shell::environment(), &binary, [8367, 8369, 8370])
 }
 pub(crate) fn run(directories: &Directories) -> Result<u8, String> {
     let written = core(directories)?;

@@ -75,6 +75,7 @@ fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
         }
         let listeners = [
             TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred clients listener"),
+            TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred forge listener"),
             TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred LLM listener"),
         ];
         let mut preferred = listeners.each_ref().map(|listener| listener.local_addr().expect("port").port());
@@ -103,13 +104,33 @@ fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
             serde_json::from_slice(&fs::read(path(&dirs.config).join("agent.json")).expect("agent")).expect("JSON");
         let llm: std::net::SocketAddr =
             agent["endpoints"][1]["address"].as_str().expect("LLM address").parse().expect("LLM socket");
-        assert_ne!(address.port(), llm.port(), "{row}: held reservations differ");
+        let forge: std::net::SocketAddr = document["application"]["forges"][0]["api"]["socket"]
+            .as_str()
+            .expect("forge address")
+            .parse()
+            .expect("forge socket");
+        assert_eq!(document["application"]["forges"][0]["git"], format!("http://{forge}"), "{row}");
+        assert_eq!(
+            document["application"]["setup"][0]["mode"]["fake"]["listen"],
+            serde_json::json!({"socket": forge.to_string()}),
+            "{row}"
+        );
+        assert_eq!(
+            document["application"]["demo"]["llm"]["listen"],
+            serde_json::json!({"socket": llm.to_string()}),
+            "{row}"
+        );
+        assert_ne!(address.port(), forge.port(), "{row}: clients and forge reservations differ");
+        assert_ne!(address.port(), llm.port(), "{row}: clients and LLM reservations differ");
+        assert_ne!(forge.port(), llm.port(), "{row}: forge and LLM reservations differ");
+        assert_eq!(forge.port() == preferred[1], !held && !same, "{row}");
+        assert!(TcpListener::bind(forge).is_ok(), "{row}: forge reservation released");
         assert_eq!(
             document["engine"]["llm"]["endpoints"][1]["address"],
             serde_json::json!({"socket": llm.to_string()}),
             "{row}"
         );
-        assert_eq!(llm.port() == preferred[1], !held && !same, "{row}");
+        assert_eq!(llm.port() == preferred[2], !held, "{row}");
         assert!(TcpListener::bind(llm).is_ok(), "{row}: LLM reservation released");
         assert_eq!(agent["programs"].as_object().expect("programs").contains_key("claude_code"), claude);
         assert_eq!(written.missing_bundle.is_none(), bundle);
@@ -192,7 +213,7 @@ fn init_refusals_leave_every_file_and_directory_untouched() {
             fs::write(&destination, b"kept").expect("existing file");
         }
         let before = snapshot(&root);
-        let why = write(&dirs, &env, &root.join("bin/temper"), [0, 0]).expect_err("refused");
+        let why = write(&dirs, &env, &root.join("bin/temper"), [0, 0, 0]).expect_err("refused");
         assert_eq!(why, format!("{}: already exists", destination.display()));
         assert_eq!(snapshot(&root), before, "{row}: every file and directory untouched");
         fs::remove_dir_all(root).expect("cleanup");
@@ -223,8 +244,13 @@ fn generated_configuration_passes_the_same_checks_as_serve() {
     let root = scratch("acceptance");
     let dirs = directories(&root);
     let env = environment(&root, true);
-    write(&dirs, &env, &root.join("bin/temper"), [0, 0]).expect("init");
+    write(&dirs, &env, &root.join("bin/temper"), [0, 0, 0]).expect("init");
     let bytes = fs::read(dirs.document()).expect("document");
-    crate::setup::check(&bytes, &dirs.jig()).expect("init document passes setup and named");
+    let deployment = crate::setup::check(&bytes, &dirs.jig()).expect("init document passes setup and named");
+    let demo = deployment.demo.expect("init declares the demo");
+    assert_eq!(demo.provider(), 3);
+    assert_eq!(demo.forge(), 1);
+    assert_eq!(demo.project(), 1);
+    assert_eq!(demo.client(), path(&dirs.data).join("demo/client").as_os_str().as_bytes());
     fs::remove_dir_all(root).expect("cleanup");
 }

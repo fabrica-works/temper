@@ -633,28 +633,30 @@ pub struct Bounded {
     pub files: temper_service::settings::Files,
     pub agent: temper_service::settings::Agent,
     pub seeds: temper_service::settings::Seeds,
-    forge: temper_service::ForgeRuntime,
+    forges: Box<[temper_service::ForgeRuntime]>,
 }
 impl Bounded {
     #[must_use]
     pub fn forges(&self) -> skein_lib::List<temper_service::ForgeRuntime> {
         use skein_forge_connection::settings::Transport;
-        let mut forges = skein_lib::List::with_capacity(1);
-        let transport = match &self.forge.transport {
-            Transport::Plaintext { name } => Transport::Plaintext { name: name.clone() },
-            Transport::Tls { server_name, trust } => {
-                Transport::Tls { server_name: server_name.clone(), trust: trust.clone() }
-            }
-        };
-        forges
-            .push(temper_service::ForgeRuntime {
-                number: self.forge.number,
-                address: self.forge.address,
-                transport,
-                trust_roots: self.forge.trust_roots,
-                trust_root_bytes: self.forge.trust_root_bytes,
-            })
-            .expect("one forge");
+        let mut forges = skein_lib::List::with_capacity(u32::try_from(self.forges.len()).expect("forge count"));
+        for forge in &self.forges {
+            let transport = match &forge.transport {
+                Transport::Plaintext { name } => Transport::Plaintext { name: name.clone() },
+                Transport::Tls { server_name, trust } => {
+                    Transport::Tls { server_name: server_name.clone(), trust: trust.clone() }
+                }
+            };
+            forges
+                .push(temper_service::ForgeRuntime {
+                    number: forge.number,
+                    address: forge.address,
+                    transport,
+                    trust_roots: forge.trust_roots,
+                    trust_root_bytes: forge.trust_root_bytes,
+                })
+                .expect("configured forge count");
+        }
         forges
     }
     #[must_use]
@@ -724,6 +726,7 @@ pub fn bounded_template(directory: &Path) -> Bounded {
             bundle: None,
             ports: Ports {
                 clients: NonZeroU16::new(8367).expect("clients port"),
+                forge: NonZeroU16::new(8369).expect("the fake forge port is nonzero"),
                 llm: NonZeroU16::new(8370).expect("LLM port"),
             },
         },
@@ -773,6 +776,25 @@ fn bounded_document(directory: &Path, mut value: serde_json::Value, forge: tempe
     let document = serde_json::to_vec(&value).expect("bounded JSON");
     let named =
         temper_service::named(&document, &jig_protocol_config::Directories::working()).expect("bounded example named");
+    let mut forges = List::with_capacity(u32::try_from(named.forges.len()).expect("forge count"));
+    for local in &named.forges {
+        if local.number != forge.number {
+            let jig_protocol_config::Address::Addr(address) = &local.api else {
+                panic!("additional bounded forges have socket addresses")
+            };
+            assert!(matches!(local.transport, temper_service::startup::Transport::Plaintext));
+            forges
+                .push(temper_service::ForgeRuntime {
+                    number: local.number,
+                    address: address.socket().expect("local forge socket"),
+                    transport: skein_forge_connection::settings::Transport::Plaintext { name: None },
+                    trust_roots: 0,
+                    trust_root_bytes: 0,
+                })
+                .expect("configured forge count");
+        }
+    }
+    forges.push(forge).expect("primary forge");
     let mut agent = agent::preflight(&named).expect("ordinary agent declarations");
     assert_eq!(agent.programs.len(), 1, "owned example declares Claude Code");
     agent.programs[0].path = path.as_bytes().into();
@@ -782,10 +804,12 @@ fn bounded_document(directory: &Path, mut value: serde_json::Value, forge: tempe
         temper_service::limits::profile(temper_service::limits::Profile::Small).forge_component.token_bytes;
     for file in named.files {
         let bytes = match file.path.as_ref() {
-            b"forge-1/api_token" => vec![b't'; usize::try_from(token_bytes).expect("token bound")],
-            b"forge-1/user" => b"42".to_vec(),
+            b"forge-1/api_token" | b"demo/forge/api_token" => {
+                vec![b't'; usize::try_from(token_bytes).expect("token bound")]
+            }
+            b"forge-1/user" | b"demo/forge/user" => b"42".to_vec(),
             b"forge-1/webhook_secret" => b"webhook-secret".to_vec(),
-            b"forge-1/git_token" => b"git-token".to_vec(),
+            b"forge-1/git_token" | b"demo/forge/git_token" => b"git-token".to_vec(),
             name => fs::read(directory.join(std::ffi::OsStr::from_bytes(name))).expect("fixture file"),
         };
         entries.push((file.path, Secret::new(bytes.into_boxed_slice()))).expect("named file count");
@@ -795,7 +819,7 @@ fn bounded_document(directory: &Path, mut value: serde_json::Value, forge: tempe
         files: Files { entries },
         agent,
         seeds: Seeds { deployment: [7; 16], installation: [8; 16], seed: 7, crypto: Secret::new(Box::new([9; 32])) },
-        forge,
+        forges: forges.into_boxed(),
     }
 }
 

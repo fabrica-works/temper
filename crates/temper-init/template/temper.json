@@ -220,7 +220,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 85510306965947,
+    "memory_bytes": 85510309429589,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -822,6 +822,21 @@
   "application": {
     "forges": [
       {
+        "number": 1,
+        "kind": "forgejo",
+        "api": {
+          "socket": "$forge"
+        },
+        "transport": "plaintext",
+        "git": "$forge_git",
+        "web": null,
+        "api_token": "demo/forge/api_token",
+        "user": {
+          "file": "demo/forge/user"
+        },
+        "webhook_secret": null
+      },
+      {
         "number": 2,
         "kind": "github",
         "api": null,
@@ -836,6 +851,16 @@
         "forge": 2,
         "login": null,
         "author": null
+      },
+      {
+        "number": 2,
+        "forge": 1,
+        "token": "demo/forge/git_token",
+        "login": "temper",
+        "author": {
+          "name": "Temper",
+          "email": "temper@localhost"
+        }
       }
     ],
     "landing": {
@@ -872,8 +897,66 @@
       "bundle": "$bundle"
     },
     "webhooks": null,
-    "setup": [],
-    "demo": null,
+    "setup": [
+      {
+        "forge": 1,
+        "directory": "demo/forge",
+        "bot": {
+          "login": "temper",
+          "email": "temper@localhost"
+        },
+        "mode": {
+          "fake": {
+            "listen": {
+              "socket": "$forge"
+            },
+            "git": "demo/bin/git",
+            "owner": "demo",
+            "repositories": [
+              {
+                "name": "widget",
+                "landing": "main"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "demo": {
+      "llm": {
+        "listen": {
+          "socket": "$llm"
+        },
+        "provider": 3,
+        "key": "demo/llm.key",
+        "asked": [
+          {
+            "cue": "Add CSV export to widget",
+            "turns": [
+              "I would add an Export CSV button to widget's table, writing the rows on screen with their column names as the first line, so the table opens in any spreadsheet. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done."
+            ]
+          },
+          {
+            "cue": "Add a dark theme to widget",
+            "turns": [
+              "I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done."
+            ]
+          },
+          {
+            "cue": "Fix widget's empty search state",
+            "turns": [
+              "I would have widget say when a search finds nothing, name the words searched for and offer to clear them, in place of an empty table that looks broken. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done."
+            ]
+          }
+        ],
+        "otherwise": [
+          "I am the demo model: I answer only the suggested requests, from a script. To ask for other work, connect a model from Accounts: a ChatGPT plan, a Claude subscription or an API key."
+        ]
+      },
+      "forge": 1,
+      "project": 1,
+      "client": "demo/client"
+    },
     "limits": {
       "profile": "small",
       "overrides": {

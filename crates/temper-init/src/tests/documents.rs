@@ -100,14 +100,34 @@ fn the_default_is_the_owned_example_so_edited() {
             ("/engine/llm/models", json!([owned["engine"]["llm"]["models"][0], demo_model()])),
             ("/engine/charters/0/alternatives", json!(["demo"])),
             // Written by startup's owned_memory_figures_for_init drift check, at bounded strings.
-            ("/engine/memory_bytes", json!(85_510_306_965_947_u64)),
+            ("/engine/memory_bytes", json!(85_510_309_429_589_u64)),
             ("/workers/0/memory_bytes", json!(3_266_333_819_083_u64)),
             (
                 "/application/forges",
-                json!([{"number": 2_u16, "kind": "github", "api": null, "transport": null, "git": null, "web": null}]),
+                json!([
+                    {"number": 1_u16, "kind": "forgejo", "api": {"socket": format!("127.0.0.1:{}", facts.ports.forge)},
+                     "transport": "plaintext", "git": format!("http://127.0.0.1:{}", facts.ports.forge), "web": null,
+                     "api_token": "demo/forge/api_token", "user": {"file": "demo/forge/user"}, "webhook_secret": null},
+                    {"number": 2_u16, "kind": "github", "api": null, "transport": null, "git": null, "web": null}
+                ]),
             ),
-            ("/application/identities", json!([{"number": 1_u32, "forge": 2_u16, "login": null, "author": null}])),
-            ("/application/setup", parse(b"[]")),
+            (
+                "/application/identities",
+                json!([
+                    {"number": 1_u32, "forge": 2_u16, "login": null, "author": null},
+                    {"number": 2_u32, "forge": 1_u16, "token": "demo/forge/git_token", "login": "temper",
+                     "author": {"name": "Temper", "email": "temper@localhost"}}
+                ]),
+            ),
+            (
+                "/application/setup",
+                json!([{
+                    "forge": 1_u16, "directory": "demo/forge", "bot": {"login": "temper", "email": "temper@localhost"},
+                    "mode": {"fake": {"listen": {"socket": format!("127.0.0.1:{}", facts.ports.forge)},
+                        "git": "demo/bin/git", "owner": "demo", "repositories": [{"name": "widget", "landing": "main"}]}}
+                }]),
+            ),
+            ("/application/demo", demo(facts.ports.llm.get())),
             ("/application/webhooks", Value::Null),
             ("/application/clients/listener/socket", json!(format!("127.0.0.1:{}", facts.ports.clients))),
             (
@@ -139,6 +159,44 @@ fn the_default_is_the_owned_example_so_edited() {
         }
         assert_eq!(actual, expected, "{row}");
     }
+}
+
+fn demo(port: u16) -> Value {
+    json!({
+        "llm": {
+            "listen": {
+                "socket": format!("127.0.0.1:{port}")
+            },
+            "provider": 3,
+            "key": "demo/llm.key",
+            "asked": [
+                {
+                    "cue": "Add CSV export to widget",
+                    "turns": [
+                        "I would add an Export CSV button to widget's table, writing the rows on screen with their column names as the first line, so the table opens in any spreadsheet. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done."
+                    ]
+                },
+                {
+                    "cue": "Add a dark theme to widget",
+                    "turns": [
+                        "I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done."
+                    ]
+                },
+                {
+                    "cue": "Fix widget's empty search state",
+                    "turns": [
+                        "I would have widget say when a search finds nothing, name the words searched for and offer to clear them, in place of an empty table that looks broken. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done."
+                    ]
+                }
+            ],
+            "otherwise": [
+                "I am the demo model: I answer only the suggested requests, from a script. To ask for other work, connect a model from Accounts: a ChatGPT plan, a Claude subscription or an API key."
+            ]
+        },
+        "forge": 1,
+        "project": 1,
+        "client": "demo/client"
+    })
 }
 
 fn demo_model() -> Value {
@@ -223,7 +281,9 @@ fn no_placeholder_is_left() {
                 (b"\"$git\"".as_slice(), 1),
                 (b"\"$listener\"".as_slice(), 1),
                 (b"\"$bundle\"".as_slice(), 1),
-                (b"\"$llm\"".as_slice(), 1),
+                (b"\"$forge\"".as_slice(), 2),
+                (b"\"$forge_git\"".as_slice(), 1),
+                (b"\"$llm\"".as_slice(), 2),
             ]
             .as_slice(),
         ),

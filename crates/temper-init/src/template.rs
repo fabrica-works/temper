@@ -20,6 +20,11 @@ pub(crate) const CODING: &[u8] = include_bytes!("../template/charters/coding.txt
 pub(crate) fn documents(facts: &Facts<'_>, directories: &Directories<'_>) -> (Box<[u8]>, Box<[u8]>) {
     let agent = path::join(directories.config, b"agent.json");
     let programs = path::join(directories.data, b"programs");
+    let forge = listener(facts.ports.forge);
+    let mut forge_git = Writer::new(7_usize.checked_add(forge.len()).expect("an HTTP base fits"));
+    forge_git.put(b"http://").expect("the scheme was counted");
+    forge_git.put(&forge).expect("the socket was counted");
+    let forge_git = forge_git.finish();
     let llm = listener(facts.ports.llm);
     let listener = listener(facts.ports.clients);
     let values = [
@@ -27,6 +32,8 @@ pub(crate) fn documents(facts: &Facts<'_>, directories: &Directories<'_>) -> (Bo
         (b"agent".as_slice(), json(Value::Text(Some(&agent)))),
         (b"git".as_slice(), json(Value::Text(facts.git))),
         (b"listener".as_slice(), json(Value::Text(Some(&listener)))),
+        (b"forge".as_slice(), json(Value::Text(Some(&forge)))),
+        (b"forge_git".as_slice(), json(Value::Text(Some(&forge_git)))),
         (b"llm".as_slice(), json(Value::Text(Some(&llm)))),
         (b"bundle".as_slice(), json(Value::Text(facts.bundle))),
         (b"programs".as_slice(), json(Value::Programs { claude: facts.claude, directory: &programs })),
