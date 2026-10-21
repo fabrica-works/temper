@@ -422,8 +422,6 @@ fn form_page(
             form.selection.holder == holder,
         );
     }
-    b.open(Role::Slot);
-    b.style(crate::look::CARD);
     for (field, word, value) in [
         (Field::Provider, W::ProviderField, form.selection.provider),
         (Field::Account, W::AccountField, form.selection.account),
@@ -450,8 +448,6 @@ fn form_page(
         b.close();
     }
     if let Some(binding) = bindings.insert(Meaning::Key) {
-        b.open(Role::Slot);
-        b.style(crate::look::CARD);
         b.open(Role::TextField);
         b.name(&words::say(w, W::KeyField, &[]));
         b.entry(skein_ui::EntryKind::Secret);
@@ -461,9 +457,7 @@ fn form_page(
             b.state(State::Disabled);
         }
         b.close();
-        b.close();
     }
-    b.close();
     let busy = busy || bindings.invalid();
     if bindings.invalid() {
         text(b, w, Role::Alert, W::Selection);
