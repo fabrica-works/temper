@@ -4,6 +4,7 @@ use crate::limits::{Limits, Unfit, check};
 use alloc::boxed::Box;
 use skein_io::kernel::Exit;
 use skein_lib::{List, Queue, Time};
+use temper_forge_setup::Kind;
 /// Inputs referring only to a step's index.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Input {
@@ -130,7 +131,7 @@ impl Machine {
             };
             states
                 .push(State {
-                    long: step.step.is_long(),
+                    long: step.step.kind() == Kind::Long,
                     group,
                     phase: Phase::Dormant,
                     exits: Queue::with_capacity(limits.restarts.saturating_add(1)),

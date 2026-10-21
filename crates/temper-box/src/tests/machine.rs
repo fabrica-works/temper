@@ -5,6 +5,7 @@ use crate::{
 };
 use skein_io::kernel::Exit;
 use skein_lib::Duration;
+use temper_forge_setup::Kind;
 #[test]
 fn a_once_step_must_exit_zero_before_the_next_starts() {
     let mut rig = Rig::new(&limits::small());
@@ -236,24 +237,24 @@ fn asked_groups_follow_their_chains_records_failures_and_stop() {
     use Order::{Close, Record, Say, Signal, Spawn};
     fn placed() -> Box<[Placed]> {
         layout::flatten(Steps {
-            always: Box::new([step(b"anchor", true), step(b"serve", true)]),
+            always: Box::new([step(b"anchor", Kind::Long), step(b"serve", Kind::Long)]),
             asked: Box::new([
                 Group {
                     forge: 3,
                     before: 1,
                     steps: Box::new([
-                        (Stage::Fetch, step(b"fetch 3", false)),
-                        (Stage::Prepare, step(b"prepare 3", false)),
-                        (Stage::Run, step(b"forgejo 3", true)),
-                        (Stage::Run, step(b"runner 3", true)),
+                        (Stage::Fetch, step(b"fetch 3", Kind::Once)),
+                        (Stage::Prepare, step(b"prepare 3", Kind::Once)),
+                        (Stage::Run, step(b"forgejo 3", Kind::Long)),
+                        (Stage::Run, step(b"runner 3", Kind::Long)),
                     ]),
                 },
                 Group {
                     forge: 4,
                     before: 2,
                     steps: Box::new([
-                        (Stage::Prepare, step(b"prepare 4", false)),
-                        (Stage::Run, step(b"forgejo 4", true)),
+                        (Stage::Prepare, step(b"prepare 4", Kind::Once)),
+                        (Stage::Run, step(b"forgejo 4", Kind::Long)),
                     ]),
                 },
             ]),
@@ -409,7 +410,10 @@ fn asked_groups_follow_their_chains_records_failures_and_stop() {
             asked: Box::new([Group {
                 forge: 9,
                 before: 0,
-                steps: Box::new([(if long { Stage::Run } else { Stage::Fetch }, step(b"only", long))]),
+                steps: Box::new([(
+                    if long { Stage::Run } else { Stage::Fetch },
+                    step(b"only", if long { Kind::Long } else { Kind::Once }),
+                )]),
             }]),
         });
         let mut machine = Machine::new(&limits::small(), &placed).unwrap();

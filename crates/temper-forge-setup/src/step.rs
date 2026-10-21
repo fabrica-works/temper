@@ -1,4 +1,4 @@
-//! The box's ordered commands; each hides whether it is once or long.
+//! The box's ordered commands; each hides whether it is once, long or link.
 use crate::{
     check::joined,
     setup::{Mode, Setup},
@@ -35,23 +35,30 @@ pub struct Steps {
     pub always: Box<[Step]>,
     pub asked: Box<[Group]>,
 }
+/// How the box runs a step (protocol/setup.md, 7.2).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Kind {
+    Once,
+    Long,
+    Link,
+}
 /// One command of the temper binary that the box runs.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Step {
     name: Box<[u8]>,
     arguments: Box<[Box<[u8]>]>,
-    long: bool,
+    kind: Kind,
 }
 impl Step {
     /// Constructs a step from its display name, arguments and lifetime.
     #[must_use]
-    pub fn new(name: Box<[u8]>, arguments: Box<[Box<[u8]>]>, long: bool) -> Self {
-        Self { name, arguments, long }
+    pub fn new(name: Box<[u8]>, arguments: Box<[Box<[u8]>]>, kind: Kind) -> Self {
+        Self { name, arguments, kind }
     }
-    /// Whether this step runs until stopped.
+    /// How the box runs this step.
     #[must_use]
-    pub fn is_long(&self) -> bool {
-        self.long
+    pub fn kind(&self) -> Kind {
+        self.kind
     }
     /// The step's name for prefixed output.
     #[must_use]
@@ -84,7 +91,7 @@ fn forge(action: &[u8], flags: &[Box<[u8]>], number: u16, run: Option<&[u8]>) ->
         }
         None => joined(&[action, b" ", n]),
     };
-    Step::new(name, args.into_boxed(), run.is_some())
+    Step::new(name, args.into_boxed(), if run.is_some() { Kind::Long } else { Kind::Once })
 }
 /// Carries the box's absolute directory flags after each command's words.
 /// Commands in setup order: owned processes, every reconcile, then serve;
@@ -131,6 +138,6 @@ pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
     for flag in flags {
         serve.push(flag.clone()).expect("flags counted");
     }
-    out.push(Step::new(bytes::copy_of(b"serve"), serve.into_boxed(), true)).expect("serve capacity");
+    out.push(Step::new(bytes::copy_of(b"serve"), serve.into_boxed(), Kind::Long)).expect("serve capacity");
     Steps { always: out.into_boxed(), asked: asked.into_boxed() }
 }

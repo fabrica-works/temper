@@ -18,6 +18,6 @@ pub mod state;
 pub mod step;
 pub mod upgrade;
 pub use setup::Setup;
-pub use step::{Group, Stage, Step, Steps, steps};
+pub use step::{Group, Kind, Stage, Step, Steps, steps};
 #[cfg(test)]
 mod tests;

@@ -5,24 +5,24 @@ use crate::{
 use alloc::boxed::Box;
 use skein_io::kernel::Exit;
 use skein_lib::{Duration, List, Queue, Time, bytes};
-use temper_forge_setup::Step;
+use temper_forge_setup::{Kind, Step};
 pub const PREPARE: usize = 0;
 pub const FORGEJO: usize = 1;
 pub const RUNNER: usize = 2;
 pub const RECONCILE_1: usize = 3;
 pub const RECONCILE_2: usize = 4;
 pub const SERVE: usize = 5;
-pub fn step(name: &[u8], long: bool) -> Step {
-    command(name, &[], long)
+pub fn step(name: &[u8], kind: Kind) -> Step {
+    command(name, &[], kind)
 }
 pub fn owned_steps() -> Box<[Step]> {
     Box::new([
-        step(b"prepare", false),
-        step(b"forgejo", true),
-        step(b"runner", true),
-        step(b"reconcile-1", false),
-        step(b"reconcile-2", false),
-        step(b"serve", true),
+        step(b"prepare", Kind::Once),
+        step(b"forgejo", Kind::Long),
+        step(b"runner", Kind::Long),
+        step(b"reconcile-1", Kind::Once),
+        step(b"reconcile-2", Kind::Once),
+        step(b"serve", Kind::Long),
     ])
 }
 #[derive(Debug)]
@@ -105,19 +105,23 @@ use skein_shell::Host;
 use skein_sim::{Answer, Ask, Call, Config, Handle, Pid, Program, Reply, Sim};
 
 pub fn once(name: &[u8], arguments: &[&[u8]]) -> Step {
-    command(name, arguments, false)
+    command(name, arguments, Kind::Once)
 }
 pub fn long(name: &[u8], arguments: &[&[u8]]) -> Step {
-    command(name, arguments, true)
+    command(name, arguments, Kind::Long)
 }
-fn command(name: &[u8], arguments: &[&[u8]], long: bool) -> Step {
+#[expect(dead_code, reason = "the next change adds the link host tests")]
+pub fn link(name: &[u8], arguments: &[&[u8]]) -> Step {
+    command(name, arguments, Kind::Link)
+}
+fn command(name: &[u8], arguments: &[&[u8]], kind: Kind) -> Step {
     let capacity = u32::try_from(arguments.len()).expect("small fixture").saturating_add(1);
     let mut args = List::with_capacity(capacity);
     for argument in arguments {
         args.push(bytes::copy_of(argument)).expect("argument slots");
     }
     args.push(bytes::copy_of(name)).expect("name last");
-    Step::new(bytes::copy_of(name), args.into_boxed(), long)
+    Step::new(bytes::copy_of(name), args.into_boxed(), kind)
 }
 #[derive(Debug)]
 pub struct Launch {

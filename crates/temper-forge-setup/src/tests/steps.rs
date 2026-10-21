@@ -1,15 +1,16 @@
 use super::fixtures;
 use crate::{
+    Kind,
     setup::{Mode, Setup},
     steps,
 };
 use alloc::boxed::Box;
-fn names(setup: &Setup, expected: &[(&[u8], bool)]) {
+fn names(setup: &Setup, expected: &[(&[u8], Kind)]) {
     let steps = steps(setup, &flags()).always;
     assert_eq!(steps.len(), expected.len());
-    for (step, (name, long)) in steps.iter().zip(expected) {
+    for (step, (name, kind)) in steps.iter().zip(expected) {
         assert_eq!(step.name(), *name);
-        assert_eq!(step.is_long(), *long);
+        assert_eq!(step.kind(), *kind);
     }
 }
 #[test]
@@ -17,12 +18,12 @@ fn a_managed_and_an_owned_forge_run_the_six_steps_of_the_design_tree() {
     names(
         &fixtures::setup(),
         &[
-            (b"prepare 2", false),
-            (b"forgejo 2", true),
-            (b"runner 2", true),
-            (b"reconcile 1", false),
-            (b"reconcile 2", false),
-            (b"serve", true),
+            (b"prepare 2", Kind::Once),
+            (b"forgejo 2", Kind::Long),
+            (b"runner 2", Kind::Long),
+            (b"reconcile 1", Kind::Once),
+            (b"reconcile 2", Kind::Once),
+            (b"serve", Kind::Long),
         ],
     );
     let commands = steps(&fixtures::setup(), &flags()).always;
@@ -46,13 +47,13 @@ fn a_fake_forge_keeps_its_reconcile_without_process_steps() {
     names(
         &fixtures::fake_setup(),
         &[
-            (b"prepare 2", false),
-            (b"forgejo 2", true),
-            (b"runner 2", true),
-            (b"reconcile 1", false),
-            (b"reconcile 2", false),
-            (b"reconcile 3", false),
-            (b"serve", true),
+            (b"prepare 2", Kind::Once),
+            (b"forgejo 2", Kind::Long),
+            (b"runner 2", Kind::Long),
+            (b"reconcile 1", Kind::Once),
+            (b"reconcile 2", Kind::Once),
+            (b"reconcile 3", Kind::Once),
+            (b"serve", Kind::Long),
         ],
     );
     assert!(steps(&fixtures::fake_setup(), &flags()).asked.is_empty());
@@ -67,22 +68,22 @@ fn an_owned_forge_without_a_runner_has_no_runner_step() {
     names(
         &setup,
         &[
-            (b"prepare 2", false),
-            (b"forgejo 2", true),
-            (b"reconcile 1", false),
-            (b"reconcile 2", false),
-            (b"serve", true),
+            (b"prepare 2", Kind::Once),
+            (b"forgejo 2", Kind::Long),
+            (b"reconcile 1", Kind::Once),
+            (b"reconcile 2", Kind::Once),
+            (b"serve", Kind::Long),
         ],
     );
 }
 #[test]
 fn a_managed_forge_alone_runs_reconcile_then_serve() {
     let setup = Setup { entries: Box::new([fixtures::setup().entries[0].clone()]) };
-    names(&setup, &[(b"reconcile 1", false), (b"serve", true)]);
+    names(&setup, &[(b"reconcile 1", Kind::Once), (b"serve", Kind::Long)]);
 }
 #[test]
 fn an_empty_setup_runs_serve_alone() {
-    names(&Setup { entries: Box::new([]) }, &[(b"serve", true)]);
+    names(&Setup { entries: Box::new([]) }, &[(b"serve", Kind::Long)]);
 }
 
 fn flags() -> Box<[Box<[u8]>]> {
@@ -117,7 +118,7 @@ fn asked_groups_keep_their_place_and_stages_without_reconcile() {
         assert_eq!(group.steps[0].0, crate::Stage::Prepare);
         for (stage, step) in group.steps.iter().skip(1) {
             assert_eq!(*stage, crate::Stage::Run);
-            assert!(step.is_long());
+            assert_eq!(step.kind(), Kind::Long);
         }
     }
     for (stage, word) in
