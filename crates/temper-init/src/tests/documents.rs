@@ -99,6 +99,7 @@ fn the_default_is_the_owned_example_so_edited() {
             ),
             ("/engine/llm/models", json!([owned["engine"]["llm"]["models"][0], demo_model()])),
             ("/engine/charters/0/alternatives", json!(["demo"])),
+            ("/engine/charters/1/alternatives", json!(["demo"])),
             // Written by startup's owned_memory_figures_for_init drift check, at bounded strings.
             ("/engine/memory_bytes", json!(85_510_309_429_589_u64)),
             ("/workers/0/memory_bytes", json!(3_266_333_819_083_u64)),
@@ -172,9 +173,11 @@ fn demo(port: u16) -> Value {
             "asked": [
                 {
                     "cue": "Add CSV export to widget",
-                    "turns": [
-                        demo_turn("I would add an Export CSV button to widget's table, writing the rows on screen with their column names as the first line, so the table opens in any spreadsheet. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.")
-                    ]
+                    "turns": csv_chat()
+                },
+                {
+                    "cue": "Export widget's table as CSV",
+                    "turns": csv_coding()
                 },
                 {
                     "cue": "Add a dark theme to widget",
@@ -197,6 +200,80 @@ fn demo(port: u16) -> Value {
         "project": 1,
         "client": "demo/client"
     })
+}
+
+fn csv_chat() -> Value {
+    json!([
+        scripted_turn(json!([
+            {"text": "I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge."},
+            {"call": "delegate", "arguments": {"batch": [{
+                "executor": {"kind": "procedure", "connector": 1, "code": 2},
+                "spec": {"words": "Export widget's table as CSV", "parameters": [
+                    {"name": 1, "kind": "resource", "connector": 1, "resource": 1},
+                    {"name": 2, "kind": "bytes", "value": "main"}
+                ]},
+                "contract": {"kind": "change", "connector": 1, "change_kind": 1, "words": 128},
+                "authority": {"tools": 1, "grants": [demo_grant(2), demo_grant(3), demo_grant(4), demo_grant(10), demo_grant(11), demo_grant(12)],
+                    "delegation": {"kinds": [{"kind": "agent", "number": 2}], "tasks": 4, "depth": 2},
+                    "budget": {"spend": 10}, "notes": 0}
+            }]}}
+        ])),
+        scripted_turn(json!([{"call": "wait", "arguments": {}}])),
+        scripted_turn(json!([
+            {"text": "CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change."},
+            {"call": "wait", "arguments": {}}
+        ]))
+    ])
+}
+
+fn demo_grant(kind: u16) -> Value {
+    json!({"connector": 1_u16, "kind": kind, "segments": ["forge"], "terminal": "open", "last": ""})
+}
+
+fn csv_coding() -> Value {
+    let old = "fn main() {\n    for (name, count) in TABLE {\n        println!(\"{name:<8}{count}\");\n    }\n}\n";
+    let new = concat!(
+        "fn main() {\n",
+        "    let csv = std::env::args().any(|arg| arg == \"--csv\");\n",
+        "    if csv {\n",
+        "        println!(\"name,count\");\n",
+        "    }\n",
+        "    for (name, count) in TABLE {\n",
+        "        if csv {\n",
+        "            println!(\"{name},{count}\");\n",
+        "        } else {\n",
+        "            println!(\"{name:<8}{count}\");\n",
+        "        }\n",
+        "    }\n",
+        "}\n"
+    );
+    json!([
+        scripted_turn(json!([{"call": "read", "arguments": {"path": "src/main.rs"}}])),
+        scripted_turn(json!([{"call": "edit", "arguments": {
+            "path": "src/main.rs", "edits": [{"old": old, "new": new}]
+        }}])),
+        scripted_turn(json!([{"call": "finish", "arguments": {"form": "change", "fields": {
+            "title": "Add CSV export to widget",
+            "body": "widget --csv prints the table as CSV: a header line, then a line for each row. This was a scripted demo change."
+        }}}]))
+    ])
+}
+
+fn scripted_turn(lines: Value) -> Value {
+    let mut bytes = 0_usize;
+    for line in lines.as_array().unwrap() {
+        let length = match line["text"].as_str() {
+            Some(text) => text.len(),
+            None => line["call"]
+                .as_str()
+                .unwrap()
+                .len()
+                .checked_add(serde_json::to_vec(&line["arguments"]).unwrap().len())
+                .unwrap(),
+        };
+        bytes = bytes.checked_add(length).unwrap();
+    }
+    json!({"lines": lines, "finish": "tool_calls", "tokens": bytes.div_ceil(4)})
 }
 
 fn demo_turn(text: &str) -> Value {

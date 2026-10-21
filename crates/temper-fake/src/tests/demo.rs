@@ -2,6 +2,7 @@
 use crate::{demo, llm};
 use jig_protocol_config::{self as config, Path};
 use serde_json::{Value, json};
+use skein_fake_llm_domain::api::{self, Finish, Message, Part, Role};
 use temper_forge_setup::{problem, setup::Setup};
 
 type Row = (Vec<(&'static str, Option<Value>)>, &'static str);
@@ -310,10 +311,9 @@ fn key_file() {
 
 #[test]
 fn demo_answers_the_brief() {
-    use skein_fake_llm_domain::api::{Finish, Message, Part, Role};
     let mut value = fixture();
-    // Each suggested request is one turn, as init writes it. Keep the finish
-    // call in the answer: a text-only stop does not finish a chat's run.
+    // Keep the finish call in these short answers: a text-only stop does not
+    // finish a chat's run.
     value["application"]["demo"]["llm"]["asked"] = json!([
         {"cue":"Add CSV export to widget","turns":[{
             "lines":[{"text":"Export CSV"},{"call":"finish","arguments":{
@@ -368,5 +368,131 @@ fn demo_answers_the_brief() {
         assert_eq!(answer.parts.as_ref(), parts.as_slice(), "{name}");
         assert_eq!(answer.finish, finish, "{name}");
         assert_eq!(answer.usage.output, Some(tokens), "{name}");
+    }
+}
+
+fn template() -> Value {
+    let template: Value = serde_json::from_slice(include_bytes!("../../../temper-init/template/temper.json")).unwrap();
+    let mut value = fixture();
+    value["engine"]["llm"]["models"][1] = template["engine"]["llm"]["models"][1].clone();
+    value["application"]["demo"] = template["application"]["demo"].clone();
+    value["application"]["demo"]["llm"]["listen"]["socket"] = json!("127.0.0.1:8370");
+    value
+}
+
+const CHAT: &str = "Help the person plan their work. Delegate repository changes to the coding procedure and explain the result.\n\n## Task\n\nAdd CSV export to widget\n[Report: at most 32 bytes]\n[Requested by person 1]\n\n";
+const RESUMED_CHAT: &str = "Help the person plan their work. Delegate repository changes to the coding procedure and explain the result.\n\n## Task\n\nAdd CSV export to widget\n[Report: at most 32 bytes]\n[Requested by person 1]\n\n## Plan\n\ndelegate 2: ended, spec revision 1\n";
+const CODING: &str = "Read the repository and make the requested change. Check the result, then finish with a clear change summary.\n\n## Task\n\nExport widget's table as CSV\n[Change connector 1, kind 2, at most 4096 bytes]\n[Requested by task 2]\n\n";
+
+#[test]
+fn the_templates_demo_fits_the_fakes_bounds() {
+    assert!(read(&template()).unwrap().is_some());
+}
+
+fn answers(system: &str, resumed: &str, count: usize) -> Vec<api::Answer> {
+    let demo = read(&template()).unwrap().unwrap();
+    let mut query = super::query(system.as_bytes(), b"Begin the work your brief describes.");
+    query.model = b"demo".as_slice().into();
+    query.max_tokens = 8192;
+    let mut answers = Vec::new();
+    for index in 0..count {
+        if index == 2 {
+            query.system = resumed.as_bytes().into();
+        }
+        let answer = super::answer(demo.llm(), 23, query.clone());
+        let mut messages = query.messages.into_vec();
+        messages.push(Message { role: Role::Assistant, parts: answer.parts.clone() });
+        for part in &answer.parts {
+            if let Part::ToolCall { id, .. } = part {
+                messages.push(Message {
+                    role: Role::User,
+                    parts: Box::new([Part::ToolOutput {
+                        id: id.clone(),
+                        output: b"Completed".as_slice().into(),
+                        is_error: false,
+                    }]),
+                });
+            }
+        }
+        query.messages = messages.into_boxed_slice();
+        answers.push(answer);
+    }
+    answers
+}
+
+fn call(answer: &api::Answer, name: &[u8]) -> Value {
+    assert_eq!(answer.finish, Finish::ToolCalls);
+    let Some(Part::ToolCall { id, name: called, arguments }) = answer.parts.last() else { panic!("tool call") };
+    assert_eq!(id.as_ref(), b"call_0000000000000001");
+    assert_eq!(called.as_ref(), name);
+    serde_json::from_slice(arguments).unwrap()
+}
+
+#[test]
+fn the_csv_chat_delegates_waits_and_reports_landing_before_waiting_again() {
+    let answers = answers(CHAT, RESUMED_CHAT, 3);
+    assert_eq!(answers[0].parts.len(), 2);
+    assert_eq!(answers[0].parts[0], Part::Text { text: "I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.".as_bytes().into() });
+    let delegate = call(&answers[0], b"delegate");
+    assert_eq!(delegate["batch"][0]["executor"], json!({"kind":"procedure","connector":1,"code":2}));
+    assert_eq!(delegate["batch"][0]["spec"]["words"], "Export widget's table as CSV");
+    assert_eq!(answers[1].parts.len(), 1);
+    assert_eq!(call(&answers[1], b"wait"), json!({}));
+    assert_eq!(answers[2].parts.len(), 2);
+    assert_eq!(answers[2].parts[0], Part::Text { text: "CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change.".as_bytes().into() });
+    assert_eq!(call(&answers[2], b"wait"), json!({}));
+    assert_eq!(answers.iter().map(|a| a.usage.output).collect::<Vec<_>>(), [Some(256), Some(2), Some(30)]);
+}
+
+#[test]
+fn the_csv_chat_answers_done_past_its_last_turn() {
+    let answers = answers(CHAT, RESUMED_CHAT, 4);
+    assert_eq!(answers[3].parts.as_ref(), &[Part::Text { text: b"done".as_slice().into() }]);
+    assert_eq!(answers[3].finish, Finish::Stop);
+    assert_eq!(answers[3].usage.output, Some(1));
+}
+
+#[test]
+fn the_csv_coding_agent_reads_edits_and_finishes_the_change() {
+    let answers = answers(CODING, CODING, 3);
+    for answer in &answers {
+        assert_eq!(answer.parts.len(), 1);
+    }
+    assert_eq!(call(&answers[0], b"read"), json!({"path":"src/main.rs"}));
+    let edit = call(&answers[1], b"edit");
+    assert_eq!(edit["path"], "src/main.rs");
+    assert_eq!(edit["edits"].as_array().unwrap().len(), 1);
+    assert!(edit["edits"][0]["old"].as_str().unwrap().ends_with("}\n"));
+    assert!(edit["edits"][0]["new"].as_str().unwrap().contains("println!(\"name,count\");"));
+    assert_eq!(
+        call(&answers[2], b"finish"),
+        json!({"form":"change","fields":{
+            "title":"Add CSV export to widget",
+            "body":"widget --csv prints the table as CSV: a header line, then a line for each row. This was a scripted demo change."
+        }})
+    );
+    assert_eq!(answers.iter().map(|a| a.usage.output).collect::<Vec<_>>(), [Some(7), Some(116), Some(48)]);
+}
+
+#[test]
+fn the_csv_cues_select_only_their_own_agents_briefs() {
+    let value = template();
+    for (index, own, other, tool) in [(0, CHAT, CODING, b"delegate".as_slice()), (1, CODING, RESUMED_CHAT, b"read")] {
+        let cue = value["application"]["demo"]["llm"]["asked"][index]["cue"].as_str().unwrap();
+        assert!(own.contains(cue));
+        assert!(!other.contains(cue));
+        let mut only = value.clone();
+        only["application"]["demo"]["llm"]["asked"] = json!([value["application"]["demo"]["llm"]["asked"][index]]);
+        let demo = read(&only).unwrap().unwrap();
+        for (system, selected) in [(own, true), (other, false)] {
+            let mut query = super::query(system.as_bytes(), b"Begin the work your brief describes.");
+            query.model = b"demo".as_slice().into();
+            query.max_tokens = 8192;
+            let answer = super::answer(demo.llm(), 23, query);
+            let arguments = call(&answer, if selected { tool } else { b"finish" });
+            if !selected {
+                assert_eq!(arguments["form"], "report");
+            }
+        }
     }
 }

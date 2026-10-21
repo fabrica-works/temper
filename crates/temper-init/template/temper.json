@@ -129,7 +129,7 @@
         "number": 2,
         "instructions": "charters/coding.txt",
         "model": "gpt-6-luna",
-        "alternatives": [],
+        "alternatives": ["demo"],
         "hosts": "workers",
         "waiting_ms": 10000,
         "resume": true,
@@ -936,19 +936,194 @@
               {
                 "lines": [
                   {
-                    "text": "I would add an Export CSV button to widget's table, writing the rows on screen with their column names as the first line, so the table opens in any spreadsheet. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done."
+                    "text": "I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge."
                   },
                   {
-                    "call": "finish",
+                    "call": "delegate",
                     "arguments": {
-                      "form": "report",
-                      "text": "The demo changes nothing.",
-                      "fields": {}
+                      "batch": [
+                        {
+                          "executor": {
+                            "kind": "procedure",
+                            "connector": 1,
+                            "code": 2
+                          },
+                          "spec": {
+                            "words": "Export widget's table as CSV",
+                            "parameters": [
+                              {
+                                "name": 1,
+                                "kind": "resource",
+                                "connector": 1,
+                                "resource": 1
+                              },
+                              {
+                                "name": 2,
+                                "kind": "bytes",
+                                "value": "main"
+                              }
+                            ]
+                          },
+                          "contract": {
+                            "kind": "change",
+                            "connector": 1,
+                            "change_kind": 1,
+                            "words": 128
+                          },
+                          "authority": {
+                            "tools": 1,
+                            "grants": [
+                              {
+                                "connector": 1,
+                                "kind": 2,
+                                "segments": [
+                                  "forge"
+                                ],
+                                "terminal": "open",
+                                "last": ""
+                              },
+                              {
+                                "connector": 1,
+                                "kind": 3,
+                                "segments": [
+                                  "forge"
+                                ],
+                                "terminal": "open",
+                                "last": ""
+                              },
+                              {
+                                "connector": 1,
+                                "kind": 4,
+                                "segments": [
+                                  "forge"
+                                ],
+                                "terminal": "open",
+                                "last": ""
+                              },
+                              {
+                                "connector": 1,
+                                "kind": 10,
+                                "segments": [
+                                  "forge"
+                                ],
+                                "terminal": "open",
+                                "last": ""
+                              },
+                              {
+                                "connector": 1,
+                                "kind": 11,
+                                "segments": [
+                                  "forge"
+                                ],
+                                "terminal": "open",
+                                "last": ""
+                              },
+                              {
+                                "connector": 1,
+                                "kind": 12,
+                                "segments": [
+                                  "forge"
+                                ],
+                                "terminal": "open",
+                                "last": ""
+                              }
+                            ],
+                            "delegation": {
+                              "kinds": [
+                                {
+                                  "kind": "agent",
+                                  "number": 2
+                                }
+                              ],
+                              "tasks": 4,
+                              "depth": 2
+                            },
+                            "budget": {
+                              "spend": 10
+                            },
+                            "notes": 0
+                          }
+                        }
+                      ]
                     }
                   }
                 ],
                 "finish": "tool_calls",
-                "tokens": 72
+                "tokens": 256
+              },
+              {
+                "lines": [
+                  {
+                    "call": "wait",
+                    "arguments": {}
+                  }
+                ],
+                "finish": "tool_calls",
+                "tokens": 2
+              },
+              {
+                "lines": [
+                  {
+                    "text": "CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change."
+                  },
+                  {
+                    "call": "wait",
+                    "arguments": {}
+                  }
+                ],
+                "finish": "tool_calls",
+                "tokens": 30
+              }
+            ]
+          },
+          {
+            "cue": "Export widget's table as CSV",
+            "turns": [
+              {
+                "lines": [
+                  {
+                    "call": "read",
+                    "arguments": {
+                      "path": "src/main.rs"
+                    }
+                  }
+                ],
+                "finish": "tool_calls",
+                "tokens": 7
+              },
+              {
+                "lines": [
+                  {
+                    "call": "edit",
+                    "arguments": {
+                      "path": "src/main.rs",
+                      "edits": [
+                        {
+                          "old": "fn main() {\n    for (name, count) in TABLE {\n        println!(\"{name:<8}{count}\");\n    }\n}\n",
+                          "new": "fn main() {\n    let csv = std::env::args().any(|arg| arg == \"--csv\");\n    if csv {\n        println!(\"name,count\");\n    }\n    for (name, count) in TABLE {\n        if csv {\n            println!(\"{name},{count}\");\n        } else {\n            println!(\"{name:<8}{count}\");\n        }\n    }\n}\n"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "finish": "tool_calls",
+                "tokens": 116
+              },
+              {
+                "lines": [
+                  {
+                    "call": "finish",
+                    "arguments": {
+                      "form": "change",
+                      "fields": {
+                        "title": "Add CSV export to widget",
+                        "body": "widget --csv prints the table as CSV: a header line, then a line for each row. This was a scripted demo change."
+                      }
+                    }
+                  }
+                ],
+                "finish": "tool_calls",
+                "tokens": 48
               }
             ]
           },
