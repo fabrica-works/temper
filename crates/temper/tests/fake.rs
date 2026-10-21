@@ -452,51 +452,33 @@ enum GitEndpoint {
     Closed,
 }
 
-/// One complete request gets an empty, unnamed 404, then the listener closes.
-#[expect(clippy::disallowed_methods, reason = "the process test's fixed HTTP peer serves one request on a thread")]
-fn no_git_route() -> (SocketAddr, std::thread::JoinHandle<()>) {
+/// Answers the one request the row's git makes with an empty, unnamed 404,
+/// on the test's own thread, between the spawn and the exit it waits for.
+fn no_git_route(listener: &std::net::TcpListener) {
     use std::io::{BufRead, BufReader};
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("no-route listener");
-    let address = listener.local_addr().expect("no-route address");
-    listener.set_nonblocking(true).expect("nonblocking listener");
-    let thread = std::thread::spawn(move || {
-        let within = Duration::from_secs(2);
-        let clock = skein_shell::Clock::new();
-        let deadline = clock.now().now.saturating_add(skein_lib::Duration::from_secs(2));
-        let (stream, _) = loop {
-            match listener.accept() {
-                Ok(connection) => break connection,
-                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                    assert!(clock.now().now < deadline, "no git request within its bound");
-                    std::thread::sleep(Duration::from_millis(1));
-                }
-                Err(error) => panic!("no-route accept: {error}"),
-            }
-        };
-        stream.set_read_timeout(Some(within)).expect("request deadline");
-        stream.set_write_timeout(Some(within)).expect("answer deadline");
-        let mut reader = BufReader::new(stream);
-        let mut length = None;
-        loop {
-            let mut line = String::new();
-            assert_ne!(reader.read_line(&mut line).expect("request head"), 0, "complete head");
-            if line == "\r\n" {
-                break;
-            }
-            if let Some((name, value)) = line.split_once(':')
-                && name.eq_ignore_ascii_case("content-length")
-            {
-                length = Some(value.trim().parse::<usize>().expect("body length"));
-            }
+    let (stream, _) = listener.accept().expect("no-route request");
+    stream.set_read_timeout(Some(Duration::from_millis(300))).expect("valid fixture");
+    stream.set_write_timeout(Some(Duration::from_millis(300))).expect("valid fixture");
+    let mut reader = BufReader::new(stream);
+    let mut length = None;
+    loop {
+        let mut line = String::new();
+        assert_ne!(reader.read_line(&mut line).expect("request head"), 0, "complete head");
+        if line == "\r\n" {
+            break;
         }
-        let mut body = vec![0; length.expect("Content-Length")];
-        reader.read_exact(&mut body).expect("complete request body");
-        reader
-            .get_mut()
-            .write_all(b"HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\nconnection: close\r\n\r\n")
-            .expect("no-route answer");
-    });
-    (address, thread)
+        if let Some((name, value)) = line.split_once(':')
+            && name.eq_ignore_ascii_case("content-length")
+        {
+            length = Some(value.trim().parse::<usize>().expect("body length"));
+        }
+    }
+    let mut body = vec![0; length.expect("Content-Length")];
+    reader.read_exact(&mut body).expect("complete request body");
+    reader
+        .get_mut()
+        .write_all(b"HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\nconnection: close\r\n\r\n")
+        .expect("no-route answer");
 }
 
 struct GitRow {
@@ -704,8 +686,9 @@ fn git_run() {
         let address = match row.endpoint {
             GitEndpoint::Forge => forge.address,
             GitEndpoint::NoRoute => {
-                let (address, thread) = no_git_route();
-                no_route = Some(thread);
+                let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("no-route listener");
+                let address = listener.local_addr().expect("no-route address");
+                no_route = Some(listener);
                 address
             }
             GitEndpoint::Llm => {
@@ -772,6 +755,9 @@ fn git_run() {
             }
             let mut child = command.spawn().expect("git process");
             child.stdin.take().expect("git stdin").write_all(step.input).expect("commit message");
+            if let Some(listener) = &no_route {
+                no_git_route(listener);
+            }
             let output = child.wait_with_output().expect("git exit");
             assert_eq!(
                 output.status.code(),
@@ -804,9 +790,6 @@ fn git_run() {
         }
         if let Some(llm) = llm {
             llm.stop();
-        }
-        if let Some(thread) = no_route {
-            thread.join().expect("no-route listener served its request");
         }
         forge.stop();
         scratch.remove();
