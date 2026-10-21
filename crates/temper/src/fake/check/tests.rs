@@ -83,7 +83,11 @@ fn store() {
             "application",
             Copy::Store { format: Some(application), rows: Box::new([]) },
             page_rows,
-            Err("format check: Format { family: Application, found: 4, wanted: 3 }".to_owned()),
+            Err(format!(
+                "format check: Format {{ family: Application, found: {}, wanted: {} }}",
+                temper_protocol_store::STORE_VERSION.checked_add(1).expect("application version increment fits u32"),
+                temper_protocol_store::STORE_VERSION,
+            )),
         ),
         (
             "component",
