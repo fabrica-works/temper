@@ -1342,9 +1342,12 @@ finishes, so the demo's own work pushes nothing yet.
   the system text, and the one user message is smith's own opening, so
   a request's cue is in the system, where skein's cued scripts look and
   its asked ones do not (skein's `fake-llm.md`, 2.4). A cued script's
-  turns count every assistant message of the conversation, and each
-  run is a conversation of its own, so a run's first answer is its
-  script's first turn. It reads the
+  turns count every assistant message of the conversation, so a chat's
+  first answer is its script's first turn, and its one turn finishes
+  the run: the chat is then ended, with no composer, so no second
+  message reaches the demo (a message sent while the run is active
+  would join the same conversation, past the script's turns, and be
+  answered "done"). It reads the
   key file before it binds, and refuses to start without it, naming
   the file; it accepts that one credential, and refuses every other
   request as the provider would. It serves `llm.provider`'s models, at
