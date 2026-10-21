@@ -3,13 +3,14 @@
     "name": "standard",
     "declared": {
       "memory": 2147483648,
-      "tool_payload": 600,
+      "tool_payload": 4098,
       "read_window": 256,
       "conversations": 1,
       "calls_per_response": 1
     },
     "policy": {
-      "max_turns": 5,
+      "max_turns": 8,
+      "check_timeout": 60000,
       "group_stop": 10,
       "inbox": 8,
       "unacknowledged": 8

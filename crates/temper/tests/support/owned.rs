@@ -602,6 +602,11 @@ pub fn lay(directory: &Path, owned: &Owned) {
     }
     let path = directory.join("owned/agent.json");
     let mut agent: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("agent")).expect("agent JSON");
+    // Metadata reads must never resolve a shipped provider's real address.
+    // Preserve every endpoint's provider identity and declared quantities.
+    for endpoint in agent["endpoints"].as_array_mut().expect("agent endpoints") {
+        endpoint["address"] = owned.llm.to_string().into();
+    }
     agent["endpoints"][0]["server_name"] = "skein.test".into();
     agent["endpoints"][0]["trust_der"] = serde_json::json!(directory.join("root.der"));
     fs::write(path, serde_json::to_vec(&agent).expect("agent JSON")).expect("fake agent");

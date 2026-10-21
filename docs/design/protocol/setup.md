@@ -1008,13 +1008,18 @@ runs it (section 7).
   Claude Code's program, its path and its programs directory, a
   directory the person names; and takes the process tier's profile, the
   sizes its live tier runs a real model with: smith's `standard`, with
-  `declared` `memory` 2,147,483,648, `tool_payload` 600, `read_window`
+  `declared` `memory` 2,147,483,648, `tool_payload` 4,098, `read_window`
   256, `conversations` 1 and `calls_per_response` 1, and `policy`
-  `max_turns` 5, `group_stop` 10, `inbox` 8 and `unacknowledged` 8. Its
-  messages are then 600 bytes, and its largest call 4,096 bytes, its
-  `outcome_bytes` (configuration.md, section 7, `small` against the
-  agent). smith's standard sizes with nothing declared refuse the
-  example's model declaration at start.
+  `max_turns` 8, `check_timeout` 60,000 ms, `group_stop` 10, `inbox` 8
+  and `unacknowledged` 8. Both charters require eight turns; each permits
+  modifying work with a 60,000 ms reserve, so the agent's check timeout
+  must fit that reserve. The engine requires 4,096-byte messages;
+  smith's two-byte rendered separator makes the minimum payload 4,098
+  bytes, advertising 4,096 message bytes. Its largest call is then
+  4,098 bytes, the larger of that payload and its 4,096-byte outcome
+  (configuration.md, section 7, `small` against the agent). smith's
+  standard sizes with nothing declared refuse the example's model
+  declaration at start.
 - **Its `engine.limits`** are jig's small profile with the overrides
   configuration.md, section 7 asks so that the engine's documents, its
   watch room and the forge's paths fit temper's client, and those its
@@ -1042,9 +1047,10 @@ runs it (section 7).
   hub's that jig's small, sized for any agent, sets past smith's agent
   (configuration.md, section 7, the worker's check against the agent),
   and no other: `hub.accounts` 4, the agent's accounts, where jig's small
-  has 8; and `hub.event_bytes` 598, the agent's `message_bytes`, 600,
-  less smith's 2-byte separator, where jig's small has 65,536. Its
-  `application.limits` is `small` with no override.
+  has 8; and `hub.event_bytes` 4,096, the agent's advertised message
+  bytes, where jig's small has 65,536. Its `application.limits` is
+  `small` with `checkout.message_bytes` 4,098 so the checkout accepts
+  the agent's largest call.
 - **Its `memory_bytes`** hold its worst cases wherever a person lays it
   and whatever its forge's records hold: each start passes with each
   string its service's worst case counts, and a person's copy changes,

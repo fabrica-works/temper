@@ -821,10 +821,10 @@
         "profile": "small",
         "overrides": {
           "hub.accounts": 4,
-          "hub.event_bytes": 598
+          "hub.event_bytes": 4096
         }
       },
-      "memory_bytes": 3280140765187
+      "memory_bytes": 3283176427421
     }
   ],
   "application": {
@@ -884,7 +884,9 @@
     "setup": [],
     "limits": {
       "profile": "small",
-      "overrides": {}
+      "overrides": {
+        "checkout.message_bytes": 4098
+      }
     },
     "workers": [
       {

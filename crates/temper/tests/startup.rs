@@ -342,6 +342,87 @@ fn serve_prepares_once_on_the_owned_example() {
     scratch.remove();
 }
 
+fn configuration_document(value: &serde_json::Value) -> skein_json::Document {
+    jig_protocol_config::document(
+        &serde_json::to_vec(value).expect("configuration JSON"),
+        &jig_protocol_config::DocumentLimits { bytes: 1_048_576, tokens: 65_536, depth: 32 },
+    )
+    .expect("configuration document")
+}
+
+#[test]
+fn shipped_bounds_fit_the_configured_charters_and_worker() {
+    use jig_protocol_config as config;
+    use temper_service as service;
+
+    let scratch = support::Scratch::startup("owned-admission");
+    let bounded = support::owned::bounded(scratch.path());
+    let value: serde_json::Value = serde_json::from_slice(&bounded.document).expect("deployment JSON");
+    let engine = config::engine(&configuration_document(&value["engine"]), 0, &config::Directories::working())
+        .expect("engine configuration");
+    let agent = &bounded.agent;
+    // Temporary compatibility assertions against jig's fleet_needs/shortfall:
+    // these do not exercise fleet admission. Replace them with the proposed
+    // canonical public check once jig exposes it; keep production policy there.
+    assert!(agent.bounds.spend >= engine.rules.maximum_run_spend);
+    assert!(agent.bounds.message_bytes >= engine.limits.core.tasks.message_bytes);
+    assert!(agent.bounds.inbox >= engine.limits.core.tasks.run_inbox);
+    assert!(agent.bounds.unacknowledged >= engine.limits.hub.turns);
+    for charter in &engine.charters {
+        assert!(agent.bounds.turns >= charter.policy.turns, "charter {} turns", charter.number);
+        assert!(agent.bounds.time >= charter.policy.time, "charter {} time", charter.number);
+        assert!(agent.bounds.waiting >= charter.policy.waiting, "charter {} waiting", charter.number);
+        if charter.policy.modify {
+            assert!(agent.bounds.checks <= charter.policy.reserve_time, "charter {} checks", charter.number);
+        }
+        for model in core::iter::once(&charter.policy.model).chain(&charter.policy.alternatives) {
+            assert!(
+                agent.bounds.models.iter().any(|bound| bound.name == model.name
+                    && bound.window >= model.window
+                    && bound.output >= model.output),
+                "charter {} model {:?}",
+                charter.number,
+                model.name
+            );
+        }
+    }
+    // The minimum Smith payload is the engine's message requirement plus
+    // Smith's rendered separator; its advertised message excludes that separator.
+    let payload = u64::from(engine.limits.core.tasks.message_bytes)
+        .checked_add(temper_worker_domain::SEPARATOR)
+        .expect("rendered message");
+    assert!(agent.host_limits.message_bytes >= payload);
+    let named = service::named(&bounded.document, &config::Directories::working()).expect("owned configuration");
+    let worker = &service::settings::Worker {
+        jig: config::worker(&configuration_document(&value["workers"][0]), 0, &config::Directories::working())
+            .expect("worker configuration"),
+        root: named.worker_root,
+        git: Some(b"/usr/bin/git".as_slice().into()),
+    };
+    let mut own = service::limits::profile(service::limits::Profile::Small);
+    for (name, number) in value["application"]["limits"]["overrides"].as_object().expect("overrides") {
+        service::limits::apply(&mut own, name.as_bytes(), number.as_u64().expect("limit number"))
+            .expect("application override");
+    }
+    let own = &own;
+    assert!(worker.jig.limits.hub.event_bytes >= u64::from(agent.bounds.message_bytes));
+    assert!(u64::from(own.checkout.message_bytes) >= agent.host_limits.call_bytes);
+    let prepared = service::worker_settings::prepare(worker, agent, own).expect("complete worker bounds");
+    // Each receiver one byte below its actual sender's bound fails its own rule.
+    let mut short = prepared.root.clone();
+    short.host.event_bytes = u64::from(agent.bounds.message_bytes).checked_sub(1).expect("nonempty message");
+    assert_eq!(temper_worker_domain::unfit(&short).as_slice(), &[temper_worker_domain::Unfit::BoundsMessage]);
+    let mut short = prepared.root.clone();
+    short.checkout.message_bytes = u32::try_from(agent.host_limits.call_bytes)
+        .expect("call fits checkout bound")
+        .checked_sub(1)
+        .expect("nonempty call");
+    assert_eq!(temper_worker_domain::unfit(&short).as_slice(), &[temper_worker_domain::Unfit::CallBytes]);
+    let required = service::worker_worst_case(worker, agent, own).expect("worker memory expression");
+    assert!(required <= worker.jig.memory, "worker needs {required}, declares {}", worker.jig.memory);
+    scratch.remove();
+}
+
 #[test]
 fn the_owned_example_is_named_without_a_problem() {
     // Only naming a fixture document; no deployment or files are opened.
@@ -701,7 +782,11 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // cohorts 9,984 B per room slot (the link's 48 outputs * 208 B IO request).
     let worker_growth = 8_736 * 107_206_624_u64 + 117_552 + 230_981 + 199_784 + 2_912 * (224 + 544 + 32 + 9_984);
     // Delta +936,589,018,589 B (31,951,325 B outside host copies); total 3,280,140,765,187 B.
-    assert_eq!(required.worker_bytes, 2_343_551_746_598_u64 + worker_growth);
+    // Admission: payload 600 -> 4098, hub event 598 -> 4096 and checkout
+    // message 4096 -> 4098. The unchanged worker_worst_case calculation at
+    // these same bounded strings adds exactly 3,035,662,234 B (no headroom).
+    let admission_growth = 3_035_662_234_u64;
+    assert_eq!(required.worker_bytes, 2_343_551_746_598_u64 + worker_growth + admission_growth);
 
     support::owned::check_memory(required);
     eprintln!("owned requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
