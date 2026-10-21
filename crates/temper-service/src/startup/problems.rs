@@ -149,7 +149,7 @@ fn admission(
     }
     let (before, between, after): (&[u8], &[u8], &[u8]) = match why {
         AgentShortfall::Model { .. } => unreachable!("name diagnostic above"),
-        AgentShortfall::Window { .. } => (b"needs a ", b"-token context window; the agent offers ", b" tokens"),
+        AgentShortfall::Window { .. } => (b"needs a context window of ", b" tokens; the agent offers ", b" tokens"),
         AgentShortfall::Output { .. } => (b"needs ", b" output tokens; the agent offers ", b" tokens"),
         AgentShortfall::Turns { .. } => (b"needs ", b" turns; the agent's profile.policy.max_turns allows ", b""),
         AgentShortfall::Spend => {
@@ -168,10 +168,14 @@ fn admission(
             (b"needs ", b"-byte messages (tasks.message_bytes); the agent offers ", b" (tool_payload less 2)")
         }
         AgentShortfall::Inbox => {
-            (b"needs ", b" inbox messages (tasks.run_inbox); the agent's profile.policy.inbox allows ", b"")
+            (b"needs an inbox of ", b" (tasks.run_inbox); the agent's profile.policy.inbox allows ", b"")
         }
         AgentShortfall::Unacknowledged => {
-            (b"needs ", b" unacknowledged turns (hub.turns); the agent's profile.policy.unacknowledged allows ", b"")
+            (
+                b"needs an unacknowledged-turn allowance of ",
+                b" (hub.turns); the agent's profile.policy.unacknowledged allows ",
+                b"",
+            )
         }
     };
     put(writer, length, measuring, before);

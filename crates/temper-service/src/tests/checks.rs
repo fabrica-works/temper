@@ -536,7 +536,7 @@ fn admission_names_global_and_time_requirements_with_their_units() {
             100,
             1,
             1,
-            "engine.limits: needs 2 inbox messages (tasks.run_inbox); the agent's profile.policy.inbox allows 1\n",
+            "engine.limits: needs an inbox of 2 (tasks.run_inbox); the agent's profile.policy.inbox allows 1\n",
         ),
         (
             300_000,
@@ -544,7 +544,7 @@ fn admission_names_global_and_time_requirements_with_their_units() {
             100,
             2,
             0,
-            "engine.limits: needs 1 unacknowledged turns (hub.turns); the agent's profile.policy.unacknowledged allows 0\n",
+            "engine.limits: needs an unacknowledged-turn allowance of 1 (hub.turns); the agent's profile.policy.unacknowledged allows 0\n",
         ),
     ] {
         let mut agent = fixtures::startup_agent();

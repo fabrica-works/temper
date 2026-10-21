@@ -791,7 +791,7 @@ fn admission_model_words_use_tokens_and_missing_names_make_no_amount_claim() {
         ),
         (
             AgentShortfall::Window { charter: 7, model: 0 },
-            "model: needs a 8192-token context window; the agent offers 1024 tokens\n",
+            "model: needs a context window of 8192 tokens; the agent offers 1024 tokens\n",
         ),
         (
             AgentShortfall::Output { charter: 7, model: 0 },
