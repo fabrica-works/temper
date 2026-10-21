@@ -1,6 +1,20 @@
 //! The document form's files and peer loop (protocol/setup.md, 8.4).
-use skein_shell::{Fallback, Origin, Setting, Settings};
-use std::path::PathBuf;
+use skein_fake_peers::{forge as forge_peer, llm as llm_peer};
+use skein_io::kernel::{Complete, Done, Exit, Fd, Op, Submit};
+use skein_lib::{List, Queue, Time, Token, Wall};
+use skein_shell::{Fallback, Host as _, Origin, Setting, Settings};
+use std::{
+    cell::RefCell,
+    fs::{self, File, OpenOptions},
+    io::{self, Write},
+    os::unix::fs::OpenOptionsExt,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
+use temper_fake::{
+    credential::{self, credential},
+    forge, limits, llm,
+};
 
 pub const LLM_SETTINGS: Settings = Settings {
     tool: "temper",
@@ -102,113 +116,6 @@ pub fn configure(arguments: &[Bytes], environment: &[EnvironmentEntry]) -> Resul
     };
     Ok(Arguments { kind, document: super::path(&resolved.value(0).bytes).to_path_buf(), ready, seed, observations })
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    fn configured(arguments: &[&str], environment: &[(&str, &str)]) -> Result<super::super::Command, String> {
-        let arguments = arguments.iter().map(|s| s.as_bytes().into()).collect::<Vec<_>>();
-        let environment =
-            environment.iter().map(|(k, v)| (k.as_bytes().into(), v.as_bytes().into())).collect::<Vec<_>>();
-        super::super::configure_with(&arguments, &environment, b"/work")
-    }
-    #[test]
-    fn arguments() {
-        for (words, environment, kind, document, ready, seed, observations) in [
-            (vec!["fake", "llm", "--document", "llm.json"], vec![], Kind::Llm, "llm.json", None, 0, None),
-            (vec!["fake", "forge", "--document", "forge.json"], vec![], Kind::Forge, "forge.json", None, 0, None),
-            (
-                vec!["fake", "llm", "--document", "llm.json", "--ready", "ready ", "--seed", "23"],
-                vec![],
-                Kind::Llm,
-                "llm.json",
-                Some("ready "),
-                23,
-                None,
-            ),
-            (
-                vec!["fake", "forge", "--document", "forge.json", "--ready", "", "--observations", "seen"],
-                vec![],
-                Kind::Forge,
-                "forge.json",
-                Some(""),
-                0,
-                Some("seen"),
-            ),
-            (
-                vec!["fake", "forge"],
-                vec![
-                    ("TEMPER_DOCUMENT", "env.json"),
-                    ("TEMPER_READY", "up "),
-                    ("TEMPER_SEED", "42"),
-                    ("TEMPER_OBSERVATIONS", "seen"),
-                ],
-                Kind::Forge,
-                "env.json",
-                Some("up "),
-                42,
-                Some("seen"),
-            ),
-            (
-                vec!["fake", "llm", "--document", "flag.json", "--seed", "7"],
-                vec![("TEMPER_DOCUMENT", "env.json"), ("TEMPER_SEED", "42")],
-                Kind::Llm,
-                "flag.json",
-                None,
-                7,
-                None,
-            ),
-        ] {
-            let Command::Fake { arguments } = configured(&words, &environment).expect("valid fixture") else {
-                panic!("fake command");
-            };
-            assert_eq!(
-                arguments,
-                Arguments {
-                    kind,
-                    document: document.into(),
-                    ready: ready.map(|s| s.as_bytes().into()),
-                    seed,
-                    observations: observations.map(Into::into)
-                }
-            );
-        }
-        for (words, expected) in [
-            (vec!["fake"], "temper fake: expected llm or forge\n"),
-            (vec!["fake", "other"], "temper fake: unknown fake other\n"),
-            (vec!["fake", "llm"], "temper fake llm: --document FILE is not given, and TEMPER_DOCUMENT is not set\n"),
-            (
-                vec!["fake", "llm", "--document", "doc", "--seed", "no"],
-                "temper fake llm: --seed N (TEMPER_SEED): expected a decimal u64\n",
-            ),
-            (
-                vec!["fake", "llm", "--document", "doc", "--observations", "seen"],
-                "temper fake llm: unexpected argument --observations\n",
-            ),
-            (vec!["fake", "forge", "--document", "doc", "extra"], "temper fake forge: unexpected argument extra\n"),
-        ] {
-            assert_eq!(configured(&words, &[]).expect_err("refused fixture"), expected);
-        }
-    }
-    use crate::Command;
-}
-
-use skein_fake_peers::{forge as forge_peer, llm as llm_peer};
-use skein_io::kernel::{Complete, Done, Exit, Fd, Op, Submit};
-use skein_lib::{List, Queue, Time, Token, Wall};
-use skein_shell::Host as _;
-use std::{
-    cell::RefCell,
-    fs::{self, File, OpenOptions},
-    io::{self, Write},
-    os::unix::fs::OpenOptionsExt,
-    path::Path,
-    rc::Rc,
-};
-use temper_fake::{
-    credential::{self, credential},
-    forge, limits, llm,
-};
 
 /// Creates every output before opening the peer or kernel. A refused start rolls
 /// back only what this invocation created; a running peer leaves every file.
@@ -404,7 +311,10 @@ struct Host {
     command: &'static str,
 }
 impl Host {
-    fn failed(&mut self, name: &str, why: &dyn std::fmt::Display) {
+    fn checkpoint_or_llm(&self) -> bool {
+        self.shared.is_none() || self.checkpoint
+    }
+    fn fail(&mut self, name: &str, why: &dyn std::fmt::Display) {
         eprintln!("{}: {name}: {why}", self.command);
         self.failed = true;
         self.stopped = true;
@@ -453,7 +363,7 @@ impl Host {
             drop(forge);
             if result.is_err() {
                 self.buffer.clear();
-                self.failed("observations", &"drain exceeds its byte bound");
+                self.fail("observations", &"drain exceeds its byte bound");
                 return;
             }
             if !self.buffer.is_empty() {
@@ -461,7 +371,7 @@ impl Host {
                 self.buffer.clear();
                 if let Err(why) = result {
                     let path = self.observation_path.as_ref().expect("writer has path").display().to_string();
-                    self.failed(&path, &why);
+                    self.fail(&path, &why);
                 }
             }
         } else {
@@ -485,7 +395,7 @@ impl skein_shell::Host for Host {
                     Err(error) => {
                         // InvalidArgument/Other leave the read running (kernel.rs:45-46).
                         // Retry its cancellation; a descriptor closes only after its read.
-                        self.failed("signals: cancel", &format_args!("{error:?}"));
+                        self.fail("signals: cancel", &format_args!("{error:?}"));
                     }
                     Ok(_) => panic!("cancel completes with Nothing"),
                 }
@@ -496,7 +406,7 @@ impl skein_shell::Host for Host {
                         if !(matches!(complete.result, Ok(Done::Signalled(_)))
                             || self.failed && complete.result == Err(skein_io::kernel::Error::Cancelled))
                         {
-                            self.failed("signals", &"read failed");
+                            self.fail("signals", &"read failed");
                         }
                         self.stopped = true;
                         self.peer.shutdown();
@@ -534,7 +444,7 @@ impl skein_shell::Host for Host {
             let result =
                 stdout.write_all(&prefix).and_then(|()| writeln!(stdout, "{address}")).and_then(|()| stdout.flush());
             if let Err(why) = result {
-                self.failed("stdout", &why);
+                self.fail("stdout", &why);
             }
         }
         self.observations();
@@ -588,16 +498,97 @@ impl skein_shell::Host for Host {
         self.is_empty().then_some(Exit::Code(u8::from(self.failed)))
     }
 }
-impl Host {
-    fn checkpoint_or_llm(&self) -> bool {
-        self.shared.is_none() || self.checkpoint
-    }
-}
 
 #[cfg(test)]
-mod failure_tests {
+mod tests {
     use super::*;
+    use crate::Command;
     use std::io::Read;
+
+    fn configured(arguments: &[&str], environment: &[(&str, &str)]) -> Result<Command, String> {
+        let arguments = arguments.iter().map(|s| s.as_bytes().into()).collect::<Vec<_>>();
+        let environment =
+            environment.iter().map(|(k, v)| (k.as_bytes().into(), v.as_bytes().into())).collect::<Vec<_>>();
+        crate::configure_with(&arguments, &environment, b"/work")
+    }
+    #[test]
+    fn arguments() {
+        for (words, environment, kind, document, ready, seed, observations) in [
+            (vec!["fake", "llm", "--document", "llm.json"], vec![], Kind::Llm, "llm.json", None, 0, None),
+            (vec!["fake", "forge", "--document", "forge.json"], vec![], Kind::Forge, "forge.json", None, 0, None),
+            (
+                vec!["fake", "llm", "--document", "llm.json", "--ready", "ready ", "--seed", "23"],
+                vec![],
+                Kind::Llm,
+                "llm.json",
+                Some("ready "),
+                23,
+                None,
+            ),
+            (
+                vec!["fake", "forge", "--document", "forge.json", "--ready", "", "--observations", "seen"],
+                vec![],
+                Kind::Forge,
+                "forge.json",
+                Some(""),
+                0,
+                Some("seen"),
+            ),
+            (
+                vec!["fake", "forge"],
+                vec![
+                    ("TEMPER_DOCUMENT", "env.json"),
+                    ("TEMPER_READY", "up "),
+                    ("TEMPER_SEED", "42"),
+                    ("TEMPER_OBSERVATIONS", "seen"),
+                ],
+                Kind::Forge,
+                "env.json",
+                Some("up "),
+                42,
+                Some("seen"),
+            ),
+            (
+                vec!["fake", "llm", "--document", "flag.json", "--seed", "7"],
+                vec![("TEMPER_DOCUMENT", "env.json"), ("TEMPER_SEED", "42")],
+                Kind::Llm,
+                "flag.json",
+                None,
+                7,
+                None,
+            ),
+        ] {
+            let Command::Fake { arguments } = configured(&words, &environment).expect("valid fixture") else {
+                panic!("fake command");
+            };
+            assert_eq!(
+                arguments,
+                Arguments {
+                    kind,
+                    document: document.into(),
+                    ready: ready.map(|s| s.as_bytes().into()),
+                    seed,
+                    observations: observations.map(Into::into)
+                }
+            );
+        }
+        for (words, expected) in [
+            (vec!["fake"], "temper fake: expected llm or forge\n"),
+            (vec!["fake", "other"], "temper fake: unknown fake other\n"),
+            (vec!["fake", "llm"], "temper fake llm: --document FILE is not given, and TEMPER_DOCUMENT is not set\n"),
+            (
+                vec!["fake", "llm", "--document", "doc", "--seed", "no"],
+                "temper fake llm: --seed N (TEMPER_SEED): expected a decimal u64\n",
+            ),
+            (
+                vec!["fake", "llm", "--document", "doc", "--observations", "seen"],
+                "temper fake llm: unexpected argument --observations\n",
+            ),
+            (vec!["fake", "forge", "--document", "doc", "extra"], "temper fake forge: unexpected argument extra\n"),
+        ] {
+            assert_eq!(configured(&words, &[]).expect_err("refused fixture"), expected);
+        }
+    }
 
     fn advance(host: &Host, content: &[u8]) {
         let mut shared = host.shared.as_ref().expect("forge").borrow_mut();
@@ -625,7 +616,7 @@ mod failure_tests {
         {
             let directory =
                 std::env::temp_dir().join(format!("temper-fake-write-failure-{}-{name}", std::process::id()));
-            super::super::directories::make_private(&directory, skein_shell::effective_user()).expect("valid fixture");
+            crate::directories::make_private(&directory, skein_shell::effective_user()).expect("valid fixture");
             let document = directory.join("forge.json");
             fs::write(
                 &document,

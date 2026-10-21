@@ -15,7 +15,6 @@ use jig_protocol_config::Path;
 use serde_json::{Value, json};
 use skein_fake_llm_domain::api;
 use skein_lib::{Env, Queue, ReplyTo, Time, Token, Wall};
-use skein_shell::Host as _;
 
 fn llm_document() -> Value {
     json!({"listen":{"socket":"127.0.0.1:0"},"key":"/tmp/key","tls":null,
@@ -494,7 +493,6 @@ fn ci_cue() {
 }
 
 #[test]
-#[expect(clippy::print_stderr, reason = "report the checked peers byte bounds for protocol/setup.md, 8.4")]
 fn constants_fit() {
     let models = (0..8).map(|i| json!({"name":format!("qa-{i}"),"window":4096,"output":1024})).collect::<Vec<_>>();
     let scripts = |prefix: &str| {
@@ -508,11 +506,10 @@ fn constants_fit() {
     let key = credential(0, credential::KEY);
     let plain = crate::wire::llm(llm::configuration(&document, &key, 0)).expect("valid fixture");
     assert!(skein_fake_llm_domain::worst_case(&llm::LIMITS).is_some());
-    let plain_bytes = plain.worst_case();
     let mut tls: Value = serde_json::from_slice(&bytes).expect("valid fixture");
     tls["tls"] = json!({"root":"/tmp/root"});
     let document = llm::Document::decode(&serde_json::to_vec(&tls).expect("valid fixture")).expect("valid fixture");
-    let tls = crate::wire::llm(llm::configuration(&document, &key, 0)).expect("valid fixture");
+    crate::wire::llm(llm::configuration(&document, &key, 0)).expect("valid fixture");
     let document=forge::Document::decode(&serde_json::to_vec(&json!({"listen":{"socket":"127.0.0.1:0"},"admin_token":"/tmp/admin_token","owner":"fake",
             "repositories":(0..8).map(|i|json!({"name":format!("repo-{i}"),"landing":"main","ci":null})).collect::<Vec<_>>()})).expect("valid fixture")).expect("valid fixture");
     let token = credential(0, credential::ADMIN_TOKEN);
@@ -528,14 +525,6 @@ fn constants_fit() {
     assert_eq!(issued.scopes.as_ref(), &[Box::<[u8]>::from(b"all".as_slice())]);
     assert!(skein_fake_forge_protocol::git::fits(&crate::wire::forge_limits(), &forge::LIMITS.limits));
     assert!(skein_fake_forge_domain::worst_case(&forge::LIMITS.limits).is_some());
-    eprintln!(
-        "worst case: llm plaintext {plain_bytes}, llm TLS {}, forge {}, observation buffer {} bytes; operations llm {}, forge {}",
-        tls.worst_case(),
-        peer.worst_case(),
-        crate::limits::OBSERVATION_BYTES,
-        plain.operations(),
-        peer.operations()
-    );
     assert!(plain.observations().is_empty());
     assert!(peer.observations().is_empty());
 }
