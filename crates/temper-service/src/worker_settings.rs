@@ -153,7 +153,7 @@ pub(crate) fn grant_bytes(credential: u32, identity: u32) -> Option<u32> {
 }
 
 pub(crate) fn credential_bytes(token: u32) -> u32 {
-    token.max(jig_client_protocol_wire::v10::CEILINGS.keyed_value_some)
+    token.max(jig_client_protocol_wire::v11::CEILINGS.keyed_value_some)
 }
 
 /// One retained declaration per recognized adapter, with each path at smith's bound.

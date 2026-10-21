@@ -435,9 +435,13 @@ fn clone_file_kind(kind: &skein_io::kernel::Op) -> skein_io::kernel::Op {
     match kind {
         Op::Open { root, path, how } => Op::Open { root: *root, path: path.clone(), how: *how },
         Op::Read { fd, buf, at } => Op::Read { fd: *fd, buf: buf.clone(), at: *at },
-        Op::Rename { from_dir, from, to_dir, to } => {
-            Op::Rename { from_dir: *from_dir, from: from.clone(), to_dir: *to_dir, to: to.clone() }
-        }
+        Op::Rename { from_dir, from, to_dir, to, no_replace } => Op::Rename {
+            from_dir: *from_dir,
+            from: from.clone(),
+            to_dir: *to_dir,
+            to: to.clone(),
+            no_replace: *no_replace,
+        },
         Op::Remove { dir, name, directory } => Op::Remove { dir: *dir, name: name.clone(), directory: *directory },
         Op::MakeDirectory { dir, name, mode } => Op::MakeDirectory { dir: *dir, name: name.clone(), mode: *mode },
         Op::List { fd, entries, names } => Op::List { fd: *fd, entries: entries.clone(), names: names.clone() },

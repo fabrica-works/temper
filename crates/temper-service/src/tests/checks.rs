@@ -483,7 +483,7 @@ fn configured_keys_use_the_key_ceiling_instead_of_the_oauth_token_bound() {
         config::document(&input, &config::DocumentLimits { bytes: 65_536, tokens: 4096, depth: 32 }).unwrap();
     let mut engine = config::engine(&document, 0, &jig_protocol_config::Directories::working()).unwrap();
     engine.limits.token = 1;
-    let key = jig_client_protocol_wire::v10::CEILINGS.keyed_value_some;
+    let key = jig_client_protocol_wire::v11::CEILINGS.keyed_value_some;
     assert_eq!(crate::values::credential_bytes(&engine), key);
     let mut worker = fixtures::worker_settings().jig.limits;
     worker.token = 1;

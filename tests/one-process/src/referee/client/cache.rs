@@ -1,5 +1,5 @@
 //! Failure-only metadata of the native client's real private-store operations.
-use jig_client_protocol_wire::v10 as wire;
+use jig_client_protocol_wire::v11 as wire;
 use skein_io::kernel::{Complete, Done, Fd, Op};
 use skein_lib::Reader;
 use std::{cell::RefCell, collections::BTreeMap, fmt, rc::Rc};
@@ -113,7 +113,7 @@ impl Cache {
                 let table = self.table(if directory { b"private/store" } else { path });
                 self.record(Event::Sync { directory, table });
             }
-            (Op::Rename { from_dir, from, to_dir, to }, Ok(Done::Nothing)) => {
+            (Op::Rename { from_dir, from, to_dir, to, .. }, Ok(Done::Nothing)) => {
                 let (Some(source), Some(destination)) = (self.path(*from_dir), self.path(*to_dir)) else { return };
                 let source = [source.as_slice(), b"/", from].concat();
                 let destination = [destination.as_slice(), b"/", to].concat();

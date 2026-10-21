@@ -19,7 +19,7 @@ impl Directories {
     fn rename(&mut self, from_dir: Fd, from: Box<[u8]>) -> Op {
         let to = Box::from(Decimal::of(self.serial).as_bytes());
         self.serial = self.serial.checked_add(1).expect("trash serial lifetime");
-        Op::Rename { from_dir, from, to_dir: self.trash.expect("trash opened"), to }
+        Op::Rename { from_dir, from, to_dir: self.trash.expect("trash opened"), to, no_replace: false }
     }
 }
 #[derive(Debug)]

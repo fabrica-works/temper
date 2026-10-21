@@ -33,6 +33,7 @@ pub struct World {
 pub fn charter() -> engine::Charter {
     let mut charter = walking::charter();
     charter.policy.model = engine::Model {
+        program: None,
         dialect: temper_worker_domain_world::DIALECT,
         endpoint: 0,
         name: b"fake-1".as_slice().into(),

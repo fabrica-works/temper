@@ -362,6 +362,7 @@ pub fn charter() -> engine::Charter {
             reserve_turns: 1,
             reserve_time: Duration::from_secs(10),
             model: engine::Model {
+                program: None,
                 dialect: 1,
                 endpoint: 1,
                 name: b"scripted".as_slice().into(),

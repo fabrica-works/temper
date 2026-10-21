@@ -333,11 +333,15 @@ impl Below {
         from: &[u8],
         to_dir: kernel::Fd,
         to: &[u8],
+        no_replace: bool,
     ) -> Result<kernel::Done, kernel::Error> {
         let from = self.path(from_dir, from);
         let to = self.path(to_dir, to);
         if !self.tree.contains_key(&from) {
             return Err(kernel::Error::NotFound);
+        }
+        if no_replace && self.tree.contains_key(&to) {
+            return Err(kernel::Error::Exists);
         }
         if self.tree.contains_key(&to) && !self.children_of(&to).is_empty() {
             return Err(kernel::Error::NotEmpty);
@@ -441,7 +445,9 @@ impl Below {
                 self.tree.remove(&path);
                 Ok(Done::Nothing)
             }
-            Op::Rename { from_dir, from, to_dir, to } => self.moving(*from_dir, from, *to_dir, to),
+            Op::Rename { from_dir, from, to_dir, to, no_replace } => {
+                self.moving(*from_dir, from, *to_dir, to, *no_replace)
+            }
             Op::List { fd, entries, names } => Ok(self.listing(*fd, entries, names)),
             other @ (Op::Lock { .. }
             | Op::Socket { .. }

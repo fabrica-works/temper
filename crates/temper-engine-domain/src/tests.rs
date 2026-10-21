@@ -391,6 +391,7 @@ fn held_assignment() -> crate::Assignment {
                 reserve_turns: 1,
                 reserve_time: skein_lib::Duration::from_secs(1),
                 model: crate::Model {
+                    program: None,
                     dialect: 1,
                     endpoint: 1,
                     name: b"m".as_slice().into(),

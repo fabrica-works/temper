@@ -6,8 +6,8 @@ use jig_client::{Client, Key, Outcome, Told, contract as c};
 use skein_lib::{List, Queue};
 
 /// Catalogue ceilings enforced by the received client wire.
-pub const MODELS: u32 = jig_client_protocol_wire::v10::CEILINGS.me_project_models;
-pub const EFFORTS: u32 = jig_client_protocol_wire::v10::CEILINGS.me_model_efforts;
+pub const MODELS: u32 = jig_client_protocol_wire::v11::CEILINGS.me_project_models;
+pub const EFFORTS: u32 = jig_client_protocol_wire::v11::CEILINGS.me_model_efforts;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Context {

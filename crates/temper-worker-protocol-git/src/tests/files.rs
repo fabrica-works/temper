@@ -11,7 +11,7 @@ fn open(path: &[u8], how: OpenHow) -> Op {
     Op::Open { root: Fd::new(3), path: Box::from(path), how }
 }
 fn rename(from_dir: Fd, from: &[u8], to: &[u8]) -> Op {
-    Op::Rename { from_dir, from: Box::from(from), to_dir: fixtures::TRASH, to: Box::from(to) }
+    Op::Rename { from_dir, from: Box::from(from), to_dir: fixtures::TRASH, to: Box::from(to), no_replace: false }
 }
 fn remove(dir: Fd, name: &[u8], directory: bool) -> Op {
     Op::Remove { dir, name: Box::from(name), directory }
