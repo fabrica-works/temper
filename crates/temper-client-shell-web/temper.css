@@ -121,8 +121,14 @@ a { color: inherit; text-decoration: none; }
 }
 /* .terminal-topbar at 760px: visible navigation on its own scrolling row. */
 @media (max-width: 760px) {
-  .temper-banner { flex-wrap: wrap; gap: 8px 11px; padding-block: 12px 0; }
-  .temper-navigation { order: 1; flex: 0 0 100%; min-width: 0; overflow-x: auto; padding-bottom: 8px; }
+  .temper-banner { flex-wrap: wrap; gap: 0 11px; padding-block: 0; }
+  .temper-banner > button { max-width: min(18em, calc((100% - 130px) / 2)); }
+  /* Break after projects; navigation then corner retain their DOM order. */
+  .temper-banner:has(> .temper-navigation)::after { content: ''; flex: 0 0 100%; }
+  .temper-navigation { order: 1; flex: 1 1 7em; min-width: 0; overflow-x: auto; }
+  .temper-navigation a { flex: none; display: inline-flex; align-items: center; min-height: 28px; }
+  .temper-corner { order: 1; gap: 10px; min-height: 28px; }
+  .temper-corner > button { margin-block: 0; }
   .temper-main { width: calc(100% - 28px); padding-top: 16px; }
   .temper-accounts { width: calc(100% - 28px); margin-top: 16px; }
   .temper-hint { display: none; }
