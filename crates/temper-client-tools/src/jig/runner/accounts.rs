@@ -53,7 +53,7 @@ fn build(reading: &reads::Reading) -> Result<acts::Request, &'static [u8]> {
                         if found.is_some() {
                             return Err(b"account number is ambiguous; read accounts again");
                         }
-                        found = Some((row.holder, &row.sources, row.cut));
+                        found = Some((row.holder, &row.sources, row.cut, row.provider, row.provider_name.as_ref()));
                     }
                 }
             }
@@ -63,7 +63,7 @@ fn build(reading: &reads::Reading) -> Result<acts::Request, &'static [u8]> {
                         if found.is_some() {
                             return Err(b"account number is ambiguous; read accounts again");
                         }
-                        found = Some((row.holder, &row.sources, row.cut));
+                        found = Some((row.holder, &row.sources, row.cut, row.provider, row.provider_name.as_ref()));
                     }
                 }
             }
@@ -82,11 +82,24 @@ fn build(reading: &reads::Reading) -> Result<acts::Request, &'static [u8]> {
             | c::Delivery::Deployment(_) => {}
         }
     }
-    let (holder, sources, cut) = found.ok_or(b"account unavailable; read accounts again".as_slice())?;
+    let (holder, sources, cut, provider, provider_name) =
+        found.ok_or(b"account unavailable; read accounts again".as_slice())?;
     let holder = match holder {
         c::OwnerAccountHolder::Party(_) => c::AccountHolder::Own,
         c::OwnerAccountHolder::Deployment => c::AccountHolder::Deployment,
     };
+    let mut context = crate::jig::render::outcome::Account {
+        provider,
+        provider_name: provider_name.cloned(),
+        program: false,
+        sign_in: false,
+    };
+    if call.tool == 28 && !cut {
+        for source in sources {
+            context.program |= source.kind == c::OwnerAccountKind::Program;
+            context.sign_in |= source.kind == c::OwnerAccountKind::SignIn;
+        }
+    }
     let source_slot = if call.tool == 29 { 2 } else { 1 };
     let selected = if call.tool == 27 {
         Some(1)
@@ -101,27 +114,11 @@ fn build(reading: &reads::Reading) -> Result<acts::Request, &'static [u8]> {
     } else if call.tool == 29 && selected.is_none() {
         c::AccountChange::MoveAccount { account, place: integer(call, 1).checked_sub(1).expect("one-based position") }
     } else {
-        if cut {
-            return Err(b"source list is incomplete; read accounts again");
-        }
-        let mut source = None;
-        for candidate in sources {
-            let kind = match candidate.kind {
-                c::OwnerAccountKind::SignIn => 0,
-                c::OwnerAccountKind::Key => 1,
-                c::OwnerAccountKind::Program => 2,
-                c::OwnerAccountKind::None => 3,
-            };
-            if selected.is_none() || selected == Some(kind) {
-                if source.is_some() {
-                    return Err(b"source is ambiguous; name one unique --source kind");
-                }
-                source = Some(candidate);
-            }
-        }
-        let source = source.ok_or(b"source unavailable; read accounts again".as_slice())?;
+        let source = source(sources, selected, cut)?;
         if call.tool == 25 || call.tool == 28 && source.kind != c::OwnerAccountKind::Key {
-            return Ok(acts::Request::Ask(c::Ask::SignOut { holder, source: source.number }));
+            context.program = source.kind == c::OwnerAccountKind::Program;
+            context.sign_in = source.kind == c::OwnerAccountKind::SignIn;
+            return Ok(acts::Request::Account { ask: c::Ask::SignOut { holder, source: source.number }, context });
         }
         match call.tool {
             33 => {
@@ -141,7 +138,8 @@ fn build(reading: &reads::Reading) -> Result<acts::Request, &'static [u8]> {
             _ => unreachable!("account act"),
         }
     };
-    Ok(acts::Request::Ask(c::Ask::AccountChange { holder, change }))
+    let ask = c::Ask::AccountChange { holder, change };
+    if call.tool == 28 && !cut { Ok(acts::Request::Account { ask, context }) } else { Ok(acts::Request::Ask(ask)) }
 }
 fn join(call: &Call) -> Option<u32> {
     Some(u32::try_from(number(call, 2)?).expect("checked number"))
@@ -172,12 +170,35 @@ fn declare(call: &Call, me: &c::Me) -> Result<(acts::Request, Option<c::Recipien
         acts::Request::DeclareProgram {
             holder: c::AccountHolder::Own,
             provider,
-            join: match number(call, 3) {
-                Some(n) => Some(u32::try_from(n).expect("checked account")),
-                None => None,
-            },
+            join: if number(call, 3).is_some() { Some(integer(call, 3)) } else { None },
             name: name.clone(),
         },
         None,
     ))
+}
+
+fn source(
+    sources: &skein_lib::List<c::OwnerAccountSource>,
+    selected: Option<u8>,
+    cut: bool,
+) -> Result<&c::OwnerAccountSource, &'static [u8]> {
+    if cut {
+        return Err(b"source list is incomplete; read accounts again");
+    }
+    let mut source = None;
+    for candidate in sources {
+        let kind = match candidate.kind {
+            c::OwnerAccountKind::SignIn => 0,
+            c::OwnerAccountKind::Key => 1,
+            c::OwnerAccountKind::Program => 2,
+            c::OwnerAccountKind::None => 3,
+        };
+        if selected.is_none() || selected == Some(kind) {
+            if source.is_some() {
+                return Err(b"source is ambiguous; name one unique --source kind");
+            }
+            source = Some(candidate);
+        }
+    }
+    source.ok_or(b"source unavailable; read accounts again".as_slice())
 }

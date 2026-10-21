@@ -373,8 +373,8 @@ pub const DECLARE: Tool = Tool {
     result: b"declare",
     forms: &[&[
         positional(b"provider", b"PROVIDER", Kind::Number, Required, b"LLM provider number from me"),
-        positional(b"adapter", b"ADAPTER", Kind::Text, Required, b"Program offered by the provider in me"),
-        positional(b"name", b"NAME", Kind::Text, Required, b"1 to 32 lower-case letters, digits or hyphens"),
+        positional(b"adapter", b"ADAPTER", Kind::Literal, Required, b"Program offered by the provider in me"),
+        positional(b"name", b"NAME", Kind::Literal, Required, b"1 to 32 lower-case letters, digits or hyphens"),
         flag(b"account", b"A", Kind::Number, Optional, b"Join an account"),
     ]],
     keyed: Keyed::Required,

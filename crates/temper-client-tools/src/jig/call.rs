@@ -7,6 +7,7 @@ use alloc::boxed::Box;
 use jig_client::contract::{InboxGroup, ProposalKey, QueryOrder, TurnName};
 /// The client tools' carried key bound (client/tools.md, 12).
 pub const PROGRAM_NAME: u32 = jig_client::contract::PROGRAM_NAME;
+/// jig's protocol/configuration.md program-adapter names are at most 32 bytes.
 pub const PROGRAM_ADAPTER: u32 = 32;
 pub const KEY_BYTES: u32 = 4096;
 #[derive(Clone, Debug, PartialEq, Eq)]

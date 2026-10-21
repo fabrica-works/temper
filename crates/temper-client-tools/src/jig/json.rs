@@ -233,6 +233,7 @@ fn decode_value(table: &[&Tool], doc: &Document, at: u32, spec: &Argument, limit
         Kind::Project if kind == JsonKind::Number => {}
         Kind::Word { .. }
         | Kind::Text
+        | Kind::Literal
         | Kind::File
         | Kind::Proposal
         | Kind::Digest
@@ -426,6 +427,7 @@ fn encode_tool(tool: &Tool, out: &mut Encoder) {
                 Kind::Number
                 | Kind::Count
                 | Kind::Text
+                | Kind::Literal
                 | Kind::File
                 | Kind::Duration
                 | Kind::Proposal
@@ -465,6 +467,7 @@ fn kind_word(kind: Kind) -> &'static [u8] {
         Kind::Count => b"count",
         Kind::Word { .. } => b"word",
         Kind::Text => b"text",
+        Kind::Literal => b"literal",
         Kind::File => b"file",
         Kind::Duration => b"duration",
         Kind::Proposal => b"proposal",

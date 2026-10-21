@@ -116,6 +116,11 @@ fn party_fields(
             cut,
             window,
         );
+        // The party document supplies no account activity lists.
+        out.key(b"runs");
+        out.null();
+        out.key(b"waiting");
+        out.null();
         out.object_end();
     }
     out.array_end();
@@ -154,6 +159,7 @@ fn party_fields(
             out.object_start();
             super::offers::fields(&extra.providers, extra.providers_cut, extra.key_bytes, out, cut, window);
             super::offers::readiness(&extra.readiness, extra.readiness_cut, limits, out, window);
+            super::account_programs::deployment_hosts(extra, out, cut, window);
             out.object_end();
         }
     }
@@ -228,9 +234,13 @@ fn line(
     number(b"number", u64::from(number_), out);
     number(b"place", u64::from(place), out);
     provider(supplied_provider, out);
+    window.cut |= display.cut;
     out.key(b"provider_name");
     match provider_name {
-        Some(name) => super::encode_document_text(name, out, cut),
+        Some(name) => {
+            super::encode_document_text(name, out, cut);
+            window.cut |= name.cut;
+        }
         None => out.null(),
     }
     out.key(b"manage_usage");
@@ -275,7 +285,7 @@ fn line(
         number(b"place", u64::from(source.place), out);
         out.key(b"name");
         match &source.name {
-            Some(name) => cut.words(name, out),
+            Some(name) => super::offers::whole(name, out, cut, window),
             None => out.null(),
         }
         out.key(b"kind");
@@ -472,6 +482,21 @@ fn models(me: &c::Me, project: Option<u32>, out: &mut Encoder, cut: &mut Cut, wi
             }
             out.object_start();
             provider(model.provider, out);
+            out.key(b"provider_name");
+            let mut name = None;
+            for offer in &me.providers {
+                if Some(offer.provider) == model.provider {
+                    name = Some(&offer.name);
+                    break;
+                }
+            }
+            match name {
+                Some(name) => {
+                    super::encode_document_text(name, out, cut);
+                    window.cut |= name.cut;
+                }
+                None => out.null(),
+            }
             out.key(b"models");
             out.array_start();
             for item in &held.models {
@@ -522,7 +547,7 @@ fn models(me: &c::Me, project: Option<u32>, out: &mut Encoder, cut: &mut Cut, wi
 pub(super) fn text(value: Accounts<'_>, limits: &Limits, out: &mut Text) {
     // Keep every printed identity and cut identical to JSON, followed by the
     // usual text digest and wait status. No second account interpretation.
-    out.put(&value.bytes(limits, false));
+    super::account_lines::text(&value.bytes(limits, false), out);
     out.put(b"\ndigest: ");
     out.put(if value.models.is_some() { b"models" } else { b"accounts" });
     out.put(b" ");

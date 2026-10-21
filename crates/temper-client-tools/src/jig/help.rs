@@ -58,6 +58,7 @@ fn shown(argument: &Argument, out: &mut Writer) -> Result<(), Overflow> {
         Kind::Number
         | Kind::Count
         | Kind::Text
+        | Kind::Literal
         | Kind::File
         | Kind::Duration
         | Kind::Digest

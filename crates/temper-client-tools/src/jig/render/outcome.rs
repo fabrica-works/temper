@@ -7,11 +7,20 @@ use skein_json::writer::Encoder;
 #[derive(Debug)]
 pub(crate) struct Operation {
     pub word: &'static [u8],
+    pub account: Option<Account>,
     pub task: Option<u64>,
     pub to: Option<c::Recipient>,
     pub party: Option<u64>,
     pub retry: Option<Box<[u8]>>,
     pub value_name: Option<crate::jig::key::Name>,
+}
+/// One in-flight source context; its name is bounded by the client's document text limit.
+#[derive(Clone, Debug)]
+pub(crate) struct Account {
+    pub provider: Option<u32>,
+    pub provider_name: Option<c::DocumentText>,
+    pub program: bool,
+    pub sign_in: bool,
 }
 impl Operation {
     pub(crate) fn of(ask: &Ask) -> Self {
@@ -80,7 +89,7 @@ impl Operation {
                 ),
             },
         };
-        Self { word, task, to: None, party: None, retry: None, value_name: None }
+        Self { word, account: None, task, to: None, party: None, retry: None, value_name: None }
     }
 }
 pub(crate) fn print(
@@ -132,10 +141,10 @@ fn bytes(
             length: u32::try_from(limits.ask_bytes).expect("output bytes fit"),
         };
         let mut measure = Encoder::measure(&bounds);
-        encode(operation, outcome, &mut measure, kept, limits);
+        encode(operation, outcome, &mut measure, kept, me, limits);
         let Ok(size) = measure.measured() else { return super::failure(b"result limit", true, 1).stderr };
         let mut write = Encoder::write(size, &bounds);
-        encode(operation, outcome, &mut write, kept, limits);
+        encode(operation, outcome, &mut write, kept, me, limits);
         let bytes = write.finish();
         if kept { newline(&bytes) } else { bytes }
     } else {
@@ -217,19 +226,10 @@ fn text(operation: &Operation, outcome: &Outcome, me: Option<&c::Me>, limits: &L
             out.put(b"\nwait accounts --until settled");
         }
         c::Answer::Done(c::Outcome::Owner(
-            c::OwnerOutcome::AccountSignedOut { confirmed: false, failed_hosts }
-            | c::OwnerOutcome::AccountRemoved { confirmed: false, failed_hosts },
+            c::OwnerOutcome::AccountSignedOut { confirmed, failed_hosts }
+            | c::OwnerOutcome::AccountRemoved { confirmed, failed_hosts },
         )) => {
-            out.put(b"Removed locally; disconnect this application in the provider's settings, under Apps.");
-            for host in &**failed_hosts {
-                out.put(b"\n");
-                out.put(&host.name);
-                out.put(match host.why {
-                    c::AccountHostWhy::NotInContact => b": not in contact",
-                    c::AccountHostWhy::Lost => b": contact lost",
-                    c::AccountHostWhy::Failed => b": failed",
-                });
-            }
+            sign_out(operation, *confirmed, failed_hosts, me, limits, out);
         }
         c::Answer::Done(done) => {
             out.put(b"done: ");
@@ -294,7 +294,14 @@ fn decision(how: &c::Decision, out: &mut Text) {
         c::Decision::LeftHeld { .. } => b"left held",
     });
 }
-fn encode(operation: &Operation, outcome: &Outcome, out: &mut Encoder, kept: bool, limits: &Limits) {
+fn encode(
+    operation: &Operation,
+    outcome: &Outcome,
+    out: &mut Encoder,
+    kept: bool,
+    me: Option<&c::Me>,
+    limits: &Limits,
+) {
     out.object_start();
     out.key(b"operation");
     out.string(operation.word);
@@ -318,6 +325,19 @@ fn encode(operation: &Operation, outcome: &Outcome, out: &mut Encoder, kept: boo
     if let Some(next) = account_follow_up(operation, outcome) {
         out.key(b"next");
         out.string(next);
+    }
+    if let Outcome::Answered(Answered::Jig(c::Answer::Done(c::Outcome::Owner(
+        c::OwnerOutcome::AccountSignedOut { confirmed, failed_hosts }
+        | c::OwnerOutcome::AccountRemoved { confirmed, failed_hosts },
+    )))) = outcome
+    {
+        let mut measure = Text::measure();
+        if sign_out(operation, *confirmed, failed_hosts, me, limits, &mut measure) {
+            let mut write = Text::writing_exact(measure);
+            sign_out(operation, *confirmed, failed_hosts, me, limits, &mut write);
+            out.key(b"next");
+            out.string(&write.finish());
+        }
     }
     if !kept {
         out.key(b"task");
@@ -419,10 +439,6 @@ fn account_follow_up(operation: &Operation, outcome: &Outcome) -> Option<&'stati
         {
             Some(b"wait accounts --until settled")
         }
-        Outcome::Answered(Answered::Jig(c::Answer::Done(c::Outcome::Owner(
-            c::OwnerOutcome::AccountSignedOut { confirmed: false, .. }
-            | c::OwnerOutcome::AccountRemoved { confirmed: false, .. },
-        )))) => Some(b"Disconnect this application in the provider's settings, under Apps."),
         Outcome::NotKept
         | Outcome::Answered(_)
         | Outcome::Unknown
@@ -432,4 +448,78 @@ fn account_follow_up(operation: &Operation, outcome: &Outcome) -> Option<&'stati
         | Outcome::Unsent
         | Outcome::Lost => None,
     }
+}
+
+fn sign_out(
+    operation: &Operation,
+    confirmed: bool,
+    failed_hosts: &[c::AccountHostFailure],
+    me: Option<&c::Me>,
+    limits: &Limits,
+    out: &mut Text,
+) -> bool {
+    let mut advice = false;
+    let program = match &operation.account {
+        Some(account) => account.program,
+        None => !failed_hosts.is_empty(),
+    };
+    if program {
+        if failed_hosts.is_empty() {
+            out.put(b"Signed out on every machine.");
+        } else {
+            advice = true;
+            out.put(b"Not signed out on:");
+            for host in failed_hosts {
+                out.put(b"\n");
+                out.put(&host.name);
+                out.put(match host.why {
+                    c::AccountHostWhy::NotInContact => b": not in contact",
+                    c::AccountHostWhy::Lost => b": contact lost",
+                    c::AccountHostWhy::Failed => b": failed",
+                });
+            }
+        }
+    }
+    let sign_in = match &operation.account {
+        Some(account) => account.sign_in,
+        None => false,
+    };
+    // With failed hosts, a mixed removal cannot tell us whether its sign-in was revoked.
+    if !confirmed && (sign_in || failed_hosts.is_empty()) {
+        advice = true;
+        if program {
+            out.put(b"\n");
+        }
+        out.put(limits.application);
+        out.put(b" removed its tokens. Disconnect ");
+        out.put(limits.application);
+        out.put(b" in ");
+        let mut named = false;
+        if let Some(account) = &operation.account {
+            if let Some(name) = &account.provider_name
+                && !name.cut
+            {
+                out.put(name.bytes());
+                out.put(b"'s settings, under Apps.");
+                named = true;
+            }
+            if !named && let Some(me) = me {
+                for offer in &me.providers {
+                    if Some(offer.provider) == account.provider && !offer.name.cut {
+                        out.put(offer.name.bytes());
+                        out.put(b"'s settings, under Apps.");
+                        named = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if !named {
+            out.put(b"the provider's settings, under Apps.");
+        }
+    } else if !program {
+        out.put(b"done: ");
+        out.put(operation.word);
+    }
+    advice
 }

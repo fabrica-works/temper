@@ -27,6 +27,12 @@ pub(super) fn valid(
             };
             set.get(usize::from(*index)).is_some()
         }
+        Kind::Literal => {
+            let Value::Text(_) = value else {
+                return Err(Usage::Kind { argument });
+            };
+            return valid_text(value, argument, limits);
+        }
         Kind::Text => return valid_text(value, argument, limits),
         Kind::File => {
             if *value == Value::Stdin {
@@ -118,7 +124,7 @@ pub(crate) fn decode(table: &[&Tool], kind: Kind, word: &[u8]) -> Option<Value> 
             Value::Word(found?)
         }
         Kind::Text | Kind::File if word == b"-" => Value::Stdin,
-        Kind::Text => Value::Text(Box::from(word)),
+        Kind::Text | Kind::Literal => Value::Text(Box::from(word)),
         Kind::File => Value::File(Box::from(word)),
         Kind::Project => {
             if word.is_empty() {

@@ -140,7 +140,13 @@ fn connect_prints_the_watch_that_follows_its_address() {
 fn unconfirmed_disconnect_names_the_provider_settings() {
     let mut root = f::account_root(false);
     let call = root.submit(&["disconnect", "43"]);
-    f::deliver_accounts(&mut root, f::accounts());
+    let mut me = f::me(f::PARTY);
+    me.providers = f::provider_offers();
+    root.deliver(c::Delivery::Me(Box::new(me)));
+    let mut accounts = f::accounts();
+    accounts.accounts.get_mut(0).expect("account").sources.get_mut(0).expect("source").kind =
+        c::OwnerAccountKind::SignIn;
+    f::deliver_accounts(&mut root, accounts);
     assert_eq!(
         root.sends.get(&call).expect("disconnect").2,
         jig_client::Ask::Jig(Box::new(c::Ask::SignOut { holder: c::AccountHolder::Own, source: f::SOURCE }))
@@ -151,7 +157,9 @@ fn unconfirmed_disconnect_names_the_provider_settings() {
     );
     let printed = root.answer(call).expect("removed locally");
     assert_eq!(printed.status, 0);
-    assert!(skein_lib::bytes::find(&printed.stdout, b"provider's settings").is_some());
+    assert!(
+        skein_lib::bytes::find(&printed.stdout, b"Disconnect temper in Scripted's settings, under Apps.").is_some()
+    );
 }
 #[test]
 fn a_value_request_is_not_retried_automatically() {
@@ -347,14 +355,14 @@ fn declare_refuses_unchecked_adapters_when_provider_offers_are_cut() {
 #[test]
 fn declare_checks_the_portable_name_bound_in_argv_and_json() {
     for name in ["", "UPPER", "with_space ", "../escape", "abcdefghijklmnopqrstuvwxyz1234567"] {
-        assert!(f::parse(&["declare", "9", "helper", name, "--key", "k"]).is_err(), "{name}");
+        f::parse(&["declare", "9", "helper", name, "--key", "k"]).expect_err("invalid portable name");
     }
-    for name in ["a", "abcdefghijklmnopqrstuvwxyz123456"] {
+    for name in ["a", "-", "abcdefghijklmnopqrstuvwxyz123456"] {
         let call = f::call(&["declare", "9", "helper", name, "--key", "k"]);
         assert_eq!(f::printed(&call), Parsed::Call { call, json: false });
     }
-    assert!(f::parse(&["declare", "9", "helper", "work-login"]).is_err());
-    assert!(f::parse(&["declare", "4294967296", "helper", "work-login", "--key", "k"]).is_err());
+    f::parse(&["declare", "9", "helper", "work-login"]).expect_err("declaration needs a key");
+    f::parse(&["declare", "4294967296", "helper", "work-login", "--key", "k"]).expect_err("provider fits u32");
 }
 #[test]
 fn verify_asks_the_supplied_program_source_then_names_the_wait() {
@@ -404,5 +412,207 @@ fn verify_refuses_sources_without_a_program_login_locally() {
         assert_eq!(printed.status, 1);
         assert!(skein_lib::bytes::find(&printed.stderr, b"verify needs a program source").is_some());
         assert!(root.sends.is_empty());
+    }
+}
+
+#[test]
+fn forget_with_cut_sources_keeps_the_source_kinds_unknown() {
+    for kind in [c::OwnerAccountKind::Key, c::OwnerAccountKind::Program, c::OwnerAccountKind::SignIn] {
+        for failed in [false, true] {
+            let mut root = f::account_root(false);
+            let call = root.submit(&["forget", "43"]);
+            let mut accounts = f::accounts();
+            let row = accounts.accounts.get_mut(0).expect("account");
+            row.sources.get_mut(0).expect("source").kind = kind;
+            row.cut = true;
+            f::deliver_accounts(&mut root, accounts);
+            assert_eq!(
+                root.sends.get(&call).expect("remove request").2,
+                jig_client::Ask::Jig(Box::new(c::Ask::AccountChange {
+                    holder: c::AccountHolder::Own,
+                    change: c::AccountChange::Remove { account: f::ACCOUNT },
+                }))
+            );
+            let failed_hosts = if failed {
+                Box::<[c::AccountHostFailure]>::from([c::AccountHostFailure {
+                    name: b"laptop".as_slice().into(),
+                    why: c::AccountHostWhy::NotInContact,
+                }])
+            } else {
+                Box::default()
+            };
+            root.done(call, c::Outcome::Owner(c::OwnerOutcome::AccountRemoved { confirmed: false, failed_hosts }));
+            let printed = root.answer(call).expect("removal");
+            assert_eq!(printed.status, 0);
+            if failed {
+                assert!(f::has(&printed, b"Not signed out on:\nlaptop: not in contact"));
+                assert!(!f::has(&printed, b"under Apps"), "a visible sign-in alone cannot establish the omitted kinds");
+            } else {
+                assert!(f::has(&printed, b"Disconnect temper in the provider's settings, under Apps."));
+                assert!(!f::has(&printed, b"Signed out on every machine."));
+            }
+            assert!(!f::has(&printed, b"done: forget"));
+        }
+    }
+}
+
+#[test]
+fn restored_unconfirmed_sign_out_and_removal_print_the_provider_settings_advice() {
+    for remove in [false, true] {
+        for json in [false, true] {
+            let mut records = f::restored_message(f::PARTY);
+            let ask = if remove {
+                c::Ask::AccountChange {
+                    holder: c::AccountHolder::Own,
+                    change: c::AccountChange::Remove { account: f::ACCOUNT },
+                }
+            } else {
+                c::Ask::SignOut { holder: c::AccountHolder::Own, source: f::SOURCE }
+            };
+            records.get_mut(f::EMPTY).expect("restored request").request.request = jig_client::Ask::Jig(Box::new(ask));
+            let mut root = f::started_with(records, f::SEED, json);
+            root.deliver(c::Delivery::Me(Box::new(f::me(f::PARTY))));
+            let done = if remove {
+                c::OwnerOutcome::AccountRemoved { confirmed: false, failed_hosts: Box::default() }
+            } else {
+                c::OwnerOutcome::AccountSignedOut { confirmed: false, failed_hosts: Box::default() }
+            };
+            root.done(f::EMPTY, c::Outcome::Owner(done));
+            let line = root.kept_lines.get(0).expect("restored answer");
+            assert!(
+                skein_lib::bytes::find(line, b"Disconnect temper in the provider's settings, under Apps.").is_some()
+            );
+            assert!(skein_lib::bytes::find(line, b"read accounts").is_none());
+        }
+    }
+}
+
+#[test]
+fn mixed_forget_reports_program_hosts_independently_of_sign_in_revocation() {
+    for failed in [false, true] {
+        let mut root = f::account_root(false);
+        let call = root.submit(&["forget", "43"]);
+        let mut accounts = f::accounts();
+        let row = accounts.accounts.get_mut(0).expect("account");
+        let mut source = row.sources.get(0).expect("source").clone();
+        row.sources = List::with_capacity(2);
+        source.kind = c::OwnerAccountKind::Program;
+        row.sources.push(source.clone()).expect("program");
+        source.number = f::SOURCE.checked_add(1).expect("other source");
+        source.kind = c::OwnerAccountKind::SignIn;
+        row.sources.push(source).expect("sign-in");
+        f::deliver_accounts(&mut root, accounts);
+        let failed_hosts = if failed {
+            Box::<[c::AccountHostFailure]>::from([c::AccountHostFailure {
+                name: b"laptop".as_slice().into(),
+                why: c::AccountHostWhy::NotInContact,
+            }])
+        } else {
+            Box::default()
+        };
+        root.done(call, c::Outcome::Owner(c::OwnerOutcome::AccountRemoved { confirmed: false, failed_hosts }));
+        let printed = root.answer(call).expect("mixed removal");
+        assert_eq!(printed.status, 0);
+        if failed {
+            assert!(f::has(&printed, b"Not signed out on:\nlaptop: not in contact"));
+        } else {
+            assert!(f::has(&printed, b"Signed out on every machine."));
+        }
+        assert!(f::has(&printed, b"Disconnect temper in Scripted's settings, under Apps."));
+        assert!(!f::has(&printed, b"Sign-out not confirmed on every machine."));
+    }
+}
+
+#[test]
+fn confirmed_key_and_sign_in_results_keep_done_in_text_only() {
+    for kind in [c::OwnerAccountKind::Key, c::OwnerAccountKind::SignIn] {
+        for remove in [false, true] {
+            for json in [false, true] {
+                let mut root = f::account_root(false);
+                let word = if remove { "forget" } else { "disconnect" };
+                let call = if json { root.submit(&[word, "43", "--json"]) } else { root.submit(&[word, "43"]) };
+                let mut accounts = f::accounts();
+                accounts.accounts.get_mut(0).expect("account").sources.get_mut(0).expect("source").kind = kind;
+                f::deliver_accounts(&mut root, accounts);
+                let done = if remove {
+                    c::OwnerOutcome::AccountRemoved { confirmed: true, failed_hosts: Box::default() }
+                } else {
+                    c::OwnerOutcome::AccountSignedOut { confirmed: true, failed_hosts: Box::default() }
+                };
+                root.done(call, c::Outcome::Owner(done));
+                let printed = root.answer(call).expect("confirmed result");
+                assert_eq!(printed.status, 0);
+                if json {
+                    let expected = if remove {
+                        b"{\"operation\":\"forget\",\"outcome\":{\"done\":{\"owner\":{\"account_removed\":{\"confirmed\":true,\"failed_hosts\":[]}}}},\"task\":null,\"to\":null}".as_slice()
+                    } else {
+                        b"{\"operation\":\"disconnect\",\"outcome\":{\"done\":{\"owner\":{\"account_signed_out\":{\"confirmed\":true,\"failed_hosts\":[]}}}},\"task\":null,\"to\":null}".as_slice()
+                    };
+                    assert_eq!(printed.stdout.as_ref(), expected);
+                } else {
+                    assert!(f::has(&printed, if remove { b"done: forget" } else { b"done: disconnect" }));
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn program_disconnect_and_forget_report_confirmation_or_each_failed_host() {
+    for words in [&["disconnect", "43"][..], &["forget", "43", "--source", "program"], &["forget", "43"]] {
+        for confirmed in [false, true] {
+            for json in [false, true] {
+                let mut root = f::account_root(false);
+                let mut argv = List::with_capacity(8);
+                for word in words {
+                    argv.push(*word).expect("argv room");
+                }
+                if json {
+                    argv.push("--json").expect("json flag room");
+                }
+                let call = root.submit(argv.as_slice());
+                let mut accounts = f::accounts();
+                let source = accounts.accounts.get_mut(0).expect("account").sources.get_mut(0).expect("source");
+                source.kind = c::OwnerAccountKind::Program;
+                source.name = Some(b"work-login".as_slice().into());
+                f::deliver_accounts(&mut root, accounts);
+                let failed_hosts = if confirmed {
+                    Box::<[c::AccountHostFailure]>::default()
+                } else {
+                    Box::new([
+                        c::AccountHostFailure {
+                            name: b"laptop".as_slice().into(),
+                            why: c::AccountHostWhy::NotInContact,
+                        },
+                        c::AccountHostFailure { name: b"desktop".as_slice().into(), why: c::AccountHostWhy::Lost },
+                        c::AccountHostFailure { name: b"builder".as_slice().into(), why: c::AccountHostWhy::Failed },
+                    ])
+                };
+                let done = if words.len() == 2 && words[0] == "forget" {
+                    c::OwnerOutcome::AccountRemoved { confirmed, failed_hosts }
+                } else {
+                    c::OwnerOutcome::AccountSignedOut { confirmed, failed_hosts }
+                };
+                root.done(call, c::Outcome::Owner(done));
+                let printed = root.answer(call).expect("sign-out result");
+                assert_eq!(printed.status, 0);
+                if confirmed {
+                    if json {
+                        assert!(!f::has(&printed, b"\"next\":"));
+                        assert!(!f::has(&printed, b"done: "));
+                    } else {
+                        assert!(f::has(&printed, b"Signed out on every machine."));
+                    }
+                } else {
+                    if json {
+                        assert!(f::has(&printed, b"\"next\":"));
+                    }
+                    for fact in [b"laptop: not in contact".as_slice(), b"desktop: contact lost", b"builder: failed"] {
+                        assert!(f::has(&printed, fact), "{printed:?}");
+                    }
+                }
+                assert!(!f::has(&printed, b"under Apps"));
+            }
+        }
     }
 }

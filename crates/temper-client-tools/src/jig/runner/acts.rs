@@ -360,6 +360,7 @@ fn decision(call: &Call, limits: &Limits) -> Result<c::Decision, Failed> {
 }
 pub(super) enum Request {
     Ask(c::Ask),
+    Account { ask: c::Ask, context: render::outcome::Account },
     AddKey { holder: c::AccountHolder, provider: u32, join: Option<u32> },
     ReplaceKey { holder: c::AccountHolder, source: u32 },
     DeclareProgram { holder: c::AccountHolder, provider: u32, join: Option<u32>, name: Box<[u8]> },
@@ -406,7 +407,16 @@ pub(super) fn prepared(
         Some(name) => Some(crate::jig::key::named(runner.salt, name)),
         None => None,
     };
+    let (request, account) = match request {
+        Request::Account { ask, context } => (Request::Ask(ask), Some(context)),
+        request @ (Request::Ask(_)
+        | Request::AddKey { .. }
+        | Request::ReplaceKey { .. }
+        | Request::DeclareProgram { .. }
+        | Request::CheckProgram { .. }) => (request, None),
+    };
     let event = match request {
+        Request::Account { .. } => unreachable!("account context extracted"),
         Request::DeclareProgram { holder, provider, join, name: program } => {
             jig_client::accounts::declare_program(key, name.expect("declaration name"), holder, provider, join, program)
         }
@@ -433,6 +443,7 @@ pub(super) fn prepared(
     let (Event::Send { request, .. } | Event::Carry { request, .. }) = &event else { unreachable!("act event") };
     let mut operation = Operation::of(request);
     operation.to = to;
+    operation.account = account;
     operation.retry = Some(render::outcome::retry(&called.call));
     if called.call.tool == 26 || called.call.tool == 27 {
         operation.value_name.clone_from(&called.call.key);

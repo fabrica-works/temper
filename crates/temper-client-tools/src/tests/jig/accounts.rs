@@ -84,6 +84,7 @@ fn models_group_only_project_authorized_models_without_guessing_provider_readine
             })
             .expect("models");
     }
+    me.providers = f::provider_offers();
     root.deliver(c::Delivery::Me(Box::new(me)));
     for project in ["absent", "999"] {
         let call = root.submit(&["models", "--project", project]);
@@ -106,8 +107,9 @@ fn models_group_only_project_authorized_models_without_guessing_provider_readine
             assert!(f::json_has(&printed, fact), "{fact:?}");
         }
         let mut groups = 0u32;
-        for window in printed.stdout.windows(b"\"provider\":9,\"models\"".len()) {
-            if window == b"\"provider\":9,\"models\"" {
+        let end = skein_lib::bytes::find(&printed.stdout, b"\"current\":").expect("model projection ends");
+        for window in printed.stdout.get(..end).expect("models").windows(b"\"provider\":9,\"provider_name\"".len()) {
+            if window == b"\"provider\":9,\"provider_name\"" {
                 groups += 1;
             }
         }
@@ -145,7 +147,7 @@ fn account_output_truncates_oversized_projections_within_the_result_window() {
         let printed = root.answer(call).expect("cut result");
         assert_eq!(printed.status, 0, "{printed:?}");
         assert!(printed.stdout.len() <= usize::try_from(crate::limits::TEXT).expect("text fits"));
-        assert!(f::json_has(&printed, b"\"cut\":true"));
+        assert!(f::json_has(&printed, if json { b"\"cut\":true" } else { b"cut: true" }));
         assert!(f::json_has(&printed, b"bytes_left"));
     }
 }
@@ -257,7 +259,7 @@ fn deployment_offers_share_the_accounts_result_window() {
         let printed = root.answer(call).expect("bounded offers");
         assert_eq!(printed.status, 0);
         assert!(printed.stdout.len() <= usize::try_from(crate::limits::TEXT).expect("text fits"));
-        assert!(f::json_has(&printed, b"\"cut\":true"));
+        assert!(f::json_has(&printed, if flags.len() > 1 { b"\"cut\":true" } else { b"cut: true" }));
     }
 }
 
@@ -322,4 +324,100 @@ fn model_cache_writes_default_to_the_supplied_input_price() {
         &printed,
         b"\"prices\":{\"input\":17,\"cached\":3,\"cache_write\":17,\"output\":29,\"unit\":100}"
     ));
+}
+
+#[test]
+fn accounts_show_supplied_deployment_activity_and_no_party_activity() {
+    for json in [false, true] {
+        let mut root = f::account_root(true);
+        let mut deployment = f::deployment();
+        let row = deployment.accounts.get_mut(0).expect("account");
+        row.runs = List::with_capacity(1);
+        row.waiting = List::with_capacity(1);
+        let mut chip = f::task_line().chip;
+        chip.task = 211;
+        row.runs.push(chip.clone()).expect("running task");
+        chip.task = 223;
+        row.waiting.push(chip).expect("waiting task");
+        let call = root.submit(if json { &["accounts", "--json"][..] } else { &["accounts"][..] });
+        f::deliver_accounts(&mut root, f::accounts());
+        f::deliver_deployment(&mut root, deployment);
+        let printed = root.answer(call).expect("activity");
+        let expected: &[&[u8]] = if json {
+            &[b"\"runs\":null,\"waiting\":null", b"\"runs\":[211],\"waiting\":[223]"]
+        } else {
+            &[b"runs: null", b"waiting: null", b"runs: \n        - 211", b"waiting: \n        - 223", b"Scripted"]
+        };
+        for fact in expected {
+            assert!(f::has(&printed, fact), "{fact:?}: {printed:?}");
+        }
+    }
+}
+#[test]
+fn model_text_prints_supplied_descriptions_prices_efforts_and_provider_name() {
+    let mut root = f::account_root(false);
+    let mut me = f::choice_me(100);
+    me.providers = f::provider_offers();
+    let model = me.projects.get_mut(0).expect("project").models.get_mut(0).expect("model");
+    model.provider = Some(f::PROVIDER);
+    model.description = Some(f::act_text(b"Reasoning and code"));
+    model.prices = c::ModelPrices { input: 13, cached: 7, cache_write: None, output: 31, unit: 1000 };
+    root.deliver(c::Delivery::Me(Box::new(me)));
+    let call = root.submit(&["models", "--project", "shop"]);
+    f::deliver_accounts(&mut root, f::accounts());
+    let printed = root.answer(call).expect("model text");
+    assert_eq!(printed.status, 0);
+    assert!(!printed.stdout.starts_with(b"{"));
+    for fact in [
+        b"Scripted".as_slice(),
+        b"description: Reasoning and code",
+        b"input: 13",
+        b"cached: 7",
+        b"cache_write: 13",
+        b"output: 31",
+        b"unit: 1000",
+        b"- high",
+    ] {
+        assert!(f::has(&printed, fact), "{fact:?}: {printed:?}");
+    }
+}
+
+#[test]
+fn owner_accounts_include_each_supplied_deployment_host_login_state() {
+    let mut deployment = f::deployment();
+    deployment.hosts = List::with_capacity(1);
+    deployment
+        .hosts
+        .push(c::OwnerHost {
+            name: Some(b"deployment-worker".as_slice().into()),
+            awaiting_logins: false,
+            rule: c::HostRule::Open,
+            programs: List::with_capacity(1),
+            channel: 17,
+            kind: c::OwnerHostKind::Worker,
+            slots: 1,
+            used: 0,
+            free: 1,
+            draining: false,
+            connected: true,
+            grace_until: None,
+            grace_remaining: None,
+            runs: List::with_capacity(0),
+            cut: false,
+        })
+        .expect("host room");
+    let host = deployment.hosts.get_mut(0).expect("fixture host");
+    host.programs
+        .push(c::OwnerProgramLogin {
+            name: b"deployment-login".as_slice().into(),
+            state: Some(c::OwnerProgramState::NotSignedIn),
+            sign_out: None,
+            cleanup: false,
+            cut: false,
+        })
+        .expect("login");
+    let printed = f::account_read(&mut f::account_root(true), f::accounts(), Some(deployment));
+    for fact in [b"deployment-worker".as_slice(), b"deployment-login", b"not_signed_in"] {
+        assert!(f::has(&printed, fact), "{printed:?}");
+    }
 }

@@ -53,8 +53,12 @@ pub enum Keyed {
 pub enum Kind {
     Number,
     Count,
-    Word { set: &'static [&'static [u8]] },
+    Word {
+        set: &'static [&'static [u8]],
+    },
     Text,
+    /// A literal name: a dash is a name, never stdin.
+    Literal,
     File,
     Duration,
     Proposal,
