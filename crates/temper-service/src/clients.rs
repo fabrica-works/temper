@@ -358,7 +358,8 @@ impl Clients {
         let mount_pending = self.mount.up(&self.mount_env, &mut self.mount_out);
         self.pending |= mount_pending;
         if self.component_closed && !mount_pending && self.mount_out.is_empty() && self.out.is_empty() {
-            self.pending |= self.server.finish();
+            self.server.finish();
+            self.pending = true;
         }
         if let Some(request) = self.mount_out.pop() {
             self.pending = true;

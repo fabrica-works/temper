@@ -27,19 +27,9 @@ pub(crate) struct Engine {
     pub(crate) pending: Option<Box<root::Event>>,
     begin: bool,
     pub(crate) credentials: List<u32>,
-    pub(crate) release: Release,
+    ready: bool,
     aborted: Option<()>,
     max_out: u32,
-}
-/// What a release may still find in the domain.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Release {
-    /// The last release settled, and no input has reached the domain since.
-    Settled,
-    /// The domain may hold output that has not been released.
-    Ready,
-    /// Input or output since the last reclaim: a settle waits for the next one.
-    Reclaim,
 }
 pub(crate) struct Children {
     pub(crate) accounts: Option<crate::accounts::Accounts>,
@@ -102,7 +92,7 @@ impl Engine {
             blocked: false,
             pending: None,
             begin: true,
-            release: Release::Ready,
+            ready: true,
             aborted: None,
             max_out,
         })
@@ -122,22 +112,12 @@ impl Engine {
     }
     pub(crate) fn step(&mut self, event: root::Event) {
         let watcher = watcher(&event);
-        if let Err(event) = self.try_step(event) {
+        if let Err(event) = root::try_step(&mut self.domain, &self.env, event) {
             self.pending = Some(Box::new(event));
             self.blocked = true;
         } else {
             self.admission = watcher;
         }
-        self.drain_facts();
-    }
-    #[expect(clippy::result_large_err, reason = "admission returns the original refused input")]
-    pub(crate) fn try_step(&mut self, event: root::Event) -> Result<(), root::Event> {
-        self.release = Release::Reclaim;
-        root::try_step(&mut self.domain, &self.env, event)
-    }
-    fn fire(&mut self) {
-        self.release = Release::Reclaim;
-        root::fire(&mut self.domain, &self.env);
         self.drain_facts();
     }
     fn drain_facts(&mut self) {
@@ -191,7 +171,7 @@ impl Engine {
         components
             || self.room()
                 && (self.begin
-                    || self.release != Release::Settled
+                    || self.ready
                     || !self.blocked
                         && (self.pending.is_some()
                             || !self.events.is_empty()
@@ -300,7 +280,8 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
         && let Some(deadline) = engine.domain.next_deadline(&engine.env)
         && deadline <= now
     {
-        engine.fire();
+        root::fire(&mut engine.domain, &engine.env);
+        engine.drain_facts();
     }
     release(engine);
     if engine.forge.room(1) {
@@ -315,10 +296,11 @@ fn clients_pass(engine: &mut Engine) {
     }
     engine.clients.advance(&mut engine.events, &engine.workers.forges);
 }
-pub(crate) fn release(engine: &mut Engine) {
+fn release(engine: &mut Engine) {
+    engine.ready = true;
     let mut empty = 0_u32;
     for _ in 0..root::max_out(&engine.env.limits) {
-        if engine.release == Release::Settled || !engine.room() || engine.end.is_some() {
+        if !engine.room() || engine.end.is_some() {
             break;
         }
         root::release(&mut engine.domain, &engine.env, &mut engine.requests);
@@ -335,7 +317,6 @@ pub(crate) fn release(engine: &mut Engine) {
             empty = empty.checked_add(1).expect("two empty passes");
         } else {
             empty = 0;
-            engine.release = Release::Reclaim;
         }
         for _ in 0..engine.requests.len() {
             let request = engine.requests.pop().expect("root outputs");
@@ -345,12 +326,7 @@ pub(crate) fn release(engine: &mut Engine) {
             }
         }
         if empty == 2 {
-            // Reclaim can free forge call slots that a later Resume needs.
-            // Settle only after a pass with no input or output since reclaim.
-            engine.release = match engine.release {
-                Release::Reclaim => Release::Ready,
-                Release::Ready | Release::Settled => Release::Settled,
-            };
+            engine.ready = false;
             break;
         }
     }
@@ -358,9 +334,6 @@ pub(crate) fn release(engine: &mut Engine) {
         engine.clients.down(jig_protocol_engine_clients::Event::Admitted { watcher });
     }
     engine.domain.reclaim();
-    if engine.release == Release::Reclaim {
-        engine.release = Release::Ready;
-    }
     stop::advance(engine);
 }
 pub(crate) fn answer(engine: &mut Engine) {
@@ -498,7 +471,9 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
                     engine.forge.down(skein_forge_connection::Request::Returned(answer));
                     continue;
                 }
-                if let Err(root::Event::Forge(event)) = engine.try_step(crate::forge::event(answer)) {
+                if let Err(root::Event::Forge(event)) =
+                    root::try_step(&mut engine.domain, &engine.env, crate::forge::event(answer))
+                {
                     engine.forge.down(skein_forge_connection::Request::Refused(
                         crate::forge::back(event).expect("the routing hands the root only the component's answers"),
                     ));
@@ -510,7 +485,9 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
                     continue;
                 }
                 let connection = hinted.connection;
-                if let Err(root::Event::Forge(event)) = engine.try_step(crate::forge::hinted(hinted)) {
+                if let Err(root::Event::Forge(event)) =
+                    root::try_step(&mut engine.domain, &engine.env, crate::forge::hinted(hinted))
+                {
                     let temper_engine_domain_forge::Event::Hint { hint } = *event else {
                         unreachable!("hint retained by admission")
                     };
