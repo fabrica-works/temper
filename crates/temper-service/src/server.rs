@@ -229,8 +229,11 @@ impl Server {
         }
     }
     /// The clients component and its mount have no more responses to supply.
-    pub fn finish(&mut self) {
+    /// Return whether this newly finished the server.
+    pub fn finish(&mut self) -> bool {
+        let changed = !self.finished;
         self.finished = true;
+        changed
     }
     pub fn abort(&mut self, out: &mut Queue<Routed>) {
         self.phase = Phase::Aborting;

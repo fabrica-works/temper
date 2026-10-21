@@ -116,6 +116,26 @@ fn closing_a_listener_during_start_closes_the_component() {
 }
 
 #[test]
+fn a_finished_component_waits_quietly_for_its_listener_to_close() {
+    use skein_lib::{Queue, Time, Wall};
+    let mut service = super::fixtures::ready();
+    let clients = &mut service.engine.clients;
+    let mut events = Queue::with_capacity(64);
+    clients.down(kit::Event::Close);
+    clients.iterate(Time::ZERO, Wall::EPOCH, &mut events, &[]);
+    // The listener's Close is issued, but its Closed terminal has not arrived.
+    assert!(clients.io.pop().is_some());
+    // Component::up queued Closed at the previous iterate's end; finish now runs first.
+    clients.iterate(Time::ZERO, Wall::EPOCH, &mut events, &[]);
+    assert!(clients.work_pending(Time::ZERO), "the first finish schedules its continuation");
+    for _ in 0_u32..3 {
+        clients.iterate(Time::ZERO, Wall::EPOCH, &mut events, &[]);
+        assert!(!clients.closed, "waiting for the listener terminal");
+        assert!(!clients.work_pending(Time::ZERO), "finish wakes only once");
+    }
+}
+
+#[test]
 fn a_sign_in_digest_and_expiry_are_kept_in_secrets() {
     let mut clients = super::fixtures::clients();
     let mut store = super::fixtures::memory_store();
