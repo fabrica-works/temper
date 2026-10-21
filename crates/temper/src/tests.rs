@@ -282,7 +282,6 @@ fn forge_commands_refuse_managed_and_fake_entries_by_name() {
     configuration::fake_entry(&mut fake["application"]["setup"][0], "127.0.0.1:9");
     for (document, arguments, expected) in [
         (&managed, vec!["prepare", "1"], "temper forge prepare: forge 1: it is managed, not owned\n"),
-        (&fake, vec!["prepare", "1"], "temper forge prepare: forge 1: it is fake, not owned\n"),
         (&managed, vec!["run", "1", "forgejo"], "temper forge run: forge 1: it is managed, not owned\n"),
         (&fake, vec!["run", "1", "forgejo"], "temper forge run: forge 1: it is fake, not owned\n"),
     ] {

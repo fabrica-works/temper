@@ -370,3 +370,59 @@ fn reconcile_refuses_a_forge_the_setup_has_no_entry_for() {
     assert!(!scratch.path().join("forge-1").exists());
     scratch.remove();
 }
+
+#[test]
+fn fake_preparation_writes_only_a_private_token_and_keeps_existing_bytes() {
+    for existing in [None, Some(b"existing token\n".as_slice())] {
+        let scratch = support::Scratch::new("fake_prepare");
+        fake_configuration(scratch.path());
+        let directory = scratch.path().join("forge-1");
+        let token = directory.join("admin_token");
+        if let Some(bytes) = existing {
+            fs::create_dir(&directory).expect("directory");
+            fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).expect("private");
+            support::write_private(&token, bytes);
+        }
+        let output = support::owned::prepare(scratch.path(), 1);
+        assert_eq!(output.status.code(), Some(0), "{}", String::from_utf8_lossy(&output.stderr));
+        assert!(output.stdout.is_empty());
+        assert!(output.stderr.is_empty());
+        assert_eq!(fs::metadata(&directory).expect("directory").permissions().mode() & 0o777, 0o700);
+        assert_eq!(fs::read_dir(&directory).expect("directory").count(), 1);
+        let bytes = fs::read(&token).expect("token");
+        if let Some(expected) = existing {
+            assert_eq!(bytes, expected);
+        } else {
+            assert_eq!(bytes.len(), 40);
+            assert!(bytes.iter().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(b)));
+            assert_eq!(fs::metadata(&token).expect("token").permissions().mode() & 0o777, 0o600);
+        }
+        scratch.remove();
+    }
+}
+#[test]
+fn fake_preparation_refuses_an_open_directory_and_run_still_refuses_fake() {
+    for (verb, names_directory, reason) in [
+        ("prepare", true, "must be a private directory of this user's, not reached through a link"),
+        ("run", false, "it is fake, not owned"),
+    ] {
+        let scratch = support::Scratch::new("fake_prepare_refused");
+        fake_configuration(scratch.path());
+        let directory = scratch.path().join("forge-1");
+        fs::create_dir(&directory).expect("directory");
+        fs::set_permissions(&directory, fs::Permissions::from_mode(0o755)).expect("open directory");
+        let location = if names_directory { format!("{}: ", directory.display()) } else { String::new() };
+        support::owned::refused(
+            scratch.path(),
+            verb,
+            format!("temper forge {verb}: forge 1: {location}{reason}\n").as_bytes(),
+        );
+        assert_eq!(fs::read_dir(directory).expect("untouched directory").count(), 0);
+        scratch.remove();
+    }
+}
+
+fn fake_configuration(directory: &std::path::Path) {
+    let config = support::configuration::check_document(directory);
+    fs::write(directory.join("temper.json"), serde_json::to_vec(&config).expect("document")).expect("document");
+}

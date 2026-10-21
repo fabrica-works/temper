@@ -2,7 +2,11 @@
 use std::{
     ffi::OsString,
     fs,
-    os::unix::{ffi::OsStrExt, fs::DirBuilderExt},
+    io::Write,
+    os::unix::{
+        ffi::OsStrExt,
+        fs::{DirBuilderExt, OpenOptionsExt},
+    },
 };
 use temper_forge_setup::{
     place::{File, Place},
@@ -176,9 +180,10 @@ pub(crate) fn start(directories: &super::Directories, arguments: &[OsString]) ->
     }
     let entry = checked.setup.entry(number).ok_or_else(|| refused("the setup has no entry for it".into()))?;
     let owned = match &entry.mode {
-        Mode::Owned(owned) => owned,
+        Mode::Owned(owned) => Some(owned),
         Mode::Managed { .. } => return Err(refused("it is managed, not owned".into())),
-        Mode::Fake(_) => return Err(refused("it is fake, not owned".into())),
+        Mode::Fake(_) if which.is_some() => return Err(refused("it is fake, not owned".into())),
+        Mode::Fake(_) => None,
     };
     let directory = super::path(&entry.directory);
     if which.is_none() && !directory.exists() {
@@ -192,6 +197,10 @@ pub(crate) fn start(directories: &super::Directories, arguments: &[OsString]) ->
     if directory.exists() {
         super::private_root(directory, user).map_err(|why| refused(format!("{}: {why}", directory.display())))?;
     }
+    let Some(owned) = owned else {
+        prepare_fake(&directory.join("admin_token")).map_err(refused)?;
+        return Ok(0);
+    };
     let place = Place { directory: directory.as_os_str().as_bytes().into(), user: login(user).map_err(refused)? };
     let limits = jig_protocol_config::profile(jig_protocol_config::Profile::Small).io;
     if let Some(which) = which {
@@ -209,6 +218,25 @@ pub(crate) fn start(directories: &super::Directories, arguments: &[OsString]) ->
     )
     .map_err(|why| refused(failure(why, &place)))?;
     Ok(0)
+}
+/// The fake shares only the private directory and token with an owned forge (protocol/setup.md, 8.4).
+fn prepare_fake(path: &std::path::Path) -> Result<(), String> {
+    match fs::symlink_metadata(path) {
+        Ok(_) => return Ok(()),
+        Err(why) if why.kind() == std::io::ErrorKind::NotFound => {}
+        Err(why) => return Err(format!("{}: {why}", path.display())),
+    }
+    let seed = skein_shell::crypto_seed().map_err(|errno| format!("random token: errno {errno}"))?;
+    let mut token = [0; 40];
+    for (byte, digits) in seed.expose().iter().take(20).zip(token.chunks_exact_mut(2)) {
+        digits[0] = b"0123456789abcdef"[usize::from(byte / 16)];
+        digits[1] = b"0123456789abcdef"[usize::from(byte % 16)];
+    }
+    match fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(path) {
+        Ok(mut file) => file.write_all(&token).map_err(|why| format!("{}: {why}", path.display())),
+        Err(why) if why.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+        Err(why) => Err(format!("{}: {why}", path.display())),
+    }
 }
 #[must_use]
 pub fn run(directories: &super::Directories, arguments: &[OsString]) -> u8 {
