@@ -529,6 +529,31 @@ fn constants_fit() {
     assert!(peer.observations().is_empty());
 }
 
+#[test]
+fn forge_setup_document_equals_the_standalone_form() {
+    use temper_forge_setup::setup::{Fake, Repository};
+    for (owner, repositories) in
+        [("fake", vec![("widget", "main")]), ("demo", vec![("widget", "trunk"), ("kit", "release")])]
+    {
+        let fake = Fake {
+            listen: "127.0.0.1:3311".parse().expect("listen"),
+            git: Box::from(b"/demo/bin/git".as_slice()),
+            owner: owner.as_bytes().into(),
+            repositories: repositories
+                .iter()
+                .map(|(name, landing)| Repository { name: name.as_bytes().into(), landing: landing.as_bytes().into() })
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+        };
+        let doc = json!({"listen":{"socket":"127.0.0.1:3311"},"admin_token":"/forge/admin_token","owner":owner,
+            "repositories":repositories.iter().map(|(name, landing)| json!({"name":name,"landing":landing,"ci":null})).collect::<Vec<_>>()});
+        assert_eq!(
+            forge::Document::fake(&fake, b"/forge/admin_token"),
+            forge::Document::decode(&serde_json::to_vec(&doc).expect("document")).expect("checked")
+        );
+    }
+}
+
 mod check;
 
 mod demo;

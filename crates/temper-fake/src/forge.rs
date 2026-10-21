@@ -42,6 +42,23 @@ pub struct Document {
     repositories: Box<[Repository]>,
 }
 impl Document {
+    /// The fake forge of a checked setup entry, its token at `admin_token` (protocol/setup.md, 8.4).
+    #[must_use]
+    pub fn fake(fake: &temper_forge_setup::setup::Fake, admin_token: &[u8]) -> Self {
+        let mut repositories =
+            List::with_capacity(u32::try_from(fake.repositories.len()).expect("checked repositories"));
+        for repository in &fake.repositories {
+            repositories
+                .push(Repository { name: repository.name.clone(), landing: repository.landing.clone(), ci: None })
+                .expect("checked repositories");
+        }
+        Self {
+            listen: fake.listen,
+            admin_token: bytes::copy_of(admin_token),
+            owner: fake.owner.clone(),
+            repositories: repositories.into_boxed(),
+        }
+    }
     pub fn decode(bytes: &[u8]) -> Result<Self, Refusal> {
         let d = read::document(bytes)?;
         let p = Path::root();

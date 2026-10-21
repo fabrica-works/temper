@@ -61,7 +61,7 @@ fn arguments() {
             arguments,
             Arguments {
                 kind,
-                document: document.into(),
+                source: Source::Document(document.into()),
                 ready: ready.map(|s| s.as_bytes().into()),
                 seed,
                 observations: observations.map(Into::into)
@@ -80,7 +80,10 @@ fn arguments() {
             vec!["fake", "llm", "--document", "doc", "--observations", "seen"],
             "temper fake llm: unexpected argument --observations\n",
         ),
-        (vec!["fake", "forge", "--document", "doc", "extra"], "temper fake forge: unexpected argument extra\n"),
+        (
+            vec!["fake", "forge", "--document", "doc", "extra"],
+            "temper fake forge: usage: temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE]\n",
+        ),
     ] {
         assert_eq!(configured(&words, &[]).expect_err("refused fixture"), expected);
     }
@@ -228,7 +231,7 @@ fn observation_write_failure_drains_the_peer_and_keeps_its_outputs() {
         let path = directory.join("observations");
         let arguments = Arguments {
             kind: Kind::Forge,
-            document: document.clone(),
+            source: Source::Document(document.clone()),
             ready: None,
             seed: 23,
             observations: Some(path.clone()),
@@ -306,5 +309,63 @@ fn observation_write_failure_drains_the_peer_and_keeps_its_outputs() {
         assert!(document.exists());
         assert!(directory.join("forge/admin_token").exists());
         fs::remove_dir_all(directory).expect("valid fixture");
+    }
+}
+
+#[test]
+fn forge_deployment_arguments() {
+    for (words, environment, directories, forge) in [
+        (
+            vec!["fake", "forge", "1", "--ready", "ready ", "--seed", "23", "--observations", "seen"],
+            vec![("HOME", "/home/test")],
+            check_directories(
+                "/home/test/.config/temper",
+                "/home/test/.local/share/temper",
+                "/home/test/.cache/temper",
+                Origin::Home,
+            ),
+            1,
+        ),
+        (
+            vec![
+                "fake",
+                "forge",
+                "--data",
+                "data",
+                "--config",
+                "/config",
+                "--cache",
+                "cache",
+                "65535",
+                "--ready",
+                "ready ",
+                "--seed",
+                "23",
+                "--observations",
+                "seen",
+            ],
+            vec![],
+            check_directories("/config", "/work/data", "/work/cache", Origin::Flag),
+            u16::MAX,
+        ),
+    ] {
+        assert_eq!(
+            configured(&words, &environment),
+            Ok(Command::Fake {
+                arguments: Arguments {
+                    kind: Kind::Forge,
+                    source: Source::Setup { directories, forge },
+                    ready: Some(b"ready ".as_slice().into()),
+                    seed: 23,
+                    observations: Some("seen".into()),
+                }
+            })
+        );
+    }
+    for number in ["-1", "+1", "65536", "forge", ""] {
+        assert_eq!(
+            configured(&["fake", "forge", number], &[("HOME", "/home/test")]),
+            Err("temper fake forge: N: expected a forge number, a decimal u16\n".into())
+        );
     }
 }

@@ -32,7 +32,7 @@ pub mod open;
 mod program_login;
 mod setup;
 pub use host::Host;
-pub const USAGE: &str = "usage: temper init [DIRECTORIES] | temper serve [DIRECTORIES] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper fake llm --document FILE [--ready PREFIX] [--seed N] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge check [DIRECTORIES] N OBSERVATIONS STORE | temper fake git ARGS... | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
+pub const USAGE: &str = "usage: temper init [DIRECTORIES] | temper serve [DIRECTORIES] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper fake llm --document FILE [--ready PREFIX] [--seed N] | temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge check [DIRECTORIES] N OBSERVATIONS STORE | temper fake git ARGS... | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
 const CONFIG_BYTES: u32 = 1 << 20;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -55,6 +55,7 @@ pub fn usage() -> String {
     skein_shell::help(&directories::SETTINGS, &mut help);
     help.extend_from_slice(b"\ntemper fake llm --document FILE [--ready PREFIX] [--seed N]\n");
     skein_shell::help(&fake::LLM_SETTINGS, &mut help);
+    help.extend_from_slice(b"\ntemper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE]\n");
     help.extend_from_slice(b"\ntemper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE]\n");
     skein_shell::help(&fake::FORGE_SETTINGS, &mut help);
     help.extend_from_slice(b"\ntemper fake forge check [DIRECTORIES] N OBSERVATIONS STORE\n");

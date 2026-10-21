@@ -41,7 +41,9 @@ struct Running {
 }
 impl Running {
     fn start(kind: &str, document: &Path, observations: Option<&Path>) -> Self {
-        let mut command = command(kind, document);
+        Self::command(command(kind, document), observations)
+    }
+    fn command(mut command: Command, observations: Option<&Path>) -> Self {
         command.args(["--ready", "ready ", "--seed", "23"]);
         if let Some(path) = observations {
             command.arg("--observations").arg(path);
@@ -235,7 +237,124 @@ fn refused_start() {
         assert_eq!(String::from_utf8(output.stderr).expect("UTF-8 refusal"), expected, "{}", row.name);
         assert_eq!(snapshot(&dir), before, "{}: refused startup restores the files", row.name);
     }
+    refused_deployment_start(scratch.path());
     scratch.remove();
+}
+
+fn deployment_command(directory: &Path) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_temper"));
+    command
+        .env_clear()
+        .args(["fake", "forge"])
+        .args(support::configuration::flags(directory))
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    command
+}
+fn forge_setup(directory: &Path, listen: &str) -> Value {
+    let mut config = support::configuration::check_document(directory);
+    config["application"]["forges"][0]["api"] = json!({"socket":listen});
+    config["application"]["forges"][0]["git"] = json!(format!("http://{listen}"));
+    let fake = &mut config["application"]["setup"][0]["mode"]["fake"];
+    fake["listen"] = json!({"socket":listen});
+    fake["owner"] = json!("fake");
+    fake["repositories"][0]["landing"] = json!("trunk");
+    config
+}
+fn refused_deployment_start(root: &Path) {
+    const TOKEN: &[u8] = b"0123456789abcdef0123456789abcdef01234567";
+    let directory = root.join("deployment");
+    fs::create_dir(&directory).expect("deployment cases");
+    for (name, number, mode, token, own_document, observations, reason, names_file) in [
+        ("absent", "1", "fake", None, false, false, "absent", true),
+        ("short", "1", "fake", Some(&TOKEN[..39]), false, false, "expected 40 lowercase hexadecimal digits", true),
+        (
+            "uppercase",
+            "1",
+            "fake",
+            Some(b"A123456789abcdef0123456789abcdef01234567".as_slice()),
+            false,
+            false,
+            "expected 40 lowercase hexadecimal digits",
+            true,
+        ),
+        (
+            "long",
+            "1",
+            "fake",
+            Some(b"0123456789abcdef0123456789abcdef01234567890".as_slice()),
+            false,
+            false,
+            "past 40 bytes",
+            true,
+        ),
+        ("no_entry", "2", "fake", None, false, false, "the setup has no entry for it", false),
+        ("owned", "1", "owned", None, false, false, "it is owned, not fake", false),
+        ("managed", "1", "managed", None, false, false, "it is managed, not fake", false),
+        (
+            "both",
+            "1",
+            "fake",
+            None,
+            true,
+            false,
+            "usage: temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE]",
+            false,
+        ),
+        ("observations", "1", "fake", Some(TOKEN), false, true, "File exists (os error 17)", true),
+    ] {
+        let dir = directory.join(name);
+        fs::create_dir(&dir).expect("case directory");
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).expect("private");
+        let mut config = forge_setup(&dir, "127.0.0.1:9");
+        match mode {
+            "owned" => support::owned::document(
+                &mut config,
+                &support::owned::Names {
+                    forgejo: Path::new("/usr/bin/false"),
+                    runner: None,
+                    port: 9,
+                    bot: "temper",
+                    person: "ada",
+                    orgs: &["acme"],
+                },
+            ),
+            "managed" => {
+                config["application"]["setup"][0]["mode"] = json!({"managed":{"admin_token":"admin_token"}});
+                config["application"]["setup"][0]["orgs"] = json!(["acme"]);
+            }
+            "fake" => {}
+            _ => unreachable!("fixture mode"),
+        }
+        document(&dir.join("temper.json"), &config);
+        if let Some(token) = token {
+            fs::create_dir(dir.join("forge-1")).expect("token directory");
+            fs::set_permissions(dir.join("forge-1"), fs::Permissions::from_mode(0o700)).expect("private");
+            support::write_private(&dir.join("forge-1/admin_token"), token);
+        }
+        let mut command = deployment_command(&dir);
+        command.arg(number);
+        if own_document {
+            command.args(["--document", "unused.json"]);
+        }
+        if observations {
+            fs::write(dir.join("observations"), b"existing").expect("existing observations");
+            command.arg("--observations").arg(dir.join("observations"));
+        }
+        let before = snapshot(&dir);
+        let output = command.output().expect("refused fake");
+        assert_eq!(output.status.code(), Some(1), "{name}");
+        assert!(output.stdout.is_empty());
+        let file = if observations { "observations" } else { "forge-1/admin_token" };
+        let location = if names_file { format!("{}: ", dir.join(file).display()) } else { String::new() };
+        assert_eq!(
+            String::from_utf8(output.stderr).expect("refusal"),
+            format!("temper fake forge: {location}{reason}\n"),
+            "{name}"
+        );
+        assert_eq!(snapshot(&dir), before, "{name}: refused startup leaves directories unchanged");
+    }
 }
 
 fn snapshot(root: &Path) -> std::collections::BTreeMap<std::path::PathBuf, (u32, Option<Vec<u8>>)> {
@@ -258,83 +377,120 @@ fn snapshot(root: &Path) -> std::collections::BTreeMap<std::path::PathBuf, (u32,
     found
 }
 #[test]
+#[expect(clippy::too_many_lines, reason = "both forge forms serve the same requests and retain their files")]
 fn forge_run() {
-    let scratch = support::Scratch::new("fake_forge_run");
-    let dir = scratch.path();
-    let doc = dir.join("forge.json");
-    let mut config = forge_document(dir);
-    config["repositories"][0]["landing"] = json!("trunk");
-    document(&doc, &config);
-    let observations = dir.join("observations");
-    let run = Running::start("forge", &doc, Some(&observations));
-    let token = temper_fake::credential::credential(23, temper_fake::credential::ADMIN_TOKEN);
-    private_hex(&dir.join("forge/admin_token"), &token);
-    assert_eq!(fs::metadata(dir.join("forge")).expect("valid fixture").permissions().mode() & 0o777, 0o700);
-    assert_eq!(fs::metadata(&observations).expect("valid fixture").permissions().mode() & 0o777, 0o600);
-    assert_eq!(fs::read(&observations).expect("valid fixture"), b"{\"observations_lost\":0}\n", "no seed observations");
-    let auth = format!("token {}", std::str::from_utf8(&token).expect("valid fixture"));
-    let user = request(run.address, "GET", "/api/v1/user", &auth, b"");
-    assert!(user.starts_with(b"HTTP/1.1 200"));
-    assert_eq!(body(&user)["login"], "temper-admin");
-    let repository = request(run.address, "GET", "/api/v1/repositories/1", &auth, b"");
-    assert!(repository.starts_with(b"HTTP/1.1 200"));
-    let repository = body(&repository);
-    for (member, expected) in
-        [("default_branch", "trunk".to_owned()), ("html_url", format!("http://{}/fake/widget", run.address))]
-    {
-        assert_eq!(repository[member], expected, "{member}");
+    for from_setup in [false, true] {
+        let scratch = support::Scratch::new("fake_forge_run");
+        let dir = scratch.path();
+        let doc = dir.join("forge.json");
+        let mut config = forge_document(dir);
+        config["repositories"][0]["landing"] = json!("trunk");
+        document(&doc, &config);
+        let observations = dir.join("observations");
+        let (run, token_path, token) = if from_setup {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("available port");
+            let listen = listener.local_addr().expect("listen");
+            drop(listener);
+            document(&dir.join("temper.json"), &forge_setup(dir, &listen.to_string()));
+            let prepared = support::owned::prepare(dir, 1);
+            assert!(prepared.status.success(), "{}", String::from_utf8_lossy(&prepared.stderr));
+            let path = dir.join("forge-1/admin_token");
+            let token = fs::read(&path).expect("prepared token");
+            let mut command = deployment_command(dir);
+            command.arg("1");
+            let run = Running::command(command, Some(&observations));
+            assert_eq!(run.address, listen, "ready on fake.listen");
+            (run, path, token)
+        } else {
+            (
+                Running::start("forge", &doc, Some(&observations)),
+                dir.join("forge/admin_token"),
+                temper_fake::credential::credential(23, temper_fake::credential::ADMIN_TOKEN).to_vec(),
+            )
+        };
+        private_hex(&token_path, &token);
+        assert_eq!(
+            fs::metadata(token_path.parent().expect("token directory")).expect("valid fixture").permissions().mode()
+                & 0o777,
+            0o700
+        );
+        assert_eq!(fs::metadata(&observations).expect("valid fixture").permissions().mode() & 0o777, 0o600);
+        assert_eq!(
+            fs::read(&observations).expect("valid fixture"),
+            b"{\"observations_lost\":0}\n",
+            "no seed observations"
+        );
+        let auth = format!("token {}", std::str::from_utf8(&token).expect("valid fixture"));
+        let user = request(run.address, "GET", "/api/v1/user", &auth, b"");
+        assert!(user.starts_with(b"HTTP/1.1 200"));
+        assert_eq!(body(&user)["login"], "temper-admin");
+        let repository = request(run.address, "GET", "/api/v1/repositories/1", &auth, b"");
+        assert!(repository.starts_with(b"HTTP/1.1 200"));
+        let repository = body(&repository);
+        for (member, expected) in
+            [("default_branch", "trunk".to_owned()), ("html_url", format!("http://{}/fake/widget", run.address))]
+        {
+            assert_eq!(repository[member], expected, "{member}");
+        }
+        let objects = request(run.address, "POST", "/.fake/git/objects", "", br#"{"commits":[1]}"#);
+        assert!(objects.starts_with(b"HTTP/1.1 200"));
+        let objects = body(&objects);
+        assert_eq!(objects["objects"][0]["commit"], 1);
+        assert!(objects["objects"][0]["parent"].is_null());
+        let tree = objects["objects"][0]["tree"].as_array().expect("valid fixture");
+        assert_eq!(tree.len(), temper_fake::forge::FILES.len());
+        let path = b".forgejo/workflows/check.yml";
+        let len = skein_lib::base64::encoded_len(
+            skein_lib::base64::Alphabet::Standard,
+            u32::try_from(path.len()).expect("valid fixture"),
+        )
+        .expect("valid fixture");
+        let mut expected_path = skein_lib::Writer::new(usize::try_from(len).expect("valid fixture"));
+        skein_lib::base64::encode(skein_lib::base64::Alphabet::Standard, path, &mut expected_path)
+            .expect("valid fixture");
+        let expected_path = expected_path.finish();
+        assert!(
+            tree.iter().any(|file| file["path"].as_str().expect("valid fixture").as_bytes() == expected_path.as_ref())
+        );
+        // Setup's admin flag and the domain's repository permission are separate.
+        // Grant through the API, as a runner would, rather than seeding a grant.
+        let grant = request(
+            run.address,
+            "PUT",
+            "/api/v1/repos/fake/widget/collaborators/temper-admin",
+            &auth,
+            br#"{"permission":"admin"}"#,
+        );
+        assert!(grant.starts_with(b"HTTP/1.1 204"), "{}", String::from_utf8_lossy(&grant));
+        let branch = request(
+            run.address,
+            "POST",
+            "/api/v1/repos/fake/widget/branches",
+            &auth,
+            br#"{"new_branch_name":"work","old_ref_name":"0000000000000001000000000000000000000000"}"#,
+        );
+        assert!(branch.starts_with(b"HTTP/1.1 201"), "{}", String::from_utf8_lossy(&branch));
+        let lines = fs::read_to_string(&observations).expect("valid fixture");
+        let records =
+            lines.lines().map(|line| serde_json::from_str::<Value>(line).expect("valid fixture")).collect::<Vec<_>>();
+        assert!(records.iter().any(|line| line["observation"] == "moved" && line["branch"] == "work"));
+        assert!(
+            records.last().expect("valid fixture").get("observations_lost").is_some(),
+            "checkpoint precedes the reply"
+        );
+        run.stop();
+        let lines = fs::read_to_string(&observations).expect("valid fixture");
+        assert_eq!(
+            serde_json::from_str::<Value>(lines.lines().last().expect("valid fixture")).expect("valid fixture"),
+            json!({"observations_lost":0})
+        );
+        assert_eq!(fs::read(&token_path).expect("token kept at stop"), token);
+        assert!(observations.exists());
+        assert!(doc.exists());
+        scratch.remove();
     }
-    let objects = request(run.address, "POST", "/.fake/git/objects", "", br#"{"commits":[1]}"#);
-    assert!(objects.starts_with(b"HTTP/1.1 200"));
-    let objects = body(&objects);
-    assert_eq!(objects["objects"][0]["commit"], 1);
-    assert!(objects["objects"][0]["parent"].is_null());
-    let tree = objects["objects"][0]["tree"].as_array().expect("valid fixture");
-    assert_eq!(tree.len(), temper_fake::forge::FILES.len());
-    let path = b".forgejo/workflows/check.yml";
-    let len = skein_lib::base64::encoded_len(
-        skein_lib::base64::Alphabet::Standard,
-        u32::try_from(path.len()).expect("valid fixture"),
-    )
-    .expect("valid fixture");
-    let mut expected_path = skein_lib::Writer::new(usize::try_from(len).expect("valid fixture"));
-    skein_lib::base64::encode(skein_lib::base64::Alphabet::Standard, path, &mut expected_path).expect("valid fixture");
-    let expected_path = expected_path.finish();
-    assert!(tree.iter().any(|file| file["path"].as_str().expect("valid fixture").as_bytes() == expected_path.as_ref()));
-    // Setup's admin flag and the domain's repository permission are separate.
-    // Grant through the API, as a runner would, rather than seeding a grant.
-    let grant = request(
-        run.address,
-        "PUT",
-        "/api/v1/repos/fake/widget/collaborators/temper-admin",
-        &auth,
-        br#"{"permission":"admin"}"#,
-    );
-    assert!(grant.starts_with(b"HTTP/1.1 204"), "{}", String::from_utf8_lossy(&grant));
-    let branch = request(
-        run.address,
-        "POST",
-        "/api/v1/repos/fake/widget/branches",
-        &auth,
-        br#"{"new_branch_name":"work","old_ref_name":"0000000000000001000000000000000000000000"}"#,
-    );
-    assert!(branch.starts_with(b"HTTP/1.1 201"), "{}", String::from_utf8_lossy(&branch));
-    let lines = fs::read_to_string(&observations).expect("valid fixture");
-    let records =
-        lines.lines().map(|line| serde_json::from_str::<Value>(line).expect("valid fixture")).collect::<Vec<_>>();
-    assert!(records.iter().any(|line| line["observation"] == "moved" && line["branch"] == "work"));
-    assert!(records.last().expect("valid fixture").get("observations_lost").is_some(), "checkpoint precedes the reply");
-    run.stop();
-    let lines = fs::read_to_string(&observations).expect("valid fixture");
-    assert_eq!(
-        serde_json::from_str::<Value>(lines.lines().last().expect("valid fixture")).expect("valid fixture"),
-        json!({"observations_lost":0})
-    );
-    assert!(dir.join("forge/admin_token").exists());
-    assert!(observations.exists());
-    assert!(doc.exists());
-    scratch.remove();
 }
+
 const CHAT:&[u8]=br#"{"model":"qa","store":false,"instructions":"","input":[{"role":"user","content":[{"type":"input_text","text":"say hello"}]}],"stream":true}"#;
 #[test]
 fn llm_run() {

@@ -1,4 +1,4 @@
-//! The document form's files and peer loop (protocol/setup.md, 8.4).
+//! The deployment and document forms' files and peer loop (protocol/setup.md, 8.4).
 pub(crate) mod check;
 pub mod git;
 use skein_fake_peers::{forge as forge_peer, llm as llm_peer};
@@ -9,7 +9,7 @@ use std::{
     cell::RefCell,
     fs::{self, File, OpenOptions},
     io::{self, Write},
-    os::unix::fs::OpenOptionsExt,
+    os::unix::{ffi::OsStrExt, fs::OpenOptionsExt},
     path::{Path, PathBuf},
     rc::Rc,
 };
@@ -43,7 +43,7 @@ pub const FORGE_SETTINGS: Settings = Settings {
             name: "document",
             value: "FILE",
             about: "The fake forge's JSON document.",
-            fallback: Fallback::Refuse,
+            fallback: Fallback::Text(""),
         },
         Setting {
             name: "ready",
@@ -79,9 +79,14 @@ impl Kind {
     }
 }
 #[derive(Debug, PartialEq, Eq)]
+pub enum Source {
+    Document(PathBuf),
+    Setup { directories: super::Directories, forge: u16 },
+}
+#[derive(Debug, PartialEq, Eq)]
 pub struct Arguments {
     pub kind: Kind,
-    pub document: PathBuf,
+    pub source: Source,
     pub ready: Option<Box<[u8]>>,
     pub seed: u64,
     pub observations: Option<PathBuf>,
@@ -118,9 +123,25 @@ pub fn configure(
     };
     let resolved = skein_shell::resolve(table, arguments, environment)
         .map_err(|why| super::prefixed(kind.command(), &why.to_string()))?;
-    if let Some(word) = resolved.rest().first() {
-        return Err(super::prefixed(kind.command(), &format!("unexpected argument {}", String::from_utf8_lossy(word))));
-    }
+    let source = if kind == Kind::Forge && resolved.value(0).origin == Origin::Default {
+        let (directories, rest) = super::directories::resolve(resolved.rest(), environment, working)
+            .map_err(|why| super::prefixed(kind.command(), &why.to_string()))?;
+        let [number] = rest.as_ref() else {
+            return Err(super::prefixed(kind.command(), FORGE_USAGE));
+        };
+        let forge = forge_number(number).map_err(|why| super::prefixed(kind.command(), why))?;
+        Source::Setup { directories, forge }
+    } else {
+        if let Some(word) = resolved.rest().first() {
+            let why = if kind == Kind::Forge {
+                FORGE_USAGE.into()
+            } else {
+                format!("unexpected argument {}", String::from_utf8_lossy(word))
+            };
+            return Err(super::prefixed(kind.command(), &why));
+        }
+        Source::Document(super::path(&resolved.value(0).bytes).to_path_buf())
+    };
     let seed = &resolved.value(2).bytes;
     let seed = std::str::from_utf8(seed)
         .ok()
@@ -135,15 +156,16 @@ pub fn configure(
     } else {
         None
     };
-    Ok(super::Command::Fake {
-        arguments: Arguments {
-            kind,
-            document: super::path(&resolved.value(0).bytes).to_path_buf(),
-            ready,
-            seed,
-            observations,
-        },
-    })
+    Ok(super::Command::Fake { arguments: Arguments { kind, source, ready, seed, observations } })
+}
+
+const FORGE_USAGE: &str = "usage: temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE]";
+fn forge_number(number: &[u8]) -> Result<u16, &'static str> {
+    std::str::from_utf8(number)
+        .ok()
+        .filter(|text| !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit()))
+        .and_then(|text| text.parse::<u16>().ok())
+        .ok_or("N: expected a forge number, a decimal u16")
 }
 
 fn check_command(
@@ -157,11 +179,7 @@ fn check_command(
     let [number, observations, store] = rest.as_ref() else {
         return Err(refused("expected N OBSERVATIONS STORE"));
     };
-    let forge = std::str::from_utf8(number)
-        .ok()
-        .filter(|text| !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit()))
-        .and_then(|text| text.parse::<u16>().ok())
-        .ok_or_else(|| refused("N: expected a forge number, a decimal u16"))?;
+    let forge = forge_number(number).map_err(refused)?;
     Ok(super::Command::FakeCheck {
         directories,
         check: Check { forge, observations: super::path(observations).into(), store: super::path(store).into() },
@@ -226,11 +244,49 @@ impl Created {
         }
     }
 }
+fn read_document(path: &Path, bound: u32) -> Result<Box<[u8]>, String> {
+    skein_shell::read_file(path, bound).map_err(|why| format!("{}: {}", path.display(), super::unread(why)))
+}
+fn forge_document(source: &Source, seed: u64, created: &mut Created) -> Result<(forge::Document, [u8; 40]), String> {
+    match source {
+        Source::Document(path) => {
+            let bytes = read_document(path, temper_fake::DOCUMENT_BYTES)?;
+            let document =
+                forge::Document::decode(&bytes).map_err(|why| String::from_utf8_lossy(&why.line()).into_owned())?;
+            let token = credential(seed, credential::ADMIN_TOKEN);
+            let path = super::path(document.admin_token());
+            created.directory(path.parent().expect("absolute token file"))?;
+            created.file(path, &token)?;
+            Ok((document, token))
+        }
+        Source::Setup { directories, forge } => {
+            let bytes = read_document(&directories.document(), super::CONFIG_BYTES)?;
+            let (_, checked, _) = super::setup::check(&bytes, &directories.jig())?;
+            let entry = checked.setup.entry(*forge).ok_or("the setup has no entry for it")?;
+            let fake = match &entry.mode {
+                temper_forge_setup::setup::Mode::Fake(fake) => fake,
+                temper_forge_setup::setup::Mode::Owned(_) => return Err("it is owned, not fake".into()),
+                temper_forge_setup::setup::Mode::Managed { .. } => return Err("it is managed, not fake".into()),
+            };
+            let path = super::path(&entry.directory).join("admin_token");
+            let bytes = skein_shell::read_private_file(&path, 40, skein_shell::effective_user())
+                .map_err(|why| format!("{}: {}", path.display(), super::unread(why)))?;
+            let token: [u8; 40] = bytes
+                .expose()
+                .try_into()
+                .ok()
+                .filter(|bytes: &[u8; 40]| bytes.iter().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(b)))
+                .ok_or_else(|| format!("{}: expected 40 lowercase hexadecimal digits", path.display()))?;
+            Ok((forge::Document::fake(fake, path.as_os_str().as_bytes()), token))
+        }
+    }
+}
+
 fn start(arguments: &Arguments, created: &mut Created) -> Result<(Host, skein_shell::Kernel), String> {
-    let bytes = skein_shell::read_file(&arguments.document, temper_fake::DOCUMENT_BYTES)
-        .map_err(|why| format!("{}: {}", arguments.document.display(), super::unread(why)))?;
     let (peer, shared, observations, writer, buffer) = match arguments.kind {
         Kind::Llm => {
+            let Source::Document(path) = &arguments.source else { unreachable!("LLM has only the document form") };
+            let bytes = read_document(path, temper_fake::DOCUMENT_BYTES)?;
             let document =
                 llm::Document::decode(&bytes).map_err(|why| String::from_utf8_lossy(&why.line()).into_owned())?;
             let key = credential(arguments.seed, credential::KEY);
@@ -250,12 +306,7 @@ fn start(arguments: &Arguments, created: &mut Created) -> Result<(Host, skein_sh
             (Peer::Llm(peer), None, observations, writer, buffer)
         }
         Kind::Forge => {
-            let document =
-                forge::Document::decode(&bytes).map_err(|why| String::from_utf8_lossy(&why.line()).into_owned())?;
-            let token = credential(arguments.seed, credential::ADMIN_TOKEN);
-            let path = super::path(document.admin_token());
-            created.directory(path.parent().expect("absolute token file"))?;
-            created.file(path, &token)?;
+            let (document, token) = forge_document(&arguments.source, arguments.seed, created)?;
             let (peer, shared) =
                 forge::peer(&document, &token, arguments.seed).map_err(|why| format!("peer: {why:?}"))?;
             let mut buffer =
