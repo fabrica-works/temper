@@ -10,6 +10,7 @@ publish.workspace = true
 skein-lib.workspace = true
 skein-io.workspace = true
 skein-shell.workspace = true
+skein-http.workspace = true
 skein-fake-checkout.workspace = true
 skein-fake-forge-domain.workspace = true
 skein-fake-forge-protocol.workspace = true

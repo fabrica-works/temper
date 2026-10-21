@@ -2735,6 +2735,7 @@ dependencies = [
  "skein-fake-forge-protocol",
  "skein-fake-machine",
  "skein-fake-peers",
+ "skein-http",
  "skein-io",
  "skein-lib",
  "skein-shell",

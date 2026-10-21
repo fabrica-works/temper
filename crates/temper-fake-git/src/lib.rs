@@ -9,3 +9,6 @@ mod transport;
 pub use check::{Checked, Refusal, check};
 pub use program::{Git, Start};
 pub use transport::{Transport, Typed};
+
+/// The HTTP client and its kernel socket jobs.
+pub mod connection;

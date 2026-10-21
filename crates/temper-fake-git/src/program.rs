@@ -22,9 +22,11 @@ enum Job {
     Write(Fd, Box<[u8]>, u32),
     Pipe(Fd, Box<[u8]>, u32),
     Close(Fd),
+    Socket(Op),
 }
 #[derive(Debug)]
 enum Pending {
+    Socket,
     Scan(Vec<u8>),
     List(Vec<u8>, Fd),
     ReadOpen(Vec<u8>),
@@ -54,6 +56,7 @@ pub struct Git<T: Transport> {
     checked: Option<Checked>,
     checkout: Checkout,
     transport: T,
+    connection: Option<crate::connection::Connection>,
     root: Fd,
     pipes: BTreeMap<u32, Fd>,
     owned: BTreeSet<Fd>,
@@ -111,7 +114,9 @@ impl<T: Transport> Git<T> {
         }
         let mut checkout = Checkout::new();
         checkout.mkdir(b"");
+        let connection = transport.connection();
         Self {
+            connection,
             checked,
             checkout,
             transport,
@@ -137,6 +142,7 @@ impl<T: Transport> Git<T> {
     }
     fn next(&mut self, job: Job) {
         match job {
+            Job::Socket(op) => self.emit(op, Pending::Socket),
             Job::Scan(path) => self.emit(
                 Op::Open { root: self.root, path: path.clone().into(), how: OpenHow::DirectoryNoFollow },
                 Pending::Scan(path),
@@ -193,7 +199,14 @@ impl<T: Transport> Git<T> {
     }
     fn complete(&mut self, complete: Complete) {
         let pending = self.pending.take().expect("one requested kernel operation");
-        match (pending, complete.kind, complete.result) {
+        if matches!(pending, Pending::Socket) {
+            self.connection.as_mut().expect("socket job's connection").complete(complete.kind, complete.result);
+        } else {
+            self.file_complete(pending, complete.kind, complete.result);
+        }
+    }
+    fn file_complete(&mut self, pending: Pending, kind: Op, result: Result<Done, k::Error>) {
+        match (pending, kind, result) {
             (Pending::Scan(path), _, Ok(Done::Fd(fd))) => {
                 self.owned.insert(fd);
                 self.before.insert(path.clone(), k::Kind::Directory);
@@ -255,6 +268,7 @@ impl<T: Transport> Git<T> {
                     | Job::Truncate(..)
                     | Job::Write(..)
                     | Job::Pipe(..)
+                    | Job::Socket(_)
                     | Job::Close(_) => panic!("parent operation"),
                 };
                 self.emit(op, Pending::ParentAction(fd));
@@ -376,6 +390,18 @@ impl<T: Transport> Host for Git<T> {
         if self.pending.is_some() {
             return;
         }
+        if let Some(connection) = &mut self.connection {
+            if self.closing {
+                connection.close();
+            }
+            if let Some(op) = connection.next_job() {
+                self.next(Job::Socket(op));
+                return;
+            }
+            if connection.busy() {
+                return;
+            }
+        }
         if self.jobs.is_empty() && !self.closing {
             self.prepare();
         }
@@ -412,7 +438,7 @@ impl<T: Transport> Host for Git<T> {
         self.is_empty().then(|| Exit::Code(self.answer.as_ref().expect("answered invocation").exit))
     }
     fn worst_case(&self) -> u64 {
-        128 * 1024 * 1024
+        128 * 1024 * 1024 + self.connection.as_ref().map_or(0, crate::connection::Connection::worst_case)
     }
     fn operations(&self) -> u32 {
         1

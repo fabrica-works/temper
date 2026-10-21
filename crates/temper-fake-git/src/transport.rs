@@ -10,6 +10,11 @@ use std::{cell::RefCell, rc::Rc};
 /// A transport preserves the kit's object graph and write promises; a run with
 /// a missing call is discarded before any of its files or output are kept.
 pub trait Transport: Remote {
+    /// Allocate a lazy connection for a route transport; typed calls need none.
+    fn connection(&self) -> Option<crate::connection::Connection> {
+        None
+    }
+
     /// Select the identity for this run; keep its secret on the transport side.
     fn authenticate(&mut self, credential: Option<&Credential>);
     /// Whether the last repository refusal named a known identity.
