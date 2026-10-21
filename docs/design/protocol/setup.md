@@ -1582,8 +1582,18 @@ demo's own work pushes nothing yet.
     `client unknown` and `decisions incomplete`; with the decisions
     given first and the stream cut at a checkpoint, no merge precedes
     `decided` and no stream is truncated.
-  - *Its stderr* is what it read, kept as its evidence: the boundary's
-    lines and its count, the profile, and each decision.
+  - *Its stderr* is what it read, kept as its evidence, in JSON lines:
+    `{"boundary":{"lines":N,"lost":L}}`, the checkpoint's line count
+    and loss; `{"profile":PROFILE,"decisions_complete":BOOL}`, the
+    profile's members by their names in skein's `Profile`; and
+    `{"decision":{"repository":OWNER/NAME,"number":N,"head":H}}` for
+    each decision, its head the fake's commit number. A reader's refusal
+    follows as a text line.
+  - *Its own errors:* a refused argument, a document that does not read
+    or check, or a forge N without a fake entry is the check's error,
+    not the run's: status 1, its refusal on stderr and no line, which
+    the lab reads as the check's error, never a pass (skein's `lab.md`,
+    7.2). The check creates no directory.
 - **Its code:** `temper-fake`, step code (section 11): the member's
   types and checks; the fake LLM's and the fake forge's configurations
   and seeds, from the deployment's document or from one of their own;

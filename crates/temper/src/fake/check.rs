@@ -1,5 +1,8 @@
 //! The check's offline readers (protocol/setup.md, 8.4).
+use super::Check;
+use crate::directories::Directories;
 use jig_protocol_store::{codec::component::Format, format, keys};
+use skein_fake_forge_domain::promises::Judge;
 use skein_fake_forge_domain::promises::Recorded;
 use skein_fake_forge_protocol::observations::decode_with_limits;
 use skein_io::{
@@ -12,9 +15,105 @@ use skein_lib::{Env, Queue, Time, Token, Wall};
 use skein_shell::Host as _;
 use std::{
     fs::File,
-    io::{BufRead, BufReader, Read, Take},
+    io::{BufRead, BufReader, Read, Take, Write},
     path::{Path, PathBuf},
 };
+use temper_fake::check::{self, Reason};
+use temper_forge_setup::setup::Mode;
+
+const COMMAND: &str = "temper fake forge check";
+
+/// The check's exit status and its two streams (protocol/setup.md, 8.4).
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct Outcome {
+    pub(crate) status: u8,
+    pub(crate) stdout: Box<[u8]>,
+    pub(crate) stderr: Box<[u8]>,
+}
+
+/// Reads the document, the observations and the store's copy, and judges.
+pub(crate) fn outcome(directories: &Directories, check: &Check) -> Outcome {
+    let limits = match configuration(directories, check.forge) {
+        Ok(limits) => limits,
+        Err(why) => {
+            return Outcome {
+                status: 1,
+                stdout: Box::new([]),
+                stderr: crate::prefixed(COMMAND, &why).into_bytes().into_boxed_slice(),
+            };
+        }
+    };
+    let observations = match Observations::open(&check.observations) {
+        Ok(observations) => observations,
+        Err(why) => return undecided(Reason::ObservationsMissing, Vec::new(), Some(&why)),
+    };
+    let mut stderr = check::boundary_line(observations.lines(), observations.lost()).into_vec();
+    let rows = match read_store(&check.store, &limits.store) {
+        Ok(rows) => rows,
+        Err(why) => return undecided(Reason::StoreUnreadable, stderr, Some(&why)),
+    };
+    let evidence = match check::evidence(check.forge, &rows, &limits.forge) {
+        Ok(evidence) => evidence,
+        Err(reason) => return undecided(reason, stderr, None),
+    };
+    stderr.extend_from_slice(&check::evidence_lines(&evidence));
+    let mut judge = Judge::new(evidence.profile);
+    for decision in &evidence.decisions {
+        judge.decide(decision);
+    }
+    judge.decided();
+    let records = match observations.records() {
+        Ok(records) => records,
+        Err(why) => return undecided(Reason::ObservationsMissing, stderr, Some(&why)),
+    };
+    for record in records {
+        match record {
+            Ok(record) => judge.observe(&record),
+            Err(why) => return undecided(Reason::ObservationsMissing, stderr, Some(&why)),
+        }
+    }
+    let output = check::verdict(&judge.verdict(), evidence.complete);
+    Outcome { status: output.status, stdout: output.stdout, stderr: stderr.into_boxed_slice() }
+}
+fn configuration(directories: &Directories, forge: u16) -> Result<temper_service::startup::StoreLimits, String> {
+    let document = directories.document();
+    let bytes = skein_shell::read_file(&document, crate::CONFIG_BYTES)
+        .map_err(|why| format!("configuration {}: {}", document.display(), crate::unread(why)))?;
+    let jig = directories.jig();
+    let (_, checked, _) = crate::setup::check(&bytes, &jig)?;
+    let limits = temper_service::startup::store_limits(&bytes, &jig)
+        .map_err(|why| String::from_utf8_lossy(&temper_service::startup::lines(&why)).into_owned())?;
+    let entry = checked.setup.entry(forge).ok_or_else(|| format!("forge {forge}: the setup has no entry for it"))?;
+    match &entry.mode {
+        Mode::Fake(_) => Ok(limits),
+        Mode::Managed { .. } => Err(format!("forge {forge}: it is managed, not fake")),
+        Mode::Owned(_) => Err(format!("forge {forge}: it is owned, not fake")),
+    }
+}
+fn undecided(reason: Reason, mut stderr: Vec<u8>, why: Option<&str>) -> Outcome {
+    if let Some(why) = why {
+        stderr.extend_from_slice(crate::prefixed(COMMAND, why).as_bytes());
+    }
+    let output = check::undecided(reason);
+    Outcome { status: output.status, stdout: output.stdout, stderr: stderr.into_boxed_slice() }
+}
+
+/// Writes the outcome's streams and returns its status.
+pub(crate) fn run(directories: &Directories, check: &Check) -> u8 {
+    let outcome = outcome(directories, check);
+    let stdout = std::io::stdout().lock().write_all(&outcome.stdout);
+    let mut stderr = std::io::stderr().lock();
+    let written = stderr.write_all(&outcome.stderr);
+    let mut status = outcome.status;
+    for (stream, result) in [("stdout", stdout), ("stderr", written)] {
+        if let Err(why) = result {
+            status = 1;
+            // A broken stderr may also refuse this last diagnostic.
+            let _ = stderr.write_all(crate::prefixed(COMMAND, &format!("{stream}: {why}")).as_bytes());
+        }
+    }
+    status
+}
 
 type Row = (Box<[u8]>, Box<[u8]>);
 pub(crate) type Rows = Box<[Row]>;

@@ -32,7 +32,7 @@ pub mod open;
 mod program_login;
 mod setup;
 pub use host::Host;
-pub const USAGE: &str = "usage: temper init [DIRECTORIES] | temper serve [DIRECTORIES] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper fake llm --document FILE [--ready PREFIX] [--seed N] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE] | temper fake git ARGS... | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
+pub const USAGE: &str = "usage: temper init [DIRECTORIES] | temper serve [DIRECTORIES] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper fake llm --document FILE [--ready PREFIX] [--seed N] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge check [DIRECTORIES] N OBSERVATIONS STORE | temper fake git ARGS... | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
 const CONFIG_BYTES: u32 = 1 << 20;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -45,6 +45,7 @@ pub enum Command {
     Open { arguments: Vec<OsString> },
     Ctl { arguments: Vec<OsString> },
     Fake { arguments: fake::Arguments },
+    FakeCheck { directories: Directories, check: fake::Check },
     FakeGit { arguments: Box<[Box<[u8]>]> },
     Forge { directories: Directories, arguments: Vec<OsString> },
 }
@@ -56,6 +57,7 @@ pub fn usage() -> String {
     skein_shell::help(&fake::LLM_SETTINGS, &mut help);
     help.extend_from_slice(b"\ntemper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE]\n");
     skein_shell::help(&fake::FORGE_SETTINGS, &mut help);
+    help.extend_from_slice(b"\ntemper fake forge check [DIRECTORIES] N OBSERVATIONS STORE\n");
     help.extend_from_slice(b"\ntemper fake git ARGS...\n");
     String::from_utf8(help).expect("help is UTF-8")
 }
@@ -85,7 +87,7 @@ pub fn configure_with(
     let os =
         |args: &[Box<[u8]>]| args.iter().map(|arg| std::ffi::OsStr::from_bytes(arg).to_owned()).collect::<Vec<_>>();
     match command.as_ref() {
-        b"fake" => return fake::configure(arguments, environment),
+        b"fake" => return fake::configure(arguments, environment, working),
         b"ctl" => return Ok(Command::Ctl { arguments: os(arguments) }),
         b"open" => return Ok(Command::Open { arguments: os(arguments) }),
         b"agent" => {
@@ -143,6 +145,7 @@ pub fn run(command: Command) -> Result<u8, String> {
                 .map_err(|why| prefixed("temper program-login", &why.lines().collect::<Vec<_>>().join("; ")));
         }
         Command::Fake { arguments } => return fake::run(&arguments),
+        Command::FakeCheck { directories, check } => return Ok(fake::check::run(&directories, &check)),
         Command::FakeGit { arguments } => return Ok(fake::git::run(&arguments)),
         Command::Forge { directories, arguments } => return Ok(forge::run(&directories, &arguments)),
         Command::Ctl { arguments } => return Ok(ctl::run(&arguments, &Clock::new())),

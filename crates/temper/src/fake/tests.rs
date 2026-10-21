@@ -8,6 +8,7 @@ fn configured(arguments: &[&str], environment: &[(&str, &str)]) -> Result<Comman
     crate::configure_with(&arguments, &environment, b"/work")
 }
 #[test]
+#[expect(clippy::too_many_lines, reason = "one argument table covers peer settings and the check's exact refusals")]
 fn arguments() {
     for (words, environment, kind, document, ready, seed, observations) in [
         (vec!["fake", "llm", "--document", "llm.json"], vec![], Kind::Llm, "llm.json", None, 0, None),
@@ -68,7 +69,83 @@ fn arguments() {
             }
         );
     }
+    for (words, environment, directories, forge) in [
+        (
+            vec!["fake", "forge", "check", "0", "observations", "copy"],
+            vec![("HOME", "/home/test")],
+            crate::directories::Directories {
+                config: b"/home/test/.config/temper".as_slice().into(),
+                data: b"/home/test/.local/share/temper".as_slice().into(),
+                cache: b"/home/test/.cache/temper".as_slice().into(),
+                origins: [Origin::Home; 3],
+            },
+            0,
+        ),
+        (
+            vec![
+                "fake",
+                "forge",
+                "check",
+                "--data",
+                "data",
+                "--config",
+                "/config",
+                "--cache",
+                "cache",
+                "65535",
+                "observations",
+                "copy",
+            ],
+            vec![],
+            crate::directories::Directories {
+                config: b"/config".as_slice().into(),
+                data: b"/work/data".as_slice().into(),
+                cache: b"/work/cache".as_slice().into(),
+                origins: [Origin::Flag; 3],
+            },
+            u16::MAX,
+        ),
+    ] {
+        assert_eq!(
+            configured(&words, &environment),
+            Ok(Command::FakeCheck {
+                directories,
+                check: Check { forge, observations: "observations".into(), store: "copy".into() },
+            })
+        );
+    }
     for (words, expected) in [
+        (vec!["fake", "forge", "check"], "temper fake forge check: expected N OBSERVATIONS STORE\n"),
+        (vec!["fake", "forge", "check", "1"], "temper fake forge check: expected N OBSERVATIONS STORE\n"),
+        (
+            vec!["fake", "forge", "check", "1", "observations"],
+            "temper fake forge check: expected N OBSERVATIONS STORE\n",
+        ),
+        (
+            vec!["fake", "forge", "check", "1", "observations", "copy", "extra"],
+            "temper fake forge check: expected N OBSERVATIONS STORE\n",
+        ),
+        (
+            vec!["fake", "forge", "check", "x", "observations", "copy"],
+            "temper fake forge check: N: expected a forge number, a decimal u16\n",
+        ),
+        (
+            vec!["fake", "forge", "check", "65536", "observations", "copy"],
+            "temper fake forge check: N: expected a forge number, a decimal u16\n",
+        ),
+        (
+            vec!["fake", "forge", "check", "-1", "observations", "copy"],
+            "temper fake forge check: N: expected a forge number, a decimal u16\n",
+        ),
+        (
+            vec!["fake", "forge", "check", "+1", "observations", "copy"],
+            "temper fake forge check: N: expected a forge number, a decimal u16\n",
+        ),
+        (
+            vec!["fake", "forge", "check", "1", "observations", "copy", "--unknown"],
+            "temper fake forge check: expected N OBSERVATIONS STORE\n",
+        ),
+        (vec!["fake", "forge", "check", "--config"], "temper fake forge check: --config takes a value: DIR\n"),
         (vec!["fake"], "temper fake: expected llm, forge or git\n"),
         (vec!["fake", "other"], "temper fake: unknown fake other\n"),
         (vec!["fake", "llm"], "temper fake llm: --document FILE is not given, and TEMPER_DOCUMENT is not set\n"),
@@ -82,7 +159,7 @@ fn arguments() {
         ),
         (vec!["fake", "forge", "--document", "doc", "extra"], "temper fake forge: unexpected argument extra\n"),
     ] {
-        assert_eq!(configured(&words, &[]).expect_err("refused fixture"), expected);
+        assert_eq!(configured(&words, &[("HOME", "/home/test")]).expect_err("refused fixture"), expected);
     }
 }
 

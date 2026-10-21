@@ -195,3 +195,159 @@ fn observations() {
     }
     fs::remove_dir_all(root).expect("scratch removed");
 }
+
+use skein_forge::api::{Repository, Write as ForgeWrite};
+use skein_forge_client::{Condition, Effect, Entry, Writer};
+use temper_engine_domain_forge as d;
+use temper_protocol_store::{keys as temper_keys, records};
+
+const REPO: Repository = Repository { forge: 1, repository: 2 };
+fn repository() -> d::Stored {
+    d::Stored::Repository(d::Repository {
+        project: 1,
+        home: true,
+        provider: REPO,
+        host: b"forge".as_slice().into(),
+        owner: b"demo".as_slice().into(),
+        name: b"widget".as_slice().into(),
+        prefix: b"temper/".as_slice().into(),
+        role: d::Role::Owned,
+        ci: true,
+        checks: Box::new([]),
+        kinds: d::Kinds {
+            read: true,
+            push: true,
+            open: true,
+            land: true,
+            review: false,
+            status: true,
+            comment: true,
+            issue: true,
+            branch: true,
+        },
+        protection: d::Protection::Absent,
+        settings: skein_forge::api::Settings {
+            default_branch: b"main".as_slice().into(),
+            merge: true,
+            squash: true,
+            rebase: true,
+        },
+    })
+}
+fn entry() -> d::Stored {
+    d::Stored::Entry {
+        entry: Entry {
+            number: 1,
+            task: 4,
+            repository: REPO,
+            effect: Effect {
+                write: ForgeWrite::Merge { number: 1, head: skein_fake_forge_protocol::routes::object(2).bytes },
+                condition: Condition::None,
+            },
+            start: None,
+            attempt: None,
+            failures: 0,
+            queued: false,
+        },
+        held: false,
+    }
+}
+fn deployment(merge: bool) -> Rows {
+    let mut rows = vec![d::Stored::Writer(Writer { forge: 1, author: 7 }), repository()];
+    if merge {
+        rows.push(entry());
+    }
+    stored_rows(&rows)
+}
+fn stored_rows(rows: &[d::Stored]) -> Rows {
+    rows.iter()
+        .map(|row| {
+            let key = temper_keys::encode(&d::stored_key(row), u32::MAX).expect("fixture key");
+            ([&[keys::APPLICATION], key.as_ref()].concat().into_boxed_slice(), records::encode(row))
+        })
+        .collect()
+}
+const BOUNDARY: &[u8] = b"{\"boundary\":{\"lines\":1,\"lost\":0}}\n";
+const TWO_LINES: &[u8] = b"{\"boundary\":{\"lines\":2,\"lost\":0}}\n";
+const PROFILE: &[u8] = b"{\"profile\":{\"client\":7,\"marker\":[\"<!-- temper:key \",\" -->\\n\"],\"owned_branches\":[\"temper/\"],\"allowed\":[\"comment\",\"merge\",\"close\"],\"bounds\":{\"objects\":256,\"decisions\":0}},\"decisions_complete\":true}\n";
+const DECIDED_PROFILE: &[u8] = b"{\"profile\":{\"client\":7,\"marker\":[\"<!-- temper:key \",\" -->\\n\"],\"owned_branches\":[\"temper/\"],\"allowed\":[\"comment\",\"merge\",\"close\"],\"bounds\":{\"objects\":256,\"decisions\":1}},\"decisions_complete\":true}\n";
+const DECISION: &[u8] = b"{\"decision\":{\"repository\":\"demo/widget\",\"number\":1,\"head\":2}}\n";
+const MERGE: &[u8] = b"{\"observation\":\"merged\",\"repository\":\"demo/widget\",\"number\":1,\"base\":\"main\",\"head\":2,\"commit\":3,\"by\":7}\n";
+fn expected(status: u8, stdout: &[u8], stderr: &[u8]) -> Outcome {
+    Outcome { status, stdout: stdout.into(), stderr: stderr.into() }
+}
+fn diagnostic(why: &str) -> Vec<u8> {
+    format!("temper fake forge check: {why}\n").into_bytes()
+}
+#[test]
+fn verb() {
+    let root = scratch("fake-check-verb");
+    let document = crate::tests::configuration::check_document(&root);
+    let mut no_entry = document.clone();
+    no_entry["application"]["setup"] = serde_json::json!([]);
+    let mut managed = document.clone();
+    managed["application"]["setup"][0]["orgs"] = serde_json::json!(["demo"]);
+    managed["application"]["setup"][0]["mode"] = serde_json::json!({"managed":{"admin_token":"admin_token"}});
+    let mut owned = document.clone();
+    owned["application"]["setup"][0]["orgs"] = serde_json::json!(["demo"]);
+    owned["application"]["setup"][0]["mode"] = serde_json::json!({"owned":{
+        "forgejo":"/fixture/forgejo", "runner":null, "listen":{"socket":"127.0.0.1:9"},
+        "person":{"login":"ada","email":"ada@example.test"}
+    }});
+    let mut bad_setup = document.clone();
+    bad_setup["application"]["setup"][0]["forge"] = 7.into();
+    let current = Some(format::current(temper_protocol_store::STORE_VERSION, [0; 16]));
+    let good = || Copy::Store { format: current, rows: deployment(false) };
+    for (name, document, observations, copy, expected) in [
+        ("pass", Some(document.clone()), Some(START.to_vec()), good(), expected(0, b"", &[BOUNDARY, PROFILE].concat())),
+        ("fail", Some(document.clone()), Some([MERGE, START].concat()), good(), expected(1,
+            b"{\"fail\":\"promise/order/demo%2Fwidget/1/2\",\"summary\":\"a merge with no decision at its head\"}\n",
+            &[TWO_LINES, PROFILE].concat())),
+        ("decision", Some(document.clone()), Some([MERGE, START].concat()), Copy::Store { format: current, rows: deployment(true) },
+            expected(0, b"", &[TWO_LINES, DECIDED_PROFILE, DECISION].concat())),
+        ("absent-observations", Some(document.clone()), None, good(), expected(2,
+            b"{\"undecided\":\"observations missing\"}\n", &diagnostic(&format!("observations {}: {}",
+                root.join("absent-observations/observations").display(), std::io::Error::from_raw_os_error(2))))),
+        ("no-checkpoint", Some(document.clone()), Some(MERGE.to_vec()), good(), expected(2,
+            b"{\"undecided\":\"observations missing\"}\n", &diagnostic(MISSING))),
+        ("refused-observations", Some(document.clone()), Some([b"{\n", START].concat()), good(), expected(2,
+            b"{\"undecided\":\"observations missing\"}\n", &diagnostic(REFUSED))),
+        ("absent-store", Some(document.clone()), Some(START.to_vec()), Copy::Absent, expected(2,
+            b"{\"undecided\":\"store unreadable\"}\n", &[BOUNDARY, &diagnostic(&format!("opening {}: errno 2", root.join("absent-store/copy").display()))].concat())),
+        ("not-store", Some(document.clone()), Some(START.to_vec()), Copy::File, expected(2,
+            b"{\"undecided\":\"store unreadable\"}\n", &[BOUNDARY, &diagnostic(&format!("opening {}: errno 20", root.join("not-store/copy").display()))].concat())),
+        ("client-unknown", Some(document.clone()), Some(START.to_vec()), Copy::Store { format: current, rows: stored_rows(&[repository()]) },
+            expected(2, b"{\"undecided\":\"client unknown\"}\n", BOUNDARY)),
+        ("absent-document", None, Some(START.to_vec()), Copy::Absent, expected(1, b"", &diagnostic(&format!("configuration {}: absent", root.join("absent-document/temper.json").display())))),
+        ("no-entry", Some(no_entry), Some(START.to_vec()), Copy::Absent, expected(1, b"", &diagnostic("forge 1: the setup has no entry for it"))),
+        ("managed", Some(managed), Some(START.to_vec()), Copy::Absent, expected(1, b"", &diagnostic("forge 1: it is managed, not fake"))),
+        ("owned", Some(owned), Some(START.to_vec()), Copy::Absent, expected(1, b"", &diagnostic("forge 1: it is owned, not fake"))),
+        ("invalid-document", Some(serde_json::json!({})), None, Copy::Absent, expected(1, b"",
+            b"temper fake forge check: engine: missing\ntemper fake forge check: workers: missing\ntemper fake forge check: application: missing\n")),
+        ("invalid-setup", Some(bad_setup), None, Copy::Absent, expected(1, b"", &diagnostic("application.setup[0].forge: unknown reference"))),
+    ] {
+        let directory = root.join(name);
+        fs::create_dir(&directory).expect("row directory");
+        let directories = crate::directories::tests::given(&directory);
+        let bytes = document.map(|document| serde_json::to_vec(&document).expect("fixture document"));
+        if let Some(bytes) = &bytes {
+            fs::write(directories.document(), bytes).expect("document file");
+        }
+        let check = Check { forge: 1, observations: directory.join("observations"), store: directory.join("copy") };
+        if let Some(observations) = observations {
+            fs::write(&check.observations, observations).expect("observations file");
+        }
+        match copy {
+            Copy::Store { format, rows } => {
+                let limits = temper_service::startup::store_limits(bytes.as_ref().expect("seed document"), &directories.jig()).expect("store limits");
+                seed(&check.store, &limits.store, format, rows);
+            }
+            Copy::Absent => {}
+            Copy::File => fs::write(&check.store, b"not a store").expect("non-store"),
+        }
+        assert_eq!(outcome(&directories, &check), expected, "{name}");
+        assert!(!directory.join("data").exists(), "{name}: creates no data directory");
+        assert!(!directory.join("cache").exists(), "{name}: creates no cache directory");
+    }
+    fs::remove_dir_all(root).expect("scratch removed");
+}

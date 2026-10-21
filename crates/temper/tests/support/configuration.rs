@@ -85,3 +85,18 @@ pub fn fake_entry(entry: &mut serde_json::Value, listen: &str) {
         "repositories": [{"name": "widget", "landing": "main"}]
     }});
 }
+
+/// A deployment whose forge 1 is the demo's fake, without creating its files.
+#[must_use]
+pub fn check_document(directory: &Path) -> serde_json::Value {
+    let (_, bytes) = documents(directory, "/fixture/temper");
+    let mut value: serde_json::Value = serde_json::from_slice(&bytes).expect("deployment JSON");
+    value["application"]["setup"] = serde_json::json!([{
+        "forge":1, "directory":"forge-1", "bot":{"login":"temper","email":"temper@example.test"}
+    }]);
+    fake_entry(&mut value["application"]["setup"][0], "127.0.0.1:9");
+    value["application"]["forges"][0]["api_token"] = "forge-1/api_token".into();
+    value["application"]["forges"][0]["user"] = serde_json::json!({"file":"forge-1/user"});
+    value["application"]["identities"][0]["token"] = "forge-1/git_token".into();
+    value
+}

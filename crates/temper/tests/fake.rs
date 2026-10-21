@@ -795,3 +795,41 @@ fn git_run() {
         scratch.remove();
     }
 }
+
+#[test]
+fn check_run() {
+    let scratch = support::Scratch::startup("fake-check-run");
+    let directory = scratch.path();
+    document(&directory.join("temper.json"), &support::configuration::check_document(directory));
+    let observations = directory.join("observations");
+    fs::write(&observations, b"{\"observations_lost\":0}\n").expect("checkpoint");
+    let store = directory.join("copy");
+    let data = directory.join("data");
+    let cache = directory.join("cache");
+    let ended = Command::new(env!("CARGO_BIN_EXE_temper"))
+        .env_clear()
+        .args(["fake", "forge", "check", "--config"])
+        .arg(directory)
+        .arg("--data")
+        .arg(&data)
+        .arg("--cache")
+        .arg(&cache)
+        .arg("1")
+        .arg(&observations)
+        .arg(&store)
+        .output()
+        .expect("check process");
+    assert_eq!(ended.status.code(), Some(2));
+    assert_eq!(ended.stdout, b"{\"undecided\":\"store unreadable\"}\n");
+    assert_eq!(
+        ended.stderr,
+        format!(
+            "{{\"boundary\":{{\"lines\":1,\"lost\":0}}}}\ntemper fake forge check: opening {}: errno 2\n",
+            store.display()
+        )
+        .as_bytes()
+    );
+    assert!(!data.exists());
+    assert!(!cache.exists());
+    scratch.remove();
+}

@@ -1,6 +1,5 @@
 //! The document form's files and peer loop (protocol/setup.md, 8.4).
-#[cfg_attr(not(test), expect(dead_code, reason = "the check verb joins these readers in t27c"))]
-mod check;
+pub(crate) mod check;
 pub mod git;
 use skein_fake_peers::{forge as forge_peer, llm as llm_peer};
 use skein_io::kernel::{Complete, Done, Exit, Fd, Op, Submit};
@@ -87,14 +86,30 @@ pub struct Arguments {
     pub seed: u64,
     pub observations: Option<PathBuf>,
 }
+#[derive(Debug, PartialEq, Eq)]
+pub struct Check {
+    pub forge: u16,
+    pub observations: PathBuf,
+    pub store: PathBuf,
+}
 type Bytes = Box<[u8]>;
 type EnvironmentEntry = (Bytes, Bytes);
-pub fn configure(arguments: &[Bytes], environment: &[EnvironmentEntry]) -> Result<super::Command, String> {
+pub fn configure(
+    arguments: &[Bytes],
+    environment: &[EnvironmentEntry],
+    working: &[u8],
+) -> Result<super::Command, String> {
     let Some((verb, arguments)) = arguments.split_first() else {
         return Err("temper fake: expected llm, forge or git\n".into());
     };
     if verb.as_ref() == b"git" {
         return Ok(super::Command::FakeGit { arguments: arguments.into() });
+    }
+    if verb.as_ref() == b"forge"
+        && let Some((word, arguments)) = arguments.split_first()
+        && word.as_ref() == b"check"
+    {
+        return check_command(arguments, environment, working);
     }
     let (kind, table) = match verb.as_ref() {
         b"llm" => (Kind::Llm, &LLM_SETTINGS),
@@ -128,6 +143,28 @@ pub fn configure(arguments: &[Bytes], environment: &[EnvironmentEntry]) -> Resul
             seed,
             observations,
         },
+    })
+}
+
+fn check_command(
+    arguments: &[Bytes],
+    environment: &[EnvironmentEntry],
+    working: &[u8],
+) -> Result<super::Command, String> {
+    let refused = |why: &str| super::prefixed("temper fake forge check", why);
+    let (directories, rest) =
+        super::directories::resolve(arguments, environment, working).map_err(|why| refused(&why.to_string()))?;
+    let [number, observations, store] = rest.as_ref() else {
+        return Err(refused("expected N OBSERVATIONS STORE"));
+    };
+    let forge = std::str::from_utf8(number)
+        .ok()
+        .filter(|text| !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit()))
+        .and_then(|text| text.parse::<u16>().ok())
+        .ok_or_else(|| refused("N: expected a forge number, a decimal u16"))?;
+    Ok(super::Command::FakeCheck {
+        directories,
+        check: Check { forge, observations: super::path(observations).into(), store: super::path(store).into() },
     })
 }
 
