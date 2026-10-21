@@ -725,7 +725,8 @@ producing ─► opening ─► checking ─► gating ─► queued ─► firs
    changes is a repair, given its remarks; a blocking approval a person
    declines holds the change (8.3).
 5. **Queued:** ready (CI passed and every blocking gate holds, at its
-   head) and waiting its turn in its landing branch's queue (section 9).
+   head, and its task is not kept by a dependency) and waiting its turn
+   in its landing branch's queue (section 9).
 6. **First:** its turn, which it keeps through what follows unless it
    leaves the queue (section 9). If its head lacks the base's tip, it is
    **updated** (section 10): cleanly, and its new head is checked again,
@@ -740,7 +741,10 @@ producing ─► opening ─► checking ─► gating ─► queued ─► firs
    rule's, which the core checks at the merge (8.7). Where the forge's
    own merge queue guards the branch, the merge puts the pull request in
    that queue at exactly its head, and the change lands or is ejected
-   later (9.1). Merged, the change is **landed**: its result is the
+   later (9.1). The merge waits for dependencies (jig's
+   `domain/connectors.md`, 4.1): the core refuses it while the change's
+   task is kept, naming what it waits for, a backstop to the queue's own
+   rule (section 9). Merged, the change is **landed**: its result is the
    landing (the pull request, the merge commit, the queue's group's
    where the forge's queue landed it, whose id in hexadecimal is the
    result's words: `root.md`, section 6), and it closes, its branch
@@ -943,7 +947,9 @@ one project (another may read it as context), so its goals' priorities
 are comparable.
 
 - **In the queue:** a change is in the queue once it is ready (CI passed
-  and every blocking gate holds, at its head). It keeps the time it
+  and every blocking gate holds, at its head, and its task is not kept:
+  no dependency it was given is pending, jig's `domain/tasks.md`, 5.7).
+  It keeps the time it
   first became ready while it stays live, so leaving and coming back
   does not send it to the back.
 - **Ordered by priority,** its goal's (jig's `domain/core.md`, 6.2), a
@@ -958,10 +964,12 @@ are comparable.
   its new head and its merge, so no CI run is wasted by a change
   overtaking it. It **leaves the queue** on a conflict, on a check that
   fails (CI, a gate asked again), on a gate added, when held or
-  closing, or once the forge's own merge queue holds it (9.1), and the
-  next becomes first; it comes back when it is ready
-  again, at its place by its first time. A resolution never holds the
-  queue.
+  closing, when its task is kept by a dependency added to it, or once
+  the forge's own merge queue holds it (9.1), and the next becomes
+  first; it comes back when it is ready again, at its place by its
+  first time. A kept change keeps its head, its checks and its gates'
+  verdicts: once its last dependency is met, it is ready again at once
+  if they still hold. A resolution never holds the queue.
 - **Derived, not kept.** A queue is the ready changes into a branch,
   their priorities and their times; nothing of it is stored beyond the
   changes' own states, so a restart rebuilds it from them.
