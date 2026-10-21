@@ -1231,8 +1231,12 @@ defaults for a person's real work are open (section 16).
 - **Its LLM providers:** the owned example's `engine.llm`, whole (8.1),
   with no account; and 3, Demo, the demo model's (8.4): one endpoint,
   `demo`, at `127.0.0.1:<the fake LLM's port>`, plaintext, OpenAI's
-  dialect on its public route; one model, `demo`, priced 0, its window
-  and its output within the fake's limits; its source a key. The agent's
+  dialect on its public route; one model, `demo`, priced as the owned
+  example's model is, 1 per 1,000,000 for input, cached and output (jig
+  and smith refuse a price of 0); its window 131,072 and its output
+  8,192, so that smith's room at the owned threshold, 4/5, still offers
+  the owned message bound, 4,098 bytes, and a request at the threshold
+  stays within the fake's request bound; its source a key. The agent's
   configuration declares it too (8.2).
 - **One project,** number 1, adopting nothing until the person adopts
   a repository from the client. Its landing rule covers every
