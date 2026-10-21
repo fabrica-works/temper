@@ -626,7 +626,7 @@ and arrives through the director.
 | the git route's `objects` (skein's `fake-forge.md`, section 4) | skein's fake forge | 8.4 |
 | TLS on the fake LLM with skein's test root, and the root's file to trust | first-run | M1; no plaintext variant |
 | fake forge deliveries across processes to the hook registered on serve's bound webhook address | first-run | M1's story |
-| serve's actual bound webhook address available to reconcile; its listeners' ready lines are designed, `listening <listener> <address>` on stderr (`protocol/README.md`, 15.3), and built with the cluster | serve's CLI owner, routed from QA's S2 by the director; the lines o/cluster-build's | delivery readiness |
+| serve's actual bound webhook address available to reconcile; its listeners' ready lines are designed, `listening <listener> <address>` on stderr (`protocol/README.md`, 15.3), and built with the cluster, the webhooks' address from skein's 14h (skein's `forge-connection.md`, 6.4) | serve's CLI owner, routed from QA's S2 by the director; the lines o/cluster-build's | delivery readiness |
 | fake-owned key/token derivation from decimal u64 seeds and 0600 output files named by the experiment; exact interfaces | first-run, director 253's default | seed, setup handover; runner invents no bytes |
 | `wait forges --until connected:1` (area 6) | github | the seed, as the demo's |
 | serve's link on its stdout, or a private channel for it | the director (the serve survey) | the seed's sign-in |

@@ -820,6 +820,11 @@ w1, w2       temper serve DIRS     after the engine: each a worker alone
   A refused opening or hello is a note on the worker's stderr with jig's
   reason, and the worker redials, as a worker between hosts would; it
   never exits for one. The sign-in link stays on stdout (section 4).
+- **Each line's address is its listener's bound one:** the clients'
+  server keeps its own, as the sign-in link reads it; the workers'
+  routing keeps the one io's `Listening` event gives; and the webhooks'
+  comes up from skein-forge-connection as its `listening` event (skein's
+  `forge-connection.md`, 6.4, as skein's change 14h brings it).
 - **Ready** (skein's `lab.md`, 4.3): the engine at its `listening` lines
   and its sign-in link; a worker at its `linked` line. A task created
   before a worker's hello has reached the fleet waits for a free slot,
@@ -896,7 +901,11 @@ Each where `../domain/testing.md` puts it (2.4 to 2.6):
 | the real loop | an engine alone and two workers alone, three services on one ring with their own directories, the workers dialling the engine's listener on loopback: a task on each runs to its end |
 | the process tier | `lab/cluster/` on real processes, as below |
 
-The process tier's first stories, one slot on each worker:
+The process tier's first stories, one slot on each worker. A temper
+worker takes one slot today: smith gives its agent one run, and the
+worker's limits keep its slots within its agents. Two tasks on two
+workers need no more; a worker of several slots is later (15.7).
+
 
 - **A task on each worker:** two tasks on the fakes, one run on w1 and
   one on w2, each to its end; then the cluster stopped, each process
@@ -926,4 +935,8 @@ worker (`../draft/reference-case.md`).
 - **The reference case's multi-worker steps driven in the lab,** by a
   driver (skein's `lab.md`, section 6), once temper's experiments have
   one; the cluster's description runs with none until then (15.5).
+- **A worker of several slots,** as the reference case's s1 with its
+  three (`../draft/reference-case.md`, 3 and 4.1): a worker's change,
+  in smith's runs and the worker's limits, and not the cluster's. Until
+  then each of the cluster's workers takes one slot.
 - **`temper init` for the cluster's shapes** (section 14).
