@@ -115,3 +115,47 @@ fn task_labels_use_jigs_label_numbers() {
         assert_eq!(query.label, Some(*label), "{word}");
     }
 }
+
+#[test]
+fn a_kept_activity_is_parked_in_text_and_preserved_in_json() {
+    for (argv, expected) in [
+        (&["activity", "41"][..], b"parked".as_slice()),
+        (&["activity", "41", "--json"][..], br#""kept":{"attempt":7,"pending":[]}"#),
+    ] {
+        let c::ReadResult::Value(c::ReadValue::Activity(mut page)) = fixtures::activity_words() else {
+            panic!("activity")
+        };
+        page.rows.get_mut(0).expect("row").event = c::Activity::Owner {
+            source: Box::new(c::OwnerActivityLine {
+                task: fixtures::TASK,
+                position: 1,
+                at: skein_lib::Wall::EPOCH,
+                line: c::OwnerActivity::Kept { attempt: 7, pending: skein_lib::List::with_capacity(0) },
+            }),
+            decoded: None,
+        };
+        let printed = fixtures::read_answer(argv, c::ReadResult::Value(c::ReadValue::Activity(page)));
+        assert!(skein_lib::bytes::find(&printed.stdout, expected).is_some());
+    }
+}
+#[test]
+fn a_met_notice_keeps_its_dependency_and_removal_flag_in_json() {
+    let c::ReadResult::Value(c::ReadValue::Activity(mut page)) = fixtures::activity_words() else { panic!("activity") };
+    page.rows.get_mut(0).expect("row").event = c::Activity::Owner {
+        source: Box::new(c::OwnerActivityLine {
+            task: fixtures::TASK,
+            position: 1,
+            at: skein_lib::Wall::EPOCH,
+            line: c::OwnerActivity::Words {
+                message: 2,
+                by: c::OwnerRequester::Task(12),
+                kind: c::OwnerMessageKind::Met { dependency: 12, removed: true },
+                words: fixtures::act_text(b""),
+            },
+        }),
+        decoded: None,
+    };
+    let printed =
+        fixtures::read_answer(&["activity", "41", "--json"], c::ReadResult::Value(c::ReadValue::Activity(page)));
+    assert!(skein_lib::bytes::find(&printed.stdout, br#""met":{"dependency":12,"removed":true}"#).is_some());
+}

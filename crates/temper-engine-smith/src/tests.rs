@@ -417,6 +417,14 @@ fn amend_and_release_calls_name_their_revision() {
 
 const ANSWER_CASES: &[(engine::CallAnswer, &[u8], bool)] = &[
     (
+        engine::CallAnswer::Moved {
+            task: CALL_TASK,
+            now: jig_domain_people::Moved::Hold { revision: 2, reason: jig_domain_people::HoldReason::Circle },
+        },
+        b"Moved: task 23 is held at hold revision 2 now, for a circle of waits",
+        true,
+    ),
+    (
         engine::CallAnswer::Again { task: CALL_TASK, required: true },
         b"Refused: task 23 holds an effect whose outcome is uncertain; say again: true or false",
         true,
@@ -559,4 +567,21 @@ fn an_amendment_keeps_its_llm_preference() {
             subagents: Box::new([tasks::ModelEffort { model: 3, effort: None }]),
         })
     );
+}
+
+#[test]
+fn dependency_refusals_keep_their_blocked_tasks() {
+    for (why, expected) in [
+        (tasks::Refusal::Circle { cut: false }, b"Refused: circle 23".as_slice()),
+        (tasks::Refusal::DependencyEnded { how: tasks::Status::Failed }, b"Refused: dependency 23"),
+        (tasks::Refusal::Kept, b"Refused: kept 23"),
+    ] {
+        let value = engine::CallAnswer::ControlRefused(tasks::Problem {
+            task: None,
+            capacity: None,
+            why,
+            blocked_by: Some(Box::new([CALL_TASK])),
+        });
+        assert_eq!(answer(&value).text(), expected);
+    }
 }

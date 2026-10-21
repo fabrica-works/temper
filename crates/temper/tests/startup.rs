@@ -885,6 +885,10 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     let endpoint_binding_growth = 3_076 * (64 * (16 + 32) + 4 * 16 + 2 * 4 * 3 * 8 + document_copies * (2 * 16));
     // One configured forge retains an optional repository git program (16 B).
     let git_program_growth = 16;
+    // Jig 031f7267 -> 2a62db26: bounded task-record additions (added at/by,
+    // circle witnesses and kept pending dependencies) enlarge retained records
+    // and their store/page carriers by 42,615,522,708 B; worker inputs stay fixed.
+    let added_dependencies_growth = 42_615_522_708_u64;
     assert_eq!(
         required.engine_bytes,
         79_659_997_210_050_u64
@@ -897,6 +901,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + repin_growth
             + endpoint_binding_growth
             + git_program_growth
+            + added_dependencies_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.

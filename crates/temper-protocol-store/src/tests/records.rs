@@ -416,6 +416,11 @@ fn application_refusals() -> Box<[jig_domain_people::Refusal]> {
         rows.push(p::Refusal::Account { account: 43, why }).expect("account refusal rows fit");
     }
     for row in [
+        p::Refusal::Circle { tasks: Box::new([u64::MAX, 42]), cut: true },
+        p::Refusal::Kept { pending: Box::new([42, u64::MAX]) },
+        p::Refusal::Dependency { dependency: u64::MAX, how: p::DependencyStatus::Done },
+        p::Refusal::Dependency { dependency: u64::MAX, how: p::DependencyStatus::Failed },
+        p::Refusal::Dependency { dependency: u64::MAX, how: p::DependencyStatus::Cancelled },
         p::Refusal::Role { held: None },
         p::Refusal::Taken { by: u64::MAX },
         p::Refusal::NotWaiting,
@@ -496,12 +501,32 @@ fn application_refusals() -> Box<[jig_domain_people::Refusal]> {
     ] {
         rows.push(p::Refusal::Limit { which }).expect("bounded application cases");
     }
+    application_refusal_lists(&mut rows);
     application_moved_and_ended(&mut rows);
     rows.into_boxed()
+}
+fn application_refusal_lists(rows: &mut skein_lib::List<jig_domain_people::Refusal>) {
+    use jig_domain_people as p;
+    for (count, circle) in [
+        (jig_protocol_store::people_v6::CEILINGS.refusal_circle_tasks, true),
+        (jig_protocol_store::people_v6::CEILINGS.refusal_kept_pending, false),
+    ] {
+        let mut tasks = skein_lib::List::with_capacity(count);
+        for task in 0..count {
+            tasks.push(u64::from(task)).expect("ceiling-sized refusal list");
+        }
+        rows.push(if circle {
+            p::Refusal::Circle { tasks: tasks.into_boxed(), cut: false }
+        } else {
+            p::Refusal::Kept { pending: tasks.into_boxed() }
+        })
+        .expect("bounded application cases");
+    }
 }
 fn application_moved_and_ended(rows: &mut skein_lib::List<jig_domain_people::Refusal>) {
     use jig_domain_people as p;
     for reason in [
+        p::HoldReason::Circle,
         p::HoldReason::Failures { class: p::FailureClass::Invalid },
         p::HoldReason::Stalled,
         p::HoldReason::Dependency { task: u64::MAX },
@@ -613,7 +638,7 @@ fn every_application_outcome_preserves_its_complete_record() {
     assert!(
         jig_protocol_store::people_v6::Refusal::worst_case_bytes(&jig_protocol_store::people_v6::CEILINGS)
             .expect("bounded facts")
-            <= 24
+            <= u64::from(v4::CEILINGS.core_refused_refusal)
     );
 }
 #[test]

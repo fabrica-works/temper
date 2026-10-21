@@ -50,6 +50,7 @@ fn root_with_hold(executor: c::Executor, priority: Option<u32>, held: bool) -> t
     document.priority = priority;
     if held {
         document.hold = Some(c::TaskHold::Owner(Box::new(c::OwnerChipHold {
+            circle: None,
             account: None,
             source: None,
             reason: c::HoldCategory::Failures { class: c::HoldFailure::Run },

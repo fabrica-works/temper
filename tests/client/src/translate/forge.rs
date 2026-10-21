@@ -69,7 +69,7 @@ pub fn outcome(value: &owner::ApplicationOutcome) -> forge::Answer {
             },
         }),
         owner::ApplicationOutcome::CoreRefused(why) => {
-            forge::Answer::CoreRefused(wire::refusals::refusal(*why).expect("representable application refusal"))
+            forge::Answer::CoreRefused(wire::refusals::refusal(why.clone()).expect("representable application refusal"))
         }
         owner::ApplicationOutcome::ForgeRefused(why) => forge::Answer::ForgeRefused(match why {
             owner::AdoptionRefusal::NoSuchForge => forge::Reason::NoSuchForge,

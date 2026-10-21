@@ -28,6 +28,7 @@ pub(super) fn encode_hold_reason(value: &p::HoldReason, l: &w::Limits) -> Result
             l,
             w::HoldReasonFailuresParts { class: encode_failure_class(*class, l) },
         )?),
+        p::HoldReason::Circle => w::HoldReason::Circle,
         p::HoldReason::Stalled => w::HoldReason::Stalled,
         p::HoldReason::Dependency { task } => {
             w::HoldReason::Dependency(w::HoldReasonDependency::new(l, w::HoldReasonDependencyParts { task: *task })?)
@@ -58,6 +59,7 @@ pub(super) fn decode_hold_reason(value: w::HoldReason) -> p::HoldReason {
         w::HoldReason::Failures(value) => {
             p::HoldReason::Failures { class: decode_failure_class(value.class().clone()) }
         }
+        w::HoldReason::Circle => p::HoldReason::Circle,
         w::HoldReason::Stalled => p::HoldReason::Stalled,
         w::HoldReason::Dependency(value) => p::HoldReason::Dependency { task: value.task() },
         w::HoldReason::Stopped => p::HoldReason::Stopped,
@@ -357,6 +359,28 @@ pub(super) fn encode_refusal(value: &p::Refusal, l: &w::Limits) -> Result<w::Ref
         p::Refusal::Ended { how } => {
             w::Refusal::Ended(w::RefusalEnded::new(l, w::RefusalEndedParts { how: encode_ending(how, l)? })?)
         }
+        p::Refusal::Circle { tasks, cut } => w::Refusal::Circle(w::RefusalCircle::new(
+            l,
+            w::RefusalCircleParts {
+                tasks: numbers(tasks, l.refusal_circle_tasks, w::Path::RefusalCircleTasks)?,
+                cut: *cut,
+            },
+        )?),
+        p::Refusal::Dependency { dependency, how } => w::Refusal::Dependency(w::RefusalDependency::new(
+            l,
+            w::RefusalDependencyParts {
+                dependency: *dependency,
+                how: match how {
+                    p::DependencyStatus::Done => w::DependencyStatus::Done,
+                    p::DependencyStatus::Failed => w::DependencyStatus::Failed,
+                    p::DependencyStatus::Cancelled => w::DependencyStatus::Cancelled,
+                },
+            },
+        )?),
+        p::Refusal::Kept { pending } => w::Refusal::Kept(w::RefusalKept::new(
+            l,
+            w::RefusalKeptParts { pending: numbers(pending, l.refusal_kept_pending, w::Path::RefusalKeptPending)? },
+        )?),
         p::Refusal::Taken { by } => w::Refusal::Taken(w::RefusalTaken::new(l, w::RefusalTakenParts { by: *by })?),
         p::Refusal::NoEscalationHolder => w::Refusal::NoEscalationHolder,
         p::Refusal::NotWaiting => w::Refusal::NotWaiting,
@@ -410,6 +434,19 @@ pub(super) fn decode_refusal(value: w::Refusal) -> p::Refusal {
         w::Refusal::Limit(value) => p::Refusal::Limit { which: decode_limit_kind(value.which().clone()) },
         w::Refusal::Moved(value) => p::Refusal::Moved { now: decode_moved(value.now().clone()) },
         w::Refusal::Ended(value) => p::Refusal::Ended { how: decode_ending(value.how().clone()) },
+        w::Refusal::Circle(value) => {
+            let w::RefusalCircleParts { tasks, cut } = value.into_parts();
+            p::Refusal::Circle { tasks: tasks.into_boxed(), cut }
+        }
+        w::Refusal::Dependency(value) => p::Refusal::Dependency {
+            dependency: value.dependency(),
+            how: match value.how() {
+                w::DependencyStatus::Done => p::DependencyStatus::Done,
+                w::DependencyStatus::Failed => p::DependencyStatus::Failed,
+                w::DependencyStatus::Cancelled => p::DependencyStatus::Cancelled,
+            },
+        },
+        w::Refusal::Kept(value) => p::Refusal::Kept { pending: value.into_parts().pending.into_boxed() },
         w::Refusal::Taken(value) => p::Refusal::Taken { by: value.by() },
         w::Refusal::NoEscalationHolder => p::Refusal::NoEscalationHolder,
         w::Refusal::NotWaiting => p::Refusal::NotWaiting,
@@ -512,4 +549,18 @@ fn decode_llm_why(value: w::LlmWhy) -> p::LlmWhy {
         w::LlmWhy::Procedure => p::LlmWhy::Procedure,
         w::LlmWhy::Repeated => p::LlmWhy::Repeated,
     }
+}
+
+fn numbers(values: &[u64], limit: u32, path: w::Path) -> Result<skein_lib::List<u64>, w::Problem> {
+    let Ok(length) = u32::try_from(values.len()) else {
+        return Err(w::Problem { path, reason: skein_codec::Reason::Bound });
+    };
+    if length > limit {
+        return Err(w::Problem { path, reason: skein_codec::Reason::Bound });
+    }
+    let mut rows = skein_lib::List::with_capacity(length);
+    for value in values {
+        rows.push(*value).expect("checked refusal list length");
+    }
+    Ok(rows)
 }

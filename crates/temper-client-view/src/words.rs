@@ -10,6 +10,8 @@ use skein_ui::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
+    WaitRefused,
+    DependencyParked,
     WaitInvalid,
     ChoiceDraft,
     ChoiceDraftDefault,
@@ -138,7 +140,9 @@ pub enum Word {
     SignOutLost,
     Unshowable,
 }
-const ALL: [Word; 125] = [
+const ALL: [Word; 127] = [
+    Word::WaitRefused,
+    Word::DependencyParked,
     Word::WaitInvalid,
     Word::ChoiceDraft,
     Word::ChoiceDraftDefault,
@@ -273,6 +277,8 @@ impl Word {
             Self::OutOfDate => 181,
             Self::SignedOutMain => 182,
             Self::OutOfDateMain => 183,
+            Self::WaitRefused => 1029,
+            Self::DependencyParked => 1030,
             Self::WaitInvalid => 1028,
             Self::ChoiceDraft => 1024,
             Self::ChoiceDraftDefault => 1025,
@@ -544,6 +550,8 @@ const DEMO_REQUEST: &[&[u8]] = &[b"Try a request in ", b"/", b". Follow the task
 fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
+        Word::WaitRefused => (&[b"Next run refused"], &[]),
+        Word::DependencyParked => (&[b"parked"], &[]),
         Word::WaitInvalid => (&[b"The requested account cannot serve this work"], &[]),
         Word::ChoiceDraft => (&[b"Next run if applied: ", b""], &[Name]),
         Word::ChoiceDraftDefault => (&[b"Next run if applied: engine default"], &[]),

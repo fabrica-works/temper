@@ -29,6 +29,7 @@ pub(crate) fn chat_at(task: u64, stage: c::RunStage, work: Option<c::OwnerChipWo
     task.chip.details = Box::new(c::ChipPhase::Owner {
         phase: c::OwnerChipPhase::Active(stage),
         details: Box::new(c::OwnerChipDetails {
+            dependencies: List::with_capacity(EMPTY),
             project: task.project,
             executor: c::OwnerExecutor::Agent { charter: PROJECT },
             phase_since: Wall::EPOCH,

@@ -279,6 +279,7 @@ pub(crate) fn waiting(
     match wait {
         None => {}
         Some(c::TaskRunWait::Credential) => line(b, w, W::WaitCredential, &[]),
+        Some(c::TaskRunWait::Refused(_)) => line(b, w, W::WaitRefused, &[]),
         Some(c::TaskRunWait::Host) => line(b, w, W::WaitCapacity, &[]),
         Some(c::TaskRunWait::Account { account, source, why }) => {
             account_wait(b, root, account, source, why, w, bindings);

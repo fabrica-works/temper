@@ -401,6 +401,7 @@ fn inbox_words(word: &tasks::Word) -> Box<[u8]> {
         tasks::MessageKind::Words
         | tasks::MessageKind::Question
         | tasks::MessageKind::Answer { .. }
+        | tasks::MessageKind::Met { .. }
         | tasks::MessageKind::Notice { .. }
         | tasks::MessageKind::News { .. }
         | tasks::MessageKind::Timer { .. }

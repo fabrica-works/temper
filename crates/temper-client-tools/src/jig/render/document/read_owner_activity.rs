@@ -1,5 +1,6 @@
 //! Integer JSON for supplied read facts.
 use skein_json::writer::Encoder;
+#[expect(clippy::too_many_lines, reason = "one exhaustive encoding of jig's owner activity vocabulary")]
 pub(super) fn encode_owner_activity(
     value: &jig_client::contract::OwnerActivity,
     out: &mut Encoder,
@@ -90,6 +91,21 @@ pub(super) fn encode_owner_activity(
             out.object_start();
             out.key(b"revision");
             out.unsigned(*(revision));
+            out.object_end();
+            out.object_end();
+        }
+        jig_client::contract::OwnerActivity::Kept { attempt, pending } => {
+            out.object_start();
+            out.key(b"kept");
+            out.object_start();
+            out.key(b"attempt");
+            out.unsigned(*attempt);
+            out.key(b"pending");
+            out.array_start();
+            for task in pending {
+                out.unsigned(*task);
+            }
+            out.array_end();
             out.object_end();
             out.object_end();
         }

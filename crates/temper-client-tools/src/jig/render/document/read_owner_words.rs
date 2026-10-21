@@ -1,5 +1,6 @@
 //! Integer JSON for supplied read facts.
 use skein_json::writer::Encoder;
+#[expect(clippy::too_many_lines, reason = "one exhaustive encoding of jig's owner message vocabulary")]
 pub(super) fn encode_owner_message_kind(
     value: &jig_client::contract::OwnerMessageKind,
     out: &mut Encoder,
@@ -56,6 +57,17 @@ pub(super) fn encode_owner_message_kind(
             out.object_start();
             out.key(b"revision");
             out.unsigned(*(revision));
+            out.object_end();
+            out.object_end();
+        }
+        jig_client::contract::OwnerMessageKind::Met { dependency, removed } => {
+            out.object_start();
+            out.key(b"met");
+            out.object_start();
+            out.key(b"dependency");
+            out.unsigned(*dependency);
+            out.key(b"removed");
+            out.boolean(*removed);
             out.object_end();
             out.object_end();
         }

@@ -35,6 +35,9 @@ pub fn refusal(b: &mut Builder, words: &Words, value: &c::Refusal) {
         | c::Refusal::Unknown
         | c::Refusal::NotOffered
         | c::Refusal::KeyConflict
+        | c::Refusal::Circle { .. }
+        | c::Refusal::Dependency { .. }
+        | c::Refusal::Kept { .. }
         | c::Refusal::Provider => None,
     };
     let name = words.say_word(jig_client::words::Word::refusal(value), hole.as_slice());
@@ -291,6 +294,7 @@ pub fn hold(b: &mut Builder, value: &c::HoldCategory, words: &Words) {
         | c::HoldCategory::HoldsWaited
         | c::HoldCategory::ResourceUnavailable
         | c::HoldCategory::ResourceAccess
+        | c::HoldCategory::Circle
         | c::HoldCategory::Procedure => None,
     };
     text(b, Role::Paragraph, &words.say_word(jig_client::words::Word::hold(value), number.as_slice()));

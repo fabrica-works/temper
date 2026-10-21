@@ -513,3 +513,17 @@ fn a_waiting_account_shows_its_display() {
     b.close();
     assert!(String::from_utf8(fixtures::text(&b.finish()).into_vec()).unwrap().contains("Waiting account: Personal"));
 }
+
+#[test]
+fn a_refused_next_run_says_so() {
+    let root = task_root();
+    let mut builder = Builder::new(&fixtures::tree_limits());
+    crate::choice::waiting(
+        &mut builder,
+        &root,
+        Some(c::TaskRunWait::Refused(c::TaskWaitRefused::Program(c::OpenProgram::Model))),
+        &fixtures::words(),
+        &mut crate::frame::Bindings::new(32),
+    );
+    assert_eq!(fixtures::text(&builder.finish()).as_ref(), b"Next run refused");
+}

@@ -197,7 +197,7 @@ pub const CEILINGS: Limits = Limits {
     projected_milestones: 1_024,
     application_adopted_owner: 4_096,
     application_adopted_name: 4_096,
-    core_refused_refusal: 24,
+    core_refused_refusal: 517,
 };
 
 /// A field or tag that caused a codec problem.

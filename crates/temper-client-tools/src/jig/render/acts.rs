@@ -264,6 +264,9 @@ pub fn refusal(why: &Refusal, book: &Phrasebook, out: &mut Text) {
         | Refusal::Unknown
         | Refusal::NotOffered
         | Refusal::KeyConflict
+        | Refusal::Circle { .. }
+        | Refusal::Dependency { .. }
+        | Refusal::Kept { .. }
         | Refusal::Provider => book.say(0, word.id(), &[]),
     }
     .expect("checked refusal phrase")

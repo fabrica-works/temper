@@ -369,3 +369,35 @@ fn a_refusal_exits_2_with_its_alternatives() {
         assert_eq!((answer.status, answer.stderr.as_ref()), (2, expected), "{argv:?}");
     }
 }
+
+#[test]
+fn dependency_refusals_print_jigs_words_and_integer_facts() {
+    for (refusal, words, json) in [
+        (
+            c::Refusal::Circle { tasks: skein_lib::List::with_capacity(0), cut: true },
+            b"These tasks would wait for one another".as_slice(),
+            br#""circle":{"tasks":[],"cut":true}"#.as_slice(),
+        ),
+        (
+            c::Refusal::Dependency { dependency: fixtures::TASK, how: c::OwnerTaskStatus::Failed },
+            b"The added dependency has ended",
+            br#""dependency":{"dependency":41,"how":"failed"}"#,
+        ),
+        (
+            c::Refusal::Kept { pending: skein_lib::List::with_capacity(0) },
+            b"This answer waits for pending dependencies",
+            br#""kept":{"pending":[]}"#,
+        ),
+    ] {
+        for (args, expected) in
+            [(fixtures::MESSAGE_CALL, words), (&["message", "41", "hello", "--key", "words", "--json"][..], json)]
+        {
+            let mut root = fixtures::signed_in(fixtures::PARTY);
+            let call = root.submit(args);
+            root.serve(call, fixtures::task_result(fixtures::offered(&[c::ActKind::Message])));
+            root.answered(call, c::Answer::Refused { refusal: refusal.clone(), at: None });
+            let printed = root.answer(call).expect("refused");
+            assert!(skein_lib::bytes::find(&printed.stderr, expected).is_some(), "{printed:?}");
+        }
+    }
+}

@@ -174,8 +174,8 @@ record Projected { opened: bool digest: option fixed 32 last_body: option u64 bo
 record IssueRow { goal: u64 repository: Repository state: Projected number: option u64 pending: option u64 before: option Projected failed: bool desired: option GoalView }
 # 02.4: family 15, the retained application outcome.
 record ApplicationAdopted { repository: Repository owner: bytes 4096 name: bytes 4096 role: Role home: bool kinds: Kinds protection: RepositoryProtection }
-# jig-protocol-store's people_v6 Refusal: at most 24 bytes, all facts preserved.
-record CoreRefused { refusal: bytes 24 }
+# Ceiling: jig-protocol-store people_v6::Refusal::worst_case_bytes(&people_v6::CEILINGS).
+record CoreRefused { refusal: bytes 517 }
 enum ForgeReason { no_such_forge, not_found, no_access, refused, in_flight, too_large, unreachable, invalid_answer, not_installed }
 record ForgeRefused { reason: ForgeReason }
 enum ApplicationOutcome { adopted: ApplicationAdopted, core_refused: CoreRefused, forge_refused: ForgeRefused }

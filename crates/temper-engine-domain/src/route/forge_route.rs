@@ -1626,6 +1626,7 @@ pub(crate) fn start_change(domain: &mut Domain, env: &Env<Limits>, context: &tas
                 | tasks::MessageKind::Amendment { .. }
                 | tasks::MessageKind::Question
                 | tasks::MessageKind::Answer { .. }
+                | tasks::MessageKind::Met { .. }
                 | tasks::MessageKind::Notice { .. }
                 | tasks::MessageKind::Timer { .. }
                 | tasks::MessageKind::PersonStalled { .. }

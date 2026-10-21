@@ -301,7 +301,7 @@ fn waiting(value: &WaitsOn, me: Option<&Me>, book: &Phrasebook, out: &mut Text) 
             out.number(u64::from(*entries));
             out.put(b" waiting");
         }
-        WaitsOn::Delegates | WaitsOn::News | WaitsOn::Nothing => {
+        WaitsOn::Dependencies { .. } | WaitsOn::Delegates | WaitsOn::News | WaitsOn::Nothing => {
             out.put(&book.say(0, Word::waiting(value).id(), &[]).expect("waiting phrase").text);
         }
     }

@@ -422,6 +422,7 @@ pub(crate) fn owner_activity(b: &mut Builder, event: &c::OwnerActivity, words: &
         c::OwnerActivity::RunEnded { attempt, .. } => words.text(b, Word::RunEnded, &[Hole::Number(*attempt)]),
         c::OwnerActivity::Decided { .. } => words.text(b, Word::DecisionMade, &[]),
         c::OwnerActivity::Turn { .. } => words.text(b, Word::UnreadTurn, &[]),
+        c::OwnerActivity::Kept { .. } => words.text(b, Word::DependencyParked, &[]),
         c::OwnerActivity::Milestone { position } => words.text(b, Word::Milestone, &[Hole::Number(*position)]),
     }
 }

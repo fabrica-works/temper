@@ -196,3 +196,41 @@ fn a_source_wait_prints_a_null_json_deadline() {
         assert!(skein_lib::bytes::find(&answer.stdout, br#""until":null"#).is_some());
     }
 }
+
+#[test]
+fn dependency_waits_use_jigs_words_and_keep_their_counts() {
+    for (argv, expected) in [
+        (fixtures::TASK_CALL, b"waiting on: Kept by its dependencies".as_slice()),
+        (fixtures::TASK_JSON_CALL, br#""dependencies":{"pending":[],"count":2}"#),
+    ] {
+        let task = fixtures::goal(
+            fixtures::TASK,
+            jig_client::contract::WaitsOn::Dependencies { pending: skein_lib::List::with_capacity(0), count: 2 },
+        );
+        let printed = fixtures::read_answer(argv, fixtures::task_result(task));
+        assert!(skein_lib::bytes::find(&printed.stdout, expected).is_some());
+    }
+}
+#[test]
+fn a_circle_hold_keeps_its_json_category() {
+    let mut latest = fixtures::chat_at(fixtures::TASK, jig_client::contract::RunStage::Idle, None);
+    let task = fixtures::task_in(&mut latest);
+    let jig_client::contract::ChipPhase::Owner { phase, .. } = task.chip.details.as_mut() else { panic!("owner chip") };
+    *phase =
+        jig_client::contract::OwnerChipPhase::Held { reason: jig_client::contract::HoldCategory::Circle, revision: 1 };
+    let printed = fixtures::read_answer(fixtures::TASK_JSON_CALL, fixtures::task_result(task.clone()));
+    assert!(skein_lib::bytes::find(&printed.stdout, br#""reason":"circle""#).is_some());
+}
+#[test]
+fn a_refused_next_run_is_named_in_text_and_json() {
+    for (argv, expected) in
+        [(fixtures::TASK_CALL, b"next run: refused".as_slice()), (fixtures::TASK_JSON_CALL, br#""run_wait":"refused""#)]
+    {
+        let mut task = fixtures::goal(fixtures::TASK, jig_client::contract::WaitsOn::Nothing);
+        task.run_wait = Some(jig_client::contract::TaskRunWait::Refused(
+            jig_client::contract::TaskWaitRefused::Program(jig_client::contract::OpenProgram::Model),
+        ));
+        let printed = fixtures::read_answer(argv, fixtures::task_result(task));
+        assert!(skein_lib::bytes::find(&printed.stdout, expected).is_some());
+    }
+}

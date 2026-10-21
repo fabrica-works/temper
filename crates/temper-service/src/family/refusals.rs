@@ -56,6 +56,30 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
         p::Refusal::Ended { how } => {
             w::Refusal::Ended(w::RefusalEnded::new(limits, w::RefusalEndedParts { how: ending(how, limits)? })?)
         }
+        p::Refusal::Circle { tasks, cut } => w::Refusal::Circle(w::RefusalCircle::new(
+            limits,
+            w::RefusalCircleParts {
+                tasks: numbers(&tasks, limits.refusal_circle_tasks, w::Path::RefusalCircleTasks)?,
+                cut,
+            },
+        )?),
+        p::Refusal::Dependency { dependency, how } => w::Refusal::Dependency(w::RefusalDependency::new(
+            limits,
+            w::RefusalDependencyParts {
+                dependency,
+                how: match how {
+                    p::DependencyStatus::Done => w::OwnerTaskStatus::Done,
+                    p::DependencyStatus::Failed => w::OwnerTaskStatus::Failed,
+                    p::DependencyStatus::Cancelled => w::OwnerTaskStatus::Cancelled,
+                },
+            },
+        )?),
+        p::Refusal::Kept { pending } => w::Refusal::Kept(w::RefusalKept::new(
+            limits,
+            w::RefusalKeptParts {
+                pending: numbers(&pending, limits.refusal_kept_pending, w::Path::RefusalKeptPending)?,
+            },
+        )?),
         p::Refusal::Taken { by } => w::Refusal::Taken(w::RefusalTaken::new(limits, w::RefusalTakenParts { by })?),
         p::Refusal::NotWaiting => w::Refusal::NotWaiting,
         p::Refusal::NoFurther => w::Refusal::NoFurther,
@@ -200,6 +224,7 @@ fn hold(value: p::HoldReason, limits: &w::Limits) -> Result<w::HoldCategory, w::
         p::HoldReason::HoldsWaited => w::HoldCategory::HoldsWaited,
         p::HoldReason::ResourceUnavailable => w::HoldCategory::ResourceUnavailable,
         p::HoldReason::ResourceAccess => w::HoldCategory::ResourceAccess,
+        p::HoldReason::Circle => w::HoldCategory::Circle,
         p::HoldReason::Procedure => w::HoldCategory::Procedure,
         p::HoldReason::Dependency { task } => w::HoldCategory::Dependency(w::HoldCategoryDependency::new(
             limits,
@@ -265,4 +290,18 @@ fn ending(value: p::Ending, limits: &w::Limits) -> Result<w::Ending, w::Problem>
     rows.put(&row.measure().to_be_bytes()).expect("measured piece length");
     row.encode(&mut rows).expect("measured ending row");
     w::Ending::new(limits, w::EndingParts { rows: rows.finish() })
+}
+
+fn numbers(values: &[u64], limit: u32, path: w::Path) -> Result<skein_lib::List<u64>, w::Problem> {
+    let Ok(length) = u32::try_from(values.len()) else {
+        return Err(w::Problem { path, reason: skein_codec::Reason::Bound });
+    };
+    if length > limit {
+        return Err(w::Problem { path, reason: skein_codec::Reason::Bound });
+    }
+    let mut rows = skein_lib::List::with_capacity(length);
+    for value in values {
+        rows.push(*value).expect("checked refusal list length");
+    }
+    Ok(rows)
 }

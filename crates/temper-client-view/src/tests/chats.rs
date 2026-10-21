@@ -21,6 +21,7 @@ pub(super) fn line() -> TaskLine {
         deadline: None,
     };
     let details = OwnerChipDetails {
+        dependencies: List::with_capacity(EMPTY),
         project: fixtures::PROJECT,
         executor: OwnerExecutor::Person(PersonAddress::Party(73)),
         phase_since: Wall::EPOCH,

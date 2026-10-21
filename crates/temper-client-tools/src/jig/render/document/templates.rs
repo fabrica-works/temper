@@ -82,6 +82,21 @@ pub(super) fn encode_waits_on(value: &jig_client::contract::WaitsOn, out: &mut E
             out.object_end();
             out.object_end();
         }
+        jig_client::contract::WaitsOn::Dependencies { pending, count } => {
+            out.object_start();
+            out.key(b"dependencies");
+            out.object_start();
+            out.key(b"pending");
+            out.array_start();
+            for task in pending {
+                out.unsigned(*task);
+            }
+            out.array_end();
+            out.key(b"count");
+            out.unsigned(u64::from(*count));
+            out.object_end();
+            out.object_end();
+        }
         jig_client::contract::WaitsOn::Delegates => out.string(b"delegates"),
         jig_client::contract::WaitsOn::News => out.string(b"news"),
         jig_client::contract::WaitsOn::Nothing => out.string(b"nothing"),

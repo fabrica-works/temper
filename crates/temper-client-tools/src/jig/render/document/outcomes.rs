@@ -60,6 +60,7 @@ pub(super) fn encode_recipient(value: &jig_client::contract::Recipient, out: &mu
     }
 }
 
+#[expect(clippy::too_many_lines, reason = "one exhaustive encoding of jig's refusal vocabulary")]
 pub(super) fn encode_refusal(value: &jig_client::contract::Refusal, out: &mut Encoder, budget: &mut super::Cut) {
     match value {
         jig_client::contract::Refusal::NoEscalationHolder => out.string(b"no_escalation_holder"),
@@ -151,6 +152,45 @@ pub(super) fn encode_refusal(value: &jig_client::contract::Refusal, out: &mut En
             out.string(model.bytes());
             out.key(b"why");
             encode_llm_why(*(why), out);
+            out.object_end();
+            out.object_end();
+        }
+        jig_client::contract::Refusal::Circle { tasks, cut } => {
+            out.object_start();
+            out.key(b"circle");
+            out.object_start();
+            out.key(b"tasks");
+            out.array_start();
+            for task in tasks {
+                out.unsigned(*task);
+            }
+            out.array_end();
+            out.key(b"cut");
+            out.boolean(*cut);
+            out.object_end();
+            out.object_end();
+        }
+        jig_client::contract::Refusal::Dependency { dependency, how } => {
+            out.object_start();
+            out.key(b"dependency");
+            out.object_start();
+            out.key(b"dependency");
+            out.unsigned(*dependency);
+            out.key(b"how");
+            super::owner_links::encode_owner_task_status(*how, out, budget);
+            out.object_end();
+            out.object_end();
+        }
+        jig_client::contract::Refusal::Kept { pending } => {
+            out.object_start();
+            out.key(b"kept");
+            out.object_start();
+            out.key(b"pending");
+            out.array_start();
+            for task in pending {
+                out.unsigned(*task);
+            }
+            out.array_end();
             out.object_end();
             out.object_end();
         }

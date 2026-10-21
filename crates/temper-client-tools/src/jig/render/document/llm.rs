@@ -42,6 +42,7 @@ pub(super) fn encode_task(value: &c::Task, out: &mut Encoder, cut: &mut Cut) {
     match value.run_wait {
         None => out.null(),
         Some(c::TaskRunWait::Credential) => out.string(b"credential"),
+        Some(c::TaskRunWait::Refused(_)) => out.string(b"refused"),
         Some(c::TaskRunWait::Host) => out.string(b"host"),
         Some(c::TaskRunWait::Account { account, source, why }) => {
             out.object_start();
@@ -121,6 +122,7 @@ pub(super) fn text_wait(value: Option<c::TaskRunWait>, out: &mut Text) {
     out.put(b"\nnext run: ");
     match value {
         c::TaskRunWait::Credential => out.put(b"credential"),
+        c::TaskRunWait::Refused(_) => out.put(b"refused"),
         c::TaskRunWait::Host => out.put(b"host"),
         c::TaskRunWait::Account { account, source, why } => {
             out.put(b"account ");
