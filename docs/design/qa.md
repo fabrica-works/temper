@@ -1,14 +1,15 @@
 # QA in the lab
 
-2026-10-20, with director decision 253. temper's binding to skein's lab (skein's
-`lab.md`): the experiments temper keeps in `lab/`, the cluster, seed,
-charter, tool and checks each runs with, what the fakes' scripts must
-say, the cost classes they name, and the first campaign's process. It
-settles M1 of `draft/qa-loop.md`: a person's chat asks for a one-file
-change on `fake/widget`, which is proposed, pushed, passes CI and its
-review, and lands. The lab's records, commands, outcomes, verdicts and
-findings are skein's `lab.md`'s, cited by section and never restated.
-What M1 waits for, and its adopted decisions, are section 11.
+2026-10-20, with director decision 253, revised 2026-10-21. temper's
+binding to skein's lab (skein's `lab.md`): the experiments temper keeps
+in `lab/`, the cluster, seed, charter, tool and checks each runs with,
+what the fakes' scripts must say, the cost classes they name, and the
+first campaign's process. It settles M1 of `draft/qa-loop.md`: a
+person's chat asks for a one-file change on `fake/widget`, which is
+proposed, pushed, passes CI and its review, and lands. The lab's
+records, commands, outcomes, verdicts and findings are skein's
+`lab.md`'s, cited by section and never restated. What M1 waits for, and
+its adopted decisions, are section 11.
 
 ## 1. In one page
 
@@ -133,13 +134,18 @@ forge    temper fake forge, from its document, port 0          ready "listening 
   start-order draw changes nothing (skein's `lab.md`, 5.4).
 - **Addresses from ready lines alone** (skein's `lab.md`, 4.4): each fake
   prints `--ready`'s prefix and its bound address (`protocol/setup.md`,
-  8.4). Serve must report its bound webhook address, a pending CLI
-  interface routed through the director (11.1). Its sign-in link,
+  8.4). Serve prints each listener's bound address on its stderr,
+  `listening webhooks <address>` among them (`protocol/README.md`,
+  15.3), a ready line the lab captures. Its sign-in link,
   `http://HOST:PORT/jig/v1/sign-in/link?secret=…` (`client/README.md`,
   section 7), gives the clients' listener's bound address. Reconcile
   registers the webhook after serve binds; the fake delivers to that
-  hook. The bound-address notification and bootstrap channel's exact
-  syntax remain their owner's, not invented in these templates.
+  hook. The bootstrap channel's exact syntax remains its owner's, not
+  invented in these templates.
+- **The cluster's processes,** an engine alone and workers alone, each
+  a `temper serve` of its own after the same fakes, are `lab/cluster/`'s
+  (`protocol/README.md`, section 15), by the same lines; M1's
+  experiment keeps one serve, standalone.
 
 ### 4.2 Its processes
 
@@ -162,7 +168,8 @@ serve  after  llm
   every path given.
 - **`memory_bytes`:** null for the fakes, which declare none; for
   serve, what its document states for the engine and its worker, which
-  share its process (`protocol/configuration.md`, section 7).
+  share its process (`protocol/configuration.md`, section 7); in the
+  cluster, each process's own service's (`protocol/README.md`, 15.1).
 - **Files beneath a directory** (`config/`, `secrets/`, `setup/`) keep
   the configuration directory free of secrets
   (`protocol/configuration.md`, section 12) and the fake's setup
@@ -619,7 +626,7 @@ and arrives through the director.
 | the git route's `objects` (skein's `fake-forge.md`, section 4) | skein's fake forge | 8.4 |
 | TLS on the fake LLM with skein's test root, and the root's file to trust | first-run | M1; no plaintext variant |
 | fake forge deliveries across processes to the hook registered on serve's bound webhook address | first-run | M1's story |
-| serve's actual bound webhook address available to reconcile and a ready notification for its listeners | serve's CLI owner, routed from QA's S2 by the director | delivery readiness |
+| serve's actual bound webhook address available to reconcile; its listeners' ready lines are designed, `listening <listener> <address>` on stderr (`protocol/README.md`, 15.3), and built with the cluster | serve's CLI owner, routed from QA's S2 by the director; the lines o/cluster-build's | delivery readiness |
 | fake-owned key/token derivation from decimal u64 seeds and 0600 output files named by the experiment; exact interfaces | first-run, director 253's default | seed, setup handover; runner invents no bytes |
 | `wait forges --until connected:1` (area 6) | github | the seed, as the demo's |
 | serve's link on its stdout, or a private channel for it | the director (the serve survey) | the seed's sign-in |

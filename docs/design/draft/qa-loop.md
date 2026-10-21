@@ -1,16 +1,16 @@
 # The QA loop, first milestone
 
-Draft, 2026-10-20. Agents use temper end to end, as processes, through
-its agents' tools, and report what they find in records of a fixed
-shape. It records a session with the user on 2026-10-20. The loop runs
-by hand for now, but its records, its runner and its roles are the
-lab's (`factory.md`, section 8), so that they move into the lab
-application later and inform its design; `qa.md` is the inspiration.
-This draft covers the loop's mechanics and its first milestone, M1:
-the loop's process and tooling, proven on the simplest story, on fake
-backends. M2 (a real forge, the fake LLM) and M3
-(real forges, real LLMs) are drafts of their own; the mapping of the
-owners' process onto temper is `temper-on-temper.md`.
+Draft, 2026-10-20, revised 2026-10-21. Agents use temper end to end, as
+processes, through its agents' tools, and report what they find in
+records of a fixed shape. It records a session with the user on
+2026-10-20. The loop runs by hand for now, but its records, its runner
+and its roles are the lab's (`factory.md`, section 8), so that they move
+into the lab application later and inform its design; `qa.md` is the
+inspiration. This draft covers the loop's mechanics and its first
+milestone, M1: the loop's process and tooling, proven on the simplest
+story, on fake backends. M2 (a real forge, the fake LLM) and M3 (real
+forges, real LLMs) are drafts of their own; the mapping of the owners'
+process onto temper is `temper-on-temper.md`.
 
 ## 1. In one page
 
@@ -24,7 +24,8 @@ owners' process onto temper is `temper-on-temper.md`.
   finding (section 3).
 - **The cluster is a list of processes,** not the box: M1's are the fake
   LLM, the fake forge, and `temper serve`. A later cluster
-  adds an engine alone and workers by adding processes (section 4).
+  adds an engine alone and workers by adding processes (section 4),
+  as `lab/cluster/` does (`../protocol/README.md`, section 15).
 - **A driver agent** (Codex) follows the experiment's charter through
   `temper ctl`, every call recorded (section 5).
 - **Checks** read the cluster from outside: stops and panics, temper's
@@ -134,7 +135,8 @@ run R, seed S, scratch directory D
 ```
 
 The runner knows processes, not temper: an engine alone and a worker or
-several, once temper runs them apart, are more entries, and a
+several are more entries, as `lab/cluster/` has them, each a `temper
+serve` of its own (`../protocol/README.md`, section 15), and a
 real Forgejo (M2) replaces `fake-forge` with skein's throwaway Forgejo.
 
 ## 5. The driver
@@ -301,7 +303,8 @@ class, and a fix checked again.
   documents too; a later milestone.
 - **Explorers** that write experiments of their own, aimed at what
   landed.
-- **The cluster grown:** an engine alone and workers.
+- **The cluster grown:** an engine alone and workers, `lab/cluster/`
+  (`../protocol/README.md`, section 15), once a driver runs it.
 - **Real agents on the fake forge:** a real LLM's agent with the fake
   forge's seeded faults, cheaper and more repeatable than M3's real
   forges. Such an agent runs git in its working tree (`git status`,

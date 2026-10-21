@@ -1,6 +1,6 @@
 # temper's parts on jig's channel
 
-Provisional, 2026-10-03, revised 2026-10-20. What temper carries on the
+Provisional, 2026-10-03, revised 2026-10-21. What temper carries on the
 channel between its engine and a worker: its parts inside jig's records,
 under its payload version, and a git identity's value inside a credential
 grant. The channel is jig's (jig's `protocol/channel.md`), and this
@@ -139,9 +139,10 @@ record Writable    { push: bytes  expected: option fixed 32 }
   than copies; everything a worker needs to reach the forge, but the
   credential, is in them. The credential is the grant's (section 6).
 - **A fake forge's git is local.** Its program is a path on the
-  engine's machine, so a fake forge serves workers in `temper serve`'s
-  process alone, as its listener is loopback's (setup.md, 8.4); a
-  remote worker takes its own machine's git for every repository
+  engine's machine, so a fake forge serves workers on that machine
+  alone, as its listener is loopback's (setup.md, 8.4): standalone's
+  worker, and the cluster's workers alone (README, 15.2). A worker on
+  another host takes its own machine's git for every repository
   (configuration.md, section 4).
 - **Checked at the worker's entrance:** names, remotes, programs and
   branches within its limits, a program that is not an absolute path,

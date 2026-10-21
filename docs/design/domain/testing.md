@@ -1,6 +1,6 @@
 # Testing temper
 
-Provisional, 2026-10-03, revised 2026-10-20. How temper is tested. The
+Provisional, 2026-10-03, revised 2026-10-21. How temper is tested. The
 strategy is skein's `docs/foundation/testing-strategy.md`: the tiers,
 faults, what every fake shares, what every world checks, scenarios and
 the referee, the two suites, and where a failure is fixed. This document
@@ -60,8 +60,8 @@ and what is still open (section 10).
 | protocol worlds | the forge's: the forge component against the fake forge's protocol layer, deliveries included; reconcile's is skein's (2.2) |
 | io worlds | skein's: temper does not retest io |
 | simulated worlds | the one-process world: `temper-service` on skein's simulator (2.3, 2.5) |
-| real loop | the standalone service, hosted agents, native clients and fake peers in one loop over one real ring (2.4) |
-| end to end | the process tier: the real binary, an owned Forgejo and its runner, and real git (2.6) |
+| real loop | the standalone service, hosted agents, native clients and fake peers in one loop over one real ring; the cluster's engine alone and two workers alone, in the same loop (2.4) |
+| end to end | the process tier: the real binary, an owned Forgejo and its runner, and real git; the cluster's processes on the fakes as processes (2.6) |
 | end to end, live | the live tier: the process tier's stories with a real model (2.7) |
 
 Every child domain has a world of its own but the engine's rules, which
@@ -69,9 +69,10 @@ keep no state and are tested by their step tests alone: a departure from
 testing-strategy.md, 2.2, since with no state there is no sequence for a
 world to drive. The process tier departs from the strategy's end to end
 (testing-strategy.md, 2.9) twice: its forge is an owned Forgejo with its
-runner, never a fake, since temper provisions and runs it; and it runs
-outside both suites, by its script, since starting Forgejo takes longer
-than a suite's budget.
+runner, never a fake, since temper provisions and runs it, but in a
+first run's story and the cluster's, whose forge is temper's fake forge
+as a process; and it runs outside both suites, by its script, since
+starting Forgejo takes longer than a suite's budget.
 
 The tiers in the two suites keep the budgets of 6.1; the process and the
 live tiers, outside them, keep their own (2.6, 2.7). The browser tier,
@@ -358,13 +359,25 @@ in the lower world that owns it, never here.
     9.1), the connector's state, picker and queue in the system
     worlds (2.1).
 
+- **The cluster's services,** one story (../protocol/README.md, 15.6):
+  an engine alone and two workers alone, three `temper-service`
+  services in the one loop, each on three scratch directories of its
+  own (../protocol/README.md, 15.1), the workers dialling the engine's
+  workers' listener on loopback with their fixture secrets
+  (../protocol/README.md, 15.3). Each worker has one slot: two tasks on
+  the fake LLM peer and the fake git program, one placed on each worker,
+  each run to its end. It shares the standalone stories' hosts, fakes
+  and checks; the shapes' checks are step tests, and placement, a lost
+  worker and its grace the engine's domain world's.
+
 What only the real kernel shows is this tier's: transport, persistence
 and lifecycle, `temper ctl`'s lock and DIRECTORY's files
 (../client/tools.md, 11.3), within 6.1's budgets. A failure found here
 is rerun lower down as a scenario, where it replays (testing-strategy.md,
 2.8). The process tier keeps executable startup, CLI
 parsing, exit statuses, OS process launch and signal handling, the
-owned Forgejo and runner, and production's containment (section 6).
+owned Forgejo and runner, the cluster's processes, and production's
+containment (section 6).
 
 ### 2.5 The one-process world
 
@@ -571,6 +584,19 @@ and 10).
   path in `TEMPER_TEST_CLAUDE`. The argument checks, the directories
   checked at each name and made private, and the command's arguments and
   environment before the exec are the shell's lower tests.
+- **The cluster,** its own tests (../protocol/README.md, 15.6), on
+  temper's fakes as processes, never on Forgejo: `lab/cluster/`, the
+  lab's description of the cluster (../protocol/README.md, 15.5), read
+  by `crates/temper/tests/support/cluster.rs`, which starts the fake
+  forge, the fake LLM, the engine alone and two workers alone as
+  processes, each in a cgroup of its own, awaits their ready lines and
+  stops them in reverse. Its stories: a task on each worker; a worker
+  lost, killed mid-run; a worker hung, stopped past the grace and
+  continued; a worker started later, and one restarted; and a mixed
+  document refused, exit 1. Each story's referee is the tier's, the
+  forge's state read from the fake forge's API, and no process of the
+  cluster outliving it. Without delegated cgroups the cluster's tests
+  fail at their start, saying why (section 10).
 - **Outside the suites:** nextest profile `process`, run by
   `scripts/proof-one-process.sh`, which builds the binary and the fake
   `claude` first and sets `TEMPER_TEST_CLAUDE`. It aims at 3 minutes; if
@@ -1183,7 +1209,9 @@ world of temper's on a scripted engine (../client/README.md, section 10).
 ```
 crates/*/src/tests.rs               step tests
 tests/codecs                        temper-codecs-world: the generated codecs and the foreign documents' decoders
-crates/temper/tests/process.rs      the process tier (2.6): the story, the terminal, the server's guards, the hinted story, `temper box`; nextest profile process
+crates/temper/tests/process.rs      the process tier (2.6): the story, the terminal, the server's guards, the hinted story, `temper box`, the cluster's stories; nextest profile process
+crates/temper/tests/support/cluster.rs  the cluster's reader: `lab/cluster/` started, awaited and stopped on skein-world's `Binary` (../protocol/README.md, 15.5)
+lab/cluster                         the cluster's description, in the lab's format, which the process tier and skein's lab runner both run
 crates/temper/tests/live.rs         the live tier (2.7), nextest profile live
 tests/client-browser                temper-client-browser-world: the browser tier (../client/browser.md, section 4), Chromium against temper serve on the bundle the gate builds; nextest profile browser
 crates/temper-client-shell-terminal/tests  the terminal's machine world (../client/README.md, section 10)
@@ -1261,7 +1289,9 @@ scripts/after-landing.sh            the process tier, after each landing
   the bridge.
 - **What the real loop leaves out:** the real-git bridge (above),
   CI that runs a workflow's steps in the shell subset (how much sh,
-  below), faults in the loop, and several real workers in one world.
+  below), and faults in the loop. Several workers in one world are the
+  cluster's services (2.4); the cluster's faults, a worker lost or hung,
+  are the process tier's (2.6).
 - **How much sh:** which commands and syntax the subset takes. It stays a
   subset of POSIX, so that real sh agrees.
 - **Where the shell's interpreter lives,** so that the machine and the
@@ -1275,7 +1305,10 @@ scripts/after-landing.sh            the process tier, after each landing
   in the tiers below. Default: checked in the one-process world.
 - **The process tier's privileges:** the containment it shares with
   production needs user namespaces and a delegated cgroup on the test
-  host. Default: process groups.
+  host. Default: process groups, but the cluster's tests, which observe
+  several processes and need skein-world's cgroup trees, delegated by
+  the user's service manager, and fail at their start without them
+  (2.6).
 - **The machine's git in the process tier.** Default: whatever git the
   test host has, 2.41 or later, which ../protocol/git.md's start refuses below
   (../protocol/git.md, section 3); transcripts are of 2.53.

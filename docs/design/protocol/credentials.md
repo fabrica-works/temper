@@ -1,6 +1,6 @@
 # Credentials
 
-Provisional, 2026-10-03, revised 2026-10-20. temper's credentials: which
+Provisional, 2026-10-03, revised 2026-10-21. temper's credentials: which
 secrets temper's processes hold, where each comes from, who may use it,
 and how it reaches the process that does. LLM accounts, workers' secrets
 and people's sign-ins are jig's (jig's `protocol/README.md`, section 8;
@@ -449,7 +449,9 @@ sources in its holder's order. temper configures the LLM providers
   (section 5) keeps the new record, then announces the next generation.
   A GitHub forge's tokens renew themselves. Generation 1 at each start is
   sound only because no worker outlives the engine: in standalone the
-  worker is in the engine's process (section 8).
+  worker is in the engine's process, and the cluster restarts whole,
+  its workers stopped before its engine and never left under a new one
+  (README, 15.4; section 8).
 
 ## 5. The forges' access
 
@@ -602,9 +604,10 @@ sources in its holder's order. temper configures the LLM providers
 - **Generations across starts.** Generation 1 at every start names a new
   value once a record is replaced or a token minted, which is sound only
   while no worker outlives the engine; a GitHub forge's identity moves
-  about one generation an hour per installation. Default: standalone
-  only; a fleet whose workers outlive the engine waits for generations
-  kept across starts.
+  about one generation an hour per installation. Default: standalone,
+  and the cluster restarted whole (README, 15.4); a fleet whose workers
+  outlive the engine waits for generations kept across starts, with
+  hosts apart (README, section 14).
 - **Rows of a forge not configured.** Default: left as they are and
   named once in the log at start; erasing them waits for a request that
   disconnects a forge.

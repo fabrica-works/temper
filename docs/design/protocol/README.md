@@ -1,6 +1,6 @@
 # The protocol layer
 
-Provisional, 2026-10-03, revised 2026-10-20. temper's protocol layer:
+Provisional, 2026-10-03, revised 2026-10-21. temper's protocol layer:
 how temper composes jig's protocol layer with components of its own (its
 forge's, its checkout's, its client's) into the processes of one binary.
 jig owns the layer's shape (jig's `protocol/README.md`) and the services'
@@ -9,7 +9,8 @@ the crates it is made of. The mechanics are those of skein's
 `programming-model.md` (sections 2, 4 and 9); the entities it carries are
 those of `../domain/`. Each boundary of temper's own is designed in a
 document of its own (section 2). What is open across them is listed in
-section 14.
+section 14. The cluster, temper as several processes of one machine for
+its tests and its lab, is section 15.
 
 ## 1. In one page
 
@@ -49,6 +50,13 @@ section 14.
   another host, the forge as a sign-in provider and the forge's client
   documents come after (section 14). The browser is a person's client
   on loopback too (`../client/browser.md`).
+- **The cluster, for tests and the lab.** The same `temper serve`, on a
+  document of another shape, is an engine alone or a worker alone. One
+  engine alone and its workers alone, each a process of its own on one
+  machine, joined over loopback in plaintext, with the fakes as
+  processes beside them, are the cluster that temper's process tier and
+  the QA lab both run, from one description (section 15). It is no
+  deployment's shape: a box keeps its one worker inside `temper serve`.
 - **One binary:** `serve`, `agent`, `open`, `program-login`, the forge's
   setup's `forge prepare`, `forge run` and `box`, and
   the agents' `ctl`, which `../client/tools.md` designs (section 4).
@@ -111,6 +119,10 @@ binary (`jig-test`).
 | Name | What it is |
 |---|---|
 | standalone | one process on one person's machine: `temper serve` with the engine and one worker joined in process (section 8) |
+| engine alone | `temper serve` on a document with an engine and no worker, its workers' listener on loopback (15.1) |
+| worker alone | `temper serve` on a document with one worker and no engine, dialling an engine alone on loopback (15.1) |
+| the cluster | one engine alone and its workers alone on one machine, with the fakes as processes, as temper's process tier and the QA lab run it (section 15) |
+| the cluster's description | `lab/cluster/`: the cluster's processes and their documents in the lab's experiment format, read by the lab's runner and by the process tier's (15.5) |
 | the engine's service, the worker's service | each `iterate` with its root and protocol layer, in `temper-service` (sections 6 and 7) |
 | the routing | the protocol layer's code between io, components and the root (jig's `protocol/service.md`, section 2) |
 | the forge component | skein's `skein-forge-connection` (forge.md; skein's `forge-connection.md`) |
@@ -165,16 +177,23 @@ default; the document is `temper.json` in the configuration directory
 (configuration.md, section 12).
 
 - **`temper serve`:** reads the configuration (configuration.md,
-  section 2), opens the store in the deployment's directory, and runs
-  the engine's and the worker's services in one process on skein's
-  `Host` and `drive` (jig's `protocol/service.md`, sections 4 and 10).
+  section 2) and runs the services its document's shape names, in one
+  process on skein's `Host` and `drive` (jig's `protocol/service.md`,
+  sections 4 and 10): standalone, the engine's and the worker's, the
+  store in the deployment's directory; an engine alone, the engine's
+  with its store and no worker; a worker alone, the worker's, with no
+  store (15.1).
   - Its stdout carries only sign-in links, one per line: each the
     secret jig's clients' component gives, in jig's default mapping's
     link route under temper's prefix (jig's `protocol/client.md`,
     section 8; `../client/README.md`, section 7); its stderr carries startup
-    notes and the reason of a failure.
+    notes, the lines of 15.3 (each TCP listener once bound, and a worker
+    alone's link at each opening) and the reason of a failure. A worker
+    alone prints no sign-in link.
   - A first termination signal drains it (jig's `protocol/service.md`,
-    section 5); a second turns the drain into an abort.
+    section 5), and a worker alone's runs its worker's ending (jig's
+    `protocol/service.md`, section 6); a second turns either into an
+    abort.
 - **`temper init`:** writes a deployment that starts, the default
   document among it, into the three directories, refusing when the
   configuration directory holds a document (setup.md, 8.2).
@@ -206,7 +225,8 @@ default; the document is `temper.json` in the configuration directory
     order, restarted when they exit and stopped in reverse order; its
     stdout is `temper serve`'s, its stderr each step's, line by line,
     prefixed by the step's name (setup.md, section 7).
-- **Exit status:** 0 after a drained shutdown or a finished command; 1 on
+- **Exit status:** 0 after a drained shutdown, a worker alone's ending
+  or a finished command; 1 on
   any failure (a refused start, a usage error, a failed commit, an
   abort, a failed step of the setup, the box giving up), the reason on
   stderr. smith's agent shell exits 0 or 1 the same way; `temper ctl`'s
@@ -231,7 +251,8 @@ temper program-login NAME              run by hand on a host, replaced by the pr
 ```
 
 A box runs `temper serve` as one of its steps, after the forge's setup's
-commands, each a child of its own (setup.md, 7.1).
+commands, each a child of its own (setup.md, 7.1). The cluster's
+processes are 15.2's.
 
 ## 5. Components and crates
 
@@ -633,8 +654,10 @@ temper: its tiers, fakes, layout and budgets. What checks this layer:
 - **The process tier and the live tier:** the real binary end to end,
   outside the two suites: a chat answered, a change landed on an owned
   Forgejo with CI and webhooks, the binary killed and restarted, `temper
-  box`, `temper program-login` over smith's fake `claude`; then a real
-  model (`../domain/testing.md`, 2.6 and 2.7; setup.md, 13.4).
+  box`, `temper program-login` over smith's fake `claude`, the cluster
+  with a task on each of two workers alone and a worker lost (15.6);
+  then a real model (`../domain/testing.md`, 2.6 and 2.7; setup.md,
+  13.4).
 
 ## 14. Open questions
 
@@ -659,8 +682,248 @@ Each document keeps its own; these cross them:
 - **After standalone,** each designed where it is named, and needed only
   beyond one person's machine: webhooks from another host, over TLS
   (forge.md, section 5); hosts apart: TLS on the engine's listeners,
-  contained process trees, a process with a worker only (jig's
-  `protocol/README.md`, section 10); the forge as people's sign-in
+  contained process trees, a worker alone on another host (jig's
+  `protocol/README.md`, section 10; on one machine it is the cluster's,
+  section 15); the forge as people's sign-in
   provider (credentials.md, section 8); the forge's client documents and
   panels (`../client/forge.md`); and what the forge's setup leaves for later
   (setup.md, section 15). Default: standalone.
+- **An engine restarted under live workers.** The engine announces its
+  identities' values at generation 1 at each start, sound only while no
+  worker outlives it (credentials.md, section 4). Default: the cluster
+  restarts whole, its workers stopped before its engine (15.4);
+  generations kept across starts come with hosts apart (credentials.md,
+  section 8).
+- **`temper init` for the cluster's shapes.** Default: none; `temper
+  init` writes standalone, and the cluster's documents are its
+  description's templates (15.5). Hosts apart would want it.
+- **Limits across processes.** Each process checks its own document
+  (configuration.md, section 7); what holds only between an engine's
+  limits and a worker's, the cluster's one template holds, writing the
+  same `application.limits` into each of its documents, and jig's link
+  holds the rest at its opening, by its terms and the hello's bounds
+  (15.3). Default: so; a digest of the limits at the
+  link's opening, beside the payload's version, comes with hosts apart.
+- **The description's Rust reader's home.** Default: temper's process
+  tier's support (15.5); skein-world's, once a second product runs a
+  cluster of its own.
+
+## 15. The cluster
+
+The cluster is temper on several processes of one machine: one engine
+alone, its workers alone, and the fakes, each a process of its own,
+joined over loopback. It is a primitive of temper's tests and of the QA
+lab, the reference case's shape on fakes: an engine and its workers, one
+of them added later (`../draft/reference-case.md`, section 3). It is no
+deployment's: `temper init` writes standalone, and a box keeps its one
+worker inside `temper serve` (setup.md, 7.1). TLS, containment and other
+hosts are later (15.7).
+
+### 15.1 Its shapes
+
+`temper serve` takes its shape from its document's members, and from
+nothing else: no flag, no command of its own.
+
+| Shape | `engine` | `workers` | `application` |
+|---|---|---|---|
+| standalone | jig's engine part; `hosts.listener` `[{"in_process": "workers"}]` | one, whose `engine` is `{"in_process": "workers"}` | every member; `workers`, one entry |
+| engine alone | jig's engine part; `hosts.listener` one socket address on loopback, in plaintext, its port 0 or fixed; `hosts.workers` the cluster's workers, each with its digest | `[]` | every member; `workers` `[]` |
+| worker alone | absent | one, whose `engine` is a socket address on loopback, in plaintext | `workers`, one entry, and `limits`, alone |
+
+- **Never mixed.** A document of none of these shapes is refused, naming
+  the path that departs from the nearest: an engine with both a worker
+  and a socket listener, a listener list with an in-process name and a
+  socket, a worker alone with any other member. An in-process listener
+  tells jig's core that no worker outlives the engine, so it settles the
+  claims of every worker at once on a restart (jig's `domain/engine.md`,
+  section 6): a socket's workers among them would lose their runs.
+- **Each shape's checks** (configuration.md, section 2): standalone's,
+  as section 2 gives them; an engine alone's the same, but for its
+  listener and its workers, by the table's rule, and the root's for
+  every shape with an engine; a worker alone's, its worker part's, its
+  entry of `application.workers` (configuration.md, section 4) and the
+  limits' checks its side holds (configuration.md, section 7).
+- **The service** has an optional engine and an optional worker:
+  standalone both, an engine alone no worker, and a worker alone no
+  engine, whose loop, ending and exit are its worker's alone, with no
+  store (sections 6 and 7; jig's `protocol/service.md`, section 6).
+- **Three directories for each process,** its own (configuration.md,
+  section 12): an engine alone's data holds the deployment's directory,
+  the store and the secrets' store among it, and each worker's digest; a
+  worker alone's, its secret, its root, where its workspaces are, and
+  its programs directory. No two processes share one.
+- **Memory by its service:** an engine alone's worst case within
+  `engine.memory_bytes`, a worker alone's within its worker part's
+  `memory_bytes` (configuration.md, section 7); io's sockets, each its
+  own service's.
+- **`temper program-login`** takes a worker alone's directories as it
+  takes standalone's, and reads only the worker's part: each worker
+  signs its programs in on its own, and none is copied to another
+  (`../draft/reference-case.md`, 4.5).
+
+### 15.2 Its processes
+
+```
+fake forge   temper fake forge ... --ready PREFIX    (setup.md, 8.4)
+fake llm     temper fake llm ... --ready PREFIX
+engine       temper serve DIRS     after both fakes: an engine alone
+w1, w2       temper serve DIRS     after the engine: each a worker alone
+  agents, git                      its children, each a process group
+```
+
+- **Started in order, stopped in reverse:** the fakes; the engine, once
+  both fakes are ready; each worker, once the engine is (15.3). A worker
+  may start later than the others, as the reference case's s2 does.
+- **Every address from a ready line:** each listener binds port 0 on
+  127.0.0.1, and its process prints what it got; the description's
+  templates carry it to the processes after it (skein's `lab.md`, 4.4).
+  The engine's document names the fakes' addresses as their ready lines
+  gave them, and each worker's names the engine's workers' listener as
+  its `listening workers` line gave it.
+- **Workers are the engine's configured positions,**
+  `engine.hosts.workers`, each with its own name and secret (jig's
+  `domain/engine.md`, section 8). A worker started later is a position
+  the engine knows from its start, empty until that worker links; a
+  position added is a new engine document, so the cluster's restart
+  (15.4).
+- **The fakes are setup.md, 8.4's,** each a process of its own with its
+  ready line. A worker's git is the program an assignment's repositories
+  name, `temper fake git` for a fake forge (channel.md, section 4): the
+  workers share the fake forge's machine, so its program's path and its
+  loopback listener serve them as they serve standalone's worker.
+
+### 15.3 Joining, and its lines
+
+- **jig's link, in plaintext over loopback** (jig's
+  `protocol/channel.md`, section 10): the worker dials the engine's
+  workers' listener; the engine takes its name and its secret against
+  that worker's digest, then its hello: its capability, its configured
+  position, its capacity and a stop bound strictly below the engine's
+  grace, `fleet.grace_ms`. The worker redials, jittered and doubling,
+  until it links.
+- **Secrets are the description's fixtures:** each worker's secret, and
+  its digest in the engine's data, a fixed pair the description holds
+  and renders into each process's directories (15.5); a test's, never a
+  deployment's, and never copied from one.
+- **Short graces:** the description's are seconds, each worker's stop
+  bound below the engine's grace, so a lost worker's runs are placed
+  again within a test's time.
+- **Lines on stderr,** each one line, flushed once what it says holds;
+  the cluster's contract, read by their literal prefixes (skein's
+  `lab.md`, 4.3):
+
+  | Line | Printed by | When |
+  |---|---|---|
+  | `listening <listener> <address>` | each shape with an engine, for `clients`, `webhooks` and a socket's `workers` | once that listener is bound, with the address bound (`listening workers 127.0.0.1:41733`) |
+  | `linked <worker> <address>` | a worker alone | at each opening of its link: the engine has taken its secret and its hello is sent, with the engine's address |
+
+  A refused opening or hello is a note on the worker's stderr with jig's
+  reason, and the worker redials, as a worker between hosts would; it
+  never exits for one. The sign-in link stays on stdout (section 4).
+- **Ready** (skein's `lab.md`, 4.3): the engine at its `listening` lines
+  and its sign-in link; a worker at its `linked` line. A task created
+  before a worker's hello has reached the fleet waits for a free slot,
+  so no ready line need say more.
+
+### 15.4 Stopping, and what fails
+
+- **Stopped in reverse** (skein's `lab.md`, 5.2): each worker first, by
+  its first termination signal, which runs its worker's ending: its runs
+  stopped, and done once the engine has every turn and answer, or past
+  its grace (jig's `protocol/service.md`, section 6), exiting 0; then
+  the engine, drained, exiting 0; then the fakes. A process not ended
+  within the description's `stop_seconds` is killed, its tree with it,
+  and the stop fails.
+- **No survivors:** each process in a cgroup of its own, its agents and
+  git within it; a stop is done once its cgroup is empty, and a process
+  left in it is a survivor, killed and reported.
+- **A worker lost,** its tree killed mid-run: the engine's fleet keeps
+  its runs for its grace, then they are lost and their tasks retry, on a
+  worker with a free slot (jig's `domain/engine.md`, section 8). The
+  lost attempt is fenced, so nothing it may still have sent counts, and
+  nothing lands twice.
+- **A worker hung,** its tree stopped by `SIGSTOP` past the engine's
+  grace, then continued: its run has been placed again; it links again,
+  and the attempt it held, fenced, lands nothing.
+- **A worker restarted** on its own directories links again at its
+  position and takes new runs.
+- **The engine ends the cluster.** An engine that exits, or is killed,
+  under live workers ends the cluster's run: it is never restarted under
+  them (section 14). Its workers, past their grace, cancel their runs
+  and are stopped; an agent whose worker has gone sees its pipes close,
+  and ends.
+
+### 15.5 Its description
+
+- **One description, `lab/cluster/`** in temper: an experiment in the
+  lab's format, `lab-experiment/1` (skein's `lab.md`, section 4). Its
+  `processes` are 15.2's, each with its `argv`, its whole `env`, its
+  `ready` lines (15.3), its `after`, its `memory_bytes` (15.1) and its
+  `files`: its document, rendered from a template, and its secret or the
+  digests. Its templates name each address by `{proc.P.ready.C}` and
+  each directory by `{proc.P.dir}` (skein's `lab.md`, 4.2). A cost
+  class's `stop_seconds` is above each worker's stop bound and the
+  engine's drain.
+- **Two readers.** skein's lab runner runs it as any experiment (skein's
+  `lab.md`, section 5), its driver null until the lab's drivers come
+  (15.7). temper's process tier reads it with
+  `crates/temper/tests/support/cluster.rs`: the format, the directories
+  and the processes; the templates rendered; each process started by
+  skein-world's `Binary`, in a cgroup of its own, by `after`, ties in
+  name order, with no seed; its ready lines awaited on its streams; and
+  the processes stopped in reverse, a termination signal, then
+  `stop_seconds`, then the tree killed. It reads none of the lab's own
+  members (actions, faults, collection, checks), and refuses none.
+- **Why a description,** not one program both call: the lab's runner is
+  Python and the process tier is Rust; the lab's format is literal so
+  that readers in any language agree (skein's `lab.md`, 4.3); and a
+  change to the cluster is one file both run, so the tests and the lab
+  cannot drift apart. The reader is temper's until a second product
+  needs one (section 14).
+- **Cgroups, or no cluster:** several processes observed by one test
+  need skein-world's cgroup trees, where the user's service manager
+  delegates them; walking refuses a second observer. Without them, the
+  cluster's tests fail at their start, saying why.
+
+### 15.6 Its tests
+
+Each where `../domain/testing.md` puts it (2.4 to 2.6):
+
+| Where | What it shows |
+|---|---|
+| step tests | each shape read and checked, a document of none refused, naming its path; each line of 15.3 as printed |
+| the engine's domain | two workers at positions 0 and 1, one slot each: two tasks, one placed on each; one lost, its run placed on the other past the grace |
+| the real loop | an engine alone and two workers alone, three services on one ring with their own directories, the workers dialling the engine's listener on loopback: a task on each runs to its end |
+| the process tier | `lab/cluster/` on real processes, as below |
+
+The process tier's first stories, one slot on each worker:
+
+- **A task on each worker:** two tasks on the fakes, one run on w1 and
+  one on w2, each to its end; then the cluster stopped, each process
+  exiting 0, no survivor.
+- **A worker lost:** w1 killed mid-run; its task's run is placed on w2
+  past the grace, and lands once.
+- **A worker hung:** w1 stopped past the grace, then continued; its run,
+  placed on w2, lands once, and w1's attempt lands nothing.
+- **A worker started later:** w2 started once w1's slot is taken; the
+  second task waits, then runs on w2 once it links. A restarted worker
+  links again at its position.
+- **A mixed document,** each shape's departures, refuses its start,
+  exiting 1 and naming the path.
+
+These are the reference case's multi-worker steps at their smallest:
+4.1's placement by free slots, 4.3's worker added later, 4.6's hung
+worker (`../draft/reference-case.md`).
+
+### 15.7 Later
+
+- **TLS on the workers' listener, contained process trees, and workers
+  on other hosts,** with hosts apart (section 14): a worker alone on
+  another machine is the same document, its `engine` in TLS (jig's
+  `protocol/README.md`, section 10).
+- **An engine restarted under live workers,** with generations kept
+  across starts (section 14).
+- **The reference case's multi-worker steps driven in the lab,** by a
+  driver (skein's `lab.md`, section 6), once temper's experiments have
+  one; the cluster's description runs with none until then (15.5).
+- **`temper init` for the cluster's shapes** (section 14).

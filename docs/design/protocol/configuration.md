@@ -1,6 +1,6 @@
 # Configuration
 
-Provisional, 2026-10-14, revised 2026-10-20. What temper's processes
+Provisional, 2026-10-14, revised 2026-10-21. What temper's processes
 are told when they start: the one JSON document `temper serve` reads,
 and the forge's setup's commands with it, with jig's parts as jig
 defines them and temper's own members beside them; the private files it
@@ -17,7 +17,9 @@ document says what temper adds. What is open is listed in section 11.
 - **One document per `temper serve`,** in jig's shape: three top-level
   members, `engine` (jig's engine part), `workers` (jig's worker parts)
   and `application` (temper's members). Nothing else at the top level.
-  The forge's setup's commands read the same document (section 8).
+  The forge's setup's commands read the same document (section 8). Its
+  members give its shape: standalone, or the cluster's engine alone or
+  worker alone (section 2).
 - **Three directories,** configuration, data and cache, by skein's
   arguments' rule: the document is always `temper.json` in the
   configuration directory, each path in it is typed by the directory it
@@ -27,8 +29,8 @@ document says what temper adds. What is open is listed in section 11.
   duplicate or out-of-bound members refuse the start, naming the path
   (jig's `protocol/configuration.md`, section 1). A change is a restart.
 - **jig's parts are jig's:** `jig-protocol-config` parses them; temper
-  writes no parser of its own for them, and adds only the checks
-  standalone needs (section 2).
+  writes no parser of its own for them, and adds only the checks its
+  shapes need (section 2).
 - **temper's members,** under `application`: `forges`, `identities`,
   `landing`, `charter`, `clients`, `webhooks`, `setup`, `demo` and
   `limits` for the engine (section 3), and `workers`, one entry per worker (section 4).
@@ -74,7 +76,11 @@ document says what temper adds. What is open is listed in section 11.
   in-process name `workers`; the clients' listener, and the webhooks'
   listener when configured, on loopback, the clients' at a fixed port
   when a GitHub forge is configured; the agent program is temper's own
-  binary.
+  binary. `temper init` writes it, and every deployment is it.
+- **The cluster's two shapes,** for tests and the lab on one machine
+  (README, section 15): an engine alone, with no worker and a workers'
+  listener on loopback in plaintext, and a worker alone, with no engine,
+  dialling it. A document of none of the three is refused (section 2).
 - **The agent's configuration is smith's** (section 5), and `temper open`
   takes no file at all (section 9).
 
@@ -134,9 +140,31 @@ document says what temper adds. What is open is listed in section 11.
 
   The worker's `agent` names temper's own binary (section 5), which no
   check can tell from another program.
-- **What temper's root requires of jig's parts,** standalone or not, each
-  checked at start, a failure naming its path: `engine.limits`'
-  `fleet.engine_slots` is 0, and every charter's `hosts` is `"workers"`.
+- **The shape is read from the members,** before any other check, and
+  each shape's checks are its own (README, 15.1):
+
+  | Shape | `engine` | `workers` | `application` |
+  |---|---|---|---|
+  | standalone | present, `hosts.listener` `[{"in_process": "workers"}]` | one, its `engine` `{"in_process": "workers"}` | every member, `workers` one entry |
+  | engine alone | present, `hosts.listener` one socket address on loopback (in `127.0.0.0/8`, or `::1`), plaintext, its port fixed or 0; `hosts.workers` one or more | `[]` | every member, `workers` `[]` |
+  | worker alone | absent | one, its `engine` a socket address on loopback, plaintext | `workers`, one entry, and `limits`; no other member |
+
+  - an engine alone is checked as standalone is, but for its listener
+    and its workers, by the table, each worker's `digest` a data path
+    of its own;
+  - a worker alone is checked for its worker part, its entry of
+    `application.workers` (section 4), its agent's configuration
+    (section 5) and the limits its side takes (section 7), and for
+    nothing of an engine's;
+  - any other document is refused, naming the member that departs from
+    the nearest shape: an in-process listener beside a socket, an
+    engine with both a worker and a socket listener, a worker alone
+    with another member. An in-process listener tells jig's core that
+    no worker outlives the engine (jig's `domain/engine.md`, section 6),
+    which a socket's workers would.
+- **What temper's root requires of jig's parts,** in every shape with an
+  engine, each checked at start, a failure naming its path:
+  `engine.limits`' `fleet.engine_slots` is 0, and every charter's `hosts` is `"workers"`.
   The root has no hub child, so the fleet must place every run on a
   worker (`../domain/root.md`, section 2).
 - **Templates are jig's two defaults,** chat (template 1, label 1) and
@@ -155,13 +183,15 @@ document says what temper adds. What is open is listed in section 11.
      the document, `temper.json` in the configuration directory, whole,
      with skein's startup kit, within the bound jig's reference binary
      sets on a configuration's bytes;
-  2. jig's parts, by `jig-protocol-config`; `application`, by
+  2. jig's parts, by `jig-protocol-config`, and the shape they give;
+     `application`, with the members its shape takes, by
      `temper-service`'s startup, with `jig-protocol-config`'s readers, so
      every problem names its path the same way
      (`application.forges[0].api`); `setup`, `demo`, and the setup's and
      the box's limits, by their own crates' checks (setup.md, sections 8,
      8.4 and 11);
-  3. the checks across the whole: the references of sections 2 to 5,
+  3. the checks across the whole that its shape holds: the references
+     of sections 2 to 5,
      the clients' listener's fixed port with a GitHub forge and each
      identity's largest value against the channel's bound on a
      credential's value (section 3), the limits against each other and
@@ -359,7 +389,8 @@ and its forge routes each GitHub forge's `web`.
 ## 4. temper's members for a worker
 
 **`application.workers`:** a list with one entry per entry of the
-top-level `workers`, in the same order; standalone has one. Each:
+top-level `workers`, in the same order; standalone and a worker alone
+have one, an engine alone none. Each:
 
 | Member | Type | Bounds | Feeds |
 |---|---|---|---|
@@ -375,9 +406,10 @@ top-level `workers`, in the same order; standalone has one. Each:
   no credential but the worker's secret, and no forge configuration.
   Remotes, git identities and a fake forge's git program come with each
   assignment, in its repositories' records (channel.md, section 4).
-- **A remote worker** takes its own machine's git as its `git`: a fake
-  forge is on loopback alone (setup.md, 8.4), and no remote worker
-  serves its repositories.
+- **A worker on another host** takes its own machine's git as its `git`:
+  a fake forge is on loopback alone (setup.md, 8.4), and serves no
+  worker on another host. The cluster's workers are on its machine, and
+  it serves them (README, 15.2).
 
 ## 5. The agent's configuration
 
@@ -620,6 +652,16 @@ top-level `workers`, in the same order; standalone has one. Each:
     message, and the agent's message less that separator within the
     hub's event. So `hub.event_bytes` is the agent's `message_bytes` less
     2, and no other value starts.
+- **In the cluster's shapes** (README, 15.1), each process checks what
+  its document holds: an engine alone, every check above but the
+  worker's; a worker alone, the worker's, the checkout's and the git
+  component's, and the channel's for what its side receives. What only
+  an engine's document and a worker's hold together, the engine's
+  largest part against the worker's `limits` among it, is held by the
+  cluster's description, whose one template writes the same
+  `application.limits` into every document (README, 15.5), and at the
+  link's opening by jig's hello and terms (jig's `protocol/channel.md`,
+  4.3).
 - **jig's limits stay in jig's parts:** `engine.limits` and each worker's
   `limits` (jig's `protocol/configuration.md`, section 6).
 - **What the root takes of `engine.limits`:** its core children's
@@ -687,8 +729,9 @@ top-level `workers`, in the same order; standalone has one. Each:
   identities' table, the routing's records, forges' accesses and origins
   said, the setup host's states and runs) together must fit the memory
   jig's part states, `engine.memory_bytes` for the engine's service and
-  `memory_bytes` of the worker's part for the worker's, or the start is
-  refused, saying by how much. The owned example's `engine.limits`, worker `limits` and
+  `memory_bytes` of the worker's part for the worker's, each in the
+  process that holds it (section 2), or the start is refused, saying by
+  how much. The owned example's `engine.limits`, worker `limits` and
   `memory_bytes`, and why each holds, are setup.md, 8.1's.
 
 ## 8. First start and every start
@@ -1043,5 +1086,9 @@ variable, else its default.
   file and the demo model's key are data paths, and jig's secrets' store is in the deployment's directory.
 - **The box passes its three on** to each step, as flags, each absolute
   (setup.md, 7.1).
+- **Each of the cluster's processes has its own three** (README, 15.1):
+  an engine alone's data holds the deployment's directory and each
+  worker's digest; a worker alone's, its secret and its root. No two
+  processes share a data or cache directory.
 - **Tests give all three,** each a directory of the test's own: no test
   resolves a default under `$HOME` (`../domain/testing.md`).
