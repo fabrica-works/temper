@@ -15,7 +15,7 @@ fn the_looks_names_pass_skeins_check() {
 }
 #[test]
 fn each_style_or_region_is_named_under_temper() {
-    let named: [(skein_ui::Style, &[u8]); 60] = [
+    let named: [(skein_ui::Style, &[u8]); 62] = [
         (BANNER, b"temper-banner"),
         (NAVIGATION, b"temper-navigation"),
         (MAIN, b"temper-main"),
@@ -76,6 +76,8 @@ fn each_style_or_region_is_named_under_temper() {
         (EVENTS, b"temper-events"),
         (STATUS_DONE, b"temper-status-done"),
         (CHOICE, b"temper-choice"),
+        (ACCOUNTS_PAGE, b"temper-accounts-page"),
+        (ADOPTION_PAGE, b"temper-adoption-page"),
     ];
     for (style, name) in named {
         assert_eq!(NAMES.style(style), Some(name));
@@ -84,8 +86,8 @@ fn each_style_or_region_is_named_under_temper() {
 }
 #[test]
 fn each_pages_main_carries_the_main_token() {
-    let builds: [fn() -> temper_client_domain::Domain; 4] =
-        [fixtures::signed_out, fixtures::out_of_date, fixtures::adoption_root, fixtures::chats_root];
+    let builds: [fn() -> temper_client_domain::Domain; 3] =
+        [fixtures::signed_out, fixtures::out_of_date, fixtures::chats_root];
     for build in builds {
         let view = fixtures::page_view(&build());
         assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN])]);
@@ -95,7 +97,9 @@ fn each_pages_main_carries_the_main_token() {
     let view = fixtures::page_view(&fixtures::inbox_root());
     assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN, PAGE])]);
     let view = fixtures::page_view(&fixtures::account_root().0);
-    assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN])]);
+    assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN, PAGE])]);
+    let view = fixtures::page_view(&fixtures::adoption_root());
+    assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN, PAGE])]);
     let view = fixtures::page_view(&fixtures::chat::chat_root());
     assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN, CHAT])]);
 }
@@ -282,6 +286,25 @@ fn the_choice_token_stays_on_the_composer_slot() {
         let mut found = false;
         for node in view.tree().nodes() {
             if node.styles.as_slice().contains(&CHOICE) {
+                assert_eq!(node.role, Role::Slot);
+                found = true;
+            }
+        }
+        assert!(found);
+    }
+}
+
+#[test]
+fn the_account_and_adoption_bars_keep_their_headings() {
+    for (root, token) in [(fixtures::account_root().0, ACCOUNTS_PAGE), (fixtures::adoption_root(), ADOPTION_PAGE)] {
+        let view = fixtures::page_view(&root);
+        assert_eq!(fixtures::styles(view.tree(), Role::Heading { level: 1 }).as_ref(), [Box::from([])]);
+        let mut found = false;
+        for node in view.tree().nodes() {
+            if node.styles.as_slice().contains(&token) {
+                assert_eq!(node.role, Role::Slot);
+            }
+            if node.styles.as_slice().contains(&PAGEBAR) {
                 assert_eq!(node.role, Role::Slot);
                 found = true;
             }

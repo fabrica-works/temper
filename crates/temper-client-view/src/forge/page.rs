@@ -16,6 +16,8 @@ pub fn page(
     bindings: &mut Bindings,
     text_limit: u32,
 ) {
+    builder.open(Role::Slot);
+    builder.style(crate::look::PAGEBAR);
     builder.open(Role::Heading { level: 1 });
     let title = match project_name {
         Some(name) => words::say(words, Word::Title, &[Hole::Name(copy_of(name))]),
@@ -24,11 +26,17 @@ pub fn page(
     builder.name(&title);
     builder.text(skein_ui::Run::Plain, &title);
     builder.close();
+    builder.close();
+    builder.open(Role::Slot);
+    builder.style(crate::look::CARD);
+    builder.open(Role::Slot);
+    builder.style(crate::look::CARD);
     for (field, word) in
         [(forge::Text::Forge, Word::Forge), (forge::Text::Owner, Word::Owner), (forge::Text::Name, Word::Name)]
     {
         text_field(builder, form, field, word, words, bindings);
     }
+    builder.close();
     builder.open(Role::ChoiceGroup);
     builder.name(&words::say(words, Word::Role, &[]));
     for (role, word) in [
@@ -46,8 +54,11 @@ pub fn page(
     }
     builder.close();
     check(builder, form.home, Word::Home, Meaning::Home, words, bindings);
+    builder.open(Role::Slot);
+    builder.style(crate::look::CARD);
     text_field(builder, form, forge::Text::Prefix, Word::Prefix, words, bindings);
     text_field(builder, form, forge::Text::Landing, Word::Landing, words, bindings);
+    builder.close();
     check(builder, form.ci, Word::Ci, Meaning::Ci, words, bindings);
     text_field(builder, form, forge::Text::Checks, Word::Checks, words, bindings);
     builder.open(Role::Button);
@@ -75,6 +86,7 @@ pub fn page(
     if let Some(answer) = &form.outcome {
         outcome(builder, form, answer, words, text_limit);
     }
+    builder.close();
 }
 fn text_field(
     builder: &mut Builder,
@@ -85,6 +97,8 @@ fn text_field(
     bindings: &mut Bindings,
 ) {
     let field_state = form.texts.get(field.index()).expect("six fields");
+    builder.open(Role::Slot);
+    builder.style(crate::look::CARD);
     builder.open(Role::TextField);
     builder.name(&words::say(words, word, &[]));
     builder.value(&field_state.text, field_state.written);
@@ -94,6 +108,7 @@ fn text_field(
     }
     builder.close();
     broken(builder, field_state.broken, words);
+    builder.close();
 }
 fn check(
     builder: &mut Builder,

@@ -300,7 +300,13 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
     let counts = bindings.counts();
     b.open(Role::Main);
     b.style(crate::look::MAIN);
+    b.style(crate::look::PAGE);
+    b.open(Role::Slot);
+    b.style(crate::look::ACCOUNTS_PAGE);
+    b.open(Role::Slot);
+    b.style(crate::look::PAGEBAR);
     text(b, w, Role::Heading { level: 1 }, W::Accounts);
+    b.close();
     text(b, w, Role::Heading { level: 2 }, W::Own);
     if let Some(doc) = accounts::document(root.client()) {
         if doc.accounts.is_empty() {
@@ -385,6 +391,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
         form_page(b, root, w, bindings, form, text_per_node);
     }
     b.close();
+    b.close();
 }
 fn form_page(
     b: &mut Builder,
@@ -415,12 +422,16 @@ fn form_page(
             form.selection.holder == holder,
         );
     }
+    b.open(Role::Slot);
+    b.style(crate::look::CARD);
     for (field, word, value) in [
         (Field::Provider, W::ProviderField, form.selection.provider),
         (Field::Account, W::AccountField, form.selection.account),
         (Field::Source, W::SourceField, form.selection.source),
     ] {
         let Some(binding) = bindings.insert(Meaning::Field(field, form.selection)) else { continue };
+        b.open(Role::Slot);
+        b.style(crate::look::CARD);
         b.open(Role::TextField);
         b.name(&words::say(w, word, &[]));
         let text: Box<[u8]> = match value {
@@ -436,8 +447,11 @@ fn form_page(
             b.state(State::Disabled);
         }
         b.close();
+        b.close();
     }
     if let Some(binding) = bindings.insert(Meaning::Key) {
+        b.open(Role::Slot);
+        b.style(crate::look::CARD);
         b.open(Role::TextField);
         b.name(&words::say(w, W::KeyField, &[]));
         b.entry(skein_ui::EntryKind::Secret);
@@ -447,11 +461,15 @@ fn form_page(
             b.state(State::Disabled);
         }
         b.close();
+        b.close();
     }
+    b.close();
     let busy = busy || bindings.invalid();
     if bindings.invalid() {
         text(b, w, Role::Alert, W::Selection);
     }
+    b.open(Role::Slot);
+    b.style(crate::look::CARD);
     let name = root.pages().account_name();
     for (operation, word) in [
         (Operation::SignIn, W::SignInAction),
@@ -486,6 +504,7 @@ fn form_page(
         control(b, w, bindings, W::Confirm, Meaning::Action(Act::Confirm), busy, false);
     }
     control(b, w, bindings, W::Cancel, Meaning::Action(Act::Cancel), false, false);
+    b.close();
     outcome(b, root, w, form, text_per_node);
     b.close();
 }

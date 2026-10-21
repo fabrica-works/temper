@@ -121,6 +121,10 @@ pub const EVENTS: Style = Style { owner: owner(), token: 57 };
 pub const STATUS_DONE: Style = Style { owner: owner(), token: 58 };
 /// The next-run model choice block.
 pub const CHOICE: Style = Style { owner: owner(), token: 59 };
+/// The accounts page body, separate from the banner notice.
+pub const ACCOUNTS_PAGE: Style = Style { owner: owner(), token: 60 };
+/// The repository adoption page body.
+pub const ADOPTION_PAGE: Style = Style { owner: owner(), token: 61 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -186,6 +190,8 @@ pub const NAMES: Names<'static> = Names {
         b"temper-events",
         b"temper-status-done",
         b"temper-choice",
+        b"temper-accounts-page",
+        b"temper-adoption-page",
     ],
     regions: &[b"temper-link"],
 };

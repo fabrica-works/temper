@@ -42,7 +42,11 @@ impl View {
         let project = crate::pages::project_name(root.pages(), root.client(), form.project);
         b.open(Role::Main);
         b.style(crate::look::MAIN);
+        b.style(crate::look::PAGE);
+        b.open(Role::Slot);
+        b.style(crate::look::ADOPTION_PAGE);
         forge::page::page(b, form, project, &self.forge_words, &mut self.forge, self.limits.tree.text_per_node);
+        b.close();
         b.close();
     }
     #[must_use]
