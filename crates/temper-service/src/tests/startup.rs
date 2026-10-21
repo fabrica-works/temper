@@ -105,11 +105,15 @@ fn an_unknown_profile_is_refused_naming_its_path() {
     assert_eq!(&*refused(input.as_bytes()), b"application.limits.profile: the only profile is \"small\"\n");
 }
 #[test]
+#[expect(clippy::disallowed_macros, reason = "ordinary tests format input and diagnostics")]
 fn an_override_by_dotted_name_is_set_or_refused() {
     let jig = fixtures::engine().jig;
     let input = core::str::from_utf8(fixtures::APPLICATION).unwrap();
     for (override_value, expected) in [
-        ("\"overrides\":{\"forge.repositories\":3}", ""),
+        (
+            "\"overrides\":{\"forge.repositories\":3,\"forges.log_origins\":3,\"forge_component.log_origins\":7,\"forge_component.log_poll_ms\":7123,\"forge_component.log_catch_up_ms\":9321,\"forge_component.log_pages\":13,\"forge_component.delivery_bytes\":12345}",
+            "",
+        ),
         (
             "\"overrides\":{\"forge.nothing\":3}",
             "application.limits.overrides.forge.nothing: no limit of temper's has this name\n",
@@ -123,7 +127,27 @@ fn an_override_by_dotted_name_is_set_or_refused() {
         assert_eq!(&*lines(&problems), expected.as_bytes(), "row {override_value}");
         if let Some(members) = members {
             assert_eq!(members.limits.forge.repositories, 3, "set {override_value}");
+            assert_eq!((members.limits.forges.log_origins, members.limits.forge_component.log_origins), (3, 7));
+            assert_eq!(members.limits.forge_component.log_poll, skein_lib::Duration::from_millis(7123));
+            assert_eq!(members.limits.forge_component.log_catch_up, skein_lib::Duration::from_millis(9321));
+            assert_eq!(members.limits.forge_component.log_pages, 13);
+            assert_eq!(members.limits.forge_component.delivery_bytes, 12_345);
         }
+    }
+    for (name, value) in [
+        ("forges.log_origins", u64::from(u32::MAX) + 1),
+        ("forge_component.log_origins", u64::from(u32::MAX) + 1),
+        ("forge_component.log_poll_ms", u64::MAX / 1_000_000 + 1),
+        ("forge_component.log_catch_up_ms", u64::MAX / 1_000_000 + 1),
+        ("forge_component.log_pages", u64::from(u32::MAX) + 1),
+        ("forge_component.delivery_bytes", u64::from(u32::MAX) + 1),
+    ] {
+        let override_value = format!("\"overrides\":{{\"{name}\":{value}}}");
+        let (_, problems) = application(input.replace("\"overrides\":{}", &override_value).as_bytes(), &jig);
+        assert_eq!(
+            lines(&problems).as_ref(),
+            format!("application.limits.overrides.{name}: outside its type\n").as_bytes()
+        );
     }
 }
 #[test]
@@ -621,6 +645,77 @@ fn load_refuses_a_record_one_byte_short_of_app_key() {
         lines(&found).as_ref(),
         b"application.limits.overrides.records.value_bytes: must agree with AppKey (forge_component.key_bytes)\n"
     );
+}
+#[test]
+#[expect(clippy::disallowed_macros, reason = "ordinary tests format input and diagnostics")]
+fn load_refuses_log_limits_naming_both_bounds() {
+    let document = fixtures::document();
+    let document = core::str::from_utf8(&document).unwrap();
+    let needle = "\"overrides\":{\"checkout.name_bytes\"";
+    assert_eq!(document.matches(needle).count(), 1);
+    for (overrides, expected) in [
+        (
+            "\"forges.log_origins\":0",
+            "application.limits.overrides.forges.log_origins: must agree with forges.log_origins (above 0)\n",
+        ),
+        (
+            "\"forge_component.log_origins\":0",
+            "application.limits.overrides.forge_component.log_origins: must agree with forge_component.log_origins (above 0)\napplication.limits.overrides.forges.log_origins: must agree with forge_component.log_origins\n",
+        ),
+        (
+            "\"forge_component.log_poll_ms\":0",
+            "application.limits.overrides.forge_component.log_poll_ms: must agree with forge_component.log_poll_ms (above 0)\n",
+        ),
+        (
+            "\"forge_component.log_catch_up_ms\":0",
+            "application.limits.overrides.forge_component.log_catch_up_ms: must agree with forge_component.log_catch_up_ms (above 0)\napplication.limits.overrides.forge_component.log_catch_up_ms: must agree with forge_component.log_poll_ms\n",
+        ),
+        (
+            "\"forge_component.log_pages\":0",
+            "application.limits.overrides.forge_component.log_pages: must agree with forge_component.log_pages (above 0)\n",
+        ),
+        (
+            "\"forge_component.delivery_bytes\":0",
+            "application.limits.overrides.forge_component.delivery_bytes: must agree with forge_component.delivery_bytes (above 0)\n",
+        ),
+        (
+            "\"forges.log_origins\":5,\"forge_component.log_origins\":5",
+            "application.limits.overrides.forges.log_origins: must agree with forges.log_origins (at most 4)\n",
+        ),
+        (
+            "\"forges.log_origins\":3,\"forge_component.log_origins\":2",
+            "application.limits.overrides.forges.log_origins: must agree with forge_component.log_origins\n",
+        ),
+        (
+            "\"forge_component.log_poll_ms\":86400000,\"forge_component.log_catch_up_ms\":86399999",
+            "application.limits.overrides.forge_component.log_catch_up_ms: must agree with forge_component.log_poll_ms\n",
+        ),
+        (
+            "\"forge_component.log_catch_up_ms\":86400001",
+            "application.limits.overrides.forge_component.log_catch_up_ms: must agree with forge_component.log_catch_up_ms (at most 86400000 ms / 24 h)\n",
+        ),
+    ] {
+        let input = document.replacen(needle, &format!("\"overrides\":{{{overrides},\"checkout.name_bytes\""), 1);
+        let found = crate::named(input.as_bytes(), &config::Directories::working()).unwrap_err();
+        assert_eq!(lines(&found).as_ref(), expected.as_bytes(), "{overrides}");
+    }
+    let overrides = "\"forges.log_origins\":3,\"forge_component.log_origins\":7,\"forge_component.log_poll_ms\":7123,\"forge_component.log_catch_up_ms\":9321,\"forge_component.log_pages\":13,\"forge_component.delivery_bytes\":12345";
+    let input = document.replacen(needle, &format!("\"overrides\":{{{overrides},\"checkout.name_bytes\""), 1);
+    crate::named(input.as_bytes(), &config::Directories::working()).unwrap();
+    // Named checks all relations; inspect the same document through the existing application parser.
+    let parsed =
+        config::document(input.as_bytes(), &config::DocumentLimits { bytes: 1_048_576, tokens: 16_384, depth: 32 })
+            .unwrap();
+    let at = config::read::Object::new(&parsed, 0).unwrap().member(&parsed, b"application").unwrap();
+    let jig = fixtures::engine().jig;
+    let mut problems = Problems::empty();
+    let loaded = application::parse(&parsed, at, &jig, &config::Directories::working(), &mut problems).unwrap().limits;
+    assert!(problems.is_empty());
+    assert_eq!((loaded.forges.log_origins, loaded.forge_component.log_origins), (3, 7));
+    assert_eq!(loaded.forge_component.log_poll, skein_lib::Duration::from_millis(7123));
+    assert_eq!(loaded.forge_component.log_catch_up, skein_lib::Duration::from_millis(9321));
+    assert_eq!(loaded.forge_component.log_pages, 13);
+    assert_eq!(loaded.forge_component.delivery_bytes, 12_345);
 }
 #[test]
 fn github_defaults_and_the_identity_join_need_no_credential_files() {

@@ -45,6 +45,8 @@ pub struct Records {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Forges {
     pub installations: u32,
+    /// Maximum configured job-log origins per forge (protocol/configuration.md, 7).
+    pub log_origins: u32,
 }
 /// Refusal of an override; the caller retains its name.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -282,7 +284,7 @@ pub fn profile(profile: Profile) -> Limits {
         Profile::Small => Limits {
             setup: temper_forge_setup::limits::host(),
             records: Records { value_bytes: 4096 },
-            forges: Forges { installations: FORGE_INSTALLATIONS },
+            forges: Forges { installations: FORGE_INSTALLATIONS, log_origins: 4 },
             forge_component: crate::forge::small(&FORGE),
             root: ROOT,
             forge: FORGE,

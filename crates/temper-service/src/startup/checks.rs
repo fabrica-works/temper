@@ -4,7 +4,7 @@ use crate::{limits, settings};
 use jig_domain_fleet as fleet;
 use jig_protocol_config::{self as config, Path, Segment};
 use skein_io::Addr;
-use skein_lib::{List, Map};
+use skein_lib::{Duration, List, Map};
 use temper_engine_domain as domain;
 use temper_protocol_worker_wire as payload;
 use temper_worker_domain as worker_domain;
@@ -637,7 +637,7 @@ fn charter_index(engine: &config::Engine, number: u32) -> usize {
     }
     unreachable!("canonical shortfall names a configured charter")
 }
-fn millis(duration: skein_lib::Duration) -> u64 {
+fn millis(duration: Duration) -> u64 {
     duration.as_nanos() / 1_000_000
 }
 /// One io holds engine links, the worker's link, and four entities per child.
@@ -788,6 +788,39 @@ pub fn records(
     forges: &[super::application::Forge],
     problems: &mut Problems,
 ) {
+    let component = &limits.forge_component;
+    for (name, positive, other) in [
+        (b"forges.log_origins".as_slice(), limits.forges.log_origins > 0, b"forges.log_origins (above 0)".as_slice()),
+        (b"forge_component.log_origins", component.log_origins > 0, b"forge_component.log_origins (above 0)"),
+        (b"forge_component.log_poll_ms", component.log_poll > Duration::ZERO, b"forge_component.log_poll_ms (above 0)"),
+        (
+            b"forge_component.log_catch_up_ms",
+            component.log_catch_up > Duration::ZERO,
+            b"forge_component.log_catch_up_ms (above 0)",
+        ),
+        (b"forge_component.log_pages", component.log_pages > 0, b"forge_component.log_pages (above 0)"),
+        (b"forge_component.delivery_bytes", component.delivery_bytes > 0, b"forge_component.delivery_bytes (above 0)"),
+    ] {
+        if !positive {
+            against(problems, name, other);
+        }
+    }
+    if limits.forges.log_origins > 4 {
+        against(problems, b"forges.log_origins", b"forges.log_origins (at most 4)");
+    }
+    if limits.forges.log_origins > component.log_origins {
+        against(problems, b"forges.log_origins", b"forge_component.log_origins");
+    }
+    if component.log_catch_up < component.log_poll {
+        against(problems, b"forge_component.log_catch_up_ms", b"forge_component.log_poll_ms");
+    }
+    if component.log_catch_up > Duration::from_secs(86_400) {
+        against(
+            problems,
+            b"forge_component.log_catch_up_ms",
+            b"forge_component.log_catch_up_ms (at most 86400000 ms / 24 h)",
+        );
+    }
     let value = limits.records.value_bytes;
     if value == 0 || value > secret_value_bound(jig, limits).unwrap_or(0) {
         against(problems, b"records.value_bytes", b"engine.limits.store.value");

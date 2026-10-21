@@ -36,7 +36,12 @@ fn no_two_component_prefixes_meet() {
 #[test]
 fn an_override_sets_the_field_its_dotted_name_names() {
     let mut limits = limits::profile(limits::Profile::Small);
-    let rows: [(&[u8], u64); 7] = [
+    assert_eq!((limits.forges.log_origins, limits.forge_component.log_origins), (4, 4));
+    assert_eq!(limits.forge_component.log_poll, Duration::from_secs(5));
+    assert_eq!(limits.forge_component.log_catch_up, Duration::from_secs(86_400));
+    assert_eq!(limits.forge_component.log_pages, 10);
+    assert_eq!(limits.forge_component.delivery_bytes, 1_048_576);
+    let rows: [(&[u8], u64); 13] = [
         (b"forge.repositories", 3),
         (b"forge.client.calls", 5),
         (b"forge.client.settle_ms", 2_000),
@@ -44,6 +49,12 @@ fn an_override_sets_the_field_its_dotted_name_names() {
         (b"root.loads.rows", 9),
         (b"clients.bundle_files", 2),
         (b"clients.bundle_bytes", 61),
+        (b"forges.log_origins", 3),
+        (b"forge_component.log_origins", 7),
+        (b"forge_component.log_poll_ms", 7123),
+        (b"forge_component.log_catch_up_ms", 9321),
+        (b"forge_component.log_pages", 13),
+        (b"forge_component.delivery_bytes", 12_345),
     ];
     for (name, value) in rows {
         assert_eq!(limits::apply(&mut limits, name, value), Ok(()), "{name:?}");
@@ -54,6 +65,11 @@ fn an_override_sets_the_field_its_dotted_name_names() {
     assert_eq!(limits.checkout.remote_timeout, Duration::from_millis(7_000));
     assert_eq!(limits.root.loads.rows, 9);
     assert_eq!(limits.clients, limits::Clients { bundle_files: 2, bundle_bytes: 61 });
+    assert_eq!((limits.forges.log_origins, limits.forge_component.log_origins), (3, 7));
+    assert_eq!(limits.forge_component.log_poll, Duration::from_nanos(7_123_000_000));
+    assert_eq!(limits.forge_component.log_catch_up, Duration::from_nanos(9_321_000_000));
+    assert_eq!(limits.forge_component.log_pages, 13);
+    assert_eq!(limits.forge_component.delivery_bytes, 12_345);
 }
 
 #[test]
@@ -69,6 +85,19 @@ fn an_unknown_name_or_a_value_past_its_type_is_refused() {
     ];
     for (name, value, refused) in rows {
         assert_eq!(limits::apply(&mut limits, name, value), Err(refused), "{name:?}");
+        assert_eq!(limits, before, "{name:?}");
+    }
+    for (name, maximum) in [
+        (b"forges.log_origins".as_slice(), u64::from(u32::MAX)),
+        (b"forge_component.log_origins", u64::from(u32::MAX)),
+        (b"forge_component.log_poll_ms", u64::MAX / 1_000_000),
+        (b"forge_component.log_catch_up_ms", u64::MAX / 1_000_000),
+        (b"forge_component.log_pages", u64::from(u32::MAX)),
+        (b"forge_component.delivery_bytes", u64::from(u32::MAX)),
+    ] {
+        assert_eq!(limits::apply(&mut limits, name, maximum), Ok(()));
+        let before = limits;
+        assert_eq!(limits::apply(&mut limits, name, maximum + 1), Err(limits::Refused::Range));
         assert_eq!(limits, before, "{name:?}");
     }
 }
@@ -226,6 +255,61 @@ fn encoded_setup_writes_fit_exactly_and_name_the_short_bound() {
         own.records.value_bytes = value;
         let mut problems = Problems::empty();
         checks::records(&settings.jig, &own, &[], &mut problems);
+        assert_eq!(crate::startup::lines(&problems).as_ref(), expected.as_bytes());
+    }
+}
+#[test]
+#[expect(clippy::disallowed_macros, clippy::disallowed_methods, reason = "tests format diagnostic text")]
+fn log_limits_check_zero_capacity_and_timing_relations() {
+    let jig = fixtures::engine().jig;
+    let defaults = limits::profile(limits::Profile::Small);
+    for name in [
+        "forges.log_origins",
+        "forge_component.log_origins",
+        "forge_component.log_poll_ms",
+        "forge_component.log_catch_up_ms",
+        "forge_component.log_pages",
+        "forge_component.delivery_bytes",
+    ] {
+        let mut own = defaults;
+        limits::apply(&mut own, name.as_bytes(), 0).unwrap();
+        let mut problems = crate::startup::Problems::empty();
+        crate::startup::checks::records(&jig, &own, &[], &mut problems);
+        let mut expected = format!("application.limits.overrides.{name}: must agree with {name} (above 0)\n");
+        if name == "forge_component.log_origins" {
+            expected +=
+                "application.limits.overrides.forges.log_origins: must agree with forge_component.log_origins\n";
+        }
+        if name == "forge_component.log_catch_up_ms" {
+            expected += "application.limits.overrides.forge_component.log_catch_up_ms: must agree with forge_component.log_poll_ms\n";
+        }
+        assert_eq!(crate::startup::lines(&problems).as_ref(), expected.as_bytes());
+    }
+    let day = 86_400_000;
+    for (origins, capacity, poll, catch_up, expected) in [
+        (4, 4, 5000, day, ""),
+        (4, 5, 5000, day, ""),
+        (5, 5, 5000, day, "forges.log_origins: must agree with forges.log_origins (at most 4)\n"),
+        (2, 2, 5000, day, ""),
+        (3, 2, 5000, day, "forges.log_origins: must agree with forge_component.log_origins\n"),
+        (4, 4, day, day, ""),
+        (4, 4, day, day - 1, "forge_component.log_catch_up_ms: must agree with forge_component.log_poll_ms\n"),
+        (
+            4,
+            4,
+            5000,
+            day + 1,
+            "forge_component.log_catch_up_ms: must agree with forge_component.log_catch_up_ms (at most 86400000 ms / 24 h)\n",
+        ),
+    ] {
+        let mut own = defaults;
+        own.forges.log_origins = origins;
+        own.forge_component.log_origins = capacity;
+        own.forge_component.log_poll = Duration::from_millis(poll);
+        own.forge_component.log_catch_up = Duration::from_millis(catch_up);
+        let mut problems = crate::startup::Problems::empty();
+        crate::startup::checks::records(&jig, &own, &[], &mut problems);
+        let expected = [if expected.is_empty() { "" } else { "application.limits.overrides." }, expected].concat();
         assert_eq!(crate::startup::lines(&problems).as_ref(), expected.as_bytes());
     }
 }

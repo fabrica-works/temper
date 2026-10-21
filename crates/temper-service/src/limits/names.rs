@@ -178,6 +178,18 @@ pub(super) fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), 
         b"clients.bundle_bytes" => limits.clients.bundle_bytes = u32::try_from(value).or(Err(Refused::Range))?,
         b"records.value_bytes" => limits.records.value_bytes = u32::try_from(value).or(Err(Refused::Range))?,
         b"forges.installations" => limits.forges.installations = u32::try_from(value).or(Err(Refused::Range))?,
+        b"forges.log_origins" => limits.forges.log_origins = u32::try_from(value).or(Err(Refused::Range))?,
+        b"forge_component.log_origins" => {
+            limits.forge_component.log_origins = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"forge_component.log_poll_ms" => limits.forge_component.log_poll = duration(value)?,
+        b"forge_component.log_catch_up_ms" => limits.forge_component.log_catch_up = duration(value)?,
+        b"forge_component.log_pages" => {
+            limits.forge_component.log_pages = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"forge_component.delivery_bytes" => {
+            limits.forge_component.delivery_bytes = u32::try_from(value).or(Err(Refused::Range))?;
+        }
         b"forge_component.installations" => {
             limits.forge_component.installations = u32::try_from(value).or(Err(Refused::Range))?;
         }
