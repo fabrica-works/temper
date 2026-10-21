@@ -1,11 +1,9 @@
 //! Landing spans chat, coding and review, then the chat's reply after the merge.
 //! Landing and added-dependency stories host four or five agent lifetimes with git
 //! calls, exceeding the 1 s guide; their behavior is covered in the root worlds.
+//! The shared-forge harness does not meter each host, so use the system allocator.
 use serde_json::Value;
-use skein_world::domain::heap::Counting;
 use temper_real_loop_world::landing;
-#[global_allocator]
-static HEAP: Counting = Counting;
 
 #[test]
 fn a_chat_lands_its_change_on_the_forge() {
