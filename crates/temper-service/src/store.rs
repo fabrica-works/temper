@@ -87,6 +87,11 @@ pub fn limits(
     })
 }
 impl Store {
+    #[cfg(test)]
+    pub(crate) fn opening_limits(&self) -> protocol::Limits {
+        self.env.limits
+    }
+
     #[must_use]
     pub fn new(
         application: &root::Limits,

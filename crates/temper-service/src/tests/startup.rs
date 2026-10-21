@@ -803,3 +803,33 @@ fn admission_model_words_use_tokens_and_missing_names_make_no_amount_claim() {
         assert_eq!(&*lines(&problems), expected.as_bytes());
     }
 }
+
+#[test]
+fn a_store_reader_derives_serves_limits_or_their_problem_path() {
+    let document = fixtures::document();
+    let directories = config::Directories::working();
+    let service = crate::startup(
+        &document,
+        &directories,
+        &fixtures::files(),
+        &fixtures::startup_agent(),
+        &fixtures::seeds(),
+        None,
+        fixtures::worker_runtime(),
+        fixtures::forge_runtime(),
+    )
+    .unwrap();
+    let refused = core::str::from_utf8(&document).unwrap().replacen(
+        "\"overrides\":{\"checkout.name_bytes\"",
+        "\"overrides\":{\"root.loads.rows\":0,\"checkout.name_bytes\"",
+        1,
+    );
+    for (name, input, expected) in [
+        ("serve", document.as_ref(), Ok((service.engine.store.opening_limits(), service.engine.env.limits.forge))),
+        ("limits", refused.as_bytes(), Err(b"engine.limits: past its bound\n".as_slice())),
+    ] {
+        let found = crate::store_limits(input, &directories);
+        let found = found.map(|limits| (limits.store, limits.forge)).map_err(|problems| lines(&problems));
+        assert_eq!(found.as_ref().map_err(AsRef::as_ref), expected.as_ref().map_err(AsRef::as_ref), "{name}");
+    }
+}

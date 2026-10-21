@@ -77,6 +77,28 @@ pub struct Named {
     pub webhooks: Option<application::Webhooks>,
     pub overrides: Box<[(Box<[u8]>, u64)]>,
 }
+/// The limits serve opens the deployment's store at, for a reader of a copy of it.
+#[derive(Debug)]
+pub struct StoreLimits {
+    pub store: jig_protocol_store::Limits,
+    pub forge: temper_engine_domain_forge::Limits,
+}
+/// Derive the store's opening limits without reading named files or checking runtime facts.
+pub fn store_limits(document: &[u8], directories: &config::Directories) -> Result<StoreLimits, Problems> {
+    let mut parsed = load(document, directories, false)?;
+    let root = engine_limits(&mut parsed.engine.limits, &parsed.application.limits)?;
+    let store = crate::store::limits(&root, &parsed.engine.limits.core, &root.forge, &parsed.engine.limits.store)
+        .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Jig(config::What::Bound)))?;
+    Ok(StoreLimits { store, forge: root.forge })
+}
+fn engine_limits(
+    jig: &mut config::Limits,
+    own: &crate::limits::Limits,
+) -> Result<temper_engine_domain::Limits, Problems> {
+    jig.clients.wire.keyed_value_some = jig.clients.wire.keyed_value_some.min(own.records.value_bytes);
+    crate::limits::engine(jig, own)
+        .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Jig(config::What::Bound)))
+}
 #[derive(Debug)]
 struct Parsed {
     engine: config::Engine,
@@ -91,8 +113,13 @@ fn problem(path: Path, what: What) -> Problems {
 fn indexed(index: usize) -> Path {
     Path::root().member(b"workers").child(Segment::Index(u32::try_from(index).expect("bounded workers")))
 }
-#[expect(clippy::too_many_lines, reason = "one load pass accumulates all cross-part diagnostics")]
 fn parse(input: &[u8], directories: &config::Directories) -> Result<Parsed, Problems> {
+    load(input, directories, true)
+}
+// Readers need the typed document alone. Startup also checks cross-part and
+// raw-path constraints here, preserving the order of its accumulated problems.
+#[expect(clippy::too_many_lines, reason = "one load pass accumulates all cross-part diagnostics")]
+fn load(input: &[u8], directories: &config::Directories, check_start: bool) -> Result<Parsed, Problems> {
     let length = u32::try_from(input.len()).or(Err(problem(Path::root(), What::Jig(config::What::Bound))))?;
     let document =
         match config::document(input, &config::DocumentLimits { bytes: 1_048_576, tokens: length, depth: 32 }) {
@@ -136,7 +163,9 @@ fn parse(input: &[u8], directories: &config::Directories) -> Result<Parsed, Prob
     };
     let mut workers = List::with_capacity(ats.len());
     for (index, at) in ats.iter().enumerate() {
-        checks::raw_worker(&document, *at, &indexed(index), &mut problems);
+        if check_start {
+            checks::raw_worker(&document, *at, &indexed(index), &mut problems);
+        }
         match config::worker(&document, *at, directories) {
             Ok(worker) => workers.push(worker).expect("bounded workers"),
             Err(found) => problems.append(found, &indexed(index)),
@@ -154,6 +183,9 @@ fn parse(input: &[u8], directories: &config::Directories) -> Result<Parsed, Prob
     }
     let application = application.expect("required application checked");
     let workers = workers.into_boxed();
+    if !check_start {
+        return Ok(Parsed { engine: engine.expect("required engine checked"), workers, application });
+    }
     checks::standalone(
         engine.as_ref().expect("required engine checked"),
         &application.clients,
@@ -357,10 +389,7 @@ fn checked_start(
         charter: parsed.application.charter,
         limits: parsed.application.limits,
     };
-    engine.jig.limits.clients.wire.keyed_value_some =
-        engine.jig.limits.clients.wire.keyed_value_some.min(engine.limits.records.value_bytes);
-    let root = crate::limits::engine(&engine.jig.limits, &engine.limits)
-        .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Jig(config::What::Bound)))?;
+    let root = engine_limits(&mut engine.jig.limits, &engine.limits)?;
     checks::root(core, &engine, seeds, &parsed.application.landing_projects, &root, &mut problems);
     if !problems.is_empty() {
         return Err(problems);
