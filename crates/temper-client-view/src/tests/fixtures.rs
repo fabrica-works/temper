@@ -195,7 +195,7 @@ pub fn account_root() -> (temper_client_domain::Domain, Token) {
     let (root, _, _, _, accounts) = root_at_full(temper_client_domain::Address::Accounts, &domain_limits(), b"Shop");
     (root, accounts.expect("global accounts watch"))
 }
-fn root_at_full(
+pub(super) fn root_at_full(
     address: temper_client_domain::Address,
     limits: &Limits,
     project_name: &[u8],

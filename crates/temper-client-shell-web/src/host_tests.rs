@@ -162,10 +162,23 @@ fn the_accounts_href_navigates_inside_the_app() {
     assert_eq!(host.show, Some((Box::from(b"/accounts".as_slice()), false)));
 }
 
+#[path = "../../../testing/memory_literal.rs"]
+mod memory_literal;
+// Retained domain draft: 3 x 1,048,576 document bytes + 280 B size_of::<Draft>()
+// = 3,146,008 B. Base 87c82f753: 119,483,766,536 + 3,146,008 B domain draft
+// + 304 added view nodes x 574,364 B = 119,661,519,200 B.
+#[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
+const WEB_BYTES: u64 = 119661519200;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {
-    assert_eq!(limits::worst_case(&limits::client()), Some(119_483_766_536));
+    let actual = limits::worst_case(&limits::client()).expect("priced web preset");
+    memory_literal::check(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/host_tests.rs"),
+        "const WEB_BYTES: u64 = ",
+        WEB_BYTES,
+        actual,
+    );
 }
 
 #[test]

@@ -1,6 +1,7 @@
 mod accounts;
 mod chat;
 mod chats;
+mod choice;
 mod inbox;
 mod task;
 use super::fixtures;

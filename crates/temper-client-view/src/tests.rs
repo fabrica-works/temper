@@ -1,4 +1,5 @@
 mod chats;
+mod choice;
 mod confirm;
 mod demo;
 mod fixtures;

@@ -36,12 +36,24 @@ impl Limits {
             .checked_add(counts.sign_ins.checked_mul(2)?)?
             .checked_add(receiving.projects.checked_mul(4)?)?
             .checked_add(128)?;
+        // Catalogue: me_project_models x (1 Item + 1 Button + 2 Paragraphs),
+        // plus me_model_efforts x 1 Button for the selected model. Fixed room:
+        // 2 Slots + 1 List + 18 Paragraphs (including pending/refusal room)
+        // + 3 Statuses + 6 Links + 2 Buttons = 32. Thus 64 x 4 + 16 + 32 = 304 nodes.
+        // Each adds the unchanged UI node/text/run/patch price plus one forge
+        // and one frame binding: at the fixture/web text price,
+        // 304 x 574,364 B = 174,606,656 B (including the UI scratch trees).
+        let choices = temper_client_domain::pages::choice::MODELS
+            .checked_mul(4)?
+            .checked_add(temper_client_domain::pages::choice::EFFORTS)?
+            .checked_add(32)?;
         let nodes = cards
             .checked_add(turns)?
             .checked_add(receiving.rows.checked_mul(32)?)?
             .checked_add(receiving.projects.checked_mul(4)?)?
             .checked_add(128)?
-            .max(account_nodes);
+            .max(account_nodes)
+            .checked_add(choices)?;
         let tree = skein_ui::Limits {
             nodes,
             depth: receiving.rows.checked_add(34)?,

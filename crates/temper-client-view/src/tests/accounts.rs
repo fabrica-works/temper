@@ -329,13 +329,24 @@ fn sign_in_ends_preserve_their_typed_details() {
         assert!(skein_lib::bytes::find(&fixtures::text(fixtures::build(&mut view, &root)), expected).is_some());
     }
 }
+#[path = "../../../../testing/memory_literal.rs"]
+mod memory_literal;
+// Base 87c82f753: 4,420,462,083 + 304 added nodes x 574,364 B = 4,595,068,739 B.
+#[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
+const ACCOUNT_BYTES: u64 = 4595068739;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {
     let domain = fixtures::limits();
     let words = fixtures::words();
     let bounds = crate::Limits::of(&domain, &words).unwrap();
-    assert_eq!(crate::worst_case(&bounds, &domain, &words), Some(4_420_462_083));
+    let actual = crate::worst_case(&bounds, &domain, &words).expect("priced fixture");
+    memory_literal::check(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/tests/accounts.rs"),
+        "const ACCOUNT_BYTES: u64 = ",
+        ACCOUNT_BYTES,
+        actual,
+    );
 }
 fn owner_root() -> (d::Domain, Token) {
     let limits = fixtures::limits();
