@@ -455,7 +455,7 @@ fn synthetic_frame(builder: &mut skein_ui::Builder, behind: bool) {
     builder.close();
     builder.open(Role::Button);
     builder.name(b"Shop");
-    builder.state(skein_ui::State::Selected);
+    builder.state(skein_ui::State::Pressed);
     builder.bind(binding());
     builder.close();
     builder.open(Role::Navigation);

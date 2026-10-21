@@ -1,6 +1,6 @@
 == Chat 9 == Live
 temper
-[1] Shop (selected)
+[1] Shop (pressed)
 [2] Inbox 0
 [3] Chats
 [4] Adopt a repository

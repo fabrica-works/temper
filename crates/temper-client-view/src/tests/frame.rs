@@ -202,8 +202,8 @@ fn the_navigation_is_inside_the_banner_after_projects_before_the_link() {
     let region = region.expect("link");
     assert!(nav > banner && nav < banner + usize::try_from(nodes[banner].size).expect("size"));
     assert!(nav < region);
-    for (index, node) in nodes.iter().enumerate() {
-        if node.role == Role::Button && node.states.as_slice().contains(&skein_ui::State::Selected) {
+    for (index, node) in nodes.iter().enumerate().take(banner + usize::try_from(nodes[banner].size).expect("size")) {
+        if node.role == Role::Button && node.states.as_slice().contains(&skein_ui::State::Pressed) {
             assert!(index < nav, "projects precede navigation");
         }
     }

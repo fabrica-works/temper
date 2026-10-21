@@ -112,7 +112,7 @@ pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words:
                     builder.open(Role::Button);
                     builder.name(name);
                     if selected {
-                        builder.state(skein_ui::State::Selected);
+                        builder.state(skein_ui::State::Pressed);
                     }
                     builder.bind(bindings.insert(Act::Project { project: row.project }));
                     builder.close();

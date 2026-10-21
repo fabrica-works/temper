@@ -307,7 +307,7 @@ fn prepare_account(
             .find(|node| {
                 node.role == skein_ui::Role::Button
                     && node.name.as_deref() == Some(b"Project".as_slice())
-                    && !node.states.iter().any(|state| *state == skein_ui::State::Selected)
+                    && !node.states.iter().any(|state| *state == skein_ui::State::Pressed)
             })
             .map(|node| node.id)
     {
