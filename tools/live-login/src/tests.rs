@@ -49,3 +49,22 @@ fn the_small_codex_model_is_read_from_its_table() {
         assert_eq!(small_codex(text).as_deref(), expected, "model table {text:?}");
     }
 }
+
+#[test]
+fn the_status_line_names_utc_expiry_renewal_and_the_live_tier() {
+    for (expires_at, utc) in [
+        (0, "1970-01-01 00:00Z"),
+        (951_827_696, "2000-02-29 12:34Z"),
+        (1_792_577_099, "2026-10-21 10:04Z"),
+        (4_107_542_399, "2100-02-28 23:59Z"),
+        (4_107_542_400, "2100-03-01 00:00Z"),
+    ] {
+        assert_eq!(
+            status_line("gpt-6-luna", expires_at),
+            format!(
+                "live-login: model gpt-6-luna, token valid until {utc}; renew: codex login, then live-login; feeds the live tier only"
+            ),
+            "expiry {expires_at}"
+        );
+    }
+}

@@ -65,6 +65,30 @@ fn private(path: &Path, value: &Value) -> Result<(), String> {
         .map_err(|_| "live-login: cannot create private output")?;
     file.write_all(&bytes).map_err(|_| "live-login: cannot write private output".to_owned())
 }
+// Gregorian dates from Unix epoch days, using March-based 400-year eras, as
+// temper-client-view's chat_clock and skein-http's private put_date do.
+// Expiry is in u64 seconds rather than Wall's u64 nanoseconds; days plus
+// 719,468 and every calendar intermediate still fit u64.
+fn civil_from_days(days: u64) -> (u64, u64, u64) {
+    let shifted = days + 719_468;
+    let era = shifted / 146_097;
+    let day_of_era = shifted % 146_097;
+    let year_of_era = (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let march_month = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * march_month + 2) / 5 + 1;
+    let month = if march_month < 10 { march_month + 3 } else { march_month - 9 };
+    (year + u64::from(month <= 2), month, day)
+}
+fn status_line(model: &str, expires_at: u64) -> String {
+    let (year, month, day) = civil_from_days(expires_at / 86_400);
+    let hour = expires_at / 3_600 % 24;
+    let minute = expires_at / 60 % 60;
+    format!(
+        "live-login: model {model}, token valid until {year:04}-{month:02}-{day:02} {hour:02}:{minute:02}Z; renew: codex login, then live-login; feeds the live tier only"
+    )
+}
 fn run() -> Result<(), String> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     if !(args.len() == 2 || args.len() == 4 && args[2] == "--models") {
@@ -86,7 +110,7 @@ fn run() -> Result<(), String> {
     }
     private(&config, &json!({"account_file":account_file,"model":model,"address":address.to_string()}))?;
     private(&account_file, &account(&value))?;
-    println!("live-login: model {model}, token valid for {} s", value.expires_at - now);
+    println!("{}", status_line(&model, value.expires_at));
     Ok(())
 }
 fn main() -> ExitCode {
