@@ -15,7 +15,7 @@ fn the_looks_names_pass_skeins_check() {
 }
 #[test]
 fn each_style_or_region_is_named_under_temper() {
-    let named: [(skein_ui::Style, &[u8]); 64] = [
+    let named: [(skein_ui::Style, &[u8]); 67] = [
         (BANNER, b"temper-banner"),
         (NAVIGATION, b"temper-navigation"),
         (MAIN, b"temper-main"),
@@ -80,6 +80,9 @@ fn each_style_or_region_is_named_under_temper() {
         (ADOPTION_PAGE, b"temper-adoption-page"),
         (INVITATION, b"temper-invitation"),
         (REFUSAL, b"temper-refusal"),
+        (STEPS, b"temper-steps"),
+        (STEP, b"temper-step"),
+        (STEP_DONE, b"temper-step-done"),
     ];
     for (style, name) in named {
         assert_eq!(NAMES.style(style), Some(name));
@@ -313,4 +316,9 @@ fn the_account_and_adoption_bars_keep_their_headings() {
         }
         assert!(found);
     }
+}
+
+#[test]
+fn the_delegation_steps_keep_their_roles() {
+    super::delegation::step_roles();
 }

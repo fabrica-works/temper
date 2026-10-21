@@ -221,6 +221,24 @@ fn a_departed_proposal_keeps_its_identity_for_the_explanation() {
 }
 
 const DELEGATED: u64 = 2;
+#[test]
+fn a_chat_watches_a_delegated_task_when_only_its_result_remains() {
+    let mut f = f::opened();
+    while f.out.pop().is_some() {}
+    let next = f.chat.next;
+    let mut blocks = skein_lib::List::with_capacity(1);
+    blocks
+        .push(c::Block::Result {
+            call: 8,
+            summary: c::Text::new(Box::from(f::WAKE_SUMMARY), 128).expect("wake summary"),
+            failed: false,
+        })
+        .expect("wake result");
+    f::activity_blocks(&mut f, c::Speaker::Person, blocks, f::POSITION);
+    let handle = jig_client::Handle { asker: crate::owner::Owner::Pages.asker(), number: next };
+    assert_eq!(watches(&mut f.out).as_ref(), [(handle, DELEGATED)]);
+}
+
 fn watches(out: &mut Queue<Request>) -> Box<[(jig_client::Handle, u64)]> {
     let mut watches = skein_lib::List::with_capacity(OUTPUTS);
     while let Some(request) = out.pop() {
@@ -262,6 +280,21 @@ fn a_chat_watches_each_delegated_task_as_its_call_arrives() {
     assert_eq!(f.chat.delegation(&f.client, DELEGATED), Some(&task));
     assert!(f.out.is_empty(), "a document refresh leaves its watch alone");
     assert!(f.chat.delegation(&f.client, 999).is_none(), "only held delegations are exposed");
+}
+#[test]
+fn a_delegation_requested_by_another_owner_is_not_this_chats() {
+    let mut f = f::opened();
+    f::activity(&mut f, &[DELEGATED], f::POSITION);
+    for (requester, requested) in
+        [(c::OwnerRequester::Person(DELEGATED), false), (c::OwnerRequester::Task(f::TASK), true)]
+    {
+        let mut task = f::change();
+        task.chip.task = DELEGATED;
+        task.requester = requester;
+        f.chat.delegations.get_mut(0).expect("delegation").final_task = Some(Box::new(task.clone()));
+        assert_eq!(f.chat.delegation(&f.client, DELEGATED), Some(&task));
+        assert_eq!(f.chat.requested(&f.client, DELEGATED), if requested { Some(&task) } else { None });
+    }
 }
 #[test]
 fn a_chat_watches_the_newest_delegations_up_to_its_bound() {

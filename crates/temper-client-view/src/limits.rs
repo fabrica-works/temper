@@ -20,6 +20,10 @@ impl Limits {
             .checked_add(32)?;
         let card = proposed.checked_mul(receiving.rows)?.checked_add(128)?;
         let cards = card.checked_mul(receiving.reads.checked_add(1)?)?;
+        // Each watched task has one card at the call that made it: fourteen
+        // structural nodes, plus the result's markdown.
+        let delegations = temper_client_domain::pages::delegation::bound(domain);
+        let delegated = markdown.checked_add(14)?.checked_mul(delegations)?;
         // A transcript window, with a window of messages and blocks in each turn.
         let turns = markdown
             .checked_add(16)?
@@ -53,6 +57,7 @@ impl Limits {
             .checked_add(32)?;
         let nodes = cards
             .checked_add(turns)?
+            .checked_add(delegated)?
             .checked_add(receiving.rows.checked_mul(32)?)?
             .checked_add(receiving.projects.checked_mul(4)?)?
             .checked_add(128)?
@@ -81,6 +86,10 @@ impl Limits {
 pub fn worst_case(limits: &Limits, domain: &temper_client_domain::Limits, words: &Words) -> Option<u64> {
     skein_ui::worst_case(&limits.tree)?
         .checked_add(skein_lib::List::<u64>::worst_case(domain.client.domain.rows.checked_add(1)?)?)?
+        .checked_add(
+            skein_lib::List::<u64>::worst_case(temper_client_domain::pages::delegation::bound(domain))?
+                .checked_mul(2)?,
+        )?
         .checked_add(crate::forge::bindings::worst_case(limits.tree.bindings)?)?
         .checked_add(crate::frame::Bindings::worst_case(limits.tree.bindings)?)?
         .checked_add(crate::accounts::Bindings::worst_case(crate::accounts::binding_capacity(&domain.accounts))?)?

@@ -189,7 +189,7 @@ fn chip(b: &mut Builder, chip: &c::Chip, words: &Words, bindings: &mut Bindings)
     }
     b.close();
 }
-fn task_link(b: &mut Builder, task: u64, words: &Words, bindings: &mut Bindings) {
+pub(crate) fn task_link(b: &mut Builder, task: u64, words: &Words, bindings: &mut Bindings) {
     let name = words.say(Word::Task, &[Hole::Number(task)]);
     b.open(Role::Link);
     b.name(&name);

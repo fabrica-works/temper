@@ -129,6 +129,12 @@ pub const ADOPTION_PAGE: Style = Style { owner: owner(), token: 61 };
 pub const INVITATION: Style = Style { owner: owner(), token: 62 };
 /// A supplied refusal, still announced as a status.
 pub const REFUSAL: Style = Style { owner: owner(), token: 63 };
+/// A change's steps on its delegation card.
+pub const STEPS: Style = Style { owner: owner(), token: 64 };
+/// One step on a change's delegation card.
+pub const STEP: Style = Style { owner: owner(), token: 65 };
+/// A completed step on a change's delegation card.
+pub const STEP_DONE: Style = Style { owner: owner(), token: 66 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -198,6 +204,9 @@ pub const NAMES: Names<'static> = Names {
         b"temper-adoption-page",
         b"temper-invitation",
         b"temper-refusal",
+        b"temper-steps",
+        b"temper-step",
+        b"temper-step-done",
     ],
     regions: &[b"temper-link"],
 };

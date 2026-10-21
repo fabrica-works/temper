@@ -1,6 +1,7 @@
 mod chats;
 mod choice;
 mod confirm;
+mod delegation;
 mod demo;
 mod fixtures;
 mod forge_page;

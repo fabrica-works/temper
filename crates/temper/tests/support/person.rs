@@ -77,6 +77,12 @@ pub fn demo_change() -> Script {
     const CHANGE: u64 = 2;
     let conversation = || Box::new([Target::Role { role: Role::Log, name: b"Conversation".as_slice().into() }]);
     let details = || Box::new([Target::Role { role: Role::Region, name: b"Task details".as_slice().into() }]);
+    let card = || {
+        Box::new([
+            Target::Role { role: Role::Log, name: b"Conversation".as_slice().into() },
+            Target::Role { role: Role::Region, name: b"Task 2".as_slice().into() },
+        ])
+    };
     Script {
         begin: Begin::Link,
         steps: Box::new([
@@ -92,6 +98,10 @@ pub fn demo_change() -> Script {
                 find: Find::text("CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change.".as_bytes()).within(conversation()),
                 within: DEMO_LANDS_WITHIN,
             },
+            // client/README.md, 5.7: the delegated change's card says it landed.
+            Step::See { find: Find::text("T2 · CHANGE".as_bytes()).within(card()), within: START_WITHIN },
+            Step::See { find: Find::exactly_named(Role::Status, b"Landed").within(card()), within: START_WITHIN },
+            Step::See { find: Find::text("CI passed. Landed · merge commit ".as_bytes()).within(card()), within: START_WITHIN },
             // The owner's chat log holds the result's words alone, not its ending.
             Step::Go { address: Address::Task { task: CHANGE } },
             Step::See {

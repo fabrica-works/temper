@@ -148,7 +148,8 @@ fn owner_ending(how: &c::OwnerChipEnding) -> (State, Option<&c::ResultValue>, Op
         }
     }
 }
-/// The tasks a delegate call made: none for a failed call or another tool.
+/// The tasks a delegate call made (temper-engine-smith answers.rs `CallAnswer::Delegated`): none
+/// for a failed call or another tool.
 pub fn delegated(call: &c::Call, into: &mut List<u64>) {
     if call.failed || call.tool.bytes() != b"delegate" {
         return;
@@ -178,6 +179,43 @@ pub fn delegated(call: &c::Call, into: &mut List<u64>) {
             from = at.saturating_add(1);
         }
     }
+}
+/// The tasks whose results a result block carries, in temper's inbox words (temper-engine-domain
+/// link.rs `inbox_words`).
+pub fn results(summary: &[u8], into: &mut List<u64>) {
+    let mut from = 0;
+    for (at, byte) in summary.iter().chain(core::iter::once(&b'\n')).enumerate() {
+        if *byte != b'\n' {
+            continue;
+        }
+        let mut line = summary.get(from..at).unwrap_or_default();
+        from = at.saturating_add(1);
+        let end = digits(line);
+        if end > 0
+            && let Some(words) = line.get(end..)
+            && let Some(words) = words.strip_prefix(b": ")
+        {
+            line = words;
+        }
+        let Some(words) = line.strip_prefix(b"Result from task ") else { continue };
+        let end = digits(words);
+        if words.get(end) == Some(&b':')
+            && let Some(task) = number(words.get(..end).unwrap_or_default())
+            && !into.as_slice().contains(&task)
+            && into.push(task).is_err()
+        {
+            return;
+        }
+    }
+}
+fn digits(bytes: &[u8]) -> usize {
+    let mut end = 0;
+    while let Some(byte) = bytes.get(end)
+        && byte.is_ascii_digit()
+    {
+        end = end.saturating_add(1);
+    }
+    end
 }
 fn number(bytes: &[u8]) -> Option<u64> {
     let bytes = bytes.trim_ascii();

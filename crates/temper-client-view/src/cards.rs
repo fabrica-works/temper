@@ -1,4 +1,5 @@
 //! Temper's cards read delivered objects and jig's public decision facts.
+pub(crate) mod delegation;
 mod proposal;
 pub mod words;
 use crate::words::Words;

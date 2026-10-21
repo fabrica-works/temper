@@ -294,7 +294,7 @@ keeps (`../protocol/configuration.md`, section 2).
 |---|---|---|---|---|
 | `Inbox` (home) | `inbox.html` | what needs the person, across projects, filtered by project, kind and goal (its root): proposals, questions, held tasks, person tasks; then updates (results, replies) | `inbox` with its filters; the `proposal` or `task` an entry's card needs | accept, reject with a reason, answer, release, leave held, take, hand back; seen |
 | `Chats` | `chats.html`, `first-run.html` | a composer to start a chat; in the demo's project while the demo's model half holds, its suggested requests (4.8, 5.6); the person's chats, live or closed, newest activity first, each with its status, spend and delegates | `tasks{query}`: requester the person, the chat label, by last activity; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request |
-| `Chat { task }` | `index.html` | the conversation: committed turns, the person's words, work summaries, provisional text; each task it delegated as that task's card, at the call that made it (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer | `task`, `activity` a page at a time, `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
+| `Chat { task }` | `index.html` | the conversation: committed turns, the person's words, work summaries, provisional text; each task it delegated as that task's card, at the call that made it or else at the result it sent back (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer | `task`, `activity` a page at a time, `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls and results name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
 | `Task { task }` | `task.html`, `agent-task.html` | a goal: its header, what was asked, its plan as a tree, its latest activity and history, its budget and authority, with Amend, Stop and Cancel; an agent's task: its transcript and a composer, with Amend and Stop | `task`, `tree`, `activity`; `run` while one is live | amend, stop, cancel, release a held task of the plan, message an agent's task |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
@@ -978,10 +978,11 @@ OWNER/NAME is the demo's repository, and the cues the demo's, copied in:
 ### 5.7 A delegation's card
 
 A chat's delegation shows as the card of the task it made, at the call
-that made it: a delegation as the chips of the tasks it made, and their
-results (jig's `client/domain/objects.md`, section 10), in one card per
-task, as `mockups/first-run.html` shows it. For a change, it is the
-first form of the change's chip in a chat (`forge.md`, 2.4 and 2.5).
+that made it, or else at the result it sent back: a delegation as the
+chips of the tasks it made, and their results (jig's
+`client/domain/objects.md`, section 10), in one card per task, as
+`mockups/first-run.html` shows it. For a change, it is the first form of
+the change's chip in a chat (`forge.md`, 2.4 and 2.5).
 
 - **Which tasks.** A `delegate` call that did not fail names the tasks
   it made: by the call's `objects`, each `Task(N)`, when jig's thread
@@ -989,14 +990,26 @@ first form of the change's chip in a chat (`forge.md`, 2.4 and 2.5).
   words ("Delegated tasks: 2, 3", `temper-engine-smith`'s answers),
   which the domain reads N from (section 11). The chat's task document
   is not enough: it lists the chat's delegates while they live only.
+- **Where it shows.** Once, at the first of its anchors the
+  conversation's window holds: its call, or else a result block that
+  carries its result, whose summary has a line "Result from task N:"
+  after the inbox entry's "M: " (temper's inbox words,
+  `temper-engine-domain`'s `inbox_words`). Both presets keep two lines
+  (`rows`), so when the task ends, the chat's wake turn and its run's
+  end push the call out, and the result that woke the chat is what is
+  left of the delegation. Those words name a person's number as well
+  as a task's: a result shows a card only once its task's document
+  says this chat requested it (its `requester`), and keeps its work
+  summary otherwise; until the document arrives, the number holds one
+  of the watches.
 - **What it reads.** The chat page watches each such task's document
   (`Subject::Task`), as the task's own page does: its chip, its result
   contract, its hold and its result, which stay readable once it has
-  ended. It watches those of the calls its thread holds, the newest
-  first, up to the domain's `reads`; one past them, or whose call the
-  thread no longer holds, is unwatched, and leaving the page closes
+  ended. It watches those its thread's calls and results name, the
+  newest first, up to the domain's `reads`; one past them, or that the
+  thread no longer names, is unwatched, and leaving the page closes
   them all. A delegation whose document has not arrived, or past the
-  bound, shows as the call's work summary, as any call does.
+  bound, shows as its anchor's work summary, as any call does.
 - **Its parts,** in the mockup's order, a region named "Task N":
   - a line with its number and kind, "TN · CHANGE", and its state; the
     kind is its result contract's: CHANGE, REPORT, VERDICT, APPROVAL;
@@ -1008,8 +1021,9 @@ first form of the change's chip in a chat (`forge.md`, 2.4 and 2.5).
 - **Its state,** in temper's words, from its document: "Running" while
   it lives, "Held" while held (why, on its page and in the inbox);
   once ended, "Landed" for a change done with a change's result,
-  "Done" for any other done, "Failed", "Cancelled" (cancelled or
-  withdrawn), and "Ended" otherwise.
+  "Completed" for any other done (jig's word, as the task's page says
+  it), "Failed", "Cancelled" (cancelled or withdrawn), and "Ended"
+  otherwise.
 - **Its result's words:** a landed change's, "CI passed. Landed ·
   merge commit ABCDEFG", ABCDEFG the first seven characters of the
   result's words, which are the merge commit's id in hex (the engine's
@@ -1708,10 +1722,12 @@ own tests:
   their work set aside for a fresh start. Default: not offered.
 - **A delegation's tasks, keyed** (5.7): jig's thread keeps a
   `delegate` call's `objects` empty, so the domain reads the tasks
-  from temper's acknowledgement, words of the engine's that the client
-  depends on. Default: the objects when jig's thread keys them (a jig
-  change and its repin), the words meanwhile, both ends temper's and
-  joined by the process tier's first run (section 10).
+  from temper's acknowledgement and, at a result, from temper's inbox
+  words: words of the engine's that the client depends on, each marked
+  so where it is written and where it is read. Default: the objects
+  when jig's thread keys them (a jig change and its repin), the words
+  meanwhile, both ends temper's and joined by the process tier's first
+  run (section 10).
 - **A change's live stages** on its card (5.7; `forge.md`, 2.1): the
   steps are a stand-in, ticked from the result. The engine publishing
   the change's step as its task's part, which the forge's side reads,

@@ -388,6 +388,7 @@ pub(crate) fn message(run: Token, attempt: Token, word: &tasks::Word) -> host::L
 pub fn inbox_words(word: &tasks::Word) -> Box<[u8]> {
     let (label, number) = match word.kind {
         tasks::MessageKind::Result(_) => (
+            // The client's chat cards read this line (temper-client-domain pages/delegation.rs `results`).
             b"Result from task ".as_slice(),
             match word.from {
                 tasks::Party::Task(task) => task,

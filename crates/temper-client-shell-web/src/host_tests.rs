@@ -168,9 +168,12 @@ mod memory_literal;
 // = 3,146,008 B. Base 87c82f753: 119,483,766,536 + 3,146,008 B domain draft
 // + 304 added view nodes x 574,364 B = 119,661,519,200 B. A chat's 12 delegations
 // (client/README.md, 5.7): 12 x 1,048,576 document bytes + 1,392 B of lists
-// = 12,584,304 B, so 119,674,103,504 B.
+// = 12,584,304 B, so 119,674,103,504 B. Their 12 cards (5.7): 12 x (514 markdown
+// + 14) nodes x 574,364 B + 12 x 8 B of carded tasks = 3,639,170,400 B,
+// so 123,313,273,904 B.
+// Cards remembered across the window: 12 x 8 B = 96 B, so 123,313,274,000 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 119674103504;
+const WEB_BYTES: u64 = 123313274000;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

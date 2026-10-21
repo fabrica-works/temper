@@ -98,6 +98,8 @@ pub fn handles(out: &mut Queue<Request>) -> Box<[Handle]> {
     handles.into_boxed()
 }
 pub const DELEGATE: u64 = 12;
+pub const WAKE_SUMMARY: &[u8] =
+    b"Begin the work your brief describes.\n\n2: Result from task 2:\n0000000000000003000000000000000000000000";
 pub fn with_delegate() -> Fixture {
     let mut fixture = opened();
     let mut task = task();
@@ -148,8 +150,11 @@ pub fn activity(f: &mut Fixture, tasks: &[u64], position: u64) {
     for task in tasks {
         blocks.push(c::Block::Call(delegate_call(*task))).expect("call fits");
     }
+    activity_blocks(f, c::Speaker::Assistant, blocks, position);
+}
+pub fn activity_blocks(f: &mut Fixture, speaker: c::Speaker, blocks: List<c::Block>, position: u64) {
     let mut messages = List::with_capacity(ONE);
-    messages.push(c::Message { speaker: c::Speaker::Assistant, blocks }).expect("message");
+    messages.push(c::Message { speaker, blocks }).expect("message");
     let turn = c::Turn {
         messages,
         used: c::Usage { input: 0, output: 0, cached: 0, cache_written: 0 },

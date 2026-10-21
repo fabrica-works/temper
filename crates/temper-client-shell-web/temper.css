@@ -230,6 +230,10 @@ a { color: inherit; text-decoration: none; }
 .temper-chat .temper-card button:hover { border-color: #ba9c89; color: #9d5139; }
 .temper-chat .temper-card button:first-of-type { background: var(--temper-accent); border-color: var(--temper-accent); color: #fff; }
 .temper-chat .temper-card button:first-of-type:hover { background: #a8563e; color: #fff; }
+/* .steps, .step and .step.done: a change's steps on its card. */
+.temper-steps { display: grid; grid-template-columns: repeat(4,1fr); gap: 3px; margin: 22px 0; list-style: none; padding: 0; }
+.temper-step { border-top: 3px solid var(--temper-line); padding-top: 9px; font-size: 11px; color: var(--temper-muted); }
+.temper-step-done { border-color: var(--temper-green); color: var(--temper-green); }
 /* .terminal-composer-area and .terminal-composer: reuse the Chats entry. */
 .temper-chat .temper-composer-area { flex: none; border-top: 1px solid var(--temper-line); background: #f9f7f3; padding: 10px 23px; }
 .temper-chat .temper-entry { width: min(1040px, 100%); margin: 0 auto; min-height: 40px; border-radius: 7px; padding: 8px 8px 8px 12px; box-shadow: 0 2px 8px rgba(55,42,27,.035); }

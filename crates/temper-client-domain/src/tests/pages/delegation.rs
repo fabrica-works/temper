@@ -6,6 +6,28 @@ const MERGE: &[u8] = b"abcdef0123456789abcdef0123456789abcdef0123";
 const TASKS: u32 = 2;
 
 #[test]
+fn a_result_names_its_tasks_by_temper_words() {
+    for (summary, expected) in [
+        (f::WAKE_SUMMARY, [2].as_slice()),
+        ("Begin…\n\n3: Result from task 7:\nok\n4: Result from task 9:\nwords".as_bytes(), &[7, 9]),
+        (b"Result from task 5:\nx", &[5]),
+        (b"she said Result from task 2:", &[]),
+        (b"Result from task x:", &[]),
+        (b"9: Result from task 18446744073709551616:", &[]),
+        (b"Result from task 2:\n3: Result from task 2:\nResult from task 7:", &[2, 7]),
+        (b"x: Result from task 2:\nResult from task  2:\nResult from task 2 :", &[]),
+    ] {
+        let mut tasks = List::with_capacity(TASKS);
+        delegation::results(summary, &mut tasks);
+        assert_eq!(tasks.as_slice(), expected);
+    }
+    let mut tasks = List::with_capacity(1);
+    tasks.push(7).expect("full receiver");
+    delegation::results(f::WAKE_SUMMARY, &mut tasks);
+    assert_eq!(tasks.as_slice(), [7]);
+}
+
+#[test]
 fn a_delegate_call_names_its_tasks_by_its_objects() {
     let mut call = f::delegate_call(2);
     call.objects = List::with_capacity(3);

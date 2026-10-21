@@ -1,0 +1,35 @@
+== Chat 1 == Live
+temper
+[1] demo (pressed)
+[2] Inbox 0
+[3] Chats
+[4] Adopt a repository
+[5] Accounts
+* Pat
+[6] Sign out
+Add CSV export to widget
+* Parked
+Spent 0; delegates spent 0
+[7] Mark seen
+Conversation:
+  Pat
+  * Read
+  Add CSV export to widget
+  Agent
+  I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.
+  Task 2:
+    T2 · CHANGE
+    * Landed
+    ### Export widget's table as CSV
+    CI passed. Landed · merge commit 1a2b3c4
+    Steps:
+      - Branch pushed
+      - Pull request opened
+      - CI passed
+      - Landed
+    [8] Task 2
+  CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change.
+Engine default for next run
+[9] Message: (empty) (enter sends)
+Enter to send · Shift+Enter for a new line
+[10] Send

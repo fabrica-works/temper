@@ -194,6 +194,13 @@ impl Chat {
         }
         None
     }
+    /// A delegation's task document, once it says this chat requested it: a result's words name
+    /// a task by a number that may be a person's.
+    #[must_use]
+    pub fn requested<'a>(&'a self, client: &'a Client, task: u64) -> Option<&'a c::Task> {
+        let document = self.delegation(client, task)?;
+        if document.requester == c::OwnerRequester::Task(self.task) { Some(document) } else { None }
+    }
     fn delegation_handle(&self, handle: Handle) -> Option<u64> {
         for delegation in &self.delegations {
             if delegation.handle == handle {
@@ -206,14 +213,17 @@ impl Chat {
         let bound = self.delegations.capacity();
         let mut tasks = List::with_capacity(bound);
         let mut called = List::with_capacity(bound);
-        // Thread's borrowed lines are chronological, so visit the calls backwards.
+        // Thread's borrowed lines are chronological, so visit the anchors backwards.
         'turns: for line in self.thread.lines().iter().rev() {
             let jig_client::thread::Line::Turn { turn, .. } = line else { continue };
             for message in turn.messages.iter().rev() {
                 for block in message.blocks.iter().rev() {
-                    let c::Block::Call(call) = block else { continue };
                     called.clear();
-                    delegation::delegated(call, &mut called);
+                    match block {
+                        c::Block::Call(call) => delegation::delegated(call, &mut called),
+                        c::Block::Result { summary, .. } => delegation::results(summary.bytes(), &mut called),
+                        c::Block::Text(_) | c::Block::Opaque { .. } => continue,
+                    }
                     for task in &called {
                         if !tasks.as_slice().contains(task) && tasks.push(*task).is_err() {
                             break 'turns;

@@ -541,7 +541,15 @@ pub mod chat {
     }
     pub fn tree(thread: &Thread) -> skein_ui::Tree {
         let mut b = Builder::new(&fixtures::tree_limits());
-        crate::pages::chat::conversation(&mut b, thread, &fixtures::words(), LINES, TEXT);
+        crate::pages::chat::conversation(
+            &mut b,
+            thread,
+            &fixtures::words(),
+            LINES,
+            TEXT,
+            None,
+            &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+        );
         b.finish()
     }
     pub fn closing(grace: Option<skein_lib::Duration>) -> skein_ui::Tree {

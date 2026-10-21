@@ -9,10 +9,11 @@ use jig_client::{
     contract as c,
     thread::{Line, Thread, Words as WordState},
 };
+use skein_lib::List;
 use skein_ui::{Builder, Role, Run, State, phrases::Hole};
 use temper_client_domain::{
     Domain,
-    pages::{Act, chat::Chat},
+    pages::{Act, chat::Chat, delegation},
 };
 fn text(b: &mut Builder, role: Role, value: &[u8]) {
     b.open(role);
@@ -58,7 +59,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         if let jig_client::thread::window::Edge::More(_) = chat.thread.lines.edges.after {
             control(b, bindings, Role::Button, &words.say(Word::Older, &[]), Act::Older);
         }
-        conversation(b, &chat.thread, words, rows, text_limit);
+        conversation(b, &chat.thread, words, rows, text_limit, Some((chat, root.client())), bindings);
         if !chat.cards.is_empty() || !chat.departures().is_empty() {
             b.open(Role::List);
             b.style(look::CARDS);
@@ -157,10 +158,29 @@ fn composer(
         crate::choice::composer(b, root, Some(task), words, bindings);
     }
 }
-pub(crate) fn conversation(b: &mut Builder, thread: &Thread, words: &Words, rows: u32, text_limit: u32) {
+pub(crate) fn conversation(
+    b: &mut Builder,
+    thread: &Thread,
+    words: &Words,
+    rows: u32,
+    text_limit: u32,
+    delegations: Option<(&Chat, &jig_client::Client)>,
+    bindings: &mut Bindings,
+) {
+    let bound = match delegations {
+        Some((chat, _)) => chat.delegations.capacity(),
+        None => 0,
+    };
+    let mut tasks = List::with_capacity(bound);
+    let mut shown = List::with_capacity(bound);
     b.open(Role::Log);
     b.name(&words.say_card(P::ConversationLog, &[]));
     for line in thread.lines().into_boxed() {
+        if let Line::Activity { line } = &line
+            && hidden(&line.event, delegations)
+        {
+            continue;
+        }
         b.open(Role::Region);
         b.style(look::TURN);
         match line {
@@ -189,7 +209,9 @@ pub(crate) fn conversation(b: &mut Builder, thread: &Thread, words: &Words, rows
                 b.close();
                 b.close();
             }
-            Line::Turn { turn, .. } => committed(b, turn, words, rows, text_limit),
+            Line::Turn { turn, .. } => {
+                committed(b, turn, words, (rows, text_limit), delegations, (&mut tasks, &mut shown), bindings);
+            }
             Line::Provisional { text, cut, .. } => {
                 b.open(Role::Slot);
                 b.style(look::MESSAGE);
@@ -245,7 +267,17 @@ pub(crate) fn conversation(b: &mut Builder, thread: &Thread, words: &Words, rows
     }
     b.close();
 }
-fn committed(b: &mut Builder, turn: &c::Turn, words: &Words, rows: u32, text_limit: u32) {
+fn committed(
+    b: &mut Builder,
+    turn: &c::Turn,
+    words: &Words,
+    limits: (u32, u32),
+    delegations: Option<(&Chat, &jig_client::Client)>,
+    lists: (&mut List<u64>, &mut List<u64>),
+    bindings: &mut Bindings,
+) {
+    let (rows, text_limit) = limits;
+    let (tasks, shown) = lists;
     for message in prefix(b, turn.messages.as_slice(), rows, words) {
         b.open(Role::Slot);
         b.style(look::MESSAGE);
@@ -274,6 +306,12 @@ fn committed(b: &mut Builder, turn: &c::Turn, words: &Words, rows: u32, text_lim
             match block {
                 c::Block::Text(value) => markdown(b, value.bytes(), words, text_limit),
                 c::Block::Call(call) => {
+                    tasks.clear();
+                    delegation::delegated(call, tasks);
+                    cards(b, tasks, delegations, shown, words, bindings);
+                    if carded(tasks, delegations) {
+                        continue;
+                    }
                     b.open(Role::Slot);
                     b.style(look::WORK);
                     text(b, Role::Paragraph, call.tool.bytes());
@@ -282,7 +320,26 @@ fn committed(b: &mut Builder, turn: &c::Turn, words: &Words, rows: u32, text_lim
                     }
                     b.close();
                 }
-                c::Block::Result { summary, failed, .. } => {
+                c::Block::Result { call, summary, failed } => {
+                    tasks.clear();
+                    for message in &turn.messages {
+                        for block in &message.blocks {
+                            if let c::Block::Call(source) = block
+                                && source.number == *call
+                            {
+                                delegation::delegated(source, tasks);
+                            }
+                        }
+                    }
+                    if carded(tasks, delegations) {
+                        continue;
+                    }
+                    tasks.clear();
+                    delegation::results(summary.bytes(), tasks);
+                    if requested(tasks, delegations) {
+                        cards(b, tasks, delegations, shown, words, bindings);
+                        continue;
+                    }
                     b.open(Role::Slot);
                     b.style(look::WORK);
                     words.card_text(b, if *failed { P::CallFailed } else { P::CallCompleted }, &[]);
@@ -303,6 +360,76 @@ fn committed(b: &mut Builder, turn: &c::Turn, words: &Words, rows: u32, text_lim
     }
 }
 
+fn cards(
+    b: &mut Builder,
+    tasks: &List<u64>,
+    delegations: Option<(&Chat, &jig_client::Client)>,
+    shown: &mut List<u64>,
+    words: &Words,
+    bindings: &mut Bindings,
+) {
+    let Some((chat, client)) = delegations else { return };
+    for task in tasks {
+        if !shown.as_slice().contains(task)
+            && let Some(document) = chat.delegation(client, *task)
+        {
+            crate::cards::delegation::card(b, document, words, bindings);
+            shown.push(*task).expect("shown delegations fit their bound");
+        }
+    }
+}
+fn requested(tasks: &List<u64>, delegations: Option<(&Chat, &jig_client::Client)>) -> bool {
+    let Some((chat, client)) = delegations else { return false };
+    if tasks.is_empty() {
+        return false;
+    }
+    for task in tasks {
+        if chat.requested(client, *task).is_none() {
+            return false;
+        }
+    }
+    true
+}
+fn carded(tasks: &List<u64>, delegations: Option<(&Chat, &jig_client::Client)>) -> bool {
+    let Some((chat, client)) = delegations else { return false };
+    if tasks.is_empty() {
+        return false;
+    }
+    for task in tasks {
+        if chat.delegation(client, *task).is_none() {
+            return false;
+        }
+    }
+    true
+}
+fn hidden(event: &c::Activity, delegations: Option<(&Chat, &jig_client::Client)>) -> bool {
+    let Some((chat, client)) = delegations else { return false };
+    let task = match event {
+        c::Activity::Owner { source, .. } => {
+            if let c::OwnerActivity::Heard(c::OwnerWord {
+                from: c::OwnerRequester::Task(task),
+                kind: c::OwnerMessageKind::Result(_),
+                ..
+            }) = &source.line
+            {
+                Some(*task)
+            } else {
+                None
+            }
+        }
+        c::Activity::Result { result } => Some(result.task.task),
+        c::Activity::Words { .. }
+        | c::Activity::RunBegan { .. }
+        | c::Activity::RunEnded { .. }
+        | c::Activity::Turn { .. }
+        | c::Activity::News { .. }
+        | c::Activity::Decision { .. } => None,
+    };
+    match task {
+        Some(task) => chat.delegation(client, task).is_some(),
+        None => false,
+    }
+}
 fn prefix<'a, T>(b: &mut Builder, values: &'a [T], most: u32, words: &Words) -> &'a [T] {
     let end = values.len().min(usize::try_from(most).expect("window fits"));
     if end < values.len() {

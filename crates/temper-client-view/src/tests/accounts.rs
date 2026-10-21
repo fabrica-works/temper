@@ -437,8 +437,11 @@ fn only_settled_account_statuses_have_the_done_style() {
 #[path = "../../../../testing/memory_literal.rs"]
 mod memory_literal;
 // Base 87c82f753: 4,420,462,083 + 304 added nodes x 574,364 B = 4,595,068,739 B.
+// A chat's 5 delegation cards (client/README.md, 5.7): 5 x (66 markdown + 14)
+// nodes x 574,364 B + 5 x 8 B of carded tasks = 229,745,640 B, so 4,824,814,379 B.
+// Cards remembered across the window: 5 x 8 B = 40 B, so 4,824,814,419 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 4595068739;
+const ACCOUNT_BYTES: u64 = 4824814419;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

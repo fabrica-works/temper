@@ -239,6 +239,7 @@ fn rendered(answer: &CallAnswer) -> Result<HostAnswer, Problem> {
             false
         }
         CallAnswer::Delegated(ids) => {
+            // The client's chat cards read this line (temper-client-domain pages/delegation.rs `delegated`).
             text.add(b"Delegated tasks: ")?;
             for (at, id) in ids.iter().enumerate() {
                 if at > 0 {
