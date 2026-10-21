@@ -90,7 +90,7 @@ fn messages(words: &[tasks::Word]) -> Box<[host::StartMessage]> {
             tasks::Party::Deployment { .. } => b"deployment".as_slice().into(),
         };
         messages
-            .push(host::StartMessage { name: Token::new(word.number), sender, words: word.words.clone() })
+            .push(host::StartMessage { name: Token::new(word.number), sender, words: root::inbox_words(word) })
             .expect("bounded messages");
     }
     messages.into_boxed()
@@ -138,4 +138,27 @@ fn answered(calls: &[core::SettledCall]) -> Box<[host::AnsweredCall]> {
             .expect("bounded answered calls");
     }
     answered.into_boxed()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_starting_run_hears_its_met_dependency_by_name() {
+        // A run resumed by its last dependency's end hears the Met notice that woke it (jig's
+        // domain/tasks.md, section 8.1), as a live run does.
+        let met = tasks::Word {
+            number: 2,
+            from: tasks::Party::Task(2),
+            kind: tasks::MessageKind::Met { dependency: 2, removed: false },
+            words: Box::new([]),
+            at: skein_lib::Wall::EPOCH,
+            hits: 1,
+            eligible: true,
+        };
+        let started = messages(&[met]);
+        assert_eq!(started[0].sender.as_ref(), b"2");
+        assert_eq!(started[0].words.as_ref(), b"T2 is done; the task can go on");
+    }
 }

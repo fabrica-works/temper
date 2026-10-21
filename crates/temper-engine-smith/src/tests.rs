@@ -112,6 +112,30 @@ fn root_charter_becomes_a_smith_start_with_ordered_brief_and_exact_budget() {
 }
 
 #[test]
+fn a_starting_run_hears_its_met_dependency_by_name() {
+    // A run resumed by its last dependency's end hears the Met notice that woke it (jig's
+    // domain/tasks.md, section 8.1), as a live run does.
+    let mut assignment = assignment();
+    assignment.messages = Box::new([tasks::Word {
+        number: 2,
+        from: tasks::Party::Task(2),
+        kind: tasks::MessageKind::Met { dependency: 2, removed: false },
+        words: Box::new([]),
+        at: skein_lib::Wall::EPOCH,
+        hits: 1,
+        eligible: true,
+    }]);
+    let window = smith::Window { turns: 1, bytes: 100_000 };
+    let smith::Event::Start { messages, .. } =
+        start(&assignment, None, None, ReplyTo::new(Token::new(50)), Token::new(23), window)
+    else {
+        panic!("start conversion produces Smith Start")
+    };
+    assert_eq!(messages[0].label.as_ref(), b"2");
+    assert_eq!(messages[0].text.as_ref(), b"T2 is done; the task can go on");
+}
+
+#[test]
 fn selected_llm_bindings_reach_smith() {
     let mut assignment = assignment();
     assignment.run.policy.model.effort = Some(b"high".as_slice().into());

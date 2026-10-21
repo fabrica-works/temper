@@ -382,8 +382,10 @@ pub(crate) fn message(run: Token, attempt: Token, word: &tasks::Word) -> host::L
     }
 }
 
-/// Preserve the task-owned message kind when translating its opaque words.
-fn inbox_words(word: &tasks::Word) -> Box<[u8]> {
+/// Preserve the task-owned message kind when translating its opaque words,
+/// for a live run's message and a starting run's inbox alike.
+#[must_use]
+pub fn inbox_words(word: &tasks::Word) -> Box<[u8]> {
     let (label, number) = match word.kind {
         tasks::MessageKind::Result(_) => (
             b"Result from task ".as_slice(),
