@@ -388,14 +388,7 @@ fn forge_run() {
         document(&doc, &config);
         let observations = dir.join("observations");
         let (run, token_path, token) = if from_setup {
-            let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("available port");
-            let listen = listener.local_addr().expect("listen");
-            drop(listener);
-            document(&dir.join("temper.json"), &forge_setup(dir, &listen.to_string()));
-            let prepared = support::owned::prepare(dir, 1);
-            assert!(prepared.status.success(), "{}", String::from_utf8_lossy(&prepared.stderr));
-            let path = dir.join("forge-1/admin_token");
-            let token = fs::read(&path).expect("prepared token");
+            let (listen, path, token) = prepared_forge(dir);
             let mut command = deployment_command(dir);
             command.arg("1");
             let run = Running::command(command, Some(&observations));
@@ -489,6 +482,41 @@ fn forge_run() {
         assert!(doc.exists());
         scratch.remove();
     }
+}
+
+fn prepared_forge(directory: &Path) -> (SocketAddr, std::path::PathBuf, Vec<u8>) {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("available port");
+    let listen = listener.local_addr().expect("listen");
+    drop(listener);
+    document(&directory.join("temper.json"), &forge_setup(directory, &listen.to_string()));
+    let prepared = support::owned::prepare(directory, 1);
+    assert_eq!(prepared.status.code(), Some(0), "{}", String::from_utf8_lossy(&prepared.stderr));
+    let path = directory.join("forge-1/admin_token");
+    let token = fs::read(&path).expect("prepared token");
+    (listen, path, token)
+}
+#[test]
+fn the_prepared_fake_reconciles_twice_before_it_stops() {
+    let scratch = support::Scratch::new("fake_forge_reconcile");
+    let (_, path, token) = prepared_forge(scratch.path());
+    let mut command = deployment_command(scratch.path());
+    command.arg("1");
+    let run = Running::command(command, None);
+    for pass in ["first", "second"] {
+        let output = Command::new(env!("CARGO_BIN_EXE_temper"))
+            .env_clear()
+            .args(["forge", "reconcile"])
+            .args(support::configuration::flags(scratch.path()))
+            .arg("1")
+            .output()
+            .expect("reconcile ends");
+        assert_eq!(output.status.code(), Some(0), "{pass}: {}", String::from_utf8_lossy(&output.stderr));
+        assert!(output.stdout.is_empty());
+        assert!(output.stderr.is_empty());
+    }
+    run.stop();
+    assert_eq!(fs::read(path).expect("handover token kept"), token);
+    scratch.remove();
 }
 
 const CHAT:&[u8]=br#"{"model":"qa","store":false,"instructions":"","input":[{"role":"user","content":[{"type":"input_text","text":"say hello"}]}],"stream":true}"#;
