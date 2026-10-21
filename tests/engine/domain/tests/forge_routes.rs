@@ -457,8 +457,8 @@ impl World {
                                 free: 0,
                                 rate: None,
                                 call,
-                                cost: 1,
-                                result: Err(skein_forge::api::Error::MissingJob),
+                                cost: 0,
+                                result: Err(skein_forge::api::Error::Refused),
                             }),
                         )));
                         continue;
@@ -1240,22 +1240,29 @@ const BUILD_LOG_END: &[u8] = b"failing check build 3\n";
 /// Temper 03.1's cancelled job's completion log, read by hand.
 const JOB_LOG_END: &[u8] = b"job build cancelled\n";
 
-/// Push the producer's head, fail build, end the producer, and await its repair.
-fn failed_ci_repair(world: &mut World, producer: &engine::Assignment, branch: &[u8]) -> engine::Assignment {
+/// Push the producer's head, fail the named checks, end the producer, and await its repair.
+fn failed_ci_repair(
+    world: &mut World,
+    producer: &engine::Assignment,
+    branch: &[u8],
+    checks: &[&[u8]],
+) -> engine::Assignment {
     assert!(matches!(
         world.external(2, raw::Op::Git(raw::Git::Create { branch: Box::from(branch), commit: 1 })),
         raw::Answer::Branch(raw::Created::Created)
     ));
     let head = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", branch, b"file", b"first", 1)
         .expect("producer pushed its branch");
-    world.external(
-        1,
-        raw::Op::Write(raw::Write::Status {
-            commit: head,
-            context: Box::from(&b"build"[..]),
-            state: raw::Check::Failed,
-        }),
-    );
+    for context in checks {
+        world.external(
+            1,
+            raw::Op::Write(raw::Write::Status {
+                commit: head,
+                context: Box::from(*context),
+                state: raw::Check::Failed,
+            }),
+        );
+    }
     let event = world.protocol.answer(
         Token::new(7),
         producer.task,
@@ -1307,7 +1314,7 @@ fn a_failed_ci_repair_brief_names_the_failed_step_and_its_logs_end() {
         1,
         raw::Op::Write(raw::Write::Status { commit: 1, context: Box::from(&b"build"[..]), state: raw::Check::Passed }),
     );
-    let repair = failed_ci_repair(&mut world, &producer, &branch);
+    let repair = failed_ci_repair(&mut world, &producer, &branch, &[b"build"]);
     assert!(
         matches!(repair.workspace.repositories[0].start, engine::ForgeStart::Branch(ref name) if name.as_ref() == branch.as_ref())
     );
@@ -1320,7 +1327,7 @@ fn a_failed_ci_repair_brief_names_the_failed_step_and_its_logs_end() {
 fn a_failed_ci_with_no_failed_step_briefs_the_end_of_the_jobs_log() {
     let (mut world, _chat, producer, branch) = change_world(false, 0, None);
     fake::set_failing(&mut world.fake, b"org/repo", b"build", raw::Failing::NoStep);
-    let repair = failed_ci_repair(&mut world, &producer, &branch);
+    let repair = failed_ci_repair(&mut world, &producer, &branch, &[b"build"]);
     let words = ci_words(&repair);
     assert!(
         contains(words, b"No step failed. End of the job's log:\n[log truncated before this]\n"),
@@ -1335,11 +1342,16 @@ fn a_failed_ci_with_no_failed_step_briefs_the_end_of_the_jobs_log() {
 fn an_unreadable_failed_job_log_is_named_and_repair_still_runs() {
     let (mut world, _chat, producer, branch) = change_world(false, 0, None);
     world.fail_job_reads = true;
-    let repair = failed_ci_repair(&mut world, &producer, &branch);
+    let repair = failed_ci_repair(&mut world, &producer, &branch, &[b"build", b"lint"]);
     let words = ci_words(&repair);
     assert!(contains(words, b"[job log could not be read]"), "{}", String::from_utf8_lossy(words));
     assert!(contains(words, b"Description:"), "{}", String::from_utf8_lossy(words));
     assert!(contains(words, b"Link:"), "{}", String::from_utf8_lossy(words));
+    assert!(contains(words, b"Failed check: build\n"), "{}", String::from_utf8_lossy(words));
+    assert!(contains(words, b"Failed check: lint\n"), "{}", String::from_utf8_lossy(words));
+    assert_eq!(words.windows(b"Description:".len()).filter(|part| *part == b"Description:").count(), 2);
+    assert_eq!(words.windows(b"Link:".len()).filter(|part| *part == b"Link:").count(), 2);
+    assert!(words.ends_with(b"Repair the failed check.\n"), "{}", String::from_utf8_lossy(words));
 }
 
 fn failed_ci_with_delayed_brief() -> (World, u64, u64) {

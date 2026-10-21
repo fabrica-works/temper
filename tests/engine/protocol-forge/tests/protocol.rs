@@ -471,5 +471,27 @@ fn github_reaches_ready_through_its_accepted_installations() {
     assert_eq!(world.requests().len(), 6);
     assert_eq!(world.git_tokens().len(), 1);
     assert!(world.script_done());
+
+    // Empty origins refuse a pinned Job before metadata, redirect or blob requests.
+    let requests = world.requests().to_vec();
+    let mut head = [0; 32];
+    head[..8].copy_from_slice(&1_u64.to_be_bytes());
+    world.call(
+        1,
+        skein_forge::api::Repository { forge: fixtures::FORGE, repository: 2 },
+        skein_forge::api::Op::Read(skein_forge::api::Read::Job {
+            attempt: skein_forge::api::JobAttempt { head, run: 1, job: 1, attempt: 1 },
+            max_bytes: 1_024,
+        }),
+    );
+    // Settle the terminal in virtual time before the next delivery-log poll.
+    world.run_for(skein_lib::Duration::from_millis(1));
+    let answer = world.answered(1).expect("refused Job terminal");
+    assert_eq!(answer.result, Err(skein_forge::api::Error::Refused));
+    assert_eq!(answer.cost, 0);
+    assert_eq!(world.deliveries().iter().filter(|answer| answer.call.raw() == 1).count(), 1);
+    assert_eq!(world.requests(), requests);
+    assert!(world.blob_records().is_empty());
+    assert!(world.script_done());
     assert!(world.close());
 }

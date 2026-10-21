@@ -721,6 +721,8 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     let scratch = support::Scratch::startup("owned-memory-figures");
     let bounded = support::owned::bounded(scratch.path());
     let required = bounded.requirements();
+    // skein 9d34791e -> fc3e61ea changes terminal Job refusal only: zero owned-byte drift.
+    // Both JSONs retain 85,508,807,222,521 B engine / 3,283,176,427,421 B worker.
     // Against main fcfd657f7 (79,659,997,210,050 B engine; 2,343,551,746,598 B worker).
     // Compared with the prior base, configured-forge retention and the setup-host/store-v3
     // changes lower both engine sums by 2,708,534,096 B. Their bounds cancel in this
