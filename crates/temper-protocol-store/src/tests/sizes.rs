@@ -7,7 +7,7 @@ fn the_application_sizes_are_the_largest_key_and_row() {
     // Change's eight remarks each hold 4096 bytes; the complete row is 35403.
     assert_eq!(
         application(&fixtures::LIMITS),
-        Some(jig_protocol_store::sizes::Application { version: 3, key: 403, value: 35_403 })
+        Some(jig_protocol_store::sizes::Application { version: 4, key: 403, value: 35_403 })
     );
 }
 #[test]
@@ -45,5 +45,5 @@ fn a_row_whose_key_disagrees_with_its_record_is_undecodable() {
 }
 #[test]
 fn the_store_version_is_three() {
-    assert_eq!(crate::STORE_VERSION, 3);
+    assert_eq!(crate::STORE_VERSION, 4);
 }

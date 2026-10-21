@@ -26,7 +26,7 @@ fn key(bytes: &[u8]) {
 fn golden(bytes: &[u8], bounds: &Bounds) {
     record(bytes, bounds);
     // Value's goldens hold each family; prepend Row's version to reach its decoder.
-    let mut versioned = vec![0_u8, 3];
+    let mut versioned = vec![0_u8, 4];
     versioned.extend_from_slice(bytes);
     record(&versioned, bounds);
 }
@@ -34,7 +34,7 @@ fn golden(bytes: &[u8], bounds: &Bounds) {
 fn store_decoders_never_panic_and_reencode_the_same() {
     let bounds = temper_protocol_store::bounds(&LIMITS).expect("fixture limits fit");
     let mut rng = Rng::new(0x7e3d_0405);
-    let goldens = temper_codecs_world::goldens("crates/temper-protocol-store/golden/v3");
+    let goldens = temper_codecs_world::goldens("crates/temper-protocol-store/golden/v4");
     for _ in 0..2_000 {
         record(&temper_codecs_world::drawn(&mut rng, 512), &bounds);
         key(&temper_codecs_world::drawn(&mut rng, 512));

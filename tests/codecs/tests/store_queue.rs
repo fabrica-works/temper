@@ -1,4 +1,4 @@
-//! The runtime-30 merge queue is durable at v3 in place (protocol/store.md, 4).
+//! The runtime-30 merge queue is durable at v4 in place (protocol/store.md, 4).
 #[path = "support/store.rs"]
 mod fixture;
 use skein_forge::api::{Answer, Repository, Write};
@@ -27,13 +27,13 @@ fn entry(queued: bool) -> Stored {
 #[test]
 fn queued_and_unqueued_entries_have_v3_golden_bytes_and_round_trip() {
     let bounds = temper_protocol_store::bounds(&fixture::LIMITS).expect("fixture bounds");
-    assert_eq!(STORE_VERSION, 3);
+    assert_eq!(STORE_VERSION, 4);
     for queued in [false, true] {
         let value = entry(queued);
         let bytes = records::encode(&value);
         let name = if queued { "merge-queued.bin" } else { "merge-unqueued.bin" };
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../crates/temper-protocol-store/golden/v3")
+            .join("../../crates/temper-protocol-store/golden/v4")
             .join(name);
         if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1") {
             std::fs::write(&path, &bytes).expect("write queue golden");
@@ -71,7 +71,7 @@ fn not_installed_call_and_application_reasons_round_trip_distinctly_at_v3() {
         },
     ] {
         let bytes = records::encode(&value);
-        assert_eq!(STORE_VERSION, 3);
+        assert_eq!(STORE_VERSION, 4);
         assert_eq!(records::decode(&bytes, &bounds), Ok(value));
     }
 }

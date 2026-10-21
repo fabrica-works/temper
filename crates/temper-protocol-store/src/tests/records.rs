@@ -1,5 +1,5 @@
 use super::fixtures;
-use crate::{records, v3};
+use crate::{records, v4};
 use temper_engine_domain_forge as forge;
 
 #[test]
@@ -54,7 +54,7 @@ fn bounds_take_each_limit_from_its_source() {
 #[test]
 fn bounds_refuse_sources_past_schema_ceilings() {
     let mut larger = fixtures::LIMITS;
-    larger.name_bytes = v3::CEILINGS.adopted_host.checked_add(1).expect("one past ceiling");
+    larger.name_bytes = v4::CEILINGS.adopted_host.checked_add(1).expect("one past ceiling");
     assert_eq!(crate::bounds(&larger), None);
 }
 
@@ -620,14 +620,14 @@ fn every_application_outcome_preserves_its_complete_record() {
 fn application_decoding_refuses_malformed_refusal_facts() {
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture bounds");
     for refusal in [Box::from([255]), Box::from([2]), Box::from([9, 0])] {
-        let value = v3::CoreRefused::new(&v3::CEILINGS, v3::CoreRefusedParts { refusal }).expect("small piece");
-        let application = v3::Application::new(
-            &v3::CEILINGS,
-            v3::ApplicationParts { token: 9, until: 10, outcome: v3::ApplicationOutcome::CoreRefused(value) },
+        let value = v4::CoreRefused::new(&v4::CEILINGS, v4::CoreRefusedParts { refusal }).expect("small piece");
+        let application = v4::Application::new(
+            &v4::CEILINGS,
+            v4::ApplicationParts { token: 9, until: 10, outcome: v4::ApplicationOutcome::CoreRefused(value) },
         )
         .expect("application");
         let row =
-            v3::Row::new(&v3::CEILINGS, v3::RowParts { value: v3::Value::Application(application) }).expect("row");
+            v4::Row::new(&v4::CEILINGS, v4::RowParts { value: v4::Value::Application(application) }).expect("row");
         assert_eq!(records::decode(&fixtures::encoded_row(&row), &bounds), Err(crate::Undecodable));
     }
 }
@@ -673,7 +673,7 @@ fn forge_writers_round_trip_with_the_v3_golden_bytes() {
         let key = crate::keys::encode(&forge::stored_key(&row), u32::MAX).expect("writer key");
         let bytes = records::encode(&row);
         assert_eq!(bytes.len(), 13); // Row version, family, forge, author.
-        assert_eq!(&bytes[..3], &[0, 3, 16]);
+        assert_eq!(&bytes[..3], &[0, 4, 16]);
         assert_eq!(records::row(&key, &bytes, &bounds), Ok(row));
         if forge == u16::MAX {
             let mut golden = [255; 11];
