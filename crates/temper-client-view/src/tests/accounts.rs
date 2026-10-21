@@ -307,9 +307,12 @@ fn a_supplied_reset_is_visible() {
     let mut view = fixtures::view();
     let mut doc = document(1);
     doc.accounts.get_mut(0).unwrap().sources.get_mut(0).unwrap().state =
-        c::OwnerAccountState::Later { until: Some(skein_lib::Wall::from_nanos(14_000_000_000)) };
+        c::OwnerAccountState::Later { until: Some(skein_lib::Wall::from_nanos(1_791_828_240_000_000_000)) };
     deliver(&mut root, watch, doc);
-    assert!(skein_lib::bytes::find(&fixtures::text(fixtures::build(&mut view, &root)), b"Limited until 14").is_some());
+    assert!(
+        skein_lib::bytes::find(&fixtures::text(fixtures::build(&mut view, &root)), b"Limited until Oct 12, 18:04 UTC")
+            .is_some()
+    );
 }
 #[test]
 fn sign_in_ends_preserve_their_typed_details() {
@@ -576,8 +579,8 @@ fn attention_has_a_separator() {
 fn spent_has_its_own_time_word() {
     let mut doc = document(1);
     doc.accounts.get_mut(0).unwrap().sources.get_mut(0).unwrap().spent_until =
-        Some(skein_lib::Wall::from_nanos(14_000_000_000));
-    assert!(shown(doc).contains("Ready · Usage limit reached · Usage limit until 14"));
+        Some(skein_lib::Wall::from_nanos(1_791_828_240_000_000_000));
+    assert!(shown(doc).contains("Ready · Usage limit reached · Usage limit until Oct 12, 18:04 UTC"));
 }
 fn confirmation_words(operation: Operation) -> String {
     let (mut root, watch) = fixtures::account_root();

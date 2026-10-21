@@ -289,12 +289,17 @@ pub(crate) fn extend(shapes: &mut List<PhraseShape>, phrases: &mut List<Phrase>)
             })
             .expect("account phrases fit");
     }
-    for (number, prefix, kind) in [
-        (200, b"".as_slice(), HoleKind::Number),
-        (201, b"Limited until ".as_slice(), HoleKind::Wall),
-        (202, b"Try again after ".as_slice(), HoleKind::Span),
-        (203, b"Usage limit until ".as_slice(), HoleKind::Wall),
-        (204, b"Sign-in address is longer than this client shows; bytes: ".as_slice(), HoleKind::Number),
+    for (number, prefix, kind, suffix) in [
+        (200, b"".as_slice(), HoleKind::Number, b"".as_slice()),
+        (201, b"Limited until ".as_slice(), HoleKind::Moment, b" UTC".as_slice()),
+        (202, b"Try again after ".as_slice(), HoleKind::Span, b"".as_slice()),
+        (203, b"Usage limit until ".as_slice(), HoleKind::Moment, b" UTC".as_slice()),
+        (
+            204,
+            b"Sign-in address is longer than this client shows; bytes: ".as_slice(),
+            HoleKind::Number,
+            b"".as_slice(),
+        ),
     ] {
         let id = id(number);
         shapes
@@ -305,7 +310,11 @@ pub(crate) fn extend(shapes: &mut List<PhraseShape>, phrases: &mut List<Phrase>)
                 id,
                 forms: Box::new([Form {
                     class: PluralClass::Other,
-                    segments: Box::new([Segment::Text(copy_of(prefix)), Segment::Hole { index: 0, kind }]),
+                    segments: Box::new([
+                        Segment::Text(copy_of(prefix)),
+                        Segment::Hole { index: 0, kind },
+                        Segment::Text(copy_of(suffix)),
+                    ]),
                 }]),
             })
             .expect("account phrase fits");

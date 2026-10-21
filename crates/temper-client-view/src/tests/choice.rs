@@ -222,6 +222,15 @@ fn an_unknown_reset_has_no_time() {
         .contains("until")
     );
 }
+#[test]
+fn a_known_reset_shows_its_utc_moment() {
+    let until = Some(skein_lib::Wall::from_nanos(1_791_828_240_000_000_000));
+    let shown = String::from_utf8(
+        fixtures::text(&wait(c::TaskWaitWhy::Source(c::TaskSourceState::Limited { until }))).into_vec(),
+    )
+    .unwrap();
+    assert!(shown.contains("Limited until Oct 12, 18:04 UTC"), "{shown}");
+}
 
 fn model_words() -> crate::words::Words {
     crate::words::Words::english(fixtures::FORGE, 128, crate::words::Shell::Terminal).unwrap()
