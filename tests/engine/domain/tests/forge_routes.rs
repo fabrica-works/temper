@@ -3116,9 +3116,15 @@ fn a_tracked_goals_changes_install_landing_and_current_head_ci_topics_without_ag
     world.send(event);
     for _ in 0..180 {
         world.tick();
-        if subscriptions(&world).iter().any(|subscriber| {
-            subscriber.topic == forge_top::Topic::Ci { repository: forge_world::REPO, head: translate::commit(pushed) }
-        }) {
+        // Ordered outbox handoff shifts the watcher schedule; the durable
+        // subscription alone does not guarantee restart's drained API cut.
+        if world.pending.is_empty()
+            && world.store.pending.is_empty()
+            && subscriptions(&world).iter().any(|subscriber| {
+                subscriber.topic
+                    == forge_top::Topic::Ci { repository: forge_world::REPO, head: translate::commit(pushed) }
+            })
+        {
             break;
         }
     }

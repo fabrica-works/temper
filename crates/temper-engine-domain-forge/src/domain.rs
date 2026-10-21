@@ -82,6 +82,14 @@ struct StepInput {
 pub(crate) struct Outboxed {
     entry: skein_forge_client::Entry,
     held: bool,
+    handoff: Handoff,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Handoff {
+    Uncommitted,
+    Ready,
+    Handed,
 }
 
 /// The bounded forge connector subtree.
@@ -452,7 +460,28 @@ impl Domain {
     /// Whether a child call or a newly committed entry may be sent.
     #[must_use]
     pub fn is_ready(&self) -> bool {
-        !self.procedure_wakes.is_empty() || self.client.is_ready() || (self.lost_waiting() && self.client.has_room())
+        self.next_handoff().is_some()
+            || !self.procedure_wakes.is_empty()
+            || self.client.is_ready()
+            || (self.lost_waiting() && self.client.has_room())
+    }
+
+    fn next_handoff(&self) -> Option<u64> {
+        for (number, row) in &self.entries {
+            if row.handoff == Handoff::Handed {
+                continue;
+            }
+            if row.handoff != Handoff::Ready {
+                return None;
+            }
+            for (_, pending) in &self.steps {
+                if pending.entry < *number {
+                    return None;
+                }
+            }
+            return Some(*number);
+        }
+        None
     }
 
     /// Whether a lost writer's read waits to be asked again.
@@ -860,6 +889,12 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
 
 /// Drive one child call after prior saves have committed.
 pub fn resume(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+    let before = out.len();
+    handoff_one(d, env, out);
+    if out.len() != before {
+        // An admission refusal already spent this step's child output burst.
+        return;
+    }
     let child_env = child_env(env);
     skein_forge_client::resume(&mut d.client, &child_env, &mut d.client_out);
     drain(d, env, out);
@@ -1612,7 +1647,11 @@ fn enqueue(d: &mut Domain, env: &Env<Limits>, entry: skein_forge_client::Entry, 
 /// Save one entry in the client's hands: newly committed, for the client to
 /// make once the commit is durable, or a known entry's progress.
 fn keep_entry(d: &mut Domain, entry: skein_forge_client::Entry, release: Option<u64>, out: &mut Queue<Request>) {
-    let row = Outboxed { entry: entry.clone(), held: false };
+    let handoff = match d.entries.get(&entry.number) {
+        Some(row) => row.handoff,
+        None => Handoff::Uncommitted,
+    };
+    let row = Outboxed { entry: entry.clone(), held: false, handoff };
     d.entries.insert(entry.number, row).expect("entry capacity checked or a known entry replaced");
     emit(out, Request::Save { read_afresh: None, release, record: Stored::Entry { entry, held: false } });
 }
@@ -2951,11 +2990,24 @@ fn release_projection(d: &mut Domain, goal: u64, out: &mut Queue<Request>) {
 }
 
 fn committed(d: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Request>) {
-    if let Some(row) = d.entries.get(&number)
-        && !row.held
+    if let Some(row) = d.entries.get_mut(&number)
+        && row.handoff == Handoff::Uncommitted
     {
-        child(d, env, skein_forge_client::Event::Make { entry: row.entry.clone() }, out);
+        row.handoff = Handoff::Ready;
     }
+    handoff_one(d, env, out);
+}
+
+fn handoff_one(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+    // skein's forge-client.md, 7.2: each new Make is above every held entry.
+    // Fresh-read chains retain their reserved numbers; built changes,
+    // projections and releases share this outbox and wait for lower chains
+    // and entries to finish or commit. Hand over at most one per step.
+    let Some(number) = d.next_handoff() else { return };
+    let row = d.entries.get_mut(&number).expect("selected entry remains");
+    row.handoff = Handoff::Handed;
+    let entry = row.entry.clone();
+    child(d, env, skein_forge_client::Event::Make { entry }, out);
 }
 
 /// A person's choice for a held entry: again hands it back to the client,
@@ -3021,7 +3073,16 @@ fn withdraw(d: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Requ
     if let Some(row) = d.entries.get(&number)
         && !row.held
     {
-        child(d, env, skein_forge_client::Event::Withdraw { entry: number }, out);
+        if row.handoff != Handoff::Handed && row.entry.attempt.is_none() {
+            d.client_out.push(skein_forge_client::Request::Outcome {
+                entry: number,
+                task: row.entry.task,
+                outcome: skein_forge_client::Outcome::Withdrawn,
+            });
+            drain(d, env, out);
+        } else {
+            child(d, env, skein_forge_client::Event::Withdraw { entry: number }, out);
+        }
     }
 }
 
@@ -3580,7 +3641,9 @@ fn restore(d: &mut Domain, env: &Env<Limits>, record: Stored) {
             assert!(d.proposed_effects.insert(row.number, row).is_ok(), "restored proposed effect fits");
         }
         Stored::Entry { entry, held } => {
-            d.entries.insert(entry.number, Outboxed { entry, held }).expect("restored entry within limits");
+            d.entries
+                .insert(entry.number, Outboxed { entry, held, handoff: Handoff::Handed })
+                .expect("restored entry within limits");
         }
         Stored::Writer(row) => {
             let mut discarded = Queue::with_capacity(env.limits.output);
@@ -3646,6 +3709,8 @@ fn restored(d: &mut Domain, env: &Env<Limits>, clock: skein_forge_client::Recove
         }
     }
     for entry in &entries {
+        // Startup reconciliation can build entries before Restored too.
+        d.entries.get_mut(&entry.number).expect("restored entry remains").handoff = Handoff::Handed;
         child(d, env, skein_forge_client::Event::Make { entry: entry.clone() }, out);
     }
     emit(out, Request::RestartDone { stage: RestartStage::Restored });

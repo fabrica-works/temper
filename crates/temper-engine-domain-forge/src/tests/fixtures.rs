@@ -58,14 +58,9 @@ pub fn open_pull() -> skein_forge::api::Pull {
     }
 }
 
-pub fn opening() -> (Domain, Token) {
+pub fn opening_row() -> ChangeRow {
     use temper_engine_domain_forge_change as change;
-    let mut d = domain();
-    outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
-    outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
-    outputs(&mut d, Event::ReadAfresh);
-    outputs(&mut d, Event::SettleOutbox);
-    let row = ChangeRow {
+    ChangeRow {
         task: CHANGE,
         repository: REPO,
         branch: Box::from(b"temper/51".as_slice()),
@@ -97,7 +92,16 @@ pub fn opening() -> (Domain, Token) {
         base_repair: false,
         queue_repair: None,
         queue_repairs: 0,
-    };
+    }
+}
+
+pub fn opening() -> (Domain, Token) {
+    let mut d = domain();
+    outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+    outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
+    outputs(&mut d, Event::ReadAfresh);
+    outputs(&mut d, Event::SettleOutbox);
+    let row = opening_row();
     let entry = skein_forge_client::Entry {
         number: OPEN,
         task: CHANGE,
@@ -174,6 +178,10 @@ pub fn step_change(d: &mut Domain) {
 
 pub fn missing_pull(d: &mut Domain) {
     step_change(d);
+    missing_pull_reads(d);
+}
+
+pub fn missing_pull_reads(d: &mut Domain) {
     answer_next(d, Ok(skein_forge::api::Answer::Commit(HEAD)));
     answer_next(d, Ok(skein_forge::api::Answer::Commit(BASE)));
     answer_next(d, Err(skein_forge::api::Error::Missing));

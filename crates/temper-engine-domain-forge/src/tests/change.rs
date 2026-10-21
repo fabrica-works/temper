@@ -3,6 +3,147 @@ use super::*;
 // env() starts at 100 s; the change policy stalls for another 30 s.
 const WAIT_UNTIL: Wall = Wall::from_nanos(130_000_000_000);
 
+const LATER_CHANGE: u64 = fixtures::CHANGE + 1;
+const FIRST_ENTRY: u64 = fixtures::OPEN + 1;
+const LATER_ENTRY: u64 = FIRST_ENTRY + 1;
+const LATER_BRANCH: &[u8] = b"temper/52";
+
+fn start_opening(d: &mut Domain, task: u64, entry: u64) {
+    use temper_engine_domain_forge_change as change;
+    outputs(
+        d,
+        Event::StepChange {
+            task,
+            entry,
+            heard: change::Heard {
+                delegate: change::Status::Passed,
+                effect: change::EffectResult::None,
+                released: false,
+                cancelled: false,
+            },
+            gates: Box::new([]),
+            queue_repair_active: false,
+            kept: false,
+        },
+    );
+}
+
+/// Leave the lower chain's last read in flight while the higher entry commits.
+fn reversed_openings(lower_requested: bool) -> (Domain, Token) {
+    use skein_forge::api::Answer;
+    use temper_engine_domain_forge_change as change;
+    let mut d = domain();
+    outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+    outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
+    outputs(&mut d, Event::ReadAfresh);
+    outputs(&mut d, Event::SettleOutbox);
+    let mut row = fixtures::opening_row();
+    row.pending = None;
+    row.pull = None;
+    row.effect = change::EffectResult::None;
+    row.change.state = change::State::Opening { requested: lower_requested };
+    outputs(&mut d, Event::Change { row: row.clone() });
+    row.task = LATER_CHANGE;
+    row.change.task = LATER_CHANGE;
+    row.change.state = change::State::Opening { requested: false };
+    row.branch = Box::from(LATER_BRANCH);
+    outputs(&mut d, Event::Change { row });
+    start_opening(&mut d, fixtures::CHANGE, FIRST_ENTRY);
+    fixtures::missing_pull_reads(&mut d);
+    let green = Answer::Statuses { ci: skein_forge::api::Ci::Passed, statuses: Box::new([]), more: false };
+    fixtures::answer_next(&mut d, Ok(green.clone()));
+    fixtures::answer_next(&mut d, Ok(green));
+    let (lower, _) = fixtures::next_call(&mut d);
+    start_opening(&mut d, LATER_CHANGE, LATER_ENTRY);
+    fixtures::missing_pull_reads(&mut d);
+    let built = fixtures::finish_missing(&mut d);
+    assert!(built_entry(&built, LATER_ENTRY), "higher effect: {built:?}");
+    outputs(&mut d, Event::Committed { entry: LATER_ENTRY });
+    (d, lower)
+}
+
+fn answer_entry_clock(d: &mut Domain) {
+    fixtures::answer_next(d, Ok(skein_forge::api::Answer::Items { items: Box::new([]), more: false, now: env().now }));
+}
+
+fn built_entry(requests: &[Request], number: u64) -> bool {
+    for request in requests {
+        if let Request::ChangeDecision { entry: Some(entry), .. } = request
+            && *entry == number
+        {
+            return true;
+        }
+    }
+    false
+}
+
+#[test]
+fn changes_finishing_in_reverse_order_reach_the_client_in_number_order() {
+    use skein_forge::api::{Answer, Op, Write};
+    let (mut d, lower) = reversed_openings(false);
+    let built = finish_lower(&mut d, lower);
+    assert!(built_entry(&built, FIRST_ENTRY), "lower effect: {built:?}");
+    outputs(&mut d, Event::Committed { entry: FIRST_ENTRY });
+    answer_entry_clock(&mut d);
+    let (first, op) = fixtures::next_call(&mut d);
+    let Op::Write(Write::OpenPull { head, .. }) = op else { panic!("first opening") };
+    assert_eq!(head.as_ref(), b"temper/51");
+    fixtures::answer(&mut d, first, Ok(Answer::Created(2)));
+    answer_entry_clock(&mut d);
+    let (_, op) = fixtures::next_call(&mut d);
+    let Op::Write(Write::OpenPull { head, .. }) = op else { panic!("later opening") };
+    assert_eq!(head.as_ref(), LATER_BRANCH);
+}
+
+fn finish_lower(d: &mut Domain, lower: Token) -> Box<[Request]> {
+    fixtures::answer(
+        d,
+        lower,
+        Ok(skein_forge::api::Answer::Compare {
+            before: fixtures::BASE,
+            after: fixtures::HEAD,
+            contains_before: true,
+            files: Box::new([]),
+            commits: Box::new([]),
+        }),
+    )
+}
+
+#[test]
+fn a_lower_chain_waiting_without_an_entry_releases_the_later_entry() {
+    let (mut d, lower) = reversed_openings(true);
+    assert!(ready(&mut d).is_empty(), "the later entry waits for the lower chain");
+    let waited = finish_lower(&mut d, lower);
+    assert!(
+        waited.contains(&Request::ChangeDecision {
+            task: fixtures::CHANGE,
+            decision: temper_engine_domain_forge_change::Decision::Wait { until: Some(WAIT_UNTIL) },
+            entry: None,
+            evidence: None,
+        }),
+        "lower wait: {waited:?}"
+    );
+    assert!(d.is_ready(), "the committed entry keeps the connector ready");
+    answer_entry_clock(&mut d);
+    let (_, op) = fixtures::next_call(&mut d);
+    let skein_forge::api::Op::Write(skein_forge::api::Write::OpenPull { head, .. }) = op else {
+        panic!("later opening")
+    };
+    assert_eq!(head.as_ref(), LATER_BRANCH);
+}
+
+#[test]
+fn a_committed_entry_waiting_for_a_lower_chain_can_be_withdrawn() {
+    let (mut d, _) = reversed_openings(false);
+    let withdrawn = outputs(&mut d, Event::Withdraw { entry: LATER_ENTRY });
+    assert!(withdrawn.contains(&Request::Outcome {
+        entry: LATER_ENTRY,
+        task: LATER_CHANGE,
+        outcome: skein_forge_client::Outcome::Withdrawn,
+    }));
+    assert!(ready(&mut d).is_empty(), "withdrawal releases no forge call");
+}
+
 #[test]
 fn an_overtaking_open_outcome_restarts_the_fresh_chain() {
     use skein_forge::api::{Answer, Op, Read};
