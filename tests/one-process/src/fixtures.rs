@@ -357,10 +357,11 @@ pub(crate) fn peer_limits() -> skein_fake_peers::Limits {
         observation_bytes: STORY_OBSERVATION_BYTES,
     }
 }
-/// The Forgejo protocol's limits. Bodies and documents hold the git route's
-/// whole trees of the domain the worlds share (256 files of 64 KiB, about
-/// 22.5 MB as base64), as the peer requires (skein's `git::fits`); its
-/// buffers grow only as a call fills them.
+/// The Forgejo protocol's limits. Bodies, documents and strings hold the
+/// git route's whole trees of the domain the worlds share (256 files of
+/// 64 KiB, about 22.5 MB as base64), as the peer requires (skein's
+/// `git::fits`, and a body fits one string); a buffer's pages are resident
+/// only as a call fills them.
 pub(crate) fn forge_limits() -> skein_fake_forge_protocol::Limits {
     skein_fake_forge_protocol::Limits {
         calls: 4,
@@ -377,7 +378,7 @@ pub(crate) fn forge_limits() -> skein_fake_forge_protocol::Limits {
         documents: skein_forge::forgejo::limits::Limits {
             json: skein_json::tokenizer::Limits {
                 chunk: 1024,
-                string: 131_072,
+                string: 25_165_824,
                 number: 32,
                 depth: 16,
                 length: 25_165_824,
