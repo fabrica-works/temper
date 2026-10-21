@@ -42,12 +42,12 @@ enum Phase {
 }
 struct Judge {
     plan: Plan,
-    forgejo: SocketAddr,
+    forgejo: Option<SocketAddr>,
     forgejo_at_link: Rc<Cell<Option<u16>>>,
     forgejo_pids: Rc<Cell<Option<(u32, u32)>>>,
     engine_served: Rc<Cell<Option<bool>>>,
     temper_program: PathBuf,
-    forgejo_program: PathBuf,
+    forgejo_program: Option<PathBuf>,
     phase: Phase,
     next_probe: Time,
     cleanup: bool,
@@ -59,12 +59,13 @@ impl Judge {
         let pids = &binary.tree_status().live_pids;
         match self.phase {
             Phase::Linked => {
-                self.forgejo_at_link.set(status(self.forgejo, "/api/v1/version"));
+                self.forgejo_at_link.set(self.forgejo.and_then(|address| status(address, "/api/v1/version")));
                 match self.plan {
                     Plan::Stop => self.stop(binary),
                     Plan::KillForgejo => {
                         if let Some(engine) = find(pids, &self.temper_program, b"serve")
-                            && let Some(forgejo) = find(pids, &self.forgejo_program, b"web")
+                            && let Some(forgejo) =
+                                find(pids, self.forgejo_program.as_deref().expect("Forgejo restart plan"), b"web")
                         {
                             let killed = std::process::Command::new("/usr/bin/kill")
                                 .args(["-KILL", &forgejo.to_string()])
@@ -77,9 +78,10 @@ impl Judge {
                 }
             }
             Phase::Killed { engine, forgejo } => {
-                if let Some(restarted) = find(pids, &self.forgejo_program, b"web")
+                if let Some(restarted) =
+                    find(pids, self.forgejo_program.as_deref().expect("Forgejo restart plan"), b"web")
                     && restarted != forgejo
-                    && status(self.forgejo, "/api/v1/version") == Some(200)
+                    && self.forgejo.and_then(|address| status(address, "/api/v1/version")) == Some(200)
                 {
                     self.forgejo_pids.set(Some((forgejo, restarted)));
                     self.engine_served.set(Some(
@@ -136,7 +138,7 @@ impl Referee<Process> for Judge {
 }
 /// Starts the shipped box and drives its referee within the supplied deadline.
 #[must_use]
-pub fn run(directory: &Path, forgejo: SocketAddr, plan: Plan, deadline: Duration) -> Outcome {
+pub fn run(directory: &Path, forgejo: Option<SocketAddr>, plan: Plan, deadline: Duration) -> Outcome {
     let clock = Clock::new();
     let mut binary = Binary::start_with_tree(
         Command {
@@ -157,7 +159,11 @@ pub fn run(directory: &Path, forgejo: SocketAddr, plan: Plan, deadline: Duration
     let forgejo_at_link = Rc::new(Cell::new(None));
     let forgejo_pids = Rc::new(Cell::new(None));
     let engine_served = Rc::new(Cell::new(None));
-    let (forgejo_program, _) = super::owned::binaries();
+    let forgejo_program = if matches!(plan, Plan::KillForgejo) {
+        Some(std::fs::canonicalize(super::owned::binaries().0).expect("Forgejo path"))
+    } else {
+        None
+    };
     let mut world = real::World::new(Judge {
         plan,
         forgejo,
@@ -165,12 +171,12 @@ pub fn run(directory: &Path, forgejo: SocketAddr, plan: Plan, deadline: Duration
         forgejo_pids: forgejo_pids.clone(),
         engine_served: engine_served.clone(),
         temper_program: std::fs::canonicalize(env!("CARGO_BIN_EXE_temper")).expect("temper path"),
-        forgejo_program: std::fs::canonicalize(forgejo_program).expect("Forgejo path"),
+        forgejo_program,
         phase: Phase::Linked,
         next_probe: Time::ZERO,
         cleanup: false,
         deadline: clock.now().now.saturating_add(Duration::from_nanos(
-            deadline.as_nanos().saturating_sub(Duration::from_secs(5).as_nanos()),
+            deadline.as_nanos().saturating_sub(Duration::from_secs(5).as_nanos()).max(deadline.as_nanos() / 2),
         )),
         settled: false,
     });

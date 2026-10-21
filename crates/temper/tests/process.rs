@@ -383,7 +383,7 @@ fn temper_box_prints_its_link_and_stops_its_processes() {
     let scratch = support::Scratch::new("box_stop");
     let owned = boxed_example(&scratch);
     let forgejo = owned.forgejo;
-    let ended = support::boxed::run(scratch.path(), forgejo, support::boxed::Plan::Stop, BOX_DEADLINE);
+    let ended = support::boxed::run(scratch.path(), Some(forgejo), support::boxed::Plan::Stop, BOX_DEADLINE);
     assert_box_streams(&ended);
     assert_eq!(ended.forgejo_at_link, Some(200), "Forgejo answered its version when the link came");
     assert_eq!(ended.exit, Some(Exit::Code(0)), "stopped as asked: {}", String::from_utf8_lossy(&ended.stderr));
@@ -417,7 +417,7 @@ fn temper_box_restarts_a_killed_forgejo_while_the_engine_serves() {
     let owned = boxed_example(&scratch);
     let forgejo = owned.forgejo;
     let kill = support::boxed::Plan::KillForgejo;
-    let ended = support::boxed::run(scratch.path(), forgejo, kill, BOX_DEADLINE);
+    let ended = support::boxed::run(scratch.path(), Some(forgejo), kill, BOX_DEADLINE);
     let (killed, restarted) = ended.forgejo_pids.unwrap_or_else(|| {
         panic!("Forgejo was killed and came back: {}", String::from_utf8_lossy(&ended.stderr));
     });

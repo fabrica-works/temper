@@ -171,6 +171,27 @@ fn refused_box(scratch: &support::Scratch, value: &serde_json::Value) -> String 
         .expect_err("box refused")
 }
 #[test]
+fn temper_box_runs_a_fake_entry_to_serves_link() {
+    let scratch = support::Scratch::startup("box-fake-entry");
+    let mut value = managed(scratch.path(), true);
+    let address = support::free_addresses::<1>(&[])[0];
+    support::configuration::fake_entry(&mut value["application"]["setup"][0], &address.to_string());
+    value["application"]["forges"][0]["api"] = serde_json::json!({"socket": address.to_string()});
+    value["application"]["forges"][0]["git"] = format!("http://{address}").into();
+    fs::set_permissions(scratch.path().join("forge-1"), fs::Permissions::from_mode(0o700))
+        .expect("private forge directory");
+    support::write_private(&scratch.path().join("temper.json"), &serde_json::to_vec(&value).expect("JSON"));
+    let ended =
+        support::boxed::run(scratch.path(), None, support::boxed::Plan::Stop, skein_lib::Duration::from_secs(3));
+    let diagnostic = String::from_utf8_lossy(&ended.stderr);
+    let link = support::printed_link(&ended.stdout).unwrap_or_else(|| panic!("serve's link: {diagnostic}"));
+    assert!(skein_lib::bytes::find(link, b"/jig/v1/sign-in/link?secret=").is_some(), "{diagnostic}");
+    assert!(!diagnostic.contains("application.setup"), "{diagnostic}");
+    assert_eq!(ended.exit, Some(skein_io::kernel::Exit::Code(0)), "{diagnostic}");
+    assert_eq!(ended.left, Some(Vec::new()), "no process outlived the box: {diagnostic}");
+    scratch.remove();
+}
+#[test]
 fn a_nonempty_box_configuration_without_a_document_is_refused_naming_it() {
     let scratch = support::Scratch::startup("box-absent-document");
     fs::write(scratch.path().join("other"), b"kept").expect("nonempty configuration");
