@@ -7,8 +7,8 @@ fn set(value: &mut Value, path: &str, replacement: Value) {
     *value.pointer_mut(path).expect("the member exists in the owned example") = replacement;
 }
 
-fn github() -> Value {
-    json!({"segments": ["forge", "github.com"], "last": "open", "value": ""})
+fn every_forge() -> Value {
+    json!({"segments": ["forge"], "last": "open", "value": ""})
 }
 
 fn replace_org_patterns(document: &mut Value) -> u32 {
@@ -19,7 +19,7 @@ fn replace_org_patterns(document: &mut Value) -> u32 {
     for _ in 0..4096_u32 {
         let Some(value) = pending.pop() else { break };
         if *value == org {
-            *value = github();
+            *value = every_forge();
             replaced = replaced.checked_add(1).expect("the owned example's pattern count fits");
             continue;
         }
@@ -124,7 +124,7 @@ fn the_default_is_the_owned_example_so_edited() {
                     None => Value::Null,
                 },
             ),
-            ("/application/landing/projects/0/rules/0/pattern", github()),
+            ("/application/landing/projects/0/rules/0/pattern", every_forge()),
             ("/application/landing/projects/0/rules/0/gates", parse(b"[]")),
             ("/engine/charters/0/instructions", json!("charters/chat.txt")),
             ("/engine/charters/1/instructions", json!("charters/coding.txt")),

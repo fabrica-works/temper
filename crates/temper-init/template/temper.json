@@ -230,8 +230,7 @@
             "kind": 1,
             "pattern": {
               "segments": [
-                "forge",
-                "github.com"
+                "forge"
               ],
               "last": "open",
               "value": ""
@@ -242,8 +241,7 @@
             "kind": 2,
             "pattern": {
               "segments": [
-                "forge",
-                "github.com"
+                "forge"
               ],
               "last": "open",
               "value": ""
@@ -254,8 +252,7 @@
             "kind": 3,
             "pattern": {
               "segments": [
-                "forge",
-                "github.com"
+                "forge"
               ],
               "last": "open",
               "value": ""
@@ -266,8 +263,7 @@
             "kind": 4,
             "pattern": {
               "segments": [
-                "forge",
-                "github.com"
+                "forge"
               ],
               "last": "open",
               "value": ""
@@ -278,8 +274,7 @@
             "kind": 7,
             "pattern": {
               "segments": [
-                "forge",
-                "github.com"
+                "forge"
               ],
               "last": "open",
               "value": ""
@@ -290,8 +285,7 @@
             "kind": 8,
             "pattern": {
               "segments": [
-                "forge",
-                "github.com"
+                "forge"
               ],
               "last": "open",
               "value": ""
@@ -302,8 +296,7 @@
             "kind": 10,
             "pattern": {
               "segments": [
-                "forge",
-                "github.com"
+                "forge"
               ],
               "last": "open",
               "value": ""
@@ -314,8 +307,7 @@
             "kind": 11,
             "pattern": {
               "segments": [
-                "forge",
-                "github.com"
+                "forge"
               ],
               "last": "open",
               "value": ""
@@ -326,8 +318,7 @@
             "kind": 12,
             "pattern": {
               "segments": [
-                "forge",
-                "github.com"
+                "forge"
               ],
               "last": "open",
               "value": ""
@@ -338,8 +329,7 @@
             "kind": 13,
             "pattern": {
               "segments": [
-                "forge",
-                "github.com"
+                "forge"
               ],
               "last": "open",
               "value": ""
@@ -397,8 +387,7 @@
               "kind": 1,
               "pattern": {
                 "segments": [
-                  "forge",
-                  "github.com"
+                  "forge"
                 ],
                 "last": "open",
                 "value": ""
@@ -409,8 +398,7 @@
               "kind": 2,
               "pattern": {
                 "segments": [
-                  "forge",
-                  "github.com"
+                  "forge"
                 ],
                 "last": "open",
                 "value": ""
@@ -421,8 +409,7 @@
               "kind": 3,
               "pattern": {
                 "segments": [
-                  "forge",
-                  "github.com"
+                  "forge"
                 ],
                 "last": "open",
                 "value": ""
@@ -433,8 +420,7 @@
               "kind": 4,
               "pattern": {
                 "segments": [
-                  "forge",
-                  "github.com"
+                  "forge"
                 ],
                 "last": "open",
                 "value": ""
@@ -445,8 +431,7 @@
               "kind": 7,
               "pattern": {
                 "segments": [
-                  "forge",
-                  "github.com"
+                  "forge"
                 ],
                 "last": "open",
                 "value": ""
@@ -457,8 +442,7 @@
               "kind": 8,
               "pattern": {
                 "segments": [
-                  "forge",
-                  "github.com"
+                  "forge"
                 ],
                 "last": "open",
                 "value": ""
@@ -469,8 +453,7 @@
               "kind": 10,
               "pattern": {
                 "segments": [
-                  "forge",
-                  "github.com"
+                  "forge"
                 ],
                 "last": "open",
                 "value": ""
@@ -481,8 +464,7 @@
               "kind": 11,
               "pattern": {
                 "segments": [
-                  "forge",
-                  "github.com"
+                  "forge"
                 ],
                 "last": "open",
                 "value": ""
@@ -493,8 +475,7 @@
               "kind": 12,
               "pattern": {
                 "segments": [
-                  "forge",
-                  "github.com"
+                  "forge"
                 ],
                 "last": "open",
                 "value": ""
@@ -505,8 +486,7 @@
               "kind": 13,
               "pattern": {
                 "segments": [
-                  "forge",
-                  "github.com"
+                  "forge"
                 ],
                 "last": "open",
                 "value": ""
@@ -522,8 +502,7 @@
                 "kind": 1,
                 "pattern": {
                   "segments": [
-                    "forge",
-                    "github.com"
+                    "forge"
                   ],
                   "last": "open",
                   "value": ""
@@ -534,8 +513,7 @@
                 "kind": 2,
                 "pattern": {
                   "segments": [
-                    "forge",
-                    "github.com"
+                    "forge"
                   ],
                   "last": "open",
                   "value": ""
@@ -546,8 +524,7 @@
                 "kind": 3,
                 "pattern": {
                   "segments": [
-                    "forge",
-                    "github.com"
+                    "forge"
                   ],
                   "last": "open",
                   "value": ""
@@ -558,8 +535,7 @@
                 "kind": 4,
                 "pattern": {
                   "segments": [
-                    "forge",
-                    "github.com"
+                    "forge"
                   ],
                   "last": "open",
                   "value": ""
@@ -570,8 +546,7 @@
                 "kind": 7,
                 "pattern": {
                   "segments": [
-                    "forge",
-                    "github.com"
+                    "forge"
                   ],
                   "last": "open",
                   "value": ""
@@ -582,8 +557,7 @@
                 "kind": 8,
                 "pattern": {
                   "segments": [
-                    "forge",
-                    "github.com"
+                    "forge"
                   ],
                   "last": "open",
                   "value": ""
@@ -594,8 +568,7 @@
                 "kind": 10,
                 "pattern": {
                   "segments": [
-                    "forge",
-                    "github.com"
+                    "forge"
                   ],
                   "last": "open",
                   "value": ""
@@ -606,8 +579,7 @@
                 "kind": 11,
                 "pattern": {
                   "segments": [
-                    "forge",
-                    "github.com"
+                    "forge"
                   ],
                   "last": "open",
                   "value": ""
@@ -618,8 +590,7 @@
                 "kind": 12,
                 "pattern": {
                   "segments": [
-                    "forge",
-                    "github.com"
+                    "forge"
                   ],
                   "last": "open",
                   "value": ""
@@ -630,8 +601,7 @@
                 "kind": 13,
                 "pattern": {
                   "segments": [
-                    "forge",
-                    "github.com"
+                    "forge"
                   ],
                   "last": "open",
                   "value": ""
@@ -677,8 +647,7 @@
                     "kind": 1,
                     "pattern": {
                       "segments": [
-                        "forge",
-                        "github.com"
+                        "forge"
                       ],
                       "last": "open",
                       "value": ""
@@ -689,8 +658,7 @@
                     "kind": 2,
                     "pattern": {
                       "segments": [
-                        "forge",
-                        "github.com"
+                        "forge"
                       ],
                       "last": "open",
                       "value": ""
@@ -701,8 +669,7 @@
                     "kind": 3,
                     "pattern": {
                       "segments": [
-                        "forge",
-                        "github.com"
+                        "forge"
                       ],
                       "last": "open",
                       "value": ""
@@ -713,8 +680,7 @@
                     "kind": 4,
                     "pattern": {
                       "segments": [
-                        "forge",
-                        "github.com"
+                        "forge"
                       ],
                       "last": "open",
                       "value": ""
@@ -725,8 +691,7 @@
                     "kind": 7,
                     "pattern": {
                       "segments": [
-                        "forge",
-                        "github.com"
+                        "forge"
                       ],
                       "last": "open",
                       "value": ""
@@ -737,8 +702,7 @@
                     "kind": 8,
                     "pattern": {
                       "segments": [
-                        "forge",
-                        "github.com"
+                        "forge"
                       ],
                       "last": "open",
                       "value": ""
@@ -749,8 +713,7 @@
                     "kind": 10,
                     "pattern": {
                       "segments": [
-                        "forge",
-                        "github.com"
+                        "forge"
                       ],
                       "last": "open",
                       "value": ""
@@ -761,8 +724,7 @@
                     "kind": 11,
                     "pattern": {
                       "segments": [
-                        "forge",
-                        "github.com"
+                        "forge"
                       ],
                       "last": "open",
                       "value": ""
@@ -773,8 +735,7 @@
                     "kind": 12,
                     "pattern": {
                       "segments": [
-                        "forge",
-                        "github.com"
+                        "forge"
                       ],
                       "last": "open",
                       "value": ""
@@ -785,8 +746,7 @@
                     "kind": 13,
                     "pattern": {
                       "segments": [
-                        "forge",
-                        "github.com"
+                        "forge"
                       ],
                       "last": "open",
                       "value": ""
@@ -889,8 +849,7 @@
               "kind": 4,
               "pattern": {
                 "segments": [
-                  "forge",
-                  "github.com"
+                  "forge"
                 ],
                 "last": "open",
                 "value": ""
