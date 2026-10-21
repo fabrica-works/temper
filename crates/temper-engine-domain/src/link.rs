@@ -398,10 +398,10 @@ fn inbox_words(word: &tasks::Word) -> Box<[u8]> {
         }
         tasks::MessageKind::PersonStalled { task } => (b"Person task past its waiting deadline ".as_slice(), task),
         tasks::MessageKind::EffectNotMade { entry } => (b"Effect not made ".as_slice(), entry),
+        tasks::MessageKind::Met { dependency, removed } => return met_words(dependency, removed, &word.words),
         tasks::MessageKind::Words
         | tasks::MessageKind::Question
         | tasks::MessageKind::Answer { .. }
-        | tasks::MessageKind::Met { .. }
         | tasks::MessageKind::Notice { .. }
         | tasks::MessageKind::News { .. }
         | tasks::MessageKind::Timer { .. }
@@ -418,6 +418,27 @@ fn inbox_words(word: &tasks::Word) -> Box<[u8]> {
     writer.put(number.as_bytes()).expect("measured source");
     writer.put(b":\n").expect("measured separator");
     writer.put(&word.words).expect("measured words");
+    writer.finish()
+}
+
+fn met_words(dependency: u64, removed: bool, words: &[u8]) -> Box<[u8]> {
+    let dependency = Decimal::of(dependency);
+    let line = if removed {
+        b" was removed from its dependencies; the task can go on".as_slice()
+    } else {
+        b" is done; the task can go on".as_slice()
+    };
+    let separator = if words.is_empty() { b"".as_slice() } else { b":\n".as_slice() };
+    let bytes = 1_usize.checked_add(dependency.as_bytes().len()).expect("bounded dependency label");
+    let bytes = bytes.checked_add(line.len()).expect("bounded dependency notice");
+    let bytes = bytes.checked_add(separator.len()).expect("bounded message separator");
+    let bytes = bytes.checked_add(words.len()).expect("bounded message envelope");
+    let mut writer = Writer::new(bytes);
+    writer.put(b"T").expect("measured label");
+    writer.put(dependency.as_bytes()).expect("measured dependency");
+    writer.put(line).expect("measured notice");
+    writer.put(separator).expect("measured separator");
+    writer.put(words).expect("measured words");
     writer.finish()
 }
 
@@ -460,6 +481,32 @@ const fn source_failure(reason: host::SourceFailure) -> fleet::SourceFailure {
 mod tests {
     use super::*;
     use skein_lib::Duration;
+
+    #[test]
+    fn met_notices_name_the_dependency_and_preserve_any_words() {
+        let cases: &[(bool, &[u8], &[u8])] = &[
+            (false, b"", b"T42 is done; the task can go on"),
+            (true, b"", b"T42 was removed from its dependencies; the task can go on"),
+            (false, b"landed", b"T42 is done; the task can go on:\nlanded"),
+            (
+                true,
+                b"no longer needed",
+                b"T42 was removed from its dependencies; the task can go on:\nno longer needed",
+            ),
+        ];
+        for &(removed, words, expected) in cases {
+            let word = tasks::Word {
+                number: 2,
+                from: tasks::Party::Task(7),
+                kind: tasks::MessageKind::Met { dependency: 42, removed },
+                words: words.into(),
+                at: skein_lib::Wall::EPOCH,
+                hits: 1,
+                eligible: true,
+            };
+            assert_eq!(inbox_words(&word).as_ref(), expected);
+        }
+    }
 
     #[test]
     fn hello_advertises_the_public_bounds_conversion() {
