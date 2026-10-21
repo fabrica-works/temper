@@ -1323,18 +1323,28 @@ finishes, so the demo's own work pushes nothing yet.
   that says it is the demo model, which answers only the suggested
   requests, and how to connect a real one from the client's accounts
   page. Each is one turn, an object: its text line, then
-  `{"call": "finish", "arguments": {"report": "The demo changes
-  nothing."}}`, finishing `tool_calls`, its tokens its text's bytes
-  divided by 4, rounded up. A chat's run ends only at `finish`: a
-  text-only stop is nudged once, and a second fails the run (smith's
-  `domain/run.md`, 7.2), and the chat's contract is a report of at most
-  32 bytes (`engine.templates`' `chat`), so the answer is the text and
-  the report is short. Their content is the demo's follow-up
-  (`../draft/first-run.md`, section 8).
+  `{"call": "finish", "arguments": {"form": "report", "text": "The demo
+  changes nothing.", "fields": {}}}`, finishing `tool_calls`, its
+  tokens its text's bytes divided by 4, rounded up. A chat's run ends
+  only at `finish`: a text-only stop is nudged once, and a second fails
+  the run (smith's `domain/run.md`, 7.2), and the chat's contract is a
+  report of at most 32 bytes (`engine.templates`' `chat`), so the answer
+  is the text and the report is short. `finish`'s arguments are the
+  contract's, as smith's schema for the tool has them (its
+  `smith-protocol-llm`'s `contract.rs`): a `form`, the report's `text`
+  and its `fields`, none for a chat. Their content is the demo's
+  follow-up (`../draft/first-run.md`, section 8).
 - **`temper fake llm DIRS`,** a long step: skein's fake LLM peer, run
   `without_records` as a peer serving a person is (skein's
-  `fake-llm.md`), its domain `Domain::played` with `asked` and
-  `otherwise` as its scripts, no cued script and no menu. It reads the
+  `fake-llm.md`), its domain `Domain::played` with `asked` as its
+  cued scripts and `otherwise` as its fallback, no asked script and no
+  menu. A chat's opening words are its run's brief, which smith puts in
+  the system text, and the one user message is smith's own opening, so
+  a request's cue is in the system, where skein's cued scripts look and
+  its asked ones do not (skein's `fake-llm.md`, 2.4). A cued script's
+  turns count every assistant message of the conversation, and each
+  run is a conversation of its own, so a run's first answer is its
+  script's first turn. It reads the
   key file before it binds, and refuses to start without it, naming
   the file; it accepts that one credential, and refuses every other
   request as the provider would. It serves `llm.provider`'s models, at

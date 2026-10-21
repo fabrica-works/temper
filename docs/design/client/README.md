@@ -344,9 +344,10 @@ keeps (`../protocol/configuration.md`, section 2).
 - **A suggested request** (`first-run.html`) starts a chat with the
   cue's words as its first message, as the composer's send does: one
   act, one request (3.6), the suggestions and the send disabled while
-  it is pending. The demo model finds the cue in that message (skein's
-  `fake-llm.md`, 2.4), so the chat plays the cue's script; the
-  composer's text is left as it was.
+  it is pending. The engine puts that message in the run's brief, and
+  the demo model finds the cue there (`../protocol/setup.md`, 8.4), so
+  the chat plays the cue's script; the composer's text is left as it
+  was.
 - **The work's account and model.** A chat's composer names the
   account and model its next run takes, and offers the models `me`
   serves for the project (jig's `client/domain/contract.md`, 5.3), each
