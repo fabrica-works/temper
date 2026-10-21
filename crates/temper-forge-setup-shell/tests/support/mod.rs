@@ -70,6 +70,7 @@ pub fn settings(address: std::net::SocketAddr) -> temper_forge_setup_shell::reco
             forgejo: Box::new([]),
             runner: None,
             listen: address,
+            orgs: Box::new([]),
             person: Account { login: b"ada".as_slice().into(), email: b"ada@example.invalid".as_slice().into() },
         }),
     };

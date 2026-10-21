@@ -96,10 +96,16 @@ pub fn values(
         forge: entry.forge,
         bot_login: entry.bot.login.clone(),
         bot_email: entry.bot.email.clone(),
-        // temper-15 moves owned orgs under mode.owned.person.orgs; managed still parses them.
+        // temper-15 removes the old entry-level orgs fallback.
         orgs: match &entry.mode {
             crate::setup::Mode::Managed { .. } | crate::setup::Mode::Fake(_) => Box::new([]),
-            crate::setup::Mode::Owned(_) => entry.orgs.clone(),
+            crate::setup::Mode::Owned(owned) => {
+                if owned.orgs.is_empty() {
+                    entry.orgs.clone()
+                } else {
+                    owned.orgs.clone()
+                }
+            }
         },
         // None adopted until temper-14a gives the owned forge’s adopted list.
         adopted: Box::new([]),

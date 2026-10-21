@@ -19,6 +19,8 @@ fn an_owned_entry_with_a_runner_reads_into_its_members() {
     let Mode::Owned(owned) = &entry.mode else { panic!("owned") };
     assert_eq!(owned.listen, SocketAddr::from((Ipv4Addr::LOCALHOST, 3000)));
     assert_eq!(owned.runner.as_ref().unwrap().capacity, 1);
+    assert!(owned.orgs.is_empty());
+    assert_eq!(entry.orgs.as_ref(), &[Box::<[u8]>::from(b"work".as_slice())]);
 }
 #[test]
 fn a_fake_entry_reads_every_member_and_joins_data_paths() {
@@ -416,4 +418,61 @@ fn a_fake_git_path_keeps_absolute_values_and_refuses_escape() {
         };
         assert_eq!(found, expected);
     }
+}
+
+#[test]
+fn an_owned_entry_reads_its_persons_orgs_without_an_old_list() {
+    let mut problems = Problems::empty();
+    let setup = Setup::read(
+        &fixtures::document(&fixtures::nested()),
+        0,
+        &limits::small(),
+        &jig_protocol_config::Directories::working(),
+        &mut problems,
+    )
+    .unwrap();
+    assert!(problems.is_empty());
+    let entry = setup.entry(2).unwrap();
+    let Mode::Owned(owned) = &entry.mode else { panic!("owned") };
+    assert_eq!(owned.orgs.as_ref(), &[Box::<[u8]>::from(b"nested".as_slice())]);
+    assert!(entry.orgs.is_empty());
+}
+
+#[test]
+fn nested_orgs_refuse_malformed_values_and_the_same_bound_at_their_path() {
+    for (list, expected) in [
+        (b"false".as_slice(), b"application.setup[1].mode.owned.person.orgs: wrong value kind\n".as_slice()),
+        (b"[]", b"application.setup[1].mode.owned.person.orgs: invalid form\n"),
+        (b"[false]", b"application.setup[1].mode.owned.person.orgs[0]: wrong value kind\n"),
+        (br#"["bad/name"]"#, b"application.setup[1].mode.owned.person.orgs[0]: invalid form\n"),
+        (
+            br#"["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]"#,
+            b"application.setup[1].mode.owned.person.orgs[0]: past its bound\n",
+        ),
+        (br#"["a","b","c","d","e","f","g","h","i"]"#, b"application.setup[1].mode.owned.person.orgs: past its bound\n"),
+    ] {
+        refused(&fixtures::changed_in(&fixtures::nested(), br#"["nested"]"#, list), expected);
+    }
+    let bytes = fixtures::changed_in(&fixtures::nested(), br#"["nested"]"#, br#"["a","b","c","d","e","f","g","h"]"#);
+    let mut problems = Problems::empty();
+    assert!(
+        Setup::read(
+            &fixtures::document(&bytes),
+            0,
+            &limits::small(),
+            &jig_protocol_config::Directories::working(),
+            &mut problems
+        )
+        .is_some()
+    );
+    assert!(problems.is_empty());
+}
+
+#[test]
+fn an_owned_entry_refuses_both_org_lists_and_keeps_the_old_missing_list_refusal() {
+    refused(
+        &fixtures::changed(br#""login":"ada""#, br#""login":"ada","orgs":["nested"]"#),
+        b"application.setup[1].orgs: invalid form\napplication.setup[1].mode.owned.person.orgs: invalid form\n",
+    );
+    refused(&fixtures::changed(br#""orgs":["work"],"#, b""), b"application.setup[1].orgs: missing\n");
 }

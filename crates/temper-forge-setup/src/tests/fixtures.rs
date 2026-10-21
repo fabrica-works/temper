@@ -32,6 +32,10 @@ pub fn document(bytes: &[u8]) -> Document {
 pub fn setup() -> Setup {
     read_setup(TWO)
 }
+pub fn nested() -> Box<[u8]> {
+    let bytes = changed(br#""orgs":["work"],"#, b"");
+    changed_in(&bytes, br#""login":"ada""#, br#""login":"ada","orgs":["nested"]"#)
+}
 fn read_setup(bytes: &[u8]) -> Setup {
     Setup::read(
         &document(bytes),

@@ -193,6 +193,7 @@ fn owned_gets_forgejo_given_and_managed_stays_unserved_without_start_time_plans(
             Mode::Managed { admin_token: b"/data/admin".as_slice().into() }
         } else {
             Mode::Owned(temper_forge_setup::setup::Owned {
+                orgs: Box::new([]),
                 fetch: temper_forge_setup::setup::Fetch { forgejo: false, runner: false, mirror: None },
                 forgejo: b"/bin/forgejo".as_slice().into(),
                 runner: None,

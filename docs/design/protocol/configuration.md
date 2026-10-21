@@ -579,7 +579,7 @@ have one, an engine alone none. Each:
   | `forge_component.log_catch_up_ms` | `log_catch_up` (default 24 h): how far back the delivery log is read when a forge starts again within one process (skein's `forge-connection.md`, 6.5); at most a day, the log's own reach. temper keeps no `guid` across process starts: a process's first read of a forge's log keeps the newest and reads nothing back, and skein's forge client reads each adopted repository afresh at restart |
   | `forge_component.log_pages` | the pages one read of the delivery log takes (default 10) |
   | `forge_component.delivery_bytes` | a delivery read from the log (default 1 MiB) |
-  | `setup.orgs` | a setup's `orgs` |
+  | `setup.orgs` | a setup's org list: Owned names exactly one of `orgs` (until temper-15) and `mode.owned.person.orgs` |
   | `setup.deadline_ms` | a setup plan's run, its wait for the forge among it |
   | `setup.backoff_ms`, `setup.backoff_max_ms` | a setup plan's first request made again, doubling |
   | `setup.states` | the setup host's states, held in memory, for the manifest's and the installation's returns |
