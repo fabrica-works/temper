@@ -50,7 +50,7 @@ pub fn spawn_of(command: &Command) -> Spawn {
     }
 }
 
-use crate::{Answer, Transport, answer, check, id::id};
+use crate::{Answer, Typed, answer, check, id::id};
 use skein_fake_forge_domain::{self as domain, api};
 use skein_fake_peers::forge::Forge;
 use skein_lib::{Duration, List};
@@ -76,7 +76,7 @@ pub enum Fault {
 /// The forge and local files for one invocation or a hosted-world story.
 #[derive(Debug)]
 pub struct Scenario {
-    pub transport: Transport,
+    pub transport: Typed,
     pub checkout: Checkout,
     pub base: u64,
     pub topic: u64,
@@ -152,7 +152,7 @@ pub fn named(full: &[u8], protected: Option<&[u8]>) -> Scenario {
     domain::grant(&mut domain, full, 1, api::Permission::Write);
     domain::grant(&mut domain, full, 2, api::Permission::Read);
     let forge = Rc::new(RefCell::new(Forge::new(domain, CONFIG)));
-    let mut transport = Transport::new(forge, &table(full, protected));
+    let mut transport = Typed::new(forge, &table(full, protected));
     let identity = identity();
     transport.authenticate(Some(&(identity.login, identity.token)));
     let topic =

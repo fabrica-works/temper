@@ -153,7 +153,7 @@ impl State {
         domain::repository(&mut domain, &config, setup);
         domain::grant(&mut domain, b"acme/app", 1, api::Permission::Write);
         let handle = Rc::new(RefCell::new(Forge::new(domain, config)));
-        crate::git::share(Some(temper_fake_git_hosted::Transport::new(handle.clone(), &table)));
+        crate::git::share(Some(temper_fake_git_hosted::Typed::new(handle.clone(), &table)));
         let peer = Peer::new(
             ([127, 0, 0, 1], 0).into(),
             peer_limits(),

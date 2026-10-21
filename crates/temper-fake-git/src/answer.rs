@@ -2,7 +2,7 @@
 use crate::{Checked, Transport, id::id};
 use skein_fake_checkout::{
     Checkout,
-    git::{self, Created, Fault, Pushed, Remote, Tree, Want, What},
+    git::{self, Created, Fault, Pushed, Tree, Want, What},
     in_git,
 };
 use temper_worker_domain_checkout::git::Commit;
@@ -33,7 +33,7 @@ impl Answer {
 }
 /// Answer one admitted invocation using only the fake checkout and transport.
 #[must_use]
-pub fn answer(checked: &Checked, checkout: &mut Checkout, transport: &mut Transport) -> Answer {
+pub fn answer(checked: &Checked, checkout: &mut Checkout, transport: &mut impl Transport) -> Answer {
     transport.authenticate(checked.credential.as_ref());
     let at = checked.at.as_ref();
     match &checked.command {
@@ -109,7 +109,7 @@ pub fn answer(checked: &Checked, checkout: &mut Checkout, transport: &mut Transp
         }
     }
 }
-fn merge(checkout: &mut Checkout, at: &[u8], transport: &Transport, theirs: u64) -> Answer {
+fn merge(checkout: &mut Checkout, at: &[u8], transport: &mut impl Transport, theirs: u64) -> Answer {
     let Some(head) = checkout.content(&path(at, b".git/temper-head")).map(count_bytes) else {
         return Answer::local_failure();
     };
@@ -225,7 +225,7 @@ fn tree_id(tree: &Tree) -> u64 {
         .fold(0xcbf2_9ce4_8422_2325, |hash, byte| (hash ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3))
 }
 
-fn fetch(checkout: &mut Checkout, at: &[u8], transport: &mut Transport, remote: &[u8], source: &Source) -> Answer {
+fn fetch(checkout: &mut Checkout, at: &[u8], transport: &mut impl Transport, remote: &[u8], source: &Source) -> Answer {
     let previous = checkout.content(&path(at, b".git/refs/temper/fetched")).map_or(0, count_bytes);
     let want = match source {
         Source::Branch(branch) => Want::Branch(branch),
@@ -253,7 +253,7 @@ fn fetch(checkout: &mut Checkout, at: &[u8], transport: &mut Transport, remote: 
     }
 }
 
-fn create(checked: &Checked, transport: &mut Transport, remote: &[u8], branch: &[u8], commit: &Commit) -> Answer {
+fn create(checked: &Checked, transport: &mut impl Transport, remote: &[u8], branch: &[u8], commit: &Commit) -> Answer {
     let commit = count(*commit);
     let old = transport.branch(remote, branch);
     match git::create(transport, remote, branch, commit) {
@@ -270,7 +270,7 @@ fn create(checked: &Checked, transport: &mut Transport, remote: &[u8], branch: &
 fn push(
     checkout: &Checkout,
     at: &[u8],
-    transport: &mut Transport,
+    transport: &mut impl Transport,
     remote: &[u8],
     commit: &Commit,
     branch: &[u8],

@@ -2,7 +2,7 @@
 use crate::{calls::Caller, world::Proc};
 use skein_world::{HostedProgram, Inherited, StartupRoot, real::World};
 use std::{cell::RefCell, ffi::OsStr, os::unix::ffi::OsStrExt, path::PathBuf};
-use temper_fake_git_hosted::{Answer, Transport, fixtures::Scenario};
+use temper_fake_git_hosted::{Answer, Typed, fixtures::Scenario};
 use temper_worker_protocol_git::invocation::Command;
 
 pub struct Disk {
@@ -71,12 +71,12 @@ impl skein_world::Referee<Proc> for Judge {
         true
     }
 }
-thread_local! { static SHARED: RefCell<Option<Transport>> = const { RefCell::new(None) }; }
-pub fn share(transport: Option<Transport>) {
+thread_local! { static SHARED: RefCell<Option<Typed>> = const { RefCell::new(None) }; }
+pub fn share(transport: Option<Typed>) {
     SHARED.with(|shared| *shared.borrow_mut() = transport);
 }
 #[must_use]
-pub fn transport() -> Transport {
+pub fn transport() -> Typed {
     SHARED.with(|shared| shared.borrow().as_ref().expect("world's forge").clone())
 }
 fn git(spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {

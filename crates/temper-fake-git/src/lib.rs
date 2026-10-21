@@ -8,4 +8,4 @@ mod program;
 mod transport;
 pub use check::{Checked, Refusal, check};
 pub use program::{Git, Start};
-pub use transport::Transport;
+pub use transport::{Transport, Typed};

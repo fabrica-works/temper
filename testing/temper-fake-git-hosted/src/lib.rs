@@ -3,7 +3,7 @@
 use skein_io::kernel::Spawn;
 use skein_world::Inherited;
 use std::collections::BTreeSet;
-pub use temper_fake_git::{Answer, Checked, Git, Refusal, Start, Transport, answer, check, id};
+pub use temper_fake_git::{Answer, Checked, Git, Refusal, Start, Typed, answer, check, id};
 pub mod fixtures;
 
 /// Take the worker root and every descriptor inherited by this program.
@@ -18,7 +18,7 @@ pub fn start(inherited: &Inherited) -> Start {
 
 /// Assert the world's spawn contract before building its program.
 #[must_use]
-pub fn git(spawn: &Spawn, inherited: &Inherited, transport: Transport) -> Git {
+pub fn git(spawn: &Spawn, inherited: &Inherited, transport: Typed) -> Git<Typed> {
     match check(spawn) {
         Ok(_) | Err(Refusal::Usage) => {}
         Err(Refusal::Broken(rule)) => panic!("git's spawn broke {rule}"),

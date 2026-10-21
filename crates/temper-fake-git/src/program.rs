@@ -50,10 +50,10 @@ pub struct Start {
 }
 /// One hosted invocation; every descriptor closes before its terminal exit.
 #[derive(Debug)]
-pub struct Git {
+pub struct Git<T: Transport> {
     checked: Option<Checked>,
     checkout: Checkout,
-    transport: Transport,
+    transport: T,
     root: Fd,
     pipes: BTreeMap<u32, Fd>,
     owned: BTreeSet<Fd>,
@@ -68,9 +68,9 @@ pub struct Git {
     completions: Queue<Complete>,
     submissions: Queue<Submit>,
 }
-impl Git {
+impl<T: Transport> Git<T> {
     #[must_use]
-    pub fn new(spawn: &k::Spawn, start: Start, transport: Transport) -> Self {
+    pub fn new(spawn: &k::Spawn, start: Start, transport: T) -> Self {
         let mut broken = None;
         let checked = match check(spawn) {
             Ok(value) => Some(value),
@@ -367,9 +367,9 @@ impl Git {
         }
     }
 }
-impl Host for Git {
+impl<T: Transport> Host for Git<T> {
     fn iterate(&mut self, now: Time, _wall: Wall) {
-        self.transport.forge.borrow_mut().now = now;
+        self.transport.set_time(now);
         while let Some(complete) = self.completions.pop() {
             self.complete(complete);
         }

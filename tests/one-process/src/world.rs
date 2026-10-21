@@ -137,7 +137,7 @@ impl Host for ServiceHost {
 pub(crate) enum Proc {
     Service(Box<ServiceHost>),
     Agent(Box<skein_world::PipeHost<smith_agent_shell::Agent>>),
-    Git(Box<temper_fake_git_hosted::Git>),
+    Git(Box<temper_fake_git_hosted::Git<temper_fake_git_hosted::Typed>>),
     Shell(Box<stories::Shell>),
     Peer(Box<SignalHost<skein_fake_peers::llm::Peer>>),
     Forge(Box<SignalHost<Peer>>),
@@ -678,11 +678,11 @@ fn hooks_address(bound: &mut Option<(Fd, SocketAddr)>, complete: &Complete) -> O
         _ => None,
     }
 }
-thread_local! { static SHARED: RefCell<Option<temper_fake_git_hosted::Transport>> = const { RefCell::new(None) }; }
-fn share(transport: Option<temper_fake_git_hosted::Transport>) {
+thread_local! { static SHARED: RefCell<Option<temper_fake_git_hosted::Typed>> = const { RefCell::new(None) }; }
+fn share(transport: Option<temper_fake_git_hosted::Typed>) {
     SHARED.with(|shared| *shared.borrow_mut() = transport);
 }
-fn transport() -> temper_fake_git_hosted::Transport {
+fn transport() -> temper_fake_git_hosted::Typed {
     SHARED.with(|shared| shared.borrow().as_ref().expect("world's forge").clone())
 }
 fn peer() -> Peer {

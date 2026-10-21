@@ -3,18 +3,38 @@ use crate::check::Credential;
 use skein_fake_checkout::git::{Created, Fault, Pushed, Remote, Tree, Want, What};
 use skein_fake_forge_domain::{self as domain, api};
 use skein_fake_peers::forge::Forge;
-use skein_lib::{Env, ReplyTo, Secret, Wall};
+use skein_lib::{Env, ReplyTo, Secret, Time, Wall};
 use std::{cell::RefCell, rc::Rc};
+
+/// The program's synchronous remote and store, including replay's missing call.
+/// A transport preserves the kit's object graph and write promises; a run with
+/// a missing call is discarded before any of its files or output are kept.
+pub trait Transport: Remote {
+    /// Select the identity for this run; keep its secret on the transport side.
+    fn authenticate(&mut self, credential: Option<&Credential>);
+    /// Whether the last repository refusal named a known identity.
+    fn authenticated(&self) -> bool;
+    /// Read the branch's current head, or no head when it is absent or refused.
+    fn branch(&mut self, remote: &[u8], branch: &[u8]) -> Option<u64>;
+    /// Ask whether the first commit is an ancestor of the second.
+    fn is_ancestor(&mut self, ancestor: u64, commit: u64) -> bool;
+    /// Store a fresh commit, even for an unchanged tree, with these exact parents.
+    fn commit_tree(&mut self, parent: u64, merging: Option<u64>, tree: Tree, message: &[u8]) -> u64;
+    /// Set the forge's input clock before the run makes any call.
+    fn set_time(&mut self, now: Time);
+    /// Take the first call this run lacked; the typed transport never lacks one.
+    fn missed(&mut self) -> Option<skein_fake_forge_protocol::git::Call>;
+}
 
 /// The known tokens and logins stay solely on this side of the boundary.
 #[derive(Debug, Clone)]
-pub struct Transport {
+pub struct Typed {
     pub forge: Rc<RefCell<Forge>>,
     tokens: Rc<Vec<(Secret, u64)>>,
     users: Rc<Vec<(u64, Box<[u8]>)>>,
     user: Option<u64>,
 }
-impl Transport {
+impl Typed {
     /// Copy the protocol scenario's identity tables before it takes ownership.
     #[must_use]
     pub fn new(forge: Rc<RefCell<Forge>>, table: &skein_fake_forge_protocol::Config) -> Self {
@@ -95,7 +115,7 @@ impl Transport {
         self.forge.borrow().domain.is_ancestor(ancestor, commit)
     }
 }
-impl Remote for Transport {
+impl Remote for Typed {
     fn heads(&mut self, remote: &[u8]) -> Result<Vec<u64>, Fault> {
         let api::Answer::Cloned { branches, .. } = self.call(remote, api::Git::Clone)? else {
             panic!("clone answer");
@@ -202,5 +222,29 @@ fn fault(error: api::Error) -> Fault {
         | api::Error::Stale
         | api::Error::AlreadyQueued(_)
         | api::Error::Conflict => panic!("unexpected git fault: {error:?}"),
+    }
+}
+
+impl Transport for Typed {
+    fn authenticate(&mut self, credential: Option<&Credential>) {
+        Self::authenticate(self, credential);
+    }
+    fn authenticated(&self) -> bool {
+        Self::authenticated(self)
+    }
+    fn branch(&mut self, remote: &[u8], branch: &[u8]) -> Option<u64> {
+        Self::branch(self, remote, branch)
+    }
+    fn is_ancestor(&mut self, ancestor: u64, commit: u64) -> bool {
+        Self::is_ancestor(self, ancestor, commit)
+    }
+    fn commit_tree(&mut self, parent: u64, merging: Option<u64>, tree: Tree, message: &[u8]) -> u64 {
+        Self::commit_tree(self, parent, merging, tree, message)
+    }
+    fn set_time(&mut self, now: Time) {
+        self.forge.borrow_mut().now = now;
+    }
+    fn missed(&mut self) -> Option<skein_fake_forge_protocol::git::Call> {
+        None
     }
 }

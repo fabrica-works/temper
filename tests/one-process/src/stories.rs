@@ -127,7 +127,7 @@ pub(crate) fn provider(story: Story) -> skein_fake_peers::llm::Peer {
         skein_fake_llm_protocol::documents::Provider::OpenAi,
     )
 }
-pub(crate) fn forge(story: Story) -> temper_fake_git_hosted::Transport {
+pub(crate) fn forge(story: Story) -> temper_fake_git_hosted::Typed {
     let config = skein_fake_forge_domain::Config {
         limits: skein_fake_forge_domain::Limits {
             statuses: fixtures::FORGE_STATUSES,
@@ -169,7 +169,7 @@ pub(crate) fn forge(story: Story) -> temper_fake_git_hosted::Transport {
     );
     let forge = std::rc::Rc::new(std::cell::RefCell::new(skein_fake_peers::forge::Forge::new(domain, config)));
     let mut transport =
-        temper_fake_git_hosted::Transport::new(forge, &temper_fake_git_hosted::fixtures::table(b"acme/app", None));
+        temper_fake_git_hosted::Typed::new(forge, &temper_fake_git_hosted::fixtures::table(b"acme/app", None));
     let identity = temper_fake_git_hosted::fixtures::identity();
     transport.authenticate(Some(&(identity.login, identity.token)));
     assert_eq!(
@@ -199,7 +199,7 @@ pub(crate) fn forge(story: Story) -> temper_fake_git_hosted::Transport {
     while transport.forge.borrow_mut().domain.pop_observation().is_some() {}
     transport
 }
-pub(crate) fn prepare_merge_branch(transport: &temper_fake_git_hosted::Transport) {
+pub(crate) fn prepare_merge_branch(transport: &temper_fake_git_hosted::Typed) {
     let mut forge = transport.forge.borrow_mut();
     let env = skein_lib::Env { now: forge.now, wall: skein_lib::Wall::EPOCH, limits: forge.config };
     assert!(forge.pending.room() >= skein_fake_forge_domain::MAX_OUT, "reserve external domain output");
