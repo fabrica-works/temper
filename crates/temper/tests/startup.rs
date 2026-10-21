@@ -896,6 +896,9 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // The root's 32 observation Facts grow 120 B inline for StepRefused's problem.
     // Its 3,076 owned envelope copies add 11,811,840 B; worker inputs stay fixed.
     let procedure_refusal_growth = 3_076 * 32 * 120;
+    // Skein 4760d83c: the forge connection's JSON body intake adds 8,256 B
+    // per connection at the 4,096-B chunk, across two connection slots.
+    let forge_body_intake_growth = 2 * 8_256;
     assert_eq!(
         required.engine_bytes,
         79_659_997_210_050_u64
@@ -911,6 +914,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + added_dependencies_growth
             + preparing_dependency_reads_growth
             + procedure_refusal_growth
+            + forge_body_intake_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
