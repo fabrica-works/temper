@@ -1,0 +1,198 @@
+use super::*;
+use crate::Command;
+use std::io::Read;
+
+fn configured(arguments: &[&str], environment: &[(&str, &str)]) -> Result<Command, String> {
+    let arguments = arguments.iter().map(|s| s.as_bytes().into()).collect::<Vec<_>>();
+    let environment = environment.iter().map(|(k, v)| (k.as_bytes().into(), v.as_bytes().into())).collect::<Vec<_>>();
+    crate::configure_with(&arguments, &environment, b"/work")
+}
+#[test]
+fn arguments() {
+    for (words, environment, kind, document, ready, seed, observations) in [
+        (vec!["fake", "llm", "--document", "llm.json"], vec![], Kind::Llm, "llm.json", None, 0, None),
+        (vec!["fake", "forge", "--document", "forge.json"], vec![], Kind::Forge, "forge.json", None, 0, None),
+        (
+            vec!["fake", "llm", "--document", "llm.json", "--ready", "ready ", "--seed", "23"],
+            vec![],
+            Kind::Llm,
+            "llm.json",
+            Some("ready "),
+            23,
+            None,
+        ),
+        (
+            vec!["fake", "forge", "--document", "forge.json", "--ready", "", "--observations", "seen"],
+            vec![],
+            Kind::Forge,
+            "forge.json",
+            Some(""),
+            0,
+            Some("seen"),
+        ),
+        (
+            vec!["fake", "forge"],
+            vec![
+                ("TEMPER_DOCUMENT", "env.json"),
+                ("TEMPER_READY", "up "),
+                ("TEMPER_SEED", "42"),
+                ("TEMPER_OBSERVATIONS", "seen"),
+            ],
+            Kind::Forge,
+            "env.json",
+            Some("up "),
+            42,
+            Some("seen"),
+        ),
+        (
+            vec!["fake", "llm", "--document", "flag.json", "--seed", "7"],
+            vec![("TEMPER_DOCUMENT", "env.json"), ("TEMPER_SEED", "42")],
+            Kind::Llm,
+            "flag.json",
+            None,
+            7,
+            None,
+        ),
+    ] {
+        let Command::Fake { arguments } = configured(&words, &environment).expect("valid fixture") else {
+            panic!("fake command");
+        };
+        assert_eq!(
+            arguments,
+            Arguments {
+                kind,
+                document: document.into(),
+                ready: ready.map(|s| s.as_bytes().into()),
+                seed,
+                observations: observations.map(Into::into)
+            }
+        );
+    }
+    for (words, expected) in [
+        (vec!["fake"], "temper fake: expected llm or forge\n"),
+        (vec!["fake", "other"], "temper fake: unknown fake other\n"),
+        (vec!["fake", "llm"], "temper fake llm: --document FILE is not given, and TEMPER_DOCUMENT is not set\n"),
+        (
+            vec!["fake", "llm", "--document", "doc", "--seed", "no"],
+            "temper fake llm: --seed N (TEMPER_SEED): expected a decimal u64\n",
+        ),
+        (
+            vec!["fake", "llm", "--document", "doc", "--observations", "seen"],
+            "temper fake llm: unexpected argument --observations\n",
+        ),
+        (vec!["fake", "forge", "--document", "doc", "extra"], "temper fake forge: unexpected argument extra\n"),
+    ] {
+        assert_eq!(configured(&words, &[]).expect_err("refused fixture"), expected);
+    }
+}
+
+fn advance(host: &Host, content: &[u8]) {
+    let mut shared = host.shared.as_ref().expect("forge").borrow_mut();
+    let env = skein_lib::Env { now: Time::ZERO, wall: Wall::EPOCH, limits: forge::LIMITS };
+    skein_fake_forge_domain::advance(&mut shared.domain, &env, b"fake/widget", b"main", b"new", content, forge::OWNER)
+        .expect("valid fixture");
+}
+
+#[test]
+fn observation_write_failure_drains_the_peer_and_keeps_its_outputs() {
+    // The read-only descriptor fails writes with EBADF without damaging the
+    // real FILE. Restoring write access after failure detects later writes,
+    // including a misleading checkpoint at stop. The tiny buffer also checks
+    // the drain's bound failure under the same refused-reply contract.
+    for (name, checkpoint, bound_failure) in
+        [("first", false, false), ("checkpoint", true, false), ("bound", true, true)]
+    {
+        let directory = std::env::temp_dir().join(format!("temper-fake-write-failure-{}-{name}", std::process::id()));
+        crate::directories::make_private(&directory, skein_shell::effective_user()).expect("valid fixture");
+        let document = directory.join("forge.json");
+        fs::write(
+            &document,
+            serde_json::to_vec(&serde_json::json!({"listen":{"socket":"127.0.0.1:0"},
+            "admin_token":directory.join("forge/admin_token"),"owner":"fake",
+            "repositories":[{"name":"widget","landing":"main","ci":null}]}))
+            .expect("valid fixture"),
+        )
+        .expect("valid fixture");
+        let path = directory.join("observations");
+        let arguments = Arguments {
+            kind: Kind::Forge,
+            document: document.clone(),
+            ready: None,
+            seed: 23,
+            observations: Some(path.clone()),
+        };
+        let (mut host, mut kernel) = start(&arguments, &mut Created::default()).expect("valid fixture");
+        if checkpoint {
+            advance(&host, b"before");
+            host.observations();
+        }
+        let clock = skein_shell::Clock::new();
+        let deadline = clock.now().now.saturating_add(skein_lib::Duration::from_millis(300));
+        let mut client = None;
+        let before = loop {
+            assert!(clock.now().now < deadline, "{name}: reaches the reply pass");
+            kernel.reap(host.completions());
+            let skein_shell::Now { now, wall } = clock.now();
+            host.iterate(now, wall);
+            if client.is_none()
+                && let Some(address) = host.peer.address()
+            {
+                let mut socket = std::net::TcpStream::connect(address).expect("client");
+                socket.set_read_timeout(Some(std::time::Duration::from_millis(300))).expect("timeout");
+                let token = credential(23, credential::ADMIN_TOKEN);
+                write!(socket, "GET /api/v1/repositories/1 HTTP/1.1\r\nHost: localhost\r\nAuthorization: token {}\r\nConnection: keep-alive\r\n\r\n",
+                    std::str::from_utf8(&token).expect("hex")).expect("request");
+                client = Some(socket);
+            }
+            let reply = host.submissions.iter().any(|submission| matches!(submission.kind, Op::Send { .. }));
+            if reply {
+                // A request is in this pass, with its reply still unsubmitted.
+                advance(&host, b"lost");
+                if bound_failure {
+                    host.buffer = List::with_capacity(1);
+                } else {
+                    host.observations = Some(File::open(&path).expect("read-only writer seam"));
+                }
+            }
+            let before = fs::read(&path).expect("FILE before this pass");
+            host.drain();
+            if reply {
+                assert!(host.failed, "{name}: the pass's write fails");
+                assert!(
+                    host.completions
+                        .iter()
+                        .any(|c| matches!(c.kind, Op::Send { .. })
+                            && c.result == Err(skein_io::kernel::Error::BrokenPipe)),
+                    "{name}: reply refused"
+                );
+                host.observations = Some(OpenOptions::new().append(true).open(&path).expect("restore writer"));
+                advance(&host, b"later");
+                break before;
+            }
+            kernel.submit(host.submissions(), skein_shell::Wait::No);
+        };
+        // The client's sending half remains open: settling must cancel Recv.
+        assert_eq!(skein_shell::drive(&mut kernel, &clock, &mut host), Exit::Code(1), "{name}");
+        let mut client = client.expect("open client");
+        let mut bytes = Vec::new();
+        match client.read_to_end(&mut bytes) {
+            Ok(_) => {}
+            Err(why) if why.kind() == io::ErrorKind::ConnectionReset => {}
+            Err(why) => panic!("{name}: client end: {why}"),
+        }
+        assert!(bytes.is_empty(), "{name}: no reply bytes");
+        assert!(host.is_empty());
+        assert_eq!(kernel.in_flight(), 0);
+        assert!(host.shared.as_ref().expect("forge").borrow_mut().domain.pop_observation().is_none());
+        assert_eq!(fs::read(&path).expect("FILE"), before, "{name}: no checkpoint after loss");
+        if checkpoint {
+            let records = String::from_utf8(before).expect("JSON lines");
+            assert_eq!(records.lines().last(), Some("{\"observations_lost\":0}"));
+        } else {
+            assert!(before.is_empty(), "{name}: the first write failed");
+        }
+        assert!(document.exists());
+        assert!(directory.join("forge/admin_token").exists());
+        fs::remove_dir_all(directory).expect("valid fixture");
+    }
+}
