@@ -286,6 +286,13 @@ fn forges(configured: &[service::startup::Forge]) -> Result<List<service::ForgeR
     Ok(runtime)
 }
 fn prepare(directories: &Directories, bytes: &[u8], owned: &mut Vec<Fd>) -> Result<service::Service, String> {
+    prepare_with_store(directories, bytes, owned).map(|(service, _)| service)
+}
+fn prepare_with_store(
+    directories: &Directories,
+    bytes: &[u8],
+    owned: &mut Vec<Fd>,
+) -> Result<(service::Service, Box<[u8]>), String> {
     let (named, _, _) = setup::check(bytes, &directories.jig())?;
     let document =
         config::document(bytes, &config::DocumentLimits { bytes: CONFIG_BYTES, tokens: CONFIG_BYTES, depth: 32 })
@@ -341,7 +348,7 @@ fn prepare(directories: &Directories, bytes: &[u8], owned: &mut Vec<Fd>) -> Resu
     if let Some(bundle) = bundle {
         service.adopt_bundle(bundle);
     }
-    Ok(service)
+    Ok((service, named.deployment))
 }
 fn close(owned: Vec<Fd>) {
     for fd in owned {
@@ -368,9 +375,9 @@ pub fn prepare_in(directories: &Directories) -> Result<service::Service, String>
 fn serve(directories: &Directories) -> Result<Exit, String> {
     let bytes = directories.read()?;
     let mut owned = Vec::new();
-    let prepared = prepare(directories, &bytes, &mut owned);
-    let mut service = match prepared {
-        Ok(service) => service,
+    let prepared = prepare_with_store(directories, &bytes, &mut owned);
+    let (mut service, store) = match prepared {
+        Ok(prepared) => prepared,
         Err(why) => {
             close(owned);
             return Err(why);
@@ -390,7 +397,9 @@ fn serve(directories: &Directories) -> Result<Exit, String> {
             return Err(why);
         }
     };
-    Ok(skein_shell::drive(&mut kernel, &Clock::new(), &mut Host::new(service)))
+    let mut host = Host::new(service, directories.clone());
+    host.store = store;
+    Ok(skein_shell::drive(&mut kernel, &Clock::new(), &mut host))
 }
 #[cfg(test)]
 mod tests;

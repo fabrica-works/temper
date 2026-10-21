@@ -1,18 +1,23 @@
 //! The shell's adapter over the temper composition (jig's protocol/service.md, 7).
+use crate::directories::Directories;
 use skein_io::kernel::{Complete, Exit, Submit};
 use skein_lib::{Queue, Time, Wall};
 use std::io::{self, Write};
+use std::path::{Component, Path, PathBuf};
 use temper_service::{End, Service, Stop};
 
 pub struct Host {
     pub service: Service,
+    directories: Directories,
+    pub(super) store: Box<[u8]>,
     output: Box<dyn Write>,
     output_failed: bool,
 }
 impl Host {
     #[must_use]
-    pub fn new(service: Service) -> Self {
-        Self { service, output: Box::new(io::stdout()), output_failed: false }
+    pub fn new(service: Service, directories: Directories) -> Self {
+        let store = directories.data.clone();
+        Self { service, directories, store, output: Box::new(io::stdout()), output_failed: false }
     }
 }
 impl skein_shell::Host for Host {
@@ -47,19 +52,9 @@ impl skein_shell::Host for Host {
         if !self.service.is_empty() {
             return None;
         }
-        if let Some(End::Stopped(why)) = self.service.end() {
-            let lines = match why {
-                Stop::Start(found) => crate::problems(&temper_service::startup::Problems::jig(
-                    found.clone(),
-                    &jig_protocol_config::Path::root(),
-                )),
-                Stop::CommitFailed { number } => format!("temper serve: commit {number} failed\n"),
-                Stop::Hooks => "temper serve: webhooks listener failed\n".into(),
-                Stop::Listener => "temper serve: client listener failed\n".into(),
-            };
-            eprint!("{lines}");
-        }
-        Some(Exit::Code(u8::from(self.output_failed || self.service.end() != Some(&End::Drained))))
+        let (lines, code) = ending(self.service.end(), self.output_failed, &self.directories, &self.store);
+        eprint!("{lines}");
+        Some(Exit::Code(code))
     }
     fn drain(&mut self) {
         while let Some(note) = self.service.notes().pop() {
@@ -79,6 +74,55 @@ impl skein_shell::Host for Host {
             }
         }
     }
+}
+
+// Compare lexical components, without opening paths during an error report.
+fn lexical(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            component @ (Component::Prefix(_) | Component::RootDir | Component::Normal(_)) => {
+                normalized.push(component.as_os_str());
+            }
+        }
+    }
+    normalized
+}
+fn ending(end: Option<&End>, output_failed: bool, directories: &Directories, store: &[u8]) -> (String, u8) {
+    let lines = match end {
+        Some(End::Stopped(why)) => match why {
+            Stop::Start(found) => crate::problems(&temper_service::startup::Problems::jig(
+                found.clone(),
+                &jig_protocol_config::Path::root(),
+            )),
+            Stop::StoreVersion => {
+                let data = crate::path(&directories.data);
+                let store = crate::path(store);
+                if lexical(store).starts_with(lexical(data)) {
+                    format!(
+                        "temper serve: data directory {}: its store is at another version; move it aside\n",
+                        data.display()
+                    )
+                } else {
+                    format!(
+                        "temper serve: data directory {}: its store at {} is at another version; move the store {} aside\n",
+                        data.display(),
+                        store.display(),
+                        store.display()
+                    )
+                }
+            }
+            Stop::CommitFailed { number } => format!("temper serve: commit {number} failed\n"),
+            Stop::Hooks => "temper serve: webhooks listener failed\n".into(),
+            Stop::Listener => "temper serve: client listener failed\n".into(),
+        },
+        None | Some(End::Drained | End::Aborted) => String::new(),
+    };
+    (lines, u8::from(output_failed || end != Some(&End::Drained)))
 }
 
 fn note_line(note: temper_service::Note) -> String {
@@ -169,4 +213,69 @@ fn records_and_installation_notes_name_the_forge_and_reason() {
         note_line(Note::ForgeUnkept { number: 7, installation: 93 }),
         "temper serve: forge 7: installation 93: not kept\n"
     );
+}
+
+#[test]
+fn a_store_version_refusal_names_what_to_move() {
+    let arguments =
+        [b"--config".as_slice(), b"/configuration", b"--data", b"/data", b"--cache", b"/cache"].map(Box::from);
+    let (directories, rest) = crate::directories::resolve(&arguments, &[], b"/").expect("resolved directories");
+    assert!(rest.is_empty());
+    for (store, expected) in [
+        ("/data/deployment", "temper serve: data directory /data: its store is at another version; move it aside\n"),
+        ("/data", "temper serve: data directory /data: its store is at another version; move it aside\n"),
+        (
+            "/data/./child/../deployment",
+            "temper serve: data directory /data: its store is at another version; move it aside\n",
+        ),
+        (
+            "/elsewhere/store",
+            "temper serve: data directory /data: its store at /elsewhere/store is at another version; move the store /elsewhere/store aside\n",
+        ),
+        (
+            "/data2/store",
+            "temper serve: data directory /data: its store at /data2/store is at another version; move the store /data2/store aside\n",
+        ),
+        (
+            "/data/../other/store",
+            "temper serve: data directory /data: its store at /data/../other/store is at another version; move the store /data/../other/store aside\n",
+        ),
+    ] {
+        let (line, code) = ending(Some(&End::Stopped(Stop::StoreVersion)), false, &directories, store.as_bytes());
+        assert_eq!(line, expected, "{store}");
+        assert_eq!(code, 1, "{store}");
+    }
+    // Directory bytes follow the shell's existing Path::display convention.
+    let arguments =
+        [b"--config".as_slice(), b"/configuration", b"--data", b"/data/\xff", b"--cache", b"/cache"].map(Box::from);
+    let (directories, _) = crate::directories::resolve(&arguments, &[], b"/").expect("byte paths");
+    assert_eq!(
+        ending(Some(&End::Stopped(Stop::StoreVersion)), false, &directories, b"/data/\xff/store"),
+        ("temper serve: data directory /data/\u{fffd}: its store is at another version; move it aside\n".into(), 1)
+    );
+}
+
+#[test]
+fn other_endings_keep_their_exit_behavior() {
+    let arguments =
+        [b"--config".as_slice(), b"/configuration", b"--data", b"/data", b"--cache", b"/cache"].map(Box::from);
+    let (directories, _) = crate::directories::resolve(&arguments, &[], b"/").expect("resolved directories");
+    let mut problems = jig_protocol_config::Problems::empty();
+    problems.push(jig_protocol_config::Path::root().member(b"deployment"), jig_protocol_config::What::Refers);
+    for (end, output_failed, expected, code) in [
+        (Some(End::Stopped(Stop::Start(problems))), false, "temper serve: deployment: unknown reference\n", 1),
+        (Some(End::Stopped(Stop::CommitFailed { number: 7 })), false, "temper serve: commit 7 failed\n", 1),
+        (Some(End::Stopped(Stop::Hooks)), false, "temper serve: webhooks listener failed\n", 1),
+        (Some(End::Stopped(Stop::Listener)), false, "temper serve: client listener failed\n", 1),
+        (Some(End::Drained), false, "", 0),
+        (Some(End::Drained), true, "", 1),
+        (Some(End::Aborted), false, "", 1),
+        (None, false, "", 1),
+    ] {
+        assert_eq!(
+            ending(end.as_ref(), output_failed, &directories, b"/data/store"),
+            (expected.into(), code),
+            "{end:?}, output failed {output_failed}"
+        );
+    }
 }

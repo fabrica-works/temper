@@ -55,6 +55,8 @@ pub enum Stop {
         number: u64,
     },
     Start(Problems),
+    /// The store uses another format version (jig's protocol/store.md, 5.3).
+    StoreVersion,
     Listener,
     /// The webhooks listener failed.
     Hooks,

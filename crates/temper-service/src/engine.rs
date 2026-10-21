@@ -356,6 +356,9 @@ pub(crate) fn answer(engine: &mut Engine) {
                 engine.store.opened = true;
                 engine.store.installation = installation;
             }
+            jig_protocol_store::Event::OpenRefused { why: jig_protocol_store::OpenRefusal::Format { .. }, .. } => {
+                stop::version(engine);
+            }
             jig_protocol_store::Event::OpenRefused { .. } => stop::unavailable(engine, b"deployment"),
             event @ (jig_protocol_store::Event::Kept { owner }
             | jig_protocol_store::Event::Stale { owner }
