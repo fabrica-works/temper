@@ -346,3 +346,92 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
   .temper-heading .temper-filters { flex: 0 0 100%; margin-top: 8px; justify-content: flex-start; }
   .temper-page .temper-card textarea { width: 100%; }
 }
+
+/* .topbar .breadcrumbs: task lineage with a silent separator. */
+.temper-page:has(> .temper-task-heading) > .temper-pagebar { gap: 9px; color: var(--temper-muted); font-size: 11px; }
+.temper-page:has(> .temper-task-heading) > .temper-pagebar p { margin: 0; color: var(--temper-ink); font-weight: 600; }
+.temper-page:has(> .temper-task-heading) > .temper-pagebar a + p::before { content: '/' / ''; color: #b7b1a8; margin-right: 9px; font-weight: 400; }
+.temper-page:has(> .temper-task-heading) > .temper-pagebar a:hover { color: var(--temper-accent-dark); text-decoration: underline; }
+/* .task-heading: an unboxed heading at the page's left edge. */
+.temper-main.temper-page > .temper-task-heading { max-width: 760px; margin: 22px auto 19px max(24px, calc((100% - 1160px) / 2)); }
+.temper-task-heading > h2 { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+.temper-task-heading > h1 { margin: 7px 0; font: 700 clamp(21px, 2.25vw, 26px)/1.25 var(--temper-mono); letter-spacing: -.025em; overflow-wrap: anywhere; }
+/* .meta-row, .tag.accent and .task-chip: task identity and supplied facts. */
+.temper-task-heading > .temper-meta { gap: 7px 12px; }
+.temper-task-heading > .temper-meta:last-child { margin-top: 10px; }
+.temper-task-heading .temper-meta p { margin: 0; }
+.temper-task-heading > .temper-meta:first-of-type > p:first-child { padding: 2px 6px; border-radius: 3px; color: var(--temper-accent-dark); background: var(--temper-accent-pale); font-size: 10px; font-weight: 600; white-space: nowrap; }
+.temper-task-heading > .temper-meta > div:not([role]) { display: inline-flex; align-items: center; gap: 6px; padding: 2px 6px; border: 1px solid var(--temper-line); border-radius: 3px; background: #f9f8f5; color: #5d625b; font-size: 10px; font-weight: 600; }
+.temper-task-heading > .temper-meta > div:not([role]) > p:first-child { color: var(--temper-accent-dark); font-weight: 700; }
+.temper-task-heading > .temper-meta:first-of-type > div + * + *::before, .temper-task-heading > .temper-meta:last-child > p + p::before, .temper-task-card > .temper-meta > :not(:first-child)::before { content: '·' / ''; margin-right: 12px; color: var(--temper-muted); }
+/* .tag.green: done uses the shared status tag's dimensions. */
+.temper-task-heading .temper-status-done { display: inline-flex; align-items: center; width: fit-content; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; white-space: nowrap; color: var(--temper-green); background: var(--temper-green-pale); }
+/* .card.card-pad and .card-top h2: the task's stacked cards. */
+.temper-page > .temper-task-card { min-width: 0; padding: 15px 18px; border: 1px solid var(--temper-line); border-radius: 5px; background: var(--temper-paper); margin-block: 0 9px; overflow-wrap: anywhere; }
+.temper-task-card > h2 { margin: 0; font: 700 14px/1.3 var(--temper-mono); letter-spacing: -.025em; }
+/* What was asked and .rule: markdown followed by the supplied resource row. */
+.temper-task-card > p, .temper-task-card > ul:not(.temper-events), .temper-task-card > ol, .temper-task-card > pre, .temper-task-card > blockquote { margin: 14px 0 0; font-size: 12px; line-height: 1.7; }
+.temper-task-card pre { overflow-x: auto; white-space: pre; overflow-wrap: normal; }
+.temper-task-card code { font: inherit; }
+.temper-task-card > .temper-meta { border-top: 1px solid var(--temper-line); padding-top: 12px; margin-top: 12px; }
+.temper-task-card > .temper-meta p { margin: 0; }
+/* .plan-list and .plan-row: name, executor and phase, with no spend column. */
+.temper-plan { display: grid; }
+.temper-plan [role=treeitem] { min-width: 0; }
+.temper-plan-row { display: grid; grid-template-columns: minmax(0, 1fr) 110px 110px; gap: 11px; align-items: center; border-bottom: 1px solid #f0ede8; padding: 7px 0; font-size: 11px; }
+.temper-plan-row > :first-child { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.temper-plan-row > div > a { flex: none; font-weight: 700; }
+.temper-plan-row > div > p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.temper-plan-row p { margin: 0; }
+.temper-plan-row > p { grid-column: 2; grid-row: 1; color: var(--temper-muted); }
+.temper-plan-row > :nth-child(n+4) { grid-column: 1; grid-row: 2; color: var(--temper-muted); }
+.temper-plan-row a:hover { color: var(--temper-accent-dark); text-decoration: underline; }
+/* .tree: nested names have silent branches; the root has none. */
+.temper-plan [role=treeitem] > [role=treeitem] { margin-left: 20px; }
+.temper-plan [role=treeitem] > [role=treeitem] > .temper-plan-row > div:first-child::before { content: '├─' / ''; flex: none; color: #b6aa9d; font-family: monospace; white-space: pre; }
+.temper-plan [role=treeitem] > [role=treeitem]:last-of-type > .temper-plan-row > div:first-child::before { content: '└─' / ''; }
+.temper-plan [role=treeitem]:last-of-type:not(:has(> [role=treeitem])) > .temper-plan-row { border-bottom: 0; }
+/* .phase, .phase.held and .phase.good: phase words remain visible without tags. */
+.temper-plan-row > [role=status] { grid-column: 3; grid-row: 1; display: block; width: auto; padding: 0; border-radius: 0; background: transparent; color: var(--temper-muted); font-size: 11px; font-weight: 400; white-space: normal; }
+.temper-plan-row > .temper-status-active { color: var(--temper-ink); }
+.temper-plan-row > .temper-status-done { color: var(--temper-green); }
+.temper-plan-row > .temper-status-held { color: var(--temper-red); font-weight: 700; }
+.temper-plan-row > .temper-status-retrying { color: var(--temper-amber); }
+/* Folded rows and .notice.red: the supplied counts and held-below notice. */
+.temper-plan > p, .temper-plan [role=treeitem] > p { margin: 0; padding: 7px 0; font-size: 11px; color: var(--temper-muted); }
+.temper-plan > [role=status], .temper-plan [role=treeitem] > [role=status] { margin: 7px 0; padding: 7px 10px; border: 1px solid #f0d8d3; border-radius: 4px; background: var(--temper-red-pale); color: #79504b; font-size: 11px; line-height: 1.5; }
+/* .notice.red: valid one-item lists under held plan rows. */
+.temper-plan-hold { list-style: none; padding: 0; margin: 7px 0; }
+.temper-plan-hold > li { padding: 11px 14px; border: 1px solid #f0d8d3; border-radius: 4px; background: var(--temper-red-pale); color: #79504b; font-size: 11px; line-height: 1.5; }
+.temper-plan-hold p { margin: 0 0 7px; }
+.temper-plan-hold p:first-child { font-weight: 700; }
+/* .button-row and .button.primary: reuse the Inbox's decision controls. */
+.temper-plan-hold button { vertical-align: bottom; border: 1px solid #dcd5ca; border-radius: 4px; min-height: 28px; padding: 5px 9px; margin: 10px 8px 0 0; background: var(--temper-paper); color: var(--temper-ink); font: 600 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.temper-plan-hold button:first-of-type { background: var(--temper-accent); border-color: var(--temper-accent); color: white; }
+.temper-plan-hold button:first-of-type:hover { background: #a8563e; }
+.temper-plan-hold textarea { display: block; width: 100%; min-height: 75px; margin-top: 8px; border: 1px solid #d8d0c5; border-radius: 5px; padding: 8px; resize: vertical; font: inherit; }
+/* .timeline and .event: faint wall-clock times beside activity words. */
+.temper-events { display: grid; list-style: none; padding: 0; margin: 0; }
+.temper-events > li { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 12px; padding: 8px 0; border-bottom: 1px solid #f0ede8; font-size: 11px; }
+.temper-events > li:last-child { border-bottom: 0; }
+.temper-events > li > p { color: #a09c93; margin: 0; }
+.temper-events > li > div { min-width: 0; }
+.temper-events > li > div p { margin: 3px 0 0; color: var(--temper-muted); font-size: 11px; }
+/* .page at 850px: keep the task heading on the page's left edge. */
+@media (max-width: 850px) {
+  .temper-main.temper-page > .temper-task-heading { margin-left: 17px; }
+}
+/* .topbar and .page at 760px: the shared 35px bar and narrower page. */
+@media (max-width: 760px) {
+  .temper-main.temper-page > .temper-task-heading { margin-top: 16px; margin-left: 14px; }
+}
+/* .plan-row at 600px: retain executor and phase on a second line. */
+@media (max-width: 600px) {
+  .temper-task-heading > .temper-meta { flex-wrap: wrap; }
+  .temper-plan-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: 4px; }
+  .temper-plan-row > div:first-child { grid-column: 1 / -1; grid-row: 1; }
+  .temper-plan-row > p { grid-column: 1; grid-row: 2; }
+  .temper-plan-row > [role=status] { grid-column: 2; grid-row: 2; }
+  .temper-plan-row > :nth-child(n+4) { grid-column: 1 / -1; grid-row: 3; }
+  .temper-plan [role=treeitem] > [role=treeitem] { margin-left: 10px; }
+}
