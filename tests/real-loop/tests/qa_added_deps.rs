@@ -102,7 +102,7 @@ fn met_notice_tells_the_agent_which_dependency_finished() {
     let ran = landed_report();
     let text = agent_text(&ran, "@kept_a3");
     assert!(
-        text.contains("Met") || text.contains("met") || text.contains("task 2"),
+        text.contains("T2 is done; the task can go on"),
         "the resumed agent must hear an identifiable Met notice for task 2, rather than an empty numbered message: {text:?}"
     );
 }
