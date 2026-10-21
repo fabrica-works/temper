@@ -9,6 +9,11 @@ old process of designs, plans and runs is out of scope. The evidence is
 a trace of 25 hours of the real execution, kept in
 `~/src/rust/tmp/temper-on-temper/`. What falls short is recorded here
 (section 6); drafts in jig, smith or temper follow when the user agrees.
+On 2026-10-21 owners.md and director.md moved to a new shape: owners
+reach their drafts through milestones under a cap, each on a fresh
+session. Sections 4.2, 4.4 and 6 take it in. `reference-case.md`
+condenses this analysis, the change of shape and the new shape's first
+milestone into one story.
 
 ## 1. In one page
 
@@ -35,15 +40,25 @@ a trace of 25 hours of the real execution, kept in
   show it what the director saw (the information), let it act (the
   power), and do what followed (the mechanics). Every judgement can be
   expressed, except two powers (section 5).
+- **The reference case** (`reference-case.md`) is one story that holds
+  every mechanic here once, the change of shape included. The mockups,
+  the lab and the director work from it.
 - **What falls short needs design:**
-  - adding a dependency to a live task;
+  - adding a dependency to a live task, since designed in jig;
   - parking an owner;
   - plan usage in accounts;
   - worker health;
   - a failure at the landing tip that matches an open finding.
 
   Whether an owner resumes its session or starts fresh is the charter's
-  choice already; which works better is an experiment (section 6).
+  choice already; which works better is an experiment (section 6). The
+  new shape adds six (6.8):
+  - an open finding at a change's head;
+  - a repair that adopts work in flight;
+  - the cap against delegates' deadlines;
+  - a fresh run at a milestone's end;
+  - a stopped goal's delegates;
+  - retiring a charter.
 - **What temper does better:**
   - Sessions can't be orphaned or duplicated.
   - Releases need no relay, and landing conflicts get repair tasks.
@@ -233,6 +248,10 @@ a trace of 25 hours of the real execution, kept in
     results and failures; and on a timer every two hours.
   - Landing news is kept for its next run, not woken on.
   - Its authority is the project's.
+  - Its compactions, capped since 10-21, and its fresh context at every
+    third check are its charter's waiting and the deployment's resume
+    limit (6.6). Its timers are the task's, so they can't keep a run
+    busy past a fresh start.
 - **An owner is a goal,** a tracked task with a priority (jig's
   `domain/core.md`, 6.2), which the director delegates per draft.
   - Its charter: `owners.md`'s part for owners.
@@ -247,8 +266,13 @@ a trace of 25 hours of the real execution, kept in
   - It wakes on its delegates' questions and results, on failures, on
     landings that overlap its work, and on the director's words.
   - Its charter resumes the transcript and waits with a long threshold,
-    as today's long sessions do (6.6).
-- **A sub-owner** is the same, delegated by its owner, narrower.
+    as today's long sessions do (6.6). Since 10-21 an owner starts
+    fresh at each milestone's end, and today's handover routine goes:
+    one run per task leaves no old session to stop (6.8).
+- **A sub-owner** is the same, delegated by its owner, narrower. Since
+  10-21 there is one per milestone, under a deadline at the 4-hour cap.
+  It starts no sub-owner of its own, which authority's depth makes a
+  rail.
 - **An implementer** is an agent task on its own r-branch.
   - Its instructions are the task file. Its model is GPT at high, or
     Claude for taste.
@@ -257,7 +281,9 @@ a trace of 25 hours of the real execution, kept in
     implementer's task produces the change, and the owner's check is a
     gate on it.
 - **A tester** is an agent task without forge effects, so it cannot
-  land.
+  land. Since 10-21 a milestone's QA pass is one: a Codex task that
+  reads the design only. It runs beside the next milestone, and is
+  delegated by the sub-owner that ended.
 - **An advisor** is a one-shot agent task, Opus xhigh, with a result
   contract.
 
@@ -288,6 +314,21 @@ a trace of 25 hours of the real execution, kept in
   the director decides (jig's `domain/tasks.md`, section 9).
 - **A checkpoint** ("bring me its trace before it lands") is a
   convention: the owner hands its branch down only after the answer.
+- **Milestones** (owners.md since 10-21):
+  - The plan is the owner's first report, a question its parent
+    answers.
+  - The cap is the sub-owner's deadline. At the deadline jig holds the
+    sub-owner and tells its requester, and the escalation goes up as
+    questions. The answer (a split, more time, a change of course) is
+    an amendment or a new sub-owner. Where jig and the cap differ is
+    6.8.
+  - A milestone's end is a result to the owner. The owner's next run
+    starts the next sub-owner on it.
+- **Pausing:** the user's pause is the user's Stop on each goal, and
+  their resume a Release with an amended brief. While a goal is held,
+  overlaps on its files are kept for it as news, which replaces the
+  ledger of hunks another owner writes for its rebase. Parking by the
+  director stays a gap (6.2).
 - **Footprints** are the paths a change's spec names. A landing that
   overlaps them wakes the owner (`../domain/forge.md`, section 7). They
   are not enforced: authority is per repository, not per path.
@@ -368,7 +409,9 @@ a trace of 25 hours of the real execution, kept in
 ## 5. Replays
 
 Each replay names what happened, then T (trigger), I (information), P
-(power), M (mechanics) and R (rails) in temper.
+(power), M (mechanics) and R (rails) in temper. `reference-case.md`
+puts all six into one story, with the change of shape on 10-21 and the
+new shape's first milestone.
 
 ### 5.1 o/qa starts (decision 242, 16:52Z)
 
@@ -556,6 +599,8 @@ Each of these needs assessment and design, in a draft of its own.
     other closes, or a step that waits at its next turn;
   - who may add one: the requester, an ancestor, a party;
   - how it shows in views and the tree's history.
+- **Since designed:** jig's `domain/tasks.md`, section 7, "Adding and
+  removing dependencies", which is being built.
 
 ### 6.2 Parking an owner
 
@@ -565,7 +610,10 @@ Each of these needs assessment and design, in a draft of its own.
   shrink a delegate's budget, none of which is a park.
 - **Why it matters here.** The director parked o/hearth twice and
   resumed it once, each time on the user's words. It also stopped and
-  restarted owners to move them, and to recover after duplicates.
+  restarted owners to move them, and to recover after duplicates. On
+  10-21 the user paused every owner but one. That pause is the user's
+  own Stop, which the user can do in the client. What stays a gap is
+  the director doing it for them.
 - **To design:**
   - whether an ancestor may park a delegate's subtree, and whom the
     hold escalates to;
@@ -637,6 +685,8 @@ Each of these needs assessment and design, in a draft of its own.
   favours compaction. The sampled owners compacted often (dozens of
   times in a few hours, to be checked). The encoding starts with
   resume (4.2).
+- **Since 10-21 owners.md settles it for owners:** resume within a
+  milestone, and start fresh at its end. Expressing that is 6.8's.
 
 ### 6.7 Smaller
 
@@ -648,6 +698,53 @@ Each of these needs assessment and design, in a draft of its own.
   if detection proves not enough (section 11).
 - **Data that is neither git nor notes,** carried on a move: hearth's
   outputs or the lab's evidence (5.3).
+
+### 6.8 From the new shape
+
+The change of shape on 10-21 and the new shape's first milestone
+(o/first-run's D1) showed six more. `reference-case.md` names the step
+each comes from.
+
+- **An open finding at a change's head.**
+  - CI failing at a change's head starts a repair (4.3). In D1, 8 of 9
+    failed gates came from the runner (its CPU clock under load, a
+    global timeout) or from a known flake, and one was real. In temper
+    each of the eight would have been a repair with nothing to fix.
+  - To design: a failure that matches an open finding, or comes from a
+    runner flagged unhealthy (6.4), runs CI again rather than starting
+    a repair. This is 6.5's rule, at the head.
+- **A repair that adopts work in flight.**
+  - D1's first landing turned main red: the after-landing tier, which
+    the gate doesn't run, failed. The fix was already in flight in the
+    milestone's next task, and the director gave it a deadline.
+  - To design: the tip's repair adopting a change that is already open,
+    rather than starting one.
+- **The cap against delegates' deadlines.**
+  - jig holds a task past its deadline and tells its requester. Its
+    delegates' deadlines are no later than its own
+    (`domain/authority.md`, section 7), so they are held with it.
+  - owners.md's cap is different. A milestone at its cap starts nothing
+    new, but what is running finishes.
+  - To design: a grace for delegates at a parent's deadline, or a
+    deadline that holds new starts only.
+- **A fresh run at a milestone's end.**
+  - A charter says resume or fresh for every next run (6.6), while
+    owners.md wants both, by phase.
+  - To design: a coordinator asking for a fresh next run, or a charter
+    policy keyed on a delegate's result. It is likely sugar.
+- **A stopped goal's delegates.**
+  - When the user paused owners, their running implementers finished
+    into their worktrees, and their changes already queued landed.
+  - To check: whether a party's Stop (`domain/people.md`, 5.1) leaves a
+    goal's delegates and queued changes going on, and if not, whether
+    a pause needs it to.
+- **Retiring a charter.**
+  - The user had the old process's leftovers stopped, and kept from
+    starting again. A new shape also reaches owners mid-flight.
+  - To check: withdrawing a charter that still has tasks, and whether
+    a charter's changed policy reaches tasks already running. An
+    amendment replaces a task's instructions whole (`domain/tasks.md`,
+    section 7), but nothing says what a charter change does.
 
 ## 7. Where it does better
 
@@ -709,7 +806,8 @@ conventions that say to use it, as now.
    when the user agrees.
 2. **GitHub and CI.** o/github's work, then CI on self-hosted runners
    with labels per machine.
-3. **Replays in the lab.** Each episode of section 5 is an experiment:
+3. **Replays in the lab.** The reference case comes first, as one
+   story on fakes. Then each episode of section 5 is an experiment:
    - the fake LLM is scripted with the reference's judgements, the
      oracle;
    - the fake forge holds the five repositories at the reference's
