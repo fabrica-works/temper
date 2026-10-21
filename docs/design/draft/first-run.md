@@ -278,7 +278,7 @@ experience; good defaults for a person's real work are open (section 8).
   with it, and the domain is built again from a new document as a start
   builds it. It would make section 4's last rows no restart. An
   investigation of the code (2026-10-20,
-  `~/src/rust/tmp/codex-helper/temper-hot-restart.md`) finds it
+  `hot-restart-report.md`) finds it
   feasible, medium for a first version, large for any change at any
   time:
   - **The seam exists:** `Service` keeps io, the store and the worker
