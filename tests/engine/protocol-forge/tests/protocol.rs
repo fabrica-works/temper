@@ -1,3 +1,4 @@
+use skein_fake_forge_domain::{Observation, api::Kind};
 use skein_fake_forge_protocol::Route;
 use skein_forge_machine_world::joint::REPO;
 use skein_lib::Wall;
@@ -99,6 +100,25 @@ fn a_change_produced_opened_checked_queued_and_landed() {
     let finished = land_change(&mut world);
     assert!(finished, "change should land");
     assert_eq!(world.writes(), 2);
+}
+
+#[test]
+fn a_github_change_is_produced_and_opened() {
+    let mut world = Protocol::github(11);
+    world.run_for(1);
+    world.restart();
+    let world = opened_change_in(world);
+    assert!(matches!(
+        world.stored().get(&top::Key::Repository(REPO)),
+        Some(top::Stored::Repository(row)) if matches!(row.protection, top::Protection::Absent)
+    ));
+    assert_eq!(world.tally().routes.get(&Route::OpenPull), Some(&1));
+    let opened: Vec<_> = world.observations().iter().filter(|o| matches!(o, Observation::Opened { .. })).collect();
+    assert!(matches!(opened.as_slice(), [Observation::Opened {
+        repository, number, kind: Kind::Pull, branches: Some(branches), by: 9, ..
+    }] if repository.as_ref() == b"acme/widgets" && *number > 0
+        && branches.head.as_ref() == b"temper/51" && branches.base.as_ref() == b"main"
+        && branches.commit == world.branch(b"temper/51")));
 }
 
 #[test]
@@ -376,10 +396,15 @@ fn land_change(world: &mut Protocol) -> bool {
 }
 
 fn opened_change() -> Protocol {
-    let mut world = Protocol::new(11);
+    opened_change_in(Protocol::new(11))
+}
+
+fn opened_change_in(mut world: Protocol) -> Protocol {
     world.adopt();
     world.take_seen();
-    world.event(top::Event::Change { row: change_row() });
+    let mut row = change_row();
+    row.change.since = world.wall();
+    world.event(top::Event::Change { row });
     step_change(&mut world, 2, change::Status::Unknown, false);
     world.run_for(1);
     assert!(world.seen().iter().any(|request| matches!(

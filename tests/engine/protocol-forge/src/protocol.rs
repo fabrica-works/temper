@@ -1,4 +1,4 @@
-//! The forge connector and real component against the fake Forgejo through bytes.
+//! The forge connector and real component against the fake forge through bytes.
 use crate::fixtures;
 use skein_fake_forge_domain::{self as forge, api as raw};
 use skein_fake_forge_protocol::{Faults, Route, Tally};
@@ -22,6 +22,7 @@ pub struct Protocol {
     serial: u64,
     generation: u64,
     seed: u64,
+    fixture: fixtures::Fixture,
     writes: u32,
     calls: u32,
     costs: u64,
@@ -38,19 +39,35 @@ impl Protocol {
     pub fn cutting(seed: u64, chance: u32, faults: Faults) -> Self {
         let mut config = fixtures::protocol_config();
         config.faults = faults;
-        let now = Time::from_nanos(100_000_000_000);
+        let joint = Joint::with(
+            seed,
+            chance,
+            config,
+            fixtures::limits(),
+            fixtures::writer_settings(),
+            fixtures::protocol_shared(),
+            joint::checks(1000),
+        );
+        Self::with(seed, joint, fixtures::FORGEJO)
+    }
+    #[must_use]
+    pub fn github(seed: u64) -> Self {
+        let joint = Joint::github(
+            seed,
+            0,
+            fixtures::limits(),
+            fixtures::github_settings(),
+            fixtures::protocol_shared(),
+            joint::checks(1000),
+        );
+        Self::with(seed, joint, fixtures::GITHUB)
+    }
+    fn with(seed: u64, joint: Joint, fixture: fixtures::Fixture) -> Self {
         let mut world = Self {
-            top: Self::top(seed),
-            env: Env { now, wall: Wall::from_nanos(now.as_nanos()), limits: LIMITS },
-            joint: Joint::with(
-                seed,
-                chance,
-                config,
-                fixtures::limits(),
-                fixtures::writer_settings(),
-                fixtures::protocol_shared(),
-                joint::checks(1000),
-            ),
+            top: Self::top(seed, fixture.writer),
+            env: Env { now: joint.env.now, wall: joint.env.wall, limits: LIMITS },
+            joint,
+            fixture,
             top_out: Queue::with_capacity(top::max_out(&LIMITS)),
             stored: Map::with_capacity(128),
             seen: List::with_capacity(256),
@@ -66,16 +83,23 @@ impl Protocol {
             item_pages: Vec::new(),
             item_start: 0,
         };
+        world.accept_installations();
         world.event(top::Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
         world
     }
-    fn top(seed: u64) -> top::Domain {
+    fn accept_installations(&mut self) {
+        if self.fixture.kind == skein_forge_connection::settings::Kind::GitHub {
+            self.joint
+                .action(skein_forge_connection::Request::Installations { forge: REPO.forge, accepted: Box::from([1]) });
+        }
+    }
+    fn top(seed: u64, author: u64) -> top::Domain {
         top::Domain::new(
             &LIMITS,
             seed,
             skein_forge_client::Config {
                 namespace: Box::from(b"world".as_slice()),
-                writers: Box::new([skein_forge_client::Writer { forge: REPO.forge, author: 1 }]),
+                writers: Box::new([skein_forge_client::Writer { forge: REPO.forge, author }]),
             },
             &[top::GitIdentity { forge: REPO.forge, credential: 1 }],
         )
@@ -103,8 +127,8 @@ impl Protocol {
                     home: role != top::Role::Context,
                     forge: REPO.forge,
                     host: Box::from(&b"forge.example"[..]),
-                    owner: Box::from(&b"org"[..]),
-                    name: Box::from(&b"repo"[..]),
+                    owner: Box::from(self.fixture.owner),
+                    name: Box::from(self.fixture.name),
                     prefix: Box::from(&b"temper/"[..]),
                     role,
                     landing: Box::from(&b"main"[..]),
@@ -124,6 +148,14 @@ impl Protocol {
         panic!("the person could not adopt the fixture repository");
     }
 
+    #[must_use]
+    pub fn wall(&self) -> Wall {
+        self.env.wall
+    }
+    #[must_use]
+    pub fn observations(&self) -> &[forge::Observation] {
+        &self.joint.observations
+    }
     #[must_use]
     pub fn seen(&self) -> &[top::Request] {
         self.seen.as_slice()
@@ -150,7 +182,7 @@ impl Protocol {
     }
     /// Script a worker's pushed branch through the independent fake git.
     pub fn permission(&mut self, permission: raw::Permission) {
-        forge::grant(&mut self.joint.domain, b"org/repo", 1, permission);
+        forge::grant(&mut self.joint.domain, self.fixture.path, self.fixture.writer, permission);
     }
 
     pub fn produce(&mut self, branch: &[u8]) {
@@ -173,17 +205,18 @@ impl Protocol {
         }
     }
     pub fn push(&mut self, branch: &[u8], content: &[u8]) {
-        if self.joint.domain.branch(b"org/repo", branch).is_none() {
+        if self.joint.domain.branch(self.fixture.path, branch).is_none() {
             self.external(raw::Op::Git(raw::Git::Create { branch: Box::from(branch), commit: 1 }), 2);
         }
         self.push_file(branch, b"file", content);
     }
     pub fn push_file(&mut self, branch: &[u8], path: &[u8], content: &[u8]) {
-        self.push_as(branch, path, content, 1);
+        self.push_as(branch, path, content, self.fixture.writer);
     }
     pub fn push_as(&mut self, branch: &[u8], path: &[u8], content: &[u8], actor: u64) {
-        let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: self.joint.fake_env.limits };
-        forge::advance(&mut self.joint.domain, &env, b"org/repo", branch, path, content, actor).expect("scripted push");
+        let env = self.scripted_env(self.env.now);
+        forge::advance(&mut self.joint.domain, &env, self.fixture.path, branch, path, content, actor)
+            .expect("scripted push");
     }
     pub fn status(&mut self, branch: &[u8], check: raw::Check) {
         self.external(
@@ -235,16 +268,17 @@ impl Protocol {
     }
     #[must_use]
     pub fn branch(&self, branch: &[u8]) -> u64 {
-        self.joint.domain.branch(b"org/repo", branch).expect("fixture branch")
+        self.joint.domain.branch(self.fixture.path, branch).expect("fixture branch")
     }
 
     /// Old calls reach their accounting terminal without delivering an outcome to the new top.
     pub fn restart(&mut self) {
         self.finish();
-        let component = Component::new(fixtures::writer_settings(), &fixtures::limits(), &fixtures::protocol_shared())
+        let component = Component::new(self.fixture.settings(), &fixtures::limits(), &fixtures::protocol_shared())
             .expect("fresh component");
         self.joint.replace(component);
-        self.top = Self::top(self.seed);
+        self.accept_installations();
+        self.top = Self::top(self.seed, self.fixture.writer);
         let records: Vec<_> = self.stored.iter().map(|(_, row)| row.clone()).collect();
         for record in records {
             self.event(top::Event::Restore { record });
@@ -278,13 +312,20 @@ impl Protocol {
         assert_eq!(u64::from(self.calls), self.answered.len() as u64, "each call has one terminal");
     }
     fn external(&mut self, op: raw::Op, user: u64) -> raw::Answer {
-        self.external_at(op, user, Time::ZERO)
+        self.external_at(op, user, self.env.now)
     }
-    fn external_at(&mut self, op: raw::Op, user: u64, now: Time) -> raw::Answer {
+    // GitHub fake time is wall-based; Forgejo fake time is monotonic.
+    fn scripted_env(&self, now: Time) -> Env<forge::Config> {
         let mut config = self.joint.fake_env.limits;
         config.latency_min = Duration::ZERO;
         config.latency_max = Duration::ZERO;
-        let env = Env { now, wall: Wall::EPOCH, limits: config };
+        let offset = self.joint.fake_env.now.as_nanos().saturating_sub(self.env.now.as_nanos());
+        let now = Time::from_nanos(now.as_nanos().saturating_add(offset));
+        let wall = if offset == 0 { self.joint.fake_env.wall } else { Wall::from_nanos(now.as_nanos()) };
+        Env { now, wall, limits: config }
+    }
+    fn external_at(&mut self, op: raw::Op, user: u64, now: Time) -> raw::Answer {
+        let env = self.scripted_env(now);
         let mut output = Queue::with_capacity(forge::MAX_OUT);
         forge::step(
             &mut self.joint.domain,
@@ -292,7 +333,7 @@ impl Protocol {
             forge::Event::Call {
                 reply_to: ReplyTo::new(Token::new(u64::MAX)),
                 user,
-                repository: Box::from(b"org/repo".as_slice()),
+                repository: Box::from(self.fixture.path),
                 op,
             },
             &mut output,
@@ -326,18 +367,21 @@ impl Protocol {
                 if self.env.now >= end {
                     return;
                 }
+                let offset = self.joint.fake_env.now.as_nanos().saturating_sub(self.env.now.as_nanos());
+                let fake =
+                    self.joint.domain.next_deadline().map(|at| Time::from_nanos(at.as_nanos().saturating_sub(offset)));
                 let next = self
                     .top
                     .next_deadline()
                     .filter(|at| *at > self.env.now)
                     .unwrap_or(end)
                     .min(self.joint.component.next_deadline().filter(|at| *at > self.env.now).unwrap_or(end))
-                    .min(self.joint.domain.next_deadline().filter(|at| *at > self.env.now).unwrap_or(end))
+                    .min(fake.filter(|at| *at > self.env.now).unwrap_or(end))
                     .min(end)
                     .max(self.env.now.saturating_add(Duration::from_nanos(1)));
                 self.joint.time(next);
-                self.env.now = next;
-                self.env.wall = Wall::from_nanos(next.as_nanos());
+                self.env.now = self.joint.env.now;
+                self.env.wall = self.joint.env.wall;
             }
             self.top.reclaim();
         }

@@ -179,3 +179,26 @@ pub fn github_settings() -> Settings {
     });
     settings
 }
+
+/// The joint's repository path and API/git writer for each dialect.
+#[derive(Clone, Copy)]
+pub struct Fixture {
+    pub kind: Kind,
+    pub owner: &'static [u8],
+    pub name: &'static [u8],
+    pub path: &'static [u8],
+    pub writer: u64,
+}
+pub const FORGEJO: Fixture =
+    Fixture { kind: Kind::Forgejo, owner: b"org", name: b"repo", path: b"org/repo", writer: 1 };
+pub const GITHUB: Fixture =
+    Fixture { kind: Kind::GitHub, owner: b"acme", name: b"widgets", path: b"acme/widgets", writer: 9 };
+impl Fixture {
+    #[must_use]
+    pub fn settings(self) -> Settings {
+        match self.kind {
+            Kind::Forgejo => writer_settings(),
+            Kind::GitHub => github_settings(),
+        }
+    }
+}
