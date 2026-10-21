@@ -88,7 +88,7 @@ pub fn start(
     for grant in &assignment.grants {
         // Application grants are the worker's own, for git (domain/worker.md, 4.1).
         match grant.form.table() {
-            accounts::GrantTable::Accounts => grants
+            accounts::GrantTable::Accounts | accounts::GrantTable::Name => grants
                 .push(smith::Grant {
                     name: smith::GrantName { account: grant.account, generation: grant.generation },
                     valid: grant.valid,

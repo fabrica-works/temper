@@ -780,3 +780,26 @@ fn startup_maps_refused_setup_and_total_overflow_to_memory_bound() {
         assert_eq!(lines(&Problems::jig(found, &Path::root())).as_ref(), b"engine.memory_bytes: past its bound\n");
     }
 }
+
+#[test]
+fn admission_model_words_use_tokens_and_missing_names_make_no_amount_claim() {
+    use jig_domain_fleet::AgentShortfall;
+    for (why, expected) in [
+        (
+            AgentShortfall::Model { charter: 7, model: 0 },
+            "model: not in the agent's configuration under the same name\n",
+        ),
+        (
+            AgentShortfall::Window { charter: 7, model: 0 },
+            "model: needs a 8192-token context window; the agent offers 1024 tokens\n",
+        ),
+        (
+            AgentShortfall::Output { charter: 7, model: 0 },
+            "model: needs 8192 output tokens; the agent offers 1024 tokens\n",
+        ),
+    ] {
+        let mut problems = Problems::empty();
+        problems.push(Path::root().member(b"model"), What::Admission { why, offered: 1024, required: 8192 });
+        assert_eq!(&*lines(&problems), expected.as_bytes());
+    }
+}

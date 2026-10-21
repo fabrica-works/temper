@@ -419,6 +419,15 @@ top-level `workers`, in the same order; standalone has one. Each:
   or the start is refused, naming it. One process reads both, so a
   mismatch that would fail every run's charter is caught before the
   loop.
+- **The worker must fit the configured charters.** After those name checks,
+  startup builds jig's core configuration once, expands its instruction files,
+  and projects its fleet needs with jig's `fleet_needs::configured`. The
+  worker's bounds pass through the same `hello_bounds` conversion as its
+  hello and jig's `shortfall` selects the first unmet requirement. Startup
+  names that requirement's configuration path, required and offered amounts,
+  with its dimension's units; the same core configuration then checks the
+  root. Admission policy stays in jig, including checks fitting within a
+  modifying charter's reserve.
 
 ## 6. Secrets' files
 

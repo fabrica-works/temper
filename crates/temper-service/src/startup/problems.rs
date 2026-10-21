@@ -18,6 +18,7 @@ pub enum What {
     Past { bytes: u64, bound: u64 },
     Within { bytes: u64, limit: &'static [u8], bound: u64 },
     Agent,
+    Admission { why: jig_domain_fleet::AgentShortfall, offered: u64, required: u64 },
     Adapter,
     Redirect(super::Listener),
     NoHub,
@@ -83,7 +84,7 @@ fn words(what: What) -> &'static [u8] {
         What::Override(limits::Refused::Unknown) => b"no limit of temper's has this name",
         What::Override(limits::Refused::Range) => b"outside its type",
         What::Against { .. } => b"must agree with ",
-        What::Past { .. } | What::Within { .. } => b"",
+        What::Past { .. } | What::Within { .. } | What::Admission { .. } => b"",
         What::Redirect(_) => b"fixed port conflicts with ",
         What::Adapter => b"program adapter not declared in the agent's programs",
         What::Agent => b"not in the agent's configuration under the same name",
@@ -132,29 +133,82 @@ fn redirect_listener(listener: super::Listener, writer: &mut Writer, length: &mu
     };
     put(writer, length, measuring, name);
 }
+fn admission(
+    why: jig_domain_fleet::AgentShortfall,
+    offered: u64,
+    required: u64,
+    writer: &mut Writer,
+    length: &mut usize,
+    measuring: bool,
+) {
+    use jig_domain_fleet::AgentShortfall;
+    // Missing names carry no numerical claim, even if constructed by a caller.
+    if let AgentShortfall::Model { .. } = why {
+        put(writer, length, measuring, b"not in the agent's configuration under the same name");
+        return;
+    }
+    let (before, between, after): (&[u8], &[u8], &[u8]) = match why {
+        AgentShortfall::Model { .. } => unreachable!("name diagnostic above"),
+        AgentShortfall::Window { .. } => (b"needs a ", b"-token context window; the agent offers ", b" tokens"),
+        AgentShortfall::Output { .. } => (b"needs ", b" output tokens; the agent offers ", b" tokens"),
+        AgentShortfall::Turns { .. } => (b"needs ", b" turns; the agent's profile.policy.max_turns allows ", b""),
+        AgentShortfall::Spend => {
+            (b"needs a spend allowance of ", b"; the agent's profile.policy.max_spend allows ", b"")
+        }
+        AgentShortfall::Time { .. } => {
+            (b"needs ", b" ms of run time; the agent's profile.policy.max_time allows ", b" ms")
+        }
+        AgentShortfall::Waiting { .. } => {
+            (b"needs ", b" ms of waiting; the agent's profile.policy.max_waiting allows ", b" ms")
+        }
+        AgentShortfall::Checks { .. } => {
+            (b"needs checks within ", b" ms; the agent's profile.policy.check_timeout is ", b" ms")
+        }
+        AgentShortfall::Message => {
+            (b"needs ", b"-byte messages (tasks.message_bytes); the agent offers ", b" (tool_payload less 2)")
+        }
+        AgentShortfall::Inbox => {
+            (b"needs ", b" inbox messages (tasks.run_inbox); the agent's profile.policy.inbox allows ", b"")
+        }
+        AgentShortfall::Unacknowledged => {
+            (b"needs ", b" unacknowledged turns (hub.turns); the agent's profile.policy.unacknowledged allows ", b"")
+        }
+    };
+    put(writer, length, measuring, before);
+    put(writer, length, measuring, Decimal::of(required).as_bytes());
+    put(writer, length, measuring, between);
+    put(writer, length, measuring, Decimal::of(offered).as_bytes());
+    put(writer, length, measuring, after);
+}
+fn render_path(path: &config::Path, writer: &mut Writer, length: &mut usize, measuring: bool) {
+    let mut member = false;
+    for segment in &path.segments {
+        match segment {
+            config::Segment::Member(name) => {
+                if member {
+                    put(writer, length, measuring, b".");
+                }
+                put(writer, length, measuring, name);
+                member = true;
+            }
+            config::Segment::Index(index) => {
+                put(writer, length, measuring, b"[");
+                put(writer, length, measuring, Decimal::of(u64::from(*index)).as_bytes());
+                put(writer, length, measuring, b"]");
+            }
+        }
+    }
+}
 fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
     let mut length = 0_usize;
     for problem in &problems.problems {
-        let mut member = false;
-        for segment in &problem.path.segments {
-            match segment {
-                config::Segment::Member(name) => {
-                    if member {
-                        put(writer, &mut length, measuring, b".");
-                    }
-                    put(writer, &mut length, measuring, name);
-                    member = true;
-                }
-                config::Segment::Index(index) => {
-                    put(writer, &mut length, measuring, b"[");
-                    put(writer, &mut length, measuring, Decimal::of(u64::from(*index)).as_bytes());
-                    put(writer, &mut length, measuring, b"]");
-                }
-            }
-        }
+        render_path(&problem.path, writer, &mut length, measuring);
         put(writer, &mut length, measuring, b": ");
         put(writer, &mut length, measuring, words(problem.what));
         match problem.what {
+            What::Admission { why, offered, required } => {
+                admission(why, offered, required, writer, &mut length, measuring);
+            }
             What::Redirect(listener) => redirect_listener(listener, writer, &mut length, measuring),
             What::Against { other } => put(writer, &mut length, measuring, other),
             What::Past { bytes, bound } => {

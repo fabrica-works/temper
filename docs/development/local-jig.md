@@ -59,3 +59,12 @@ diff -u \
 
 No diff means the revisions match. Check without the local patch, when
 temper's lock contains jig's Git commit.
+
+The stage 1 startup admission integration has an explicitly approved pin
+exception: jig `4be07c1fb71dccfd433c253b5e6abd90c965405e`, while temper
+retains smith `f1d8d29bf88ce2724d363c724cc4dd9fcbdc377e` and skein
+`9d34791ec9bae7253917270ccee56668b0f4115d`. That jig commit's own lock uses
+smith `3ffd88c34fbbd3f9d622db40ec73c7189c41999f` and skein
+`7218a31f7b73e6c27723466a8a59fc5161ba9cfe`; the comparison above therefore
+reports this known skew. The exception authorizes no further upstream
+movement; a later coordinated repin must restore the matching-lock rule.

@@ -33,6 +33,10 @@ fn only_the_llm_accounts_grants_reach_smith() {
         (host::Form::Credential(host::Scheme::Bearer), agent::Form::Credential(agent::Scheme::Bearer)),
         (host::Form::Credential(host::Scheme::Key), agent::Form::Credential(agent::Scheme::Key)),
         (host::Form::Withdrawn, agent::Form::Withdrawn),
+        (
+            host::Form::Program(host::SourceName::new(b"claude").unwrap()),
+            agent::Form::Program(agent::SourceName::new(b"claude").unwrap()),
+        ),
     ] {
         let mut h = Harness::new();
         let mut llm = grant(host::GrantTable::Accounts, 1);

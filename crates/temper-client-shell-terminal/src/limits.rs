@@ -34,6 +34,7 @@ pub fn native() -> Limits {
             };
             let client = jig_client::Limits {
                 domain: jig_client::DomainLimits {
+                    accounts: jig_client::AccountCounts { accounts: 16, sources: 8, sign_ins: 4 },
                     owners: &[jig_client::Spoken {
                         family: temper_client_protocol_wire::FORGE,
                         version: temper_client_protocol_wire::CLIENT_VERSION,

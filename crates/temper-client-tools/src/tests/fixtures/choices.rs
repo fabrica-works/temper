@@ -26,11 +26,21 @@ pub(crate) fn choice_me(budget: u64) -> c::Me {
     efforts.push(act_text(EFFORT_NAME)).expect("one effort");
     project
         .models
-        .push(c::MeModel { name: act_text(MODEL_NAME), provider: None, window: 8192, output: 1024, efforts })
+        .push(c::MeModel {
+            prices: c::ModelPrices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1000 },
+            description: None,
+            name: act_text(MODEL_NAME),
+            provider: None,
+            window: 8192,
+            output: 1024,
+            efforts,
+        })
         .expect("one selectable model");
     project
         .models
         .push(c::MeModel {
+            prices: c::ModelPrices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1000 },
+            description: None,
             name: act_text(EFFORTLESS_MODEL_NAME),
             provider: None,
             window: 8192,

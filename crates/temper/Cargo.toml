@@ -47,6 +47,8 @@ smith-host-protocol.workspace = true
 [dev-dependencies]
 temper-worker-protocol-git.workspace = true
 temper-worker-domain-checkout.workspace = true
+jig-domain-core.workspace = true
+jig-domain-fleet.workspace = true
 skein-fake-forge-domain.workspace = true
 skein-fake-llm-domain.workspace = true
 skein-llm.workspace = true

@@ -105,6 +105,9 @@ fn grants(grants: &[accounts::Grant]) -> Box<[host::Grant]> {
             }),
             accounts::Form::Withdrawn => host::Form::Withdrawn,
             accounts::Form::Application => host::Form::Application,
+            accounts::Form::Program(name) => {
+                host::Form::Program(host::SourceName::new(name.as_bytes()).expect("same source name grammar"))
+            }
         };
         filled
             .push(host::Grant { form, account: grant.account, generation: grant.generation, valid: grant.valid })

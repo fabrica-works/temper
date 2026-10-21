@@ -501,3 +501,59 @@ fn fixed_redirects() -> [crate::startup::RedirectPort; 2] {
         redirect_path: b"callback".as_slice().into(),
     })
 }
+
+#[test]
+fn admission_names_global_and_time_requirements_with_their_units() {
+    use skein_lib::Duration;
+    for (time, waiting, spend, inbox, unacknowledged, expected) in [
+        (
+            29_999,
+            60_000,
+            100,
+            8,
+            8,
+            "engine.charters[0].time_ms: needs 30000 ms of run time; the agent's profile.policy.max_time allows 29999 ms\n",
+        ),
+        (
+            300_000,
+            9_999,
+            100,
+            8,
+            8,
+            "engine.charters[0].waiting_ms: needs 10000 ms of waiting; the agent's profile.policy.max_waiting allows 9999 ms\n",
+        ),
+        (
+            300_000,
+            60_000,
+            99,
+            8,
+            8,
+            "engine.rules.maximum_run_spend: needs a spend allowance of 100; the agent's profile.policy.max_spend allows 99\n",
+        ),
+        (
+            300_000,
+            60_000,
+            100,
+            1,
+            1,
+            "engine.limits: needs 2 inbox messages (tasks.run_inbox); the agent's profile.policy.inbox allows 1\n",
+        ),
+        (
+            300_000,
+            60_000,
+            100,
+            2,
+            0,
+            "engine.limits: needs 1 unacknowledged turns (hub.turns); the agent's profile.policy.unacknowledged allows 0\n",
+        ),
+    ] {
+        let mut agent = fixtures::startup_agent();
+        agent.bounds.time = Duration::from_millis(time);
+        agent.bounds.waiting = Duration::from_millis(waiting);
+        agent.bounds.spend = spend;
+        agent.bounds.inbox = inbox;
+        agent.bounds.unacknowledged = unacknowledged;
+        let found = started(&fixtures::document(), &fixtures::files(), &agent);
+        assert_eq!(&*lines(&found), expected.as_bytes());
+    }
+}

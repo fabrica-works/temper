@@ -1,7 +1,6 @@
 //! Checks across standalone's parts before any service is made.
 use super::{Problems, What};
 use crate::{limits, settings};
-use alloc::boxed::Box;
 use jig_domain_fleet as fleet;
 use jig_protocol_config::{self as config, Path, Segment};
 use skein_io::Addr;
@@ -404,18 +403,13 @@ fn index_of(numbers: &[u32], number: u32) -> usize {
 /// What the root's construction asserts, refused before it is made, each
 /// naming the configuration that breaks it (domain/root.md, 6).
 pub fn root(
+    core: jig_domain_core::Config,
     engine: &settings::Engine,
     seeds: &settings::Seeds,
     landing_projects: &[u32],
     limits: &domain::Limits,
     problems: &mut Problems,
 ) {
-    let mut core = config::core(&engine.jig, seeds.deployment, seeds.seed);
-    for charter in &mut core.settings.charters {
-        if let Some(contents) = engine.files.contents(&charter.policy.instructions) {
-            charter.policy.instructions = Box::from(contents);
-        }
-    }
     let mut projects = Map::with_capacity(engine.landing.projects.capacity());
     for (&project, rules) in &engine.landing.projects {
         projects.insert(project, rules.clone()).expect("the same capacity");
@@ -532,6 +526,119 @@ fn model(model: &jig_domain_core::Model, bounds: &jig_domain_host::Bounds, path:
     if !found {
         problems.push(path, What::Agent);
     }
+}
+/// Report the fleet's selected admission failure; amounts only project that decision.
+pub fn admission(
+    core: &jig_domain_core::Config,
+    engine: &config::Engine,
+    agent: &settings::Agent,
+    problems: &mut Problems,
+) {
+    use fleet::AgentShortfall;
+    let needs = jig_domain_core::fleet_needs::configured(core, &engine.limits.core);
+    let bounds = domain::hello_bounds(agent.bounds.clone());
+    let Some(why) = fleet::shortfall(&needs, &bounds, fleet::HostKind::Worker) else { return };
+    let engine_path = Path::root().member(b"engine");
+    let (path, offered, required) = match why {
+        AgentShortfall::Model { charter, model }
+        | AgentShortfall::Window { charter, model }
+        | AgentShortfall::Output { charter, model } => {
+            let index = charter_index(engine, charter);
+            let need = needs
+                .charters
+                .get(index)
+                .expect("selected charter")
+                .models
+                .get(usize::try_from(model).expect("configured model index"))
+                .expect("selected model");
+            let path = model_path(index, model);
+            let mut offered = None;
+            for bound in &bounds.models {
+                if bound.name == need.name {
+                    offered = Some(bound);
+                    break;
+                }
+            }
+            let Some(bound) = offered else {
+                problems.push(path, What::Agent);
+                return;
+            };
+            match why {
+                AgentShortfall::Model { .. } => {
+                    problems.push(path, What::Agent);
+                    return;
+                }
+                AgentShortfall::Window { .. } => (path, u64::from(bound.window), u64::from(need.window)),
+                AgentShortfall::Output { .. } => (path, u64::from(bound.output), u64::from(need.output)),
+                AgentShortfall::Turns { .. }
+                | AgentShortfall::Time { .. }
+                | AgentShortfall::Waiting { .. }
+                | AgentShortfall::Checks { .. }
+                | AgentShortfall::Spend
+                | AgentShortfall::Message
+                | AgentShortfall::Inbox
+                | AgentShortfall::Unacknowledged => unreachable!("selected model dimension"),
+            }
+        }
+        AgentShortfall::Turns { charter }
+        | AgentShortfall::Time { charter }
+        | AgentShortfall::Waiting { charter }
+        | AgentShortfall::Checks { charter } => {
+            let index = charter_index(engine, charter);
+            let need = needs.charters.get(index).expect("selected charter");
+            let path = at(index, engine_path.member(b"charters"));
+            match why {
+                AgentShortfall::Turns { .. } => (path.member(b"turns"), u64::from(bounds.turns), u64::from(need.turns)),
+                AgentShortfall::Time { .. } => (path.member(b"time_ms"), millis(bounds.time), millis(need.time)),
+                AgentShortfall::Waiting { .. } => {
+                    (path.member(b"waiting_ms"), millis(bounds.waiting), millis(need.waiting))
+                }
+                AgentShortfall::Checks { .. } => (
+                    path.member(b"reserve_time_ms"),
+                    millis(bounds.checks),
+                    millis(need.change_reserve.expect("selected change reserve")),
+                ),
+                AgentShortfall::Model { .. }
+                | AgentShortfall::Window { .. }
+                | AgentShortfall::Output { .. }
+                | AgentShortfall::Spend
+                | AgentShortfall::Message
+                | AgentShortfall::Inbox
+                | AgentShortfall::Unacknowledged => unreachable!("selected charter dimension"),
+            }
+        }
+        AgentShortfall::Spend => (engine_path.member(b"rules").member(b"maximum_run_spend"), bounds.spend, needs.spend),
+        AgentShortfall::Message => {
+            (engine_path.member(b"limits"), u64::from(bounds.message_bytes), u64::from(needs.message_bytes))
+        }
+        AgentShortfall::Inbox => {
+            (engine_path.member(b"limits"), u64::from(bounds.inbox), u64::from(needs.start_messages))
+        }
+        AgentShortfall::Unacknowledged => {
+            (engine_path.member(b"limits"), u64::from(bounds.unacknowledged), u64::from(needs.unacknowledged))
+        }
+    };
+    problems.push(path, What::Admission { why, offered, required });
+}
+fn model_path(index: usize, model: u32) -> Path {
+    let path = at(index, Path::root().member(b"engine").member(b"charters"));
+    match model.checked_sub(1) {
+        None => path.member(b"model"),
+        Some(alternative) => {
+            at(usize::try_from(alternative).expect("configured alternative index"), path.member(b"alternatives"))
+        }
+    }
+}
+fn charter_index(engine: &config::Engine, number: u32) -> usize {
+    for (index, charter) in engine.charters.iter().enumerate() {
+        if charter.number == number {
+            return index;
+        }
+    }
+    unreachable!("canonical shortfall names a configured charter")
+}
+fn millis(duration: skein_lib::Duration) -> u64 {
+    duration.as_nanos() / 1_000_000
 }
 /// One io holds engine links, the worker's link, and four entities per child.
 pub(super) fn sockets(

@@ -159,6 +159,7 @@ pub const fn grant(table: host::GrantTable, account: u32) -> host::Grant {
         form: match table {
             host::GrantTable::Accounts => host::Form::Credential(host::Scheme::Bearer),
             host::GrantTable::Application => host::Form::Application,
+            host::GrantTable::Name => panic!("fixture grants use account or application values"),
         },
         account,
         generation: 1,

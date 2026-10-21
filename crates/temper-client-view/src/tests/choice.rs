@@ -98,6 +98,8 @@ fn account_facts(ready: Option<c::PayerReadiness>, accounts: List<c::OwnerAccoun
     let mut models = List::with_capacity(2);
     models
         .push(c::MeModel {
+            prices: c::ModelPrices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1000 },
+            description: None,
             name: c::Text::new(Box::from(*b"chosen"), 32).unwrap(),
             provider: Some(17),
             window: 1024,
@@ -107,6 +109,8 @@ fn account_facts(ready: Option<c::PayerReadiness>, accounts: List<c::OwnerAccoun
         .unwrap();
     models
         .push(c::MeModel {
+            prices: c::ModelPrices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1000 },
+            description: None,
             name: c::Text::new(Box::from(*b"second"), 32).unwrap(),
             provider: None,
             window: 1024,
@@ -252,6 +256,8 @@ fn catalogue(name: &[u8], efforts: &[&[u8]]) -> d::Domain {
     let mut models = List::with_capacity(1);
     models
         .push(c::MeModel {
+            prices: c::ModelPrices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1000 },
+            description: None,
             name: c::Text::new(Box::from(name), NAME_BYTES).unwrap(),
             provider: None,
             window: 1024,
@@ -340,6 +346,8 @@ fn only_the_selected_duplicate_model_shows_its_efforts() {
         efforts.push(c::Text::new(Box::from(effort), EFFORT_BYTES).unwrap()).unwrap();
         models
             .push(c::MeModel {
+                prices: c::ModelPrices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1000 },
+                description: None,
                 name: c::Text::new(Box::from(*b"shared"), NAME_BYTES).unwrap(),
                 provider: Some(provider),
                 window: 1024,

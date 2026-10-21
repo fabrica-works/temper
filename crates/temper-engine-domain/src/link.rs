@@ -63,12 +63,6 @@ fn parts_within(parts: &Parts, limits: &crate::Limits) -> bool {
 }
 
 fn hello(hello: host::Hello) -> fleet::Hello {
-    let mut models = List::with_capacity(u32::try_from(hello.bounds.models.len()).expect("bounded models"));
-    for model in hello.bounds.models {
-        models
-            .push(fleet::ModelBound { name: model.name, window: model.window, output: model.output })
-            .expect("one slot per model");
-    }
     let mut hosting = List::with_capacity(u32::try_from(hello.hosting.len()).expect("bounded hosted runs"));
     for run in hello.hosting {
         hosting
@@ -80,17 +74,29 @@ fn hello(hello: host::Hello) -> fleet::Hello {
         stop_bound: hello.stop_bound,
         workstreams: hello.workstreams,
         hosting: hosting.into_boxed(),
-        bounds: fleet::Bounds {
-            models: models.into_boxed(),
-            turns: hello.bounds.turns,
-            spend: hello.bounds.spend,
-            time: hello.bounds.time,
-            waiting: hello.bounds.waiting,
-            checks: hello.bounds.checks,
-            message_bytes: hello.bounds.message_bytes,
-            inbox: hello.bounds.inbox,
-            unacknowledged: hello.bounds.unacknowledged,
-        },
+        bounds: hello_bounds(hello.bounds),
+    }
+}
+
+/// The worker's advertised agent bounds in the fleet's hello vocabulary.
+#[must_use]
+pub fn hello_bounds(bounds: host::Bounds) -> fleet::Bounds {
+    let mut models = List::with_capacity(u32::try_from(bounds.models.len()).expect("bounded models"));
+    for model in bounds.models {
+        models
+            .push(fleet::ModelBound { name: model.name, window: model.window, output: model.output })
+            .expect("one slot per model");
+    }
+    fleet::Bounds {
+        models: models.into_boxed(),
+        turns: bounds.turns,
+        spend: bounds.spend,
+        time: bounds.time,
+        waiting: bounds.waiting,
+        checks: bounds.checks,
+        message_bytes: bounds.message_bytes,
+        inbox: bounds.inbox,
+        unacknowledged: bounds.unacknowledged,
     }
 }
 
@@ -446,5 +452,46 @@ const fn source_failure(reason: host::SourceFailure) -> fleet::SourceFailure {
         host::SourceFailure::Unconfigured => fleet::SourceFailure::Unconfigured,
         host::SourceFailure::Unknown => fleet::SourceFailure::Unknown,
         host::SourceFailure::Closed => fleet::SourceFailure::Closed,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use skein_lib::Duration;
+
+    #[test]
+    fn hello_advertises_the_public_bounds_conversion() {
+        let bounds = host::Bounds {
+            models: Box::new([host::ModelBound { name: Box::from(b"model".as_slice()), window: 8192, output: 1024 }]),
+            turns: 8,
+            spend: 100,
+            time: Duration::from_secs(360),
+            waiting: Duration::from_secs(60),
+            checks: Duration::from_secs(60),
+            message_bytes: 4096,
+            inbox: 8,
+            unacknowledged: 4,
+        };
+        let converted = hello_bounds(bounds.clone());
+        let hello = hello(host::Hello {
+            slots: 2,
+            stop_bound: Duration::from_secs(5),
+            workstreams: Box::new([11]),
+            hosting: Box::new([]),
+            bounds: bounds.clone(),
+        });
+        assert_eq!(hello.bounds, converted);
+        assert_eq!(hello.bounds.models[0].name, bounds.models[0].name);
+        assert_eq!(hello.bounds.models[0].window, bounds.models[0].window);
+        assert_eq!(hello.bounds.models[0].output, bounds.models[0].output);
+        assert_eq!(hello.bounds.turns, bounds.turns);
+        assert_eq!(hello.bounds.spend, bounds.spend);
+        assert_eq!(hello.bounds.time, bounds.time);
+        assert_eq!(hello.bounds.waiting, bounds.waiting);
+        assert_eq!(hello.bounds.checks, bounds.checks);
+        assert_eq!(hello.bounds.message_bytes, bounds.message_bytes);
+        assert_eq!(hello.bounds.inbox, bounds.inbox);
+        assert_eq!(hello.bounds.unacknowledged, bounds.unacknowledged);
     }
 }

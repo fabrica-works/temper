@@ -36,14 +36,13 @@ impl Values {
     pub fn grants(&self, grants: &[host::Grant], now: Time) -> Box<[Option<GrantValue>]> {
         let mut values = List::with_capacity(u32::try_from(grants.len()).expect("bounded grants"));
         for grant in grants {
-            let value = match grant.form.table() {
-                host::GrantTable::Accounts => {
+            let value = match grant.form {
+                host::Form::Credential(_) | host::Form::Withdrawn => {
                     account_grant(grant.form, self.accounts.value(grant.account, grant.generation, now))
                 }
-                host::GrantTable::Application if grant.generation == 1 => {
-                    identity_grant(self.identities.get(&grant.account))
-                }
-                host::GrantTable::Application => None,
+                host::Form::Application if grant.generation == 1 => identity_grant(self.identities.get(&grant.account)),
+                host::Form::Application => None,
+                host::Form::Program(name) => Some(GrantValue::Program { name }),
             };
             values.push(value).expect("one slot per grant");
         }

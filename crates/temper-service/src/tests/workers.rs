@@ -458,3 +458,18 @@ fn engine_values_preserve_slots_and_refuse_a_different_declared_form() {
         }
     }
 }
+
+#[test]
+fn a_program_grant_carries_its_name_without_a_credential_table_entry() {
+    let values = crate::values::Values::new(0, 0);
+    let name = host::SourceName::new(b"claude").unwrap();
+    let grant = host::Grant {
+        form: host::Form::Program(name),
+        account: 1,
+        generation: 2,
+        valid: skein_lib::Duration::from_secs(60),
+    };
+    let filled = values.grants(&[grant], Time::ZERO);
+    let [Some(GrantValue::Program { name: held })] = filled.as_ref() else { panic!("one named program value") };
+    assert_eq!(*held, name);
+}

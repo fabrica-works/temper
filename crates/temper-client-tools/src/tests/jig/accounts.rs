@@ -74,6 +74,8 @@ fn models_group_only_project_authorized_models_without_guessing_provider_readine
         project
             .models
             .push(c::MeModel {
+                prices: c::ModelPrices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1000 },
+                description: None,
                 name: c::Text::new(name.into(), 32).expect("model"),
                 provider,
                 window: 8192,

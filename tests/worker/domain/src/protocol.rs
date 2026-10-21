@@ -262,11 +262,14 @@ pub fn report(text: &[u8]) -> agent::RunResult {
     agent::RunResult::Accepted { outcome: agent::Declared::new(declared, u64::MAX).expect("a bounded result") }
 }
 
-const fn smith_grant(value: host::Grant) -> Option<agent::Grant> {
+fn smith_grant(value: host::Grant) -> Option<agent::Grant> {
     let form = match value.form {
         host::Form::Credential(host::Scheme::Bearer) => agent::Form::Credential(agent::Scheme::Bearer),
         host::Form::Credential(host::Scheme::Key) => agent::Form::Credential(agent::Scheme::Key),
         host::Form::Withdrawn => agent::Form::Withdrawn,
+        host::Form::Program(name) => {
+            agent::Form::Program(agent::SourceName::new(name.as_bytes()).expect("same source name grammar"))
+        }
         host::Form::Application => return None,
     };
     Some(agent::Grant { account: value.account, generation: value.generation, valid: value.valid, form })

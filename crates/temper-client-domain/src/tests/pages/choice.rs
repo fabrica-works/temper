@@ -21,6 +21,8 @@ fn me() -> c::Me {
     for name in [b"first".as_slice(), b"second"] {
         models
             .push(c::MeModel {
+                prices: c::ModelPrices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1000 },
+                description: None,
                 name: fixtures::acts::text(name),
                 provider: Some(17),
                 window: 1024,
@@ -190,6 +192,8 @@ fn the_selected_duplicate_models_effort_reaches_the_request() {
         efforts.push(fixtures::acts::text(effort)).unwrap();
         models
             .push(c::MeModel {
+                prices: c::ModelPrices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1000 },
+                description: None,
                 name: fixtures::acts::text(b"shared"),
                 provider: Some(provider),
                 window: 1024,

@@ -405,11 +405,14 @@ pub fn answer_parts(
     parts.into_boxed()
 }
 
-const fn smith_grant(value: hub::Grant) -> Option<smith::Grant> {
+fn smith_grant(value: hub::Grant) -> Option<smith::Grant> {
     let form = match value.form {
         hub::Form::Credential(hub::Scheme::Bearer) => smith::Form::Credential(smith::Scheme::Bearer),
         hub::Form::Credential(hub::Scheme::Key) => smith::Form::Credential(smith::Scheme::Key),
         hub::Form::Withdrawn => smith::Form::Withdrawn,
+        hub::Form::Program(name) => {
+            smith::Form::Program(smith::SourceName::new(name.as_bytes()).expect("same source name grammar"))
+        }
         hub::Form::Application => return None,
     };
     Some(smith::Grant { account: value.account, generation: value.generation, valid: value.valid, form })

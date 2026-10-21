@@ -39,5 +39,6 @@ pub use jig_domain_core::{Charter, Delegate, Dependency, Model, ProcedureStep, R
 pub use limits::{
     BriefBudgets, BriefLimits, FACTS, LOAD_BYTES, Limits, VIEWS, WATCHES_PER_STREAM, payload_worst_case, worst_case,
 };
+pub use link::hello_bounds;
 pub use route::{Approval, Freshness, Gate, HostDelivery, HostRequest, LandingRule, adopt_repository_ask};
 pub use translate::{Config, LandingPolicy};

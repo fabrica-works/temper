@@ -10,9 +10,8 @@
 use super::fixtures;
 use crate::startup::{Problems, checks, lines};
 
-const ENGINE_OVERRIDES: &str = r#""tasks.result_bytes":32,"people.amendment_bytes":64,"core.policy_bytes":256,"tasks.spec_bytes":128,"tasks.message_bytes":512,"tasks.hold_bytes":64,"tasks.authority_bytes":64,"people.words":512,"core.call_answer_bytes":2048,"notes.recalled":1"#;
-const WORKER_OVERRIDES: &str =
-    r#""hub.slots":1,"hub.run_calls":1,"tasks.message_bytes":512,"people.words":512,"core.call_answer_bytes":2048"#;
+const ENGINE_OVERRIDES: &str = r#""tasks.result_bytes":32,"tasks.run_inbox":2,"hub.turns":1,"people.amendment_bytes":64,"core.policy_bytes":256,"tasks.spec_bytes":128,"tasks.message_bytes":512,"tasks.hold_bytes":64,"tasks.authority_bytes":64,"people.words":512,"core.call_answer_bytes":2048,"notes.recalled":1"#;
+const WORKER_OVERRIDES: &str = r#""hub.slots":1,"hub.run_calls":1,"tasks.run_inbox":2,"hub.turns":1,"tasks.message_bytes":512,"people.words":512,"core.call_answer_bytes":2048"#;
 
 fn started(document: &[u8]) -> Box<[u8]> {
     let found = match crate::startup(
@@ -43,7 +42,14 @@ fn engine_with(extra: &str) -> Box<[u8]> {
 fn root(limits: &temper_engine_domain::Limits) -> Box<[u8]> {
     let engine = fixtures::engine();
     let mut found = Problems::empty();
-    checks::root(&engine, &fixtures::seeds(), &[], limits, &mut found);
+    let seeds = fixtures::seeds();
+    let mut core = jig_protocol_config::core(&engine.jig, seeds.deployment, seeds.seed);
+    for charter in &mut core.settings.charters {
+        if let Some(contents) = engine.files.contents(&charter.policy.instructions) {
+            charter.policy.instructions = Box::from(contents);
+        }
+    }
+    checks::root(core, &engine, &seeds, &[], limits, &mut found);
     lines(&found)
 }
 fn root_limits() -> temper_engine_domain::Limits {

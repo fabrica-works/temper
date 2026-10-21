@@ -325,6 +325,12 @@ fn checked_start(
     if !problems.is_empty() {
         return Err(problems);
     }
+    let mut core = config::core(&parsed.engine, seeds.deployment, seeds.seed);
+    read_instructions(&mut core, files);
+    checks::admission(&core, &parsed.engine, agent, &mut problems);
+    if !problems.is_empty() {
+        return Err(problems);
+    }
     let worker = parsed.workers.into_iter().next().expect("one worker checked");
     let own = parsed.application.workers.into_iter().next().expect("one application worker checked");
     let worker = settings::Worker { jig: worker, root: own.root, git: own.git };
@@ -355,7 +361,7 @@ fn checked_start(
         engine.jig.limits.clients.wire.keyed_value_some.min(engine.limits.records.value_bytes);
     let root = crate::limits::engine(&engine.jig.limits, &engine.limits)
         .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Jig(config::What::Bound)))?;
-    checks::root(&engine, seeds, &parsed.application.landing_projects, &root, &mut problems);
+    checks::root(core, &engine, seeds, &parsed.application.landing_projects, &root, &mut problems);
     if !problems.is_empty() {
         return Err(problems);
     }
@@ -385,6 +391,13 @@ fn checked_start(
         io,
         forges: prepared_forges,
     })
+}
+fn read_instructions(core: &mut jig_domain_core::Config, files: &settings::Files) {
+    for charter in &mut core.settings.charters {
+        if let Some(contents) = files.contents(&charter.policy.instructions) {
+            charter.policy.instructions = Box::from(contents);
+        }
+    }
 }
 /// Build the engine and worker together from the parsed document and read files.
 #[expect(clippy::too_many_arguments, reason = "startup receives the same directories as named plus the runtime facts")]

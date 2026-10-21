@@ -315,11 +315,10 @@ fn the_owned_example_asks_for_reconciles_files() {
     );
     scratch.remove();
 }
-#[test]
-fn serve_prepares_once_on_the_owned_example() {
+fn owned_example_with_forge_files(case: &str) -> support::Scratch {
     const TOKEN_BYTES: usize = 512;
     const BOT_USER: &[u8] = b"42";
-    let scratch = support::Scratch::startup("owned-example-prepared");
+    let scratch = support::Scratch::startup(case);
     let owned = support::owned::Owned::example();
     support::owned::lay(scratch.path(), &owned);
     support::write_private(
@@ -337,8 +336,96 @@ fn serve_prepares_once_on_the_owned_example() {
     ] {
         support::write_private(&forge.join(name), bytes);
     }
+    scratch
+}
+#[test]
+fn serve_prepares_once_on_the_owned_example() {
+    let scratch = owned_example_with_forge_files("owned-example-prepared");
     let prepared = temper::prepare_in(&support::configuration::directories(scratch.path()));
     assert!(prepared.is_ok(), "{}", prepared.err().unwrap_or_default());
+    scratch.remove();
+}
+#[test]
+fn serve_checks_the_owned_agents_admission_at_each_bound() {
+    let scratch = owned_example_with_forge_files("owned-admission-bounds");
+    let path = scratch.path().join("owned/agent.json");
+    let original: serde_json::Value =
+        serde_json::from_slice(&fs::read(&path).expect("agent fixture")).expect("agent JSON");
+    for (member, value, expected) in [
+        (
+            "max_turns",
+            7,
+            Some("engine.charters[0].turns: needs 8 turns; the agent's profile.policy.max_turns allows 7\n"),
+        ),
+        ("max_turns", 8, None),
+        (
+            "check_timeout",
+            60001,
+            Some(
+                "engine.charters[0].reserve_time_ms: needs checks within 60000 ms; the agent's profile.policy.check_timeout is 60001 ms\n",
+            ),
+        ),
+        ("check_timeout", 60000, None),
+        (
+            "check_timeout",
+            300_000,
+            Some(
+                "engine.charters[0].reserve_time_ms: needs checks within 60000 ms; the agent's profile.policy.check_timeout is 300000 ms\n",
+            ),
+        ),
+        (
+            "tool_payload",
+            4097,
+            Some(
+                "engine.limits: needs 4096-byte messages (tasks.message_bytes); the agent offers 4095 (tool_payload less 2)\n",
+            ),
+        ),
+        ("tool_payload", 4098, None),
+        (
+            "tool_payload",
+            600,
+            Some(
+                "engine.limits: needs 4096-byte messages (tasks.message_bytes); the agent offers 598 (tool_payload less 2)\n",
+            ),
+        ),
+    ] {
+        let mut agent = original.clone();
+        let section = if member == "tool_payload" { "declared" } else { "policy" };
+        agent["profile"][section][member] = value.into();
+        support::write_private(&path, &serde_json::to_vec(&agent).expect("agent JSON"));
+        let result = temper::prepare_in(&support::configuration::directories(scratch.path()));
+        match expected {
+            Some(line) => assert_eq!(
+                result.err().expect("admission refused"),
+                format!("temper serve: {line}"),
+                "{member}={value}"
+            ),
+            None => assert!(result.is_ok(), "{member}={value}: {}", result.err().unwrap_or_default()),
+        }
+    }
+    let mut agent = original.clone();
+    agent["profile"]["policy"]["max_turns"] = 5.into();
+    agent["profile"]["policy"]["check_timeout"] = 300_000.into();
+    agent["profile"]["declared"]["tool_payload"] = 600.into();
+    support::write_private(&path, &serde_json::to_vec(&agent).expect("agent JSON"));
+    assert_eq!(
+        temper::prepare_in(&support::configuration::directories(scratch.path())).err().expect("old tuple refused"),
+        "temper serve: engine.charters[0].turns: needs 8 turns; the agent's profile.policy.max_turns allows 5\n"
+    );
+    // The selected charter's number identifies its path, even when it is not its index.
+    let config_path = scratch.path().join("temper.json");
+    let mut document: serde_json::Value =
+        serde_json::from_slice(&fs::read(&config_path).expect("configuration")).expect("JSON");
+    assert_eq!(document["engine"]["charters"][1]["number"].as_u64(), Some(2));
+    document["engine"]["charters"][0]["turns"] = 4.into();
+    support::write_private(&config_path, &serde_json::to_vec(&document).expect("configuration JSON"));
+    agent = original;
+    agent["profile"]["policy"]["max_turns"] = 7.into();
+    support::write_private(&path, &serde_json::to_vec(&agent).expect("agent JSON"));
+    assert_eq!(
+        temper::prepare_in(&support::configuration::directories(scratch.path())).err().expect("second charter refused"),
+        "temper serve: engine.charters[1].turns: needs 8 turns; the agent's profile.policy.max_turns allows 7\n"
+    );
     scratch.remove();
 }
 
@@ -361,31 +448,17 @@ fn shipped_bounds_fit_the_configured_charters_and_worker() {
     let engine = config::engine(&configuration_document(&value["engine"]), 0, &config::Directories::working())
         .expect("engine configuration");
     let agent = &bounded.agent;
-    // Temporary compatibility assertions against jig's fleet_needs/shortfall:
-    // these do not exercise fleet admission. Replace them with the proposed
-    // canonical public check once jig exposes it; keep production policy there.
-    assert!(agent.bounds.spend >= engine.rules.maximum_run_spend);
-    assert!(agent.bounds.message_bytes >= engine.limits.core.tasks.message_bytes);
-    assert!(agent.bounds.inbox >= engine.limits.core.tasks.run_inbox);
-    assert!(agent.bounds.unacknowledged >= engine.limits.hub.turns);
-    for charter in &engine.charters {
-        assert!(agent.bounds.turns >= charter.policy.turns, "charter {} turns", charter.number);
-        assert!(agent.bounds.time >= charter.policy.time, "charter {} time", charter.number);
-        assert!(agent.bounds.waiting >= charter.policy.waiting, "charter {} waiting", charter.number);
-        if charter.policy.modify {
-            assert!(agent.bounds.checks <= charter.policy.reserve_time, "charter {} checks", charter.number);
-        }
-        for model in core::iter::once(&charter.policy.model).chain(&charter.policy.alternatives) {
-            assert!(
-                agent.bounds.models.iter().any(|bound| bound.name == model.name
-                    && bound.window >= model.window
-                    && bound.output >= model.output),
-                "charter {} model {:?}",
-                charter.number,
-                model.name
-            );
-        }
-    }
+    let core = config::core(&engine, [0; 16], 1);
+    let needs = jig_domain_core::fleet_needs::configured(&core, &engine.limits.core);
+    assert_eq!(
+        jig_domain_fleet::shortfall(
+            &needs,
+            &temper_engine_domain::hello_bounds(agent.bounds.clone()),
+            jig_domain_fleet::HostKind::Worker,
+        ),
+        None,
+        "the shipped worker is admitted by the canonical fleet check"
+    );
     // The minimum Smith payload is the engine's message requirement plus
     // Smith's rendered separator; its advertised message excludes that separator.
     let payload = u64::from(engine.limits.core.tasks.message_bytes)
@@ -767,6 +840,12 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     let endpoint_growth = 6 - 5;
     // 20b: Host, owner tables/names, encoded writes/handoff, pages, above, IO, deletion scratch.
     let setup_growth = 96_188 + 14_768 + 49_216 + 131_712 + 1_610_617_344 + 100_673_280 + 200;
+    // Jig 4353edb9 -> 4be07c1f: Program forms add 32 B per retained
+    // grant and source. Core/root grow 8,576 B per envelope;
+    // the accounts queue holds 264 FromComponent answers. Two client components retain
+    // 64 model descriptions (512 B) and 64 B of prices/header per model.
+    // Service's aligned codec bounds grow 8 B. No admission accounting changes.
+    let repin_growth = 3_076 * 8_576 + 264 * 32 + 2 * 64 * (512 + 64) + 8;
     assert_eq!(
         required.engine_bytes,
         79_659_997_210_050_u64
@@ -776,6 +855,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + programs_growth
             + endpoint_growth
             + setup_growth
+            + repin_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -789,7 +869,11 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // message 4096 -> 4098. The unchanged worker_worst_case calculation at
     // these same bounded strings adds exactly 3,035,662,234 B (no headroom).
     let admission_growth = 3_035_662_234_u64;
-    assert_eq!(required.worker_bytes, 2_343_551_746_598_u64 + worker_growth + admission_growth);
+    // Four held grants add 4 * 32 B in the host; the worker link's
+    // transient list holds accounts + credentials = 4 + 3 grants (224 B).
+    // The original admission cause stays separate.
+    let grant_growth = 4 * 32 + (4 + 3) * 32;
+    assert_eq!(required.worker_bytes, 2_343_551_746_598_u64 + worker_growth + admission_growth + grant_growth);
 
     support::owned::check_memory(required);
     eprintln!("owned requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
