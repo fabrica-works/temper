@@ -72,7 +72,7 @@ fn kind(b: &mut Builder, w: &Words, value: c::OwnerAccountKind) {
         },
     );
 }
-fn unloaded(b: &mut Builder, w: &Words, at: c::OwnerAccountPlace, why: c::OwnerAccountUnread) {
+pub(crate) fn unloaded(b: &mut Builder, w: &Words, at: c::OwnerAccountPlace, why: c::OwnerAccountUnread) {
     run(b, w, W::Unloaded);
     run(
         b,

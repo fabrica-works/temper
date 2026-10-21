@@ -92,7 +92,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             super::chats::outcome_text(b, words, outcome, 0);
         }
         b.close();
-        composer(b, chat, task, words, bindings, temper_client_domain::pages::shown(root.pages()));
+        composer(b, root, chat, task, words, bindings, temper_client_domain::pages::shown(root.pages()));
     }
     crate::confirm::main(b, root, words, bindings, rows);
     b.close();
@@ -124,10 +124,19 @@ fn spend(b: &mut Builder, task: &c::Task, words: &Words) {
         ),
     );
 }
-fn composer(b: &mut Builder, chat: &Chat, task: &c::Task, words: &Words, bindings: &mut Bindings, shown: u64) {
+fn composer(
+    b: &mut Builder,
+    root: &Domain,
+    chat: &Chat,
+    task: &c::Task,
+    words: &Words,
+    bindings: &mut Bindings,
+    shown: u64,
+) {
     if temper_client_domain::pages::chat::allowed(task, c::ActKind::Message) {
         b.open(Role::Slot);
         b.style(look::COMPOSER_AREA);
+        crate::choice::composer(b, root, Some(task), words, bindings);
         b.open(Role::Slot);
         b.style(look::ENTRY);
         b.open(Role::TextArea);
@@ -144,6 +153,8 @@ fn composer(b: &mut Builder, chat: &Chat, task: &c::Task, words: &Words, binding
         control(b, bindings, Role::Button, &words.say(Word::Send, &[]), Act::Send);
         b.close();
         b.close();
+    } else {
+        crate::choice::composer(b, root, Some(task), words, bindings);
     }
 }
 pub(crate) fn conversation(b: &mut Builder, thread: &Thread, words: &Words, rows: u32, text_limit: u32) {

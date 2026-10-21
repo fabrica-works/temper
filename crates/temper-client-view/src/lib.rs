@@ -4,6 +4,7 @@
 extern crate alloc;
 mod accounts;
 pub mod cards;
+mod choice;
 mod confirm;
 pub mod forge;
 pub mod frame;

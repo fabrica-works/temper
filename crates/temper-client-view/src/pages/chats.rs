@@ -29,6 +29,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
     suggestions(b, root, words, bindings);
     if let Some(chats) = root.pages().chats() {
         if root.pages().me(root.client()).is_some() && root.pages().project().is_some() {
+            crate::choice::composer(b, root, None, words, bindings);
             b.open(Role::Slot);
             b.style(crate::look::ENTRY);
             b.open(Role::TextArea);
@@ -42,13 +43,17 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             b.style(crate::look::HINT);
             words.text(b, Word::ChatHint, &[]);
             b.close();
-            b.open(Role::Button);
-            b.name(&words.say(Word::Start, &[]));
-            if chats.start.is_some() {
-                b.state(State::Disabled);
+            if let Some(me) = root.pages().me(root.client())
+                && root.pages().choice().valid(me)
+            {
+                b.open(Role::Button);
+                b.name(&words.say(Word::Start, &[]));
+                if chats.start.is_some() {
+                    b.state(State::Disabled);
+                }
+                b.bind(bindings.insert(Act::StartChat));
+                b.close();
             }
-            b.bind(bindings.insert(Act::StartChat));
-            b.close();
             b.close();
         }
         if chats.refusal.is_some() {

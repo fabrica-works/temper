@@ -37,6 +37,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         text(b, Role::Paragraph, &words.say(Word::Task, &[Hole::Number(task.chip.task)]));
         b.close();
         header(b, task, root.pages().me(root.client()), words);
+        crate::choice::composer(b, root, Some(task), words, bindings);
         if page.shape == Shape::Tracked {
             asked(b, task, words);
         }

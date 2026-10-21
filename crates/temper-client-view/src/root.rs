@@ -66,6 +66,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     builder.open(Role::Page);
     crate::frame::banner(&mut builder, root, &view.forge_words, &mut view.pages);
     crate::frame::demo_banner(&mut builder, root, &view.forge_words, &mut view.pages);
+    crate::choice::banner(&mut builder, root, &view.forge_words, &mut view.pages);
     if let Some(word) = crate::frame::unavailable(root) {
         builder.open(Role::Main);
         builder.style(crate::look::MAIN);
