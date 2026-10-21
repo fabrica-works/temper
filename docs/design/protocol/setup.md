@@ -1476,10 +1476,12 @@ demo's own work pushes nothing yet.
   owned forge's (5.1, 6.5): `TakeOver`, then `Reconcile`, which makes the
   bot and its tokens on the fake. A fake not yet bound when the start's
   reconcile reaches it is reconcile's wait for the forge (5.3).
-- **`temper fake seed DIRS`,** a link step: `temper-client-tools` as a
-  library (`../client/tools.md`, section 10), its DIRECTORY `client`.
-  Its acts, in order, each reading first and done when it finds itself
-  done:
+- **`temper fake seed DIRS`,** a link step: `temper ctl` calls
+  (`../client/tools.md`, section 10), each a child of the binary's own
+  run, its DIRECTORY the demo's `client`. A call is the person's own
+  tool, at its own exit statuses and lines, so the seed holds no client
+  and reads only what each call prints. Its acts, in order, each reading
+  first and done when it finds itself done:
   1. sign in with the link on its stdin, serve's first line;
   2. add the demo model's key, `llm.key`, as the deployment's account of
      `llm.provider`, its idempotency key `demo-llm`;
@@ -1602,8 +1604,8 @@ demo's own work pushes nothing yet.
   types and checks; the fake LLM's and the fake forge's configurations
   and seeds, from the deployment's document or from one of their own;
   `steps`, the box's steps for the document; and the seed's plan, its
-  acts as client calls with what each reads to find itself done. It
-  names no host. Its dependencies:
+  acts as `temper ctl` calls with what each reads to find itself done.
+  It names no host. Its dependencies:
   `temper-forge-setup`, `skein-fake-forge-domain`,
   `skein-fake-forge-protocol`, `skein-fake-llm-domain`,
   `skein-fake-llm-protocol`, `skein-llm`, `skein-http`, `skein-forge`,
@@ -1616,10 +1618,11 @@ demo's own work pushes nothing yet.
   `temper-engine-domain-forge-change` and
   `temper-engine-domain-forge-issues`. The binary's
   `crates/temper/src/fake.rs` hosts the peers and the seed on
-  skein-shell, reads the check's files and opens the store's copy at
-  the limits `temper-service`'s `startup::store_limits` derives from the
-  document, and `temper fake git` is `temper-fake-git`'s core on the real
-  file system (`../domain/testing.md`, 4.3), which `main` runs when its
+  skein-shell, the seed's calls as children of `temper ctl`, reads the
+  check's files and opens the store's copy at the limits
+  `temper-service`'s `startup::store_limits` derives from the document,
+  and `temper fake git` is `temper-fake-git`'s core on the real file
+  system (`../domain/testing.md`, 4.3), which `main` runs when its
   `argv[0]`'s last component is `git`.
   `Mode::Fake` and the link step's kind are `temper-forge-setup`'s.
 - **Not yet:** git's smart HTTP on the fake, its pages, and its state

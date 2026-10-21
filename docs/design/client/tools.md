@@ -970,13 +970,13 @@ directory of the QA harness's:
   removing its directory: the harness's, never a tool's.
 
 A person's first run is the box's demo (`../protocol/setup.md`, 8.4),
-whose seed, `temper fake seed`, makes the harness's calls as a library,
-DIRECTORY `demo/client` in the data directory: `sign-in -` with serve's
-first link; `add-key` of the demo model's key, `--deployment --key
-demo-llm`; `wait accounts --until usable` and `wait forges --until
-settled`; `adopt` of the demo's repository into project 1, `--key
-demo-adopt`; and `sign-out`. Each first reads whether it is done, since
-a key is free again past the engine's retention (section 7).
+whose seed, `temper fake seed`, makes the harness's calls as `temper
+ctl` children, DIRECTORY `demo/client` in the data directory: `sign-in
+-` with serve's first link; `add-key` of the demo model's key,
+`--deployment --key demo-llm`; `wait accounts --until usable` and `wait
+forges --until settled`; `adopt` of the demo's repository into project
+1, `--key demo-adopt`; and `sign-out`. Each first reads whether it is
+done, since a key is free again past the engine's retention (section 7).
 
 ## 11. Testing
 
