@@ -1391,13 +1391,16 @@ demo's own work pushes nothing yet.
     `Service::new`), 0 when absent, as the box runs it; in a document's
     form, its credentials' too (below);
   - `--observations FILE`, the fake forge's alone: FILE created new at
-    0o600, and each observation its domain makes (skein's
-    `fake-forge.md`, 2.4) drained after each pass, as a referee drains
-    it, and written to FILE in skein's encoding, one JSON line each in
-    drain order. A pass that observed or lost any ends its lines with a
-    checkpoint, `{"observations_lost":N}`, the count lost so far, and
-    the program writes one more at its stop, so FILE is whole up to its
-    last checkpoint, and a stopped program's last line is one. Nothing
+    0o600, its first line a checkpoint, `{"observations_lost":0}`,
+    written before the ready line, and each observation its domain
+    makes (skein's `fake-forge.md`, 2.4) drained after each pass, as a
+    referee drains it, and written to FILE in skein's encoding, one
+    JSON line each in drain order. A pass that observed or lost any
+    ends its lines with a checkpoint, `{"observations_lost":N}`, the
+    count lost so far, and the program writes one more at its stop, so
+    FILE is whole up to its last checkpoint from its ready line on, a
+    copy taken while it runs as much as the file, and a stopped
+    program's last line is one. Nothing
     of a pass is sent, no reply and no delivery, before its lines'
     write completes, so a reader that has seen a reply, or what a reply
     caused, finds in FILE what the pass observed. Without the flag, the
@@ -1492,6 +1495,79 @@ demo's own work pushes nothing yet.
   start, so a worker's clone of one still matches it; a branch an agent
   pushed is lost with the fake's state, and the engine's records of it
   outlive it, until the fake keeps its state across starts (below).
+- **`temper fake forge check DIRS N OBSERVATIONS STORE`,** no step: the
+  QA loop's check of the fake forge's promises (`../qa.md`, 8.3),
+  skein's judge (skein's `fake-forge.md`, 2.5) over forge N's
+  observations, with temper's decisions from temper's own record, a
+  copy of its store, never from the merges judged (decision 259). It
+  reads the document for forge N, a fake `setup` entry, and for the
+  store's limits; it reaches no peer and writes nothing but the copy,
+  which opening may repair.
+  - *OBSERVATIONS,* the file `--observations` wrote, or a copy of it:
+    its lines through its last checkpoint, the flush boundary, whose
+    count is the judge's loss. What follows is a flush still being
+    written, and is not read. A file without a checkpoint, or a line
+    before it that skein's `decode` refuses, is undecided:
+    `observations missing`.
+  - *STORE,* a copy of the deployment's store, `store/` in
+    `engine.deployment.directory`, never the store itself, taken once
+    serve has exited, stopped or killed: `/bin/cp -R -- <store>/.
+    <empty directory>/`. A copy taken while serve runs is not one:
+    skein's KV store has one process (skein's `kv.md`, section 1), and a
+    copy made beside its writer can open to part of a commit with
+    nothing refused (section 16). It is opened as serve opens it, at
+    the document's limits; one that does not open, of another
+    `STORE_VERSION`, or with a row that does not decode is undecided:
+    `store unreadable`.
+  - *The profile,* temper's as a client of forge N: `client` forge N's
+    `Writer`, the bot's number on the fake, and with none, undecided:
+    `client unknown`; `marker` temper's key's delimiters,
+    `<!-- temper:key ` and ` -->` with its line feed (forge.md,
+    section 4); `owned_branches` the `prefix` of each of forge N's
+    `Repository` rows; `allowed` `Comment`, `Merge` and `Close`, the
+    writes temper makes on items it did not open; `bounds` the
+    decisions' count, and `temper-fake`'s constant for the objects,
+    past which the judge is undecided: `judge full`.
+  - *The decisions,* each merge temper decided on forge N, as the
+    judge's `Decision`: its repository `owner/name`, its pull and its
+    head. They are read from two families (store.md, section 2):
+    - each `Entry` whose write is a merge, settled or not, sent or not:
+      its `Write::Merge`'s number and head, and its repository;
+    - each `Landed` row, a merge temper made, joined by its task to the
+      task's `Change` row: that row's repository, `pull` and
+      `last_head`, since a change's head stays put from its decision to
+      its landing.
+
+    A change in `Landing`, or held over it, adds none of its own: its
+    `Entry` stands for it until the merge settles, and its `Landed` row
+    after, if temper made the merge. A head is the fake's commit, its
+    first 8 bytes big-endian and the rest zero; any other is undecided:
+    `store unreadable`. Rows of other forges' repositories are skipped.
+    The decisions may be incomplete when the `Landed` rows number the
+    forge domain's `landings` limit (store.md, section 7), or when a
+    decision's `Repository` row is gone. An `Order` breach is then
+    undecided, `decisions incomplete`, not a fail, since a decision
+    missing can only make a merge look undecided; the other breaches
+    stand.
+  - *Its order:* the decisions, then `decided`, then the observations,
+    then the verdict, so no merge is judged before every decision is
+    in. The collection copies OBSERVATIONS no later than STORE: a
+    decision is saved before its merge is sent (`../domain/forge.md`,
+    section 6), so a store copied after the observations holds the
+    decision behind every merge they hold.
+  - *Its verdict,* by the check's contract (skein's `lab.md`, 7.2;
+    decision 259): a pass is status 0 and no line; breaches are status
+    1, a `{"fail": LINE, "summary": TEXT}` line each, its `line()` the
+    signature and its summary the promise's words, then an
+    `{"undecided": REASON}` line when the evidence is also incomplete;
+    undecided alone is status 2 and its line. The judge's reasons read
+    `observations lost`, `judge full` and `observations unforwarded`,
+    and the check's own `observations missing`, `store unreadable`,
+    `client unknown` and `decisions incomplete`; with the decisions
+    given first and the stream cut at a checkpoint, no merge precedes
+    `decided` and no stream is truncated.
+  - *Its stderr* is what it read, kept as its evidence: the boundary's
+    lines and its count, the profile, and each decision.
 - **Its code:** `temper-fake`, step code (section 11): the member's
   types and checks; the fake LLM's and the fake forge's configurations
   and seeds, from the deployment's document or from one of their own;
@@ -1502,17 +1578,19 @@ demo's own work pushes nothing yet.
   `skein-fake-forge-protocol`, `skein-fake-llm-domain`,
   `skein-fake-llm-protocol`, `skein-llm`, `skein-http`, `skein-forge`,
   `skein-fake-peers`, `jig-protocol-config`, `skein-lib` and
-  `skein-json`. The binary's `crates/temper/src/fake.rs` hosts the
-  peers and the seed on skein-shell, and `temper fake git` is
+  `skein-json`; and for the check, `temper-protocol-store`, since the
+  check's derivation is `temper-fake`'s too: from the store's rows to
+  the judge's profile and decisions, and from its verdict to the
+  check's lines. The binary's `crates/temper/src/fake.rs` hosts the
+  peers and the seed on skein-shell, reads the check's files and opens
+  the store's copy at the limits `temper-service`'s `store::limits`
+  derives from the document, and `temper fake git` is
   `temper-fake-git`'s core on the real file system (`../domain/testing.md`,
   4.3), which `main` runs when its `argv[0]`'s last component is `git`.
   `Mode::Fake` and the link step's kind are `temper-forge-setup`'s.
 - **Not yet:** git's smart HTTP on the fake, its pages, and its state
-  across starts; a webhooks' listener in the box, so the demo's forge
-  delivers as the QA loop's does; and `temper fake forge check FILE`,
-  which judges an observations file by the forge's promises under the
-  QA loop's contract for a check (its exits 0, 1 and 2, its signatures
-  as JSON lines); each is the demo's follow-up or the QA loop's
+  across starts; and a webhooks' listener in the box, so the demo's
+  forge delivers as the QA loop's does; each is the demo's follow-up
   (`../draft/qa-loop.md`, sections 4 and 11).
 
 ## 9. Credentials
@@ -1955,6 +2033,20 @@ Each is intended; what it needs is named with it.
   has, so the start's check bounds nothing a person's machine holds.
   Default: as the example states them; which terms of the worst cases
   make them so large is open (configuration.md, section 11).
+- **The check's decisions** (8.4) are read from rows kept for other
+  ends, and two decisions leave none: a change whose pull is replaced
+  while `Landing` joins its `Landed` row to the later pull, and an
+  enqueue the forge's merge queue drops leaves no `Entry` once settled,
+  a GitHub path the Forgejo fake never takes. Default: as 8.4 reads
+  them; a family of temper's decisions, `(repository, pull, head)`
+  written in the merge's `Entry`'s commit, is the route when a run
+  needs either, a store version's change (store.md, section 4).
+- **A store copied while serve runs.** The QA loop collects with its
+  processes up (skein's `lab.md`, 4.5), and a copy beside serve is no
+  copy (8.4), so a run whose serve lives to its collection has no
+  decisions. Default: such a run's check is undecided, `store
+  unreadable`, until the lab collects after its stop, or skein's KV
+  store states a copy a second process can make while its writer runs.
 
 ## 17. Connecting GitHub
 
