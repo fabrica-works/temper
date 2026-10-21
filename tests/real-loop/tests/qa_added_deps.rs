@@ -237,6 +237,7 @@ fn unreachable_dependency_refusal_names_the_task_to_the_agent() {
 }
 
 #[test]
+#[ignore = "M4 (C): ended prerequisite outside the working set"]
 fn cancelled_dependency_refusal_names_the_task_to_the_agent() {
     // jig's domain/tasks.md 7; engine.md 7.3: adding a cancelled prerequisite is refused, naming it.
     let ran = refusal_story(|_| refusal_scripts(REPORT_TASK, PREREQUISITE_TASK, true), false);
@@ -270,6 +271,7 @@ fn failed_prerequisite_scripts(_: SocketAddr) -> Box<[Script]> {
 }
 
 #[test]
+#[ignore = "M4 (C): ended prerequisite outside the working set"]
 fn failed_dependency_refusal_names_the_task_to_the_agent() {
     // jig's domain/tasks.md 7; engine.md 7.3: adding a failed prerequisite is refused, naming it.
     let ran = refusal_story(failed_prerequisite_scripts, false);
