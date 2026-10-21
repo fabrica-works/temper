@@ -854,7 +854,7 @@ temper box
   (8.4), and gives them to `temper-box`, an asked forge's group apart.
 - **Checked:** a boundary test fails the gate when `temper-box` depends
   on a crate named `temper-*` but `temper-forge-setup`, or names an item
-  of it but `steps`, `Steps`, `Group`, `Stage` and `Step`.
+  of it but `steps`, `Steps`, `Group`, `Stage`, `Step` and its `Kind`.
 
 ### 7.4 Other arrangements of the same commands
 
