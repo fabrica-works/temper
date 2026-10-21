@@ -198,8 +198,7 @@ impl Throwaway {
 
 pub fn configuration(directory: &Path, forge: &Forge<'_>, value: &mut Value) {
     let Forge::Throwaway { api, forgejo, .. } = forge else { return };
-    let mut owned = owned::Owned::tier();
-    owned.forgejo = *api;
+    let mut owned = owned::Owned::beside(*api);
     owned.forgejo_binary = forgejo.into();
     let path = directory.join("temper.json");
     if let Ok(bytes) = fs::read(&path) {

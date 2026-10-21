@@ -22,13 +22,9 @@ const SOCKET_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
 pub const PING: &[u8] = b"ping";
 
 #[must_use]
-pub fn free_address() -> SocketAddr {
-    TcpListener::bind("127.0.0.1:0").expect("free socket").local_addr().expect("socket address")
-}
-#[must_use]
 pub fn configuration(directory: &Path) -> SocketAddr {
     super::configuration(directory, &super::Forge::Unreached);
-    let address = free_address();
+    let [address] = super::free_addresses(&[]);
     let path = directory.join("temper.json");
     let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
     value["application"]["webhooks"] = serde_json::json!({"listener":{"socket":address.to_string()}});

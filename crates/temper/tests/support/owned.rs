@@ -299,7 +299,8 @@ pub fn await_answer(port: u16, path: &str, token: Option<&str>) -> serde_json::V
 pub fn prepared_processes(directory: &Path) -> u16 {
     let forgejo = std::env::var_os("TEMPER_FORGEJO").expect("TEMPER_FORGEJO");
     let runner = std::env::var_os("TEMPER_FORGEJO_RUNNER").expect("TEMPER_FORGEJO_RUNNER");
-    let port = std::net::TcpListener::bind("127.0.0.1:0").expect("free port").local_addr().expect("address").port();
+    let [address] = super::free_addresses(&[]);
+    let port = address.port();
     configuration(
         directory,
         &Names {
@@ -468,7 +469,8 @@ pub fn configuration_value(directory: &Path, change: fn(&mut serde_json::Value))
 #[must_use]
 pub fn reconcile_configuration(directory: &Path) -> u16 {
     let binary = std::env::var_os("TEMPER_FORGEJO").expect("TEMPER_FORGEJO");
-    let port = std::net::TcpListener::bind("127.0.0.1:0").expect("free port").local_addr().expect("address").port();
+    let [address] = super::free_addresses(&[]);
+    let port = address.port();
     configuration(
         directory,
         &Names { forgejo: Path::new(&binary), runner: None, port, bot: "temper", person: "ada", orgs: &["acme"] },
@@ -530,16 +532,14 @@ impl Owned {
     }
     #[must_use]
     pub fn tier() -> Self {
+        let [forgejo] = super::free_addresses(&[]);
+        Self::beside(forgejo)
+    }
+    #[must_use]
+    pub fn beside(forgejo: SocketAddr) -> Self {
         let (forgejo_binary, runner_binary) = binaries();
-        Self {
-            forgejo: super::webhooks::free_address(),
-            clients: super::webhooks::free_address(),
-            webhooks: super::webhooks::free_address(),
-            forgejo_binary,
-            runner_binary,
-            review: false,
-            ..Self::example()
-        }
+        let [clients, webhooks] = super::free_addresses(&[forgejo]);
+        Self { forgejo, clients, webhooks, forgejo_binary, runner_binary, review: false, ..Self::example() }
     }
 }
 fn edited(bytes: &[u8], owned: &Owned) -> String {

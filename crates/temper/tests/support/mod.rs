@@ -10,7 +10,29 @@ pub mod forgejo;
 pub mod live;
 pub mod person;
 pub mod program_login;
-use std::{fs, os::unix::fs::PermissionsExt, path::Path};
+use std::{fs, net::SocketAddr, os::unix::fs::PermissionsExt, path::Path};
+
+/// `N` distinct loopback addresses that no listener holds now, none of
+/// them in `taken`. A released port may be handed out again, so every
+/// listener is held until all `N` are drawn, including a draw in `taken`.
+/// Each skipped address stays held: at most `N + taken.len()` binds.
+/// Two equal listeners fail temper-forge-setup's `check.rs:112`.
+#[must_use]
+pub fn free_addresses<const N: usize>(taken: &[SocketAddr]) -> [SocketAddr; N] {
+    let mut addresses = [SocketAddr::from(([127, 0, 0, 1], 0)); N];
+    let mut listeners = Vec::new();
+    let mut drawn = 0;
+    while drawn < N {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("free socket");
+        let address = listener.local_addr().expect("socket address");
+        listeners.push(listener);
+        if !taken.contains(&address) {
+            addresses[drawn] = address;
+            drawn += 1;
+        }
+    }
+    addresses
+}
 
 pub enum Forge<'a> {
     Unreached,
