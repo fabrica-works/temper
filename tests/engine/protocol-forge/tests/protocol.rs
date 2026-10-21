@@ -464,10 +464,11 @@ fn github_reaches_ready_through_its_accepted_installations() {
         .collect(),
     );
     world.action(skein_forge_connection::Request::Installations { forge: fixtures::FORGE, accepted: Box::from([1]) });
-    world.run_for(skein_lib::Duration::from_secs(1));
+    world.log_requests(vec!["GET /app/hook/deliveries?per_page=8".into()]);
+    world.run_for(skein_lib::Duration::from_secs(6));
     assert_eq!(world.connected_forges(), &[fixtures::FORGE]);
     assert_eq!(world.start(fixtures::FORGE), Some(skein_forge_connection::start::Start::Ready { cap: 100 }));
-    assert_eq!(world.requests().len(), 5);
+    assert_eq!(world.requests().len(), 6);
     assert_eq!(world.git_tokens().len(), 1);
     assert!(world.script_done());
     assert!(world.close());

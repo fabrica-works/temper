@@ -150,11 +150,11 @@ pub fn small(forge: &forge::Limits) -> skein_forge_connection::Limits {
         token_bytes: 512,
         key_bytes: u32::try_from(skein_tls::RS256_KEY_BYTES).expect("RS256 key bound fits u32"),
         installations: limits::FORGE_INSTALLATIONS,
-        log_origins: 1,
-        log_poll: Duration::from_secs(86_400),
-        log_catch_up: Duration::from_secs(3600),
+        log_origins: 4,
+        log_poll: Duration::from_secs(5),
+        log_catch_up: Duration::from_secs(86_400),
         log_pages: 10,
-        delivery_bytes: 65_536,
+        delivery_bytes: 1_048_576,
         renew_before: Duration::from_secs(10 * 60),
         connections: forge.client.calls,
         head_bytes: 16_384,
@@ -310,8 +310,14 @@ pub fn problems(unusable: skein_forge_connection::Unusable, found: &mut Problems
                 b"io.output",
             ]
         }
-        Unusable::Zero | Unusable::Word | Unusable::LogOrigins { .. } | Unusable::Origin { .. } => {
-            &[b"forge_component"]
+        Unusable::Zero | Unusable::Word => &[b"forge_component"],
+        Unusable::Origin { forge, .. } => {
+            found.push(forge_path(u32::from(forge)).member(b"log_origins"), What::Bound);
+            return;
+        }
+        Unusable::LogOrigins { forge, .. } => {
+            found.push(forge_path(u32::from(forge)).member(b"log_origins"), What::Bound);
+            &[b"forge_component.log_origins"]
         }
         Unusable::Duplicate { forge } => {
             found.push(forge_path(u32::from(forge)).member(b"number"), What::Unique);
@@ -367,6 +373,8 @@ pub(crate) fn indexed(
     | skein_forge_connection::Unusable::User { forge }
     | skein_forge_connection::Unusable::PlaintextName { forge }
     | skein_forge_connection::Unusable::Request { forge }
+    | skein_forge_connection::Unusable::Origin { forge, .. }
+    | skein_forge_connection::Unusable::LogOrigins { forge, .. }
     | skein_forge_connection::Unusable::Address { forge } = &mut unusable
     {
         for (index, configured) in forges.iter().enumerate() {

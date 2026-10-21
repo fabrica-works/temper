@@ -527,14 +527,14 @@ top-level `workers`, in the same order; standalone has one. Each:
   | `forges.installations` | the installations a GitHub forge accepts, its `Accepted` record's ids (credentials.md, 2.1) |
   | `forges.log_origins` | a forge's `log_origins`; at most 4 (section 3) |
   | `forge_component.installations` | the installations the component holds tokens for, per forge |
-  | `forge_component.log_origins` | the origins a job log's redirect may reach, per forge; as many origins said of other redirects are kept per forge (`Fact::Origin`, forge.md, 3.6) |
+  | `forge_component.log_origins` | the origins a job log's redirect may reach, per forge (default 4); as many origins said of other redirects are kept per forge (`Fact::Origin`, forge.md, 3.6) |
   | `forge_component.token_bytes` | a forge's token: an API token, a git token or a site admin's token (skein's `forge-connection.md`, 7.2) |
   | `forge_component.key_bytes` | a GitHub App's key |
   | `forge_component.renew_before_ms` | `renew_before`: how long before an installation's token expires it is minted again (credentials.md, section 5) |
-  | `forge_component.log_poll_ms` | `log_poll`: between two reads of a GitHub App's delivery log |
-  | `forge_component.log_catch_up_ms` | `log_catch_up`: how far back the delivery log is read when a forge starts again within one process (skein's `forge-connection.md`, 6.5); at most a day, the log's own reach. temper keeps no `guid` across process starts: a process's first read of a forge's log keeps the newest and reads nothing back, and skein's forge client reads each adopted repository afresh at restart |
-  | `forge_component.log_pages` | the pages one read of the delivery log takes |
-  | `forge_component.delivery_bytes` | a delivery read from the log |
+  | `forge_component.log_poll_ms` | `log_poll`: between two reads of a GitHub App's delivery log (default 5 s) |
+  | `forge_component.log_catch_up_ms` | `log_catch_up` (default 24 h): how far back the delivery log is read when a forge starts again within one process (skein's `forge-connection.md`, 6.5); at most a day, the log's own reach. temper keeps no `guid` across process starts: a process's first read of a forge's log keeps the newest and reads nothing back, and skein's forge client reads each adopted repository afresh at restart |
+  | `forge_component.log_pages` | the pages one read of the delivery log takes (default 10) |
+  | `forge_component.delivery_bytes` | a delivery read from the log (default 1 MiB) |
   | `setup.orgs` | a setup's `orgs` |
   | `setup.deadline_ms` | a setup plan's run, its wait for the forge among it |
   | `setup.backoff_ms`, `setup.backoff_max_ms` | a setup plan's first request made again, doubling |

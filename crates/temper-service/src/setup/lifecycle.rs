@@ -377,11 +377,10 @@ pub(super) fn advance(engine: &mut crate::engine::Engine) {
             for id in &deleted {
                 engine.setup.lifecycle.deleted.remove(&(*forge, *id));
             }
-            engine.setup.lifecycle.deleting.insert(*forge, ()).expect("one rewrite per forge");
             if remaining.as_slice() == accepted(engine, *forge).as_ref() {
-                engine.setup.lifecycle.deleting.remove(forge);
                 continue;
             }
+            engine.setup.lifecycle.deleting.insert(*forge, ()).expect("one rewrite per forge");
             let bytes = skein_forge_setup::item::accepted_item(remaining.as_slice());
             keep(engine, *forge, Item::Accepted, bytes.expose(), Purpose::Deleted(*forge));
         } else if engine.setup.lifecycle.reconcile.contains_key(forge)

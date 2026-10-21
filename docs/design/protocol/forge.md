@@ -395,6 +395,8 @@ skein's in-process host component (`forge-setup.md`, its host), a child
 of the engine's protocol layer beside the forge component. The routing
 carries what passes between it, the root and the records.
 
+The engine builds the setup host once at start from the configured forges, admitting `host::worst_case(&limits, &settings)` against its own bound before it builds it; a full host answers `Why::Busy` at a Run's start, and the page shows it as busy, try again (skein's `forge-setup.md`, 6.5).
+
 - **Down,** `Run { run, plan }` and `Answer { run, answer }`; **up,**
   `Need { run, need }`, `Done { run, outcome }` and `Stop { run,
   failure }`. It holds an admin's token and a GitHub App's key only

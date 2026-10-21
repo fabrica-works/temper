@@ -178,11 +178,10 @@ fn forge_component_limits_that_disagree_are_problems_naming_both() {
     ];
     for (refusal, expected) in rows {
         let mut found = jig_protocol_config::Problems::empty();
-        forge::problems(refusal.clone(), &mut found);
+        forge::problems(refusal, &mut found);
         assert_eq!(
             crate::startup::lines(&crate::startup::Problems::jig(found, &jig_protocol_config::Path::root())).as_ref(),
-            expected,
-            "{refusal:?}"
+            expected
         );
     }
 }
@@ -261,6 +260,11 @@ fn temper_word_keeps_the_marker_bytes_and_length() {
     let mut found = jig_protocol_config::Problems::empty();
     let settings =
         forge::settings(&config.forges, fixtures::forge_runtime(), None, &mut found).expect("fixture settings");
+    let defaults = config.limits.forge_component;
+    assert!(settings.forges.get(0).unwrap().log_origins.is_empty());
+    assert_eq!((defaults.log_origins, defaults.log_pages, defaults.delivery_bytes), (4, 10, 1_048_576));
+    assert_eq!(defaults.log_poll, Duration::from_secs(5));
+    assert_eq!(defaults.log_catch_up, Duration::from_secs(86_400));
     assert_eq!(settings.word.as_ref(), b"temper");
     assert_eq!(skein_forge::marker::length(&settings.word, 2), Some(25));
     let encoded = skein_forge::marker::encode(&settings.word, &[0xab, 1], b"", 25);
@@ -280,7 +284,7 @@ fn the_component_s_new_refusals_are_problems_naming_their_members() {
         (skein_forge_connection::Unusable::PlaintextName { forge: 1 }, b"application.forges[1].api: past its bound\n"),
     ];
     for (refusal, expected) in rows {
-        assert_eq!(problem_lines(refusal.clone()).as_ref(), expected, "{refusal:?}");
+        assert_eq!(problem_lines(refusal).as_ref(), expected);
     }
 }
 
@@ -292,12 +296,17 @@ fn the_forge_fixture_number_differs_from_its_index() {
 
 #[test]
 fn a_refusal_naming_a_forge_is_indexed_to_the_configured_forge() {
+    use skein_forge_connection::Unusable;
     let config = fixtures::engine();
-    let refusal = skein_forge_connection::Unusable::PlaintextName { forge: config.forges[0].number };
-    assert_eq!(
-        problem_lines(forge::indexed(refusal, &config.forges)).as_ref(),
-        b"application.forges[0].api: past its bound\n"
-    );
+    let number = config.forges[0].number;
+    let rows: [(Unusable, &[u8]); 3] = [
+        (Unusable::PlaintextName { forge: number }, b"application.forges[0].api: past its bound\n"),
+        (Unusable::Origin { forge: number, origin: skein_forge::github::redirect::Origin { tls: false, host: Box::from(b"logs.test".as_slice()), port: 80 } }, b"application.forges[0].log_origins: past its bound\n"),
+        (Unusable::LogOrigins { forge: number, origins: 5, limit: 4 }, b"application.forges[0].log_origins: past its bound\napplication.limits.overrides.forge_component.log_origins: past its bound\n"),
+    ];
+    for (refusal, expected) in rows {
+        assert_eq!(problem_lines(forge::indexed(refusal, &config.forges)).as_ref(), expected);
+    }
 }
 
 #[test]

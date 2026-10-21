@@ -464,6 +464,7 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
         if !engine.forge.room(1) || engine.end.is_none() && !engine.room() {
             break;
         }
+        #[expect(clippy::match_same_arms, reason = "separate exhaustive facts name the tasks that give them meaning")]
         match engine.forge.above.pop().expect("forge outputs") {
             skein_forge_connection::Event::Answered(answer) => {
                 if engine.end.is_some() {
@@ -500,13 +501,12 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
             skein_forge_connection::Event::Installation { forge, installation, account, change } => {
                 crate::setup::lifecycle::installation(engine, forge, installation, account, change);
             }
-            // temper-02 handles git token values and installation access marks, and gives the
-            // delivery log's origins and gaps meaning in the root.
-            skein_forge_connection::Event::GitToken { .. }
-            | skein_forge_connection::Event::Fact {
-                fact: skein_forge_connection::Fact::Origin { .. } | skein_forge_connection::Fact::Gap,
-                ..
-            } => {}
+            // temper-02 handles git token values and installation access marks.
+            skein_forge_connection::Event::GitToken { .. } => {}
+            // temper-21 names unknown log origins, without deciding on them.
+            skein_forge_connection::Event::Fact { fact: skein_forge_connection::Fact::Origin { .. }, .. } => {}
+            // temper-21 logs gaps, without deciding on them.
+            skein_forge_connection::Event::Fact { fact: skein_forge_connection::Fact::Gap, .. } => {}
             skein_forge_connection::Event::Fact {
                 forge,
                 fact: skein_forge_connection::Fact::Unkept { installation },
