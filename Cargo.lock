@@ -2691,6 +2691,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-fake"
+version = "0.0.0"
+dependencies = [
+ "jig-protocol-config",
+ "serde_json",
+ "skein-fake-forge-domain",
+ "skein-fake-forge-protocol",
+ "skein-fake-llm-domain",
+ "skein-fake-llm-protocol",
+ "skein-fake-peers",
+ "skein-forge",
+ "skein-http",
+ "skein-json",
+ "skein-lib",
+ "skein-llm",
+ "skein-shell",
+]
+
+[[package]]
 name = "temper-fake-checkout"
 version = "0.0.0"
 dependencies = [

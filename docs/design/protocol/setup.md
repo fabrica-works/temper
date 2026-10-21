@@ -1493,6 +1493,7 @@ demo's own work pushes nothing yet.
   names no host. Its dependencies:
   `temper-forge-setup`, `skein-fake-forge-domain`,
   `skein-fake-forge-protocol`, `skein-fake-llm-domain`,
+  `skein-fake-llm-protocol`, `skein-llm`, `skein-http`, `skein-forge`,
   `skein-fake-peers`, `jig-protocol-config`, `skein-lib` and
   `skein-json`. The binary's `crates/temper/src/fake.rs` hosts the
   peers and the seed on skein-shell, and `temper fake git` is
