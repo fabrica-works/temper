@@ -528,3 +528,5 @@ fn constants_fit() {
     assert!(plain.observations().is_empty());
     assert!(peer.observations().is_empty());
 }
+
+mod check;

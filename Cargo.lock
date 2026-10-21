@@ -2708,11 +2708,16 @@ dependencies = [
  "skein-fake-llm-protocol",
  "skein-fake-peers",
  "skein-forge",
+ "skein-forge-client",
  "skein-http",
  "skein-json",
  "skein-lib",
  "skein-llm",
  "skein-shell",
+ "temper-engine-domain-forge",
+ "temper-engine-domain-forge-change",
+ "temper-engine-domain-forge-issues",
+ "temper-protocol-store",
 ]
 
 [[package]]

@@ -1534,7 +1534,10 @@ demo's own work pushes nothing yet.
     foreign, since temper updates only its own change's branch
     (section 10 there); `bounds` the decisions' count, and
     `temper-fake`'s constant for the objects, past which the judge is
-    undecided: `judge full`.
+    undecided: `judge full`. The constant is sized for the runs the check
+    judges, not for the fake's limits: the judge reserves each repository
+    slot's tables at it, so its memory grows with its square, and a run's
+    history, each branch and key it saw, is bounded by no limit.
   - *The decisions,* each merge temper decided on forge N, as the
     judge's `Decision`: its repository `owner/name`, its pull and its
     head. They are read from two families (store.md, section 2):
@@ -1546,16 +1549,17 @@ demo's own work pushes nothing yet.
       its landing.
 
     A change in `Landing`, or held over it, adds none of its own: its
-    `Entry` stands for it until the merge settles, and its `Landed` row
-    after, if temper made the merge. A head is the fake's commit, its
-    first 8 bytes big-endian and the rest zero; any other is undecided:
-    `store unreadable`. Rows of other forges' repositories are skipped.
-    The decisions may be incomplete when the `Landed` rows number the
-    forge domain's `landings` limit (store.md, section 7), or when a
-    decision's `Repository` row is gone. An `Order` breach is then
-    undecided, `decisions incomplete`, not a fail, since a decision
-    missing can only make a merge look undecided; the other breaches
-    stand.
+    `Entry` stands for it until the merge settles, and its `Landed`
+    row after, if temper made the merge. A head is the fake's commit,
+    its first 8 bytes big-endian and the rest zero; any other is
+    undecided: `store unreadable`. So is a `Landed` row whose task has
+    no `Change` row, or a `Change` row with no `pull` or `last_head`.
+    Rows of other forges' repositories are skipped. The decisions may
+    be incomplete when the `Landed` rows number the forge domain's
+    `landings` limit (store.md, section 7), or when a decision's
+    `Repository` row is gone. An `Order` breach is then undecided,
+    `decisions incomplete`, not a fail, since a decision missing can
+    only make a merge look undecided; the other breaches stand.
   - *Its order:* the decisions, then `decided`, then the observations,
     then the verdict, so no merge is judged before every decision is
     in. The collection copies OBSERVATIONS no later than STORE: a
@@ -1585,11 +1589,14 @@ demo's own work pushes nothing yet.
   `skein-fake-forge-protocol`, `skein-fake-llm-domain`,
   `skein-fake-llm-protocol`, `skein-llm`, `skein-http`, `skein-forge`,
   `skein-fake-peers`, `jig-protocol-config`, `skein-lib` and
-  `skein-json`; and for the check, `temper-protocol-store`, since the
+  `skein-json`; and for the check, `temper-protocol-store`,
+  `temper-engine-domain-forge` and `skein-forge-client`, since the
   check's derivation is `temper-fake`'s too: from the store's rows to
   the judge's profile and decisions, and from its verdict to the
-  check's lines. The binary's `crates/temper/src/fake.rs` hosts the
-  peers and the seed on skein-shell, reads the check's files and opens
+  check's lines. Its table fixtures also name
+  `temper-engine-domain-forge-change` and `temper-engine-domain-forge-issues`.
+  The binary's `crates/temper/src/fake.rs` hosts the peers and the seed
+  on skein-shell, reads the check's files and opens
   the store's copy at the limits `temper-service`'s `store::limits`
   derives from the document, and `temper fake git` is
   `temper-fake-git`'s core on the real file system (`../domain/testing.md`,

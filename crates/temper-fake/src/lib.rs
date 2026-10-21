@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 
+pub mod check;
 pub mod credential;
 pub mod forge;
 pub mod limits;

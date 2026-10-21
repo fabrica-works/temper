@@ -7,6 +7,8 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+temper-protocol-store.workspace = true
+temper-engine-domain-forge.workspace = true
 skein-fake-forge-domain.workspace = true
 skein-fake-forge-protocol.workspace = true
 skein-fake-llm-domain.workspace = true
@@ -14,12 +16,15 @@ skein-fake-llm-protocol.workspace = true
 skein-llm.workspace = true
 skein-http.workspace = true
 skein-forge.workspace = true
+skein-forge-client.workspace = true
 skein-fake-peers.workspace = true
 jig-protocol-config.workspace = true
 skein-lib.workspace = true
 skein-json.workspace = true
 
 [dev-dependencies]
+temper-engine-domain-forge-change.workspace = true
+temper-engine-domain-forge-issues.workspace = true
 skein-shell.workspace = true
 serde_json.workspace = true
 
