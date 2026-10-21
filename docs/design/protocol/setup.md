@@ -1515,10 +1515,12 @@ demo's own work pushes nothing yet.
     <empty directory>/`. A copy taken while serve runs is not one:
     skein's KV store has one process (skein's `kv.md`, section 1), and a
     copy made beside its writer can open to part of a commit with
-    nothing refused (section 16). It is opened as serve opens it, at
-    the document's limits; one that does not open, of another
-    `STORE_VERSION`, or with a row that does not decode is undecided:
-    `store unreadable`.
+    nothing refused. The lab takes it after the run's processes stop
+    (skein's `lab.md`, its collection after the stop), so a run whose
+    lab has no such step has no copy. It is opened as serve opens it,
+    at the document's limits; one that is absent, does not open, is of
+    another `STORE_VERSION`, or has a row that does not decode is
+    undecided: `store unreadable`.
   - *The profile,* temper's as a client of forge N: `client` forge N's
     `Writer`, the bot's number on the fake, and with none, undecided:
     `client unknown`; `marker` temper's key's delimiters,
@@ -2041,12 +2043,6 @@ Each is intended; what it needs is named with it.
   them; a family of temper's decisions, `(repository, pull, head)`
   written in the merge's `Entry`'s commit, is the route when a run
   needs either, a store version's change (store.md, section 4).
-- **A store copied while serve runs.** The QA loop collects with its
-  processes up (skein's `lab.md`, 4.5), and a copy beside serve is no
-  copy (8.4), so a run whose serve lives to its collection has no
-  decisions. Default: such a run's check is undecided, `store
-  unreadable`, until the lab collects after its stop, or skein's KV
-  store states a copy a second process can make while its writer runs.
 
 ## 17. Connecting GitHub
 
