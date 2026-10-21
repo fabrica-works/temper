@@ -860,6 +860,20 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // 64 model descriptions (512 B) and 64 B of prices/header per model.
     // Service's aligned codec bounds grow 8 B. No admission accounting changes.
     let repin_growth = 3_076 * 8_576 + 264 * 32 + 2 * 64 * (512 + 64) + 8;
+    // e4b1a8855 -> jig 031f7267, smith cfc6a6b0, skein f77e4990:
+    // measured core 12,221,072,683 -> 12,221,076,907 B (+4,224).
+    // Model grows 112 -> 128 B; each of 64 bounded models also reserves a
+    // 32 B backend name. Four charter carriers grow 16 B each. Placement
+    // and catalogue each retain 4 accounts * 3 sources * 8 B HostSource.
+    // HostRule grows the winning deployment document by 2 hosts * 16 B.
+    // Core holds 28 copies (1 + 16 + 4 + 2 + 5); the root's two five-document
+    // read answers add 10 more. Thus the root and payload each grow 4,544 B.
+    // Assignment remains 176 B: its RunCharter is boxed, so its map adds 0.
+    // Program forms/grants were already priced on e4b1a8855; no new 32 B
+    // grant growth belongs to this interval. Measured system terms grow by
+    // 1 root * 4,544 + 2,817 handoffs * 4,544 + (256 store slots + 2 read
+    // flights) * 4,544 = 13,977,344 B; every other system term stays fixed.
+    let endpoint_binding_growth = 3_076 * (64 * (16 + 32) + 4 * 16 + 2 * 4 * 3 * 8 + document_copies * (2 * 16));
     assert_eq!(
         required.engine_bytes,
         79_659_997_210_050_u64
@@ -870,6 +884,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + endpoint_growth
             + setup_growth
             + repin_growth
+            + endpoint_binding_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -887,6 +902,9 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // transient list holds accounts + credentials = 4 + 3 grants (224 B).
     // The original admission cause stays separate.
     let grant_growth = 4 * 32 + (4 + 3) * 32;
+    // This repin adds 0 B per worker owner: host/channel, source commands,
+    // grant carriers and IO queues retain their previous sizes. The term-by-term
+    // startup measurement remains 3,283,176,427,773 B.
     assert_eq!(required.worker_bytes, 2_343_551_746_598_u64 + worker_growth + admission_growth + grant_growth);
 
     support::owned::check_memory(required);

@@ -266,8 +266,11 @@ fn application_files_keep_paths_bounds_privacy_and_resolution_refusals() {
 fn named_lists_each_file_with_its_bound_and_privacy() {
     let named = crate::named(&fixtures::document(), &jig_protocol_config::Directories::working()).unwrap();
     assert_eq!(named.files.len(), 7, "all files listed");
+    // The optional program carriers add 16 B to both RunPolicy and its model.
+    // With the same run budget, this direct charter has 32 B less instruction room.
+    let instruction_bytes = 16_070 - 2 * 16;
     for (name, path, max, private) in [
-        (b"charters/chat.txt".as_slice(), b"engine.charters[0].instructions".as_slice(), 16_070, false),
+        (b"charters/chat.txt".as_slice(), b"engine.charters[0].instructions".as_slice(), instruction_bytes, false),
         (b"secrets/worker-a.digest", b"engine.hosts.workers[0].digest", 65, true),
         (b"worker-secret", b"workers[0].secret", 257, true),
         (fixtures::AGENT_JSON, b"workers[0].agent.configuration", 1_048_576, false),
