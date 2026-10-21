@@ -338,24 +338,130 @@ fn draining_closes_the_host_and_waits_for_closed() {
     assert!(service.engine.setup.pages.is_empty());
     assert_eq!(service.engine.setup.next_deadline(), None);
 }
-#[test]
-fn a_tls_forge_is_refused_by_name_without_stopping_startup() {
-    let mut service = service(8, Duration::from_secs(3600));
+fn tls_forges() -> (crate::settings::Engine, List<crate::ForgeRuntime>) {
+    // Skein's fixed TLS-world root, carried here without another test dependency.
+    let root = skein_lib::base64::decode(
+        skein_lib::base64::Alphabet::Standard,
+        concat!(
+            "MIIBmDCCAT+gAwIBAgIUHvatnWfGKnu6ssb8pgtoqmWxTcQwCgYIKoZIzj0EAwIwGjEYMBYGA1UEAwwPc2tlaW4gdGVzdCByb290",
+            "MB4XDTI2MDEwMTAwMDAwMFoXDTM2MDEwMTAwMDAwMFowGjEYMBYGA1UEAwwPc2tlaW4gdGVzdCByb290MFkwEwYHKoZIzj0CAQYI",
+            "KoZIzj0DAQcDQgAElnuG+BWgtzb++8N0S1weL+2KuE3Fb9nx992dyCDQ6GJdAwludLQPNm9HNipn55h9kfFjKtdy/de0tsxuavfE",
+            "UqNjMGEwHQYDVR0OBBYEFPmq8/JFoN7ZJ8taLdr3/hphqvWjMB8GA1UdIwQYMBaAFPmq8/JFoN7ZJ8taLdr3/hphqvWjMA8GA1Ud",
+            "EwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMAoGCCqGSM49BAMCA0cAMEQCIEtpmEfeTnDuXGC/OGm3Q7fM97DmGIwA3AUsfwTn",
+            "AaLNAiAdXjbm1OYLV5vW4t68UIk4Kzxdk5qEue0bPNUZ9oISMw==",
+        )
+        .as_bytes(),
+        412,
+    )
+    .unwrap();
     let mut config = fixtures::engine();
-    config.forges[0].kind = crate::settings::Kind::GitHub;
-    config.forges[0].api_token = None;
-    config.forges[0].transport =
-        crate::settings::Transport::Tls { server_name: b"forge.example".as_slice().into(), trust: None };
-    let (endpoints, _) = crate::forge::prepare(&config, fixtures::forge_runtime()).unwrap();
-    service.engine.setup = prepare(&config, &endpoints, &fixtures::seeds().crypto, 2).unwrap();
+    config.forges =
+        Box::new([fixtures::forges().into_iter().next().unwrap(), fixtures::forges().into_iter().next().unwrap()]);
+    let mut runtime = List::with_capacity(2);
+    for (index, (number, name, address)) in
+        [(1, "first.test", [192, 0, 2, 7]), (2, "second.test", [192, 0, 2, 8])].into_iter().enumerate()
+    {
+        config.forges[index].number = number;
+        config.forges[index].kind = crate::settings::Kind::GitHub;
+        config.forges[index].api_token = None;
+        config.forges[index].transport =
+            crate::settings::Transport::Tls { server_name: name.as_bytes().into(), trust: None };
+        let (trust, _) = skein_tls::Config::from_der(core::slice::from_ref(&root), &[name.as_bytes()]).unwrap();
+        runtime
+            .push(crate::ForgeRuntime {
+                number,
+                address: (address, 443).into(),
+                transport: skein_forge_connection::settings::Transport::Tls {
+                    server_name: skein_tls::Name::new(name).unwrap(),
+                    trust,
+                },
+                trust_roots: 1,
+                trust_root_bytes: 412,
+            })
+            .unwrap();
+    }
+    (config, runtime)
+}
+#[test]
+#[expect(
+    clippy::disallowed_macros,
+    reason = "compare each prepared public trust configuration without exposing credentials"
+)]
+fn each_github_tls_entry_keeps_its_prepared_name_trust_and_address() {
+    let (config, runtime) = tls_forges();
+    let (endpoints, _) = crate::forge::prepare(&config, runtime).unwrap();
+    let setup = prepare(&config, &endpoints, &fixtures::seeds().crypto, 2).unwrap();
+    assert_eq!(setup.served.len(), 2);
+    let (settings, _) = setup.pending.unwrap();
+    assert_eq!(settings.forges.len(), 2);
+    for endpoint in &endpoints.forges {
+        let mut entry = None;
+        for candidate in &settings.forges {
+            if candidate.number() == endpoint.number {
+                entry = Some(candidate);
+                break;
+            }
+        }
+        let entry = entry.unwrap();
+        assert_eq!(entry.address, endpoint.address);
+        let host::Transport::Tls { server_name, trust } = &entry.transport else { panic!("TLS entry") };
+        let skein_forge_connection::settings::Transport::Tls { server_name: name, trust: prepared } =
+            &endpoint.transport
+        else {
+            panic!("prepared TLS")
+        };
+        assert_eq!(server_name, name);
+        assert_eq!(alloc::format!("{trust:?}"), alloc::format!("{prepared:?}"));
+    }
+}
+#[test]
+fn tls_selects_a_larger_host_price_than_plaintext() {
+    let (mut config, mut runtime) = tls_forges();
+    // Both transports use the ciphertext room TLS requires as their common io ceiling.
+    config.jig.limits.io.output = skein_tls::client::largest_room(&config.limits.forge_component.tls);
+    for index in 0..runtime.len() {
+        runtime.get_mut(index).unwrap().address.set_ip([127, 0, 0, 1].into());
+    }
+    let (endpoints, _) = crate::forge::prepare(&config, runtime).unwrap();
+    let setup = prepare(&config, &endpoints, &fixtures::seeds().crypto, 2).unwrap();
+    let (mut settings, _) = setup.pending.unwrap();
+    let tls = host::worst_case(&setup.env.limits, &settings).unwrap();
+    for index in 0..settings.forges.len() {
+        let entry = settings.forges.get_mut(index).unwrap();
+        let host::Transport::Tls { server_name, .. } = &entry.transport else { panic!("TLS entry") };
+        let skein_tls::Server::Dns(name) = server_name.server() else { panic!("fixture DNS name") };
+        entry.transport = host::Transport::Plaintext { name: Some(name.as_bytes().into()) };
+    }
+    assert!(tls > host::worst_case(&setup.env.limits, &settings).unwrap());
+}
+#[test]
+fn admitted_tls_starts_after_rows_and_serves_a_local_manifest() {
+    let required = accounted(8, 8, true);
+    let (mut config, runtime) = configured(8, 8, true);
+    config.jig.memory = required;
+    let mut service = crate::Service::engine(config, &fixtures::seeds(), None, runtime).unwrap();
+    assert_eq!(service.worst_case(), required);
+    assert!(service.engine.setup.component.is_none(), "no host before the rows load");
+    let (settings, _) = service.engine.setup.pending.as_ref().unwrap();
+    assert_eq!(settings.forges.len(), 2);
+    for entry in &settings.forges {
+        let host::Transport::Tls { .. } = &entry.transport else { panic!("admitted TLS") };
+        assert!(service.engine.setup.served.contains_key(&entry.number()));
+    }
+    service.engine.store = fixtures::records_store();
+    for _ in 0_u32..8 {
+        crate::forge::records::advance(&mut service.engine);
+    }
     advance(&mut service.engine);
-    assert!(service.engine.setup.served.is_empty());
-    start(&mut service, 1, host::Plan::Manifest { forge: 1, target: Target::Personal });
-    let root::SetupEnd::Stopped { forge, reason } = terminal(&mut service) else { panic!("TLS refusal") };
-    assert_eq!(forge, 1);
-    assert!(contains(&reason, b"no TLS at this pin"));
+    assert!(service.engine.forge_records.done());
+    assert!(service.engine.setup.component.is_some());
+    for _ in 0..service.engine.notes.len() {
+        let _startup_note = service.engine.notes.pop();
+    }
+    let state = manifest(&mut service, 1);
+    assert!(service.setup_page(1, &state, Time::ZERO).is_some());
     assert!(service.end().is_none());
-    assert!(service.engine.setup.io.is_empty());
+    assert!(service.engine.setup.io.is_empty(), "manifest is local");
 }
 #[test]
 fn the_host_names_the_metadata_limits_and_rejects_bad_start_limits() {
@@ -398,7 +504,7 @@ fn setup_memory_includes_the_whole_host_and_its_owner() {
     assert_eq!((machines, rows, pages), (630_744, 1_825_634, 131_072));
     let whole = worst_case(&config, &endpoints, 2).unwrap();
     assert!(whole > host::worst_case(&setup.env.limits, &settings).unwrap());
-    assert!(accounted(8, 8) > accounted(1, 1), "runs/states change the admitted shell price");
+    assert!(accounted(8, 8, false) > accounted(1, 1, false), "runs/states change the admitted shell price");
 }
 #[test]
 fn every_host_unusable_arm_has_an_operator_path() {
@@ -490,25 +596,23 @@ fn stopped_connection_text_has_a_fixed_bound() {
         );
     }
 }
-fn configured(runs: u32, states: u32) -> crate::settings::Engine {
-    let mut config = fixtures::engine();
+fn configured(runs: u32, states: u32, tls: bool) -> (crate::settings::Engine, List<crate::ForgeRuntime>) {
+    let (mut config, runtime) = if tls { tls_forges() } else { (fixtures::engine(), fixtures::forge_runtime()) };
     config.forges[0].kind = crate::settings::Kind::GitHub;
     config.forges[0].api_token = None;
     config.limits.setup.runs = runs;
     config.limits.setup.states = states;
     fixtures::fill_files(&mut config);
-    config
+    (config, runtime)
 }
 #[expect(clippy::arithmetic_side_effects, reason = "the measured nonzero bound permits one byte less")]
-fn accounted(runs: u32, states: u32) -> u64 {
-    let required =
-        crate::Service::engine(configured(runs, states), &fixtures::seeds(), None, fixtures::forge_runtime())
-            .unwrap()
-            .worst_case();
+fn accounted(runs: u32, states: u32, tls: bool) -> u64 {
+    let (config, runtime) = configured(runs, states, tls);
+    let required = crate::Service::engine(config, &fixtures::seeds(), None, runtime).unwrap().worst_case();
     for short in [false, true] {
-        let mut config = configured(runs, states);
+        let (mut config, runtime) = configured(runs, states, tls);
         config.jig.memory = required - u64::from(short);
-        let started = crate::Service::engine(config, &fixtures::seeds(), None, fixtures::forge_runtime());
+        let started = crate::Service::engine(config, &fixtures::seeds(), None, runtime);
         if short {
             assert_eq!(
                 started.err().unwrap().problems.get(0).unwrap().what,

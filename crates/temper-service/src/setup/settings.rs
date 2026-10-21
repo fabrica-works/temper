@@ -18,19 +18,22 @@ pub(super) fn fixed(
         if source.kind != crate::settings::Kind::GitHub {
             continue;
         }
-        if let crate::settings::Transport::Tls { .. } = &source.transport {
-            continue;
-        }
         let transport = match &endpoint.transport {
             skein_forge_connection::settings::Transport::Plaintext { name } => {
                 host::Transport::Plaintext { name: name.clone() }
             }
-            skein_forge_connection::settings::Transport::Tls { .. } => continue,
+            skein_forge_connection::settings::Transport::Tls { server_name, trust } => {
+                host::Transport::Tls { server_name: server_name.clone(), trust: trust.clone() }
+            }
         };
         let skein_io::Addr::Ip(address) = endpoint.address else {
             continue;
         };
-        if !address.ip().is_loopback() {
+        let plaintext = match &transport {
+            host::Transport::Plaintext { .. } => true,
+            host::Transport::Tls { .. } => false,
+        };
+        if plaintext && !address.ip().is_loopback() {
             continue;
         }
         let url = listener(&config.clients.listener)?;
@@ -109,7 +112,7 @@ pub(crate) fn prepare(
     for forge in &config.forges {
         if !layer.served.contains_key(&forge.number) {
             let reason: &[u8] = match forge.kind {
-                crate::settings::Kind::GitHub => b"setup host serves no TLS at this pin",
+                crate::settings::Kind::GitHub => b"setup host serves plaintext only on loopback",
                 crate::settings::Kind::Forgejo => b"Forgejo setup is temper-14's",
             };
             layer.unserved.insert(forge.number, reason).expect("configured setup exclusions");
