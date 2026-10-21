@@ -100,7 +100,7 @@ fn forge(action: &[u8], flags: &[Box<[u8]>], number: u16, run: Option<&[u8]>) ->
 pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
     let count = u32::try_from(setup.entries.len()).expect("bounded entries");
     let mut out = List::with_capacity(
-        count.checked_mul(4).expect("bounded step count").checked_add(1).expect("bounded step count"),
+        count.checked_mul(5).expect("bounded step count").checked_add(1).expect("bounded step count"),
     );
     let mut asked = List::with_capacity(count);
     for e in &setup.entries {
@@ -108,7 +108,10 @@ pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
             // Fake processes and their preparation come later; keep their reconcile below.
             Mode::Managed { .. } | Mode::Fake(_) => {}
             Mode::Owned(o) => {
-                let mut group = List::with_capacity(3);
+                let mut group = List::with_capacity(4);
+                if o.fetch.forgejo || o.fetch.runner {
+                    group.push((Stage::Fetch, forge(b"fetch", flags, e.forge, None))).expect("fetch");
+                }
                 group.push((Stage::Prepare, forge(b"prepare", flags, e.forge, None))).expect("prepare");
                 group.push((Stage::Run, forge(b"run", flags, e.forge, Some(b"forgejo")))).expect("forgejo");
                 if o.runner.is_some() {
