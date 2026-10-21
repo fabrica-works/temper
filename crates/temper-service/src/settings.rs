@@ -12,6 +12,8 @@ pub struct Forge {
     pub transport: Transport,
     /// The base of each remote and the host of the forge's resource paths.
     pub git: Box<[u8]>,
+    /// The fake forge's resolved git program, in place of the worker's git.
+    pub git_program: Option<Box<[u8]>>,
     pub web: Option<Box<[u8]>>,
     /// The API token, read from its private file: the forge component's alone.
     pub api_token: Option<Secret>,

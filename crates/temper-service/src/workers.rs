@@ -546,6 +546,9 @@ pub fn worst_case(settings: &crate::settings::Engine, room: u32) -> Option<u64> 
         bytes = bytes.checked_add(u64::try_from(endpoint.name.len()).ok()?)?;
     }
     for forge in &settings.forges {
+        if let Some(program) = &forge.git_program {
+            bytes = bytes.checked_add(u64::try_from(program.len()).ok()?)?;
+        }
         if let Some(web) = &forge.web {
             bytes = bytes.checked_add(u64::try_from(web.len()).ok()?)?;
         }

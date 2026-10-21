@@ -319,8 +319,12 @@ pub fn memory_requirements(
     accounts: Option<&AccountsRuntime>,
     forges: List<crate::ForgeRuntime>,
 ) -> Result<Requirements, Problems> {
-    Ok(checked_start(document, directories, files, agent, seeds, accounts, forges)?.requirements)
+    Ok(checked_start(document, directories, files, agent, seeds, accounts, forges, None)?.requirements)
 }
+#[expect(
+    clippy::too_many_arguments,
+    reason = "checked startup receives the shell's resolved setup beside its runtime facts"
+)]
 fn checked_start(
     document: &[u8],
     directories: &config::Directories,
@@ -329,6 +333,7 @@ fn checked_start(
     seeds: &settings::Seeds,
     accounts: Option<&AccountsRuntime>,
     forges: List<crate::ForgeRuntime>,
+    setup: Option<&temper_forge_setup::check::Checked>,
 ) -> Result<CheckedStart, Problems> {
     let parsed = parse(document, directories)?;
     check_files(&parsed, files)?;
@@ -337,7 +342,10 @@ fn checked_start(
     if !problems.is_empty() {
         return Err(problems);
     }
-    let resolved = resolved.expect("resolved files checked");
+    let mut resolved = resolved.expect("resolved files checked");
+    if let Some(setup) = setup {
+        application::git_programs(&mut resolved.forges, &setup.setup);
+    }
     let own = &parsed.application.limits;
     let remote = u32::try_from(checks::longest_remote(&resolved.forges, own.forge.name_bytes).unwrap_or(u64::MAX)).ok();
     let engine_bounds = temper_protocol_worker_wire::Bounds {
@@ -446,8 +454,23 @@ pub fn startup(
     runtime: WorkerRuntime,
     forges: List<crate::ForgeRuntime>,
 ) -> Result<Service, Problems> {
+    with_setup(document, directories, files, agent, seeds, accounts, runtime, forges, None)
+}
+/// Build the standalone service with the binary's checked, resolved forge setup.
+#[expect(clippy::too_many_arguments, reason = "startup receives the checked setup beside the same runtime facts")]
+pub fn with_setup(
+    document: &[u8],
+    directories: &config::Directories,
+    files: &settings::Files,
+    agent: &settings::Agent,
+    seeds: &settings::Seeds,
+    accounts: Option<AccountsRuntime>,
+    runtime: WorkerRuntime,
+    forges: List<crate::ForgeRuntime>,
+    setup: Option<&temper_forge_setup::check::Checked>,
+) -> Result<Service, Problems> {
     let CheckedStart { engine, worker, requirements, io, forges } =
-        checked_start(document, directories, files, agent, seeds, accounts.as_ref(), forges)?;
+        checked_start(document, directories, files, agent, seeds, accounts.as_ref(), forges, setup)?;
     let mut problems = Problems::empty();
     checks::memory(
         requirements.engine_bytes,

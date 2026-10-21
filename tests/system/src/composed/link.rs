@@ -33,6 +33,7 @@ pub fn assignment(assignment: &engine::Assignment) -> (host::Assignment, wire::W
         api: jig_protocol_config::Address::Host { name: b"forge.test".as_slice().into(), port: 80 },
         transport: settings::Transport::Plaintext,
         git: GIT_BASE.into(),
+        git_program: None,
         web: None,
         api_token: Some(Secret::new(Box::new([]))),
         webhook_secret: None,

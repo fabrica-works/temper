@@ -307,7 +307,7 @@ fn prepare_with_store(
     bytes: &[u8],
     owned: &mut Vec<Fd>,
 ) -> Result<(service::Service, Box<[u8]>), String> {
-    let setup::Deployment { named, .. } = setup::check(bytes, &directories.jig())?;
+    let setup::Deployment { named, checked, .. } = setup::check(bytes, &directories.jig())?;
     let document =
         config::document(bytes, &config::DocumentLimits { bytes: CONFIG_BYTES, tokens: CONFIG_BYTES, depth: 32 })
             .expect("named checked document");
@@ -337,7 +337,7 @@ fn prepare_with_store(
     let drawn = skein_shell::crypto_seed().map_err(|errno| format!("installation id: errno {errno}"))?;
     let mut installation = [0_u8; 16];
     installation.copy_from_slice(drawn.expose().get(..16).expect("32-byte seed"));
-    let mut service = service::startup(
+    let mut service = service::startup::with_setup(
         bytes,
         &directories.jig(),
         &files,
@@ -346,6 +346,7 @@ fn prepare_with_store(
         Some(accounts),
         service::WorkerRuntime { root, path: root_path.as_os_str().as_bytes().into() },
         forges,
+        Some(&checked),
     )
     .map_err(|why| String::from_utf8_lossy(&service::startup::lines(&why)).into_owned())?;
     if let Some(program) = agent.programs.first() {

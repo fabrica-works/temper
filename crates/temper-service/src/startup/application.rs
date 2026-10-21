@@ -845,6 +845,18 @@ fn resolved_transport(
         }
     }
 }
+/// Join each fake program to its forge, after setup has resolved its data paths.
+pub fn git_programs(forges: &mut [settings::Forge], setup: &temper_forge_setup::setup::Setup) {
+    for entry in &setup.entries {
+        if let temper_forge_setup::setup::Mode::Fake(fake) = &entry.mode {
+            for forge in forges.iter_mut() {
+                if forge.number == entry.forge {
+                    forge.git_program = Some(fake.git.clone());
+                }
+            }
+        }
+    }
+}
 pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Problems) -> Option<Resolved> {
     let mut forges = List::with_capacity(u32::try_from(members.forges.len()).expect("bounded forges"));
     let mut identities = List::with_capacity(u32::try_from(members.identities.len()).expect("bounded identities"));
@@ -897,6 +909,7 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
                     api: forge.api.clone(),
                     transport,
                     git: forge.git.clone(),
+                    git_program: None,
                     web: forge.web.clone(),
                     api_token: token,
                     webhook_secret,

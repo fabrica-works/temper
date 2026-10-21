@@ -18,8 +18,36 @@ fn a_workspace_reaches_items_with_each_remote_made_from_its_base() {
         let first = items.repositories.into_boxed().into_iter().next().unwrap().into_parts();
         assert_eq!(first.tag, 7, "{base:?}");
         assert_eq!(first.remote.as_ref(), remote, "{base:?}");
-        assert_eq!(first.git, None, "routing leaves the repository program unset");
+        assert_eq!(first.git, None, "a forge without its own program uses the worker's git");
         assert_eq!(items.save, None, "{base:?}");
+    }
+}
+#[test]
+fn each_repository_takes_its_forges_git_program() {
+    let mut forges = List::with_capacity(3);
+    for (number, program) in
+        [(2, None), (3, Some(b"/data/other/bin/git".as_slice())), (1, Some(b"/data/demo/bin/git".as_slice()))]
+    {
+        let mut forge = fixtures::forges().into_iter().next().unwrap();
+        forge.number = number;
+        if let Some(program) = program {
+            forge.git_program = Some(program.into());
+        }
+        forges.push(forge).unwrap();
+    }
+    let forges = forges.into_boxed();
+    for (number, program) in
+        [(1, Some(b"/data/demo/bin/git".as_slice())), (2, None), (3, Some(b"/data/other/bin/git".as_slice()))]
+    {
+        let mut repository = fixtures::repository(7, b"acme", b"shop");
+        repository.provider.forge = number;
+        let assignment = fixtures::assignment_with(repository);
+        let items = translate::items(&assignment, &forges, &fixtures::wire_limits()).unwrap().unwrap();
+        let repository = items.repositories().get(0).unwrap();
+        assert_eq!(repository.git().as_deref(), program, "forge {number}");
+        assert_eq!(repository.remote(), b"https://forge.example/acme/shop.git");
+        let (workspace, _) = translate::workspace(Some(&items));
+        assert_eq!(workspace.repositories[0].git.as_deref(), program, "worker's forge {number}");
     }
 }
 fn branch() -> wire::Branch {

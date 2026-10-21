@@ -115,6 +115,7 @@ pub fn forges() -> Box<[settings::Forge]> {
         api: jig_protocol_config::Address::Host { name: Box::from(&b"forge.example"[..]), port: 443 },
         transport: settings::Transport::Plaintext,
         git: Box::from(&b"https://forge.example"[..]),
+        git_program: None,
         web: None,
         api_token: Some(Secret::new(Box::from(&b"api-token"[..]))),
         webhook_secret: None,

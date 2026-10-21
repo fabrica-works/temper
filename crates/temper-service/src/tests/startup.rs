@@ -63,6 +63,65 @@ fn the_standalone_example_reads_into_its_members() {
     let document = fixtures::parsed();
     assert!(!document.is_empty(), "full standalone example is JSON");
 }
+
+fn checked_fake_setup() -> temper_forge_setup::check::Checked {
+    use temper_forge_setup::check;
+    let input = br#"[{"forge":1,"directory":"demo/forge","bot":{"login":"temper","email":"temper@example.test"},
+        "mode":{"fake":{"listen":{"socket":"127.0.0.1:9"},"git":"demo/bin/git","owner":"demo",
+        "repositories":[{"name":"widget","landing":"main"}]}}}]"#;
+    let document = config::document(input, &config::DocumentLimits { bytes: 65_536, tokens: 1024, depth: 32 }).unwrap();
+    check::checked(
+        &document,
+        0,
+        &config::Directories::given(b"/config", b"/data", b"/cache").unwrap(),
+        &check::Members {
+            forges: Box::new([check::Forge {
+                number: 1,
+                api: Some("127.0.0.1:9".parse().unwrap()),
+                plaintext: true,
+                git: b"http://127.0.0.1:9".as_slice().into(),
+                user: check::User::File(b"/data/demo/forge/user".as_slice().into()),
+                api_token: b"/data/demo/forge/api_token".as_slice().into(),
+                webhook_secret: None,
+                identity_token: b"/data/demo/forge/git_token".as_slice().into(),
+                identity_login: b"temper".as_slice().into(),
+            }]),
+            listeners: Box::new([]),
+        },
+        None,
+        &[],
+    )
+    .unwrap()
+}
+
+#[test]
+fn the_checked_fake_git_program_reaches_the_services_forge_settings() {
+    let checked = checked_fake_setup();
+    let service = crate::startup::with_setup(
+        &fixtures::document(),
+        &config::Directories::working(),
+        &fixtures::files(),
+        &fixtures::startup_agent(),
+        &fixtures::seeds(),
+        None,
+        fixtures::worker_runtime(),
+        fixtures::forge_runtime(),
+        Some(&checked),
+    )
+    .unwrap();
+    let forge = &service.engine.workers.forges[0];
+    assert_eq!(forge.git_program.as_deref(), Some(b"/data/demo/bin/git".as_slice()));
+    assert_eq!(forge.git.as_ref(), b"http://127.0.0.1:9");
+}
+
+#[test]
+fn the_worker_channels_count_the_retained_fake_git_program() {
+    let mut settings = fixtures::engine();
+    let before = crate::workers::worst_case(&settings, 4).unwrap();
+    let program = b"/data/demo/bin/git";
+    settings.forges[0].git_program = Some(program.as_slice().into());
+    assert_eq!(crate::workers::worst_case(&settings, 4).unwrap() - before, u64::try_from(program.len()).unwrap());
+}
 #[test]
 fn the_example_engine_keeps_jigs_chat_and_goal_templates() {
     let jig = fixtures::engine().jig;
