@@ -6,6 +6,7 @@ pub mod check;
 pub mod given;
 pub mod ini;
 pub mod limits;
+pub mod name;
 pub mod place;
 pub mod prepare;
 pub mod problem;

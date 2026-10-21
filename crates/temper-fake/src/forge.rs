@@ -6,7 +6,9 @@ use jig_protocol_config::Path;
 use skein_fake_forge_domain::{self as domain, api};
 use skein_fake_forge_protocol as forgejo;
 use skein_fake_peers::forge::Forge;
+use skein_forge_setup::given::login;
 use skein_lib::{Duration, List, Secret, bytes};
+use temper_forge_setup::name::{branch, relative, repository};
 
 /// Setup increments its account number before insertion, so it cannot issue MAX.
 pub const OWNER: u64 = u64::MAX;
@@ -64,7 +66,7 @@ impl Document {
             let landing = read::field(&mut o, &d, b"landing", LIMITS.limits.name_bytes, &p)?;
             let ci_at = read::required(&mut o, &d, b"ci", &p)?;
             read::finish(o, &d, &p)?;
-            if !repository_name(&name) {
+            if !repository(&name) {
                 return Err(read::why(&p.member(b"name"), b"expected a Forgejo repository name"));
             }
             if !branch(&landing) {
@@ -188,62 +190,6 @@ pub fn checks(ci: Option<&Ci>) -> api::Checks {
             None => None,
         },
     }
-}
-fn login(b: &[u8]) -> bool {
-    !b.is_empty() && b.len() <= 40 && repository_name(b)
-}
-fn repository_name(b: &[u8]) -> bool {
-    if b.is_empty() || !b.first().expect("nonempty").is_ascii_alphanumeric() {
-        return false;
-    }
-    for c in b {
-        if !c.is_ascii_alphanumeric() && !b"._-".contains(c) {
-            return false;
-        }
-    }
-    true
-}
-fn relative(b: &[u8]) -> bool {
-    if b.is_empty() || b.starts_with(b"/") || b.contains(&0) {
-        return false;
-    }
-    let mut start = 0_usize;
-    for end in 0..=b.len() {
-        if end == b.len() || b.get(end) == Some(&b'/') {
-            let part = b.get(start..end).expect("within path");
-            if part.is_empty() || part == b"." || part == b".." {
-                return false;
-            }
-            start = end.saturating_add(1);
-        }
-    }
-    true
-}
-fn branch(b: &[u8]) -> bool {
-    if !relative(b) || b == b"@" || b.ends_with(b".") {
-        return false;
-    }
-    for c in b {
-        if *c <= 32 || *c == 127 || b"~^:?*[\\".contains(c) {
-            return false;
-        }
-    }
-    for pair in b.windows(2) {
-        if pair == b".." || pair == b"@{" {
-            return false;
-        }
-    }
-    let mut start = 0_usize;
-    for end in 0..=b.len() {
-        if end == b.len() || b.get(end) == Some(&b'/') {
-            let part = b.get(start..end).expect("within path");
-            if part.starts_with(b".") || part.ends_with(b".lock") {
-                return false;
-            }
-            start = end.saturating_add(1);
-        }
-    }
-    true
 }
 /// Bounded store for eight repositories, with small mutable QA histories.
 pub const LIMITS: domain::Config = domain::Config {

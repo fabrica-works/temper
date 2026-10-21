@@ -2712,6 +2712,7 @@ dependencies = [
  "skein-fake-peers",
  "skein-forge",
  "skein-forge-client",
+ "skein-forge-setup",
  "skein-http",
  "skein-json",
  "skein-lib",
@@ -2720,6 +2721,7 @@ dependencies = [
  "temper-engine-domain-forge",
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-issues",
+ "temper-forge-setup",
  "temper-protocol-store",
 ]
 
