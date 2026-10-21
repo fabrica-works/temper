@@ -69,7 +69,7 @@ fn arguments() {
         );
     }
     for (words, expected) in [
-        (vec!["fake"], "temper fake: expected llm or forge\n"),
+        (vec!["fake"], "temper fake: expected llm, forge or git\n"),
         (vec!["fake", "other"], "temper fake: unknown fake other\n"),
         (vec!["fake", "llm"], "temper fake llm: --document FILE is not given, and TEMPER_DOCUMENT is not set\n"),
         (
@@ -83,6 +83,31 @@ fn arguments() {
         (vec!["fake", "forge", "--document", "doc", "extra"], "temper fake forge: unexpected argument extra\n"),
     ] {
         assert_eq!(configured(&words, &[]).expect_err("refused fixture"), expected);
+    }
+}
+
+#[test]
+fn git_dispatch() {
+    for (program, words, expected) in [
+        ("git", vec![], Some(vec![])),
+        ("/abs/bin/git", vec![], Some(vec![])),
+        ("./git", vec![], Some(vec![])),
+        ("temper", vec![], None),
+        ("/usr/bin/temper", vec![], None),
+        ("gitx", vec![], None),
+        ("git.exe", vec![], None),
+        ("temper", vec!["fake", "git", "version"], Some(vec!["version"])),
+    ] {
+        let arguments = if git::is_git(std::ffi::OsStr::new(program)) {
+            Some(words.iter().map(|s| Box::from(s.as_bytes())).collect::<Vec<_>>())
+        } else {
+            match configured(&words, &[]) {
+                Ok(Command::FakeGit { arguments }) => Some(arguments.into_vec()),
+                _ => None,
+            }
+        };
+        let expected = expected.map(|words| words.iter().map(|s| Box::from(s.as_bytes())).collect::<Vec<_>>());
+        assert_eq!(arguments, expected, "{program} {words:?}");
     }
 }
 

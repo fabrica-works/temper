@@ -894,14 +894,19 @@ its own:
   the route is out of reach or fails; 125 and `temper fake git: broken:
   <rule>` on stderr for a spawn that breaks what it checks (above),
   which the hosted program asserts; and, for a remote whose host serves
-  no git route, 128 and `fatal: <host> serves no fake git route`. An
-  assertion of skein's kit ends the process as a panic (101).
+  no git route (an unnamed 404 or 405, or an answer the route can't
+  read), 128 and `fatal: <host> serves no fake git route`. A host that
+  refuses the credential before it routes, as the fake LLM peer does,
+  answers as the fake forge refuses an unknown credential, an unnamed
+  401, and is git's 401 line. An assertion of skein's kit ends the
+  process as a panic (101).
 - **How the binary is it:** `temper` is `temper fake git` when its
   `argv[0]`'s last component is `git`, before it reads a command of its
   own: a link named `git` to the binary, the fake setup entry's `git`,
   which the worker spawns by the absolute path each of the forge's
   repositories' records names (../protocol/setup.md, 8.2;
   ../protocol/channel.md, section 4), with git's command line as it is.
+  A person can run the same program as `temper fake git ARGS...`.
 - **Its crates:** the core, `crates/temper-fake-git`, ordinary Rust
   (programming-model.md, 10.2) with no test dependency, since the
   binary ships it: the checks, the answers, the step core, the replay

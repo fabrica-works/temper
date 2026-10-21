@@ -296,6 +296,12 @@ pub const LIMITS: domain::Config = domain::Config {
     edit_updates: false,
 };
 
+/// The git route's wire bounds, shared by the peer and its process client.
+#[must_use]
+pub fn git_limits() -> skein_fake_forge_protocol::Limits {
+    crate::wire::forge_limits()
+}
+
 /// Constructs the checked document's peer without io (protocol/setup.md, 8.4).
 /// The peer's shared Forge is lent back to the host for observation drains.
 /// This follows skein's fake-forge.md, 5, `Rc<RefCell<Forge>>` boundary;
@@ -315,7 +321,7 @@ pub fn peer(
         document.listen(),
         crate::limits::peer(),
         config,
-        crate::wire::forge_limits(),
+        git_limits(),
         shared.clone(),
         seed,
     )?

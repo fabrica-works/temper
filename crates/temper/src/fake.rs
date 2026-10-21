@@ -1,4 +1,5 @@
 //! The document form's files and peer loop (protocol/setup.md, 8.4).
+pub mod git;
 use skein_fake_peers::{forge as forge_peer, llm as llm_peer};
 use skein_io::kernel::{Complete, Done, Exit, Fd, Op, Submit};
 use skein_lib::{List, Queue, Time, Token, Wall};
@@ -86,10 +87,13 @@ pub struct Arguments {
 }
 type Bytes = Box<[u8]>;
 type EnvironmentEntry = (Bytes, Bytes);
-pub fn configure(arguments: &[Bytes], environment: &[EnvironmentEntry]) -> Result<Arguments, String> {
+pub fn configure(arguments: &[Bytes], environment: &[EnvironmentEntry]) -> Result<super::Command, String> {
     let Some((verb, arguments)) = arguments.split_first() else {
-        return Err("temper fake: expected llm or forge\n".into());
+        return Err("temper fake: expected llm, forge or git\n".into());
     };
+    if verb.as_ref() == b"git" {
+        return Ok(super::Command::FakeGit { arguments: arguments.into() });
+    }
     let (kind, table) = match verb.as_ref() {
         b"llm" => (Kind::Llm, &LLM_SETTINGS),
         b"forge" => (Kind::Forge, &FORGE_SETTINGS),
@@ -114,7 +118,15 @@ pub fn configure(arguments: &[Bytes], environment: &[EnvironmentEntry]) -> Resul
     } else {
         None
     };
-    Ok(Arguments { kind, document: super::path(&resolved.value(0).bytes).to_path_buf(), ready, seed, observations })
+    Ok(super::Command::Fake {
+        arguments: Arguments {
+            kind,
+            document: super::path(&resolved.value(0).bytes).to_path_buf(),
+            ready,
+            seed,
+            observations,
+        },
+    })
 }
 
 /// Creates every output before opening the peer or kernel. A refused start rolls

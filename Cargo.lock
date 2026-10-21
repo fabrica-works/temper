@@ -2301,6 +2301,7 @@ dependencies = [
  "temper-client-tools",
  "temper-engine-domain",
  "temper-fake",
+ "temper-fake-git",
  "temper-forge-setup",
  "temper-forge-setup-shell",
  "temper-init",
@@ -2308,6 +2309,8 @@ dependencies = [
  "temper-real-loop-world",
  "temper-service",
  "temper-worker-domain",
+ "temper-worker-domain-checkout",
+ "temper-worker-protocol-git",
 ]
 
 [[package]]
