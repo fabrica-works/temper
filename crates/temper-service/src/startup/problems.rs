@@ -170,13 +170,11 @@ fn admission(
         AgentShortfall::Inbox => {
             (b"needs an inbox of ", b" (tasks.run_inbox); the agent's profile.policy.inbox allows ", b"")
         }
-        AgentShortfall::Unacknowledged => {
-            (
-                b"needs an unacknowledged-turn allowance of ",
-                b" (hub.turns); the agent's profile.policy.unacknowledged allows ",
-                b"",
-            )
-        }
+        AgentShortfall::Unacknowledged => (
+            b"needs an unacknowledged-turn allowance of ",
+            b" (hub.turns); the agent's profile.policy.unacknowledged allows ",
+            b"",
+        ),
     };
     put(writer, length, measuring, before);
     put(writer, length, measuring, Decimal::of(required).as_bytes());
