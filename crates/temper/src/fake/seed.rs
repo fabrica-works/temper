@@ -29,6 +29,9 @@ fn start(directories: &crate::Directories) -> Result<u8, String> {
     let bytes = super::read_document(&directories.document(), crate::CONFIG_BYTES)?;
     let deployment = crate::setup::check(&bytes, &directories.jig())?;
     let demo = deployment.demo.ok_or("application.demo is null: the deployment has no demo")?;
+    let entry = deployment.checked.setup.entry(demo.forge()).expect("checked demo forge");
+    let temper_forge_setup::setup::Mode::Fake(fake) = &entry.mode else { unreachable!("checked demo fake") };
+    let plan = Plan::new(&demo, fake, deployment.checked.limits.deadline);
     let program = std::env::current_exe().map_err(|why| why.to_string())?;
     let mut owned = Vec::new();
     let opened = (|| {
@@ -37,8 +40,7 @@ fn start(directories: &crate::Directories) -> Result<u8, String> {
         owned.push(root);
         let signals = skein_shell::open_termination_signals().map_err(|why| format!("signals: errno {why}"))?;
         owned.push(signals);
-        let service =
-            Service::new(Plan::new(&demo), demo.client().into(), program.as_os_str().as_bytes().into(), root, signals);
+        let service = Service::new(plan, demo.client().into(), program.as_os_str().as_bytes().into(), root, signals);
         let kernel = Kernel::open(Config { operations: service.operations() }).map_err(|why| why.to_string())?;
         Ok::<_, String>((service, kernel))
     })();
@@ -203,8 +205,12 @@ impl Service {
                 child.pipes[usize::try_from(pipe.child).expect("standard descriptor")] = pipe.parent;
             }
             self.request(WAIT, Op::Wait { pidfd, reap: false });
-            if self.stopping != Stopping::Running {
-                self.signal_child(if self.stopping == Stopping::Killing { Signal::Kill } else { Signal::Terminate });
+            if self.status.is_some() {
+                self.signal_child(if self.stopping == Stopping::Terminating {
+                    Signal::Terminate
+                } else {
+                    Signal::Kill
+                });
             }
         } else {
             self.fail(b"ctl could not be spawned");
@@ -318,9 +324,13 @@ impl Service {
         }
     }
     fn spawn(&mut self) {
-        let Next::Call(call) = self.plan.next() else {
-            self.status = Some(0);
-            return;
+        let call = match self.plan.next() {
+            Next::Call(call) => call,
+            Next::Wait => return,
+            Next::Done => {
+                self.status = Some(0);
+                return;
+            }
         };
         let input = call.link;
         let mut args = vec![b"ctl".as_slice().into(), self.client.clone()];
@@ -351,7 +361,7 @@ impl Service {
         });
         self.request(SPAWN, Op::Spawn { spawn: Box::new(spawn) });
     }
-    fn child_work(&mut self) {
+    fn child_work(&mut self, now: Time) {
         let Some(child) = self.child.as_mut() else {
             return;
         };
@@ -394,7 +404,7 @@ impl Service {
                     Some(Exit::Code(code)) => Some(code),
                     _ => None,
                 };
-                match self.plan.ended(&Ended { status, stdout: &child.output[0], stderr: &child.output[1] }) {
+                match self.plan.ended(&Ended { status, stdout: &child.output[0], stderr: &child.output[1] }, now) {
                     Ok(Some(line)) => self.say(line),
                     Ok(None) => {}
                     Err(failed) => {
@@ -405,8 +415,16 @@ impl Service {
             }
         }
     }
-    fn advance(&mut self) {
-        self.child_work();
+    fn advance(&mut self, now: Time) {
+        if self.status.is_none()
+            && self.line.is_none()
+            && let Err(failed) = self.plan.tick(now)
+        {
+            self.say(failed.why);
+            self.status = Some(1);
+            self.signal_child(Signal::Kill);
+        }
+        self.child_work(now);
         if let Some(line) = &self.line
             && !self.saying
         {
@@ -467,11 +485,11 @@ impl Service {
     }
 }
 impl Host for Service {
-    fn iterate(&mut self, _now: Time, _wall: Wall) {
+    fn iterate(&mut self, now: Time, _wall: Wall) {
         while let Some(complete) = self.complete.pop() {
             self.completed(complete);
         }
-        self.advance();
+        self.advance(now);
     }
     fn completions(&mut self) -> &mut Queue<Complete> {
         &mut self.complete
@@ -483,10 +501,10 @@ impl Host for Service {
         !self.complete.is_empty() || !self.submit.is_empty()
     }
     fn next_deadline(&self) -> Option<Time> {
-        None
+        if self.status.is_none() && self.line.is_none() { self.plan.next_deadline() } else { None }
     }
     fn next_policy_deadline(&self) -> Option<Time> {
-        None
+        if self.status.is_none() && self.line.is_none() { self.plan.next_policy_deadline() } else { None }
     }
     fn is_empty(&self) -> bool {
         self.status.is_some()

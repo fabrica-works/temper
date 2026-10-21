@@ -419,6 +419,11 @@ fn seeded_credentials() {
     }
 }
 #[test]
+fn widget_prints_the_three_row_table() {
+    let (_, main) = forge::FILES.iter().find(|(path, _)| *path == b"src/main.rs").unwrap();
+    assert_eq!(*main, b"const TABLE: [(&str, u32); 3] = [(\"apples\", 3), (\"pears\", 5), (\"plums\", 2)];\n\nfn main() {\n    for (name, count) in TABLE {\n        println!(\"{name:<8}{count}\");\n    }\n}\n");
+}
+#[test]
 fn forge_seed() {
     let mut doc = forge_document();
     doc["repositories"] =

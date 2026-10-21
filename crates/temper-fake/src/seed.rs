@@ -2,7 +2,8 @@
 use crate::demo::Demo;
 use alloc::boxed::Box;
 use jig_protocol_config as config;
-use skein_lib::{Decimal, List};
+use skein_lib::{Decimal, Duration, List, Time};
+use temper_forge_setup::setup::Fake;
 
 /// The seed's acts, in order (protocol/setup.md, 8.4).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -30,6 +31,7 @@ pub struct Ended<'a> {
 #[derive(Debug)]
 pub enum Next<'a> {
     Call(Call<'a>),
+    Wait,
     Done,
 }
 /// Words for the seed's stderr, including its prefix and newline.
@@ -47,7 +49,7 @@ pub const SPENT_STATUS: u8 = 1;
 pub const SPENT_STDERR: &[u8] = b"temper ctl: the sign-in link was refused\n";
 pub const KEY_FOUND_LINE: &[u8] = b"temper fake seed: act 2: the deployment's key was found\n";
 pub const KEY_ADDED_LINE: &[u8] = b"temper fake seed: act 2: the deployment's key was added\n";
-pub const ADOPT_LINE: &[u8] = b"temper fake seed: act 4: the demo's repository is not adopted and the forges are not waited on; both wait on temper-14\n";
+pub const ADOPT_LINE: &[u8] = b"temper fake seed: act 4: the demo's repository was adopted\n";
 
 #[derive(Debug)]
 pub struct Plan {
@@ -60,10 +62,17 @@ pub struct Plan {
     add: Box<[Box<[u8]>]>,
     wait: Box<[Box<[u8]>]>,
     sign_out: Box<[Box<[u8]>]>,
+    adopt: Box<[Box<[u8]>]>,
+    attempt: u64,
+    timeout: Duration,
+    until: Option<Time>,
+    retry: Option<Time>,
+    first_refusal: Option<Failed>,
 }
 impl Plan {
     #[must_use]
-    pub fn new(demo: &Demo) -> Self {
+    pub fn new(demo: &Demo, fake: &Fake, timeout: Duration) -> Self {
+        let repository = fake.repositories.first().expect("checked fake repositories");
         Self {
             act: Act::SignIn,
             adding: false,
@@ -81,6 +90,25 @@ impl Plan {
             ]),
             wait: words(&[b"wait", b"accounts", b"--until", b"usable"]),
             sign_out: words(&[b"sign-out"]),
+            adopt: words(&[
+                b"adopt",
+                b"--project",
+                Decimal::of(u64::from(demo.project())).as_bytes(),
+                b"--owner",
+                &fake.owner,
+                b"--name",
+                &repository.name,
+                b"--landing",
+                &repository.landing,
+                b"--key",
+                b"demo-adopt",
+                b"--json",
+            ]),
+            attempt: 1,
+            timeout,
+            until: None,
+            retry: None,
+            first_refusal: None,
         }
     }
     #[must_use]
@@ -91,6 +119,9 @@ impl Plan {
     pub fn next(&self) -> Next<'_> {
         if self.done {
             return Next::Done;
+        }
+        if self.retry.is_some() {
+            return Next::Wait;
         }
         let words = match self.act {
             Act::SignIn | Act::Spent => &self.sign_in,
@@ -103,12 +134,12 @@ impl Plan {
             }
             Act::Usable => &self.wait,
             Act::SignOut => &self.sign_out,
-            Act::Adopt => unreachable!("the wait's end passes the call-free adoption act"),
+            Act::Adopt => &self.adopt,
         };
         Next::Call(Call { words, link: self.act == Act::SignIn || self.act == Act::Spent })
     }
-    /// Move on after a call; the wait also reports the call-free fourth act.
-    pub fn ended(&mut self, ended: &Ended<'_>) -> Result<Option<Box<[u8]>>, Failed> {
+    /// Move on after a call, or wait before trying the next adoption key.
+    pub fn ended(&mut self, ended: &Ended<'_>, now: Time) -> Result<Option<Box<[u8]>>, Failed> {
         assert!(!self.done, "no end after Done");
         if self.act == Act::Spent {
             if ended.status != Some(SPENT_STATUS) || ended.stderr != SPENT_STDERR {
@@ -121,6 +152,9 @@ impl Plan {
             }
             self.done = true;
             return Ok(Some(line(b"6", b"the spent link was refused")));
+        }
+        if self.act == Act::Adopt {
+            return self.adopted(ended, now);
         }
         if ended.status != Some(0) {
             return Err(failure(self.act, b"call failed", ended));
@@ -153,17 +187,98 @@ impl Plan {
                 }
             }
             Act::Usable => {
-                self.act = Act::SignOut;
-                Some(crate::read::joined(&[&line(b"3", b"accounts are usable"), ADOPT_LINE]))
+                self.act = Act::Adopt;
+                self.until = Some(now.saturating_add(self.timeout));
+                Some(line(b"3", b"accounts are usable"))
             }
             Act::SignOut => {
                 self.act = Act::Spent;
                 Some(line(b"5", b"signed out"))
             }
-            Act::Adopt | Act::Spent => unreachable!("no call for adoption; spent handled above"),
+            Act::Adopt | Act::Spent => unreachable!("adoption and spent handled above"),
         };
         Ok(result)
     }
+    fn adopted(&mut self, ended: &Ended<'_>, now: Time) -> Result<Option<Box<[u8]>>, Failed> {
+        match adoption_answer(ended) {
+            Some(true) => {
+                self.act = Act::SignOut;
+                self.until = None;
+                self.first_refusal = None;
+                Ok(Some(ADOPT_LINE.into()))
+            }
+            Some(false) => {
+                if self.first_refusal.is_none() {
+                    self.first_refusal = Some(failure(Act::Adopt, b"setup deadline elapsed", ended));
+                }
+                self.attempt = self.attempt.checked_add(1).expect("adoption keys within the deadline");
+                *self.adopt.get_mut(10).expect("adoption key argument") =
+                    crate::read::joined(&[b"demo-adopt-", Decimal::of(self.attempt).as_bytes()]);
+                self.retry = Some(now.saturating_add(Duration::from_millis(250)));
+                Ok(None)
+            }
+            None => Err(failure(Act::Adopt, b"unexpected adoption answer", ended)),
+        }
+    }
+    /// Fire the retry or the act's deadline, including while a ctl child is running.
+    pub fn tick(&mut self, now: Time) -> Result<(), Failed> {
+        if let Some(until) = self.until
+            && now >= until
+        {
+            self.until = None;
+            self.retry = None;
+            return Err(match self.first_refusal.take() {
+                Some(refusal) => refusal,
+                None => {
+                    failure(Act::Adopt, b"setup deadline elapsed", &Ended { status: None, stdout: &[], stderr: &[] })
+                }
+            });
+        }
+        if let Some(retry) = self.retry
+            && now >= retry
+        {
+            self.retry = None;
+        }
+        Ok(())
+    }
+    #[must_use]
+    pub fn next_policy_deadline(&self) -> Option<Time> {
+        self.until
+    }
+    #[must_use]
+    pub fn next_deadline(&self) -> Option<Time> {
+        match (self.until, self.retry) {
+            (Some(until), Some(retry)) => Some(until.min(retry)),
+            (until, retry) => until.or(retry),
+        }
+    }
+}
+// Ctl replays a saved answer inside an operation/outcome envelope; refusals
+// are on stderr, while an adoption is on stdout (client/tools.md, 10).
+fn adoption_answer(ended: &Ended<'_>) -> Option<bool> {
+    let bytes = match ended.status {
+        Some(0) => ended.stdout,
+        Some(2) => ended.stderr,
+        _ => return None,
+    };
+    let d =
+        config::document(bytes, &config::DocumentLimits { bytes: CALL_OUTPUT, tokens: CALL_OUTPUT, depth: 32 }).ok()?;
+    let at = if let Some(outcome) = member(&d, 0, b"outcome") {
+        let operation = member(&d, 0, b"operation")?;
+        if config::read::text(&d, operation, CALL_OUTPUT).ok()?.as_ref() != b"adopt" {
+            return None;
+        }
+        outcome
+    } else {
+        0
+    };
+    if ended.status == Some(0) {
+        config::read::Object::new(&d, member(&d, at, b"adopted")?).ok()?;
+        return Some(true);
+    }
+    let refused = member(&d, at, b"forge_refused")?;
+    let reason = member(&d, refused, b"reason")?;
+    if config::read::text(&d, reason, CALL_OUTPUT).ok()?.as_ref() == b"unreachable" { Some(false) } else { None }
 }
 fn words(parts: &[&[u8]]) -> Box<[Box<[u8]>]> {
     let mut out = List::with_capacity(u32::try_from(parts.len()).expect("fixed argument count"));

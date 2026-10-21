@@ -760,7 +760,7 @@ fn git_run() {
     const BASE: &[u8] = b"0000000000000001000000000000000000000000";
     const STORED: &[u8] = b"0000000000000002000000000000000000000000";
     // The FNV tree id for forge::FILES with new.txt = "new\n" added.
-    const TREE: &[u8] = b"9e92e227be81f504000000000000000000000000";
+    const TREE: &[u8] = b"7ec978a5592769d8000000000000000000000000";
     let object = |id| invocation::object(id).expect("fixture object id");
     let clone = || {
         git_step(
@@ -811,7 +811,7 @@ fn git_run() {
                     ..git_step(GitCommand::Add, Some(Kind::Commit), "work/widget")
                 },
                 GitStep {
-                    stdout: "9e92e227be81f504000000000000000000000000\n",
+                    stdout: "7ec978a5592769d8000000000000000000000000\n",
                     ..git_step(GitCommand::WriteTree, Some(Kind::Commit), "work/widget")
                 },
                 GitStep {
@@ -1163,6 +1163,8 @@ fn seed_demo(name: &str) -> (support::Scratch, Running, Running, SeedServe) {
     support::configuration(dir, &support::Forge::Unreached);
     let [listen, forge_listen] = support::free_addresses::<2>(&[]);
     let mut config = support::configuration::demo_document(dir, &listen.to_string());
+    // Adoption outgrows the channel fixture's tiny amendment; use the shipped bound.
+    config["engine"]["limits"]["overrides"].as_object_mut().expect("engine overrides").remove("people.amendment_bytes");
     config["application"]["forges"][0]["api"] = json!({"socket":forge_listen.to_string()});
     config["application"]["forges"][0]["git"] = json!(format!("http://{forge_listen}"));
     config["application"]["setup"][0]["mode"]["fake"]["listen"] = json!({"socket":forge_listen.to_string()});
@@ -1210,7 +1212,7 @@ fn seed_runs_fresh_then_finds_the_deployment_key() {
     let path = first.split(|byte| *byte == b'?').next().expect("printed link path");
     let wrong = [path, b"?secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n"].concat();
     let prefix = "temper fake seed: act 1: signed in\n";
-    let tail = "temper fake seed: act 3: accounts are usable\ntemper fake seed: act 4: the demo's repository is not adopted and the forges are not waited on; both wait on temper-14\ntemper fake seed: act 5: signed out\ntemper fake seed: act 6: the spent link was refused\n";
+    let tail = "temper fake seed: act 3: accounts are usable\ntemper fake seed: act 4: the demo's repository was adopted\ntemper fake seed: act 5: signed out\ntemper fake seed: act 6: the spent link was refused\n";
     let bound = usize::try_from(temper_box::host::LINE_BYTES).expect("link bound");
     let at_bound = vec![b'x'; bound];
     let past_bound = vec![b'x'; bound + 1];
