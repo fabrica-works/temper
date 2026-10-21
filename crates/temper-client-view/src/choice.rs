@@ -63,6 +63,7 @@ pub(crate) fn composer(b: &mut Builder, root: &Domain, task: Option<&c::Task>, w
     }
     let draft = root.pages().choice();
     b.open(Role::Slot);
+    b.style(crate::look::CHOICE);
     match draft.context {
         Some(choice::Context::Task { .. }) if draft.requested != draft.original => {
             requested(b, root, draft.original.as_ref(), W::ChoiceRequested, w);

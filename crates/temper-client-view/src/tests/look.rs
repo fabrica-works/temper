@@ -15,7 +15,7 @@ fn the_looks_names_pass_skeins_check() {
 }
 #[test]
 fn each_style_or_region_is_named_under_temper() {
-    let named: [(skein_ui::Style, &[u8]); 59] = [
+    let named: [(skein_ui::Style, &[u8]); 60] = [
         (BANNER, b"temper-banner"),
         (NAVIGATION, b"temper-navigation"),
         (MAIN, b"temper-main"),
@@ -75,6 +75,7 @@ fn each_style_or_region_is_named_under_temper() {
         (PLAN_HOLD, b"temper-plan-hold"),
         (EVENTS, b"temper-events"),
         (STATUS_DONE, b"temper-status-done"),
+        (CHOICE, b"temper-choice"),
     ];
     for (style, name) in named {
         assert_eq!(NAMES.style(style), Some(name));
@@ -267,5 +268,24 @@ fn the_task_tokens_stay_on_their_roles() {
             }
         }
         assert!(found, "{token:?}");
+    }
+}
+
+#[test]
+fn the_choice_token_stays_on_the_composer_slot() {
+    let mut roots = skein_lib::List::with_capacity(3);
+    roots.push(fixtures::chats_root()).expect("chats");
+    roots.push(fixtures::chat::messaging_root()).expect("chat");
+    roots.push(fixtures::task::root(jig_client::contract::Executor::Agent { charter: 1 }, Some(1))).expect("task");
+    for root in &roots {
+        let view = fixtures::page_view(root);
+        let mut found = false;
+        for node in view.tree().nodes() {
+            if node.styles.as_slice().contains(&CHOICE) {
+                assert_eq!(node.role, Role::Slot);
+                found = true;
+            }
+        }
+        assert!(found);
     }
 }

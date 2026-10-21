@@ -119,6 +119,8 @@ pub const PLAN_HOLD: Style = Style { owner: owner(), token: 56 };
 pub const EVENTS: Style = Style { owner: owner(), token: 57 };
 /// A done task phase.
 pub const STATUS_DONE: Style = Style { owner: owner(), token: 58 };
+/// The next-run model choice block.
+pub const CHOICE: Style = Style { owner: owner(), token: 59 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -183,6 +185,7 @@ pub const NAMES: Names<'static> = Names {
         b"temper-plan-hold",
         b"temper-events",
         b"temper-status-done",
+        b"temper-choice",
     ],
     regions: &[b"temper-link"],
 };

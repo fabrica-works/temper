@@ -441,3 +441,49 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
   .temper-plan-row > :nth-child(n+4) { grid-column: 1 / -1; grid-row: 3; }
   .temper-plan [role=treeitem] > [role=group] > [role=treeitem], .temper-plan [role=treeitem] > p, .temper-plan [role=treeitem] > [role=status] { margin-left: 10px; }
 }
+
+/* .meta-row: the next-run choice is an unboxed, wrapping group. */
+.temper-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px; min-width: 0; color: var(--temper-muted); font: 11px/1.58 var(--temper-mono); }
+.temper-choice > * { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+/* .meta-row and .first-run-account-line: supplied facts and Usage stay inline. */
+.temper-choice p { width: auto; margin: 0; font-size: 11px; }
+.temper-choice .temper-account-line { width: auto; margin: 0; font-size: 11px; }
+.temper-choice a { text-decoration: underline; }
+.temper-choice a:hover { color: var(--temper-accent-dark); }
+.temper-choice .temper-account-line a { margin-left: 6px; }
+/* .filter-row: the catalogue wraps as inline provider/model/effort groups. */
+.temper-choice > .temper-rows { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.temper-choice .temper-row { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.temper-choice .temper-row > p:nth-of-type(n) { flex: initial; order: 0; width: auto; margin: 0; color: var(--temper-muted); font: 10px/1.58 var(--temper-mono); letter-spacing: inherit; text-align: left; }
+/* .filter and .filter.active: Selected buttons retain their ARIA state. */
+.temper-choice .temper-row > button { max-width: 100%; min-width: 0; min-height: 28px; padding: 5px 9px; border: 1px solid var(--temper-line); border-radius: 4px; background: #f7f5f0; color: var(--temper-muted); font: 600 11px/1.35 var(--temper-mono); white-space: normal; overflow-wrap: anywhere; }
+.temper-choice .temper-row > button ~ button { padding: 3px 7px; font-size: 10px; }
+.temper-choice .temper-row > button:is([aria-selected=true], [aria-pressed=true]) { background: #eae4d9; border-color: #eae4d9; color: var(--temper-ink); }
+/* .button-row and .button: Reset is quiet; the following Apply is primary. */
+.temper-choice > button { min-height: 28px; margin: 0; padding: 5px 9px; border: 0; border-radius: 4px; background: transparent; color: var(--temper-muted); font: 600 11px/1.35 var(--temper-mono); white-space: normal; overflow-wrap: anywhere; }
+.temper-choice > button:hover { color: var(--temper-accent-dark); text-decoration: underline; }
+.temper-choice > button + button { border: 1px solid var(--temper-accent); background: var(--temper-accent); color: white; }
+.temper-choice > button + button:hover { background: #a8563e; text-decoration: none; }
+/* Pending and outcomes take a full row; status tokens keep their own colours. */
+.temper-choice:not(:has(> .temper-rows)) > .temper-account-line:last-child,
+.temper-choice > p:not(.temper-account-line), .temper-choice > [role=status]:not(.temper-status-active), .temper-choice > [role=alert] { flex-basis: 100%; }
+/* .terminal-entry-composer: Chats uses the entry's left-aligned width. */
+.temper-main > .temper-choice { width: min(760px, 100%); margin: 0 0 8px; }
+/* .task-heading: ten pixels after its metadata, nineteen before the cards. */
+.temper-main.temper-page > .temper-choice { width: min(760px, calc(100% - 48px)); margin: -9px auto 19px max(24px, calc((100% - 1160px) / 2)); }
+/* .terminal-composer-area: the entry column, also when Message is unavailable. */
+.temper-chat .temper-composer-area > .temper-choice { width: min(1040px, 100%); margin: 0 auto 8px; }
+.temper-chat > .temper-choice { box-sizing: content-box; flex: none; width: min(1040px, calc(100% - 46px)); margin: 0 auto; padding: 10px 23px; }
+/* .task-heading at 850px: follow the heading's left edge. */
+@media (max-width: 850px) {
+  .temper-main.temper-page > .temper-choice { margin-left: 17px; }
+}
+/* .page at 760px: the task heading and cards share the phone inset. */
+@media (max-width: 760px) {
+  .temper-main.temper-page > .temper-choice { width: min(760px, calc(100% - 28px)); margin-left: 14px; }
+}
+/* .terminal-composer-area at 600px: retain wrapping and 28px pills. */
+@media (max-width: 600px) {
+  .temper-choice .temper-row { min-width: 0; }
+  .temper-chat > .temper-choice { width: min(1040px, calc(100% - 20px)); padding: 8px 10px; }
+}
