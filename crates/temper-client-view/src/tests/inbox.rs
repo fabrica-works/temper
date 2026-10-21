@@ -298,6 +298,49 @@ fn an_unknown_project_name_keeps_the_numbered_fallback() {
 }
 
 #[test]
+fn a_reply_card_names_its_task_after_the_task_ends() {
+    use skein_fake_person::{Face, Find, Found, Target, TreeFace};
+
+    let mut task = fixtures::task::document();
+    task.chip.task = fixtures::INBOX_REPLY_TASK;
+    task.chip.title = c::DocumentText {
+        bytes: c::Text::new(Box::from(*b"Land a small change"), 32).expect("task title"),
+        cut: false,
+    };
+    task.chip.phase = c::Phase::Ended;
+    let name = Box::from(task.chip.title.bytes());
+    let result = c::Result {
+        task: task.chip.clone(),
+        ending: c::Ending::Done,
+        value: None,
+        at: None,
+        details: None,
+        acts: skein_lib::List::with_capacity(0),
+    };
+    let root = fixtures::inbox_with_document(
+        Filter::ALL,
+        Some((
+            c::Read::Task { task: fixtures::INBOX_REPLY_TASK },
+            c::ReadValue::Historical(Box::new(c::OwnerHistorical {
+                key: c::ObjectKey::Task(fixtures::INBOX_REPLY_TASK),
+                value: c::OwnerHistoricalValue::Task { document: Box::new(task), result: Box::new(result) },
+                at: None,
+                by: None,
+            })),
+        )),
+    );
+    let view = fixtures::page_view(&root);
+    let mut face = TreeFace::new(view.tree());
+    let find =
+        Find::named(Role::Heading { level: 3 }, b"Reply").within(Box::new([Target::Role { role: Role::Item, name }]));
+    let found = match face.find(&find) {
+        Found::Node(_) => true,
+        Found::Absent | Found::Pending => false,
+    };
+    assert!(found, "ended task's named Item holds H3 Reply");
+}
+
+#[test]
 fn loaded_task_held_and_result_titles_keep_the_title_token() {
     let mut task = fixtures::task::document();
     task.chip.task = fixtures::INBOX_TASK;

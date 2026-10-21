@@ -2462,6 +2462,7 @@ dependencies = [
  "jig-client-protocol-link",
  "jig-client-protocol-wire",
  "jig-client-test-records",
+ "skein-fake-person",
  "skein-lib",
  "skein-ui",
  "temper-client-domain",

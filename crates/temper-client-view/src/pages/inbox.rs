@@ -4,7 +4,7 @@ use crate::{
     look,
     words::{Word, Words},
 };
-use jig_client::contract::{InboxGroup, ObjectKey, Proposer, ReadValue, ResultValue};
+use jig_client::contract::{InboxGroup, ObjectKey, OwnerHistoricalValue, Proposer, ReadValue, ResultValue};
 use skein_lib::Decimal;
 use skein_ui::{Builder, Role, Run, State, phrases::Hole};
 use temper_client_domain::{
@@ -283,6 +283,14 @@ fn body(b: &mut Builder, page: &ReadValue, words: &Words) {
             title(b, task.chip.title.bytes());
             crate::cards::specification(b, &task.spec, words);
         }
+        ReadValue::Historical(page) => match &page.value {
+            OwnerHistoricalValue::Task { document, .. } => title(b, document.chip.title.bytes()),
+            OwnerHistoricalValue::Proposal(_)
+            | OwnerHistoricalValue::PersonProposal { .. }
+            | OwnerHistoricalValue::Escalation { .. }
+            | OwnerHistoricalValue::Question { .. }
+            | OwnerHistoricalValue::PersonTask { .. } => {}
+        },
         ReadValue::Result(result) => {
             title(b, result.task.title.bytes());
             words.ending(b, &result.ending);
@@ -308,7 +316,6 @@ fn body(b: &mut Builder, page: &ReadValue, words: &Words) {
         | ReadValue::Proposal(_)
         | ReadValue::Tasks(_)
         | ReadValue::OwnerProject(_)
-        | ReadValue::Historical(_)
         | ReadValue::Me(_)
         | ReadValue::Ended(_)
         | ReadValue::OwnerEnded(_)
