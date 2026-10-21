@@ -8,7 +8,6 @@ fn configured(arguments: &[&str], environment: &[(&str, &str)]) -> Result<Comman
     crate::configure_with(&arguments, &environment, b"/work")
 }
 #[test]
-#[expect(clippy::too_many_lines, reason = "one argument table covers peer settings and the check's exact refusals")]
 fn arguments() {
     for (words, environment, kind, document, ready, seed, observations) in [
         (vec!["fake", "llm", "--document", "llm.json"], vec![], Kind::Llm, "llm.json", None, 0, None),
@@ -69,16 +68,44 @@ fn arguments() {
             }
         );
     }
+    for (words, expected) in [
+        (vec!["fake"], "temper fake: expected llm, forge or git\n"),
+        (vec!["fake", "other"], "temper fake: unknown fake other\n"),
+        (vec!["fake", "llm"], "temper fake llm: --document FILE is not given, and TEMPER_DOCUMENT is not set\n"),
+        (
+            vec!["fake", "llm", "--document", "doc", "--seed", "no"],
+            "temper fake llm: --seed N (TEMPER_SEED): expected a decimal u64\n",
+        ),
+        (
+            vec!["fake", "llm", "--document", "doc", "--observations", "seen"],
+            "temper fake llm: unexpected argument --observations\n",
+        ),
+        (vec!["fake", "forge", "--document", "doc", "extra"], "temper fake forge: unexpected argument extra\n"),
+    ] {
+        assert_eq!(configured(&words, &[]).expect_err("refused fixture"), expected);
+    }
+}
+
+fn check_directories(config: &str, data: &str, cache: &str, origin: Origin) -> crate::directories::Directories {
+    crate::directories::Directories {
+        config: config.as_bytes().into(),
+        data: data.as_bytes().into(),
+        cache: cache.as_bytes().into(),
+        origins: [origin; 3],
+    }
+}
+#[test]
+fn check_arguments() {
     for (words, environment, directories, forge) in [
         (
             vec!["fake", "forge", "check", "0", "observations", "copy"],
             vec![("HOME", "/home/test")],
-            crate::directories::Directories {
-                config: b"/home/test/.config/temper".as_slice().into(),
-                data: b"/home/test/.local/share/temper".as_slice().into(),
-                cache: b"/home/test/.cache/temper".as_slice().into(),
-                origins: [Origin::Home; 3],
-            },
+            check_directories(
+                "/home/test/.config/temper",
+                "/home/test/.local/share/temper",
+                "/home/test/.cache/temper",
+                Origin::Home,
+            ),
             0,
         ),
         (
@@ -97,12 +124,7 @@ fn arguments() {
                 "copy",
             ],
             vec![],
-            crate::directories::Directories {
-                config: b"/config".as_slice().into(),
-                data: b"/work/data".as_slice().into(),
-                cache: b"/work/cache".as_slice().into(),
-                origins: [Origin::Flag; 3],
-            },
+            check_directories("/config", "/work/data", "/work/cache", Origin::Flag),
             u16::MAX,
         ),
     ] {
@@ -146,18 +168,6 @@ fn arguments() {
             "temper fake forge check: expected N OBSERVATIONS STORE\n",
         ),
         (vec!["fake", "forge", "check", "--config"], "temper fake forge check: --config takes a value: DIR\n"),
-        (vec!["fake"], "temper fake: expected llm, forge or git\n"),
-        (vec!["fake", "other"], "temper fake: unknown fake other\n"),
-        (vec!["fake", "llm"], "temper fake llm: --document FILE is not given, and TEMPER_DOCUMENT is not set\n"),
-        (
-            vec!["fake", "llm", "--document", "doc", "--seed", "no"],
-            "temper fake llm: --seed N (TEMPER_SEED): expected a decimal u64\n",
-        ),
-        (
-            vec!["fake", "llm", "--document", "doc", "--observations", "seen"],
-            "temper fake llm: unexpected argument --observations\n",
-        ),
-        (vec!["fake", "forge", "--document", "doc", "extra"], "temper fake forge: unexpected argument extra\n"),
     ] {
         assert_eq!(configured(&words, &[("HOME", "/home/test")]).expect_err("refused fixture"), expected);
     }

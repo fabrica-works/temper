@@ -273,11 +273,29 @@ const PROFILE: &[u8] = b"{\"profile\":{\"client\":7,\"marker\":[\"<!-- temper:ke
 const DECIDED_PROFILE: &[u8] = b"{\"profile\":{\"client\":7,\"marker\":[\"<!-- temper:key \",\" -->\\n\"],\"owned_branches\":[\"temper/\"],\"allowed\":[\"comment\",\"merge\",\"close\"],\"bounds\":{\"objects\":256,\"decisions\":1}},\"decisions_complete\":true}\n";
 const DECISION: &[u8] = b"{\"decision\":{\"repository\":\"demo/widget\",\"number\":1,\"head\":2}}\n";
 const MERGE: &[u8] = b"{\"observation\":\"merged\",\"repository\":\"demo/widget\",\"number\":1,\"base\":\"main\",\"head\":2,\"commit\":3,\"by\":7}\n";
+const ORDER: &[u8] =
+    b"{\"fail\":\"promise/order/demo%2Fwidget/1/2\",\"summary\":\"a merge with no decision at its head\"}\n";
+const INVALID_DOCUMENT: &[u8] = b"temper fake forge check: engine: missing\ntemper fake forge check: workers: missing\ntemper fake forge check: application: missing\n";
 fn expected(status: u8, stdout: &[u8], stderr: &[u8]) -> Outcome {
     Outcome { status, stdout: stdout.into(), stderr: stderr.into() }
 }
 fn diagnostic(why: &str) -> Vec<u8> {
     format!("temper fake forge check: {why}\n").into_bytes()
+}
+fn refused(why: &str) -> Outcome {
+    expected(1, b"", &diagnostic(why))
+}
+fn undecided(word: &[u8], stderr: &[u8]) -> Outcome {
+    expected(2, &[b"{\"undecided\":\"", word, b"\"}\n"].concat(), stderr)
+}
+fn missing_observations(why: &str) -> Outcome {
+    undecided(b"observations missing", &diagnostic(why))
+}
+fn unreadable_store(path: &Path, errno: u8) -> Outcome {
+    undecided(
+        b"store unreadable",
+        &[BOUNDARY, &diagnostic(&format!("opening {}: errno {errno}", path.display()))].concat(),
+    )
 }
 #[test]
 fn verb() {
@@ -298,33 +316,59 @@ fn verb() {
     bad_setup["application"]["setup"][0]["forge"] = 7.into();
     let current = Some(format::current(temper_protocol_store::STORE_VERSION, [0; 16]));
     let good = || Copy::Store { format: current, rows: deployment(false) };
+    let doc = || Some(document.clone());
+    let checkpoint = || Some(START.to_vec());
+    let path = |name: &str, file: &str| root.join(name).join(file);
     for (name, document, observations, copy, expected) in [
-        ("pass", Some(document.clone()), Some(START.to_vec()), good(), expected(0, b"", &[BOUNDARY, PROFILE].concat())),
-        ("fail", Some(document.clone()), Some([MERGE, START].concat()), good(), expected(1,
-            b"{\"fail\":\"promise/order/demo%2Fwidget/1/2\",\"summary\":\"a merge with no decision at its head\"}\n",
-            &[TWO_LINES, PROFILE].concat())),
-        ("decision", Some(document.clone()), Some([MERGE, START].concat()), Copy::Store { format: current, rows: deployment(true) },
-            expected(0, b"", &[TWO_LINES, DECIDED_PROFILE, DECISION].concat())),
-        ("absent-observations", Some(document.clone()), None, good(), expected(2,
-            b"{\"undecided\":\"observations missing\"}\n", &diagnostic(&format!("observations {}: {}",
-                root.join("absent-observations/observations").display(), std::io::Error::from_raw_os_error(2))))),
-        ("no-checkpoint", Some(document.clone()), Some(MERGE.to_vec()), good(), expected(2,
-            b"{\"undecided\":\"observations missing\"}\n", &diagnostic(MISSING))),
-        ("refused-observations", Some(document.clone()), Some([b"{\n", START].concat()), good(), expected(2,
-            b"{\"undecided\":\"observations missing\"}\n", &diagnostic(REFUSED))),
-        ("absent-store", Some(document.clone()), Some(START.to_vec()), Copy::Absent, expected(2,
-            b"{\"undecided\":\"store unreadable\"}\n", &[BOUNDARY, &diagnostic(&format!("opening {}: errno 2", root.join("absent-store/copy").display()))].concat())),
-        ("not-store", Some(document.clone()), Some(START.to_vec()), Copy::File, expected(2,
-            b"{\"undecided\":\"store unreadable\"}\n", &[BOUNDARY, &diagnostic(&format!("opening {}: errno 20", root.join("not-store/copy").display()))].concat())),
-        ("client-unknown", Some(document.clone()), Some(START.to_vec()), Copy::Store { format: current, rows: stored_rows(&[repository()]) },
-            expected(2, b"{\"undecided\":\"client unknown\"}\n", BOUNDARY)),
-        ("absent-document", None, Some(START.to_vec()), Copy::Absent, expected(1, b"", &diagnostic(&format!("configuration {}: absent", root.join("absent-document/temper.json").display())))),
-        ("no-entry", Some(no_entry), Some(START.to_vec()), Copy::Absent, expected(1, b"", &diagnostic("forge 1: the setup has no entry for it"))),
-        ("managed", Some(managed), Some(START.to_vec()), Copy::Absent, expected(1, b"", &diagnostic("forge 1: it is managed, not fake"))),
-        ("owned", Some(owned), Some(START.to_vec()), Copy::Absent, expected(1, b"", &diagnostic("forge 1: it is owned, not fake"))),
-        ("invalid-document", Some(serde_json::json!({})), None, Copy::Absent, expected(1, b"",
-            b"temper fake forge check: engine: missing\ntemper fake forge check: workers: missing\ntemper fake forge check: application: missing\n")),
-        ("invalid-setup", Some(bad_setup), None, Copy::Absent, expected(1, b"", &diagnostic("application.setup[0].forge: unknown reference"))),
+        ("pass", doc(), checkpoint(), good(), expected(0, b"", &[BOUNDARY, PROFILE].concat())),
+        ("fail", doc(), Some([MERGE, START].concat()), good(), expected(1, ORDER, &[TWO_LINES, PROFILE].concat())),
+        (
+            "decision",
+            doc(),
+            Some([MERGE, START].concat()),
+            Copy::Store { format: current, rows: deployment(true) },
+            expected(0, b"", &[TWO_LINES, DECIDED_PROFILE, DECISION].concat()),
+        ),
+        (
+            "absent-observations",
+            doc(),
+            None,
+            good(),
+            missing_observations(&format!(
+                "observations {}: {}",
+                path("absent-observations", "observations").display(),
+                std::io::Error::from_raw_os_error(2)
+            )),
+        ),
+        ("no-checkpoint", doc(), Some(MERGE.to_vec()), good(), missing_observations(MISSING)),
+        ("refused-observations", doc(), Some([b"{\n", START].concat()), good(), missing_observations(REFUSED)),
+        ("absent-store", doc(), checkpoint(), Copy::Absent, unreadable_store(&path("absent-store", "copy"), 2)),
+        ("not-store", doc(), checkpoint(), Copy::File, unreadable_store(&path("not-store", "copy"), 20)),
+        (
+            "client-unknown",
+            doc(),
+            checkpoint(),
+            Copy::Store { format: current, rows: stored_rows(&[repository()]) },
+            undecided(b"client unknown", BOUNDARY),
+        ),
+        (
+            "absent-document",
+            None,
+            checkpoint(),
+            Copy::Absent,
+            refused(&format!("configuration {}: absent", path("absent-document", "temper.json").display())),
+        ),
+        ("no-entry", Some(no_entry), checkpoint(), Copy::Absent, refused("forge 1: the setup has no entry for it")),
+        ("managed", Some(managed), checkpoint(), Copy::Absent, refused("forge 1: it is managed, not fake")),
+        ("owned", Some(owned), checkpoint(), Copy::Absent, refused("forge 1: it is owned, not fake")),
+        ("invalid-document", Some(serde_json::json!({})), None, Copy::Absent, expected(1, b"", INVALID_DOCUMENT)),
+        (
+            "invalid-setup",
+            Some(bad_setup),
+            None,
+            Copy::Absent,
+            refused("application.setup[0].forge: unknown reference"),
+        ),
     ] {
         let directory = root.join(name);
         fs::create_dir(&directory).expect("row directory");
@@ -339,7 +383,9 @@ fn verb() {
         }
         match copy {
             Copy::Store { format, rows } => {
-                let limits = temper_service::startup::store_limits(bytes.as_ref().expect("seed document"), &directories.jig()).expect("store limits");
+                let limits =
+                    temper_service::startup::store_limits(bytes.as_ref().expect("seed document"), &directories.jig())
+                        .expect("store limits");
                 seed(&check.store, &limits.store, format, rows);
             }
             Copy::Absent => {}
