@@ -9,6 +9,10 @@ const LATER_ENTRY: u64 = FIRST_ENTRY + 1;
 const LATER_BRANCH: &[u8] = b"temper/52";
 
 fn start_opening(d: &mut Domain, task: u64, entry: u64) {
+    start_opening_kept(d, task, entry, false);
+}
+
+fn start_opening_kept(d: &mut Domain, task: u64, entry: u64, kept: bool) {
     use temper_engine_domain_forge_change as change;
     outputs(
         d,
@@ -23,7 +27,7 @@ fn start_opening(d: &mut Domain, task: u64, entry: u64) {
             },
             gates: Box::new([]),
             queue_repair_active: false,
-            kept: false,
+            kept,
         },
     );
 }
@@ -107,6 +111,64 @@ fn finish_lower(d: &mut Domain, lower: Token) -> Box<[Request]> {
             commits: Box::new([]),
         }),
     )
+}
+
+#[test]
+fn a_woken_chain_restarts_with_its_newest_entry_number() {
+    use skein_forge::api::{Answer, Op, Read, Write};
+    let (mut d, lower) = reversed_openings(false);
+    let newest = LATER_ENTRY + 2;
+    start_opening(&mut d, fixtures::CHANGE, newest - 1);
+    start_opening(&mut d, fixtures::CHANGE, newest);
+    assert!(finish_lower(&mut d, lower).is_empty(), "the woken chain restarts");
+    let (branch, op) = fixtures::next_call(&mut d);
+    assert_eq!(op, Op::Read(Read::Branch { branch: Box::from(b"temper/51".as_slice()) }));
+    // Leave the restarted chain's first read unanswered while B writes.
+    answer_entry_clock(&mut d);
+    let (later, op) = fixtures::next_call(&mut d);
+    let Op::Write(Write::OpenPull { head, .. }) = op else { panic!("later opening before restarted reads finish") };
+    assert_eq!(head.as_ref(), LATER_BRANCH);
+    fixtures::answer(&mut d, later, Ok(Answer::Created(2)));
+    fixtures::answer(&mut d, branch, Ok(Answer::Commit(fixtures::HEAD)));
+    fixtures::answer_next(&mut d, Ok(Answer::Commit(fixtures::BASE)));
+    fixtures::answer_next(&mut d, Err(skein_forge::api::Error::Missing));
+    let built = fixtures::finish_missing(&mut d);
+    assert!(built_entry(&built, newest), "restarted effect uses the newest reservation: {built:?}");
+}
+
+#[test]
+fn a_wake_that_unkeeps_an_inflight_chain_is_not_lost() {
+    use skein_forge::api::Answer;
+    use temper_engine_domain_forge_change as change;
+    let mut d = domain();
+    outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+    outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
+    outputs(&mut d, Event::ReadAfresh);
+    outputs(&mut d, Event::SettleOutbox);
+    let mut row = fixtures::opening_row();
+    row.pending = None;
+    row.effect = change::EffectResult::None;
+    row.pull = Some(1);
+    row.change.state = change::State::Gating { head: fixtures::HEAD, asked: Box::new([]) };
+    outputs(&mut d, Event::Change { row });
+    start_opening_kept(&mut d, fixtures::CHANGE, FIRST_ENTRY, true);
+    fixtures::missing_pull_reads(&mut d);
+    start_opening(&mut d, fixtures::CHANGE, LATER_ENTRY);
+    assert!(fixtures::finish_missing(&mut d).is_empty(), "the kept chain restarts");
+    fixtures::answer_next(&mut d, Ok(Answer::Commit(fixtures::HEAD)));
+    fixtures::answer_next(&mut d, Ok(Answer::Commit(fixtures::BASE)));
+    fixtures::answer_next(&mut d, Ok(Answer::Pull(fixtures::open_pull())));
+    fixtures::finish_missing(&mut d);
+    let finished = fixtures::answer_next(&mut d, Ok(Answer::Reviews { reviews: Box::new([]), more: false }));
+    assert!(
+        finished.contains(&Request::ChangeDecision {
+            task: fixtures::CHANGE,
+            decision: change::Decision::Ready,
+            entry: None,
+            evidence: None,
+        }),
+        "the newest wake unkeeps the change: {finished:?}"
+    );
 }
 
 #[test]

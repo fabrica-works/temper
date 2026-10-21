@@ -1799,13 +1799,22 @@ fn step_change(d: &mut Domain, env: &Env<Limits>, input: StepInput, out: &mut Qu
             owner = Some(*token);
         }
     }
-    if let Some(owner) = owner {
-        d.steps.get_mut(&owner).expect("found pending step").woken = true;
+    if gates.len() > usize::try_from(env.limits.change_policy.gates).expect("u32 fits usize") {
+        emit(out, Request::Refused { task });
         return;
     }
-    if gates.len() > usize::try_from(env.limits.change_policy.gates).expect("u32 fits usize")
-        || d.steps.len() == env.limits.changes
-    {
+    if let Some(owner) = owner {
+        let pending = d.steps.get_mut(&owner).expect("found pending step");
+        // Entries hand off in number order (skein's forge-client.md, 7.2);
+        // the newest wake reserves the restart's entry and reads jig's current kept answer.
+        pending.entry = entry;
+        pending.kept = kept;
+        pending.queue_repair_active = queue_repair_active;
+        pending.gates = gates;
+        pending.woken = true;
+        return;
+    }
+    if d.steps.len() == env.limits.changes {
         emit(out, Request::Refused { task });
         return;
     }
