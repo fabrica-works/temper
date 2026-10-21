@@ -682,9 +682,16 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     let carriers = 2 * 32 + 2 * 16 + 2 * (8 + 8 + 8) + 3 * (24 + 5 * 4 + 4) + 2 * 24 + 14 * 4;
     let programs_growth = 3_076 * envelope_growth + carriers;
     // Programs delta +77,994,945,656 B; total 85,507,095,639,812 B.
+    // workers::worst_case retains one endpoint name: codex (5 B) becomes openai (6 B).
+    let endpoint_growth = 6 - 5;
     assert_eq!(
         required.engine_bytes,
-        79_659_997_210_050_u64 + engine_growth + lifecycle_growth + catalogue_growth + programs_growth
+        79_659_997_210_050_u64
+            + engine_growth
+            + lifecycle_growth
+            + catalogue_growth
+            + programs_growth
+            + endpoint_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -837,7 +844,7 @@ fn program_login_prepares_private_directories_through_each_supported_parent() {
 }
 
 #[test]
-fn init_prints_only_its_written_files_and_explicit_start_flags_on_stderr() {
+fn init_prints_written_files_account_guidance_and_explicit_start_flags_on_stderr() {
     const NO_GIT: &str =
         "init: no git on PATH: a real forge's repositories need git 2.41 or later, set as workers[].git";
     for has_git in [true, false] {
@@ -866,6 +873,7 @@ fn init_prints_only_its_written_files_and_explicit_start_flags_on_stderr() {
             writeln!(expected, "init: wrote {}", scratch.path().join(name).display()).expect("string");
         }
         assert!(lines.starts_with(&expected), "files are reported in write order");
+        assert!(lines.contains("init: after starting, add an OpenAI API key from the accounts page\n"));
         let path = scratch.path().display();
         assert!(
             lines.ends_with(&format!("init: start it with temper box --config {path} --data {path} --cache {path}\n"))

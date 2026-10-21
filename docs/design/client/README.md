@@ -898,8 +898,9 @@ nothing to the view's limits.
 temper's phrasebook words what jig's accounts document holds (jig's
 `client/domain/contract.md`, 7.1; jig's `domain/accounts.md`, 3.5 and
 section 5); the providers' names and their plans' are the
-configuration's, OpenAI's and ChatGPT's in the owned example
-(`../protocol/setup.md`, 8.1):
+configuration's. The owned example offers OpenAI API keys only
+(`../protocol/setup.md`, 8.1); ChatGPT sign-in arrives after verification
+against the real issuer (JP13). The words for each offered source are:
 
 - **The banner:** "Agents need an LLM account to run." and "Continue
   with ChatGPT", "Use your Claude subscription", "Use an API key", one

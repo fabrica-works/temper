@@ -997,14 +997,14 @@ runs it (section 7).
   a pull request, update it from its base, close or reopen it, and edit,
   close or reopen an issue; 10, as the process tier's owner holds them.
 - **Its LLM providers** (configuration.md, section 2), written out
-  whole: 1, OpenAI, with ChatGPT's sign-in, its registration public and
-  its redirect's port ephemeral, and keys; and 2, Anthropic, with Claude
-  Code as a program, and keys. Each with its endpoint, its models and
-  their prices. The charters allow each provider's models in order, the
-  default the first whose LLM provider has a usable account (llm.md,
-  section 5; jig's `domain/tasks.md`, section 3).
+  whole: 1, OpenAI, with keys only, its public Responses endpoint and
+  gpt-6-luna with its window, output and prices. ChatGPT sign-in is
+  added after verification against the real issuer (JP13). The charters
+  allow the provider's models in order, the default the first whose LLM
+  provider has a usable account (llm.md, section 5; jig's
+  `domain/tasks.md`, section 3).
 - **Its agent's configuration** (configuration.md, section 5),
-  `owned/agent.json`, declares both providers' endpoints and models, and
+  `owned/agent.json`, declares OpenAI's endpoint and model, and
   Claude Code's program, its path and its programs directory, a
   directory the person names; and takes the process tier's profile, the
   sizes its live tier runs a real model with: smith's `standard`, with

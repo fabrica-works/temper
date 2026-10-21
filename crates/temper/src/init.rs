@@ -215,6 +215,7 @@ pub(crate) fn run(directories: &Directories) -> Result<u8, String> {
     if let Some(path) = written.missing_bundle {
         eprintln!("init: no bundle at {}: the browser is not served", path.display());
     }
+    eprintln!("init: after starting, add an OpenAI API key from the accounts page");
     let mut line = String::from("init: start it with temper box");
     for (index, (name, value)) in
         [("config", &directories.config), ("data", &directories.data), ("cache", &directories.cache)].iter().enumerate()

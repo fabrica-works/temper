@@ -542,15 +542,30 @@ impl Owned {
         Self { forgejo, clients, webhooks, forgejo_binary, runner_binary, review: false, ..Self::example() }
     }
 }
+/// Each value the example names and the test's own in its place; the runner's path goes before Forgejo's,
+/// which prefixes it.
+fn stand_ins(owned: &Owned) -> [(&'static str, String); 6] {
+    [
+        ("127.0.0.1:3000", owned.forgejo.to_string()),
+        ("127.0.0.1:7100", owned.clients.to_string()),
+        ("127.0.0.1:7101", owned.webhooks.to_string()),
+        ("api.openai.com:443", owned.llm.to_string()),
+        ("/opt/forgejo/forgejo-runner", owned.runner_binary.to_str().expect("runner path").to_owned()),
+        ("/opt/forgejo/forgejo", owned.forgejo_binary.to_str().expect("Forgejo path").to_owned()),
+    ]
+}
+/// One shipped file with the test's values; a value the example no longer names is refused rather than kept.
 fn edited(bytes: &[u8], owned: &Owned) -> String {
-    std::str::from_utf8(bytes)
-        .expect("example UTF-8")
-        .replace("127.0.0.1:3000", &owned.forgejo.to_string())
-        .replace("127.0.0.1:7100", &owned.clients.to_string())
-        .replace("127.0.0.1:7101", &owned.webhooks.to_string())
-        .replace("chatgpt.com:443", &owned.llm.to_string())
-        .replace("/opt/forgejo/forgejo-runner", owned.runner_binary.to_str().expect("runner path"))
-        .replace("/opt/forgejo/forgejo", owned.forgejo_binary.to_str().expect("Forgejo path"))
+    let text = std::str::from_utf8(bytes).expect("example UTF-8").to_owned();
+    stand_ins(owned).iter().fold(text, |text, (needle, value)| {
+        assert!(
+            std::iter::once(EXAMPLE)
+                .chain(SHIPPED.iter().map(|(_, file)| *file))
+                .any(|file| std::str::from_utf8(file).expect("example UTF-8").contains(needle)),
+            "the owned example names {needle}"
+        );
+        text.replace(needle, value)
+    })
 }
 fn example_value(owned: &Owned) -> serde_json::Value {
     let mut value: serde_json::Value = serde_json::from_str(&edited(EXAMPLE, owned)).expect("owned JSON");

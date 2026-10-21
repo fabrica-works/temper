@@ -21,7 +21,7 @@
     "llm": {
       "providers": [
         {
-          "name": "codex",
+          "name": "openai",
           "number": 1,
           "signed_in_plan": false,
           "models": ["gpt-6-luna"],
@@ -30,25 +30,25 @@
       ],
       "endpoints": [
         {
-          "name": "codex",
+          "name": "openai",
           "number": 1,
-          "dialect": 1,
-          "provider": "codex",
+          "dialect": 3,
+          "provider": "openai",
           "address": {
-            "host": "chatgpt.com",
+            "host": "api.openai.com",
             "port": 443
           },
           "transport": "tls",
           "headers": [],
           "connect_ms": 10000,
           "handshake_ms": 10000,
-          "server_name": "chatgpt.com"
+          "server_name": "api.openai.com"
         }
       ],
       "models": [
         {
           "name": "gpt-6-luna",
-          "endpoint": "codex",
+          "endpoint": "openai",
           "window": 1048576,
           "output": 8192,
           "prices": {
@@ -188,7 +188,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 85507095639812,
+    "memory_bytes": 85507095639813,
     "rules": {
       "ceiling": {
         "tools": 1,

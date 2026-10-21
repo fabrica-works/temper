@@ -42,6 +42,36 @@ fn replace_org_patterns(document: &mut Value) -> u32 {
 }
 
 #[test]
+fn the_owned_example_offers_openai_keys_at_the_public_api() {
+    let owned = parse(fixtures::OWNED);
+    assert_eq!(
+        owned["engine"]["llm"]["providers"],
+        json!([{
+            "name": "openai", "number": 1_u32, "signed_in_plan": false,
+            "models": ["gpt-6-luna"], "sources": {"keys": true}
+        }])
+    );
+    let endpoint = &owned["engine"]["llm"]["endpoints"][0];
+    assert_eq!(endpoint["name"], "openai");
+    assert_eq!(endpoint["provider"], "openai");
+    assert_eq!(endpoint["dialect"], 3_u32);
+    assert_eq!(endpoint["address"], json!({"host": "api.openai.com", "port": 443_u16}));
+    assert_eq!(endpoint["transport"], "tls");
+    assert_eq!(endpoint["server_name"], "api.openai.com");
+    assert_eq!(endpoint["headers"], parse(b"[]"));
+    assert_eq!(owned["engine"]["llm"]["models"][0]["endpoint"], "openai");
+    let agent = parse(fixtures::AGENT);
+    let endpoint = &agent["endpoints"][0];
+    assert_eq!(endpoint["name"], "openai");
+    assert_eq!(endpoint["provider"], "openai");
+    assert_eq!(endpoint["dialect"], 3_u32);
+    assert_eq!(endpoint["address"], "api.openai.com:443");
+    assert_eq!(endpoint["transport"], "tls");
+    assert_eq!(endpoint["server_name"], "api.openai.com");
+    assert_eq!(endpoint["headers"], parse(b"[]"));
+}
+
+#[test]
 fn the_default_is_the_owned_example_so_edited() {
     let owned = parse(fixtures::OWNED);
     for (row, facts) in cases() {

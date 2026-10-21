@@ -17,30 +17,17 @@
   },
   "endpoints": [
     {
-      "name": "codex",
+      "name": "openai",
       "number": 1,
-      "dialect": 1,
-      "provider": "codex",
-      "address": "chatgpt.com:443",
+      "dialect": 3,
+      "provider": "openai",
+      "address": "api.openai.com:443",
       "transport": "tls",
-      "server_name": "chatgpt.com",
+      "server_name": "api.openai.com",
       "identity": "plain",
       "connect": 10000,
       "handshake": 10000,
-      "headers": [
-        {
-          "name": "originator",
-          "value": "pi"
-        },
-        {
-          "name": "user-agent",
-          "value": "pi (linux; x86_64)"
-        },
-        {
-          "name": "OpenAI-Beta",
-          "value": "responses=experimental"
-        }
-      ],
+      "headers": [],
       "models": [
         {
           "name": "gpt-6-luna",
