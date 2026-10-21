@@ -516,7 +516,7 @@ fn account_removal_confirmation_names_its_holder() {
     assert!(text.contains("Remove this account and all its sources? · The deployment's accounts · Account 41"));
 }
 #[test]
-fn the_current_holder_is_selected() {
+fn the_current_holder_is_pressed() {
     let (mut root, _) = owner_root();
     action(
         &mut root,
@@ -525,7 +525,8 @@ fn the_current_holder_is_selected() {
     let mut view = fixtures::view();
     let tree = fixtures::build(&mut view, &root);
     let control = tree.nodes().iter().find(|n| n.name.as_deref() == Some(b"Use deployment accounts")).unwrap();
-    assert!(control.states.as_slice().contains(&skein_ui::State::Selected));
+    assert!(control.states.as_slice().contains(&skein_ui::State::Pressed));
+    assert!(!control.states.as_slice().contains(&skein_ui::State::Selected));
 }
 #[test]
 fn an_account_without_a_provider_has_one_separator() {

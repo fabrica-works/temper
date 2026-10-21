@@ -356,6 +356,22 @@ fn only_the_selected_duplicate_model_shows_its_efforts() {
 }
 
 #[test]
+fn the_chosen_model_and_effort_are_pressed() {
+    let mut root = catalogue(b"needs-effort", &[b"low", b"high"]);
+    edit(&mut root, d::pages::choice::Act::Model { index: 0 });
+    edit(&mut root, d::pages::choice::Act::Effort { index: 1 });
+    let view = catalogue_view(&root);
+    let states = |name: &[u8]| {
+        let node = view.tree().nodes().iter().find(|n| n.role == Role::Button && n.name.as_deref() == Some(name));
+        node.unwrap().states.as_slice().to_vec()
+    };
+    for name in [b"needs-effort".as_slice(), b"high"] {
+        assert!(states(name).contains(&skein_ui::State::Pressed));
+        assert!(!states(name).contains(&skein_ui::State::Selected));
+    }
+    assert!(!states(b"low").contains(&skein_ui::State::Pressed));
+}
+#[test]
 fn an_invalid_draft_withholds_start() {
     let mut root = catalogue(b"needs-effort", &[b"high"]);
     edit(&mut root, d::pages::choice::Act::Model { index: 0 });
@@ -434,13 +450,16 @@ fn an_unapplied_model_has_a_separate_draft_label() {
     assert!(!shown.contains("Requested for next run: second"));
 }
 fn named_account() -> d::Domain {
+    one_account(3, false)
+}
+fn one_account(number: u32, plan: bool) -> d::Domain {
     let mut accounts = List::with_capacity(1);
     accounts
         .push(c::OwnerAccountLine {
-            number: 3,
+            number,
             place: 1,
             uses: None,
-            plan: false,
+            plan,
             provider: None,
             provider_name: None,
             manage_usage: None,
@@ -453,6 +472,10 @@ fn named_account() -> d::Domain {
     account_facts(None, accounts)
 }
 
+#[test]
+fn a_kept_account_separates_its_display_from_its_plan() {
+    assert!(text(&one_account(7, true)).contains("Personal · Signed-in plan"));
+}
 #[test]
 fn a_requested_account_shows_its_display() {
     let root = named_account();

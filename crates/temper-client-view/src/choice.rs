@@ -24,14 +24,14 @@ fn line(b: &mut Builder, w: &Words, word: W, holes: &[Hole]) {
     b.text(skein_ui::Run::Plain, &text);
     b.close();
 }
-fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], act: Act, selected: bool) {
+fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], act: Act, pressed: bool) {
     b.open(role);
     b.name(name);
     if role == Role::Link {
         b.text(skein_ui::Run::Plain, name);
     }
-    if selected {
-        b.state(State::Selected);
+    if pressed {
+        b.state(State::Pressed);
     }
     b.bind(bindings.insert(act));
     b.close();
@@ -250,6 +250,7 @@ fn committed(b: &mut Builder, root: &Domain, task: &c::Task, w: &Words, bindings
             }
             b.text(skein_ui::Run::Plain, row.display.bytes());
             if row.plan {
+                b.text(skein_ui::Run::Plain, b" \xc2\xb7 ");
                 b.text(skein_ui::Run::Plain, &crate::accounts::words::say(w, crate::accounts::words::Word::Plan, &[]));
             }
             if let Some(address) = &row.manage_usage

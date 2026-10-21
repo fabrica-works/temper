@@ -37,14 +37,14 @@ fn control(
     word: W,
     meaning: Meaning,
     disabled: bool,
-    selected: bool,
+    pressed: bool,
 ) {
     let Some(binding) = bindings.insert(meaning) else { return };
     b.open(Role::Button);
     b.name(&words::say(w, word, &[]));
     b.bind(binding);
-    if selected {
-        b.state(State::Selected);
+    if pressed {
+        b.state(State::Pressed);
     }
     if disabled {
         b.state(State::Disabled);
