@@ -59,7 +59,7 @@ impl Refusal {
 pub fn why(p: &Path, words: &'static [u8]) -> Refusal {
     Refusal { path: p.clone(), words }
 }
-fn kind(p: &Path, what: What) -> Refusal {
+pub(crate) fn kind(p: &Path, what: What) -> Refusal {
     let words: &[u8] = match what {
         What::Json => b"invalid JSON",
         What::Unknown => b"unknown member",

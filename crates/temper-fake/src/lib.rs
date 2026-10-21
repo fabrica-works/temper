@@ -6,6 +6,7 @@ extern crate alloc;
 
 pub mod check;
 pub mod credential;
+pub mod demo;
 pub mod forge;
 pub mod limits;
 pub mod llm;

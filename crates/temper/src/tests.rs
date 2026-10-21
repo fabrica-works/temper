@@ -149,7 +149,7 @@ fn ctl_is_configured() {
 
 #[test]
 fn fixed_sign_in_ports_are_checked_against_owned_and_fake_listeners() {
-    // Fixture parsing without a deployment keeps written paths.
+    // Resolve the fixture's data paths as a deployment does.
     let example = include_bytes!("../../../docs/examples/owned.json");
     let mut value: serde_json::Value = serde_json::from_slice(example).expect("owned JSON");
     value["engine"]["llm"]["providers"] = serde_json::json!([{
@@ -166,7 +166,30 @@ fn fixed_sign_in_ports_are_checked_against_owned_and_fake_listeners() {
     value["application"]["limits"]["overrides"]["checkout.workspaces"] = 1.into();
     let mut fake = value.clone();
     configuration::fake_entry(&mut fake["application"]["setup"][0], "127.0.0.1:3000");
+    let mut demo = fake.clone();
+    demo["engine"]["llm"]["providers"][0]["sources"]["sign_in"]["redirect_port"] = 8370.into();
+    demo["engine"]["llm"]["providers"].as_array_mut().expect("fixture list").push(serde_json::json!({
+        "name":"demo", "number":3, "models":["demo"], "sources":{"keys":true}
+    }));
+    demo["engine"]["llm"]["endpoints"].as_array_mut().expect("fixture list").push(serde_json::json!({
+        "name":"demo", "number":3, "dialect":3, "provider":"demo", "transport":"plaintext",
+        "address":{"socket":"127.0.0.1:8370"}, "headers":[], "connect_ms":10000, "handshake_ms":10000
+    }));
+    demo["engine"]["llm"]["models"].as_array_mut().expect("fixture list").push(serde_json::json!({
+        "name":"demo", "endpoint":"demo", "window":4096, "output":1024,
+        "prices":{"input":1,"cached":1,"output":1,"unit":1}
+    }));
+    demo["application"]["demo"] = serde_json::json!({"llm":{
+        "listen":{"socket":"127.0.0.1:8370"}, "provider":3, "key":"demo/llm.key", "asked":[],
+        "otherwise":["demo model"]}, "forge":1, "project":1, "client":"demo/client"});
+    let mut bad_demo = demo.clone();
+    bad_demo["application"]["demo"]["project"] = 9.into();
     for (document, expected) in [
+        (&bad_demo, "application.demo.project: names no project\n"),
+        (
+            &demo,
+            "engine.llm.providers[0].sources.sign_in.redirect_port: fixed port conflicts with application.demo.llm.listen\n",
+        ),
         (
             &value,
             "engine.llm.providers[0].sources.sign_in.redirect_port: fixed port conflicts with application.setup[0].mode.owned.listen\n",
@@ -179,7 +202,7 @@ fn fixed_sign_in_ports_are_checked_against_owned_and_fake_listeners() {
         assert_eq!(
             super::setup::check(
                 &serde_json::to_vec(document).expect("local JSON"),
-                &jig_protocol_config::Directories::working()
+                &jig_protocol_config::Directories::given(b"/config", b"/data", b"/cache").expect("fixture directories")
             )
             .expect_err("local listen conflict"),
             expected
@@ -190,7 +213,7 @@ fn fixed_sign_in_ports_are_checked_against_owned_and_fake_listeners() {
     assert!(
         super::setup::check(
             &serde_json::to_vec(&value).expect("connected JSON"),
-            &jig_protocol_config::Directories::working()
+            &jig_protocol_config::Directories::given(b"/config", b"/data", b"/cache").expect("fixture directories")
         )
         .is_ok()
     );

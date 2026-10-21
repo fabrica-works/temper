@@ -530,3 +530,5 @@ fn constants_fit() {
 }
 
 mod check;
+
+mod demo;

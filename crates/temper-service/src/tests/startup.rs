@@ -478,12 +478,18 @@ fn a_user_object_with_an_empty_path_is_refused() {
     assert_eq!(&*refused_user("{\"file\":\"\"}"), b"application.forges[0].user.file: invalid form\n");
 }
 #[test]
-fn a_missing_setup_is_refused_naming_its_path() {
-    let input = core::str::from_utf8(fixtures::APPLICATION).unwrap().replace("\"setup\":[],", "");
-    let (members, problems) = application(input.as_bytes(), &fixtures::engine().jig);
-    assert!(members.is_none());
-    assert_eq!(&*lines(&problems), b"application.setup: missing\n");
+fn a_missing_setup_or_demo_is_refused_naming_its_path() {
+    for (member, expected) in [
+        ("\"setup\":[],", b"application.setup: missing\n".as_slice()),
+        ("\"demo\":null,", b"application.demo: missing\n".as_slice()),
+    ] {
+        let input = core::str::from_utf8(fixtures::APPLICATION).unwrap().replace(member, "");
+        let (members, problems) = application(input.as_bytes(), &fixtures::engine().jig);
+        assert!(members.is_none());
+        assert_eq!(&*lines(&problems), expected);
+    }
 }
+
 #[test]
 fn a_setup_or_box_override_is_handed_on_with_its_value() {
     let input = core::str::from_utf8(fixtures::APPLICATION)

@@ -26,6 +26,7 @@ pub enum Listener {
     Webhooks,
     Owned(u32),
     Fake(u32),
+    Demo,
 }
 fn redirects(engine: &config::Engine) -> Box<[RedirectPort]> {
     let mut redirects = List::with_capacity(u32::try_from(engine.llm.providers.len()).expect("bounded providers"));
@@ -66,6 +67,8 @@ pub struct Named {
     pub files: Box<[config::File]>,
     pub redirects: Box<[RedirectPort]>,
     pub deployment: Box<[u8]>,
+    pub llm: config::Llm,
+    pub projects: Box<[config::Project]>,
     pub worker_root: Box<[u8]>,
     pub agent: Box<[u8]>,
     pub forges: Box<[Forge]>,
@@ -275,6 +278,8 @@ pub fn named(document: &[u8], directories: &config::Directories) -> Result<Named
         identities: parsed.application.identities,
         overrides: parsed.application.overrides,
         deployment: parsed.engine.deployment.directory,
+        llm: parsed.engine.llm,
+        projects: parsed.engine.projects,
         worker_root: parsed.application.workers.first().expect("one application worker checked").root.clone(),
         agent: parsed.workers.first().expect("one worker checked").agent.configuration.clone(),
     })

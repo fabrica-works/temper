@@ -894,6 +894,7 @@ one worker, complete:
   "clients": {"listener": {"socket": "127.0.0.1:7100"}, "bundle": null},
   "webhooks": null,
   "setup": [],
+  "demo": null,
   "limits": {"profile": "small", "overrides": {}},
   "workers": [{"root": "workspaces", "git": "/usr/bin/git"}]
 }

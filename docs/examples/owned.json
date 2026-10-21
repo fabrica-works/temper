@@ -904,6 +904,7 @@
         "socket": "127.0.0.1:7101"
       }
     },
+    "demo": null,
     "setup": [
       {
         "forge": 1,

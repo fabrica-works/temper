@@ -71,6 +71,27 @@ pub(crate) fn check(
             temper_service::startup::redirect_ports(&named.redirects, Some(listen.port()), listener, &mut problems);
         }
     }
+    let projects: Vec<_> = named.projects.iter().map(|project| project.number).collect();
+    let mut taken = vec![named.deployment.as_ref(), named.worker_root.as_ref()];
+    taken.extend(checked.setup.entries.iter().map(|entry| entry.directory.as_ref()));
+    let facts = temper_fake::demo::Facts {
+        llm: &named.llm,
+        projects: &projects,
+        setup: &checked.setup,
+        listeners: &members.listeners,
+        directories,
+        taken: &taken,
+    };
+    let demo = temper_fake::demo::read(&document, super::member(&document, application, b"demo"), &facts)
+        .map_err(|why| String::from_utf8_lossy(&why.line()).into_owned())?;
+    if let Some(demo) = demo {
+        temper_service::startup::redirect_ports(
+            &named.redirects,
+            Some(demo.llm().listen().port()),
+            temper_service::startup::Listener::Demo,
+            &mut problems,
+        );
+    }
     if !problems.is_empty() {
         return Err(String::from_utf8_lossy(&temper_service::startup::lines(&problems)).into_owned());
     }

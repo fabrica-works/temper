@@ -882,6 +882,7 @@
     },
     "webhooks": null,
     "setup": [],
+    "demo": null,
     "limits": {
       "profile": "small",
       "overrides": {

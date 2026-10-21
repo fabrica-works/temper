@@ -54,11 +54,17 @@ impl Document {
             asked: scripts(&d, asked_at, &p.member(b"asked"))?,
             otherwise: turns(&d, otherwise_at, &p.member(b"otherwise"))?,
         };
-        // The domain owns the joint byte accounting, including every wrapper.
-        match domain::Domain::played(&LIMITS, 0, scripts.clone(), empty_menu()) {
-            Ok(_) => {}
-            Err(_) => return Err(read::why(&p.member(b"otherwise"), b"scripts past their joint byte bound")),
-        }
+        Self::checked(listen, key, root, models, scripts, &p)
+    }
+    pub(crate) fn checked(
+        listen: SocketAddr,
+        key: Box<[u8]>,
+        root: Option<Box<[u8]>>,
+        models: Box<[Model]>,
+        scripts: api::Scripts,
+        p: &Path,
+    ) -> Result<Self, Refusal> {
+        check_scripts(&scripts, &p.member(b"otherwise"))?;
         Ok(Self { listen, key, root, models, scripts })
     }
     #[must_use]
@@ -121,23 +127,8 @@ fn models(d: &Json, at: u32, p: &Path) -> Result<Box<[Model]>, Refusal> {
         let window_at = read::required(&mut o, d, b"window", &p)?;
         let output_at = read::required(&mut o, d, b"output", &p)?;
         read::finish(o, d, &p)?;
-        read::nonempty(&name, &p.member(b"name"))?;
         let window = read::integer(d, window_at, u64::from(u32::MAX), &p.member(b"window"))?;
         let output = read::integer(d, output_at, u64::from(u32::MAX), &p.member(b"output"))?;
-        if window == 0 {
-            return Err(read::why(&p.member(b"window"), b"must be at least 1"));
-        }
-        if output == 0 {
-            return Err(read::why(&p.member(b"output"), b"must be at least 1"));
-        }
-        if output > window {
-            return Err(read::why(&p.member(b"output"), b"must not exceed window"));
-        }
-        for prev in &out {
-            if prev.name == name {
-                return Err(read::why(&p.member(b"name"), b"must be unique"));
-            }
-        }
         out.push(Model {
             name,
             window: u32::try_from(window).expect("u32 bound"),
@@ -145,9 +136,52 @@ fn models(d: &Json, at: u32, p: &Path) -> Result<Box<[Model]>, Refusal> {
         })
         .expect("eight models");
     }
+    check_models(out.as_slice(), p, true)?;
     Ok(out.into_boxed())
 }
-fn scripts(d: &Json, at: u32, p: &Path) -> Result<Box<[api::Script]>, Refusal> {
+/// The same model bounds for the document and a deployment's derivation.
+/// The latter reports every model problem at its provider member.
+pub(crate) fn check_models(models: &[Model], p: &Path, indexed: bool) -> Result<(), Refusal> {
+    if models.len() > usize::try_from(crate::ENTRIES).expect("eight models") {
+        return Err(read::why(p, b"past its bound"));
+    }
+    if models.is_empty() {
+        return Err(read::why(p, b"must be non-empty"));
+    }
+    for (i, model) in models.iter().enumerate() {
+        let here = if indexed { read::index(p, i) } else { p.clone() };
+        let name = if indexed { here.member(b"name") } else { here.clone() };
+        let window = if indexed { here.member(b"window") } else { here.clone() };
+        let output = if indexed { here.member(b"output") } else { here.clone() };
+        read::nonempty(&model.name, &name)?;
+        if model.name.len() > usize::try_from(crate::limits::MODEL_NAME_BYTES).expect("name bound") {
+            return Err(read::why(&name, b"past its bound"));
+        }
+        if model.window == 0 {
+            return Err(read::why(&window, b"must be at least 1"));
+        }
+        if model.output == 0 {
+            return Err(read::why(&output, b"must be at least 1"));
+        }
+        if model.output > model.window {
+            return Err(read::why(&output, b"must not exceed window"));
+        }
+        for prev in models.iter().take(i) {
+            if prev.name == model.name {
+                return Err(read::why(&name, b"must be unique"));
+            }
+        }
+    }
+    Ok(())
+}
+pub(crate) fn check_scripts(scripts: &api::Scripts, p: &Path) -> Result<(), Refusal> {
+    // The domain owns the joint byte accounting, including every wrapper.
+    match domain::Domain::played(&LIMITS, 0, scripts.clone(), empty_menu()) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(read::why(p, b"scripts past their joint byte bound")),
+    }
+}
+pub(crate) fn scripts(d: &Json, at: u32, p: &Path) -> Result<Box<[api::Script]>, Refusal> {
     let items = read::list(d, at, 0, p)?;
     let mut out = List::<api::Script>::with_capacity(items.len());
     for (i, at) in items.iter().enumerate() {
@@ -167,7 +201,7 @@ fn scripts(d: &Json, at: u32, p: &Path) -> Result<Box<[api::Script]>, Refusal> {
     }
     Ok(out.into_boxed())
 }
-fn turns(d: &Json, at: u32, p: &Path) -> Result<Box<[api::Turn]>, Refusal> {
+pub(crate) fn turns(d: &Json, at: u32, p: &Path) -> Result<Box<[api::Turn]>, Refusal> {
     let items = read::list(d, at, 1, p)?;
     let mut out = List::with_capacity(items.len());
     for (i, at) in items.iter().enumerate() {

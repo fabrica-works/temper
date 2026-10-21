@@ -636,6 +636,7 @@ pub fn parse(
     let mut object = read::object(document, at, &path, problems)?;
     let mut overrides = List::with_capacity(document.len());
     read::required(&mut object, document, b"setup", &path, problems);
+    read::required(&mut object, document, b"demo", &path, problems);
     let limit_at = read::required(&mut object, document, b"limits", &path, problems);
     let limits = match limit_at {
         Some(at) => configured_limits(document, at, &path.member(b"limits"), problems, &mut overrides),

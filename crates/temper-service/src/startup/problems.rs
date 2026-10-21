@@ -123,6 +123,7 @@ fn words(what: What) -> &'static [u8] {
 }
 fn redirect_listener(listener: super::Listener, writer: &mut Writer, length: &mut usize, measuring: bool) {
     let name = match listener {
+        super::Listener::Demo => b"application.demo.llm.listen".as_slice(),
         super::Listener::Clients => b"application.clients.listener".as_slice(),
         super::Listener::Webhooks => b"application.webhooks.listener".as_slice(),
         super::Listener::Owned(index) => {
