@@ -1,6 +1,12 @@
 //! Reconcile's bounded orgs, deadline and wait (protocol/configuration.md, 7).
 use skein_forge_setup::limits::Limits;
 
+/// A fetched binary's cap; largest pin: Forgejo 17.0.0 amd64, 122,053,192 bytes.
+pub const FETCH_BYTES: u64 = 268_435_456;
+/// Reads `setup.fetch_bytes`, which must be above zero.
+pub fn fetch_bytes(value: u64) -> Result<u64, Refused> {
+    if value == 0 { Err(Refused::Range) } else { Ok(value) }
+}
 /// Small-profile host admission, beside the pure plan profile returned by `small()`.
 pub mod small {
     // Four forges, each with one writing run and one Reachable beside it.

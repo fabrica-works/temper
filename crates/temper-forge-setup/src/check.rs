@@ -38,6 +38,7 @@ pub struct Members {
 /// Setup and limits on which a command may act.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Checked {
+    pub fetch_bytes: u64,
     pub setup: Setup,
     pub limits: Limits,
 }
@@ -163,9 +164,21 @@ pub fn checked(
 ) -> Result<Checked, Problems> {
     let mut ps = Problems::empty();
     let mut limits = limits::small();
+    let mut fetch_bytes = limits::FETCH_BYTES;
     let lp = Path::root().member(b"application").member(b"limits").member(b"overrides");
     for (name, value) in overrides {
-        if let Err(w) = limits::apply(&mut limits, name, *value) {
+        let result = if name.as_ref() == b"setup.fetch_bytes" {
+            match limits::fetch_bytes(*value) {
+                Ok(value) => {
+                    fetch_bytes = value;
+                    Ok(())
+                }
+                Err(why) => Err(why),
+            }
+        } else {
+            limits::apply(&mut limits, name, *value)
+        };
+        if let Err(w) = result {
             ps.push(
                 lp.member(name),
                 What::Reason(match w {
@@ -194,5 +207,5 @@ pub fn checked(
             }
         }
     }
-    if ps.is_empty() { Ok(Checked { setup: setup.expect("clean parse"), limits }) } else { Err(ps) }
+    if ps.is_empty() { Ok(Checked { fetch_bytes, setup: setup.expect("clean parse"), limits }) } else { Err(ps) }
 }

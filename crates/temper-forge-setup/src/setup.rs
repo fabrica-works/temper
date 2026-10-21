@@ -26,10 +26,30 @@ pub struct Runner {
 /// What temper runs for one forge.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Owned {
+    pub fetch: Fetch,
     pub forgejo: Box<[u8]>,
     pub runner: Option<Runner>,
     pub listen: SocketAddr,
     pub person: Account,
+}
+/// Which pinned binaries the fetch supplies (protocol/setup.md, 6.6).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Fetch {
+    pub forgejo: bool,
+    pub runner: bool,
+    pub mirror: Option<Mirror>,
+}
+/// Alternate origins; the release paths and digests stay pinned.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Mirror {
+    pub forgejo: Origin,
+    pub runner: Origin,
+}
+/// An HTTPS authority, without a path.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Origin {
+    pub host: Box<[u8]>,
+    pub port: u16,
 }
 /// One of a fake forge's repositories.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -253,17 +273,67 @@ fn owned(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<O
     let runner_at = o.required(d, b"runner", p, ps);
     let listen_at = o.required(d, b"listen", p, ps);
     let person_at = o.required(d, b"person", p, ps);
+    let mirror_at = o.member(d, b"mirror");
     o.finish(d, p, ps);
     let runner_at = runner_at?;
-    let runner = if d.token(runner_at)?.kind == Kind::Null {
+    let mut runner = if d.token(runner_at)?.kind == Kind::Null {
         None
     } else {
         Some(runner(d, runner_at, &p.member(b"runner"), ps)?)
     };
     let listen = listen(d, listen_at?, &p.member(b"listen"), ps)?;
-    let forgejo = forgejo?;
+    let mut forgejo = forgejo?;
     valid(path(&forgejo), p.member(b"forgejo"), ps);
-    Some(Owned { forgejo, runner, listen, person: account(d, person_at?, &p.member(b"person"), ps)? })
+    let fetched_forgejo = forgejo.as_ref() == b"fetched";
+    let mut fetched_runner = false;
+    if fetched_forgejo {
+        forgejo = crate::check::joined(&[b"forgejo/", skein_forge::forgejo::pin::VERSION.as_bytes(), b"/forgejo"]);
+    }
+    if let Some(runner) = &mut runner {
+        fetched_runner = runner.binary.as_ref() == b"fetched";
+        if fetched_runner {
+            runner.binary = crate::check::joined(&[
+                b"forgejo-runner/",
+                skein_forge::forgejo::pin::RUNNER_VERSION.as_bytes(),
+                b"/forgejo-runner",
+            ]);
+        }
+    }
+    let mirror = match mirror_at {
+        Some(at) => Some(mirror(d, at, &p.member(b"mirror"), ps)?),
+        None => None,
+    };
+    let fetch = Fetch { forgejo: fetched_forgejo, runner: fetched_runner, mirror };
+    Some(Owned { fetch, forgejo, runner, listen, person: account(d, person_at?, &p.member(b"person"), ps)? })
+}
+fn mirror(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<Mirror> {
+    let mut o = object(d, at, p, ps)?;
+    let forgejo = text(d, &mut o, b"forgejo", p, ps);
+    let runner = text(d, &mut o, b"runner", p, ps);
+    o.finish(d, p, ps);
+    let forgejo = origin(&forgejo?, &p.member(b"forgejo"), ps);
+    let runner = origin(&runner?, &p.member(b"runner"), ps);
+    Some(Mirror { forgejo: forgejo?, runner: runner? })
+}
+fn origin(value: &[u8], p: &Path, ps: &mut config::Problems) -> Option<Origin> {
+    // The shared location parser handles authorities; origins forbid every tail.
+    let authority = value.strip_prefix(b"https://");
+    let mut clean = authority.is_some();
+    if let Some(rest) = authority {
+        for byte in rest {
+            if b"/?#".contains(byte) {
+                clean = false;
+            }
+        }
+    }
+    if clean
+        && let Ok(parsed) = skein_forge::github::redirect::parse(value, 4096, 1)
+        && parsed.origin.port != 0
+    {
+        return Some(Origin { host: parsed.origin.host, port: parsed.origin.port });
+    }
+    ps.push(p.clone(), config::What::Form);
+    None
 }
 fn listen(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<SocketAddr> {
     let address = config::address::read(d, at, p, ps)?;

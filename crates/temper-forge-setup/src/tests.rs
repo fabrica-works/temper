@@ -1,3 +1,4 @@
+mod fetch;
 mod files;
 mod fixtures;
 mod given;

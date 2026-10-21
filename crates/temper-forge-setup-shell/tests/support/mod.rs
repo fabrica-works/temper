@@ -66,6 +66,7 @@ pub fn settings(address: std::net::SocketAddr) -> temper_forge_setup_shell::reco
         bot: Account { login: b"temper-bot".as_slice().into(), email: b"bot@example.invalid".as_slice().into() },
         orgs: Box::new([b"acme".as_slice().into()]),
         mode: Mode::Owned(Owned {
+            fetch: temper_forge_setup::setup::Fetch { forgejo: false, runner: false, mirror: None },
             forgejo: Box::new([]),
             runner: None,
             listen: address,
