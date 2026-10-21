@@ -458,7 +458,7 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 /* .filter and .filter.active: Selected buttons retain their ARIA state. */
 .temper-choice .temper-row > button { max-width: 100%; min-width: 0; min-height: 28px; padding: 5px 9px; border: 1px solid var(--temper-line); border-radius: 4px; background: #f7f5f0; color: var(--temper-muted); font: 600 11px/1.35 var(--temper-mono); white-space: normal; overflow-wrap: anywhere; }
 .temper-choice .temper-row > button ~ button { padding: 3px 7px; font-size: 10px; }
-.temper-choice .temper-row > button:is([aria-selected=true], [aria-pressed=true]) { background: #eae4d9; border-color: #eae4d9; color: var(--temper-ink); }
+.temper-choice .temper-row > button[aria-pressed=true] { background: #eae4d9; border-color: #eae4d9; color: var(--temper-ink); }
 /* .button-row and .button: Reset is quiet, its words on the column's edge; the following Apply is primary. */
 .temper-choice > button { min-height: 28px; margin: 0; padding: 5px 0; border: 0; border-radius: 4px; background: transparent; color: var(--temper-muted); font: 600 11px/1.35 var(--temper-mono); white-space: normal; overflow-wrap: anywhere; }
 .temper-choice > button:hover { color: var(--temper-accent-dark); text-decoration: underline; }
