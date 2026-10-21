@@ -51,6 +51,33 @@ fn only_the_llm_accounts_grants_reach_smith() {
 }
 
 #[test]
+fn a_program_grant_renewal_reaches_smith_through_the_hub() {
+    let mut h = Harness::new();
+    let mut grant = grant(host::GrantTable::Name, 1);
+    let rows = h.run(Event::Link(host::LinkDown::Assign { assignment: assignment(false, Box::new([grant])) }));
+    let mut expected = agent::Grant {
+        account: grant.account,
+        generation: 1,
+        valid: grant.valid,
+        form: agent::Form::Program(agent::SourceName::new(b"alice").unwrap()),
+    };
+    assert_eq!(&*sent_start(&rows).grants, [expected]);
+    h.say(agent::Up::Admitted);
+    grant.generation = 2;
+    let rows = h.run(Event::Link(host::LinkDown::Grant { run: RUN, attempt: ATTEMPT, grant }));
+    let mut sent = None;
+    for row in &rows {
+        if let Request::Process(process) = row
+            && let agent::process::Request::Send { message: agent::Down::Grant { grant }, .. } = process.as_ref()
+        {
+            assert!(sent.replace(*grant).is_none(), "one renewal");
+        }
+    }
+    expected.generation = 2;
+    assert_eq!(sent, Some(expected));
+}
+
+#[test]
 fn an_agent_that_fails_before_its_run_is_admitted_ends_a_cancelled_start() {
     let mut h = Harness::new();
     h.run(Event::Link(host::LinkDown::Assign { assignment: assignment(false, Box::new([])) }));

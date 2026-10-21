@@ -473,3 +473,30 @@ fn a_program_grant_carries_its_name_without_a_credential_table_entry() {
     let [Some(GrantValue::Program { name: held })] = filled.as_ref() else { panic!("one named program value") };
     assert_eq!(*held, name);
 }
+
+#[test]
+fn a_program_grants_charter_keeps_its_source_account() {
+    let settings = fixtures::engine();
+    let encoding = fixtures::encoding(&settings);
+    let mut assignment = fixtures::assignment_with(fixtures::repository(7, b"acme", b"shop"));
+    assignment.run.sources = Box::new([Some(17)]);
+    assignment.grants = Box::new([jig_domain_accounts::Grant {
+        form: jig_domain_accounts::Form::Program(jig_domain_accounts::SourceName::new(b"alice").unwrap()),
+        account: 17,
+        generation: 2,
+        valid: skein_lib::Duration::from_secs(60),
+    }]);
+    let empty = crate::values::Values::new(0, 0);
+    let jig_protocol_engine_workers::Event::Down { down: host::LinkDown::Assign { assignment: sent }, values, .. } =
+        crate::assignment::down(assignment, &settings.forges, &encoding, &empty, Token::new(8), Time::ZERO).unwrap()
+    else {
+        panic!("assignment down")
+    };
+    let [grant] = sent.assignment.grants.as_ref() else { panic!("one program grant") };
+    assert_eq!(grant.form, host::Form::Program(host::SourceName::new(b"alice").unwrap()));
+    let [Some(GrantValue::Program { name })] = values.as_ref() else { panic!("one name without a table entry") };
+    assert_eq!(name.as_bytes(), b"alice");
+    let charter = decoded_charter(&sent.assignment.charter);
+    assert_eq!(charter.main().account(), &Some(17));
+    assert_eq!(charter.main().endpoint(), b"fake");
+}

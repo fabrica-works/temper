@@ -154,12 +154,14 @@ pub fn refused(why: &[u8]) -> Request {
 }
 
 /// A grant of `account` in `table`.
-pub const fn grant(table: host::GrantTable, account: u32) -> host::Grant {
+pub fn grant(table: host::GrantTable, account: u32) -> host::Grant {
     host::Grant {
         form: match table {
             host::GrantTable::Accounts => host::Form::Credential(host::Scheme::Bearer),
             host::GrantTable::Application => host::Form::Application,
-            host::GrantTable::Name => panic!("fixture grants use account or application values"),
+            host::GrantTable::Name => {
+                host::Form::Program(host::SourceName::new(b"alice").expect("fixture source name"))
+            }
         },
         account,
         generation: 1,
