@@ -101,7 +101,7 @@ fn the_default_is_the_owned_example_so_edited() {
             ("/engine/charters/0/alternatives", json!(["demo"])),
             ("/engine/charters/1/alternatives", json!(["demo"])),
             // Written by startup's owned_memory_figures_for_init drift check, at bounded strings.
-            ("/engine/memory_bytes", json!(85_559_605_532_209_u64)),
+            ("/engine/memory_bytes", json!(85_559_617_344_049_u64)),
             ("/workers/0/memory_bytes", json!(3_266_333_819_083_u64)),
             (
                 "/application/forges",

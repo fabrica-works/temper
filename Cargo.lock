@@ -2644,6 +2644,7 @@ dependencies = [
  "temper-engine-domain-forge",
  "temper-engine-domain-forge-change",
  "temper-engine-forge-world",
+ "temper-engine-smith",
  "temper-protocol-store",
  "temper-service",
 ]

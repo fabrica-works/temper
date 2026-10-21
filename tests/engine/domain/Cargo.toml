@@ -41,6 +41,7 @@ smith-domain-session.workspace = true
 smith-domain-tools.workspace = true
 
 [dev-dependencies]
+temper-engine-smith.workspace = true
 jig-tasks-world.workspace = true
 jig-people-world.workspace = true
 

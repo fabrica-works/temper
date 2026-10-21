@@ -893,6 +893,9 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // reads and their bounded IDs/results; temper drops its own reader.
     // Net engine growth is 6,680,579,880 B; worker inputs stay fixed.
     let preparing_dependency_reads_growth = 6_680_579_880_u64;
+    // The root's 32 observation Facts grow 120 B inline for StepRefused's problem.
+    // Its 3,076 owned envelope copies add 11,811,840 B; worker inputs stay fixed.
+    let procedure_refusal_growth = 3_076 * 32 * 120;
     assert_eq!(
         required.engine_bytes,
         79_659_997_210_050_u64
@@ -907,6 +910,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + git_program_growth
             + added_dependencies_growth
             + preparing_dependency_reads_growth
+            + procedure_refusal_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.

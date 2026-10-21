@@ -20,8 +20,29 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
             step_made(domain, task, step, first);
             None
         }
-        core::Ask::StepRefused { task, step, .. } => {
+        core::Ask::StepRefused { task, step, why } => {
             step_made(domain, task, step, None);
+            if let core::StepRefusal::Refused(problem) = why {
+                // Jig's domain/connectors.md, 6.2: step again on refusal. A kept change waits
+                // without a deadline; its dependency's Met wakes it (jig's domain/tasks.md, 5.7).
+                if connector == domain.config.forge_connector
+                    && domain.core.tasks.waiting_effect_problem(task).as_ref() == Some(&problem)
+                    && let Some((owner, code @ 2, current)) = domain.core.tasks.procedure_due(task)
+                    && owner == connector
+                    && current == step
+                {
+                    domain.work.push(Work::Core(core::Event::ProcedureStep {
+                        task,
+                        step,
+                        connector,
+                        code,
+                        decision: core::ProcedureStep::new(core::StepEnd::Wait),
+                    }));
+                }
+                if domain.facts.try_push(crate::Fact::StepRefused { task, step, problem }).is_err() {
+                    domain.facts_lost = domain.facts_lost.saturating_add(1);
+                }
+            }
             None
         }
         // temper's forge serves no client documents or application requests

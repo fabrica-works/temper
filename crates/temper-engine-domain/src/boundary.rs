@@ -333,10 +333,12 @@ pub enum Missing {
 }
 
 /// An observation of the root, which decides nothing (domain/root.md, 3 and 7.4).
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Fact {
     /// A fenced answer reported a permanent preparation failure.
     PreparationFailed { task: u64, attempt: u64, preparation: Preparation },
+    /// The core refused a procedure's step; the root decides nothing (domain/root.md, 3 and 7.4).
+    StepRefused { task: u64, step: u64, problem: jig_domain_tasks::Problem },
 }
 
 #[derive(Debug)]

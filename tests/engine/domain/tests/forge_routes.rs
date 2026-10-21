@@ -45,6 +45,8 @@ struct World {
     fail_job_reads: bool,
     slow_brief_reads: bool,
     owner_gate: bool,
+    held_reads: Option<Vec<engine::Request>>,
+    merges: u32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -113,6 +115,7 @@ impl World {
                 limits.authority.facts = 8;
             }
             if with_change {
+                limits.call_records = 4;
                 limits.brief.gather = Duration::from_secs(5);
                 limits.brief.read_bytes = 512;
                 limits.brief.budgets.pull = 384;
@@ -331,6 +334,8 @@ impl World {
             fail_job_reads: false,
             slow_brief_reads: false,
             owner_gate,
+            held_reads: None,
+            merges: 0,
         }
     }
 
@@ -448,6 +453,18 @@ impl World {
                     self.events.push_back(engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next }));
                 }
                 engine::Request::Forge { call, repository, op } => {
+                    if let Some(reads) = &mut self.held_reads
+                        && matches!(op, skein_forge::api::Op::Read(_))
+                        && self.store.rows.values().any(|row| matches!(row,
+                            Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Change(row)
+                                if matches!(row.change.state, temper_engine_domain_forge_change::State::Queued { .. } | temper_engine_domain_forge_change::State::First { .. }))))
+                    {
+                        reads.push(engine::Request::Forge { call, repository, op });
+                        continue;
+                    }
+                    if matches!(op, skein_forge::api::Op::Write(skein_forge::api::Write::Merge { .. })) {
+                        self.merges += 1;
+                    }
                     self.forge_calls += 1;
                     if self.fail_job_reads
                         && matches!(op, skein_forge::api::Op::Read(skein_forge::api::Read::Job { .. }))
@@ -892,6 +909,154 @@ fn change_world_in(
     );
     let branch = producer.workspace.repositories[0].push.clone().expect("writable change branch");
     (world, chat, producer, branch)
+}
+
+#[test]
+#[expect(clippy::too_many_lines, reason = "one race follows the kept merge through refusal and Met to landing")]
+fn a_merge_asked_while_kept_is_refused_naming_the_pending() {
+    let (mut world, chat, producer, branch) = change_world(false, 1000, None);
+    let c = match live_task(&world, producer.task).requester {
+        tasks::Party::Task(task) => task,
+        tasks::Party::Person(_) | tasks::Party::Deployment { .. } => panic!("producer belongs to its change"),
+    };
+    let event = world.protocol.call(
+        Token::new(7),
+        chat.task,
+        chat.attempt,
+        791,
+        engine::Call {
+            completion: 1,
+            position: 2,
+            tool: engine::Tool::Delegate {
+                batch: Box::new([temper_engine_domain_world::fixtures::report_delegate(b"dependency e", Box::new([]))]),
+            },
+        },
+    );
+    world.send(event);
+    world.external(2, raw::Op::Git(raw::Git::Create { branch: branch.clone(), commit: 1 }));
+    fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"fixed", 1)
+        .expect("producer pushed");
+    let event = world.protocol.answer(
+        Token::new(7),
+        producer.task,
+        producer.attempt,
+        5,
+        tasks::End::Finished {
+            result: tasks::TaskResult::Change {
+                connector: 0,
+                kind: 2,
+                resource: u64::from(forge_world::REPO.repository),
+                words: b"pushed".as_slice().into(),
+            },
+            cancel_delegates: false,
+        },
+        engine::Parts::none(),
+    );
+    world.held_reads = Some(Vec::new());
+    world.send(event);
+    for _ in 0..200 {
+        world.tick();
+        if world.held_reads.as_ref().is_some_and(|reads| !reads.is_empty()) && world.assigned.len() > 2 {
+            break;
+        }
+    }
+    assert!(
+        world.held_reads.as_ref().is_some_and(|reads| !reads.is_empty()),
+        "the first, ready change is reading its merge facts: rows={:?}; assigned={:?}; merges={}",
+        world.store.rows.values().filter(|row| matches!(row, Record::Forge { .. })).collect::<Vec<_>>(),
+        world.assigned.iter().map(|run| run.task).collect::<Vec<_>>(),
+        world.merges
+    );
+    let e = world.assigned.get(2).expect("dependency assigned after producer finished").clone();
+    assert_eq!(live_task(&world, e.task).spec.words.as_ref(), b"dependency e");
+    let mut amendment = temper_engine_domain_world::fixtures::task_amendment(None, None, b"wait for e");
+    amendment.dependencies = Some(Box::new([e.task]));
+    let event = world.protocol.call(
+        Token::new(7),
+        chat.task,
+        chat.attempt,
+        792,
+        engine::Call {
+            completion: 1,
+            position: 3,
+            tool: engine::Tool::Amend { target: c, revision: spec_revision(&world, c), amendment },
+        },
+    );
+    world.send(event);
+    for _ in 0..40 {
+        world.tick();
+        if live_task(&world, c).waiting_on.as_ref() == [e.task] {
+            break;
+        }
+    }
+    assert_eq!(
+        live_task(&world, c).waiting_on.as_ref(),
+        [e.task],
+        "amendment committed before merge reads resume: {:?}",
+        world.answers
+    );
+    for read in world.held_reads.take().expect("paused merge reads") {
+        world.out.push(read);
+    }
+    world.collect();
+    for _ in 0..80 {
+        world.tick();
+    }
+    assert_eq!(world.merges, 0, "a kept merge never reaches the fake forge");
+    let problem = std::iter::from_fn(|| world.root.pop_fact())
+        .find_map(|fact| match fact {
+            engine::Fact::StepRefused { task, problem, .. } if task == c => Some(problem),
+            _ => None,
+        })
+        .expect("the core refused c's merge step");
+    let rendered = temper_engine_smith::answer(&engine::CallAnswer::EffectRefused(problem));
+    assert_eq!(rendered.text(), format!("Refused: kept until T{} is done", e.task).as_bytes());
+    assert!(matches!(live_task(&world, c).phase, tasks::Phase::Active(_)), "kept change is not held");
+
+    let event = world.protocol.answer(
+        Token::new(7),
+        e.task,
+        e.attempt,
+        5,
+        tasks::End::Finished {
+            result: tasks::TaskResult::Report { words: b"e done".as_slice().into() },
+            cancel_delegates: false,
+        },
+        engine::Parts::none(),
+    );
+    world.send(event);
+    let mut met = false;
+    for _ in 0..200 {
+        world.tick();
+        if let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(row)))) =
+            world.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(c))))
+        {
+            met |= row
+                .inbox
+                .iter()
+                .any(|word| word.kind == tasks::MessageKind::Met { dependency: e.task, removed: false });
+        }
+        if world.store.rows.values().any(|stored| matches!(stored,
+            Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Change(row)
+                if row.task == c && matches!(row.change.state, temper_engine_domain_forge_change::State::Landed { .. }))))
+        {
+            break;
+        }
+    }
+    assert!(met, "the dependency's completion delivers Met to c");
+    assert!(matches!(world.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(e.task)))),
+        Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(row)))) if matches!(row.phase, tasks::Phase::Ended(tasks::Ending::Done(_)))));
+    assert_eq!(world.merges, 1, "Met wakes the vetoed change and its merge reaches the forge");
+    assert!(world.store.rows.values().any(|stored| matches!(stored,
+        Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Change(row)
+            if row.task == c && matches!(row.change.state, temper_engine_domain_forge_change::State::Landed { .. })))));
+}
+
+fn live_task(world: &World, task: u64) -> &tasks::TaskRecord {
+    match world.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(task)))) {
+        Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(row)))) => row,
+        _ => panic!("live task {task}"),
+    }
 }
 
 #[test]

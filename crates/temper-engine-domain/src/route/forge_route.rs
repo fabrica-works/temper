@@ -2573,7 +2573,9 @@ pub(crate) fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, as
                 domain.work.push(Work::Forge(forge::Event::VetoChange { task, entry, prior: evidence.prior }));
                 if answer == authority::Answer::Wait {
                     domain.forge.wait_change(&super::environment_forge(env), task, None);
-                } else {
+                } else if answer != authority::Answer::Refuse
+                    || domain.core.tasks.waiting_effect_problem(task).is_none()
+                {
                     domain.work.push(Work::Tasks(tasks::Event::Hold { task, why: tasks::Hold::Effects }));
                 }
             }
