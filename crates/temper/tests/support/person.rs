@@ -7,6 +7,8 @@ use skein_shell::Host;
 use temper_client_domain::Address;
 use temper_client_shell_terminal::client::{NativeClient, Settings, Start};
 const START_WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(20);
+// Measured 21 s from Start to landed + one missed slow poll of 40 s = 61 s.
+const DEMO_LANDS_WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(61);
 const SIGN_IN_FIRST: skein_lib::Duration = skein_lib::Duration::from_millis(100);
 const SIGN_IN_MOST: skein_lib::Duration = skein_lib::Duration::from_secs(2);
 const PIPE: Token = Token::new(u64::MAX);
@@ -64,6 +66,40 @@ pub fn demo_chat(cue: &[u8], text: &[u8], report: &[u8]) -> Script {
             Step::Go { address: Address::Inbox { filter: temper_client_domain::address::Filter::ALL } },
             Step::See { find: Find::exactly_named(Role::Status, b"Done").within(result()), within: START_WITHIN },
             Step::See { find: Find::text(report).within(result()), within: START_WITHIN },
+        ]),
+    }
+}
+/// The first run delegates and lands without choosing a model or answering its wait.
+#[must_use]
+pub fn demo_change() -> Script {
+    use skein_ui::Role;
+    // The empty first run's chat is task 1; its change is task 2.
+    const CHANGE: u64 = 2;
+    let conversation = || Box::new([Target::Role { role: Role::Log, name: b"Conversation".as_slice().into() }]);
+    let details = || Box::new([Target::Role { role: Role::Region, name: b"Task details".as_slice().into() }]);
+    Script {
+        begin: Begin::Link,
+        steps: Box::new([
+            Step::Go { address: Address::Chats },
+            Step::See { find: Find::named(Role::TextArea, b"Start a chat"), within: START_WITHIN },
+            Step::Type { find: Find::named(Role::TextArea, b"Start a chat"), words: b"Add CSV export to widget".as_slice().into() },
+            Step::Press { find: Find::named(Role::Button, b"Start") },
+            Step::See {
+                find: Find::text("I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.".as_bytes()).within(conversation()),
+                within: START_WITHIN,
+            },
+            Step::See {
+                find: Find::text("CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change.".as_bytes()).within(conversation()),
+                within: DEMO_LANDS_WITHIN,
+            },
+            // The owner's chat log holds the result's words alone, not its ending.
+            Step::Go { address: Address::Task { task: CHANGE } },
+            Step::See {
+                find: Find::exactly_named(Role::Heading { level: 1 }, b"Export widget's table as CSV").within(details()),
+                within: START_WITHIN,
+            },
+            // Ended, not held: a change that fails to land is held; the clone check reads the merge.
+            Step::See { find: Find::exactly_named(Role::Status, b"Ended").within(details()), within: START_WITHIN },
         ]),
     }
 }

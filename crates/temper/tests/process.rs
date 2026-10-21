@@ -554,18 +554,19 @@ fn first_run(restart: bool) {
         .zip(&paths)
         .flat_map(|(flag, path)| [flag.into(), path.display().to_string()])
         .collect();
-    let mut first_head = None;
-    for (run, cue, text, key) in [
+    for (run, person, key) in [
         (
             "first",
-            "Add CSV export to widget",
-            "I would add an Export CSV button to widget's table, writing the rows on screen with their column names as the first line, so the table opens in any spreadsheet.",
+            support::person::demo_change(),
             temper_fake::seed::KEY_ADDED_LINE,
         ),
         (
             "second",
-            "Add a dark theme to widget",
-            "I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step.",
+            support::person::demo_chat(
+                b"Add a dark theme to widget",
+                b"I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step.",
+                b"The demo changes nothing.",
+            ),
             temper_fake::seed::KEY_FOUND_LINE,
         ),
     ].into_iter().take(if restart { 2 } else { 1 }) {
@@ -576,9 +577,9 @@ fn first_run(restart: bool) {
             scratch.path(),
             flags.clone(),
             &client,
-            support::person::demo_chat(cue.as_bytes(), text.as_bytes(), b"The demo changes nothing."),
+            person,
             BOX_DEADLINE,
-            || demo_clone(&paths[0], &paths[1], &client),
+            || demo_main(&paths[0], &paths[1], &client, run == "first"),
         );
         let stderr = String::from_utf8_lossy(&ended.stderr);
         assert_eq!(ended.exit, Some(Exit::Code(0)), "{run}: {stderr}");
@@ -587,10 +588,8 @@ fn first_run(restart: bool) {
         let wrote = format!("box: wrote the configuration, {}\n", paths[0].join("temper.json").display());
         assert_eq!(stderr.contains(&wrote), run == "first", "{run}: {stderr}");
         assert_demo_streams(&ended.stdout, &ended.stderr, key);
-        if let Some(head) = &first_head {
-            assert_eq!(&ended.checked, head, "the fake's landing head survives the restart");
-        } else {
-            first_head = Some(ended.checked);
+        if run == "second" {
+            assert_eq!(ended.checked, fake_forge_commit_id(DEMO_SEEDED_HEAD_COUNT), "a restarted fake holds the seed");
         }
     }
     scratch.remove();
@@ -631,15 +630,12 @@ fn assert_demo_streams(stdout: &[u8], stderr: &[u8], key: &[u8]) {
         );
     }
 }
-/// The worker's invocation against the demo's link, after a test-only read grant.
-/// Until temper-14, no adoption grants the bot access to the fake repository.
-fn demo_clone(config: &std::path::Path, data: &std::path::Path, root: &std::path::Path) -> String {
-    use std::{
-        fs,
-        io::{Read, Write},
-        os::unix::ffi::OsStrExt,
-        process::Command,
-    };
+// forge_seed gives repository 1 the counted head 1 at every fake start.
+const DEMO_SEEDED_HEAD_COUNT: u64 = 1;
+
+/// The demo's main, cloned as the worker clones it, after landing or a fresh fake.
+fn demo_main(config: &std::path::Path, data: &std::path::Path, root: &std::path::Path, landed: bool) -> String {
+    use std::{fs, os::unix::ffi::OsStrExt, process::Command};
     use temper_worker_protocol_git::invocation::{self, Command as GitCommand};
     let document: serde_json::Value =
         serde_json::from_slice(&fs::read(config.join("temper.json")).expect("written configuration")).expect("JSON");
@@ -650,19 +646,21 @@ fn demo_clone(config: &std::path::Path, data: &std::path::Path, root: &std::path
     let user =
         support::owned::answer(address.port(), "/api/v1/user", Some(token.trim())).expect("reconciled bot answers");
     assert_eq!(user["login"], "temper", "reconcile made and authenticated forge 1's bot before serve");
-    let admin = fs::read_to_string(data.join("demo/forge/admin_token")).expect("prepare's handover");
-    let mut socket =
-        std::net::TcpStream::connect_timeout(&address, std::time::Duration::from_secs(1)).expect("fake forge");
-    socket.set_read_timeout(Some(std::time::Duration::from_secs(1))).expect("bounded grant");
-    let grant = br#"{"permission":"read"}"#;
-    write!(socket, "PUT /api/v1/repos/demo/widget/collaborators/temper HTTP/1.1\r\nHost: {address}\r\nAuthorization: token {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", admin.trim(), grant.len()).expect("grant request");
-    socket.write_all(grant).expect("grant body");
-    let mut reply = Vec::new();
-    socket.read_to_end(&mut reply).expect("grant reply");
-    assert!(reply.starts_with(b"HTTP/1.1 204"), "test-only read grant: {}", String::from_utf8_lossy(&reply));
     let branch = support::owned::answer(address.port(), "/api/v1/repos/demo/widget/branches/main", Some(token.trim()))
         .expect("main's API head");
     let head = branch["commit"]["id"].as_str().expect("landing head").to_string();
+    let seeded = fake_forge_commit_id(DEMO_SEEDED_HEAD_COUNT);
+    if landed {
+        assert_ne!(head, seeded, "the change moved main");
+        let compared = support::owned::answer(
+            address.port(),
+            &format!("/api/v1/repos/demo/widget/compare/{seeded}...{head}"),
+            Some(token.trim()),
+        )
+        .expect("seed to main comparison");
+        assert_eq!(compared["total_commits"], 1, "one commit past the seed: {compared}");
+        assert_eq!(compared["commits"], serde_json::json!([{"sha": head}]), "only the landed commit");
+    }
     let identity = temper_worker_protocol_git::Identity {
         token: skein_lib::Secret::new(
             fs::read(data.join("demo/forge/git_token")).expect("reconcile's git token").into_boxed_slice(),
@@ -695,12 +693,32 @@ fn demo_clone(config: &std::path::Path, data: &std::path::Path, root: &std::path
     }
     let checkout = root.join("widget");
     for (path, bytes) in temper_fake::forge::FILES {
-        assert_eq!(fs::read(checkout.join(std::ffi::OsStr::from_bytes(path))).expect("cloned seed file"), bytes);
+        let expected = if landed && path == b"src/main.rs" {
+            let script = document["application"]["demo"]["llm"]["asked"]
+                .as_array()
+                .expect("demo scripts")
+                .iter()
+                .find(|script| script["cue"] == "Export widget's table as CSV")
+                .expect("coding script");
+            let edit = &script["turns"][1]["lines"][0]["arguments"]["edits"][0];
+            let old = edit["old"].as_str().expect("old main");
+            let new = edit["new"].as_str().expect("new main");
+            let seed = std::str::from_utf8(bytes).expect("seeded source");
+            assert_eq!(seed.matches(old).count(), 1, "one coding edit in the seed");
+            seed.replacen(old, new, 1).into_bytes()
+        } else {
+            bytes.to_vec()
+        };
+        assert_eq!(fs::read(checkout.join(std::ffi::OsStr::from_bytes(path))).expect("cloned demo file"), expected);
     }
     assert_eq!(fs::read(checkout.join(".git/temper-remote")).expect("cloned remote"), remote.as_bytes());
     let count = u64::from_le_bytes(
         fs::read(checkout.join(".git/temper-head")).expect("cloned head").try_into().expect("counted id"),
     );
-    assert_eq!(format!("{count:016x}{}", "0".repeat(24)), head, "clone holds the API's landing head");
+    assert_eq!(fake_forge_commit_id(count), head, "clone holds the API's landing head");
     head
+}
+
+fn fake_forge_commit_id(count: u64) -> String {
+    format!("{count:016x}{}", "0".repeat(24))
 }
