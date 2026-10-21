@@ -2802,6 +2802,7 @@ name = "temper-forge-setup-shell"
 version = "0.0.0"
 dependencies = [
  "jig-protocol-config",
+ "rustls",
  "skein-forge",
  "skein-forge-connection",
  "skein-forge-setup",
@@ -2810,6 +2811,8 @@ dependencies = [
  "skein-json",
  "skein-lib",
  "skein-shell",
+ "skein-tls",
+ "skein-tls-world",
  "temper-forge-setup",
  "temper-service",
 ]

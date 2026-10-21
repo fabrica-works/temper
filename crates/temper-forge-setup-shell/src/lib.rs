@@ -1,6 +1,7 @@
 //! Hosts of the forge setup machines (protocol/setup.md, 11).
 pub mod command;
 pub mod exchange;
+pub mod fetch;
 pub mod files;
 pub mod prepare;
 pub mod process;
