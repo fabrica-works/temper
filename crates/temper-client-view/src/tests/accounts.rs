@@ -331,6 +331,106 @@ fn sign_in_ends_preserve_their_typed_details() {
         assert!(skein_lib::bytes::find(&fixtures::text(fixtures::build(&mut view, &root)), expected).is_some());
     }
 }
+fn answer_account_operation(root: &mut d::Domain, operation: Operation, outcome: c::OwnerOutcome) {
+    let limits = fixtures::limits();
+    let env = skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits };
+    let mut out = skein_lib::Queue::with_capacity(d::max_out(&limits));
+    for act in [
+        A::Select { selection: Selection { account: Some(1), source: Some(1), ..Default::default() } },
+        A::Submit { name: [98; 16], operation },
+        A::Confirm,
+    ] {
+        d::step(root, &env, d::Event::Act { action: d::Action::Pages(d::pages::Act::Accounts(act)) }, &mut out);
+    }
+    d::step(root, &env, d::Event::Client { event: jig_client::Event::Stored }, &mut out);
+    let attempt = out
+        .iter()
+        .find_map(|request| match request {
+            d::Request::Client {
+                request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, .. } },
+            } => Some(*attempt),
+            d::Request::Client { .. }
+            | d::Request::Show { .. }
+            | d::Request::SignOut
+            | d::Request::Dropped { .. }
+            | d::Request::Fact { .. } => None,
+        })
+        .expect("account operation attempt");
+    fixtures::root_event(
+        root,
+        d::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Answer {
+                    attempt,
+                    envelope: skein_lib::RequestEnvelope::Final,
+                    answer: Some(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(outcome)))),
+                    why: None,
+                },
+            },
+        },
+    );
+}
+#[test]
+fn only_settled_account_statuses_have_the_done_style() {
+    use crate::accounts::words::{self, Word as W};
+    for (outcome, word, done) in [
+        (None, W::Settled, true),
+        (
+            Some((
+                Operation::SignOut,
+                c::OwnerOutcome::AccountSignedOut { confirmed: true, failed_hosts: Box::new([]) },
+            )),
+            W::Confirmed,
+            true,
+        ),
+        (
+            Some((
+                Operation::SignOut,
+                c::OwnerOutcome::AccountSignedOut { confirmed: false, failed_hosts: Box::new([]) },
+            )),
+            W::Unconfirmed,
+            false,
+        ),
+        (
+            Some((
+                Operation::RemoveKey,
+                c::OwnerOutcome::AccountRemoved { confirmed: true, failed_hosts: Box::new([]) },
+            )),
+            W::Removed,
+            true,
+        ),
+        (
+            Some((
+                Operation::RemoveKey,
+                c::OwnerOutcome::AccountRemoved { confirmed: false, failed_hosts: Box::new([]) },
+            )),
+            W::RemovedUnconfirmed,
+            false,
+        ),
+    ] {
+        let (mut root, watch) = fixtures::account_root();
+        let mut doc = document(1);
+        doc.settled = outcome.is_none();
+        deliver(&mut root, watch, doc);
+        if let Some((operation, outcome)) = outcome {
+            answer_account_operation(&mut root, operation, outcome);
+        }
+        let mut view = fixtures::view();
+        let tree = fixtures::build(&mut view, &root);
+        let name = words::say(&fixtures::words(), word, &[]);
+        let status = tree
+            .nodes()
+            .iter()
+            .find(|n| n.role == Role::Status && n.name.as_deref() == Some(name.as_ref()))
+            .expect("account status line");
+        assert_eq!(
+            status.styles.as_slice().contains(&crate::look::STATUS_DONE),
+            done,
+            "{}",
+            String::from_utf8_lossy(&name)
+        );
+    }
+}
 #[path = "../../../../testing/memory_literal.rs"]
 mod memory_literal;
 // Base 87c82f753: 4,420,462,083 + 304 added nodes x 574,364 B = 4,595,068,739 B.

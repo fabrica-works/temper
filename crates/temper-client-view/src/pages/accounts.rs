@@ -22,6 +22,14 @@ pub(super) fn number(b: &mut Builder, w: &Words, value: u64) {
 fn text(b: &mut Builder, w: &Words, role: Role, word: W) {
     crate::cards::text(b, role, &words::say(w, word, &[]));
 }
+fn done(b: &mut Builder, w: &Words, word: W) {
+    let value = words::say(w, word, &[]);
+    b.open(Role::Status);
+    b.style(crate::look::STATUS_DONE);
+    b.name(&value);
+    b.text(Run::Plain, &value);
+    b.close();
+}
 fn fact(b: &mut Builder, w: &Words, word: W, value: u64) {
     b.open(Role::Paragraph);
     b.open(Role::Text);
@@ -345,7 +353,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
         omitted(b, w, W::SignInsOmitted, doc.signing.len(), counts.sign_ins);
         super::account_programs::hosts(b, w, &doc.program_hosts, counts, text_per_node);
         if doc.settled {
-            text(b, w, Role::Status, W::Settled);
+            done(b, w, W::Settled);
         }
         if let Some(last) = &doc.last_end {
             fact(b, w, W::LastEnd, u64::from(last.source));
@@ -525,13 +533,21 @@ fn outcome(b: &mut Builder, root: &Domain, w: &Words, form: &accounts::Accounts,
             Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
                 c::OwnerOutcome::AccountSignedOut { confirmed, failed_hosts },
             ))))) => {
-                text(b, w, Role::Status, if *confirmed { W::Confirmed } else { W::Unconfirmed });
+                if *confirmed {
+                    done(b, w, W::Confirmed);
+                } else {
+                    text(b, w, Role::Status, W::Unconfirmed);
+                }
                 super::account_programs::failures(b, w, failed_hosts, text_per_node);
             }
             Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
                 c::OwnerOutcome::AccountRemoved { confirmed, failed_hosts },
             ))))) => {
-                text(b, w, Role::Status, if *confirmed { W::Removed } else { W::RemovedUnconfirmed });
+                if *confirmed {
+                    done(b, w, W::Removed);
+                } else {
+                    text(b, w, Role::Status, W::RemovedUnconfirmed);
+                }
                 super::account_programs::failures(b, w, failed_hosts, text_per_node);
             }
             Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(

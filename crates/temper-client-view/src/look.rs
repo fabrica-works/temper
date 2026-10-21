@@ -117,7 +117,7 @@ pub const PLAN_ROW: Style = Style { owner: owner(), token: 55 };
 pub const PLAN_HOLD: Style = Style { owner: owner(), token: 56 };
 /// The task activity list.
 pub const EVENTS: Style = Style { owner: owner(), token: 57 };
-/// A done task phase.
+/// A done task phase or a settled account outcome.
 pub const STATUS_DONE: Style = Style { owner: owner(), token: 58 };
 /// The next-run model choice block.
 pub const CHOICE: Style = Style { owner: owner(), token: 59 };
