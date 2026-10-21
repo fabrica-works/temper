@@ -104,11 +104,30 @@ fn the_io_limits_are_usable_for_one_six_and_sixty_four_steps() {
     for count in [1_u32, 6, 64] {
         let limits = io_limits(count);
         assert!(limits.is_usable(), "usable for {count} steps");
-        assert_eq!(limits.sockets, count.saturating_mul(3).saturating_add(5));
+        assert_eq!(limits.sockets, count.saturating_mul(4).saturating_add(5));
         assert_eq!((limits.intake, limits.receive, limits.names), (LINE_BYTES, 1, 0));
         assert_eq!((limits.sends, limits.accepts, limits.backlog), (1, 1, 1));
         assert_eq!(limits.close_timeout, Duration::from_secs(5));
         assert_eq!(limits.retry, Duration::from_millis(10));
+        let mut steps = List::with_capacity(count);
+        steps.push(long(b"serve", &[b"never"])).unwrap();
+        if count > 1 {
+            steps.push(super::fixtures::link(b"seed", &[b"exit", b"0"])).unwrap();
+        }
+        for _ in steps.len()..count {
+            steps.push(long(b"worker", &[b"never"])).unwrap();
+        }
+        let mut harness = Harness::with_stubborn(steps.as_slice(), true);
+        harness.run_until_idle();
+        if count > 1 {
+            harness.write_child(harness.serve_index(), 1, b"link\n");
+            harness.run_until_idle();
+        }
+        assert_eq!(harness.launches.len(), count);
+        harness.terminate();
+        assert_eq!(harness.run_to_end(), Exit::Code(0));
+        harness.sim.assert_quiescent(harness.pid);
+        harness.sim.assert_no_open_fds(harness.pid);
     }
 }
 
@@ -278,6 +297,206 @@ fn a_serve_that_does_not_read_holds_the_next_ask_until_replies_are_written() {
         assert_eq!(received.as_slice(), expected, "buffer {buffer}: replies stay in order");
         harness.terminate();
         assert_eq!(harness.run_to_end(), Exit::Code(0));
+        harness.sim.assert_quiescent(harness.pid);
+        harness.sim.assert_no_open_fds(harness.pid);
+    }
+}
+
+#[test]
+#[expect(clippy::too_many_lines, reason = "the link's byte and lifecycle cases share the hosted-child table")]
+fn a_link_receives_only_the_first_line_and_its_end() {
+    use super::fixtures::link;
+    use skein_shell::Host;
+    enum Action {
+        Write(&'static [u8], usize, Box<[u8]>),
+        Read(Box<[u8]>),
+        Exit(&'static [u8]),
+        WriteExit(&'static [u8], Box<[u8]>),
+        BrokenPipe,
+        Advance,
+        Stdout(Box<[u8]>),
+        Stderr(&'static [u8]),
+        Spawns(&'static [u8], usize),
+    }
+    type Case<'a> = (&'a str, &'a [&'a [u8]], Duration, Box<[Action]>);
+    use Action::{Advance, Exit as End, Read, Spawns, Stderr, Stdout, Write};
+    fn write(name: &'static [u8], fd: usize, data: &[u8]) -> Action {
+        Write(name, fd, bytes::copy_of(data))
+    }
+    fn read(data: &[u8]) -> Action {
+        Read(bytes::copy_of(data))
+    }
+    fn stdout(data: &[u8]) -> Action {
+        Stdout(bytes::copy_of(data))
+    }
+    let mut full = List::with_capacity(LINE_BYTES);
+    for _ in 0..LINE_BYTES {
+        full.push(b'x').unwrap();
+    }
+    let full = full.into_boxed();
+    let past = crate::lines::joined(&[full.as_ref(), b"tail\nlater\n"]);
+    let cases: [Case<'_>; 9] = [
+        (
+            "whole",
+            &[b"never".as_slice()][..],
+            Duration::from_millis(500),
+            Box::new([write(b"serve", 1, b"link\nlater\n"), read(b"link\n"), read(b""), stdout(b"later\n")]),
+        ),
+        (
+            "two chunks",
+            &[b"never".as_slice()][..],
+            Duration::from_millis(500),
+            Box::new([
+                write(b"serve", 1, b"li"),
+                Spawns(b"seed", 0),
+                stdout(b""),
+                write(b"serve", 1, b"nk\nlater\n"),
+                read(b"link\n"),
+                read(b""),
+                stdout(b"later\n"),
+            ]),
+        ),
+        (
+            "at cap",
+            &[b"never".as_slice()][..],
+            Duration::from_millis(500),
+            Box::new([write(b"serve", 1, &full), read(&full), read(b""), stdout(b"")]),
+        ),
+        (
+            "past cap",
+            &[b"never".as_slice()][..],
+            Duration::from_millis(500),
+            Box::new([write(b"serve", 1, &past), read(&full), read(b""), stdout(b"tail\nlater\n")]),
+        ),
+        (
+            "incomplete exit",
+            &[b"never".as_slice()][..],
+            Duration::from_millis(500),
+            Box::new([
+                write(b"serve", 1, b"half"),
+                End(b"serve"),
+                stdout(b"half"),
+                Spawns(b"seed", 0),
+                Advance,
+                write(b"serve", 1, b"restart\nlater\n"),
+                read(b"restart\n"),
+                read(b""),
+                stdout(b"later\n"),
+            ]),
+        ),
+        (
+            "seed exits unread",
+            &[b"exit".as_slice(), b"0"][..],
+            Duration::from_millis(500),
+            Box::new([
+                write(b"serve", 1, b"link\nlater\n"),
+                Spawns(b"seed", 1),
+                Action::BrokenPipe,
+                stdout(b"later\n"),
+            ]),
+        ),
+        (
+            "seed output",
+            &[b"never".as_slice()][..],
+            Duration::from_millis(500),
+            Box::new([
+                write(b"serve", 1, b"link\nlater\n"),
+                read(b"link\n"),
+                read(b""),
+                write(b"seed", 1, b"out\n"),
+                write(b"seed", 2, b"err\n"),
+                Stderr(b"seed: out\nseed: err\n"),
+                stdout(b"later\n"),
+            ]),
+        ),
+        (
+            "restart after seed",
+            &[b"never".as_slice()][..],
+            Duration::from_millis(500),
+            Box::new([
+                write(b"serve", 1, b"link\n"),
+                read(b"link\n"),
+                read(b""),
+                End(b"serve"),
+                Advance,
+                write(b"serve", 1, b"fresh\nlater\n"),
+                Spawns(b"seed", 1),
+                stdout(b"fresh\nlater\n"),
+            ]),
+        ),
+        (
+            "line with immediate restart",
+            &[b"never".as_slice()][..],
+            Duration::from_millis(0),
+            Box::new([
+                Action::WriteExit(b"serve", bytes::copy_of(b"link\n")),
+                read(b"link\n"),
+                read(b""),
+                Spawns(b"serve", 2),
+                Spawns(b"seed", 1),
+                stdout(b""),
+            ]),
+        ),
+    ];
+    for (name, seed_args, backoff, actions) in cases {
+        let steps = temper_forge_setup::Steps {
+            always: Box::new([long(b"serve", &[b"never"]), link(b"seed", seed_args)]),
+            asked: Box::new([]),
+        };
+        let limits = crate::limits::Limits { backoff, ..crate::limits::small() };
+        let mut harness = Harness::configured(steps, &[], true, skein_sim::Config::calm().buffer, &limits);
+        harness.run_until_idle();
+        for action in actions {
+            match action {
+                Write(child, fd, data) => harness.write_child(harness.child_index(child), fd, &data),
+                Read(expected) => {
+                    let seed = harness.child_index(b"seed");
+                    let mut received = List::with_capacity(LINE_BYTES);
+                    // A pipe may return a short read; read again until the expected line is whole.
+                    for _ in 0..expected.len().max(1) {
+                        let most = u32::try_from(
+                            expected.len().saturating_sub(usize::try_from(received.len()).unwrap()).max(1),
+                        )
+                        .unwrap();
+                        let piece = harness.read_stdin(seed, most);
+                        for byte in &piece {
+                            received.push(*byte).unwrap();
+                        }
+                        if piece.is_empty() || usize::try_from(received.len()).unwrap() == expected.len() {
+                            break;
+                        }
+                    }
+                    assert_eq!(received.as_slice(), expected.as_ref(), "{name}: stdin");
+                }
+                End(child) => {
+                    let pid = harness.hosted.get(harness.child_index(child)).unwrap().pid;
+                    harness.sim.finish_service(pid, Exit::Code(0));
+                }
+                Action::WriteExit(child, data) => {
+                    let index = harness.child_index(child);
+                    harness.write_child(index, 1, &data);
+                    let pid = harness.hosted.get(index).unwrap().pid;
+                    harness.sim.finish_service(pid, Exit::Code(0));
+                }
+                Action::BrokenPipe => {
+                    let mut found = false;
+                    for entry in harness.sim.trace() {
+                        if let Event::Complete { result: Err(skein_io::kernel::Error::BrokenPipe), .. } = &entry.event {
+                            found = true;
+                        }
+                    }
+                    assert!(found, "{name}: the stdin write failed");
+                }
+                Advance => harness.sim.advance_to(harness.sim.now().saturating_add(Duration::from_millis(500))),
+                Stdout(expected) => assert_eq!(harness.stdout().as_ref(), expected.as_ref(), "{name}: stdout"),
+                Stderr(expected) => assert_eq!(harness.stderr().as_ref(), expected, "{name}: stderr"),
+                Spawns(child, expected) => assert_eq!(harness.spawn_times(child).len(), expected, "{name}: launches"),
+            }
+            harness.run_until_idle();
+        }
+        assert_eq!(harness.service.exit(), None, "{name}: link stdin alone can fail");
+        harness.terminate();
+        assert_eq!(harness.run_to_end(), Exit::Code(0), "{name}: stop");
         harness.sim.assert_quiescent(harness.pid);
         harness.sim.assert_no_open_fds(harness.pid);
     }

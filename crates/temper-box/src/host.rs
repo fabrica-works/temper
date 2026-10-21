@@ -17,7 +17,7 @@ use skein_lib::{
     Decimal, Duration, Env, List, Queue, Time, Token, Wall,
     stream::{Down, Read, Up},
 };
-use temper_forge_setup::Steps;
+use temper_forge_setup::{Kind, Steps};
 /// The descriptors and command inherited from the binary.
 #[derive(Debug)]
 pub struct Settings {
@@ -52,6 +52,9 @@ struct Child {
     process: Option<Token>,
     pipes: [Pipe; 2],
     spawn: bool,
+    hold: bool,
+    line: Option<Box<[u8]>>,
+    stdin: Option<Sink>,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Phase {
@@ -133,6 +136,9 @@ impl Service {
                     process: None,
                     pipes: [Pipe::new(lines::route(&settings.serve, step.name(), 1)), Pipe::new(false)],
                     spawn: false,
+                    hold: false,
+                    line: None,
+                    stdin: None,
                 })
                 .expect("one child per step");
             inputs = inputs.saturating_add(u64::try_from(step.name().len()).expect("name length"));
@@ -171,7 +177,8 @@ impl Service {
             .saturating_add(Sink::worst_case(entries, bounds.output).saturating_mul(2))
             .saturating_add(Sink::worst_case(reply_entries, limits.line_bytes))
             .saturating_add(u64::from(limits.line_bytes).saturating_mul(2))
-            .saturating_add(Records::worst_case(count));
+            .saturating_add(Records::worst_case(count))
+            .saturating_add(link_memory(&steps));
         Ok(Self {
             io,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: bounds },
@@ -208,26 +215,7 @@ impl Service {
         match event {
             Event::Shutdown { .. } => self.input(Input::Terminate),
             Event::Spawned { owner, child, pipes } => {
-                for (step, state) in self.children.iter_mut().enumerate() {
-                    if state.owner == Some(owner) {
-                        state.process = Some(child);
-                        for (pipe, token) in state.pipes.iter_mut().zip(&pipes) {
-                            pipe.token = Some(*token);
-                        }
-                        if self.steps.get(step).expect("step").step.name() == self.settings.serve.as_ref() {
-                            self.control = Some(Control {
-                                read: *pipes.get(2).expect("serve fd 3"),
-                                sink: Sink::new(*pipes.get(3).expect("serve fd 4"), self.reply_entries),
-                                reader: Reader::new(self.line_bytes),
-                                reading: false,
-                                ended: false,
-                                line: None,
-                            });
-                        }
-                        self.machine.input(self.env.now, Input::Started { step }, &mut self.orders);
-                        break;
-                    }
-                }
+                self.spawned(owner, child, &pipes);
             }
             Event::Exited { owner, exit } => {
                 for (step, state) in self.children.iter().enumerate() {
@@ -265,6 +253,11 @@ impl Service {
                     }
                 }
                 for (step, state) in self.children.iter_mut().enumerate() {
+                    if let Some(stdin) = &state.stdin
+                        && stdin.token == owner
+                    {
+                        state.stdin = None;
+                    }
                     if state.owner == Some(owner) {
                         let input = if state.process.take().is_some() {
                             Input::Closed { step }
@@ -300,6 +293,33 @@ impl Service {
             | Event::Window { .. } => {}
         }
     }
+    fn spawned(&mut self, owner: Token, child: Token, pipes: &[Token]) {
+        for (step, state) in self.children.iter_mut().enumerate() {
+            if state.owner == Some(owner) {
+                state.process = Some(child);
+                if self.steps.get(step).expect("step").step.kind() == Kind::Link {
+                    let mut sink = Sink::new(*pipes.get(2).expect("link stdin"), 1);
+                    sink.push(state.line.take().expect("link's first line")).expect("one entry");
+                    state.stdin = Some(sink);
+                }
+                for (pipe, token) in state.pipes.iter_mut().zip(pipes) {
+                    pipe.token = Some(*token);
+                }
+                if self.steps.get(step).expect("step").step.name() == self.settings.serve.as_ref() {
+                    self.control = Some(Control {
+                        read: *pipes.get(2).expect("serve fd 3"),
+                        sink: Sink::new(*pipes.get(3).expect("serve fd 4"), self.reply_entries),
+                        reader: Reader::new(self.line_bytes),
+                        reading: false,
+                        ended: false,
+                        line: None,
+                    });
+                }
+                self.machine.input(self.env.now, Input::Started { step }, &mut self.orders);
+                break;
+            }
+        }
+    }
     fn stream(&mut self, owner: Token, up: Up) {
         if let Some(control) = &mut self.control {
             if control.sink.token == owner {
@@ -332,8 +352,15 @@ impl Service {
                 return;
             }
         }
-        for state in &mut self.children {
-            for pipe in &mut state.pipes {
+        for (step, state) in self.children.iter_mut().enumerate() {
+            if let Some(stdin) = &mut state.stdin
+                && stdin.token == owner
+            {
+                // Only the link's exit decides success, even if it did not read.
+                stdin.up(up, &mut self.requests);
+                return;
+            }
+            for (fd, pipe) in state.pipes.iter_mut().enumerate() {
                 if pipe.token == Some(owner) {
                     pipe.reading = false;
                     match up {
@@ -343,6 +370,13 @@ impl Service {
                             self.requests.push(Request::Close { entity: owner });
                         }
                         Up::Room => {}
+                    }
+                    if fd == 0
+                        && let Some(line) = pipe.lines.first()
+                        && self.machine.outcome().is_none()
+                    {
+                        state.line = Some(line);
+                        self.machine.input(self.env.now, Input::Line { step }, &mut self.orders);
                     }
                     return;
                 }
@@ -381,7 +415,15 @@ impl Service {
                     }
                 }
             }
-            Order::Spawn { step } => self.children.get_mut(step).expect("machine step").spawn = true,
+            Order::Hold { step } => self.children.get_mut(step).expect("machine step").hold = true,
+            Order::Spawn { step } => {
+                if self.steps.get(step).expect("step").step.kind() == Kind::Link {
+                    let before = step.checked_sub(1).expect("link predecessor");
+                    let line = self.children.get_mut(before).expect("long step").line.take();
+                    self.children.get_mut(step).expect("link step").line = line;
+                }
+                self.children.get_mut(step).expect("machine step").spawn = true;
+            }
             Order::Signal { step } => {
                 if let Some(child) = self.children.get(step).expect("machine step").process {
                     self.requests.push(Request::Signal {
@@ -410,6 +452,9 @@ impl Service {
             if self.requests.room() < 6 {
                 break;
             }
+            if let Some(stdin) = &mut state.stdin {
+                stdin.tick(true, &mut self.requests);
+            }
             let description = &self.steps.get(step).expect("step state").step;
             for (fd, pipe) in state.pipes.iter_mut().enumerate() {
                 let plain = fd == 0 && lines::route(&self.settings.serve, description.name(), 1);
@@ -434,7 +479,7 @@ impl Service {
                     pipe.reading = true;
                 }
             }
-            let mut settled = true;
+            let mut settled = state.stdin.is_none();
             for pipe in &state.pipes {
                 settled &= pipe.settled();
             }
@@ -446,8 +491,15 @@ impl Service {
                 self.serial = self.serial.checked_add(1).expect("spawn serial");
                 let owner = Token::new(self.serial);
                 state.owner = Some(owner);
+                if description.kind() != Kind::Link {
+                    state.line = None;
+                }
                 for (fd, pipe) in state.pipes.iter_mut().enumerate() {
                     *pipe = Pipe::new(fd == 0 && lines::route(&self.settings.serve, description.name(), 1));
+                }
+                if state.hold {
+                    state.pipes.get_mut(0).expect("stdout").lines.hold();
+                    state.hold = false;
                 }
                 self.requests.push(Request::Spawn {
                     owner,
@@ -463,6 +515,12 @@ impl Service {
                                 kernel::Pipe { child: 2, way: kernel::Way::Out, parent: None },
                                 kernel::Pipe { child: 3, way: kernel::Way::Out, parent: None },
                                 kernel::Pipe { child: 4, way: kernel::Way::In, parent: None },
+                            ])
+                        } else if description.kind() == Kind::Link {
+                            Box::new([
+                                kernel::Pipe { child: 1, way: kernel::Way::Out, parent: None },
+                                kernel::Pipe { child: 2, way: kernel::Way::Out, parent: None },
+                                kernel::Pipe { child: 0, way: kernel::Way::In, parent: None },
                             ])
                         } else {
                             Box::new([
@@ -601,6 +659,15 @@ impl Service {
         }
     }
 }
+fn link_memory(steps: &[Placed]) -> u64 {
+    let mut memory = 0_u64;
+    for step in steps {
+        if step.step.kind() == Kind::Link {
+            memory = memory.saturating_add(u64::from(LINE_BYTES)).saturating_add(Sink::worst_case(1, LINE_BYTES));
+        }
+    }
+    memory
+}
 fn inherited_bytes(settings: &Settings, count: u32) -> u64 {
     let mut inputs = 0_u64;
     inputs = inputs.saturating_add(
@@ -620,12 +687,12 @@ fn inherited_bytes(settings: &Settings, count: u32) -> u64 {
     );
     inputs
 }
-/// Three entities per step, three inherited streams and two serve control pipes.
+/// Up to four entities per step, three inherited streams and two serve control pipes.
 /// Names and the configured control line bound extend the byte limits at construction.
 #[must_use]
 pub fn io_limits(steps: u32) -> io::Limits {
     io::Limits {
-        sockets: steps.checked_mul(3).expect("bounded step count").checked_add(5).expect("inherited streams"),
+        sockets: steps.checked_mul(4).expect("bounded step count").checked_add(5).expect("inherited streams"),
         names: 0,
         refusals: steps.max(1),
         intake: LINE_BYTES,
@@ -757,6 +824,11 @@ impl skein_shell::Host for Service {
             }
         }
         for (step, state) in self.children.iter().enumerate() {
+            if let Some(stdin) = &state.stdin
+                && (stdin.pending() || stdin.needs_flush())
+            {
+                return true;
+            }
             let description = &self.steps.get(step).expect("step state").step;
             for (fd, pipe) in state.pipes.iter().enumerate() {
                 let plain = fd == 0 && lines::route(&self.settings.serve, description.name(), 1);
@@ -767,7 +839,7 @@ impl skein_shell::Host for Service {
                     return true;
                 }
             }
-            let mut settled = true;
+            let mut settled = state.stdin.is_none();
             for pipe in &state.pipes {
                 settled &= pipe.settled();
             }

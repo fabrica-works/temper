@@ -10,6 +10,7 @@ pub fn route(plain: &[u8], step: &[u8], child_fd: u32) -> bool {
 #[derive(Debug)]
 pub struct Lines {
     plain: bool,
+    holding: bool,
     chunk: Box<[u8]>,
     position: usize,
     piece: List<u8>,
@@ -18,7 +19,34 @@ pub struct Lines {
 impl Lines {
     #[must_use]
     pub fn new(plain: bool) -> Self {
-        Self { plain, chunk: Box::new([]), position: 0, piece: List::with_capacity(LINE_BYTES), ended: false }
+        Self {
+            plain,
+            holding: false,
+            chunk: Box::new([]),
+            position: 0,
+            piece: List::with_capacity(LINE_BYTES),
+            ended: false,
+        }
+    }
+    /// Keep the next complete first line apart from ordinary output.
+    pub fn hold(&mut self) {
+        self.holding = true;
+    }
+    /// Consumes at most one bounded chunk; EOF releases an incomplete line.
+    pub fn first(&mut self) -> Option<Box<[u8]>> {
+        if !self.holding {
+            return None;
+        }
+        if self.fill_piece() {
+            self.holding = false;
+            let first = skein_lib::bytes::copy_of(self.piece.as_slice());
+            self.piece.clear();
+            return Some(first);
+        }
+        if self.ended {
+            self.holding = false;
+        }
+        None
     }
     pub fn push(&mut self, bytes: Box<[u8]>) {
         assert!(self.chunk.is_empty(), "one chunk per pipe");
@@ -41,12 +69,37 @@ impl Lines {
         self.chunk.is_empty() && self.piece.is_empty()
     }
     pub fn take(&mut self, name: &[u8]) -> Option<Box<[u8]>> {
+        if self.holding {
+            return None;
+        }
         if self.plain {
+            if !self.piece.is_empty() {
+                let output = skein_lib::bytes::copy_of(self.piece.as_slice());
+                self.piece.clear();
+                return Some(output);
+            }
             if self.chunk.is_empty() {
                 return None;
             }
-            return Some(core::mem::replace(&mut self.chunk, Box::new([])));
+            let output = if self.position == 0 {
+                core::mem::replace(&mut self.chunk, Box::new([]))
+            } else {
+                let output = skein_lib::bytes::copy_of(self.chunk.get(self.position..).expect("remaining chunk"));
+                self.chunk = Box::new([]);
+                output
+            };
+            self.position = 0;
+            return Some(output);
         }
+        let complete = self.fill_piece();
+        if !complete && (!self.ended || self.piece.is_empty()) {
+            return None;
+        }
+        let output = joined(&[name, b": ", self.piece.as_slice()]);
+        self.piece.clear();
+        Some(output)
+    }
+    fn fill_piece(&mut self) -> bool {
         let mut complete = false;
         for byte in self.chunk.iter().skip(self.position) {
             self.piece.push(*byte).expect("line cap checked after each byte");
@@ -60,12 +113,7 @@ impl Lines {
             self.chunk = Box::new([]);
             self.position = 0;
         }
-        if !complete && (!self.ended || self.piece.is_empty()) {
-            return None;
-        }
-        let output = joined(&[name, b": ", self.piece.as_slice()]);
-        self.piece.clear();
-        Some(output)
+        complete
     }
 }
 pub(crate) fn joined(parts: &[&[u8]]) -> Box<[u8]> {

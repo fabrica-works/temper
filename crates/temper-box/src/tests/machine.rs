@@ -464,3 +464,252 @@ fn asked_groups_follow_their_chains_records_failures_and_stop() {
     assert_eq!(placed.len(), 8);
     assert_eq!(placed[6].asked, Some(Asked { forge: 4, stage: Stage::Prepare }));
 }
+
+#[test]
+#[expect(clippy::too_many_lines, reason = "protocol/setup.md 13.1 link behaviours share one transition table")]
+fn a_link_takes_the_first_line_once_across_restarts_and_stop() {
+    use super::fixtures::step;
+    use crate::{
+        layout,
+        machine::{Machine, Said},
+    };
+    use skein_lib::{Queue, Time};
+    use temper_forge_setup::{Group, Stage, Steps};
+    #[derive(Clone, Copy, Debug)]
+    enum Action {
+        Input(Input),
+        Fire(u64),
+    }
+    use Action::{Fire as F, Input as I};
+    use Input::{Ask, Closed, Exited, Line, Started, Terminate};
+    use Order::{Close, Hold, Say, Signal, Spawn};
+    const PREPARE: usize = 0;
+    const FORGE: usize = 1;
+    const SERVE: usize = 2;
+    const SEED: usize = 3;
+    type Rows = Box<[(Action, Box<[Order]>)]>;
+    fn append(prefix: &Rows, rows: &[(Action, Box<[Order]>)]) -> Rows {
+        let mut result = skein_lib::List::with_capacity(u32::try_from(prefix.len() + rows.len()).unwrap());
+        for row in prefix {
+            result.push(row.clone()).unwrap();
+        }
+        for row in rows {
+            result.push(row.clone()).unwrap();
+        }
+        result.into_boxed()
+    }
+    let startup: Rows = Box::new([
+        (I(Started { step: PREPARE }), Box::new([])),
+        (I(Exited { step: PREPARE, exit: Exit::Code(0) }), Box::new([Close { step: PREPARE }])),
+        (I(Closed { step: PREPARE }), Box::new([Spawn { step: FORGE }])),
+        (I(Started { step: FORGE }), Box::new([Hold { step: SERVE }, Spawn { step: SERVE }])),
+        (I(Started { step: SERVE }), Box::new([])),
+    ]);
+    let linked = append(
+        &startup,
+        &[
+            (I(Line { step: SERVE }), Box::new([Spawn { step: SEED }])),
+            (I(Started { step: SEED }), Box::new([])),
+            (I(Line { step: SERVE }), Box::new([])),
+        ],
+    );
+    let mut stopping: Rows = Box::new([(I(Terminate), Box::new([Signal { step: SEED }]))]);
+    for (index, step) in [SEED, SERVE, FORGE].into_iter().enumerate() {
+        let first = u64::try_from(index).unwrap() * 20_000;
+        stopping = append(
+            &stopping,
+            &[
+                (F(first + 10_000), Box::new([Signal { step }])),
+                (F(first + 20_000), Box::new([Close { step }])),
+                (I(Closed { step }), if step == FORGE { Box::new([]) } else { Box::new([Signal { step: step - 1 }]) }),
+            ],
+        );
+    }
+    let cases = [
+        (
+            "success then ask",
+            append(
+                &linked,
+                &[
+                    (I(Exited { step: SEED, exit: Exit::Code(0) }), Box::new([Close { step: SEED }])),
+                    (I(Closed { step: SEED }), Box::new([])),
+                    (I(Ask { forge: 3 }), Box::new([Spawn { step: 4 }, Say { said: Said::Step { step: 4 } }])),
+                ],
+            ),
+            None,
+        ),
+        (
+            "seed failure",
+            append(
+                &linked,
+                &[
+                    (I(Exited { step: SEED, exit: Exit::Code(1) }), Box::new([Close { step: SEED }])),
+                    (I(Closed { step: SEED }), Box::new([Signal { step: SERVE }])),
+                ],
+            ),
+            Some(Outcome::GaveUp { step: SEED, restarts: 0 }),
+        ),
+        (
+            "exit before line",
+            append(
+                &startup,
+                &[
+                    (I(Exited { step: SERVE, exit: Exit::Code(1) }), Box::new([Close { step: SERVE }])),
+                    (I(Closed { step: SERVE }), Box::new([])),
+                    (F(500), Box::new([Hold { step: SERVE }, Spawn { step: SERVE }])),
+                    (I(Started { step: SERVE }), Box::new([])),
+                    (I(Line { step: SERVE }), Box::new([Spawn { step: SEED }])),
+                ],
+            ),
+            None,
+        ),
+        (
+            "exit after line",
+            append(
+                &linked,
+                &[
+                    (I(Exited { step: SERVE, exit: Exit::Code(1) }), Box::new([Close { step: SERVE }])),
+                    (I(Closed { step: SERVE }), Box::new([])),
+                    (F(500), Box::new([Spawn { step: SERVE }])),
+                    (I(Started { step: SERVE }), Box::new([])),
+                    (I(Line { step: SERVE }), Box::new([])),
+                ],
+            ),
+            None,
+        ),
+        (
+            "line after exit",
+            append(
+                &startup,
+                &[
+                    (I(Exited { step: SERVE, exit: Exit::Code(1) }), Box::new([Close { step: SERVE }])),
+                    (I(Line { step: SERVE }), Box::new([Spawn { step: SEED }])),
+                    (I(Closed { step: SERVE }), Box::new([])),
+                    (F(500), Box::new([Spawn { step: SERVE }])),
+                    (I(Started { step: SERVE }), Box::new([])),
+                    (I(Line { step: SERVE }), Box::new([])),
+                ],
+            ),
+            None,
+        ),
+        (
+            "line after closed",
+            append(
+                &startup,
+                &[
+                    (I(Exited { step: SERVE, exit: Exit::Code(1) }), Box::new([Close { step: SERVE }])),
+                    (I(Closed { step: SERVE }), Box::new([])),
+                    (I(Line { step: SERVE }), Box::new([Spawn { step: SEED }])),
+                    (F(500), Box::new([Spawn { step: SERVE }])),
+                ],
+            ),
+            None,
+        ),
+        (
+            "forge restart while seed runs",
+            append(
+                &linked,
+                &[
+                    (I(Exited { step: FORGE, exit: Exit::Code(1) }), Box::new([Close { step: FORGE }])),
+                    (I(Closed { step: FORGE }), Box::new([])),
+                    (F(500), Box::new([Spawn { step: PREPARE }])),
+                    (I(Started { step: PREPARE }), Box::new([])),
+                    (I(Exited { step: PREPARE, exit: Exit::Code(0) }), Box::new([Close { step: PREPARE }])),
+                    (I(Closed { step: PREPARE }), Box::new([Spawn { step: FORGE }])),
+                    (I(Started { step: FORGE }), Box::new([])),
+                ],
+            ),
+            None,
+        ),
+        ("stop running seed", append(&linked, &stopping), Some(Outcome::Stopped)),
+        (
+            "stop before line",
+            append(
+                &startup,
+                &[(I(Terminate), Box::new([Signal { step: SERVE }])), (I(Line { step: SERVE }), Box::new([]))],
+            ),
+            Some(Outcome::Stopped),
+        ),
+    ];
+    for (name, script, outcome) in cases {
+        let steps = layout::flatten(Steps {
+            always: Box::new([
+                step(b"prepare", Kind::Once),
+                step(b"forge", Kind::Long),
+                step(b"serve", Kind::Long),
+                step(b"seed", Kind::Link),
+            ]),
+            asked: Box::new([Group {
+                forge: 3,
+                before: 4,
+                steps: Box::new([
+                    (Stage::Prepare, step(b"prepare 3", Kind::Once)),
+                    (Stage::Run, step(b"forge 3", Kind::Long)),
+                ]),
+            }]),
+        });
+        let mut machine = Machine::new(&limits::small(), &steps).unwrap();
+        let mut out = Queue::with_capacity(machine.max_out());
+        let mut now = Time::ZERO;
+        machine.start(now, &[], &mut out);
+        assert_eq!(out.pop(), Some(Spawn { step: PREPARE }), "{name}");
+        assert!(out.is_empty());
+        for (action, expected) in script {
+            match action {
+                I(input) => machine.input(now, input, &mut out),
+                F(ms) => {
+                    now = Time::ZERO.saturating_add(Duration::from_millis(ms));
+                    machine.fire(now, &mut out);
+                }
+            }
+            let mut got = skein_lib::List::with_capacity(out.len());
+            for _ in 0..out.len() {
+                got.push(out.pop().unwrap()).unwrap();
+            }
+            assert_eq!(got.as_slice(), expected.as_ref(), "{name}: {action:?}");
+        }
+        assert_eq!(machine.outcome(), outcome, "{name}");
+    }
+}
+
+fn check_link_placement(steps: &[crate::layout::Placed]) {
+    crate::machine::Machine::new(&limits::small(), steps).unwrap();
+}
+#[test]
+#[should_panic(expected = "a link is not first")]
+fn a_link_cannot_be_first() {
+    check_link_placement(&[crate::layout::Placed { step: super::fixtures::step(b"seed", Kind::Link), asked: None }]);
+}
+#[test]
+#[should_panic(expected = "a link is outside groups")]
+fn a_link_cannot_belong_to_a_group() {
+    use crate::layout::{Asked, Placed};
+    check_link_placement(&[
+        Placed { step: super::fixtures::step(b"serve", Kind::Long), asked: None },
+        Placed {
+            step: super::fixtures::step(b"seed", Kind::Link),
+            asked: Some(Asked { forge: 3, stage: temper_forge_setup::Stage::Run }),
+        },
+    ]);
+}
+#[test]
+#[should_panic(expected = "a link follows a long step")]
+fn a_link_cannot_follow_a_once_step() {
+    use crate::layout::Placed;
+    check_link_placement(&[
+        Placed { step: super::fixtures::step(b"prepare", Kind::Once), asked: None },
+        Placed { step: super::fixtures::step(b"seed", Kind::Link), asked: None },
+    ]);
+}
+#[test]
+#[should_panic(expected = "a link's long step is outside groups")]
+fn a_link_cannot_follow_a_group_step() {
+    use crate::layout::{Asked, Placed};
+    check_link_placement(&[
+        Placed {
+            step: super::fixtures::step(b"serve", Kind::Long),
+            asked: Some(Asked { forge: 3, stage: temper_forge_setup::Stage::Run }),
+        },
+        Placed { step: super::fixtures::step(b"seed", Kind::Link), asked: None },
+    ]);
+}

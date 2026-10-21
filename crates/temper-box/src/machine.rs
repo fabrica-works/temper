@@ -9,6 +9,7 @@ use temper_forge_setup::Kind;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Input {
     Started { step: usize },
+    Line { step: usize },
     NotStarted { step: usize },
     Exited { step: usize, exit: Exit },
     Closed { step: usize },
@@ -20,6 +21,7 @@ pub enum Input {
 /// Effects requested of the host.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Order {
+    Hold { step: usize },
     Spawn { step: usize },
     Signal { step: usize },
     Close { step: usize },
@@ -77,7 +79,7 @@ enum Phase {
 }
 #[derive(Debug)]
 pub(crate) struct State {
-    long: bool,
+    kind: Kind,
     group: Option<usize>,
     phase: Phase,
     exits: Queue<Time>,
@@ -99,6 +101,13 @@ impl Machine {
         let mut states = List::with_capacity(u32::try_from(steps.len()).expect("steps fit u32"));
         let mut groups = List::with_capacity(u32::try_from(steps.len()).expect("bounded groups"));
         for (index, step) in steps.iter().enumerate() {
+            if step.step.kind() == Kind::Link {
+                assert!(step.asked.is_none(), "a link is outside groups");
+                let before = index.checked_sub(1).expect("a link is not first");
+                let previous = steps.get(before).expect("preceding step");
+                assert!(previous.step.kind() == Kind::Long, "a link follows a long step");
+                assert!(previous.asked.is_none(), "a link's long step is outside groups");
+            }
             let group = match step.asked {
                 Some(asked) => {
                     let last = groups.len().checked_sub(1);
@@ -131,7 +140,7 @@ impl Machine {
             };
             states
                 .push(State {
-                    long: step.step.kind() == Kind::Long,
+                    kind: step.step.kind(),
                     group,
                     phase: Phase::Dormant,
                     exits: Queue::with_capacity(limits.restarts.saturating_add(1)),
@@ -196,6 +205,12 @@ impl Machine {
         }
     }
     fn spawn(&mut self, step: usize, next: Option<usize>, orders: &mut Queue<Order>) {
+        if let Some(next) = next
+            && self.states.get(next).expect("next step").kind == Kind::Link
+            && self.states.get(next).expect("next step").phase == Phase::Dormant
+        {
+            orders.push(Order::Hold { step });
+        }
         if let Some(state) = self.states.get_mut(step) {
             state.phase = Phase::Starting { next };
             orders.push(Order::Spawn { step });
@@ -223,6 +238,7 @@ impl Machine {
                     self.fail(group, Why::NotWritten, orders);
                 }
             }
+            Input::Line { step } => self.line(step, orders),
             Input::Started { step } => self.started(now, step, orders),
             Input::NotStarted { step } => {
                 if self.outcome.is_none()
@@ -251,7 +267,7 @@ impl Machine {
             Input::Exited { step, exit } => {
                 if self.outcome.is_none()
                     && let Some(group) = self.starting_group(step)
-                    && (self.states.get(step).expect("step").long || exit != Exit::Code(0))
+                    && (self.states.get(step).expect("step").kind == Kind::Long || exit != Exit::Code(0))
                 {
                     self.fail(group, Why::Exited { step, exit }, orders);
                 } else {
@@ -283,14 +299,19 @@ impl Machine {
                             orders.push(Order::Close { step });
                         }
                         Status::Starting => {
-                            if self.states.get(step).expect("step").long {
+                            if self.states.get(step).expect("step").kind == Kind::Long {
                                 self.states.get_mut(step).expect("step").phase = Phase::Live { next: None };
                                 self.advance_group(group, next, orders);
                             }
                         }
                         Status::Dormant | Status::Recording { .. } | Status::Started => {}
                     }
-                } else if self.states.get(step).expect("step").long {
+                } else if self.states.get(step).expect("step").kind == Kind::Long {
+                    if let Some(next) = next
+                        && self.states.get(next).expect("next step").kind == Kind::Link
+                    {
+                        return;
+                    }
                     self.states.get_mut(step).expect("step").phase = Phase::Live { next: None };
                     if let Some(next) = next {
                         self.spawn(next, self.continuation(next), orders);
@@ -305,6 +326,38 @@ impl Machine {
             | Phase::Grace { .. }
             | Phase::Stopped => {}
         }
+    }
+    fn line(&mut self, step: usize, orders: &mut Queue<Order>) {
+        if self.outcome.is_some() {
+            return;
+        }
+        let Some(state) = self.states.get(step) else { return };
+        if state.kind != Kind::Long {
+            return;
+        }
+        let next = match state.phase {
+            Phase::Waiting { next }
+            | Phase::Live { next }
+            | Phase::Closing { next, .. }
+            | Phase::Backoff { next, .. } => next,
+            Phase::Dormant | Phase::Starting { .. } | Phase::Grace { .. } | Phase::Stopped => None,
+        };
+        let Some(link) = next else { return };
+        let state = self.states.get(link).expect("next step");
+        if state.kind != Kind::Link || state.phase != Phase::Dormant {
+            return;
+        }
+        let state = self.states.get_mut(step).expect("long step");
+        match &mut state.phase {
+            Phase::Waiting { next }
+            | Phase::Live { next }
+            | Phase::Closing { next, .. }
+            | Phase::Backoff { next, .. } => *next = None,
+            Phase::Dormant | Phase::Starting { .. } | Phase::Grace { .. } | Phase::Stopped => {
+                unreachable!("checked phase")
+            }
+        }
+        self.spawn(link, self.continuation(link), orders);
     }
     fn exited(&mut self, step: usize, success: bool, orders: &mut Queue<Order>) {
         let Some(state) = self.states.get_mut(step) else {
@@ -341,7 +394,7 @@ impl Machine {
                         Status::Starting => self.advance_group(group, next, orders),
                         Status::Dormant | Status::Recording { .. } | Status::Started => {}
                     }
-                } else if self.states.get(step).expect("step").long {
+                } else if self.states.get(step).expect("step").kind == Kind::Long {
                     self.restart(now, step, next, orders);
                 } else if success {
                     if let Some(next) = next {
@@ -414,7 +467,7 @@ impl Machine {
         let mut written = false;
         for step in group.first..group.end {
             let state = self.states.get(step).expect("group step");
-            if state.long
+            if state.kind == Kind::Long
                 && match state.phase {
                     Phase::Live { .. } => true,
                     Phase::Dormant
@@ -430,7 +483,7 @@ impl Machine {
             }
         }
         let needs_record = match next {
-            Some(step) => self.states.get(step).expect("step").long && !written,
+            Some(step) => self.states.get(step).expect("step").kind == Kind::Long && !written,
             None => !written,
         };
         if needs_record {
@@ -609,7 +662,7 @@ impl Machine {
                         if self.chain(before) != self.chain(step) {
                             continue;
                         }
-                        if self.states.get(before).expect("bounded step").long {
+                        if self.states.get(before).expect("bounded step").kind != Kind::Once {
                             break;
                         }
                         first = before;

@@ -110,7 +110,6 @@ pub fn once(name: &[u8], arguments: &[&[u8]]) -> Step {
 pub fn long(name: &[u8], arguments: &[&[u8]]) -> Step {
     command(name, arguments, Kind::Long)
 }
-#[expect(dead_code, reason = "the next change adds the link host tests")]
 pub fn link(name: &[u8], arguments: &[&[u8]]) -> Step {
     command(name, arguments, Kind::Link)
 }
@@ -132,6 +131,8 @@ pub struct Launch {
 }
 #[derive(Debug)]
 pub struct Hosted {
+    pub name: Box<[u8]>,
+    pub stdio: [Option<Fd>; 3],
     pub pid: Pid,
     pub descriptors: Box<[Fd]>,
     pub closed: bool,
@@ -147,6 +148,7 @@ pub struct Harness {
     pub machine: FakeMachine,
     pub signals: Fd,
     pub stderr: Fd,
+    pub stdout: Fd,
     pub calls: Queue<Call>,
     pub answers: Queue<Answer>,
     pub stubborn: bool,
@@ -173,6 +175,15 @@ impl Harness {
         stubborn: bool,
         buffer: u32,
     ) -> Self {
+        Self::configured(steps, items, stubborn, buffer, &limits::small())
+    }
+    pub fn configured(
+        steps: temper_forge_setup::Steps,
+        items: &[skein_fake_machine::Item],
+        stubborn: bool,
+        buffer: u32,
+        limits: &limits::Limits,
+    ) -> Self {
         let mut config = Config::calm();
         config.buffer = buffer;
         let mut sim = Sim::new(0x12_02, config);
@@ -192,7 +203,7 @@ impl Harness {
             stdout,
             stderr,
         };
-        let service = Service::new(&limits::small(), steps, settings).expect("valid limits");
+        let service = Service::new(limits, steps, settings).expect("valid limits");
         Self {
             sim,
             pid,
@@ -201,6 +212,7 @@ impl Harness {
             machine,
             signals,
             stderr,
+            stdout,
             calls: Queue::with_capacity(64),
             answers: Queue::with_capacity(64),
             stubborn,
@@ -258,7 +270,11 @@ impl Harness {
                 let mut descriptors = List::with_capacity(5);
                 let mut input = None;
                 let mut output = None;
+                let mut stdio = [None; 3];
                 for (number, fd) in inherited {
+                    if let Some(slot) = stdio.get_mut(usize::try_from(number).unwrap()) {
+                        *slot = Some(fd);
+                    }
                     if number == 3 {
                         output = Some(fd);
                     }
@@ -275,8 +291,17 @@ impl Harness {
                     }
                 }
                 descriptors.push(self.sim.open_signal_source(pid)).expect("child signal source");
+                let Op::Spawn { spawn } = &complete.kind else { panic!("hosted spawn") };
                 self.hosted
-                    .push(Hosted { pid, descriptors: descriptors.into_boxed(), closed: false, input, output })
+                    .push(Hosted {
+                        name: spawn.args.last().unwrap().clone(),
+                        stdio,
+                        pid,
+                        descriptors: descriptors.into_boxed(),
+                        closed: false,
+                        input,
+                        output,
+                    })
                     .expect("bounded hosted children");
             }
         }
@@ -376,8 +401,34 @@ impl Harness {
     }
     pub fn read_reply(&mut self, most: u32) -> Box<[u8]> {
         let child = self.hosted.get(self.serve_index()).unwrap();
-        let pid = child.pid;
-        let fd = child.input.unwrap();
+        self.read_pipe(child.pid, child.input.unwrap(), most)
+    }
+    pub fn child_index(&self, name: &[u8]) -> u32 {
+        for index in (0..self.hosted.len()).rev() {
+            let child = self.hosted.get(index).unwrap();
+            if child.name.as_ref() == name && !child.closed {
+                return index;
+            }
+        }
+        panic!("live hosted child")
+    }
+    pub fn write_child(&mut self, index: u32, number: usize, data: &[u8]) {
+        let child = self.hosted.get(index).unwrap();
+        let mut submissions = Queue::with_capacity(1);
+        submissions.push(Submit {
+            op: Token::new(102),
+            kind: Op::PipeWrite { fd: child.stdio[number].unwrap(), bytes: bytes::copy_of(data), from: 0 },
+        });
+        self.sim.submit(child.pid, &mut submissions);
+        let mut completions = Queue::with_capacity(1);
+        self.sim.reap(child.pid, &mut completions);
+        assert_eq!(completions.pop().unwrap().result, Ok(Done::Count(u32::try_from(data.len()).unwrap())));
+    }
+    pub fn read_stdin(&mut self, index: u32, most: u32) -> Box<[u8]> {
+        let child = self.hosted.get(index).unwrap();
+        self.read_pipe(child.pid, child.stdio[0].unwrap(), most)
+    }
+    fn read_pipe(&mut self, pid: Pid, fd: Fd, most: u32) -> Box<[u8]> {
         let mut submissions = Queue::with_capacity(1);
         submissions.push(Submit {
             op: Token::new(101),
@@ -416,6 +467,9 @@ impl Harness {
             }
         }
         times.into_boxed()
+    }
+    pub fn stdout(&mut self) -> Box<[u8]> {
+        self.sim.peer_drain(self.pid, self.stdout, 65_536).into_boxed_slice()
     }
     pub fn stderr(&mut self) -> Box<[u8]> {
         self.sim.peer_drain(self.pid, self.stderr, 65_536).into_boxed_slice()
