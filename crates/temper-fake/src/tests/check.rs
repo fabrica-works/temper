@@ -535,3 +535,82 @@ fn reasons() -> [(Why, Reason); 5] {
         (Why::Unforwarded, Reason::ObservationsUnforwarded),
     ]
 }
+
+fn stderr_evidence(
+    prefix: &[u8],
+    allowed: Box<[Allowance]>,
+    decisions: &[(u64, u64)],
+    complete: bool,
+) -> check::Evidence {
+    check::Evidence {
+        profile: Profile {
+            client: 7,
+            marker: (Box::from(b"<!-- temper:key ".as_slice()), Box::from(b" -->\n".as_slice())),
+            owned_branches: Box::new([prefix.into()]),
+            allowed,
+            bounds: skein_fake_forge_domain::promises::Bounds { objects: check::OBJECTS, decisions: 1 },
+        },
+        decisions: decisions
+            .iter()
+            .map(|(number, head)| Decision {
+                repository: b"demo/widget".as_slice().into(),
+                number: *number,
+                head: *head,
+            })
+            .collect(),
+        complete,
+    }
+}
+#[test]
+fn stderr() {
+    enum Input {
+        Boundary(u64, u64),
+        Evidence(check::Evidence),
+    }
+    let allowed = || Box::from([Allowance::Comment, Allowance::Merge, Allowance::Close]);
+    for (name, input, expected) in [
+        ("boundary", Input::Boundary(3, 0), "{\"boundary\":{\"lines\":3,\"lost\":0}}\n"),
+        (
+            "profile",
+            Input::Evidence(stderr_evidence(b"temper/", allowed(), &[], true)),
+            "{\"profile\":{\"client\":7,\"marker\":[\"<!-- temper:key \",\" -->\\n\"],\"owned_branches\":[\"temper/\"],\"allowed\":[\"comment\",\"merge\",\"close\"],\"bounds\":{\"objects\":256,\"decisions\":1}},\"decisions_complete\":true}\n",
+        ),
+        (
+            "two decisions incomplete",
+            Input::Evidence(stderr_evidence(b"temper/", allowed(), &[(9, 2), (1, 3)], false)),
+            concat!(
+                "{\"profile\":{\"client\":7,\"marker\":[\"<!-- temper:key \",\" -->\\n\"],\"owned_branches\":[\"temper/\"],\"allowed\":[\"comment\",\"merge\",\"close\"],\"bounds\":{\"objects\":256,\"decisions\":1}},\"decisions_complete\":false}\n",
+                "{\"decision\":{\"repository\":\"demo/widget\",\"number\":9,\"head\":2}}\n",
+                "{\"decision\":{\"repository\":\"demo/widget\",\"number\":1,\"head\":3}}\n"
+            ),
+        ),
+        (
+            "every allowance",
+            Input::Evidence(stderr_evidence(
+                b"temper/",
+                Box::new([
+                    Allowance::Comment,
+                    Allowance::Review,
+                    Allowance::Request,
+                    Allowance::Merge,
+                    Allowance::Close,
+                    Allowance::Labels(b"a\"label".as_slice().into()),
+                ]),
+                &[],
+                true,
+            )),
+            "{\"profile\":{\"client\":7,\"marker\":[\"<!-- temper:key \",\" -->\\n\"],\"owned_branches\":[\"temper/\"],\"allowed\":[\"comment\",\"review\",\"request\",\"merge\",\"close\",{\"labels\":\"a\\\"label\"}],\"bounds\":{\"objects\":256,\"decisions\":1}},\"decisions_complete\":true}\n",
+        ),
+        (
+            "non UTF-8 prefix",
+            Input::Evidence(stderr_evidence(b"temper/\xff\xfe", allowed(), &[], true)),
+            "{\"profile\":{\"client\":7,\"marker\":[\"<!-- temper:key \",\" -->\\n\"],\"owned_branches\":[\"temper/��\"],\"allowed\":[\"comment\",\"merge\",\"close\"],\"bounds\":{\"objects\":256,\"decisions\":1}},\"decisions_complete\":true}\n",
+        ),
+    ] {
+        let found = match input {
+            Input::Boundary(lines, lost) => check::boundary_line(lines, lost),
+            Input::Evidence(evidence) => check::evidence_lines(&evidence),
+        };
+        assert_eq!(found.as_ref(), expected.as_bytes(), "{name}");
+    }
+}

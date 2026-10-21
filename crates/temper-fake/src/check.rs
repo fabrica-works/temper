@@ -297,3 +297,141 @@ fn encode(breach: Option<&Breach>, text: &str, out: &mut Encoder) {
     out.string(text.as_bytes());
     out.object_end();
 }
+
+/// The observations' boundary, the check's first stderr line.
+#[must_use]
+pub fn boundary_line(lines: u64, lost: u64) -> Box<[u8]> {
+    let limits = Limits { depth: 2, length: u32::MAX };
+    let mut measure = Encoder::measure(&limits);
+    encode_boundary(lines, lost, &mut measure);
+    let mut write = Encoder::write(measure.measured().expect("boundary fits JSON length"), &limits);
+    encode_boundary(lines, lost, &mut write);
+    terminated(write)
+}
+fn encode_boundary(lines: u64, lost: u64, out: &mut Encoder) {
+    out.object_start();
+    out.key(b"boundary");
+    out.object_start();
+    out.key(b"lines");
+    out.unsigned(lines);
+    out.key(b"lost");
+    out.unsigned(lost);
+    out.object_end();
+    out.object_end();
+}
+
+/// The profile, then one line per decision, in the evidence's order.
+#[must_use]
+pub fn evidence_lines(evidence: &Evidence) -> Box<[u8]> {
+    let limits = Limits { depth: 4, length: u32::MAX };
+    let mut measure = Encoder::measure(&limits);
+    encode_profile(evidence, &mut measure);
+    let mut write = Encoder::write(measure.measured().expect("profile fits JSON length"), &limits);
+    encode_profile(evidence, &mut write);
+    let profile = terminated(write);
+    let count = u32::try_from(evidence.decisions.len()).expect("bounded decisions");
+    let mut lines = List::with_capacity(count);
+    let mut size = profile.len();
+    for decision in &evidence.decisions {
+        let mut measure = Encoder::measure(&limits);
+        encode_decision(decision, &mut measure);
+        let mut write = Encoder::write(measure.measured().expect("decision fits JSON length"), &limits);
+        encode_decision(decision, &mut write);
+        let line = terminated(write);
+        size = size.checked_add(line.len()).expect("evidence fits address space");
+        lines.push(line).expect("one line per decision");
+    }
+    let mut out = Writer::new(size);
+    out.put(&profile).expect("sized evidence");
+    for line in &lines {
+        out.put(line).expect("sized evidence");
+    }
+    out.finish()
+}
+fn terminated(write: Encoder) -> Box<[u8]> {
+    let bytes = write.finish();
+    let mut out = Writer::new(bytes.len().checked_add(1).expect("room for newline"));
+    out.put(&bytes).expect("sized line");
+    out.put(b"\n").expect("sized line");
+    out.finish()
+}
+// Evidence is for people, never input. Keep malformed names readable while
+// supplying the JSON encoder only valid UTF-8, with room measured first.
+fn readable(bytes: &[u8], out: &mut Encoder) {
+    let mut size = 0usize;
+    for chunk in bytes.utf8_chunks() {
+        size = size.checked_add(chunk.valid().len()).expect("text fits address space");
+        if !chunk.invalid().is_empty() {
+            size = size.checked_add(3).expect("room for replacement character");
+        }
+    }
+    let mut text = Writer::new(size);
+    for chunk in bytes.utf8_chunks() {
+        text.put(chunk.valid().as_bytes()).expect("sized text");
+        if !chunk.invalid().is_empty() {
+            text.put("\u{fffd}".as_bytes()).expect("sized text");
+        }
+    }
+    out.string(&text.finish());
+}
+fn encode_profile(evidence: &Evidence, out: &mut Encoder) {
+    let profile = &evidence.profile;
+    out.object_start();
+    out.key(b"profile");
+    out.object_start();
+    out.key(b"client");
+    out.unsigned(profile.client);
+    out.key(b"marker");
+    out.array_start();
+    readable(&profile.marker.0, out);
+    readable(&profile.marker.1, out);
+    out.array_end();
+    out.key(b"owned_branches");
+    out.array_start();
+    for prefix in &profile.owned_branches {
+        readable(prefix, out);
+    }
+    out.array_end();
+    out.key(b"allowed");
+    out.array_start();
+    for allowance in &profile.allowed {
+        match allowance {
+            Allowance::Comment => out.string(b"comment"),
+            Allowance::Review => out.string(b"review"),
+            Allowance::Request => out.string(b"request"),
+            Allowance::Merge => out.string(b"merge"),
+            Allowance::Close => out.string(b"close"),
+            Allowance::Labels(name) => {
+                out.object_start();
+                out.key(b"labels");
+                readable(name, out);
+                out.object_end();
+            }
+        }
+    }
+    out.array_end();
+    out.key(b"bounds");
+    out.object_start();
+    out.key(b"objects");
+    out.unsigned(u64::from(profile.bounds.objects));
+    out.key(b"decisions");
+    out.unsigned(u64::from(profile.bounds.decisions));
+    out.object_end();
+    out.object_end();
+    out.key(b"decisions_complete");
+    out.boolean(evidence.complete);
+    out.object_end();
+}
+fn encode_decision(decision: &Decision, out: &mut Encoder) {
+    out.object_start();
+    out.key(b"decision");
+    out.object_start();
+    out.key(b"repository");
+    readable(&decision.repository, out);
+    out.key(b"number");
+    out.unsigned(decision.number);
+    out.key(b"head");
+    out.unsigned(decision.head);
+    out.object_end();
+    out.object_end();
+}
