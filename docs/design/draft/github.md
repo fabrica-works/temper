@@ -603,7 +603,9 @@ token makes an App:
 
 Run on 2026-10-20 with a throwaway public App, `temper-probe-d0fc06`,
 installed on the account `freeekanayaka` (repository
-`freeekanayaka/temper-probe`) and the org `fabrig-ai`, then named `fabrig-dev` (repository `fabrig-ai/temper-probe`; the API answers the old names with a 301), with API version 2026-03-10; each repository
+`freeekanayaka/temper-probe`) and the org `fabrig-ai`, then named
+`fabrig-dev` (repository `fabrig-ai/temper-probe`; the API answers the
+old names with a 301), with API version 2026-03-10; each repository
 had one Actions workflow, a job `ci` that sleeps 45 seconds and fails
 when the head's message says `FAIL`. Rulesets, pull requests, issues,
 branches and tokens made by the probes were removed after. The scripts
