@@ -10,6 +10,7 @@ pub mod accounts;
 pub mod chat;
 pub mod chats;
 pub mod choice;
+pub mod delegation;
 pub mod inbox;
 pub mod task;
 #[derive(Debug)]

@@ -219,3 +219,152 @@ fn a_departed_proposal_keeps_its_identity_for_the_explanation() {
     proposals(&mut f, &[]);
     assert_eq!(f.chat.departures(), &[c::ObjectKey::Proposal(PROPOSAL)]);
 }
+
+const DELEGATED: u64 = 2;
+fn watches(out: &mut Queue<Request>) -> Box<[(jig_client::Handle, u64)]> {
+    let mut watches = skein_lib::List::with_capacity(OUTPUTS);
+    while let Some(request) = out.pop() {
+        if let Request::Client(Event::Watch { handle, subject: Watchable::Jig(c::Subject::Task { task }) }) = request {
+            watches.push((handle, task)).expect("bounded watches");
+        }
+    }
+    watches.into_boxed()
+}
+#[test]
+fn a_chat_watches_each_delegated_task_as_its_call_arrives() {
+    let mut f = f::opened();
+    while f.out.pop().is_some() {}
+    let next = f.chat.next;
+    f::activity(&mut f, &[DELEGATED], f::POSITION);
+    let handle = jig_client::Handle { asker: crate::owner::Owner::Pages.asker(), number: next };
+    assert_eq!(watches(&mut f.out).as_ref(), [(handle, DELEGATED)], "fresh handle watches the delegated task");
+    assert!(f.chat.delegation(&f.client, DELEGATED).is_none(), "wait for its document");
+    let mut emitted = Queue::with_capacity(OUTPUTS);
+    f.client.step(
+        skein_lib::Time::ZERO,
+        skein_lib::Wall::EPOCH,
+        Event::Watch { handle, subject: Watchable::Jig(c::Subject::Task { task: DELEGATED }) },
+        &mut emitted,
+    );
+    let mut watch = None;
+    while let Some(request) = emitted.pop() {
+        if let jig_client::Request::Down {
+            down: jig_client::Down::Open { watch: token, subject: Watchable::Jig(c::Subject::Task { task: DELEGATED }) },
+        } = request
+        {
+            watch = Some(token);
+        }
+    }
+    let mut task = f::change();
+    task.chip.task = DELEGATED;
+    f::deliver(&mut f.client, watch.expect("delegation opened"), task.clone());
+    assert!(f.chat.told(&f.client, Told::Changed { handle }, &mut f.out));
+    assert_eq!(f.chat.delegation(&f.client, DELEGATED), Some(&task));
+    assert!(f.out.is_empty(), "a document refresh leaves its watch alone");
+    assert!(f.chat.delegation(&f.client, 999).is_none(), "only held delegations are exposed");
+}
+#[test]
+fn a_chat_watches_the_newest_delegations_up_to_its_bound() {
+    let mut f = f::opened();
+    while f.out.pop().is_some() {}
+    let bound = crate::pages::delegation::bound(&fixtures::limits());
+    let mut tasks = skein_lib::List::with_capacity(bound + 1);
+    for task in 1..=u64::from(bound + 1) {
+        tasks.push(task).expect("calls");
+    }
+    f::activity(&mut f, tasks.as_slice(), f::POSITION);
+    let watched = watches(&mut f.out);
+    assert_eq!(watched.len(), usize::try_from(bound).expect("bound fits"));
+    for (index, (_, task)) in watched.iter().enumerate() {
+        assert_eq!(*task, u64::from(bound + 1) - u64::try_from(index).expect("bounded index"));
+    }
+    for delegation in &f.chat.delegations {
+        assert_ne!(delegation.task, 1, "oldest is past the bound");
+    }
+}
+#[test]
+fn a_delegation_is_unwatched_as_its_call_leaves_the_thread() {
+    let mut f = f::opened();
+    while f.out.pop().is_some() {}
+    f::activity(&mut f, &[DELEGATED], f::POSITION);
+    let handle = watches(&mut f.out)[0].0;
+    f::activity(&mut f, &[], f::POSITION + 1);
+    assert_eq!(f::handles(&mut f.out).as_ref(), [handle]);
+    assert!(f.chat.delegations.is_empty());
+    assert!(f.chat.delegation(&f.client, DELEGATED).is_none());
+}
+#[test]
+fn a_newer_delegation_unwatches_the_one_past_the_bound() {
+    let mut f = f::opened();
+    while f.out.pop().is_some() {}
+    let bound = crate::pages::delegation::bound(&fixtures::limits());
+    let mut tasks = skein_lib::List::with_capacity(bound + 1);
+    for task in 1..=u64::from(bound) {
+        tasks.push(task).expect("calls");
+    }
+    f::activity(&mut f, tasks.as_slice(), f::POSITION);
+    let old = watches(&mut f.out);
+    let oldest = old.last().expect("oldest").0;
+    tasks.push(u64::from(bound + 1)).expect("new call");
+    f::activity(&mut f, tasks.as_slice(), f::POSITION + 1);
+    assert_eq!(
+        f.out.pop(),
+        Some(Request::Client(Event::Read {
+            handle: f.chat.activity,
+            read: Readable::Jig(c::Read::Activity { task: f::TASK, before: None })
+        }))
+    );
+    assert_eq!(f.out.pop(), Some(Request::Client(Event::Unwatch { handle: oldest })), "make watch room first");
+    let new = watches(&mut f.out);
+    assert_eq!(new.len(), 1);
+    assert_eq!(new[0].1, u64::from(bound + 1));
+    for (delegation, (handle, task)) in f.chat.delegations.iter().skip(1).zip(old.iter()) {
+        assert_eq!((delegation.handle, delegation.task), (*handle, *task), "retained handles stay the same");
+    }
+}
+#[test]
+fn leaving_a_chat_unwatches_its_delegations() {
+    let mut f = f::with_delegate();
+    f::activity(&mut f, &[DELEGATED, 3], f::POSITION);
+    let watched = watches(&mut f.out);
+    f.chat.leave(&mut f.out);
+    let left = f::handles(&mut f.out);
+    assert_eq!(left.len(), 5, "document, activity, run and both delegations");
+    assert_eq!(&left[3..], [watched[0].0, watched[1].0]);
+}
+#[test]
+fn an_ended_delegation_reads_its_task_and_keeps_its_result() {
+    let mut f = f::opened();
+    f::activity(&mut f, &[DELEGATED], f::POSITION);
+    let handle = watches(&mut f.out)[0].0;
+    for why in [jig_client::Why::SubjectEnded, jig_client::Why::Unknown] {
+        assert!(f.chat.told(&f.client, Told::Ended { handle, why }, &mut f.out));
+        assert_eq!(
+            f.out.pop(),
+            Some(Request::Client(Event::Read { handle, read: Readable::Jig(c::Read::Task { task: DELEGATED }) }))
+        );
+        assert!(f.out.is_empty());
+    }
+    let mut task = f::change();
+    task.chip.task = DELEGATED;
+    let result = f::result(&task, c::Ending::Done, Some(f::change_value(b"abcdef0123456789")));
+    let historical = c::OwnerHistorical {
+        key: c::ObjectKey::Task(DELEGATED),
+        value: c::OwnerHistoricalValue::Task { document: Box::new(task.clone()), result: Box::new(result.clone()) },
+        at: None,
+        by: None,
+    };
+    assert!(f.chat.told(
+        &f.client,
+        Told::Page {
+            handle,
+            page: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Historical(Box::new(historical))))
+        },
+        &mut f.out
+    ));
+    task.result = Some(c::TaskResult::Document(Box::new(result)));
+    assert_eq!(f.chat.delegation(&f.client, DELEGATED), Some(&task));
+    f.chat.told(&f.client, Told::Changed { handle: f.chat.document }, &mut f.out);
+    assert_eq!(f.chat.delegation(&f.client, DELEGATED), Some(&task), "refresh keeps the final task");
+    assert!(f.out.is_empty(), "no new requests for retained calls");
+}

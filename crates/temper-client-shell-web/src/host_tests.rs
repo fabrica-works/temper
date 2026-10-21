@@ -166,9 +166,11 @@ fn the_accounts_href_navigates_inside_the_app() {
 mod memory_literal;
 // Retained domain draft: 3 x 1,048,576 document bytes + 280 B size_of::<Draft>()
 // = 3,146,008 B. Base 87c82f753: 119,483,766,536 + 3,146,008 B domain draft
-// + 304 added view nodes x 574,364 B = 119,661,519,200 B.
+// + 304 added view nodes x 574,364 B = 119,661,519,200 B. A chat's 12 delegations
+// (client/README.md, 5.7): 12 x 1,048,576 document bytes + 1,392 B of lists
+// = 12,584,304 B, so 119,674,103,504 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 119661519200;
+const WEB_BYTES: u64 = 119674103504;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

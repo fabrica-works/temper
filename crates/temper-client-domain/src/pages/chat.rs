@@ -1,5 +1,5 @@
 //! One chat borrows its task and retains jig's bounded conversation projection.
-use super::{Act, Request};
+use super::{Act, Request, delegation};
 use crate::{Limits, owner::Owner};
 use alloc::boxed::Box;
 use jig_client::{Client, Handle, Key, Latest, Readable, Readout, Told, Watchable, contract as c, thread::Thread};
@@ -25,6 +25,7 @@ pub struct Chat {
     pub outcome: Option<jig_client::Outcome>,
     pub seen: u64,
     pub cards: List<super::inbox::Card>,
+    pub delegations: List<delegation::Delegation>,
     departures: List<c::ObjectKey>,
     pub closing: Option<c::Ask>,
     pub final_task: Option<Box<c::Task>>,
@@ -52,6 +53,7 @@ impl Chat {
             outcome: None,
             seen: 0,
             cards: List::with_capacity(limits.client.domain.reads),
+            delegations: List::with_capacity(delegation::bound(limits)),
             departures: List::with_capacity(limits.client.domain.reads),
             closing: None,
             final_task: None,
@@ -63,6 +65,9 @@ impl Chat {
         }
         for card in &self.cards {
             unwatch(card.handle, out);
+        }
+        for delegation in &self.delegations {
+            unwatch(delegation.handle, out);
         }
         self.next
     }
@@ -91,21 +96,7 @@ impl Chat {
                 read(handle, Some(c::Read::Task { task: self.task }), out);
             }
             Told::Page { handle, page } if handle == self.document => {
-                let task = match page {
-                    Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(task))) => Some(task),
-                    Readout::Jig(c::ReadResult::Value(c::ReadValue::Historical(value)))
-                        if value.matches(c::ObjectKey::Task(self.task)) =>
-                    {
-                        if let c::OwnerHistoricalValue::Task { mut document, result } = value.value {
-                            document.result = Some(c::TaskResult::Document(result));
-                            Some(document)
-                        } else {
-                            None
-                        }
-                    }
-                    Readout::Limit | Readout::NotServed { .. } | Readout::Jig(_) | Readout::Family { .. } => None,
-                };
-                if let Some(task) = task {
+                if let Some(task) = page_task(page, self.task) {
                     read(self.activity, self.thread.document(&task), out);
                     self.watch_run(&task, out);
                     self.proposals(&task, out);
@@ -154,6 +145,24 @@ impl Chat {
                     }
                 }
             }
+            Told::Changed { handle } if self.delegation_handle(handle).is_some() => {}
+            Told::Ended { handle, why: jig_client::Why::SubjectEnded | jig_client::Why::Unknown }
+                if self.delegation_handle(handle).is_some() =>
+            {
+                let task = self.delegation_handle(handle).expect("delegation handle");
+                read(handle, Some(c::Read::Task { task }), out);
+            }
+            Told::Page { handle, page } if self.delegation_handle(handle).is_some() => {
+                for index in 0..self.delegations.len() {
+                    let delegation = self.delegations.get_mut(index).expect("bounded delegation");
+                    if delegation.handle == handle {
+                        if let Some(task) = page_task(page, delegation.task) {
+                            delegation.final_task = Some(task);
+                        }
+                        break;
+                    }
+                }
+            }
             Told::Link { .. }
             | Told::Pending { .. }
             | Told::Answered { .. }
@@ -167,7 +176,85 @@ impl Chat {
         if self.run.is_none() && self.thread.loaded >= self.thread.committed {
             self.thread.end_run();
         }
+        self.delegations(out);
         true
+    }
+    #[must_use]
+    pub fn delegation<'a>(&'a self, client: &'a Client, task: u64) -> Option<&'a c::Task> {
+        for delegation in &self.delegations {
+            if delegation.task == task {
+                if let Some(task) = &delegation.final_task {
+                    return Some(task);
+                }
+                return match latest(client, delegation.handle)? {
+                    Latest::Jig(c::Delivery::Task(task)) => Some(task),
+                    Latest::Jig(_) | Latest::Family(_) => None,
+                };
+            }
+        }
+        None
+    }
+    fn delegation_handle(&self, handle: Handle) -> Option<u64> {
+        for delegation in &self.delegations {
+            if delegation.handle == handle {
+                return Some(delegation.task);
+            }
+        }
+        None
+    }
+    fn delegations(&mut self, out: &mut Queue<Request>) {
+        let bound = self.delegations.capacity();
+        let mut tasks = List::with_capacity(bound);
+        let mut called = List::with_capacity(bound);
+        // Thread's borrowed lines are chronological, so visit the calls backwards.
+        'turns: for line in self.thread.lines().iter().rev() {
+            let jig_client::thread::Line::Turn { turn, .. } = line else { continue };
+            for message in turn.messages.iter().rev() {
+                for block in message.blocks.iter().rev() {
+                    let c::Block::Call(call) = block else { continue };
+                    called.clear();
+                    delegation::delegated(call, &mut called);
+                    for task in &called {
+                        if !tasks.as_slice().contains(task) && tasks.push(*task).is_err() {
+                            break 'turns;
+                        }
+                    }
+                }
+            }
+        }
+        for delegation in &self.delegations {
+            if !tasks.as_slice().contains(&delegation.task) {
+                unwatch(delegation.handle, out);
+            }
+        }
+        let mut ordered = List::with_capacity(bound);
+        for task in &tasks {
+            let mut kept = None;
+            for index in 0..self.delegations.len() {
+                let delegation = self.delegations.get_mut(index).expect("bounded delegation");
+                if delegation.task == *task {
+                    kept = Some(delegation::Delegation {
+                        task: *task,
+                        handle: delegation.handle,
+                        final_task: delegation.final_task.take(),
+                    });
+                    break;
+                }
+            }
+            let delegation = if let Some(kept) = kept {
+                kept
+            } else {
+                let handle = handle(self.next);
+                self.next = self.next.checked_add(1).expect("chat handles fit");
+                out.push(Request::Client(jig_client::Event::Watch {
+                    handle,
+                    subject: Watchable::Jig(c::Subject::Task { task: *task }),
+                }));
+                delegation::Delegation { task: *task, handle, final_task: None }
+            };
+            ordered.push(delegation).expect("bounded delegations");
+        }
+        self.delegations = ordered;
     }
     fn card_handle(&self, handle: Handle) -> bool {
         for card in &self.cards {
@@ -423,6 +510,13 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         // Refresh can briefly retain old cards beside their replacements.
         .checked_add(super::inbox::worst_case(limits)?)?
         .checked_add(List::<c::ObjectKey>::worst_case(limits.client.domain.reads)?)?
+        // Refresh moves final documents, retaining only the old and new list slots.
+        .checked_add(List::<delegation::Delegation>::worst_case(delegation::bound(limits))?.checked_mul(2)?)?
+        .checked_add(u64::from(delegation::bound(limits)).checked_mul(limits.client.domain.document_bytes)?)?
+        .checked_add(List::<u64>::worst_case(delegation::bound(limits))?.checked_mul(2)?)?
+        .checked_add(List::<jig_client::thread::Line<'_>>::worst_case(
+            limits.client.domain.rows.checked_mul(4)?.checked_add(1)?,
+        )?)?
         // A received task's delegate list is bounded by its document bytes.
         .checked_add(List::<c::Operation>::worst_case(
             u32::try_from(limits.client.domain.document_bytes).ok()?.checked_add(1)?,
@@ -430,6 +524,22 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(
             u64::from(u32::try_from(limits.client.domain.document_bytes).ok()?.checked_add(1)?).checked_mul(11)?,
         )
+}
+fn page_task(page: Readout, task: u64) -> Option<Box<c::Task>> {
+    match page {
+        Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(task))) => Some(task),
+        Readout::Jig(c::ReadResult::Value(c::ReadValue::Historical(value)))
+            if value.matches(c::ObjectKey::Task(task)) =>
+        {
+            if let c::OwnerHistoricalValue::Task { mut document, result } = value.value {
+                document.result = Some(c::TaskResult::Document(result));
+                Some(document)
+            } else {
+                None
+            }
+        }
+        Readout::Limit | Readout::NotServed { .. } | Readout::Jig(_) | Readout::Family { .. } => None,
+    }
 }
 fn handle(number: u64) -> Handle {
     Handle { asker: Owner::Pages.asker(), number }

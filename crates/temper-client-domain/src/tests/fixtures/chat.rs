@@ -129,3 +129,89 @@ pub fn with_delegate() -> Fixture {
     while fixture.out.pop().is_some() {}
     fixture
 }
+
+pub fn delegate_call(task: u64) -> c::Call {
+    let mut objects = List::with_capacity(ONE);
+    objects.push(c::ObjectKey::Task(task)).expect("delegated task");
+    c::Call {
+        number: task,
+        tool: acts::text(b"delegate"),
+        input: acts::text(b"{}"),
+        outcome: Some(acts::text(b"Delegated tasks: 2, 3")),
+        failed: false,
+        objects,
+        parts: List::with_capacity(0),
+    }
+}
+pub fn activity(f: &mut Fixture, tasks: &[u64], position: u64) {
+    let mut blocks = List::with_capacity(u32::try_from(tasks.len()).expect("fixture calls fit"));
+    for task in tasks {
+        blocks.push(c::Block::Call(delegate_call(*task))).expect("call fits");
+    }
+    let mut messages = List::with_capacity(ONE);
+    messages.push(c::Message { speaker: c::Speaker::Assistant, blocks }).expect("message");
+    let turn = c::Turn {
+        messages,
+        used: c::Usage { input: 0, output: 0, cached: 0, cache_written: 0 },
+        spent: 0,
+        read_through: None,
+        cut: false,
+    };
+    let mut rows = List::with_capacity(ONE);
+    rows.push(c::ActivityLine {
+        position,
+        at: Wall::EPOCH,
+        event: c::Activity::Turn {
+            name: c::TurnName { attempt: ATTEMPT, number: u32::try_from(position).expect("fixture turn") },
+            turn: c::TurnRead::Decoded(turn),
+        },
+    })
+    .expect("turn");
+    let mut task = task();
+    task.activity = position;
+    deliver(&mut f.client, f.watch, task);
+    f.chat.told(&f.client, Told::Changed { handle: f.chat.document }, &mut f.out);
+    f.chat.told(
+        &f.client,
+        Told::Page {
+            handle: f.chat.activity,
+            page: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(Box::new(c::ActivityPage {
+                rows,
+                before: None,
+                after: None,
+                cut: false,
+            })))),
+        },
+        &mut f.out,
+    );
+}
+pub fn result(task: &c::Task, ending: c::Ending, value: Option<c::ResultValue>) -> c::Result {
+    c::Result {
+        task: task.chip.clone(),
+        ending,
+        value,
+        at: Some(Wall::EPOCH),
+        details: None,
+        acts: List::with_capacity(0),
+    }
+}
+pub fn document_text(bytes: &[u8]) -> DocumentText {
+    let bound = u32::try_from(bytes.len()).expect("fixture text fits");
+    DocumentText::complete(c::Text::new(Box::from(bytes), bound).expect("fixture text"))
+}
+pub fn change() -> c::Task {
+    let mut task = task();
+    task.hold = None;
+    task.result = None;
+    task.result_contract = c::TaskContractDocument::Change { connector: FORGE, kind: 1, words: 64 };
+    let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() else { panic!("owner chip") };
+    details.ending = None;
+    task
+}
+pub fn change_value(words: &[u8]) -> c::ResultValue {
+    c::ResultValue::Change {
+        kind: 1,
+        part: c::OwnerPart { connector: FORGE, kind: c::OwnerPartKind::Result, key: c::OwnerPartKey::Number(TASK) },
+        words: document_text(words),
+    }
+}
