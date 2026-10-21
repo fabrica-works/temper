@@ -41,7 +41,10 @@ pub fn answer(checked: &Checked, checkout: &mut Checkout, transport: &mut impl T
         Command::Clone { remote, directory } => {
             let destination = path(at, directory);
             match git::clone_repository(transport, checkout, remote, &destination) {
-                Ok(()) => Answer::success(Vec::new()),
+                Ok(()) => {
+                    checkout.write(&path(&destination, b".git/temper-remote"), remote);
+                    Answer::success(Vec::new())
+                }
                 Err(fault) => failed(remote, fault),
             }
         }

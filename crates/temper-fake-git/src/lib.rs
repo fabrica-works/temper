@@ -12,3 +12,10 @@ pub use transport::{Transport, Typed};
 
 /// The HTTP client and its kernel socket jobs.
 pub mod connection;
+
+mod route;
+pub use route::{MAX_RUNS, Route};
+mod exchange;
+
+#[cfg(test)]
+mod tests;

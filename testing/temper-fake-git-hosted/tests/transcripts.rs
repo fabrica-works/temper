@@ -381,6 +381,7 @@ fn hosted_clone_creates_only_the_destination_without_checking_out_files() {
     assert!(result.stderr.is_empty());
     assert_eq!(disk.read(&scenario.at, b"copy/.git/objects/1"), b"");
     assert_eq!(disk.read(&scenario.at, b"copy/.git/objects/2"), b"");
+    assert_eq!(disk.read(&scenario.at, b"copy/.git/temper-remote"), scenario.remote);
     assert_eq!(disk.read(&scenario.at, b"conflict.txt"), b"base\n");
     let cloned =
         disk.machine.open(disk.root, &[scenario.at.as_slice(), b"/copy/conflict.txt"].concat(), How::PathNoFollow);

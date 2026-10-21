@@ -11,6 +11,7 @@ skein-lib.workspace = true
 skein-io.workspace = true
 skein-shell.workspace = true
 skein-http.workspace = true
+skein-json.workspace = true
 skein-fake-checkout.workspace = true
 skein-fake-forge-domain.workspace = true
 skein-fake-forge-protocol.workspace = true
@@ -19,6 +20,7 @@ temper-worker-protocol-git.workspace = true
 temper-worker-domain-checkout.workspace = true
 
 [dev-dependencies]
+skein-forge.workspace = true
 skein-fake-machine = { git = "https://github.com/fabrig-dev/skein.git" }
 
 [lints.rust]

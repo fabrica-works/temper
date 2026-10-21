@@ -10,6 +10,26 @@ use std::{cell::RefCell, rc::Rc};
 /// A transport preserves the kit's object graph and write promises; a run with
 /// a missing call is discarded before any of its files or output are kept.
 pub trait Transport: Remote {
+    /// Start a fresh replay cursor before running the scanned checkout again.
+    fn begin(&mut self) {}
+    /// Encoding bounds for a missing route call; typed transports miss none.
+    fn route_limits(&self) -> Option<skein_fake_forge_protocol::Limits> {
+        None
+    }
+    /// Retain a missing call's terminal answer once, including an identity refusal.
+    fn receive(
+        &mut self,
+        _call: skein_fake_forge_protocol::git::Call,
+        _answer: Result<skein_fake_forge_protocol::git::Answer, api::Error>,
+        _authenticated: bool,
+    ) {
+        unreachable!("a typed transport never misses a call");
+    }
+    /// The command's retained log, cached objects and transient decoding buffers.
+    fn worst_case(&self) -> u64 {
+        0
+    }
+
     /// Allocate a lazy connection for a route transport; typed calls need none.
     fn connection(&self) -> Option<crate::connection::Connection> {
         None
@@ -198,7 +218,7 @@ fn repository(url: &[u8]) -> &[u8] {
     let slash = rest.iter().position(|b| *b == b'/').expect("repository URL path");
     rest[slash + 1..].strip_suffix(b".git").unwrap_or(&rest[slash + 1..])
 }
-fn fault(error: api::Error) -> Fault {
+pub(crate) fn fault(error: api::Error) -> Fault {
     match error {
         api::Error::Missing(api::What::Repository) => Fault::Missing(What::Repository),
         api::Error::Missing(api::What::Branch) => Fault::Missing(What::Branch),

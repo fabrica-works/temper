@@ -17,6 +17,8 @@ pub struct Checked {
     pub committer: Author,
     pub author: Option<Author>,
     pub credential: Option<Credential>,
+    /// The admitted Authorization header, forwarded verbatim on repository calls.
+    pub authorization: Option<Secret>,
     /// commit-tree's stdin, filled by the hosted program after admission.
     pub message: Vec<u8>,
 }
@@ -115,7 +117,20 @@ pub fn check(spawn: &Spawn) -> Result<Checked, Refusal> {
     {
         return Err(Refusal::Broken("placeholder committer"));
     }
-    Ok(Checked { command, at: spawn.dir.clone(), home, committer, author, credential, message: Vec::new() })
+    let authorization = spawn
+        .env
+        .iter()
+        .find_map(|e| e.strip_prefix(b"GIT_CONFIG_VALUE_0=Authorization: ").map(|value| Secret::new(value.into())));
+    Ok(Checked {
+        command,
+        at: spawn.dir.clone(),
+        home,
+        committer,
+        author,
+        credential,
+        authorization,
+        message: Vec::new(),
+    })
 }
 fn read_credential(env: &mut BTreeMap<&[u8], &[u8]>, spawn: &Spawn) -> Result<Credential, Refusal> {
     if env.remove(b"GIT_CONFIG_COUNT".as_slice()) != Some(b"1".as_slice())
@@ -166,7 +181,7 @@ fn check_remote(url: &[u8]) -> Result<(), Refusal> {
     }
     Ok(())
 }
-fn remote(command: &Command) -> Option<&[u8]> {
+pub(crate) fn remote(command: &Command) -> Option<&[u8]> {
     match command {
         Command::Clone { remote, .. }
         | Command::Fetch { remote, .. }

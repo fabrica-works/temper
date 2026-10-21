@@ -57,6 +57,8 @@ pub struct Git<T: Transport> {
     checkout: Checkout,
     transport: T,
     connection: Option<crate::connection::Connection>,
+    exchange: Option<crate::exchange::Exchange>,
+    runs: u32,
     root: Fd,
     pipes: BTreeMap<u32, Fd>,
     owned: BTreeSet<Fd>,
@@ -117,6 +119,8 @@ impl<T: Transport> Git<T> {
         let connection = transport.connection();
         Self {
             connection,
+            exchange: None,
+            runs: 0,
             checked,
             checkout,
             transport,
@@ -327,10 +331,26 @@ impl<T: Transport> Git<T> {
         }
     }
     fn prepare(&mut self) {
-        let answer = self.answer.take().unwrap_or_else(|| match &self.checked {
-            Some(checked) => answer(checked, &mut self.checkout, &mut self.transport),
-            None => Answer::usage(),
-        });
+        let answer = if let Some(answer) = self.answer.take() {
+            answer
+        } else if self.checked.is_some() {
+            if self.runs >= crate::MAX_RUNS {
+                crate::exchange::broken("runs")
+            } else {
+                self.runs += 1;
+                self.transport.begin();
+                let result =
+                    answer(self.checked.as_ref().expect("checked invocation"), &mut self.checkout, &mut self.transport);
+                if let Some(call) = self.transport.missed() {
+                    self.restore();
+                    self.request(call);
+                    return;
+                }
+                result
+            }
+        } else {
+            Answer::usage()
+        };
         if self.checked.is_some() && answer.exit <= 1 {
             self.changes();
         }
@@ -342,6 +362,45 @@ impl<T: Transport> Git<T> {
         }
         self.answer = Some(answer);
         self.closing = true;
+    }
+    fn restore(&mut self) {
+        let mut checkout = Checkout::new();
+        checkout.mkdir(b"");
+        for (path, kind) in &self.before {
+            match kind {
+                k::Kind::Directory => checkout.mkdir(path),
+                k::Kind::File => {
+                    checkout.write(path, self.files.get(path).expect("scanned file"));
+                }
+                k::Kind::Symlink | k::Kind::Other => checkout.special(path),
+            }
+        }
+        self.checkout = checkout;
+    }
+    fn request(&mut self, call: skein_fake_forge_protocol::git::Call) {
+        let checked = self.checked.as_ref().expect("admitted route invocation");
+        let remote = crate::check::remote(&checked.command)
+            .map(<[u8]>::to_vec)
+            .or_else(|| self.files.get(&path(&checked.at, b".git/temper-remote")).cloned())
+            .unwrap_or_default();
+        let result = crate::exchange::Exchange::new(call, remote).and_then(|exchange| {
+            let limits = self.transport.route_limits().expect("missing call's route limits");
+            let (call, body) = exchange.request(checked.authorization.as_ref(), &limits)?;
+            self.connection.as_mut().expect("missing call's connection").call(exchange.address, call, body);
+            Ok(exchange)
+        });
+        match result {
+            Ok(exchange) => self.exchange = Some(exchange),
+            Err(answer) => self.answer = Some(answer),
+        }
+    }
+    fn received(&mut self, reply: Result<crate::connection::Reply, crate::connection::Failed>) {
+        let exchange = self.exchange.take().expect("one missing call in flight");
+        let limits = self.transport.route_limits().expect("route limits");
+        match exchange.finish(reply, &limits) {
+            Ok((call, answer, authenticated)) => self.transport.receive(call, answer, authenticated),
+            Err(answer) => self.answer = Some(answer),
+        }
     }
     fn changes(&mut self) {
         let mut after = nodes(&mut self.checkout);
@@ -394,11 +453,16 @@ impl<T: Transport> Host for Git<T> {
             if self.closing {
                 connection.close();
             }
-            if let Some(op) = connection.next_job() {
+            let op = connection.next_job();
+            let result = connection.take();
+            if let Some(op) = op {
                 self.next(Job::Socket(op));
                 return;
             }
-            if connection.busy() {
+            if let Some(result) = result {
+                self.received(result);
+            }
+            if self.exchange.is_some() {
                 return;
             }
         }
@@ -438,7 +502,9 @@ impl<T: Transport> Host for Git<T> {
         self.is_empty().then(|| Exit::Code(self.answer.as_ref().expect("answered invocation").exit))
     }
     fn worst_case(&self) -> u64 {
-        128 * 1024 * 1024 + self.connection.as_ref().map_or(0, crate::connection::Connection::worst_case)
+        128 * 1024 * 1024
+            + self.transport.worst_case()
+            + self.connection.as_ref().map_or(0, crate::connection::Connection::worst_case)
     }
     fn operations(&self) -> u32 {
         1

@@ -27,7 +27,7 @@ enum State {
     Closed,
 }
 /// A lazy connection: one call at a time and one kernel operation in flight.
-/// Its owner submits `next`'s job and returns it through `complete`, and closes
+/// Its owner submits `next_job`'s job and returns it through `complete`, and closes
 /// the connection before exiting. Read demands use an intake; short sends keep
 /// their offset and output room is granted only when the previous send freed it.
 #[derive(Debug)]
@@ -172,6 +172,10 @@ impl Connection {
     }
     /// Produce the next kernel job after routing all immediately available HTTP work.
     pub fn next_job(&mut self) -> Option<Op> {
+        // A failed open/connect owes its terminal before the owner closes it.
+        if self.result.is_some() {
+            return None;
+        }
         match self.state {
             State::Dormant | State::Closed => return None,
             State::Opening => return Some(Op::Socket { family: k::Family::of(&self.address.expect("call listener")) }),
@@ -274,6 +278,7 @@ impl Connection {
         self.call = None;
         self.upload = None;
         self.busy = false;
+        self.result = None;
         self.state = match self.state {
             State::Dormant | State::Opening | State::Closed => State::Closed,
             State::Connecting(fd) | State::Closing(fd) => State::Closing(fd),
@@ -335,6 +340,7 @@ mod tests {
             let mut connection = request();
             let mut held = BTreeSet::new();
             let mut sent = Vec::new();
+            let mut connects = 0;
             let mut result = None;
             for _ in 0..1024 {
                 let job = connection.next_job();
@@ -354,11 +360,8 @@ mod tests {
                         Ok(Done::Fd(Fd::new(7)))
                     }
                     Op::Connect { .. } => {
-                        if refused {
-                            Err(k::Error::Refused)
-                        } else {
-                            Ok(Done::Nothing)
-                        }
+                        connects += 1;
+                        if refused { Err(k::Error::Refused) } else { Ok(Done::Nothing) }
                     }
                     Op::Send { bytes, from, .. } => {
                         let bytes = &bytes[usize::try_from(*from).expect("offset")..];
@@ -409,6 +412,7 @@ mod tests {
                 connection.complete(job, result);
             }
             assert_eq!(result, Some(expected), "{name}");
+            assert_eq!(connects, 1, "{name}: connect once");
             assert!(connection.is_closed() && held.is_empty(), "{name}: all descriptors close");
             if !refused {
                 assert!(sent.starts_with(b"POST /.fake/git/clone HTTP/1.1\r\n"), "{name}");
