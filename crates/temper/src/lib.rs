@@ -32,7 +32,7 @@ pub mod open;
 mod program_login;
 mod setup;
 pub use host::Host;
-pub const USAGE: &str = "usage: temper init [DIRECTORIES] | temper serve [DIRECTORIES] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper fake llm --document FILE [--ready PREFIX] [--seed N] | temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge check [DIRECTORIES] N OBSERVATIONS STORE | temper fake seed [DIRECTORIES] | temper fake git ARGS... | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
+pub const USAGE: &str = "usage: temper init [DIRECTORIES] | temper serve [DIRECTORIES] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge fetch [DIRECTORIES] FORGE | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper fake llm --document FILE [--ready PREFIX] [--seed N] | temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge check [DIRECTORIES] N OBSERVATIONS STORE | temper fake seed [DIRECTORIES] | temper fake git ARGS... | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
 const CONFIG_BYTES: u32 = 1 << 20;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -48,7 +48,7 @@ pub enum Command {
     FakeCheck { directories: Directories, check: fake::Check },
     FakeSeed { directories: Directories },
     FakeGit { arguments: Box<[Box<[u8]>]> },
-    Forge { directories: Directories, arguments: Vec<OsString> },
+    Forge { directories: Directories, arguments: Vec<OsString>, ssl_cert_file: Option<PathBuf> },
 }
 #[must_use]
 pub fn usage() -> String {
@@ -104,7 +104,7 @@ pub fn configure_with(
     }
     let (verb, arguments) = if command.as_ref() == b"forge" {
         let Some((verb, arguments)) = arguments.split_first() else { return Err(invalid()) };
-        if ![b"prepare".as_slice(), b"run", b"reconcile"].contains(&verb.as_ref()) {
+        if ![b"fetch".as_slice(), b"prepare", b"run", b"reconcile"].contains(&verb.as_ref()) {
             return Err(invalid());
         }
         (Some(verb), arguments)
@@ -131,7 +131,12 @@ pub fn configure_with(
             }
             let mut arguments = os(std::slice::from_ref(verb));
             arguments.extend(rest);
-            Ok(Command::Forge { directories, arguments })
+            let ssl_cert_file = environment
+                .iter()
+                .find(|(name, _)| name.as_ref() == b"SSL_CERT_FILE")
+                .filter(|(_, value)| !value.is_empty())
+                .map(|(_, value)| path(value).to_path_buf());
+            Ok(Command::Forge { directories, arguments, ssl_cert_file })
         }
         _ => Err(invalid()),
     }
@@ -151,7 +156,9 @@ pub fn run(command: Command) -> Result<u8, String> {
         Command::FakeCheck { directories, check } => return Ok(fake::check::run(&directories, &check)),
         Command::FakeSeed { directories } => return fake::seed::run(&directories),
         Command::FakeGit { arguments } => return Ok(fake::git::run(&arguments)),
-        Command::Forge { directories, arguments } => return Ok(forge::run(&directories, &arguments)),
+        Command::Forge { directories, arguments, ssl_cert_file } => {
+            return Ok(forge::run(&directories, &arguments, ssl_cert_file));
+        }
         Command::Ctl { arguments } => return Ok(ctl::run(&arguments, &Clock::new())),
         Command::Open { arguments } => return Ok(open::run(&arguments, &Clock::new())),
     };

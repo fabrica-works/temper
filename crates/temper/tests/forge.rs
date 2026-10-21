@@ -426,3 +426,115 @@ fn fake_configuration(directory: &std::path::Path) {
     let config = support::configuration::check_document(directory);
     fs::write(directory.join("temper.json"), serde_json::to_vec(&config).expect("document")).expect("document");
 }
+
+#[test]
+#[expect(clippy::too_many_lines, reason = "one table of complete fetch command diagnostics and file outcomes")]
+fn forge_fetch_command() {
+    use skein_lib::sha256::Sha256;
+    use support::{configuration, owned};
+    for row in ["managed", "fake", "paths", "digest", "present", "missing-roots", "usage"] {
+        let scratch = support::Scratch::new(&format!("forge-fetch-{row}"));
+        owned::configuration(
+            scratch.path(),
+            &owned::Names {
+                forgejo: std::path::Path::new("/opt/forgejo/forgejo"),
+                runner: None,
+                port: 3000,
+                bot: "temper",
+                person: "ada",
+                orgs: &["acme"],
+            },
+        );
+        let path = scratch.path().join("temper.json");
+        let mut document: serde_json::Value =
+            serde_json::from_slice(&fs::read(&path).expect("document")).expect("JSON");
+        document["application"]["forges"][0]["number"] = 3.into();
+        document["application"]["setup"][0]["forge"] = 3.into();
+        let mut server = None;
+        let root = scratch.path().join("root.pem");
+        let file = scratch.path().join("forgejo/17.0.0/forgejo");
+        match row {
+            "managed" => {
+                document["application"]["setup"][0]["mode"] =
+                    serde_json::json!({"managed":{"admin_token":"admin_token"}});
+            }
+            "fake" => configuration::fake_entry(&mut document["application"]["setup"][0], "127.0.0.1:3000"),
+            "digest" | "present" | "missing-roots" => {
+                document["application"]["setup"][0]["mode"]["owned"]["forgejo"] = "fetched".into();
+                if row == "digest" {
+                    let peer = support::fetch::server();
+                    let origin = format!("https://{}", peer.address);
+                    document["application"]["setup"][0]["mode"]["owned"]["mirror"] =
+                        serde_json::json!({"forgejo":origin,"runner":origin});
+                    server = Some(peer);
+                }
+                if row == "present" {
+                    fs::create_dir_all(file.parent().expect("cache parent")).expect("parents");
+                    fs::write(&file, b"mine").expect("person's file");
+                }
+            }
+            "paths" | "usage" => {}
+            _ => unreachable!(),
+        }
+        fs::write(&path, serde_json::to_vec(&document).expect("JSON")).expect("document");
+        if row != "missing-roots" {
+            support::fetch::roots(&root);
+        }
+        let mut command = Command::new(env!("CARGO_BIN_EXE_temper"));
+        command.args(["forge", "fetch"]).args(configuration::flags(scratch.path()));
+        if row != "usage" {
+            command.arg("3");
+        }
+        let result = command.env("SSL_CERT_FILE", &root).current_dir(scratch.path()).output().expect("fetch command");
+        let expected = match row {
+            "managed" => "temper forge fetch: forge 3: it is managed, not owned\n".into(),
+            "fake" => "temper forge fetch: forge 3: it is fake, not owned\n".into(),
+            "paths" => "temper forge fetch: forge 3: neither of its binaries is \"fetched\"\n".into(),
+            "digest" => {
+                let peer = server.as_ref().expect("local peer");
+                let mut hash = Sha256::new();
+                hash.update(b"abc");
+                format!(
+                    "temper forge fetch: forge 3: https://{}/forgejo/forgejo/releases/download/v17.0.0/forgejo-17.0.0-linux-{}: digest differs: pinned {}, got {}\n",
+                    peer.address,
+                    match std::env::consts::ARCH {
+                        "x86_64" => "amd64",
+                        "aarch64" => "arm64",
+                        _ => panic!("test host has pinned architecture"),
+                    },
+                    skein_forge::forgejo::pin::digest(
+                        skein_forge::forgejo::pin::Binary::Forgejo,
+                        match std::env::consts::ARCH {
+                            "x86_64" => "amd64",
+                            "aarch64" => "arm64",
+                            _ => unreachable!(),
+                        }
+                    )
+                    .expect("pin"),
+                    String::from_utf8_lossy(&temper_forge_setup::fetch::hex(&hash.finish()))
+                )
+            }
+            "present" => format!("temper forge fetch: forge 3: {}: does not match the pinned digest\n", file.display()),
+            "missing-roots" => format!("temper forge fetch: forge 3: {}: roots: Absent\n", root.display()),
+            "usage" => format!("temper: invalid arguments\n{}", temper::usage()),
+            _ => unreachable!(),
+        };
+        assert_eq!(result.status.code(), Some(1), "{row}");
+        assert!(result.stdout.is_empty(), "{row}");
+        assert_eq!(String::from_utf8_lossy(&result.stderr), expected, "{row}");
+        assert!(!file.with_file_name("forgejo.part").exists(), "{row}");
+        if row == "present" {
+            assert_eq!(fs::read(&file).expect("person's file kept"), b"mine");
+        } else {
+            assert!(!file.exists(), "{row}");
+        }
+        if let Some(peer) = server {
+            peer.check();
+        }
+        scratch.remove();
+    }
+    assert_eq!(
+        temper::USAGE.split(" | ").find(|part| part.starts_with("temper forge fetch")),
+        Some("temper forge fetch [DIRECTORIES] FORGE")
+    );
+}

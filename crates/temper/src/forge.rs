@@ -143,15 +143,20 @@ fn run_failure(why: host::Failed, launch: &run::Launch, number: u16, directories
         host::Failed::Exec(why) => format!("{}: {why}", text(&launch.program)),
     }
 }
-pub(crate) fn start(directories: &super::Directories, arguments: &[OsString]) -> Result<u8, Refused> {
+pub(crate) fn start(
+    directories: &super::Directories,
+    arguments: &[OsString],
+    ssl_cert_file: Option<std::path::PathBuf>,
+) -> Result<u8, Refused> {
     let usage = || {
         Refused {
         verb: "prepare",
         number: None,
-        why: "usage: temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE".into(),
+        why: "usage: temper forge fetch [DIRECTORIES] FORGE | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE".into(),
     }
     };
     let (verb, number, which) = match arguments {
+        [verb, number] if verb == "fetch" => ("fetch", number, None),
         [verb, number] if verb == "prepare" => ("prepare", number, None),
         [verb, number] if verb == "reconcile" => ("reconcile", number, None),
         [verb, number, which] if verb == "run" => {
@@ -183,9 +188,25 @@ pub(crate) fn start(directories: &super::Directories, arguments: &[OsString]) ->
     let owned = match &entry.mode {
         Mode::Owned(owned) => Some(owned),
         Mode::Managed { .. } => return Err(refused("it is managed, not owned".into())),
-        Mode::Fake(_) if which.is_some() => return Err(refused("it is fake, not owned".into())),
+        Mode::Fake(_) if which.is_some() || verb == "fetch" => return Err(refused("it is fake, not owned".into())),
         Mode::Fake(_) => None,
     };
+    if verb == "fetch" {
+        let owned = owned.expect("fetch requires owned");
+        if !owned.fetch.forgejo && !owned.fetch.runner {
+            return Err(refused("neither of its binaries is \"fetched\"".into()));
+        }
+        let pins = temper_forge_setup::fetch::pins(owned, std::env::consts::ARCH)
+            .map_err(|why| refused(text(&why.words())))?;
+        let machine = temper_forge_setup::fetch::Fetch::new(pins, checked.fetch_bytes);
+        return temper_forge_setup_shell::fetch::run(
+            &jig_protocol_config::profile(jig_protocol_config::Profile::Small).io,
+            &skein_shell::Trust::Machine { ssl_cert_file },
+            machine,
+        )
+        .map(|()| 0)
+        .map_err(|why| refused(why.words()));
+    }
     let directory = super::path(&entry.directory);
     if which.is_none() && !directory.exists() {
         fs::DirBuilder::new()
@@ -240,8 +261,8 @@ fn prepare_fake(path: &std::path::Path) -> Result<(), String> {
     }
 }
 #[must_use]
-pub fn run(directories: &super::Directories, arguments: &[OsString]) -> u8 {
-    match start(directories, arguments) {
+pub fn run(directories: &super::Directories, arguments: &[OsString], ssl_cert_file: Option<std::path::PathBuf>) -> u8 {
+    match start(directories, arguments, ssl_cert_file) {
         Ok(code) => code,
         Err(why) => {
             eprint!("{}", why.line());

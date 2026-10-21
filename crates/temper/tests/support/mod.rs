@@ -2,6 +2,7 @@
 pub mod boxed;
 pub mod configuration;
 pub mod ctl;
+pub mod fetch;
 pub mod owned;
 pub mod terminal;
 pub mod webhooks;

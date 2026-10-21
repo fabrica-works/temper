@@ -9,6 +9,7 @@ fn directory_commands_take_flags_after_their_command_words() {
         (vec!["program-login", "name"], true),
         (vec!["program-login"], false),
         (vec!["forge", "prepare", "1"], true),
+        (vec!["forge", "fetch", "1"], true),
         (vec!["forge", "run", "1", "runner"], true),
         (vec!["forge", "reconcile", "1"], true),
         (vec!["unknown"], false),
@@ -281,6 +282,7 @@ fn forge_commands_refuse_managed_and_fake_entries_by_name() {
         let refused = super::forge::start(
             &configuration::directories(&directory),
             &arguments.iter().map(std::ffi::OsString::from).collect::<Vec<_>>(),
+            None,
         )
         .expect_err("not owned");
         assert_eq!(refused.line(), expected);
