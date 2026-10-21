@@ -52,7 +52,7 @@ fn settings_refusals_name_the_flag_and_its_reason() {
         assert_eq!(resolve(&args(&arguments), &[], b"/work").expect_err("refused").to_string(), expected);
     }
 }
-fn scratch(name: &str) -> PathBuf {
+pub(crate) fn scratch(name: &str) -> PathBuf {
     let path = std::env::temp_dir().join(format!("temper-dirs-{}-{name}", std::process::id()));
     std::fs::create_dir(&path).expect("scratch");
     path

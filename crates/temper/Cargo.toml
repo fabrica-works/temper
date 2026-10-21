@@ -44,12 +44,16 @@ smith-host-domain.workspace = true
 smith-local-service.workspace = true
 smith-host-protocol.workspace = true
 
+jig-protocol-store.workspace = true
+temper-protocol-store.workspace = true
+skein-fake-forge-domain.workspace = true
+skein-kv.workspace = true
+
 [dev-dependencies]
 temper-worker-protocol-git.workspace = true
 temper-worker-domain-checkout.workspace = true
 jig-domain-core.workspace = true
 jig-domain-fleet.workspace = true
-skein-fake-forge-domain.workspace = true
 skein-fake-llm-domain.workspace = true
 skein-llm.workspace = true
 rustls.workspace = true
@@ -57,8 +61,6 @@ temper-real-loop-world = { path = "../../tests/real-loop" }
 smith-fake-claude.workspace = true
 smith-local-process-world.workspace = true
 temper-engine-domain.workspace = true
-temper-protocol-store.workspace = true
-jig-protocol-store.workspace = true
 skein-throwaway-forgejo.workspace = true
 temper-client-shell-terminal.workspace = true
 temper-client-domain.workspace = true

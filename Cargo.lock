@@ -2277,6 +2277,7 @@ dependencies = [
  "skein-forge-connection",
  "skein-io",
  "skein-json",
+ "skein-kv",
  "skein-lib",
  "skein-llm",
  "skein-llm-world",

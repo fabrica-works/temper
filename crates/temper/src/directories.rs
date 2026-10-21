@@ -147,4 +147,4 @@ pub(crate) fn make_private(path: &Path, user: u32) -> Result<(), String> {
     private_root(path, user).map_err(|why| format!("{}: {why}", path.display()))
 }
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

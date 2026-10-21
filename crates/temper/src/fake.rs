@@ -1,4 +1,6 @@
 //! The document form's files and peer loop (protocol/setup.md, 8.4).
+#[cfg_attr(not(test), expect(dead_code, reason = "the check verb joins these readers in t27c"))]
+mod check;
 pub mod git;
 use skein_fake_peers::{forge as forge_peer, llm as llm_peer};
 use skein_io::kernel::{Complete, Done, Exit, Fd, Op, Submit};

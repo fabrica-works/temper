@@ -1507,8 +1507,8 @@ demo's own work pushes nothing yet.
     its lines through its last checkpoint, the flush boundary, whose
     count is the judge's loss. What follows is a flush still being
     written, and is not read. A file without a checkpoint, or a line
-    before it that skein's `decode` refuses, is undecided:
-    `observations missing`.
+    before it that skein's decoder refuses at the fake's limits, is
+    undecided: `observations missing`.
   - *STORE,* a copy of the deployment's store, `store/` in
     `engine.deployment.directory`, never the store itself, taken once
     serve has exited, stopped or killed: `/bin/cp -R -- <store>/.
@@ -1517,10 +1517,12 @@ demo's own work pushes nothing yet.
     copy made beside its writer can open to part of a commit with
     nothing refused. The lab takes it after the run's processes stop
     (skein's `lab.md`, its collection after the stop), so a run whose
-    lab has no such step has no copy. It is opened as serve opens it,
-    at the document's limits; one that is absent, does not open, is of
-    another `STORE_VERSION`, or has a row that does not decode is
-    undecided: `store unreadable`.
+    lab has no such step has no copy. It is opened as serve's store
+    opens it, at the limits `temper-service` derives from the document,
+    and its format checked as jig checks it, temper's interval read in
+    key order; one that is absent, does not open, is of another
+    `STORE_VERSION`, or has a row that does not decode is undecided:
+    `store unreadable`.
   - *The profile,* temper's as a client of forge N: `client` forge N's
     `Writer`, the bot's number on the fake, and with none, undecided:
     `client unknown`; `marker` temper's key's delimiters,
@@ -1598,10 +1600,10 @@ demo's own work pushes nothing yet.
   `temper-engine-domain-forge-issues`. The binary's
   `crates/temper/src/fake.rs` hosts the peers and the seed on
   skein-shell, reads the check's files and opens the store's copy at
-  the limits `temper-service`'s `store::limits`
-  derives from the document, and `temper fake git` is
-  `temper-fake-git`'s core on the real file system (`../domain/testing.md`,
-  4.3), which `main` runs when its `argv[0]`'s last component is `git`.
+  the limits `temper-service`'s `startup::store_limits` derives from the
+  document, and `temper fake git` is `temper-fake-git`'s core on the real
+  file system (`../domain/testing.md`, 4.3), which `main` runs when its
+  `argv[0]`'s last component is `git`.
   `Mode::Fake` and the link step's kind are `temper-forge-setup`'s.
 - **Not yet:** git's smart HTTP on the fake, its pages, and its state
   across starts; and a webhooks' listener in the box, so the demo's
