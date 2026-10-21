@@ -85,6 +85,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
         builder.open(Role::Main);
         builder.style(crate::look::MAIN);
         builder.open(Role::Paragraph);
+        builder.style(crate::look::UNAVAILABLE);
         view.forge_words.text(
             &mut builder,
             if word == Word::SignedOut { Word::SignedOutMain } else { Word::OutOfDateMain },

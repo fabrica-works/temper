@@ -137,6 +137,8 @@ pub const STEP: Style = Style { owner: owner(), token: 65 };
 pub const STEP_DONE: Style = Style { owner: owner(), token: 66 };
 /// The demo's project, repository and signed-in role.
 pub const CONTEXT: Style = Style { owner: owner(), token: 67 };
+/// The existing guidance when the application is unavailable.
+pub const UNAVAILABLE: Style = Style { owner: owner(), token: 68 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -210,6 +212,7 @@ pub const NAMES: Names<'static> = Names {
         b"temper-step",
         b"temper-step-done",
         b"temper-context",
+        b"temper-unavailable",
     ],
     regions: &[b"temper-link"],
 };

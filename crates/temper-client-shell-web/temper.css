@@ -577,3 +577,10 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 
 /* Supplied refusals keep Status semantics and share the Accounts alert colour. */
 .temper-main [role=status].temper-refusal { color: var(--temper-red); font-size: 11px; overflow-wrap: anywhere; }
+
+/* Existing unavailable guidance uses the Accounts card and reading column. */
+.temper-main:has(> .temper-unavailable) { width: 100%; padding-top: 164px; }
+.temper-unavailable { width: min(760px, calc(100% - 48px)); margin: 0 auto; border: 1px solid #dbd4ca; border-radius: 9px; background: #fffefd; padding: 20px; color: var(--temper-ink); font: 12px/1.58 var(--temper-mono); overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .temper-unavailable { width: calc(100% - 28px); }
+}
