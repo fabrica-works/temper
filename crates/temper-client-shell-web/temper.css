@@ -510,7 +510,8 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 .temper-accounts-page form .temper-card, .temper-adoption-page .temper-card .temper-card { padding: 0; border: 0; border-radius: 0; background: transparent; }
 .temper-adoption-page > .temper-card > .temper-card:has(> .temper-card) { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 14px; }
 :is(.temper-accounts-page, .temper-adoption-page) div:has(> input:not([type=radio]):not([type=checkbox])) { min-width: 0; }
-:is(.temper-accounts-page, .temper-adoption-page) label[for] { display: block; margin: 12px 0 5px; color: #756e65; font: 11px/1.58 var(--temper-mono); overflow-wrap: anywhere; }
+:is(.temper-accounts-page form, .temper-adoption-page > .temper-card > .temper-card) > .temper-card:has(> input:not([type=radio]):not([type=checkbox])) { display: flex; flex-direction: column; justify-content: flex-end; }
+:is(.temper-accounts-page, .temper-adoption-page) label[for]:has(+ input:not([type=radio], [type=checkbox])) { display: block; margin: 12px 0 5px; color: #756e65; font: 11px/1.58 var(--temper-mono); overflow-wrap: anywhere; }
 :is(.temper-accounts-page, .temper-adoption-page) input:not([type=radio]):not([type=checkbox]) { display: block; width: 100%; min-width: 0; border: 1px solid #d8d0c5; background: #fff; color: var(--temper-ink); border-radius: 8px; padding: 9px 11px; font: 12px/1.58 var(--temper-mono); }
 /* .stack and .kv: one radio or check and its existing words on each row. */
 .temper-adoption-page [role=radiogroup] { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 9px; margin-top: 18px; }
@@ -519,10 +520,10 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 .temper-adoption-page input:is([type=radio], [type=checkbox]) { flex: none; margin: 0; accent-color: var(--temper-accent); }
 /* The pinned renderer emits the input and its label as siblings. */
 .temper-adoption-page [role=radiogroup] > input { align-self: center; }
-.temper-adoption-page > .temper-card { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 9px; }
+.temper-adoption-page > .temper-card { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 9px; margin-top: 24px; }
 .temper-adoption-page > .temper-card > :not(input[type=checkbox]):not(input[type=checkbox] + label) { grid-column: 1 / -1; }
 .temper-adoption-page > .temper-card > input[type=checkbox] { grid-column: 1; align-self: center; }
-.temper-adoption-page > .temper-card > input[type=checkbox] + label { grid-column: 2; margin: 0; padding: 8px 0; border-bottom: 1px solid #f0ede8; color: var(--temper-ink); }
+.temper-adoption-page > .temper-card > input[type=checkbox] + label { grid-column: 2; margin: 0; padding: 8px 0; border-bottom: 1px solid #f0ede8; color: var(--temper-ink); font: 11px/1.58 var(--temper-mono); }
 /* .button-row and dialog actions: Accounts stays plain; Adopt is primary. */
 .temper-accounts-page form > .temper-card:first-of-type { grid-column: 1; }
 .temper-accounts-page form > label, .temper-accounts-page form > .temper-card:has(> button) { grid-column: 1 / -1; }
