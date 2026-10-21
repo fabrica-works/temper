@@ -4,6 +4,11 @@ use crate::{BranchHead, Criterion, Hold, Key, Name, PullState, Repository, Store
 use core::mem::size_of;
 use skein_lib::{Map, Queue};
 
+/// GitHub App slugs become bot logins with this suffix (setup/lifecycle.rs).
+pub const BOT_LOGIN_SUFFIX: &[u8] = b"[bot]";
+/// Bounds `stopped_text`'s Debug: skein `connection::Stopped` is fixed-shape (boundary.rs:109–151).
+pub const STOPPED_TEXT_BYTES: u64 = 128;
+
 /// Capacity of each durable top table and its child.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
@@ -89,7 +94,9 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         .checked_add(skein_forge_client::worst_case(&l.client)?)?
         .checked_add(Map::<skein_forge::api::Repository, Repository>::worst_case(l.repositories)?)?
         .checked_add(Map::<u16, crate::Connection>::worst_case(l.client.repositories)?)?
-        .checked_add(u64::from(l.client.repositories).checked_mul(u64::from(l.name_bytes).checked_add(5)?.max(128))?)?
+        .checked_add(u64::from(l.client.repositories).checked_mul(
+            u64::from(l.name_bytes).checked_add(u64::try_from(BOT_LOGIN_SUFFIX.len()).ok()?)?.max(STOPPED_TEXT_BYTES),
+        )?)?
         .checked_add(Map::<(u16, u64), crate::Installation>::worst_case(l.client.rows)?)?
         .checked_add(u64::from(l.client.rows).checked_mul(u64::from(l.name_bytes))?)?
         // Each forge's writer and git identity.
@@ -197,7 +204,9 @@ fn issue_payload(l: &Limits) -> Option<u64> {
 pub fn connection_worst_case(forges: u32, installations: u32, name_bytes: u32) -> Option<u64> {
     let count = forges.checked_mul(installations)?;
     Map::<u16, crate::Connection>::worst_case(forges)?
-        .checked_add(u64::from(forges).checked_mul(u64::from(name_bytes).checked_add(5)?.max(128))?)?
+        .checked_add(u64::from(forges).checked_mul(
+            u64::from(name_bytes).checked_add(u64::try_from(BOT_LOGIN_SUFFIX.len()).ok()?)?.max(STOPPED_TEXT_BYTES),
+        )?)?
         .checked_add(Map::<(u16, u64), crate::Installation>::worst_case(count)?)?
         .checked_add(u64::from(count).checked_mul(u64::from(name_bytes))?)
 }

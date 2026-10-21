@@ -268,9 +268,10 @@ pub(crate) fn connected(engine: &mut crate::engine::Engine, forge: u16) {
         let id =
             skein_forge_setup::item::user(rows.get(Item::User).expect("connected User")).expect("valid User").get();
         let slug = rows.get(Item::AppSlug).expect("connected slug");
-        let mut login = skein_lib::Writer::new(slug.len().checked_add(5).expect("bot login"));
+        let mut login =
+            skein_lib::Writer::new(slug.len().checked_add(domain::BOT_LOGIN_SUFFIX.len()).expect("bot login"));
         login.put(slug).expect("slug room");
-        login.put(b"[bot]").expect("suffix room");
+        login.put(domain::BOT_LOGIN_SUFFIX).expect("suffix room");
         (id, login.finish())
     } else {
         // Forgejo still starts from private files (temper-15); its login is the git identity's.

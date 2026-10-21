@@ -765,6 +765,8 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // Programs delta +77,994,945,656 B; total 85,507,095,639,812 B.
     // workers::worst_case retains one endpoint name: codex (5 B) becomes openai (6 B).
     let endpoint_growth = 6 - 5;
+    // 20b: Host, owner tables/names, encoded writes/handoff, pages, above, IO, deletion scratch.
+    let setup_growth = 96_188 + 14_768 + 49_216 + 131_712 + 1_610_617_344 + 100_673_280 + 200;
     assert_eq!(
         required.engine_bytes,
         79_659_997_210_050_u64
@@ -773,6 +775,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + catalogue_growth
             + programs_growth
             + endpoint_growth
+            + setup_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.

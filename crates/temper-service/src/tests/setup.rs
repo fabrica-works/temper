@@ -86,6 +86,7 @@ fn row(service: &mut crate::Service, item: Item, bytes: &[u8]) {
 fn the_host_starts_after_loading_with_temper_urls_and_the_configured_limits() {
     let mut service = service(8, Duration::from_secs(3600));
     let state = manifest(&mut service, 1);
+    assert_eq!(u64::try_from(state.len()).unwrap(), STATE_TEXT_BYTES);
     let page = service.setup_page(1, &state, Time::ZERO).unwrap();
     for expected in [
         b"temper-".as_slice(),
@@ -378,7 +379,7 @@ fn contains(bytes: &[u8], needle: &[u8]) -> bool {
     false
 }
 #[test]
-fn setup_memory_figures_remain_separate_from_the_host_admission() {
+fn setup_memory_includes_the_whole_host_and_its_owner() {
     let mut config = fixtures::engine();
     config.forges[0].kind = crate::settings::Kind::GitHub;
     config.forges[0].api_token = None;
@@ -395,7 +396,9 @@ fn setup_memory_figures_remain_separate_from_the_host_admission() {
     .unwrap();
     let pages = 8_u64.checked_mul(u64::from(given.limits.page_bytes)).unwrap();
     assert_eq!((machines, rows, pages), (630_744, 1_825_634, 131_072));
-    assert_eq!(accounted(8, 8), accounted(1, 1), "runtime 55: no partial Host charge");
+    let whole = worst_case(&config, &endpoints, 2).unwrap();
+    assert!(whole > host::worst_case(&setup.env.limits, &settings).unwrap());
+    assert!(accounted(8, 8) > accounted(1, 1), "runs/states change the admitted shell price");
 }
 #[test]
 fn every_host_unusable_arm_has_an_operator_path() {
@@ -453,14 +456,56 @@ fn invalid_host_limits_stop_after_load_and_setup_overrides_are_checked() {
     assert_eq!(own.setup.runs, 3);
 }
 
-fn accounted(runs: u32, states: u32) -> u64 {
+#[test]
+fn stopped_connection_text_has_a_fixed_bound() {
+    use skein_forge_connection::{StartRead, Stopped, Value};
+    let mut reasons = List::with_capacity(13);
+    for value in [Value::Credential, Value::Token, Value::Key, Value::User, Value::Secret] {
+        reasons.push(Stopped::Invalid { value }).unwrap();
+    }
+    for read in [StartRead::User, StartRead::ApiSettings, StartRead::Installations, StartRead::Mint, StartRead::Viewer]
+    {
+        reasons.push(Stopped::Refused { read, status: u16::MAX }).unwrap();
+    }
+    reasons.push(Stopped::TokenRefused { installation: u64::MAX, status: u16::MAX }).unwrap();
+    reasons.push(Stopped::OtherUser { user: u64::MAX }).unwrap();
+    reasons.push(Stopped::KeyRefused).unwrap();
+    for why in &reasons {
+        assert!(
+            u64::try_from(lifecycle::stopped_text(*why).len()).unwrap()
+                <= temper_engine_domain_forge::STOPPED_TEXT_BYTES
+        );
+    }
+}
+fn configured(runs: u32, states: u32) -> crate::settings::Engine {
     let mut config = fixtures::engine();
     config.forges[0].kind = crate::settings::Kind::GitHub;
     config.forges[0].api_token = None;
     config.limits.setup.runs = runs;
     config.limits.setup.states = states;
     fixtures::fill_files(&mut config);
-    crate::Service::engine(config, &fixtures::seeds(), None, fixtures::forge_runtime()).unwrap().worst_case()
+    config
+}
+#[expect(clippy::arithmetic_side_effects, reason = "the measured nonzero bound permits one byte less")]
+fn accounted(runs: u32, states: u32) -> u64 {
+    let required =
+        crate::Service::engine(configured(runs, states), &fixtures::seeds(), None, fixtures::forge_runtime())
+            .unwrap()
+            .worst_case();
+    for short in [false, true] {
+        let mut config = configured(runs, states);
+        config.jig.memory = required - u64::from(short);
+        let started = crate::Service::engine(config, &fixtures::seeds(), None, fixtures::forge_runtime());
+        if short {
+            assert_eq!(
+                started.err().unwrap().problems.get(0).unwrap().what,
+                jig_protocol_config::What::Memory { over: 1 }
+            );
+        } else {
+            assert_eq!(started.unwrap().worst_case(), required);
+        }
+    }
+    required
 }
 
 #[path = "setup_lifecycle.rs"]

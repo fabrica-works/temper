@@ -27,6 +27,8 @@ pub struct Service {
     bytes: u64,
     links: Queue<Box<[u8]>>,
 }
+// Existing reservation for setup/forge handoffs beside a root routing pass.
+const SETUP_ROUTING_HEADROOM: u32 = 2;
 impl Service {
     pub fn configure_program_sources(
         &mut self,
@@ -127,7 +129,7 @@ impl Service {
             &settings,
             &forge_settings,
             &seeds.crypto,
-            max.checked_add(2).expect("setup routing headroom"),
+            max.checked_add(SETUP_ROUTING_HEADROOM).expect("setup routing headroom"),
         )?;
         let forge = crate::forge::Layer::new(
             forge_settings,
@@ -597,7 +599,19 @@ pub(crate) fn startup_worst_case(
     let operations = startup_operations(io, queue, worker_operations).ok_or(start_problem(b"limits", What::Bound))?;
     let bytes = memory(settings, root, store, runtime, operations, io, (forge_bytes.1, forge_bytes.2))
         .ok_or(start_problem(b"memory_bytes", What::Bound))?;
-    bytes.checked_add(forge_bytes.0).ok_or(start_problem(b"memory_bytes", What::Bound))
+    let setup = crate::setup::worst_case(
+        settings,
+        forge_bytes.2,
+        temper_engine_domain::max_out(root)
+            .checked_add(SETUP_ROUTING_HEADROOM)
+            .ok_or(start_problem(b"memory_bytes", What::Bound))?,
+    )
+    .ok_or(start_problem(b"memory_bytes", What::Bound))?;
+    bytes
+        .checked_add(forge_bytes.0)
+        .ok_or(start_problem(b"memory_bytes", What::Bound))?
+        .checked_add(setup)
+        .ok_or(start_problem(b"memory_bytes", What::Bound))
 }
 fn startup_operations(io: &io::Limits, queue: u32, worker_operations: u32) -> Option<u32> {
     io::operations(io)?.checked_add(queue.checked_mul(4)?)?.checked_add(worker_operations)
@@ -655,7 +669,7 @@ fn memory(
     )?)?;
     bytes = bytes.checked_add(clients::bundle::worst_case(&settings.limits.clients)?)?;
     let forges = skein_forge_connection::limits::Forges::of(forge.1)?;
-    let batch = temper_engine_domain::max_out(root).checked_add(2)?;
+    let batch = temper_engine_domain::max_out(root).checked_add(SETUP_ROUTING_HEADROOM)?;
     bytes = bytes
         .checked_add(skein_forge_connection::limits::worst_case(
             &settings.limits.forge_component,

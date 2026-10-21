@@ -707,3 +707,64 @@ fn a_configured_github_forge_without_records_starts_not_connected() {
     assert!(service.engine.domain.ready());
     assert_eq!(service.end(), None);
 }
+
+#[test]
+fn startup_admits_the_full_setup_total_and_refuses_one_byte_short() {
+    let document = github_input(core::str::from_utf8(&fixtures::document()).unwrap())
+        .replace("\"api\":null", "\"api\":{\"socket\":\"127.0.0.1:9\"}")
+        .replace("\"transport\":null", "\"transport\":\"plaintext\"");
+    let directories = config::Directories::working();
+    let files = fixtures::files();
+    let agent = fixtures::startup_agent();
+    let seeds = fixtures::seeds();
+    let required = crate::startup::memory_requirements(
+        document.as_bytes(),
+        &directories,
+        &files,
+        &agent,
+        &seeds,
+        None,
+        fixtures::forge_runtime(),
+    )
+    .unwrap();
+    for short in [false, true] {
+        let input = document
+            .replacen("1152921504606846976", &(required.engine_bytes - u64::from(short)).to_string(), 1)
+            .replace("1152921504606846976", &required.worker_bytes.to_string());
+        let started = crate::startup(
+            input.as_bytes(),
+            &directories,
+            &files,
+            &agent,
+            &seeds,
+            None,
+            fixtures::worker_runtime(),
+            fixtures::forge_runtime(),
+        );
+        if short {
+            assert_eq!(
+                lines(&started.err().unwrap()).as_ref(),
+                b"engine.memory_bytes: the worst case passes memory_bytes by 1 bytes\n"
+            );
+        } else {
+            assert_eq!(started.unwrap().worst_case(), required.engine_bytes + required.worker_bytes);
+        }
+    }
+}
+#[test]
+fn startup_maps_refused_setup_and_total_overflow_to_memory_bound() {
+    let mut engine = fixtures::engine();
+    let (endpoints, _) = crate::forge::prepare(&engine, fixtures::forge_runtime()).unwrap();
+    let root = crate::limits::engine(&engine.jig.limits, &engine.limits).unwrap();
+    let store = crate::store::limits(&root, &engine.jig.limits.core, &root.forge, &engine.jig.limits.store).unwrap();
+    let io = engine.jig.limits.io;
+    // u32::MAX runs overflows setup's writes = runs + forges, after the host bound fits.
+    for (runs, roots) in [(0, 0), (u32::MAX, 0), (8, u64::MAX)] {
+        engine.limits.setup.runs = runs;
+        assert_eq!(runs.checked_add(engine.limits.forge_component.forges).is_none(), runs == u32::MAX);
+        assert_eq!(crate::setup::worst_case(&engine, &endpoints, 2).is_none(), runs != 8);
+        let found = crate::system::startup_worst_case(&engine, &root, &store, None, 0, &io, (roots, 0, &endpoints))
+            .unwrap_err();
+        assert_eq!(lines(&Problems::jig(found, &Path::root())).as_ref(), b"engine.memory_bytes: past its bound\n");
+    }
+}

@@ -4,12 +4,10 @@ use jig_protocol_config::{Path, Problems, What};
 use skein_forge_setup::{github, host};
 use skein_lib::{CryptoRng, List, Writer};
 
-pub(crate) fn prepare(
+pub(super) fn fixed(
     config: &crate::settings::Engine,
     forges: &skein_forge_connection::Settings,
-    seed: &skein_lib::Secret,
-    batch: u32,
-) -> Result<super::Layer, Problems> {
+) -> Result<(host::Settings, host::Limits), Problems> {
     let own = &config.limits;
     let pure = own.setup.plan();
     check(&own.setup)?;
@@ -88,9 +86,19 @@ pub(crate) fn prepare(
         io: config.jig.limits.io,
         tls: f.tls,
     };
+    Ok((host::Settings { forges: configured, user_agent: Box::from(crate::forge::USER_AGENT.as_bytes()) }, limits))
+}
+pub(crate) fn prepare(
+    config: &crate::settings::Engine,
+    forges: &skein_forge_connection::Settings,
+    seed: &skein_lib::Secret,
+    batch: u32,
+) -> Result<super::Layer, Problems> {
+    let (settings, limits) = fixed(config, forges)?;
+    let own = &config.limits;
     let crypto = CryptoRng::new(seed, 5).ok_or(problem(b"setup"))?;
     let mut layer = super::Layer::new(
-        host::Settings { forges: configured, user_agent: Box::from(crate::forge::USER_AGENT.as_bytes()) },
+        settings,
         limits,
         crypto,
         own.setup.state_life,

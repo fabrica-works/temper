@@ -44,6 +44,62 @@ struct Page {
     bytes: Box<[u8]>,
     until: Time,
 }
+// skein host/states.rs:53 spells its 16 random bytes as 32 hex bytes.
+pub(crate) const STATE_TEXT_BYTES: u64 = 32;
+/// Whole host plus the allocations retained by this owner (protocol/forge.md, 2.6).
+pub(crate) fn worst_case(
+    config: &crate::settings::Engine,
+    forges: &skein_forge_connection::Settings,
+    batch: u32,
+) -> Option<u64> {
+    use temper_engine_domain_forge::{BOT_LOGIN_SUFFIX, STOPPED_TEXT_BYTES};
+    let (settings, l) = settings::fixed(config, forges).ok()?;
+    let host = host::worst_case(&l, &settings)?; // Includes pending fixed Settings, moved into Host::new.
+    let installations = config.limits.forge_component.installations;
+    let count = l.forges.checked_mul(installations)?;
+    let above = batch.checked_mul(host::MAX_OUT.above)?;
+    let below = batch.checked_mul(host::MAX_OUT.below)?;
+    let writes = l.runs.checked_add(l.forges)?;
+    let name = u64::from(config.limits.forge.name_bytes);
+    let page = u64::from(l.body_bytes).checked_add(STATE_TEXT_BYTES)?;
+    let wanted = skein_forge::github::setup::PERMISSIONS.len().checked_add(skein_forge::github::setup::EVENTS.len())?;
+    let lacking = skein_lib::List::<skein_forge_setup::github::Lacking>::worst_case(u32::try_from(wanted).ok()?)?
+        .checked_add(diagnostics::worst_case()?)?;
+    // Handed-up items, pages/links with state, failure subjects, or missing access.
+    let payload =
+        u64::from(l.body_bytes_in).max(page).max(u64::from(config.limits.records.value_bytes)).max(name).max(lacking);
+    host.checked_add(Map::<u16, ()>::worst_case(l.forges)?)? // served
+        .checked_add(Map::<u16, ()>::worst_case(l.forges)?)? // lifecycle.reconcile
+        .checked_add(Map::<u16, ()>::worst_case(l.forges)?)? // lifecycle.deleting
+        .checked_add(Map::<u16, &'static [u8]>::worst_case(l.forges)?)? // unserved
+        // BASE stages only auto-Reconcile with empty adopted data; 07/08/09 must bound inputs first.
+        .checked_add(Map::<Token, host::Plan>::worst_case(l.runs)?)?
+        .checked_add(Map::<Token, Run>::worst_case(l.runs)?)?
+        .checked_add(
+            name.checked_add(u64::try_from(BOT_LOGIN_SUFFIX.len()).ok()?)?
+                .max(STOPPED_TEXT_BYTES)
+                .checked_mul(u64::from(l.runs))?,
+        )?
+        .checked_add(Map::<(u16, u64), ()>::worst_case(count)?)? // lifecycle.deleted
+        .checked_add(Map::<(u16, u64), temper_engine_domain_forge::Installation>::worst_case(count)?)?
+        .checked_add(name.checked_mul(u64::from(count))?)? // installation account logins
+        .checked_add(Map::<Token, Write>::worst_case(writes)?)?
+        // Encoded record, including VERSION; the store's own copy stays in store::worst_case.
+        .checked_add(u64::from(config.limits.records.value_bytes).checked_mul(u64::from(writes))?)?
+        .checked_add(Queue::<Page>::worst_case(l.states)?)?
+        .checked_add(page.checked_mul(u64::from(l.states))?)?
+        .checked_add(Queue::<host::Event>::worst_case(above)?)?
+        .checked_add(payload.checked_mul(u64::from(above))?)?
+        .checked_add(Queue::<skein_io::Request>::worst_case(below)?)?
+        .checked_add(u64::from(l.io.output).checked_mul(u64::from(below))?)?
+        .checked_add(skein_lib::List::<u16>::worst_case(l.forges)?)? // advance's forge-number scratch
+        .checked_add(skein_lib::List::<u64>::worst_case(installations)?)? // accepted()
+        .checked_add(skein_lib::List::<u64>::worst_case(installations)?)? // deleted
+        .checked_add(skein_lib::List::<u64>::worst_case(installations)?)? // remaining
+        // accepted_item's raw little-endian ids coexist with the encoded Write above.
+        .checked_add(u64::try_from(size_of::<u64>()).ok()?.checked_mul(u64::from(installations))?)
+}
+
 impl Layer {
     pub(crate) fn new(
         settings: host::Settings,
