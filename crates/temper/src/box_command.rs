@@ -7,7 +7,7 @@ use temper_box::host::{Service, Settings};
 /// Checks the document before starting its steps; refusals contain unprefixed lines.
 pub fn run(directories: &super::Directories) -> Result<Exit, String> {
     let bytes = configuration(directories)?;
-    let (_, checked, limits) = super::setup::check(&bytes, &directories.jig())?;
+    let super::setup::Deployment { checked, limits, .. } = super::setup::check(&bytes, &directories.jig())?;
     let mut refusals = Vec::new();
     for (index, entry) in checked.setup.entries.iter().enumerate() {
         match &entry.mode {

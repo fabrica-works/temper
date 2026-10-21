@@ -167,7 +167,8 @@ pub(crate) fn start(directories: &super::Directories, arguments: &[OsString]) ->
     let number = number.to_str().and_then(|n| n.parse::<u16>().ok()).ok_or_else(usage)?;
     let refused = |why| Refused { verb, number: Some(number), why };
     let bytes = directories.read().map_err(refused)?;
-    let (named, checked, _) = super::setup::check(&bytes, &directories.jig()).map_err(refused)?;
+    let super::setup::Deployment { named, checked, .. } =
+        super::setup::check(&bytes, &directories.jig()).map_err(refused)?;
     if verb == "reconcile" {
         let settings = reconcile_settings(&named, &checked, number).map_err(refused)?;
         return temper_forge_setup_shell::reconcile::reconcile(settings, &skein_shell::Clock::new())

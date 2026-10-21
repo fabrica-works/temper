@@ -15,13 +15,18 @@ use std::{
 };
 use temper_fake::{
     credential::{self, credential},
-    forge, limits, llm,
+    demo, forge, limits, llm,
 };
 
 pub const LLM_SETTINGS: Settings = Settings {
     tool: "temper",
     table: &[
-        Setting { name: "document", value: "FILE", about: "The fake LLM's JSON document.", fallback: Fallback::Refuse },
+        Setting {
+            name: "document",
+            value: "FILE",
+            about: "The fake LLM's JSON document.",
+            fallback: Fallback::Text(""),
+        },
         Setting {
             name: "ready",
             value: "PREFIX",
@@ -81,6 +86,7 @@ impl Kind {
 #[derive(Debug, PartialEq, Eq)]
 pub enum Source {
     Document(PathBuf),
+    Demo { directories: super::Directories },
     Setup { directories: super::Directories, forge: u16 },
 }
 #[derive(Debug, PartialEq, Eq)]
@@ -123,14 +129,24 @@ pub fn configure(
     };
     let resolved = skein_shell::resolve(table, arguments, environment)
         .map_err(|why| super::prefixed(kind.command(), &why.to_string()))?;
-    let source = if kind == Kind::Forge && resolved.value(0).origin == Origin::Default {
+    let source = if resolved.value(0).origin == Origin::Default {
         let (directories, rest) = super::directories::resolve(resolved.rest(), environment, working)
             .map_err(|why| super::prefixed(kind.command(), &why.to_string()))?;
-        let [number] = rest.as_ref() else {
-            return Err(super::prefixed(kind.command(), FORGE_USAGE));
-        };
-        let forge = forge_number(number).map_err(|why| super::prefixed(kind.command(), why))?;
-        Source::Setup { directories, forge }
+        match kind {
+            Kind::Forge => {
+                let [number] = rest.as_ref() else {
+                    return Err(super::prefixed(kind.command(), FORGE_USAGE));
+                };
+                let forge = forge_number(number).map_err(|why| super::prefixed(kind.command(), why))?;
+                Source::Setup { directories, forge }
+            }
+            Kind::Llm => {
+                if !rest.is_empty() {
+                    return Err(super::prefixed(kind.command(), LLM_USAGE));
+                }
+                Source::Demo { directories }
+            }
+        }
     } else {
         if let Some(word) = resolved.rest().first() {
             let why = if kind == Kind::Forge {
@@ -159,6 +175,7 @@ pub fn configure(
     Ok(super::Command::Fake { arguments: Arguments { kind, source, ready, seed, observations } })
 }
 
+const LLM_USAGE: &str = "usage: temper fake llm [DIRECTORIES] [--ready PREFIX] [--seed N] | temper fake llm --document FILE [--ready PREFIX] [--seed N]";
 const FORGE_USAGE: &str = "usage: temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE]";
 fn forge_number(number: &[u8]) -> Result<u16, &'static str> {
     std::str::from_utf8(number)
@@ -249,6 +266,7 @@ fn read_document(path: &Path, bound: u32) -> Result<Box<[u8]>, String> {
 }
 fn forge_document(source: &Source, seed: u64, created: &mut Created) -> Result<(forge::Document, [u8; 40]), String> {
     match source {
+        Source::Demo { .. } => unreachable!("forge has document and setup forms"),
         Source::Document(path) => {
             let bytes = read_document(path, temper_fake::DOCUMENT_BYTES)?;
             let document =
@@ -261,7 +279,7 @@ fn forge_document(source: &Source, seed: u64, created: &mut Created) -> Result<(
         }
         Source::Setup { directories, forge } => {
             let bytes = read_document(&directories.document(), super::CONFIG_BYTES)?;
-            let (_, checked, _) = super::setup::check(&bytes, &directories.jig())?;
+            let super::setup::Deployment { checked, .. } = super::setup::check(&bytes, &directories.jig())?;
             let entry = checked.setup.entry(*forge).ok_or("the setup has no entry for it")?;
             let fake = match &entry.mode {
                 temper_forge_setup::setup::Mode::Fake(fake) => fake,
@@ -285,18 +303,34 @@ fn forge_document(source: &Source, seed: u64, created: &mut Created) -> Result<(
 fn start(arguments: &Arguments, created: &mut Created) -> Result<(Host, skein_shell::Kernel), String> {
     let (peer, shared, observations, writer, buffer) = match arguments.kind {
         Kind::Llm => {
-            let Source::Document(path) = &arguments.source else { unreachable!("LLM has only the document form") };
-            let bytes = read_document(path, temper_fake::DOCUMENT_BYTES)?;
-            let document =
-                llm::Document::decode(&bytes).map_err(|why| String::from_utf8_lossy(&why.line()).into_owned())?;
-            let key = credential(arguments.seed, credential::KEY);
-            created.file(super::path(document.key()), &key)?;
-            if let Some(root) = document.root() {
-                created.file(super::path(root), skein_fake_peers::transport::ROOT)?;
-            }
+            let configuration = match &arguments.source {
+                Source::Document(path) => {
+                    let bytes = read_document(path, temper_fake::DOCUMENT_BYTES)?;
+                    let document = llm::Document::decode(&bytes)
+                        .map_err(|why| String::from_utf8_lossy(&why.line()).into_owned())?;
+                    let key = credential(arguments.seed, credential::KEY);
+                    created.file(super::path(document.key()), &key)?;
+                    if let Some(root) = document.root() {
+                        created.file(super::path(root), skein_fake_peers::transport::ROOT)?;
+                    }
+                    llm::configuration(&document, &key, arguments.seed)
+                }
+                Source::Demo { directories } => {
+                    let bytes = read_document(&directories.document(), super::CONFIG_BYTES)?;
+                    let deployment = super::setup::check(&bytes, &directories.jig())?;
+                    let demo = deployment.demo.ok_or("application.demo is null: the deployment has no demo")?;
+                    let path = super::path(demo.llm().key());
+                    let file =
+                        skein_shell::read_private_file(path, demo::KEY_FILE_BYTES, skein_shell::effective_user())
+                            .map_err(|why| format!("{}: {}", path.display(), super::unread(why)))?;
+                    let key =
+                        demo::key(file.expose()).map_err(|why| format!("{}: {}", path.display(), why.reason()))?;
+                    llm::configuration(demo.llm(), key, arguments.seed)
+                }
+                Source::Setup { .. } => unreachable!("LLM has document and demo forms"),
+            };
             let observations = arguments.observations.as_ref().map(|path| created.file(path, b"")).transpose()?;
-            let peer = llm::peer(llm::configuration(&document, &key, arguments.seed))
-                .map_err(|why| format!("peer: {why:?}"))?;
+            let peer = llm::peer(configuration).map_err(|why| format!("peer: {why:?}"))?;
             let writer = arguments
                 .observations
                 .as_ref()

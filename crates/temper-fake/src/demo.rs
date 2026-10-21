@@ -8,6 +8,40 @@ use skein_json::Document as Json;
 use skein_lib::{List, bytes};
 use temper_forge_setup::setup::{Mode, Setup};
 
+/// The key file's read bound: the largest account key and its newline.
+/// jig's client-v11 Keyed.value ceiling is 4096 bytes; account keys are raw bytes.
+pub const KEY_FILE_BYTES: u32 = 4097;
+
+/// Why the demo key cannot be added as an account's key.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeyRefused {
+    Empty,
+    TooLong,
+}
+impl KeyRefused {
+    #[must_use]
+    pub fn reason(self) -> &'static str {
+        match self {
+            Self::Empty => "holds no key",
+            Self::TooLong => "key past 4096 bytes",
+        }
+    }
+}
+/// A demo key file's key: its bytes less a final newline (protocol/setup.md, 8.4).
+pub fn key(file: &[u8]) -> Result<&[u8], KeyRefused> {
+    let key = match file.strip_suffix(b"\n") {
+        Some(key) => key,
+        None => file,
+    };
+    if key.is_empty() {
+        return Err(KeyRefused::Empty);
+    }
+    if key.len() > usize::try_from(KEY_FILE_BYTES - 1).expect("key bound") {
+        return Err(KeyRefused::TooLong);
+    }
+    Ok(key)
+}
+
 /// The deployment's demo, checked against the document (protocol/setup.md, 8.4).
 #[derive(Debug)]
 pub struct Demo {

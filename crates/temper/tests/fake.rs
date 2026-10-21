@@ -241,11 +241,11 @@ fn refused_start() {
     scratch.remove();
 }
 
-fn deployment_command(directory: &Path) -> Command {
+fn deployment_command(kind: &str, directory: &Path) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_temper"));
     command
         .env_clear()
-        .args(["fake", "forge"])
+        .args(["fake", kind])
         .args(support::configuration::flags(directory))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -262,6 +262,7 @@ fn forge_setup(directory: &Path, listen: &str) -> Value {
     fake["repositories"][0]["landing"] = json!("trunk");
     config
 }
+#[expect(clippy::too_many_lines, reason = "deployment forms refuse before creating files")]
 fn refused_deployment_start(root: &Path) {
     const TOKEN: &[u8] = b"0123456789abcdef0123456789abcdef01234567";
     let directory = root.join("deployment");
@@ -333,7 +334,7 @@ fn refused_deployment_start(root: &Path) {
             fs::set_permissions(dir.join("forge-1"), fs::Permissions::from_mode(0o700)).expect("private");
             support::write_private(&dir.join("forge-1/admin_token"), token);
         }
-        let mut command = deployment_command(&dir);
+        let mut command = deployment_command("forge", &dir);
         command.arg(number);
         if own_document {
             command.args(["--document", "unused.json"]);
@@ -353,6 +354,40 @@ fn refused_deployment_start(root: &Path) {
             format!("temper fake forge: {location}{reason}\n"),
             "{name}"
         );
+        assert_eq!(snapshot(&dir), before, "{name}: refused startup leaves directories unchanged");
+    }
+    let bound = usize::try_from(temper_fake::demo::KEY_FILE_BYTES).expect("key file bound");
+    for (name, demo, file, mode, extra, reason, names_file) in [
+        ("llm_null", false, None, 0o600, false, "application.demo is null: the deployment has no demo".to_owned(), false),
+        ("llm_absent", true, None, 0o600, false, "absent".to_owned(), true),
+        ("llm_public", true, Some(TOKEN.to_vec()), 0o644, false, "readable by others or reached through a link".to_owned(), true),
+        ("llm_empty", true, Some(b"\n".to_vec()), 0o600, false, "holds no key".to_owned(), true),
+        ("llm_long", true, Some(vec![b'k'; bound + 1]), 0o600, false, format!("past {bound} bytes"), true),
+        ("llm_word", true, None, 0o600, true, "usage: temper fake llm [DIRECTORIES] [--ready PREFIX] [--seed N] | temper fake llm --document FILE [--ready PREFIX] [--seed N]".to_owned(), false),
+    ] {
+        let dir = directory.join(name);
+        fs::create_dir(&dir).expect("case directory");
+        let mut config = support::configuration::demo_document(&dir, "127.0.0.1:8370");
+        if !demo {
+            config["application"]["demo"] = Value::Null;
+        }
+        document(&dir.join("temper.json"), &config);
+        let path = dir.join("demo/llm.key");
+        if let Some(file) = file {
+            fs::create_dir(dir.join("demo")).expect("key directory");
+            support::write_private(&path, &file);
+            fs::set_permissions(&path, fs::Permissions::from_mode(mode)).expect("key mode");
+        }
+        let mut command = deployment_command("llm", &dir);
+        if extra {
+            command.arg("extra");
+        }
+        let before = snapshot(&dir);
+        let output = command.output().expect("refused demo");
+        assert_eq!(output.status.code(), Some(1), "{name}");
+        assert!(output.stdout.is_empty(), "{name}");
+        let location = if names_file { format!("{}: ", path.display()) } else { String::new() };
+        assert_eq!(output.stderr, format!("temper fake llm: {location}{reason}\n").as_bytes(), "{name}");
         assert_eq!(snapshot(&dir), before, "{name}: refused startup leaves directories unchanged");
     }
 }
@@ -389,7 +424,7 @@ fn forge_run() {
         let observations = dir.join("observations");
         let (run, token_path, token) = if from_setup {
             let (listen, path, token) = prepared_forge(dir);
-            let mut command = deployment_command(dir);
+            let mut command = deployment_command("forge", dir);
             command.arg("1");
             let run = Running::command(command, Some(&observations));
             assert_eq!(run.address, listen, "ready on fake.listen");
@@ -499,7 +534,7 @@ fn prepared_forge(directory: &Path) -> (SocketAddr, std::path::PathBuf, Vec<u8>)
 fn the_prepared_fake_reconciles_twice_before_it_stops() {
     let scratch = support::Scratch::new("fake_forge_reconcile");
     let (_, path, token) = prepared_forge(scratch.path());
-    let mut command = deployment_command(scratch.path());
+    let mut command = deployment_command("forge", scratch.path());
     command.arg("1");
     let run = Running::command(command, None);
     for pass in ["first", "second"] {
@@ -521,15 +556,33 @@ fn the_prepared_fake_reconciles_twice_before_it_stops() {
 
 const CHAT:&[u8]=br#"{"model":"qa","store":false,"instructions":"","input":[{"role":"user","content":[{"type":"input_text","text":"say hello"}]}],"stream":true}"#;
 #[test]
+#[expect(clippy::too_many_lines, reason = "all LLM forms serve the same requests and retain their files")]
 fn llm_run() {
-    for tls in [false, true] {
-        let scratch = support::Scratch::new(if tls { "fake_llm_tls" } else { "fake_llm_plain" });
+    for (name, tls, demo) in
+        [("fake_llm_plain", false, false), ("fake_llm_tls", true, false), ("fake_llm_demo", false, true)]
+    {
+        let scratch = support::Scratch::new(name);
         let dir = scratch.path();
         let doc = dir.join("llm.json");
         document(&doc, &llm_document(dir, tls));
-        let run = Running::start("llm", &doc, None);
-        let key = temper_fake::credential::credential(23, temper_fake::credential::KEY);
-        private_hex(&dir.join("key"), &key);
+        let (run, key_path, key) = if demo {
+            let listen = support::free_addresses::<1>(&[])[0];
+            let config = support::configuration::demo_document(dir, &listen.to_string());
+            document(&dir.join("temper.json"), &config);
+            fs::create_dir(dir.join("demo")).expect("demo directory");
+            let path = dir.join("demo/llm.key");
+            let key = b"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_vec();
+            support::write_private(&path, &[key.as_slice(), b"\n"].concat());
+            let run = Running::command(deployment_command("llm", dir), None);
+            assert_eq!(run.address, listen, "ready on application.demo.llm.listen");
+            (run, path, key)
+        } else {
+            let run = Running::start("llm", &doc, None);
+            let key = temper_fake::credential::credential(23, temper_fake::credential::KEY);
+            private_hex(&dir.join("key"), &key);
+            (run, dir.join("key"), key.to_vec())
+        };
+        let before = snapshot(dir);
         let auth = format!("Bearer {}", std::str::from_utf8(&key).expect("valid fixture"));
         for (credential, status, text) in [
             (&*auth, b"HTTP/1.1 200".as_slice(), "hello from QA"),
@@ -586,11 +639,25 @@ fn llm_run() {
             assert!(response.starts_with(b"HTTP/1.1 200"));
             assert!(String::from_utf8_lossy(&response).contains("hello from QA"));
         }
-        run.stop();
-        assert!(dir.join("key").exists());
-        if tls {
-            assert!(dir.join("root.der").exists());
+        let mut other: Value = serde_json::from_slice(CHAT).expect("valid fixture");
+        other["input"][0]["content"][0]["text"] = json!("another request");
+        if !tls {
+            let response = request(
+                run.address,
+                "POST",
+                "/v1/responses",
+                &auth,
+                &serde_json::to_vec(&other).expect("valid fixture"),
+            );
+            assert!(response.starts_with(b"HTTP/1.1 200"));
+            assert!(String::from_utf8_lossy(&response).contains("fallback"));
         }
+        run.stop();
+        assert_eq!(snapshot(dir), before, "{name}: files and modes retained after stop");
+        assert_eq!(
+            fs::read(&key_path).expect("key retained"),
+            if demo { [key.as_slice(), b"\n"].concat() } else { key }
+        );
         scratch.remove();
     }
 }

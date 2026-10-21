@@ -168,20 +168,12 @@ fn fixed_sign_in_ports_are_checked_against_owned_and_fake_listeners() {
     configuration::fake_entry(&mut fake["application"]["setup"][0], "127.0.0.1:3000");
     let mut demo = fake.clone();
     demo["engine"]["llm"]["providers"][0]["sources"]["sign_in"]["redirect_port"] = 8370.into();
-    demo["engine"]["llm"]["providers"].as_array_mut().expect("fixture list").push(serde_json::json!({
-        "name":"demo", "number":3, "models":["demo"], "sources":{"keys":true}
-    }));
-    demo["engine"]["llm"]["endpoints"].as_array_mut().expect("fixture list").push(serde_json::json!({
-        "name":"demo", "number":3, "dialect":3, "provider":"demo", "transport":"plaintext",
-        "address":{"socket":"127.0.0.1:8370"}, "headers":[], "connect_ms":10000, "handshake_ms":10000
-    }));
-    demo["engine"]["llm"]["models"].as_array_mut().expect("fixture list").push(serde_json::json!({
-        "name":"demo", "endpoint":"demo", "window":4096, "output":1024,
-        "prices":{"input":1,"cached":1,"output":1,"unit":1}
-    }));
-    demo["application"]["demo"] = serde_json::json!({"llm":{
-        "listen":{"socket":"127.0.0.1:8370"}, "provider":3, "key":"demo/llm.key", "asked":[],
-        "otherwise":["demo model"]}, "forge":1, "project":1, "client":"demo/client"});
+    let fixture = configuration::demo_document(std::path::Path::new("/config"), "127.0.0.1:8370");
+    for field in ["providers", "endpoints", "models"] {
+        let member = fixture["engine"]["llm"][field].as_array().expect("LLM table").last().expect("demo member");
+        demo["engine"]["llm"][field].as_array_mut().expect("LLM table").push(member.clone());
+    }
+    demo["application"]["demo"] = fixture["application"]["demo"].clone();
     let mut bad_demo = demo.clone();
     bad_demo["application"]["demo"]["project"] = 9.into();
     for (document, expected) in [
@@ -210,13 +202,12 @@ fn fixed_sign_in_ports_are_checked_against_owned_and_fake_listeners() {
     }
     // The same API on a connected forge belongs to the remote peer, not this process.
     value["application"]["setup"] = serde_json::json!([]);
-    assert!(
-        super::setup::check(
-            &serde_json::to_vec(&value).expect("connected JSON"),
-            &jig_protocol_config::Directories::given(b"/config", b"/data", b"/cache").expect("fixture directories")
-        )
-        .is_ok()
-    );
+    let deployment = super::setup::check(
+        &serde_json::to_vec(&value).expect("connected JSON"),
+        &jig_protocol_config::Directories::given(b"/config", b"/data", b"/cache").expect("fixture directories"),
+    )
+    .expect("connected forge");
+    assert!(deployment.demo.is_none());
 }
 
 #[test]

@@ -19,7 +19,7 @@ fn command(
 ) -> Result<std::process::Command, String> {
     let name = source_name(name)?;
     let bytes = directories.read()?;
-    let (named, _, _) = super::setup::check(&bytes, &directories.jig())?;
+    let super::setup::Deployment { named, .. } = super::setup::check(&bytes, &directories.jig())?;
     let agent = super::agent::preflight(&named)?;
     let program = agent
         .programs

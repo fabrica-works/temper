@@ -100,3 +100,28 @@ pub fn check_document(directory: &Path) -> serde_json::Value {
     value["application"]["identities"][0]["token"] = "forge-1/git_token".into();
     value
 }
+
+/// A demo model whose one plaintext endpoint listens at the supplied address.
+#[must_use]
+pub fn demo_document(directory: &Path, listen: &str) -> serde_json::Value {
+    let mut value = check_document(directory);
+    let llm = serde_json::json!({
+        "providers":[{"name":"demo", "number":3, "models":["qa"], "sources":{"keys":true}}],
+        "endpoints":[{"name":"demo", "number":3, "dialect":3, "provider":"demo",
+            "address":{"socket":listen}, "transport":"plaintext", "headers":[],
+            "connect_ms":10000, "handshake_ms":10000}],
+        "models":[{"name":"qa", "endpoint":"demo", "window":4096, "output":1024,
+            "prices":{"input":1,"cached":1,"output":1,"unit":1}}]
+    });
+    for field in ["providers", "endpoints", "models"] {
+        value["engine"]["llm"][field]
+            .as_array_mut()
+            .expect("LLM table")
+            .extend(llm[field].as_array().expect("demo table").iter().cloned());
+    }
+    value["application"]["demo"] = serde_json::json!({"llm":{
+        "listen":{"socket":listen}, "provider":3, "key":"demo/llm.key",
+        "asked":[{"cue":"say hello", "turns":["hello from QA"]}], "otherwise":["fallback"]},
+        "forge":1, "project":1, "client":"demo/client"});
+    value
+}

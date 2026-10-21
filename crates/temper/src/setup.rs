@@ -6,10 +6,15 @@ use temper_forge_setup::{
 };
 use temper_service::startup::{Named, Transport, User};
 
-pub(crate) fn check(
-    bytes: &[u8],
-    directories: &config::Directories,
-) -> Result<(Named, Checked, temper_box::limits::Limits), String> {
+#[derive(Debug)]
+pub(crate) struct Deployment {
+    pub named: Named,
+    pub checked: Checked,
+    pub limits: temper_box::limits::Limits,
+    pub demo: Option<temper_fake::demo::Demo>,
+}
+
+pub(crate) fn check(bytes: &[u8], directories: &config::Directories) -> Result<Deployment, String> {
     let named = temper_service::named(bytes, directories)
         .map_err(|why| String::from_utf8_lossy(&temper_service::startup::lines(&why)).into_owned())?;
     let document = config::document(
@@ -84,7 +89,7 @@ pub(crate) fn check(
     };
     let demo = temper_fake::demo::read(&document, super::member(&document, application, b"demo"), &facts)
         .map_err(|why| String::from_utf8_lossy(&why.line()).into_owned())?;
-    if let Some(demo) = demo {
+    if let Some(demo) = &demo {
         temper_service::startup::redirect_ports(
             &named.redirects,
             Some(demo.llm().listen().port()),
@@ -96,7 +101,7 @@ pub(crate) fn check(
         return Err(String::from_utf8_lossy(&temper_service::startup::lines(&problems)).into_owned());
     }
     let limits = box_limits(&named.overrides)?;
-    Ok((named, checked, limits))
+    Ok(Deployment { named, checked, limits, demo })
 }
 
 fn box_limits(overrides: &[(Box<[u8]>, u64)]) -> Result<temper_box::limits::Limits, String> {

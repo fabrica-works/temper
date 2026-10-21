@@ -105,7 +105,7 @@ pub struct Configuration {
 pub const ROUTE: &[u8] = b"/v1/responses";
 /// Builds the played domain without a menu, failures or latency, and its one key.
 #[must_use]
-pub fn configuration(document: &Document, key: &[u8; 40], seed: u64) -> Configuration {
+pub fn configuration(document: &Document, key: &[u8], seed: u64) -> Configuration {
     Configuration {
         listen: document.listen,
         tls: document.root.is_some(),

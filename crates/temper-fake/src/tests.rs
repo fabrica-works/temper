@@ -504,12 +504,12 @@ fn constants_fit() {
             "models":models,"cued":scripts("system"),"asked":scripts("request"),"otherwise":["a","b","c","d","e","f","g","h"]})).expect("valid fixture");
     let document = llm::Document::decode(&bytes).expect("valid fixture");
     let key = credential(0, credential::KEY);
-    let plain = crate::wire::llm(llm::configuration(&document, &key, 0)).expect("valid fixture");
+    let plain = crate::wire::llm(llm::configuration(&document, &key[..], 0)).expect("valid fixture");
     assert!(skein_fake_llm_domain::worst_case(&llm::LIMITS).is_some());
     let mut tls: Value = serde_json::from_slice(&bytes).expect("valid fixture");
     tls["tls"] = json!({"root":"/tmp/root"});
     let document = llm::Document::decode(&serde_json::to_vec(&tls).expect("valid fixture")).expect("valid fixture");
-    crate::wire::llm(llm::configuration(&document, &key, 0)).expect("valid fixture");
+    crate::wire::llm(llm::configuration(&document, &key[..], 0)).expect("valid fixture");
     let document=forge::Document::decode(&serde_json::to_vec(&json!({"listen":{"socket":"127.0.0.1:0"},"admin_token":"/tmp/admin_token","owner":"fake",
             "repositories":(0..8).map(|i|json!({"name":format!("repo-{i}"),"landing":"main","ci":null})).collect::<Vec<_>>()})).expect("valid fixture")).expect("valid fixture");
     let token = credential(0, credential::ADMIN_TOKEN);

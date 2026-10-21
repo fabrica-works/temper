@@ -285,3 +285,25 @@ fn demo_acceptance() {
         assert_eq!(demo.client(), b"/data/demo/client");
     }
 }
+
+#[test]
+fn key_file() {
+    let hex = b"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    let bound = usize::try_from(demo::KEY_FILE_BYTES - 1).unwrap();
+    // The engine's Keyed.value is a secret, not text: every byte is admitted.
+    let bytes: Vec<u8> = (0..=255).collect();
+    for (file, expected) in [
+        ([hex.as_slice(), b"\n"].concat(), Ok(hex.as_slice().to_vec())),
+        (hex.to_vec(), Ok(hex.to_vec())),
+        ([hex.as_slice(), b"\n\n"].concat(), Ok([hex.as_slice(), b"\n"].concat())),
+        (b"\n".to_vec(), Err("holds no key")),
+        (vec![], Err("holds no key")),
+        (vec![b'k'; bound + 1], Err("key past 4096 bytes")),
+        ([vec![b'k'; bound + 1], vec![b'\n']].concat(), Err("key past 4096 bytes")),
+        (vec![b'k'; bound], Ok(vec![b'k'; bound])),
+        ([vec![b'k'; bound], vec![b'\n']].concat(), Ok(vec![b'k'; bound])),
+        (bytes.clone(), Ok(bytes)),
+    ] {
+        assert_eq!(demo::key(&file).map(<[u8]>::to_vec).map_err(demo::KeyRefused::reason), expected);
+    }
+}

@@ -71,7 +71,10 @@ fn arguments() {
     for (words, expected) in [
         (vec!["fake"], "temper fake: expected llm, forge or git\n"),
         (vec!["fake", "other"], "temper fake: unknown fake other\n"),
-        (vec!["fake", "llm"], "temper fake llm: --document FILE is not given, and TEMPER_DOCUMENT is not set\n"),
+        (
+            vec!["fake", "llm"],
+            "temper fake llm: --config DIR is not given, TEMPER_CONFIG is not set, and its default $XDG_CONFIG_HOME/temper needs XDG_CONFIG_HOME or HOME as an absolute path\n",
+        ),
         (
             vec!["fake", "llm", "--document", "doc", "--seed", "no"],
             "temper fake llm: --seed N (TEMPER_SEED): expected a decimal u64\n",
@@ -313,7 +316,7 @@ fn observation_write_failure_drains_the_peer_and_keeps_its_outputs() {
 }
 
 #[test]
-fn forge_deployment_arguments() {
+fn deployment_arguments() {
     for (words, environment, directories, forge) in [
         (
             vec!["fake", "forge", "1", "--ready", "ready ", "--seed", "23", "--observations", "seen"],
@@ -366,6 +369,36 @@ fn forge_deployment_arguments() {
         assert_eq!(
             configured(&["fake", "forge", number], &[("HOME", "/home/test")]),
             Err("temper fake forge: N: expected a forge number, a decimal u16\n".into())
+        );
+    }
+    for (words, environment, directories) in [
+        (
+            vec!["fake", "llm"],
+            vec![("HOME", "/home/test")],
+            check_directories(
+                "/home/test/.config/temper",
+                "/home/test/.local/share/temper",
+                "/home/test/.cache/temper",
+                Origin::Home,
+            ),
+        ),
+        (
+            vec!["fake", "llm", "--config", "/config", "--data", "data", "--cache", "cache"],
+            vec![],
+            check_directories("/config", "/work/data", "/work/cache", Origin::Flag),
+        ),
+    ] {
+        assert_eq!(
+            configured(&words, &environment),
+            Ok(Command::Fake {
+                arguments: Arguments {
+                    kind: Kind::Llm,
+                    source: Source::Demo { directories },
+                    ready: None,
+                    seed: 0,
+                    observations: None,
+                }
+            })
         );
     }
 }
