@@ -356,21 +356,29 @@ fn entry(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Prob
     let bot_at = o.required(d, b"bot", p, ps);
     let mode_at = o.required(d, b"mode", p, ps);
     let start_at = o.member(d, b"start");
-    let mode = mode(d, mode_at?, &p.member(b"mode"), ps)?;
+    let mode = match mode_at {
+        Some(at) => mode(d, at, &p.member(b"mode"), ps),
+        None => None,
+    };
     let orgs: Option<Box<[Box<[u8]>]>> = match &mode {
-        Mode::Fake(_) => {
+        Some(Mode::Fake(_)) => {
             valid(o.member(d, b"orgs").is_none(), p.member(b"orgs"), ps);
             Some(Box::new([]))
         }
-        Mode::Managed { .. } | Mode::Owned(_) => {
+        Some(Mode::Managed { .. } | Mode::Owned(_)) => {
             let at = o.required(d, b"orgs", p, ps);
             match at {
                 Some(at) => strings(d, at, limits.orgs, true, &p.member(b"orgs"), ps),
                 None => None,
             }
         }
+        None => match o.member(d, b"orgs") {
+            Some(at) => strings(d, at, limits.orgs, true, &p.member(b"orgs"), ps),
+            None => None,
+        },
     };
     o.finish(d, p, ps);
+    let mode = mode?;
     let asked = if let Some(at) = start_at {
         let value = match read::text(d, at, 4096) {
             Ok(value) => value,

@@ -128,6 +128,16 @@ fn a_member_outside_its_bounds_is_refused_naming_its_path() {
         ),
         (br#""managed":{"admin_token":"secrets/forgejo-admin"}"#, b"", b"application.setup[0].mode: invalid form\n"),
         (
+            br#""mode":{"managed":{"admin_token":"secrets/forgejo-admin"}}"#,
+            br#""mode":{},"extra":0"#,
+            b"application.setup[0].mode: invalid form\napplication.setup[0].extra: unknown member\n",
+        ),
+        (
+            br#""orgs":["acme"],"mode":{"managed":{"admin_token":"secrets/forgejo-admin"}}"#,
+            br#""orgs":false,"mode":{}"#,
+            b"application.setup[0].mode: invalid form\napplication.setup[0].orgs: wrong value kind\n",
+        ),
+        (
             br#""managed":{"admin_token":"secrets/forgejo-admin"}"#,
             br#""managed":{},"owned":{}"#,
             b"application.setup[0].mode: invalid form\n",
