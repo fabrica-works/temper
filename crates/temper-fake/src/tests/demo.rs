@@ -6,7 +6,7 @@ use temper_forge_setup::{problem, setup::Setup};
 
 type Row = (Vec<(&'static str, Option<Value>)>, &'static str);
 
-fn fixture() -> Value {
+pub(super) fn fixture() -> Value {
     let mut d: Value = serde_json::from_slice(include_bytes!("../../../../docs/examples/owned.json")).unwrap();
     d["engine"]["llm"]["endpoints"].as_array_mut().unwrap().push(json!({
         "name":"demo", "number":3, "dialect":3, "provider":"demo",
@@ -35,7 +35,7 @@ fn fixture() -> Value {
 fn member(d: &skein_json::Document, at: u32, name: &[u8]) -> u32 {
     config::read::Object::new(d, at).unwrap().member(d, name).unwrap()
 }
-fn read(value: &Value) -> Result<Option<demo::Demo>, crate::Refusal> {
+pub(super) fn read(value: &Value) -> Result<Option<demo::Demo>, crate::Refusal> {
     let bytes = serde_json::to_vec(value).unwrap();
     let d = config::document(&bytes, &config::DocumentLimits { bytes: 1 << 20, tokens: 1 << 20, depth: 32 }).unwrap();
     let directories = config::Directories::given(b"/config", b"/data", b"/cache").unwrap();

@@ -557,3 +557,5 @@ fn forge_setup_document_equals_the_standalone_form() {
 mod check;
 
 mod demo;
+
+mod seed;

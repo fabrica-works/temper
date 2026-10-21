@@ -11,6 +11,7 @@ pub mod forge;
 pub mod limits;
 pub mod llm;
 mod read;
+pub mod seed;
 pub mod turn;
 mod wire;
 pub use read::Refusal;
