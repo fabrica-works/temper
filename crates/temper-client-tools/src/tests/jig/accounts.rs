@@ -141,3 +141,114 @@ fn account_output_truncates_oversized_projections_within_the_result_window() {
         assert!(f::json_has(&printed, b"bytes_left"));
     }
 }
+
+fn me_read(me: c::Me, json: bool) -> crate::jig::Printed {
+    let mut root = f::account_root(true);
+    root.deliver(c::Delivery::Me(Box::new(me)));
+    let flags = if json { &["me", "--json"][..] } else { &["me"][..] };
+    let call = root.submit(flags);
+    root.answer(call).expect("me projection")
+}
+#[test]
+fn me_provider_name_loss_marks_cut() {
+    let mut me = f::me(f::PARTY);
+    me.providers = f::provider_offers();
+    me.providers.get_mut(0).expect("offer").name.cut = true;
+    assert!(f::json_has(&me_read(me, true), b"\"cut\":true,\"retention\":"));
+}
+#[test]
+fn me_program_list_loss_marks_cut() {
+    let mut me = f::me(f::PARTY);
+    me.providers = f::provider_offers();
+    me.providers.get_mut(0).expect("offer").programs_cut = true;
+    assert!(f::json_has(&me_read(me, true), b"\"cut\":true,\"retention\":"));
+}
+#[test]
+fn me_provider_list_loss_marks_cut() {
+    let mut me = f::me(f::PARTY);
+    me.providers = f::provider_offers();
+    me.providers_cut = true;
+    assert!(f::json_has(&me_read(me, true), b"\"cut\":true,\"retention\":"));
+}
+#[test]
+fn party_readiness_loss_marks_accounts_cut() {
+    let mut party = f::accounts();
+    let deployment = f::deployment();
+    party.readiness_cut = true;
+    let printed = f::account_read(&mut f::account_root(true), party, Some(deployment));
+    assert!(f::json_without_digest(&printed.stdout).ends_with(b"\"cut\":true}"));
+}
+#[test]
+fn deployment_readiness_loss_marks_accounts_cut() {
+    let party = f::accounts();
+    let mut deployment = f::deployment();
+    deployment.readiness_cut = true;
+    let printed = f::account_read(&mut f::account_root(true), party, Some(deployment));
+    assert!(f::json_without_digest(&printed.stdout).ends_with(b"\"cut\":true}"));
+}
+#[test]
+fn deployment_provider_name_loss_marks_accounts_cut() {
+    let party = f::accounts();
+    let mut deployment = f::deployment();
+    deployment.providers = f::provider_offers();
+    deployment.providers.get_mut(0).expect("offer").name.cut = true;
+    let printed = f::account_read(&mut f::account_root(true), party, Some(deployment));
+    assert!(f::json_without_digest(&printed.stdout).ends_with(b"\"cut\":true}"));
+}
+#[test]
+fn deployment_program_list_loss_marks_accounts_cut() {
+    let party = f::accounts();
+    let mut deployment = f::deployment();
+    deployment.providers = f::provider_offers();
+    deployment.providers.get_mut(0).expect("offer").programs_cut = true;
+    let printed = f::account_read(&mut f::account_root(true), party, Some(deployment));
+    assert!(f::json_without_digest(&printed.stdout).ends_with(b"\"cut\":true}"));
+}
+#[test]
+fn deployment_provider_list_loss_marks_accounts_cut() {
+    let party = f::accounts();
+    let mut deployment = f::deployment();
+    deployment.providers = f::provider_offers();
+    deployment.providers_cut = true;
+    let printed = f::account_read(&mut f::account_root(true), party, Some(deployment));
+    assert!(f::json_without_digest(&printed.stdout).ends_with(b"\"cut\":true}"));
+}
+#[test]
+fn me_text_exposes_configured_provider_offers() {
+    let mut root = f::account_root(true);
+    let mut me = f::me(f::PARTY);
+    me.providers = f::provider_offers();
+    root.deliver(c::Delivery::Me(Box::new(me)));
+    let call = root.submit(&["me"]);
+    let printed = root.answer(call).expect("offers text");
+    for fact in [
+        b"name: Scripted name_cut: false key_bytes: 256".as_slice(),
+        b"sign_in: true key: true none: false signed_in_plan: false programs_cut: false",
+        b"programs: helper manage_usage: https://provider.example/usage",
+        b"providers_cut: false\nkey_bytes: 256\ncut: false\n",
+    ] {
+        assert!(f::has(&printed, fact), "{fact:?}");
+    }
+}
+#[test]
+fn deployment_offers_share_the_accounts_result_window() {
+    const OFFERS: u32 = 64;
+    let mut deployment = f::deployment();
+    let offer = f::provider_offers().get(0).expect("offer").clone();
+    deployment.providers = List::with_capacity(OFFERS);
+    deployment.readiness = List::with_capacity(OFFERS);
+    for _ in 0..OFFERS {
+        deployment.providers.push(offer.clone()).expect("offer room");
+        deployment.readiness.push(*f::payer_readiness().get(0).expect("readiness")).expect("readiness room");
+    }
+    for flags in [&["accounts"][..], &["accounts", "--json"]] {
+        let mut root = f::account_root(true);
+        let call = root.submit(flags);
+        f::deliver_accounts(&mut root, f::accounts());
+        f::deliver_deployment(&mut root, deployment.clone());
+        let printed = root.answer(call).expect("bounded offers");
+        assert_eq!(printed.status, 0);
+        assert!(printed.stdout.len() <= usize::try_from(crate::limits::TEXT).expect("text fits"));
+        assert!(f::json_has(&printed, b"\"cut\":true"));
+    }
+}

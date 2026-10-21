@@ -166,7 +166,7 @@ watch's subject, its digest (5.4). It needs no key.
 
 | Tool | What it answers | jig's |
 |---|---|---|
-| `me` | the party, its projects with their roles and pools, what waits for it counted, the bounds of what it may create, the retention | `me` |
+| `me` | the party, its projects with their roles and pools, what waits for it counted, the bounds of what it may create, configured provider offers and key-byte ceilings, the retention | `me` |
 | `inbox [--project P] [--kind K] [--root N] [--after C]` | what needs the party, then updates, each with its acts | `inbox` |
 | `tasks --project P [--label chat\|goal] [--tracked] [--mine] [--ended] [--order activity\|priority] [--after C]` | task lines of one group: the live tasks, or with `--ended` the ended | `tasks{query}` (jig's `client/domain/contract.md`, 6.1) |
 | `task N [--tree] [--activity K] [--run]` | a task's document, with its acts; with its live tree, its K latest activity lines, its live run, in one answer | `task{n}`, `tree{root}`, `activity{n}`, `run{n}` |
@@ -437,6 +437,13 @@ area lands with its stories (section 11).
      the host's (5.6), so a sign-in with a provider is `connect` and its
      end `disconnect`; `forget`, `rank`, `verify` and `retry` are
      jig's remove, order, check and resume.
+   - **Offers and readiness are supplied facts.** `me` prints `providers`,
+     `providers_cut` and `key_bytes`. `accounts` prints the party's
+     `readiness` and `readiness_cut`; for an owner its `deployment_facts`
+     holds the deployment's offers and readiness beside the existing
+     `deployment` account rows. Nested loss contributes to the document's
+     `cut`. Each readiness list has its own window, preserving both supplied
+     observations. These fields enter the same digest for reads and waits.
    - **One result per call.** `connect` prints the address and returns;
      the sign-in goes on at the engine, and `wait accounts --until
      settled` follows it (5.4). It never opens a browser, and the
@@ -695,6 +702,14 @@ may change with them.
 - **Every result has a ceiling,** in rows and bytes: a list's page, the
   activity lines `task` adds, a conversation's page, a turn's part. A
   text cut prints how much was left and the call that reads the rest.
+- **`me` prints a `cut:` line** in text and a `cut` field in JSON. It is
+  true for supplied document loss, omitted provider/program rows, a cut
+  provider name, and any free text lost earlier in the document. The
+  provider offers include their own `providers_cut`, `name.cut` and
+  `programs_cut` facts; the document flag combines these losses.
+- **Program identifiers and manage URLs are whole or omitted.** If one
+  cannot fit the text budget, JSON prints null and text omits its bytes;
+  the document's cut flag is true. A displayed prefix is never a target.
 - **Long texts are paged, never whole by default:** `chat`, `activity`
   and `turn` take a cursor or an offset. An agent's context is the
   budget the defaults are chosen for.

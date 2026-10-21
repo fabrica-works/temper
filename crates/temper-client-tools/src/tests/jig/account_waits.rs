@@ -159,3 +159,157 @@ fn account_condition(condition: &str, usable: bool, settled: bool) -> (f::Harnes
     f::deliver_accounts(&mut root, party.clone());
     (root, call, party)
 }
+
+#[test]
+fn me_offer_changes_wake_a_wait() {
+    for change in OfferChange::ALL {
+        let mut root = f::account_root(true);
+        let mut me = f::me(f::PARTY);
+        me.providers = f::provider_offers();
+        root.deliver(c::Delivery::Me(Box::new(me.clone())));
+        let read = root.submit(&["me", "--json"]);
+        let before = root.answer(read).expect("me projection");
+        let call = root.wait_since(&["wait", "me"], &[], &f::last_digest(&before.stdout));
+        root.deliver(c::Delivery::Me(Box::new(me.clone())));
+        assert!(root.answer(call).is_none(), "unchanged offers");
+        (me.providers, me.providers_cut, me.key_bytes) = changed_offers(change);
+        root.deliver(c::Delivery::Me(Box::new(me)));
+        assert_eq!(root.answer(call).expect("offer change").status, 0, "change {change:?}");
+    }
+}
+#[test]
+fn deployment_offer_changes_wake_an_accounts_wait() {
+    for change in OfferChange::ALL {
+        let mut root = f::account_root(true);
+        let mut deployment = f::deployment();
+        deployment.providers = f::provider_offers();
+        let before = f::account_read(&mut root, f::accounts(), Some(deployment.clone()));
+        let call = root.wait_since(WAIT_ACCOUNTS, &[], &f::last_digest(&before.stdout));
+        f::deliver_accounts(&mut root, f::accounts());
+        f::deliver_deployment(&mut root, deployment.clone());
+        assert!(root.answer(call).is_none(), "unchanged offers");
+        (deployment.providers, deployment.providers_cut, deployment.key_bytes) = changed_offers(change);
+        f::deliver_deployment(&mut root, deployment);
+        assert_eq!(root.answer(call).expect("offer change").status, 0, "change {change:?}");
+    }
+}
+#[test]
+fn party_readiness_changes_wake_an_accounts_wait() {
+    for change in ReadinessChange::ALL {
+        let mut root = f::account_root(false);
+        let mut party = f::accounts();
+        party.readiness = f::payer_readiness();
+        let before = f::account_read(&mut root, party.clone(), None);
+        let call = root.wait_since(WAIT_ACCOUNTS, &[], &f::last_digest(&before.stdout));
+        f::deliver_accounts(&mut root, party.clone());
+        assert!(root.answer(call).is_none(), "unchanged readiness");
+        (party.readiness, party.readiness_cut) = changed_readiness(change);
+        f::deliver_accounts(&mut root, party);
+        assert_eq!(root.answer(call).expect("readiness change").status, 0, "change {change:?}");
+    }
+}
+#[test]
+fn deployment_readiness_changes_wake_an_accounts_wait() {
+    for change in ReadinessChange::ALL {
+        let mut root = f::account_root(true);
+        let mut deployment = f::deployment();
+        deployment.readiness = f::payer_readiness();
+        let before = f::account_read(&mut root, f::accounts(), Some(deployment.clone()));
+        let call = root.wait_since(WAIT_ACCOUNTS, &[], &f::last_digest(&before.stdout));
+        f::deliver_accounts(&mut root, f::accounts());
+        f::deliver_deployment(&mut root, deployment.clone());
+        assert!(root.answer(call).is_none(), "unchanged readiness");
+        (deployment.readiness, deployment.readiness_cut) = changed_readiness(change);
+        f::deliver_deployment(&mut root, deployment);
+        assert_eq!(root.answer(call).expect("readiness change").status, 0, "change {change:?}");
+    }
+}
+#[derive(Clone, Copy, Debug)]
+enum OfferChange {
+    Removed,
+    Provider,
+    KeyBytes,
+    Name,
+    NameCut,
+    SignIn,
+    Key,
+    None,
+    SignedInPlan,
+    Program,
+    ProgramsCut,
+    ManageUsage,
+    ProvidersCut,
+    Ceiling,
+}
+impl OfferChange {
+    const ALL: [Self; 14] = [
+        Self::Removed,
+        Self::Provider,
+        Self::KeyBytes,
+        Self::Name,
+        Self::NameCut,
+        Self::SignIn,
+        Self::Key,
+        Self::None,
+        Self::SignedInPlan,
+        Self::Program,
+        Self::ProgramsCut,
+        Self::ManageUsage,
+        Self::ProvidersCut,
+        Self::Ceiling,
+    ];
+}
+#[derive(Clone, Copy, Debug)]
+enum ReadinessChange {
+    Removed,
+    Provider,
+    Payer,
+    Usable,
+    Unavailable,
+    Settled,
+    Cut,
+}
+impl ReadinessChange {
+    const ALL: [Self; 7] =
+        [Self::Removed, Self::Provider, Self::Payer, Self::Usable, Self::Unavailable, Self::Settled, Self::Cut];
+}
+fn changed_offers(change: OfferChange) -> (skein_lib::List<c::ProviderOffer>, bool, u32) {
+    let mut providers = f::provider_offers();
+    let row = providers.get_mut(0).expect("offer");
+    let mut cut = false;
+    let mut key_bytes = 256;
+    match change {
+        OfferChange::Removed => providers = skein_lib::List::with_capacity(0),
+        OfferChange::Provider => row.provider = f::PROVIDER.checked_add(1).expect("other provider"),
+        OfferChange::KeyBytes => row.key_bytes = 257,
+        OfferChange::Name => row.name.bytes = c::Text::new(b"renamed".as_slice().into(), 32).expect("name"),
+        OfferChange::NameCut => row.name.cut = true,
+        OfferChange::SignIn => row.sign_in = false,
+        OfferChange::Key => row.key = false,
+        OfferChange::None => row.none = true,
+        OfferChange::SignedInPlan => row.signed_in_plan = true,
+        OfferChange::Program => {
+            *row.programs.get_mut(0).expect("program") = c::Text::new(b"other".as_slice().into(), 32).expect("program");
+        }
+        OfferChange::ProgramsCut => row.programs_cut = true,
+        OfferChange::ManageUsage => row.manage_usage = None,
+        OfferChange::ProvidersCut => cut = true,
+        OfferChange::Ceiling => key_bytes = 257,
+    }
+    (providers, cut, key_bytes)
+}
+fn changed_readiness(change: ReadinessChange) -> (skein_lib::List<c::PayerReadiness>, bool) {
+    let mut rows = f::payer_readiness();
+    let row = rows.get_mut(0).expect("readiness");
+    let mut cut = false;
+    match change {
+        ReadinessChange::Removed => rows = skein_lib::List::with_capacity(0),
+        ReadinessChange::Provider => row.provider = f::PROVIDER.checked_add(1).expect("other provider"),
+        ReadinessChange::Payer => row.payer = c::OwnerAccountUse::Project(1),
+        ReadinessChange::Usable => row.readiness = c::Readiness::Usable,
+        ReadinessChange::Unavailable => row.readiness = c::Readiness::Unavailable,
+        ReadinessChange::Settled => row.settled = Some(false),
+        ReadinessChange::Cut => cut = true,
+    }
+    (rows, cut)
+}

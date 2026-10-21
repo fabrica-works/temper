@@ -29,7 +29,7 @@ pub(crate) fn encode_as(
     let mut cut =
         Cut { room: usize::try_from(limits.text).expect("text fits"), left: 0, turn: None, subject: true, digest };
     match part {
-        Part::Me(value) => super::encode_me(value, out, &mut cut),
+        Part::Me(value) => super::encode_me(value, out, &mut cut, limits),
         Part::Task(value) => super::encode_task(value, out, &mut cut),
         Part::Tree(value) => super::encode_tree(value, out, &mut cut),
         Part::OwnerTree(value) => super::encode_owner_tree(value, out, &mut cut),

@@ -51,7 +51,7 @@ pub(super) fn text(
     let most = usize::try_from(limits.rows).expect("rows fit");
     if let Some(delivery) = wait.delivery {
         match delivery {
-            c::Delivery::Me(me) => super::me_text(me, book, out),
+            c::Delivery::Me(me) => super::me_text(me, book, limits, out),
             c::Delivery::Task(task) => super::task_text(task, wait.me, book, owner_part, out),
             c::Delivery::Tree(_) | c::Delivery::OwnerTree(_) => super::super::lists::tree(delivery, book, out),
             c::Delivery::Tasks(tasks) => {

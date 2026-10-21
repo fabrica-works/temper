@@ -12,6 +12,7 @@ mod wait;
 
 mod account_waits;
 mod accounts;
+mod catalogue_windows;
 
 mod account_acts;
 

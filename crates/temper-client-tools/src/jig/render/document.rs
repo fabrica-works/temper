@@ -71,7 +71,7 @@ fn text(
     match document {
         Document::Wait(wait) => waiting::text(wait, book, limits, owner_part, out),
         Document::Accounts(value) => accounts::text(*value, limits, out),
-        Document::Me(me) => me_text(me, book, out),
+        Document::Me(me) => me_text(me, book, limits, out),
         Document::Task(task, me) => task_text(task, *me, book, owner_part, out),
         Document::HistoricalTask(task, result, me) => {
             task_text(task, *me, book, owner_part, out);
@@ -100,7 +100,7 @@ pub(crate) fn phrasebook(text: u32) -> Phrasebook {
     };
     Phrasebook::load(shapes, Box::new([words::english()]), &limits).expect("checked jig phrases")
 }
-fn me_text(me: &Me, book: &Phrasebook, out: &mut Text) {
+fn me_text(me: &Me, book: &Phrasebook, limits: &Limits, out: &mut Text) {
     out.put(b"party ");
     out.number(me.party.number);
     out.put(b" \xc2\xb7 ");
@@ -153,6 +153,7 @@ fn me_text(me: &Me, book: &Phrasebook, out: &mut Text) {
     out.put(b"\nretention: ");
     out.number(me.retention.as_nanos());
     out.put(b" ns\n");
+    offers::text(me, limits, out);
 }
 fn result_text(result: &jig_client::contract::Result, out: &mut Text) {
     let bounds = skein_json::writer::Limits { depth: 32, length: u32::MAX };
@@ -399,6 +400,7 @@ mod holds;
 mod limits;
 mod llm;
 mod me;
+mod offers;
 mod outcomes;
 mod owner_authority;
 mod owner_chips;

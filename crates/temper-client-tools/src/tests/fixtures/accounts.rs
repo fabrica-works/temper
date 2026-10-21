@@ -112,3 +112,35 @@ pub(crate) fn account_read(
     }
     root.answer(call).expect("first deliveries complete read")
 }
+
+pub(crate) fn provider_offers() -> List<c::ProviderOffer> {
+    let mut programs = List::with_capacity(1);
+    programs.push(c::Text::new(b"helper".as_slice().into(), 32).expect("program")).expect("program room");
+    let mut offers = List::with_capacity(1);
+    offers
+        .push(c::ProviderOffer {
+            provider: PROVIDER,
+            key_bytes: 256,
+            name: document_text(b"Scripted"),
+            sign_in: true,
+            key: true,
+            programs,
+            programs_cut: false,
+            none: false,
+            signed_in_plan: false,
+            manage_usage: Some(b"https://provider.example/usage".as_slice().into()),
+        })
+        .expect("offer room");
+    offers
+}
+pub(crate) fn payer_readiness() -> List<c::PayerReadiness> {
+    let mut rows = List::with_capacity(1);
+    rows.push(c::PayerReadiness {
+        provider: PROVIDER,
+        payer: c::OwnerAccountUse::Party(PARTY),
+        readiness: c::Readiness::Unknown,
+        settled: None,
+    })
+    .expect("readiness room");
+    rows
+}

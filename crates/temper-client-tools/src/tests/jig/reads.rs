@@ -28,6 +28,10 @@ fn me_prints_the_live_frame() {
     for (argv, golden) in [(fixtures::ME_CALL, "me"), (fixtures::ME_JSON_CALL, "me_json")] {
         let (mut root, call) = fixtures::read_call(argv);
         let answer = root.answer(call).expect("live frame answered");
+        if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some() {
+            std::fs::write(std::path::Path::new("src/tests/golden").join(golden).with_extension("txt"), &answer.stdout)
+                .expect("write me golden");
+        }
         assert_eq!((answer.status, answer.stdout), (0, fixtures::golden(golden)), "{golden}");
     }
 }

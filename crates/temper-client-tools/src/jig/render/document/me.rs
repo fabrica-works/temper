@@ -24,7 +24,12 @@ pub(super) fn encode_malformed(value: jig_client::contract::Malformed, out: &mut
     }
 }
 
-pub(super) fn encode_me(value: &jig_client::contract::Me, out: &mut Encoder, budget: &mut super::Cut) {
+pub(super) fn encode_me(
+    value: &jig_client::contract::Me,
+    out: &mut Encoder,
+    budget: &mut super::Cut,
+    limits: &super::Limits,
+) {
     let digest = budget.digest.take();
     out.object_start();
     out.key(b"party");
@@ -43,8 +48,10 @@ pub(super) fn encode_me(value: &jig_client::contract::Me, out: &mut Encoder, bud
     super::encode_count(value.updates, out, budget);
     out.key(b"results_seen");
     out.unsigned(value.results_seen);
+    let mut window = super::offers::me_window(limits);
+    super::offers::fields(&value.providers, value.providers_cut, value.key_bytes, out, budget, &mut window);
     out.key(b"cut");
-    out.boolean(value.cut);
+    out.boolean(value.cut || window.cut || budget.left > 0);
     out.key(b"retention");
     out.unsigned(value.retention.as_nanos());
     out.key(b"deployment_role");

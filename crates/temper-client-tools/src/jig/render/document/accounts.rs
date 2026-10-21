@@ -26,15 +26,16 @@ impl Accounts<'_> {
         out.finish()
     }
 }
-// A single row budget covers all nested lists. Reserve 1 KiB for the envelope,
-// at most 1 KiB per item, and half the window for escaped text (six bytes per
-// input byte). The final 128 bytes hold the digest and wait outcome.
-struct Window {
-    left: u32,
-    cut: bool,
+// Reserve 1 KiB for the envelope and 128 B for its digest/wait outcome.
+// Each of the two readiness lists has its own capacity (contract rows) × 128 B.
+// Remaining bytes split between account/catalogue structure (1 KiB per row)
+// and escaped text (six bytes per input byte).
+pub(super) struct Window {
+    pub(super) left: u32,
+    pub(super) cut: bool,
 }
 impl Window {
-    fn take(&mut self) -> bool {
+    pub(super) fn take(&mut self) -> bool {
         if let Some(left) = self.left.checked_sub(1) {
             self.left = left;
             true
@@ -46,7 +47,9 @@ impl Window {
 }
 pub(super) fn encode(value: Accounts<'_>, limits: &Limits, printed: bool, out: &mut Encoder) {
     let room = limits.text.saturating_sub(128);
-    let mut window = Window { left: limits.rows.min(room.saturating_sub(1024) / 2048), cut: false };
+    let readiness = super::offers::readiness_rows(limits);
+    let room = room.saturating_sub(1024).saturating_sub(readiness.saturating_mul(2).saturating_mul(128));
+    let mut window = Window { left: limits.rows.min(room / 2048), cut: false };
     let mut cut =
         Cut { room: usize::try_from(room / 12).expect("text fits"), left: 0, turn: None, subject: false, digest: None };
     out.object_start();
@@ -58,7 +61,7 @@ pub(super) fn encode(value: Accounts<'_>, limits: &Limits, printed: bool, out: &
     out.key(b"accounts");
     match value.party {
         None => out.null(),
-        Some(party) => party_fields(party, value.deployment, out, &mut cut, &mut window),
+        Some(party) => party_fields(party, value.deployment, limits, out, &mut cut, &mut window),
     }
     number(b"bytes_left", cut.left, out);
     out.key(b"cut");
@@ -80,6 +83,7 @@ pub(super) fn encode(value: Accounts<'_>, limits: &Limits, printed: bool, out: &
 fn party_fields(
     party: &c::OwnerAccounts,
     extra: Option<&c::OwnerDeployment>,
+    limits: &Limits,
     out: &mut Encoder,
     cut: &mut Cut,
     window: &mut Window,
@@ -140,7 +144,18 @@ fn party_fields(
             out.object_end();
         }
     }
+    super::offers::readiness(&party.readiness, party.readiness_cut, limits, out, window);
     deployment(extra, out, cut, window);
+    out.key(b"deployment_facts");
+    match extra {
+        None => out.null(),
+        Some(extra) => {
+            out.object_start();
+            super::offers::fields(&extra.providers, extra.providers_cut, extra.key_bytes, out, cut, window);
+            super::offers::readiness(&extra.readiness, extra.readiness_cut, limits, out, window);
+            out.object_end();
+        }
+    }
     window.cut |= party.cut;
     out.key(b"cut");
     out.boolean(window.cut || cut.left > 0);
@@ -219,7 +234,7 @@ fn line(
     }
     out.key(b"manage_usage");
     match manage_usage {
-        Some(uri) => cut.words(uri, out),
+        Some(uri) => super::offers::whole(uri, out, cut, window),
         None => out.null(),
     }
 

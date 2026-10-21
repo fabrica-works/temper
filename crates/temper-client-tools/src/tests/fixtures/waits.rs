@@ -187,6 +187,9 @@ pub(crate) fn task_digest(delivery: &c::Delivery) -> crate::jig::digest::Digest 
     crate::jig::digest::part(&crate::jig::render::Part::delivery(delivery).expect("subject"), &limits())
 }
 pub(crate) fn json_has(printed: &crate::jig::Printed, expected: &[u8]) -> bool {
+    has(printed, expected)
+}
+pub(crate) fn has(printed: &crate::jig::Printed, expected: &[u8]) -> bool {
     skein_lib::bytes::find(&printed.stdout, expected).is_some()
 }
 impl Harness {
