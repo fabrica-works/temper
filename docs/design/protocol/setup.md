@@ -1336,8 +1336,10 @@ since the box has no webhooks' listener (8.3).
   (`../draft/first-run.md`, section 8).
   - *"Add CSV export to widget",* the chat's, three turns, each
     finishing `tool_calls`:
-    1. `delegate`, one item: the change procedure, `{"kind":
-       "procedure", "connector": 1, "code": 2}`; its spec's words
+    1. the text "I’ll delegate this change in demo/widget. It will push
+       a branch, open a pull request, check CI and land into main on
+       Demo forge.", then `delegate`, one item: the change procedure,
+       `{"kind": "procedure", "connector": 1, "code": 2}`; its spec's words
        `Export widget's table as CSV`, and its parameters the repository,
        `{"kind": "resource", "connector": 1, "resource": 1}`, the fake's
        `demo/widget` (below), and the bytes `main`; its contract a
@@ -1346,15 +1348,15 @@ since the box has no webhooks' listener (8.3).
        (`tests/real-loop`'s `landing.rs`), its grants on the project's
        pattern (8.3) and its delegation to the coding charter's agents,
        `{"kind": "agent", "number": 2}`;
-    2. the text "I’ll delegate this change in demo/widget. It will push
-       a branch, open a pull request, check CI and land into main on
-       Demo forge.", then `{"call": "wait", "arguments": {}}`;
+    2. `{"call": "wait", "arguments": {}}`;
     3. once the change's result wakes the chat, the text "CSV export is
        available from widget’s table. The change landed on Demo forge.
        This was a scripted demo change.", then the same `wait`.
 
     The two texts are the mockup's (`../client/mockups/first-run.js`),
-    its typographic apostrophes kept, less the task's number.
+    its typographic apostrophes kept, less the task's number. The first
+    goes with the `delegate` it announces, since the chat's page shows a
+    message's text beside its calls (`temper-client-view`'s chat page).
 
     It never calls `finish`: the chat stays open, its composer with it,
     and the chat's 32-byte report bound (`engine.templates`' `chat`)
