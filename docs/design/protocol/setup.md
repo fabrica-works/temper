@@ -1246,9 +1246,15 @@ defaults for a person's real work are open (section 16).
   with no person in between. Its owner's grants, the rules' ceiling and
   its projections are the owned example's, on that pattern in place of
   the org's.
-- **Its charters and templates,** the owned example's, but that chat's
-  models end with `demo`: chat, 1, and coding, 2, the one the forge's procedures start agents' work under
-  (`application.charter`); the templates `chat` and `goal`.
+- **Its charters and templates,** the owned example's, but both
+  charters' models end with `demo`: chat, 1, and coding, 2, the one the
+  forge's procedures start agents' work under (`application.charter`);
+  the templates `chat` and `goal`. A task with no model chosen takes the
+  first of its charter's models whose provider has an account serving
+  its payer (jig's `jig-domain-core` `llm.rs`), so on a first run, whose
+  one account is the demo's, a chat and the coding agent of the change
+  it delegates both run on the demo model, with no pick, until the
+  person adds an account.
 - **One worker,** in the process, its `root` `workspaces` in the data
   directory, its `git` the machine's, or null (8.2); the deployment's directory
   `deployment` in the data directory; the clients' listener
@@ -1270,11 +1276,14 @@ A person's first run is a demo (`../draft/first-run.md`, 3.5, 3.6 and
 5, step 3): the box runs a fake LLM and a fake Forgejo from temper's
 own binary, the engine sets itself up on the fake as on an owned one,
 and a seed adds the demo model's key and adopts the demo's repository
-through the client's protocol. Its bar: a chat that works on the demo
-model, and the demo forge connected and its repository adopted. Its git
-is `temper fake git`, on the fake forge's git route, so a worker's
-clone and push reach the fake; the demo model answers in text and
-finishes, so the demo's own work pushes nothing yet.
+through the client's protocol. Its bar: one suggested request landed
+end to end on the demo model, by the engine's own loop with nothing
+staged. The chat delegates a change on `demo/widget`; its coding agent
+edits a file; the worker commits and pushes the branch with `temper
+fake git`, on the fake forge's git route; the change opens its pull
+request, passes the fake's CI and lands into `main`; and the chat says
+so. The other suggestions answer in text. The engine polls the fake,
+since the box has no webhooks' listener (8.3).
 
 - **`application.demo`,** or null for none:
 
@@ -1317,23 +1326,74 @@ finishes, so the demo's own work pushes nothing yet.
   No turn holds a hold, a failing line or opaque bytes.
 - **Its words,** as `temper init` writes them (8.2): one `asked` script
   for each request the client suggests in the demo project
-  (`../client/mockups/first-run.html`): "Add CSV export to widget", "Add
-  a dark theme to widget" and "Fix widget's empty search state", each
-  answering in text what it would change and why; and an `otherwise`
-  that says it is the demo model, which answers only the suggested
-  requests, and how to connect a real one from the client's accounts
-  page. Each is one turn, an object: its text line, then
-  `{"call": "finish", "arguments": {"form": "report", "text": "The demo
-  changes nothing.", "fields": {}}}`, finishing `tool_calls`, its
-  tokens its text's bytes divided by 4, rounded up. A chat's run ends
-  only at `finish`: a text-only stop is nudged once, and a second fails
-  the run (smith's `domain/run.md`, 7.2), and the chat's contract is a
-  report of at most 32 bytes (`engine.templates`' `chat`), so the answer
-  is the text and the report is short. `finish`'s arguments are the
-  contract's, as smith's schema for the tool has them (its
-  `smith-protocol-llm`'s `contract.rs`): a `form`, the report's `text`
-  and its `fields`, none for a chat. Their content is the demo's
-  follow-up (`../draft/first-run.md`, section 8).
+  (`../client/mockups/first-run.html`), "Add CSV export to widget", "Add
+  a dark theme to widget" and "Fix widget's empty search state"; one
+  for the coding agent of the change the first delegates; and an
+  `otherwise` that says it is the demo model, which answers only the
+  suggested requests, and how to connect a real one from the client's
+  accounts page. Each turn is an object, its tokens its lines' bytes
+  divided by 4, rounded up. Their content is the demo's follow-up
+  (`../draft/first-run.md`, section 8).
+  - *"Add CSV export to widget",* the chat's, three turns, each
+    finishing `tool_calls`:
+    1. `delegate`, one item: the change procedure, `{"kind":
+       "procedure", "connector": 1, "code": 2}`; its spec's words
+       `Export widget's table as CSV`, and its parameters the repository,
+       `{"kind": "resource", "connector": 1, "resource": 1}`, the fake's
+       `demo/widget` (below), and the bytes `main`; its contract a
+       change on connector 1, kind 1, in at most 128 words; its
+       authority the one the real loop's landing story gives its change
+       (`tests/real-loop`'s `landing.rs`), its grants on the project's
+       pattern (8.3) and its delegation to the coding charter's agents,
+       `{"kind": "agent", "number": 2}`;
+    2. the text "A coding agent is making this change in demo/widget: it
+       will push a branch, open a pull request, check CI and land into
+       main on Demo forge.", then `{"call": "wait", "arguments": {}}`;
+    3. once the change's result wakes the chat, the text "CSV export is
+       available from widget's table: the change landed into main on
+       Demo forge. This was a scripted demo change.", then the same
+       `wait`.
+
+    It never calls `finish`: the chat stays open, its composer with it,
+    and the chat's 32-byte report bound (`engine.templates`' `chat`)
+    never applies.
+  - *`Export widget's table as CSV`,* the coding agent's, cued by the
+    delegate's words, which are the change's title and so its agent's
+    brief; the chat's request never reaches that agent's system text,
+    nor do these words reach the chat's, so the two cues match apart.
+    Three turns, each finishing `tool_calls`: `read` of `src/main.rs`;
+    `edit` of it, `{"path", "edits": [{"old", "new"}]}`, its `main`
+    printing the table as CSV when run with `--csv`, a header line
+    `name,count`, then a line for each row; and `{"call": "finish",
+    "arguments": {"form": "change", "fields": {"title": "Add CSV export
+    to widget", "body": …}}}`. The worker commits and pushes what it
+    left, and the procedure opens, checks and lands the change
+    (`../domain/forge.md`); the coding charter's agent writes no git.
+  - *The dark theme, the empty search, and `otherwise`,* one turn each:
+    its text line, answering what it would change and why, then
+    `{"call": "finish", "arguments": {"form": "report", "text": "The demo
+    changes nothing.", "fields": {}}}`, finishing `tool_calls`, since a
+    text-only stop is nudged once and a second fails the run (smith's
+    `domain/run.md`, 7.2); the report is short, within the chat's 32
+    bytes, and the answer is the text. `finish`'s arguments are the
+    contract's, as smith's schema for the tool has them (its
+    `smith-protocol-llm`'s `contract.rs`): a `form`, the report's `text`
+    and its `fields`, none for a chat.
+
+  What the scripts cannot know, they do not say: the task's number,
+  which the client's card for the change shows; and how the change
+  ended, so the CSV's third turn says it landed even when the task's own
+  row says otherwise. A message the person sends while the CSV's chat
+  waits answers its wait and plays its third turn early, and one more
+  is past its turns, answered "done", nudged once, and fails the run. A
+  second CSV request, once the first landed, finds `main` past the
+  edit's `old` and its change fails, until a restart seeds the fake
+  again. `temper-init`'s tests check the scripts as data: each cue
+  matched apart in its own system text and absent from the others',
+  within `temper-fake`'s bounds; the process tier's first run plays
+  them (13.4). The real loop's landing story already plays a cued
+  chat's `delegate` to its landing on skein's peers, so the demo adds
+  no story there.
 - **`temper fake llm DIRS`,** a long step: skein's fake LLM peer, run
   `without_records` as a peer serving a person is (skein's
   `fake-llm.md`), its domain `Domain::played` with `asked` as its
@@ -1342,12 +1402,12 @@ finishes, so the demo's own work pushes nothing yet.
   the system text, and the one user message is smith's own opening, so
   a request's cue is in the system, where skein's cued scripts look and
   its asked ones do not (skein's `fake-llm.md`, 2.4). A cued script's
-  turns count every assistant message of the conversation, so a chat's
-  first answer is its script's first turn, and its one turn finishes
-  the run: the chat is then ended, with no composer, so no second
-  message reaches the demo (a message sent while the run is active
-  would join the same conversation, past the script's turns, and be
-  answered "done"). It reads the
+  turns count every assistant message of the conversation, a tool's
+  call among them, so a chat's first answer is its script's first turn
+  and each result or message that wakes it plays the next. A one-turn
+  script finishes the run, and the chat is then ended, with no
+  composer; the CSV's waits, and is open (above). A message past a
+  script's turns is answered "done". It reads the
   key file before it binds, and refuses to start without it, naming
   the file; it accepts that one credential, and refuses every other
   request as the provider would. It serves `llm.provider`'s models, at
@@ -1374,7 +1434,9 @@ finishes, so the demo's own work pushes nothing yet.
     `demo/widget` and the QA loop's `fake/widget` are each 1; on its
     `landing` branch, one commit of `temper-fake`'s constants, its
     files, author and time alike, so its head is the same commit at
-    every start: a few files and `.forgejo/workflows/check.yml`, which
+    every start: `README.md`; `src/main.rs`, whose `main` prints
+    widget's table, three rows of a name and a count, the file the
+    demo's change edits; and `.forgejo/workflows/check.yml`, which
     describes the check the fake's CI stands for and is not run;
   - *its CI,* `Checks` with one context, `check`, with no latency,
     silence or rerun: on a repository with a cue, the domain's `Cue { path, green
@@ -1385,7 +1447,13 @@ finishes, so the demo's own work pushes nothing yet.
 
   The bot is reconcile's, and its access to a repository the adoption's
   collaborator grant, which reaches the fake's domain (skein's
-  `fake-forge.md`, section 4): the seed grants nothing. It serves its
+  `fake-forge.md`, section 4): the seed grants nothing. Until access at
+  adoption is built (5.4), a fake's reconcile stands in for it: its
+  repositories (5.3) are the fake's own, `fake.repositories`, adopted
+  or not, so its step 6 makes the bot a collaborator with write on each
+  before the engine serves, through the forge's own route, and an
+  adoption finds the write it needs. It makes no hook, the box having
+  no listener. It goes with `Adopt` on Forgejo. It serves its
   git route among its routes (skein's `fake-forge.md`, section 4), and
   no git smart HTTP; it keeps no state across its starts.
 - **Its deliveries follow the setup's hooks** (skein's `fake-forge.md`,
@@ -1507,9 +1575,16 @@ finishes, so the demo's own work pushes nothing yet.
   2. add the demo model's key, `llm.key`, as the deployment's account of
      `llm.provider`, its idempotency key `demo-llm`;
   3. wait until that account is usable, and until every forge is
-     settled;
+     settled; until `temper ctl` serves `wait forges`
+     (`../client/tools.md`, 5.4), until the account alone, and act 4
+     waits for the forge;
   4. adopt `fake.repositories`' first into `project`, from `forge`, the
-     owner's, on its `landing`, its idempotency key `demo-adopt`;
+     owner's, on its `landing`, its idempotency key `demo-adopt`. Until
+     act 3 waits for the forge, an adoption refused because the forge
+     has not yet connected (`temper ctl adopt`'s exit 2, the forge did
+     not answer) is made again every 250 ms, each under the next key,
+     `demo-adopt-2`, `demo-adopt-3` and on, until the setup's deadline
+     (`setup.deadline_ms`), the first refusal named on its stderr;
   5. sign out;
   6. present the link's secret again: it is refused as spent, and
      serve writes a fresh link to its stdout, the box's, which is the
@@ -2003,11 +2078,16 @@ it checks of this document:
 - **A first run,** a test of its own: `temper box` on three empty
   scratch directories writes the configuration (8.2), says so, and
   prints one sign-in link, which signs the owner in; the demo forge is
-  connected, `demo/widget` adopted into project 1, and the project's
-  chat answers a suggested request on the demo model (8.4); and the
-  test's own clone of `demo/widget` by the demo's link, run as the
-  worker runs git, holds the fake's landing head. A second box on the
-  same directories does the same, its seed finding its acts done.
+  connected and `demo/widget` adopted into project 1. The owner sends
+  "Add CSV export to widget" to the project's chat, which runs on the
+  demo model with no pick (8.3); the chat's last message says the
+  change landed, its delegated task ended landed, and the test's own
+  clone of `demo/widget` by the demo's link, run as the worker runs
+  git, holds `main` one commit past the seeded head, its `src/main.rs`
+  the coding agent's edit (8.4). It lands on polls alone, within the
+  tier's budget. A second box on the same directories signs in again,
+  its seed finding its acts done, and its clone holds the seeded head,
+  since the fake keeps no state across its starts.
 - **A first run set up for real,** a test of its own: `temper box` on
   three empty scratch directories, forge 3's `mirror` a local file
   server over TLS with skein's test root, serving at the pinned paths

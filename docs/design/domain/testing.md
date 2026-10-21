@@ -515,7 +515,12 @@ and 10).
 - **A first run,** a test of its own (../protocol/setup.md, 13.4):
   `temper box` on three empty scratch directories writes the
   configuration (../protocol/setup.md, 8.2), says so on stderr, and
-  prints a sign-in link that signs the owner in.
+  prints a sign-in link that signs the owner in; the demo's suggested
+  change, sent to the project's chat, is delegated, pushed by `temper
+  fake git`, checked and landed into the fake's `main` on the demo
+  model, on polls alone, and the chat says so (../protocol/setup.md,
+  8.4 and 13.4). The demo's scripts are data, checked in
+  `temper-init`'s step tests; this test alone plays them end to end.
 - **`temper program-login`,** a sixth test, on a scratch directory of
   its own (../protocol/credentials.md, section 3): on the owned example
   with Claude Code's path at smith's fake `claude`, `temper
