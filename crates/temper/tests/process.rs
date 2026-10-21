@@ -530,3 +530,177 @@ fn program_login_story(row: &str, login: smith_fake_claude::Login, exit: u8) {
     support::program_login::no_deployment_resources(directory);
     scratch.remove();
 }
+
+#[test]
+fn a_first_run_answers_on_the_demo() {
+    first_run(false);
+}
+
+#[test]
+#[ignore = "jig seeds no deployment owner in init's configuration; ctl omits the kept deployment account"]
+fn a_first_run_answers_on_the_demo_and_a_second_finds_it_seeded() {
+    first_run(true);
+}
+fn first_run(restart: bool) {
+    use std::{fs, os::unix::fs::PermissionsExt};
+    let scratch = support::Scratch::new("first-run");
+    let paths = ["config", "data", "cache"].map(|name| scratch.path().join(name));
+    for path in &paths {
+        fs::create_dir(path).expect("empty first-run directory");
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700)).expect("private first-run directory");
+    }
+    let flags: Vec<String> = ["--config", "--data", "--cache"]
+        .into_iter()
+        .zip(&paths)
+        .flat_map(|(flag, path)| [flag.into(), path.display().to_string()])
+        .collect();
+    let mut first_head = None;
+    for (run, cue, text, key) in [
+        (
+            "first",
+            "Add CSV export to widget",
+            "I would add an Export CSV button to widget's table, writing the rows on screen with their column names as the first line, so the table opens in any spreadsheet.",
+            temper_fake::seed::KEY_ADDED_LINE,
+        ),
+        (
+            "second",
+            "Add a dark theme to widget",
+            "I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step.",
+            temper_fake::seed::KEY_FOUND_LINE,
+        ),
+    ].into_iter().take(if restart { 2 } else { 1 }) {
+        let client = scratch.path().join(run);
+        fs::create_dir(&client).expect("fresh client root");
+        fs::set_permissions(&client, fs::Permissions::from_mode(0o700)).expect("private client root");
+        let ended = support::boxed::run_story(
+            scratch.path(),
+            flags.clone(),
+            &client,
+            support::person::demo_chat(cue.as_bytes(), text.as_bytes(), b"The demo changes nothing."),
+            BOX_DEADLINE,
+            || demo_clone(&paths[0], &paths[1], &client),
+        );
+        let stderr = String::from_utf8_lossy(&ended.stderr);
+        assert_eq!(ended.exit, Some(Exit::Code(0)), "{run}: {stderr}");
+        assert!(ended.finished, "{run}: {stderr}");
+        assert_eq!(ended.left, Some(Vec::new()), "{run}: no process outlived the box: {stderr}");
+        let wrote = format!("box: wrote the configuration, {}\n", paths[0].join("temper.json").display());
+        assert_eq!(stderr.contains(&wrote), run == "first", "{run}: {stderr}");
+        assert_demo_streams(&ended.stdout, &ended.stderr, key);
+        if let Some(head) = &first_head {
+            assert_eq!(&ended.checked, head, "the fake's landing head survives the restart");
+        } else {
+            first_head = Some(ended.checked);
+        }
+    }
+    scratch.remove();
+}
+fn assert_demo_streams(stdout: &[u8], stderr: &[u8], key: &[u8]) {
+    let link = support::printed_link(stdout).expect("the person's sign-in link");
+    assert!(skein_lib::bytes::find(link, b"/jig/v1/sign-in/link?secret=").is_some());
+    assert_eq!(stdout, [link, b"\n"].concat(), "exactly one stdout line");
+    let stderr = std::str::from_utf8(stderr).expect("demo diagnostics");
+    let adopt = std::str::from_utf8(temper_fake::seed::ADOPT_LINE).expect("act 4");
+    let lines = [
+        "temper fake seed: act 1: signed in\n".to_string(),
+        std::str::from_utf8(key).expect("act 2").into(),
+        "temper fake seed: act 3: accounts are usable\n".into(),
+        adopt.into(),
+        "temper fake seed: act 5: signed out\n".into(),
+        "temper fake seed: act 6: the spent link was refused\n".into(),
+    ];
+    let mut remaining = stderr;
+    for line in lines {
+        let expected = format!("seed: {line}");
+        let (_, after) =
+            remaining.split_once(&expected).unwrap_or_else(|| panic!("missing ordered {expected}: {stderr}"));
+        remaining = after;
+        assert_eq!(stderr.matches(&expected).count(), 1, "one act: {expected}");
+    }
+    let steps = ["fake llm: ", "prepare 1: ", "fake forge 1: ", "reconcile 1: ", "serve: ", "seed: ", "box: "];
+    let bundle = std::path::Path::new(env!("CARGO_BIN_EXE_temper"))
+        .parent()
+        .expect("binary parent")
+        .join("../share/temper/bundle");
+    let no_bundle = format!("init: no bundle at {}: the browser is not served", bundle.display());
+    let no_git = "init: no git on PATH: a real forge's repositories need git 2.41 or later, set as workers[].git";
+    for line in stderr.lines() {
+        assert!(
+            steps.iter().any(|prefix| line.starts_with(prefix)) || line == no_git || line == no_bundle,
+            "unprefixed demo diagnostic: {line}"
+        );
+    }
+}
+/// The worker's invocation against the demo's link, after a test-only read grant.
+/// Until temper-14, no adoption grants the bot access to the fake repository.
+fn demo_clone(config: &std::path::Path, data: &std::path::Path, root: &std::path::Path) -> String {
+    use std::{
+        fs,
+        io::{Read, Write},
+        os::unix::ffi::OsStrExt,
+        process::Command,
+    };
+    use temper_worker_protocol_git::invocation::{self, Command as GitCommand};
+    let document: serde_json::Value =
+        serde_json::from_slice(&fs::read(config.join("temper.json")).expect("written configuration")).expect("JSON");
+    let forge = &document["application"]["forges"][0];
+    let address: std::net::SocketAddr =
+        forge["api"]["socket"].as_str().expect("chosen forge address").parse().expect("loopback");
+    let token = fs::read_to_string(data.join("demo/forge/api_token")).expect("reconcile's API token");
+    let user =
+        support::owned::answer(address.port(), "/api/v1/user", Some(token.trim())).expect("reconciled bot answers");
+    assert_eq!(user["login"], "temper", "reconcile made and authenticated forge 1's bot before serve");
+    let admin = fs::read_to_string(data.join("demo/forge/admin_token")).expect("prepare's handover");
+    let mut socket =
+        std::net::TcpStream::connect_timeout(&address, std::time::Duration::from_secs(1)).expect("fake forge");
+    socket.set_read_timeout(Some(std::time::Duration::from_secs(1))).expect("bounded grant");
+    let grant = br#"{"permission":"read"}"#;
+    write!(socket, "PUT /api/v1/repos/demo/widget/collaborators/temper HTTP/1.1\r\nHost: {address}\r\nAuthorization: token {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", admin.trim(), grant.len()).expect("grant request");
+    socket.write_all(grant).expect("grant body");
+    let mut reply = Vec::new();
+    socket.read_to_end(&mut reply).expect("grant reply");
+    assert!(reply.starts_with(b"HTTP/1.1 204"), "test-only read grant: {}", String::from_utf8_lossy(&reply));
+    let branch = support::owned::answer(address.port(), "/api/v1/repos/demo/widget/branches/main", Some(token.trim()))
+        .expect("main's API head");
+    let head = branch["commit"]["id"].as_str().expect("landing head").to_string();
+    let identity = temper_worker_protocol_git::Identity {
+        token: skein_lib::Secret::new(
+            fs::read(data.join("demo/forge/git_token")).expect("reconcile's git token").into_boxed_slice(),
+        ),
+        login: b"temper".as_slice().into(),
+        name: b"Temper".as_slice().into(),
+        email: b"temper@localhost".as_slice().into(),
+    };
+    let remote = format!("{}/demo/widget.git", forge["git"].as_str().expect("demo git URL"));
+    let clone = GitCommand::Clone { remote: remote.as_bytes().into(), directory: b"widget".as_slice().into() };
+    for (operation, kind, at) in [
+        (clone, temper_worker_domain_checkout::git::Kind::Clone, root.to_path_buf()),
+        (
+            GitCommand::CheckOut { commit: invocation::object(head.as_bytes()).expect("API object id") },
+            temper_worker_domain_checkout::git::Kind::CheckOut,
+            root.join("widget"),
+        ),
+    ] {
+        let mut command = Command::new(data.join("demo/bin/git"));
+        command
+            .env_clear()
+            .current_dir(at)
+            .args(invocation::arguments(&operation).iter().map(|word| std::ffi::OsStr::from_bytes(word)));
+        for entry in invocation::environment(root.as_os_str().as_bytes(), Some(kind), Some(&identity)) {
+            let split = entry.iter().position(|b| *b == b'=').expect("environment entry");
+            command.env(std::ffi::OsStr::from_bytes(&entry[..split]), std::ffi::OsStr::from_bytes(&entry[split + 1..]));
+        }
+        let cloned = command.output().expect("demo's git link");
+        assert!(cloned.status.success(), "git: {}", String::from_utf8_lossy(&cloned.stderr));
+    }
+    let checkout = root.join("widget");
+    for (path, bytes) in temper_fake::forge::FILES {
+        assert_eq!(fs::read(checkout.join(std::ffi::OsStr::from_bytes(path))).expect("cloned seed file"), bytes);
+    }
+    assert_eq!(fs::read(checkout.join(".git/temper-remote")).expect("cloned remote"), remote.as_bytes());
+    let count = u64::from_le_bytes(
+        fs::read(checkout.join(".git/temper-head")).expect("cloned head").try_into().expect("counted id"),
+    );
+    assert_eq!(format!("{count:016x}{}", "0".repeat(24)), head, "clone holds the API's landing head");
+    head
+}

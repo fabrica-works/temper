@@ -45,6 +45,8 @@ pub const QUOTE_BYTES: usize = 256;
 /// CLI sign-in refusal, for both text and JSON calls (client shell `host::fail`).
 pub const SPENT_STATUS: u8 = 1;
 pub const SPENT_STDERR: &[u8] = b"temper ctl: the sign-in link was refused\n";
+pub const KEY_FOUND_LINE: &[u8] = b"temper fake seed: act 2: the deployment's key was found\n";
+pub const KEY_ADDED_LINE: &[u8] = b"temper fake seed: act 2: the deployment's key was added\n";
 pub const ADOPT_LINE: &[u8] = b"temper fake seed: act 4: the demo's repository is not adopted and the forges are not waited on; both wait on temper-14\n";
 
 #[derive(Debug)]
@@ -144,10 +146,7 @@ impl Plan {
                     };
                 if self.adding || found {
                     self.act = Act::Usable;
-                    Some(line(
-                        b"2",
-                        if found { b"the deployment's key was found" } else { b"the deployment's key was added" },
-                    ))
+                    Some(if found { KEY_FOUND_LINE.into() } else { KEY_ADDED_LINE.into() })
                 } else {
                     self.adding = true;
                     None
