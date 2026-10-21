@@ -415,15 +415,26 @@ fn hosts_without_an_ip_and_port_fail_before_opening_a_socket() {
     }
 }
 #[test]
-fn a_route_that_never_supplies_a_missing_object_hits_the_runs_bound() {
+fn the_runs_bound_lets_the_last_run_finish_and_ends_the_next() {
+    // Every empty objects answer costs one discarded run. With MAX_RUNS - 2
+    // of them, the answer that fills the object makes the last run MAX_RUNS;
+    // with MAX_RUNS, the run past the bound is never made.
     let missing = object_call(TOPIC);
-    let response = Response::Answer(RemoteAnswer::Objects { objects: Box::new([]), graph: Box::new([]) });
-    let script = vec![(missing, response); usize::try_from(crate::MAX_RUNS).expect("runs")];
-    let (answer, mut disk, net) = run(&Command::CheckOut { commit: commit(TOPIC) }, script);
-    assert_eq!(answer.exit, 125);
-    assert_eq!(answer.stderr, b"temper fake git: broken: runs\n");
-    assert_eq!(net.seen.len(), usize::try_from(crate::MAX_RUNS).expect("runs"));
-    assert_eq!(disk.read(b"repo/file").as_deref(), Some(b"base\n".as_slice()));
+    let empty = Response::Answer(RemoteAnswer::Objects { objects: Box::new([]), graph: Box::new([]) });
+    let runs = usize::try_from(crate::MAX_RUNS).expect("runs");
+    let rows = [
+        (runs - 2, Some(objects(TOPIC)), 0, b"".as_slice(), runs - 1, b"topic\n".as_slice()),
+        (runs, None, 125, b"temper fake git: broken: runs\n".as_slice(), runs, b"base\n".as_slice()),
+    ];
+    for (empties, last, exit, stderr, seen, file) in rows {
+        let mut script = vec![(missing.clone(), empty.clone()); empties];
+        script.extend(last.map(|last| (missing.clone(), last)));
+        let (answer, mut disk, net) = run(&Command::CheckOut { commit: commit(TOPIC) }, script);
+        assert_eq!(answer.exit, exit, "{empties} empty answers");
+        assert_eq!(answer.stderr, stderr, "{empties} empty answers");
+        assert_eq!(net.seen.len(), seen, "{empties} empty answers");
+        assert_eq!(disk.read(b"repo/file").as_deref(), Some(file), "{empties} empty answers");
+    }
 }
 
 fn answer_miss(route: &mut Route, net: &mut Net, connection: &mut crate::connection::Connection, missing: Call) {
@@ -558,20 +569,4 @@ fn a_lost_push_answer_does_not_send_the_write_again() {
         output::classify(&answer.stderr, temper_worker_domain_checkout::git::Kind::Push),
         temper_worker_domain_checkout::git::Fault::Unreachable
     );
-}
-
-#[test]
-fn a_command_can_finish_on_the_last_allowed_run() {
-    // Every empty objects answer costs one discarded run. The last answer
-    // fills the object so the final run is exactly MAX_RUNS.
-    let missing = object_call(TOPIC);
-    let empty = Response::Answer(RemoteAnswer::Objects { objects: Box::new([]), graph: Box::new([]) });
-    let mut script =
-        vec![(missing.clone(), empty); usize::try_from(crate::MAX_RUNS - 2).expect("runs before final answer")];
-    script.push((missing, objects(TOPIC)));
-    let (answer, mut disk, net) = run(&Command::CheckOut { commit: commit(TOPIC) }, script);
-    assert_eq!(answer.exit, 0);
-    assert!(answer.stderr.is_empty());
-    assert_eq!(net.seen.len(), usize::try_from(crate::MAX_RUNS - 1).expect("one final run without a miss"));
-    assert_eq!(disk.read(b"repo/file").as_deref(), Some(b"topic\n".as_slice()));
 }
