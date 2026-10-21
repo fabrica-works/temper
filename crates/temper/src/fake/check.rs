@@ -101,8 +101,8 @@ fn undecided(reason: Reason, mut stderr: Vec<u8>, why: Option<&str>) -> Outcome 
 /// Writes the outcome's streams and returns its status.
 pub(crate) fn run(directories: &Directories, check: &Check) -> u8 {
     let outcome = outcome(directories, check);
-    let stdout = std::io::stdout().lock().write_all(&outcome.stdout);
-    let mut stderr = std::io::stderr().lock();
+    let stdout = std::io::stdout().write_all(&outcome.stdout);
+    let mut stderr = std::io::stderr();
     let written = stderr.write_all(&outcome.stderr);
     let mut status = outcome.status;
     for (stream, result) in [("stdout", stdout), ("stderr", written)] {
