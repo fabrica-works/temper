@@ -189,16 +189,6 @@ impl Rows {
     pub fn forge(&self, forge: u16) -> Option<&ForgeRows> {
         self.forges.get(&forge)
     }
-    // Iterator adapters here expose a borrowed view, never retain a closure or state.
-    #[expect(clippy::disallowed_methods, reason = "temper-01 asks for an iterator over unconfigured forge numbers")]
-    pub fn unconfigured<'a>(&'a self, configured: &'a [u16]) -> impl Iterator<Item = u16> + 'a {
-        self.forges.iter().filter(move |(number, _)| !configured.contains(number)).map(|(number, _)| *number)
-    }
-    #[must_use]
-    pub fn worst_case(value_bytes: u32) -> Option<u64> {
-        Map::<u16, ForgeRows>::worst_case(FORGES)?
-            .checked_add(u64::from(FORGES).checked_mul(10)?.checked_mul(u64::from(value_bytes))?)
-    }
 }
 impl ForgeRows {
     /// Read an item past temper's version byte; malformed rows are refused.

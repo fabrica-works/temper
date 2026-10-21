@@ -598,7 +598,7 @@ fn paths_are_resolved_by_kind_and_absolute_only_members_refuse_relative_values()
 fn github_application() -> Box<str> {
     github_input(core::str::from_utf8(fixtures::APPLICATION).unwrap())
 }
-fn github_input(input: &str) -> Box<str> {
+pub(super) fn github_input(input: &str) -> Box<str> {
     input
                 .replace("\"kind\":\"forgejo\"", "\"kind\":\"github\"")
         .replace("\"api\":{\"socket\":\"127.0.0.1:9\"}", "\"api\":null")
@@ -606,6 +606,18 @@ fn github_input(input: &str) -> Box<str> {
         .replace("\"git\":\"http://127.0.0.1:9\"", "\"git\":null,\"web\":null")
         .replace(",\"webhook_secret\":null,\"api_token\":\"secrets/forge-1.api-token\",\"user\":{\"file\":\"secrets/forge-1.user\"},\"identity\":1", "")
         .replace("\"token\":\"secrets/forge-1.git-token\",\"login\":\"temper\",\"author\":{\"name\":\"Temper\",\"email\":\"temper@example.test\"}", "\"forge\":1,\"login\":null,\"author\":null").into_boxed_str()
+}
+#[test]
+fn load_refuses_a_record_one_byte_short_of_app_key() {
+    let document = github_input(core::str::from_utf8(&fixtures::document()).unwrap());
+    let needle = "\"overrides\":{\"checkout.name_bytes\"";
+    assert_eq!(document.matches(needle).count(), 1);
+    let document = document.replacen(needle, "\"overrides\":{\"records.value_bytes\":1196,\"checkout.name_bytes\"", 1);
+    let found = crate::named(document.as_bytes(), &config::Directories::working()).unwrap_err();
+    assert_eq!(
+        lines(&found).as_ref(),
+        b"application.limits.overrides.records.value_bytes: must agree with AppKey (forge_component.key_bytes)\n"
+    );
 }
 #[test]
 fn github_defaults_and_the_identity_join_need_no_credential_files() {

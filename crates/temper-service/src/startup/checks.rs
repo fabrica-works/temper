@@ -639,17 +639,66 @@ pub(super) fn raw_worker(document: &skein_json::Document, at: u32, path: &Path, 
     }
 }
 
-/// Application records fit the store and the component's configured item bounds.
-pub fn records(jig: &config::Engine, limits: &limits::Limits, problems: &mut Problems) {
+/// Encoded active writes; `AppId`/`User` are 9 bytes, dominated by admitted `AppKey`.
+pub(crate) fn record_writes(
+    limits: &limits::Limits,
+    forges: &[super::application::Forge],
+) -> List<(Option<u64>, &'static [u8], Option<usize>)> {
+    use temper_protocol_records as records;
+    let capacity =
+        u32::try_from(forges.len()).expect("bounded configured forges").checked_add(3).expect("three scalars");
+    let mut writes = List::with_capacity(capacity);
+    let accepted = match u64::from(limits.forges.installations).checked_mul(8) {
+        Some(bytes) => bytes.checked_add(1),
+        None => None,
+    };
+    for (bytes, source) in [
+        (u64::from(limits.forge_component.key_bytes).checked_add(1), b"AppKey (forge_component.key_bytes)".as_slice()),
+        (accepted, b"Accepted (forges.installations)"),
+        (u64::from(limits.forge.name_bytes).checked_add(1), b"AppSlug (forge.name_bytes)"),
+    ] {
+        writes.push((bytes, source, None)).expect("three scalar writes");
+    }
+    for (index, forge) in forges.iter().enumerate() {
+        if forge.kind != settings::Kind::GitHub {
+            continue;
+        }
+        // Already refused by application::forge_endpoint; never encode its socket.
+        if let config::Address::Addr(Addr::InProcess(_)) = &forge.api {
+            continue;
+        }
+        let origin = records::origin(skein_forge_connection::settings::Kind::GitHub, &forge.api).encode();
+        writes
+            .push((u64::try_from(records::encode(&origin).len()).ok(), b"Origin", Some(index)))
+            .expect("configured origins");
+    }
+    writes
+}
+/// Application records fit the store and the largest encoded active write.
+pub fn records(
+    jig: &config::Engine,
+    limits: &limits::Limits,
+    forges: &[super::application::Forge],
+    problems: &mut Problems,
+) {
     let value = limits.records.value_bytes;
     if value == 0 || value > secret_value_bound(jig, limits).unwrap_or(0) {
         against(problems, b"records.value_bytes", b"engine.limits.store.value");
     }
-    if value <= limits.forge_component.key_bytes {
-        against(problems, b"records.value_bytes", b"forge_component.key_bytes");
+    let mut largest = (0, b"AppKey (forge_component.key_bytes)".as_slice(), None);
+    for (bytes, source, index) in record_writes(limits, forges).into_boxed() {
+        if bytes.unwrap_or(u64::MAX) > largest.0 {
+            largest = (bytes.unwrap_or(u64::MAX), source, index);
+        }
     }
-    if u64::from(value) <= u64::from(limits.forges.installations).checked_mul(8).expect("u32 installations") {
-        against(problems, b"records.value_bytes", b"forges.installations");
+    if u64::from(value) < largest.0 {
+        against(problems, b"records.value_bytes", largest.1);
+        if let Some(index) = largest.2 {
+            problems.push(
+                at(index, Path::root().member(b"application").member(b"forges")).member(b"api"),
+                What::Against { other: b"Origin (records.value_bytes)" },
+            );
+        }
     }
     if limits.forges.installations == 0 || limits.forges.installations > limits.forge_component.installations {
         against(problems, b"forges.installations", b"forge_component.installations");

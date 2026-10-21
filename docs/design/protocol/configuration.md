@@ -563,9 +563,11 @@ top-level `workers`, in the same order; standalone has one. Each:
     it parses and the diagnostic it keeps);
   - the records': `records.value_bytes` within the largest value jig's
     secrets' store keeps (jig's `protocol/store.md`, section 9), and
-    above both the component's `key_bytes` and 8 bytes per
-    `forges.installations`, so the largest `AppKey` and `Accepted` fit
-    with their version byte (credentials.md, 2.1);
+    large enough for the maximum encoded `AppKey`, `Accepted`, `AppSlug`
+    and every configured GitHub forge's `Origin`: the component's
+    `key_bytes`, 8 bytes per `forges.installations`, or `forge.name_bytes`,
+    each with its version byte; `Origin` counts both its kind and version
+    prefixes and the configured API address with its port (credentials.md, 2.1);
   - the forges': `forges.installations` at most
     `forge_component.installations`; `forges.log_origins` at most
     `forge_component.log_origins`, and each forge's `log_origins` within

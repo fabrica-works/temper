@@ -278,6 +278,27 @@ fn a_first_listing_deletion_suspension_and_stray_are_idempotent() {
     assert_eq!(service.engine.events.len(), 3, "same deleted, suspended and stray states reach root only once");
     assert!(service.engine.setup.lifecycle.installations.get(&(1, 22)).unwrap().suspended);
     assert!(service.engine.setup.lifecycle.installations.get(&(1, 33)).unwrap().stray);
+    installation(&mut service, 22, Change::Repositories);
+    assert_eq!(service.engine.events.len(), 3, "same repositories data is silent");
+    assert!(service.engine.setup.lifecycle.installations.get(&(1, 22)).unwrap().suspended);
+    for _ in 0_u32..3 {
+        let _discard = service.engine.events.pop().unwrap();
+    }
+    let mut updated = service.engine.setup.lifecycle.installations.get(&(1, 22)).unwrap().clone();
+    updated.account = Some((222, Box::from(b"changed-account".as_slice())));
+    for _ in 0_u32..2 {
+        service.engine.forge.above.push(connection::Event::Installation {
+            forge: 1,
+            installation: 22,
+            account: Some(connection::Account { id: 222, login: Box::from(b"changed-account".as_slice()) }),
+            change: Change::Repositories,
+        });
+        crate::engine::forge_pass(&mut service.engine);
+    }
+    assert_eq!(service.engine.events.len(), 1, "changed account is emitted once");
+    let event = domain::Event::Installation { forge: 1, installation: 22, state: Some(updated) };
+    let root::Event::Forge(emitted) = service.engine.events.pop().unwrap() else { panic!("installation event") };
+    assert_eq!(*emitted, event);
     advance(&mut service.engine);
     assert_eq!(service.engine.setup.writes.len(), 1);
     keep_next(&mut service, Item::Accepted);

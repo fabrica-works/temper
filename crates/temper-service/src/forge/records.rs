@@ -35,14 +35,13 @@ impl Rows {
     pub(crate) fn forge(&self, forge: u16) -> Option<&records::ForgeRows> {
         self.values.forge(forge)
     }
-    fn next_unconfigured(&self, after: u32, configured: &[u16]) -> Option<u16> {
+    #[expect(clippy::manual_map, reason = "the programming model uses explicit matches")]
+    fn next_unconfigured(&self, after: u32) -> Option<u16> {
         let after = u16::try_from(after).ok()?;
-        for (number, ()) in self.unconfigured.range(after..) {
-            if !configured.contains(number) {
-                return Some(*number);
-            }
+        match self.unconfigured.range(after..).next() {
+            Some((number, ())) => Some(*number),
+            None => None,
         }
-        None
     }
     pub(crate) fn worst_case(forges: u32, value_bytes: u32) -> Option<u64> {
         // The codec map allocates as it fills; push bounds it to configured forges.
@@ -170,7 +169,7 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
         }
         Phase::Name { after } => {
             let rows = &engine.forge_records.rows;
-            let found = rows.next_unconfigured(after, rows.configured.as_slice());
+            let found = rows.next_unconfigured(after);
             match found {
                 Some(number) => {
                     if engine.notes.room() == 0 {
@@ -222,13 +221,13 @@ fn unconfigured_numbers_resume_at_the_cursor_without_retaining_values() {
     // Unknown item codes still identify an unconfigured forge without reading bytes.
     rows.push((u64::from(records::FAMILY_FORGE) << 48) | (78 << 16) | 0x000b, Secret::new(Box::from([])), 4096);
     assert_eq!(rows.unconfigured.len(), 4);
-    assert_eq!(rows.next_unconfigured(0, &[1]), Some(0));
-    assert_eq!(rows.next_unconfigured(1, &[1]), Some(77));
-    assert_eq!(rows.next_unconfigured(78, &[1]), Some(78));
-    assert_eq!(rows.next_unconfigured(78, &[1, 78]), Some(u16::MAX));
-    assert_eq!(rows.next_unconfigured(u32::from(u16::MAX), &[1]), Some(u16::MAX));
-    assert_eq!(rows.next_unconfigured(FORGES, &[1]), None);
-    assert_eq!(rows.next_unconfigured(u32::MAX, &[1]), None);
+    assert_eq!(rows.next_unconfigured(0), Some(0));
+    assert_eq!(rows.next_unconfigured(1), Some(77));
+    assert_eq!(rows.next_unconfigured(78), Some(78));
+    assert_eq!(rows.next_unconfigured(79), Some(u16::MAX));
+    assert_eq!(rows.next_unconfigured(u32::from(u16::MAX)), Some(u16::MAX));
+    assert_eq!(rows.next_unconfigured(FORGES), None);
+    assert_eq!(rows.next_unconfigured(u32::MAX), None);
     rows.push(records::number(1, records::Item::User), Secret::new(Box::from([1, 9])), 4096);
     assert!(rows.forge(1).is_some());
     assert_eq!(rows.unconfigured.len(), 4);

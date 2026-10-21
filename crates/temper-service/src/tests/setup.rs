@@ -402,6 +402,7 @@ fn setup_memory_includes_the_whole_host_and_its_owner() {
 }
 #[test]
 fn every_host_unusable_arm_has_an_operator_path() {
+    use host::Stacked::{HttpOverTls, TlsOverIo};
     use host::{Stacked, Unusable};
     for why in [
         Unusable::Zero,
@@ -410,6 +411,8 @@ fn every_host_unusable_arm_has_an_operator_path() {
         Unusable::GitHubDocuments(skein_forge::github::limits::Problem::Depth),
         Unusable::GitHubMetadata { inner: 1, string_bytes: 1 },
         Unusable::Stack { stacked: Stacked::HttpOverIo, demand: 2, cap: 1 },
+        Unusable::Stack { stacked: HttpOverTls, demand: 2, cap: 1 },
+        Unusable::Stack { stacked: TlsOverIo, demand: 2, cap: 1 },
         Unusable::Stack { stacked: Stacked::JsonOverHttp, demand: 2, cap: 1 },
         Unusable::Forges { forges: 1 },
         Unusable::Duplicate { forge: 1 },
@@ -435,6 +438,16 @@ fn every_host_unusable_arm_has_an_operator_path() {
         let mut found = jig_protocol_config::Problems::empty();
         settings::problems(why, &mut found);
         assert!(!found.is_empty());
+        let Unusable::Stack { stacked, .. } = why else { continue };
+        let expected: &[&[u8]] = match stacked {
+            HttpOverTls => &[b"forge_component.chunk", b"forge_component.tls.read", b"forge_component.tls.send"],
+            TlsOverIo => &[b"forge_component.tls.read", b"forge_component.tls.send", b"io.intake", b"io.output"],
+            Stacked::HttpOverIo | Stacked::JsonOverHttp => continue,
+        };
+        assert_eq!(found.problems.len(), u32::try_from(expected.len()).unwrap());
+        for (problem, name) in found.problems.iter().zip(expected) {
+            assert_eq!(problem.path, settings::limit_path(name));
+        }
     }
 }
 #[test]

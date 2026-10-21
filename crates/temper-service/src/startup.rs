@@ -91,6 +91,7 @@ fn problem(path: Path, what: What) -> Problems {
 fn indexed(index: usize) -> Path {
     Path::root().member(b"workers").child(Segment::Index(u32::try_from(index).expect("bounded workers")))
 }
+#[expect(clippy::too_many_lines, reason = "one load pass accumulates all cross-part diagnostics")]
 fn parse(input: &[u8], directories: &config::Directories) -> Result<Parsed, Problems> {
     let length = u32::try_from(input.len()).or(Err(problem(Path::root(), What::Jig(config::What::Bound))))?;
     let document =
@@ -172,7 +173,12 @@ fn parse(input: &[u8], directories: &config::Directories) -> Result<Parsed, Prob
     );
     checks::webhooks(&application, &mut problems);
     check_redirects(engine.as_ref().expect("required engine checked"), &application, &mut problems);
-    checks::records(engine.as_ref().expect("required engine checked"), &application.limits, &mut problems);
+    checks::records(
+        engine.as_ref().expect("required engine checked"),
+        &application.limits,
+        &application.forges,
+        &mut problems,
+    );
     checks::limits(&application.limits, &application.limits.git_component, &mut problems);
     let mut base = 0;
     for forge in &application.forges {

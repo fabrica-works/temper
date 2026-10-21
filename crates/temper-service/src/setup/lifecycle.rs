@@ -111,10 +111,8 @@ pub(crate) fn state(engine: &mut crate::engine::Engine, forge: u16, state: domai
 }
 pub(super) fn keep(engine: &mut crate::engine::Engine, forge: u16, item: Item, bytes: &[u8], purpose: Purpose) {
     let value = Secret::new(records::encode(bytes).into_boxed_slice());
-    if value.expose().len() > usize::try_from(engine.setup.value_bytes).expect("record bound") {
-        crate::stop::unavailable(engine, b"forge records");
-        return;
-    }
+    let bound = usize::try_from(engine.setup.value_bytes).expect("record bound");
+    assert!(value.expose().len() <= bound, "startup::checks::records proves every encoded setup write fits");
     assert!(engine.setup.next_write < (1_u64 << 60_u32), "setup write names fit prefix");
     let owner = Token::new(crate::tokens::SETUP | engine.setup.next_write);
     engine.setup.next_write = engine.setup.next_write.checked_add(1).expect("setup write names");

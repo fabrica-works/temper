@@ -169,6 +169,8 @@ fn records_and_installations_override_and_check_both_bounds() {
         ),
         (b"records.value_bytes", u64::from(defaults.forge_component.key_bytes), b"forge_component.key_bytes"),
         (b"forges.installations", 512, b"records.value_bytes"),
+        (b"forge_component.key_bytes", u64::from(u32::MAX), b"AppKey"),
+        (b"forges.installations", u64::from(u32::MAX), b"Accepted"),
         (b"forges.installations", 0, b"forge_component.installations"),
         (b"forges.installations", 9, b"forge_component.installations"),
         (b"forge_component.installations", 7, b"forges.installations"),
@@ -176,7 +178,7 @@ fn records_and_installations_override_and_check_both_bounds() {
         let mut own = defaults;
         limits::apply(&mut own, name, value).unwrap();
         let mut problems = crate::startup::Problems::empty();
-        crate::startup::checks::records(&jig, &own, &mut problems);
+        crate::startup::checks::records(&jig, &own, &[], &mut problems);
         let lines = crate::startup::lines(&problems);
         assert!(lines.windows(name.len()).any(|part| part == name), "{name:?}");
         assert!(lines.windows(other.len()).any(|part| part == other), "{other:?}");
@@ -189,8 +191,76 @@ fn records_and_installations_override_and_check_both_bounds() {
     assert_eq!(own.forge_component.key_bytes, 2000);
     assert_eq!(own.forge_component.renew_before, Duration::from_secs(60));
     let mut problems = crate::startup::Problems::empty();
-    crate::startup::checks::records(&jig, &own, &mut problems);
+    crate::startup::checks::records(&jig, &own, &[], &mut problems);
     assert!(problems.is_empty());
+}
+#[test]
+fn encoded_setup_writes_fit_exactly_and_name_the_short_bound() {
+    use crate::startup::{Problems, checks};
+    use temper_protocol_records as records;
+    let settings = fixtures::engine();
+    let mut own = settings.limits;
+    let key = skein_lib::bytes::zeroed(usize::try_from(own.forge_component.key_bytes).unwrap());
+    assert_eq!(records::encode(&key).len(), 1197); // DER bound plus VERSION.
+    let mut ids = skein_lib::List::with_capacity(150);
+    for id in 1..=150 {
+        ids.push(id).unwrap();
+    }
+    assert_eq!(records::encode(skein_forge_setup::item::accepted_item(ids.as_slice()).expose()).len(), 1201);
+    for (installations, value, expected) in [
+        (8, 1197, ""),
+        (
+            8,
+            1196,
+            "application.limits.overrides.records.value_bytes: must agree with AppKey (forge_component.key_bytes)\n",
+        ),
+        (150, 1201, ""),
+        (
+            150,
+            1200,
+            "application.limits.overrides.records.value_bytes: must agree with Accepted (forges.installations)\n",
+        ),
+    ] {
+        own.forges.installations = installations;
+        own.forge_component.installations = installations;
+        own.records.value_bytes = value;
+        let mut problems = Problems::empty();
+        checks::records(&settings.jig, &own, &[], &mut problems);
+        assert_eq!(crate::startup::lines(&problems).as_ref(), expected.as_bytes());
+    }
+}
+#[test]
+#[expect(clippy::disallowed_methods, reason = "ordinary tests inspect diagnostic text")]
+fn origin_inventory_keeps_configured_text_prefixes_and_forge_indices() {
+    use crate::startup::checks;
+    use jig_protocol_config::{Address, Directories};
+    use temper_protocol_records as records;
+    let document = fixtures::document();
+    let input = super::startup::github_input(core::str::from_utf8(&document).unwrap());
+    let mut forges = skein_lib::List::with_capacity(5);
+    forges.push(crate::named(&document, &Directories::working()).unwrap().forges.into_vec().pop().unwrap()).unwrap();
+    for (api, length) in [
+        (Address::Host { name: Box::from(b"api.github.com".as_slice()), port: 443 }, 20),
+        (Address::Host { name: Box::from(b"forge.example".as_slice()), port: 12345 }, 21),
+        (Address::Addr(skein_io::Addr::Ip("127.0.0.1:3000".parse().unwrap())), 16),
+        (Address::Addr(skein_io::Addr::Ip("[::1]:3000".parse().unwrap())), 12),
+    ] {
+        let mut forge =
+            crate::named(input.as_bytes(), &Directories::working()).unwrap().forges.into_vec().pop().unwrap();
+        forge.api = api;
+        let encoded =
+            records::encode(&records::origin(skein_forge_connection::settings::Kind::GitHub, &forge.api).encode());
+        assert_eq!(encoded.len(), length);
+        assert_eq!(&encoded[..2], &[records::VERSION, 2]);
+        let index = usize::try_from(forges.len()).unwrap();
+        forges.push(forge).unwrap();
+        let inventory = checks::record_writes(&fixtures::engine().limits, forges.as_slice());
+        assert_eq!(inventory.len(), forges.len() + 2);
+        assert_eq!(
+            *inventory.get(u32::try_from(index + 2).unwrap()).unwrap(),
+            (Some(u64::try_from(length).unwrap()), b"Origin".as_slice(), Some(index))
+        );
+    }
 }
 #[test]
 #[expect(clippy::disallowed_methods, reason = "ordinary tests inspect diagnostic text")]
