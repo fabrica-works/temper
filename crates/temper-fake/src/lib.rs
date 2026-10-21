@@ -12,9 +12,11 @@ pub mod limits;
 pub mod llm;
 mod read;
 pub mod seed;
+pub mod steps;
 pub mod turn;
 mod wire;
 pub use read::Refusal;
+pub use steps::steps;
 
 /// The whole JSON input bound, checked before decoding or creating any output.
 pub const DOCUMENT_BYTES: u32 = 1 << 20;
