@@ -128,3 +128,329 @@ fn fetch_bound_through_checked() {
         }
     }
 }
+
+use crate::fetch::{self, Event, Failure, Pin, Request};
+use skein_lib::{Queue, sha256::Sha256};
+fn sha(bytes: &[u8]) -> [u8; 32] {
+    let mut hash = Sha256::new();
+    hash.update(bytes);
+    hash.finish()
+}
+fn unhex(text: &str) -> [u8; 32] {
+    let mut value = [0; 32];
+    for (value, digits) in value.iter_mut().zip(text.as_bytes().chunks_exact(2)) {
+        *value = u8::from_str_radix(core::str::from_utf8(digits).unwrap(), 16).unwrap();
+    }
+    value
+}
+#[test]
+#[expect(clippy::too_many_lines, reason = "one table of pinned architectures and selections")]
+fn architecture_pins() {
+    for (machine, forgejo, runner, mirror, expected) in [
+        (
+            "x86_64",
+            true,
+            true,
+            false,
+            Ok((
+                "amd64",
+                "5a3b07e124ed70b4e46ee3939515f003bd3cc85352257a9a4607a527251042ca",
+                "fadaec897f5e6641c363f87ecaf75f866f99c81b7097ec6b433e4c48123fcad1",
+            )),
+        ),
+        (
+            "aarch64",
+            true,
+            true,
+            false,
+            Ok((
+                "arm64",
+                "e5ec437cd6357e8d1b4580cb47ab1daa58a32b33971a63db63446a535d33adb7",
+                "9d3d462ee83e4e629f959faeacceb20eed2f25290bddea402e65ace46a31afd9",
+            )),
+        ),
+        (
+            "x86_64",
+            true,
+            false,
+            false,
+            Ok((
+                "amd64",
+                "5a3b07e124ed70b4e46ee3939515f003bd3cc85352257a9a4607a527251042ca",
+                "fadaec897f5e6641c363f87ecaf75f866f99c81b7097ec6b433e4c48123fcad1",
+            )),
+        ),
+        (
+            "x86_64",
+            false,
+            true,
+            false,
+            Ok((
+                "amd64",
+                "5a3b07e124ed70b4e46ee3939515f003bd3cc85352257a9a4607a527251042ca",
+                "fadaec897f5e6641c363f87ecaf75f866f99c81b7097ec6b433e4c48123fcad1",
+            )),
+        ),
+        (
+            "x86_64",
+            true,
+            true,
+            true,
+            Ok((
+                "amd64",
+                "5a3b07e124ed70b4e46ee3939515f003bd3cc85352257a9a4607a527251042ca",
+                "fadaec897f5e6641c363f87ecaf75f866f99c81b7097ec6b433e4c48123fcad1",
+            )),
+        ),
+        ("riscv64", true, true, false, Err(Failure::Architecture(b"riscv64".as_slice().into()))),
+        (
+            "x86_64",
+            false,
+            false,
+            false,
+            Ok((
+                "amd64",
+                "5a3b07e124ed70b4e46ee3939515f003bd3cc85352257a9a4607a527251042ca",
+                "fadaec897f5e6641c363f87ecaf75f866f99c81b7097ec6b433e4c48123fcad1",
+            )),
+        ),
+    ] {
+        let mut owned = fixtures::owned();
+        owned.fetch = Fetch {
+            forgejo,
+            runner,
+            mirror: mirror.then(|| Mirror { forgejo: origin(b"mirror.test", 443), runner: origin(b"127.0.0.1", 8443) }),
+        };
+        let expected = expected.map(|(arch, fj, run)| {
+            let mut pins = Vec::new();
+            if forgejo {
+                pins.push(Pin {
+                    origin: if mirror { origin(b"mirror.test", 443) } else { origin(b"codeberg.org", 443) },
+                    path: format!("/forgejo/forgejo/releases/download/v17.0.0/forgejo-17.0.0-linux-{arch}")
+                        .as_bytes()
+                        .into(),
+                    digest: unhex(fj),
+                    file: owned.forgejo.clone(),
+                });
+            }
+            if runner {
+                pins.push(Pin {
+                    origin: if mirror { origin(b"127.0.0.1", 8443) } else { origin(b"code.forgejo.org", 443) },
+                    path: format!("/forgejo/runner/releases/download/v13.2.0/forgejo-runner-13.2.0-linux-{arch}")
+                        .as_bytes()
+                        .into(),
+                    digest: unhex(run),
+                    file: owned.runner.as_ref().unwrap().binary.clone(),
+                });
+            }
+            pins.into_boxed_slice()
+        });
+        assert_eq!(fetch::pins(&owned, machine), expected, "{machine} {forgejo} {runner} {mirror}");
+    }
+}
+fn pin(file: &[u8]) -> Pin {
+    Pin {
+        origin: origin(b"mirror.test", 8443),
+        path: b"/binary".as_slice().into(),
+        digest: sha(b"abc"),
+        file: file.into(),
+    }
+}
+fn hash(file: &[u8]) -> Request {
+    Request::Hash { file: file.into() }
+}
+fn get() -> Request {
+    Request::Get { origin: origin(b"mirror.test", 8443), path: b"/binary".as_slice().into() }
+}
+fn open(file: &str) -> Request {
+    Request::Open { part: format!("{file}.part").as_bytes().into() }
+}
+fn write(offset: u64, bytes: &[u8]) -> Request {
+    Request::Write { offset, bytes: bytes.into() }
+}
+fn finish(file: &str) -> Request {
+    Request::Finish { part: format!("{file}.part").as_bytes().into(), file: file.as_bytes().into() }
+}
+fn remove() -> Request {
+    Request::Remove { part: b"/cache/bin.part".as_slice().into() }
+}
+fn url() -> Box<[u8]> {
+    b"https://mirror.test:8443/binary".as_slice().into()
+}
+#[test]
+#[expect(clippy::too_many_lines, reason = "one table of complete request and event traces")]
+fn fetch_machine() {
+    let success = vec![
+        (Event::Begin, hash(b"/cache/bin")),
+        (Event::Hashed(None), get()),
+        (Event::Answered { status: 200, length: Some(3) }, open("/cache/bin")),
+        (Event::Done, Request::Read),
+        (Event::Chunk(b"a".as_slice().into()), write(0, b"a")),
+        (Event::Done, Request::Read),
+        (Event::Chunk(b"bc".as_slice().into()), write(1, b"bc")),
+        (Event::Done, Request::Read),
+        (Event::Ended, finish("/cache/bin")),
+        (Event::Done, Request::End(Ok(()))),
+    ];
+    let mut two = success[..9]
+        .iter()
+        .map(|(event, request)| {
+            (
+                event.clone(),
+                match request {
+                    Request::Hash { file } => hash(file),
+                    Request::Get { .. } => get(),
+                    Request::Open { .. } => open("/cache/bin"),
+                    Request::Read => Request::Read,
+                    Request::Write { offset, bytes } => write(*offset, bytes),
+                    Request::Finish { .. } => finish("/cache/bin"),
+                    Request::Remove { .. } | Request::End(_) => unreachable!(),
+                },
+            )
+        })
+        .collect::<Vec<_>>();
+    two.extend([
+        (Event::Done, hash(b"/cache/two")),
+        (Event::Hashed(None), get()),
+        (Event::Answered { status: 200, length: None }, open("/cache/two")),
+        (Event::Done, Request::Read),
+        (Event::Chunk(b"abc".as_slice().into()), write(0, b"abc")),
+        (Event::Done, Request::Read),
+        (Event::Ended, finish("/cache/two")),
+        (Event::Done, Request::End(Ok(()))),
+    ]);
+    for (name, count, bound, steps) in [
+        ("absent two chunks", 1, 10, success),
+        (
+            "matching",
+            1,
+            3,
+            vec![(Event::Begin, hash(b"/cache/bin")), (Event::Hashed(Some(sha(b"abc"))), Request::End(Ok(())))],
+        ),
+        (
+            "present mismatch stops before second",
+            2,
+            3,
+            vec![
+                (Event::Begin, hash(b"/cache/bin")),
+                (
+                    Event::Hashed(Some(sha(b"x"))),
+                    Request::End(Err(Failure::Present { file: b"/cache/bin".as_slice().into() })),
+                ),
+            ],
+        ),
+        (
+            "302",
+            1,
+            3,
+            vec![
+                (Event::Begin, hash(b"/cache/bin")),
+                (Event::Hashed(None), get()),
+                (
+                    Event::Answered { status: 302, length: None },
+                    Request::End(Err(Failure::Status { url: url(), status: 302 })),
+                ),
+            ],
+        ),
+        (
+            "404",
+            1,
+            3,
+            vec![
+                (Event::Begin, hash(b"/cache/bin")),
+                (Event::Hashed(None), get()),
+                (
+                    Event::Answered { status: 404, length: None },
+                    Request::End(Err(Failure::Status { url: url(), status: 404 })),
+                ),
+            ],
+        ),
+        (
+            "length past bound",
+            1,
+            2,
+            vec![
+                (Event::Begin, hash(b"/cache/bin")),
+                (Event::Hashed(None), get()),
+                (Event::Answered { status: 200, length: Some(3) }, Request::End(Err(Failure::Bytes { url: url() }))),
+            ],
+        ),
+        (
+            "length at bound",
+            1,
+            3,
+            vec![
+                (Event::Begin, hash(b"/cache/bin")),
+                (Event::Hashed(None), get()),
+                (Event::Answered { status: 200, length: Some(3) }, open("/cache/bin")),
+                (Event::Done, Request::Read),
+                (Event::Chunk(b"abc".as_slice().into()), write(0, b"abc")),
+                (Event::Done, Request::Read),
+                (Event::Ended, finish("/cache/bin")),
+                (Event::Done, Request::End(Ok(()))),
+            ],
+        ),
+        (
+            "stream past bound",
+            1,
+            2,
+            vec![
+                (Event::Begin, hash(b"/cache/bin")),
+                (Event::Hashed(None), get()),
+                (Event::Answered { status: 200, length: None }, open("/cache/bin")),
+                (Event::Done, Request::Read),
+                (Event::Chunk(b"ab".as_slice().into()), write(0, b"ab")),
+                (Event::Done, Request::Read),
+                (Event::Chunk(b"c".as_slice().into()), remove()),
+                (Event::Done, Request::End(Err(Failure::Bytes { url: url() }))),
+            ],
+        ),
+        (
+            "wrong digest",
+            1,
+            3,
+            vec![
+                (Event::Begin, hash(b"/cache/bin")),
+                (Event::Hashed(None), get()),
+                (Event::Answered { status: 200, length: None }, open("/cache/bin")),
+                (Event::Done, Request::Read),
+                (Event::Chunk(b"x".as_slice().into()), write(0, b"x")),
+                (Event::Done, Request::Read),
+                (Event::Ended, remove()),
+                (Event::Done, Request::End(Err(Failure::Digest { url: url(), pinned: sha(b"abc"), got: sha(b"x") }))),
+            ],
+        ),
+        ("both fetched", 2, 3, two),
+        ("none", 0, 3, vec![(Event::Begin, Request::End(Ok(())))]),
+    ] {
+        let pins = match count {
+            0_u8 => vec![],
+            1 => vec![pin(b"/cache/bin")],
+            2 => vec![pin(b"/cache/bin"), pin(b"/cache/two")],
+            _ => unreachable!(),
+        };
+        let mut machine = fetch::Fetch::new(pins.into_boxed_slice(), bound);
+        let mut out = Queue::with_capacity(fetch::MAX_OUT);
+        for (event, expected) in steps {
+            fetch::step(&mut machine, event, &mut out);
+            assert_eq!(out.pop(), Some(expected), "{name}");
+            assert!(out.is_empty());
+        }
+    }
+}
+#[test]
+fn failures_words_and_urls() {
+    for (failure, expected) in [
+        (Failure::Architecture(b"riscv64".as_slice().into()), "no pinned binaries for architecture riscv64"),
+        (Failure::Present { file: b"/cache/bin".as_slice().into() }, "/cache/bin: does not match the pinned digest"),
+        (Failure::Status { url: url(), status: 302 }, "https://mirror.test:8443/binary: HTTP status 302"),
+        (Failure::Bytes { url: url() }, "https://mirror.test:8443/binary: body past setup.fetch_bytes"),
+        (
+            Failure::Digest { url: url(), pinned: sha(b"abc"), got: sha(b"x") },
+            "https://mirror.test:8443/binary: digest differs: pinned ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad, got 2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881",
+        ),
+    ] {
+        assert_eq!(failure.words().as_ref(), expected.as_bytes());
+    }
+    assert_eq!(fetch::url(&origin(b"mirror.test", 443), b"/binary").as_ref(), b"https://mirror.test/binary");
+}

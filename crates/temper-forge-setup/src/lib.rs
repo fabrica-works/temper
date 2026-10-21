@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 pub mod check;
+pub mod fetch;
 pub mod given;
 pub mod ini;
 pub mod limits;
