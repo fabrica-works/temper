@@ -284,8 +284,8 @@ the new shape's first milestone into one story.
   It starts no sub-owner of its own, which authority's depth makes a
   rail.
 - **An implementer** is an agent task on its own r-branch.
-  - Its instructions are the task file. Its model is GPT at high, or
-    Claude for taste.
+  - Its instructions are the task file. Its model is GPT at medium or
+    high by the task, or Claude for taste.
   - Its result reaches the owner, who checks the diff and hands the
     branch down to a change (`../domain/forge.md`, section 11). Or the
     implementer's task produces the change, and the owner's check is a
@@ -761,13 +761,18 @@ step each comes from.
     land what was ready, write a closing note with what was left, and
     stop. Fresh missions took their work on, with briefs built from
     their notes.
+  - Work other owners owed the ended owner went to it by name. Hashes
+    o/github owed o/qa had to be re-addressed by hand to o/qa-a, its
+    successor.
   - In jig, a goal's notes are scoped to its subtree (`domain/core.md`,
-    6.2), and its kept news, footprint and grants are its own. So a
-    successor goal starts with none of them.
+    6.2). Its kept news, footprint, grants, and waits on other tasks
+    (dependencies and subscriptions) are its own too. So a successor
+    goal starts with none of them.
   - To design: what passes from a goal that ended to the goal that
     takes its work on: notes, kept news, grants on another owner's
-    files, parked branches. And whether that takes a new operation, or
-    an input and a note scope that the director passes on.
+    files, parked branches, and its waits on other tasks, so that what
+    others owe it reaches the successor. And whether that takes a new
+    operation, or an input and a note scope that the director passes on.
 
 ## 7. Where it does better
 

@@ -544,6 +544,10 @@ B's notes and closing note. C needs what was kept for B:
 - e1's approval;
 - the clock and F2 findings.
 
+C also needs what B was waiting for. M2 will change more of B's files,
+and A2 owes B each landing's hash for B's rebase. Those are now owed to
+C.
+
 C proposes one milestone, N1, which it drives itself: B's old plan,
 reordered toward priority 1, with a date its mission must meet. It
 takes its API's shape from an Opus one-shot. The director gives N1 a
@@ -554,8 +558,8 @@ green light.
   - amendment (exact);
   - a goal that completes with what is left in its result (exact);
   - a new goal with the last one's notes and closing note as its input,
-    and the news kept for B reaching C (design, 6.8: a goal's notes
-    and news are its own);
+    and the news kept for B and B's waits on other tasks reaching C
+    (design, 6.8: a goal's notes, news and waits are its own);
   - a goal's deadline (exact);
   - a Codex owner taking taste from an advisor and bringing its design
     to the director (exact).
@@ -697,8 +701,8 @@ New with the change of shape and the new shape's first milestone
 - **The old shape retired:** a charter withdrawn while tasks still use
   it, and a charter's new policy reaching live tasks (5.2, 5.3).
 - **A goal's successor:** a goal's notes are its subtree's, and its
-  kept news its own. A fresh goal that takes on an ended one's work
-  starts with neither (7.1).
+  kept news and its waits on other tasks are its own. A fresh goal that
+  takes on an ended one's work starts with none of them (7.1).
 
 ## 10. Left out, and why
 
