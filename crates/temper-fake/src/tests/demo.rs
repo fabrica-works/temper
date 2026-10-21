@@ -276,8 +276,8 @@ fn demo_acceptance() {
         let demo = demo.unwrap();
         let m = &value["application"]["demo"]["llm"];
         let standalone = json!({"listen":m["listen"], "key":"/data/demo/llm.key", "tls":null,
-            "models":[{"name":"demo","window":window,"output":output}], "cued":[],
-            "asked":m["asked"], "otherwise":m["otherwise"]});
+            "models":[{"name":"demo","window":window,"output":output}], "cued":m["asked"],
+            "asked":[], "otherwise":m["otherwise"]});
         assert_eq!(demo.llm(), &llm::Document::decode(&serde_json::to_vec(&standalone).unwrap()).unwrap());
         assert_eq!(demo.provider(), 3);
         assert_eq!(demo.forge(), 1);
@@ -305,5 +305,68 @@ fn key_file() {
         (bytes.clone(), Ok(bytes)),
     ] {
         assert_eq!(demo::key(&file).map(<[u8]>::to_vec).map_err(demo::KeyRefused::reason), expected);
+    }
+}
+
+#[test]
+fn demo_answers_the_brief() {
+    use skein_fake_llm_domain::api::{Finish, Message, Part, Role};
+    let mut value = fixture();
+    // Each suggested request is one turn, as init writes it. Keep the finish
+    // call in the answer: a text-only stop does not finish a chat's run.
+    value["application"]["demo"]["llm"]["asked"] = json!([
+        {"cue":"Add CSV export to widget","turns":[{
+            "lines":[{"text":"Export CSV"},{"call":"finish","arguments":{
+                "form":"report","text":"The demo changes nothing.","fields":{}
+            }}],"finish":"tool_calls","tokens":3
+        }]},
+        {"cue":"Add a dark theme to widget","turns":[{
+            "lines":[{"text":"Use dark colours"},{"call":"finish","arguments":{
+                "form":"report","text":"The demo changes nothing.","fields":{}
+            }}],"finish":"tool_calls","tokens":4
+        }]}
+    ]);
+    let demo = read(&value).unwrap().unwrap();
+    let csv = "Help the person plan their work. Delegate repository changes to the coding procedure and explain the result.\n\n## Task\n\nAdd CSV export to widget\n[Report: at most 32 bytes]\n[Requested by person 1]\n\n";
+    let dark = "Help the person plan their work. Delegate repository changes to the coding procedure and explain the result.\n\n## Task\n\nAdd a dark theme to widget\n[Report: at most 32 bytes]\n[Requested by person 1]\n\n";
+    let opening = "Begin the work your brief describes.";
+    for (name, system, user, said, text, tokens, finish) in [
+        ("CSV brief", csv, opening, false, "Export CSV", 3, Finish::ToolCalls),
+        ("dark brief", dark, opening, false, "Use dark colours", 4, Finish::ToolCalls),
+        ("user cue only", "No suggested request", "Add CSV export to widget", false, "demo model", 3, Finish::Stop),
+        ("past last turn", csv, opening, true, "done", 1, Finish::Stop),
+        (
+            "earliest cue",
+            "Add a dark theme to widget; Add CSV export to widget",
+            opening,
+            false,
+            "Use dark colours",
+            4,
+            Finish::ToolCalls,
+        ),
+    ] {
+        let mut query = super::query(system.as_bytes(), user.as_bytes());
+        if said {
+            query.messages = Box::new([
+                Message { role: Role::User, parts: Box::new([Part::Text { text: opening.as_bytes().into() }]) },
+                Message {
+                    role: Role::Assistant,
+                    parts: Box::new([Part::Text { text: b"Earlier answer".as_slice().into() }]),
+                },
+                Message { role: Role::User, parts: Box::new([Part::Text { text: user.as_bytes().into() }]) },
+            ]);
+        }
+        let answer = super::answer(demo.llm(), 23, query);
+        let mut parts = vec![Part::Text { text: text.as_bytes().into() }];
+        if finish == Finish::ToolCalls {
+            parts.push(Part::ToolCall {
+                id: b"call_0000000000000001".as_slice().into(),
+                name: b"finish".as_slice().into(),
+                arguments: br#"{"fields":{},"form":"report","text":"The demo changes nothing."}"#.as_slice().into(),
+            });
+        }
+        assert_eq!(answer.parts.as_ref(), parts.as_slice(), "{name}");
+        assert_eq!(answer.finish, finish, "{name}");
+        assert_eq!(answer.usage.output, Some(tokens), "{name}");
     }
 }

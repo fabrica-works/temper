@@ -584,6 +584,12 @@ fn llm_run() {
             private_hex(&dir.join("key"), &key);
             (run, dir.join("key"), key.to_vec())
         };
+        let mut chat: Value = serde_json::from_slice(CHAT).expect("valid fixture");
+        if demo {
+            chat["instructions"] = json!("say hello");
+            chat["input"][0]["content"][0]["text"] = json!("Begin the work your brief describes.");
+        }
+        let chat = serde_json::to_vec(&chat).expect("valid fixture");
         let before = snapshot(dir);
         let auth = format!("Bearer {}", std::str::from_utf8(&key).expect("valid fixture"));
         for (credential, status, text) in [
@@ -614,7 +620,7 @@ fn llm_run() {
                 )
                 .expect("valid fixture");
                 let mut stream = rustls::StreamOwned::new(connection, stream(run.address));
-                stream.write_all(&http("POST", "/v1/responses", credential, CHAT)).expect("valid fixture");
+                stream.write_all(&http("POST", "/v1/responses", credential, &chat)).expect("valid fixture");
                 let mut response = Vec::new();
                 match stream.read_to_end(&mut response) {
                     Ok(_) => {}
@@ -623,13 +629,13 @@ fn llm_run() {
                 }
                 response
             } else {
-                request(run.address, "POST", "/v1/responses", credential, CHAT)
+                request(run.address, "POST", "/v1/responses", credential, &chat)
             };
             assert!(response.starts_with(status), "{}", String::from_utf8_lossy(&response));
             assert!(String::from_utf8_lossy(&response).contains(text), "{}", String::from_utf8_lossy(&response));
         }
         if !tls {
-            let mut other: Value = serde_json::from_slice(CHAT).expect("valid fixture");
+            let mut other: Value = serde_json::from_slice(&chat).expect("valid fixture");
             other["model"] = json!("another-model");
             let response = request(
                 run.address,
@@ -641,7 +647,8 @@ fn llm_run() {
             assert!(response.starts_with(b"HTTP/1.1 200"));
             assert!(String::from_utf8_lossy(&response).contains("hello from QA"));
         }
-        let mut other: Value = serde_json::from_slice(CHAT).expect("valid fixture");
+        let mut other: Value = serde_json::from_slice(&chat).expect("valid fixture");
+        other["instructions"] = json!("");
         other["input"][0]["content"][0]["text"] = json!("another request");
         if !tls {
             let response = request(

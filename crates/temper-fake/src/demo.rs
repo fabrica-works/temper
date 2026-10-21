@@ -114,8 +114,8 @@ pub fn read(document: &Json, at: u32, facts: &Facts<'_>) -> Result<Option<Demo>,
     read::absolute(&key, &lp.member(b"key"))?;
     let client = data_path(document, client_at, facts.directories, &p.member(b"client"))?;
     let scripts = api::Scripts {
-        cued: Box::new([]),
-        asked: llm::scripts(document, asked_at, &lp.member(b"asked"))?,
+        cued: llm::scripts(document, asked_at, &lp.member(b"asked"))?,
+        asked: Box::new([]),
         otherwise: llm::turns(document, otherwise_at, &lp.member(b"otherwise"))?,
     };
     let llm = llm::Document::checked(listen, key, None, models, scripts, &lp)?;
