@@ -151,7 +151,6 @@ fn init_refusals_leave_every_file_and_directory_untouched() {
     }
 }
 #[test]
-#[ignore = "landed init template requires the separate GitHub parser work recorded in STATUS"]
 fn generated_configuration_passes_the_same_checks_as_serve() {
     let root = scratch("acceptance");
     let dirs = directories(&root);

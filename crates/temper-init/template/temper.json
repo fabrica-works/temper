@@ -832,8 +832,7 @@
         "api": null,
         "transport": null,
         "git": null,
-        "web": null,
-        "log_origins": null
+        "web": null
       }
     ],
     "identities": [

@@ -52,7 +52,7 @@ fn the_default_is_the_owned_example_so_edited() {
         for (path, value) in [
             (
                 "/application/forges",
-                json!([{"number": 2_u16, "kind": "github", "api": null, "transport": null, "git": null, "web": null, "log_origins": null}]),
+                json!([{"number": 2_u16, "kind": "github", "api": null, "transport": null, "git": null, "web": null}]),
             ),
             ("/application/identities", json!([{"number": 1_u32, "forge": 2_u16, "login": null, "author": null}])),
             ("/application/setup", parse(b"[]")),
