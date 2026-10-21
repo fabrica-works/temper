@@ -207,3 +207,126 @@ pub fn status(address: SocketAddr, target: &str) -> Option<u16> {
     let length = socket.read(&mut bytes).ok()?;
     std::str::from_utf8(&bytes[..length]).ok()?.split_whitespace().nth(1)?.parse().ok()
 }
+
+/// The first run's evidence, including a check made while the box still serves.
+pub struct StoryOutcome<T> {
+    pub exit: Option<Exit>,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+    pub left: Option<Vec<u32>>,
+    pub finished: bool,
+    pub checked: T,
+}
+struct StoryJudge<'a, F, T> {
+    check: Option<F>,
+    checked: &'a Cell<Option<T>>,
+    stopping: bool,
+    cleanup: bool,
+    settled: bool,
+    deadline: Time,
+}
+impl<F: FnOnce() -> T, T> Referee<Process> for StoryJudge<'_, F, T> {
+    fn act(&mut self, now: Time, procs: &mut [Process]) {
+        let Process::Person(person) = &procs[1] else { panic!("native person") };
+        let finished = person.finished && person.client.as_ref().is_some_and(Host::is_empty);
+        let Process::Binary(binary) = &mut procs[0] else { panic!("binary") };
+        if !self.stopping && finished {
+            self.checked.set(Some(self.check.take().expect("one check before stopping")()));
+            binary.signal(Signal::Terminate);
+            self.stopping = true;
+        }
+        let left = binary.tree_status().live_at_leader_exit.as_ref().is_some_and(|pids| !pids.is_empty());
+        if !self.cleanup && (left || now >= self.deadline) && !binary.is_empty() {
+            binary.signal_tree(Signal::Kill);
+            self.cleanup = true;
+        }
+    }
+    fn observe(&mut self, now: Time, procs: &[Process]) {
+        self.settled = self.stopping && procs.iter().all(Host::is_empty);
+        let Process::Binary(binary) = &procs[0] else { panic!("binary") };
+        let Process::Person(person) = &procs[1] else { panic!("native person") };
+        let stderr = String::from_utf8_lossy(binary.stderr());
+        if person.failed.is_some() {
+            for node in person.client.as_ref().expect("native client").tree().nodes() {
+                eprintln!(
+                    "{:?}: {} {}",
+                    node.role,
+                    String::from_utf8_lossy(node.name.as_deref().unwrap_or_default()),
+                    node.text.iter().map(|run| String::from_utf8_lossy(&run.text)).collect::<String>()
+                );
+            }
+        }
+        assert!(person.failed.is_none(), "{:?}; temper box stderr: {stderr}", person.failed);
+        assert!(binary.exit_status().is_none() || self.stopping, "temper box ended before the person: {stderr}");
+        assert!(binary.exit_status().is_none_or(|exit| exit == Exit::Code(0)), "temper box failed: {stderr}");
+        assert!(!binary.stderr_overflowed(), "temper box overflowed stderr: {stderr}");
+        assert!(now < self.deadline || self.settled, "native person did not settle: {stderr}");
+    }
+    fn next_deadline(&self) -> Option<Time> {
+        (!self.settled).then_some(self.deadline)
+    }
+    fn overdue(&self, now: Time) -> Option<String> {
+        (!self.settled && now >= self.deadline).then(|| "box's person did not finish and settle".into())
+    }
+    fn passed(&self) -> bool {
+        self.settled
+    }
+}
+/// Runs the shipped box on its pipes with a fresh client rooted at `client`.
+/// Checks the forge after the person finishes and their client settles, before SIGTERM.
+#[must_use]
+pub fn run_story<T>(
+    directory: &Path,
+    flags: Vec<String>,
+    client: &Path,
+    script: super::person::Script,
+    deadline: Duration,
+    check: impl FnOnce() -> T,
+) -> StoryOutcome<T> {
+    let clock = Clock::new();
+    let mut binary = Binary::start_with_tree(
+        Command {
+            program: env!("CARGO_BIN_EXE_temper").into(),
+            arguments: std::iter::once("box".into()).chain(flags.into_iter().map(Into::into)).collect(),
+            directory: directory.into(),
+            // Init's optional git/claude discovery is exercised without PATH.
+            // The demo uses the written link to this binary, and needs neither.
+            environment: Vec::new(),
+        },
+        Mode::Pipes,
+        262_144,
+        Expectation::Supervise,
+        false,
+    )
+    .expect("temper box starts");
+    let streams = binary.take_streams().expect("binary pipes");
+    let mut fds = streams.descriptors();
+    let Streams::Pipes { input, output } = streams else { panic!("pipes mode") };
+    let root = skein_shell::open_root(client).expect("client's parent root");
+    fds.push(root);
+    let checked = Cell::new(None);
+    let mut world = real::World::new(StoryJudge {
+        check: Some(check),
+        checked: &checked,
+        stopping: false,
+        cleanup: false,
+        settled: false,
+        deadline: clock.now().now.saturating_add(Duration::from_nanos(
+            deadline.as_nanos().saturating_sub(Duration::from_secs(5).as_nanos()),
+        )),
+    });
+    world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
+    world.spawn_with_fds(fds, || Process::Person(Box::new(super::person::Person::new(root, input, output, script))));
+    let ended = world.run(&clock, deadline);
+    assert!(ended.procs.iter().all(Host::is_empty), "all real io settles");
+    let Process::Binary(binary) = &ended.procs[0] else { panic!("binary") };
+    let Process::Person(person) = &ended.procs[1] else { panic!("native person") };
+    StoryOutcome {
+        exit: binary.exit_status(),
+        stdout: person.stdout().to_vec(),
+        stderr: binary.stderr().to_vec(),
+        left: binary.tree_status().live_at_leader_exit.clone(),
+        finished: person.finished,
+        checked: checked.take().expect("the finished person's forge check ran"),
+    }
+}

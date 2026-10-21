@@ -11,21 +11,59 @@ const SIGN_IN_FIRST: skein_lib::Duration = skein_lib::Duration::from_millis(100)
 const SIGN_IN_MOST: skein_lib::Duration = skein_lib::Duration::from_secs(2);
 const PIPE: Token = Token::new(u64::MAX);
 const CLOSE: Token = Token::new(u64::MAX - 1);
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Begin {
+    LinkWithKey,
+    Token,
+    Link,
+}
 /// The script is separate from the client's production composition.
 pub struct Script {
     steps: Box<[Step<Address>]>,
-    resume: bool,
+    begin: Begin,
 }
 #[must_use]
 pub fn answered_chat(words: &[u8], answer: &[u8]) -> Script {
     Script {
-        resume: false,
+        begin: Begin::LinkWithKey,
         steps: Box::new([
             Step::Go { address: Address::Chats },
             Step::See { find: Find::named(skein_ui::Role::TextArea, b"Start a chat"), within: START_WITHIN },
             Step::Type { find: Find::named(skein_ui::Role::TextArea, b"Start a chat"), words: words.into() },
             Step::Press { find: Find::named(skein_ui::Role::Button, b"Start") },
             Step::See { find: Find::text(answer), within: START_WITHIN },
+        ]),
+    }
+}
+/// Signs in by the printed link, no key added: the demo's seed added it.
+/// Asks `cue` in a new chat, then sees the text and the task's report.
+#[must_use]
+pub fn demo_chat(cue: &[u8], text: &[u8], report: &[u8]) -> Script {
+    use skein_ui::Role;
+    let result = || Box::new([Target::Role { role: Role::Item, name: cue.into() }]);
+    Script {
+        begin: Begin::Link,
+        steps: Box::new([
+            Step::Go { address: Address::Chats },
+            Step::See { find: Find::named(Role::TextArea, b"Start a chat"), within: START_WITHIN },
+            Step::Press { find: Find::exactly_named(Role::Button, b"demo") },
+            Step::Type { find: Find::named(Role::TextArea, b"Start a chat"), words: cue.into() },
+            Step::Press { find: Find::named(Role::Button, b"Start") },
+            // Native's two-row log initially holds the end and result. Once
+            // the report arrives, page back to the turn that carries the answer.
+            Step::See { find: Find::text(report), within: START_WITHIN },
+            Step::See { find: Find::named(Role::Button, b"Older"), within: START_WITHIN },
+            Step::Press { find: Find::named(Role::Button, b"Older") },
+            Step::See {
+                find: Find::text(text)
+                    .within(Box::new([Target::Role { role: Role::Log, name: b"Conversation".as_slice().into() }])),
+                within: START_WITHIN,
+            },
+            // A Failed's reason could contain the report too. The inbox's result
+            // card must say Done, and hold this cue's report, without any log.
+            Step::Go { address: Address::Inbox { filter: temper_client_domain::address::Filter::ALL } },
+            Step::See { find: Find::exactly_named(Role::Status, b"Done").within(result()), within: START_WITHIN },
+            Step::See { find: Find::text(report).within(result()), within: START_WITHIN },
         ]),
     }
 }
@@ -51,11 +89,18 @@ pub struct Person {
     pub finished: bool,
     project: ProjectSelection,
     pub failed: Option<String>,
-    resume: bool,
+    begin: Begin,
+    seed: u64,
     completions: Queue<Complete>,
     submissions: Queue<Submit>,
 }
 impl Person {
+    /// Every byte read from the binary's stdout, including the printed link.
+    #[must_use]
+    pub fn stdout(&self) -> &[u8] {
+        &self.bytes
+    }
+
     #[must_use]
     pub fn with_link(root: Fd, input: Fd, output: Fd, script: Script, link: &[u8]) -> Self {
         let mut person = Self::new(root, input, output, script);
@@ -65,9 +110,7 @@ impl Person {
     }
     #[must_use]
     pub fn new(root: Fd, input: Fd, output: Fd, script: Script) -> Self {
-        let steps = if script.resume {
-            script.steps
-        } else {
+        let steps = if script.begin == Begin::LinkWithKey {
             use skein_ui::Role;
             let mut setup = vec![
                 Step::Go { address: Address::Accounts },
@@ -83,6 +126,8 @@ impl Person {
             ];
             setup.extend(script.steps);
             setup.into_boxed_slice()
+        } else {
+            script.steps
         };
         Self {
             client: None,
@@ -100,7 +145,15 @@ impl Person {
             finished: false,
             project: ProjectSelection::Pending,
             failed: None,
-            resume: script.resume,
+            begin: script.begin,
+            // Fresh demo clients must not reuse the same request names when
+            // signing the same owner in again on the same deployment.
+            seed: if script.begin == Begin::Link {
+                let seed = skein_shell::crypto_seed().expect("demo client's fresh seed");
+                u64::from_le_bytes(seed.expose()[..8].try_into().expect("eight seed bytes"))
+            } else {
+                7
+            },
             completions: Queue::with_capacity(512),
             submissions: Queue::with_capacity(512),
         }
@@ -154,8 +207,8 @@ impl Person {
                     },
                     self.root.take().expect("client root"),
                     skein_shell::effective_user(),
-                    7,
-                    if self.resume { Start::Token } else { Start::Link(link.into()) },
+                    self.seed,
+                    if self.begin == Begin::Token { Start::Token } else { Start::Link(link.into()) },
                 )
                 .expect("printed sign-in link"),
             );
@@ -222,22 +275,7 @@ impl Person {
                 self.wake = Some(self.wake.map_or(retry, |at| at.min(retry)));
             }
         }
-        // These fixtures give project zero its real deployment membership. Choose
-        // the other offered project (one) before executing the story's own acts.
-        if client.started()
-            && self.project == ProjectSelection::Pending
-            && let Some(node) = client
-                .tree()
-                .nodes()
-                .iter()
-                .find(|node| {
-                    node.role == skein_ui::Role::Button
-                        && node.name.as_deref() == Some(b"Project".as_slice())
-                        && !node.states.iter().any(|state| *state == skein_ui::State::Pressed)
-                })
-                .map(|node| node.id)
-        {
-            assert!(client.act(node, skein_ui::Act::Press), "offered project selection");
+        if client.started() && self.project == ProjectSelection::Pending && select_project(client, self.begin) {
             self.project = ProjectSelection::Selected;
             self.wake = Some(now);
         }
@@ -266,6 +304,23 @@ impl Person {
             self.submissions.push(submit);
         }
     }
+}
+// Channel fixtures offer project zero and one. Init offers just one, already
+// selected. The demo uses that button; older scripts still choose the other one.
+fn select_project(client: &mut NativeClient, begin: Begin) -> bool {
+    let node = client
+        .tree()
+        .nodes()
+        .iter()
+        .find(|node| {
+            node.role == skein_ui::Role::Button
+                && node.name.as_deref() == Some(b"Project".as_slice())
+                && (begin == Begin::Link || !node.states.as_slice().contains(&skein_ui::State::Pressed))
+        })
+        .map(|node| node.id);
+    let Some(node) = node else { return false };
+    assert!(client.act(node, skein_ui::Act::Press), "offered project selection");
+    true
 }
 impl Host for Person {
     fn iterate(&mut self, now: Time, wall: Wall) {
@@ -348,12 +403,12 @@ pub fn adopt_and_change(_forgejo: &super::forgejo::Throwaway) -> Script {
         Step::Go { address: Address::Inbox { filter: temper_client_domain::address::Filter::ALL } },
         inbox_reply(b"@forge_chat Land a small change"),
     ]);
-    Script { steps: steps.into_boxed_slice(), resume: false }
+    Script { steps: steps.into_boxed_slice(), begin: Begin::LinkWithKey }
 }
 #[must_use]
 pub fn found() -> Script {
     Script {
-        resume: true,
+        begin: Begin::Token,
         steps: Box::new([
             Step::Go { address: Address::Inbox { filter: temper_client_domain::address::Filter::ALL } },
             inbox_reply(b"@forge_chat Land a small change"),
