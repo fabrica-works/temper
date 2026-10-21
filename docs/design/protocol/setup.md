@@ -1273,8 +1273,8 @@ and a seed adds the demo model's key and adopts the demo's repository
 through the client's protocol. Its bar: a chat that works on the demo
 model, and the demo forge connected and its repository adopted. Its git
 is `temper fake git`, on the fake forge's git route, so a worker's
-clone and push reach the fake; the demo model answers in text, so the
-demo's own work pushes nothing yet.
+clone and push reach the fake; the demo model answers in text and
+finishes, so the demo's own work pushes nothing yet.
 
 - **`application.demo`,** or null for none:
 
@@ -1303,9 +1303,10 @@ demo's own work pushes nothing yet.
   `script_bytes` (skein's `fake-llm.md`), which `temper-fake` sets.
 - **A turn** is skein's `Turn` (skein's `fake-llm.md`, section 2), in
   either of two spellings:
-  - *a text,* the demo's: one text line, finishing `stop`, its tokens
-    its bytes divided by 4, rounded up;
-  - *an object,* `{"lines", "finish", "tokens"}`, the QA loop's: `lines`
+  - *a text:* one text line, finishing `stop`, its tokens its bytes
+    divided by 4, rounded up;
+  - *an object,* `{"lines", "finish", "tokens"}`, the QA loop's and the
+    demo's: `lines`
     1 to 8, each `{"text"}`, non-empty text, or `{"call", "arguments"}`,
     a tool's name of 1 to 64 ASCII letters, digits, `_` and `-` and its
     arguments a JSON object, which `temper-fake` writes compact as the
@@ -1321,8 +1322,15 @@ demo's own work pushes nothing yet.
   answering in text what it would change and why; and an `otherwise`
   that says it is the demo model, which answers only the suggested
   requests, and how to connect a real one from the client's accounts
-  page. Their content is the demo's follow-up (`../draft/first-run.md`,
-  section 8).
+  page. Each is one turn, an object: its text line, then
+  `{"call": "finish", "arguments": {"report": "The demo changes
+  nothing."}}`, finishing `tool_calls`, its tokens its text's bytes
+  divided by 4, rounded up. A chat's run ends only at `finish`: a
+  text-only stop is nudged once, and a second fails the run (smith's
+  `domain/run.md`, 7.2), and the chat's contract is a report of at most
+  32 bytes (`engine.templates`' `chat`), so the answer is the text and
+  the report is short. Their content is the demo's follow-up
+  (`../draft/first-run.md`, section 8).
 - **`temper fake llm DIRS`,** a long step: skein's fake LLM peer, run
   `without_records` as a peer serving a person is (skein's
   `fake-llm.md`), its domain `Domain::played` with `asked` and
