@@ -486,6 +486,20 @@ fn models(me: &c::Me, project: Option<u32>, out: &mut Encoder, cut: &mut Cut, wi
                 cut.words(item.name.bytes(), out);
                 number(b"window", u64::from(item.window), out);
                 number(b"output", u64::from(item.output), out);
+                out.key(b"description");
+                match &item.description {
+                    Some(description) => cut.words(description.bytes(), out),
+                    None => out.null(),
+                }
+                out.key(b"prices");
+                out.object_start();
+                number(b"input", item.prices.input, out);
+                number(b"cached", item.prices.cached, out);
+                // jig prices cache writes at input when no separate price is configured.
+                number(b"cache_write", item.prices.cache_write.unwrap_or(item.prices.input), out);
+                number(b"output", item.prices.output, out);
+                number(b"unit", u64::from(item.prices.unit), out);
+                out.object_end();
                 out.key(b"efforts");
                 out.array_start();
                 for effort in &item.efforts {

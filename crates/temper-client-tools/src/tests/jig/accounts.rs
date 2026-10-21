@@ -74,8 +74,8 @@ fn models_group_only_project_authorized_models_without_guessing_provider_readine
         project
             .models
             .push(c::MeModel {
-                prices: c::ModelPrices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1000 },
-                description: None,
+                prices: c::ModelPrices { input: 7, cached: 2, cache_write: Some(9), output: 11, unit: 1000 },
+                description: Some(c::Text::new(b"Careful reasoning".as_slice().into(), 64).expect("description")),
                 name: c::Text::new(name.into(), 32).expect("model"),
                 provider,
                 window: 8192,
@@ -99,6 +99,12 @@ fn models_group_only_project_authorized_models_without_guessing_provider_readine
         {
             assert!(f::json_has(&printed, fact), "{fact:?}");
         }
+        for fact in [
+            b"\"description\":\"Careful reasoning\"".as_slice(),
+            b"\"prices\":{\"input\":7,\"cached\":2,\"cache_write\":9,\"output\":11,\"unit\":1000}",
+        ] {
+            assert!(f::json_has(&printed, fact), "{fact:?}");
+        }
         let mut groups = 0u32;
         for window in printed.stdout.windows(b"\"provider\":9,\"models\"".len()) {
             if window == b"\"provider\":9,\"models\"" {
@@ -106,7 +112,7 @@ fn models_group_only_project_authorized_models_without_guessing_provider_readine
             }
         }
         assert_eq!(groups, 1, "one group per supplied provider");
-        for absent in [b"needs an account".as_slice(), b"price", b"description", b"OpenAI"] {
+        for absent in [b"needs an account".as_slice(), b"OpenAI"] {
             assert!(!f::json_has(&printed, absent));
         }
         let accounts = f::account_read(&mut root, f::accounts(), None);
@@ -287,4 +293,33 @@ fn account_projection_includes_configured_worker_login_facts() {
     for fact in [b"configured-worker".as_slice(), b"work-login", b"other-method"] {
         assert!(skein_lib::bytes::find(&printed.stdout, fact).is_some(), "{printed:?}");
     }
+}
+
+#[test]
+fn model_cache_writes_default_to_the_supplied_input_price() {
+    let mut root = f::account_root(false);
+    let mut me = f::me(f::PARTY);
+    let project = me.projects.get_mut(0).expect("project");
+    project.models = List::with_capacity(1);
+    project
+        .models
+        .push(c::MeModel {
+            name: c::Text::new(b"reasoner".as_slice().into(), 32).expect("model"),
+            provider: Some(f::PROVIDER),
+            window: 8192,
+            output: 1024,
+            efforts: List::with_capacity(0),
+            description: None,
+            prices: c::ModelPrices { input: 17, cached: 3, cache_write: None, output: 29, unit: 100 },
+        })
+        .expect("model room");
+    root.deliver(c::Delivery::Me(Box::new(me)));
+    let call = root.submit(&["models", "--json"]);
+    f::deliver_accounts(&mut root, f::accounts());
+    let printed = root.answer(call).expect("model prices");
+    assert!(f::json_has(&printed, b"\"description\":null"));
+    assert!(f::json_has(
+        &printed,
+        b"\"prices\":{\"input\":17,\"cached\":3,\"cache_write\":17,\"output\":29,\"unit\":100}"
+    ));
 }
