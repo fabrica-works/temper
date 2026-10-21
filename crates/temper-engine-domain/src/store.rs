@@ -49,6 +49,8 @@ pub enum CallAnswer {
     Controlled,
     /// A named task control change was refused without mutation.
     ControlRefused(jig_domain_tasks::Problem),
+    /// An effect was refused before mutation.
+    EffectRefused(jig_domain_tasks::Problem),
     /// A requested widening needs a holder or violates a hard ceiling.
     ControlDenied { answer: jig_domain_authority::Answer },
     /// Message entered its target's inbox at this commit position.
@@ -135,6 +137,7 @@ impl CallAnswer {
             }
             CallAnswer::ProposalRefused(problem) => jig_domain_core::CallPart::ProposalRefused(problem.clone()),
             CallAnswer::Controlled => jig_domain_core::CallPart::Controlled,
+            CallAnswer::EffectRefused(problem) => jig_domain_core::CallPart::EffectRefused(problem.clone()),
             CallAnswer::ControlRefused(problem) => jig_domain_core::CallPart::ControlRefused(problem.clone()),
             CallAnswer::ControlDenied { answer } => jig_domain_core::CallPart::ControlDenied { answer: *answer },
             CallAnswer::Sent { message } => jig_domain_core::CallPart::Sent { message: *message },
@@ -196,6 +199,7 @@ impl CallAnswer {
             }
             jig_domain_core::CallPart::ProposalRefused(problem) => CallAnswer::ProposalRefused(problem.clone()),
             jig_domain_core::CallPart::Controlled => CallAnswer::Controlled,
+            jig_domain_core::CallPart::EffectRefused(problem) => CallAnswer::EffectRefused(problem.clone()),
             jig_domain_core::CallPart::ControlRefused(problem) => CallAnswer::ControlRefused(problem.clone()),
             jig_domain_core::CallPart::ControlDenied { answer } => CallAnswer::ControlDenied { answer: *answer },
             jig_domain_core::CallPart::Sent { message } => CallAnswer::Sent { message: *message },
@@ -750,6 +754,7 @@ pub(crate) fn call_answer_bytes(answer: &CallAnswer) -> Option<u64> {
         | CallAnswer::Revised { .. }
         | CallAnswer::Moved { .. }
         | CallAnswer::Controlled
+        | CallAnswer::EffectRefused(_)
         | CallAnswer::ControlRefused(_)
         | CallAnswer::ControlDenied { .. }
         | CallAnswer::Introduced

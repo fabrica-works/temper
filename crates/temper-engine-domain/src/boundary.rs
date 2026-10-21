@@ -5,7 +5,7 @@ use alloc::boxed::Box;
 use jig_domain_accounts as accounts;
 use jig_domain_brief as brief;
 use jig_domain_core as core;
-use jig_domain_core::{Delegate, HistoricalResult, ProcedureStep, RunCharter};
+use jig_domain_core::{Delegate, ProcedureStep, RunCharter};
 use jig_domain_fleet as fleet;
 use jig_domain_host as host;
 use jig_domain_people as people;
@@ -615,6 +615,7 @@ pub(crate) enum Payload {
 /// An ended owner row the core asked the root to load.
 #[derive(Debug)]
 pub(crate) enum EndedRead {
+    EndedTask { request: Token, task: u64 },
     SeenConversation { request: Token, task: u64 },
     Position { request: Token, task: u64, party: u64 },
     PartyInput { request: Token, task: u64 },
@@ -628,7 +629,6 @@ pub(crate) enum Read {
     TaskProposal { to: ReplyTo, key: CallKey, proposal: u64 },
     Ended(EndedRead),
     Transcript { task: u64 },
-    Dependency(DependencyRead),
     InputCheck(InputCheck),
     Notes { owner: Token },
 }
@@ -642,14 +642,6 @@ pub(crate) struct InputCheck {
     pub(crate) at: u32,
     pub(crate) project: u32,
     pub(crate) stubs: List<tasks::Stub>,
-}
-
-#[derive(Debug)]
-pub(crate) struct DependencyRead {
-    pub(crate) task: u64,
-    pub(crate) ids: Box<[u64]>,
-    pub(crate) at: u32,
-    pub(crate) results: List<HistoricalResult>,
 }
 
 /// A child continuation that has crossed its journal barrier. Its payload is

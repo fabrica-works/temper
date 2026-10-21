@@ -5,7 +5,7 @@ use super::{
     Request, Token, Work, emit, escalation, forge_route, internal, proposals, relay_call,
 };
 use crate::Range;
-use crate::archive::{begin_dependency_read, retire_read};
+use crate::archive::retire_read;
 use crate::assemble::{brief_outputs, finish_brief_plan, take_payload};
 use crate::boundary::{EndedRead, Payload};
 use alloc::boxed::Box;
@@ -138,6 +138,9 @@ pub(crate) fn now(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
         core::Now::StartPreparation { task, transcript_waiter, from } => {
             start_preparation(domain, env, decision, task, transcript_waiter, from);
         }
+        core::Now::EndedTask { request, task } => {
+            ended(domain, env, decision, EndedRead::EndedTask { request, task });
+        }
         core::Now::SeenConversation { request, task } => {
             ended(domain, env, decision, EndedRead::SeenConversation { request, task });
         }
@@ -212,7 +215,7 @@ pub(crate) fn now(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
     }
 }
 
-/// Load the current transcript window, then the dependencies' results, before the brief.
+/// Load the current transcript window before the brief.
 fn start_preparation(
     domain: &mut Domain,
     env: &Env<Limits>,
@@ -230,17 +233,15 @@ fn start_preparation(
         }
         retire_read(domain, waiter);
     }
-    if let Some((waiter, first)) = begin_dependency_read(domain, task) {
-        let range = Range::Core(crate::CoreRange::TaskResult { task: first });
-        emit(decision, &env.limits, Delivery::Load { waiter, range, after: None });
-    }
+    domain.work.push(Work::StartBrief { task });
 }
 
 /// Load one ended owner row the core asked for; a full read table answers busy.
 fn ended(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decision, read: EndedRead) {
     let range = match &read {
         EndedRead::Position { task, party, .. } => crate::CoreRange::EndedRead { task: *task, party: *party },
-        EndedRead::SeenConversation { task, .. }
+        EndedRead::EndedTask { task, .. }
+        | EndedRead::SeenConversation { task, .. }
         | EndedRead::PartyInput { task, .. }
         | EndedRead::PersonTask { task, .. } => crate::CoreRange::TaskResult { task: *task },
     };
@@ -257,7 +258,6 @@ fn ended(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decision, read: 
                 | Read::Proposal(_)
                 | Read::TaskProposal { .. }
                 | Read::Transcript { .. }
-                | Read::Dependency(_)
                 | Read::InputCheck(_)
                 | Read::Notes { .. },
             )

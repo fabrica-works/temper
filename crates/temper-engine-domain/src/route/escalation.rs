@@ -114,7 +114,6 @@ fn query(read: Read) -> Query {
         | Read::TaskProposal { .. }
         | Read::Ended(_)
         | Read::Transcript { .. }
-        | Read::Dependency(_)
         | Read::InputCheck(_)
         | Read::Notes { .. } => unreachable!("only decision history loads here"),
     }

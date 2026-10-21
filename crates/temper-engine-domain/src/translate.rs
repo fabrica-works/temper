@@ -358,6 +358,7 @@ pub(crate) fn keep_connector_answer(
         | CallAnswer::Revised { .. }
         | CallAnswer::Moved { .. }
         | CallAnswer::Controlled
+        | CallAnswer::EffectRefused(_)
         | CallAnswer::ControlRefused(_)
         | CallAnswer::ControlDenied { .. }
         | CallAnswer::Sent { .. }

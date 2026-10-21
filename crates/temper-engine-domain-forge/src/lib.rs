@@ -82,6 +82,12 @@ pub const fn effect_shape(kind: u16) -> Option<(EffectForm, Recovery)> {
     }
 }
 
+/// Whether a forge kind waits while its task has pending dependencies.
+#[must_use]
+pub const fn waits_for_dependencies(_kind: u16) -> bool {
+    false
+}
+
 /// Connector-owned request and the facts jig may inspect before admitting it.
 #[derive(Debug)]
 pub struct AgentEffect {

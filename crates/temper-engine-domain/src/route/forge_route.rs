@@ -425,6 +425,7 @@ fn describe_agent(
         forge::Recovery::Unrecoverable => Recovery::Unrecoverable,
     };
     let description = EffectDescription {
+        waits_for_dependencies: forge::waits_for_dependencies(described.kind),
         connector: domain.config.forge_connector,
         purpose: key.completion.into(),
         effect: authority::Effect {
@@ -1474,6 +1475,7 @@ fn describe_change_effect(
         forge::Recovery::Unrecoverable => Recovery::Unrecoverable,
     };
     Some(EffectDescription {
+        waits_for_dependencies: forge::waits_for_dependencies(kind),
         connector: domain.config.forge_connector,
         purpose: u64::from(kind),
         effect,
@@ -2200,6 +2202,7 @@ pub(crate) fn outputs(
                     forge::Access::Unavailable => authority::EffectAccess::Unavailable,
                 };
                 let description = EffectDescription {
+                    waits_for_dependencies: forge::waits_for_dependencies(description.kind),
                     connector: domain.config.forge_connector,
                     purpose: entry.number,
                     effect: authority::Effect {
@@ -2407,6 +2410,7 @@ pub(crate) fn effect_answer(domain: &Domain, key: CallKey, part: &jig_domain_cor
         | jig_domain_core::CallPart::Revised { .. }
         | jig_domain_core::CallPart::Moved { .. }
         | jig_domain_core::CallPart::Controlled
+        | jig_domain_core::CallPart::EffectRefused(_)
         | jig_domain_core::CallPart::ControlRefused(_)
         | jig_domain_core::CallPart::ControlDenied { .. }
         | jig_domain_core::CallPart::Sent { .. }

@@ -682,7 +682,6 @@ fn released_into(domain: &mut Domain, _env: &Env<Limits>, released: Released, ou
                 Read::Escalation(query) => (query.task, query.revision),
                 Read::Ended(_)
                 | Read::Transcript { .. }
-                | Read::Dependency(_)
                 | Read::InputCheck(_)
                 | Read::Notes { .. }
                 | Read::Proposal(_)

@@ -76,6 +76,7 @@ pub fn party(event: core::Event) -> engine::Event {
         core::Event::Activate { .. } => panic!("the client kit does not make Activate"),
         core::Event::PreparedAgent { .. } => panic!("the client kit does not make PreparedAgent"),
         core::Event::Forget { .. } => panic!("the client kit does not make Forget"),
+        core::Event::EndedTaskLoaded { .. } => panic!("the client kit does not make EndedTaskLoaded"),
         core::Event::SeenConversationLoaded { .. } => panic!("the client kit does not make SeenConversationLoaded"),
         core::Event::EndedReadLoaded { .. } => panic!("the client kit does not make EndedReadLoaded"),
         core::Event::PartyInputsLoaded { .. } => panic!("the client kit does not make PartyInputsLoaded"),

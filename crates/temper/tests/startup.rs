@@ -889,6 +889,10 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // circle witnesses and kept pending dependencies) enlarge retained records
     // and their store/page carriers by 42,615,522,708 B; worker inputs stay fixed.
     let added_dependencies_growth = 42_615_522_708_u64;
+    // Jig 2a62db26 -> f2e7e8a2: the core retains preparing dependency-result
+    // reads and their bounded IDs/results; temper drops its own reader.
+    // Net engine growth is 6,680,579,880 B; worker inputs stay fixed.
+    let preparing_dependency_reads_growth = 6_680_579_880_u64;
     assert_eq!(
         required.engine_bytes,
         79_659_997_210_050_u64
@@ -902,6 +906,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + endpoint_binding_growth
             + git_program_growth
             + added_dependencies_growth
+            + preparing_dependency_reads_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.

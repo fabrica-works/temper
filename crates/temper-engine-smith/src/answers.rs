@@ -162,6 +162,7 @@ fn rendered(answer: &CallAnswer) -> Result<HostAnswer, Problem> {
         }
         CallAnswer::EscalationRefused(problem)
         | CallAnswer::ProposalRefused(problem)
+        | CallAnswer::EffectRefused(problem)
         | CallAnswer::ControlRefused(problem)
         | CallAnswer::MessageRefused(problem)
         | CallAnswer::SubscriptionRefused(problem)

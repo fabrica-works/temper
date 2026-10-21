@@ -68,6 +68,7 @@ pub fn to_root(event: core::Event) -> Result<root::PartyInput, Box<kit::Event>> 
         | core::Event::Activate { .. }
         | core::Event::PreparedAgent { .. }
         | core::Event::Forget { .. }
+        | core::Event::EndedTaskLoaded { .. }
         | core::Event::SeenConversationLoaded { .. }
         | core::Event::EndedReadLoaded { .. }
         | core::Event::PartyInputsLoaded { .. }

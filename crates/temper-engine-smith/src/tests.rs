@@ -656,6 +656,19 @@ fn kept_names_each_dependency() {
 }
 
 #[test]
+fn a_refused_effect_names_its_pending_dependencies() {
+    let value = engine::CallAnswer::EffectRefused(tasks::Problem {
+        task: Some(99),
+        capacity: None,
+        why: tasks::Refusal::Kept,
+        blocked_by: Some(Box::new([4, 6])),
+    });
+    let rendered = answer(&value);
+    assert_eq!(rendered.text(), b"Refused: kept until T4 is done, kept until T6 is done");
+    assert!(rendered.error());
+}
+
+#[test]
 fn dependency_refusals_without_tasks_are_plain_lines() {
     let lists: [Option<Box<[u64]>>; 2] = [None, Some(Box::new([]))];
     for blocked in lists {

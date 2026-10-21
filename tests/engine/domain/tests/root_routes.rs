@@ -1208,6 +1208,8 @@ fn batch_fixture_custom(
     bounds.fleet.slots = slots;
     bounds.call_records = 4;
     bounds.brief.sections = 5;
+    // jig's provenance header on each dependency result leaves room for both reports.
+    bounds.brief.budgets.dependencies = 256;
     bounds.journal.writes = 4096;
     bounds.journal.deliveries = 100;
     bounds.journal.held = 300;

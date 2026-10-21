@@ -1,7 +1,6 @@
 //! Store adapters for the core-selected restart script (jig's domain/root.md, 8).
 use crate::archive::{
-    Waiting, dependency_failed, dependency_loaded, input_failed, input_loaded, note_failed, note_loaded,
-    transcript_failed, transcript_loaded, waiting,
+    Waiting, input_failed, input_loaded, note_failed, note_loaded, transcript_failed, transcript_loaded, waiting,
 };
 use crate::boundary::{Request, Work};
 use crate::domain::{Domain, close, emit};
@@ -155,8 +154,6 @@ pub(crate) fn load_outputs(
                     Some(Waiting::Notes) => note_loaded(domain, waiter, rows, next, cut),
                     Some(Waiting::Input) if cut.is_none() => input_loaded(domain, waiter, rows, next, out),
                     Some(Waiting::Input) => input_failed(domain, waiter),
-                    Some(Waiting::Dependency) if cut.is_none() => dependency_loaded(domain, waiter, rows, next, out),
-                    Some(Waiting::Dependency) => dependency_failed(domain, waiter),
                     Some(Waiting::Transcript) => transcript_loaded(domain, waiter, rows, next, cut, out),
                     Some(Waiting::Ended) if cut.is_none() && next.is_none() => {
                         domain.work.push(Work::EndedLoaded { waiter, rows });
@@ -186,7 +183,6 @@ pub(crate) fn load_outputs(
                 match waiting(domain, waiter) {
                     Some(Waiting::Notes) => note_failed(domain, waiter),
                     Some(Waiting::Input) => input_failed(domain, waiter),
-                    Some(Waiting::Dependency) => dependency_failed(domain, waiter),
                     Some(Waiting::Transcript) => transcript_failed(domain, waiter),
                     Some(Waiting::Ended) => domain.work.push(Work::EndedFailed { waiter }),
                     Some(Waiting::Proposal) => domain.work.push(Work::ProposalFailed { waiter }),

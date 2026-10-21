@@ -336,6 +336,7 @@ pub(crate) fn decide_call(
         | core::CallPart::Revised { .. }
         | core::CallPart::Moved { .. }
         | core::CallPart::Controlled
+        | core::CallPart::EffectRefused(_)
         | core::CallPart::ControlRefused(_)
         | core::CallPart::ControlDenied { .. }
         | core::CallPart::Sent { .. }
