@@ -33,7 +33,7 @@ fn a_managed_and_an_owned_forge_run_the_six_steps_of_the_design_tree() {
         &[b"forge", b"run", b"--config", b"/config", b"--data", b"/data", b"--cache", b"/cache", b"2", b"runner"],
         &[b"forge", b"reconcile", b"--config", b"/config", b"--data", b"/data", b"--cache", b"/cache", b"1"],
         &[b"forge", b"reconcile", b"--config", b"/config", b"--data", b"/data", b"--cache", b"/cache", b"2"],
-        &[b"serve", b"--config", b"/config", b"--data", b"/data", b"--cache", b"/cache"],
+        &[b"serve", b"--config", b"/config", b"--data", b"/data", b"--cache", b"/cache", b"--box"],
     ];
     for (step, expected) in commands.iter().zip(expected) {
         assert_eq!(step.arguments().len(), expected.len());
@@ -98,7 +98,7 @@ fn flags() -> Box<[Box<[u8]>]> {
 }
 
 #[test]
-fn asked_groups_keep_their_place_and_stages_without_reconcile() {
+fn asked_groups_keep_their_place_and_end_in_their_reconcile() {
     for runner in [false, true] {
         let mut setup = fixtures::setup();
         setup.entries[1].asked = true;
@@ -114,12 +114,17 @@ fn asked_groups_keep_their_place_and_stages_without_reconcile() {
         assert_eq!(commands.asked.len(), 1);
         let group = &commands.asked[0];
         assert_eq!((group.forge, group.before), (2, 0));
-        assert_eq!(group.steps.len(), if runner { 3 } else { 2 });
+        assert_eq!(group.steps.len(), if runner { 4 } else { 3 });
         assert_eq!(group.steps[0].0, crate::Stage::Prepare);
-        for (stage, step) in group.steps.iter().skip(1) {
+        for (stage, step) in &group.steps[1..group.steps.len() - 1] {
             assert_eq!(*stage, crate::Stage::Run);
             assert_eq!(step.kind(), Kind::Long);
         }
+        let (stage, reconcile) = group.steps.last().unwrap();
+        assert_eq!(*stage, crate::Stage::Run);
+        assert_eq!(reconcile.kind(), Kind::Once);
+        assert_eq!(reconcile.name(), b"reconcile 2");
+        assert_eq!(reconcile.arguments().last().unwrap().as_ref(), b"2");
     }
     for (stage, word) in
         [(crate::Stage::Fetch, b"fetch".as_slice()), (crate::Stage::Prepare, b"prepare"), (crate::Stage::Run, b"run")]

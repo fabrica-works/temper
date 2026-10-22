@@ -68,7 +68,7 @@ fn documents_give_the_box_its_whole_ordered_steps() {
         &["forge", "reconcile", "--config", "C", "--data", "D", "--cache", "K", "2"],
         Kind::Once,
     );
-    let serve = command("serve", &["serve", "--config", "C", "--data", "D", "--cache", "K"], Kind::Long);
+    let serve = command("serve", &["serve", "--config", "C", "--data", "D", "--cache", "K", "--box"], Kind::Long);
     let seed = command("seed", &["fake", "seed", "--config", "C", "--data", "D", "--cache", "K"], Kind::Link);
     let rows = [
         ("empty", document(json!([]), false), Steps { always: Box::new([serve.clone()]), asked: Box::new([]) }),
@@ -144,6 +144,7 @@ fn documents_give_the_box_its_whole_ordered_steps() {
                         (Stage::Prepare, prepare2.clone()),
                         (Stage::Run, forgejo2),
                         (Stage::Run, runner2),
+                        (Stage::Run, reconcile2.clone()),
                     ]),
                 }]),
             },

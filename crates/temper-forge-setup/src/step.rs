@@ -94,8 +94,8 @@ fn forge(action: &[u8], flags: &[Box<[u8]>], number: u16, run: Option<&[u8]>) ->
     Step::new(name, args.into_boxed(), if run.is_some() { Kind::Long } else { Kind::Once })
 }
 /// Carries the box's absolute directory flags after each command's words.
-/// Commands in setup order: owned processes, every reconcile, then serve;
-/// an asked forge's processes apart, in a group placed in that order.
+/// Commands in setup order: owned processes, unasked reconciles, then serve;
+/// an asked forge's processes and final reconcile apart, in a group placed in that order.
 #[must_use]
 pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
     let count = u32::try_from(setup.entries.len()).expect("bounded entries");
@@ -108,7 +108,7 @@ pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
             // Fake processes and their preparation come later; keep their reconcile below.
             Mode::Managed { .. } | Mode::Fake(_) => {}
             Mode::Owned(o) => {
-                let mut group = List::with_capacity(4);
+                let mut group = List::with_capacity(5);
                 if o.fetch.forgejo || o.fetch.runner {
                     group.push((Stage::Fetch, forge(b"fetch", flags, e.forge, None))).expect("fetch");
                 }
@@ -118,6 +118,7 @@ pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
                     group.push((Stage::Run, forge(b"run", flags, e.forge, Some(b"runner")))).expect("runner");
                 }
                 if e.asked {
+                    group.push((Stage::Run, forge(b"reconcile", flags, e.forge, None))).expect("reconcile");
                     asked
                         .push(Group { forge: e.forge, before: out.len(), steps: group.into_boxed() })
                         .expect("entry capacity");
@@ -135,12 +136,13 @@ pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
         }
     }
     let mut serve = List::with_capacity(
-        u32::try_from(flags.len()).expect("bounded flags").checked_add(1).expect("bounded arguments"),
+        u32::try_from(flags.len()).expect("bounded flags").checked_add(2).expect("bounded arguments"),
     );
     serve.push(bytes::copy_of(b"serve")).expect("command word");
     for flag in flags {
         serve.push(flag.clone()).expect("flags counted");
     }
+    serve.push(bytes::copy_of(b"--box")).expect("box flag");
     out.push(Step::new(bytes::copy_of(b"serve"), serve.into_boxed(), Kind::Long)).expect("serve capacity");
     Steps { always: out.into_boxed(), asked: asked.into_boxed() }
 }

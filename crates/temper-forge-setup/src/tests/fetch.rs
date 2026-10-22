@@ -480,6 +480,7 @@ fn groups_fetch_before_preparation() {
     let serve = || {
         let mut args = vec![b"serve".as_slice().into()];
         args.extend_from_slice(&flags);
+        args.push(b"--box".as_slice().into());
         crate::Step::new(b"serve".as_slice().into(), args.into_boxed_slice(), crate::Kind::Long)
     };
     for (forgejo, runner, asked, preceding, expected) in [
@@ -523,6 +524,7 @@ fn groups_fetch_before_preparation() {
                         (Stage::Prepare, cmd("prepare", 3, None)),
                         (Stage::Run, cmd("run", 3, Some("forgejo"))),
                         (Stage::Run, cmd("run", 3, Some("runner"))),
+                        (Stage::Run, cmd("reconcile", 3, None)),
                     ]),
                 }]),
             },

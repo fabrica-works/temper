@@ -713,3 +713,58 @@ fn a_link_cannot_follow_a_group_step() {
         Placed { step: super::fixtures::step(b"seed", Kind::Link), asked: None },
     ]);
 }
+
+#[test]
+fn an_asked_groups_final_once_step_gates_started_and_failure_allows_another_ask() {
+    use super::fixtures::step;
+    use crate::{
+        layout,
+        machine::{Machine, Said, Why},
+    };
+    use skein_lib::{Queue, Time};
+    use temper_forge_setup::{Group, Stage, Steps};
+    let placed = layout::flatten(Steps {
+        always: Box::new([]),
+        asked: Box::new([Group {
+            forge: 3,
+            before: 0,
+            steps: Box::new([
+                (Stage::Run, step(b"forgejo 3", Kind::Long)),
+                (Stage::Run, step(b"runner 3", Kind::Long)),
+                (Stage::Run, step(b"reconcile 3", Kind::Once)),
+            ]),
+        }]),
+    });
+    for code in [0, 1] {
+        let mut machine = Machine::new(&limits::small(), &placed).unwrap();
+        let mut out = Queue::with_capacity(32);
+        machine.start(Time::ZERO, &[], &mut out);
+        machine.input(Time::ZERO, Input::Ask { forge: 3 }, &mut out);
+        assert_eq!(out.pop(), Some(Order::Record { forge: 3 }));
+        machine.input(Time::ZERO, Input::Written { forge: 3 }, &mut out);
+        for step in 0..3 {
+            assert_eq!(out.pop(), Some(Order::Spawn { step }));
+            assert_eq!(out.pop(), Some(Order::Say { said: Said::Step { step } }));
+            machine.input(Time::ZERO, Input::Started { step }, &mut out);
+        }
+        assert!(out.is_empty(), "reconcile must exit before started");
+        machine.input(Time::ZERO, Input::Exited { step: 2, exit: Exit::Code(code) }, &mut out);
+        if code == 0 {
+            assert_eq!(out.pop(), Some(Order::Close { step: 2 }));
+            machine.input(Time::ZERO, Input::Closed { step: 2 }, &mut out);
+            assert_eq!(out.pop(), Some(Order::Say { said: Said::Started { forge: 3 } }));
+        } else {
+            for step in 0..3 {
+                assert_eq!(out.pop(), Some(Order::Close { step }));
+                machine.input(Time::ZERO, Input::Closed { step }, &mut out);
+            }
+            assert_eq!(
+                out.pop(),
+                Some(Order::Say { said: Said::Failed { forge: 3, why: Why::Exited { step: 2, exit: Exit::Code(1) } } })
+            );
+            machine.input(Time::ZERO, Input::Ask { forge: 3 }, &mut out);
+            assert_eq!(out.pop(), Some(Order::Record { forge: 3 }));
+        }
+        assert!(out.is_empty());
+    }
+}
