@@ -218,11 +218,7 @@ pub fn peer_limits() -> skein_fake_peers::Limits {
             close_timeout: Duration::from_secs(1),
             retry: Duration::from_millis(1),
         },
-        // Room past the forge client's calls for the peer's other
-        // connections: with only the calls' four, a call found the slots
-        // taken now and then (4 to 6 refusals a fuzzy run) and waited out
-        // its 1 s read retry.
-        connections: protocol_limits().calls + 3,
+        connections: protocol_limits().connections,
         queue: 64,
         plaintext: 32_768,
         ciphertext: 32_768,
@@ -230,6 +226,8 @@ pub fn peer_limits() -> skein_fake_peers::Limits {
         observation_bytes: STORY_OBSERVATION_BYTES,
     }
 }
+/// The forge client's simultaneous calls on the Forgejo peer.
+const CALLS: u32 = 4;
 /// The Forgejo protocol's limits. Bodies, documents and strings hold the
 /// git route's whole trees of the domain the worlds share (256 files of
 /// 64 KiB, about 22.5 MB as base64), as the peer requires (skein's
@@ -238,8 +236,12 @@ pub fn peer_limits() -> skein_fake_peers::Limits {
 #[must_use]
 pub fn protocol_limits() -> skein_fake_forge_protocol::Limits {
     skein_fake_forge_protocol::Limits {
-        calls: 4,
-        connections: 4,
+        calls: CALLS,
+        // Room past the forge client's calls for the peer's other
+        // connections: with only the calls' four, a call found the slots
+        // taken now and then (4 to 6 refusals a fuzzy run) and waited out
+        // its 1 s read retry.
+        connections: CALLS + 3,
         raw_bytes: 4096,
         http: skein_http::server::Limits {
             head: 4096,
