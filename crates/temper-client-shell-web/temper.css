@@ -27,8 +27,8 @@ button { cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 /* .terminal-topbar: one sticky banner in the mockup's order. */
 .temper-banner { position: sticky; top: 0; z-index: 12; min-height: 49px; display: flex; align-items: center; gap: 16px; padding: 0 23px; border-bottom: 1px solid var(--temper-line); background: var(--temper-topbar); }
-.temper-banner > button { min-width: 0; max-width: 18em; overflow: hidden; text-overflow: ellipsis; border: 0; border-radius: 5px; padding: 5px 0; background: transparent; color: #5f5a52; white-space: nowrap; }
-.temper-banner > button[aria-pressed=true] { color: var(--temper-ink); font-weight: 700; }
+.temper-banner > button { min-width: 0; max-width: 18em; overflow: hidden; text-overflow: ellipsis; border: 0; border-radius: 5px; padding: 5px 0; background: transparent; color: #5f5a52; font-weight: 400; letter-spacing: inherit; white-space: nowrap; }
+.temper-banner > button::after { content: '⌄' / ''; color: #a59d91; padding-left: 4px; }
 .temper-banner > button:hover { color: var(--temper-accent); }
 /* .terminal-brand and .terminal-divider: decorative mask and rule. */
 .temper-brand { display: flex; align-items: center; gap: 8px; margin: 0; font: 700 16px/1 'DM Sans', ui-sans-serif, system-ui, sans-serif; letter-spacing: -.045em; white-space: nowrap; }
@@ -99,22 +99,22 @@ a { color: inherit; text-decoration: none; }
 /* .first-run-context: the project and signed-in role. */
 .temper-context { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; color: var(--temper-muted); font-size: 11px; margin: 0 0 18px; }
 /* .first-run-empty: one invitation and a wrapping row of paper suggestions. */
-.temper-invitation { margin: 42px 0; }
-.temper-invitation > h1 { margin: 0; font: 700 18px/1.4 var(--temper-mono); letter-spacing: -.025em; }
+.temper-invitation { margin: 0; padding: 30px 0 34px; }
+.temper-invitation > h1 { margin: 0 0 8px; font: 700 clamp(21px, 2.25vw, 26px)/1.25 var(--temper-mono); letter-spacing: -.025em; }
 .temper-invitation > p { margin: 12px 0 0; color: var(--temper-muted); font-size: 12px; }
-.temper-invitation > ul { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; list-style: none; padding: 0; margin: 13px 0 0; border: 0; }
+.temper-invitation > ul { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; list-style: none; padding: 0; margin: 16px 0 0; border: 0; }
 .temper-invitation > ul > li { min-width: 0; max-width: 100%; padding: 0; border: 0; }
-.temper-invitation button { max-width: 100%; min-height: 28px; padding: 5px 9px; border: 1px solid #ddd6cb; border-radius: 5px; background: var(--temper-paper); color: #6a6258; font: 600 11px/1.35 var(--temper-mono); overflow-wrap: anywhere; }
+.temper-invitation button { display: inline-flex; align-items: center; max-width: 100%; min-height: 30px; padding: 5px 10px; border: 1px solid #ddd6cb; border-radius: 5px; background: var(--temper-paper); color: #6a6258; font: 600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
 .temper-invitation button:hover { border-color: #ba9c89; color: var(--temper-accent-dark); }
 .temper-invitation button:disabled { opacity: .55; cursor: default; }
-.temper-invitation > p:last-child { margin-top: 14px; font-size: 10px; }
+.temper-invitation > p:last-child { margin-top: 14px; font-size: 12px; }
 /* .filter: the real closed-page action. */
 .temper-main > .temper-rows + button { margin-top: 9px; border: 1px solid var(--temper-line); background: #f7f5f0; color: var(--temper-muted); border-radius: 4px; min-height: 28px; padding: 5px 9px; font: 600 11px/1.35 var(--temper-mono); }
 /* .card and .composer: existing chat-page tokens. */
 .temper-card { background: var(--temper-paper); border: 1px solid var(--temper-line); border-radius: 5px; padding: 12px 16px; }
 .temper-turn { white-space: pre-wrap; }
 .temper-composer:not(.temper-entry textarea) { field-sizing: content; min-height: 1lh; max-height: 120px; resize: none; overflow-y: auto; }
-/* .first-run-banner and .terminal-proposal-actions: the accounts' notice under the top bar, its acts as small buttons. */
+/* .first-run-banner and .terminal-proposal-actions: the demo notice, with plain bold acts that retain their targets. */
 .temper-accounts { width: min(1040px, calc(100% - 48px)); margin: 22px auto 0; padding: 12px 16px; border: 1px solid var(--temper-line); background: #f8f5f0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .temper-accounts + .temper-accounts { margin-top: 16px; }
 .temper-accounts + .temper-main { padding-top: 16px; }
@@ -123,6 +123,9 @@ a { color: inherit; text-decoration: none; }
 .temper-accounts button:hover { border-color: #ba9c89; color: var(--temper-accent-dark); }
 .temper-accounts > a { display: inline-flex; align-items: center; min-height: 28px; max-width: 100%; background: var(--temper-paper); line-height: 1.35; overflow-wrap: anywhere; }
 .temper-accounts > a:hover { color: var(--temper-accent-dark); text-decoration: underline; }
+/* The Demo region is a section; the account-required notice is a separate slot. */
+section.temper-accounts button, section.temper-accounts > a { border: 0; background: transparent; padding-left: 0; }
+section.temper-accounts button:hover { text-decoration: underline; }
 /* .first-run-account-line: the account and model above the composer. */
 .temper-account-line { width: min(1040px, 100%); margin: 0 auto 6px; font-size: 10px; color: var(--temper-muted); }
 .temper-account-line a { text-decoration: underline; }
@@ -158,6 +161,8 @@ a { color: inherit; text-decoration: none; }
   .temper-row > p:nth-of-type(3) { order: 4; }
   .temper-time { order: 5; flex: 0 0 100%; text-align: left; }
 }
+/* .terminal-variant: chat pages inherit the terminal body type, including their banner. */
+body:has(.temper-main.temper-chat) { font-size: 13px; letter-spacing: -.018em; }
 /* .terminal-shell: the log owns scrolling and the frame owns the viewport. */
 #app:has(> .temper-chat) { height: 100vh; height: 100dvh; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 #app:has(> .temper-chat) > :not(.temper-chat) { flex: none; }
@@ -167,6 +172,7 @@ a { color: inherit; text-decoration: none; }
 .temper-main .temper-chatbar > div { display: flex; align-items: center; gap: 16px; min-width: 0; white-space: nowrap; }
 .temper-main .temper-chatbar > div:first-child { flex: 0 1 auto; }
 .temper-main .temper-chatbar > div:last-child { flex: none; color: var(--temper-muted); }
+.temper-main.temper-chat .temper-chatbar > div:first-child > p { color: var(--temper-muted); font-weight: 400; }
 .temper-chat .temper-chatbar h1 { flex: none; margin: 0; color: var(--temper-accent); font: 700 11px/1.58 var(--temper-mono); letter-spacing: inherit; }
 .temper-main .temper-chatbar p { margin: 0; }
 .temper-main .temper-chatbar > div:first-child > p { overflow: hidden; text-overflow: ellipsis; font-size: 12px; font-weight: 700; }
@@ -181,6 +187,8 @@ a { color: inherit; text-decoration: none; }
 .temper-chat .temper-thread > [role=log] { flex: 0 1 auto; min-height: 0; min-height: calc-size(min-content, min(size, 33%)); width: 100%; padding: 22px max(32px, calc((100% - 1040px) / 2)) 30px; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: #d9d1c5 transparent; }
 .temper-chat .temper-thread > [role=log]:not(:last-child) { padding-bottom: 0; }
 .temper-chat .temper-thread > :not([role=log]):not(.temper-cards) { flex: none; width: min(1040px, calc(100% - 64px)); margin-inline: auto; }
+/* .first-run-context: a direct chat child shares the conversation column. */
+.temper-chat > .temper-context { flex: none; width: min(1040px, calc(100% - 64px)); margin-inline: auto; }
 /* The tail under the log, in the content column as the mockup's proposal. */
 .temper-chat .temper-thread > [role=log] ~ :not(.temper-cards) { padding-left: 109px; }
 .temper-chat .temper-thread > :last-child:not([role=log]):not(.temper-cards) { margin-bottom: 14px; }
@@ -273,6 +281,7 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
   .temper-main .temper-chatbar > div:last-child { gap: 10px; flex-wrap: wrap; white-space: normal; }
   .temper-chat .temper-thread > [role=log] { padding: 17px 16px 30px; }
   .temper-chat .temper-thread > :not([role=log]):not(.temper-cards) { width: calc(100% - 32px); }
+  .temper-chat > .temper-context { width: calc(100% - 32px); }
   .temper-chat .temper-message { grid-template-columns: 62px minmax(0, 1fr); gap: 8px; margin-bottom: 17px; }
   .temper-chat .temper-who { font-size: 10px; }
   .temper-chat .temper-says { font-size: 12px; }
@@ -594,28 +603,34 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
   .temper-unavailable, body > noscript, #app:not(:empty):not(:has(*)) { width: calc(100% - 28px); }
 }
 
-/* First run shares the chat frame; backplates join the composer band because the view has no wrapper. */
+/* .terminal-pages .page: Chats has the list width; demo start retains its own frame. */
+.temper-main:not(.temper-page):not(.temper-chat):has(> .temper-entry):not(:has(> .temper-chatbar)) { width: min(1160px, calc(100% - 48px)); }
+@media (max-width: 850px) {
+  .temper-main:not(.temper-page):not(.temper-chat):has(> .temper-entry):not(:has(> .temper-chatbar)) { width: calc(100% - 34px); }
+}
+@media (max-width: 760px) {
+  .temper-main:not(.temper-page):not(.temper-chat):has(> .temper-entry):not(:has(> .temper-chatbar)) { width: calc(100% - 28px); }
+}
+/* .demo-strip: only Chats, Inbox and Accounts; chat and demo-start notices stay boxed. */
+#app:has(> .temper-main:not(.temper-chat) > :is(h1, .temper-heading, .temper-accounts-page)) > section.temper-accounts { width: 100%; margin: 0; padding: 4px 25px; border: 0; border-bottom: 1px solid var(--temper-line); gap: 4px 18px; }
+#app:has(> .temper-main:not(.temper-chat) > :is(h1, .temper-heading, .temper-accounts-page)) > section.temper-accounts p { flex: 0 1 auto; }
+@media (max-width: 600px) {
+  #app:has(> .temper-main:not(.temper-chat) > :is(h1, .temper-heading, .temper-accounts-page)) > section.temper-accounts { padding: 6px 16px; }
+}
+/* First run shares the chat frame, with its entry following the invitation in the column. */
 .temper-main:not(.temper-chat):has(> .temper-chatbar) { width: 100%; margin: 0; padding: 0 0 58px; font-size: 13px; letter-spacing: -.018em; }
 .temper-main:not(.temper-chat):has(> .temper-chatbar) > :not(.temper-chatbar) { width: min(1040px, calc(100% - 64px)); margin-inline: auto; }
 .temper-main:not(.temper-chat):has(> .temper-chatbar) > .temper-accounts { margin-top: 22px; margin-bottom: 16px; }
 .temper-main:not(.temper-chat):has(> .temper-chatbar) > .temper-context > p { margin: 0; }
+.temper-main:not(.temper-chat):has(> .temper-chatbar) > :is(.temper-choice, .temper-entry) { width: min(760px, calc(100% - 64px)); margin-left: max(32px, calc((100% - 1040px) / 2)); margin-right: auto; }
 .temper-main:not(.temper-chat):has(> .temper-chatbar) > .temper-entry { margin-bottom: 21px; }
-#app:has(> .temper-main:not(.temper-chat) > .temper-chatbar):not(:has(> .temper-main > h2)) { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
-#app:has(> .temper-main:not(.temper-chat) > .temper-chatbar):not(:has(> .temper-main > h2)) > :not(main) { flex: none; }
-.temper-main:not(.temper-chat):has(> .temper-chatbar):not(:has(> h2)) { flex: 1; display: flex; flex-direction: column; isolation: isolate; padding-bottom: 10px; }
-.temper-main:not(.temper-chat):has(> .temper-chatbar):not(:has(> h2)) > * { flex: none; }
-.temper-main:not(.temper-chat):has(> .temper-chatbar):not(:has(> h2)) > .temper-choice { width: 100%; margin-top: auto; margin-bottom: 0; padding: 10px max(32px, calc((100% - 1040px) / 2)) 8px; border-top: 1px solid var(--temper-line); background: #f9f7f3; }
-.temper-main:not(.temper-chat):has(> .temper-chatbar):not(:has(> h2)) > .temper-entry { margin-bottom: 0; }
-.temper-main:not(.temper-chat):has(> .temper-chatbar):not(:has(> h2)) > .temper-entry ~ * { margin-block: 0; padding-top: 8px; }
-.temper-main:not(.temper-chat):has(> .temper-chatbar):not(:has(> h2)) > :is(.temper-entry, .temper-entry ~ *) { position: relative; }
-.temper-main:not(.temper-chat):has(> .temper-chatbar):not(:has(> h2)) > :is(.temper-entry, .temper-entry ~ *)::after { content: ''; position: absolute; z-index: -1; inset: -1px 0 -10px; background: #f9f7f3; box-shadow: 0 0 0 100vmax #f9f7f3; clip-path: inset(0 -100vmax); }
+.temper-main:not(.temper-chat) > .temper-chatbar .temper-status-quiet { color: #4c8067; }
+.temper-main:not(.temper-chat) > .temper-chatbar [role=status]::before { content: none; }
 @media (max-width: 760px) {
   .temper-main:not(.temper-chat):has(> .temper-chatbar) > :not(.temper-chatbar) { width: calc(100% - 32px); }
+  .temper-main:not(.temper-chat):has(> .temper-chatbar) > :is(.temper-choice, .temper-entry) { margin-left: 16px; }
   .temper-main:not(.temper-chat):has(> .temper-chatbar) > .temper-accounts { margin-top: 17px; }
-  .temper-main:not(.temper-chat):has(> .temper-chatbar):not(:has(> h2)) { padding-bottom: 8px; }
-  .temper-main:not(.temper-chat):has(> .temper-chatbar):not(:has(> h2)) > .temper-choice { width: 100%; padding: 8px 16px; }
-  .temper-main:not(.temper-chat):has(> .temper-chatbar):not(:has(> h2)) > :is(.temper-entry, .temper-entry ~ *)::after { bottom: -8px; }
 }
 @media (max-width: 430px) {
-  .temper-main:not(.temper-chat):has(> .temper-chatbar) > .temper-invitation { margin-block: 20px; }
+  .temper-main:not(.temper-chat):has(> .temper-chatbar) > .temper-invitation { padding: 20px 0 24px; }
 }
