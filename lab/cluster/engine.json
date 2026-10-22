@@ -95,7 +95,7 @@
         "waiting_ms": 60000,
         "resume": true,
         "turns": 4,
-        "time_ms": 30000,
+        "time_ms": 65000,
         "reserve_turns": 1,
         "reserve_time_ms": 5000,
         "spend": 20,

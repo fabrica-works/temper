@@ -924,7 +924,7 @@ fn the_cluster_stops_in_reverse_each_exiting_0() {
     scratch.remove();
 }
 
-// An open chat's run holds its worker's one slot until the charter's idle threshold.
+// Both the idle threshold and ordinary time allowance hold an open chat's slot.
 // Past the story's deadline, a run that parks has already failed it.
 const CHAT_HOLDS_ITS_SLOT: Duration = support::WITHIN.saturating_mul(2);
 
@@ -937,12 +937,29 @@ const CHAT_HOLDS_ITS_SLOT: Duration = support::WITHIN.saturating_mul(2);
 // so nothing is placed twice.
 #[test]
 fn a_task_runs_on_each_worker() {
-    let scratch = support::Scratch::new("cluster_each_worker");
+    cluster_chats("cluster_each_worker", ClusterStory::Each);
+}
+
+// Jig admits only with an available placement (e7a93cd, jig-domain-core
+// routing/run_preparation.rs:466–492, run_choice.rs:73–77): the second task
+// is due, unclaimed and unplaced; no attempt exists to be placed twice.
+#[test]
+fn a_worker_started_later_takes_the_waiting_task() {
+    cluster_chats("cluster_started_later", ClusterStory::Later);
+}
+
+#[test]
+fn a_worker_restarted_on_its_directories_links_at_its_position() {
+    cluster_chats("cluster_restarted", ClusterStory::Restart);
+}
+
+fn cluster_chats(case: &str, story: ClusterStory) {
+    let scratch = support::Scratch::new(case);
     let cluster = support::cluster::Cluster::read(scratch.path());
     let engine = cluster.dir("engine").join("config/temper.json");
     let key = cluster.dir("llm").join("llm.key");
     let (mut members, hosts) = cluster.members();
-    members.up(&["w1", "w2"]);
+    members.up(if story == ClusterStory::Each { &["w1", "w2"] } else { &["w1"] });
     let clock = skein_shell::Clock::new();
     let mut world = skein_world::real::World::new(ClusterChatJudge {
         members,
@@ -953,6 +970,10 @@ fn a_task_runs_on_each_worker() {
         stage: ClusterChatStage::Start,
         tasks: Vec::new(),
         workers: std::collections::BTreeSet::new(),
+        story,
+        reading: None,
+        checking: std::collections::VecDeque::new(),
+        last_read: String::new(),
     });
     for host in hosts {
         world.spawn(|| host);
@@ -964,11 +985,28 @@ fn a_task_runs_on_each_worker() {
     scratch.remove();
 }
 
+// lab/cluster has two chats, one per slot, and two lives in the restart story.
+const CLUSTER_CHATS: usize = 2;
+const FIRST_LIFE: usize = 0;
+const SECOND_LIFE: usize = 1;
+const RESTART_LINKS: usize = 2;
+const REPLY_ONCE: usize = 1;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ClusterStory {
+    Each,
+    Later,
+    Restart,
+}
+#[derive(Debug)]
 enum ClusterChatStage {
     Start,
     Created,
     Replied,
+    WaitingSlot,
+    StoppedOne,
+    Relinking,
     Closed,
+    Verifying,
     Stopping,
 }
 struct ClusterChatJudge {
@@ -980,6 +1018,10 @@ struct ClusterChatJudge {
     stage: ClusterChatStage,
     tasks: Vec<String>,
     workers: std::collections::BTreeSet<String>,
+    story: ClusterStory,
+    reading: Option<ClusterRead>,
+    checking: std::collections::VecDeque<String>,
+    last_read: String,
 }
 impl ClusterChatJudge {
     fn queue(&self, host: &mut support::cluster::Root, calls: Vec<support::ctl::Call>) {
@@ -1006,6 +1048,12 @@ impl ClusterChatJudge {
             Duration::from_millis(charter["waiting_ms"].as_u64().expect("chat waiting_ms")) >= CHAT_HOLDS_ITS_SLOT,
             "lab/cluster/engine.json: chat charter waiting_ms must hold its slot past the story deadline"
         );
+        let time = charter["time_ms"].as_u64().expect("chat time_ms");
+        let reserve = charter["reserve_time_ms"].as_u64().expect("chat reserve_time_ms");
+        assert!(
+            time.checked_sub(reserve).is_some_and(|ordinary| Duration::from_millis(ordinary) >= CHAT_HOLDS_ITS_SLOT),
+            "lab/cluster/engine.json: chat charter time_ms less its reserve must hold its slot past the story deadline"
+        );
         self.queue(
             client,
             vec![
@@ -1024,86 +1072,303 @@ impl ClusterChatJudge {
         );
         self.stage = ClusterChatStage::Created;
     }
+    fn create_second(&mut self, client: &mut support::cluster::Root) {
+        use support::ctl::{Call, PROJECT};
+        self.queue(
+            client,
+            vec![Call::new(&["chat", "--project", PROJECT, "--key", "second", "cluster-second-chat", "--json"])],
+        );
+        self.stage = ClusterChatStage::Created;
+    }
+    fn current(&self) -> &str {
+        self.checking.front().or_else(|| self.tasks.last()).expect("current chat")
+    }
+    fn poll(&self, client: &mut support::cluster::Root) {
+        use support::ctl::Call;
+        let task = self.current();
+        let mut calls = vec![Call::new(&["task", task, "--json"]), Call::new(&["accounts", "--json"])];
+        if matches!(self.stage, ClusterChatStage::Verifying) {
+            calls.push(Call::new(&["activity", task, "--json"]));
+        }
+        self.queue(client, calls);
+    }
+    fn read(&mut self, client: &mut support::cluster::Root, ends: &[support::Ended]) -> Option<ClusterRead> {
+        use support::ctl::{Call, json};
+        if self.reading.as_ref().is_some_and(|read| read.turns) {
+            let mut read = self.reading.take().expect("turn reads");
+            let turns = read.rows.iter_mut().filter(|row| row["event"]["owner"]["source"]["line"]["turn"].is_object());
+            for (row, ended) in turns.zip(ends) {
+                let turn = json(ended);
+                complete_cluster_json(&turn);
+                assert!(turn["turn"]["decoded"].is_object(), "committed turn decoded: {turn}");
+                row["event"]["owner"]["decoded"] = turn;
+            }
+            return Some(read);
+        }
+        let (mut read, page) = match ends {
+            [task, accounts] => {
+                return Some(ClusterRead {
+                    task: json(task),
+                    accounts: json(accounts),
+                    rows: Vec::new(),
+                    turns: false,
+                });
+            }
+            [task, accounts, activity] => (
+                ClusterRead { task: json(task), accounts: json(accounts), rows: Vec::new(), turns: false },
+                json(activity),
+            ),
+            [activity] => (self.reading.take().expect("continued activity"), json(activity)),
+            _ => panic!("task, accounts, activity or continued activity"),
+        };
+        complete_cluster_json(&page);
+        read.rows.extend(page["rows"].as_array().expect("activity rows").iter().cloned());
+        let task = self.current();
+        if let Some(before) = page["before"]["value"].as_str() {
+            self.queue(client, vec![Call::new(&["activity", task, "--before", before, "--json"])]);
+        } else {
+            let calls: Vec<_> = read
+                .rows
+                .iter()
+                .filter_map(|row| {
+                    let turn = &row["event"]["owner"]["source"]["line"]["turn"];
+                    turn.is_object().then(|| {
+                        Call::new(&[
+                            "turn",
+                            task,
+                            &format!(
+                                "{}.{}",
+                                turn["attempt"].as_u64().expect("turn attempt"),
+                                turn["turn"].as_u64().expect("turn number")
+                            ),
+                            "--json",
+                        ])
+                    })
+                })
+                .collect();
+            if calls.is_empty() {
+                return Some(read);
+            }
+            self.queue(client, calls);
+            read.turns = true;
+        }
+        self.reading = Some(read);
+        None
+    }
+    fn advance_read(&mut self, client: &mut support::cluster::Root, read: &ClusterRead) {
+        self.last_read = format!(
+            "phase {}, attempt {}, observation {}",
+            read.owner()["phase"],
+            read.owner()["details"]["attempt"],
+            read.owner()["details"]["observation"]
+        );
+        match self.stage {
+            ClusterChatStage::WaitingSlot => {
+                if read.owner()["phase"] == serde_json::json!({"active": "due"})
+                    && read.owner()["details"]["attempt"].is_null()
+                    && read.owner()["details"]["observation"].is_null()
+                {
+                    self.members.up(&["w2"]);
+                    self.stage = ClusterChatStage::Replied;
+                }
+                self.poll(client);
+            }
+            ClusterChatStage::Relinking => {
+                if self.members.linked("w1") == RESTART_LINKS && read.connected("w1") {
+                    self.create_second(client);
+                } else {
+                    self.poll(client);
+                }
+            }
+            ClusterChatStage::Replied => self.replied(client, read),
+            ClusterChatStage::Verifying => {
+                assert!(read.owner()["details"]["ending"]["done"].is_object(), "chat ended done: {}", read.task);
+                let text = if self.tasks.first().is_some_and(|task| task == self.current()) {
+                    "First worker replied."
+                } else {
+                    "Second worker replied."
+                };
+                assert_eq!(read.replies(text), REPLY_ONCE, "reply once across complete committed turns");
+                self.checking.pop_front().expect("verified chat");
+                if self.checking.is_empty() {
+                    if self.story == ClusterStory::Restart && self.tasks.len() < CLUSTER_CHATS {
+                        self.members.stop_one("w1");
+                        self.stage = ClusterChatStage::StoppedOne;
+                    } else {
+                        self.members.stop();
+                        self.stage = ClusterChatStage::Stopping;
+                    }
+                } else {
+                    self.poll(client);
+                }
+            }
+            ClusterChatStage::Start
+            | ClusterChatStage::Created
+            | ClusterChatStage::StoppedOne
+            | ClusterChatStage::Closed
+            | ClusterChatStage::Stopping => unreachable!("read stage"),
+        }
+    }
+    fn replied(&mut self, client: &mut support::cluster::Root, read: &ClusterRead) {
+        let first = self.tasks.len() < CLUSTER_CHATS;
+        if let Some(worker) = read.worker().filter(|_| read.waiting()) {
+            eprintln!(
+                "client placement: task {} attempt {} worker {worker}",
+                self.tasks.last().expect("chat"),
+                read.attempt()
+            );
+            if self.story == ClusterStory::Each {
+                assert!(self.workers.insert(worker.into()), "each chat on its own worker");
+            } else {
+                assert_eq!(worker, if first || self.story == ClusterStory::Restart { "w1" } else { "w2" });
+            }
+            if first {
+                if self.story == ClusterStory::Restart {
+                    self.close(client, true);
+                } else {
+                    self.create_second(client);
+                }
+            } else {
+                if self.story == ClusterStory::Each {
+                    assert_eq!(self.workers.iter().map(String::as_str).collect::<Vec<_>>(), ["w1", "w2"]);
+                }
+                self.close(client, false);
+            }
+        } else {
+            self.poll(client);
+        }
+    }
+    fn close(&mut self, client: &mut support::cluster::Root, first_only: bool) {
+        use support::ctl::Call;
+        let mut close = Vec::new();
+        for (task, key) in self.tasks.iter().zip(["close-first", "close-second"]) {
+            if self.story == ClusterStory::Restart && !first_only && self.tasks.first() == Some(task) {
+                continue;
+            }
+            self.checking.push_back(task.clone());
+            close.push(Call::new(&["close", task, "--key", key]));
+            close.push(Call::new(&["wait", "task", task, "--until", "ended"]));
+        }
+        self.queue(client, close);
+        self.stage = ClusterChatStage::Closed;
+    }
+}
+struct ClusterRead {
+    task: serde_json::Value,
+    accounts: serde_json::Value,
+    rows: Vec<serde_json::Value>,
+    turns: bool,
+}
+impl ClusterRead {
+    fn owner(&self) -> &serde_json::Value {
+        &self.task["chip"]["details"]["owner"]
+    }
+    fn waiting(&self) -> bool {
+        self.owner()["details"]["observation"]["work"] == "waiting"
+    }
+    fn attempt(&self) -> u64 {
+        self.owner()["details"]["attempt"].as_u64().expect("chat attempt")
+    }
+    fn connected(&self, name: &str) -> bool {
+        self.accounts["accounts"]["deployment_facts"]["program_hosts"]
+            .as_array()
+            .expect("deployment hosts")
+            .iter()
+            .any(|host| host["name"] == name && host["connected"] == true)
+    }
+    fn worker(&self) -> Option<&str> {
+        let channel = self.owner()["details"]["observation"]["channel"].as_u64()?;
+        self.accounts["accounts"]["deployment_facts"]["program_hosts"]
+            .as_array()
+            .expect("deployment hosts")
+            .iter()
+            .find(|host| host["channel"] == channel && host["connected"] == true)?["name"]
+            .as_str()
+    }
+    fn replies(&self, text: &str) -> usize {
+        self.rows
+            .iter()
+            .filter_map(|row| row["event"]["owner"]["decoded"]["turn"]["decoded"]["messages"].as_array())
+            .flatten()
+            .filter(|message| message["speaker"] == "assistant")
+            .flat_map(|message| message["blocks"].as_array().expect("message blocks"))
+            .filter_map(|block| block["text"]["text"].as_str())
+            .map(|words| words.matches(text).count())
+            .sum()
+    }
+}
+fn complete_cluster_json(value: &serde_json::Value) {
+    match value {
+        serde_json::Value::Object(fields) => {
+            for (key, value) in fields {
+                if key == "cut" {
+                    assert_eq!(value, false, "complete committed transcript");
+                }
+                if key == "bytes_left" {
+                    assert_eq!(value, 0, "complete turn text");
+                }
+                complete_cluster_json(value);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                complete_cluster_json(item);
+            }
+        }
+        serde_json::Value::Null
+        | serde_json::Value::Bool(_)
+        | serde_json::Value::Number(_)
+        | serde_json::Value::String(_) => {}
+    }
 }
 impl skein_world::Referee<support::cluster::Root> for ClusterChatJudge {
     fn act(&mut self, now: skein_lib::Time, hosts: &mut [support::cluster::Root]) {
         use skein_shell::Host;
-        use support::ctl::{Call, PROJECT, json};
+        use support::ctl::json;
         let (client, hosts) = hosts.split_last_mut().expect("cluster client root");
-        if self.members.is_up() {
-            if matches!(self.stage, ClusterChatStage::Start) {
-                self.begin(client);
-            } else if client.is_empty() && !matches!(self.stage, ClusterChatStage::Stopping) {
-                let support::cluster::Root::Client { calls, .. } = client else { panic!("client root") };
-                let calls = calls.take().expect("completed cluster calls");
-                for ended in calls.ends() {
-                    assert_eq!(ended.exit, Some(Exit::Code(0)), "ctl: {}", String::from_utf8_lossy(&ended.stderr));
+        if matches!(self.stage, ClusterChatStage::Start) && self.members.is_up() {
+            self.begin(client);
+        } else if matches!(self.stage, ClusterChatStage::StoppedOne) {
+            if self.members.ended("w1") {
+                self.members.restart("w1");
+                self.stage = ClusterChatStage::Relinking;
+                self.poll(client);
+            }
+        } else if client.is_empty() && !matches!(self.stage, ClusterChatStage::Start | ClusterChatStage::Stopping) {
+            let support::cluster::Root::Client { calls, .. } = client else { panic!("client root") };
+            let calls = calls.take().expect("completed cluster calls");
+            for ended in calls.ends() {
+                assert_eq!(ended.exit, Some(Exit::Code(0)), "ctl: {}", String::from_utf8_lossy(&ended.stderr));
+            }
+            match self.stage {
+                ClusterChatStage::Created => {
+                    let created = json(calls.ends().last().expect("created chat"));
+                    let task = created["outcome"]["done"]["owner"]["created"]["first"]
+                        .as_u64()
+                        .unwrap_or_else(|| panic!("created chat number: {created}"))
+                        .to_string();
+                    self.tasks.push(task);
+                    self.stage = if self.story == ClusterStory::Later && self.tasks.len() == CLUSTER_CHATS {
+                        ClusterChatStage::WaitingSlot
+                    } else {
+                        ClusterChatStage::Replied
+                    };
+                    self.poll(client);
                 }
-                match self.stage {
-                    ClusterChatStage::Created => {
-                        let created = json(calls.ends().last().expect("created chat"));
-                        let task = created["outcome"]["done"]["owner"]["created"]["first"]
-                            .as_u64()
-                            .unwrap_or_else(|| panic!("created chat number: {created}"))
-                            .to_string();
-                        self.queue(
-                            client,
-                            vec![
-                                Call::new(&["wait", "task", &task, "--until", "replied"]),
-                                Call::new(&["task", &task, "--json"]),
-                                Call::new(&["accounts", "--json"]),
-                            ],
-                        );
-                        self.tasks.push(task);
-                        self.stage = ClusterChatStage::Replied;
+                ClusterChatStage::Replied
+                | ClusterChatStage::WaitingSlot
+                | ClusterChatStage::Relinking
+                | ClusterChatStage::Verifying => {
+                    if let Some(read) = self.read(client, calls.ends()) {
+                        self.advance_read(client, &read);
                     }
-                    ClusterChatStage::Replied => {
-                        let [_, task, accounts] = calls.ends() else { panic!("reply, task, accounts") };
-                        let (task, accounts) = (json(task), json(accounts));
-                        let run = &task["chip"]["details"]["owner"]["details"];
-                        let channel = run["observation"]["channel"]
-                            .as_u64()
-                            .unwrap_or_else(|| panic!("active chat channel: {task}"));
-                        let hosts = accounts["accounts"]["deployment_facts"]["program_hosts"]
-                            .as_array()
-                            .expect("deployment hosts");
-                        let host = hosts.iter().find(|host| host["channel"] == channel).expect("run's worker");
-                        let worker = host["name"].as_str().expect("worker name");
-                        eprintln!(
-                            "client placement: task {} channel {channel} worker {worker}",
-                            self.tasks.last().expect("chat number")
-                        );
-                        assert!(self.workers.insert(worker.into()), "each chat on its own worker");
-                        if self.tasks.len() == 1 {
-                            self.queue(
-                                client,
-                                vec![Call::new(&[
-                                    "chat",
-                                    "--project",
-                                    PROJECT,
-                                    "--key",
-                                    "second",
-                                    "cluster-second-chat",
-                                    "--json",
-                                ])],
-                            );
-                            self.stage = ClusterChatStage::Created;
-                        } else {
-                            assert_eq!(self.workers.iter().map(String::as_str).collect::<Vec<_>>(), ["w1", "w2"]);
-                            let mut close = Vec::new();
-                            for (task, key) in self.tasks.iter().zip(["close-first", "close-second"]) {
-                                close.push(Call::new(&["close", task, "--key", key]));
-                                close.push(Call::new(&["wait", "task", task, "--until", "ended"]));
-                            }
-                            self.queue(client, close);
-                            self.stage = ClusterChatStage::Closed;
-                        }
-                    }
-                    ClusterChatStage::Closed => {
-                        self.members.stop();
-                        self.stage = ClusterChatStage::Stopping;
-                    }
-                    ClusterChatStage::Start | ClusterChatStage::Stopping => unreachable!("active calls"),
+                }
+                ClusterChatStage::Closed => {
+                    self.stage = ClusterChatStage::Verifying;
+                    self.poll(client);
+                }
+                ClusterChatStage::Start | ClusterChatStage::Stopping | ClusterChatStage::StoppedOne => {
+                    unreachable!("active calls")
                 }
             }
         }
@@ -1113,8 +1378,18 @@ impl skein_world::Referee<support::cluster::Root> for ClusterChatJudge {
         let (_, hosts) = hosts.split_last().expect("cluster client root");
         self.members.observe(now, hosts);
         if let Some(stopped) = self.members.stopped() {
-            assert_eq!(stopped.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), ["w2", "w1", "engine", "llm"]);
+            let expected = if self.story == ClusterStory::Restart {
+                vec![("w1", FIRST_LIFE), ("w1", SECOND_LIFE), ("engine", FIRST_LIFE), ("llm", FIRST_LIFE)]
+            } else {
+                vec![("w2", FIRST_LIFE), ("w1", FIRST_LIFE), ("engine", FIRST_LIFE), ("llm", FIRST_LIFE)]
+            };
+            assert_eq!(stopped.iter().map(|s| (s.name.as_str(), s.life)).collect::<Vec<_>>(), expected);
             for member in stopped {
+                let alone = self.story == ClusterStory::Restart && member.name == "w1" && member.life == FIRST_LIFE;
+                assert_eq!(
+                    member.ending,
+                    if alone { support::cluster::Ending::Alone } else { support::cluster::Ending::Cluster }
+                );
                 clean_cluster_exit(member);
             }
         }
@@ -1123,7 +1398,25 @@ impl skein_world::Referee<support::cluster::Root> for ClusterChatJudge {
         Some(self.members.next_deadline().map_or(self.deadline, |at| at.min(self.deadline)))
     }
     fn overdue(&self, now: skein_lib::Time) -> Option<String> {
-        (now >= self.deadline && !self.members.passed()).then(|| "cluster chats did not settle within WITHIN".into())
+        (now >= self.deadline && !self.members.passed()).then(|| {
+            format!(
+                "cluster {:?} waited in {:?}: {}; last read: {}",
+                self.story,
+                self.stage,
+                match self.stage {
+                    ClusterChatStage::Start => "requested members ready",
+                    ClusterChatStage::Created => "chat creation",
+                    ClusterChatStage::Replied => "waiting run and connected placement",
+                    ClusterChatStage::WaitingSlot => "due second chat without attempt or observation",
+                    ClusterChatStage::Closed => "closed chats ended",
+                    ClusterChatStage::Verifying => "ended done and complete committed turns",
+                    ClusterChatStage::StoppedOne => "w1's first life settled",
+                    ClusterChatStage::Relinking => "w1's second linked line and connected host",
+                    ClusterChatStage::Stopping => "every process tree settled",
+                },
+                self.last_read
+            )
+        })
     }
     fn passed(&self) -> bool {
         matches!(self.stage, ClusterChatStage::Stopping) && self.members.passed()

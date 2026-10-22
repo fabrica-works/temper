@@ -180,6 +180,9 @@ impl Cluster {
                 cluster: self,
                 requested: vec![false; count],
                 states: (0..count).map(|_| State::Waiting).collect(),
+                actions: Vec::new(),
+                linked: vec![0; count],
+                linked_through: vec![0; count],
                 started: Vec::new(),
                 stopping: false,
                 stopped: Vec::new(),
@@ -269,6 +272,7 @@ impl Host for Root {
 /// A world root: waiting, then the described Binary and its output reader, then ended.
 pub struct Member {
     command: Option<Command>,
+    starting: bool,
     binary: Option<Binary>,
     stdout: Option<StdoutReader>,
     completions: Queue<Complete>,
@@ -278,6 +282,7 @@ impl Member {
     fn idle() -> Self {
         Self {
             command: None,
+            starting: false,
             binary: None,
             stdout: None,
             completions: Queue::with_capacity(16),
@@ -287,7 +292,15 @@ impl Member {
 }
 impl Host for Member {
     fn iterate(&mut self, now: Time, wall: Wall) {
-        if let Some(command) = self.command.take() {
+        if self.starting {
+            self.starting = false;
+            let saved = self.command.as_ref().expect("rendered member command");
+            let command = Command {
+                program: saved.program.clone(),
+                arguments: saved.arguments.clone(),
+                environment: saved.environment.clone(),
+                directory: saved.directory.clone(),
+            };
             let mut binary = Binary::start_with_tree(command, Mode::Pipes, 65_536, Expectation::Supervise, false)
                 .expect("cluster member starts");
             let Streams::Pipes { input, output } = binary.take_streams().expect("cluster pipes") else {
@@ -324,7 +337,7 @@ impl Host for Member {
         &mut self.submissions
     }
     fn work_pending(&self, now: Time) -> bool {
-        self.command.is_some()
+        self.starting
             || !self.completions.is_empty()
             || self.binary.as_ref().is_some_and(|b| b.work_pending(now))
             || self.stdout.as_ref().is_some_and(|s| s.work_pending(now))
@@ -336,7 +349,7 @@ impl Host for Member {
         None
     }
     fn is_empty(&self) -> bool {
-        self.command.is_none()
+        !self.starting
             && self.binary.as_ref().is_none_or(Host::is_empty)
             && self.stdout.as_ref().is_none_or(Host::is_empty)
     }
@@ -352,15 +365,33 @@ enum State {
     Waiting,
     Starting { deadline: Time, captures: Vec<Option<String>> },
     Ready,
-    Stopping { deadline: Time, killed: bool, survivors: Vec<u32> },
+    Stopping { deadline: Time, ending: Ending, killed: bool, survivors: Vec<u32> },
     Ended,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ending {
+    Cluster,
+    Alone,
+    Kill,
+}
+enum Action {
+    End(Ending),
+    Signal(Signal),
+}
+#[derive(Clone, Copy)]
+struct Life {
+    member: usize,
+    number: usize,
 }
 /// Every cluster story embeds this half in its own referee.
 pub struct Members {
     cluster: Cluster,
     requested: Vec<bool>,
     states: Vec<State>,
-    started: Vec<usize>,
+    started: Vec<Life>,
+    actions: Vec<(usize, Action)>,
+    linked: Vec<usize>,
+    linked_through: Vec<usize>,
     stopping: bool,
     stopped: Vec<Stopped>,
     failure: Option<String>,
@@ -368,6 +399,8 @@ pub struct Members {
 /// The recorded exit of one member, in order of exit.
 pub struct Stopped {
     pub name: String,
+    pub life: usize,
+    pub ending: Ending,
     pub exit: Option<Exit>,
     pub killed: bool,
     pub survivors: Vec<u32>,
@@ -420,39 +453,98 @@ impl Members {
     pub fn stopped(&self) -> Option<&[Stopped]> {
         (self.stopping && self.stopped.len() == self.started.len()).then_some(&self.stopped)
     }
+    /// Kill the named member's whole tree, recording an intentional ending.
+    pub fn kill(&mut self, process: &str) {
+        self.end_one(process, Ending::Kill);
+    }
+    /// Signal every process in the named member's current tree.
+    pub fn signal(&mut self, process: &str, signal: Signal) {
+        let i = self.cluster.index(process);
+        assert!(matches!(self.states[i], State::Ready), "signal a ready member");
+        self.actions.push((i, Action::Signal(signal)));
+    }
+    /// Stop only this leader, escalating tree cleanup after `STOP_SECONDS`.
+    pub fn stop_one(&mut self, process: &str) {
+        self.end_one(process, Ending::Alone);
+    }
+    fn end_one(&mut self, process: &str, ending: Ending) {
+        let i = self.cluster.index(process);
+        assert!(matches!(self.states[i], State::Ready), "end a ready member");
+        self.actions.push((i, Action::End(ending)));
+    }
+    /// Start a settled member again, retaining its command, files and directories.
+    pub fn restart(&mut self, process: &str) {
+        let i = self.cluster.index(process);
+        assert!(!self.stopping && self.ended(process), "restart a settled member before stop");
+        self.states[i] = State::Waiting;
+        self.cluster.bindings.retain(|key, _| !key.starts_with(&format!("proc.{process}.ready.")));
+    }
+    #[must_use]
+    pub fn ended(&self, process: &str) -> bool {
+        matches!(self.states[self.cluster.index(process)], State::Ended)
+    }
+    /// Complete stderr lines beginning `linked `, across all lives.
+    #[must_use]
+    pub fn linked(&self, process: &str) -> usize {
+        self.linked[self.cluster.index(process)]
+    }
+    fn ending(&mut self, i: usize, ending: Ending, now: Time, hosts: &mut [Root]) {
+        let binary = hosts[i].member_mut().binary.as_mut().expect("started binary");
+        if ending == Ending::Kill {
+            binary.signal_tree(Signal::Kill);
+        } else if binary.exit_status().is_none() {
+            binary.signal(Signal::Terminate);
+        }
+        self.states[i] = State::Stopping {
+            deadline: now.saturating_add(Duration::from_secs(STOP_SECONDS)),
+            ending,
+            killed: false,
+            survivors: Vec::new(),
+        };
+    }
     pub fn act(&mut self, now: Time, hosts: &mut [Root]) {
-        for &i in &self.started {
+        for (i, action) in std::mem::take(&mut self.actions) {
+            match action {
+                Action::End(ending) => self.ending(i, ending, now, hosts),
+                Action::Signal(signal) => {
+                    hosts[i].member_mut().binary.as_mut().expect("live binary").signal_tree(signal);
+                }
+            }
+        }
+        for (i, state) in self.states.iter_mut().enumerate() {
+            if matches!(state, State::Waiting | State::Ended) {
+                continue;
+            }
             let binary = hosts[i].member_mut().binary.as_mut().expect("started member iterated");
             let survivors = binary.tree_status().live_at_leader_exit.as_deref().unwrap_or(&[]);
-            let timed_out =
-                matches!(&self.states[i], State::Stopping { deadline, killed: false, .. } if now >= *deadline);
-            let left_tree =
-                binary.exit_status().is_some() && (!survivors.is_empty() || !binary.tree_status().live_pids.is_empty());
-            if (left_tree || timed_out)
-                && !matches!(self.states[i], State::Stopping { killed: true, .. } | State::Ended)
-            {
+            let timed_out = matches!(state, State::Stopping { deadline, killed: false, .. } if now >= *deadline);
+            // skein-world end_to_end.rs:253–260 refreshes tree membership on delivery;
+            // an intentional whole-tree kill awaits settlement, not leader-exit cleanup.
+            let deliberate_kill = matches!(state, State::Stopping { ending: Ending::Kill, .. });
+            let left_tree = !deliberate_kill
+                && binary.exit_status().is_some()
+                && (!survivors.is_empty() || !binary.tree_status().live_pids.is_empty());
+            if (left_tree || timed_out) && !matches!(state, State::Stopping { killed: true, .. }) {
+                let ending = match state {
+                    State::Stopping { ending, .. } => *ending,
+                    State::Waiting | State::Starting { .. } | State::Ready | State::Ended => Ending::Cluster,
+                };
                 let mut survivors = survivors.to_vec();
                 survivors.extend_from_slice(&binary.tree_status().live_pids);
                 survivors.sort_unstable();
                 survivors.dedup();
-                self.states[i] = State::Stopping { deadline: now, killed: true, survivors };
+                *state = State::Stopping { deadline: now, ending, killed: true, survivors };
                 binary.signal_tree(Signal::Kill);
                 self.stopping = true;
             }
         }
         if self.stopping {
-            if let Some(&i) = self.started.iter().rev().find(|&&i| !matches!(self.states[i], State::Ended))
-                && !matches!(self.states[i], State::Stopping { .. })
+            if let Some(life) = self.started.iter().rev().find(|life| !matches!(self.states[life.member], State::Ended))
             {
-                let binary = hosts[i].member_mut().binary.as_mut().expect("started binary");
-                if binary.exit_status().is_none() {
-                    binary.signal(Signal::Terminate);
+                let i = life.member;
+                if !matches!(self.states[i], State::Stopping { .. }) {
+                    self.ending(i, Ending::Cluster, now, hosts);
                 }
-                self.states[i] = State::Stopping {
-                    deadline: now.saturating_add(Duration::from_secs(STOP_SECONDS)),
-                    killed: false,
-                    survivors: Vec::new(),
-                };
             }
             return;
         }
@@ -466,19 +558,37 @@ impl Members {
         pending.sort_by_key(|&i| string(&self.cluster.specs[i]["name"]));
         for i in pending {
             let name = string(&self.cluster.specs[i]["name"]);
-            hosts[i].member_mut().command = Some(self.cluster.command(name));
+            let host = hosts[i].member_mut();
+            if host.command.is_none() {
+                host.command = Some(self.cluster.command(name));
+            }
+            host.binary = None;
+            host.stdout = None;
+            host.starting = true;
+            self.linked_through[i] = 0;
             self.states[i] = State::Starting {
                 deadline: now.saturating_add(Duration::from_secs(READY_SECONDS)),
                 captures: vec![None; list(&self.cluster.specs[i]["ready"]).len()],
             };
-            self.started.push(i);
+            let number = self.started.iter().filter(|life| life.member == i).count();
+            self.started.push(Life { member: i, number });
         }
     }
     pub fn observe(&mut self, now: Time, hosts: &[Root]) {
-        for &i in &self.started {
-            let host = hosts[i].member();
+        for (i, root) in hosts.iter().enumerate() {
+            if matches!(self.states[i], State::Waiting | State::Ended) {
+                continue;
+            }
+            let host = root.member();
             let Some(binary) = &host.binary else { continue };
             let name = string(&self.cluster.specs[i]["name"]);
+            for line in binary.stderr()[self.linked_through[i]..].split_inclusive(|byte| *byte == b'\n') {
+                if !line.ends_with(b"\n") {
+                    break;
+                }
+                self.linked[i] += usize::from(line.starts_with(b"linked "));
+                self.linked_through[i] += line.len();
+            }
             assert!(!binary.stderr_overflowed(), "{name}'s stderr exceeded its bound");
             if let State::Starting { deadline, captures } = &mut self.states[i] {
                 let rules = list(&self.cluster.specs[i]["ready"]);
@@ -526,16 +636,19 @@ impl Members {
                 self.stopping = true;
                 self.states[i] = State::Stopping {
                     deadline: now.saturating_add(Duration::from_secs(STOP_SECONDS)),
+                    ending: Ending::Cluster,
                     killed: false,
                     survivors: Vec::new(),
                 };
             }
             if host.is_empty()
-                && let State::Stopping { killed, survivors, .. } = &self.states[i]
+                && let State::Stopping { ending, killed, survivors, .. } = &self.states[i]
             {
                 assert_eq!(binary.counts().expect("settled tree").method, Method::Cgroup, "{CGROUPS}");
                 self.stopped.push(Stopped {
                     name: name.into(),
+                    life: self.started.iter().rev().find(|life| life.member == i).expect("current life").number,
+                    ending: *ending,
                     exit: binary.exit_status(),
                     killed: *killed,
                     survivors: survivors.clone(),
