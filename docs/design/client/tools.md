@@ -597,9 +597,10 @@ prints its header line, its fields, its acts and, for a watch's
 subject, its digest (5.4). A goal waiting on the agent:
 
 ```
-task 41 · goal · running · shop · priority 2
+task 41 · goal · Running · shop · priority 2
 asked: Add a /health endpoint that reports the store's state
-requester: you · spent 1.20 of 5.00 · no deadline
+requester: you · spent 1.20 of 5.00 · deadline 2026-10-24 17:00 UTC
+instructions: Answer on port 8080 unless the store's file names another one, and keep the /hea… (412 bytes; --json prints them whole)
 waiting on: you: question 3 of task 44, "Which port should it listen on?"
 plan: 4 live (2 running, 1 waiting, 1 held below)
 acts:
@@ -609,6 +610,45 @@ acts:
 digest: task 7c1e09a2b44f0d13
 ```
 
+- **The header** is the task's number, its kind, its phase in jig's
+  words, its project and its tracking. Its kind is `chat` for a
+  conversation, `goal` for a goal (the task its own goal), and
+  otherwise its result contract's kind, `change`, `report`, `verdict`
+  or `approval`, the card's kinds (`README.md`, 5.7) in lower case:
+  never jig's label as a number, which jig gives no meaning (jig's
+  `domain/tasks.md`, section 3) and temper numbers its delegates by.
+  Its tracking is `priority P` while it is tracked, and `untracked`
+  otherwise. A change delegate, ended: `task 2 · change · Ended ·
+  project 1 · untracked`.
+- **The deadline** has its date and its zone: `deadline 2026-10-24
+  17:00 UTC`, or `no deadline`.
+- **Its instructions,** when the document carries them, on a line of
+  their own: whole when they are one line of at most 80 characters;
+  otherwise their first line cut at 80 characters, then `…` and how
+  many bytes they hold and where to read them whole, `(N bytes; --json
+  prints them whole)`. They are the task's instructions in force, its
+  charter's or an amendment's, and the document does not say which
+  (section 15). With none, no line.
+- **A resource** in the forge's words (`README.md`, 4.1): `resource:
+  branch temper/1/c2 of repository 1 on forge 1`, never its bytes.
+- **A result** in temper's words, never its record: `result:`, its
+  state as the card says it (`README.md`, 5.7: `Landed`, `Completed`,
+  `Failed`, `Cancelled` (cancelled or withdrawn), `Ended`), then ` · ` and its
+  words. A landed change's words are its merge commit, whole, as the
+  engine's landing words give it (the card shows seven characters; an
+  agent may need the id): `result: Landed · merge commit 3f2a9c1…`
+  (forty characters); a change's words that are not an id print as they
+  are. A report's words, a verdict's, an approval's and a choice's print
+  as they are; a connector's its summary and its part in the forge's
+  words; a failed or cancelled task's its reason, if it gave one. Words
+  of more than one line go on the lines after it, each indented two
+  spaces. The result's details and acts are under `--json` only. An
+  ended task's document, a read of an ended task and a wait's ended
+  task print it alike.
+- **An activity line** is its position, then what happened. A
+  milestone's, `phase changed`: the activity names only the position of
+  the task's history row that says which phase, and no tool reads that
+  history (section 15).
 - **Acts as calls,** without the `temper ctl DIRECTORY` prefix; a keyed
   act's call ends with `--key NAME`. A proposable act says to whom; a
   refused one says why, and prints no call. The host gives the
@@ -1296,6 +1336,32 @@ Each is named here and designed when it comes.
   retention (`README.md`, section 11, the picker's page as a read).
   Default: kept as any keyed request; a read of the forge's family once
   the engine serves one.
+- **Instructions, the charter's or an amendment's:** a task's document
+  carries the instructions in force, and nothing says whether an
+  amendment set them (6.1). Default: `task N` prints them as they are;
+  a word for their source once jig's document says it (o/controls'
+  M4, or later).
+- **A milestone's phase in `activity`:** the activity line holds only
+  the position of the task's history row (jig's `OwnerActivity::
+  Milestone`), and the phase is on that row (`OwnerMilestoneLine`).
+  Printing it costs a second read per page, a history read of the task
+  after the page's first position (jig's `Read::History`), whose page
+  is bounded and holds other rows too, so it may not reach every
+  milestone the page names, and a cut to print where it does not.
+  Default: `phase changed` (6.1); the history read with a `history`
+  tool, if the QA loop asks.
+- **Raw values left in the text** (6.1's words do not reach them yet):
+  - a role, as its number, in acts and in `me`'s held policy (`role N`);
+  - a grant's connector and kind, as numbers, not 4.1's words;
+  - a grant's resource pattern, as bytes and `*`, not 4.1's words and
+    `…`;
+  - an amendment's implications, as numbers;
+  - a turn's resource references and part references, as bytes and
+    JSON;
+  - an account's lines in `me`, as the record's fields;
+  - charter and procedure numbers in creation bounds and delegation
+    authority, and an authority's tool and note numbers;
+  - a bounded authority's walls, as nanoseconds.
 - **Waiting on one forge:** `wait forges` watches every forge's row, so
   another forge's change answers a wait with no condition. Default:
   `--until settled` or `--until connected:F` names what is waited for; a

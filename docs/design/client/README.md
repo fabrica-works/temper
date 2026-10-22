@@ -458,6 +458,7 @@ its number or its path.
   | … `pull` N | pull request #N of OWNER/NAME on HOST |
   | … `issue` N | issue #N of OWNER/NAME on HOST |
   | two segments: a forge's number (2 bytes) and a repository's id (4 bytes), big-endian, as an adoption names it | repository ID on forge F |
+  | three segments: a forge's number (2 bytes) and a repository's id (4 bytes), big-endian, then a branch's name, as the hub names a delegate's branch (`temper-engine-domain`'s forge route) | branch B of repository ID on forge F |
   | anything else | its segments joined by `/`, as they are |
 
   jig's documents name an adopted repository by its forge's number and
