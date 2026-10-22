@@ -86,8 +86,11 @@ class FilesTests(unittest.TestCase):
                 self.assertEqual(scene['name'], name)
                 self.assertEqual(scene['widths'], chat['widths'])
                 self.assertEqual(scene['names'], names)
-                self.assertEqual(scene['expectations'], [])
-                self.assertEqual(scene['departures'], [])
+                # The judge's: ids unique, each departure's line once a width.
+                judged = scene['expectations'] + scene['departures']
+                self.assertEqual(len({d['id'] for d in judged}), len(judged))
+                lines = [(d['width'], d['signature']) for d in scene['departures']]
+                self.assertEqual(len(set(lines)), len(lines))
                 self.assertEqual(scene['page'], dict(live='/chats/1', ready=dialog if name == 'chat-closing'
                                                     else composer, focus=focus))
                 if name == 'chat-closing':
