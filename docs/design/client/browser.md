@@ -491,8 +491,10 @@ view draws, never changing a view to suit a sample.
   model holds them, so that a picture differs from its mockup by look,
   not content. A value the model has no place for is left out, never
   invented. The gallery's own documents carry what the domain's
-  fixtures don't: spend in the contract's unit (0.8, not 1), and the
-  providers, accounts and their holders by name.
+  fixtures don't: the providers, accounts and their holders by name.
+  A spend is the contract's whole number (jig's owner numbers), so a
+  mockup's fraction is rounded to the nearest (0.8 is 1) until the
+  contract holds one.
 - **Its bounds** are the browser's shipped client limits as they are
   (`temper-client-shell-terminal`'s `native()`, which the browser's
   shell takes), never widened, and the view's bounds are derived from
