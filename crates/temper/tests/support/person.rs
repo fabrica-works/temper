@@ -496,7 +496,7 @@ pub fn adopt_and_change(_forgejo: &super::forgejo::Throwaway) -> Script {
         },
         Step::Press { find: Find::named(Role::Button, b"Start") },
         Step::Go { address: Address::Inbox { filter: temper_client_domain::address::Filter::ALL } },
-        inbox_reply(b"@forge_chat Land a small change"),
+        inbox_reply(FORGE_CHAT_REPLY),
     ]);
     Script { steps: steps.into_boxed_slice(), begin: Begin::LinkWithKey }
 }
@@ -506,15 +506,18 @@ pub fn found() -> Script {
         begin: Begin::Token,
         steps: Box::new([
             Step::Go { address: Address::Inbox { filter: temper_client_domain::address::Filter::ALL } },
-            inbox_reply(b"@forge_chat Land a small change"),
+            inbox_reply(FORGE_CHAT_REPLY),
         ]),
     }
 }
+/// The forge chat's reply in the inbox: the chat is task 2, after "Hello", and
+/// the view names each inbox entry by its kind and its source task.
+const FORGE_CHAT_REPLY: &[u8] = b"Reply from T2";
 #[must_use]
-pub fn inbox_reply(task: &[u8]) -> Step<Address> {
+pub fn inbox_reply(entry: &[u8]) -> Step<Address> {
     Step::See {
         find: Find::named(skein_ui::Role::Heading { level: 3 }, b"Reply")
-            .within(Box::new([Target::Role { role: skein_ui::Role::Item, name: task.into() }])),
+            .within(Box::new([Target::Role { role: skein_ui::Role::Item, name: entry.into() }])),
         within: super::WITHIN,
     }
 }
