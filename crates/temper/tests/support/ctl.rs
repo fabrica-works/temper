@@ -4,7 +4,7 @@ use skein_io::kernel::{Complete, Done, Exit, Fd, Op, Pipe, Signal, Spawn, Submit
 use skein_lib::{Duration, Queue, Time, Token, Wall};
 use skein_shell::{Clock, Host};
 use skein_world::{Referee, end_to_end::Streams, real};
-use std::{collections::VecDeque, path::Path};
+use std::{collections::VecDeque, os::unix::ffi::OsStrExt, path::Path};
 
 // The service's output bound also holds the complete tools guide (4,698 bytes).
 const OUTPUT: usize = 65_536;
@@ -215,6 +215,7 @@ enum Action {
 
 pub struct Calls {
     root: Option<Fd>,
+    client: Box<[u8]>,
     output: Option<Fd>,
     reading: bool,
     closing: u32,
@@ -231,9 +232,29 @@ pub struct Calls {
     submit: Queue<Submit>,
 }
 impl Calls {
+    /// Calls against an already running engine, with its printed link on sign-in's stdin.
+    #[must_use]
+    pub fn linked(link: &str, client: &Path) -> Self {
+        assert!(client.is_absolute(), "absolute client directory");
+        let root = skein_shell::open_root(client.parent().expect("client parent")).expect("client root");
+        let mut calls = Self::new(root, Vec::new(), None, None);
+        calls.client = client.as_os_str().as_bytes().into();
+        calls.link = format!("{link}\n").into_bytes();
+        calls
+    }
+    /// Queue another step before this batch runs.
+    pub fn push(&mut self, step: Step) {
+        self.steps.push_back(step);
+    }
+    /// Completed calls, in the order their steps ran.
+    #[must_use]
+    pub fn ends(&self) -> &[Ended] {
+        &self.ends
+    }
     fn new(root: Fd, steps: Vec<Step>, streams: Option<&Streams>, forgejo: Option<u32>) -> Self {
         let mut calls = Self {
             root: Some(root),
+            client: b"client".as_slice().into(),
             output: None,
             reading: false,
             closing: 0,
@@ -300,7 +321,7 @@ impl Calls {
     fn start(&mut self, call: Call, started: bool) {
         let mut args: Vec<Box<[u8]>> = vec![b"ctl".as_slice().into()];
         if call.directory {
-            args.push(b"client".as_slice().into());
+            args.push(self.client.clone());
         }
         args.extend(call.arguments);
         let input = match call.stdin {

@@ -172,17 +172,9 @@ impl Cluster {
     }
     /// Reserve a world root for each member before running the world.
     #[must_use]
-    pub fn members(self) -> (Members, Vec<Member>) {
+    pub fn members(self) -> (Members, Vec<Root>) {
         let count = self.specs.len();
-        let hosts = (0..count)
-            .map(|_| Member {
-                command: None,
-                binary: None,
-                stdout: None,
-                completions: Queue::with_capacity(16),
-                submissions: Queue::with_capacity(16),
-            })
-            .collect();
+        let hosts = (0..count).map(|_| Root::Process(Box::new(Member::idle()))).collect();
         (
             Members {
                 cluster: self,
@@ -198,6 +190,82 @@ impl Cluster {
     }
 }
 
+/// A cluster world root: one described process or the story's client calls.
+pub enum Root {
+    Process(Box<Member>),
+    Client { calls: Option<Box<super::ctl::Calls>>, completions: Queue<Complete>, submissions: Queue<Submit> },
+}
+impl Root {
+    #[must_use]
+    pub fn client() -> Self {
+        Self::Client { calls: None, completions: Queue::with_capacity(0), submissions: Queue::with_capacity(0) }
+    }
+    fn member(&self) -> &Member {
+        let Self::Process(member) = self else { panic!("described process root") };
+        member
+    }
+    fn member_mut(&mut self) -> &mut Member {
+        let Self::Process(member) = self else { panic!("described process root") };
+        member
+    }
+    fn host(&self) -> Option<&dyn Host> {
+        match self {
+            Self::Process(member) => Some(member.as_ref()),
+            Self::Client { calls, .. } => calls.as_deref().map(|c| c as &dyn Host),
+        }
+    }
+    fn host_mut(&mut self) -> Option<&mut dyn Host> {
+        match self {
+            Self::Process(member) => Some(member.as_mut()),
+            Self::Client { calls, .. } => calls.as_deref_mut().map(|c| c as &mut dyn Host),
+        }
+    }
+}
+impl Host for Root {
+    fn iterate(&mut self, now: Time, wall: Wall) {
+        if let Some(host) = self.host_mut() {
+            host.iterate(now, wall);
+        }
+    }
+    fn drain(&mut self) {
+        if let Some(host) = self.host_mut() {
+            host.drain();
+        }
+    }
+    fn completions(&mut self) -> &mut Queue<Complete> {
+        match self {
+            Self::Process(member) => member.completions(),
+            Self::Client { calls: Some(calls), .. } => calls.completions(),
+            Self::Client { completions, .. } => completions,
+        }
+    }
+    fn submissions(&mut self) -> &mut Queue<Submit> {
+        match self {
+            Self::Process(member) => member.submissions(),
+            Self::Client { calls: Some(calls), .. } => calls.submissions(),
+            Self::Client { submissions, .. } => submissions,
+        }
+    }
+    fn work_pending(&self, now: Time) -> bool {
+        self.host().is_some_and(|h| h.work_pending(now))
+    }
+    fn next_deadline(&self) -> Option<Time> {
+        self.host().and_then(Host::next_deadline)
+    }
+    fn next_policy_deadline(&self) -> Option<Time> {
+        self.host().and_then(Host::next_policy_deadline)
+    }
+    fn is_empty(&self) -> bool {
+        self.host().is_none_or(Host::is_empty)
+    }
+    fn worst_case(&self) -> u64 {
+        self.host().map_or(2_097_152, Host::worst_case)
+    }
+    fn operations(&self) -> u32 {
+        self.host().map_or(32, Host::operations)
+    }
+}
+
 /// A world root: waiting, then the described Binary and its output reader, then ended.
 pub struct Member {
     command: Option<Command>,
@@ -205,6 +273,17 @@ pub struct Member {
     stdout: Option<StdoutReader>,
     completions: Queue<Complete>,
     submissions: Queue<Submit>,
+}
+impl Member {
+    fn idle() -> Self {
+        Self {
+            command: None,
+            binary: None,
+            stdout: None,
+            completions: Queue::with_capacity(16),
+            submissions: Queue::with_capacity(16),
+        }
+    }
 }
 impl Host for Member {
     fn iterate(&mut self, now: Time, wall: Wall) {
@@ -341,9 +420,9 @@ impl Members {
     pub fn stopped(&self) -> Option<&[Stopped]> {
         (self.stopping && self.stopped.len() == self.started.len()).then_some(&self.stopped)
     }
-    pub fn act(&mut self, now: Time, hosts: &mut [Member]) {
+    pub fn act(&mut self, now: Time, hosts: &mut [Root]) {
         for &i in &self.started {
-            let binary = hosts[i].binary.as_mut().expect("started member iterated");
+            let binary = hosts[i].member_mut().binary.as_mut().expect("started member iterated");
             let survivors = binary.tree_status().live_at_leader_exit.as_deref().unwrap_or(&[]);
             let timed_out =
                 matches!(&self.states[i], State::Stopping { deadline, killed: false, .. } if now >= *deadline);
@@ -365,7 +444,7 @@ impl Members {
             if let Some(&i) = self.started.iter().rev().find(|&&i| !matches!(self.states[i], State::Ended))
                 && !matches!(self.states[i], State::Stopping { .. })
             {
-                let binary = hosts[i].binary.as_mut().expect("started binary");
+                let binary = hosts[i].member_mut().binary.as_mut().expect("started binary");
                 if binary.exit_status().is_none() {
                     binary.signal(Signal::Terminate);
                 }
@@ -387,7 +466,7 @@ impl Members {
         pending.sort_by_key(|&i| string(&self.cluster.specs[i]["name"]));
         for i in pending {
             let name = string(&self.cluster.specs[i]["name"]);
-            hosts[i].command = Some(self.cluster.command(name));
+            hosts[i].member_mut().command = Some(self.cluster.command(name));
             self.states[i] = State::Starting {
                 deadline: now.saturating_add(Duration::from_secs(READY_SECONDS)),
                 captures: vec![None; list(&self.cluster.specs[i]["ready"]).len()],
@@ -395,9 +474,9 @@ impl Members {
             self.started.push(i);
         }
     }
-    pub fn observe(&mut self, now: Time, hosts: &[Member]) {
+    pub fn observe(&mut self, now: Time, hosts: &[Root]) {
         for &i in &self.started {
-            let host = &hosts[i];
+            let host = hosts[i].member();
             let Some(binary) = &host.binary else { continue };
             let name = string(&self.cluster.specs[i]["name"]);
             assert!(!binary.stderr_overflowed(), "{name}'s stderr exceeded its bound");

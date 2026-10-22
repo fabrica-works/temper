@@ -743,8 +743,8 @@ struct ClusterJudge {
     deadline: skein_lib::Time,
     workers: bool,
 }
-impl skein_world::Referee<support::cluster::Member> for ClusterJudge {
-    fn act(&mut self, now: skein_lib::Time, hosts: &mut [support::cluster::Member]) {
+impl skein_world::Referee<support::cluster::Root> for ClusterJudge {
+    fn act(&mut self, now: skein_lib::Time, hosts: &mut [support::cluster::Root]) {
         if self.members.is_up() {
             if self.workers {
                 for worker in ["w1", "w2"] {
@@ -759,7 +759,7 @@ impl skein_world::Referee<support::cluster::Member> for ClusterJudge {
         }
         self.members.act(now, hosts);
     }
-    fn observe(&mut self, now: skein_lib::Time, hosts: &[support::cluster::Member]) {
+    fn observe(&mut self, now: skein_lib::Time, hosts: &[support::cluster::Root]) {
         self.members.observe(now, hosts);
         if let Some(stopped) = self.members.stopped() {
             if self.workers {
@@ -919,4 +919,210 @@ fn the_cluster_stops_in_reverse_each_exiting_0() {
     let scratch = support::Scratch::new("cluster_reverse_stop");
     cluster_story(scratch.path(), true);
     scratch.remove();
+}
+
+// An open chat's run holds its worker's one slot until the charter's idle threshold.
+// Past the story's deadline, a run that parks has already failed it.
+const CHAT_HOLDS_ITS_SLOT: Duration = support::WITHIN.saturating_mul(2);
+
+// A lost link heals: a stall past the 1 s silence loses it. The worker's contact
+// grace, graces.grace_ms 1000 (temper-service worker_settings.rs:145; jig 8f1acb2
+// worker-link component.rs:629), outlasts two redials (125–250 ms, doubling:
+// backoff.rs:16; profile/small.rs:239); a re-hello clears it (component.rs:455).
+// The engine keeps that channel's attempts adrift for fleet.grace_ms 3000
+// (jig-domain-fleet channel.rs:250); re-hello lists them back (attempt.rs:49),
+// so nothing is placed twice.
+#[test]
+fn a_task_runs_on_each_worker() {
+    let scratch = support::Scratch::new("cluster_each_worker");
+    let cluster = support::cluster::Cluster::read(scratch.path());
+    let engine = cluster.dir("engine").join("config/temper.json");
+    let key = cluster.dir("llm").join("llm.key");
+    let (mut members, hosts) = cluster.members();
+    members.up(&["w1", "w2"]);
+    let clock = skein_shell::Clock::new();
+    let mut world = skein_world::real::World::new(ClusterChatJudge {
+        members,
+        deadline: clock.now().now.saturating_add(support::WITHIN),
+        engine,
+        key,
+        client: scratch.path().join("client"),
+        stage: ClusterChatStage::Start,
+        tasks: Vec::new(),
+        workers: std::collections::BTreeSet::new(),
+    });
+    for host in hosts {
+        world.spawn(|| host);
+    }
+    world.spawn(support::cluster::Root::client);
+    let outcome = world.run(&clock, support::WITHIN);
+    assert!(outcome.procs.iter().all(skein_shell::Host::is_empty), "every cluster root settled");
+    eprintln!("cluster chats settled in {:?}", outcome.end.saturating_since(outcome.start));
+    scratch.remove();
+}
+
+enum ClusterChatStage {
+    Start,
+    Created,
+    Replied,
+    Closed,
+    Stopping,
+}
+struct ClusterChatJudge {
+    members: support::cluster::Members,
+    deadline: skein_lib::Time,
+    engine: std::path::PathBuf,
+    key: std::path::PathBuf,
+    client: std::path::PathBuf,
+    stage: ClusterChatStage,
+    tasks: Vec<String>,
+    workers: std::collections::BTreeSet<String>,
+}
+impl ClusterChatJudge {
+    fn queue(&self, host: &mut support::cluster::Root, calls: Vec<support::ctl::Call>) {
+        let link = format!("http://{}", self.members.capture("engine", "link").expect("engine link"));
+        let mut client = support::ctl::Calls::linked(&link, &self.client);
+        for call in calls {
+            client.push(support::ctl::Step::Run(call));
+        }
+        let support::cluster::Root::Client { calls, .. } = host else { panic!("client root") };
+        *calls = Some(Box::new(client));
+    }
+    fn begin(&mut self, client: &mut support::cluster::Root) {
+        use support::ctl::{Call, PROJECT};
+        let engine: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&self.engine).expect("rendered engine document"))
+                .expect("engine JSON");
+        let charter = engine["engine"]["charters"]
+            .as_array()
+            .expect("charters")
+            .iter()
+            .find(|charter| charter["number"] == engine["application"]["charter"])
+            .expect("chat charter");
+        assert!(
+            Duration::from_millis(charter["waiting_ms"].as_u64().expect("chat waiting_ms")) >= CHAT_HOLDS_ITS_SLOT,
+            "lab/cluster/engine.json: chat charter waiting_ms must hold its slot past the story deadline"
+        );
+        self.queue(
+            client,
+            vec![
+                Call::sign_in(),
+                Call::new(&[
+                    "add-key",
+                    "1",
+                    self.key.to_str().expect("LLM key path"),
+                    "--deployment",
+                    "--key",
+                    "cluster-llm",
+                ]),
+                Call::new(&["wait", "accounts", "--until", "usable"]),
+                Call::new(&["chat", "--project", PROJECT, "--key", "first", "cluster-first-chat", "--json"]),
+            ],
+        );
+        self.stage = ClusterChatStage::Created;
+    }
+}
+impl skein_world::Referee<support::cluster::Root> for ClusterChatJudge {
+    fn act(&mut self, now: skein_lib::Time, hosts: &mut [support::cluster::Root]) {
+        use skein_shell::Host;
+        use support::ctl::{Call, PROJECT, json};
+        let (client, hosts) = hosts.split_last_mut().expect("cluster client root");
+        if self.members.is_up() {
+            if matches!(self.stage, ClusterChatStage::Start) {
+                self.begin(client);
+            } else if client.is_empty() && !matches!(self.stage, ClusterChatStage::Stopping) {
+                let support::cluster::Root::Client { calls, .. } = client else { panic!("client root") };
+                let calls = calls.take().expect("completed cluster calls");
+                for ended in calls.ends() {
+                    assert_eq!(ended.exit, Some(Exit::Code(0)), "ctl: {}", String::from_utf8_lossy(&ended.stderr));
+                }
+                match self.stage {
+                    ClusterChatStage::Created => {
+                        let created = json(calls.ends().last().expect("created chat"));
+                        let task = created["outcome"]["done"]["owner"]["created"]["first"]
+                            .as_u64()
+                            .unwrap_or_else(|| panic!("created chat number: {created}"))
+                            .to_string();
+                        self.queue(
+                            client,
+                            vec![
+                                Call::new(&["wait", "task", &task, "--until", "replied"]),
+                                Call::new(&["task", &task, "--json"]),
+                                Call::new(&["accounts", "--json"]),
+                            ],
+                        );
+                        self.tasks.push(task);
+                        self.stage = ClusterChatStage::Replied;
+                    }
+                    ClusterChatStage::Replied => {
+                        let [_, task, accounts] = calls.ends() else { panic!("reply, task, accounts") };
+                        let (task, accounts) = (json(task), json(accounts));
+                        let run = &task["chip"]["details"]["owner"]["details"];
+                        let channel = run["observation"]["channel"]
+                            .as_u64()
+                            .unwrap_or_else(|| panic!("active chat channel: {task}"));
+                        let hosts = accounts["accounts"]["deployment_facts"]["program_hosts"]
+                            .as_array()
+                            .expect("deployment hosts");
+                        let host = hosts.iter().find(|host| host["channel"] == channel).expect("run's worker");
+                        let worker = host["name"].as_str().expect("worker name");
+                        eprintln!(
+                            "client placement: task {} channel {channel} worker {worker}",
+                            self.tasks.last().expect("chat number")
+                        );
+                        assert!(self.workers.insert(worker.into()), "each chat on its own worker");
+                        if self.tasks.len() == 1 {
+                            self.queue(
+                                client,
+                                vec![Call::new(&[
+                                    "chat",
+                                    "--project",
+                                    PROJECT,
+                                    "--key",
+                                    "second",
+                                    "cluster-second-chat",
+                                    "--json",
+                                ])],
+                            );
+                            self.stage = ClusterChatStage::Created;
+                        } else {
+                            assert_eq!(self.workers.iter().map(String::as_str).collect::<Vec<_>>(), ["w1", "w2"]);
+                            let mut close = Vec::new();
+                            for (task, key) in self.tasks.iter().zip(["close-first", "close-second"]) {
+                                close.push(Call::new(&["close", task, "--key", key]));
+                                close.push(Call::new(&["wait", "task", task, "--until", "ended"]));
+                            }
+                            self.queue(client, close);
+                            self.stage = ClusterChatStage::Closed;
+                        }
+                    }
+                    ClusterChatStage::Closed => {
+                        self.members.stop();
+                        self.stage = ClusterChatStage::Stopping;
+                    }
+                    ClusterChatStage::Start | ClusterChatStage::Stopping => unreachable!("active calls"),
+                }
+            }
+        }
+        self.members.act(now, hosts);
+    }
+    fn observe(&mut self, now: skein_lib::Time, hosts: &[support::cluster::Root]) {
+        let (_, hosts) = hosts.split_last().expect("cluster client root");
+        self.members.observe(now, hosts);
+        if let Some(stopped) = self.members.stopped() {
+            assert_eq!(stopped.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), ["w2", "w1", "engine", "llm"]);
+            for member in stopped {
+                clean_cluster_exit(member);
+            }
+        }
+    }
+    fn next_deadline(&self) -> Option<skein_lib::Time> {
+        Some(self.members.next_deadline().map_or(self.deadline, |at| at.min(self.deadline)))
+    }
+    fn overdue(&self, now: skein_lib::Time) -> Option<String> {
+        (now >= self.deadline && !self.members.passed()).then(|| "cluster chats did not settle within WITHIN".into())
+    }
+    fn passed(&self) -> bool {
+        matches!(self.stage, ClusterChatStage::Stopping) && self.members.passed()
+    }
 }
