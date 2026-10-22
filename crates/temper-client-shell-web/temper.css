@@ -662,7 +662,6 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 }
 @media (max-width: 760px) {
   .temper-accounts-page > :not(.temper-pagebar) { width: calc(100% - 28px); }
-  .temper-accounts-page :is(section, form) { padding: 18px; }
 }
 /* .first-run-panel on a phone: adoption's 16px edges and one field per row. */
 @media (max-width: 600px) {
