@@ -247,6 +247,7 @@ fn census_range() -> Range {
             jig_domain_core::ReadResults { party: 8, after: 0 },
             jig_domain_core::ReadResults { party: 4, after: 0 },
         ]),
+        questions: Box::new([]),
     })
 }
 fn result_key(party: u64, position: u64) -> Key {

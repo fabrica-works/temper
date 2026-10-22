@@ -963,6 +963,9 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // The bounded fixture now supplies the checked owned entry, as serve does:
     // its Forgejo Given, host protocol buffers and bounded plans add 1,194,285,681 B.
     let forgejo_setup_growth = 1_194_285_681;
+    // Jig ed4141db -> 197305b5: bounded open-question facts and their census
+    // reads grow the engine and its owned envelope copies by 886,277,472 B.
+    let open_questions_growth = 886_277_472;
     assert_eq!(
         required.engine_bytes,
         79_659_997_210_050_u64
@@ -985,6 +988,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + amendment_changes_growth
             + fake_adoption_growth
             + forgejo_setup_growth
+            + open_questions_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.

@@ -31,7 +31,7 @@ fn each_root_range_asks_the_store_as_the_table_maps_it() {
         engine::Range::Core(engine::CoreRange::Tasks),
         engine::Range::Core(engine::CoreRange::Calls),
         engine::Range::Core(engine::CoreRange::RunProofs),
-        engine::Range::Census(core::Census { results: Box::new([]) }),
+        engine::Range::Census(core::Census { results: Box::new([]), questions: Box::new([]) }),
         engine::Range::Forge,
         engine::Range::Core(engine::CoreRange::TaskResult { task: 7 }),
         engine::Range::Core(engine::CoreRange::ProposalDecision {
@@ -63,7 +63,7 @@ fn check_range(index: usize, request: store::Request) {
                 core::RestoreRange::Tasks,
                 core::RestoreRange::Core,
                 core::RestoreRange::Core,
-                core::RestoreRange::Census(core::Census { results: Box::new([]) }),
+                core::RestoreRange::Census(core::Census { results: Box::new([]), questions: Box::new([]) }),
             ];
             if index == 2 {
                 assert_eq!(ranges.as_ref(), [core::RestoreRange::Core, core::RestoreRange::Tasks]);
@@ -311,6 +311,7 @@ fn a_filtered_page_that_keeps_nothing_asks_again_from_jigs_cursor() {
 fn a_census_cursor_is_its_index_rows_key_and_interval() {
     let census = core::Census {
         results: Box::new([core::ReadResults { party: 4, after: 0 }, core::ReadResults { party: 8, after: 0 }]),
+        questions: Box::new([]),
     };
     let index = core::Key::Tasks(jig_domain_tasks::Key::Result { party: 8, position: 2 });
     let mut routes = fixtures::routes();

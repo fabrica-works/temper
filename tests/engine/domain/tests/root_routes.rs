@@ -382,7 +382,9 @@ fn a_member_starts_a_chat_and_an_observer_is_refused() {
 }
 
 #[test]
-fn a_person_answers_a_numbered_question_from_their_task() {
+fn a_person_answers_a_question_its_task_has_already_read() {
+    use jig_domain_core::{documents, reads};
+
     let (mut driver, parent) = batch_fixture_with(2, 1);
     let child = call_batch(&mut driver, &parent, 2034, Box::new([report_delegate(b"ask", Box::new([]))]))[0];
     let asker = assigned_task(&driver, child);
@@ -396,6 +398,35 @@ fn a_person_answers_a_numbered_question_from_their_task() {
     let Some(engine::CallAnswer::Sent { message: question }) = driver.answered(2035).cloned() else {
         panic!("numbered question committed")
     };
+    driver.send(protocol::turn(Token::new(7), parent.task, parent.attempt, 1, 1, Some(question), b"read question"));
+    driver.settle();
+    assert!(!live(&driver, parent.task).inbox.iter().any(|word| word.number == question));
+    assert!(driver.store.rows.contains_key(&Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn {
+        task: parent.task,
+        attempt: parent.attempt,
+        turn: 1,
+    }))));
+    driver.send(engine::Event::Party(engine::PartyInput::Read {
+        reply_to: ReplyTo::new(Token::new(2037)),
+        sign_in: driver.session(),
+        read: reads::Read::Inbox {
+            group: reads::Group::Questions,
+            filter: reads::Filter { project: Some(1), goal: None },
+            from: None,
+        },
+    }));
+    driver.settle();
+    let waiting = driver
+        .delivered
+        .iter()
+        .find_map(|delivery| {
+            if let Delivery::Read { answer: reads::Answer::Page(page), .. } = delivery { Some(page) } else { None }
+        })
+        .expect("person's questions inbox");
+    assert!(waiting.rows.iter().any(|row| matches!(row,
+        reads::PageRow::Inbox(entry) if matches!(&entry.task, documents::TaskLink::Live(chip) if chip.number == parent.task)
+            && entry.object == documents::InboxObject::Question { message: question }
+    )));
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
         models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(2036)),
