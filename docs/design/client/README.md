@@ -1150,9 +1150,9 @@ or difference of their amounts (jig's `client/domain/contract.md`,
     "retrying", "waiting for news". A held task's card and a
     delegation's card keep theirs (3.6, 5.7).
 
-  Each carries its phase's status token: a waiting state and a
-  cancelled one are quiet, a running one active, a completed one done,
-  a failed one held.
+  Each carries its phase's status token: a waiting state waiting
+  (`STATUS_WAITING`, the mockup's amber), a cancelled one quiet, a
+  running one active, a completed one done, a failed one held.
 - **The plan:** the goal is not a row of it. Its delegates, the owner
   tree's root's children, are the plan's roots; the goal's state is
   the header's, and its numbers the budget's card's.

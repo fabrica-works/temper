@@ -15,7 +15,7 @@ fn the_looks_names_pass_skeins_check() {
 }
 #[test]
 fn each_style_or_region_is_named_under_temper() {
-    let named: [(skein_ui::Style, &[u8]); 72] = [
+    let named: [(skein_ui::Style, &[u8]); 73] = [
         (BANNER, b"temper-banner"),
         (NAVIGATION, b"temper-navigation"),
         (MAIN, b"temper-main"),
@@ -88,6 +88,7 @@ fn each_style_or_region_is_named_under_temper() {
         (TASK_BUDGET, b"temper-task-budget"),
         (PLAN_SPEND, b"temper-plan-spend"),
         (DEPENDENCIES, b"temper-dependencies"),
+        (STATUS_WAITING, b"temper-status-waiting"),
     ];
     for (style, name) in named {
         assert_eq!(NAMES.style(style), Some(name));
@@ -276,6 +277,7 @@ fn the_task_tokens_stay_on_their_roles() {
         (PLAN_HOLD, Role::List),
         (EVENTS, Role::List),
         (STATUS_DONE, Role::Status),
+        (STATUS_WAITING, Role::Status),
     ] {
         let mut found = false;
         for tree in [view.tree(), &done, &activity, &plan] {

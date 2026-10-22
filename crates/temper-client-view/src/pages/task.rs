@@ -128,27 +128,27 @@ fn requester(b: &mut Builder, by: c::OwnerRequester, me: Option<&c::Me>, words: 
 fn state(b: &mut Builder, state: State, words: &Words) {
     let (name, token) = match state {
         State::Phase(phase) => (phase_word(phase, words), phase_token(phase)),
-        State::WaitingFor(number) => (words.say(Word::WaitingForTask, &[Hole::Number(number)]), look::STATUS_QUIET),
+        State::WaitingFor(number) => (words.say(Word::WaitingForTask, &[Hole::Number(number)]), look::STATUS_WAITING),
         State::WaitingForTasks { count, more } => (
             words.say(
                 if more { Word::WaitingForMoreTasks } else { Word::WaitingForTasks },
                 &[Hole::Number(u64::from(count))],
             ),
-            look::STATUS_QUIET,
+            look::STATUS_WAITING,
         ),
-        State::WaitingForHoldings => (words.say(Word::WaitingForHoldings, &[]), look::STATUS_QUIET),
+        State::WaitingForHoldings => (words.say(Word::WaitingForHoldings, &[]), look::STATUS_WAITING),
         State::WaitingForDelegates(count) => {
-            (words.say(Word::WaitingForDelegates, &[Hole::Number(u64::from(count))]), look::STATUS_QUIET)
+            (words.say(Word::WaitingForDelegates, &[Hole::Number(u64::from(count))]), look::STATUS_WAITING)
         }
-        State::WaitingForYou => (words.say(Word::WaitingForYou, &[]), look::STATUS_QUIET),
+        State::WaitingForYou => (words.say(Word::WaitingForYou, &[]), look::STATUS_WAITING),
         State::WaitingForParty(whom) => {
             let (word, number) = match whom {
                 c::Whom::Person(person) => (Word::WaitingForPerson, person),
                 c::Whom::Role { role, .. } => (Word::WaitingForRole, u64::from(role)),
             };
-            (words.say(word, &[Hole::Number(number)]), look::STATUS_QUIET)
+            (words.say(word, &[Hole::Number(number)]), look::STATUS_WAITING)
         }
-        State::WaitingForNews => (words.say(Word::WaitingForNews, &[]), look::STATUS_QUIET),
+        State::WaitingForNews => (words.say(Word::WaitingForNews, &[]), look::STATUS_WAITING),
         State::Running => (words.say(Word::Running, &[]), look::STATUS_ACTIVE),
         State::Writing => (words.say(Word::Writing, &[]), look::STATUS_ACTIVE),
         State::Tool(tool) => (words.say(Word::RunningTool, &[Hole::Name(tool)]), look::STATUS_ACTIVE),
@@ -194,9 +194,8 @@ fn phase_token(phase: c::Phase) -> skein_ui::Style {
         c::Phase::Done => look::STATUS_DONE,
         c::Phase::Held | c::Phase::Failed => look::STATUS_HELD,
         c::Phase::BackingOff => look::STATUS_RETRYING,
-        c::Phase::Waiting | c::Phase::Idle | c::Phase::Closing | c::Phase::Ended | c::Phase::Cancelled => {
-            look::STATUS_QUIET
-        }
+        c::Phase::Waiting | c::Phase::Idle => look::STATUS_WAITING,
+        c::Phase::Closing | c::Phase::Ended | c::Phase::Cancelled => look::STATUS_QUIET,
     }
 }
 pub(crate) fn asked(b: &mut Builder, task: &c::Task, words: &Words) {

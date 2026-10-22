@@ -147,6 +147,8 @@ pub const TASK_BUDGET: Style = Style { owner: owner(), token: 70 };
 pub const PLAN_SPEND: Style = Style { owner: owner(), token: 71 };
 /// A plan row's dependency line.
 pub const DEPENDENCIES: Style = Style { owner: owner(), token: 72 };
+/// A task waiting on its dependencies, delegates, an answer or news.
+pub const STATUS_WAITING: Style = Style { owner: owner(), token: 73 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -225,6 +227,7 @@ pub const NAMES: Names<'static> = Names {
         b"temper-task-budget",
         b"temper-plan-spend",
         b"temper-dependencies",
+        b"temper-status-waiting",
     ],
     regions: &[b"temper-link"],
 };

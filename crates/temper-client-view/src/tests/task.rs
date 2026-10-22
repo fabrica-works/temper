@@ -411,8 +411,8 @@ const PHASES: [(c::Phase, skein_ui::Style); 14] = [
     (c::Phase::Held, look::STATUS_HELD),
     (c::Phase::Failed, look::STATUS_HELD),
     (c::Phase::BackingOff, look::STATUS_RETRYING),
-    (c::Phase::Waiting, look::STATUS_QUIET),
-    (c::Phase::Idle, look::STATUS_QUIET),
+    (c::Phase::Waiting, look::STATUS_WAITING),
+    (c::Phase::Idle, look::STATUS_WAITING),
     (c::Phase::Closing, look::STATUS_QUIET),
     (c::Phase::Ended, look::STATUS_QUIET),
     (c::Phase::Cancelled, look::STATUS_QUIET),
@@ -939,7 +939,7 @@ fn a_plan_row_says_what_its_task_waits_for() {
         }
         owner_phase(&mut row.chip, c::OwnerChipPhase::Waiting { dependencies, more: *more, holds: *holds });
         let tree = plan_with_row(row);
-        assert_status(&tree, expected, look::STATUS_QUIET);
+        assert_status(&tree, expected, look::STATUS_WAITING);
         assert!(skein_lib::bytes::find(&fixtures::text(&tree), expected).is_some());
     }
 }
@@ -1097,7 +1097,7 @@ fn the_header_says_what_the_task_waits_for() {
     let mut dependencies = List::with_capacity(ONE);
     dependencies.push(DEPENDENCY).expect("dependency");
     task.waits_on = c::WaitsOn::Dependencies { pending: dependencies, count: 1 };
-    assert_status(&header(&task, None), b"waiting on task 17", look::STATUS_QUIET);
+    assert_status(&header(&task, None), b"waiting on task 17", look::STATUS_WAITING);
 }
 
 pub(super) fn dependency_plan() -> Tree {
@@ -1166,7 +1166,7 @@ fn the_header_says_its_exact_wait_and_goal_priority_in_both_shells() {
             let mut builder = Builder::new(&fixtures::tree_limits());
             crate::pages::task::header(&mut builder, &task, Some(&me), &words);
             let tree = builder.finish();
-            assert_status(&tree, expected, look::STATUS_QUIET);
+            assert_status(&tree, expected, look::STATUS_WAITING);
             assert!(fixtures::find(&tree, Role::Paragraph, "Goal · priority 1".as_bytes()).is_some());
         }
         task.waits_on = c::WaitsOn::Delegates;
@@ -1177,7 +1177,7 @@ fn the_header_says_its_exact_wait_and_goal_priority_in_both_shells() {
             details.live_delegates = count;
             let mut builder = Builder::new(&fixtures::tree_limits());
             crate::pages::task::header(&mut builder, &task, Some(&me), &words);
-            assert_status(&builder.finish(), expected, look::STATUS_QUIET);
+            assert_status(&builder.finish(), expected, look::STATUS_WAITING);
         }
     }
 }
