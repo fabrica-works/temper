@@ -542,7 +542,7 @@ mod tests {
             {
                 assert_eq!(*scope, c::Scope::Project(1), "watch is admitted in this task's project");
                 let watching = wire::decode_watching(&record.bytes, &w::CEILINGS).expect("watch record");
-                let w::Watch::Change(subject) = watching.watch();
+                let w::Watch::Change(subject) = watching.watch() else { panic!("change watch") };
                 assert_eq!(subject.task(), TASK, "watch names the page's task");
                 assert_eq!(record.family, FORGE, "forge owns the watch");
                 panel_watch = Some(*watch);

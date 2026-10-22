@@ -42,7 +42,12 @@ pub const fn owner(number: u16) -> Option<Owner> {
     }
 }
 /// Every record's version, served by both ends (client/README.md, 4.6).
-pub const CLIENT_VERSION: u32 = 3;
+pub const CLIENT_VERSION: u32 = 4;
+
+/// The deployment's maximum number of forges (client/README.md, 4.6).
+pub const FORGES: u32 = 16;
+/// The box's maximum setup failure line length (client/README.md, 4.6).
+pub const SET_UP_WHY_BYTES: u32 = 256;
 
 /// The demo's maximum number of suggested requests (client/README.md, 4.6).
 pub const CUES: u32 = 8;
@@ -69,6 +74,10 @@ pub struct Bounds {
 #[must_use]
 pub fn limits(bounds: &Bounds) -> Option<v1::Limits> {
     let limits = v1::Limits {
+        forges_forges: FORGES,
+        set_up_failed_why: SET_UP_WHY_BYTES,
+        connected_login: bounds.field_bytes,
+        stopped_reason: bounds.field_bytes,
         pull_address: ADDRESS_BYTES,
         queued_ahead: TASKS_AHEAD,
         change_panel_owner: bounds.field_bytes,
@@ -100,7 +109,7 @@ pub fn limits(bounds: &Bounds) -> Option<v1::Limits> {
 
 /// Encode the request for jig's keyed record and the client's small store.
 #[must_use]
-pub fn adopt(record: &v1::Adopt) -> Box<[u8]> {
+pub fn requesting(record: &v1::Requesting) -> Box<[u8]> {
     let mut writer = Writer::new(usize::try_from(record.measure()).expect("measured length fits usize"));
     record.encode(&mut writer).expect("measured room");
     writer.finish()
@@ -108,7 +117,7 @@ pub fn adopt(record: &v1::Adopt) -> Box<[u8]> {
 
 /// Encode the outcome for jig's owned record.
 #[must_use]
-pub fn answer(record: &v1::AdoptAnswer) -> Box<[u8]> {
+pub fn answer(record: &v1::Answer) -> Box<[u8]> {
     let mut writer = Writer::new(usize::try_from(record.measure()).expect("measured length fits usize"));
     record.encode(&mut writer).expect("measured room");
     writer.finish()
@@ -187,6 +196,45 @@ pub fn decode_change_panel(bytes: &[u8], limits: &v1::Limits) -> Option<v1::Chan
         && queued.place() == 0
     {
         return None;
+    }
+    Some(record)
+}
+
+/// Decode one complete requesting (client/README.md, 4.6).
+#[must_use]
+pub fn decode_requesting(bytes: &[u8], limits: &v1::Limits) -> Option<v1::Requesting> {
+    let mut reader = Reader::new(bytes);
+    let record = v1::Requesting::decode(limits, &mut reader).ok()?;
+    if !reader.is_empty() {
+        return None;
+    }
+    Some(record)
+}
+
+/// Encode the family's forges (client/README.md, 4.6).
+#[must_use]
+pub fn forges(record: &v1::Forges) -> Box<[u8]> {
+    let mut writer = Writer::new(usize::try_from(record.measure()).expect("measured length fits usize"));
+    record.encode(&mut writer).expect("measured room");
+    writer.finish()
+}
+
+/// Decode one complete forges (client/README.md, 4.6).
+#[must_use]
+pub fn decode_forges(bytes: &[u8], limits: &v1::Limits) -> Option<v1::Forges> {
+    let mut reader = Reader::new(bytes);
+    let record = v1::Forges::decode(limits, &mut reader).ok()?;
+    if !reader.is_empty() {
+        return None;
+    }
+    let mut previous = None;
+    for row in record.forges() {
+        if let Some(number) = previous
+            && number >= row.number()
+        {
+            return None;
+        }
+        previous = Some(row.number());
     }
     Some(record)
 }
