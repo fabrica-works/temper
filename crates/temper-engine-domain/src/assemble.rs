@@ -4,7 +4,6 @@ use crate::boundary::{BriefBody, BriefConnector, BriefKind, BriefSection, ForgeB
 use crate::domain::Domain;
 use crate::limits::{BriefBudgets, Limits};
 use crate::route::forge_route::unheld_run_branch;
-use alloc::boxed::Box;
 use jig_domain_brief as brief;
 use skein_lib::{Env, Id, List, Queue, Token};
 use temper_engine_domain_forge as forge;
@@ -102,7 +101,8 @@ pub(crate) fn numbered_brief_kind(kind: u16) -> ForgeBriefKind {
         1 => ForgeBriefKind::Ci,
         2 => ForgeBriefKind::Reviews,
         3 => ForgeBriefKind::Pull,
-        _ => unreachable!("temper's forge connector uses three section kinds"),
+        4 => ForgeBriefKind::Home,
+        _ => unreachable!("temper's forge connector uses four section kinds"),
     }
 }
 
@@ -113,67 +113,66 @@ pub(crate) fn take_payload(domain: &mut Domain, token: Token) -> Option<Payload>
     Some(payload)
 }
 
-fn explain_home_access(
-    domain: &Domain,
+fn plan_home_access(
+    domain: &mut Domain,
     env: &Env<Limits>,
     task: u64,
     parent: Option<u64>,
     wanted: &mut List<brief::Planned>,
-) {
-    if let Some(row) = domain.core.tasks.task(task)
-        && let Some(home) = domain.forge.home(row.project)
-        && unheld_run_branch(domain, &env.limits, task, home) == Some(true)
-    {
-        let inherited = match parent {
-            Some(parent) => match domain.forge.change(parent) {
-                Some(change) => match change.delegate {
-                    Some((child, _)) => child == task,
-                    None => false,
-                },
+) -> bool {
+    let Some(row) = domain.core.tasks.task(task) else { return true };
+    let Some(home) = domain.forge.home(row.project) else { return true };
+    if unheld_run_branch(domain, &env.limits, task, home) != Some(true) {
+        return true;
+    }
+    let inherited = match parent {
+        Some(parent) => match domain.forge.change(parent) {
+            Some(change) => match change.delegate {
+                Some((child, _)) => child == task,
                 None => false,
             },
             None => false,
-        };
-        if !inherited {
-            for index in 0..wanted.len() {
-                if let Some(brief::Planned::Core { kind: brief::Core::Task, text, .. }) = wanted.get_mut(index) {
-                    append_home_access(text, &home.owner, &home.name, env.limits.brief.budgets.task);
-                }
-            }
+        },
+        None => false,
+    };
+    if inherited {
+        return true;
+    }
+    // Required context takes a slot before optional core context. If every
+    // slot is already required, preparation fails rather than omitting Home.
+    let mut optional = None;
+    for (index, section) in wanted.iter().enumerate() {
+        if !section.required() {
+            optional = Some(index);
         }
     }
-}
-
-fn append_home_access(text: &mut Box<[u8]>, owner: &[u8], repository: &[u8], budget: u32) {
-    let parts: [&[u8]; 14] = [
-        text,
-        b"\n\nThis chat began before ",
-        owner,
-        b"/",
-        repository,
-        b" was adopted, so you can read ",
-        owner,
-        b"/",
-        repository,
-        b" but not push to it. Tell the person, in your next reply: \"This chat began before ",
-        owner,
-        b"/",
-        repository,
-        b" was adopted, so I can read it but not push. Start a new chat to push.\"",
-    ];
-    let mut needed = 0_usize;
-    for part in parts {
-        needed = needed.saturating_add(part.len());
+    if wanted.room() == 0 && optional.is_none() {
+        return false;
     }
-    if needed <= usize::try_from(budget).expect("task byte budget") {
-        let mut words = List::with_capacity(u32::try_from(needed).expect("within task budget"));
-        for part in parts {
-            for byte in part {
-                words.push(*byte).expect("task text within budget");
-            }
-        }
-        *text = words.into_boxed();
+    let source = forge::BriefSource::Home { repository: home.provider };
+    let kind = forge_brief_kind(source);
+    let token = domain
+        .brief_connectors
+        .insert(BriefConnector { task, kind, cutting: false })
+        .expect("reserved connector section room")
+        .token();
+    domain.work.push(Work::Forge(forge::Event::PlanBrief { section: token, source }));
+    let section = brief::Planned::Connector {
+        connector: 0,
+        kind: forge_kind_number(kind),
+        token,
+        size: 0,
+        limit: forge_brief_budget(kind, &domain.limits.brief.budgets),
+        priority: 5,
+        required: true,
+    };
+    if wanted.room() > 0 {
+        wanted.push(section).expect("home section room");
+    } else {
+        *wanted.get_mut(u32::try_from(optional.expect("optional slot")).expect("section index")).expect("section") =
+            section;
     }
+    true
 }
 
 pub(crate) fn finish_brief_plan(
@@ -183,7 +182,10 @@ pub(crate) fn finish_brief_plan(
     parent: Option<u64>,
     mut wanted: List<brief::Planned>,
 ) {
-    explain_home_access(domain, env, task, parent, &mut wanted);
+    if !plan_home_access(domain, env, task, parent, &mut wanted) {
+        domain.work.push(Work::Core(jig_domain_core::Event::BriefAssembled { task, ready: false }));
+        return;
+    }
     if let Some(parent) = parent
         && let Some(row) = domain.forge.change(parent)
         && let Some((child, _)) = row.delegate
@@ -266,6 +268,7 @@ pub(crate) fn finish_brief_plan(
 
 pub(crate) fn forge_brief_kind(source: forge::BriefSource) -> ForgeBriefKind {
     match source {
+        forge::BriefSource::Home { .. } => ForgeBriefKind::Home,
         forge::BriefSource::Ci { .. } => ForgeBriefKind::Ci,
         forge::BriefSource::Reviews { .. } => ForgeBriefKind::Reviews,
         forge::BriefSource::Pull { .. } => ForgeBriefKind::Pull,
@@ -274,6 +277,7 @@ pub(crate) fn forge_brief_kind(source: forge::BriefSource) -> ForgeBriefKind {
 
 pub(crate) fn forge_kind_number(kind: ForgeBriefKind) -> u16 {
     match kind {
+        ForgeBriefKind::Home => 4,
         ForgeBriefKind::Ci => 1,
         ForgeBriefKind::Reviews => 2,
         ForgeBriefKind::Pull => 3,
@@ -282,6 +286,7 @@ pub(crate) fn forge_kind_number(kind: ForgeBriefKind) -> u16 {
 
 pub(crate) fn forge_brief_budget(kind: ForgeBriefKind, budgets: &BriefBudgets) -> u32 {
     match kind {
+        ForgeBriefKind::Home => forge::HOME_SECTION_BYTES,
         ForgeBriefKind::Ci => budgets.ci,
         ForgeBriefKind::Reviews => budgets.reviews,
         ForgeBriefKind::Pull => budgets.pull,
@@ -290,19 +295,42 @@ pub(crate) fn forge_brief_budget(kind: ForgeBriefKind, budgets: &BriefBudgets) -
 
 #[cfg(test)]
 mod tests {
-    use super::append_home_access;
-    use alloc::boxed::Box;
+    use super::{ForgeBriefKind, forge_brief_budget};
+    use temper_engine_domain_forge as forge;
 
     #[test]
-    fn the_home_access_reason_must_fit_the_task_budget_whole() {
-        let original = b"Work in the home";
-        let explained = b"Work in the home\n\nThis chat began before org/repo was adopted, so you can read org/repo but not push to it. Tell the person, in your next reply: \"This chat began before org/repo was adopted, so I can read it but not push. Start a new chat to push.\"";
-        let fits = u32::try_from(explained.len()).expect("fixture byte count");
-        for (budget, expected) in [(fits, explained.as_slice()), (fits - 1, original.as_slice())] {
-            let mut text = Box::from(original.as_slice());
-            append_home_access(&mut text, b"org", b"repo", budget);
-            assert_eq!(text.as_ref(), expected);
-            assert!(text.len() <= usize::try_from(budget).expect("task budget"));
+    fn the_home_section_has_the_adoption_holds_exact_words() {
+        let expected = b"This chat began before org/repo was adopted, so you can read org/repo but not push to it. Tell the person, in your next reply: \"This chat began before org/repo was adopted, so I can read it but not push. Start a new chat to push.\"";
+        assert_eq!(
+            forge::home_access_reason(b"org", b"repo", forge::HOME_SECTION_BYTES),
+            forge::BriefRead::Got { bytes: expected.as_slice().into(), left: 0 },
+        );
+    }
+
+    #[test]
+    fn the_home_section_constant_fits_the_longest_admitted_names() {
+        let mut names = skein_lib::List::with_capacity(forge::PANEL_NAME_BYTES);
+        for _ in 0..forge::PANEL_NAME_BYTES {
+            names.push(b'x').expect("name bound");
         }
+        let names = names.into_boxed();
+        let forge::BriefRead::Got { bytes, left } =
+            forge::home_access_reason(&names, &names, forge::HOME_SECTION_BYTES)
+        else {
+            panic!("home reason")
+        };
+        assert_eq!(left, 0);
+        assert_eq!(bytes.len(), usize::try_from(forge::HOME_SECTION_BYTES).expect("section bytes"));
+        let budgets = crate::BriefBudgets {
+            task: 1,
+            dependencies: 1,
+            ci: 1,
+            reviews: 1,
+            pull: 1,
+            attempts: 1,
+            plan: 1,
+            notes: 1,
+        };
+        assert_eq!(forge_brief_budget(ForgeBriefKind::Home, &budgets), forge::HOME_SECTION_BYTES);
     }
 }

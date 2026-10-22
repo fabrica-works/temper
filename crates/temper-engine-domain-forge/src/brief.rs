@@ -5,6 +5,38 @@ use alloc::boxed::Box;
 use skein_lib::{List, Queue, Token};
 use temper_engine_domain_forge_change as change;
 
+/// The home-access reason's 209 fixed bytes plus three owner/repository pairs.
+/// Adoption bounds each name by `Limits::name_bytes`, whose ceiling is
+/// `PANEL_NAME_BYTES` (1,024 bytes for each owner and repository name).
+pub const HOME_SECTION_BYTES: u32 = 209 + 6 * crate::PANEL_NAME_BYTES;
+
+/// The adoption hold's words (domain/forge.md, section 11), bounded by the
+/// caller's read allotment and the longest admitted names. Omitted bytes follow
+/// the other forge sections' cuts.
+#[must_use]
+pub fn home_access_reason(owner: &[u8], repository: &[u8], bytes: u32) -> BriefRead {
+    let mut words = BriefWords::with_capacity(bytes.min(HOME_SECTION_BYTES), false);
+    let parts: [&[u8]; 12] = [
+        b"This chat began before ",
+        owner,
+        b"/",
+        repository,
+        b" was adopted, so you can read ",
+        owner,
+        b"/",
+        repository,
+        b" but not push to it. Tell the person, in your next reply: \"This chat began before ",
+        owner,
+        b"/",
+        repository,
+    ];
+    for part in parts {
+        append(&mut words, part);
+    }
+    append(&mut words, b" was adopted, so I can read it but not push. Start a new chat to push.\"");
+    brief_part(&words, 1, bytes)
+}
+
 #[derive(Debug)]
 pub(crate) struct BriefFetch {
     owner: Token,
@@ -380,6 +412,10 @@ pub(crate) fn gather(
         return;
     }
     let read = match source {
+        BriefSource::Home { repository } => Some(match domain.repository(repository) {
+            Some(home) if parts > 0 => home_access_reason(&home.owner, &home.name, bytes),
+            Some(_) | None => BriefRead::Failed,
+        }),
         BriefSource::Ci { item, head } => brief_ci(domain, owner, item, head, parts, bytes, max_job_bytes, out),
         BriefSource::Reviews { item, head } => brief_reviews(domain, owner, item, head, parts, bytes, out),
         BriefSource::Pull { item, head } => brief_pull(domain, owner, item, head, parts, bytes, out),

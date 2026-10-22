@@ -65,12 +65,13 @@ pub enum BriefKind {
     Forge(ForgeBriefKind),
 }
 
-/// The forge connector's three brief section kinds.
+/// The forge connector's brief section kinds.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ForgeBriefKind {
     Ci,
     Reviews,
     Pull,
+    Home,
 }
 
 /// Bytes handed to the worker, or why a section was unavailable.

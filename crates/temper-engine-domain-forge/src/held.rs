@@ -118,7 +118,7 @@ fn render(source: BriefSource, text: Box<[u8]>, left: u64, budget: u32) -> Optio
     }
     let tail = match source {
         BriefSource::Ci { .. } => true,
-        BriefSource::Reviews { .. } | BriefSource::Pull { .. } => false,
+        BriefSource::Home { .. } | BriefSource::Reviews { .. } | BriefSource::Pull { .. } => false,
     };
     let mut low = 0_usize;
     let mut high = text.len().min(room);

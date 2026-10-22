@@ -797,7 +797,9 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             };
             let max_job_bytes = match source {
                 crate::BriefSource::Ci { .. } => env.limits.client.answer_bytes.min(ci_budget / 5).max(1),
-                crate::BriefSource::Reviews { .. } | crate::BriefSource::Pull { .. } => 0,
+                crate::BriefSource::Home { .. }
+                | crate::BriefSource::Reviews { .. }
+                | crate::BriefSource::Pull { .. } => 0,
             };
             held::gather(d, section, source, parts, bytes, max_job_bytes, env.limits.brief_bytes, out);
         }

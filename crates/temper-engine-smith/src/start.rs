@@ -44,6 +44,7 @@ pub fn section(section: &engine::BriefSection) -> run::Section {
         engine::BriefKind::Core(brief::Core::Waiting) => b"Waiting",
         engine::BriefKind::Core(brief::Core::NotesIndex) => b"Notes",
         engine::BriefKind::Core(brief::Core::TranscriptTail) => b"Transcript tail",
+        engine::BriefKind::Forge(engine::ForgeBriefKind::Home) => b"Home",
         engine::BriefKind::Forge(engine::ForgeBriefKind::Ci) => b"CI",
         engine::BriefKind::Forge(engine::ForgeBriefKind::Reviews) => b"Reviews",
         engine::BriefKind::Forge(engine::ForgeBriefKind::Pull) => b"Pull request",

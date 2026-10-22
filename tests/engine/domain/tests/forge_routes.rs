@@ -80,10 +80,6 @@ impl World {
         Self::configured_policy(with_read, with_change, silent_ci, passes, paths::Gate::default(), None)
     }
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one fixture configures the policy, fake, and bounds for root forge stories"
-    )]
     fn configured_policy(
         with_read: bool,
         with_change: bool,
@@ -91,6 +87,22 @@ impl World {
         passes: u32,
         gate: paths::Gate,
         documents: Option<jig_domain_core::documents::DocumentLimits>,
+    ) -> Self {
+        Self::configured_brief(with_read, with_change, silent_ci, passes, gate, documents, None)
+    }
+
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one fixture configures the policy, fake, and bounds for root forge stories"
+    )]
+    fn configured_brief(
+        with_read: bool,
+        with_change: bool,
+        silent_ci: bool,
+        passes: u32,
+        gate: paths::Gate,
+        documents: Option<jig_domain_core::documents::DocumentLimits>,
+        brief: Option<engine::BriefLimits>,
     ) -> Self {
         let paths::Gate { approval, agent: agent_gate, owner: owner_gate } = gate;
         let [(bootstrap, mut limits), (config, _)] = std::array::from_fn(|_| {
@@ -117,10 +129,13 @@ impl World {
             if with_change {
                 // One adoption, three chat creations and two Says survive the restart cut.
                 limits.people.requests = 6;
+                // Adoption stories fill the shipped 128-byte Task section.
+                limits.people.words = 128;
+                limits.tasks.message_bytes = 128;
                 limits.call_records = 4;
                 limits.brief.gather = Duration::from_secs(5);
                 limits.brief.read_bytes = 512;
-                // Leave room for the home's access explanation beside the task specification.
+                // Change delegates gather the larger CI and pull fixtures below.
                 limits.brief.budgets.task = 384;
                 limits.brief.budgets.pull = 384;
                 limits.brief.budgets.ci = 384;
@@ -279,6 +294,9 @@ impl World {
                 // A chat's authority is its role's, one level shallower (jig a2616181).
                 config.core.authority = domain;
             }
+            if let Some(brief) = brief {
+                limits.brief = brief;
+            }
             limits.notes.scopes = 3 + limits.authority.grants;
             (config, limits)
         });
@@ -314,7 +332,12 @@ impl World {
         if let Some(documents) = documents {
             limits.documents = paths::document_limits(documents, &limits);
         }
-        let store = temper_engine_domain_world::fixtures::restored_store(bootstrap, &limits);
+        // Keep the world's broad page bounds and align its message codec with the root.
+        let mut store_limits = temper_engine_domain_world::store::widest();
+        store_limits.people.words = limits.people.words;
+        store_limits.tasks.message_bytes = limits.tasks.message_bytes;
+        let store =
+            temper_engine_domain_world::fixtures::restored_over(Store::with_limits(&store_limits), bootstrap, &limits);
         Self {
             creating: jig_core_world::fixtures::Creating::new(&config.core, limits.tasks.tree_tasks),
             root: engine::Domain::new(config, &limits).expect("valid engine configuration"),
@@ -372,16 +395,25 @@ impl World {
         assert!(self.store.pending.is_empty(), "the chosen cut resolves store uncertainty first");
         assert!(self.pending.is_empty(), "old API terminals are drained at this cut");
         let mut fresh = if self.owner_gate {
-            Self::configured_policy(
+            Self::configured_brief(
                 with_read,
                 with_change,
                 false,
                 0,
                 paths::Gate { owner: true, ..paths::Gate::default() },
                 None,
+                Some(self.env.limits.brief),
             )
         } else {
-            Self::configured(with_read, with_change)
+            Self::configured_brief(
+                with_read,
+                with_change,
+                false,
+                1000,
+                paths::Gate::default(),
+                None,
+                Some(self.env.limits.brief),
+            )
         };
         std::mem::swap(&mut self.root, &mut fresh.root);
         std::mem::swap(&mut self.out, &mut fresh.out);
@@ -2253,7 +2285,7 @@ fn a_broken_landing_branch_gets_one_deployment_repair_before_waiting_changes_lan
 }
 
 fn adoption_chat(world: &World) -> people::Ask {
-    let people::Ask::Create { project, mut batch } = world.chat(1, b"Work in the home") else { unreachable!() };
+    let people::Ask::Create { project, mut batch } = world.chat(1, &[b'x'; 128]) else { unreachable!() };
     // Three standing chats share the owner's 500-unit allotment; each run reserves at most 60.
     batch[0].budget = people::Budget::AsAllowed { cap: Some(100) };
     people::Ask::Create { project, batch }
@@ -2341,7 +2373,11 @@ fn task_brief(assignment: &engine::Assignment) -> &[u8] {
 
 #[test]
 fn a_chat_made_before_its_home_was_adopted_reads_the_home_and_says_why() {
-    let mut world = World::configured(true, true);
+    let small = temper_service::limits::profile(temper_service::limits::Profile::Small);
+    let mut world =
+        World::configured_brief(true, true, false, 1000, paths::Gate::default(), None, Some(small.root.brief));
+    assert_eq!(world.env.limits.brief.budgets.task, 128);
+    assert_eq!(world.env.limits.brief.brief_bytes, 384);
     world.sign_in();
     world.send(protocol::hello_slots(Token::new(7), 2, Box::new([])));
     let mut chats = Vec::new();
@@ -2349,6 +2385,13 @@ fn a_chat_made_before_its_home_was_adopted_reads_the_home_and_says_why() {
         let ask = adoption_chat(&world);
         let assignment = assigned_chat(&mut world, key, ask);
         assert!(live_task(&world, assignment.task).holdings.is_empty(), "no home exists to hold");
+        assert_eq!(task_brief(&assignment).len(), 128, "full task section before adoption");
+        assert!(
+            !assignment
+                .sections
+                .iter()
+                .any(|section| section.kind == engine::BriefKind::Forge(engine::ForgeBriefKind::Home))
+        );
         park_chat(&mut world, &assignment);
         chats.push(assignment);
     }
@@ -2370,13 +2413,15 @@ fn a_chat_made_before_its_home_was_adopted_reads_the_home_and_says_why() {
         let [home] = assignment.workspace.repositories.as_ref() else { panic!("one home checkout") };
         assert_eq!(home.provider, forge_world::REPO);
         assert_eq!(home.push, None);
-        let text = task_brief(&assignment);
-        assert!(
-            text.windows(reason.len()).any(|words| words == reason),
-            "task text: {:?}",
-            String::from_utf8_lossy(text)
-        );
-        assert!(text.len() <= usize::try_from(world.env.limits.brief.budgets.task).expect("task budget"));
+        assert_eq!(task_brief(&assignment), task_brief(chat), "the person's task text is unchanged");
+        assert_eq!(task_brief(&assignment).len(), 128, "full shipped task budget");
+        let home_sections: Vec<_> = assignment
+            .sections
+            .iter()
+            .filter(|section| section.kind == engine::BriefKind::Forge(engine::ForgeBriefKind::Home))
+            .collect();
+        assert_eq!(home_sections.len(), 1, "one required Home section");
+        assert_eq!(home_sections[0].body, engine::BriefBody::Text(reason.as_slice().into()));
         assert_eq!(live_task(&world, chat.task).hold, 0, "the chat was never held for Effects");
         assert!(live_task(&world, chat.task).holdings.is_empty(), "read access acquires no holding");
         park_chat(&mut world, &assignment);
@@ -2394,7 +2439,12 @@ fn a_chat_made_before_its_home_was_adopted_reads_the_home_and_says_why() {
         ])));
     let [home] = assignment.workspace.repositories.as_ref() else { panic!("one writable home checkout") };
     assert_eq!(home.push.as_deref(), Some(branch.as_slice()));
-    assert!(!task_brief(&assignment).windows(reason.len()).any(|words| words == reason));
+    assert!(
+        !assignment
+            .sections
+            .iter()
+            .any(|section| section.kind == engine::BriefKind::Forge(engine::ForgeBriefKind::Home))
+    );
 }
 
 #[test]

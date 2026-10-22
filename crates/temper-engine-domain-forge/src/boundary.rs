@@ -28,6 +28,8 @@ pub enum BriefSource {
     Reviews { item: BriefItem, head: BriefCommit },
     /// A pull request against its base at a pinned head.
     Pull { item: BriefItem, head: BriefCommit },
+    /// Why a task reads its project's adopted home without pushing.
+    Home { repository: skein_forge::api::Repository },
 }
 
 /// The connector's bounded section, or a failed gather.

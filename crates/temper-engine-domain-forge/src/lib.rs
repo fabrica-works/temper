@@ -31,7 +31,7 @@ mod settle;
 mod tests;
 mod topics;
 pub use boundary::*;
-pub use brief::hex;
+pub use brief::{HOME_SECTION_BYTES, hex, home_access_reason};
 pub use domain::{Domain, fire, max_out, resume, step, writer};
 pub use gates::{GateCandidate, GateLast, GatePattern, GatePolicy, GateTemplate};
 pub use judge::{Criterion, Freshness as JudgeFreshness, Judges, Reviewer, Verdict as JudgeVerdict};

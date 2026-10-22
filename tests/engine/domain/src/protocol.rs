@@ -23,7 +23,7 @@ pub fn bounds() -> host::Bounds {
         waiting: Duration::from_secs(60),
         // Checks finish within a changing charter's reserved time.
         checks: Duration::from_secs(10),
-        message_bytes: 64,
+        message_bytes: 128,
         inbox: 4,
         unacknowledged: 8,
     }
