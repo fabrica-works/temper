@@ -378,40 +378,60 @@ sources in its holder's order. temper configures the LLM providers
   another. Its validity
   is unbounded (`Duration` at its largest, as jig's reference service
   gives its credential): Forgejo's tokens do not expire.
-- **On GitHub:** a list of entries, one per accepted installation, each
-  the installation's account id and login, a token and its expiry, built
-  from the forge component's `Event::GitToken` and held in memory only.
-  The component mints each token with the App's key, for contents alone,
-  `renew_before` ahead of the previous one's expiry (skein's
+- **On GitHub:** a list of entries, one per installation that has a
+  token, each the installation's account id and login and its token,
+  built from the forge component's `Event::GitToken { forge,
+  installation, account, token, expires }` and held in memory only, by
+  installation. The component mints each token with the App's key, for
+  contents alone, for every accepted installation that is present and
+  not suspended, and again `renew_before` ahead of its expiry (skein's
   `forge-connection.md`). The login is `x-access-token`; the author
   defaults to the App's bot, `<slug>[bot]` with
   `<id>+<slug>[bot]@users.noreply.github.com`, `<slug>` the `AppSlug`
   record's and `<id>` the `User` record's. The value's validity is the
-  earliest expiry among its tokens, minus now.
+  earliest expiry among its tokens, minus now, and zero once that has
+  passed; a list with no entry is valid without bound, as Forgejo's
+  value is.
+- **A GitHub forge's entries change** on its events, in the routing:
+  a `GitToken` puts its installation's entry, replacing the one before;
+  an `Installation` change `Deleted` or `Suspended`, or an installation
+  no longer accepted, takes its entry out, when it has one. A forge that
+  stops keeps its entries, which lapse with the value's validity; a
+  forge connected again replaces them as its new tokens come.
 - **Generations.** Each start gives each identity that has a value
   generation 1. Each change of value makes the next generation, strictly
   increasing per number: a Forgejo forge's `GitToken` replaced; on
-  GitHub, each token renewed and each installation accepted or removed.
-  With N accepted installations, a GitHub forge's identity takes about N
-  generations an hour, each one `Event::Credential` to the live attempts
-  holding it. A generation is never kept.
+  GitHub, each change of its entries. With N accepted installations, a
+  GitHub forge's identity takes about N generations an hour, each one
+  `Event::Credential` to the live attempts holding it. A generation is
+  never kept.
 - **The order:** the routing puts each value in the identities' table,
   then gives the root `Event::Credential { number, generation, valid }`
   (jig's `domain/engine.md`, 12.1; `../domain/root.md`, 7.1). At start,
-  each identity with a value is announced before the root's restart, so
-  it is usable when decisions open; a GitHub forge's is announced when
-  its first tokens are minted.
+  each Forgejo identity with a value is announced before the root's
+  restart, so it is usable when decisions open. A GitHub forge's entries
+  gathered before its first `Connected` since the start make no
+  generation: that `Connected` announces generation 1, holding every
+  token the component handed up before it, which is one per accepted
+  installation it could mint for, so that no run starts on a partial
+  list. Each change after it announces the next. Until generation 1, a
+  run that needs the identity waits (jig's `domain/engine.md`, 12.1).
 - **The identities' table, on the engine:** each identity's two newest
   values, by number and generation, each encoded once by
   `temper-protocol-worker-wire` and held as one secret; the value server
-  answers either. No root, record of the main store, fact or log ever
-  holds a value.
+  answers either. A grant of an older generation is left out as it is
+  encoded, and the newer one follows it (jig's `protocol/channel.md`,
+  section 8). The table is temper's own: jig's accounts' table holds LLM
+  credentials' schemes alone. No root, record of the main store, fact or
+  log ever holds a value.
 - **The value's codec,** engine to worker, is temper's, versioned
   (channel.md, section 6): a kind holding Forgejo's one token or GitHub's
   list, with the login and the author. It is never stored.
 - **Granted with the assignment.** temper's assignment names the
-  identity's number in each workspace item that names a repository, with
-  the account id of the repository's owner; jig pushes an attempt only
+  identity's number in each workspace item that names a repository, and
+  on GitHub the account id of the entry whose account login is the
+  repository's owner, compared in ASCII without case, as the routing
+  last made the value (channel.md, sections 4 and 6); jig pushes an attempt only
   the credential numbers its workspace names. `jig-protocol-engine-workers`
   fills the value in from the identities' table, through the routing, as
   it encodes the assignment or a grant record, and grants follow their
@@ -425,7 +445,7 @@ sources in its holder's order. temper configures the LLM providers
   operation that names it, for git's HTTPS transport, and the component
   holds it only while that operation is in flight; it never reads the
   table itself (git.md, sections 2 and 5). On GitHub the worker picks the
-  entry whose account id is the repository's owner's; with none, the
+  entry whose account id is the item's; with none, the
   push is refused, named "temper's App is not installed on the account
   owning <name>" (channel.md, section 6).
   An operation whose identity has no value in the table fails `Broken`
@@ -608,6 +628,13 @@ sources in its holder's order. temper configures the LLM providers
   and the cluster restarted whole (README, 15.4); a fleet whose workers
   outlive the engine waits for generations kept across starts, with
   hosts apart (README, section 14).
+- **A GitHub entry chosen by the owner's id.** The routing matches a
+  repository to an entry by its owner's login, since an adopted
+  repository keeps no owner's id, so an account renamed after adoption
+  matches no entry, and its pushes are refused as not installed.
+  Default: the login; keeping the owner's id at adoption (the store's
+  `Adopted`, from the forge's read) would let the routing match the
+  entry's `account` directly.
 - **Rows of a forge not configured.** Default: left as they are and
   named once in the log at start; erasing them waits for a request that
   disconnects a forge.

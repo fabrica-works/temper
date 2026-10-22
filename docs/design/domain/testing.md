@@ -344,8 +344,15 @@ in the lower world that owns it, never here.
        repaired;
     5. an approval rule waiting on a person, then the App on the bypass
        list;
-    6. an installation's token renewed mid-run, git's generation
-       changing under it;
+    6. git on GitHub's tokens: a chat's clone and push on a GitHub
+       repository, each authenticated by its installation's token
+       (`x-access-token`), which the layer's git route checks (skein's
+       `fake-forge.md`, section 10); the token renewed mid-run, git's
+       generation changing under it, and the next push authenticated
+       by the renewed token, as the layer's record of its git calls
+       shows; a repository of an account with no installation refused
+       as not installed, without a git call
+       (../protocol/credentials.md, section 4);
     7. a repository granted on GitHub appearing in the picker;
     8. Forgejo connected, managed and owned from the client; its code
        waits for jig's request carrying a value and a jig

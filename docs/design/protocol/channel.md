@@ -218,7 +218,7 @@ record Identity { kind: Kind  login: text  name: text  email: text }
 enum   Kind     { forgejo: Token, github: Entries }
 record Token    { token: secret }
 record Entries  { entries: list Entry }
-record Entry    { account: u64  account_login: text  token: secret  expires: u64 }
+record Entry    { account: u64  account_login: text  token: secret }
 ```
 
 - **Versioned twice:** by `PAYLOAD_VERSION` (section 3), and by its
@@ -226,11 +226,14 @@ record Entry    { account: u64  account_login: text  token: secret  expires: u64
   a token.
 - **Forgejo's** is one token, the forge's `GitToken` record, with the
   bot's login, the `User` record's (credentials.md, 2.1 and section 4).
-- **GitHub's** is a list of entries, one per accepted installation, at
-  most `forges.installations` (configuration.md, section 7): the
-  installation's account id and login, its token, and the token's
-  expiry. The tokens are those the GitHub forge mints, held in memory
-  only and never stored; the login is `x-access-token`.
+- **GitHub's** is a list of entries, one per installation with a
+  token, at most `forges.installations` (configuration.md, section 7),
+  in the order of their installations' ids: the installation's account
+  id and login, and its token. The tokens are those the GitHub forge
+  mints, held in memory only and never stored; the login is
+  `x-access-token`. No entry carries its expiry: the grant's validity,
+  the earliest of them, bounds the value whole (credentials.md, section
+  4).
 - **Its other fields** are configuration's or the forge's defaults
   (configuration.md, section 3): the login, and the author's name and
   email, by default on GitHub the bot's, `<slug>[bot]` and
@@ -240,9 +243,10 @@ record Entry    { account: u64  account_login: text  token: secret  expires: u64
   newline, `<` or `>`.
 - **Generations.** Each change of value is a new generation, strictly
   increasing per number: a Forgejo forge's `GitToken` replaced; on
-  GitHub, each token minted or renewed and each installation accepted,
-  deleted, suspended or unsuspended (forge.md, 2.5). Generation 1 at
-  each start.
+  GitHub, each change of its entries, a token minted or renewed, or an
+  installation deleted, suspended or no longer accepted (forge.md, 2.5).
+  Generation 1 at each start, on GitHub at the forge's first
+  `Connected` (credentials.md, section 4).
 - **On the engine:** the routing encodes the value at start and at each
   new generation into the identities' table, as one secret held by
   number and generation, the two newest kept (credentials.md, section
