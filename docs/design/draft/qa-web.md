@@ -117,8 +117,13 @@ fixtures, its tree made a page by skein-ui-web with temper's look, beside
 - **Held to the live page:** each page with a live scene checks that the
   gallery's outline is the live one's (8.2).
 
-It is an ignored test on o/web-look's tool branch today; W1 needs it on
-main, as a program the subject's build carries (section 11).
+It is `temper-gallery`, a program of temper's workspace
+(`../client/browser.md`, section 7): `cargo run -p temper-gallery --
+OUT` prints each state's page as `OUT/NAME.html`, the bundle's
+stylesheets under `OUT/bundle/` and an index. Its names are
+`tools/gallery/names.txt`, which a scene names its state by. It draws
+at the shipped client limits, so a page shows the windows a person's
+browser shows.
 
 ### 3.3 Live scenes
 
