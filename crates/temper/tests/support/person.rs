@@ -74,6 +74,29 @@ pub fn answered_chat(words: &[u8], answer: &[u8]) -> Script {
         ]),
     }
 }
+/// Observe a ctl-started sign-in through the same person's served accounts page.
+#[must_use]
+pub fn signed_in_account(signing: &[u8], name: &[u8]) -> Script {
+    use skein_ui::Role;
+    // jig's translate.rs:124 leaves the signed-in display empty; follow it when jig carries one.
+    let card = format!("ChatGPT · OpenAI · held by {}", String::from_utf8_lossy(name));
+    Script {
+        begin: Begin::Token,
+        steps: Box::new([
+            Step::Go { address: Address::Accounts },
+            Step::See { find: Find::exactly_named(Role::Status, signing), within: START_WITHIN },
+            Step::See { find: Find::exactly_named(Role::Region, card.as_bytes()), within: START_WITHIN },
+            Step::See {
+                find: Find::text("ChatGPT sign-in · Ready".as_bytes()).within(Box::new([Target::Role {
+                    role: Role::Region,
+                    name: card.into_bytes().into_boxed_slice(),
+                }])),
+                within: START_WITHIN,
+            },
+            Step::See { find: Find::exactly_named(Role::Status, b"Signed in; account 1"), within: START_WITHIN },
+        ]),
+    }
+}
 /// Signs in by the printed link, no key added: the demo's seed added it.
 /// Asks `cue` in a new chat, task `task`, then sees the text and the task's report.
 #[must_use]
@@ -222,6 +245,23 @@ impl Person {
         let mut person = Self::build(root, None, None, Script { begin: Begin::Token, ..script });
         person.directory = b"client".as_slice().into();
         person
+    }
+    /// Hold the native observer until ctl supplies its identity and the expected page words.
+    #[must_use]
+    pub fn waiting_for_observation(root: Fd) -> Self {
+        let mut person = Self::waiting_for_ctl(root, Script { begin: Begin::Token, steps: Box::new([]) });
+        // Accounts belongs to the person and needs no project selection.
+        person.project = ProjectSelection::Selected;
+        person
+    }
+    pub fn observe(&mut self, link: &[u8], script: Script) {
+        assert!(self.client.is_none(), "observation starts once");
+        self.actor = skein_fake_person::Person::new(script.steps);
+        self.ctl_ready(link);
+    }
+    #[must_use]
+    pub fn steps_seen(&self) -> u32 {
+        self.actor.at()
     }
     pub fn ctl_ready(&mut self, link: &[u8]) {
         assert!(self.bytes.is_empty(), "one handover from ctl");

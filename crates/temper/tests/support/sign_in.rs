@@ -270,6 +270,7 @@ pub fn run(directory: &Path, issuer: oauth::Peer) {
 }
 
 struct AnswerJudge {
+    observing: bool,
     visited: bool,
     stopped: bool,
     settled: bool,
@@ -278,8 +279,8 @@ struct AnswerJudge {
 impl Referee<Process> for AnswerJudge {
     fn act(&mut self, _now: Time, procs: &mut [Process]) {
         let Process::Calls(calls) = &procs[1] else { panic!("ctl calls") };
-        if !self.visited
-            && let [_, me, connected, pending, ..] = calls.ends()
+        if !self.observing
+            && let [_, me, _, pending, ..] = calls.ends()
         {
             let party = ctl::json(me)["party"]["number"].as_u64().expect("signed-in person");
             let pending = ctl::json(pending);
@@ -288,12 +289,31 @@ impl Referee<Process> for AnswerJudge {
             };
             assert_eq!(signing["provider"], 1);
             assert_eq!(signing["holder"]["party"], party);
+            let signing = format!(
+                "Sign-in in progress: source {} · LLM provider 1 · Person {party}",
+                signing["source"].as_u64().expect("signing source")
+            );
+            let me = ctl::json(me);
+            assert_eq!(me["party"]["name"]["cut"], false, "person's full name");
+            let name = me["party"]["name"]["bytes"].as_str().expect("person's name");
+            let link = calls.link().to_vec();
+            let Process::Person(person) = &mut procs[5] else { panic!("native observer") };
+            person.observe(&link, super::person::signed_in_account(signing.as_bytes(), name.as_bytes()));
+            self.observing = true;
+        }
+        let Process::Person(person) = &procs[5] else { panic!("native observer") };
+        assert!(person.failed.is_none(), "{:?}", person.failed);
+        // Go and See must finish before authorization can complete the sign-in.
+        const SIGNING_SEEN: u32 = 2;
+        if !self.visited && self.observing && person.steps_seen() >= SIGNING_SEEN {
+            let Process::Calls(calls) = &procs[1] else { panic!("ctl calls") };
+            let connected = &calls.ends()[2];
             let address = connected
                 .stdout
                 .split(|byte| *byte == b'\n')
                 .find(|line| line.starts_with(b"http://127.0.0.1:"))
-                .expect("connect prints the address");
-            let address = address.to_vec();
+                .expect("connect prints the address")
+                .to_vec();
             let Process::Visitor(visitor) = &mut procs[3] else { panic!("browser") };
             visitor.hand(&address);
             self.visited = true;
@@ -308,7 +328,8 @@ impl Referee<Process> for AnswerJudge {
                 String::from_utf8_lossy(&ended.stdout)
             );
         }
-        if !self.stopped && calls.ends().len() == ANSWER_CALLS {
+        let Process::Person(person) = &procs[5] else { panic!("native observer") };
+        if !self.stopped && calls.ends().len() == ANSWER_CALLS && person.finished {
             let Process::Binary(binary) = &mut procs[0] else { panic!("temper") };
             binary.signal(Signal::Terminate);
             for proc in procs {
@@ -329,7 +350,16 @@ impl Referee<Process> for AnswerJudge {
         let Process::Binary(binary) = &procs[0] else { panic!("temper") };
         assert!(self.stopped || binary.exit_status().is_none(), "serve: {}", String::from_utf8_lossy(binary.stderr()));
         self.settled = self.stopped && procs.iter().all(Host::is_empty);
-        assert!(now < self.deadline || self.settled, "signed-in chat did not settle");
+        let Process::Person(person) = &procs[5] else { panic!("native observer") };
+        let Process::Calls(calls) = &procs[1] else { panic!("ctl calls") };
+        assert!(
+            now < self.deadline || self.settled,
+            "signed-in chat did not settle: observer step {}, finished {}, visited {}, calls {}",
+            person.steps_seen(),
+            person.finished,
+            self.visited,
+            calls.ends().len()
+        );
     }
     fn next_deadline(&self) -> Option<Time> {
         (!self.settled).then_some(self.deadline)
@@ -369,6 +399,7 @@ pub fn answered(directory: &Path, issuer: oauth::Peer) {
     let root = skein_shell::open_root(directory).expect("scratch root");
     fds.push(root);
     let mut world = real::World::new(AnswerJudge {
+        observing: false,
         visited: false,
         stopped: false,
         settled: false,
@@ -405,6 +436,10 @@ pub fn answered(directory: &Path, issuer: oauth::Peer) {
     world.spawn(|| Process::Issuer(Box::new(issuer)));
     world.spawn(|| Process::Visitor(Box::default()));
     world.spawn(|| Process::Peer(Box::new(peer)));
+    let observer_root = skein_shell::open_root(directory).expect("observer's scratch root");
+    world.spawn_with_fds(vec![observer_root], || {
+        Process::Person(Box::new(super::person::Person::waiting_for_observation(observer_root)))
+    });
     let outcome = world.run(&clock, super::WITHIN);
     let Process::Calls(calls) = &outcome.procs[1] else { panic!("ctl calls") };
     let [_, me, _, _, _, ready, _, conversation] = calls.ends() else { panic!("signed-in chat calls") };
