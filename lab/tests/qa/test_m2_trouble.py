@@ -103,4 +103,4 @@ class TroubleQA(unittest.TestCase):
         self.assertEqual({r['fail'] for r in rows if 'fail' in r},
                          {'browser/exception/chats', 'browser/exception/accounts'})
         self.assertTrue(any('undecided' in r for r in rows), rows)
-        self.assertEqual(result.returncode, 2, (result.stderr, rows))
+        self.assertEqual(result.returncode, 1, (result.stderr, rows))

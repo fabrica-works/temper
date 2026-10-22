@@ -558,8 +558,8 @@ live collection `hand`, `/bin/cp -R -- {dir.hand}/. {collect.dir}/.`.
 - **Left out:** the entries whose `during` is `sign-in`, the seed's
   calls.
 - **Statuses** (skein's `lab.md`, 7.2): 0 with no entry left; 1 with
-  one; 2, undecided, when the log is missing or a line unreadable, its
-  failures printed beside.
+  one, an unreadable line's `undecided` printed beside it; 2, undecided,
+  when the log is missing, or a line is unreadable and no entry is left.
 - **The codec's table is copied** into the check, which names its
   source: `docs/design/client/browser.md`, 2.3, and the codec,
   `crates/temper-client-domain/src/address.rs` (`Address`, its `path`
