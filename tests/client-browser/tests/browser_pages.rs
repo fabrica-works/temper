@@ -8,7 +8,7 @@ use skein_fake_person_browser::{
     stories::{self, Shown},
 };
 use skein_ui::Role;
-use temper_client_browser_world::{ABSENT, FIRST_CHAT, FIRST_CHAT_ADDRESS, Tier, WITHIN};
+use temper_client_browser_world::{ABSENT, FIRST_CHAT, FIRST_CHAT_ADDRESS, Tier, WITHIN, first_chat};
 
 #[test]
 fn back_then_forward_returns_to_the_chat() {
@@ -16,7 +16,7 @@ fn back_then_forward_returns_to_the_chat() {
     let mut started = Script::new(temper_client_browser_world::start_chat(b"Hello").into_boxed_slice());
     assert_eq!(Harness::new(tier.setup()).run(&mut [&mut started]), Outcome::Done, "the chat to return to");
     let chats = Shown { address: b"/chats", sees: Find::exactly_named(Role::Heading { level: 1 }, b"Chats") };
-    let chat = Shown { address: FIRST_CHAT_ADDRESS, sees: Find::exactly_named(Role::Heading { level: 1 }, FIRST_CHAT) };
+    let chat = Shown { address: FIRST_CHAT_ADDRESS, sees: first_chat(b"Hello") };
     assert_eq!(stories::back_and_forward(&tier.setup(), chats, chat, tier.states().live), Outcome::Done);
 }
 
@@ -49,9 +49,8 @@ fn enter_starts_one_chat_keeping_a_shift_enter_break() {
         Step::KeyWithShift(Key::Enter),
         Step::Type { find: composer(), words: Box::from(b"there".as_slice()) },
         Step::Key(Key::Enter),
-        see(Find::exactly_named(Role::Heading { level: 1 }, FIRST_CHAT)),
+        see(first_chat(b"Hello")),
         Step::Address(Box::from(FIRST_CHAT_ADDRESS)),
-        see(Find::exactly_named(Role::Paragraph, b"Hello")),
         chats(),
         see(Find::exactly_named(Role::Link, FIRST_CHAT)),
         Step::Person(PersonStep::Gone { find: Find::exactly_named(Role::Link, b"Chat 2"), within: ABSENT }),

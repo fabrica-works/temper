@@ -19,7 +19,7 @@ mod forgery;
 pub const WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(5);
 /// How long a story watches for what a page must not show.
 pub const ABSENT: skein_lib::Duration = skein_lib::Duration::from_secs(1);
-/// The heading of the first chat a story starts.
+/// The first chat's link on the Chats page.
 pub const FIRST_CHAT: &[u8] = b"Chat 1";
 /// Its address.
 pub const FIRST_CHAT_ADDRESS: &[u8] = b"/chats/1";
@@ -62,7 +62,12 @@ pub fn bundle() -> PathBuf {
     );
     path.canonicalize().expect("absolute bundle")
 }
-/// From a signed-in page, start the first chat with `words` and see it.
+/// The heading of the first chat a story starts: its number and its first line, `title`.
+#[must_use]
+pub fn first_chat(title: &[u8]) -> Find {
+    Find::exactly_named(Role::Heading { level: 1 }, &[b"T1 \xc2\xb7 ".as_slice(), title].concat())
+}
+/// From a signed-in page, start the first chat with `words`, one line, and see it titled by them.
 #[must_use]
 pub fn start_chat(words: &[u8]) -> Vec<Step> {
     let see = |find| Step::Person(PersonStep::See { find, within: WITHIN });
@@ -73,7 +78,7 @@ pub fn start_chat(words: &[u8]) -> Vec<Step> {
         see(composer()),
         Step::Person(PersonStep::Type { find: composer(), words: Box::from(words) }),
         Step::Person(PersonStep::Press { find: Find::exactly_named(Role::Button, b"Start") }),
-        see(Find::exactly_named(Role::Heading { level: 1 }, FIRST_CHAT)),
+        see(first_chat(words)),
     ]
 }
 fn live() -> Find {

@@ -29,8 +29,9 @@ fn inbox() -> Find {
 fn composer() -> Find {
     Find::exactly_named(Role::TextArea, b"Start a chat")
 }
+/// The first chat's heading, whatever its title.
 fn chat() -> Find {
-    Find::exactly_named(Role::Heading { level: 1 }, FIRST_CHAT)
+    Find::named(Role::Heading { level: 1 }, b"T1 \xc2\xb7 ")
 }
 fn played(setup: Setup<'_>, steps: Vec<Step>) {
     let mut script = Script::new(steps.into_boxed_slice());

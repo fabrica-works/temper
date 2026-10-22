@@ -77,7 +77,8 @@ pub(crate) fn composer(b: &mut Builder, root: &Domain, task: Option<&c::Task>, w
             requested(b, root, draft.requested.as_ref(), W::ChoiceTemplate, w);
         }
         Some(choice::Context::Template { .. } | choice::Context::Task { .. }) | None => {
-            requested(b, root, draft.requested.as_ref(), W::ChoiceRequested, w);
+            let label = if demo_model(root) { W::DemoUsing } else { W::ChoiceRequested };
+            requested(b, root, draft.requested.as_ref(), label, w);
         }
     }
     if let Some(task) = task {
@@ -168,9 +169,21 @@ pub(crate) fn shown(name: &[u8], w: &Words) -> Box<[u8]> {
     out.finish()
 }
 
+fn demo_model(root: &Domain) -> bool {
+    match root.demo() {
+        Some((demo, halves)) => halves.model && root.pages().choice().project() == Some(demo.project),
+        None => false,
+    }
+}
+
 fn requested(b: &mut Builder, root: &Domain, choice: Option<&c::LlmChoice>, label: W, w: &Words) {
     let Some(choice) = choice else {
-        line(b, w, W::ChoiceDefault, &[]);
+        let draft = root.pages().choice();
+        if demo_model(root) && draft.requested == draft.original {
+            line(b, w, W::DemoUsing, &[Hole::Name(w.say(W::Default, &[]))]);
+        } else {
+            line(b, w, W::ChoiceDefault, &[]);
+        }
         return;
     };
     line(b, w, label, &[Hole::Name(shown(choice.main.model.bytes(), w))]);

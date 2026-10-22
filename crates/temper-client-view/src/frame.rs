@@ -216,22 +216,38 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
     builder.close();
 }
 
-/// The model half's banner, after the frame and before the page's main.
+/// The demo's one banner, drawn by the frame or after a page's chatbar.
 pub(crate) fn demo_banner(b: &mut Builder, root: &Domain, words: &crate::words::Words, bindings: &mut Bindings) {
-    if unavailable(root).is_some() || *root.pages().address() == Address::Accounts || root.demo().is_none() {
+    if unavailable(root).is_some() || *root.pages().address() == Address::Accounts {
         return;
     }
+    let Some((_, halves)) = root.demo() else { return };
     b.open(Role::Region);
     b.style(crate::look::ACCOUNTS);
     b.name(&words.say(crate::words::Word::Demo, &[]));
-    text(b, Role::Paragraph, &words.say(crate::words::Word::DemoModel, &[]), None);
-    action(
-        b,
-        Role::Link,
-        &words.say(crate::words::Word::ConnectModel, &[]),
-        Act::Go { address: Address::Accounts },
-        false,
-        bindings,
-    );
+    let word = if halves.model && halves.forge {
+        crate::words::Word::DemoBoth
+    } else if halves.model {
+        crate::words::Word::DemoModel
+    } else {
+        crate::words::Word::DemoForge
+    };
+    text(b, Role::Paragraph, &words.say(word, &[]), None);
+    if halves.model {
+        action(
+            b,
+            Role::Link,
+            &words.say(crate::words::Word::ConnectModel, &[]),
+            Act::Go { address: Address::Accounts },
+            false,
+            bindings,
+        );
+    }
+    if halves.forge {
+        b.open(Role::Button);
+        b.name(&words.say(crate::words::Word::ConnectForge, &[]));
+        b.state(skein_ui::State::Disabled);
+        b.close();
+    }
     b.close();
 }

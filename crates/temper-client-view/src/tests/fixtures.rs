@@ -545,8 +545,8 @@ pub mod chat {
             &mut b,
             thread,
             &fixtures::words(),
-            LINES,
-            TEXT,
+            (LINES, TEXT),
+            (None, false),
             None,
             &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
         );
@@ -818,8 +818,16 @@ fn fixture_me(project_name: &[u8]) -> c::Me {
 pub const DEMO_CUE: &[u8] = b"Change the title";
 pub const DEMO_OTHER_CUE: &[u8] = b"Add a test";
 pub fn demo_root(address: temper_client_domain::Address, project: u32, model: bool) -> temper_client_domain::Domain {
-    let (mut root, me_watch, _, _, _) =
-        root_at_with_demo(address, &domain_limits(), b"Project", Some((project, model)));
+    demo_choice_root(address, project, model, None)
+}
+pub fn demo_choice_root(
+    address: temper_client_domain::Address,
+    project: u32,
+    model: bool,
+    llm: Option<c::LlmChoice>,
+) -> temper_client_domain::Domain {
+    let (mut root, me_watch, task_watch, _, _) =
+        root_at_with_demo(address.clone(), &domain_limits(), b"Project", Some((project, model)));
     let template = chat::messaging_root();
     let mut me = template.pages().me(template.client()).expect("chat template").clone();
     let mut charters = List::with_capacity(1);
@@ -859,6 +867,29 @@ pub fn demo_root(address: temper_client_domain::Address, project: u32, model: bo
             },
         },
     );
+    if let temper_client_domain::Address::Chat { task: number } = address {
+        let mut task = task::document();
+        task.chip.task = number;
+        task.chip.title = c::DocumentText::complete(c::Text::new(b"Ship the update".as_slice().into(), 32).unwrap());
+        task.project = PROJECT;
+        task.llm = llm;
+        task.requester = c::OwnerRequester::Person(root.pages().me(root.client()).unwrap().party.number);
+        task.acts = List::with_capacity(1);
+        task.acts
+            .push(c::Offered { act: c::ActKind::Message, admission: c::Admission::Allowed, effect: None })
+            .unwrap();
+        root_event(
+            &mut root,
+            temper_client_domain::Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Watched {
+                        watch: task_watch.unwrap(),
+                        event: c::WatchEvent::Delivered(c::Delivery::Task(Box::new(task))),
+                    },
+                },
+            },
+        );
+    }
     root
 }
 
@@ -892,16 +923,33 @@ fn deliver_demo(root: &mut temper_client_domain::Domain, read: Token, watch: Tok
             },
         },
     );
+    let mut rows = List::with_capacity(1);
+    if !model {
+        rows.push(c::OwnerAccountLine {
+            number: 1,
+            place: 1,
+            uses: None,
+            plan: false,
+            provider: Some(18),
+            provider_name: None,
+            manage_usage: None,
+            display: c::DocumentText::complete(c::Text::new(b"Other".as_slice().into(), 32).unwrap()),
+            holder: c::OwnerAccountHolder::Party(73),
+            sources: List::with_capacity(0),
+            cut: true,
+        })
+        .unwrap();
+    }
     let accounts = c::OwnerAccounts {
         program_hosts: List::with_capacity(0),
         readiness: List::with_capacity(0),
         readiness_cut: false,
-        accounts: List::with_capacity(0),
+        accounts: rows,
         signing: List::with_capacity(0),
         last_end: None,
-        usable: false,
+        usable: true,
         settled: true,
-        cut: !model,
+        cut: false,
     };
     root_event(
         root,

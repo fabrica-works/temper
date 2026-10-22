@@ -58,7 +58,10 @@ fn enter_in_the_start_composer_starts_one_chat_titled_by_its_first_line() {
             Step::Send { find: Find::named(Role::TextArea, b"Start a chat") },
             Step::Send { find: Find::named(Role::TextArea, b"Start a chat") },
             Step::See { find: Find::named(Role::TextArea, b"Message"), within: fixtures::WITHIN },
-            Step::See { find: Find::exactly_named(Role::Paragraph, b"Hello"), within: fixtures::WITHIN },
+            Step::See {
+                find: Find::exactly_named(Role::Heading { level: 1 }, b"T1 \xc2\xb7 Hello"),
+                within: fixtures::WITHIN,
+            },
         ],
     );
     assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);

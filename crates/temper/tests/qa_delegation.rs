@@ -117,7 +117,7 @@ fn original_delegate_call_uses_the_ended_task_document() {
     person.type_on(b"Older", b"");
     person.wait_for(b"* Earlier lines omitted 3\n  0000000000000003000000000000000000000000\n  Run 3 began", WITHIN);
     person.type_on(b"Older", b"");
-    person.wait_for(b"* Earlier lines omitted 5\n  Agent\n  wait\n  Run 1 ended", WITHIN);
+    person.wait_for(b"* Earlier lines omitted 5\n  Temper\n  wait\n  Run 1 ended", WITHIN);
     person.type_on(b"Older", b"");
     person.wait_for(
         "I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.\n  Task 2:\n    T2 · CHANGE\n    * Landed\n    ### Export widget's table as CSV\n    CI passed. Landed · merge commit 0000000\n".as_bytes(),

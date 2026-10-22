@@ -5,7 +5,7 @@ use jig_client_fake_person_browser::stories;
 use skein_fake_person::{Find, Step as PersonStep};
 use skein_fake_person_browser::{Harness, Outcome, Script, Step};
 use skein_ui::Role;
-use temper_client_browser_world::{FIRST_CHAT, FIRST_CHAT_ADDRESS, Tier, WITHIN};
+use temper_client_browser_world::{FIRST_CHAT_ADDRESS, Tier, WITHIN, first_chat};
 
 #[test]
 fn the_printed_link_signs_in() {
@@ -26,7 +26,7 @@ fn a_reload_on_a_chat_signs_in_by_its_cookie() {
     let mut steps = temper_client_browser_world::start_chat(b"Hello");
     steps.extend([
         Step::Person(PersonStep::Reload),
-        see(Find::exactly_named(Role::Heading { level: 1 }, FIRST_CHAT)),
+        see(first_chat(b"Hello")),
         see(tier.states().live),
         Step::Address(Box::from(FIRST_CHAT_ADDRESS)),
     ]);

@@ -266,8 +266,15 @@ fn the_chat_bar_contains_identity_spend_and_acts() {
     let bar = styled(view.tree(), crate::look::CHATBAR);
     assert_eq!(view.tree().nodes()[bar].role, Role::Slot);
     let nodes = subtree(view.tree(), bar);
+    let heading = fixtures::words().say(
+        crate::words::Word::ChatTitle,
+        &[
+            skein_ui::phrases::Hole::Number(9),
+            skein_ui::phrases::Hole::Name(skein_lib::bytes::copy_of(fixtures::task::document().chip.title.bytes())),
+        ],
+    );
     for (role, name) in [
-        (Role::Heading { level: 1 }, b"Chat 9".as_slice()),
+        (Role::Heading { level: 1 }, heading.as_ref()),
         (Role::Paragraph, b"Spent 7; delegates spent 2"),
         (Role::Status, b"Parked"),
         (Role::Button, b"Stop"),
@@ -276,7 +283,7 @@ fn the_chat_bar_contains_identity_spend_and_acts() {
     ] {
         assert!(named_position(nodes, role, Some(name)).is_some(), "{name:?}");
     }
-    assert!(named_position(nodes, Role::Paragraph, Some(fixtures::task::document().chip.title.bytes())).is_some());
+    assert!(named_position(nodes, Role::Paragraph, Some(fixtures::task::document().chip.title.bytes())).is_none());
 }
 #[test]
 fn the_chat_entry_has_the_true_hint_between_message_and_send() {

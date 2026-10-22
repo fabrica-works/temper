@@ -1,4 +1,4 @@
-== Chat 9 == Live
+== T9 · Hello == Live
 temper
 [1] Shop (pressed)
 [2] Inbox 0
@@ -6,14 +6,13 @@ temper
 [4] Adopt a repository
 * Pat
 [5] Sign out
-Hello
 * Writing
 Spent 7; delegates spent 2
 Conversation:
-  Pat
+  You
   Hello
   * Read
-  Agent
+  Temper
   I can help.
   * Writing...
   Writing an answer

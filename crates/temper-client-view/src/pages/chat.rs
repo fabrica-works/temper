@@ -37,10 +37,22 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         b.open(Role::Slot);
         b.style(look::CHATBAR);
         b.open(Role::Slot);
-        text(b, Role::Heading { level: 1 }, &words.say(Word::Chat, &[Hole::Number(chat.task)]));
-        text(b, Role::Paragraph, task.chip.title.bytes());
+        text(
+            b,
+            Role::Heading { level: 1 },
+            &words.say(
+                Word::ChatTitle,
+                &[Hole::Number(chat.task), Hole::Name(skein_lib::bytes::copy_of(task.chip.title.bytes()))],
+            ),
+        );
         if let Some(me) = root.pages().me(root.client()) {
             super::chats::status(b, &task.chip, &task.waits_on, task.project, me, words);
+        }
+        if let Some((demo, halves)) = root.demo()
+            && halves.model
+            && task.project == demo.project
+        {
+            text(b, Role::Paragraph, &words.say(Word::DemoModelName, &[]));
         }
         b.close();
         b.open(Role::Slot);
@@ -54,12 +66,31 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         control(b, bindings, Role::Button, &words.say(Word::MarkSeen, &[]), Act::Seen);
         b.close();
         b.close();
+        crate::frame::demo_banner(b, root, words, bindings);
         b.open(Role::Slot);
         b.style(look::THREAD);
         if let jig_client::thread::window::Edge::More(_) = chat.thread.lines.edges.after {
             control(b, bindings, Role::Button, &words.say(Word::Older, &[]), Act::Older);
         }
-        conversation(b, &chat.thread, words, rows, text_limit, Some((chat, root.client())), bindings);
+        let me = root.pages().me(root.client());
+        #[expect(clippy::manual_map, reason = "view code spells out the signed-in person")]
+        let person = match me {
+            Some(me) => Some(me.party.number),
+            None => None,
+        };
+        let requester = match task.requester {
+            c::OwnerRequester::Person(number) => Some(number) == person,
+            c::OwnerRequester::Task(_) | c::OwnerRequester::Deployment { .. } => false,
+        };
+        conversation(
+            b,
+            &chat.thread,
+            words,
+            (rows, text_limit),
+            (person, requester),
+            Some((chat, root.client())),
+            bindings,
+        );
         if !chat.cards.is_empty() || !chat.departures().is_empty() {
             b.open(Role::List);
             b.style(look::CARDS);
@@ -162,11 +193,12 @@ pub(crate) fn conversation(
     b: &mut Builder,
     thread: &Thread,
     words: &Words,
-    rows: u32,
-    text_limit: u32,
+    limits: (u32, u32),
+    person: (Option<u64>, bool),
     delegations: Option<(&Chat, &jig_client::Client)>,
     bindings: &mut Bindings,
 ) {
+    let (rows, text_limit) = limits;
     let bound = match delegations {
         Some((chat, _)) => chat.delegations.capacity(),
         None => 0,
@@ -185,32 +217,18 @@ pub(crate) fn conversation(
         b.style(look::TURN);
         match line {
             Line::Words { by, words: message, state } => {
-                b.open(Role::Slot);
-                b.style(look::MESSAGE);
-                b.style(look::BY_PERSON);
-                b.open(Role::Slot);
-                b.style(look::WHO);
-                if let Some(by) = by {
-                    text(b, Role::Paragraph, by.name.bytes());
-                }
-                words.status(
-                    b,
-                    match state {
-                        WordState::BeingSent => P::WordsBeingSent,
-                        WordState::Sent { .. } => P::WordsSent,
-                        WordState::Read { .. } => P::WordsRead,
-                    },
-                    &[],
-                );
-                b.close();
-                b.open(Role::Slot);
-                b.style(look::SAYS);
-                text(b, Role::Paragraph, message);
-                b.close();
-                b.close();
+                person_words(b, by, message, state, person.0, words);
             }
             Line::Turn { turn, .. } => {
-                committed(b, turn, words, (rows, text_limit), delegations, (&mut tasks, &mut shown), bindings);
+                committed(
+                    b,
+                    turn,
+                    words,
+                    (rows, text_limit, person.1),
+                    delegations,
+                    (&mut tasks, &mut shown),
+                    bindings,
+                );
             }
             Line::Provisional { text, cut, .. } => {
                 b.open(Role::Slot);
@@ -296,16 +314,50 @@ fn live_delegates(
         b.close();
     }
 }
+fn person_words(
+    b: &mut Builder,
+    by: Option<&c::Party>,
+    message: &[u8],
+    state: WordState,
+    person: Option<u64>,
+    words: &Words,
+) {
+    b.open(Role::Slot);
+    b.style(look::MESSAGE);
+    b.style(look::BY_PERSON);
+    b.open(Role::Slot);
+    b.style(look::WHO);
+    match by {
+        Some(by) if Some(by.number) != person => text(b, Role::Paragraph, by.name.bytes()),
+        Some(_) | None => text(b, Role::Paragraph, &words.say_card(P::You, &[])),
+    }
+    words.status(
+        b,
+        match state {
+            WordState::BeingSent => P::WordsBeingSent,
+            WordState::Sent { .. } => P::WordsSent,
+            WordState::Read { .. } => P::WordsRead,
+        },
+        &[],
+    );
+    b.close();
+    b.open(Role::Slot);
+    b.style(look::SAYS);
+    text(b, Role::Paragraph, message);
+    b.close();
+    b.close();
+}
+
 fn committed(
     b: &mut Builder,
     turn: &c::Turn,
     words: &Words,
-    limits: (u32, u32),
+    limits: (u32, u32, bool),
     delegations: Option<(&Chat, &jig_client::Client)>,
     lists: (&mut List<u64>, &mut List<u64>),
     bindings: &mut Bindings,
 ) {
-    let (rows, text_limit) = limits;
+    let (rows, text_limit, requester) = limits;
     let (tasks, shown) = lists;
     for message in prefix(b, turn.messages.as_slice(), rows, words) {
         b.open(Role::Slot);
@@ -321,8 +373,14 @@ fn committed(
         words.card_text(
             b,
             match message.speaker {
-                c::Speaker::Person => P::Person,
-                c::Speaker::Assistant => P::Agent,
+                c::Speaker::Person => {
+                    if requester {
+                        P::You
+                    } else {
+                        P::Person
+                    }
+                }
+                c::Speaker::Assistant => P::Temper,
                 c::Speaker::Tool => P::CallCompleted,
                 c::Speaker::System => P::TurnInstructions,
             },

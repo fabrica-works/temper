@@ -9,16 +9,15 @@ pub fn page() -> skein_ui::Tree {
     let mut b = skein_ui::Builder::new(&tree_limits());
     synthetic_frame(&mut b, false);
     b.open(Role::Main);
-    text(&mut b, Role::Heading { level: 1 }, b"Chat 9");
-    text(&mut b, Role::Paragraph, b"Hello");
+    text(&mut b, Role::Heading { level: 1 }, "T9 · Hello".as_bytes());
     text(&mut b, Role::Status, b"Writing");
     text(&mut b, Role::Paragraph, b"Spent 7; delegates spent 2");
     b.open(Role::Log);
     b.name(b"Conversation");
-    text(&mut b, Role::Paragraph, b"Pat");
+    text(&mut b, Role::Paragraph, b"You");
     text(&mut b, Role::Paragraph, b"Hello");
     text(&mut b, Role::Status, b"Read");
-    text(&mut b, Role::Paragraph, b"Agent");
+    text(&mut b, Role::Paragraph, b"Temper");
     golden_cards::report(&mut b, b"I can help.");
     text(&mut b, Role::Status, b"Writing...");
     text(&mut b, Role::Paragraph, b"Writing an answer");
@@ -81,6 +80,7 @@ pub fn delegation_page(landed: bool) -> skein_ui::Tree {
                         Some(c::Delivery::Me(Box::new(me)))
                     }
                     c::Subject::Task { task } => Some(c::Delivery::Task(Box::new(delegation_task(task, landed)))),
+                    c::Subject::Accounts if landed => Some(c::Delivery::OwnerAccounts(Box::new(demo_accounts()))),
                     c::Subject::Deployment
                     | c::Subject::Tree { .. }
                     | c::Subject::Chips { .. }
@@ -103,6 +103,25 @@ pub fn delegation_page(landed: bool) -> skein_ui::Tree {
                     delegation_activity(landed),
                 )))),
             }),
+            Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down: jig_client::Down::Read { read, what: jig_client::Readable::Family { record, .. } },
+                    },
+            } if landed
+                && temper_client_protocol_wire::decode_reading(&record.bytes, &wire_limits())
+                    .expect("forge reading")
+                    .read()
+                    == &temper_client_protocol_wire::v1::Read::Demo =>
+            {
+                Some(jig_client::Up::ReadDone {
+                    read,
+                    result: jig_client::Readout::Family {
+                        family: temper_client_protocol_wire::FORGE,
+                        record: Some(demo_answer()),
+                    },
+                })
+            }
             Request::Client { .. }
             | Request::Show { .. }
             | Request::SignOut
@@ -200,4 +219,43 @@ fn delegation_activity(landed: bool) -> contract::ActivityPage {
 
 fn delegation_text(bytes: &[u8]) -> contract::Text {
     contract::Text::new(Box::from(bytes), 256).expect("first run text fits")
+}
+
+fn demo_accounts() -> contract::OwnerAccounts {
+    contract::OwnerAccounts {
+        program_hosts: skein_lib::List::with_capacity(0),
+        readiness: skein_lib::List::with_capacity(0),
+        readiness_cut: false,
+        accounts: skein_lib::List::with_capacity(0),
+        signing: skein_lib::List::with_capacity(0),
+        last_end: None,
+        usable: true,
+        settled: true,
+        cut: false,
+    }
+}
+fn demo_answer() -> Box<[u8]> {
+    use temper_client_protocol_wire::{self as wire, v1 as w};
+    let mut cues = skein_lib::List::with_capacity(3);
+    for cue in [
+        b"Add CSV export to widget".as_slice(),
+        b"Add a dark theme to widget",
+        "Fix widget’s empty search state".as_bytes(),
+    ] {
+        cues.push(cue.into()).expect("three demo cues");
+    }
+    wire::demo_answer(
+        &w::DemoAnswer::new(
+            &wire_limits(),
+            w::DemoAnswerParts {
+                project: 1,
+                forge: 1,
+                provider: 3,
+                owner: b"demo".as_slice().into(),
+                name: b"widget".as_slice().into(),
+                cues,
+            },
+        )
+        .expect("demo answer fits"),
+    )
 }

@@ -83,12 +83,14 @@ pub struct Halves {
 }
 #[must_use]
 pub fn halves(answer: Option<&Demo>, accounts: Option<&c::OwnerAccounts>) -> Halves {
-    // The forge half waits for the deployment's part (client/forge.md, 5.4).
+    // Departure: the forge half holds while answered, pending the deployment's
+    // part (client/README.md, 4.8 and section 11).
     let mut halves = Halves { model: false, forge: false };
     let (Some(answer), Some(accounts)) = (answer, accounts) else { return halves };
     if accounts.cut {
         return halves;
     }
+    halves.forge = true;
     for line in &accounts.accounts {
         if line.provider != Some(answer.provider) {
             if line.cut {

@@ -149,7 +149,7 @@ fn accounts(provider: Option<u32>, usable: bool, cut: bool) -> c::OwnerAccounts 
     }
 }
 #[test]
-fn the_model_half_waits_for_complete_accounts_and_no_other_usable_provider() {
+fn the_halves_wait_for_accounts_and_only_the_model_yields_to_another_provider() {
     let answer = forge::family::demo(&answer(CUE), &w::CEILINGS).unwrap();
     let mut cut = accounts(Some(PROVIDER), true, false);
     cut.cut = true;
@@ -163,7 +163,11 @@ fn the_model_half_waits_for_complete_accounts_and_no_other_usable_provider() {
         ("unknown provider usable", Some(&answer), Some(accounts(None, true, false)), false),
         ("other cut", Some(&answer), Some(accounts(Some(PROVIDER + 1), false, true)), false),
     ] {
-        assert_eq!(demo::halves(answer, document.as_ref()), demo::Halves { model, forge: false }, "{row}");
+        let forge = match document.as_ref() {
+            Some(doc) => answer.is_some() && !doc.cut,
+            None => false,
+        };
+        assert_eq!(demo::halves(answer, document.as_ref()), demo::Halves { model, forge }, "{row}");
     }
 }
 fn event(root: &mut crate::Domain, event: crate::Event) -> Queue<crate::Request> {

@@ -1,4 +1,4 @@
-== Chat 1 == Live
+== T1 · Add CSV export to widget == Live
 temper
 [1] demo (pressed)
 [2] Inbox 0
@@ -7,15 +7,14 @@ temper
 [5] Accounts
 * Pat
 [6] Sign out
-Add CSV export to widget
 * Parked
 Spent 0; delegates spent 0
 [7] Mark seen
 Conversation:
-  Pat
+  You
   * Read
   Add CSV export to widget
-  Agent
+  Temper
   I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.
   Task 2:
     T2 · CHANGE
