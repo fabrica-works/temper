@@ -133,9 +133,12 @@ impl Part<'_> {
         }
     }
 }
-/// Application vocabulary for owner parts, borrowed for this step alone.
-pub trait Parts {
+/// Application vocabulary for parts and changes, borrowed for this step alone.
+pub trait Parts: core::fmt::Debug {
     fn owner_part(&self, part: &contract::OwnerPart, out: &mut Text);
+    fn part(&self, part: &contract::Part, out: &mut Text);
+    fn change_kind(&self, connector: u16, kind: u16, out: &mut Text);
+    fn change(&self, kind: u16, part: &contract::OwnerPart, words: &contract::DocumentText, out: &mut Text);
 }
 /// A bounded text result; only free text is cut, never identities or authority.
 #[derive(Debug)]
@@ -197,6 +200,36 @@ impl Text {
             .checked_add(bytes.len().checked_sub(end).expect("text cut within value"))
             .expect("document bound");
     }
+    /// A result's words follow its state, with multiline words indented within the text budget.
+    pub fn result_words(&mut self, bytes: &[u8]) {
+        if bytes.is_empty() {
+            return;
+        }
+        if !bytes.contains(&b'\n') {
+            self.put(b" \xc2\xb7 ");
+            self.words(bytes);
+            return;
+        }
+        self.put(b"\n");
+        let mut from = 0;
+        for (at, byte) in bytes.iter().chain(core::iter::once(&b'\n')).enumerate() {
+            if *byte != b'\n' {
+                continue;
+            }
+            if from != 0 {
+                self.words(b"\n");
+            }
+            let line = bytes.get(from..at).expect("line within words");
+            from = at.checked_add(1).expect("document bound");
+            if self.room < 2 {
+                self.left = self.left.checked_add(line.len()).expect("document bound");
+                continue;
+            }
+            self.room = self.room.checked_sub(2).expect("indent fits text budget");
+            self.put(b"  ");
+            self.words(line);
+        }
+    }
     #[must_use]
     pub fn finish(mut self) -> Box<[u8]> {
         self.cut_line();
@@ -244,8 +277,8 @@ fn error(out: &mut Encoder, reason: &[u8]) {
     out.object_end();
 }
 #[must_use]
-pub fn me(me: &contract::Me, json: bool, limits: &Limits, owner_part: fn(&contract::OwnerPart, &mut Text)) -> Printed {
-    document::print(document::Document::Me(me), json, limits, owner_part)
+pub fn me(me: &contract::Me, json: bool, limits: &Limits, vocabulary: &dyn Parts) -> Printed {
+    document::print(document::Document::Me(me), json, limits, vocabulary)
 }
 #[must_use]
 pub fn read(
@@ -254,7 +287,7 @@ pub fn read(
     me: Handle,
     json: bool,
     limits: &Limits,
-    owner_part: fn(&contract::OwnerPart, &mut Text),
+    vocabulary: &dyn Parts,
 ) -> Printed {
     match page {
         Readout::Jig(ReadResult::Value(ReadValue::Task(task))) => {
@@ -265,7 +298,7 @@ pub fn read(
                 },
                 None => None,
             };
-            document::print(document::Document::Task(task, party), json, limits, owner_part)
+            document::print(document::Document::Task(task, party), json, limits, vocabulary)
         }
         Readout::Jig(ReadResult::Value(ReadValue::Historical(value))) if historical_task(value).is_some() => {
             let (task, result) = historical_task(value).expect("matched historical task");
@@ -276,7 +309,7 @@ pub fn read(
                 },
                 None => None,
             };
-            document::print(document::Document::HistoricalTask(task, result, party), json, limits, owner_part)
+            document::print(document::Document::HistoricalTask(task, result, party), json, limits, vocabulary)
         }
         Readout::Jig(ReadResult::None(why)) => {
             let (reason, status): (&[u8], u8) = match why {
@@ -305,7 +338,7 @@ pub(crate) fn reads(
     client: &Client,
     me: Handle,
     limits: &Limits,
-    owner_part: fn(&contract::OwnerPart, &mut Text),
+    vocabulary: &dyn Parts,
 ) -> Printed {
     let party = match client.document(me) {
         Some(document) => match document.latest {
@@ -330,11 +363,11 @@ pub(crate) fn reads(
                     document::Document::SizedTurn { task, name: *name, bytes: *bytes },
                     reading.called.json,
                     limits,
-                    owner_part,
+                    vocabulary,
                 );
             }
             Readout::Limit | Readout::NotServed { .. } | Readout::Jig(_) | Readout::Family { .. } => {
-                return read(page, client, me, reading.called.json, limits, owner_part);
+                return read(page, client, me, reading.called.json, limits, vocabulary);
             }
         }
     }
@@ -372,13 +405,13 @@ pub(crate) fn reads(
             }),
             reading.called.json,
             limits,
-            owner_part,
+            vocabulary,
         );
     }
     if reading.called.call.tool == 3 && reading.pages.len() == 1 && reading.documents.is_empty() {
-        return read(reading.pages.get(&1).expect("task read"), client, me, reading.called.json, limits, owner_part);
+        return read(reading.pages.get(&1).expect("task read"), client, me, reading.called.json, limits, vocabulary);
     }
-    document::print(document::Document::ReadSet(reading, party), reading.called.json, limits, owner_part)
+    document::print(document::Document::ReadSet(reading, party), reading.called.json, limits, vocabulary)
 }
 
 fn check_selected(tool: u8, local: u32, value: &ReadValue) -> Result<(), ()> {
@@ -399,7 +432,7 @@ pub(crate) fn waiting(
     mut wait: document::waiting::Waiting<'_>,
     json: bool,
     limits: &Limits,
-    owner_part: fn(&contract::OwnerPart, &mut Text),
+    vocabulary: &dyn Parts,
 ) -> Printed {
     if wait.digest.is_none()
         && let Some(delivery) = wait.delivery
@@ -407,7 +440,7 @@ pub(crate) fn waiting(
         wait.digest = Some(crate::jig::digest::part(&Part::delivery(delivery).expect("subject form"), limits));
     }
     let met = wait.met;
-    let mut printed = document::print(document::Document::Wait(wait), json, limits, owner_part);
+    let mut printed = document::print(document::Document::Wait(wait), json, limits, vocabulary);
     if printed.status == 0 && !met {
         printed.status = 3;
     }

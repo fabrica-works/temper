@@ -526,6 +526,66 @@ pub(crate) fn part(part: &c::OwnerPart, out: &mut Text) {
     literals_text(literals, &holes, out);
 }
 
+pub(crate) fn change_kind(connector: u16, kind: u16, out: &mut Text) {
+    out.put(b"change");
+    if connector == temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Forge) {
+        if kind != 1 {
+            out.put(b", ");
+            match words::kind(kind) {
+                Some(word) => literals_text(words::resource_english(word).0, &[], out),
+                None => literals_text(
+                    words::resource_english(words::ResourceWord::OtherKind).0,
+                    &[Hole::Number(u64::from(kind))],
+                    out,
+                ),
+            }
+        }
+    } else {
+        out.put(b", connector ");
+        out.number(u64::from(connector));
+        out.put(b" kind ");
+        out.number(u64::from(kind));
+    }
+}
+pub(crate) fn change(_kind: u16, _part: &c::OwnerPart, words: &c::DocumentText, out: &mut Text) {
+    out.put(b"Landed");
+    if let Some(commit) = temper_client_domain::pages::delegation::merge_commit(words.bytes()) {
+        out.put(b" \xc2\xb7 merge commit ");
+        out.words(commit);
+    } else {
+        out.result_words(words.bytes());
+    }
+}
+pub(crate) fn result_part(value: &c::Part, out: &mut Text) {
+    match value {
+        c::Part::Resource { connector, path } => part(
+            &c::OwnerPart {
+                connector: *connector,
+                kind: c::OwnerPartKind::Resource,
+                key: c::OwnerPartKey::Path(path.clone()),
+            },
+            out,
+        ),
+        c::Part::Connector { .. } => literals_text(words::resource_english(words::ResourceWord::Connector).0, &[], out),
+        c::Part::Kind { kind, .. } => match words::kind(*kind) {
+            Some(word) => literals_text(words::resource_english(word).0, &[], out),
+            None => literals_text(
+                words::resource_english(words::ResourceWord::OtherKind).0,
+                &[Hole::Number(u64::from(*kind))],
+                out,
+            ),
+        },
+        c::Part::Panel { .. }
+        | c::Part::Result { .. }
+        | c::Part::Effect { .. }
+        | c::Part::OwnerEffect { .. }
+        | c::Part::Outbox { .. }
+        | c::Part::Hold { .. }
+        | c::Part::Project { .. }
+        | c::Part::Deployment { .. } => literals_text(words::resource_english(words::ResourceWord::Shown).0, &[], out),
+    }
+}
+
 fn decode_failure(json: bool, kept: bool) -> jig::Printed {
     let reason = b"adoption answer decoding failed";
     if !kept {

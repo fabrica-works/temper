@@ -9,7 +9,7 @@ pub(super) fn text(
     me: Option<&c::Me>,
     book: &Phrasebook,
     limits: &Limits,
-    owner_part: fn(&c::OwnerPart, &mut Text),
+    vocabulary: &dyn crate::jig::render::Parts,
     out: &mut Text,
 ) {
     let call = &reading.called.call;
@@ -24,13 +24,13 @@ pub(super) fn text(
     for page in reading.pages.values() {
         match page {
             Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(task))) => {
-                super::task_text(task, me, book, owner_part, out);
+                super::task_text(task, me, book, vocabulary, out);
                 super::subjects::text_digest(b"task", &super::super::Part::Task(task), limits, out);
             }
             Readout::Jig(c::ReadResult::Value(c::ReadValue::Historical(value))) => {
                 let (task, result) = super::super::historical_task(value).expect("validated historical task");
-                super::task_text(task, me, book, owner_part, out);
-                super::result_text(result, out);
+                super::task_text(task, me, book, vocabulary, out);
+                super::result_text(result, vocabulary, out);
                 super::subjects::text_digest(b"task", &super::super::Part::Task(task), limits, out);
             }
             Readout::Jig(c::ReadResult::Value(c::ReadValue::Tasks(page))) => {

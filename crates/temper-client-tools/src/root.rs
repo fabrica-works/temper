@@ -43,7 +43,7 @@ impl Root {
     }
     pub(crate) fn with_client(client: Client, seed: u64) -> Self {
         let mut runner = runner::Runner::new(RUNNER.asker(), crate::key::TOOLS, seed);
-        runner.parts(owner_part);
+        runner.parts(&Parts);
         Self { client, runner, adopter: crate::forge::Adopter::new(), next: Some(1) }
     }
     #[must_use]
@@ -207,10 +207,21 @@ impl jig::render::Parts for Parts {
     fn owner_part(&self, part: &jig_client::contract::OwnerPart, out: &mut jig::render::Text) {
         crate::forge::part(part, out);
     }
-}
-fn owner_part(part: &jig_client::contract::OwnerPart, out: &mut jig::render::Text) {
-    use jig::render::Parts as _;
-    Parts.owner_part(part, out);
+    fn part(&self, part: &jig_client::contract::Part, out: &mut jig::render::Text) {
+        crate::forge::result_part(part, out);
+    }
+    fn change_kind(&self, connector: u16, kind: u16, out: &mut jig::render::Text) {
+        crate::forge::change_kind(connector, kind, out);
+    }
+    fn change(
+        &self,
+        kind: u16,
+        part: &jig_client::contract::OwnerPart,
+        words: &jig_client::contract::DocumentText,
+        out: &mut jig::render::Text,
+    ) {
+        crate::forge::change(kind, part, words, out);
+    }
 }
 
 #[cfg(test)]

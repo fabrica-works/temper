@@ -226,7 +226,7 @@ fn complete(
             render::document::Document::Accounts(value),
             wait.called.json,
             &env.limits,
-            runner.owner_part.expect("host vocabulary"),
+            runner.parts.expect("host vocabulary"),
         );
         if printed.status == 0 && !met {
             printed.status = 3;
@@ -245,7 +245,7 @@ fn complete(
             },
             wait.called.json,
             &env.limits,
-            runner.owner_part.expect("host vocabulary"),
+            runner.parts.expect("host vocabulary"),
         )
     };
     close(&wait, runner.me(), out);
@@ -367,7 +367,7 @@ fn page(
                 },
                 wait.called.json,
                 &env.limits,
-                runner.owner_part.expect("host vocabulary"),
+                runner.parts.expect("host vocabulary"),
             )
         }
         Readout::Limit | Readout::NotServed { .. } | Readout::Jig(_) | Readout::Family { .. } => render::read(
@@ -376,7 +376,7 @@ fn page(
             runner.me(),
             wait.called.json,
             &env.limits,
-            runner.owner_part.expect("host vocabulary"),
+            runner.parts.expect("host vocabulary"),
         ),
     };
     runner::finish(wait.called, printed, out);

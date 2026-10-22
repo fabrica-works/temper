@@ -25,7 +25,7 @@ pub(crate) fn print(
     document: Document<'_>,
     json: bool,
     limits: &Limits,
-    owner_part: fn(&jig_client::contract::OwnerPart, &mut Text),
+    vocabulary: &dyn crate::jig::render::Parts,
 ) -> Printed {
     let accounts = match document {
         Document::Accounts(_) => true,
@@ -50,15 +50,15 @@ pub(crate) fn print(
     } else {
         let book = phrasebook(limits.text);
         let mut measure = Text::measure();
-        text(&document, &book, limits, owner_part, &mut measure);
+        text(&document, &book, limits, vocabulary, &mut measure);
         let structural = measure.structural();
         if accounts && structural > usize::try_from(limits.text).expect("text fits") {
             return super::failure(b"result limit", false, 1);
         }
         let mut measure = Text::bounded(limits, structural);
-        text(&document, &book, limits, owner_part, &mut measure);
+        text(&document, &book, limits, vocabulary, &mut measure);
         let mut out = measure.writing(limits, structural);
-        text(&document, &book, limits, owner_part, &mut out);
+        text(&document, &book, limits, vocabulary, &mut out);
         out.finish()
     };
     Printed { status: 0, stdout, stderr: Box::default() }
@@ -67,19 +67,19 @@ fn text(
     document: &Document<'_>,
     book: &Phrasebook,
     limits: &Limits,
-    owner_part: fn(&jig_client::contract::OwnerPart, &mut Text),
+    vocabulary: &dyn crate::jig::render::Parts,
     out: &mut Text,
 ) {
     match document {
-        Document::Wait(wait) => waiting::text(wait, book, limits, owner_part, out),
+        Document::Wait(wait) => waiting::text(wait, book, limits, vocabulary, out),
         Document::Accounts(value) => accounts::text(*value, limits, out),
         Document::Me(me) => me_text(me, book, limits, out),
-        Document::Task(task, me) => task_text(task, *me, book, owner_part, out),
+        Document::Task(task, me) => task_text(task, *me, book, vocabulary, out),
         Document::HistoricalTask(task, result, me) => {
-            task_text(task, *me, book, owner_part, out);
-            result_text(result, out);
+            task_text(task, *me, book, vocabulary, out);
+            result_text(result, vocabulary, out);
         }
-        Document::ReadSet(reading, me) => read_sets::text(reading, *me, book, limits, owner_part, out),
+        Document::ReadSet(reading, me) => read_sets::text(reading, *me, book, limits, vocabulary, out),
         Document::SizedTurn { task, name, bytes } => super::turn::sized(*task, *name, *bytes, true, out),
     }
     match document {
@@ -157,21 +157,6 @@ fn me_text(me: &Me, book: &Phrasebook, limits: &Limits, out: &mut Text) {
     out.put(b" ns\n");
     offers::text(me, limits, out);
 }
-fn result_text(result: &jig_client::contract::Result, out: &mut Text) {
-    let bounds = skein_json::writer::Limits { depth: 32, length: u32::MAX };
-    let budget = || Cut { room: out.room, left: 0, turn: None, subject: false, digest: None };
-    let mut measured = Encoder::measure(&bounds);
-    encode_result(result, &mut measured, &mut budget());
-    let mut written = Encoder::write(measured.measured().expect("bounded historical result"), &bounds);
-    let mut budget = budget();
-    encode_result(result, &mut written, &mut budget);
-    out.room = budget.room;
-    out.left =
-        out.left.checked_add(usize::try_from(budget.left).expect("bounded result text")).expect("bounded result text");
-    out.put(b"result: ");
-    out.put(&written.finish());
-    out.put(b"\n");
-}
 fn role(role: HeldRole, out: &mut Text) {
     match role {
         HeldRole::Owner => out.put(b"owner"),
@@ -188,7 +173,7 @@ fn task_text(
     task: &Task,
     me: Option<&Me>,
     book: &Phrasebook,
-    owner_part: fn(&jig_client::contract::OwnerPart, &mut Text),
+    vocabulary: &dyn crate::jig::render::Parts,
     out: &mut Text,
 ) {
     out.put(b"task ");
@@ -197,10 +182,14 @@ fn task_text(
     match task.flags.conversation {
         true => out.put(b"chat"),
         false if task.goal == Some(task.chip.task) => out.put(b"goal"),
-        false => {
-            out.put(b"label ");
-            out.number(u64::from(task.label));
-        }
+        false => match task.result_contract {
+            jig_client::contract::TaskContractDocument::Approval { .. } => out.put(b"approval"),
+            jig_client::contract::TaskContractDocument::Report { .. } => out.put(b"report"),
+            jig_client::contract::TaskContractDocument::Verdict { .. } => out.put(b"verdict"),
+            jig_client::contract::TaskContractDocument::Change { connector, kind, .. } => {
+                vocabulary.change_kind(connector, kind, out);
+            }
+        },
     }
     out.put(b" \xc2\xb7 ");
     out.put(&book.say(0, Word::Phase(task.chip.phase).id(), &[]).expect("phase phrase").text);
@@ -209,6 +198,8 @@ fn task_text(
     if let Some(priority) = task.priority {
         out.put(b" \xc2\xb7 priority ");
         out.number(u64::from(priority));
+    } else {
+        out.put(b" \xc2\xb7 untracked");
     }
     out.put(b"\nasked: ");
     out.words(task.spec.specification.words.bytes());
@@ -232,8 +223,11 @@ fn task_text(
         None => out.put(b" \xc2\xb7 no deadline"),
         Some(wall) => {
             out.put(b" \xc2\xb7 deadline ");
-            utc(wall, out);
+            clock::deadline(wall, out);
         }
+    }
+    if let Some(instructions) = &task.instructions {
+        instruction_words::text(instructions, out);
     }
     llm::text_wait(task.run_wait, out);
     out.put(b"\nwaiting on: ");
@@ -259,7 +253,7 @@ fn task_text(
     for resource in &task.resources {
         if let jig_client::contract::TaskResource::Owner(resource) = resource {
             out.put(b"resource: ");
-            owner_part(&resource.part, out);
+            vocabulary.owner_part(&resource.part, out);
             out.put(b"\n");
         }
     }
@@ -537,3 +531,8 @@ fn subject_end(digest: Option<crate::jig::digest::Digest>, out: &mut Encoder) {
 pub(crate) mod waiting;
 
 pub(crate) mod accounts;
+
+mod clock;
+mod instruction_words;
+mod result_words;
+use result_words::text as result_text;

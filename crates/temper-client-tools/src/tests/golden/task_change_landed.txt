@@ -1,0 +1,8 @@
+task 2 · change · Ended · project 1 · untracked
+asked: Export widget's table as CSV
+requester: task 1 · spent 0.00 of 0.10 · no deadline
+waiting on: Nothing awaited
+resource: branch temper/1/c2 of repository 1 on forge 1
+acts:
+result: Landed · merge commit 0000000000000003000000000000000000000000
+digest: task 7ef14b2899f4cca9

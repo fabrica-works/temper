@@ -189,7 +189,7 @@ pub(super) fn page(
                 runner.me(),
                 called.json,
                 &env.limits,
-                runner.owner_part.expect("host vocabulary"),
+                runner.parts.expect("host vocabulary"),
             );
             finish(called, printed, out);
             return;

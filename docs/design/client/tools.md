@@ -613,10 +613,13 @@ digest: task 7c1e09a2b44f0d13
 - **The header** is the task's number, its kind, its phase in jig's
   words, its project and its tracking. Its kind is `chat` for a
   conversation, `goal` for a goal (the task its own goal), and
-  otherwise its result contract's kind, `change`, `report`, `verdict`
-  or `approval`, the card's kinds (`README.md`, 5.7) in lower case:
-  never jig's label as a number, which jig gives no meaning (jig's
-  `domain/tasks.md`, section 3) and temper numbers its delegates by.
+  otherwise its result contract's kind: `approval`, `report`, `verdict`,
+  or, for Change, `change` when its connector is the forge's (1) and
+  its kind is 1. Another kind on the forge's connector is `change, `
+  followed by that kind's words (`README.md`, 4.1); any other connector
+  is `change, connector C kind K`. These are never jig's label as a
+  number, which jig gives no meaning (jig's `domain/tasks.md`, section
+  3) and temper numbers its delegates by.
   Its tracking is `priority P` while it is tracked, and `untracked`
   otherwise. A change delegate, ended: `task 2 · change · Ended ·
   project 1 · untracked`.

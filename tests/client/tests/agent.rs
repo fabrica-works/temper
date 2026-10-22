@@ -96,7 +96,13 @@ fn a_chat_the_agent_closes_ends() {
     assert_chat(&started, task);
     assert_eq!((closed.status, closed.stdout.as_ref()), (0, format!("done: task {task}, close\n").as_bytes()));
     assert!(printed.stdout.starts_with(format!("task {task} ").as_bytes()), "{printed:?}");
-    assert!(printed.stdout.windows(b"Closed by the run".len()).any(|w| w == b"Closed by the run"), "{printed:?}");
+    assert!(
+        printed
+            .stdout
+            .windows(b"result: Completed \xc2\xb7 Closed by the run\n".len())
+            .any(|w| w == b"result: Completed \xc2\xb7 Closed by the run\n"),
+        "{printed:?}"
+    );
     assert_eq!(printed.status, 0, "{printed:?}");
     assert!(printed.stdout.ends_with(b"met\n"), "{printed:?}");
 }

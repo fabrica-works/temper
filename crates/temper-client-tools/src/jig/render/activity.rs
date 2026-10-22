@@ -122,10 +122,7 @@ fn owner(row: &c::OwnerActivityLine, out: &mut Text) {
             out.number(*revision);
         }
         c::OwnerActivity::Kept { .. } => out.put(b"parked"),
-        c::OwnerActivity::Milestone { position } => {
-            out.put(b"milestone ");
-            out.number(*position);
-        }
+        c::OwnerActivity::Milestone { .. } => out.put(b"phase changed"),
     }
     out.put(b"\n");
 }

@@ -31,7 +31,7 @@ pub struct Runner {
     kept_json: bool,
     ready: bool,
     watching: bool,
-    pub(crate) owner_part: Option<fn(&jig_client::contract::OwnerPart, &mut render::Text)>,
+    pub(crate) parts: Option<&'static dyn render::Parts>,
 }
 #[derive(Debug)]
 pub struct Called {
@@ -65,11 +65,11 @@ impl Runner {
             kept_json: false,
             ready: false,
             watching: false,
-            owner_part: None,
+            parts: None,
         }
     }
-    pub fn parts(&mut self, owner_part: fn(&jig_client::contract::OwnerPart, &mut render::Text)) {
-        self.owner_part = Some(owner_part);
+    pub fn parts(&mut self, parts: &'static dyn render::Parts) {
+        self.parts = Some(parts);
     }
     pub(crate) fn forget_kept(&mut self, key: jig_client::Key) {
         self.kept.remove(&key);
@@ -133,7 +133,7 @@ fn run(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, call
             let Some(document) = client.document(runner.me()) else { return };
             let Some(Latest::Jig(Delivery::Me(me))) = document.latest else { return };
             let printed =
-                render::me(me, called.json, &env.limits, runner.owner_part.expect("host supplies part vocabulary"));
+                render::me(me, called.json, &env.limits, runner.parts.expect("host supplies part vocabulary"));
             finish(called, printed, out);
         }
         1..=7 | 22 | 23 | 25 | 27..=30 | 33 => reads::start(runner, client, env, called, out),

@@ -45,14 +45,14 @@ pub(super) fn text(
     wait: &Waiting<'_>,
     book: &Phrasebook,
     limits: &Limits,
-    owner_part: fn(&c::OwnerPart, &mut Text),
+    vocabulary: &dyn crate::jig::render::Parts,
     out: &mut Text,
 ) {
     let most = usize::try_from(limits.rows).expect("rows fit");
     if let Some(delivery) = wait.delivery {
         match delivery {
             c::Delivery::Me(me) => super::me_text(me, book, limits, out),
-            c::Delivery::Task(task) => super::task_text(task, wait.me, book, owner_part, out),
+            c::Delivery::Task(task) => super::task_text(task, wait.me, book, vocabulary, out),
             c::Delivery::Tree(_) | c::Delivery::OwnerTree(_) => super::super::lists::tree(delivery, book, out),
             c::Delivery::Tasks(tasks) => {
                 for row in tasks.rows.as_slice().iter().take(most) {
@@ -79,7 +79,7 @@ pub(super) fn text(
             | c::Delivery::OwnerAccounts(_) => unreachable!("wait subject"),
         }
         if let Some(result) = wait.result {
-            super::result_text(result, out);
+            super::result_text(result, vocabulary, out);
         }
         let part = Part::delivery(delivery).expect("subject form");
         let list = match part {
