@@ -737,6 +737,9 @@ nothing else: no flag, no command of its own.
   tells jig's core that no worker outlives the engine, so it settles the
   claims of every worker at once on a restart (jig's `domain/engine.md`,
   section 6): a socket's workers among them would lose their runs.
+  The nearest is read from two members: a document without `engine` is
+  nearest a worker alone; one whose `engine.hosts.listener`'s first
+  entry is a socket address, an engine alone; any other, standalone.
 - **Each shape's checks** (configuration.md, section 2): standalone's,
   as section 2 gives them; an engine alone's the same, but for its
   listener and its workers, by the table's rule, and the root's for
@@ -814,7 +817,7 @@ w1, w2       temper serve DIRS     after the engine: each a worker alone
 
   | Line | Printed by | When |
   |---|---|---|
-  | `listening <listener> <address>` | each shape with an engine, for `clients`, `webhooks` and a socket's `workers` | once that listener is bound, with the address bound (`listening workers 127.0.0.1:41733`) |
+  | `listening <listener> <address>` | each shape with an engine, for `clients`, `webhooks` and a socket's `workers` | once that listener is bound, with the address bound (`listening workers 127.0.0.1:41733`; an IPv6 one bracketed, `[::1]:41733`) |
   | `linked <worker> <address>` | a worker alone | at each opening of its link: the engine has taken its secret and its hello is sent, with the engine's address |
 
   A refused opening or hello is a note on the worker's stderr with jig's
