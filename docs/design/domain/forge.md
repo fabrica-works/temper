@@ -1105,6 +1105,10 @@ adoption says so, 4.4) lands through that queue. Forgejo keeps none.
     the task holds from the commit that makes it and hands to the change
     task that lands it.
 
+  A task made before its project's home was adopted holds no run branch
+  there: its runs read the home without pushing, and its brief says why.
+  A new task gets the branch.
+
   They are siblings under `temper/<root>/`, so no name is the prefix of
   another as git refs forbid, and one grant covers a tree's branches;
   a task's own branches are named in its batch symbolically and resolved

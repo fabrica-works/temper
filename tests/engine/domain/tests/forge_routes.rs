@@ -115,9 +115,13 @@ impl World {
                 limits.authority.facts = 8;
             }
             if with_change {
+                // One adoption, three chat creations and two Says survive the restart cut.
+                limits.people.requests = 6;
                 limits.call_records = 4;
                 limits.brief.gather = Duration::from_secs(5);
                 limits.brief.read_bytes = 512;
+                // Leave room for the home's access explanation beside the task specification.
+                limits.brief.budgets.task = 384;
                 limits.brief.budgets.pull = 384;
                 limits.brief.budgets.ci = 384;
                 limits.brief.brief_bytes = 768;
@@ -654,7 +658,7 @@ impl World {
         self.adopt_with_checks(true, Box::new([]));
     }
 
-    fn adopt_with_checks(&mut self, ci: bool, checks: Box<[u32]>) {
+    fn sign_in(&mut self) {
         self.until(Until::Ready);
         self.send(engine::Event::Party(engine::PartyInput::SignedIn {
             reply_to: ReplyTo::new(Token::new(90)),
@@ -665,6 +669,10 @@ impl World {
             },
         }));
         self.until(Until::SignedIn);
+    }
+
+    fn adopt_with_checks(&mut self, ci: bool, checks: Box<[u32]>) {
+        self.sign_in();
         self.send(engine::Event::Party(engine::PartyInput::Application {
             scope: jig_domain_people::ApplicationScope::Project(1),
             reply_to: ReplyTo::new(Token::new(91)),
@@ -2242,6 +2250,151 @@ fn a_broken_landing_branch_gets_one_deployment_repair_before_waiting_changes_lan
         "deployment repair and waiting change land; forge={:?}",
         world.store.rows.values().filter(|row| matches!(row, Record::Forge { .. })).collect::<Vec<_>>()
     );
+}
+
+fn adoption_chat(world: &World) -> people::Ask {
+    let people::Ask::Create { project, mut batch } = world.chat(1, b"Work in the home") else { unreachable!() };
+    // Three standing chats share the owner's 500-unit allotment; each run reserves at most 60.
+    batch[0].budget = people::Budget::AsAllowed { cap: Some(100) };
+    people::Ask::Create { project, batch }
+}
+
+fn assigned_chat(world: &mut World, key: u8, ask: people::Ask) -> engine::Assignment {
+    let before = world.assigned.len();
+    world.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
+        reply_to: ReplyTo::new(Token::new(u64::from(key))),
+        sign_in: world.signed_in.expect("owner session"),
+        key: [key; 16],
+        ask,
+    }));
+    for _ in 0..200 {
+        world.tick();
+        if world.assigned.len() > before {
+            return world.assigned[before].clone();
+        }
+    }
+    panic!(
+        "chat request {key} was not assigned; tasks={:?}; answers={:?}",
+        world
+            .store
+            .rows
+            .values()
+            .filter_map(|row| match row {
+                Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(task))) =>
+                    Some((task.number, &task.phase)),
+                _ => None,
+            })
+            .collect::<Vec<_>>(),
+        world
+            .store
+            .rows
+            .values()
+            .filter_map(|row| match row {
+                Record::Core(jig_domain_core::Record::People(people::Stored::Answer { outcome, .. })) => Some(outcome),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    );
+}
+
+fn park_chat(world: &mut World, assignment: &engine::Assignment) {
+    let read = assignment.messages.last().map(|word| word.number);
+    if read.is_some() {
+        world.send(protocol::turn(Token::new(7), assignment.task, assignment.attempt, 1, 0, read, b"Read the message"));
+        world.until(Until::Ready);
+    }
+    let mut event = world.protocol.answer(
+        Token::new(7),
+        assignment.task,
+        assignment.attempt,
+        0,
+        tasks::End::Parked,
+        engine::Parts::none(),
+    );
+    let engine::Event::Worker(engine::WorkerInput::Link {
+        link: engine::Link::Up { up: host::LinkUp::Answer { answer, .. }, .. },
+        ..
+    }) = &mut event
+    else {
+        unreachable!("the protocol's answer is a worker answer")
+    };
+    // A resumed chat consumes its Say before parking, rather than waking on it again.
+    answer.read = read.map(Token::new);
+    answer.turns = u32::from(read.is_some());
+    world.send(event);
+    world.until(Until::Ready);
+}
+
+fn task_brief(assignment: &engine::Assignment) -> &[u8] {
+    assignment
+        .sections
+        .iter()
+        .find_map(|section| match &section.body {
+            engine::BriefBody::Text(words) if section.kind == engine::BriefKind::Core(jig_domain_brief::Core::Task) => {
+                Some(words.as_ref())
+            }
+            _ => None,
+        })
+        .expect("required Task section")
+}
+
+#[test]
+fn a_chat_made_before_its_home_was_adopted_reads_the_home_and_says_why() {
+    let mut world = World::configured(true, true);
+    world.sign_in();
+    world.send(protocol::hello_slots(Token::new(7), 2, Box::new([])));
+    let mut chats = Vec::new();
+    for key in [94, 95] {
+        let ask = adoption_chat(&world);
+        let assignment = assigned_chat(&mut world, key, ask);
+        assert!(live_task(&world, assignment.task).holdings.is_empty(), "no home exists to hold");
+        park_chat(&mut world, &assignment);
+        chats.push(assignment);
+    }
+    world.adopt();
+    // Parked attempts are no longer hosted; retain their identities in chats alone.
+    world.assigned.clear();
+    world.restart(true, true);
+    world.until(Until::Ready);
+    world.send(protocol::hello_slots(Token::new(7), 2, Box::new([])));
+    let reason = b"This chat began before org/repo was adopted, so you can read org/repo but not push to it. A new chat can push. Tell the person this in your next reply.";
+    for (chat, key) in chats.iter().zip([96, 97]) {
+        let assignment = assigned_chat(
+            &mut world,
+            key,
+            people::Ask::Say { project: 1, task: chat.task, words: Box::from(&b"Continue"[..]) },
+        );
+        assert_eq!(assignment.task, chat.task);
+        assert!(assignment.attempt > chat.attempt);
+        let [home] = assignment.workspace.repositories.as_ref() else { panic!("one home checkout") };
+        assert_eq!(home.provider, forge_world::REPO);
+        assert_eq!(home.push, None);
+        let text = task_brief(&assignment);
+        assert!(
+            text.windows(reason.len()).any(|words| words == reason),
+            "task text: {:?}",
+            String::from_utf8_lossy(text)
+        );
+        assert!(text.len() <= usize::try_from(world.env.limits.brief.budgets.task).expect("task budget"));
+        assert_eq!(live_task(&world, chat.task).hold, 0, "the chat was never held for Effects");
+        assert!(live_task(&world, chat.task).holdings.is_empty(), "read access acquires no holding");
+        park_chat(&mut world, &assignment);
+    }
+    let ask = adoption_chat(&world);
+    let assignment = assigned_chat(&mut world, 98, ask);
+    let task = live_task(&world, assignment.task);
+    let branch = format!("temper/{}/r{}", task.root, task.number).into_bytes();
+    assert!(task.holdings.iter().any(|holding| matches!(holding,
+    tasks::Holding::Write { resource, kind: 1 }
+        if resource.connector == 0 && resource.path.as_ref() == [
+            Box::from(forge_world::REPO.forge.to_be_bytes()),
+            Box::from(forge_world::REPO.repository.to_be_bytes()),
+            branch.clone().into_boxed_slice(),
+        ])));
+    let [home] = assignment.workspace.repositories.as_ref() else { panic!("one writable home checkout") };
+    assert_eq!(home.push.as_deref(), Some(branch.as_slice()));
+    assert!(!task_brief(&assignment).windows(reason.len()).any(|words| words == reason));
 }
 
 #[test]

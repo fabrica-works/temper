@@ -1144,6 +1144,23 @@ fn include_repository<'a>(selected: &mut List<&'a forge::Repository>, repository
     selected.push(repository).ok()
 }
 
+/// An older task can read a newly adopted repository without acquiring its run branch.
+pub(crate) fn unheld_run_branch(
+    domain: &Domain,
+    limits: &Limits,
+    task: u64,
+    repository: &forge::Repository,
+) -> Option<bool> {
+    let root = domain.core.tasks.root(task)?;
+    let branch = tree_branch(repository, root, b'r', task, None, limits.forge.name_bytes)?;
+    let name = forge::Name {
+        forge: repository.provider.forge,
+        repository: repository.provider.repository,
+        what: branch_what(&branch, limits.forge.name_bytes)?,
+    };
+    Some(domain.core.tasks.holder(&hub_name(domain.config.forge_connector, &name, &limits.tasks)?).is_none())
+}
+
 /// Resolve a run's repository tags and change ancestry before asking policy
 /// or taking the connector writer slot.
 #[expect(clippy::too_many_lines, reason = "one claim translates and checks all repository writes and holds")]
@@ -1272,7 +1289,11 @@ pub(crate) fn run_workspace(
                     {
                         return None;
                     }
-                    authority::Writer::Ancestor
+                    Some(authority::Writer::Ancestor)
+                }
+                None if unheld_run_branch(domain, &env.limits, context.task, repository)? => {
+                    push = None;
+                    None
                 }
                 None => {
                     if domain.core.tasks.holder(&hub_name(domain.config.forge_connector, &name, &env.limits.tasks)?)
@@ -1287,25 +1308,27 @@ pub(crate) fn run_workspace(
                     } else {
                         own_holds.push(name.clone()).ok()?;
                     }
-                    authority::Writer::Task
+                    Some(authority::Writer::Task)
                 }
             };
-            writes
-                .push(authority::Write {
-                    effect: authority::Effect {
-                        connector: domain.config.forge_connector,
-                        kind: 2,
-                        name: resource_name(repository, &name.what, env.limits.authority.segments)?,
-                        state: [0; 32],
-                        price: None,
-                        access: effect_access(repository, &name.what, 2),
-                        additional: Box::new([]),
-                        guards: Box::new([]),
-                    },
-                    held,
-                })
-                .ok()?;
-            names.push(name).ok()?;
+            if let Some(held) = held {
+                writes
+                    .push(authority::Write {
+                        effect: authority::Effect {
+                            connector: domain.config.forge_connector,
+                            kind: 2,
+                            name: resource_name(repository, &name.what, env.limits.authority.segments)?,
+                            state: [0; 32],
+                            price: None,
+                            access: effect_access(repository, &name.what, 2),
+                            additional: Box::new([]),
+                            guards: Box::new([]),
+                        },
+                        held,
+                    })
+                    .ok()?;
+                names.push(name).ok()?;
+            }
         }
         let provider = item.provider;
         repositories
