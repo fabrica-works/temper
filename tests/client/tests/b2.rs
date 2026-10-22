@@ -129,5 +129,8 @@ fn task_heading(task: u64, brief: &[u8]) -> Find {
     )
 }
 fn return_to_goal(goal: u64) -> Vec<Step<Address>> {
-    vec![Step::Press { find: task_link(goal) }, see(Find::exactly_named(Role::Region, b"Task details"))]
+    vec![
+        Step::Press { find: task_link(goal) },
+        see(Find::exactly_named(Role::Heading { level: 1 }, fixtures::GOAL_BRIEF)),
+    ]
 }

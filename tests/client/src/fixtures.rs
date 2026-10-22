@@ -411,6 +411,8 @@ pub fn chat_page(task: u64) -> temper_client_domain::Address {
 
 const GOAL_REPLY: Token = Token::new(1201);
 const GOAL_KEY: [u8; 16] = [41; 16];
+/// A goal's brief, its page's heading.
+pub const GOAL_BRIEF: &[u8] = b"Fix the adopted repository";
 const GOAL_PROJECT: u32 = 1;
 const GOAL_PRIORITY: u32 = 1;
 const GOAL_LABEL: u32 = 2;
@@ -699,8 +701,7 @@ fn make_goal_named(
     if procedure {
         adopt_goal_repository(driver);
     }
-    let jig_domain_people::Ask::Create { mut batch, .. } = driver.chat_ask(GOAL_PROJECT, b"Fix the adopted repository")
-    else {
+    let jig_domain_people::Ask::Create { mut batch, .. } = driver.chat_ask(GOAL_PROJECT, GOAL_BRIEF) else {
         panic!("create fixture");
     };
     if let Some(budget) = budget {
