@@ -41,6 +41,8 @@ pub struct Joint {
 }
 fn engine_limits() -> engine::Limits {
     let mut limits = temper_engine_domain_world::fixtures::forge_limits();
+    // The world's own bound, not production's: automatic Seen takes a key per arrival.
+    limits.people.requests = 5;
     let tools = temper_client_tools::limits::client().client.domain;
     // Frame project allocations must also fit the smaller tools project bound.
     limits.documents.lines = limits.documents.lines.min(tools.projects);

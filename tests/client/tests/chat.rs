@@ -230,11 +230,11 @@ fn the_proposal_fixture_admits_both_chat_and_inbox_clients() {
 
 type Probe = (temper_client_world::app::Root, skein_lib::Queue<temper_client_domain::Request>);
 const PROBE_ROUNDS: usize = 24;
-fn probe(address: temper_client_domain::Address) -> Probe {
+fn probe(seed: u64, address: temper_client_domain::Address) -> Probe {
     use jig_client_world::harness::App;
     use temper_client_world::app::Temper;
     let limits = fixtures::domain_limits();
-    let (mut root, _) = Temper::new(fixtures::SEED);
+    let (mut root, _) = Temper::new(seed);
     let mut out = skein_lib::Queue::with_capacity(Temper::max_out(&limits));
     Temper::step(
         &mut root,
@@ -270,7 +270,9 @@ fn accepting_the_goal_with_chat_and_inbox_watches_settles_the_engine() {
     use temper_client_domain::{Action, Event, pages::Act};
     let mut front = temper_client_world::front::Joint::new(fixtures::SEED, fixtures::domain_limits());
     let task = proposed_goal(&mut front);
-    let mut probes = vec![probe(fixtures::chat_page(task)), probe(fixtures::inbox())].into_boxed_slice();
+    let mut probes =
+        vec![probe(fixtures::SEED, fixtures::chat_page(task)), probe(fixtures::SEED + 1, fixtures::inbox())]
+            .into_boxed_slice();
     for client in [DIAGNOSTIC_CLIENT, INBOX_CLIENT] {
         front.bind(client, fixtures::PARTY);
     }
