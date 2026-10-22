@@ -17,6 +17,7 @@ pub struct ServiceHost {
     pub(crate) workers_address: Option<SocketAddr>,
     pub(crate) notes: Vec<temper_service::Note>,
     pub(crate) runs: crate::cluster::Runs,
+    started_at: Option<Time>,
     pub(crate) service: Option<temper_service::Service>,
     pub(crate) address: Option<SocketAddr>,
     pub(crate) link: Vec<u8>,
@@ -86,6 +87,7 @@ impl ServiceHost {
             workers_address: None,
             notes: Vec::new(),
             runs: crate::cluster::Runs::default(),
+            started_at: None,
             service: None,
             address: None,
             link: Vec::new(),
@@ -131,6 +133,14 @@ impl ServiceHost {
     #[must_use]
     pub fn end(&self) -> Option<&crate::End> {
         self.service.as_ref().and_then(temper_service::Service::end)
+    }
+    #[must_use]
+    pub fn started_at(&self) -> Option<Time> {
+        self.started_at
+    }
+    #[must_use]
+    pub fn assigned_at(&self) -> Option<Time> {
+        self.runs.assigned_at
     }
     #[must_use]
     pub fn ran(&self) -> &[u64] {
@@ -206,6 +216,7 @@ impl Host for ServiceHost {
                 );
             }
             service.adopt_signals(self.signals).expect("service signal pipe");
+            self.started_at = Some(now);
             self.service = Some(service);
         }
         if let Some(service) = &mut self.service {
@@ -214,7 +225,7 @@ impl Host for ServiceHost {
                     self.hook_wire.complete(complete, self.hooks, &mut self.seen.responses);
                 }
                 if let Some(crate::cluster::Shape::Worker { engine: Some(engine), .. }) = self.cluster {
-                    self.runs.complete(complete, engine);
+                    self.runs.complete(complete, engine, now);
                 }
                 self.watch.complete(complete);
                 for cue in &mut self.cues {

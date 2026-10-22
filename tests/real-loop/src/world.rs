@@ -230,14 +230,15 @@ impl Referee<Proc> for Judge {
         for proc in workers.iter_mut() {
             let Proc::Service(worker) = proc else { panic!("worker root") };
             worker.address = peer.address();
-            if let Some(crate::cluster::Shape::Worker { engine, .. }) = &mut worker.cluster {
+            if let Some(crate::cluster::Shape::Worker { name, engine, started }) = &mut worker.cluster {
                 *engine = service.workers_address;
+                if caller.adding_worker() == Some(*name) {
+                    *started = true;
+                    caller.added.set(worker.linked() > 0);
+                }
             }
         }
-        if !workers.is_empty()
-            && workers.iter().all(|proc| matches!(proc, Proc::Service(worker) if worker.runs.assigned()))
-            && !self.finished
-        {
+        if placed(workers) && !self.finished {
             peer.cue = true;
         }
         if !self.armed {
@@ -290,7 +291,9 @@ impl Referee<Proc> for Judge {
         }
         service.address = peer.address();
         if service.links() != 0
-            && workers.iter().all(|proc| matches!(proc, Proc::Service(worker) if worker.linked() > 0))
+            && workers
+                .iter()
+                .all(|proc| matches!(proc, Proc::Service(worker) if !worker_started(worker) || worker.linked() > 0))
         {
             caller.released = true;
         }
@@ -322,7 +325,9 @@ impl Referee<Proc> for Judge {
         let workers_changed = workers.iter().any(|proc| {
             let Proc::Service(worker) = proc else { panic!("worker root") };
             (peer.address().is_some() && worker.address.is_none())
-                || (service.workers_address.is_some() && worker.cluster.as_ref().is_some_and(|shape| !shape.ready()))
+                || (worker_started(worker)
+                    && service.workers_address.is_some()
+                    && worker.cluster.as_ref().is_some_and(|shape| !shape.ready()))
         });
         caller.held.set(service.held_at(caller.held_index()));
         caller.links.set(service.links());
@@ -351,10 +356,13 @@ impl Referee<Proc> for Judge {
         let pending = peer.observations().iter().fold(0_i64, |n, event| {
             n + i64::from(matches!(event, Query { .. })) - i64::from(matches!(event, Answered { .. }))
         });
-        let placing = !workers.is_empty()
-            && workers.iter().all(|proc| matches!(proc, Proc::Service(worker) if worker.runs.assigned()))
-            && pending > 0;
-        if placing
+        let placing = placed(workers) && pending > 0;
+        if caller.adding_worker().is_some_and(|name| {
+            workers.iter().any(|proc| matches!(proc, Proc::Service(worker)
+                if matches!(&worker.cluster, Some(crate::cluster::Shape::Worker { name: worker_name, .. }) if *worker_name == name)
+                    && (!worker_started(worker) || worker.linked() > 0 && !caller.added.get())))
+        })
+            || placing
             || workers_changed
             || (self.stopping && workers.iter().all(Host::is_empty) && !self.engine_stopping)
             || forge_changed
@@ -362,7 +370,7 @@ impl Referee<Proc> for Judge {
             || (peer.address().is_some() && service.address.is_none())
             || (service.links() != 0
                 && !caller.released
-                && workers.iter().all(|proc| matches!(proc, Proc::Service(worker) if worker.linked() > 0)))
+                && workers.iter().all(|proc| matches!(proc, Proc::Service(worker) if !worker_started(worker) || worker.linked() > 0)))
             || (caller.watching.is_some() && (!service.watching() || service.delivered() && !caller.watched))
             || (caller.is_empty() && !self.stopping)
             || (service.is_empty() && !self.finished)
@@ -388,12 +396,13 @@ pub(crate) fn run_cluster(
     steps: impl FnOnce() -> Vec<crate::calls::Step>,
 ) -> CheckedOutcome<Proc> {
     let mut world = World::new_controlled_checked(|controls| cluster_judge(controls, workers, None));
-    cluster_roots(&mut world, workers, scratch, recipe, None, steps);
+    cluster_roots(&mut world, workers, &[], scratch, recipe, None, steps);
     world.run(&skein_shell::Clock::new(), crate::PATIENCE)
 }
 
 pub(crate) fn run_cluster_forge(
     workers: &[&'static str],
+    late: &[&str],
     scratch: &[skein_scratch::Scratch],
     fixture: forge::Fixture,
     scripts: Scripts,
@@ -401,7 +410,7 @@ pub(crate) fn run_cluster_forge(
 ) -> skein_world::real::Outcome<Proc> {
     let state = std::rc::Rc::new(std::cell::RefCell::new(None));
     let mut world = World::new_controlled(|controls| cluster_judge(controls, workers, Some(state.clone())));
-    cluster_roots(&mut world, workers, scratch, || llm::scripted(Box::new([])), Some((fixture, scripts)), steps);
+    cluster_roots(&mut world, workers, late, scratch, || llm::scripted(Box::new([])), Some((fixture, scripts)), steps);
     world.spawn(|| {
         let (forge, peer) = forge::State::new(fixture);
         *state.borrow_mut() = Some(forge);
@@ -430,6 +439,7 @@ fn cluster_judge(
 fn cluster_roots<R: Referee<Proc>>(
     world: &mut World<Proc, R>,
     workers: &[&'static str],
+    late: &[&str],
     scratch: &[skein_scratch::Scratch],
     recipe: impl FnOnce() -> llm::Recipe,
     forge: Option<(forge::Fixture, Scripts)>,
@@ -457,7 +467,7 @@ fn cluster_roots<R: Referee<Proc>>(
             Proc::Service(Box::new(ServiceHost::cluster(
                 scratch.path(),
                 signals,
-                crate::cluster::Shape::Worker { name, engine: None },
+                crate::cluster::Shape::Worker { name, engine: None, started: !late.contains(name) },
                 forge.map(|(fixture, _)| fixture),
             )))
         });
@@ -465,4 +475,15 @@ fn cluster_roots<R: Referee<Proc>>(
     let mut git = crate::git::program();
     git.instances = u32::try_from(workers.len()).expect("worker git count");
     world.host_roots(git, crate::git::roots);
+}
+
+fn worker_started(worker: &ServiceHost) -> bool {
+    !matches!(worker.cluster, Some(crate::cluster::Shape::Worker { started: false, .. }))
+}
+
+fn placed(workers: &[Proc]) -> bool {
+    !workers.is_empty()
+        && workers
+            .iter()
+            .all(|proc| matches!(proc, Proc::Service(worker) if !worker_started(worker) || worker.runs.assigned()))
 }

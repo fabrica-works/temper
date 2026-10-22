@@ -3,7 +3,7 @@ use crate::{calls, fixtures, forge, llm, service::ServiceHost, world};
 use skein_io::kernel::{Complete, Done, Op};
 use std::{fmt::Write as _, net::SocketAddr, os::unix::fs::DirBuilderExt, path::Path};
 
-/// Script hold released once every named worker has received an assignment.
+/// Script hold released once every started worker has received an assignment.
 pub const PLACED: &[u8] = b"cluster-placed";
 
 pub struct Cluster {
@@ -44,12 +44,14 @@ pub fn run_cluster(
 #[must_use]
 pub fn run_cluster_forge(
     workers: &[&'static str],
+    late: &[&str],
     fixture: forge::Fixture,
     scripts: fn(SocketAddr) -> Box<[skein_fake_llm_domain::api::Script]>,
     steps: impl FnOnce() -> Vec<calls::Step>,
 ) -> Cluster {
+    assert!(late.iter().all(|name| workers.contains(name)), "configured late workers");
     run_with(workers, None, |scratch| {
-        crate::Outcome::Forge(world::run_cluster_forge(workers, scratch, fixture, scripts, steps))
+        crate::Outcome::Forge(world::run_cluster_forge(workers, late, scratch, fixture, scripts, steps))
     })
 }
 
@@ -76,11 +78,11 @@ fn run_with(
 
 pub(crate) enum Shape {
     Engine(Vec<&'static str>),
-    Worker { name: &'static str, engine: Option<SocketAddr> },
+    Worker { name: &'static str, engine: Option<SocketAddr>, started: bool },
 }
 impl Shape {
     pub(crate) fn ready(&self) -> bool {
-        !matches!(self, Self::Worker { engine: None, .. })
+        !matches!(self, Self::Worker { engine: None, .. } | Self::Worker { started: false, .. })
     }
     pub(crate) fn write(&self, path: &Path) {
         use serde_json::json;
@@ -128,7 +130,7 @@ impl Shape {
                         .expect("fixture digest");
                 }
             }
-            Self::Worker { name, engine } => {
+            Self::Worker { name, engine, .. } => {
                 let worker = document["workers"].as_array_mut().expect("workers").first_mut().expect("one worker");
                 // One retained turn, one held event, and no program-backed LLM source.
                 for (limit, size) in [("hub.turns", 1), ("hub.held", 1), ("hub.program_sources", 0)] {
@@ -170,13 +172,14 @@ pub(crate) struct Runs {
     bytes: Vec<u8>,
     pending: Option<u64>,
     pub(crate) tasks: Vec<u64>,
+    pub(crate) assigned_at: Option<skein_lib::Time>,
 }
 impl Runs {
     pub(crate) const MEMORY: u64 = (WIRE_BYTES * 4) as u64;
     pub(crate) fn assigned(&self) -> bool {
         self.pending.is_some() || !self.tasks.is_empty()
     }
-    pub(crate) fn complete(&mut self, complete: &Complete, engine: SocketAddr) {
+    pub(crate) fn complete(&mut self, complete: &Complete, engine: SocketAddr, now: skein_lib::Time) {
         match (&complete.kind, &complete.result) {
             (Op::Recv { fd, buf }, Ok(Done::Count(count))) if Some(*fd) == self.fd => {
                 self.bytes.extend_from_slice(&buf[..*count as usize]);
@@ -195,6 +198,7 @@ impl Runs {
                         )
                         .expect("assignment");
                         self.pending = Some(assignment.task());
+                        self.assigned_at.get_or_insert(now);
                     }
                     self.bytes.drain(..end);
                 }

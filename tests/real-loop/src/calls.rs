@@ -13,6 +13,7 @@ pub enum Arg {
     Task(usize),
     Delegate(usize),
     Digest(usize),
+    ActivityBefore(usize),
     Number(u64),
     File(&'static str),
 }
@@ -28,6 +29,9 @@ pub enum Step {
     /// Finish runtime fixture provisioning before recording the story calls.
     FixtureReady,
     Advance,
+    AddWorker {
+        name: &'static str,
+    },
     Probe {
         at: Dir,
     },
@@ -69,6 +73,11 @@ pub enum Step {
         holds: &'static [u8],
         early: &'static [u8],
     },
+}
+/// Start a configured worker and wait for its link before the next act.
+#[must_use]
+pub fn add_worker(name: &'static str) -> Step {
+    Step::AddWorker { name }
 }
 #[must_use]
 pub fn advance() -> Step {
@@ -150,6 +159,11 @@ pub fn delegate(call: usize) -> Arg {
 pub fn digest(call: usize) -> Arg {
     Arg::Digest(call)
 }
+/// The previous page cursor supplied by a task's activity read.
+#[must_use]
+pub fn activity_before(call: usize) -> Arg {
+    Arg::ActivityBefore(call)
+}
 fn delegate_number(stdout: &[u8]) -> u64 {
     let value: serde_json::Value = serde_json::from_slice(stdout).expect("task tree JSON");
     let tree = &value["tree"];
@@ -208,6 +222,7 @@ pub(crate) struct Caller {
     recording: Recording,
     pub(crate) released: bool,
     pub(crate) advanced: Cell<bool>,
+    pub(crate) added: Cell<bool>,
     pub(crate) held: Cell<bool>,
     pub(crate) links: Cell<u32>,
     retry_link: Option<u32>,
@@ -235,6 +250,7 @@ impl Caller {
         self.steps.iter().filter_map(|step| match step {
             Step::Held { name } => Some(*name),
             Step::FixtureReady
+            | Step::AddWorker { .. }
             | Step::Advance
             | Step::SignIn { .. }
             | Step::SameParty { .. }
@@ -248,6 +264,12 @@ impl Caller {
             | Step::Release { .. }
             | Step::Contended { .. } => None,
         })
+    }
+    pub(crate) fn adding_worker(&self) -> Option<&'static str> {
+        match self.steps.get(self.next) {
+            Some(Step::AddWorker { name }) => Some(*name),
+            _ => None,
+        }
     }
     pub(crate) fn advancing(&self) -> bool {
         matches!(self.steps.get(self.next), Some(Step::Advance))
@@ -284,6 +306,7 @@ impl Caller {
             recording: Recording::Story,
             released: false,
             advanced: Cell::new(false),
+            added: Cell::new(false),
             held: Cell::new(false),
             links: Cell::new(0),
             retry_link: None,
@@ -338,6 +361,7 @@ impl Caller {
             }
             Step::Call { at, argv } | Step::Start { at, argv } | Step::Until { at, argv, .. } => (at, argv),
             Step::FixtureReady
+            | Step::AddWorker { .. }
             | Step::Advance
             | Step::Join { .. }
             | Step::Watching { .. }
@@ -357,6 +381,16 @@ impl Caller {
                     let value: serde_json::Value =
                         serde_json::from_slice(&self.calls[*call].stdout).expect("task JSON");
                     value["task"]["digest"].as_str().expect("task digest").as_bytes().into()
+                }
+                Arg::ActivityBefore(call) => {
+                    let value: serde_json::Value =
+                        serde_json::from_slice(&self.calls[*call].stdout).expect("activity JSON");
+                    value
+                        .pointer("/activity/before/value")
+                        .and_then(serde_json::Value::as_str)
+                        .expect("previous activity page")
+                        .as_bytes()
+                        .into()
                 }
                 Arg::Number(number) => number.to_string().into_bytes().into(),
                 Arg::File(name) => self.scratch.join(name).as_os_str().as_bytes().into(),
@@ -566,11 +600,9 @@ impl Caller {
         match step {
             Step::FixtureReady if self.running.iter().any(Option::is_some) => return,
             Step::FixtureReady => self.fixture_ready(),
-            Step::Advance => {
-                if !self.advanced.get() {
-                    return;
-                }
-            }
+            Step::AddWorker { .. } if !self.added.replace(false) => return,
+            Step::Advance if !self.advanced.get() => return,
+            Step::AddWorker { .. } | Step::Advance => {}
             Step::Held { .. } => return,
             Step::Kill { call } => {
                 let index = *call;
@@ -660,6 +692,7 @@ impl Caller {
         match self.steps.get(self.next) {
             Some(Step::FixtureReady) => self.running.iter().all(Option::is_none),
             Some(Step::Advance) => self.advanced.get(),
+            Some(Step::AddWorker { .. }) => self.added.get(),
             Some(Step::Held { .. }) => self.held.get(),
             Some(Step::SameParty { .. }) if self.retry_link.is_some() => {
                 self.retry_link.is_some_and(|link| self.links.get() > link)
