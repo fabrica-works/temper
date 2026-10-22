@@ -378,13 +378,14 @@ impl Observations {
             lines += 1;
             let record = line.and_then(|()| decode(&reader.bytes));
             match record {
-                Ok(Recorded::Lost(lost)) => {
+                Ok(Some(Recorded::Lost(lost))) => {
                     if let Some(why) = refused {
                         return Err(why);
                     }
                     boundary = Some(Self { path: path.into(), end: reader.offset, lines, lost });
                 }
-                Ok(Recorded::Observed { .. }) => {}
+                Ok(Some(Recorded::Observed { .. }) | None) => {}
+                Err(why) if why == GIT_FULL => return Err(why),
                 Err(why) => {
                     if refused.is_none() {
                         refused = Some(format!("line {lines}: {why}"));
@@ -404,9 +405,18 @@ impl Observations {
         Ok(Records { reader: Lines::open(&self.path, self.end)?, end: self.end, done: false })
     }
 }
-fn decode(bytes: &[u8]) -> Result<Recorded, String> {
-    decode_with_limits(bytes, &temper_fake::forge::LIMITS.limits).map_err(|why| format!("decode: {why:?}"))
+const GIT_FULL: &str = "GitHub git-call record is full";
+fn decode(bytes: &[u8]) -> Result<Option<Recorded>, String> {
+    match decode_with_limits(bytes, &temper_fake::forge::LIMITS.limits) {
+        Ok(record) => Ok(Some(record)),
+        Err(refused) => match temper_fake::forge::observations::decode(bytes) {
+            Ok(Some(temper_fake::forge::observations::Observation::GitCall(_))) => Ok(None),
+            Ok(Some(temper_fake::forge::observations::Observation::GitCallsFull { .. })) => Err(GIT_FULL.into()),
+            Ok(None) | Err(_) => Err(format!("decode: {refused:?}")),
+        },
+    }
 }
+
 pub(crate) struct Records {
     reader: Lines,
     end: u64,
@@ -418,10 +428,20 @@ impl Iterator for Records {
         if self.done || self.reader.offset == self.end {
             return None;
         }
-        let record = match self.reader.next_line() {
-            Ok(Some(line)) => line.and_then(|()| decode(&self.reader.bytes)),
-            Ok(None) => Err("observations: file shorter than checkpoint boundary".into()),
-            Err(why) => Err(why),
+        let record = loop {
+            match self.reader.next_line() {
+                Ok(Some(line)) => match line.and_then(|()| decode(&self.reader.bytes)) {
+                    Ok(Some(record)) => break Ok(record),
+                    Ok(None) => {
+                        if self.reader.offset == self.end {
+                            return None;
+                        }
+                    }
+                    Err(why) => break Err(why),
+                },
+                Ok(None) => break Err("observations: file shorter than checkpoint boundary".into()),
+                Err(why) => break Err(why),
+            }
         };
         if record.is_err() {
             self.done = true;

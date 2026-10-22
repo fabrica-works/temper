@@ -13,6 +13,7 @@ members = [
     "tests/one-process",
     "crates/temper-fake-git",
     "testing/temper-fake-git-hosted",
+    "testing/temper-github-app",
     "crates/temper",
     "tests/engine/protocol-forge",
     "crates/temper-client-shell-terminal",
@@ -58,6 +59,7 @@ publish = false
 
 [workspace.dependencies]
 rustls = { version = "=0.23.41", default-features = false, features = ["std", "ring", "tls12"] }
+temper-github-app = { path = "testing/temper-github-app" }
 temper-fake = { path = "crates/temper-fake" }
 temper-protocol-records = { path = "crates/temper-protocol-records" }
 skein-fake-forge-github = { git = "https://github.com/fabrig-dev/skein.git" }

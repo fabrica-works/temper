@@ -1,4 +1,6 @@
 //! The QA forge's document, fixed seed and setup acts (protocol/setup.md, 8.4).
+pub mod github;
+pub mod observations;
 use crate::{Refusal, read};
 use alloc::boxed::Box;
 use core::net::SocketAddr;
@@ -29,6 +31,7 @@ pub struct Ci {
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Repository {
+    pub owner: Box<[u8]>,
     pub name: Box<[u8]>,
     pub landing: Box<[u8]>,
     pub ci: Option<Ci>,
@@ -40,6 +43,7 @@ pub struct Document {
     admin_token: Box<[u8]>,
     owner: Box<[u8]>,
     repositories: Box<[Repository]>,
+    github: Option<github::Github>,
 }
 impl Document {
     /// The fake forge of a checked setup entry, its token at `admin_token` (protocol/setup.md, 8.4).
@@ -49,7 +53,12 @@ impl Document {
             List::with_capacity(u32::try_from(fake.repositories.len()).expect("checked repositories"));
         for repository in &fake.repositories {
             repositories
-                .push(Repository { name: repository.name.clone(), landing: repository.landing.clone(), ci: None })
+                .push(Repository {
+                    owner: fake.owner.clone(),
+                    name: repository.name.clone(),
+                    landing: repository.landing.clone(),
+                    ci: None,
+                })
                 .expect("checked repositories");
         }
         Self {
@@ -57,6 +66,7 @@ impl Document {
             admin_token: bytes::copy_of(admin_token),
             owner: fake.owner.clone(),
             repositories: repositories.into_boxed(),
+            github: None,
         }
     }
     pub fn decode(bytes: &[u8]) -> Result<Self, Refusal> {
@@ -67,6 +77,10 @@ impl Document {
         let admin_token = read::field(&mut o, &d, b"admin_token", crate::limits::PATH_BYTES, &p)?;
         let owner = read::field(&mut o, &d, b"owner", 40, &p)?;
         let repositories_at = read::required(&mut o, &d, b"repositories", &p)?;
+        let github = match o.member(&d, b"github") {
+            Some(at) => Some(github::decode(&d, at, &p.member(b"github"))?),
+            None => None,
+        };
         read::finish(o, &d, &p)?;
         let listen = read::listen(&d, listen_at, &p.member(b"listen"))?;
         read::absolute(&admin_token, &p.member(b"admin_token"))?;
@@ -81,6 +95,14 @@ impl Document {
             let mut o = read::object(&d, *at, &p)?;
             let name = read::field(&mut o, &d, b"name", 100, &p)?;
             let landing = read::field(&mut o, &d, b"landing", LIMITS.limits.name_bytes, &p)?;
+            let repository_owner = if github.is_some() {
+                match o.member(&d, b"owner") {
+                    Some(at) => read::text(&d, at, 39, &p.member(b"owner"))?,
+                    None => owner.clone(),
+                }
+            } else {
+                owner.clone()
+            };
             let ci_at = read::required(&mut o, &d, b"ci", &p)?;
             read::finish(o, &d, &p)?;
             if !repository(&name) {
@@ -90,7 +112,7 @@ impl Document {
                 return Err(read::why(&p.member(b"landing"), b"expected a branch name"));
             }
             for prev in &repositories {
-                if prev.name == name {
+                if prev.name == name && prev.owner == repository_owner {
                     return Err(read::why(&p.member(b"name"), b"must be unique"));
                 }
             }
@@ -116,9 +138,12 @@ impl Document {
                 read::nonempty(&green, &p.member(b"green"))?;
                 Some(Ci { path, green })
             };
-            repositories.push(Repository { name, landing, ci }).expect("eight repositories");
+            repositories.push(Repository { owner: repository_owner, name, landing, ci }).expect("eight repositories");
         }
-        Ok(Self { listen, admin_token, owner, repositories: repositories.into_boxed() })
+        if let Some(github) = &github {
+            github.check(repositories.as_slice())?;
+        }
+        Ok(Self { listen, admin_token, owner, repositories: repositories.into_boxed(), github })
     }
     #[must_use]
     pub fn listen(&self) -> SocketAddr {
@@ -145,7 +170,7 @@ impl Document {
         let mut repositories = List::with_capacity(crate::ENTRIES);
         for (i, repository) in self.repositories.iter().enumerate() {
             let id = u32::try_from(i).expect("eight repositories").checked_add(1).expect("numbered from one");
-            let full = read::joined(&[&self.owner, b"/", &repository.name]);
+            let full = read::joined(&[&repository.owner, b"/", &repository.name]);
             let mut tree = List::with_capacity(3);
             for (path, content) in FILES {
                 tree.push(api::File { path: bytes::copy_of(path), content: bytes::copy_of(content) })
@@ -165,6 +190,9 @@ impl Document {
                     hooked: true,
                 },
             );
+            if let Some(github) = &self.github {
+                domain::grant(&mut domain, &full, github.bot(), api::Permission::Admin);
+            }
             repositories.push(forgejo::Repository { id, full, protected: None }).expect("eight repositories");
         }
         for _ in 0..LIMITS.limits.observations {
@@ -280,6 +308,9 @@ pub fn peer(
 ) -> Result<(skein_fake_peers::forge::Peer, alloc::rc::Rc<core::cell::RefCell<Forge>>), skein_fake_peers::Error> {
     let (forge, config) = document.seed(seed);
     let shared = alloc::rc::Rc::new(core::cell::RefCell::new(forge));
+    if let Some(github) = &document.github {
+        return Ok((github.peer(document, shared.clone(), seed)?, shared));
+    }
     let mut peer = skein_fake_peers::forge::Peer::new(
         document.listen(),
         crate::limits::peer(),

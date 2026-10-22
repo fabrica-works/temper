@@ -143,6 +143,23 @@ fn observations() {
         format!("observations {}: {}", root.join("absent").display(), std::io::Error::from_raw_os_error(2));
     for (name, bytes, expected) in [
         ("start", Some(START.to_vec()), Ok((1, 0, vec![START.to_vec()]))),
+        (
+            "github",
+            Some(
+                [
+                    START,
+                    b"{\"observation\":\"git_call\",\"installation\":1,\"mint\":2,\"writes\":true,\"status\":200}\n",
+                    START,
+                ]
+                .concat(),
+            ),
+            Ok((3, 0, vec![START.to_vec(), START.to_vec()])),
+        ),
+        (
+            "github-full",
+            Some([START, b"{\"observation\":\"git_calls_full\",\"capacity\":128}\n"].concat()),
+            Err(GIT_FULL),
+        ),
         ("partial", Some([DELETED, START, b"{partial"].concat()), Ok((2, 0, vec![DELETED.to_vec(), START.to_vec()]))),
         ("refused-tail", Some([DELETED, START, b"{\n"].concat()), Ok((2, 0, vec![DELETED.to_vec(), START.to_vec()]))),
         ("refused-prefix", Some([b"{\n", START].concat()), Err(REFUSED)),

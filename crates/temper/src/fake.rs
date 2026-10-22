@@ -384,6 +384,7 @@ fn start(arguments: &Arguments, created: &mut Created) -> Result<(Host, skein_sh
         observation_path: arguments.observations.clone(),
         observations,
         writer,
+        git_calls: forge::observations::GitCalls::new(),
         buffer,
         stopped: false,
         peer_submissions: 0,
@@ -466,6 +467,7 @@ struct Host {
     observations: Option<File>,
     writer: Option<skein_fake_forge_protocol::observations::Writer>,
     buffer: List<u8>,
+    git_calls: forge::observations::GitCalls,
     stopped: bool,
     peer_submissions: u32,
     checkpoint: bool,
@@ -528,13 +530,33 @@ impl Host {
                 self.fail("observations", &"drain exceeds its byte bound");
                 return;
             }
+            let full = if let Peer::Forge(peer) = &self.peer
+                && let Some(calls) = peer.git_calls()
+            {
+                if let Ok(full) = self.git_calls.drain(calls, &mut self.buffer) {
+                    full
+                } else {
+                    self.buffer.clear();
+                    self.fail("observations", &"git-call drain exceeds its byte bound");
+                    return;
+                }
+            } else {
+                false
+            };
             if !self.buffer.is_empty() {
                 let result = self.observations.as_mut().expect("writer has file").write_all(self.buffer.as_slice());
                 self.buffer.clear();
                 if let Err(why) = result {
                     let path = self.observation_path.as_ref().expect("writer has path").display().to_string();
                     self.fail(&path, &why);
+                    return;
                 }
+            }
+            if full {
+                self.fail(
+                    "observations",
+                    &"the GitHub git-call record is full (limits.git_records); the stream has ended",
+                );
             }
         } else {
             while forge.domain.pop_observation().is_some() {}

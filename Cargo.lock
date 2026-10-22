@@ -2735,6 +2735,7 @@ dependencies = [
  "jig-protocol-config",
  "serde_json",
  "skein-fake-forge-domain",
+ "skein-fake-forge-github",
  "skein-fake-forge-protocol",
  "skein-fake-llm-domain",
  "skein-fake-llm-protocol",
@@ -2835,6 +2836,25 @@ dependencies = [
  "skein-tls",
  "skein-tls-world",
  "temper-forge-setup",
+ "temper-service",
+]
+
+[[package]]
+name = "temper-github-app"
+version = "0.0.0"
+dependencies = [
+ "jig-protocol-config",
+ "jig-protocol-store",
+ "skein-fake-forge-github",
+ "skein-forge",
+ "skein-forge-connection",
+ "skein-forge-setup",
+ "skein-io",
+ "skein-lib",
+ "skein-scratch",
+ "skein-shell",
+ "temper-protocol-records",
+ "temper-protocol-store",
  "temper-service",
 ]
 
