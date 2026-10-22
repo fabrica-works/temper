@@ -655,6 +655,12 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 .temper-page :is(.temper-accounts-page, .temper-adoption-page) button, .temper-page :is(.temper-accounts-page, .temper-adoption-page) .temper-card button { min-height: 28px; max-width: 100%; border: 1px solid #d8d0c5; border-radius: 5px; background: #fffefd; color: var(--temper-ink); padding: 6px 10px; margin: 0; font: 600 11px/1.3 var(--temper-mono); overflow-wrap: anywhere; }
 .temper-accounts-page form > button { justify-self: start; margin: 0 0 6px; }
 .temper-page .temper-adoption-page > .temper-card > button { justify-self: start; margin-top: 17px; background: var(--temper-accent); border-color: var(--temper-accent); color: #fff; }
+/* The form's checks on the radios' grid, each check and the act on the fields' 12px rhythm. */
+.temper-adoption-page section > .temper-card { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 9px; }
+.temper-adoption-page section > .temper-card > :not(input[type=checkbox], input[type=checkbox] + label) { grid-column: 1 / -1; }
+.temper-adoption-page section > .temper-card > input[type=checkbox] { grid-column: 1; align-self: center; margin-top: 12px; }
+.temper-adoption-page section > .temper-card > input[type=checkbox] + label { grid-column: 2; margin: 12px 0 0; }
+.temper-page .temper-adoption-page section > .temper-card > button { justify-self: start; margin-top: 12px; }
 :is(.temper-accounts-page, .temper-adoption-page) button:disabled { opacity: .55; cursor: default; }
 :is(.temper-accounts-page, .temper-adoption-page) a { color: var(--temper-accent); text-decoration: underline; overflow-wrap: anywhere; }
 @media (max-width: 850px) {
