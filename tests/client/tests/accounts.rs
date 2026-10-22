@@ -91,7 +91,7 @@ fn a_sign_in_started_answer_is_followed_by_its_actual_end_on_the_accounts_watch(
     front.engine.send(temper_engine_domain::Event::Account(a::Event::SignedIn {
         source,
         subject: Box::from(b"subject".as_slice()),
-        display: Box::from(b"Test".as_slice()),
+        display: Box::from(b"alice@example.com".as_slice()),
         declined: false,
     }));
     accounts::settle(&mut front, &mut root);
@@ -102,6 +102,11 @@ fn a_sign_in_started_answer_is_followed_by_its_actual_end_on_the_accounts_watch(
     );
     assert!(d::pages::accounts::document(root.client()).expect("account fixture state").last_end.is_some());
     assert_eq!(root.pages().accounts().expect("account fixture state").sign_in_address(root.client()), None);
+    patches = skein_lib::Queue::with_capacity(bounds.tree.patches);
+    temper_client_view::build(&mut view, root, fixtures::NOW, &mut patches);
+    let text: Vec<u8> =
+        view.tree().nodes().iter().flat_map(|node| node.text.iter().flat_map(|run| run.text.iter().copied())).collect();
+    assert!(String::from_utf8(text).expect("view words").contains("Signed in to ChatGPT as alice@example.com"));
 }
 
 #[test]

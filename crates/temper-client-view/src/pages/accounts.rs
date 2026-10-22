@@ -337,13 +337,20 @@ fn account(
     omitted(b, w, W::SourcesOmitted, sources.len(), counts.sources);
     b.close();
 }
-fn end(b: &mut Builder, w: &Words, end: &c::OwnerAccountEnd) {
+fn end(b: &mut Builder, w: &Words, end: &c::OwnerAccountEnd, rows: &skein_lib::List<c::OwnerAccountLine>) {
     b.open(Role::Status);
     b.open(Role::Text);
     match end {
         c::OwnerAccountEnd::Made { account, declined } | c::OwnerAccountEnd::Renewed { account, declined } => {
-            run(b, w, if let c::OwnerAccountEnd::Made { .. } = end { W::Made } else { W::Renewed });
-            number(b, w, u64::from(*account));
+            let (word, fallback) = if let c::OwnerAccountEnd::Renewed { .. } = end {
+                (W::RenewedNamed, W::Renewed)
+            } else {
+                (W::MadeNamed, W::Made)
+            };
+            if !named_end(b, w, rows, *account, word) {
+                run(b, w, fallback);
+                number(b, w, u64::from(*account));
+            }
             if *declined {
                 run(b, w, W::Declined);
             }
@@ -368,6 +375,27 @@ fn end(b: &mut Builder, w: &Words, end: &c::OwnerAccountEnd) {
     }
     b.close();
     b.close();
+}
+fn named_end(b: &mut Builder, w: &Words, rows: &skein_lib::List<c::OwnerAccountLine>, account: u32, word: W) -> bool {
+    for row in rows {
+        if row.number != account {
+            continue;
+        }
+        let Some(name) = provider_name(row.provider_name.as_ref()) else { return false };
+        if row.display.bytes().is_empty() {
+            return false;
+        }
+        let (_, plan) = words::provider_words(name);
+        let holes = [
+            Hole::Name(skein_lib::bytes::copy_of(plan)),
+            Hole::Name(skein_lib::bytes::copy_of(row.display.bytes())),
+            Hole::Name(skein_lib::bytes::copy_of(plan)),
+        ];
+        let holes = if word == W::RenewedNamed { &holes } else { holes.get(..2).expect("made has two holes") };
+        b.run(Run::Plain, &words::say(w, word, holes));
+        return true;
+    }
+    false
 }
 fn refused(b: &mut Builder, w: &Words, refusal: c::OwnerAccountRefusal) {
     use c::OwnerAccountRefusal as R;
@@ -457,7 +485,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
         }
         if let Some(last) = &doc.last_end {
             fact(b, w, W::LastEnd, u64::from(last.source));
-            end(b, w, &last.end);
+            end(b, w, &last.end, &doc.accounts);
         }
         if doc.cut {
             text(b, w, Role::Status, W::Cut);

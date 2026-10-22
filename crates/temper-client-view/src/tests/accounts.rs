@@ -563,6 +563,75 @@ fn sign_in_ends_preserve_their_typed_details() {
         assert!(skein_lib::bytes::find(&fixtures::text(fixtures::build(&mut view, &root)), expected).is_some());
     }
 }
+fn sign_in_end_words(mut doc: c::OwnerAccounts, end: c::OwnerAccountEnd) -> Vec<u8> {
+    doc.last_end = Some(c::OwnerAccountLastEnd { source: SOURCE, end });
+    let (mut root, watch) = fixtures::account_root();
+    deliver(&mut root, watch, doc);
+    let mut view = fixtures::view();
+    let tree = fixtures::build(&mut view, &root);
+    for (index, status) in tree.nodes().iter().enumerate() {
+        if status.role != Role::Status {
+            continue;
+        }
+        let node = tree.nodes().get(index.checked_add(1).unwrap()).unwrap();
+        let mut words = Vec::new();
+        for run in &node.text {
+            words.extend_from_slice(&run.text);
+        }
+        if words.starts_with(b"Signed in") || words.starts_with(b"That's") {
+            return words;
+        }
+    }
+    panic!("sign-in end status");
+}
+#[test]
+fn a_completed_sign_in_names_the_plan_and_display() {
+    assert_eq!(
+        sign_in_end_words(
+            card_document(b"openai", b"alice@example.com", c::OwnerAccountKind::SignIn),
+            c::OwnerAccountEnd::Made { account: 1, declined: false }
+        ),
+        b"Signed in to ChatGPT as alice@example.com"
+    );
+}
+#[test]
+fn a_renewed_sign_in_explains_how_to_add_another_account() {
+    assert_eq!(sign_in_end_words(card_document(b"openai", b"alice@example.com", c::OwnerAccountKind::SignIn), c::OwnerAccountEnd::Renewed { account: 1, declined: false }), b"That's alice@example.com again. To add another account, sign out of ChatGPT in your browser first, then Continue with ChatGPT.");
+}
+#[test]
+fn a_sign_in_end_keeps_the_number_when_its_account_has_not_arrived() {
+    for (end, expected) in [
+        (c::OwnerAccountEnd::Made { account: 29, declined: false }, b"Signed in; account 29".as_slice()),
+        (
+            c::OwnerAccountEnd::Renewed { account: 29, declined: false },
+            b"Signed in to the same account again; account 29",
+        ),
+    ] {
+        assert_eq!(sign_in_end_words(document(0), end), expected);
+    }
+}
+#[test]
+fn a_sign_in_end_keeps_the_number_when_its_display_is_empty() {
+    for (end, expected) in [
+        (c::OwnerAccountEnd::Made { account: 1, declined: false }, b"Signed in; account 1".as_slice()),
+        (
+            c::OwnerAccountEnd::Renewed { account: 1, declined: false },
+            b"Signed in to the same account again; account 1",
+        ),
+    ] {
+        assert_eq!(sign_in_end_words(card_document(b"openai", b"", c::OwnerAccountKind::SignIn), end), expected);
+    }
+}
+#[test]
+fn a_named_sign_in_end_still_reports_declined_plan_usage() {
+    assert!(
+        sign_in_end_words(
+            card_document(b"openai", b"alice@example.com", c::OwnerAccountKind::SignIn),
+            c::OwnerAccountEnd::Made { account: 1, declined: true }
+        )
+        .ends_with(b"You signed in without plan usage.")
+    );
+}
 fn answer_account_operation(root: &mut d::Domain, operation: Operation, outcome: c::OwnerOutcome) {
     let limits = fixtures::limits();
     let env = skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits };
@@ -697,7 +766,7 @@ mod memory_literal;
 // skein f043ea16: b6ea7b9c's placeholder and completed state; boxed patch attributes, no slotless splice room.
 // The page reserves its patch queue once, at four patches a node.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 6978187051;
+const ACCOUNT_BYTES: u64 = 6978187347;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

@@ -222,7 +222,7 @@ mod memory_literal;
 // skein f043ea16: b6ea7b9c's placeholder and completed state; boxed patch attributes, no slotless splice room.
 // The page reserves its patch queue once, at four patches a node.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274387665285;
+const WEB_BYTES: u64 = 274387665581;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

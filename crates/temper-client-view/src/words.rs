@@ -333,7 +333,7 @@ pub enum Word {
 // Forty-seven time form, calendar and placement phrases (5.12).
 // The change panel adds 86 forge phrases (2000–2085).
 // Three empty and partial ended-children phrases (5.10).
-const PHRASES: u32 = 770;
+const PHRASES: u32 = 772;
 const ALL: [Word; 302] = [
     Word::TimeYesterdayWord,
     Word::TimeJustNow,
@@ -1058,7 +1058,7 @@ impl Words {
         for phrase in jig_language().phrases {
             phrases.push(phrase).expect("jig words fit");
         }
-        crate::accounts::words::extend(&mut shapes, &mut phrases, joined);
+        crate::accounts::words::extend(&mut shapes, &mut phrases, joined, text);
         crate::cards::words::extend(text, &mut shapes, &mut phrases);
         temper_client_domain::forge::words::extend(connector, text, &mut shapes, &mut phrases);
         temper_client_domain::forge::words::extend_change(connector, &mut shapes, &mut phrases);

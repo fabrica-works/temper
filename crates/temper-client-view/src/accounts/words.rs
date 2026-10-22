@@ -147,6 +147,8 @@ pub(crate) enum Word {
     PlanSignIn,
     CodeLogin,
     ProgramCommand,
+    MadeNamed,
+    RenewedNamed,
 }
 const ROWS: &[(Word, &[u8])] = &[
     (Word::AccountsOmitted, b"Accounts left out: "),
@@ -315,6 +317,23 @@ const NAMED: &[(Word, &[u8], &[u8])] = &[
     (Word::CodeLogin, b"Claude Code login ", b""),
     (Word::ProgramCommand, b"On each host, run: temper program-login ", b""),
 ];
+// PLAN is hole 0 and DISPLAY hole 1; hole 2 repeats PLAN in a renewal.
+struct EndWords {
+    literals: &'static [&'static [u8]],
+    indices: &'static [u16],
+}
+const ENDS: &[EndWords] = &[
+    EndWords { literals: &[b"Signed in to ", b" as ", b""], indices: &[0, 1] },
+    EndWords {
+        literals: &[
+            b"That's ",
+            b" again. To add another account, sign out of ",
+            b" in your browser first, then Continue with ",
+            b".",
+        ],
+        indices: &[1, 0, 2],
+    },
+];
 fn id(number: u16) -> PhraseId {
     PhraseId { owner: super::owner(), number }
 }
@@ -329,6 +348,10 @@ pub(crate) fn say(words: &Words, word: Word, holes: &[Hole]) -> Box<[u8]> {
         203
     } else if word == Word::AddressLong {
         204
+    } else if word == Word::MadeNamed {
+        220
+    } else if word == Word::RenewedNamed {
+        221
     } else {
         let mut number = None;
         for (index, (candidate, _, _)) in NAMED.iter().enumerate() {
@@ -344,7 +367,7 @@ pub(crate) fn say(words: &Words, word: Word, holes: &[Hole]) -> Box<[u8]> {
     };
     words.book.say(words.language, id(number), holes).expect("checked account phrase").text
 }
-pub(crate) fn extend(shapes: &mut List<PhraseShape>, phrases: &mut List<Phrase>, name_bytes: u32) {
+pub(crate) fn extend(shapes: &mut List<PhraseShape>, phrases: &mut List<Phrase>, name_bytes: u32, text_bytes: u32) {
     for (index, (_, literal)) in ROWS.iter().enumerate() {
         let id = id(u16::try_from(index).expect("account words fit"));
         shapes.push(PhraseShape { id, holes: Box::new([]), plural: None }).expect("account shapes fit");
@@ -382,6 +405,25 @@ pub(crate) fn extend(shapes: &mut List<PhraseShape>, phrases: &mut List<Phrase>,
             })
             .expect("account phrase fits");
     }
+    for (index, end) in ENDS.iter().enumerate() {
+        let id = id(220_u16.checked_add(u16::try_from(index).expect("end words fit")).expect("phrase IDs fit"));
+        let hole = HoleShape { kind: HoleKind::Name, bytes: text_bytes.max(7) };
+        let mut holes = List::with_capacity(u32::try_from(end.indices.len()).expect("end holes fit"));
+        for _ in end.indices {
+            holes.push(hole).expect("end holes fit");
+        }
+        shapes.push(PhraseShape { id, holes: holes.into_boxed(), plural: None }).expect("end shapes fit");
+        let mut segments = List::with_capacity(7);
+        for (at, literal) in end.literals.iter().enumerate() {
+            segments.push(Segment::Text(copy_of(literal))).expect("end segments fit");
+            if let Some(index) = end.indices.get(at) {
+                segments.push(Segment::Hole { index: *index, kind: HoleKind::Name }).expect("end segments fit");
+            }
+        }
+        phrases
+            .push(Phrase { id, forms: Box::new([Form { class: PluralClass::Other, segments: segments.into_boxed() }]) })
+            .expect("end phrases fit");
+    }
     for (number, prefix, kind, suffix) in [
         (200, b"".as_slice(), HoleKind::Number, b"".as_slice()),
         (201, b"Limited until ".as_slice(), HoleKind::Moment, b" UTC".as_slice()),
@@ -418,7 +460,7 @@ pub(crate) fn capacity(words: &Words) -> Option<u32> {
     for number in 0..u16::try_from(ROWS.len()).ok()? {
         most = most.max(words.book.capacity(id(number))?);
     }
-    for number in [200, 201, 202, 203, 204] {
+    for number in [200, 201, 202, 203, 204, 220, 221] {
         most = most.max(words.book.capacity(id(number))?);
     }
     for index in 0..NAMED.len() {
