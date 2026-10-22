@@ -1323,10 +1323,12 @@ act but a held task's card (3.6): its acts come later (section 11).
   phrasebook's words.
 - **The look:** the chat's, MAIN and CHAT on its main, CHATBAR on its
   taskbar, THREAD on what follows it and the conversation's tokens, so
-  `temper.css`'s rules for a chat draw them; and its own: AGENT_TASK on
-  its main, AGENT_LINEAGE on the lineage bar, AGENT_BRIEF on the brief,
-  AGENT_RUN on the run's heading and its start, AGENT_RESULT on its
-  result. `task-pages.css` draws them as the mockup's
+  `temper.css`'s rules for a chat draw them; and its own: AGENT_LINEAGE
+  on the lineage bar, which tells the page from a chat's (a node
+  carries two tokens at most, and its main has MAIN and CHAT),
+  AGENT_BRIEF on the brief, AGENT_RUN on the run's heading and its
+  start, AGENT_RESULT on its result. `task-pages.css` draws them as the
+  mockup's
   `.agent-lineage`, `.agent-brief`, `.agent-run-heading`,
   `.agent-run-meta` and `.agent-result` (`browser.md`, 2.5).
 
