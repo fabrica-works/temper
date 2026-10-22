@@ -725,11 +725,12 @@ made by the forge connector from what it keeps of the change
   it encodes the document, from the forge's configured `web` and its
   kind: `WEB/OWNER/NAME/pull/N` on GitHub, `WEB/OWNER/NAME/pulls/N` on
   Forgejo. A forge with no `web` gives no address, and the page offers
-  no "View on forge" (`README.md`, 5.10).
+  no "View on forge" (`README.md`, 5.10); so does an address longer
+  than its bound (`README.md`, 4.6), which never fails the delivery.
 - **Not in it,** since the connector's records do not keep them: the
   requirements at its head, judged only at the merge
-  (`../domain/forge.md`, 8.7); its heads in order; each CI context and its failing job;
-  the pull request's title and mergeability as the forge has them; its
+  (`../domain/forge.md`, 8.7); its heads in order; each CI context and
+  its failing job; the pull request's title and mergeability as the forge has them; its
   stall's times; its place in GitHub's merge queue (section 10).
 - **As long as the change's record:** a change that has landed or ended
   keeps its last panel, delivered when its page opens, and nothing marks
