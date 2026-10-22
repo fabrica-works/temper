@@ -1398,7 +1398,7 @@ fn activity(w: World, task: u64) -> c::ActivityPage {
     let minutes: &[i64] = match (w, task) {
         (Reference, 1) => &[-64, -50, -50],
         (Solo, 6) => &[-118, -117, -88],
-        (Solo, 10) => &[-12, -12],
+        (Solo, 10) => &[-14, -12],
         (FirstRun { step: 2 }, 1) => &[1, 1, 1],
         (FirstRun { step: 3 | 4 }, 1) => &[1, 1, 1, 4, 4],
         (FirstRun { step: 4 }, 4) => &[5, 5],

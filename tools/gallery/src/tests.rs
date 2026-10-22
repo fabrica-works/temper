@@ -435,7 +435,7 @@ fn times_read_against_each_mockup_worlds_fixed_now() {
 
 #[test]
 fn gallery_chat_clocks_are_separate_leaves_under_the_speakers() {
-    for (name, clock) in [("chat-reference-T1", "06:56"), ("chat-solo-T10", "09:18")] {
+    for (name, clock) in [("chat-reference-T1", "06:56"), ("chat-solo-T10", "09:16")] {
         let sample = samples::samples().into_iter().find(|sample| sample.name == name).expect("sample");
         let view = view(&sample);
         let tree = view.tree();
