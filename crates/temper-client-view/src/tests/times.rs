@@ -206,3 +206,13 @@ fn a_build_keeps_the_earliest_change_of_the_forms_it_drew() {
     let _ago = times.say(&words, Ago, Wall::EPOCH);
     assert_eq!(times.next, Some(wall(12 * MINUTE + 5)));
 }
+
+#[test]
+fn a_turns_bare_clock_stays_fixed_across_midnight_without_its_own_wake() {
+    let words = fixtures::words();
+    for now in [MIDNIGHT + DAY - 1, MIDNIGHT + DAY] {
+        let times = crate::words::Times::new(wall(now));
+        assert_eq!(words.turn_clock(wall(NOON)).as_ref(), b"12:00");
+        assert_eq!(times.next, None);
+    }
+}

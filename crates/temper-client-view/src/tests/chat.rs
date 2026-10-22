@@ -1068,3 +1068,220 @@ fn an_automatic_seen_draws_no_progress() {
     }
     assert!(fixtures::find(view.tree(), Role::Button, b"Mark seen").is_none());
 }
+
+// Thursday 22 October 2026, noon UTC, and its neighbouring days.
+const TURN_NOON: u64 = 1_792_670_400;
+const TURN_DAY: u64 = 86_400;
+const TURN_MIDNIGHT: u64 = TURN_NOON - TURN_DAY / 2;
+fn turn_wall(seconds: u64) -> Wall {
+    Wall::from_nanos(seconds.checked_mul(1_000_000_000).expect("fixture wall fits"))
+}
+fn timed_thread(events: &[(u64, c::Activity)]) -> Thread {
+    let mut thread = Thread::new(TASK, &jig_client::thread::Limits { lines: 12, bytes: BYTES, text: 512 });
+    thread.reading = Some(jig_client::thread::Reading::Latest { known: 0 });
+    let mut rows = List::with_capacity(u32::try_from(events.len()).unwrap());
+    for (index, (at, event)) in events.iter().enumerate().rev() {
+        rows.push(c::ActivityLine {
+            position: u64::try_from(index).unwrap().checked_add(1).expect("position fits"),
+            at: turn_wall(*at),
+            event: event.clone(),
+        })
+        .unwrap();
+    }
+    thread.page(c::ActivityPage { rows, before: None, after: None, cut: false });
+    thread
+}
+fn timed_words() -> c::Activity {
+    c::Activity::Words {
+        by: c::Party { number: PARTY, kind: c::PartyKind::Person, name: fixtures::first_run::text(b"Pat") },
+        message: MESSAGE,
+        words: fixtures::first_run::text(b"A message"),
+    }
+}
+fn timed_turn() -> c::Activity {
+    fixtures::first_run::turn(
+        1,
+        ATTEMPT,
+        TURN,
+        &[fixtures::first_run::message(
+            c::Speaker::Assistant,
+            &[c::Block::Text(fixtures::first_run::text(b"An answer"))],
+        )],
+        512,
+    )
+    .event
+}
+fn timed_tree(
+    thread: &Thread,
+    drawn: crate::pages::chat::Drawn<'_>,
+    person: Option<u64>,
+    now: u64,
+) -> (skein_ui::Tree, Option<Wall>) {
+    let mut b = skein_ui::Builder::new(&fixtures::tree_limits());
+    let mut times = crate::words::Times::new(turn_wall(now));
+    crate::pages::chat::conversation_with_times(
+        &mut b,
+        thread,
+        &fixtures::words(),
+        (LINES, TEXT),
+        crate::pages::chat::Speakers { person, requester: true },
+        (drawn, Some(&mut times)),
+        &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+    );
+    (b.finish(), times.next)
+}
+fn timed_drawing(projected: bool) -> crate::pages::chat::Drawn<'static> {
+    if projected {
+        crate::pages::chat::Drawn::Chat { request: None, delegations: None }
+    } else {
+        crate::pages::chat::Drawn::Lines
+    }
+}
+fn timed_style_positions(tree: &skein_ui::Tree, style: skein_ui::Style) -> List<usize> {
+    let mut positions = List::with_capacity(fixtures::tree_limits().nodes);
+    for (index, node) in tree.nodes().iter().enumerate() {
+        if node.styles.as_slice().contains(&style) {
+            positions.push(index).expect("positions fit tree nodes");
+        }
+    }
+    positions
+}
+#[test]
+fn turn_clocks_follow_separately_named_speakers_on_both_paths() {
+    let thread = timed_thread(&[(TURN_NOON, timed_words()), (TURN_NOON + 60, timed_turn())]);
+    for projected in [true, false] {
+        for (person, label) in [(Some(PARTY), b"You".as_slice()), (None, b"Pat".as_slice())] {
+            let (tree, _) = timed_tree(&thread, timed_drawing(projected), person, TURN_NOON);
+            let roles = timed_style_positions(&tree, crate::look::WHO);
+            for (index, (name, clock)) in roles.iter().zip([(label, b"12:00"), (b"Temper".as_slice(), b"12:01")]) {
+                let children = subtree(&tree, *index);
+                assert_eq!(children[0].name.as_deref(), Some(name));
+                let clock_at = usize::try_from(children[0].size).unwrap();
+                assert_eq!(children[clock_at].role, Role::Time);
+                assert_eq!(children[clock_at].name.as_deref(), Some(clock.as_slice()));
+                assert_eq!(children[clock_at].size, 2, "the time holds only its text leaf");
+                assert_eq!(children[clock_at + 1].role, Role::Text);
+            }
+            assert_eq!(roles.len(), 2);
+        }
+    }
+}
+#[test]
+fn pending_words_and_provisional_text_have_no_clock_or_day() {
+    let mut pending = Thread::new(TASK, &jig_client::thread::Limits { lines: LINES, bytes: BYTES, text: TEXT });
+    assert!(pending.words.begin(
+        jig_client::Key { asker: jig_client::Asker::JIG, number: 1 },
+        None,
+        fixtures::first_run::text(b"Pending")
+    ));
+    for thread in [&pending, &provisional()] {
+        for projected in [true, false] {
+            let (tree, next) = timed_tree(thread, timed_drawing(projected), None, TURN_NOON);
+            for node in tree.nodes() {
+                assert_ne!(node.role, Role::Time);
+                assert!(!node.styles.as_slice().contains(&crate::look::DAY));
+            }
+            assert_eq!(next, None);
+        }
+    }
+}
+#[test]
+fn the_request_uses_the_first_timed_line_and_shares_its_day() {
+    let began = c::Activity::RunBegan {
+        attempt: ATTEMPT,
+        how: c::RunBeginning::Fresh { tail: 0 },
+        why: fixtures::first_run::text(b"Run"),
+    };
+    let thread = timed_thread(&[(TURN_NOON - 60, began), (TURN_NOON, timed_words())]);
+    let request = c::SpecificationDocument::complete(c::Specification {
+        words: fixtures::first_run::text(b"The request"),
+        parameters: List::with_capacity(0),
+        inputs: List::with_capacity(0),
+    });
+    for (thread, expected) in [(&thread, Some(b"12:00".as_slice())), (&provisional(), None)] {
+        let (tree, _) = timed_tree(
+            thread,
+            crate::pages::chat::Drawn::Chat { request: Some(&request), delegations: None },
+            None,
+            TURN_NOON,
+        );
+        let who = styled(&tree, crate::look::WHO);
+        let children = subtree(&tree, who);
+        assert_eq!(children[0].name.as_deref(), Some(b"You".as_slice()));
+        let mut clock = None;
+        for child in children {
+            if child.role == Role::Time {
+                clock = child.name.as_deref();
+            }
+        }
+        assert_eq!(clock, expected);
+        assert_eq!(timed_style_positions(&tree, crate::look::DAY).len(), u32::from(expected.is_some()));
+    }
+}
+#[test]
+fn each_days_first_turn_has_one_day_line_with_the_calendar_words() {
+    // Wednesday 31 December 2025: a year must be said before this year's October.
+    let last_year = 1_767_139_200;
+    let thread = timed_thread(&[
+        (last_year, timed_words()),
+        (TURN_NOON - 2 * TURN_DAY, timed_words()),
+        (TURN_NOON - TURN_DAY, timed_words()),
+        (TURN_NOON, timed_words()),
+        (TURN_NOON + 60, timed_turn()),
+    ]);
+    for projected in [true, false] {
+        let (tree, next) = timed_tree(&thread, timed_drawing(projected), None, TURN_NOON);
+        let days = timed_style_positions(&tree, crate::look::DAY);
+        for (index, said) in days.iter().zip([
+            "Wednesday 31 December 2025",
+            "Tuesday 20 October",
+            "Yesterday · Wednesday 21 October",
+            "Today · Thursday 22 October",
+        ]) {
+            let node = &tree.nodes()[*index];
+            assert_eq!(node.name.as_deref(), Some(said.as_bytes()));
+            assert!(
+                tree.nodes()[index + usize::try_from(node.size).unwrap()]
+                    .styles
+                    .as_slice()
+                    .contains(&crate::look::TURN),
+                "day precedes its first turn"
+            );
+        }
+        assert_eq!(days.len(), 4);
+        assert_eq!(next, Some(turn_wall(TURN_MIDNIGHT + TURN_DAY)));
+    }
+}
+#[test]
+fn an_undecodable_turn_keeps_its_clock_and_day_on_both_paths() {
+    let thread = timed_thread(&[(
+        TURN_NOON,
+        c::Activity::Turn {
+            name: c::TurnName { attempt: ATTEMPT, number: TURN },
+            turn: c::TurnRead::Undecodable { why: c::TurnProblem::Malformed },
+        },
+    )]);
+    for projected in [true, false] {
+        let (tree, _) = timed_tree(&thread, timed_drawing(projected), None, TURN_NOON);
+        assert!(fixtures::find(&tree, Role::Time, b"12:00").is_some());
+        assert!(fixtures::find(&tree, Role::Paragraph, "Today · Thursday 22 October".as_bytes()).is_some());
+    }
+}
+#[test]
+fn a_chat_rebuilds_its_day_at_midnight_and_keeps_the_turn_clock() {
+    let root = chat_with_history();
+    let shown = temper_client_domain::shown(&root);
+    let mut view = fixtures::view();
+    let mut patches = skein_lib::Queue::with_capacity(view.limits().tree.patches);
+    for (now, day, next) in [
+        (TURN_DAY - 1, "Today · Thursday 1 January", TURN_DAY),
+        (TURN_DAY, "Yesterday · Thursday 1 January", 2 * TURN_DAY),
+    ] {
+        crate::build(&mut view, &root, turn_wall(now), &mut patches);
+        assert!(fixtures::find(view.tree(), Role::Paragraph, day.as_bytes()).is_some());
+        assert!(fixtures::find(view.tree(), Role::Time, b"00:00").is_some());
+        assert_eq!(view.next_change(), Some(turn_wall(next)));
+        assert_eq!(temper_client_domain::shown(&root), shown);
+        while patches.pop().is_some() {}
+    }
+}

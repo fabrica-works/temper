@@ -1575,7 +1575,7 @@ impl Words {
         let day = at.as_nanos() / DAY;
         let today = now.as_nanos() / DAY;
         let days = today.checked_sub(day);
-        let clock = self.time_clock(at);
+        let clock = self.turn_clock(at);
         match form {
             TimeForm::Ago if day == today => self.say(Word::TimeAt, &[Hole::Name(clock)]),
             TimeForm::Ago if days == Some(1) => self.say(Word::TimeYesterdayWord, &[]),
@@ -1604,7 +1604,8 @@ impl Words {
             TimeForm::Span => unreachable!("spans have no calendar words"),
         }
     }
-    fn time_clock(&self, at: skein_lib::Wall) -> Box<[u8]> {
+    /// A turn under a day line has a fixed clock and needs no wake of its own.
+    pub(crate) fn turn_clock(&self, at: skein_lib::Wall) -> Box<[u8]> {
         let minute = at.as_nanos() / MINUTE;
         self.say(
             Word::TimeClock,

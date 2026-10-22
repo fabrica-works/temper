@@ -87,13 +87,13 @@ pub(crate) fn main(
             control(b, bindings, Role::Button, &words.say(Word::Older, &[]), Act::Older);
         }
         let person = speakers(task, root.pages().me(root.client()));
-        conversation(
+        conversation_with_times(
             b,
             &chat.thread,
             words,
             (rows, text_limit),
             person,
-            Drawn::Chat { request: Some(&task.spec), delegations: Some((chat, root.client())) },
+            (Drawn::Chat { request: Some(&task.spec), delegations: Some((chat, root.client())) }, Some(times)),
             bindings,
         );
         if !chat.cards.is_empty() || !chat.departures().is_empty() {
@@ -404,7 +404,19 @@ pub(crate) fn conversation(
     drawn: Drawn<'_>,
     bindings: &mut Bindings,
 ) {
-    // client/README.md, 5.12: add turns’ clocks and day rules when thread lines carry their time.
+    conversation_with_times(b, thread, words, limits, speakers, (drawn, None), bindings);
+}
+
+// Agent task pages keep their own treatment of moments (client/README.md, 5.12).
+pub(crate) fn conversation_with_times(
+    b: &mut Builder,
+    thread: &Thread,
+    words: &Words,
+    limits: (u32, u32),
+    speakers: Speakers,
+    (drawn, mut times): (Drawn<'_>, Option<&mut Times>),
+    bindings: &mut Bindings,
+) {
     let (rows, text_limit) = limits;
     let (projected, request, delegations) = match drawn {
         Drawn::Chat { request, delegations } => (true, request, delegations),
@@ -418,44 +430,49 @@ pub(crate) fn conversation(
     let mut shown = List::with_capacity(bound);
     b.open(Role::Log);
     b.name(&words.say_card(P::ConversationLog, &[]));
+    let lines = thread.lines().into_boxed();
+    let mut day = None;
     // A chat started with no words opens on its first words line (3.5).
     if thread.lines.edges.after == jig_client::thread::window::Edge::End
         && let Some(request) = request
         && !request.specification.words.bytes().is_empty()
     {
-        b.open(Role::Region);
-        b.style(look::TURN);
-        let label = if speakers.requester { words.say_card(P::You, &[]) } else { words.say_card(P::Person, &[]) };
-        person_message(b, &label, request.specification.words.bytes(), WordState::Read { message: 0 }, words);
-        if request.specification.words.cut {
-            words.status(b, P::TurnCut, &[]);
-        }
-        b.close();
+        let clock = turn_time(b, first_time(&lines), &mut times, &mut day, words);
+        request_message(b, request, speakers.requester, words, clock.as_deref());
     }
-    for line in thread.lines().into_boxed() {
+    for line in lines {
         if hidden_line(&line, projected, delegations) {
             heard_card(b, &line, delegations, (&mut tasks, &mut shown), words, bindings);
             continue;
         }
+        let clock = turn_time(b, line_time(&line), &mut times, &mut day, words);
         b.open(Role::Region);
         b.style(look::TURN);
         match line {
             Line::Words { by, words: message, state, .. } => {
                 if projected {
-                    person_words(b, by, message, state, speakers.person, words);
+                    person_words(b, by, message, state, speakers.person, words, clock.as_deref());
                 } else {
-                    person_lines(b, by, message, state, speakers.person, words);
+                    person_lines(b, by, message, state, speakers.person, words, clock.as_deref());
                 }
             }
             Line::Turn { turn, .. } => {
                 if projected {
-                    committed(b, turn, words, rows, delegations, (&mut tasks, &mut shown), bindings);
+                    committed(
+                        b,
+                        turn,
+                        words,
+                        (rows, clock.as_deref()),
+                        delegations,
+                        (&mut tasks, &mut shown),
+                        bindings,
+                    );
                 } else {
                     committed_lines(
                         b,
                         turn,
                         words,
-                        (rows, speakers.requester),
+                        (rows, speakers.requester, clock.as_deref()),
                         delegations,
                         (&mut tasks, &mut shown),
                         bindings,
@@ -463,13 +480,7 @@ pub(crate) fn conversation(
                 }
             }
             Line::Provisional { text, cut, .. } => provisional(b, text, cut, words, text_limit),
-            Line::Undecoded { why, .. } => match why {
-                c::TurnProblem::Version { found } => {
-                    words.status(b, P::TurnUnreadVersion, &[Hole::Number(u64::from(found))]);
-                }
-                c::TurnProblem::Malformed => words.status(b, P::TurnUnreadMalformed, &[]),
-                c::TurnProblem::TooLarge { .. } => words.status(b, P::TurnUnreadTooLarge, &[]),
-            },
+            Line::Undecoded { why, .. } => undecoded(b, why, words, clock.as_deref()),
             Line::RunBegan { attempt } => {
                 b.style(look::MARKER);
                 text(b, Role::Paragraph, &words.say(Word::RunBegan, &[Hole::Number(attempt)]));
@@ -502,6 +513,82 @@ pub(crate) fn conversation(
     // The live delegates anchor follows the window's last line (client/README.md, 5.7).
     live_delegates(b, &mut tasks, delegations, &mut shown, words, bindings);
     b.close();
+}
+fn undecoded(b: &mut Builder, why: c::TurnProblem, words: &Words, clock: Option<&[u8]>) {
+    match why {
+        c::TurnProblem::Version { found } => {
+            words.status(b, P::TurnUnreadVersion, &[Hole::Number(u64::from(found))]);
+        }
+        c::TurnProblem::Malformed => words.status(b, P::TurnUnreadMalformed, &[]),
+        c::TurnProblem::TooLarge { .. } => words.status(b, P::TurnUnreadTooLarge, &[]),
+    }
+    if clock.is_some() {
+        b.open(Role::Slot);
+        b.style(look::WHO);
+        turn_clock(b, clock);
+        b.close();
+    }
+}
+fn request_message(
+    b: &mut Builder,
+    request: &c::SpecificationDocument,
+    requester: bool,
+    words: &Words,
+    clock: Option<&[u8]>,
+) {
+    b.open(Role::Region);
+    b.style(look::TURN);
+    let label = if requester { words.say_card(P::You, &[]) } else { words.say_card(P::Person, &[]) };
+    person_message(b, &label, request.specification.words.bytes(), WordState::Read { message: 0 }, words, clock);
+    if request.specification.words.cut {
+        words.status(b, P::TurnCut, &[]);
+    }
+    b.close();
+}
+fn first_time(lines: &[Line<'_>]) -> Option<skein_lib::Wall> {
+    for line in lines {
+        if let Some(at) = line_time(line) {
+            return Some(at);
+        }
+    }
+    None
+}
+fn line_time(line: &Line<'_>) -> Option<skein_lib::Wall> {
+    match line {
+        Line::Words { at, .. } => *at,
+        Line::Turn { at, .. } | Line::Undecoded { at, .. } => Some(*at),
+        Line::Activity { .. }
+        | Line::Provisional { .. }
+        | Line::RunBegan { .. }
+        | Line::RunEnded { .. }
+        | Line::Left { .. } => None,
+    }
+}
+fn turn_time(
+    b: &mut Builder,
+    at: Option<skein_lib::Wall>,
+    times: &mut Option<&mut Times>,
+    day: &mut Option<u64>,
+    words: &Words,
+) -> Option<Box<[u8]>> {
+    let at = at?;
+    let times = times.as_mut()?;
+    let date = at.as_nanos() / 86_400_000_000_000;
+    if *day != Some(date) {
+        let said = times.say(words, TimeForm::Day, at);
+        b.open(Role::Paragraph);
+        b.style(look::DAY);
+        b.name(&said);
+        b.text(Run::Plain, &said);
+        b.close();
+        *day = Some(date);
+    }
+    Some(words.turn_clock(at))
+}
+fn turn_clock(b: &mut Builder, clock: Option<&[u8]>) {
+    if let Some(clock) = clock {
+        text(b, Role::Time, clock);
+    }
 }
 /// A delegate's heard result anchors its card, as a result block does (client/README.md, 5.7).
 fn heard_card(
@@ -555,7 +642,7 @@ fn owner_line(b: &mut Builder, line: &c::OwnerActivity, projected: bool, person:
                 return;
             }
         };
-        words_message(b, &label, message.bytes(), WordState::Read { message: 0 }, side, words);
+        words_message(b, &label, message.bytes(), WordState::Read { message: 0 }, side, words, None);
         return;
     }
     super::task::owner_activity(b, line, words);
@@ -606,15 +693,23 @@ fn person_words(
     state: WordState,
     person: Option<u64>,
     words: &Words,
+    clock: Option<&[u8]>,
 ) {
     let label = match by {
         Some(by) if Some(by.number) != person => skein_lib::bytes::copy_of(by.name.bytes()),
         Some(_) | None => words.say_card(P::You, &[]),
     };
-    person_message(b, &label, message, state, words);
+    person_message(b, &label, message, state, words, clock);
 }
-fn person_message(b: &mut Builder, label: &[u8], message: &[u8], state: WordState, words: &Words) {
-    words_message(b, label, message, state, look::BY_PERSON, words);
+fn person_message(
+    b: &mut Builder,
+    label: &[u8],
+    message: &[u8],
+    state: WordState,
+    words: &Words,
+    clock: Option<&[u8]>,
+) {
+    words_message(b, label, message, state, look::BY_PERSON, words, clock);
 }
 fn words_message(
     b: &mut Builder,
@@ -623,6 +718,7 @@ fn words_message(
     state: WordState,
     side: skein_ui::Style,
     words: &Words,
+    clock: Option<&[u8]>,
 ) {
     b.open(Role::Slot);
     b.style(look::MESSAGE);
@@ -630,6 +726,7 @@ fn words_message(
     b.open(Role::Slot);
     b.style(look::WHO);
     text(b, Role::Paragraph, label);
+    turn_clock(b, clock);
     match state {
         WordState::BeingSent => words.status(b, P::WordsBeingSent, &[]),
         WordState::Sent { .. } => words.status(b, P::WordsSent, &[]),
@@ -657,6 +754,7 @@ fn person_lines(
     state: WordState,
     person: Option<u64>,
     words: &Words,
+    clock: Option<&[u8]>,
 ) {
     b.open(Role::Slot);
     b.style(look::MESSAGE);
@@ -667,6 +765,7 @@ fn person_lines(
         Some(by) if Some(by.number) != person => text(b, Role::Paragraph, by.name.bytes()),
         Some(_) | None => text(b, Role::Paragraph, &words.say_card(P::You, &[])),
     }
+    turn_clock(b, clock);
     words.status(
         b,
         match state {
@@ -690,7 +789,7 @@ fn committed(
     b: &mut Builder,
     turn: &c::Turn,
     words: &Words,
-    rows: u32,
+    (rows, clock): (u32, Option<&[u8]>),
     delegations: Option<(&Chat, &jig_client::Client)>,
     lists: (&mut List<u64>, &mut List<u64>),
     bindings: &mut Bindings,
@@ -718,6 +817,7 @@ fn committed(
                 b.open(Role::Slot);
                 b.style(look::WHO);
                 words.card_text(b, P::Temper, &[]);
+                turn_clock(b, clock);
                 b.close();
                 b.open(Role::Slot);
                 b.style(look::SAYS);
@@ -763,12 +863,12 @@ fn committed_lines(
     b: &mut Builder,
     turn: &c::Turn,
     words: &Words,
-    limits: (u32, bool),
+    limits: (u32, bool, Option<&[u8]>),
     delegations: Option<(&Chat, &jig_client::Client)>,
     lists: (&mut List<u64>, &mut List<u64>),
     bindings: &mut Bindings,
 ) {
-    let (rows, requester) = limits;
+    let (rows, requester, clock) = limits;
     let (tasks, shown) = lists;
     for message in prefix(b, turn.messages.as_slice(), rows, words) {
         b.open(Role::Slot);
@@ -797,6 +897,7 @@ fn committed_lines(
             },
             &[],
         );
+        turn_clock(b, clock);
         b.close();
         b.open(Role::Slot);
         b.style(look::SAYS);
