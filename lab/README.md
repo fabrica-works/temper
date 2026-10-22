@@ -272,7 +272,7 @@ canonical JSON (skein's `lab.md`, 2.2), shown spread out:
     "tag": "style", "place": "mockup",
     "cites": "client/mockups/README.md, Where each value comes from",
     "seen": "temper's monospace stack adds Liberation Mono",
-    "finding": {"class": "look", "title": "…"}},
+    "finding": {"class": "look", "title": "…", "owner": "o/web-look"}},
    {"id": "fonts-phone", "width": "phone",
     "signatures": ["style/banner/faces"],
     "tag": "style", "place": "page", "cites": "qa-web.md, 11",
@@ -301,8 +301,8 @@ canonical JSON (skein's `lab.md`, 2.2), shown spread out:
   them, each in at most one difference of its width; `tag`; `place`,
   `mockup`, `page` or `silent`; `cites`, the text it is judged by;
   `seen`, what the pictures show, in a line. Then by place: `mockup`, a
-  `finding` (`class` and `title`) and the `expectations` written for it,
-  if any; `page`, its `departures` and `expectations`, the scene's ids,
+  `finding` (`class`, `title` and `owner`, the page's owner) and the
+  `expectations` written for it, if any; `page`, its `departures` and `expectations`, the scene's ids,
   at least one; `silent`, a `question`, at least two `options` and a
   `recommendation`.
 - **Findings and questions are named** `<scene>/<id>`. The findings go

@@ -3,6 +3,7 @@
 umask 077
 exec python3 -I -B -S - "$0" "$@" <<'PYTHON'
 """Build one committed gallery subject and judge each requested experiment."""
+import json
 import os
 from pathlib import Path
 import shlex
@@ -27,6 +28,7 @@ def main():
     repository = Path(sys.argv[1]).resolve().parent.parent
     sys.path.insert(0, str(repository / 'lab'))
     from look_pack import pack
+    from look_bar import bar
     skein = Path(sys.argv[2]).resolve()
     experiments = sys.argv[3:]
     lab = skein / 'scripts' / 'lab' / 'lab'
@@ -68,6 +70,7 @@ def main():
         return subject.returncode
     digest = subject.stdout.strip()
     first_error = 0
+    healthy_key = None
     failures = {2: 'refused', 3: 'not enough evidence', 4: 'error'}
     for experiment in experiments:
         key = run([lab, 'validate', experiment, '--subject', digest], repository)
@@ -80,6 +83,18 @@ def main():
             lines = judged.stdout.splitlines()
             verdict = lines[-1] if lines else failures.get(code, 'error')
             print(f'{experiment} {key.stdout.strip()} {verdict}', flush=True)
+            try:
+                definition = json.loads((repository / experiment / 'experiment.json').read_bytes())
+                lab_root = Path.home() / 'src/rust/tmp/lab'
+                previous_healthy = healthy_key
+                if not definition['planted']:
+                    healthy_key = key.stdout.strip()
+                text, _ = bar(lab_root, repository / experiment, key.stdout.strip(),
+                              lab_root / 'judgements' / definition['name'],
+                              previous_healthy if definition['planted'] else None)
+                print(text, end='', flush=True)
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                print(f'look-judge: bar: {error}', file=sys.stderr)
         if code not in (0, 1) and not first_error:
             first_error = code
     return first_error
