@@ -473,9 +473,8 @@ fn held_branch(world: &mut Protocol) -> (top::Name, skein_forge::api::Commit) {
     (name, pushed)
 }
 
-#[test]
-fn github_git_tokens_of_every_accepted_installation_come_before_connected() {
-    use skein_forge_connection::{Event, Request};
+fn connected_github_with_two_installations() -> skein_forge_machine_world::joint::Joint {
+    use skein_forge_connection::Request;
     use skein_forge_machine_world::joint::{self, Joint};
     use skein_lib::Duration;
 
@@ -497,9 +496,17 @@ fn github_git_tokens_of_every_accepted_installation_come_before_connected() {
     }
     assert_eq!(world.connected, 1);
     assert!(world.stopped.is_empty());
+    assert_eq!(world.git_tokens.len(), 2);
+    world
+}
+
+#[test]
+fn github_git_tokens_of_every_accepted_installation_come_before_connected() {
+    use skein_forge_connection::Event;
+
+    let world = connected_github_with_two_installations();
     let connected = world.events.iter().position(|event| event.starts_with("Connected {")).expect("Connected");
     assert_eq!(world.events[..connected].iter().filter(|event| event.starts_with("GitToken {")).count(), 2);
-    assert_eq!(world.git_tokens.len(), 2);
 
     // Provenance is asserted from events alone: the joint's fake service is private.
     for (installation_id, account_id, login) in [(1, 22, b"acme".as_slice()), (2, 23, b"example".as_slice())] {
@@ -522,6 +529,50 @@ fn github_git_tokens_of_every_accepted_installation_come_before_connected() {
         panic!("exactly two git tokens");
     };
     assert!(first.expose() != second.expose());
+}
+
+#[test]
+fn github_git_tokens_renew_before_they_expire() {
+    use skein_forge_connection::Event;
+    use skein_lib::Duration;
+
+    let mut world = connected_github_with_two_installations();
+    let life = skein_fake_forge_github::installations::TOKEN_LIFE;
+    let renew_before = fixtures::limits().renew_before;
+    // Run the ordinary polls and renewal timers through ten minutes before expiry,
+    // with a second for both installations' mint exchanges to finish.
+    world.run_for(Duration::from_nanos(life.as_nanos() - renew_before.as_nanos() + Duration::from_secs(1).as_nanos()));
+    assert_eq!(world.git_tokens.len(), 4);
+
+    for (installation_id, account_id, login) in [(1, 22, b"acme".as_slice()), (2, 23, b"example".as_slice())] {
+        let mut matching = world
+            .git_tokens
+            .iter()
+            .filter(|event| matches!(event, Event::GitToken { installation, .. } if *installation == installation_id));
+        let Some(Event::GitToken { forge, account, token, expires, .. }) = matching.next() else {
+            panic!("accepted installation's first git token");
+        };
+        let Some(Event::GitToken {
+            forge: renewed_forge, account: renewed_account, token: next, expires: later, ..
+        }) = matching.next()
+        else {
+            panic!("accepted installation's renewed git token");
+        };
+        assert!(matching.next().is_none());
+        assert_eq!(*forge, fixtures::FORGE);
+        assert_eq!(renewed_forge, forge);
+        assert_eq!(account.id, account_id);
+        assert_eq!(account.login.as_ref(), login);
+        assert_eq!(renewed_account.id, account.id);
+        assert_eq!(renewed_account.login, account.login);
+        assert!(!token.expose().is_empty());
+        assert!(!next.expose().is_empty());
+        assert!(next.expose() != token.expose(), "renewal mints a different token");
+        assert!(later > expires, "renewal extends the token's life");
+        assert!(world.env.wall < *expires, "renewal completes before the first token expires");
+    }
+    assert_eq!(world.connected, 1);
+    assert!(world.stopped.is_empty());
 }
 
 #[test]
