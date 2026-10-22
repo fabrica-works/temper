@@ -162,17 +162,17 @@ a { color: inherit; text-decoration: none; }
 #app:has(> .temper-chat) > :not(.temper-chat) { flex: none; }
 .temper-main.temper-chat { width: 100%; flex: 1; min-height: 0; margin: 0; padding: 0; display: flex; flex-direction: column; font-size: 13px; letter-spacing: -.018em; }
 /* .terminal-chatbar, .terminal-chat-identity and .terminal-chat-meta. */
-:is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-chatbar { height: 37px; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 0 25px; border-bottom: 1px solid var(--temper-line); background: var(--temper-canvas); font-size: 11px; }
-:is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-chatbar > div { display: flex; align-items: center; gap: 16px; min-width: 0; white-space: nowrap; }
-:is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-chatbar > div:first-child { flex: 0 1 auto; }
-:is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-chatbar > div:last-child { flex: none; color: var(--temper-muted); }
+.temper-main .temper-chatbar { height: 37px; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 0 25px; border-bottom: 1px solid var(--temper-line); background: var(--temper-canvas); font-size: 11px; }
+.temper-main .temper-chatbar > div { display: flex; align-items: center; gap: 16px; min-width: 0; white-space: nowrap; }
+.temper-main .temper-chatbar > div:first-child { flex: 0 1 auto; }
+.temper-main .temper-chatbar > div:last-child { flex: none; color: var(--temper-muted); }
 .temper-chat .temper-chatbar h1 { flex: none; margin: 0; color: var(--temper-accent); font: 700 11px/1.58 var(--temper-mono); letter-spacing: inherit; }
-:is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-chatbar p { margin: 0; }
-:is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-chatbar > div:first-child > p { overflow: hidden; text-overflow: ellipsis; font-size: 12px; font-weight: 700; }
-:is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-chatbar [role=status] { flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 0; border-radius: 0; background: transparent; font-size: 11px; font-weight: 400; }
-:is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-chatbar [role=status]::before { content: ''; width: 5px; height: 5px; flex: none; border-radius: 50%; background: currentColor; }
+.temper-main .temper-chatbar p { margin: 0; }
+.temper-main .temper-chatbar > div:first-child > p { overflow: hidden; text-overflow: ellipsis; font-size: 12px; font-weight: 700; }
+.temper-main .temper-chatbar [role=status] { flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 0; border-radius: 0; background: transparent; font-size: 11px; font-weight: 400; }
+.temper-main .temper-chatbar [role=status]::before { content: ''; width: 5px; height: 5px; flex: none; border-radius: 50%; background: currentColor; }
 .temper-chat .temper-chatbar .temper-status-active { color: #4c8067; }
-:is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-chatbar .temper-status-quiet { color: #817b73; }
+.temper-main .temper-chatbar .temper-status-quiet { color: #817b73; }
 .temper-chat .temper-chatbar button { min-height: 28px; margin-block: -2px; border: 0; background: transparent; padding: 3px 0; color: #756e65; font-size: 11px; }
 .temper-chat .temper-chatbar button:hover { color: var(--temper-accent); text-decoration: underline; }
 /* .terminal-thread and .terminal-thread-inner: edge scrollbar, centred contents. */
@@ -238,10 +238,11 @@ a { color: inherit; text-decoration: none; }
 .temper-step-done { border-color: var(--temper-green); color: var(--temper-green); }
 /* .terminal-composer-area and .terminal-composer: reuse the Chats entry. */
 .temper-chat .temper-composer-area { flex: none; border-top: 1px solid var(--temper-line); background: #f9f7f3; padding: 10px 23px; }
-:is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-entry { width: min(1040px, 100%); margin: 0 auto; min-height: 40px; border-radius: 7px; padding: 8px 8px 8px 12px; box-shadow: 0 2px 8px rgba(55,42,27,.035); }
-:is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-entry textarea { font-size: 13px; line-height: 21px; }
-:is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-entry button { border-radius: 5px / 6px 6px 7px 7px; background-color: var(--temper-accent); }
-:is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-entry button:hover { background-color: #a8563e; }
+/* Chat and demo-start entries: :has selects a main with its own bar; :where preserves specificity. */
+.temper-main:where(:has(> .temper-chatbar)) .temper-entry { width: min(1040px, 100%); margin: 0 auto; min-height: 40px; border-radius: 7px; padding: 8px 8px 8px 12px; box-shadow: 0 2px 8px rgba(55,42,27,.035); }
+.temper-main:where(:has(> .temper-chatbar)) .temper-entry textarea { font-size: 13px; line-height: 21px; }
+.temper-main:where(:has(> .temper-chatbar)) .temper-entry button { border-radius: 5px / 6px 6px 7px 7px; background-color: var(--temper-accent); }
+.temper-main:where(:has(> .temper-chatbar)) .temper-entry button:hover { background-color: #a8563e; }
 /* .terminal-dialog: the page's confirmation and proposal reason fields. */
 /* Native modal backdrop supplies the single dimming layer; keep only the card shadow. */
 dialog { position: fixed; inset: 0; z-index: 20; height: fit-content; margin: auto; width: min(420px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow-y: auto; border: 1px solid #dbd4ca; border-radius: 9px; background: #fffefd; color: var(--temper-ink); padding: 20px; box-shadow: 0 22px 70px rgba(35,30,25,.22); }
@@ -261,14 +262,14 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 /* .terminal-input-hint at 1100px. */
 @media (max-width: 1100px) {
   .temper-chat .temper-hint { display: none; }
-  :is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-chatbar { height: auto; min-height: 37px; flex-wrap: wrap; gap: 8px 18px; padding-block: 8px; }
+  .temper-main .temper-chatbar { height: auto; min-height: 37px; flex-wrap: wrap; gap: 8px 18px; padding-block: 8px; }
 }
 /* .terminal-thread-inner and .terminal-turn at 760px, retaining every control. */
 @media (max-width: 760px) {
   .temper-main.temper-chat { width: 100%; padding: 0; }
-  :is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-chatbar { padding-inline: 16px; }
-  :is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-chatbar > div:first-child { gap: 9px; width: 100%; }
-  :is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-chatbar > div:last-child { gap: 10px; flex-wrap: wrap; white-space: normal; }
+  .temper-main .temper-chatbar { padding-inline: 16px; }
+  .temper-main .temper-chatbar > div:first-child { gap: 9px; width: 100%; }
+  .temper-main .temper-chatbar > div:last-child { gap: 10px; flex-wrap: wrap; white-space: normal; }
   .temper-chat .temper-thread > [role=log] { padding: 17px 16px 30px; }
   .temper-chat .temper-thread > :not([role=log]):not(.temper-cards) { width: calc(100% - 32px); }
   .temper-chat .temper-message { grid-template-columns: 62px minmax(0, 1fr); gap: 8px; margin-bottom: 17px; }
@@ -287,10 +288,10 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
   .temper-chat .temper-who { display: flex; gap: 8px; margin-bottom: 4px; }
   .temper-chat .temper-by-tool, .temper-chat .temper-cards > .temper-card, .temper-chat .temper-turn:not(.temper-marker) > :not(.temper-message) { margin-left: 0; }
   .temper-chat .temper-thread > [role=log] ~ :not(.temper-cards) { padding-left: 0; }
-  :is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-chatbar > div:first-child { flex-wrap: wrap; }
-  :is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-chatbar > div:first-child > p { flex: 1; max-width: max-content; }
-  :is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-chatbar [role=status] { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
-  :is(.temper-chat, :where(.temper-main:not(.temper-chat):has(> .temper-chatbar))) .temper-entry textarea { font-size: 12px; }
+  .temper-main .temper-chatbar > div:first-child { flex-wrap: wrap; }
+  .temper-main .temper-chatbar > div:first-child > p { flex: 1; max-width: max-content; }
+  .temper-main .temper-chatbar [role=status] { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+  .temper-main:where(:has(> .temper-chatbar)) .temper-entry textarea { font-size: 12px; }
 }
 
 /* .page and .topbar: the full-width list page and breadcrumb bar. */
@@ -592,9 +593,7 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
   .temper-unavailable, body > noscript, #app:not(:empty):not(:has(*)) { width: calc(100% - 28px); }
 }
 
-/* First run uses the chat's frame and thread column, without changing Chats.
-   The entry and model choice are siblings here, so their empty backplates
-   paint one composer band while flex flow keeps suggestions and outcomes clear. */
+/* First run shares the chat frame; backplates join the composer band because the view has no wrapper. */
 .temper-main:not(.temper-chat):has(> .temper-chatbar) { width: 100%; margin: 0; padding: 0 0 58px; font-size: 13px; letter-spacing: -.018em; }
 .temper-main:not(.temper-chat):has(> .temper-chatbar) > :not(.temper-chatbar) { width: min(1040px, calc(100% - 64px)); margin-inline: auto; }
 .temper-main:not(.temper-chat):has(> .temper-chatbar) > .temper-accounts { margin-top: 22px; margin-bottom: 16px; }
