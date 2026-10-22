@@ -204,6 +204,132 @@ fn a_plans_items_are_nested_under_their_supplied_parent() {
     assert!(fixtures::find(&tree, Role::TreeItem, b"Task 9").is_none());
 }
 
+// README 5.8: "a live root's own delegates stay under it, in the tree's order".
+#[test]
+fn a_later_grandchild_nests_under_its_parent_not_after_its_parents_sibling() {
+    let delivery = plan_rows(&[(12, 9, 1), (13, 9, 1), (14, 12, 2)]);
+    let tree = plan(&delivery);
+    let parent = index_of(&tree, Role::TreeItem, b"Task 12");
+    assert!(named(subtree(&tree, parent), Role::TreeItem, b"Task 14"));
+    assert!(!named(subtree(&tree, parent), Role::TreeItem, b"Task 13"));
+    assert_plan_roots(&tree, &[b"Task 12", b"Task 13"]);
+    assert!(index_of(&tree, Role::TreeItem, b"Task 14") < index_of(&tree, Role::TreeItem, b"Task 13"));
+}
+
+// README 5.8: "a live root's own delegates stay under it, in the tree's order".
+#[test]
+fn a_plans_deeper_delegates_follow_parents_even_when_children_arrive_first() {
+    for rows in [
+        [(12, 9, 1), (13, 9, 1), (14, 12, 2), (15, 13, 2), (16, 14, 3)],
+        [(16, 14, 1), (14, 12, 1), (12, 9, 1), (15, 13, 1), (13, 9, 1)],
+    ] {
+        let tree = plan(&plan_rows(&rows));
+        let first = index_of(&tree, Role::TreeItem, b"Task 12");
+        let child = index_of(&tree, Role::TreeItem, b"Task 14");
+        let second = index_of(&tree, Role::TreeItem, b"Task 13");
+        assert!(named(subtree(&tree, first), Role::TreeItem, b"Task 14"));
+        assert!(named(subtree(&tree, child), Role::TreeItem, b"Task 16"));
+        assert!(!named(subtree(&tree, first), Role::TreeItem, b"Task 13"));
+        assert!(named(subtree(&tree, second), Role::TreeItem, b"Task 15"));
+        assert_plan_roots(&tree, &[b"Task 12", b"Task 13"]);
+        assert_tree_items(&tree, &[b"Task 12", b"Task 14", b"Task 16", b"Task 13", b"Task 15"]);
+    }
+}
+
+// README 5.8: "a live root's own delegates stay under it, in the tree's order".
+#[test]
+fn a_legacy_plans_later_grandchild_stays_under_its_parent() {
+    let counts =
+        c::PhaseCounts { ended: 0, waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 };
+    for rows in [
+        [(9, None), (12, Some(9)), (13, Some(9)), (14, Some(12))],
+        [(14, Some(12)), (12, Some(9)), (13, Some(9)), (9, None)],
+    ] {
+        let mut legacy = c::Tree { task: TASK, nodes: List::with_capacity(4), folded: counts, held_below: 0 };
+        for (task, parent) in rows {
+            let mut chip = row().chip;
+            chip.task = task;
+            legacy
+                .nodes
+                .push(c::TreeNode {
+                    chip,
+                    parent,
+                    dependencies: List::with_capacity(0),
+                    proposals: List::with_capacity(0),
+                    spend: 0,
+                    folded: if task == TASK { c::PhaseCounts { running: 1, ..counts } } else { counts },
+                    held_below: 0,
+                })
+                .unwrap();
+        }
+        let tree = plan(&c::Delivery::Tree(Box::new(legacy)));
+        let parent = index_of(&tree, Role::TreeItem, b"Task 12");
+        assert!(named(subtree(&tree, parent), Role::TreeItem, b"Task 14"));
+        assert!(!named(subtree(&tree, parent), Role::TreeItem, b"Task 13"));
+        let roots = children(&tree, index_of(&tree, Role::Tree, b"Plan"));
+        assert_eq!(roots.as_slice().len(), 3);
+        assert_eq!(tree.nodes()[roots.as_slice()[0]].role, Role::Paragraph);
+        assert_eq!(tree.nodes()[roots.as_slice()[1]].name.as_deref(), Some(b"Task 12".as_slice()));
+        assert_eq!(tree.nodes()[roots.as_slice()[2]].name.as_deref(), Some(b"Task 13".as_slice()));
+        assert_tree_items(&tree, &[b"Task 12", b"Task 14", b"Task 13"]);
+    }
+}
+
+// README 5.8: "An ended delegate is drawn before the first live root with a higher number";
+// "a live root's own delegates stay under it, in the tree's order".
+#[test]
+fn an_ended_delegate_follows_the_whole_subtree_of_the_live_root_before_it() {
+    let c::Delivery::OwnerTree(tree) = plan_rows(&[(12, 9, 1), (14, 9, 1), (15, 12, 2)]) else { panic!("owner tree") };
+    let root = goal_root(
+        tree.rows.as_slice(),
+        Some(tasks_page(&[ended_line(13, c::OwnerTaskStatus::Done)], false, false)),
+        c::Phase::Running,
+    );
+    let view = fixtures::page_view(&root);
+    let tree = view.tree();
+    assert_plan_roots(tree, &[b"Task 12", b"Task 13", b"Task 14"]);
+    assert!(named(subtree(tree, index_of(tree, Role::TreeItem, b"Task 12")), Role::TreeItem, b"Task 15"));
+    assert_tree_items(tree, &[b"Task 12", b"Task 15", b"Task 13", b"Task 14"]);
+}
+
+// README 5.8: "Its delegates are the plan's roots"; "in the tree's order".
+#[test]
+fn a_plan_row_with_its_parent_outside_the_window_stays_at_the_plan_level() {
+    let tree = plan(&plan_rows(&[(12, 9, 1), (14, 30, 2)]));
+    assert_plan_roots(&tree, &[b"Task 12", b"Task 14"]);
+}
+
+// README 5.8: "a live root's own delegates stay under it, in the tree's order".
+#[test]
+fn a_plans_siblings_keep_their_supplied_order_even_out_of_number_order() {
+    let tree = plan(&plan_rows(&[(18, 9, 1), (16, 12, 1), (12, 9, 1), (14, 12, 1)]));
+    assert_plan_roots(&tree, &[b"Task 18", b"Task 12"]);
+    assert_tree_items(&tree, &[b"Task 18", b"Task 12", b"Task 16", b"Task 14"]);
+}
+
+fn plan_rows(rows: &[(u64, u64, u32)]) -> c::Delivery {
+    let mut delivery = f::tree();
+    let c::Delivery::OwnerTree(tree) = &mut delivery else { panic!("owner tree") };
+    tree.rows = List::with_capacity(u32::try_from(rows.len()).unwrap());
+    for (task, parent, depth) in rows {
+        let mut row = row();
+        row.chip.task = *task;
+        row.parent = *parent;
+        row.depth = *depth;
+        tree.rows.push(row).unwrap();
+    }
+    delivery
+}
+
+fn assert_plan_roots(tree: &Tree, names: &[&[u8]]) {
+    let roots = children(tree, index_of(tree, Role::Tree, b"Plan"));
+    assert_eq!(roots.as_slice().len(), names.len());
+    for (index, name) in roots.as_slice().iter().zip(names) {
+        assert_eq!(tree.nodes()[*index].role, Role::TreeItem);
+        assert_eq!(tree.nodes()[*index].name.as_deref(), Some(*name));
+    }
+}
+
 #[test]
 fn the_release_confirmation_says_what_releasing_does() {
     use temper_client_domain::{Action, Event, pages::Act};

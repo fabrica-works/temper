@@ -157,6 +157,12 @@ pub fn worst_case(limits: &Limits, domain: &temper_client_domain::Limits, words:
         // One transient row/header state can own an observed tool name.
         .checked_add(u64::from(domain.client.domain.text))?
         .checked_add(skein_lib::List::<u64>::worst_case(domain.client.domain.rows)?)?
+        // Plan ordering: task/parent input, sorted task index, child/sibling links,
+        // deferred siblings and the resulting depth-first row indices.
+        .checked_add(skein_lib::List::<(u64, Option<u64>)>::worst_case(domain.client.domain.rows)?)?
+        .checked_add(skein_lib::List::<(u64, u32)>::worst_case(domain.client.domain.rows)?)?
+        .checked_add(skein_lib::List::<(u32, u32)>::worst_case(domain.client.domain.rows)?)?
+        .checked_add(skein_lib::List::<u32>::worst_case(domain.client.domain.rows)?.checked_mul(2)?)?
         .checked_add(
             skein_lib::List::<u64>::worst_case(temper_client_domain::pages::delegation::bound(domain))?
                 .checked_mul(2)?,

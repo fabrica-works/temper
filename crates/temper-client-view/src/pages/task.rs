@@ -602,6 +602,83 @@ fn parent(b: &mut Builder, stack: &mut List<u64>, parent: Option<u64>) {
     }
     stack.truncate(u32::try_from(keep).expect("tree stack fits"));
 }
+/// client/README.md, 5.8: keep each live root's delegates under it, in supplied
+/// sibling order. Task lookup is O(log n); linking and the explicit walk are O(n).
+fn tree_order(root: u64, rows: &[(u64, Option<u64>)]) -> List<u32> {
+    let bound = u32::try_from(rows.len()).expect("tree rows fit");
+    // `bound` is outside the window, and serves as the absent link.
+    let mut index = List::with_capacity(bound);
+    let mut links = List::with_capacity(bound);
+    let mut order = List::with_capacity(bound);
+    for (at, (task, _)) in rows.iter().enumerate() {
+        let at = u32::try_from(at).expect("tree index fits");
+        index.push((*task, at)).expect("tree index fits");
+        links.push((bound, bound)).expect("tree links fit");
+        if *task == root {
+            // Legacy deliveries include the undrawn root and its folds.
+            order.push(at).expect("tree order fits");
+        }
+    }
+    let mut index = index.into_boxed();
+    index.sort_unstable();
+    let mut first = bound;
+    // Prepending in reverse preserves the window's order at every parent.
+    for (at, (task, parent)) in rows.iter().enumerate().rev() {
+        if *task == root {
+            continue;
+        }
+        let at = u32::try_from(at).expect("tree index fits");
+        let mut parent_index = bound;
+        if let Some(parent) = parent
+            && *parent != root
+        {
+            let mut low = 0;
+            let mut high = index.len();
+            // Each step halves the index, as in EndedRows::mark.
+            for _ in 0..usize::BITS {
+                if low == high {
+                    break;
+                }
+                let half = high.checked_sub(low).expect("ordered search bounds") / 2;
+                let middle = low.checked_add(half).expect("tree index fits");
+                let (number, position) = index.get(middle).expect("search index in tree");
+                match number.cmp(parent) {
+                    core::cmp::Ordering::Less => low = middle.checked_add(1).expect("tree index fits"),
+                    core::cmp::Ordering::Greater => high = middle,
+                    core::cmp::Ordering::Equal => {
+                        parent_index = *position;
+                        break;
+                    }
+                }
+            }
+        }
+        let next = if parent_index == bound {
+            core::mem::replace(&mut first, at)
+        } else {
+            let parent = links.get_mut(parent_index).expect("parent in tree");
+            core::mem::replace(&mut parent.0, at)
+        };
+        links.get_mut(at).expect("row in tree").1 = next;
+    }
+    let mut stack = List::with_capacity(bound);
+    if first != bound {
+        stack.push(first).expect("tree walk fits");
+    }
+    // Each row is visited once; a sibling is deferred while its subtree is drawn.
+    for _ in 0..bound {
+        let Some(at) = stack.last().copied() else { break };
+        stack.truncate(stack.len().checked_sub(1).expect("nonempty tree stack"));
+        order.push(at).expect("tree order fits");
+        let (child, sibling) = *links.get(at).expect("row in tree");
+        if sibling != bound {
+            stack.push(sibling).expect("tree walk fits");
+        }
+        if child != bound {
+            stack.push(child).expect("tree walk fits");
+        }
+    }
+    order
+}
 fn folded(b: &mut Builder, counts: &[(c::Phase, u32)], held_below: u32, words: &Words) -> bool {
     let mut shown = false;
     for (phase, count) in counts {
@@ -699,6 +776,23 @@ impl<'a> Plan<'a> {
         }
     }
 }
+fn owner_plan_row(
+    b: &mut Builder,
+    row: &c::OwnerTreeRow,
+    root: &Domain,
+    words: &Words,
+    bindings: &mut Bindings,
+    rows: u32,
+) {
+    chip(b, &row.chip, words, bindings);
+    let facts = if let c::ChipPhase::Owner { details, .. } = row.chip.details.as_ref() {
+        details.dependencies.as_slice()
+    } else {
+        &[]
+    };
+    dependencies(b, row.chip.task, &row.dependencies, facts, row.cut, root.pages().me(root.client()), words, bindings);
+    controls(b, &row.chip, root, words, bindings, rows);
+}
 pub(crate) fn plan(
     b: &mut Builder,
     tree: Option<&c::Delivery>,
@@ -724,29 +818,19 @@ pub(crate) fn plan(
             has_tree_content = !tree.rows.is_empty();
             let mut stack = List::with_capacity(tree.rows.len());
             has_tree_content |= owner_folds(b, tree, tree.root.task, words);
+            let mut rows_by_parent = List::with_capacity(tree.rows.len());
             for row in &tree.rows {
+                rows_by_parent.push((row.chip.task, Some(row.parent))).expect("tree rows fit");
+            }
+            let order = tree_order(tree.root.task, rows_by_parent.as_slice());
+            for index in &order {
+                let row = tree.rows.get(*index).expect("ordered tree row");
                 if row.parent == tree.root.task && ended_rows.precedes(row.chip.task) {
                     parent(b, &mut stack, None);
                     has_tree_content |= ended_rows.before(b, Some(row.chip.task), root, words, bindings, rows);
                 }
                 parent(b, &mut stack, Some(row.parent));
-                chip(b, &row.chip, words, bindings);
-                let facts = if let c::ChipPhase::Owner { details, .. } = row.chip.details.as_ref() {
-                    details.dependencies.as_slice()
-                } else {
-                    &[]
-                };
-                dependencies(
-                    b,
-                    row.chip.task,
-                    &row.dependencies,
-                    facts,
-                    row.cut,
-                    root.pages().me(root.client()),
-                    words,
-                    bindings,
-                );
-                controls(b, &row.chip, root, words, bindings, rows);
+                owner_plan_row(b, row, root, words, bindings, rows);
                 stack.push(row.chip.task).expect("tree stack fits");
                 has_tree_content |= owner_folds(b, tree, row.chip.task, words);
             }
@@ -755,7 +839,13 @@ pub(crate) fn plan(
         }
         Some(c::Delivery::Tree(tree)) => {
             let mut stack = List::with_capacity(tree.nodes.len());
+            let mut rows_by_parent = List::with_capacity(tree.nodes.len());
             for node in &tree.nodes {
+                rows_by_parent.push((node.chip.task, node.parent)).expect("tree rows fit");
+            }
+            let order = tree_order(tree.task, rows_by_parent.as_slice());
+            for index in &order {
+                let node = tree.nodes.get(*index).expect("ordered tree node");
                 if node.parent == Some(tree.task) && ended_rows.precedes(node.chip.task) {
                     parent(b, &mut stack, None);
                     has_tree_content |= ended_rows.before(b, Some(node.chip.task), root, words, bindings, rows);
