@@ -11,7 +11,7 @@ import sys
 NAME = re.compile(r'[a-z][a-z0-9-]*\Z')
 DIGEST = re.compile(r'sha256:[0-9a-f]{64}\Z')
 TAGS = ('layout', 'navigation', 'content', 'naming', 'style', 'behaviour')
-LOOK = re.compile(r'check/(?:look-(?:structure|style)|gallery)/([^/]+)/([^/]+)/(.+)\Z')
+LOOK = re.compile(r'check/(?:look-(?:structure|style|words)|gallery)/([^/]+)/([^/]+)/(.+)\Z')
 
 
 def canonical(value):
@@ -292,7 +292,7 @@ def _picture_paths(run, scene, difference):
     if width is None:
         raise ValueError(f"{scene}/{difference['width']}: absent from first judged run")
     regions = {parts[1] for signature in difference['signatures']
-               if len(parts := signature.split('/')) >= 2 and parts[0] in ('style', 'order')}
+               if len(parts := signature.split('/')) >= 2 and parts[0] in ('style', 'order', 'words')}
     records = [width] + [r for r in width['regions'] if r['name'] in regions]
     page_only = width.get('mockup') is None
     label = 'Page' if page_only else 'Pair'

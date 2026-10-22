@@ -1,5 +1,6 @@
 """Cheap file contracts for the look experiments; capture decisions live in skein."""
 import json
+import re
 from pathlib import Path
 import unittest
 
@@ -96,6 +97,27 @@ class LookTests(unittest.TestCase):
                                  dict(role='main', name='', match='words'))
                 for region in scene['regions']:
                     self.assertEqual(set(region['page']), {'role', 'name', 'match'})
+                # skein lab-browser.md 4: the regions whose words look-words holds to the mockup's.
+                words = scene.get('words', [])
+                if scene['mockup'] is None:
+                    self.assertEqual(words, [])
+                named = set()
+                for item in words:
+                    with self.subTest(words=item.get('id')):
+                        self.assertEqual(set(item), {'id', 'width', 'region', 'data', 'cites'})
+                        self.assertRegex(item['id'], r'^[a-z][a-z0-9-]*\Z')
+                        self.assertNotIn(item['id'], ids)
+                        ids.add(item['id'])
+                        self.assertIn(item['width'], widths)
+                        self.assertIn(item['region'], regions)
+                        self.assertNotIn((item['width'], item['region']), named)
+                        named.add((item['width'], item['region']))
+                        self.assertTrue(item['cites'])
+                        self.assertEqual(len(set(item['data'])), len(item['data']))
+                        for pattern in item['data']:
+                            self.assertIsNone(re.fullmatch(pattern, ''))
+                if scene['mockup'] is not None:
+                    self.assertEqual({(width, 'banner') for width in widths} - named, set())
 
     def test_gallery_names(self):
         path = ROOT / 'tools' / 'gallery' / 'names.txt'
@@ -143,7 +165,7 @@ class LookTests(unittest.TestCase):
                          sorted(name + '.json' for name in SCENES))
         self.assertEqual([item['name'] for item in experiment['collect']], ['capture'])
         self.assertEqual([item['name'] for item in experiment['checks']],
-                         ['look-structure', 'look-style'])
+                         ['look-structure', 'look-style', 'look-words'])
         for command in experiment['collect'] + experiment['checks']:
             with self.subTest(command=command['name']):
                 argv = command['argv']
@@ -173,7 +195,7 @@ class LookTests(unittest.TestCase):
         self.assertTrue(signatures)
         self.assertEqual(signatures, sorted(set(signatures)))
         for signature in signatures:
-            self.assertRegex(signature, r'^check/look-(structure|style)/chat/(desktop|phone)/.+$')
+            self.assertRegex(signature, r'^check/look-(?:(?:structure|style)/chat|words/task)/(desktop|phone)/.+$')
         experiment['planted'] = []
         self.assertEqual(canonical(experiment), healthy[exp])
 

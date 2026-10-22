@@ -181,6 +181,10 @@ class BarTests(unittest.TestCase):
         self.make_key('key', [['check/look-style/chat/desktop/departure-gone/old']])
         self.assertIn('— departure-gone (1 runs)', self.bar()[0])
 
+    def test_words_signature_is_a_look_check(self):
+        self.make_key('key', [['check/look-words/chat/desktop/words/banner/missing/Live']])
+        self.assertIn('— not judged (1 runs)', self.bar()[0])
+
     def test_unjudged_not_a_look_check(self):
         self.make_key('key', [['panic/gallery']])
         self.assertIn('— not a look check (1 runs)', self.bar()[0])
