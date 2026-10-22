@@ -147,7 +147,7 @@ pub fn back(event: Box<forge::Event>) -> Result<skein_forge_connection::Answered
 pub fn small(forge: &forge::Limits) -> skein_forge_connection::Limits {
     skein_forge_connection::Limits {
         forges: 4,
-        token_bytes: 512,
+        token_bytes: limits::FORGE_TOKEN_BYTES,
         key_bytes: u32::try_from(skein_tls::RS256_KEY_BYTES).expect("RS256 key bound fits u32"),
         installations: limits::FORGE_INSTALLATIONS,
         log_origins: 4,

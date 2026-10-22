@@ -58,6 +58,8 @@ pub enum Refused {
 }
 /// `forge_component.installations` default; temper-01 adds the configuration row.
 pub const FORGE_INSTALLATIONS: u32 = 8;
+/// Default bound for a token minted by the forge component.
+pub const FORGE_TOKEN_BYTES: u32 = 512;
 const CLIENT: skein_forge_client::Limits = skein_forge_client::Limits {
     // Logical calls retained, queued and in flight, from the engine forge world fixture.
     pending: 4,

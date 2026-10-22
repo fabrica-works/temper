@@ -14,7 +14,9 @@ pub fn limits(own: &crate::limits::Limits) -> Option<v1::Limits> {
         remote_bytes: own.checkout.name_bytes,
         conflicts: own.checkout.conflicts,
         path_bytes: own.checkout.path_bytes,
-        token_bytes: v1::CEILINGS.identity_token,
+        token_bytes: v1::CEILINGS.token_token,
+        entries: own.forges.installations,
+        entry_token_bytes: own.forge_component.token_bytes,
         text_bytes: own.checkout.name_bytes.min(v1::CEILINGS.identity_name),
     })
 }
@@ -75,6 +77,7 @@ fn repository_item(
             start: start(&repository.start, limits)?,
             access,
             identity: repository.identity,
+            account: None,
         },
     )
 }
@@ -157,7 +160,7 @@ pub fn identity(identity: &settings::Identity, limits: &v1::Limits) -> Result<Se
     let value = v1::Identity::new(
         limits,
         v1::IdentityParts {
-            token: identity.token.clone(),
+            kind: v1::Kind::Forgejo(v1::Token::new(limits, v1::TokenParts { token: identity.token.clone() })?),
             login: identity.login.clone(),
             name: identity.author.name.clone(),
             email: identity.author.email.clone(),
@@ -189,6 +192,7 @@ pub fn workspace(items: Option<&v1::Items>) -> Assigned {
             }
             v1::Access::ReadOnly => worker::Access::ReadOnly,
         };
+        // The worker's GitHub pick (o/github-git-m2's worker task) uses Repository.account.
         repositories
             .push(worker::Repository {
                 tag: repository.tag(),
@@ -328,8 +332,13 @@ pub fn value(identity: &v1::Identity) -> Option<temper_worker_protocol_git::Iden
     if !wire::valid(identity) {
         return None;
     }
+    let token = match identity.kind() {
+        v1::Kind::Forgejo(value) => value.token().clone(),
+        // The worker's GitHub pick (o/github-git-m2's worker task) decodes this kind.
+        v1::Kind::Github(_) => return None,
+    };
     Some(temper_worker_protocol_git::Identity {
-        token: identity.token().clone(),
+        token,
         login: identity.login().into(),
         name: identity.name().into(),
         email: identity.email().into(),

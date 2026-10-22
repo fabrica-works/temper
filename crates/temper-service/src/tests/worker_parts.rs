@@ -163,7 +163,10 @@ fn an_identity_breaking_a_field_rule_is_dropped() {
         let record = v1::Identity::new(
             &limits,
             v1::IdentityParts {
-                token: Secret::new(b"credential".as_slice().into()),
+                kind: v1::Kind::Forgejo(
+                    v1::Token::new(&limits, v1::TokenParts { token: Secret::new(b"credential".as_slice().into()) })
+                        .unwrap(),
+                ),
                 login: login.into(),
                 name: name.into(),
                 email: email.into(),
@@ -243,4 +246,36 @@ fn program_resource_debug_exposes_only_counts() {
     )
     .expect("explicit command resources fit");
     assert_eq!(format!("{resources:?}"), "Resources { programs: 1, environment_entries: 1 }");
+}
+
+#[test]
+fn a_github_identity_is_dropped_and_counted_until_the_worker_pick_arrives() {
+    let limits = fixtures::wire_limits();
+    let record = v1::Identity::new(
+        &limits,
+        v1::IdentityParts {
+            kind: v1::Kind::Github(
+                v1::Entries::new(&limits, v1::EntriesParts { entries: skein_lib::List::with_capacity(0) }).unwrap(),
+            ),
+            login: b"x-access-token".as_slice().into(),
+            name: b"Temper".as_slice().into(),
+            email: b"bot@example.test".as_slice().into(),
+        },
+    )
+    .unwrap();
+    let secret = payload::identity(&record);
+    assert!(payload::valid(&record));
+    assert_eq!(worker_route::identity(&secret, &limits), None);
+    let mut worker = fixtures::worker();
+    worker.link(
+        fixtures::NOW,
+        jig_protocol_worker_link::Request::Value {
+            account: 1,
+            generation: 1,
+            expires: skein_lib::Time::from_nanos(u64::MAX),
+            value: jig_protocol_worker_link::GrantValue::Application { secret },
+        },
+    );
+    assert_eq!(worker.undecodable_values, 1);
+    assert_eq!(worker.identities.newest(1), None);
 }

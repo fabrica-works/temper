@@ -294,11 +294,17 @@ fn bounded(bounds: &payload::Bounds, engine: bool, problems: &mut Problems) -> O
         (b"checkout.name_bytes", bounds.remote_bytes, ceilings.repository_remote),
         (b"checkout.conflicts", bounds.conflicts, ceilings.files_files),
         (b"checkout.path_bytes", bounds.path_bytes, ceilings.files_files_item),
-        (b"identity.token_bytes", bounds.token_bytes, ceilings.identity_token),
+        (b"identity.token_bytes", bounds.token_bytes, ceilings.token_token),
+        (b"forges.installations", bounds.entries, ceilings.entries_entries),
+        (b"forge_component.token_bytes", bounds.entry_token_bytes, ceilings.entry_token),
         (
             b"identity.text_bytes",
             bounds.text_bytes,
-            ceilings.identity_name.min(ceilings.identity_login).min(ceilings.identity_email),
+            ceilings
+                .identity_name
+                .min(ceilings.identity_login)
+                .min(ceilings.identity_email)
+                .min(ceilings.entry_account_login),
         ),
     ] {
         if bytes > bound {

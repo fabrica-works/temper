@@ -106,7 +106,13 @@ pub fn application_value(number: u32, generation: u64, token: &[u8]) -> jig_prot
     let record = temper_protocol_worker_wire::v1::Identity::new(
         &super::wire_limits(),
         temper_protocol_worker_wire::v1::IdentityParts {
-            token: value.token,
+            kind: temper_protocol_worker_wire::v1::Kind::Forgejo(
+                temper_protocol_worker_wire::v1::Token::new(
+                    &super::wire_limits(),
+                    temper_protocol_worker_wire::v1::TokenParts { token: value.token },
+                )
+                .expect("token record"),
+            ),
             login: value.login,
             name: value.name,
             email: value.email,

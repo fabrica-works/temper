@@ -524,7 +524,9 @@ fn checked_start(
         remote_bytes: remote.unwrap_or(u32::MAX),
         conflicts: own.checkout.conflicts,
         path_bytes: own.checkout.path_bytes,
-        token_bytes: temper_protocol_worker_wire::v1::CEILINGS.identity_token,
+        token_bytes: temper_protocol_worker_wire::v1::CEILINGS.token_token,
+        entries: own.forges.installations,
+        entry_token_bytes: own.forge_component.token_bytes,
         text_bytes: temper_protocol_worker_wire::v1::CEILINGS.identity_name,
     };
     let worker_bounds = temper_protocol_worker_wire::Bounds {

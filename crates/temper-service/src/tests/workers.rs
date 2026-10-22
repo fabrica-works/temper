@@ -11,7 +11,8 @@ fn each_repositorys_grant_carries_its_identitys_value() {
     let filled = values.grants(&[fixtures::application_grant(1, 1)], Time::ZERO);
     let [Some(GrantValue::Application { secret })] = filled.as_ref() else { panic!("one application value") };
     let identity = fixtures::decoded_identity(secret);
-    assert_eq!(identity.token().expose(), b"forge-token-1234");
+    let temper_protocol_worker_wire::v1::Kind::Forgejo(token) = identity.kind() else { panic!("Forgejo identity") };
+    assert_eq!(token.token().expose(), b"forge-token-1234");
     assert_eq!(identity.login(), b"temper");
     assert_eq!(identity.name(), b"temper");
     assert_eq!(identity.email(), b"temper@forge.example");
@@ -131,7 +132,8 @@ fn an_assignment_carries_its_items_encoded_charter_and_identity_value() {
     assert!(charter.resume());
     let Some(GrantValue::Application { secret }) = &values[0] else { panic!("an application value") };
     let value = fixtures::decoded_identity(secret);
-    assert_eq!(value.token().expose(), b"forge-token-1234");
+    let temper_protocol_worker_wire::v1::Kind::Forgejo(token) = value.kind() else { panic!("Forgejo identity") };
+    assert_eq!(token.token().expose(), b"forge-token-1234");
 }
 #[test]
 fn an_assignment_that_cannot_encode_its_items_is_refused() {

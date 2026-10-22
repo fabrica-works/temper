@@ -22,7 +22,10 @@ fn limits_take_each_bound_from_its_source_field() {
             files_files_item: 8,
             diagnostic_output: 512,
             saved_repositories: 2,
-            identity_token: 40,
+            token_token: 40,
+            entries_entries: 3,
+            entry_token: 24,
+            entry_account_login: 16,
             identity_login: 16,
             identity_name: 16,
             identity_email: 16,
@@ -94,7 +97,7 @@ fn largest_parts_are_the_generated_worst_cases() {
     assert_eq!(u64::from(sizes.saved), v1::Saved::worst_case_bytes(&limits).expect("saved"));
     assert_eq!(u64::from(sizes.resource), v1::Preparation::worst_case_bytes(&limits).expect("preparation"));
     assert_eq!(u64::from(sizes.grant), v1::Identity::worst_case_bytes(&limits).expect("identity"));
-    assert_eq!(sizes, crate::Largest { items: 8601, left: 76, saved: 1076, resource: 6, grant: 104 });
+    assert_eq!(sizes, crate::Largest { items: 8619, left: 76, saved: 1076, resource: 6, grant: 233 });
 }
 
 #[test]
@@ -115,14 +118,93 @@ fn identity_rules_refuse_each_forbidden_byte() {
         (b"login", b"name", b"a<b"),
         (b"login", b"name", b"a>b"),
     ];
-    for (row, (login, name, email)) in rows.iter().enumerate() {
-        let parts = v1::IdentityParts {
-            login: Box::from(*login),
-            name: Box::from(*name),
-            email: Box::from(*email),
-            ..original.clone().into_parts()
-        };
-        let identity = v1::Identity::new(&fixtures::limits(), parts).expect("bounded valid text");
-        assert!(!crate::valid(&identity), "forbidden row {row}");
+    for kind in [
+        original.kind().clone(),
+        v1::Kind::Github(
+            v1::Entries::new(&fixtures::limits(), v1::EntriesParts { entries: List::with_capacity(0) })
+                .expect("empty entries"),
+        ),
+    ] {
+        for (row, (login, name, email)) in rows.iter().enumerate() {
+            let parts = v1::IdentityParts {
+                kind: kind.clone(),
+                login: Box::from(*login),
+                name: Box::from(*name),
+                email: Box::from(*email),
+            };
+            let identity = v1::Identity::new(&fixtures::limits(), parts).expect("bounded valid text");
+            assert!(!crate::valid(&identity), "forbidden row {row}");
+        }
+    }
+}
+
+#[test]
+fn a_github_values_entries_stop_at_their_bound() {
+    let limits = fixtures::limits();
+    for (count, accepted) in
+        [(limits.entries_entries, true), (limits.entries_entries.checked_add(1).expect("test count"), false)]
+    {
+        let mut entries = List::with_capacity(count);
+        for account in 0..count {
+            entries
+                .push(
+                    v1::Entry::new(
+                        &limits,
+                        v1::EntryParts {
+                            account: u64::from(account),
+                            account_login: Box::from(&b"owner"[..]),
+                            token: skein_lib::Secret::new(Box::from(&b"token"[..])),
+                        },
+                    )
+                    .expect("entry"),
+                )
+                .expect("counted room");
+        }
+        let kind = v1::Kind::Github(v1::Entries::new(&v1::CEILINGS, v1::EntriesParts { entries }).expect("ceiling"));
+        let parts = v1::IdentityParts { kind, ..fixtures::identity(b"token").into_parts() };
+        let made = v1::Identity::new(&limits, parts);
+        if accepted {
+            made.expect("at bound");
+        } else {
+            assert_eq!(
+                made.expect_err("past bound"),
+                v1::Problem { path: v1::Path::EntriesEntries, reason: skein_codec::Reason::Bound }
+            );
+        }
+    }
+}
+
+#[test]
+fn an_entrys_token_and_login_stop_at_their_bounds() {
+    let limits = fixtures::limits();
+    for (field, bound, path) in [
+        ("token", limits.entry_token, v1::Path::EntryToken),
+        ("login", limits.entry_account_login, v1::Path::EntryAccountLogin),
+    ] {
+        for past in [false, true] {
+            let length = usize::try_from(bound.checked_add(u32::from(past)).expect("test bound")).expect("test length");
+            let mut bytes = skein_lib::bytes::zeroed(length);
+            bytes.fill(b'x');
+            let mut parts = v1::EntryParts {
+                account: 7,
+                account_login: Box::from(&b"owner"[..]),
+                token: skein_lib::Secret::new(Box::from(&b"token"[..])),
+            };
+            if field == "token" {
+                parts.token = skein_lib::Secret::new(bytes);
+            } else {
+                parts.account_login = bytes;
+            }
+            let made = v1::Entry::new(&limits, parts);
+            if past {
+                assert_eq!(
+                    made.expect_err("past bound"),
+                    v1::Problem { path, reason: skein_codec::Reason::Bound },
+                    "{field}"
+                );
+            } else {
+                made.expect("at bound");
+            }
+        }
     }
 }

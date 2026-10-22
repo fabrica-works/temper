@@ -656,7 +656,9 @@ pub(super) fn worker_alone(
             remote_bytes: limits.checkout.name_bytes,
             conflicts: limits.checkout.conflicts,
             path_bytes: limits.checkout.path_bytes,
-            token_bytes: temper_protocol_worker_wire::v1::CEILINGS.identity_token,
+            token_bytes: temper_protocol_worker_wire::v1::CEILINGS.token_token,
+            entries: limits.forges.installations,
+            entry_token_bytes: limits.forge_component.token_bytes,
             text_bytes: temper_protocol_worker_wire::v1::CEILINGS.identity_name,
         };
         super::checks::channel(None, Some(&bounds), &[], &limits, problems);

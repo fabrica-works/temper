@@ -43,7 +43,7 @@ pub fn prepare(worker: &settings::Worker, agent: &settings::Agent, own: &limits:
     root::worst_case(&domain_limits).ok_or(problem(b"limits", What::Bound))?;
     host::Process::new(Token::new(0), &agent.limits, agent.host_limits.detail_bytes, agent.endpoints.clone())
         .or(Err(problem(b"agent", What::Bound)))?;
-    let payload = payload_limits(&own.checkout).ok_or(problem(b"limits", What::Bound))?;
+    let payload = payload_limits(own).ok_or(problem(b"limits", What::Bound))?;
     let link = link_limits(&worker.jig, &payload).ok_or(problem(b"limits", What::Bound))?;
     link::worst_case(&link).ok_or(problem(b"limits", What::Bound))?;
     let room = root::max_out(&domain_limits).checked_mul(2).ok_or(problem(b"limits", What::Bound))?;
@@ -77,14 +77,17 @@ pub fn root_limits(worker: &settings::Worker, agent: &settings::Agent, own: &lim
 
 /// The worker accepts repository and path bytes only up to its checkout limits.
 #[must_use]
-pub fn payload_limits(checkout: &temper_worker_domain_checkout::Limits) -> Option<v1::Limits> {
+pub fn payload_limits(own: &limits::Limits) -> Option<v1::Limits> {
+    let checkout = &own.checkout;
     payload::limits(&payload::Bounds {
         repositories: checkout.repositories,
         name_bytes: checkout.name_bytes,
         remote_bytes: checkout.name_bytes,
         conflicts: checkout.conflicts,
         path_bytes: checkout.path_bytes,
-        token_bytes: v1::CEILINGS.identity_token,
+        token_bytes: v1::CEILINGS.token_token,
+        entries: own.forges.installations,
+        entry_token_bytes: own.forge_component.token_bytes,
         text_bytes: v1::CEILINGS.identity_name,
     })
 }

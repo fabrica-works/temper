@@ -1,4 +1,4 @@
-family temper-worker-wire 2
+family temper-worker-wire 3
 
 # Down: the workspace items (protocol/channel.md, 4). Names, branches and
 # the save branch take Bounds.name_bytes; the remote Bounds.remote_bytes;
@@ -9,7 +9,7 @@ record Commit { commit: fixed 32 }
 enum Start { merge: Merge, base: Branch, branch: Branch, commit: Commit, saved: Branch }
 record Writable { push: bytes 1024 expected: option fixed 32 }
 enum Access { writable: Writable, read_only }
-record Repository { tag: u32 name: bytes 1024 remote: bytes 1024 git: option bytes 4096 start: Start access: Access identity: u32 }
+record Repository { tag: u32 name: bytes 1024 remote: bytes 1024 git: option bytes 4096 start: Start access: Access identity: u32 account: option u64 }
 record Items { repositories: list 64 Repository save: option bytes 1024 }
 
 # Up: what a run left and saved, a failed preparation (protocol/channel.md, 5).
@@ -31,4 +31,8 @@ record Tag { tag: u32 }
 enum Preparation { transient, missing: Missed, refused: Tag }
 
 # Beside a grant: a git identity's value (protocol/channel.md, 6).
-record Identity { token: secret 4096 login: text 256 name: text 256 email: text 256 }
+record Token { token: secret 4096 }
+record Entry { account: u64 account_login: text 256 token: secret 4096 }
+record Entries { entries: list 256 Entry }
+enum Kind { forgejo: Token, github: Entries }
+record Identity { kind: Kind login: text 256 name: text 256 email: text 256 }

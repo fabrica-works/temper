@@ -505,7 +505,7 @@ fn grant_sizes_take_credentials_source_names_and_generated_identities() {
     }
     let mut engine = fixtures::engine();
     let mut worker = fixtures::worker_settings();
-    let payload = worker_settings::payload_limits(&fixtures::worker_limits().checkout).unwrap();
+    let payload = worker_settings::payload_limits(&fixtures::worker_limits()).unwrap();
     for credential in [1, name, 4096] {
         engine.jig.limits.token = credential;
         // Table capacity, not OAuth's separate parsing bound, sizes every credential scheme.

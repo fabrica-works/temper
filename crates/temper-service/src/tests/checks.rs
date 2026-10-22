@@ -74,6 +74,57 @@ fn an_identity_past_the_grant_bound_is_refused_naming_it() {
     assert_eq!(&*lines(&found), b"application.identities[0]: past its bound\n".as_slice());
 }
 #[test]
+fn default_engine_and_worker_grants_fit_the_channel_and_link() {
+    let own = crate::limits::profile(crate::limits::Profile::Small);
+    for limits in [crate::translate::limits(&own).unwrap(), crate::worker_settings::payload_limits(&own).unwrap()] {
+        assert_eq!(payload::largest(&limits).unwrap().grant, 7057);
+        assert_eq!(jig_protocol_worker_wire::CEILINGS.application_value_secret, 8192);
+        let worker = fixtures::worker_settings();
+        let link = crate::worker_settings::link_limits(&worker.jig, &limits).unwrap();
+        assert!(jig_protocol_worker_link::worst_case(&link).is_some());
+    }
+    assert!(started(&fixtures::document(), &fixtures::files(), &fixtures::startup_agent()).is_empty());
+    let worker =
+        crate::startup::worker_part(&fixtures::worker_alone_document(), &config::Directories::working()).unwrap();
+    assert_eq!(worker.limits.forges.installations, crate::limits::FORGE_INSTALLATIONS);
+    assert_eq!(worker.limits.forge_component.token_bytes, crate::limits::FORGE_TOKEN_BYTES);
+}
+
+#[test]
+fn installations_past_the_grant_bound_refuse_the_start_naming_the_limit() {
+    // Nine entries fit; ten entries are the first count past jig's ceiling.
+    let document = fixtures::with(&fixtures::document(), b"application.limits.overrides", br#"{"checkout.name_bytes":600,"checkout.repositories":4,"git_component.stdout_bytes":2048,"forge.name_bytes":256,"forge.resources_per_task":4,"forges.installations":10,"forge_component.installations":10}"#);
+    let found = started(&document, &fixtures::files(), &fixtures::startup_agent());
+    assert_eq!(&*lines(&found), b"engine.limits.application_value_secret: 8625 bytes, past its bound of 8192\nworkers.limits.application_value_secret: 8625 bytes, past its bound of 8192\n".as_slice());
+    let document = fixtures::with(
+        &fixtures::worker_alone_document(),
+        b"application.limits.overrides",
+        br#"{"forges.installations":10,"forge_component.installations":10}"#,
+    );
+    let found = crate::startup::worker_part(&document, &config::Directories::working()).unwrap_err();
+    assert_eq!(
+        &*lines(&found),
+        b"workers.limits.application_value_secret: 8625 bytes, past its bound of 8192\n".as_slice()
+    );
+}
+
+#[test]
+fn a_worker_alone_takes_installation_and_token_bounds_from_its_configuration() {
+    let document = fixtures::with(
+        &fixtures::worker_alone_document(),
+        b"application.limits.overrides",
+        br#"{"forges.installations":3,"forge_component.token_bytes":64}"#,
+    );
+    let part = crate::startup::worker_part(&document, &config::Directories::working()).unwrap();
+    let limits = crate::worker_settings::payload_limits(&part.limits).unwrap();
+    assert_eq!(limits.entries_entries, 3);
+    assert_eq!(limits.entry_token, 64);
+    let engine_limits = crate::translate::limits(&part.limits).unwrap();
+    assert_eq!(engine_limits.entries_entries, limits.entries_entries);
+    assert_eq!(engine_limits.entry_token, limits.entry_token);
+}
+
+#[test]
 fn an_endpoint_or_model_missing_from_the_agent_is_named() {
     let document = fixtures::document();
     for (row, endpoints, models, expected) in [
@@ -142,6 +193,8 @@ fn a_channel_limit_past_a_ceiling_names_the_limit() {
         conflicts: 0,
         path_bytes: 0,
         token_bytes: 4096,
+        entries: 8,
+        entry_token_bytes: 512,
         text_bytes: 256,
     };
     let mut found = Problems::empty();

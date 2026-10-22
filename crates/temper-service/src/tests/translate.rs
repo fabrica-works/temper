@@ -216,3 +216,49 @@ fn an_empty_workspace_has_no_items() {
 fn absent_parts_leave_the_roots_parts_empty() {
     assert_eq!(translate::parts(None, None, None), root::Parts::none());
 }
+
+#[test]
+fn a_configured_identity_encodes_as_forgejos_kind() {
+    let configured = fixtures::engine().identities.into_iter().next().unwrap();
+    let limits = fixtures::wire_limits();
+    let bytes = translate::identity(&configured, &limits).unwrap();
+    let value = wire::Identity::decode(&limits, &mut skein_lib::Reader::new(bytes.expose())).unwrap();
+    let expected = wire::Identity::new(
+        &limits,
+        wire::IdentityParts {
+            kind: wire::Kind::Forgejo(wire::Token::new(&limits, wire::TokenParts { token: configured.token }).unwrap()),
+            login: configured.login,
+            name: configured.author.name,
+            email: configured.author.email,
+        },
+    )
+    .unwrap();
+    assert_eq!(value, expected);
+}
+
+#[test]
+fn each_repository_item_carries_no_account_yet() {
+    for kind in [crate::settings::Kind::Forgejo, crate::settings::Kind::GitHub] {
+        let mut forge = fixtures::forges().into_iter().next().unwrap();
+        forge.kind = kind;
+        let assignment = fixtures::assignment_with(fixtures::repository(7, b"acme", b"shop"));
+        let items = translate::items(&assignment, &[forge], &fixtures::wire_limits()).unwrap().unwrap();
+        assert_eq!(*items.repositories().get(0).unwrap().account(), None, "{kind:?}");
+    }
+}
+
+#[test]
+fn a_repositorys_account_is_dropped_before_the_workers_domain() {
+    let settings = fixtures::engine();
+    let assignment = fixtures::assignment_with(fixtures::repository(7, b"acme", b"shop"));
+    let limits = fixtures::wire_limits();
+    let original = translate::items(&assignment, &settings.forges, &limits).unwrap().unwrap();
+    let (expected, save) = translate::workspace(Some(&original));
+    let mut repositories = List::with_capacity(1);
+    let repository = original.repositories().get(0).unwrap().clone().into_parts();
+    repositories
+        .push(wire::Repository::new(&limits, wire::RepositoryParts { account: Some(19), ..repository }).unwrap())
+        .unwrap();
+    let items = wire::Items::new(&limits, wire::ItemsParts { repositories, save: original.save().clone() }).unwrap();
+    assert_eq!(translate::workspace(Some(&items)), (expected, save));
+}

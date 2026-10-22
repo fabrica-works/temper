@@ -9,6 +9,8 @@ pub const BOUNDS: Bounds = Bounds {
     conflicts: 2,
     path_bytes: 8,
     token_bytes: 40,
+    entries: 3,
+    entry_token_bytes: 24,
     text_bytes: 16,
 };
 
@@ -30,6 +32,7 @@ pub fn repository_parts(tag: u32, remote: Box<[u8]>) -> v1::RepositoryParts {
         start: v1::Start::Base(branch),
         access: v1::Access::Writable(writable),
         identity: 1,
+        account: None,
     }
 }
 
@@ -49,7 +52,9 @@ pub fn identity(token: &[u8]) -> v1::Identity {
     v1::Identity::new(
         &limits(),
         v1::IdentityParts {
-            token: Secret::new(Box::from(token)),
+            kind: v1::Kind::Forgejo(
+                v1::Token::new(&limits(), v1::TokenParts { token: Secret::new(Box::from(token)) }).expect("token"),
+            ),
             login: Box::from(&b"temper"[..]),
             name: Box::from(&b"Temper"[..]),
             email: Box::from(&b"t@forge.example"[..]),

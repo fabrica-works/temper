@@ -11,7 +11,7 @@ use alloc::boxed::Box;
 use skein_lib::{Secret, Writer};
 
 /// The application's channel payload version (protocol/channel.md, section 3).
-pub const PAYLOAD_VERSION: u32 = 2;
+pub const PAYLOAD_VERSION: u32 = 3;
 
 /// Domain bounds shared by both sides of the channel (protocol/channel.md,
 /// section 8).
@@ -23,6 +23,8 @@ pub struct Bounds {
     pub conflicts: u32,
     pub path_bytes: u32,
     pub token_bytes: u32,
+    pub entries: u32,
+    pub entry_token_bytes: u32,
     pub text_bytes: u32,
 }
 
@@ -43,7 +45,10 @@ pub fn limits(bounds: &Bounds) -> Option<v1::Limits> {
         files_files: bounds.conflicts,
         files_files_item: bounds.path_bytes,
         diagnostic_output: v1::CEILINGS.diagnostic_output,
-        identity_token: bounds.token_bytes,
+        token_token: bounds.token_bytes,
+        entries_entries: bounds.entries,
+        entry_token: bounds.entry_token_bytes,
+        entry_account_login: bounds.text_bytes,
         identity_login: bounds.text_bytes,
         identity_name: bounds.text_bytes,
         identity_email: bounds.text_bytes,
