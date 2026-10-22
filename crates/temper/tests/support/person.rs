@@ -75,11 +75,13 @@ pub fn answered_chat(words: &[u8], answer: &[u8]) -> Script {
     }
 }
 /// Signs in by the printed link, no key added: the demo's seed added it.
-/// Asks `cue` in a new chat, then sees the text and the task's report.
+/// Asks `cue` in a new chat, task `task`, then sees the text and the task's report.
 #[must_use]
-pub fn demo_chat(cue: &[u8], text: &[u8], report: &[u8]) -> Script {
+pub fn demo_chat(task: u64, cue: &[u8], text: &[u8], report: &[u8]) -> Script {
     use skein_ui::Role;
-    let result = || Box::new([Target::Role { role: Role::Item, name: cue.into() }]);
+    // The view names each inbox entry by its kind and its source task.
+    let entry: Box<[u8]> = format!("Updates from T{task}").into_bytes().into_boxed_slice();
+    let result = || Box::new([Target::Role { role: Role::Item, name: entry.clone() }]);
     Script {
         begin: Begin::Link,
         steps: Box::new([

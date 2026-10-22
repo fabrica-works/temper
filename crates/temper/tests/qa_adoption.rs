@@ -237,7 +237,7 @@ fn a_running_box_hooks_every_seeded_repository_with_the_named_secret() {
         scratch.path(),
         flags.into_iter().map(|flag| flag.into_string().expect("flag")).collect(),
         &client,
-        support::person::demo_chat(b"QA adoption probe", b"demo model", b"The demo changes nothing."),
+        support::person::demo_chat(1, b"QA adoption probe", b"demo model", b"The demo changes nothing."),
         Duration::from_secs(30),
         || {
             let token = fs::read_to_string(secret_directory.join("admin_token")).expect("handover");
