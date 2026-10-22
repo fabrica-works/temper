@@ -365,9 +365,6 @@ impl Worker {
                     link::GrantValue::Credential { scheme: link::Scheme::Key, token } => {
                         Value { token, scheme: Scheme::Key }
                     }
-                    link::GrantValue::Withdrawn { id, bearer } => {
-                        Value { token: bearer, scheme: Scheme::Withdrawn { id } }
-                    }
                     // An application's grant is a configured git identity.
                     link::GrantValue::Application { secret } => {
                         self.identity(account, generation, &secret, expires);
@@ -810,13 +807,13 @@ pub(crate) fn grant_value(table: &Table, grant: smith::Grant, now: Time) -> Opti
 fn account(table: &Table, grant: smith::Grant, now: Time) -> Option<smith_protocol_channel::GrantValue> {
     match grant.form {
         smith::Form::Program(name) => return Some(smith_protocol_channel::GrantValue::Program(name.as_bytes().into())),
-        smith::Form::Credential(_) | smith::Form::Withdrawn => {}
+        smith::Form::Withdrawn => return None,
+        smith::Form::Credential(_) => {}
     }
     let value = table.value(grant.account, grant.generation, now)?;
     let actual = match &value.scheme {
         Scheme::Bearer => smith::Form::Credential(smith::Scheme::Bearer),
         Scheme::Key => smith::Form::Credential(smith::Scheme::Key),
-        Scheme::Withdrawn { .. } => smith::Form::Withdrawn,
     };
     if grant.form != actual {
         return None;
@@ -825,9 +822,6 @@ fn account(table: &Table, grant: smith::Grant, now: Time) -> Option<smith_protoc
     Some(match &value.scheme {
         Scheme::Bearer => smith_protocol_channel::GrantValue::Bearer(token),
         Scheme::Key => smith_protocol_channel::GrantValue::Key(token),
-        Scheme::Withdrawn { id } => {
-            smith_protocol_channel::GrantValue::Withdrawn { account_id: id.expose().into(), bearer: token }
-        }
     })
 }
 pub(crate) fn start_values(table: &Table, start: &smith::Start, root: &[u8], now: Time) -> Option<host::Values> {

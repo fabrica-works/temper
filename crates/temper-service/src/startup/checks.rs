@@ -398,14 +398,8 @@ pub fn grants(engine: &config::Engine, worker: &config::Limits, agent: &settings
             What::Against { other: b"the agent's program_value_name" },
         );
     }
-    for (bytes, bound, other) in [
-        (credential, bodies.credential_value_bytes, b"the agent's credential_value_bytes".as_slice()),
-        (worker.token, bodies.withdrawn_value_bearer, b"the agent's withdrawn_value_bearer"),
-        (jig_protocol_accounts::ACCOUNT_ID_BYTES, bodies.withdrawn_value_id, b"the agent's withdrawn_value_id"),
-    ] {
-        if bytes > bound {
-            problems.push(worker_limit(b"accounts.token"), What::Against { other });
-        }
+    if credential > bodies.credential_value_bytes {
+        problems.push(worker_limit(b"accounts.token"), What::Against { other: b"the agent's credential_value_bytes" });
     }
 }
 fn worker_limit(member: &[u8]) -> Path {

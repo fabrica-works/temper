@@ -505,8 +505,8 @@ fn agent_model_bounds_are_checked_under_the_configured_name() {
 fn credential_capacity_is_checked_on_both_sides_and_against_smith() {
     let mut engine = fixtures::engine().jig;
     let mut worker = fixtures::worker_settings().jig.limits;
-    let mut agent = fixtures::worker_agent();
-    let bound = agent.limits.bodies.credential_value_bytes.min(agent.limits.bodies.withdrawn_value_bearer);
+    let agent = fixtures::worker_agent();
+    let bound = agent.limits.bodies.credential_value_bytes;
     for (sent, received, accepted) in
         [(bound, bound, true), (bound - 1, bound, true), (bound, bound - 1, false), (bound + 1, bound + 1, false)]
     {
@@ -519,12 +519,6 @@ fn credential_capacity_is_checked_on_both_sides_and_against_smith() {
             assert!(core::str::from_utf8(&lines(&problems)).unwrap().contains("accounts.token"));
         }
     }
-    engine.limits.token = bound;
-    worker.token = bound;
-    agent.limits.bodies.withdrawn_value_id = jig_protocol_accounts::ACCOUNT_ID_BYTES - 1;
-    let mut problems = Problems::empty();
-    checks::grants(&engine, &worker, &agent, &mut problems);
-    assert!(!problems.is_empty());
 }
 
 #[test]

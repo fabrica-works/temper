@@ -393,7 +393,6 @@ fn jig_refusals_print_words() {
         (config::What::Refers, b"at: unknown reference\n"),
         (config::What::Plaintext, b"at: plaintext requires loopback or in-process\n"),
         (config::What::Digest, b"at: invalid digest\n"),
-        (config::What::HandedIn, b"at: invalid handed-in account\n"),
         (config::What::Reserve { charter: 7 }, b"at: reserve does not fit charter 7\n"),
         (config::What::Budget { charter: 7 }, b"at: budget does not fit charter 7\n"),
         (config::What::Grace { template: REFUSED_TEMPLATE }, b"at: grace does not fit template 7\n"),

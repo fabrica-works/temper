@@ -520,6 +520,9 @@ fn client_receipts(event: &client::Received, store: &Store, party: Option<u64>) 
             receipts
         }
         client::Received::Answer { key, answer } => {
+            if matches!(answer, c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::MarkedSeen { .. }))) {
+                return Vec::new(); // A seen watermark has no kept request answer.
+            }
             let mut receipts = vec![rules::Receipt::Party(party.expect("signed-in request"), *key)];
             if let c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::Created { first, last, .. })) = answer {
                 receipts.extend((*first..=*last).map(rules::Receipt::Task));

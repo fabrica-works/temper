@@ -496,7 +496,6 @@ pub fn limits(settings: &crate::settings::Engine) -> Option<kit::Limits> {
             crate::values::credential_bytes(&settings.jig),
             u32::try_from(wire::Identity::worst_case_bytes(&wire)?).ok()?,
         )?,
-        account_id: jig_protocol_accounts::ACCOUNT_ID_BYTES,
         name: link.name,
         secret: link.secret,
         model_name: ceilings.model_bound_name,

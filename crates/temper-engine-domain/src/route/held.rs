@@ -100,7 +100,6 @@ pub(crate) fn held(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisi
                         fleet::Scheme::Bearer => host::Scheme::Bearer,
                         fleet::Scheme::Key => host::Scheme::Key,
                     }),
-                    fleet::Form::Withdrawn => host::Form::Withdrawn,
                     fleet::Form::Application => host::Form::Application,
                     fleet::Form::Program(name) => {
                         host::Form::Program(host::SourceName::new(name.as_bytes()).expect("same source name grammar"))

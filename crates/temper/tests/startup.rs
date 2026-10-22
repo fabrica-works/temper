@@ -900,7 +900,6 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     let required = bounded.requirements();
     // The metadata-id map is gone from Service's engine option and the
     // separately counted Accounts host, plus its small-profile tree nodes.
-    // Account-id byte capacity stays reserved until jig's next repin.
     let driver_accounts =
         jig_protocol_config::profile::profile(jig_protocol_config::profile::Profile::Small).driver.accounts;
     let metadata_ids_release = 2 * u64::try_from(size_of::<skein_lib::Map<u32, skein_lib::Secret>>())
@@ -1169,6 +1168,9 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             - metadata_ids_release
             + box_pipe_growth
             + box_link_growth
+            // Jig M2: two close outputs enlarge journal/store and routing envelopes;
+            // withdrawn values and their account-id capacity are gone (wire v5).
+            + 4_578_373_384
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -1190,6 +1192,8 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     assert_eq!(
         required.worker_bytes,
         2_343_551_746_598_u64 + worker_growth + admission_growth + grant_wire_growth + GIT_VALIDITY_GROWTH
+            // Wire v5 and the smaller account table, at these bounded strings.
+            - 8_711
     );
 
     support::owned::check_memory("../../docs/examples/owned.json", required);

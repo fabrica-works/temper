@@ -103,7 +103,6 @@ fn grants(grants: &[accounts::Grant]) -> Box<[host::Grant]> {
                 accounts::Scheme::Bearer => host::Scheme::Bearer,
                 accounts::Scheme::Key => host::Scheme::Key,
             }),
-            accounts::Form::Withdrawn => host::Form::Withdrawn,
             accounts::Form::Application => host::Form::Application,
             accounts::Form::Program(name) => {
                 host::Form::Program(host::SourceName::new(name.as_bytes()).expect("same source name grammar"))

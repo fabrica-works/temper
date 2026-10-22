@@ -411,11 +411,7 @@ fn start_and_renewal_require_the_declared_form_and_live_generation() {
         smith::Form::Credential(smith::Scheme::Key),
         smith::Form::Withdrawn,
     ];
-    for (scheme, expected) in [
-        (Scheme::Bearer, forms[0]),
-        (Scheme::Key, forms[1]),
-        (Scheme::Withdrawn { id: Secret::new(b"provider-account".as_slice().into()) }, forms[2]),
-    ] {
+    for (scheme, expected) in [(Scheme::Bearer, forms[0]), (Scheme::Key, forms[1])] {
         let mut table = Table::new(1, 64);
         for generation in [2, 3] {
             table

@@ -97,6 +97,7 @@ jig-client-protocol-link = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-client-shell-native = { git = "https://github.com/fabrig-dev/jig.git" }
 skein-tls = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-http = { git = "https://github.com/fabrig-dev/skein.git" }
+skein-fake-oauth = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-forge-connection = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-forge-machine-world = { git = "https://github.com/fabrig-dev/skein.git" }
 jig-protocol-transcript = { git = "https://github.com/fabrig-dev/jig.git" }

@@ -32,7 +32,6 @@ fn only_the_llm_accounts_grants_reach_smith() {
     for (form, expected_form) in [
         (host::Form::Credential(host::Scheme::Bearer), agent::Form::Credential(agent::Scheme::Bearer)),
         (host::Form::Credential(host::Scheme::Key), agent::Form::Credential(agent::Scheme::Key)),
-        (host::Form::Withdrawn, agent::Form::Withdrawn),
         (
             host::Form::Program(host::SourceName::new(b"claude").unwrap()),
             agent::Form::Program(agent::SourceName::new(b"claude").unwrap()),

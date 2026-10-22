@@ -53,8 +53,6 @@ pub fn prepare(worker: &settings::Worker, agent: &settings::Agent, own: &limits:
     worker.jig.limits.core.accounts.accounts.checked_add(1).ok_or(problem(b"limits", What::Bound))?;
     let bodies = &agent.limits.bodies;
     if credential_bytes(worker.jig.limits.token) > bodies.credential_value_bytes
-        || worker.jig.limits.token > bodies.withdrawn_value_bearer
-        || jig_protocol_accounts::ACCOUNT_ID_BYTES > bodies.withdrawn_value_id
         || u32::try_from(smith_host_domain::SourceName::BYTES).expect("bounded source name") > bodies.program_value_name
     {
         return Err(problem(b"limits", What::Bound));
@@ -115,7 +113,6 @@ pub fn link_limits(worker: &config::Worker, payload: &v1::Limits) -> Option<link
         result: u32::try_from(hub.outcome_bytes).ok()?,
         detail: hub.detail_bytes,
         grant: grant_bytes(credential_bytes(jig.token), largest.grant)?,
-        account_id: jig_protocol_accounts::ACCOUNT_ID_BYTES,
         name: profile.name,
         secret: profile.secret,
         model_name: ceilings.model_bound_name,

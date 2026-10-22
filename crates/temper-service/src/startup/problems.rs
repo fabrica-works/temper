@@ -116,7 +116,6 @@ fn words(what: What) -> &'static [u8] {
             config::What::Confidential => b"a confidential registration is refused: only a public one signs in",
             config::What::NoProvider => b"no provider offers this model",
             config::What::Digest => b"invalid digest",
-            config::What::HandedIn => b"invalid handed-in account",
             config::What::Reserve { .. } => b"reserve does not fit charter ",
             config::What::Budget { .. } => b"budget does not fit charter ",
             config::What::Grace { .. } => b"grace does not fit template ",
@@ -277,7 +276,6 @@ fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
                 | config::What::Confidential
                 | config::What::NoProvider
                 | config::What::Digest
-                | config::What::HandedIn
                 | config::What::Message
                 | config::What::Silence
                 | config::What::StopBound
