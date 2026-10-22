@@ -140,6 +140,68 @@ pub struct Adoption {
     pub ci: bool,
     pub checks: Box<[u32]>,
 }
+/// A FORGE request admitted by the core (client/README.md, 8).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Ask {
+    Adopt(Adoption),
+    SetUp { forge: u16 },
+}
+/// A retained application answer; only adoption outcomes are durable.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Answered {
+    Adopt(ApplicationOutcome),
+    SetUp(SetUpAnswer),
+}
+/// The setup request's one answer, independent of its later course.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SetUpAnswer {
+    SettingUp,
+    Refused(SetUpRefusal),
+}
+/// The configured forge provider (domain/forge.md, 4.1).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Kind {
+    Forgejo,
+    GitHub,
+}
+/// How the deployment connects to its forge.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Mode {
+    Connected,
+    Managed,
+    Owned,
+    Fake,
+}
+/// Public startup configuration, without credentials.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Configured {
+    pub number: u16,
+    pub kind: Kind,
+    pub mode: Mode,
+    /// The configuration's `start: asked`; false is the ordinary automatic start.
+    pub asked: bool,
+}
+/// The row's setup offer, also used to admit `SetUp` (domain/forge.md, 4.1).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Offer {
+    NotOffered,
+    NotUnderTheBox,
+    Offered,
+}
+/// One configured forge, including its current connection and setup offer.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Row {
+    pub number: u16,
+    pub kind: Kind,
+    pub mode: Mode,
+    pub connection: Connection,
+    pub offer: Offer,
+}
+/// The deployment's forges, ordered by number (domain/forge.md, 4.1).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Forges {
+    pub rows: Box<[Row]>,
+}
 /// The admitted repository and its observed collaborators.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Adopted {
@@ -551,9 +613,13 @@ pub struct Installation {
 /// A parent or child input to the connector top.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
-    /// Ask to set up an owned forge, admitted by its connection (domain/forge.md, 4.1).
-    SetUp {
+    /// The box ended its pipe (domain/forge.md, 4.1).
+    BoxClosed,
+    /// The routing's answer to a core-admitted setup request.
+    SetUpAnswered {
         forge: u16,
+        request: Token,
+        answer: SetUpAnswer,
     },
     Connection {
         forge: u16,
@@ -569,7 +635,7 @@ pub enum Event {
         request: Token,
         token: Token,
         retention: skein_lib::Duration,
-        adoption: Adoption,
+        ask: Ask,
     },
     /// The core's answer to the application's adoption part.
     ApplicationAnswered {
@@ -807,12 +873,10 @@ pub enum Request {
     /// Ask the box link to set up the forge (protocol/forge.md, 2.8).
     SetUp {
         forge: u16,
+        request: Token,
     },
-    /// Name a refused ask without changing state (domain/forge.md, 4.1).
-    SetUpRefused {
-        forge: u16,
-        why: SetUpRefusal,
-    },
+    /// The deployment's forges document changed.
+    MarkedForges,
     /// Changed panel subjects, bounded by `MARKED` (domain/root.md, 10).
     Marked {
         tasks: Box<[u64]>,

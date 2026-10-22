@@ -135,6 +135,8 @@ fn a_long_queue_counts_every_place_but_carries_only_the_nearest_ahead() {
         4,
         skein_forge_client::Config { namespace: Box::from(&b"test"[..]), writers: Box::new([]) },
         &[],
+        &[],
+        false,
     )
     .expect("long queue bounds");
     let environment = Env { limits, ..env() };
@@ -275,6 +277,8 @@ fn priority_moves_mark_the_nearest_followers_and_stop_at_the_mark_bound() {
         4,
         skein_forge_client::Config { namespace: Box::from(&b"test"[..]), writers: Box::new([]) },
         &[],
+        &[],
+        false,
     )
     .expect("queue bounds");
     let environment = Env { limits, ..env() };

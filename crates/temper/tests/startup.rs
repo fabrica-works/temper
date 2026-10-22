@@ -1185,6 +1185,9 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             // The sign-in adds token and issuer trust, at the shell's admitted root bounds.
             + skein_tls::roots_worst_case(2 * 1024, 65_536).expect("sign-in trust bound")
             - skein_tls::roots_worst_case(0, 0).expect("prior empty trust bound")
+            // Configured forge rows and pending/kept setup answers enlarge the
+            // counted engine envelopes at these same bounded strings.
+            + 2_067_328
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -1509,6 +1512,8 @@ fn owned_memory_figures_for_a_worker_alone_include_its_process_and_no_engine() {
     .expect("worker-alone fixture");
     assert_eq!(required.engine_bytes, 0);
     // Holding the box pipe adds 24 B to the worker-alone process's Service.
+    // Configured forges and volatile setup answers add 80 B through Service's
+    // engine option here; an embedded worker's payload is unchanged.
     let figure = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/figures/worker-alone-memory.txt");
     if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1") {
         fs::write(&figure, format!("{}\n", required.worker_bytes)).expect("worker-alone fixture");

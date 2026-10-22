@@ -66,7 +66,7 @@ fn an_adopt_reaches_the_root_with_its_forges_host() {
     assert_eq!((reply_to, sign_in, key, digest), (REPLY, 3, [5; 16], [7; 32]));
     assert_eq!(
         request,
-        forge::Adoption {
+        forge::Ask::Adopt(forge::Adoption {
             project: 7,
             home: true,
             forge: 1,
@@ -78,7 +78,7 @@ fn an_adopt_reaches_the_root_with_its_forges_host() {
             landing: b"main".as_slice().into(),
             ci: true,
             checks: Box::new([2, 3]),
-        }
+        })
     );
 }
 #[test]
@@ -91,6 +91,7 @@ fn an_adopt_naming_no_configured_forge_reaches_the_root_with_no_host() {
     )
     .unwrap();
     let root::Event::Party(root::PartyInput::Application { request, .. }) = event else { panic!("adoption") };
+    let forge::Ask::Adopt(request) = request else { panic!("adoption") };
     assert!(request.host.is_empty());
     assert_eq!(request.forge, 1);
 }
@@ -279,8 +280,13 @@ fn a_git_base_with_a_port_keeps_it_in_the_host() {
         assert_eq!(family::host(git).as_ref(), expected, "{git:?}");
     }
 }
+#[expect(clippy::manual_map, reason = "the strict subset uses explicit matches")]
 fn encoded(outcome: Option<forge::ApplicationOutcome>) -> w::Outcome {
     let jig = jig_protocol_config::profile(jig_protocol_config::Profile::Small).clients.wire;
+    let outcome = match outcome {
+        Some(outcome) => Some(forge::Answered::Adopt(outcome)),
+        None => None,
+    };
     let bytes = family::answer(outcome, &w::CEILINGS, &jig).unwrap();
     let mut reader = Reader::new(&bytes);
     let answer = w::Answer::decode(&w::CEILINGS, &mut reader).unwrap();
@@ -775,7 +781,7 @@ fn requesting() -> w::Requesting {
 }
 
 #[test]
-fn setup_requests_are_undecodable_until_task_e_wires_them() {
+fn setup_requests_preserve_the_keyed_envelope_and_forge() {
     let request = w::Requesting::new(
         &w::CEILINGS,
         w::RequestingParts {
@@ -783,29 +789,134 @@ fn setup_requests_are_undecodable_until_task_e_wires_them() {
         },
     )
     .unwrap();
-    let Err(event) = family::to_root(
+    let event = family::to_root(
         exchange(wire::FORGE, wire::CLIENT_VERSION, wire::requesting(&request)),
         &[],
         None,
         &w::CEILINGS,
-    ) else {
-        panic!("setup request refused")
+    )
+    .unwrap();
+    let root::Event::Party(root::PartyInput::Application { reply_to, sign_in, key, digest, request, .. }) = event
+    else {
+        panic!("setup application")
     };
-    let kit::Event::Application(kit::FromApplication::Undecodable { to }) = *event else { panic!("undecodable setup") };
-    assert_eq!(to, REPLY);
+    assert_eq!((reply_to, sign_in, key, digest, request), (REPLY, 3, [5; 16], [7; 32], forge::Ask::SetUp { forge: 3 }));
 }
 
 #[test]
-fn forges_watches_are_refused_unknown_until_task_e_wires_them() {
+fn forges_watches_name_the_deployment_subject() {
     let watching = w::Watching::new(&w::CEILINGS, w::WatchingParts { watch: w::Watch::Forges }).unwrap();
-    let Err(event) = family::to_root(
+    let event = family::to_root(
         watch_exchange(wire::FORGE, wire::CLIENT_VERSION, wire::watching(&watching)),
         &[],
         None,
         &w::CEILINGS,
-    ) else {
-        panic!("refused watch")
+    )
+    .unwrap();
+    let root::Event::Party(root::PartyInput::Watch { watcher, subject, .. }) = event else { panic!("forges watch") };
+    assert_eq!(
+        (watcher, subject),
+        (
+            WATCHER,
+            jig_domain_core::documents::Watched::Application {
+                scope: people::ApplicationScope::Deployment,
+                connector: wire::FORGE,
+                subject: Token::new(0),
+            }
+        )
+    );
+}
+
+#[test]
+#[expect(clippy::manual_map, reason = "the strict subset uses explicit matches")]
+fn setup_outcomes_use_the_family_answer_including_unknown() {
+    let jig = jig_protocol_config::profile(jig_protocol_config::Profile::Small).clients.wire;
+    for (outcome, expected) in [
+        (None, w::Outcome::Unknown),
+        (Some(forge::SetUpAnswer::SettingUp), w::Outcome::SettingUp),
+        (
+            Some(forge::SetUpAnswer::Refused(forge::SetUpRefusal::NotOffered)),
+            w::Outcome::SetUpRefused(
+                w::SetUpRefused::new(&w::CEILINGS, w::SetUpRefusedParts { why: w::SetUpRefusal::NotOffered }).unwrap(),
+            ),
+        ),
+        (
+            Some(forge::SetUpAnswer::Refused(forge::SetUpRefusal::NotUnderTheBox)),
+            w::Outcome::SetUpRefused(
+                w::SetUpRefused::new(&w::CEILINGS, w::SetUpRefusedParts { why: w::SetUpRefusal::NotUnderTheBox })
+                    .unwrap(),
+            ),
+        ),
+        (
+            Some(forge::SetUpAnswer::Refused(forge::SetUpRefusal::Busy)),
+            w::Outcome::SetUpRefused(
+                w::SetUpRefused::new(&w::CEILINGS, w::SetUpRefusedParts { why: w::SetUpRefusal::Busy }).unwrap(),
+            ),
+        ),
+    ] {
+        let outcome = match outcome {
+            Some(outcome) => Some(forge::Answered::SetUp(outcome)),
+            None => None,
+        };
+        let bytes = family::answer(outcome, &w::CEILINGS, &jig).unwrap();
+        assert_eq!(w::Answer::decode(&w::CEILINGS, &mut Reader::new(&bytes)).unwrap().into_parts().outcome, expected);
+    }
+}
+#[test]
+fn forges_encode_the_domains_rows_without_settings() {
+    let value = forge::Forges {
+        rows: Box::new([
+            forge::Row {
+                number: 1,
+                kind: forge::Kind::Forgejo,
+                mode: forge::Mode::Owned,
+                connection: forge::Connection::SettingUp { step: Some(forge::SetUpStep::Prepare) },
+                offer: forge::Offer::Offered,
+            },
+            forge::Row {
+                number: 2,
+                kind: forge::Kind::GitHub,
+                mode: forge::Mode::Connected,
+                connection: forge::Connection::NotConnected,
+                offer: forge::Offer::NotOffered,
+            },
+            forge::Row {
+                number: 3,
+                kind: forge::Kind::Forgejo,
+                mode: forge::Mode::Managed,
+                connection: forge::Connection::NotSetUp,
+                offer: forge::Offer::NotUnderTheBox,
+            },
+            forge::Row {
+                number: 4,
+                kind: forge::Kind::Forgejo,
+                mode: forge::Mode::Fake,
+                connection: forge::Connection::Connecting,
+                offer: forge::Offer::NotOffered,
+            },
+        ]),
     };
-    let kit::Event::WatchRefused { watcher, why } = *event else { panic!("unknown watch") };
-    assert_eq!((watcher, why), (WATCHER, jig_domain_core::WatchRefusal::Unknown));
+    let bytes = family::forges(value, &w::CEILINGS).unwrap();
+    let rows = temper_client_protocol_wire::decode_forges(&bytes, &w::CEILINGS).unwrap().into_parts().forges;
+    let expected = [
+        (
+            1,
+            w::Kind::Forgejo,
+            w::Mode::Owned,
+            w::Connection::SettingUp(
+                w::SettingUp::new(&w::CEILINGS, w::SettingUpParts { step: Some(w::SetUpStep::Prepare) }).unwrap(),
+            ),
+            w::Offer::Offered,
+        ),
+        (2, w::Kind::Github, w::Mode::Connected, w::Connection::NotConnected, w::Offer::NotOffered),
+        (3, w::Kind::Forgejo, w::Mode::Managed, w::Connection::NotSetUp, w::Offer::NotUnderTheBox),
+        (4, w::Kind::Forgejo, w::Mode::Fake, w::Connection::Connecting, w::Offer::NotOffered),
+    ];
+    assert_eq!(rows.len(), u32::try_from(expected.len()).unwrap());
+    for (row, (number, kind, mode, connection, offer)) in rows.into_iter().zip(expected) {
+        assert_eq!(
+            row,
+            &w::ForgeRow::new(&w::CEILINGS, w::ForgeRowParts { number, kind, mode, connection, offer }).unwrap()
+        );
+    }
 }

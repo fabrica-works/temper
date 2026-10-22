@@ -319,6 +319,8 @@ pub fn config(seed: u64) -> engine::Config {
         // worlds name at start (D10).
         identities: Box::new([temper_engine_domain_forge::GitIdentity { forge: 1, credential: 1 }]),
         forge_charter: 1,
+        forges: Box::new([]),
+        under_box: false,
     }
 }
 
@@ -730,7 +732,6 @@ impl World {
                 | engine::Request::Store(_)
                 | engine::Request::Account(_)
                 | engine::Request::SetUp { .. }
-                | engine::Request::SetUpRefused { .. }
                 | engine::Request::Setup { .. }
                 | engine::Request::Busy(_)
                 | engine::Request::Drained
@@ -834,6 +835,7 @@ impl World {
             | Delivery::ForgeCall { .. }
             | Delivery::Procedure { .. }
             | Delivery::Application { .. }
+            | Delivery::Forges { .. }
             | Delivery::Panel { .. }
             | Delivery::WebReply { .. }
             | Delivery::CarriedUnused { .. }

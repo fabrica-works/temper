@@ -177,28 +177,24 @@ fn an_answer_returned_in_the_drain_is_never_offered_again() {
 }
 #[test]
 fn routing_news_and_hints_returned_during_the_drain_are_dropped() {
-    for hint in [false, true] {
+    use temper_engine_domain_forge::{Connection, Event, SetUpAnswer};
+    for event in [
+        Event::Hint {
+            hint: skein_forge::api::Hint {
+                repository: skein_forge::api::Repository { forge: 1, repository: 2 },
+                change: skein_forge::api::Change::Item(7),
+                key: None,
+            },
+        },
+        Event::Connection { forge: 1, state: Connection::Connected { id: 42, login: Box::from(b"temper".as_slice()) } },
+        Event::BoxClosed,
+        Event::SetUpAnswered { forge: 1, request: Token::new(91), answer: SetUpAnswer::SettingUp },
+    ] {
         let mut service = fixtures::ready();
         service.shutdown();
-        if hint {
-            // forge_pass skips hints once drain is set; exercise the returned root boundary too.
-            service.engine.as_mut().expect("engine").events.push(forge::hinted(
-                skein_forge_connection::hooks::Hinted {
-                    connection: Token::new(7),
-                    hint: skein_forge::api::Hint {
-                        repository: skein_forge::api::Repository { forge: 1, repository: 2 },
-                        change: skein_forge::api::Change::Item(7),
-                        key: None,
-                    },
-                },
-            ));
-        } else {
-            crate::setup::lifecycle::state(
-                service.engine.as_mut().expect("engine"),
-                1,
-                temper_engine_domain_forge::Connection::Connected { id: 42, login: Box::from(b"temper".as_slice()) },
-            );
-        }
+        // The routing stops producing hints during a drain; exercise the
+        // returned root boundary for every kind of volatile news here too.
+        service.engine.as_mut().expect("engine").events.push(root::Event::Forge(Box::new(event)));
         for _ in 0_u32..256 {
             fixtures::turn(&mut service);
             if service.end().is_some() {

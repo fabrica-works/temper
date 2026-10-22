@@ -295,6 +295,8 @@ pub fn config(seed: u64) -> engine::Config {
         // worlds name at start (D10).
         identities: Box::new([temper_engine_domain_forge::GitIdentity { forge: 1, credential: 1 }]),
         forge_charter: 1,
+        forges: Box::new([]),
+        under_box: false,
     }
 }
 
@@ -437,8 +439,11 @@ const FORGE_LIMITS: forge::Limits = forge::Limits {
 const RESTORE_PASSES: u32 = 8;
 
 pub fn root() -> (engine::Domain, Env<engine::Limits>) {
+    root_with_config(config(7))
+}
+pub fn root_with_config(config: engine::Config) -> (engine::Domain, Env<engine::Limits>) {
     let limits = limits();
-    let mut root = engine::Domain::new(config(7), &limits).unwrap();
+    let mut root = engine::Domain::new(config, &limits).unwrap();
     // These units begin after an empty restore; service units exercise the
     // actual paged startup and its commits.
     let mut request = root.core.restart_begin();

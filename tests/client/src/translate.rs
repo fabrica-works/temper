@@ -227,7 +227,6 @@ pub fn incoming(
         | engine::Request::Forge { .. }
         | engine::Request::Account(_)
         | engine::Request::SetUp { .. }
-        | engine::Request::SetUpRefused { .. }
         | engine::Request::Setup { .. }
         | engine::Request::ToChild(_)
         | engine::Request::Busy(_)
@@ -290,6 +289,7 @@ fn delivery_packet(
         }
         // Jig has no separate live requester Result; the task document carries it.
         Delivery::Application { .. }
+        | Delivery::Forges { .. }
         | Delivery::Panel { .. }
         | Delivery::SourceSignedOut { .. }
         | Delivery::Result { .. }

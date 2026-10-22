@@ -211,12 +211,12 @@ fn the_box_pipes_carry_no_service_data_and_close_on_drain_or_abort() {
 }
 
 #[test]
-fn a_scripted_box_answers_the_engines_asks() {
+fn a_scripted_box_answers_keyed_setup_requests_through_the_clients_family() {
     use skein_io::kernel::Fd;
-    use temper_engine_domain as root;
-    use temper_engine_domain_forge::{Connection, Event, SetUpRefusal, SetUpStep};
-    const OWNED: u16 = 3;
-    const OTHER: u16 = 4;
+    use temper_client_protocol_wire::v1 as w;
+    use temper_engine_domain_forge::{Connection, SetUpStep};
+    const OWNED: u16 = 1;
+    const OTHER: u16 = 2;
     // Allow the root continuations and memory-store handoffs, then output credit and IO.
     fn turns(stand: &mut fixtures::system::SystemStand) {
         const TURNS: u8 = 64;
@@ -225,7 +225,7 @@ fn a_scripted_box_answers_the_engines_asks() {
         }
     }
     const LINE_BYTES: u32 = fixtures::system::BOX_BYTES;
-    let mut stand = fixtures::one_process();
+    let mut stand = fixtures::system::one_process_under_box(true);
     stand.service.adopt_box(Fd::new(3), Fd::new(4), LINE_BYTES).unwrap();
     fixtures::until_hosting(&mut stand);
     // SystemStand has fixed membership and an in-memory store. Startup's
@@ -234,16 +234,16 @@ fn a_scripted_box_answers_the_engines_asks() {
         crate::setup::lifecycle::state(stand.service.engine.as_mut().unwrap(), forge, Connection::NotSetUp);
     }
     turns(&mut stand);
-    let ask = root::Event::Forge(Box::new(Event::SetUp { forge: OWNED }));
-    stand.service.engine.as_mut().unwrap().events.push(ask);
+    let bearer = box_sign_in(&mut stand);
+    assert_eq!(box_setup(&mut stand, &bearer, OWNED, 1), w::Outcome::SettingUp);
     turns(&mut stand);
-    assert_eq!(stand.kernel.box_written.as_slice(), b"start 3\n");
+    assert_eq!(stand.kernel.box_written.as_slice(), b"start 1\n");
     assert_eq!(
         stand.service.engine.as_ref().unwrap().domain.forge_connection(OWNED),
         Connection::SettingUp { step: None }
     );
 
-    for byte in b"step 3 prepare\n" {
+    for byte in b"step 1 prepare\n" {
         stand.kernel.box_answers.push(*byte);
     }
     turns(&mut stand);
@@ -251,42 +251,43 @@ fn a_scripted_box_answers_the_engines_asks() {
         stand.service.engine.as_ref().unwrap().domain.forge_connection(OWNED),
         Connection::SettingUp { step: Some(SetUpStep::Prepare) }
     );
-    assert_eq!(stand.kernel.box_written.as_slice(), b"start 3\n");
+    assert_eq!(box_setup(&mut stand, &bearer, OWNED, 1), w::Outcome::SettingUp);
+    assert_eq!(stand.kernel.box_written.as_slice(), b"start 1\n");
 
-    for byte in b"failed 3 prepare 3 exited 1\n" {
+    for byte in b"failed 1 prepare 1 exited 1\n" {
         stand.kernel.box_answers.push(*byte);
     }
     turns(&mut stand);
     assert_eq!(
         stand.service.engine.as_ref().unwrap().domain.forge_connection(OWNED),
-        Connection::SetUpFailed { why: b"prepare 3 exited 1".as_slice().into() }
+        Connection::SetUpFailed { why: b"prepare 1 exited 1".as_slice().into() }
     );
-    assert_eq!(stand.kernel.box_written.as_slice(), b"start 3\n");
+    assert_eq!(stand.kernel.box_written.as_slice(), b"start 1\n");
 
-    stand.service.engine.as_mut().unwrap().events.push(root::Event::Forge(Box::new(Event::SetUp { forge: OWNED })));
+    assert_eq!(box_setup(&mut stand, &bearer, OWNED, 2), w::Outcome::SettingUp);
     turns(&mut stand);
-    assert_eq!(stand.kernel.box_written.as_slice(), b"start 3\nstart 3\n");
+    assert_eq!(stand.kernel.box_written.as_slice(), b"start 1\nstart 1\n");
     assert_eq!(
         stand.service.engine.as_ref().unwrap().domain.forge_connection(OWNED),
         Connection::SettingUp { step: None }
     );
 
-    stand.service.engine.as_mut().unwrap().events.push(root::Event::Forge(Box::new(Event::SetUp { forge: OTHER })));
+    let w::Outcome::SetUpRefused(refused) = box_setup(&mut stand, &bearer, OTHER, 3) else { panic!("busy answer") };
+    assert_eq!(*refused.why(), w::SetUpRefusal::Busy);
     turns(&mut stand);
-    assert_eq!(stand.kernel.box_written.as_slice(), b"start 3\nstart 3\n");
+    assert_eq!(stand.kernel.box_written.as_slice(), b"start 1\nstart 1\n");
     assert_eq!(
         stand.service.engine.as_ref().unwrap().domain.forge_connection(OWNED),
         Connection::SettingUp { step: None }
     );
     assert_eq!(stand.service.engine.as_ref().unwrap().domain.forge_connection(OTHER), Connection::NotSetUp);
-    assert_eq!(stand.service.notes().pop(), Some(crate::Note::SetUpRefused { number: OTHER, why: SetUpRefusal::Busy }));
-    assert!(stand.service.notes().is_empty(), "one refusal note");
+    assert!(stand.service.notes().is_empty());
 
     for byte in b"started 9\n" {
         stand.kernel.box_answers.push(*byte);
     }
     turns(&mut stand);
-    assert_eq!(stand.kernel.box_written.as_slice(), b"start 3\nstart 3\n");
+    assert_eq!(stand.kernel.box_written.as_slice(), b"start 1\nstart 1\n");
     assert_eq!(
         stand.service.engine.as_ref().unwrap().domain.forge_connection(OWNED),
         Connection::SettingUp { step: None }
@@ -296,4 +297,85 @@ fn a_scripted_box_answers_the_engines_asks() {
         Some(crate::Note::BoxLink { line: b"box link: dropped started for forge 9, not asked".as_slice().into() })
     );
     assert!(stand.service.notes().is_empty());
+}
+
+// The system story uses the actual clients component: an HTTP family request
+// crosses the core's key admission, and FromApplication::Answered returns its bytes.
+fn box_sign_in(stand: &mut fixtures::system::SystemStand) -> Box<[u8]> {
+    use fixtures::http as peer;
+    let link = stand.service.links().pop().expect("sign-in link");
+    let engine = stand.service.engine.as_mut().unwrap();
+    let body = peer::link_body(engine, &link);
+    let mut sign_in = peer::Peer::new(engine, b"POST", b"/jig/v1/sign-in/link", &body, None);
+    sign_in.pump(engine, true);
+    let jig_client_protocol_wire::v11::SignInAnswer::SignedIn(answer) = sign_in.sign_in_answer(engine) else {
+        panic!("deployment owner signed in")
+    };
+    peer::bearer(answer.token().as_ref().expect("native credential").expose())
+}
+fn box_setup(
+    stand: &mut fixtures::system::SystemStand,
+    bearer: &[u8],
+    forge: u16,
+    key: u8,
+) -> temper_client_protocol_wire::v1::Outcome {
+    use fixtures::http as peer;
+    use jig_client_protocol_wire::v11 as j;
+    use skein_lib::{Reader, Writer};
+    use temper_client_protocol_wire::{self as wire, v1 as w};
+    let engine = stand.service.engine.as_mut().unwrap();
+    let limits = &engine.clients.env.limits.wire;
+    let request = w::Requesting::new(
+        &w::CEILINGS,
+        w::RequestingParts {
+            request: w::Request::SetUp(w::SetUp::new(&w::CEILINGS, w::SetUpParts { forge }).unwrap()),
+        },
+    )
+    .unwrap();
+    let family = j::FamilyRequest::new(
+        limits,
+        j::FamilyRequestParts { scope: j::Scope::Deployment, record: wire::requesting(&request) },
+    )
+    .unwrap();
+    let mut bytes = Writer::new(usize::try_from(family.measure()).unwrap());
+    family.encode(&mut bytes).unwrap();
+    let request = j::Keyed::new(
+        limits,
+        j::KeyedParts {
+            key: [key; 16],
+            owner: j::Owner::Family(j::Family::new(limits, j::FamilyParts { number: wire::FORGE }).unwrap()),
+            version: wire::CLIENT_VERSION,
+            request: bytes.finish(),
+            value: None,
+        },
+    )
+    .unwrap();
+    let mut bytes = Writer::new(usize::try_from(request.measure()).unwrap());
+    request.encode(&mut bytes).unwrap();
+    let mut client = peer::Peer::new(engine, b"POST", b"/jig/v1/request", &bytes.finish(), Some(bearer));
+    client.pump(engine, true);
+    let at = skein_lib::bytes::find(client.received(), b"\r\n\r\n").unwrap().checked_add(4).unwrap();
+    let mut reader = Reader::new(client.received().get(at..).unwrap());
+    let j::KeyedAnswer::FinalAnswer(answer) =
+        j::KeyedAnswer::decode(&engine.clients.env.limits.wire, &mut reader).unwrap()
+    else {
+        panic!("one terminal family answer")
+    };
+    assert!(reader.is_empty());
+    assert_eq!(
+        answer.version(),
+        wire::CLIENT_VERSION,
+        "core terminal for setup: {:?}",
+        j::Final::decode(&engine.clients.env.limits.wire, &mut Reader::new(answer.record()))
+    );
+    assert_eq!(
+        *answer.owner(),
+        j::Owner::Family(
+            j::Family::new(&engine.clients.env.limits.wire, j::FamilyParts { number: wire::FORGE }).unwrap()
+        )
+    );
+    let mut reader = Reader::new(answer.record());
+    let answer = w::Answer::decode(&w::CEILINGS, &mut reader).unwrap();
+    assert!(reader.is_empty());
+    answer.into_parts().outcome
 }

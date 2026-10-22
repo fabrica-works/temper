@@ -181,6 +181,8 @@ impl World {
             seed,
             skein_forge_client::Config { namespace: Box::from(&b"world"[..]), writers: writer.into_iter().collect() },
             &[top::GitIdentity { forge: REPO.forge, credential: 1 }],
+            &[],
+            false,
         )
         .expect("valid connector configuration");
         let now = Time::from_nanos(100_000_000_000);
@@ -301,7 +303,7 @@ impl World {
             request: Token::new(100),
             token: Token::new(100),
             retention: Duration::from_secs(60),
-            adoption: top::Adoption {
+            ask: top::Ask::Adopt(top::Adoption {
                 project: 5,
                 home: role != top::Role::Context,
                 forge: REPO.forge,
@@ -313,7 +315,7 @@ impl World {
                 landing: Box::from(&b"main"[..]),
                 ci: true,
                 checks: Box::new([]),
-            },
+            }),
         });
         self.run_for(1);
     }
@@ -352,6 +354,8 @@ impl World {
                 writers: self.writer.into_iter().collect(),
             },
             &[top::GitIdentity { forge: REPO.forge, credential: 1 }],
+            &[],
+            false,
         )
         .expect("same configured connector");
         let mut rows = List::with_capacity(self.stored.len());
@@ -532,7 +536,7 @@ impl World {
                 top::Request::ApplicationPart { request, .. } => {
                     top::step(&mut self.top, &self.env, top::Event::Adopt { request }, &mut self.top_out);
                 }
-                top::Request::ApplicationDone { .. } | top::Request::Marked { .. } => {}
+                top::Request::ApplicationDone { .. } | top::Request::MarkedForges | top::Request::Marked { .. } => {}
                 top::Request::ApplicationAgain { .. } => panic!("application capacity available"),
                 top::Request::Adopted { reply_to, result } => {
                     let outcome = match &result {
@@ -582,7 +586,6 @@ impl World {
                     self.seen.push(top::Request::RestartDone { stage }).expect("world output capacity");
                 }
                 other @ (top::Request::SetUp { .. }
-                | top::Request::SetUpRefused { .. }
                 | top::Request::Resource { .. }
                 | top::Request::Taken { .. }
                 | top::Request::Refused { .. }
