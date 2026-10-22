@@ -296,7 +296,7 @@ keeps (`../protocol/configuration.md`, section 2).
 | `Chats` | `chats.html`; the demo's start at the first run's first step, which `first-run.html` opens | a composer to start a chat; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats, live or closed, newest activity first, each with its status, spend and delegates | `tasks{query}`: requester the person, the chat label, by last activity; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request |
 | `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the demo's banner while either half holds, in any project (5.1, 5.6), and the context line only in the demo's project while the demo is answered (5.6); the conversation: committed turns, the person's words, work summaries, provisional text; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer | `task`, `activity` a page at a time, `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
-| `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree with each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel; an agent's task: its transcript and a composer, with Amend and Stop | `task`, `tree`, `activity`; `run` while one is live | amend, stop, cancel, release a held task of the plan, message an agent's task |
+| `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree with each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel; an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), its composer, Amend and Stop later | `task`, `tree`, `activity` a page at a time; `run` while one is live | amend, stop, cancel, release a held task of the plan; an agent's task's later (5.9) |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
 | `Adopt { project }` | none: 4.4 | the adoption form, with the picker of the repositories temper can reach on the chosen forge | `me`; the chosen forge's deployment part, for its kind, mode, user and installations (`forge.md`, 5.4); the picker's page, a `Reachable` request (section 8) | adopt a repository (4.4) |
 | `Forges` | `forges.html` | each configured forge: its connection, its mode, on GitHub temper's App and its installations, a connect under way and how the last ended, its load | the forge's, through the forge's side (4.2) | connect; replace a key or tokens; install on another account; forget the admin's token (section 8) |
@@ -320,8 +320,9 @@ keeps (`../protocol/configuration.md`, section 2).
   time beside each turn is not drawn: the view keeps no clock (section
   11).
 - **A task's page** is of its kind, as `task.html` lays each out: a
-  tracked task's, a goal's (5.8); an agent's task's. A task with the
-  chat label opens as `Chat { task }`. A procedure's task or a person
+  tracked task's, a goal's (5.8); an agent's task's, for an agent's
+  task with no priority (5.9). A task with the chat label opens as
+  `Chat { task }`. A procedure's task or a person
   task shows a tracked task's header and plan only (section 11).
 - **The forge's parts** of a page (a goal's issue and changes on its
   page; changes in flight and the project's health on the board) are
@@ -366,8 +367,9 @@ keeps (`../protocol/configuration.md`, section 2).
   usable account of the person's work serves; a choice is the task's
   LLM choice, from the chat's next run (jig's `domain/tasks.md`, section
   3). Setting a goal names its planner's model and effort, the
-  template's by default. A task's page shows its model, effort and
-  account, changed by amending the task; a task waiting for its account
+  template's by default. A goal's page shows its model, effort and
+  account, changed by amending the task, and an agent's task's page
+  not yet (5.9); a task waiting for its account
   says so, with the account's acts (5.5; jig's `domain/authority.md`,
   8.3).
 
@@ -1220,6 +1222,114 @@ or difference of their amounts (jig's `client/domain/contract.md`,
   budget's card, besides the task page's tokens; `task-pages.css` draws
   them (`browser.md`, 2.5).
 
+### 5.9 An agent's task's page
+
+An agent's task's page (3.5) is that of an agent's task with no
+priority and not the chat label: a goal's delegate, the agent a
+change's procedure makes, a task an agent's task delegated. It shows
+its task document, its conversation as a chat's page holds one, and its
+owner tree's held cards, as `mockups/task.html` draws its agent kind,
+in the chat's look. It draws each amount and each state as the
+documents supply them (jig's `client/domain/contract.md`, 5.1), and no
+act but a held task's card (3.6): its acts come later (section 11).
+
+- **Its parts, in order:** the lineage bar; the taskbar; "Task brief";
+  the run's heading; the conversation; "Result", once it has ended;
+  "Plan", while its tree holds a delegate or a held task's card; then
+  the confirmation while one is open (3.6). At phone width the order is
+  the same: the lineage bar keeps one line, its titles cut short, and
+  the taskbar is a chat's chatbar at that width.
+- **The lineage bar:** its parent, the last of its lineage
+  (`lineage_chips`, root first), as its "Task N" link and its title,
+  after an arrow; then the task itself, "Task M" and its title. With no
+  lineage supplied, the parent is its requester's "Task N" link when a
+  task asked it, and there is none otherwise. The arrow and the slash
+  between them are the look's.
+- **The taskbar,** a chat's chatbar (3.5): its level-1 heading "TN ·
+  TITLE", as a chat's; its state, in 5.8's words, from the same
+  function (`pages::task::header_state`), with its status token; then
+  its executor, "Agent", and its own spend, "N spent", its `budget.spent`
+  as a plan row's (5.8).
+- **"Task brief":** a region, the mockup's "TASK BRIEF", whose capitals
+  are the look's: its specification as written (`spec`, read as
+  "What was asked" reads it, 5.8); who asked, in 5.8's words ("Asked by
+  task N"); then its dependency line, as a plan row's (5.8): the list
+  "Dependencies of task N", one item per dependency of its document
+  (`dependencies`), in order, keyed by its task, with its "Task M"
+  link and its state. The document's `cut` does not say which of its
+  lists was cut, so the line has no last item (section 11). The
+  mockup's worlds declare no dependency: the line is temper's, for B2.
+- **The run's heading,** one, for its current or its last run, from its
+  chip's owner phase and its `attempt` (jig's `client/domain/objects.md`,
+  section 3):
+  - "Run N · live now" while a run is out: a claimed or a running
+    run, or a run closing, N its attempt;
+  - "Run N · waiting" while the task lives and no run is out, N its
+    last run's attempt;
+  - "Run N · ended" once the task has ended, N its last run's attempt;
+  - "No run now" while it lives and has had no run, and no heading
+    once it has ended without one.
+
+  Under a live or a waiting run's heading, "Started MM-DD HH:MMZ" when
+  its chip supplies `run_since`, when the run was placed, in universal
+  time as a chats row says a time. A run's earlier runs are the
+  conversation's "Run N began" and "Run N ended": the page has no run
+  groups.
+- **The conversation** is a chat's (3.5), from the task's bounded thread
+  (jig-client's `thread`), read as the chat's page reads it, with the
+  chat's view part: its latest window; committed turns, the agent's
+  "Temper"; each call and result as a chat's work lines, a `delegate`
+  call's too, since a delegation's card is the chat's (5.7); "Run N
+  began" and "Run N ended"; the lines omitted before the window; and a
+  live run's provisional text, as the chat's provisional turn.
+- **Its result,** once it has ended: a region "Result" after the
+  conversation, its state and its words as a goal's "Result" says them
+  (5.8), from the same function (`pages::delegation::facts`):
+  "Completed", "Failed", "Cancelled" or "Ended", and the report's
+  words, or a failed task's reason. The mockup's "RESULT" capitals are
+  the look's. A task that has not ended has no such region.
+- **Its plan,** while its owner tree holds a delegate, or a held task's
+  card, its own or a delegate's: a goal's "Plan" (5.8), its rows, their
+  dependency lines and held tasks' cards. The mockup draws none on an
+  agent's page: its held cards are what this page may act on.
+- **Against its mockup,** the page's way:
+  - links and the lineage name a task "Task N", the mockup's "T12"
+    (3.5, "Links are by number"); the executor is "Agent", where the
+    mockup names the charter (3.5);
+  - the demo's banner stays where the frame draws it, before the page,
+    where the mockup draws it under the taskbar (5.1);
+  - a turn's calls are the chat's work lines, one by one, where the
+    mockup folds them ("7 tool calls · read ×6 · recall"): this page
+    draws its conversation as the chat does (section 11);
+  - not drawn, since no document supplies them: the charter's, model's,
+    account's, worker's and pool's names ("Implementer · Sonnet ·
+    medium", "on s1", "holds a slot of T12's pool"); whose
+    specification it took ("from T3's spec"); a run's own spend ("N
+    spent so far"); and, needing the clock the view does not keep, a
+    turn's time (section 11). Nor its context (`Task.context`), which
+    is optional;
+  - not drawn yet (section 11): its acts, the composer ("Steer this
+    task"), Amend and Stop; the model choice (3.5), an amendment of the
+    task's; "Older", which reads an earlier window.
+- **Where it is decided:** the domain's task page has the shape
+  `Agent`: an agent's executor, no priority, not the chat label, which
+  opens as `Chat { task }` (3.5). It holds the task's thread as the
+  chat's page holds one: made with the chat's bounds, its latest page
+  read as the page opens, read again on each change of the document,
+  given the run's live text while the `run` watch is open, and its run
+  ended as the chat's is when no run is out. A pure function of the
+  domain derives the run's heading from the chip (`pages::task::run`);
+  the state and the result are 5.8's. The view lays them out with the
+  phrasebook's words.
+- **The look:** the chat's, MAIN and CHAT on its main, CHATBAR on its
+  taskbar, THREAD on what follows it and the conversation's tokens, so
+  `temper.css`'s rules for a chat draw them; and its own: AGENT_TASK on
+  its main, AGENT_LINEAGE on the lineage bar, AGENT_BRIEF on the brief,
+  AGENT_RUN on the run's heading and its start, AGENT_RESULT on its
+  result. `task-pages.css` draws them as the mockup's
+  `.agent-lineage`, `.agent-brief`, `.agent-run-heading`,
+  `.agent-run-meta` and `.agent-result` (`browser.md`, 2.5).
+
 ## 6. The terminal shell
 
 ### 6.1 `temper open DIRECTORY LINK_OR_ADDRESS`
@@ -1694,7 +1804,11 @@ own tests:
   task's document in each state; a goal's, 5.8: a task's state from
   what it waits on and from its chip, in each waiting shape, running
   with and without an observation, and in each ending, and a
-  dependency's from each kind of link); the forge side's steps
+  dependency's from each kind of link; an agent's task's, 5.9: its
+  shape from its executor, priority and label, its thread as a chat's
+  (opened, a page, a document's change, a run's text and its end), and
+  its run's heading in each phase, with an attempt and none); the
+  forge side's steps
   (the form's rules, its request, every outcome, the version check; the
   picker's pages by number, "Next" asking the shown page's number plus
   one, a full last page's "Next" and a page past the last answering no
@@ -1709,7 +1823,13 @@ own tests:
   parts in order, the result it gives of each kind, its result in each
   state and none before it ends, no row for the goal, a row's state,
   own spend and dependency line, cut and not, and its budget's card
-  with each funder, with a deadline and none, with and without models, cut and not; the forge's words for every
+  with each funder, with a deadline and none, with and without models,
+  cut and not; an agent's task's page, 5.9: its parts in order, its
+  lineage bar with a parent's chip, a requester alone and neither, its
+  brief with dependencies and none, its run's heading in each phase
+  with a start and none, its conversation as a chat's, its result in
+  each state and none before it ends, its plan only with a delegate or
+  a card, and no act but a held task's card; the forge's words for every
   path shape and every kind, the form and its picker in each state,
   every outcome, the forges' page with a forge in each state of
   `forge.md`, 5.4);
@@ -1722,7 +1842,8 @@ own tests:
   a proposal in place, a chat with a delegation's card running and one
   landed (5.7), a board, a goal's page with its plan, a row's spend
   and dependency line and its budget (5.8), an agent's
-  task, the changes, the adoption form in each state of 4.4 and 4.7,
+  task with its brief, run, conversation and result (5.9), the
+  changes, the adoption form in each state of 4.4 and 4.7,
   its picker on a GitHub and on a Forgejo forge, a forge not connected
   and "Not listed", signed out, the accounts' banner, the accounts page
   with a sign-in's address, a key's field written, and an account in
@@ -1750,7 +1871,10 @@ own tests:
   task a delegate waits for, the rows' spend and the goal's budget,
   then, the first delegate ended, its dependant's line saying
   "Completed" and the goal's budget counting what it spent; an ended
-  goal's result; a repository adopted from the
+  goal's result; a goal's delegate opened from its plan, showing its
+  brief, its run's heading and its committed turn, the goal reached
+  again by its lineage bar, and, once the delegate has reported, its
+  run ended and its result; a repository adopted from the
   navigation's link, its outcome read and the engine holding it;
   refused: not found, a second home, a field the form refuses; a part
   of the forge's saying "Shown on the forge."; the banner with no
@@ -1969,7 +2093,20 @@ own tests:
     drawn yet; later, in jig's words;
   - "Input", "Writes", "Run N", the pool's line under the plan and the
     plan's counts: not drawn; the first two and the pool's name are
-    not supplied;
-  - a delegate's dependencies on its own page, which the mockup draws
-    on no agent's page: the dependency line under its brief, for B2,
-    the agent's page's section once it has one.
+    not supplied.
+- **An agent's task's page against its mockup** (5.9), each a default
+  the user may change:
+  - its dependencies, which the mockup draws on no agent's page: the
+    dependency line under its brief;
+  - a cut document's dependency line: no last item, since the
+    document's `cut` does not say which list was cut; a cut of its own
+    on the dependencies, as a plan row's, is the candidate (a jig
+    change);
+  - a turn's calls: the chat's work lines, one by one, not the
+    mockup's folded "N tool calls", which would change the chat's
+    page too;
+  - its plan: drawn while its tree holds a delegate or a held card,
+    where the mockup draws none;
+  - its acts, the composer ("Steer this task · words reach its live
+    run at the next turn."), Amend, Stop, the model choice and
+    "Older": not drawn yet; they come as one, with their requests.
