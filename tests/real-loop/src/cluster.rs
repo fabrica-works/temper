@@ -92,6 +92,8 @@ impl Shape {
                 document["engine"]["hosts"]["listener"] = json!([{"socket":"127.0.0.1:0"}]);
                 document["engine"]["hosts"]["workers"] =
                     workers.iter().map(|name| json!({"name":name,"digest":format!("secrets/{name}.digest")})).collect();
+                // Every configured position admitted: the small profile admits two workers.
+                document["engine"]["limits"]["overrides"]["fleet.workers"] = workers.len().into();
                 // One attempt per one-slot worker: the fleet counts attempts across the whole fleet.
                 document["engine"]["limits"]["overrides"]["fleet.attempts"] = workers.len().into();
                 document["engine"]["limits"]["overrides"]["fleet.grace_ms"] = (stop_bound_ms + 1).into();
