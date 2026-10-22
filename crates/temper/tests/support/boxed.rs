@@ -139,20 +139,24 @@ impl Referee<Process> for Judge {
 /// Starts the shipped box and drives its referee within the supplied deadline.
 #[must_use]
 pub fn run(directory: &Path, forgejo: Option<SocketAddr>, plan: Plan, deadline: Duration) -> Outcome {
-    let clock = Clock::new();
-    let mut binary = Binary::start_with_tree(
+    run_command(
         Command {
             program: env!("CARGO_BIN_EXE_temper").into(),
             arguments: std::iter::once("box".into()).chain(super::configuration::flags(directory)).collect(),
             directory: directory.into(),
             environment: Vec::new(),
         },
-        Mode::Pipes,
-        262_144,
-        Expectation::Supervise,
-        false,
+        forgejo,
+        plan,
+        deadline,
     )
-    .expect("temper box starts");
+}
+/// Drives the same box referee with an isolation wrapper around the shipped binary.
+#[must_use]
+pub fn run_command(command: Command, forgejo: Option<SocketAddr>, plan: Plan, deadline: Duration) -> Outcome {
+    let clock = Clock::new();
+    let mut binary = Binary::start_with_tree(command, Mode::Pipes, 262_144, Expectation::Supervise, false)
+        .expect("temper box starts");
     let streams = binary.take_streams().expect("binary streams");
     let fds = streams.descriptors();
     let Streams::Pipes { input, output } = streams else { panic!("pipes mode") };

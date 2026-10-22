@@ -1128,3 +1128,98 @@ impl skein_world::Referee<support::cluster::Root> for ClusterChatJudge {
         matches!(self.stage, ClusterChatStage::Stopping) && self.members.passed()
     }
 }
+
+#[test]
+#[ignore = "until accounts_runtime resolves sign-in endpoints at connect (o/accounts-jp13b's M3)"]
+fn a_default_box_with_a_sign_in_registration_starts_without_dns() {
+    use std::{ffi::OsString, fs, os::unix::fs::PermissionsExt};
+    let scratch = support::Scratch::new("first-run-no-dns");
+    let hosts = scratch.path().join("hosts");
+    let nsswitch = scratch.path().join("nsswitch.conf");
+    fs::write(&hosts, b"").expect("empty names");
+    fs::write(&nsswitch, b"hosts: files\npasswd: files\ngroup: files\n").expect("no DNS resolver");
+    let paths = ["config", "data", "cache"].map(|name| scratch.path().join(name));
+    for path in &paths {
+        fs::create_dir(path).expect("empty deployment directories");
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700)).expect("private deployment directories");
+    }
+    let mut init = std::process::Command::new(env!("CARGO_BIN_EXE_temper"));
+    init.arg("init");
+    for (flag, path) in ["--config", "--data", "--cache"].into_iter().zip(&paths) {
+        init.arg(flag).arg(path);
+    }
+    let initialized = init.output().expect("initialize the default document without resolving names");
+    assert!(initialized.status.success(), "{}", String::from_utf8_lossy(&initialized.stderr));
+    // Smith also resolves the agent's endpoints at preflight. Supply local endpoint
+    // facts there so this regression reaches accounts_runtime; forge defaults stay intact.
+    let agent_path = paths[0].join("agent.json");
+    let mut agent: serde_json::Value =
+        serde_json::from_slice(&fs::read(&agent_path).expect("agent fixture")).expect("agent JSON");
+    for endpoint in agent["endpoints"].as_array_mut().expect("endpoints") {
+        if endpoint["address"].as_str().expect("endpoint address").parse::<std::net::SocketAddr>().is_err() {
+            endpoint["address"] = "127.0.0.1:9".into();
+        }
+    }
+    fs::write(agent_path, serde_json::to_vec(&agent).expect("local agent fixture")).expect("local preflight endpoints");
+    // The shipped providers offer keys only. Add a registration solely to reach
+    // the separate sign-in startup resolver while retaining all default forges.
+    let document_path = paths[0].join("temper.json");
+    let mut document: serde_json::Value =
+        serde_json::from_slice(&fs::read(&document_path).expect("default document")).expect("JSON");
+    document["engine"]["llm"]["providers"][0]["sources"]["sign_in"] = serde_json::json!({
+        "issuer":"https://issuer.example", "client":"client", "scopes":[],
+        "authorization":"https://issuer.example/auth", "token":"https://issuer.example/token",
+        "keys":"https://issuer.example/keys", "transport":"tls", "server_name":"issuer.example",
+        "must_grant":[], "redirect_path":"callback", "redirect_port":3000
+    });
+    document["application"]["limits"]["overrides"]["git_component.operations"] = 1.into();
+    document["application"]["limits"]["overrides"]["checkout.workspaces"] = 1.into();
+    fs::write(document_path, serde_json::to_vec(&document).expect("sign-in fixture")).expect("registered sign-in");
+    // The private network has only loopback. Files-only name lookup and a private /run
+    // exclude DNS and host resolver daemons; the demo peers alone use its sockets.
+    let script = r#"set -eu
+/usr/bin/mount --make-rprivate /
+/usr/bin/mount --bind "$1" /etc/hosts
+/usr/bin/mount --bind "$2" /etc/nsswitch.conf
+/usr/bin/mount -t tmpfs tmpfs /run
+/usr/bin/ip link set lo up
+shift 2
+exec "$@"
+"#;
+    let mut arguments: Vec<OsString> = ["-Urnm", "/bin/sh", "-c", script, "no-dns"].map(OsString::from).into();
+    arguments.extend([
+        hosts.into_os_string(),
+        nsswitch.into_os_string(),
+        env!("CARGO_BIN_EXE_temper").into(),
+        "box".into(),
+    ]);
+    for (flag, path) in ["--config", "--data", "--cache"].into_iter().zip(&paths) {
+        arguments.extend([flag.into(), path.as_os_str().into()]);
+    }
+    let ended = support::boxed::run_command(
+        skein_world::end_to_end::Command {
+            program: "/usr/bin/unshare".into(),
+            arguments,
+            directory: scratch.path().into(),
+            environment: Vec::new(),
+        },
+        None,
+        support::boxed::Plan::Stop,
+        Duration::from_secs(3),
+    );
+    let diagnostic = String::from_utf8_lossy(&ended.stderr).into_owned();
+    let linked = support::printed_link(&ended.stdout).is_some();
+    scratch.remove();
+    assert!(!diagnostic.contains("application.forges"), "forge preparation refused: {diagnostic}");
+    assert!(!diagnostic.contains("workers[0].agent"), "agent preflight fixture refused: {diagnostic}");
+    assert!(
+        linked || diagnostic.contains("failed to lookup address information"),
+        "unexpected startup refusal: {diagnostic}"
+    );
+    assert!(
+        linked,
+        "no-DNS start must reach its printed link; the current sign-in endpoint resolution refuses it: {diagnostic}"
+    );
+    assert_eq!(ended.exit, Some(Exit::Code(0)), "{diagnostic}");
+    assert_eq!(ended.left, Some(Vec::new()), "no process outlived the box: {diagnostic}");
+}

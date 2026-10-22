@@ -204,16 +204,28 @@ impl ForgeRows {
 }
 #[derive(PartialEq, Eq, Debug)]
 pub enum NotConnected {
+    /// Start could not resolve this host; an operator diagnostic, never a wire value.
+    Unreachable {
+        host: Box<[u8]>,
+    },
     NoRecords,
     Incomplete,
     Unreadable,
-    OtherForge { kind: Kind, api: Box<str> },
+    OtherForge {
+        kind: Kind,
+        api: Box<str>,
+    },
 }
 // The requested diagnostic vocabulary is a format boundary, not a step effect.
 #[expect(clippy::disallowed_macros, reason = "temper-01 requires Display for operator diagnostics")]
+#[expect(clippy::disallowed_methods, reason = "operator diagnostic formats a configuration-validated host")]
 impl core::fmt::Display for NotConnected {
     fn fmt(&self, out: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            Self::Unreachable { host } => {
+                out.write_str("unreachable: ")?;
+                out.write_str(core::str::from_utf8(host).expect("checked host"))
+            }
             Self::NoRecords => out.write_str("it has no records"),
             Self::Incomplete => out.write_str("its records are incomplete"),
             Self::Unreadable => out.write_str("its records are unreadable"),

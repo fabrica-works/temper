@@ -142,27 +142,25 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
             if !engine.forge.room(2) || engine.notes.room() == 0 {
                 return;
             }
+            let number = forge.number;
             if forge.kind == crate::settings::Kind::GitHub {
                 let kind = skein_forge_connection::settings::Kind::GitHub;
                 let expected = records::origin(kind, &forge.api);
-                let start = match engine.forge_records.rows.forge(forge.number) {
+                let start = match engine.forge_records.rows.forge(number) {
                     Some(rows) => records::access(kind, &expected, rows, &engine.forge_records.bounds, false),
                     None => Err(records::NotConnected::NoRecords),
                 };
-                match start {
-                    Ok(start) => {
-                        engine.forge.down(skein_forge_connection::Request::Connect {
-                            forge: forge.number,
-                            access: start.access,
-                        });
-                        engine.forge.down(skein_forge_connection::Request::Installations {
-                            forge: forge.number,
-                            accepted: start.accepted,
-                        });
-                        // temper-02 uses start.slug for the git identity's bot author.
-                    }
-                    Err(why) => engine.notes.push(crate::Note::ForgeNotConnected { number: forge.number, why }),
-                }
+                // temper-02 uses start.slug for the git identity's bot author.
+                let start = match start {
+                    Ok(start) => Ok(crate::forge::Start::Restored(start)),
+                    Err(why) => Err(why),
+                };
+                crate::forge::connect(engine, number, start);
+            } else if let Some(host) = engine.forge.unreachable(number) {
+                // Forgejo connects nothing until temper-15; a held one is still named.
+                engine
+                    .notes
+                    .push(crate::Note::ForgeNotConnected { number, why: crate::NotConnected::Unreachable { host } });
             }
             // Forgejo keeps its files until temper-15; its grouped rows change nothing.
             engine.forge_records.phase = Phase::Connect { index: index.checked_add(1).expect("configured forges") };

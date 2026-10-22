@@ -175,6 +175,9 @@ pub(crate) fn prepare(
             for index in 0..forges.forges.len() {
                 let forge = forges.forges.get_mut(index).expect("configured forge");
                 if forge.number == setup.entry.forge {
+                    if forge.access.is_none() {
+                        break;
+                    }
                     layer
                         .lifecycle
                         .adoptions

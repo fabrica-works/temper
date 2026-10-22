@@ -226,7 +226,7 @@ impl Layer {
         self.pages.push(Page { forge, state, bytes, until: self.env.now.saturating_add(self.life) });
     }
 }
-/// Exhaustive ownership of the pinned plans, including the later tasks' arms.
+/// Name the forge before gating, including plans whose connected path is staged later.
 fn forge(plan: &host::Plan) -> u16 {
     match plan {
         host::Plan::Manifest { forge, .. }
@@ -234,12 +234,11 @@ fn forge(plan: &host::Plan) -> u16 {
         | host::Plan::Install { forge }
         | host::Plan::Accept { forge, .. }
         | host::Plan::Reconcile { forge, .. }
-        | host::Plan::Adopt { forge, .. } => *forge,
-        host::Plan::Paste { .. } => unreachable!("temper-13 stages Paste"),
-        host::Plan::Check { .. } | host::Plan::TakeOver { .. } => {
-            unreachable!("Check and TakeOver are not staged yet")
-        }
-        host::Plan::Reachable { .. } => unreachable!("temper-10 stages Reachable"),
+        | host::Plan::Adopt { forge, .. }
+        | host::Plan::Paste { forge, .. }
+        | host::Plan::Check { forge }
+        | host::Plan::TakeOver { forge, .. }
+        | host::Plan::Reachable { forge, .. } => *forge,
     }
 }
 pub(crate) fn request(engine: &mut crate::engine::Engine, run: Token) {
@@ -251,6 +250,8 @@ pub(crate) fn request(engine: &mut crate::engine::Engine, run: Token) {
             run,
             root::SetupEnd::Stopped { forge: number, reason: Box::from(b"setup host is not running".as_slice()) },
         );
+    } else if let Some(host) = engine.forge.unreachable(number) {
+        ended(engine, run, root::SetupEnd::Stopped { forge: number, reason: crate::forge::unreachable_text(&host) });
     } else if !engine.setup.served.contains_key(&number) {
         let reason = match engine.setup.unserved.get(&number) {
             Some(reason) => *reason,
@@ -282,7 +283,7 @@ pub(crate) fn request(engine: &mut crate::engine::Engine, run: Token) {
         if kind == Kind::Convert {
             lifecycle::state(engine, number, temper_engine_domain_forge::Connection::Connecting);
         }
-        engine.setup.down(host::Request::Run { run, plan });
+        run_plan(engine, run, plan);
     }
 }
 fn matches_app_plan(plan: &host::Plan) -> bool {
@@ -449,3 +450,13 @@ pub(crate) fn tag(mut request: skein_io::Request) -> skein_io::Request {
 #[cfg(test)]
 #[path = "tests/setup.rs"]
 mod tests;
+
+/// Every setup path, including internal follow-ups, crosses the same unresolved-host gate.
+fn run_plan(engine: &mut crate::engine::Engine, run: Token, plan: host::Plan) {
+    let number = forge(&plan);
+    if let Some(host) = engine.forge.unreachable(number) {
+        lifecycle::refused(engine, run, number, crate::forge::unreachable_text(&host));
+    } else {
+        engine.setup.down(host::Request::Run { run, plan });
+    }
+}

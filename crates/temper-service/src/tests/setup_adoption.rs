@@ -243,3 +243,59 @@ fn an_unserved_fake_drops_its_adoptions_and_names_the_exclusion_without_connecti
     assert!(service.engine.as_ref().expect("engine").forge.starts.is_empty());
     assert!(service.engine.as_ref().expect("engine").setup.io.is_empty());
 }
+
+#[test]
+fn an_unresolved_fake_keeps_its_entry_but_suppresses_file_access_and_adoption() {
+    let mut config = configured(false);
+    config.forges[0].api = jig_protocol_config::Address::Host { name: b"fake.example".as_slice().into(), port: 9 };
+    let mut runtime = fixtures::forge_runtime();
+    runtime.get_mut(0).unwrap().address = crate::forge::HELD_ADDRESS;
+    let mut service = crate::Service::engine(config, &fixtures::seeds(), None, runtime).unwrap();
+    let engine = service.engine.as_mut().unwrap();
+    assert!(engine.setup.served.contains_key(&1));
+    assert!(engine.setup.lifecycle.adoptions.is_empty());
+    engine.forge_records.loaded(Box::new([]), None);
+    for _ in 0_u32..8 {
+        crate::forge::records::advance(engine);
+    }
+    assert_eq!(
+        engine.notes.pop(),
+        Some(crate::Note::ForgeNotConnected {
+            number: 1,
+            why: crate::NotConnected::Unreachable { host: b"fake.example".as_slice().into() }
+        })
+    );
+    engine.forge.iterate(Time::ZERO, Wall::EPOCH);
+    advance(engine);
+    assert!(engine.forge.starts.is_empty());
+    assert!(engine.setup.runs.is_empty());
+    assert!(engine.setup.io.is_empty());
+    for request in &engine.forge.io {
+        if let skein_io::Request::Connect { .. } = request {
+            panic!("the held forge never dials");
+        }
+    }
+}
+
+#[test]
+fn an_unresolved_forgejos_asked_check_is_refused_before_its_unstaged_connected_path() {
+    let mut config = configured(false);
+    config.forges[0].api = jig_protocol_config::Address::Host { name: b"fake.example".as_slice().into(), port: 9 };
+    let mut runtime = fixtures::forge_runtime();
+    runtime.get_mut(0).unwrap().address = crate::forge::HELD_ADDRESS;
+    let mut service = crate::Service::engine(config, &fixtures::seeds(), None, runtime).unwrap();
+    let engine = service.engine.as_mut().unwrap();
+    engine.forge_records.loaded(Box::new([]), None);
+    for _ in 0_u32..8 {
+        crate::forge::records::advance(engine);
+    }
+    advance(engine);
+    start(&mut service, 1, host::Plan::Check { forge: 1 });
+    let root::SetupEnd::Stopped { forge, reason } = terminal(&mut service) else { panic!("held Check refused") };
+    assert_eq!(forge, 1);
+    assert_eq!(reason.as_ref(), b"unreachable: fake.example");
+    let engine = service.engine.as_ref().unwrap();
+    assert!(engine.forge.starts.is_empty());
+    assert!(engine.setup.runs.is_empty());
+    assert!(engine.setup.io.is_empty());
+}

@@ -1236,8 +1236,10 @@ defaults for a person's real work are open (section 16).
   start: that forge starts not connected, and each connect of it,
   restored or asked, is answered unreachable, naming the host, until a
   start that resolves it. The other forges start as they would. A
-  forge so held never hands skein's connection an address of the
-  kernel's: no placeholder reaches a socket.
+  forge so held keeps its connection and its setup entries, built with
+  the address `127.0.0.1:0`, which no listener can hold, and temper sends
+  neither a connect nor a setup request for it: the placeholder never
+  reaches a socket.
 - **Two `setup` entries:**
   - forge 1's, fake, in `demo/forge`, its `git` the demo's link (8.2),
     its bot `temper`, its `owner` `demo`, its one repository `widget`,

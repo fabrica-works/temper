@@ -161,7 +161,7 @@ pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: re
                 .expect("next repository");
         } else {
             let adoption = engine.setup.lifecycle.adoptions.remove(&forge).expect("last adoption");
-            engine.forge.down(connection::Request::Connect { forge, access: adoption.access });
+            crate::forge::connect(engine, forge, Ok(crate::forge::Start::Adopted(adoption.access)));
         }
     }
     if kind == Kind::Convert {
@@ -234,7 +234,7 @@ pub(super) fn kept(engine: &mut crate::engine::Engine, purpose: Purpose) {
             let active = engine.setup.runs.get_mut(&run).expect("conversion waits on Origin");
             active.kind = Kind::Follow;
             let forge = active.forge;
-            engine.setup.down(host::Request::Run { run, plan: host::Plan::Install { forge } });
+            super::run_plan(engine, run, host::Plan::Install { forge });
         }
         Purpose::Deleted(forge) => {
             engine.setup.lifecycle.deleting.remove(&forge);
@@ -258,13 +258,11 @@ fn connect(engine: &mut crate::engine::Engine, forge: u16) {
         }
         None => Err(records::NotConnected::NoRecords),
     };
-    match access {
-        Ok(start) => {
-            engine.forge.down(connection::Request::Connect { forge, access: start.access });
-            engine.forge.down(connection::Request::Installations { forge, accepted: start.accepted });
-        }
-        Err(why) => engine.notes.push(crate::Note::ForgeNotConnected { number: forge, why }),
-    }
+    let start = match access {
+        Ok(start) => Ok(crate::forge::Start::Restored(start)),
+        Err(why) => Err(why),
+    };
+    crate::forge::connect(engine, forge, start);
 }
 pub(super) fn accepted(engine: &crate::engine::Engine, forge: u16) -> Box<[u64]> {
     if let Some(rows) = engine.forge_records.rows.forge(forge)
@@ -417,7 +415,7 @@ pub(super) fn advance(engine: &mut crate::engine::Engine) {
                     },
                 )
                 .expect("admitted adoption");
-            engine.setup.down(host::Request::Run { run, plan: host::Plan::Adopt { forge: *forge, repository } });
+            super::run_plan(engine, run, host::Plan::Adopt { forge: *forge, repository });
             continue;
         }
         let mut deleted = List::with_capacity(engine.forge_records.bounds.installations);
@@ -468,9 +466,7 @@ pub(super) fn advance(engine: &mut crate::engine::Engine) {
                     },
                 )
                 .expect("admitted reconcile");
-            engine
-                .setup
-                .down(host::Request::Run { run, plan: host::Plan::Reconcile { forge: *forge, adopted: Box::new([]) } });
+            super::run_plan(engine, run, host::Plan::Reconcile { forge: *forge, adopted: Box::new([]) });
         }
     }
 }
@@ -478,4 +474,13 @@ pub(super) fn advance(engine: &mut crate::engine::Engine) {
 #[expect(clippy::disallowed_macros, reason = "Stopped has no credential; diagnostic boundary")]
 pub(crate) fn stopped_text(why: connection::Stopped) -> Box<[u8]> {
     alloc::format!("{why:?}").into_bytes().into_boxed_slice()
+}
+
+pub(super) fn refused(engine: &mut crate::engine::Engine, run: Token, forge: u16, reason: Box<[u8]>) {
+    if engine.setup.runs.contains_key(&run) {
+        engine.setup.lifecycle.adoptions.remove(&forge);
+        finish(engine, run, root::SetupEnd::Stopped { forge, reason });
+    } else {
+        ended(engine, run, root::SetupEnd::Stopped { forge, reason });
+    }
 }

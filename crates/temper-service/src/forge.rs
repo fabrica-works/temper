@@ -3,14 +3,26 @@ pub(crate) mod records;
 use crate::{limits, settings};
 use alloc::boxed::Box;
 use jig_protocol_config::{Path, Problems, Segment, What};
-use skein_lib::{Duration, Env, List, Queue, Time, Wall};
+use skein_lib::{Duration, Env, List, Map, Queue, Time, Wall};
 use temper_engine_domain as root;
 use temper_engine_domain_forge as forge;
 
 /// The user agent every forge request carries; a test pins it.
 pub const USER_AGENT: &str = "temper/0.0.0";
 const WORD: &[u8] = b"temper";
-/// A forge's resolved endpoint and configured TLS transport, supplied by the shell.
+/// The address of a forge whose host name doesn't resolve (protocol/setup.md, 8.3). skein's
+/// forge connection and setup host refuse an in-process address, so a held forge keeps its
+/// entries with this one: loopback port 0, which no listener can hold. No socket ever sees it:
+/// `forge::connect` and the setup gate refuse a held forge before either component is asked.
+pub const HELD_ADDRESS: core::net::SocketAddr =
+    core::net::SocketAddr::V4(core::net::SocketAddrV4::new(core::net::Ipv4Addr::LOCALHOST, 0));
+fn held(api: &jig_protocol_config::Address, address: core::net::SocketAddr) -> bool {
+    match api {
+        jig_protocol_config::Address::Host { .. } => address == HELD_ADDRESS,
+        jig_protocol_config::Address::Addr(_) => false,
+    }
+}
+/// A forge's endpoint and TLS transport, supplied by the shell; an unresolved host uses [`HELD_ADDRESS`].
 #[derive(Debug)]
 pub struct ForgeRuntime {
     pub number: u16,
@@ -71,7 +83,7 @@ pub fn settings(
                 },
                 address: skein_io::Addr::Ip(endpoint.address),
                 transport,
-                access: file_access(forge),
+                access: if held(&forge.api, endpoint.address) { None } else { file_access(forge) },
                 log_origins: List::with_capacity(0),
             })
             .expect("configured forge capacity");
@@ -188,6 +200,7 @@ pub(crate) struct Layer {
     pub(crate) io: Queue<skein_io::Request>,
     pub(crate) closed: bool,
     begun: bool,
+    held: Map<u16, Box<[u8]>>,
     #[cfg(test)]
     pub(crate) starts: List<(u16, skein_forge_connection::Access)>,
     #[cfg(test)]
@@ -201,8 +214,21 @@ impl Layer {
         limits: skein_forge_connection::Limits,
         shared: &skein_forge_connection::Shared,
         batch: u32,
+        configured: &[settings::Forge],
     ) -> Result<Self, skein_forge_connection::Unusable> {
+        let mut held_hosts = Map::with_capacity(limits.forges);
+        for endpoint in &settings.forges {
+            for forge in configured {
+                if endpoint.number == forge.number
+                    && endpoint.address == skein_io::Addr::Ip(HELD_ADDRESS)
+                    && let jig_protocol_config::Address::Host { name, .. } = &forge.api
+                {
+                    held_hosts.insert(forge.number, name.clone()).expect("configured held forge");
+                }
+            }
+        }
         Ok(Self {
+            held: held_hosts,
             component: skein_forge_connection::Component::new(settings, &limits, shared)?,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             above: Queue::with_capacity(
@@ -223,7 +249,13 @@ impl Layer {
         self.above.room() >= batch.checked_mul(skein_forge_connection::MAX_OUT.above).expect("forge batch above")
             && self.io.room() >= batch.checked_mul(skein_forge_connection::MAX_OUT.below).expect("forge batch io")
     }
+    pub(crate) fn unreachable(&self, forge: u16) -> Option<Box<[u8]>> {
+        self.held.get(&forge).cloned()
+    }
     pub(crate) fn down(&mut self, request: skein_forge_connection::Request) {
+        if let skein_forge_connection::Request::Connect { forge, .. } = &request {
+            assert!(!self.held.contains_key(forge), "temper gates unresolved connects");
+        }
         #[cfg(test)]
         if let skein_forge_connection::Request::Returned(_)
         | skein_forge_connection::Request::Refused(_)
@@ -464,4 +496,50 @@ pub(crate) fn config(
             .expect("forge identities");
     }
     (skein_forge_client::Config { namespace: Box::new(deployment), writers: Box::new([]) }, identities.into_boxed())
+}
+
+/// What a forge connect starts from.
+pub(crate) enum Start {
+    /// The forge's records, with their accepted installations.
+    Restored(temper_protocol_records::Start),
+    /// An adoption's fresh access.
+    Adopted(skein_forge_connection::Access),
+}
+/// Every forge connect enters here. A held forge is refused first, naming its host, and
+/// nothing reaches skein's connection; otherwise the start goes down, or the reason it
+/// can't is noted.
+pub(crate) fn connect(engine: &mut crate::engine::Engine, number: u16, start: Result<Start, crate::NotConnected>) {
+    if let Some(host) = engine.forge.unreachable(number) {
+        engine.notes.push(crate::Note::ForgeNotConnected { number, why: crate::NotConnected::Unreachable { host } });
+        return;
+    }
+    match start {
+        Ok(Start::Restored(start)) => {
+            engine.forge.down(skein_forge_connection::Request::Connect { forge: number, access: start.access });
+            engine
+                .forge
+                .down(skein_forge_connection::Request::Installations { forge: number, accepted: start.accepted });
+        }
+        Ok(Start::Adopted(access)) => {
+            engine.forge.down(skein_forge_connection::Request::Connect { forge: number, access });
+        }
+        Err(why) => engine.notes.push(crate::Note::ForgeNotConnected { number, why }),
+    }
+}
+/// The existing setup refusal carries the unresolved host without changing the client contract.
+pub(crate) fn unreachable_text(host: &[u8]) -> Box<[u8]> {
+    let mut out = skein_lib::Writer::new(host.len().checked_add(b"unreachable: ".len()).expect("host diagnostic"));
+    out.put(b"unreachable: ").expect("prefix");
+    out.put(host).expect("host");
+    out.finish()
+}
+/// Retained holds are priced beside the connection, independently of whether any host failed today.
+pub(crate) fn held_worst_case(config: &settings::Engine) -> Option<u64> {
+    let mut bytes = Map::<u16, Box<[u8]>>::worst_case(config.limits.forge_component.forges)?;
+    for forge in &config.forges {
+        if let jig_protocol_config::Address::Host { name, .. } = &forge.api {
+            bytes = bytes.checked_add(u64::try_from(name.len()).ok()?)?;
+        }
+    }
+    Some(bytes)
 }

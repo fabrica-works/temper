@@ -656,3 +656,78 @@ mod lifecycle_tests;
 
 #[path = "setup_adoption.rs"]
 mod adoption_tests;
+
+#[test]
+fn an_unresolved_forge_keeps_its_setup_entry_but_restored_and_asked_connects_never_dial() {
+    let mut config = fixtures::engine();
+    config.forges[0].kind = crate::settings::Kind::GitHub;
+    config.forges[0].api = jig_protocol_config::Address::Host { name: b"forge.example".as_slice().into(), port: 443 };
+    config.forges[0].api_token = None;
+    let mut other = fixtures::forges().into_iter().next().unwrap();
+    other.number = 2;
+    let first = config.forges.into_iter().next().unwrap();
+    config.forges = Box::new([first, other]);
+    fixtures::fill_files(&mut config);
+    let mut runtime = fixtures::forge_runtime();
+    runtime.get_mut(0).unwrap().address = crate::forge::HELD_ADDRESS;
+    let mut endpoints = List::with_capacity(2);
+    endpoints.push(runtime.into_boxed().into_iter().next().unwrap()).unwrap();
+    let mut other = fixtures::forge_runtime().into_boxed().into_iter().next().unwrap();
+    other.number = 2;
+    endpoints.push(other).unwrap();
+    let mut service = crate::Service::engine(config, &fixtures::seeds(), None, endpoints).unwrap();
+    let setup = &service.engine.as_ref().unwrap().setup;
+    assert!(setup.served.contains_key(&1), "the held forge still has a setup entry");
+    let (settings, _) = setup.pending.as_ref().unwrap();
+    assert_eq!(settings.forges.len(), 1);
+    assert_eq!(settings.forges.get(0).unwrap().address, skein_io::Addr::Ip(crate::forge::HELD_ADDRESS));
+    lifecycle_tests::app(&mut service);
+    let engine = service.engine.as_mut().unwrap();
+    let expected = records::origin(skein_forge_connection::settings::Kind::GitHub, &engine.workers.forges[0].api);
+    assert!(
+        records::access(
+            skein_forge_connection::settings::Kind::GitHub,
+            &expected,
+            engine.forge_records.rows.forge(1).unwrap(),
+            &engine.forge_records.bounds,
+            false
+        )
+        .is_ok(),
+        "restorable access"
+    );
+    engine.forge_records.loaded(Box::new([]), None);
+    for _ in 0_u32..8 {
+        crate::forge::records::advance(engine);
+    }
+    assert_eq!(
+        engine.notes.pop(),
+        Some(crate::Note::ForgeNotConnected {
+            number: 1,
+            why: crate::NotConnected::Unreachable { host: b"forge.example".as_slice().into() }
+        })
+    );
+    assert!(engine.forge.starts.is_empty());
+    engine.forge.iterate(Time::ZERO, Wall::EPOCH);
+    let mut other_connects = 0_u32;
+    for request in &engine.forge.io {
+        if let skein_io::Request::Connect { addr, .. } = request {
+            assert_eq!(*addr, skein_io::Addr::Ip(([127, 0, 0, 1], 3000).into()));
+            other_connects += 1;
+        }
+    }
+    assert_eq!(other_connects, 1, "the resolved forge connects normally");
+    advance(engine);
+    for (run, plan) in
+        [(1, host::Plan::Manifest { forge: 1, target: Target::Personal }), (2, host::Plan::Install { forge: 1 })]
+    {
+        start(&mut service, run, plan);
+        let root::SetupEnd::Stopped { forge, reason } = terminal(&mut service) else { panic!("held setup refused") };
+        assert_eq!(forge, 1);
+        assert_eq!(reason.as_ref(), b"unreachable: forge.example");
+    }
+    let engine = service.engine.as_ref().unwrap();
+    assert!(engine.forge.starts.is_empty());
+    assert!(engine.setup.io.is_empty(), "no held setup request reaches a socket");
+    assert!(engine.setup.runs.is_empty(), "the host never receives a held plan");
+    assert_eq!(engine.domain.forge_connection(1), temper_engine_domain_forge::Connection::NotConnected);
+}

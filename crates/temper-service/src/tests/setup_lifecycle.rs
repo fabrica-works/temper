@@ -24,7 +24,7 @@ fn converted() -> crate::Service {
     }
     service
 }
-fn app(service: &mut crate::Service) {
+pub(super) fn app(service: &mut crate::Service) {
     for (item, value) in [
         (Item::AppId, Box::from(7_u64.to_le_bytes())),
         (Item::AppSlug, Box::from(b"app-fixture".as_slice())),

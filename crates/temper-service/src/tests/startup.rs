@@ -1011,6 +1011,43 @@ fn a_configured_github_forge_without_records_starts_not_connected() {
 }
 
 #[test]
+fn an_unresolved_github_forge_starts_not_connected_naming_its_host() {
+    let document = fixtures::document();
+    let document = github_input(core::str::from_utf8(&document).unwrap());
+    let mut runtime = fixtures::forge_runtime();
+    runtime.get_mut(0).unwrap().address = crate::forge::HELD_ADDRESS;
+    let mut service = crate::startup(
+        document.as_bytes(),
+        &config::Directories::working(),
+        &fixtures::files(),
+        &fixtures::startup_agent(),
+        &fixtures::seeds(),
+        None,
+        fixtures::worker_runtime(),
+        runtime,
+    )
+    .unwrap();
+    assert_eq!(service.engine.as_ref().expect("engine").workers.forges[0].kind, settings::Kind::GitHub);
+    service.engine.as_mut().expect("engine").store = fixtures::memory_store();
+    let mut face = fixtures::ForgeFace::new();
+    for _ in 0_u8..32 {
+        face.turn(&mut service);
+    }
+    assert_eq!(
+        service.notes().pop(),
+        Some(crate::Note::ForgeNotConnected {
+            number: 1,
+            why: crate::NotConnected::Unreachable { host: b"api.github.com".as_slice().into() }
+        })
+    );
+    assert!(service.engine.as_ref().expect("engine").credentials.is_empty());
+    assert!(service.engine.as_ref().expect("engine").forge.starts.is_empty());
+    assert!(service.engine.as_ref().expect("engine").forge_records.done());
+    assert!(service.engine.as_ref().expect("engine").domain.ready());
+    assert_eq!(service.end(), None);
+}
+
+#[test]
 fn startup_admits_the_full_setup_total_and_refuses_one_byte_short() {
     let document = github_input(core::str::from_utf8(&fixtures::document()).unwrap())
         .replace("\"api\":null", "\"api\":{\"socket\":\"127.0.0.1:9\"}")

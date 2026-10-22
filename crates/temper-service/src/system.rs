@@ -132,14 +132,10 @@ impl Service {
             settings.limits.forge_component,
             &shared,
             max.checked_add(2).expect("forge routing headroom"),
+            &settings.forges,
         )
         .expect("checked forge limits");
-        for configured in &mut settings.forges {
-            configured.api_token = None;
-        }
-        for setup in &mut settings.setup {
-            setup.handover = None;
-        }
+        forget_handover(&mut settings);
         let notes = Queue::with_capacity(u32::try_from(settings.forges.len()).expect("configured forges"));
         let workers = workers::Workers::configured(&mut settings, seeds.deployment, max)?;
         let config = temper_engine_domain::Config {
@@ -756,6 +752,7 @@ fn memory(
     )?;
     let mut bytes = retained
         .checked_add(connections)?
+        .checked_add(crate::forge::held_worst_case(settings)?)?
         .checked_add(u64::try_from(size_of::<Service>()).ok()?)?
         .checked_add(skein_io::worst_case(io)?)?
         .checked_add(store::worst_case(root, store)?)?
@@ -859,4 +856,13 @@ pub(crate) fn worker_alone_worst_case(
         .checked_add(u64::from(queue).checked_mul(u64::from(worker.jig.limits.io.output).checked_add(512)?)?)?
         .checked_add(Map::<Token, (Token, Option<Token>)>::worst_case(operations)?)?
         .checked_add(Map::<Token, Token>::worst_case(operations)?)
+}
+
+fn forget_handover(settings: &mut settings::Engine) {
+    for configured in &mut settings.forges {
+        configured.api_token = None;
+    }
+    for setup in &mut settings.setup {
+        setup.handover = None;
+    }
 }

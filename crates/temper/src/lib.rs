@@ -280,12 +280,19 @@ fn accounts(engine: &config::Engine) -> Result<service::AccountsRuntime, String>
     accounts_runtime::resolve(engine)
 }
 
-fn forges(configured: &[service::startup::Forge]) -> Result<List<service::ForgeRuntime>, String> {
+fn forges(
+    configured: &[service::startup::Forge],
+    resolve: fn(&config::Address) -> Result<std::net::SocketAddr, String>,
+) -> Result<List<service::ForgeRuntime>, String> {
     use skein_forge_connection::settings::Transport;
     let mut runtime = List::with_capacity(u32::try_from(configured.len()).expect("bounded forges"));
     for (index, forge) in configured.iter().enumerate() {
         let prefix = format!("application.forges[{index}]");
-        let address = address(&forge.api).map_err(|why| format!("{prefix}.api: {why}"))?;
+        let address = match resolve(&forge.api) {
+            Ok(address) => address,
+            Err(_) if matches!(forge.api, config::Address::Host { .. }) => service::forge::HELD_ADDRESS,
+            Err(why) => return Err(format!("{prefix}.api: {why}")),
+        };
         let (transport, trust_roots, trust_root_bytes) = match &forge.transport {
             service::startup::Transport::Plaintext => (Transport::Plaintext { name: None }, 0, 0),
             service::startup::Transport::Tls { server_name: name, trust: file } => {
@@ -320,7 +327,7 @@ fn prepare_with_store(
             .expect("named checked document");
     let engine =
         config::engine(&document, member(&document, 0, b"engine"), &directories.jig()).expect("named checked engine");
-    let forges = forges(&named.forges)?;
+    let forges = forges(&named.forges, address)?;
     let agent = named.worker.as_ref().map(|_| agent::preflight(&named)).transpose()?;
     let user = skein_shell::effective_user();
     let mut named_files = named.files.into_vec();
