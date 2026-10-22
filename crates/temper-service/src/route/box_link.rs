@@ -217,8 +217,7 @@ pub(crate) fn drain(engine: &mut crate::engine::Engine, out: &mut Queue<Out>) {
             }
             Out::Failed { forge, why } => state(engine, forge, Connection::SetUpFailed { why }),
             Out::Started { forge } => {
-                // Transitional: M4 (o/forgejo-setup) reads the forge's files and sends Request::Connect here (protocol/forge.md, 2.2).
-                state(engine, forge, Connection::NotConnected);
+                crate::setup::lifecycle::started(engine, forge);
             }
             Out::Answered { forge, request, answer } => match answer {
                 Ok(()) => engine.events.push(temper_engine_domain::Event::Forge(Box::new(

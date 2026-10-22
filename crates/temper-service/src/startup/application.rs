@@ -94,6 +94,10 @@ pub enum User {
 }
 /// Twenty decimal digits and one final line feed.
 pub const USER_BYTES: u32 = 21;
+/// The start and the runtime file handover share the same decoder.
+pub(crate) fn file_user(bytes: &[u8]) -> Option<u64> {
+    read::decimal(bytes)
+}
 #[derive(Debug)]
 pub enum Transport {
     Plaintext,
@@ -991,7 +995,7 @@ fn resolved_user(
         User::File(name) => {
             let at = path.member(b"user").member(b"file");
             match contents(files, name, USER_BYTES, at.clone(), problems) {
-                Some(value) => match read::decimal(&value) {
+                Some(value) => match file_user(&value) {
                     Some(value) => Some(value),
                     None => {
                         problems.push(at, What::Jig(config::What::Form));

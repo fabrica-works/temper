@@ -106,7 +106,7 @@ pub fn settings(
     }
 }
 // Transitional Forgejo files; temper-15 replaces them with records.
-fn file_access(forge: &settings::Forge) -> Option<skein_forge_connection::Access> {
+pub(crate) fn file_access(forge: &settings::Forge) -> Option<skein_forge_connection::Access> {
     let token = forge.api_token.as_ref()?;
     Some(skein_forge_connection::Access {
         credential: skein_forge::credential::Credential::Token(token.clone()),
