@@ -19,6 +19,8 @@ pub struct Recipe {
 #[must_use]
 pub fn scripted(scripts: Box<[api::Script]>) -> Recipe {
     // Smith's configured peer bounds, for an agent's prompt and finish call.
+    // The first-turn request with a workspace mounted measured 31,007 B
+    // when the delegate and amend schemas landed, leaving 1,761 B.
     const STRINGS: u32 = 16_384;
     const REQUEST: u32 = 32_768;
     let mut config = skein_llm_world::fake::config();
