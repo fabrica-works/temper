@@ -117,6 +117,7 @@
         "deadline": "none",
         "tracked": null,
         "conversation": true,
+        "ended_by": "requester",
         "listed": false,
         "retention": "kept",
         "label": 1,
