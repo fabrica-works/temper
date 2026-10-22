@@ -439,13 +439,6 @@ fn read_value(w: World, what: &c::Read, then: Then) -> Option<c::ReadValue> {
         | c::Read::Deployment => None,
     }
 }
-fn words_line(w: World, words: &str, message: u64) -> c::Activity {
-    c::Activity::Words {
-        by: c::Party { number: 73, kind: c::PartyKind::Person, name: text(person(w)) },
-        message,
-        words: text(words),
-    }
-}
 fn agent_line(words: &str, number: u32, read: Option<u64>) -> c::Activity {
     let mut blocks = List::with_capacity(1);
     let bytes = words.as_bytes();
@@ -641,7 +634,7 @@ fn facts(w: World, number: u64) -> TaskFacts {
     match (w, number) {
         (Reference, 1) => TaskFacts {
             title: "Director",
-            brief: "",
+            brief: "Morning. I'm landing Export's draft within the hour.",
             charter: 1,
             parent: None,
             phase: c::Phase::Idle,
@@ -1081,7 +1074,7 @@ fn facts(w: World, number: u64) -> TaskFacts {
         },
         (Solo, 6) => TaskFacts {
             title: "Why is tally sum slow on big files?",
-            brief: "",
+            brief: "Why is tally sum slow on big files?\n2 GB takes 40 s.",
             charter: 1,
             parent: None,
             phase: c::Phase::Idle,
@@ -1101,7 +1094,7 @@ fn facts(w: World, number: u64) -> TaskFacts {
         },
         (Solo, 10) => TaskFacts {
             title: "Add a --json flag to tally report",
-            brief: "",
+            brief: "Add a --json flag to tally report\nOne object per row: my dashboard script reads it.",
             charter: 1,
             parent: None,
             phase: c::Phase::Idle,
@@ -1203,7 +1196,7 @@ fn facts(w: World, number: u64) -> TaskFacts {
         },
         (FirstRun { step: 2 }, 1) => TaskFacts {
             title: "Add CSV export to widget",
-            brief: "",
+            brief: "Add CSV export to widget",
             charter: 1,
             parent: None,
             phase: c::Phase::Idle,
@@ -1263,7 +1256,7 @@ fn facts(w: World, number: u64) -> TaskFacts {
         },
         (FirstRun { step: 3 | 4 }, 1) => TaskFacts {
             title: "Add CSV export to widget",
-            brief: "",
+            brief: "Add CSV export to widget",
             charter: 1,
             parent: None,
             phase: c::Phase::Idle,
@@ -1325,7 +1318,7 @@ fn facts(w: World, number: u64) -> TaskFacts {
         },
         (FirstRun { step: 4 }, 4) => TaskFacts {
             title: "Add a dark theme to widget",
-            brief: "",
+            brief: "Add a dark theme to widget",
             charter: 1,
             parent: None,
             phase: c::Phase::Done,
@@ -1351,9 +1344,6 @@ fn activity(w: World, task: u64) -> c::ActivityPage {
     match (w, task) {
         (Reference, 1) => {
             events
-                .push(words_line(w, "Morning. I'm landing Export's draft within the hour.", 1))
-                .expect("world activity");
-            events
                 .push(agent_line("Noted. I'll keep s1's three spare slots free until then.", 2, Some(1)))
                 .expect("world activity");
             events
@@ -1368,33 +1358,21 @@ fn activity(w: World, task: u64) -> c::ActivityPage {
         }
         (Solo, 6) => {
             events
-                .push(words_line(w, "Why is tally sum slow on big files?\n2 GB takes 40 s.", 1))
-                .expect("world activity");
-            events
                 .push(agent_line("I'll profile it on a generated 2 GB file first.", 2, Some(1)))
                 .expect("world activity");
             events.push(tools_line(&[("delegate", 1)], &[7], false, 3)).expect("world activity");
             events.push(agent_line("T7 found it: **92%** of the time is the CSV splitter allocating a string per line.\n\nA reused buffer cuts the run from 40 s to 1.8 s. Shall I make that a change?", 4, Some(1))).expect("world activity");
         }
         (Solo, 10) => {
-            events
-                .push(words_line(
-                    w,
-                    "Add a --json flag to tally report\nOne object per row: my dashboard script reads it.",
-                    1,
-                ))
-                .expect("world activity");
             events.push(agent_line("That changes `report`'s output and its tests, and lands into main, so I've proposed it as a goal of yours, with a budget of its own.", 2, Some(1))).expect("world activity");
             events.push(tools_line(&[("read", 2), ("propose", 1)], &[], true, 3)).expect("world activity");
         }
         (FirstRun { step: 2 }, 1) => {
-            events.push(words_line(w, "Add CSV export to widget", 1)).expect("world activity");
             events.push(agent_line("I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.", 2, Some(1))).expect("world activity");
             events.push(tools_line(&[("delegate", 1)], &[2], false, 3)).expect("world activity");
             events.push(tools_line(&[("wait", 1)], &[], false, 4)).expect("world activity");
         }
         (FirstRun { step: 3 | 4 }, 1) => {
-            events.push(words_line(w, "Add CSV export to widget", 1)).expect("world activity");
             events.push(agent_line("I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.", 2, Some(1))).expect("world activity");
             events.push(tools_line(&[("delegate", 1)], &[2], false, 3)).expect("world activity");
             events.push(tools_line(&[("wait", 1)], &[], false, 4)).expect("world activity");
@@ -1402,7 +1380,6 @@ fn activity(w: World, task: u64) -> c::ActivityPage {
             events.push(tools_line(&[("wait", 1)], &[], false, 6)).expect("world activity");
         }
         (FirstRun { step: 4 }, 4) => {
-            events.push(words_line(w, "Add a dark theme to widget", 1)).expect("world activity");
             events.push(agent_line("I’d give widget’s table a second set of colours, chosen when your system prefers a dark theme, so that widget follows your system. The demo plays only the CSV export as a change: connect a model to make this one.", 2, Some(1))).expect("world activity");
             events.push(tools_line(&[("finish", 1)], &[], false, 3)).expect("world activity");
         }
