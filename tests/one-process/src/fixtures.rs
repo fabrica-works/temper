@@ -94,7 +94,8 @@ pub(crate) fn client_limits() -> temper_client_shell_terminal::limits::Limits {
     limits.client.client.domain.turn_text = 64;
     limits.client.client.domain.document_bytes = 65_536;
     limits.client.client.domain.requests.bytes = 262_144;
-    limits.client.client.domain.ask_bytes = limits.client.client.domain.requests.bytes;
+    limits.client.client.domain.ask_bytes =
+        limits.client.client.domain.requests.bytes / u64::from(limits.client.client.domain.requests.requests);
     limits
 }
 pub(crate) fn document() -> Vec<u8> {

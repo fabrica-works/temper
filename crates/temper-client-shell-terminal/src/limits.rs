@@ -25,6 +25,7 @@ pub struct Limits {
     pub io: skein_io::Limits,
 }
 #[must_use]
+#[expect(clippy::arithmetic_side_effects, reason = "the request count is the nonzero constant declared here")]
 pub fn native() -> Limits {
     Limits {
         client: {
@@ -44,7 +45,8 @@ pub fn native() -> Limits {
                         version: temper_client_protocol_wire::CLIENT_VERSION,
                     }],
                     requests,
-                    ask_bytes: requests.bytes,
+                    // A jig ask reserves this much, so the table holds `requests` asks.
+                    ask_bytes: requests.bytes / u64::from(requests.requests),
                     handles: 17,
                     watches: 16, // Includes the shared me watch.
                     turn_bytes: 1_048_576,

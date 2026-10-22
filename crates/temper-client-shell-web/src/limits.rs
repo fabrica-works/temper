@@ -21,6 +21,7 @@ pub const CONVERSATION_TEXT: u32 = 512;
 pub const TURN_TEXT: u32 = 2048;
 /// The root's bounds: `temper-client-shell-terminal`'s `native().client`.
 #[must_use]
+#[expect(clippy::arithmetic_side_effects, reason = "the request count is the nonzero constant declared here")]
 pub fn client() -> client::Limits {
     let requests = RequestLimits {
         requests: 16,                   // Durable keyed requests.
@@ -38,7 +39,8 @@ pub fn client() -> client::Limits {
                 version: temper_client_protocol_wire::CLIENT_VERSION,
             }],
             requests,
-            ask_bytes: requests.bytes,
+            // A jig ask reserves this much, so the table holds `requests` asks.
+            ask_bytes: requests.bytes / u64::from(requests.requests),
             handles: 17,
             watches: 16, // Includes the shared me watch.
             turn_bytes: 1_048_576,

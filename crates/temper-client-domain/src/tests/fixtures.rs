@@ -7,6 +7,7 @@ pub const NOW: Wall = Wall::EPOCH;
 pub const FORGE: u16 = temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Forge);
 pub const PROJECT: u32 = 1;
 pub const SEED: u64 = 11;
+#[expect(clippy::arithmetic_side_effects, reason = "the request count is the nonzero constant declared here")]
 pub fn limits() -> Limits {
     {
         let requests = RequestLimits {
@@ -25,7 +26,7 @@ pub fn limits() -> Limits {
                     version: temper_client_protocol_wire::CLIENT_VERSION,
                 }],
                 requests,
-                ask_bytes: requests.bytes,
+                ask_bytes: requests.bytes / u64::from(requests.requests),
                 handles: 9,
                 watches: 9,
                 turn_bytes: 65536,

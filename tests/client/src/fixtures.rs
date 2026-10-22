@@ -39,7 +39,7 @@ pub fn domain_limits() -> Limits {
                     version: temper_client_protocol_wire::CLIENT_VERSION,
                 }],
                 requests,
-                ask_bytes: requests.bytes,
+                ask_bytes: requests.bytes / u64::from(requests.requests),
                 handles: 9,
                 watches: 9,
                 turn_bytes: 65536,
