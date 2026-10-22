@@ -1,6 +1,6 @@
 # Tools: temper for agents
 
-Provisional, 2026-10-17, revised 2026-10-20. How agents drive temper:
+Provisional, 2026-10-17, revised 2026-10-22. How agents drive temper:
 they read what it holds, act through jig's operations and wait for what
 changes, with `temper ctl`, a command line. It serves the agents
 (smith's) that QA and develop temper's core: they drive a throwaway
@@ -665,6 +665,18 @@ digest: task 7c1e09a2b44f0d13
   task waits on and refusals in the words a person reads.
 - **Lists** print one line per row, its number first, then the cursor
   for the next page, or that there is none.
+- **A tree** prints `tree:`, then its root and each row its window
+  holds, a chip a line. The engine answers the tools' window within its
+  own rows (jig's `client/domain/contract.md`, 7.2), so a tree larger
+  than either folds the rest, and its text says so on one line after
+  the rows: `cut: 3 more not shown (2 Running, 1 Waiting)`, the folded
+  tasks' count, then each phase that has any, in a chip's words and
+  jig's order of phases. With nothing folded, no line. Under `--json`,
+  `more` and `folded` as the document carries them.
+- **An activity page** cut before its first row (jig's
+  `protocol/store.md`, 7.3) prints no rows and its `read on with:` call,
+  never `no more`; under `--json`, `"cut":true` and the position to read
+  on from.
 - **An act's outcome** prints what was made or decided and its numbers:
   `done: task 41, chat`; `proposed: p3/17, to maintainers`; `decided
   first: by ada, accepted, 14:02`; for `adopt`, `README.md`, 4.7's
@@ -1166,6 +1178,14 @@ teardown on the real kernel; the harness checks memory ownership,
 outstanding operations and release between iterations.
 A real-loop failure is kept with its trace and reproduced lower down
 where possible; its seed does not replay the kernel's schedule.
+
+One story reads at `temper init`'s template's bounds, its documents'
+rows below the tools' 32-row window: a goal with more delegates than
+those rows, one of them ended with an ended dependency, and `task N
+--tree` answering within a second, cut and saying so, and `activity N
+--json` of the ended one answering its rows, newest first, and reading
+on to its first. Its fixture sets that bound itself, whatever the
+others' fixtures raise.
 
 ### 11.4 The process tier
 
