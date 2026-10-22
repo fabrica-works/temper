@@ -72,6 +72,15 @@ pub fn config(seed: u64) -> engine::Config {
     config
 }
 
+/// The system configuration with a chat ended only by its requester.
+#[must_use]
+pub fn open_config(seed: u64) -> engine::Config {
+    let mut config = config(seed);
+    config.core.settings.templates =
+        temper_engine_domain_world::fixtures::templates_ending(jig_domain_tasks::EndedBy::Requester);
+    config
+}
+
 /// What a worker says it can host: wide enough for [`charter`] and for the
 /// configured spend, message and inbox bounds (jig's `domain/hosts.md`, 8).
 #[must_use]

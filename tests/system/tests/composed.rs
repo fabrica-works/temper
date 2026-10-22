@@ -21,6 +21,62 @@ fn a_committed_chat_runs_through_the_worker_and_smith_and_returns_a_report() {
 }
 
 #[test]
+fn an_open_chats_text_reply_ends_its_turn_after_one_call() {
+    use jig_domain_core::{CoreRecord, Record as CoreRecordRow};
+    use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
+    use skein_lib::Duration;
+
+    let reply = b"Hello there.";
+    let mut world = World::open_chat(
+        917,
+        Script {
+            cue: Box::from(&b"@system"[..]),
+            turns: Box::new([Turn {
+                lines: Box::new([Line::Text { text: reply.as_slice().into() }]),
+                finish: Finish::Stop,
+                tokens: 20,
+            }]),
+        },
+    );
+    world.run();
+    let task = world.assignment().task;
+    let attempt = world.assignment().attempt;
+    let idle = world.assignment().run.policy.waiting;
+    for elapsed in [Duration::ZERO, idle.saturating_add(Duration::from_secs(1))] {
+        world.advance(elapsed);
+        assert_eq!(world.agent().prompts().len(), 1, "a text reply needs no finite-run nudge");
+        assert_eq!(world.observed.assignments, 1, "idle time starts no new attempt");
+        assert_eq!(world.observed.answers, 1);
+        let mut replies = 0;
+        let mut terminals = 0;
+        for row in world.store.rows.values() {
+            match row {
+                Record::Core(CoreRecordRow::Core(CoreRecord::Turn(turn))) if turn.task == task => {
+                    replies += turn.transcript.windows(reply.len()).filter(|bytes| *bytes == reply).count();
+                }
+                Record::Core(CoreRecordRow::Core(CoreRecord::Terminal(terminal))) if terminal.task == task => {
+                    assert_eq!(terminal.attempt, attempt);
+                    assert!(!matches!(terminal.end, tasks::End::Failed(_)), "no failed run");
+                    terminals += 1;
+                }
+                Record::Core(_) | Record::Forge { .. } => {}
+            }
+        }
+        assert_eq!(replies, 1, "the reply is committed once in this chat's conversation");
+        assert_eq!(terminals, 1, "one committed activation terminal");
+        let Some(Record::Core(CoreRecordRow::Tasks(tasks::Stored::Live(live)))) =
+            world.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(task))))
+        else {
+            panic!("the chat remains live");
+        };
+        assert_eq!(live.tries, tasks::Tries::NONE);
+        assert_eq!(live.attempt, attempt);
+        assert_eq!(live.last_answer, Some(attempt));
+        assert!(!world.store.rows.contains_key(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(task)))));
+    }
+}
+
+#[test]
 fn smiths_host_call_and_its_durable_reply_traverse_the_worker_process_channel() {
     let mut world = World::chat(911, report_script(true));
     world.run();

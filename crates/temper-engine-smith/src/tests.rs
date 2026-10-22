@@ -114,6 +114,28 @@ fn root_charter_becomes_a_smith_start_with_ordered_brief_and_exact_budget() {
 }
 
 #[test]
+fn a_charters_mode_is_its_tasks_ending() {
+    let change = run::outcome::ChangeSpec {
+        checks_must_pass: true,
+        fields: Box::new([
+            run::outcome::FieldRule { name: b"title".as_slice().into(), max: 128 },
+            run::outcome::FieldRule { name: b"body".as_slice().into(), max: 128 },
+        ]),
+    };
+    for (ended_by, mode, deliver) in
+        [(tasks::EndedBy::Result, run::Mode::Finite, Some(change)), (tasks::EndedBy::Requester, run::Mode::Open, None)]
+    {
+        let mut assignment = assignment();
+        assignment.run.ended_by = ended_by;
+        assignment.run.contract = tasks::Contract::Change { connector: 1, kind: 1, words: 128 };
+        let charter = crate::charter(&assignment);
+        assert_eq!(charter.mode, mode);
+        assert!(charter.grants.wait);
+        assert_eq!(charter.grants.deliver, deliver);
+    }
+}
+
+#[test]
 fn a_starting_run_hears_its_met_dependency_by_name() {
     // A run resumed by its last dependency's end hears the Met notice that woke it (jig's
     // domain/tasks.md, section 8.1), as a live run does.

@@ -76,6 +76,7 @@ enum Adoption {
 pub struct World {
     seed: u64,
     creating: jig_core_world::fixtures::Creating,
+    chat_ending: tasks::EndedBy,
     root: engine::Domain,
     env: Env<engine::Limits>,
     root_out: Queue<engine::Request>,
@@ -144,7 +145,14 @@ pub fn crossed_script() -> Script {
 /// endpoint as the worker world's codecs name it (its account included), a
 /// hub window of two turns, and room to resume a conversation.
 fn config(seed: u64) -> engine::Config {
-    let mut config = crate::world::config(seed);
+    configure(crate::world::config(seed))
+}
+
+fn open_config(seed: u64) -> engine::Config {
+    configure(crate::world::open_config(seed))
+}
+
+fn configure(mut config: engine::Config) -> engine::Config {
     let charter = crate::world::charter();
     config.core.settings.models = Box::new([charter.policy.model.clone()]);
     config.core.settings.charters = Box::new([charter]);
@@ -189,6 +197,12 @@ impl World {
     #[must_use]
     pub fn chat(seed: u64, script: Script) -> Self {
         Self::configured(seed, script, false)
+    }
+
+    /// Start a chat whose task is ended by its requester.
+    #[must_use]
+    pub fn open_chat(seed: u64, script: Script) -> Self {
+        Self::configured_with(seed, script, false, open_config)
     }
 
     /// Prepare an adopted repository through the worker before starting Smith.
@@ -280,6 +294,10 @@ impl World {
     }
 
     fn configured(seed: u64, script: Script, repository: bool) -> Self {
+        Self::configured_with(seed, script, repository, config)
+    }
+
+    fn configured_with(seed: u64, script: Script, repository: bool, config: fn(u64) -> engine::Config) -> Self {
         let [(bootstrap, mut limits), (config, _)] = std::array::from_fn(|_| {
             let mut config = config(seed);
             let mut limits = walking::limits();
@@ -314,6 +332,15 @@ impl World {
         Self {
             seed,
             creating: jig_core_world::fixtures::Creating::new(&config.core, limits.tasks.tree_tasks),
+            chat_ending: config
+                .core
+                .settings
+                .templates
+                .iter()
+                .find(|template| template.number == 1)
+                .expect("chat template")
+                .flags
+                .ended_by,
             root: engine::Domain::new(config, &limits).expect("valid engine configuration"),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             root_out: Queue::with_capacity(engine::max_out(&limits)),
@@ -412,6 +439,14 @@ impl World {
         self.process.tick(self.worker_env.now, &mut around);
         self.worker.reclaim();
         self.root.reclaim();
+    }
+
+    /// Advance controlled time, driving both roots and the process at each tick.
+    pub fn advance(&mut self, duration: Duration) {
+        let until = self.env.now.saturating_add(duration);
+        while self.env.now < until {
+            self.tick();
+        }
     }
 
     /// The deployment's first period and its git identity's credential, from
@@ -534,13 +569,23 @@ impl World {
             }),
             parties::Up::Request { to, sign_in, project, key, ask } => {
                 let ask = match ask {
-                    parties::Ask::Chat { words } => walking::configured_chat(
-                        &self.creating,
-                        &self.store.rows,
-                        self.env.limits.tasks.tree_tasks,
-                        project,
-                        &words,
-                    ),
+                    parties::Ask::Chat { words } => {
+                        let people::Ask::Create { project, mut batch } = walking::configured_chat(
+                            &self.creating,
+                            &self.store.rows,
+                            self.env.limits.tasks.tree_tasks,
+                            project,
+                            &words,
+                        ) else {
+                            unreachable!("chat creates a task")
+                        };
+                        // As jig_client::shapes::chat does, copy the template's ending into Create.
+                        batch[0].flags.ended_by = match self.chat_ending {
+                            tasks::EndedBy::Result => people::EndedBy::Result,
+                            tasks::EndedBy::Requester => people::EndedBy::Requester,
+                        };
+                        people::Ask::Create { project, batch }
+                    }
                     parties::Ask::Say { task: parties::Task::Number(task), words, release } => {
                         say(project, task, words, release)
                     }

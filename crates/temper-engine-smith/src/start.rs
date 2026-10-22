@@ -121,7 +121,8 @@ pub fn start(
     }
 }
 
-/// The channel charter resumes only when policy allows and turns are kept.
+/// The channel charter takes its mode from the task's ending and resumes
+/// only when policy allows and turns are kept (domain/agent.md, 4.6).
 #[must_use]
 pub fn charter(assignment: &engine::Assignment) -> run::Charter {
     let mut sections = List::with_capacity(assignment.sections.len().try_into().expect("bounded brief sections"));
@@ -139,8 +140,12 @@ pub fn charter(assignment: &engine::Assignment) -> run::Charter {
         models.push(model(candidate, grant)).expect("bounded model list");
     }
     let outcome = contract(&assignment.run.contract);
+    let mode = match assignment.run.ended_by {
+        tasks::EndedBy::Result => run::Mode::Finite,
+        tasks::EndedBy::Requester => run::Mode::Open,
+    };
     run::Charter {
-        mode: run::Mode::Finite,
+        mode,
         resume: policy.resume && !assignment.transcript.is_empty(),
         waiting: policy.waiting,
         instructions: policy.instructions.clone(),
@@ -151,7 +156,10 @@ pub fn charter(assignment: &engine::Assignment) -> run::Charter {
         }),
         grants: run::charter::Grants {
             wait: true,
-            deliver: outcome.change.clone(),
+            deliver: match mode {
+                run::Mode::Finite => outcome.change.clone(),
+                run::Mode::Open => None,
+            },
             tools: run::charter::Tools { inspect: policy.inspect, modify: policy.modify, shell: policy.shell },
             agents: policy.agents,
             host_tools: crate::tools(policy.call_timeout),
