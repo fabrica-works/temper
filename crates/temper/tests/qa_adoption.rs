@@ -150,7 +150,7 @@ fn malformed_handovers_are_named_without_printing_their_value() {
         let why = temper::prepare_in(&support::configuration::directories(scratch.path()))
             .err()
             .expect("malformed handover must refuse startup");
-        // A read refusal also gives the file's path; a form refusal names the member alone (the ignored case below).
+        // Both read and form refusals name the member and the handover file.
         assert!(why.contains("application.setup[0].admin_token: "), "{name}: {why}");
         assert!(!why.contains(token), "{name}: refusal disclosed the handover");
         assert_eq!(fs::read(&handover).expect("refusal leaves handover"), token.as_bytes());
@@ -159,7 +159,6 @@ fn malformed_handovers_are_named_without_printing_their_value() {
 }
 
 #[test]
-#[ignore = "a handover of 40 bytes in the wrong form is refused naming the entry's member, not the file's path: startup's What is Copy and carries no path; listed in o/first-run-d2's closing"]
 fn a_handover_in_the_wrong_form_is_refused_naming_its_path() {
     let scratch = support::Scratch::startup("qa-adoption-invalid-form-path");
     support::configuration(scratch.path(), &support::Forge::Unreached);

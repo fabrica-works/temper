@@ -57,7 +57,7 @@ fn setup_values(
                 if valid {
                     handover = Some(skein_lib::Secret::new(bytes));
                 } else {
-                    problems.push(at, What::Handover);
+                    problems.push_file(at, What::Handover, Some(handover_path(entry)));
                 }
             }
         }
@@ -448,6 +448,7 @@ struct CheckedStart {
 }
 /// Derive the two envelopes without enforcing the document's memory declarations.
 /// File, agent, root, channel and runtime checks are identical to startup's.
+#[expect(clippy::too_many_arguments, reason = "the same inputs as startup, including its checked setup")]
 pub fn memory_requirements(
     document: &[u8],
     directories: &config::Directories,
@@ -456,6 +457,7 @@ pub fn memory_requirements(
     seeds: &settings::Seeds,
     accounts: Option<&AccountsRuntime>,
     forges: List<crate::ForgeRuntime>,
+    setup: Option<&temper_forge_setup::check::Checked>,
 ) -> Result<Requirements, Problems> {
     if shape(document, directories)? == Shape::WorkerAlone {
         let part = worker_part(document, directories)?;
@@ -466,21 +468,7 @@ pub fn memory_requirements(
                 .ok_or(problem(indexed(0).member(b"memory_bytes"), What::Jig(config::What::Bound)))?,
         });
     }
-    Ok(checked_start(document, directories, files, Some(agent), seeds, accounts, forges, None)?.requirements)
-}
-/// Derive envelopes including the checked setup which the shell supplies at startup.
-#[expect(clippy::too_many_arguments, reason = "the same startup inputs plus its checked setup")]
-pub fn memory_requirements_with_setup(
-    document: &[u8],
-    directories: &config::Directories,
-    files: &settings::Files,
-    agent: &settings::Agent,
-    seeds: &settings::Seeds,
-    accounts: Option<&AccountsRuntime>,
-    forges: List<crate::ForgeRuntime>,
-    setup: &temper_forge_setup::check::Checked,
-) -> Result<Requirements, Problems> {
-    Ok(checked_start(document, directories, files, Some(agent), seeds, accounts, forges, Some(setup))?.requirements)
+    Ok(checked_start(document, directories, files, Some(agent), seeds, accounts, forges, setup)?.requirements)
 }
 #[expect(
     clippy::too_many_arguments,

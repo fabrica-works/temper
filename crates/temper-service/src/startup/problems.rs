@@ -33,6 +33,7 @@ pub enum What {
 pub struct Problem {
     pub path: config::Path,
     pub what: What,
+    pub file: Option<Box<[u8]>>,
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Problems {
@@ -45,7 +46,10 @@ impl Problems {
         Self { problems: List::with_capacity(config::PROBLEMS), past: 0 }
     }
     pub fn push(&mut self, path: config::Path, what: What) {
-        if self.problems.push(Problem { path, what }).is_err() {
+        self.push_file(path, what, None);
+    }
+    pub(crate) fn push_file(&mut self, path: config::Path, what: What, file: Option<Box<[u8]>>) {
+        if self.problems.push(Problem { path, what, file }).is_err() {
             self.past = self.past.saturating_add(1);
         }
     }
@@ -218,6 +222,10 @@ fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
     for problem in &problems.problems {
         render_path(&problem.path, writer, &mut length, measuring);
         put(writer, &mut length, measuring, b": ");
+        if let Some(file) = &problem.file {
+            put(writer, &mut length, measuring, file);
+            put(writer, &mut length, measuring, b": ");
+        }
         put(writer, &mut length, measuring, words(problem.what));
         match problem.what {
             What::Admission { why, offered, required } => {

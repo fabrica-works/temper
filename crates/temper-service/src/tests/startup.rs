@@ -1027,6 +1027,7 @@ fn startup_admits_the_full_setup_total_and_refuses_one_byte_short() {
         &seeds,
         None,
         fixtures::forge_runtime(),
+        None,
     )
     .unwrap();
     for short in [false, true] {
@@ -1166,6 +1167,7 @@ fn an_engine_alone_admits_its_own_worst_case_and_names_an_insufficient_memory_de
         &fixtures::seeds(),
         None,
         fixtures::forge_runtime(),
+        None,
     )
     .unwrap();
     assert_eq!(requirements.worker_bytes, 0);
@@ -1289,9 +1291,12 @@ fn fake_handovers_are_private_and_refused_unless_exactly_40_lowercase_hex_digits
         let result = fake_start(&checked, &files);
         if value == b"0123456789abcdef0123456789abcdef01234567" {
             assert!(result.is_ok());
+        } else if value.len() > 40 {
+            assert_eq!(lines(&result.err().unwrap()).as_ref(), b"application.setup[0].admin_token: past its bound\n");
         } else {
-            assert!(
-                skein_lib::bytes::find(&lines(&result.err().unwrap()), b"application.setup[0].admin_token:").is_some()
+            assert_eq!(
+                lines(&result.err().unwrap()).as_ref(),
+                b"application.setup[0].admin_token: /data/demo/forge/admin_token: admin_token must be exactly 40 lowercase hexadecimal digits\n"
             );
         }
     }
@@ -1328,6 +1333,7 @@ fn a_worker_alones_complete_envelope_must_fit_its_own_memory() {
         &fixtures::seeds(),
         None,
         List::with_capacity(0),
+        None,
     )
     .unwrap();
     assert_eq!(required.engine_bytes, 0);

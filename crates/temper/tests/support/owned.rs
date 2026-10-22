@@ -671,7 +671,7 @@ impl Bounded {
     }
     #[must_use]
     pub fn requirements(&self) -> temper_service::startup::Requirements {
-        temper_service::startup::memory_requirements_with_setup(
+        temper_service::startup::memory_requirements(
             &self.document,
             &jig_protocol_config::Directories::working(),
             &self.files,
@@ -679,7 +679,7 @@ impl Bounded {
             &self.seeds,
             Some(&Self::accounts()),
             self.forges(),
-            &self.setup,
+            Some(&self.setup),
         )
         .unwrap_or_else(|why| panic!("{}", String::from_utf8_lossy(&temper_service::startup::lines(&why))))
     }

@@ -227,7 +227,10 @@ fn a_fake_entrys_handover_is_read_privately_and_checked_before_serve_starts() {
             }
             _ => assert_eq!(
                 result.expect_err("handover refused"),
-                "temper serve: application.setup[0].admin_token: admin_token must be exactly 40 lowercase hexadecimal digits\n"
+                format!(
+                    "temper serve: application.setup[0].admin_token: {}: admin_token must be exactly 40 lowercase hexadecimal digits\n",
+                    handover.display()
+                )
             ),
         }
         scratch.remove();
@@ -1322,6 +1325,7 @@ fn owned_memory_figures_for_a_worker_alone_include_its_process_and_no_engine() {
         &bounded.seeds,
         None,
         skein_lib::List::with_capacity(0),
+        None,
     )
     .expect("worker-alone fixture");
     assert_eq!(required.engine_bytes, 0);
