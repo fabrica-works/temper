@@ -121,6 +121,34 @@ fn releasing_from_the_plan_names_the_holds_revision_the_card_showed() {
     assert!(fixtures::acts::sent(&mut fixtures::acts::act(&mut pages, Act::Confirm)).is_empty());
 }
 #[test]
+fn a_task_held_anew_reads_its_released_card_again() {
+    let (mut page, mut fixture) = opened();
+    let mut task = f::task();
+    let mut held = |revision| {
+        f::phase(&mut task, c::OwnerChipPhase::Held { reason: c::HoldCategory::Stopped, revision });
+        task.chip.clone()
+    };
+    page.held(&held(fixtures::acts::REVISION.value), &mut fixture.out);
+    let card = page.cards.get_mut(FIRST_CARD).expect("held card");
+    let first = card.handle;
+    let c::ReadValue::Escalation(read) = fixtures::acts::held(c::ActKind::Release) else { panic!("hold") };
+    let mut stopped = read.hold;
+    stopped.revision = fixtures::acts::REVISION;
+    let mut document = f::task();
+    document.hold = Some(c::TaskHold::Document(Box::new(stopped)));
+    card.page = Some(c::ReadValue::Task(Box::new(document)));
+    card.outcome = Some(jig_client::Outcome::Unknown);
+    while fixture.out.pop().is_some() {}
+    page.held(&held(fixtures::acts::REVISION.value), &mut fixture.out);
+    assert!(fixture.out.pop().is_none(), "the same hold keeps its card");
+    page.held(&held(fixtures::acts::NEW_REVISION.value), &mut fixture.out);
+    let card = page.cards.get(FIRST_CARD).expect("held card");
+    assert_eq!(page.cards.len(), 1);
+    assert_ne!(card.handle, first);
+    assert!(card.page.is_none() && card.outcome.is_none());
+    assert_eq!(fixture.out.pop(), Some(Request::Client(Event::Unwatch { handle: first })),);
+}
+#[test]
 fn a_moved_hold_is_refused_and_the_card_asks_to_look_again() {
     use crate::pages::Act;
     let mut pages = fixtures::task::held_pages();
@@ -823,6 +851,25 @@ fn a_message_answer_reconciles_its_conversation_words() {
         assert_eq!(page.outcome, Some(outcome));
         assert!(page.thread.words.rows.is_empty());
     }
+}
+#[test]
+fn a_delivered_message_is_said_by_its_words_not_an_outcome() {
+    let (mut pages, client) = task_pages(offered_task(c::ActKind::Message, Some(c::Admission::Allowed)));
+    page_act(&mut pages, &client, Act::MessageWords { words: Box::from(WORDS) });
+    page_act(&mut pages, &client, Act::Send);
+    let key = pages.task().expect("page").pending.as_slice()[0].0;
+    let mut out = Queue::with_capacity(OUTPUTS);
+    let done = jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Changed)));
+    pages::step(
+        &mut pages,
+        &fixtures::env(&fixtures::limits()),
+        &client,
+        pages::Event::Told { told: Told::Answered { key, outcome: done } },
+        &mut out,
+    );
+    let page = pages.task().expect("page");
+    assert!(page.pending.is_empty());
+    assert_eq!(page.outcome, None);
 }
 
 fn amend_pages(goal: bool) -> (Pages, jig_client::Client) {

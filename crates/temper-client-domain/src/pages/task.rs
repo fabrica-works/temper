@@ -573,14 +573,23 @@ impl Task {
                 self.thread.words.refused(key);
             }
         }
-        if self.pending_kind(key) == Some(Sending::Amend) {
+        let kind = self.pending_kind(key);
+        // A message delivered is said by its words, "Sent", as a chat's
+        // (client/README.md, 5.11); a refused or unknown one by the outcome.
+        let mut said = false;
+        if kind == Some(Sending::Message)
+            && let jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(_))) = &outcome
+        {
+            said = true;
+        }
+        if kind == Some(Sending::Amend) {
             if let Some(open) = &mut self.amending {
                 if let jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(_))) = &outcome {
                     open.done = true;
                 }
                 open.outcome = Some(outcome);
             }
-        } else {
+        } else if !said {
             self.outcome = Some(outcome);
         }
         let mut kept = List::with_capacity(self.pending.capacity());
@@ -680,15 +689,34 @@ impl Task {
         }
         true
     }
-    fn held(&mut self, chip: &c::Chip, out: &mut Queue<Request>) {
-        if chip.phase != c::Phase::Held || self.cards.len() == self.cards.capacity() {
+    pub(crate) fn held(&mut self, chip: &c::Chip, out: &mut Queue<Request>) {
+        if chip.phase != c::Phase::Held {
             return;
         }
         let object = c::ObjectKey::Task(chip.task);
-        for card in &self.cards {
-            if card.object == object {
-                return;
+        for index in 0..self.cards.len() {
+            let card = self.cards.get_mut(index).expect("bounded held card");
+            if card.object != object {
+                continue;
             }
+            // A card read for an earlier hold is read again for this one, so a
+            // task held anew offers Release anew (client/README.md, 5.11).
+            if card.key.is_none()
+                && let (Some(was), Some(now)) = (hold_revision(card.page.as_ref()), chip_hold(chip))
+                && was < now
+            {
+                unwatch(card.handle, out);
+                card.handle = handle(self.next);
+                self.next = self.next.checked_add(1).expect("task handles fit");
+                card.page = None;
+                card.words = None;
+                card.outcome = None;
+                read(card.handle, c::Read::Task { task: chip.task }, out);
+            }
+            return;
+        }
+        if self.cards.len() == self.cards.capacity() {
+            return;
         }
         let handle = handle(self.next);
         self.next = self.next.checked_add(1).expect("task handles fit");
@@ -779,6 +807,37 @@ fn unwatch(handle: Handle, out: &mut Queue<Request>) {
 }
 fn read(handle: Handle, read: c::Read, out: &mut Queue<Request>) {
     out.push(Request::Client(jig_client::Event::Read { handle, read: Readable::Jig(read) }));
+}
+/// The hold's revision a chip says, if it is held.
+fn chip_hold(chip: &c::Chip) -> Option<u64> {
+    match chip.details.as_ref() {
+        c::ChipPhase::Held { revision, .. } => Some(revision.value),
+        c::ChipPhase::Owner { phase: c::OwnerChipPhase::Held { revision, .. }, .. } => Some(*revision),
+        c::ChipPhase::Owner { .. }
+        | c::ChipPhase::Active(_)
+        | c::ChipPhase::Waiting { .. }
+        | c::ChipPhase::Idle { .. }
+        | c::ChipPhase::Starting
+        | c::ChipPhase::Running { .. }
+        | c::ChipPhase::WaitingForWords { .. }
+        | c::ChipPhase::BackingOff { .. }
+        | c::ChipPhase::Procedure { .. }
+        | c::ChipPhase::Person { .. }
+        | c::ChipPhase::Closing(_)
+        | c::ChipPhase::Ended { .. } => None,
+    }
+}
+/// The hold's revision a held card's read task carries, if any.
+fn hold_revision(page: Option<&c::ReadValue>) -> Option<u64> {
+    if let Some(c::ReadValue::Task(task)) = page {
+        match &task.hold {
+            Some(c::TaskHold::Owner(hold)) => Some(hold.revision),
+            Some(c::TaskHold::Document(hold)) => Some(hold.revision.value),
+            None => None,
+        }
+    } else {
+        None
+    }
 }
 fn latest(client: &Client, handle: Handle) -> Option<&Latest> {
     client.document(handle)?.latest
