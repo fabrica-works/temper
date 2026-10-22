@@ -8,6 +8,7 @@ from pathlib import Path
 import shlex
 import subprocess
 import sys
+import tempfile
 
 
 def run(argv, repository, *, capture=True):
@@ -24,6 +25,8 @@ def main():
         print('usage: lab/look-judge SKEIN EXPERIMENT...', file=sys.stderr)
         return 2
     repository = Path(sys.argv[1]).resolve().parent.parent
+    sys.path.insert(0, str(repository / 'lab'))
+    from look_pack import pack
     skein = Path(sys.argv[2]).resolve()
     experiments = sys.argv[3:]
     lab = skein / 'scripts' / 'lab' / 'lab'
@@ -49,10 +52,18 @@ def main():
     if build.returncode:
         return 4
     target = Path(os.environ.get('CARGO_TARGET_DIR', 'target'))
-    artifact = (repository / target / 'release' / 'temper-gallery').resolve()
-    subject = run([lab, 'subject', '--repository', repository,
-                   '--commit', commit.stdout.strip(), '--exclude', 'lab',
-                   '--artifact', 'gallery=' + str(artifact)], repository)
+    gallery = (repository / target / 'release' / 'temper-gallery').resolve()
+    with tempfile.TemporaryDirectory(prefix='temper-look-') as scratch:
+        scratch = Path(scratch)
+        output = scratch / 'gallery'
+        printed = run([gallery, output], repository, capture=False)
+        if printed.returncode:
+            return 4
+        artifact = scratch / 'gallery.tar'
+        artifact.write_bytes(pack(output))
+        subject = run([lab, 'subject', '--repository', repository,
+                       '--commit', commit.stdout.strip(), '--exclude', 'lab',
+                       '--artifact', 'gallery=' + str(artifact)], repository)
     if subject.returncode:
         return subject.returncode
     digest = subject.stdout.strip()

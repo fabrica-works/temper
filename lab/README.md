@@ -119,16 +119,17 @@ The process cluster description and its templates live in [cluster/](cluster/).
 `look/` holds temper's pages to the mockups (`docs/design/draft/qa-web.md`,
 sections 3 to 5): the gallery's states captured beside the mockups' at
 1440×900 and 390×844, and checked. It has no driver and no process: a
-seed action prints the gallery, the collection is skein's capture, and
-the checks are skein's look checks (skein's `docs/design/lab-browser.md`,
-4, 5 and 5.4). `look-planted/` is the same with a fault (qa-web.md, 5.4).
+seed action extracts the gallery printout, the collection is skein's
+capture, and the checks are skein's look checks (skein's
+`docs/design/lab-browser.md`, 4, 5 and 5.4). `look-planted/` is the same
+with a fault (qa-web.md, 5.4).
 
 ## Its files
 
 - `experiment.json`: `name` `look`, cost class `look`, one directory
   `page`, no processes, no driver, no faults;
   - the action `stage`: `/bin/sh {experiment}/stage {artifact.gallery}
-    {source} {dir.page}/gallery {experiment}`;
+    {dir.page}/gallery {experiment}`;
   - the collection `capture`: `{runner}/look/capture` with the settings'
     browser by its templates, `--mockups
     {source}/docs/design/client/mockups`, `--page {dir.page}/gallery`,
@@ -136,11 +137,11 @@ the checks are skein's look checks (skein's `docs/design/lab-browser.md`,
   - the checks `look-structure` and `look-style`: `{runner}/look/check
     structure|style --capture {collected.capture}/capture` and every
     scene.
-- `stage`: runs the gallery from the subject's source tree (its working
-  directory) into the page directory, then, when the experiment holds
-  `planted.css`, appends it to the bundle's `temper.css`, the last word
-  in the cascade for the pages' look. Without it, the gallery's output
-  is served as printed.
+- `stage`: extracts the subject's tar into the page directory and requires
+  exactly one `bundle/*/temper.css` (the bundle directory is named by its
+  16-digit hex digest), failing loudly if zero or several match. When the
+  experiment holds `planted.css`, it appends it to that stylesheet, the
+  last word in the cascade for the pages' look.
 - `scenes/<scene>.json`: `look-scene/1` files (below).
 - **The planted twin,** `look-planted/`: `look/`'s files byte for byte,
   but `experiment.json`, which differs by `planted` alone, and
@@ -155,13 +156,19 @@ the checks are skein's look checks (skein's `docs/design/lab-browser.md`,
 ## The subject
 
 `lab subject --repository TEMPER --commit C --exclude lab --artifact
-gallery=<temper-gallery built at C, release>`. The mockups come from
+gallery=<gallery printout tar>`. The artifact `gallery` is the gallery's
+printout at C: `look-judge` builds the release gallery, runs it into fresh
+scratch space, and packs the output as one deterministic, uncompressed
+USTAR tar. Names are sorted, relative and slash-separated; only regular
+files and directories are allowed. Times and numeric owners are zero, owner
+names empty, file modes 0644 and directory modes 0755. Names outside USTAR's
+limits are refused. Thus every page's and stylesheet's bytes are in the
+subject's digest: the same commit C gives the same key. The mockups come from
 the subject's source (`docs/design/client/mockups/`), so a changed
 mockup is a new subject and key (qa-web.md, 5.3); the scenes are the
 experiment's, so a changed scene is a new experiment and key. The
-gallery is the subject's artifact; it prints from its working
-directory, the source tree at the same commit, or from what it
-compiled in.
+gallery printout is the subject's artifact; the executable is used only
+to produce it before the subject is made.
 
 ## The scenes
 
@@ -202,7 +209,8 @@ lab/look-judge SKEIN EXPERIMENT...
 ```
 
 From a clean temper checkout at its commit C: builds the gallery
-through `heavy` (release), makes the subject, and runs skein's `lab
+through `heavy` (release), prints and packs its output in temporary space
+removed after making the subject, and runs skein's `lab
 judge` on each experiment named (`lab/look`, `lab/look-planted`):
 three seeds a key (skein's `lab.md`, section 8), printing each key and
 verdict. More runs of a seed are `lab run --seed N`. The lab is
@@ -217,5 +225,8 @@ each scene canonical `look-scene/1` with the members above, its page a
 name of `tools/gallery/names.txt`, its mockup's file in
 `client/mockups/`; `experiment.json` naming every scene in its capture
 and both checks; and `look-planted/` byte for byte `look/` but for
-`planted.css` and `experiment.json`'s `planted`. The checks' own
-decisions are skein's, tested there on capture fixtures.
+`planted.css` and `experiment.json`'s `planted`. `test_look_pack.py` checks
+identical tar bytes and digests despite changed disk times and modes,
+fixed archive metadata, and refusal of links, special files and names
+outside USTAR's limits. The checks' own decisions are skein's, tested
+there on capture fixtures.

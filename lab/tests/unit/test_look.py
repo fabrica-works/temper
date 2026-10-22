@@ -76,6 +76,10 @@ class LookTests(unittest.TestCase):
         for field in ('processes', 'faults', 'planted'):
             self.assertEqual(experiment[field], [])
         self.assertIsNone(experiment['driver'])
+        self.assertEqual(experiment['actions'], [dict(
+            name='stage', env={'PATH': '/usr/bin:/bin'},
+            argv=['/bin/sh', '{experiment}/stage', '{artifact.gallery}',
+                  '{dir.page}/gallery', '{experiment}'])])
         expected = ['{experiment}/scenes/' + name + '.json' for name in SCENES]
         self.assertEqual(sorted(p.name for p in (LOOK / 'scenes').iterdir()),
                          sorted(name + '.json' for name in SCENES))
