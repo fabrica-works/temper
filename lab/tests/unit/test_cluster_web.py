@@ -74,9 +74,9 @@ class FilesTests(unittest.TestCase):
             dict(name='smoke', argv=['/bin/sh', '{experiment}/smoke', '{runner}/hand/browse',
                  '{proc.browser.ready.address}'], env={'PATH': '/usr/bin:/bin'})]
         self.assertEqual(exp['actions'], expected)
-        self.assertEqual(exp['collect'], [dict(name='hand', cluster='up', env={}, scan=[],
+        self.assertEqual(exp['collect'], [dict(name='hand', env={}, scan=[],
                          argv=['/bin/cp', '-R', '--', '{dir.hand}/.', '{collect.dir}/.'])])
-        self.assertEqual(exp['checks'], [dict(name='trouble', cluster='up', env={},
+        self.assertEqual(exp['checks'], [dict(name='trouble', env={},
                          argv=['/usr/bin/python3', '-I', '-B', '-S', '{experiment}/checks/trouble',
                                '{collected.hand}/trouble.jsonl'])])
 
@@ -155,12 +155,15 @@ class LauncherTests(unittest.TestCase):
         scratch.__enter__ = Mock(return_value='/invented/scratch')
         scratch.__exit__ = Mock(return_value=False)
         namespace['tempfile'] = types.SimpleNamespace(TemporaryDirectory=lambda **kw: scratch)
+        copy = Mock()
+        namespace['shutil'] = types.SimpleNamespace(copyfile=copy)
         pack = Mock(return_value=b'invented tar bytes')
         module = types.ModuleType('look_pack')
         module.pack = pack
         with patch.dict('sys.modules', look_pack=module), patch.object(Path, 'is_file', return_value=True), \
-                patch.object(Path, 'write_bytes') as write, patch('sys.stdout'):
+                patch.object(Path, 'write_bytes') as write, patch.object(Path, 'chmod'), patch('sys.stdout'):
             status = namespace['main']()
+        self.copied = copy.call_args_list
         return status, calls, pack, write
 
     def test_build_pack_subject_validate_judge(self):
@@ -172,13 +175,15 @@ class LauncherTests(unittest.TestCase):
             ['heavy', 'scripts/bundle.sh', '--release', '/invented/scratch/bundle']])
         self.assertEqual(calls[4][1:], [
             'subject', '--repository', str(ROOT.parent), '--commit', 'commit-C',
-            '--exclude', 'lab', '--artifact', 'temper=/invented/target/release/temper',
+            '--exclude', 'lab', '--artifact', 'temper=/invented/scratch/temper',
             '--artifact', 'bundle=/invented/scratch/bundle.tar'])
         self.assertEqual([call[1:] for call in calls[5:]], [
             ['validate', 'lab/cluster-web', '--subject', 'subject-D'],
             ['judge', 'lab/cluster-web', '--subject', 'subject-D']])
         pack.assert_called_once_with(Path('/invented/scratch/bundle'))
         write.assert_called_once_with(b'invented tar bytes')
+        self.assertEqual([c.args for c in self.copied],
+                         [(Path('/invented/target/release/temper'), Path('/invented/scratch/temper'))])
 
     def test_dirty_tree_and_build_failure_stop(self):
         status, calls, _, _ = self.launcher(dirty=True)
@@ -191,7 +196,7 @@ class LauncherTests(unittest.TestCase):
             with self.subTest(code=code):
                 status, calls, _, _ = self.launcher(codes={'judge': code}, target='alternate-target')
                 self.assertEqual(status, expected)
-                self.assertIn('temper=' + str(ROOT.parent / 'alternate-target/release/temper'), calls[4])
+                self.assertEqual(self.copied[0].args[0], ROOT.parent / 'alternate-target/release/temper')
 
 
 if __name__ == '__main__':
