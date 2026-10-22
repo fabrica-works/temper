@@ -306,7 +306,7 @@ keeps (`../protocol/configuration.md`, section 2).
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
 | `Adopt { project }` | none: 4.4 | the adoption form, with the picker of the repositories temper can reach on the chosen forge | `me`; the chosen forge's deployment part, for its kind, mode, user and installations (`forge.md`, 5.4); the picker's page, a `Reachable` request (section 8) | adopt a repository (4.4) |
 | `Forges` | `forges.html` | each configured forge: its connection, its mode, on GitHub temper's App and its installations, a connect under way and how the last ended, its load | the forge's, through the forge's side (4.2) | connect; replace a key or tokens; install on another account; forget the admin's token (section 8) |
-| `Accounts` | `accounts.html` | the person's LLM accounts, then, for an owner, the deployment's: each with its LLM provider and display name, its holder, its sources in order, each with its state in words and, for a program's, on which hosts (5.5), the runs using it and the tasks waiting for it; the sign-ins and checks under way, and how the last ended; the three ways to add one | `accounts` (jig's `client/domain/contract.md`, 7.1); `me`'s LLM providers | sign in with an LLM provider; sign a source out; add a key, to an account or as one of its own; replace a key; remove a source or an account; declare a program's login; check it again; move an account, or a source, up or down; resume a limited source |
+| `Accounts` | `accounts.html` | the person's LLM accounts, then, for an owner, the deployment's: each with its LLM provider and display name, its holder, its sources in order, each with its state in words and, for a program's, on which hosts (5.5), the runs using it and the tasks waiting for it; the sign-ins and checks under way, and how the last ended; "Add an account", with the ways its providers offer (5.5, The ways) | `accounts` (jig's `client/domain/contract.md`, 7.1); `me`'s LLM providers | sign in with an LLM provider; sign a source out; add a key, to an account or as one of its own; replace a key; remove a source or an account; declare a program's login; check it again; move an account, or a source, up or down; resume a limited source |
 
 - **Words and facts:** a chat's status from jig's facts (jig's
   `client/domain/client.md`, section 19), in jig's words, with temper's
@@ -455,7 +455,31 @@ keeps (`../protocol/configuration.md`, section 2).
   `z`, `0` to `9` and `-`, `claude-` and the person's first name by
   default (`claude-alice`), and shows the command to run
   on each host, `temper program-login NAME`
-  (`../protocol/credentials.md`, section 3).
+  (`../protocol/credentials.md`, section 3). Its parts, in order:
+  - *"Your LLM accounts",* level 2, then each of the person's accounts
+    as a card: a region named by the account's heading (5.5, An
+    account), the heading at level 3, then its sources, each with its
+    state in words (5.5, Each state);
+  - *the deployment's accounts,* for an owner, the same way under
+    "Deployment accounts";
+  - *"Add an account",* level 2, with one button for each way the
+    configured LLM providers offer (5.5, The ways), a way's own field
+    shown once it is chosen: a key's secret field and "Add key", a
+    program's name field and "Declare". A way adds a new account to the
+    person's own accounts, a key's to the deployment's when an owner
+    has chosen "Use deployment accounts"; a plan's sign-in and a
+    program's login are always the person's own, since only a person
+    holds a plan (jig's `domain/accounts.md`, 3.2), and their ways are
+    not offered while the deployment's are chosen;
+  - *the account form,* for the acts on an existing account or source
+    by its number: sign a source out, add a key to an account, replace
+    or remove a key, remove an account, resume a source, move an
+    account or a source. It starts no sign-in and adds no account of
+    its own: that is "Add an account"'s.
+
+  The first run reaches the page by the demo's banner's "Connect a
+  model" (5.6), and its "Continue with ChatGPT" signs in with the
+  default document's OpenAI (`../protocol/setup.md`, 8.3).
 - **The forges' page** is the forge's part of the deployment's
   connectors (jig's `client/domain/pages.md`, section 7), on a page of
   temper's own (`forge.md`, 5.4). It is read for a person whose role
@@ -1155,9 +1179,28 @@ retain `text`.
 temper's phrasebook words what jig's accounts document holds (jig's
 `client/domain/contract.md`, 7.1; jig's `domain/accounts.md`, 3.5 and
 section 5); the providers' names and their plans' are the
-configuration's. The owned example offers OpenAI API keys only
-(`../protocol/setup.md`, 8.1); ChatGPT sign-in arrives after verification
-against the real issuer (JP13). The words for each offered source are:
+configuration's. The owned example and the default document offer
+OpenAI's ChatGPT sign-in and API keys (`../protocol/setup.md`, 8.1).
+The words for each offered source are:
+
+- **The providers' words.** A provider is named by its configured name,
+  but for the names the owned example ships, which temper's phrasebook
+  words as their makers do: `openai` reads "OpenAI", its signed-in plan
+  "ChatGPT"; `anthropic` reads "Anthropic", its program's plan "Claude".
+  Any other provider's plan reads as its name. jig configures no plan's
+  display name yet (jig's `protocol/configuration.md`, section 3), so
+  the plan is branded by its provider until it does.
+- **The ways,** under "Add an account" (3.5) and in the banner, one for
+  each source a configured provider offers, in provider number order,
+  but the demo's provider (`Demo.provider`, 4.8), whose account is the
+  deployment's: a sign-in to a plan, "Continue with PLAN" ("Continue
+  with ChatGPT"), and to no plan, "Sign in to PROVIDER"; a program's
+  login, "Use your PLAN subscription" ("Use your Claude subscription");
+  a key, "Use an API key", or "Use a PROVIDER API key" ("Use an OpenAI
+  API key") when more than one shown provider offers keys. Each way
+  sends what the account form's act for it would: a sign-in is jig's
+  `SignIn` for that provider, held by the person (`Own`); a key's,
+  `AddKey` joining no account; a program's, its declaration.
 
 - **The banner:** "Agents need an LLM account to run." and "Continue
   with ChatGPT", "Use your Claude subscription", "Use an API key", one
@@ -1165,7 +1208,13 @@ against the real issuer (JP13). The words for each offered source are:
   meanwhile; its page says "Starting: waiting for an account".
 - **An account** is its provider and display name, "ChatGPT ·
   alice@example.com"; a key-only account, "OpenAI API key"; a program's,
-  "Claude subscription · claude-alice".
+  "Claude subscription · claude-alice". Its card's heading follows with
+  its provider and holder: "ChatGPT · alice@example.com · OpenAI · held
+  by Alice", the holder the person's name from `me` for their own, and
+  "held by the deployment" for the deployment's. The card's region is
+  named by that heading, so a person and a screen reader find an
+  account by its name. Each source is its kind in words, "ChatGPT
+  sign-in", "API key", "Claude Code login NAME", then its state.
 - **The composer's line** names the account and model the work's next
   run takes, one line above the chooser (3.5), from what jig gives
   every page: `me`, the accounts document and its readiness:

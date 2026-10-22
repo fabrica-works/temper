@@ -1046,9 +1046,23 @@ runs it (section 7).
   a pull request, update it from its base, close or reopen it, and edit,
   close or reopen an issue; 10, as the process tier's owner holds them.
 - **Its LLM providers** (configuration.md, section 2), written out
-  whole: 1, OpenAI, with keys only, its public Responses endpoint and
-  gpt-6-luna with its window, output and prices. ChatGPT sign-in is
-  added after verification against the real issuer (JP13). The charters
+  whole: 1, OpenAI, its public Responses endpoint and gpt-6-luna with
+  its window, output and prices, offering keys and ChatGPT's sign-in.
+  The sign-in is a plan's (`signed_in_plan`, its manage-usage address
+  `https://chatgpt.com/settings/usage`), on ChatGPT's public
+  registration as jig's live sign-in uses it (jig's
+  `domain/providers.md`, 2.2): the issuer `https://auth.openai.com`,
+  the entry client `dynamic_agent_client`, the name hint `temper`,
+  authorization at `/api/accounts/authorize`, the token at
+  `/api/accounts/oauth/token`, revocation at
+  `/api/accounts/oauth/revoke` and the published keys at
+  `/.well-known/jwks.json`, all on `auth.openai.com` over TLS; the
+  scopes `openid profile email offline_access resource.invoke
+  chatgpt.tokens.use.direct`, the last of which must be granted; the
+  resource `https://api.openai.com/v1`; the redirect
+  `127.0.0.1:1455/auth/callback`, its port fixed, as the registration
+  requires. A plan's runs use the same endpoint and model as a key's,
+  with the grant as a bearer (jig's `protocol/llm.md`, 5.3). The charters
   allow the provider's models in order, the default the first whose LLM
   provider has a usable account (llm.md, section 5; jig's
   `domain/tasks.md`, section 3).
@@ -1225,7 +1239,9 @@ directory is empty (7.1).
   LOGIN cannot be a Forgejo login: forge 3's person is person` when
   the login falls back (above); `init: uid UID has no login in
   /etc/passwd: forge 3's person is person` with no login; and last,
-  `init: start it with temper box`, with the flags init was given. Its
+  `init: start it with temper box`, with the flags init was given,
+  then `init: after starting, continue with ChatGPT or add an OpenAI API
+  key from the accounts page`. Its
   stdout is empty; exit 0.
 - **Nothing else:** no account, no forge credential, no repository and
   no store. The engine's first start makes its store; accounts, forges

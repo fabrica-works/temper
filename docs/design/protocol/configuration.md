@@ -107,9 +107,9 @@ document says what temper adds. What is open is listed in section 11.
   no account, key or record: accounts are made from the client
   (credentials.md, section 3). temper adds no member; the registration's
   name hint is `temper` in every deployment (jig's `domain/providers.md`,
-  2.2). The owned example writes out OpenAI with keys only, using its
-  public Responses API (setup.md, 8.1); ChatGPT sign-in is added after
-  verification against the real issuer (JP13); a provider temper does
+  2.2). The owned example writes out OpenAI with keys and ChatGPT's
+  sign-in, a plan's, using its public Responses API (setup.md, 8.1); a
+  provider temper does
   not ship is another entry, such as a local model's endpoint on
   loopback with no source to hold.
 - **A sign-in's redirect** binds a loopback listener on an ephemeral

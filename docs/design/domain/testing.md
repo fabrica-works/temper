@@ -317,8 +317,9 @@ in the lower world that owns it, never here.
   3.4; ../client/tools.md, 11.3). The real loop and process tier (2.6)
   use runtime key adoption. Lower domain worlds first keep temper's real
   first-start rows at receipt one, then preseed restored fixture keys at receipt two; configuration
-  names providers only, and no world hands a record in; the live tier
-  is off until temper offers ChatGPT's sign-in (2.7).
+  names providers only, and no world hands a record in; ChatGPT's
+  account comes from a sign-in alone, on the fake issuer below the live
+  tier (2.6) and the real one in it (2.7).
 - **LLM accounts' stories** (../protocol/credentials.md, section 7),
   one path per source beside the key every story adds first (above),
   each scripted on the fake peers, never by chance:
@@ -747,6 +748,23 @@ and 10).
   in jig's secrets' store, and the admin's token the preparation's
   handover, `admin_token`, which the setup host takes once
   (../protocol/setup.md, sections 3 and 9).
+- **ChatGPT's sign-in,** two tests of their own
+  (`crates/temper/tests/support/sign_in.rs`;
+  ../protocol/credentials.md, section 3), on skein's fake issuer and the
+  fake LLM peer, with the sign-in's terms as `temper init` writes them
+  (../protocol/setup.md, 8.1), only its addresses swapped for the
+  fakes', plaintext, and the redirect's port the kernel's:
+  - *signed in:* `temper ctl connect 1` prints the sign-in's address and
+    the accounts page, a native person's view, shows the sign-in under
+    way; the test drives the redirect as a browser would; the page then
+    shows the person's account, "ChatGPT · DISPLAY · OpenAI", a plan,
+    its source ready; and a chat on gpt-6-luna is answered on it, the
+    fake LLM peer observing a bearer, the grant's scheme, never its
+    value;
+  - *stopped while signing:* the binary, told to stop with a sign-in
+    under way, ends at once with exit 0, well before the sign-in's
+    deadline, its client answered (jig's `domain/accounts.md`, section
+    5: the accounts' close cancels each sign-in under way).
 - **`temper program-login`,** in two stories of their own, each within ten
   seconds (five seconds before the user's doubling of 10-22, provisional)
   and with no engine, service or deployment secret: it execs smith's fake
@@ -809,12 +827,10 @@ and 10).
 
 ### 2.7 The live tier
 
-**Off until temper offers ChatGPT's sign-in** (accounts-jp13b's M3).
-The retained test is ignored and `scripts/proof-live.sh` exits nonzero
-before any sign-in. Nothing is handed in: no input takes a record, no
-tool reads another program's login, and a ChatGPT account comes only
-from a sign-in (../protocol/credentials.md, section 3). The following
-describes the tier as it will run.
+Nothing is handed in: no input takes a record, no tool reads another
+program's login, and a ChatGPT account comes only from a sign-in
+(../protocol/credentials.md, section 3), on the owned example's
+registration (../protocol/setup.md, 8.1).
 
 `crates/temper/tests/live.rs`, after jig's (jig's `protocol/service.md`,
 section 8; testing-strategy.md, 2.9).
@@ -846,8 +862,11 @@ section 8; testing-strategy.md, 2.9).
   runs `temper ctl DIRECTORY connect 1 --key live-sign-in`, prints its
   address, and runs `wait accounts --until settled`, within the
   sign-in's deadline, while the developer approves it in a browser on
-  the same machine. The account is the run's deployment's, and goes
-  with it; its runs are on smith's direct backend.
+  the same machine, or through the port forwarded to it
+  (../protocol/credentials.md, section 3). The account is the person's
+  that `temper ctl` signed in, a plan's (jig's `domain/accounts.md`,
+  3.2), in the run's deployment, and goes with it; its runs are on
+  smith's direct backend.
 - **A key, when neither is at hand:** `add-key PROVIDER FILE
   --deployment --key live-key`, from a private file the script's
   argument names, then `wait accounts --until usable`.
