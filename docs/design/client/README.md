@@ -353,11 +353,17 @@ keeps (`../protocol/configuration.md`, section 2).
   - *the agent's words,* each assistant message's text under "Temper",
     whole within the receiving bounds (5.4);
   - *its calls,* after its message's text: each delegation as its
-    task's card (5.7), then the message's other calls folded in one
-    line, "1 tool call" or "N tool calls", then their tools' names in
-    order, a name called again given once with "×N" ("2 tool calls"
-    and "read · edit"); a call that a card stands for is neither
-    counted nor named;
+    task's card (5.7), then the message's other calls in one
+    disclosure (skein's `ui.md`, its disclosure), named by its fold
+    line: "1 tool call" or "N tool calls", then their tools' names in
+    order, a name called again given once with "×N", each part after
+    " · " ("2 tool calls · read ×2", "2 tool calls · read · edit"). A
+    browser shows it folded to its name until the person opens it,
+    while the terminal and the fake person find its content whole: each
+    of those calls in order, as a work line, its tool's name and its
+    outcome where the call has one, as an agent's task's page draws a
+    call (5.9). A call that a card stands for is neither counted, named
+    nor listed;
   - *the person's words,* the thread's words and each words line a
     person sent (jig's `OwnerActivity::Words`, by a person), under
     "You" or the party's name, a paragraph for each line, with "Being
@@ -1485,7 +1491,7 @@ the change's chip in a chat (`forge.md`, 2.4 and 2.5).
 - **The first run:** the chat is task 1 and the change it delegates
   task 2, so the person reads "T2 · CHANGE", Running, then Landed
   (`../draft/first-run.md`, 2.1), and after the card the chat's next
-  call, folded, "1 tool call" and "wait" (3.5).
+  call, folded, "1 tool call · wait" (3.5).
 
 ### 5.8 A goal's page
 
