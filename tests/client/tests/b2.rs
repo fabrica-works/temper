@@ -38,6 +38,7 @@ fn open_advisors_result_and_return(advised: &b2::Advised) -> Vec<Step<Address>> 
     let mut steps = vec![
         see(link.clone()),
         gone(Find::exactly_named(Role::TreeItem, format!("Task {}", advised.advisor).as_bytes())),
+        see(in_region(Find::text(b"No live tasks."), b"Plan")),
         Step::Press { find: link },
         see(task_heading(advised.advisor, b2::ADVISOR_BRIEF)),
         see(in_region(Find::exactly_named(Role::Status, b"Completed"), b"Result")),
@@ -89,6 +90,7 @@ fn see_the_goals_report_and_settled_budget(
     vec![
         see(in_region(Find::exactly_named(Role::Status, b"Completed"), b"Result")),
         see(in_region(Find::text(report), b"Result")),
+        see(in_region(Find::text(b"No live tasks."), b"Plan")),
         see(in_region(
             Find::text(
                 format!("{} spent · {} left of {}", budget.numbers.spent, budget.left, budget.numbers.budget)

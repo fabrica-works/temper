@@ -198,7 +198,20 @@ fn composer(b: &mut Builder, root: &Domain, page: &task::Task, task: &c::Task, w
             b.close();
             b.close();
         }
-        c::Admission::Proposed { .. } | c::Admission::Refused(_) => {
+        // Why Message isn't offered is a note, as the steer note is, not an outcome (5.11).
+        c::Admission::Refused(refusal) => {
+            text(b, Role::Paragraph, &words.say(Word::Message, &[]));
+            b.open(Role::Paragraph);
+            b.style(look::AGENT_STEER);
+            if let c::Refusal::NotWaiting = refusal {
+                words.text(b, Word::MessageOnceRuns, &[]);
+            } else {
+                words.refusal(b, &refusal, 0);
+            }
+            b.close();
+            crate::choice::composer(b, root, Some(task), words, bindings);
+        }
+        c::Admission::Proposed { .. } => {
             super::task::act(b, task, c::ActKind::Message, Word::Message, Act::Send, words, bindings);
             crate::choice::composer(b, root, Some(task), words, bindings);
         }

@@ -146,7 +146,7 @@ fn a_waiting_delegates_message_is_refused_with_its_reason() {
         person,
         vec![
             Step::See { find: Find::text(b"Message"), within: fixtures::WITHIN },
-            Step::See { find: Find::text(b"This object waits for someone else"), within: fixtures::WITHIN },
+            Step::See { find: Find::text(b"Messages reach it once it runs."), within: fixtures::WITHIN },
             Step::Gone { find: Find::named(Role::TextArea, b"Message"), within: fixtures::WITHIN },
             Step::Gone { find: Find::named(Role::Button, b"Send"), within: fixtures::WITHIN },
         ],

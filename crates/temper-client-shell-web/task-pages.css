@@ -37,6 +37,9 @@
 .temper-task-budget > [role=term]:not(:has(~ [role=term])), .temper-task-budget > [role=definition]:not(:has(~ [role=term])) { border-bottom: 0; }
 .temper-task-budget > [role=term]:not(:has(~ [role=term])), .temper-task-budget > [role=definition]:last-child { padding-bottom: 0; }
 .temper-task-budget a:hover { color: var(--temper-accent-dark); text-decoration: underline; }
+/* A heard result's "Task N" in Latest activity, drawn as the plan's task links. */
+.temper-events > li > div > a { font-weight: 700; }
+.temper-events > li > div > a:hover { color: var(--temper-accent-dark); text-decoration: underline; }
 /* .tree-row at 1100px: the reference narrows kind, state and spend. */
 @media (max-width: 1100px) {
   .temper-plan-row:has(> .temper-plan-spend) { grid-template-columns: minmax(0, 1fr) 130px 220px max-content; }
@@ -121,6 +124,8 @@
 /* .agent-steer-note, above the chat's choice line and composer. */
 .temper-chat .temper-composer-area > .temper-agent-steer { width: min(1040px, 100%); margin: 0 auto 6px; color: #91897e; font-size: 10px; line-height: 1.58; }
 .temper-agent-steer > p { margin: 0; }
+/* A refused Message's reason is a note in the steer note's look, not an outcome (5.11). */
+.temper-composer-area > .temper-agent-steer [role=status].temper-refusal { color: inherit; font-size: inherit; }
 .temper-chat:has(> .temper-agent-lineage) .temper-composer-area > :is(p:not(.temper-agent-steer), [role=status]) { width: min(1040px, 100%); margin: 0 auto 6px; font-size: 11px; overflow-wrap: anywhere; }
 @media (max-width: 850px) {
   .temper-main.temper-page:has(> .temper-task-acts) > .temper-task-heading { margin-left: 17px; }

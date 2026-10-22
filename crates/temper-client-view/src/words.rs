@@ -260,6 +260,8 @@ pub enum Word {
     DependencyKeeps,
     MainNavigation,
     KindFrom,
+    NoLiveTasks,
+    MessageOnceRuns,
 }
 // Room for temper, jig, account, card and forge phrases.
 // Seven chat projection phrases, alongside the agent's original work-line words.
@@ -267,8 +269,9 @@ pub enum Word {
 // dependency mark phrases (5.8).
 // Two names for navigation and cards.
 // Five chats heading, filter and empty phrases (client/README.md, 3.5).
-const PHRASES: u32 = 606;
-const ALL: [Word; 244] = [
+// An empty plan's line (5.8) and a waiting agent's Message note (5.11).
+const PHRASES: u32 = 608;
+const ALL: [Word; 246] = [
     Word::WaitRefused,
     Word::DependencyParked,
     Word::WaitInvalid,
@@ -513,6 +516,8 @@ const ALL: [Word; 244] = [
     Word::DependencyKeeps,
     Word::MainNavigation,
     Word::KindFrom,
+    Word::NoLiveTasks,
+    Word::MessageOnceRuns,
 ];
 impl Word {
     #[expect(clippy::too_many_lines, reason = "one exhaustive table keeps the frame phrase IDs stable")]
@@ -767,6 +772,8 @@ impl Word {
             Self::DependencyKeeps => 1062,
             Self::MainNavigation => 1063,
             Self::KindFrom => 1064,
+            Self::NoLiveTasks => 1065,
+            Self::MessageOnceRuns => 1066,
         };
         let owner =
             if number >= 100 { crate::frame::owner() } else { temper_client_domain::forge::words::owner(connector) };
@@ -1106,6 +1113,8 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::Brand => (&[b"temper"], &[]),
         Word::MainNavigation => (&[b"Main navigation"], &[]),
         Word::KindFrom => (&[b"", b" from ", b""], &[Name, Name]),
+        Word::NoLiveTasks => (&[b"No live tasks."], &[]),
+        Word::MessageOnceRuns => (&[b"Messages reach it once it runs."], &[]),
         Word::InboxTitle => (&[b"Inbox"], &[]),
         Word::NeedsYou => (&[b"Needs you"], &[]),
         Word::InboxUpdates => (&[b"Updates"], &[]),

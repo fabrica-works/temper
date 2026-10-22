@@ -588,8 +588,11 @@ pub(crate) fn plan(
     b.open(Role::Tree);
     b.style(look::PLAN);
     b.name(&words.say(word, &[]));
+    // The tree is live only: once every delegate has ended, it says so (5.8).
+    let mut empty = false;
     match tree {
         c::Delivery::OwnerTree(tree) => {
+            empty = tree.rows.is_empty() && tree.held_below == 0 && tree.folded.is_empty();
             let mut stack = List::with_capacity(tree.rows.len());
             owner_folds(b, tree, tree.root.task, words);
             for row in &tree.rows {
@@ -646,6 +649,9 @@ pub(crate) fn plan(
         | c::Delivery::OwnerAccounts(_) => {}
     }
     b.close();
+    if empty {
+        text(b, Role::Paragraph, &words.say(Word::NoLiveTasks, &[]));
+    }
     b.close();
 }
 #[expect(

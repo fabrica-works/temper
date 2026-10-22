@@ -114,6 +114,44 @@ fn a_plans_chip_links_to_its_tasks_page_by_number() {
         Some(Action::Pages(Act::Go { address: temper_client_domain::Address::Task { task: CHILD } }))
     );
 }
+#[test]
+fn a_plan_with_no_live_task_says_so_in_its_region() {
+    for rows in [0_usize, 1] {
+        let mut delivery = f::tree();
+        let c::Delivery::OwnerTree(owner) = &mut delivery else { panic!("owner tree") };
+        owner.rows = List::with_capacity(ONE);
+        if rows == 1 {
+            owner.rows.push(row()).expect("row");
+        }
+        owner.folded = List::with_capacity(0);
+        owner.held_below = 0;
+        let mut builder = Builder::new(&fixtures::tree_limits());
+        crate::pages::task::plan(
+            &mut builder,
+            &delivery,
+            &f::held_root(),
+            &fixtures::words(),
+            &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+            fixtures::domain_limits().client.domain.rows,
+            crate::words::Word::Plan,
+        );
+        let tree = builder.finish();
+        let region = region_index(&tree, b"Plan");
+        let said = index_of_text(&tree, b"No live tasks.");
+        if rows == 0 {
+            let said = said.expect("the empty plan's line");
+            let end = region + usize::try_from(tree.nodes()[region].size).expect("size");
+            assert!(region < said && said <= end, "the line is the region's");
+            assert_eq!(tree.nodes()[said].role, Role::Paragraph);
+        } else {
+            assert!(said.is_none());
+        }
+    }
+}
+fn index_of_text(tree: &Tree, expected: &[u8]) -> Option<usize> {
+    (0..tree.nodes().len())
+        .find(|index| tree.nodes()[*index].role == Role::Paragraph && &*fixtures::node_text(tree, *index) == expected)
+}
 
 fn asked(part: c::Part) -> Tree {
     let mut task = f::document();
@@ -1901,9 +1939,11 @@ fn an_agents_taskbar_has_stop_and_its_composer_has_the_steering_note() {
 }
 #[test]
 fn an_agents_refused_or_proposed_message_says_why_in_the_composers_place() {
-    for admission in
-        [c::Admission::Refused(c::Refusal::NotWaiting), c::Admission::Proposed { to: c::Recipient::Party(PARTY) }]
-    {
+    for admission in [
+        c::Admission::Refused(c::Refusal::NotWaiting),
+        c::Admission::Refused(c::Refusal::NoFurther),
+        c::Admission::Proposed { to: c::Recipient::Party(PARTY) },
+    ] {
         let mut task = f::delegate();
         offers(&mut task, &[(c::ActKind::Message, admission.clone())]);
         let view = agent(task);
@@ -1912,12 +1952,27 @@ fn an_agents_refused_or_proposed_message_says_why_in_the_composers_place() {
         assert!(named(subtree(tree, composer), Role::Paragraph, b"Message"));
         assert!(fixtures::find(tree, Role::TextArea, b"Message").is_none());
         assert!(fixtures::find(tree, Role::Button, b"Send").is_none());
-        assert!(!has_style(tree.nodes(), look::AGENT_STEER));
-        if let c::Admission::Proposed { .. } = admission {
-            assert!(contains(tree, b"This needs a proposal to"));
-        } else {
-            let expected = fixtures::words().say_word(jig_client::words::Word::refusal(&c::Refusal::NotWaiting), &[]);
-            assert!(contains(tree, &expected));
+        match admission {
+            c::Admission::Proposed { .. } => {
+                assert!(!has_style(tree.nodes(), look::AGENT_STEER));
+                assert!(contains(tree, b"This needs a proposal to"));
+            }
+            // Why Message isn't offered is a note in the steer note's look.
+            c::Admission::Refused(c::Refusal::NotWaiting) => {
+                let note = styled(tree, look::AGENT_STEER);
+                assert!(composer < note && note <= composer + usize::try_from(tree.nodes()[composer].size).unwrap());
+                assert_eq!(&*fixtures::node_text(tree, note), b"Messages reach it once it runs.");
+                let refused =
+                    fixtures::words().say_word(jig_client::words::Word::refusal(&c::Refusal::NotWaiting), &[]);
+                assert!(!contains(tree, &refused));
+            }
+            c::Admission::Refused(refusal) => {
+                let note = styled(tree, look::AGENT_STEER);
+                assert!(composer < note && note <= composer + usize::try_from(tree.nodes()[composer].size).unwrap());
+                let expected = fixtures::words().say_word(jig_client::words::Word::refusal(&refusal), &[]);
+                assert_eq!(&*fixtures::node_text(tree, note), &*expected);
+            }
+            c::Admission::Allowed | c::Admission::Bounded { .. } => unreachable!(),
         }
     }
 }

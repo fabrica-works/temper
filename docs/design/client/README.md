@@ -1332,7 +1332,9 @@ or difference of their amounts (jig's `client/domain/contract.md`,
   running one active, a completed one done, a failed one held.
 - **The plan:** the goal is not a row of it. Its delegates, the owner
   tree's root's children, are the plan's roots; the goal's state is
-  the header's, and its numbers the budget's card's.
+  the header's, and its numbers the budget's card's: the tree is live
+  only, so when it holds no row, fold or held count (every delegate
+  ended, or none yet), the region holds one line, "No live tasks."
 - **A plan row's cells:** the "Task N" link and the task's title; its
   executor; its state; its spend, "N spent", what the task spent
   itself (its chip's `budget.spent`; not the row's `spent`, which adds
@@ -1595,8 +1597,11 @@ Its rules:
   message sent shows in the conversation as a chat's person's words
   do, "Being sent", then "Sent". The engine offers Message on every
   live agent's task and refuses it while the task waits to start
-  (`NotWaiting`): the composer's place then holds "Message" and the
-  refusal, and its model choice line alone. A goal's page has no
+  (`NotWaiting`): the composer's place then holds "Message", then a
+  note in the steer note's look, temper's "Messages reach it once it
+  runs." (any other refusal: its supplied words, in the same look,
+  since why Message isn't offered is no outcome), and its model choice
+  line alone. A goal's page has no
   composer, as the mockup draws none; its model choice is 5.8's.
 - **Stop,** confirmed (3.6): a dialog "Stop" saying "Its run stops, and
   the task is held until it is released.", then "Confirm" and "Cancel".
