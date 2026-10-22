@@ -663,7 +663,8 @@ limits, or for a malformed page. The forge's own stories are forge.md,
 section 18's.
 
 Its Open chats' stories (`agent.md`, 4.6), in the engine's world on
-temper's chat as configured, Open: a chat whose run answers and
+a chat ended by its requester, as temper's is configured (temper-init's
+golden shows the flag shipped): a chat whose run answers and
 finishes parks, its reply committed and no try spent, still at rest
 past its idle interval; its person's next words wake it once; its
 person's Close, the client's `close_chat`, ends it with its committed
