@@ -156,7 +156,7 @@ pub(crate) fn row(b: &mut Builder, root: &Domain, line: &TaskLine, words: &Words
     );
     text(b, Role::Paragraph, line.chip.title.bytes());
     if let Some(me) = root.pages().me(root.client()) {
-        status(b, &line.chip, &line.waits_on, line.project, me, words);
+        status(b, &line.chip, &line.waits_on, (line.project, line.requester), None, me, words);
     }
     text(
         b,
@@ -197,10 +197,37 @@ pub(crate) fn status(
     b: &mut Builder,
     chip: &jig_client::contract::Chip,
     waits_on: &jig_client::contract::WaitsOn,
-    project: u32,
+    (project, requester): (u32, jig_client::contract::OwnerRequester),
+    wake: Option<&jig_client::contract::OwnerWakePolicy>,
     me: &jig_client::contract::Me,
     words: &Words,
 ) {
+    use jig_client::contract::{ChipPhase, OwnerRequester, WaitsOn, WakeRule};
+    let narrowed = if *waits_on == WaitsOn::Delegates
+        && let ChipPhase::Owner { details, .. } = chip.details.as_ref()
+        && details.live_delegates > 0
+    {
+        Some(words.say(Word::WaitingForDelegates, &[Hole::Number(u64::from(details.live_delegates))]))
+    } else if *waits_on == WaitsOn::News
+        && requester == OwnerRequester::Person(me.party.number)
+        && let Some(wake) = wake
+        && match wake.words {
+            WakeRule::Never => false,
+            WakeRule::Immediate | WakeRule::Batch { .. } => true,
+        }
+    {
+        Some(words.say(Word::WaitingForYourWords, &[]))
+    } else {
+        None
+    };
+    if let Some(name) = narrowed {
+        b.open(Role::Status);
+        b.style(crate::look::STATUS_QUIET);
+        b.name(&name);
+        b.text(Run::Plain, &name);
+        b.close();
+        return;
+    }
     let status = jig_client::facts::chat_status(chip, waits_on, project, me);
     let holes = match &status {
         jig_client::facts::ChatStatus::Tool { tool, .. } => Some(Hole::Name(tool.clone())),

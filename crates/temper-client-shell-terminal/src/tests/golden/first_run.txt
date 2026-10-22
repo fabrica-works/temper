@@ -1,7 +1,7 @@
 == What shall we change? == Live
 temper
 [1] demo (pressed)
-[2] Inbox 0
+[2] Inbox
 [3] Chats (current)
 [4] Adopt a repository
 [5] Accounts
@@ -15,7 +15,7 @@ Demo:
   [7] Connect a model
   [-] Connect a forge (disabled)
 demo · demo/widget on Demo forge
-Signed in as the deployment's owner
+Signed in as the deployment’s owner
 Try a request in demo/widget. Follow the task from its branch to a landed change.
 Suggested requests:
   - [8] Add CSV export to widget

@@ -46,7 +46,15 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             ),
         );
         if let Some(me) = root.pages().me(root.client()) {
-            super::chats::status(b, &task.chip, &task.waits_on, task.project, me, words);
+            super::chats::status(
+                b,
+                &task.chip,
+                &task.waits_on,
+                (task.project, task.requester),
+                Some(&task.wake),
+                me,
+                words,
+            );
         }
         if let Some((demo, halves)) = root.demo()
             && halves.model
@@ -146,8 +154,12 @@ pub(crate) fn context(b: &mut Builder, root: &Domain, project: u32, words: &Word
     b.style(look::CONTEXT);
     let repository = words.say(Word::DemoRepository, &[Hole::Name(demo.owner.clone()), Hole::Name(demo.name.clone())]);
     b.open(Role::Paragraph);
-    b.text(Run::Plain, &project);
-    b.text(Run::Plain, &repository);
+    b.text(Run::Plain, &words.say(Word::DemoContextProject, &[Hole::Name(project)]));
+    b.open(Role::Text);
+    b.style(look::REPOSITORY);
+    b.run(Run::Plain, &repository);
+    b.close();
+    words.text(b, Word::DemoRepositoryForge, &[]);
     b.close();
     let mut owner = false;
     for project in &me.projects {

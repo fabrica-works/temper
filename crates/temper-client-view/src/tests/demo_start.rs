@@ -100,7 +100,7 @@ fn the_context_names_the_deployment_owner_then_the_project_owner_then_the_person
             Some(c::HeldRole::Owner),
             c::HeldRole::Owner,
             true,
-            b"Signed in as the deployment's owner".as_slice(),
+            "Signed in as the deployment’s owner".as_bytes(),
             "Shop · acme/shop on Demo forge",
         ),
         (
@@ -108,7 +108,7 @@ fn the_context_names_the_deployment_owner_then_the_project_owner_then_the_person
             None,
             c::HeldRole::Owner,
             true,
-            b"Signed in as the project's owner",
+            "Signed in as the project’s owner".as_bytes(),
             "Shop · acme/shop on Demo forge",
         ),
         (
@@ -172,5 +172,24 @@ fn a_chats_context_follows_the_banner_only_in_the_demo_project_even_without_its_
             let banner = banner.unwrap();
             assert_eq!(context.unwrap(), banner + usize::try_from(view.tree().nodes()[banner].size).unwrap(), "{row}");
         }
+    }
+}
+
+#[test]
+fn the_context_repository_has_its_own_node_and_style() {
+    // Each page has exactly one demo repository in its context.
+    const REPOSITORIES: u32 = 1;
+    for address in [Address::Chats, Address::Chat { task: f::chat::TASK }] {
+        let root = f::demo_root(address, f::PROJECT, true);
+        let view = f::page_view(&root);
+        let mut repositories = skein_lib::List::with_capacity(REPOSITORIES);
+        for (index, node) in view.tree().nodes().iter().enumerate() {
+            if node.styles.as_slice().contains(&crate::look::REPOSITORY) {
+                repositories.push(f::node_text(view.tree(), index)).expect("one repository");
+                assert_eq!(node.role, Role::Text);
+            }
+        }
+        assert_eq!(repositories.as_slice(), [Box::from(b"acme/shop".as_slice())]);
+        assert_eq!(crate::look::NAMES.styles[usize::from(crate::look::REPOSITORY.token)], b"temper-repository");
     }
 }

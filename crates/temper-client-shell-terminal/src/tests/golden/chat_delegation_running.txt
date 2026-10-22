@@ -1,13 +1,13 @@
 == T1 · Add CSV export to widget == Live
 temper
 [1] demo (pressed)
-[2] Inbox 0
+[2] Inbox
 [3] Chats
 [4] Adopt a repository
 [5] Accounts
 * Pat
 [6] Sign out
-* Parked
+* waiting on 1 delegate
 Spent 0; delegates spent 0
 [7] Mark seen
 Conversation:
@@ -25,7 +25,7 @@ Conversation:
       - Pull request opened
       - CI passed
       - Landed
-    [8] Task 2
+    [8] Task 2 ↗
 Engine default for next run
 [9] Message: (empty) (enter sends)
 Enter to send · Shift+Enter for a new line

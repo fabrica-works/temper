@@ -928,9 +928,10 @@ of each (`../draft/first-run.md`, 3.6).
 ### 5.3 Navigation
 
 In the mockups' top bar's order: "Inbox", with the count of what needs
-the person from `me`; "Chats"; then, for the project the person is in,
-"Board" and "Changes"; and after them "Adopt a repository", to
-`Adopt { project }`; then "Forges", to `Forges`, and last, "Accounts",
+the person from `me`, omitted when zero; "Chats"; then, for the project
+the person is in, "Board" and "Changes"; and after them "Adopt a
+repository", to `Adopt { project }`; then "Forges", to `Forges`, and
+last, "Accounts",
 to `Accounts`, both whatever the project. With no project chosen, the
 project's entries are not offered. The mockups' "Tasks", a list of a
 project's tasks, and "Workers", the deployment's hosts, are not in the
@@ -1071,10 +1072,11 @@ OWNER/NAME is the demo's repository, and the cues the demo's, copied in:
   chat, its page keeps the frame (3.5).
 - **The context line,** after the banner: "PROJECT · OWNER/NAME on Demo
   forge", PROJECT the project as the banner names it; then "Signed in
-  as the deployment's owner" while `me`'s role on the deployment is
-  `Owner`, else "Signed in as the project's owner" while the person's
+  as the deployment’s owner" while `me`'s role on the deployment is
+  `Owner`, else "Signed in as the project’s owner" while the person's
   role on the project is `Owner`, else "Signed in as NAME", the
-  person's name as the banner shows it.
+  person's name as the banner shows it. OWNER/NAME is a node of its
+  own, for the look.
 - **The composer's line,** while the model's half holds and the draft
   is for the demo's project: "Using Demo model · MODEL", MODEL the
   requested model's name, or "Default" while none is requested, in
@@ -2135,10 +2137,10 @@ own tests:
   domain's `halves` alone, until the forge's side reads the part
   (o/github's); "Connect a forge" a disabled button until the client
   has the forges' page.
-- **"Signed in as the deployment's owner"** (5.6) reads `me`'s role on
+- **"Signed in as the deployment’s owner"** (5.6) reads `me`'s role on
   the deployment, which the engine gives only once it seeds the
   deployment's owner (jig's t31a). Default: the project's role
-  meanwhile ("Signed in as the project's owner").
+  meanwhile ("Signed in as the project’s owner").
 - **The composer's placeholder** ("Try a suggested request…", the
   first-run mockup's earlier draft): skein-ui's text area has none, and adding
   one is a change to skein's API and a repin. Default: not drawn.

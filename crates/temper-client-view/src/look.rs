@@ -157,6 +157,8 @@ pub const AGENT_BRIEF: Style = Style { owner: owner(), token: 75 };
 pub const AGENT_RUN: Style = Style { owner: owner(), token: 76 };
 /// An ended agent task's result.
 pub const AGENT_RESULT: Style = Style { owner: owner(), token: 77 };
+/// The demo context line's repository.
+pub const REPOSITORY: Style = Style { owner: owner(), token: 78 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -240,6 +242,7 @@ pub const NAMES: Names<'static> = Names {
         b"temper-agent-brief",
         b"temper-agent-run",
         b"temper-agent-result",
+        b"temper-repository",
     ],
     regions: &[b"temper-link"],
 };

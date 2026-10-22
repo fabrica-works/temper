@@ -587,3 +587,68 @@ fn pending_progress_and_the_answer_stay_before_the_composer() {
     let status = named_position(answered.tree().nodes(), Role::Status, Some(&applied)).expect("applied outcome");
     assert!(status < styled(answered.tree(), crate::look::COMPOSER_AREA));
 }
+
+fn header_with_status(waits_on: c::WaitsOn, live: u32, wake: c::WakeRule, requester: c::OwnerRequester) -> crate::View {
+    use temper_client_domain::{Address, Event};
+    let (mut root, _, watch) = fixtures::root_at(Address::Chat { task: TASK }, &fixtures::domain_limits());
+    let mut task = fixtures::task::document();
+    task.chip.task = TASK;
+    task.waits_on = waits_on;
+    task.requester = requester;
+    task.wake.words = wake;
+    let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() else { panic!("owner") };
+    details.live_delegates = live;
+    fixtures::root_event(
+        &mut root,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch: watch.expect("task watch"),
+                    event: c::WatchEvent::Delivered(c::Delivery::Task(Box::new(task))),
+                },
+            },
+        },
+    );
+    fixtures::page_view(&root)
+}
+
+#[test]
+fn the_chatbar_counts_the_delegates_it_waits_on() {
+    // One and two distinguish the shared goal phrase's plural forms.
+    for (live, expected) in [(1, b"waiting on 1 delegate".as_slice()), (2, b"waiting on 2 delegates")] {
+        let view =
+            header_with_status(c::WaitsOn::Delegates, live, c::WakeRule::Never, c::OwnerRequester::Person(PARTY));
+        let status = fixtures::find(view.tree(), Role::Status, expected).expect("delegate status");
+        assert_eq!(view.tree().find(status).unwrap().styles.as_slice(), [crate::look::STATUS_QUIET]);
+    }
+}
+
+#[test]
+fn the_chatbar_waits_on_the_requesting_persons_words() {
+    // Batching also wakes on words, after its configured count or age.
+    const BATCH_COUNT: u32 = 2;
+    let person = fixtures::root_in_project(None);
+    let requester = person.pages().me(person.client()).unwrap().party.number;
+    for rule in
+        [c::WakeRule::Immediate, c::WakeRule::Batch { count: BATCH_COUNT, age: skein_lib::Duration::from_secs(1) }]
+    {
+        let view = header_with_status(c::WaitsOn::News, 0, rule, c::OwnerRequester::Person(requester));
+        let status = fixtures::find(view.tree(), Role::Status, b"waiting on your words").expect("words status");
+        assert_eq!(view.tree().find(status).unwrap().styles.as_slice(), [crate::look::STATUS_QUIET]);
+    }
+}
+
+#[test]
+fn the_chatbar_keeps_jigs_word_without_the_requesters_words_wake() {
+    const OTHER_PERSON: u64 = 74;
+    let person = fixtures::root_in_project(None);
+    let requester = person.pages().me(person.client()).unwrap().party.number;
+    for (rule, by) in [
+        (c::WakeRule::Never, c::OwnerRequester::Person(requester)),
+        (c::WakeRule::Immediate, c::OwnerRequester::Person(OTHER_PERSON)),
+        (c::WakeRule::Immediate, c::OwnerRequester::Task(TASK)),
+    ] {
+        let view = header_with_status(c::WaitsOn::News, 0, rule, by);
+        assert!(fixtures::find(view.tree(), Role::Status, b"Parked").is_some());
+    }
+}

@@ -179,8 +179,9 @@ mod memory_literal;
 // Lower-case phase words add 16 phrases' room, 2,368 B: 123,725,102,804 B.
 // Agent page: 557 added nodes x 574,364 B + 16,782,488 B for the bounded thread
 // and borrowed view lines = 336,703,236 B, giving 124,061,806,040 B.
+// The context line adds one repository/forge text node; chat words use existing phrase room.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 124061806040;
+const WEB_BYTES: u64 = 124062380404;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

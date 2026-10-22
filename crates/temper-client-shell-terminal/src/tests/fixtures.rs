@@ -462,7 +462,7 @@ fn synthetic_frame(builder: &mut skein_ui::Builder, behind: bool) {
     builder.bind(binding());
     builder.close();
     builder.open(Role::Navigation);
-    for name in [b"Inbox 0".as_slice(), b"Chats", b"Adopt a repository"] {
+    for name in [b"Inbox".as_slice(), b"Chats", b"Adopt a repository"] {
         builder.open(Role::Link);
         builder.name(name);
         builder.link(binding());

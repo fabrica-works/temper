@@ -361,6 +361,14 @@ fn a_running_change_shows_its_card_at_its_call() {
     assert!(find(&view, Find::exactly_named(Role::Heading { level: 3 }, TITLE)).is_some());
     steps(&view, false);
     let link = find(&view, Find::exactly_named(Role::Link, b"Task 2")).expect("task link");
+    let mut link_text = None;
+    for (index, node) in view.tree().nodes().iter().enumerate() {
+        if node.id == link {
+            link_text = Some(fixtures::node_text(view.tree(), index));
+            break;
+        }
+    }
+    assert_eq!(link_text.as_deref(), Some("Task 2 ↗".as_bytes()));
     assert_eq!(
         crate::act(&mut view, link, skein_ui::Act::Press),
         Some(temper_client_domain::Action::Pages(temper_client_domain::pages::Act::Go {

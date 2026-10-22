@@ -7,7 +7,7 @@ fn the_navigation_ends_with_accounts() {
     let view = fixtures::signed_in_with_project();
     assert_eq!(
         fixtures::link_names(&view).as_ref(),
-        [Box::from(*b"Inbox 0"), Box::from(*b"Chats"), Box::from(*b"Adopt a repository"), Box::from(*b"Accounts")]
+        [Box::from(*b"Inbox"), Box::from(*b"Chats"), Box::from(*b"Adopt a repository"), Box::from(*b"Accounts")]
     );
 }
 #[test]
@@ -212,8 +212,8 @@ fn the_navigation_is_inside_the_banner_after_projects_before_the_link() {
 fn the_navigation_marks_only_the_current_page() {
     use temper_client_domain::{Address, address::Filter};
     for (address, current) in [
-        (Address::Inbox { filter: Filter::ALL }, Some(b"Inbox 0".as_slice())),
-        (Address::Inbox { filter: Filter { goal: Some(9), ..Filter::ALL } }, Some(b"Inbox 0".as_slice())),
+        (Address::Inbox { filter: Filter::ALL }, Some(b"Inbox".as_slice())),
+        (Address::Inbox { filter: Filter { goal: Some(9), ..Filter::ALL } }, Some(b"Inbox".as_slice())),
         (Address::Chats, Some(b"Chats".as_slice())),
         (Address::Adopt { project: fixtures::PROJECT }, Some(b"Adopt a repository".as_slice())),
         (Address::Accounts, Some(b"Accounts".as_slice())),
@@ -289,4 +289,29 @@ fn assert_corner(view: &crate::View, children: &[(Role, Option<&[u8]>)]) {
         index = index.checked_add(usize::try_from(node.size).expect("child size")).expect("next child");
     }
     assert_eq!(index, end, "no loose corner contents");
+}
+
+#[test]
+fn navigation_shows_the_inbox_count_only_when_nonzero() {
+    const NEEDS: u32 = 3;
+    for (count, expected) in [(0, b"Inbox".as_slice()), (NEEDS, b"Inbox 3")] {
+        let (mut root, watch) = fixtures::root_with_watch(None);
+        let mut me = root.pages().me(root.client()).unwrap().clone();
+        me.needs_total = count;
+        fixtures::root_event(
+            &mut root,
+            temper_client_domain::Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Watched {
+                        watch,
+                        event: jig_client::contract::WatchEvent::Delivered(jig_client::contract::Delivery::Me(
+                            Box::new(me),
+                        )),
+                    },
+                },
+            },
+        );
+        let view = fixtures::page_view(&root);
+        assert!(fixtures::find(view.tree(), Role::Link, expected).is_some());
+    }
 }

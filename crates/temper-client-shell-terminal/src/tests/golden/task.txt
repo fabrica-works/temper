@@ -1,7 +1,7 @@
 == Refresh token handling == Live
 temper
 [1] Shop (pressed)
-[2] Inbox 0
+[2] Inbox
 [3] Chats
 [4] Adopt a repository
 * Pat

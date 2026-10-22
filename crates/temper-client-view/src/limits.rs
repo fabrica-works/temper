@@ -84,7 +84,9 @@ impl Limits {
             .checked_add(receiving.projects.checked_mul(4)?)?
             .checked_add(128)?
             .max(account_nodes)
-            .checked_add(choices)?;
+            .checked_add(choices)?
+            // The context line splits the repository from its forge suffix.
+            .checked_add(1)?;
         let tree = skein_ui::Limits {
             nodes,
             depth: receiving.rows.checked_add(34)?,

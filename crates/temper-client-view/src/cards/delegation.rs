@@ -7,7 +7,13 @@ use crate::{
 };
 use jig_client::contract as c;
 use skein_ui::{Builder, Role, Run, phrases::Hole};
-use temper_client_domain::pages::delegation::{self, Kind, Said, State};
+use temper_client_domain::{
+    Address,
+    pages::{
+        Act,
+        delegation::{self, Kind, Said, State},
+    },
+};
 
 pub(crate) fn card(b: &mut Builder, task: &c::Task, words: &Words, bindings: &mut Bindings) {
     let facts = delegation::facts(task);
@@ -51,7 +57,15 @@ pub(crate) fn card(b: &mut Builder, task: &c::Task, words: &Words, bindings: &mu
         }
         b.close();
     }
-    crate::pages::task::task_link(b, facts.task, words, bindings);
+    let name = words.say(Word::Task, &[Hole::Number(facts.task)]);
+    b.open(Role::Link);
+    b.name(&name);
+    b.open(Role::Text);
+    b.run(Run::Plain, &name);
+    b.run(Run::Plain, " ↗".as_bytes());
+    b.close();
+    b.bind(bindings.insert(Act::Go { address: Address::Task { task: facts.task } }));
+    b.close();
     b.close();
 }
 pub(crate) fn status(b: &mut Builder, state: State, words: &Words) {

@@ -154,6 +154,15 @@ fn delegation_task(number: u64, landed: bool) -> contract::Task {
     task.chip.phase = c::Phase::Running;
     task.proposals.clear();
     task.activity = if number == 1 { if landed { 3 } else { 2 } } else { 0 };
+    if number == 1 {
+        task.requester = c::OwnerRequester::Person(1);
+        task.wake.words = c::WakeRule::Immediate;
+        task.waits_on = if landed { c::WaitsOn::News } else { c::WaitsOn::Delegates };
+        let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() else { panic!("chat owner") };
+        // The first-run fixture has one change, still live until its result arrives.
+        details.live_delegates = u32::from(!landed);
+        details.wake = task.wake;
+    }
     if number == 2 {
         task.result_contract = c::TaskContractDocument::Change { connector: 1, kind: 1, words: 256 };
         if landed {

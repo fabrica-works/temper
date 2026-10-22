@@ -413,3 +413,22 @@ fn a_live_demo_chat_brings_back_its_section_heading() {
     assert!(fixtures::find(view.tree(), Role::Heading { level: 2 }, b"Closed chats").is_none());
     assert!(fixtures::find(view.tree(), Role::Button, b"More closed chats").is_none());
 }
+
+#[test]
+fn a_chats_line_counts_the_delegates_it_waits_on() {
+    let mut line = line();
+    line.waits_on = WaitsOn::Delegates;
+    let (tree, _) = tree(&line);
+    assert!(fixtures::find(&tree, Role::Status, b"waiting on 3 delegates").is_some());
+    assert_eq!(fixtures::styles(&tree, Role::Status).as_ref(), [Box::from([crate::look::STATUS_QUIET])]);
+}
+
+#[test]
+fn a_chats_line_keeps_jigs_word_for_news_without_a_wake_policy() {
+    let mut line = line();
+    line.waits_on = WaitsOn::News;
+    let ChipPhase::Owner { details, .. } = line.chip.details.as_mut() else { panic!("owner") };
+    details.wake.words = WakeRule::Immediate;
+    let (tree, _) = tree(&line);
+    assert!(fixtures::find(&tree, Role::Status, b"Parked").is_some());
+}

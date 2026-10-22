@@ -170,13 +170,15 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
         Address::Adopt { .. } => (false, true),
         Address::Chats | Address::Chat { .. } | Address::Task { .. } | Address::Accounts => (false, false),
     };
-    let name = words.say(
-        crate::words::Word::Inbox,
-        &[skein_ui::phrases::Hole::Number(u64::from(match root.pages().me(root.client()) {
-            Some(me) => me.needs_total,
-            None => 0,
-        }))],
-    );
+    let count = match root.pages().me(root.client()) {
+        Some(me) => me.needs_total,
+        None => 0,
+    };
+    let name = if count == 0 {
+        words.say(crate::words::Word::InboxTitle, &[])
+    } else {
+        words.say(crate::words::Word::Inbox, &[skein_ui::phrases::Hole::Number(u64::from(count))])
+    };
     builder.open(Role::Navigation);
     builder.style(crate::look::NAVIGATION);
     action(
