@@ -205,10 +205,10 @@ fn the_checked_fake_git_program_reaches_the_services_forge_settings() {
         &fixtures::document(),
         &config::Directories::working(),
         &fixtures::files(),
-        &fixtures::startup_agent(),
+        Some(&fixtures::startup_agent()),
         &fixtures::seeds(),
         None,
-        fixtures::worker_runtime(),
+        Some(fixtures::worker_runtime()),
         fixtures::forge_runtime(),
         Some(&checked),
     )
@@ -477,8 +477,8 @@ fn named_lists_each_file_with_its_bound_and_privacy() {
 fn named_returns_the_worker_root_and_the_agent_configuration() {
     let named = crate::named(&fixtures::document(), &jig_protocol_config::Directories::working()).unwrap();
     assert_eq!(named.deployment.as_ref(), b"state");
-    assert_eq!(named.worker_root.as_ref(), b"worker-root");
-    assert_eq!(named.agent.as_ref(), fixtures::AGENT_JSON);
+    assert_eq!(named.worker.as_ref().expect("standalone worker").root.as_ref(), b"worker-root");
+    assert_eq!(named.worker.as_ref().expect("standalone worker").agent.as_ref(), fixtures::AGENT_JSON);
 }
 #[test]
 fn a_file_named_but_not_given_refuses_the_start_naming_it() {
@@ -771,7 +771,7 @@ fn paths_are_resolved_by_kind_and_absolute_only_members_refuse_relative_values()
         } else {
             let named = result.unwrap();
             let value = match member {
-                b"application.workers[0].root" => &*named.worker_root,
+                b"application.workers[0].root" => &*named.worker.as_ref().expect("standalone worker").root,
                 b"engine.deployment.directory" => &*named.deployment,
                 b"application.clients.bundle" => named.bundle.as_deref().unwrap(),
                 _ => &*named.files.iter().find(|file| file.path.as_ref() == expected).expect("resolved file key").path,
@@ -1098,5 +1098,136 @@ fn a_store_reader_derives_serves_limits_or_their_problem_path() {
         let found = crate::store_limits(input, &directories);
         let found = found.map(|limits| (limits.store, limits.forge)).map_err(|problems| lines(&problems));
         assert_eq!(found.as_ref().map_err(AsRef::as_ref), expected.as_ref().map_err(AsRef::as_ref), "{name}");
+    }
+}
+
+#[test]
+fn an_engine_alone_prepares_without_a_worker_or_its_files_and_agent() {
+    let input = fixtures::engine_alone_document();
+    let named = crate::named(&input, &config::Directories::working()).unwrap();
+    assert!(named.worker.is_none());
+    let mut files = fixtures::files();
+    for path in [b"worker-secret".as_slice(), fixtures::AGENT_JSON] {
+        files.entries = fixtures::without(files.entries, path);
+    }
+    let service = crate::startup::with_setup(
+        &input,
+        &config::Directories::working(),
+        &files,
+        None,
+        &fixtures::seeds(),
+        None,
+        None,
+        fixtures::forge_runtime(),
+        None,
+    )
+    .unwrap();
+    assert!(service.worker.is_none());
+}
+
+#[test]
+fn an_engine_alone_admits_its_own_worst_case_and_names_an_insufficient_memory_declaration() {
+    let input = fixtures::engine_alone_document();
+    let requirements = crate::startup::memory_requirements(
+        &input,
+        &config::Directories::working(),
+        &fixtures::files(),
+        &fixtures::startup_agent(),
+        &fixtures::seeds(),
+        None,
+        fixtures::forge_runtime(),
+    )
+    .unwrap();
+    assert_eq!(requirements.worker_bytes, 0);
+    assert!(requirements.engine_bytes > 0);
+    for (memory, accepted) in
+        [(requirements.engine_bytes, true), (requirements.engine_bytes.checked_sub(1).unwrap(), false)]
+    {
+        let input = fixtures::with(&input, b"engine.memory_bytes", memory.to_string().as_bytes());
+        let result = crate::startup::with_setup(
+            &input,
+            &config::Directories::working(),
+            &fixtures::files(),
+            None,
+            &fixtures::seeds(),
+            None,
+            None,
+            fixtures::forge_runtime(),
+            None,
+        );
+        if accepted {
+            assert!(result.is_ok(), "at the calculated worst case");
+        } else {
+            let found = result.err().unwrap();
+            assert_eq!(found.problems.len(), 1);
+            assert_eq!(found.problems.get(0).unwrap().path, Path::root().member(b"engine").member(b"memory_bytes"));
+            assert_eq!(found.problems.get(0).unwrap().what, What::Jig(config::What::Memory { over: 1 }));
+        }
+    }
+}
+
+#[test]
+fn a_checked_worker_alone_has_its_shape_and_refuses_engine_application_members() {
+    let input = fixtures::worker_alone_document();
+    assert_eq!(crate::startup::shape(&input, &config::Directories::working()), Ok(crate::startup::Shape::WorkerAlone));
+    let text = core::str::from_utf8(&input).unwrap().replace("\"application\":{", "\"application\":{\"forges\":[],");
+    let found = crate::startup::shape(text.as_bytes(), &config::Directories::working()).unwrap_err();
+    assert_eq!(found.problems.len(), 1);
+    assert_eq!(found.problems.get(0).unwrap().path, Path::root().member(b"application").member(b"forges"));
+    assert_eq!(found.problems.get(0).unwrap().what, What::WorkerAlone);
+}
+
+#[test]
+fn a_worker_alone_checks_its_application_paths_and_its_git_and_channel_limits() {
+    let input = fixtures::worker_alone_document();
+    for (member, value, path, what) in [
+        (
+            b"application.workers[0].root".as_slice(),
+            b"12".as_slice(),
+            Path::root().member(b"application").member(b"workers").child(Segment::Index(0)).member(b"root"),
+            What::Jig(config::What::Kind),
+        ),
+        (
+            b"application.workers[0].root",
+            br#""../escape""#,
+            Path::root().member(b"application").member(b"workers").child(Segment::Index(0)).member(b"root"),
+            What::Jig(config::What::Relative),
+        ),
+        (
+            b"application.workers[0].git",
+            br#""git""#,
+            Path::root().member(b"application").member(b"workers").child(Segment::Index(0)).member(b"git"),
+            What::Absolute,
+        ),
+        (
+            b"workers[0].agent.configuration",
+            br#""temper""#,
+            Path::root().member(b"workers").child(Segment::Index(0)).member(b"agent").member(b"configuration"),
+            What::Absolute,
+        ),
+        (
+            b"application.limits.overrides",
+            br#"{"git_component.operations":1}"#,
+            Path::root()
+                .member(b"application")
+                .member(b"limits")
+                .member(b"overrides")
+                .member(b"git_component.operations"),
+            What::Against { other: b"checkout.workspaces" },
+        ),
+        (
+            b"application.limits.overrides",
+            br#"{"checkout.repositories":4294967295}"#,
+            Path::root().member(b"application").member(b"limits").member(b"overrides").member(b"checkout.repositories"),
+            What::Past {
+                bytes: 4_294_967_295,
+                bound: u64::from(temper_protocol_worker_wire::v1::CEILINGS.items_repositories),
+            },
+        ),
+    ] {
+        let input = fixtures::with(&input, member, value);
+        let found = crate::startup::shape(&input, &config::Directories::working()).unwrap_err();
+        assert_eq!(found.problems.len(), 1, "{}: {:?}", core::str::from_utf8(member).unwrap(), found);
+        assert_eq!((found.problems.get(0).unwrap().path.clone(), found.problems.get(0).unwrap().what), (path, what));
     }
 }

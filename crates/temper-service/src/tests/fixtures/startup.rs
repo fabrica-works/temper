@@ -193,3 +193,23 @@ pub fn webhook_document() -> Box<[u8]> {
         .into_bytes()
         .into_boxed_slice()
 }
+
+/// The same deployment with its worker hosted by another process.
+pub fn engine_alone_document() -> Box<[u8]> {
+    let input = with(&document(), b"engine.hosts.listener", br#"[{"socket":"127.0.0.1:0"}]"#);
+    let input = with(&input, b"workers", b"[]");
+    with(&input, b"application.workers", b"[]")
+}
+
+/// A worker's document has no engine or engine application members.
+pub fn worker_alone_document() -> Box<[u8]> {
+    let input = with(&document(), b"workers[0].engine", br#"{"socket":"127.0.0.1:7100"}"#);
+    let input = with(
+        &input,
+        b"application",
+        br#"{"workers":[{"root":"worker-root","git":"/usr/bin/git"}],"limits":{"profile":"small","overrides":{}}}"#,
+    );
+    let text = core::str::from_utf8(&input).unwrap();
+    let (_, workers) = text.split_once(", \"workers\":").unwrap();
+    [b"{\"workers\":".as_slice(), workers.as_bytes()].concat().into_boxed_slice()
+}

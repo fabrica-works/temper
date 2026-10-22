@@ -1,5 +1,6 @@
 // Fixture parsing without a deployment keeps written paths.
 #![expect(clippy::disallowed_methods, reason = "ordinary tests edit UTF-8 configuration fixtures")]
+#![expect(clippy::disallowed_types, clippy::disallowed_macros, reason = "ordinary step tests build diagnostic tables")]
 use super::fixtures;
 use crate::startup::{Problems, What, checks, lines};
 use jig_protocol_config::{self as config, Path};
@@ -145,7 +146,7 @@ fn a_channel_limit_past_a_ceiling_names_the_limit() {
     };
     let mut found = Problems::empty();
     let too_many = payload::Bounds { repositories: u32::MAX, ..normal };
-    checks::channel(&too_many, &normal, &[], &own, &mut found);
+    checks::channel(Some(&too_many), Some(&normal), &[], &own, &mut found);
     assert_eq!(found.problems.len(), 1);
     assert_eq!(
         found.problems.get(0).unwrap().path,
@@ -216,7 +217,7 @@ fn standalone_shapes() -> [(Shape, Path, What); 8] {
             Path::root().member(b"workers").child(config::Segment::Index(0)).member(b"engine"),
             What::Standalone,
         ),
-        (Shape::HostSocket, Path::root().member(b"engine").member(b"hosts").member(b"listener"), What::Standalone),
+        (Shape::HostSocket, Path::root().member(b"workers"), What::EngineAlone),
         (
             Shape::ClientProcess,
             Path::root().member(b"application").member(b"clients").member(b"listener"),
@@ -562,5 +563,150 @@ fn admission_names_global_and_time_requirements_with_their_units() {
         agent.bounds.unacknowledged = unacknowledged;
         let found = started(&fixtures::document(), &fixtures::files(), &agent);
         assert_eq!(&*lines(&found), expected.as_bytes());
+    }
+}
+
+#[test]
+fn each_document_shape_is_read_from_its_members() {
+    use crate::startup::{Shape, shape};
+    for (document, expected) in [
+        (fixtures::document(), Shape::Standalone),
+        (fixtures::engine_alone_document(), Shape::EngineAlone),
+        (fixtures::worker_alone_document(), Shape::WorkerAlone),
+    ] {
+        assert_eq!(shape(&document, &config::Directories::working()), Ok(expected));
+    }
+}
+
+type ShapeRow = (&'static [u8], &'static [u8], Vec<(Path, What)>);
+
+fn shape_problems(input: &[u8]) -> Vec<(Path, What)> {
+    crate::startup::shape(input, &config::Directories::working())
+        .unwrap_err()
+        .problems
+        .iter()
+        .map(|problem| (problem.path.clone(), problem.what))
+        .collect()
+}
+
+#[test]
+fn an_engine_alone_names_each_shape_departure() {
+    use config::Segment::Index;
+    let root = Path::root();
+    let hosts = root.member(b"engine").member(b"hosts");
+    let listener = hosts.member(b"listener");
+    let base = fixtures::engine_alone_document();
+    let rows: &[ShapeRow] = &[
+        (b"workers", b"[{}]", vec![(root.member(b"workers"), What::EngineAlone)]),
+        (
+            b"application.workers",
+            br#"[{"root":"worker-root","git":null}]"#,
+            vec![(root.member(b"application").member(b"workers"), What::EngineAlone)],
+        ),
+        (
+            b"engine.hosts.listener",
+            br#"[{"socket":"127.0.0.1:0"},{"in_process":"workers"}]"#,
+            vec![(listener.clone(), What::EngineAlone), (listener.child(Index(1)), What::EngineAlone)],
+        ),
+        (
+            b"engine.hosts.listener",
+            br#"[{"socket":"127.0.0.1:0"},{"socket":"[::1]:0"}]"#,
+            vec![(listener.clone(), What::EngineAlone)],
+        ),
+        (
+            b"engine.hosts.listener",
+            br#"[{"socket":"192.0.2.1:7000"}]"#,
+            vec![(listener.child(Index(0)), What::Jig(config::What::Plaintext))],
+        ),
+        (
+            b"engine.hosts.listener",
+            br#"[{"socket":"127.0.0.1:0","transport":"tls"}]"#,
+            vec![(listener.child(Index(0)).member(b"transport"), What::Jig(config::What::Unknown))],
+        ),
+        (b"engine.hosts.workers", b"[]", vec![(hosts.member(b"workers"), What::EngineAlone)]),
+        (
+            b"engine.hosts.workers",
+            br#"[{"name":"worker-a","digest":"same"},{"name":"worker-b","digest":"same"}]"#,
+            vec![(hosts.member(b"workers").child(Index(1)).member(b"digest"), What::EngineAlone)],
+        ),
+    ];
+    for (member, value, expected) in rows {
+        let input = fixtures::with(&base, member, value);
+        assert_eq!(&shape_problems(&input), expected, "{}", core::str::from_utf8(member).unwrap());
+    }
+}
+
+#[test]
+fn the_socket_listener_in_the_old_hostsocket_case_now_names_both_local_worker_lists() {
+    let input = fixtures::with(&fixtures::document(), b"engine.hosts.listener", br#"[{"socket":"127.0.0.1:7100"}]"#);
+    assert_eq!(
+        shape_problems(&input),
+        vec![
+            (Path::root().member(b"workers"), What::EngineAlone),
+            (Path::root().member(b"application").member(b"workers"), What::EngineAlone),
+        ]
+    );
+}
+
+#[test]
+fn a_worker_alone_names_each_shape_departure() {
+    use config::Segment::Index;
+    let root = Path::root();
+    let workers = root.member(b"workers");
+    let engine = workers.child(Index(0)).member(b"engine");
+    let base = fixtures::worker_alone_document();
+    let rows: &[ShapeRow] = &[
+        (b"workers", b"[]", vec![(workers.clone(), What::WorkerAlone)]),
+        (b"workers[0].engine", br#"{"in_process":"workers"}"#, vec![(engine.clone(), What::WorkerAlone)]),
+        (
+            b"workers[0].engine",
+            br#"{"socket":"192.0.2.1:7000"}"#,
+            vec![(engine.clone(), What::Jig(config::What::Plaintext))],
+        ),
+        (
+            b"workers[0].engine",
+            br#"{"socket":"127.0.0.1:7000","transport":"tls"}"#,
+            vec![(engine.member(b"transport"), What::Jig(config::What::Unknown))],
+        ),
+        (b"application.workers", b"[]", vec![(root.member(b"application").member(b"workers"), What::WorkerAlone)]),
+        (
+            b"application.workers",
+            br#"[{"root":"one","git":null},{"root":"two","git":null}]"#,
+            vec![(root.member(b"application").member(b"workers"), What::WorkerAlone)],
+        ),
+        (
+            b"application",
+            br#"{"workers":[{"root":"worker","git":null}],"limits":{"profile":"small","overrides":{}},"forges":[]}"#,
+            vec![(root.member(b"application").member(b"forges"), What::WorkerAlone)],
+        ),
+    ];
+    for (member, value, expected) in rows {
+        let input = fixtures::with(&base, member, value);
+        assert_eq!(&shape_problems(&input), expected, "{}", core::str::from_utf8(member).unwrap());
+    }
+    let stray = [b"{\"stray\":null,".as_slice(), &base[1..]].concat();
+    assert_eq!(shape_problems(&stray), vec![(root.member(b"stray"), What::WorkerAlone)]);
+    // Duplicate whole worker documents by their existing raw list body.
+    let text = core::str::from_utf8(&base).unwrap();
+    let (_, body) = text.split_once("\"workers\":[").unwrap();
+    let (body, _) = body.split_once("],\"application\":").unwrap();
+    let two = [b"[".as_slice(), body.as_bytes(), b",", body.as_bytes(), b"]"].concat();
+    assert_eq!(shape_problems(&fixtures::with(&base, b"workers", &two)), vec![(workers, What::WorkerAlone)]);
+}
+
+#[test]
+fn the_cluster_shapes_accept_both_loopback_families_and_the_whole_v4_range() {
+    for socket in [br#"{"socket":"127.42.3.4:7100"}"#.as_slice(), br#"{"socket":"[::1]:7100"}"#] {
+        let worker = fixtures::with(&fixtures::worker_alone_document(), b"workers[0].engine", socket);
+        assert_eq!(
+            crate::startup::shape(&worker, &config::Directories::working()),
+            Ok(crate::startup::Shape::WorkerAlone)
+        );
+        let listener = [b"[".as_slice(), socket, b"]"].concat();
+        let engine = fixtures::with(&fixtures::engine_alone_document(), b"engine.hosts.listener", &listener);
+        assert_eq!(
+            crate::startup::shape(&engine, &config::Directories::working()),
+            Ok(crate::startup::Shape::EngineAlone)
+        );
     }
 }

@@ -1,4 +1,4 @@
-//! The whole standalone document and its checked startup (protocol/configuration.md, 2).
+//! The document's shape and its checked startup (protocol/configuration.md, 2).
 pub(crate) mod application;
 pub(crate) mod checks;
 mod problems;
@@ -10,6 +10,39 @@ use jig_protocol_config::{self as config, Path, Segment, read};
 pub use problems::{Problem, Problems, What, lines};
 use skein_lib::List;
 
+/// The services selected by the document's members (protocol/README.md, 15.1).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Shape {
+    Standalone,
+    EngineAlone,
+    WorkerAlone,
+}
+fn member(document: &skein_json::Document, at: u32, name: &[u8]) -> Option<u32> {
+    read::Object::new(document, at).ok()?.member(document, name)
+}
+fn nearest(document: &skein_json::Document) -> Shape {
+    let Some(engine) = member(document, 0, b"engine") else { return Shape::WorkerAlone };
+    let Some(hosts) = member(document, engine, b"hosts") else { return Shape::Standalone };
+    let Some(at) = member(document, hosts, b"listener") else { return Shape::Standalone };
+    let Ok(listeners) = read::list(document, at, document.len()) else { return Shape::Standalone };
+    let Some(first) = listeners.get(0) else { return Shape::Standalone };
+    if member(document, *first, b"socket").is_some() { Shape::EngineAlone } else { Shape::Standalone }
+}
+/// Read and check the shape before opening any named file.
+pub fn shape(input: &[u8], directories: &config::Directories) -> Result<Shape, Problems> {
+    Ok(load(input, directories, true)?.0)
+}
+fn finish_shape(document: &skein_json::Document, object: read::Object, path: &Path, problems: &mut Problems) {
+    let mut found = config::Problems::empty();
+    object.finish(document, path, &mut found);
+    for found in &found.problems {
+        problems.push(
+            found.path.clone(),
+            if found.what == config::What::Unknown { What::WorkerAlone } else { What::Jig(found.what) },
+        );
+    }
+    problems.past = problems.past.saturating_add(found.past);
+}
 /// A forge API token's bound, until the forge component supplies it.
 pub const API_TOKEN_BYTES: u32 = 4096;
 /// A provider's fixed sign-in redirect, with its diagnostic path; no credentials.
@@ -69,8 +102,7 @@ pub struct Named {
     pub deployment: Box<[u8]>,
     pub llm: config::Llm,
     pub projects: Box<[config::Project]>,
-    pub worker_root: Box<[u8]>,
-    pub agent: Box<[u8]>,
+    pub worker: Option<NamedWorker>,
     pub forges: Box<[Forge]>,
     pub identities: Box<[Identity]>,
     pub clients: config::Address,
@@ -81,6 +113,11 @@ pub struct Named {
     pub webhooks: Option<application::Webhooks>,
     pub overrides: Box<[(Box<[u8]>, u64)]>,
 }
+#[derive(Debug)]
+pub struct NamedWorker {
+    pub root: Box<[u8]>,
+    pub agent: Box<[u8]>,
+}
 /// The limits serve opens the deployment's store at, for a reader of a copy of it.
 #[derive(Debug)]
 pub struct StoreLimits {
@@ -89,7 +126,8 @@ pub struct StoreLimits {
 }
 /// Derive the store's opening limits without reading named files or checking runtime facts.
 pub fn store_limits(document: &[u8], directories: &config::Directories) -> Result<StoreLimits, Problems> {
-    let mut parsed = load(document, directories, false)?;
+    let mut parsed =
+        load(document, directories, false)?.1.ok_or(problem(Path::root().member(b"engine"), What::Standalone))?;
     let root = engine_limits(&mut parsed.engine.limits, &parsed.application.limits)?;
     let store = crate::store::limits(&root, &parsed.engine.limits.core, &root.forge, &parsed.engine.limits.store)
         .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Jig(config::What::Bound)))?;
@@ -118,18 +156,23 @@ fn indexed(index: usize) -> Path {
     Path::root().member(b"workers").child(Segment::Index(u32::try_from(index).expect("bounded workers")))
 }
 fn parse(input: &[u8], directories: &config::Directories) -> Result<Parsed, Problems> {
-    load(input, directories, true)
+    load(input, directories, true)?.1.ok_or(problem(Path::root().member(b"engine"), What::Standalone))
 }
 // Readers need the typed document alone. Startup also checks cross-part and
 // raw-path constraints here, preserving the order of its accumulated problems.
 #[expect(clippy::too_many_lines, reason = "one load pass accumulates all cross-part diagnostics")]
-fn load(input: &[u8], directories: &config::Directories, check_start: bool) -> Result<Parsed, Problems> {
+fn load(
+    input: &[u8],
+    directories: &config::Directories,
+    check_start: bool,
+) -> Result<(Shape, Option<Parsed>), Problems> {
     let length = u32::try_from(input.len()).or(Err(problem(Path::root(), What::Jig(config::What::Bound))))?;
     let document =
         match config::document(input, &config::DocumentLimits { bytes: 1_048_576, tokens: length, depth: 32 }) {
             Ok(document) => document,
             Err(found) => return Err(problem(found.path, What::Jig(found.what))),
         };
+    let shape = nearest(&document);
     let mut problems = Problems::empty();
     let mut found = config::Problems::empty();
     let mut whole = match read::Object::new(&document, 0) {
@@ -137,10 +180,19 @@ fn load(input: &[u8], directories: &config::Directories, check_start: bool) -> R
         Err(what) => return Err(problem(Path::root(), What::Jig(what))),
     };
     let root = Path::root();
-    let engine_at = whole.required(&document, b"engine", &root, &mut found);
+    // Keep the empty object's established missing-member diagnostics.
+    let engine_at = if document.len() == 2 {
+        whole.required(&document, b"engine", &root, &mut found)
+    } else {
+        whole.member(&document, b"engine")
+    };
     let worker_at = whole.required(&document, b"workers", &root, &mut found);
     let application_at = whole.required(&document, b"application", &root, &mut found);
-    whole.finish(&document, &root, &mut found);
+    if shape == Shape::WorkerAlone {
+        finish_shape(&document, whole, &root, &mut problems);
+    } else {
+        whole.finish(&document, &root, &mut found);
+    }
     problems.append(found, &root);
     let engine = match engine_at {
         Some(at) => match config::engine(&document, at, directories) {
@@ -167,6 +219,9 @@ fn load(input: &[u8], directories: &config::Directories, check_start: bool) -> R
     };
     let mut workers = List::with_capacity(ats.len());
     for (index, at) in ats.iter().enumerate() {
+        if shape == Shape::EngineAlone {
+            continue;
+        }
         if check_start {
             checks::raw_worker(&document, *at, &indexed(index), &mut problems);
         }
@@ -174,6 +229,20 @@ fn load(input: &[u8], directories: &config::Directories, check_start: bool) -> R
             Ok(worker) => workers.push(worker).expect("bounded workers"),
             Err(found) => problems.append(found, &indexed(index)),
         }
+    }
+    if shape == Shape::WorkerAlone {
+        if worker_at.is_some() && ats.len() != 1 {
+            problems.push(root.member(b"workers"), What::WorkerAlone);
+        }
+        for (index, worker) in workers.iter().enumerate() {
+            if !checks::loopback(&worker.engine) {
+                problems.push(indexed(index).member(b"engine"), What::WorkerAlone);
+            }
+        }
+        if let Some(at) = application_at {
+            application::worker_alone(&document, at, directories, &mut problems);
+        }
+        return if problems.is_empty() { Ok((shape, None)) } else { Err(problems) };
     }
     let application = match &engine {
         Some(engine) => match application_at {
@@ -188,7 +257,10 @@ fn load(input: &[u8], directories: &config::Directories, check_start: bool) -> R
     let application = application.expect("required application checked");
     let workers = workers.into_boxed();
     if !check_start {
-        return Ok(Parsed { engine: engine.expect("required engine checked"), workers, application });
+        return Ok((shape, Some(Parsed { engine: engine.expect("required engine checked"), workers, application })));
+    }
+    if shape == Shape::EngineAlone && !ats.is_empty() {
+        problems.push(root.member(b"workers"), What::EngineAlone);
     }
     checks::standalone(
         engine.as_ref().expect("required engine checked"),
@@ -196,7 +268,9 @@ fn load(input: &[u8], directories: &config::Directories, check_start: bool) -> R
         &workers,
         &mut problems,
     );
-    if workers.len() != application.workers.len() {
+    if shape == Shape::EngineAlone && !application.workers.is_empty() {
+        problems.push(root.member(b"application").member(b"workers"), What::EngineAlone);
+    } else if workers.len() != application.workers.len() {
         problems.push(root.member(b"application").member(b"workers"), What::Jig(config::What::Bound));
     }
     checks::hub(engine.as_ref().expect("required engine checked"), &mut problems);
@@ -233,11 +307,14 @@ fn load(input: &[u8], directories: &config::Directories, check_start: bool) -> R
     if !problems.is_empty() {
         return Err(problems);
     }
-    Ok(Parsed { engine: engine.expect("required engine checked"), workers, application })
+    Ok((shape, Some(Parsed { engine: engine.expect("required engine checked"), workers, application })))
 }
 fn all_files(parsed: &Parsed) -> Box<[config::File]> {
     let engine = config::files(&parsed.engine);
-    let worker = config::worker_files(parsed.workers.first().expect("one worker checked"));
+    let worker = match parsed.workers.first() {
+        Some(worker) => config::worker_files(worker),
+        None => Box::new([]),
+    };
     let application = application::files(
         &parsed.application,
         API_TOKEN_BYTES,
@@ -280,8 +357,13 @@ pub fn named(document: &[u8], directories: &config::Directories) -> Result<Named
         deployment: parsed.engine.deployment.directory,
         llm: parsed.engine.llm,
         projects: parsed.engine.projects,
-        worker_root: parsed.application.workers.first().expect("one application worker checked").root.clone(),
-        agent: parsed.workers.first().expect("one worker checked").agent.configuration.clone(),
+        worker: match parsed.workers.first() {
+            Some(worker) => Some(NamedWorker {
+                root: parsed.application.workers.first().expect("one application worker checked").root.clone(),
+                agent: worker.agent.configuration.clone(),
+            }),
+            None => None,
+        },
     })
 }
 fn check_files(parsed: &Parsed, files: &settings::Files) -> Result<(), Problems> {
@@ -303,7 +385,7 @@ pub struct Requirements {
 }
 struct CheckedStart {
     engine: settings::Engine,
-    worker: settings::Worker,
+    worker: Option<settings::Worker>,
     requirements: Requirements,
     io: skein_io::Limits,
     forges: (skein_forge_connection::Settings, u64, u64),
@@ -319,23 +401,28 @@ pub fn memory_requirements(
     accounts: Option<&AccountsRuntime>,
     forges: List<crate::ForgeRuntime>,
 ) -> Result<Requirements, Problems> {
-    Ok(checked_start(document, directories, files, agent, seeds, accounts, forges, None)?.requirements)
+    Ok(checked_start(document, directories, files, Some(agent), seeds, accounts, forges, None)?.requirements)
 }
 #[expect(
     clippy::too_many_arguments,
-    reason = "checked startup receives the shell's resolved setup beside its runtime facts"
+    clippy::too_many_lines,
+    reason = "one checked startup pass preserves diagnostic order beside resolved setup and runtime facts"
 )]
 fn checked_start(
     document: &[u8],
     directories: &config::Directories,
     files: &settings::Files,
-    agent: &settings::Agent,
+    agent: Option<&settings::Agent>,
     seeds: &settings::Seeds,
     accounts: Option<&AccountsRuntime>,
     forges: List<crate::ForgeRuntime>,
     setup: Option<&temper_forge_setup::check::Checked>,
 ) -> Result<CheckedStart, Problems> {
     let parsed = parse(document, directories)?;
+    let agent = match parsed.workers.first() {
+        Some(_) => Some(agent.ok_or(problem(indexed(0).member(b"agent"), What::Agent))?),
+        None => None,
+    };
     check_files(&parsed, files)?;
     let mut problems = Problems::empty();
     let resolved = application::resolve(&parsed.application, files, &mut problems);
@@ -363,35 +450,50 @@ fn checked_start(
         remote_bytes: own.checkout.name_bytes,
         ..engine_bounds
     };
-    checks::channel(&engine_bounds, &worker_bounds, &resolved.forges, own, &mut problems);
+    checks::channel(
+        Some(&engine_bounds),
+        if agent.is_some() { Some(&worker_bounds) } else { None },
+        &resolved.forges,
+        own,
+        &mut problems,
+    );
     if let Some(wire) = crate::translate::limits(own) {
         checks::identities(&resolved.identities, &wire, &mut problems);
     }
-    checks::agent(&parsed.engine, agent, &mut problems);
+    if let Some(agent) = agent {
+        checks::agent(&parsed.engine, agent, &mut problems);
+    }
     if !problems.is_empty() {
         return Err(problems);
     }
     let mut core = config::core(&parsed.engine, seeds.deployment, seeds.seed);
     read_instructions(&mut core, files);
-    checks::admission(&core, &parsed.engine, agent, &mut problems);
+    if let Some(agent) = agent {
+        checks::admission(&core, &parsed.engine, agent, &mut problems);
+    }
     if !problems.is_empty() {
         return Err(problems);
     }
-    let worker = parsed.workers.into_iter().next().expect("one worker checked");
-    let own = parsed.application.workers.into_iter().next().expect("one application worker checked");
-    let worker = settings::Worker { jig: worker, root: own.root, git: own.git };
-    checks::worker(&crate::worker_settings::root_limits(&worker, agent, &parsed.application.limits), &mut problems);
-    checks::grants(&parsed.engine, &worker.jig.limits, agent, &mut problems);
-    if !problems.is_empty() {
-        return Err(problems);
-    }
-    if let Err(found) = crate::worker_settings::prepare(&worker, agent, &parsed.application.limits) {
-        return Err(Problems::jig(found, &Path::root()));
-    }
-    let bytes = crate::worker_worst_case(&worker, agent, &parsed.application.limits)
-        .ok_or(problem(indexed(0).member(b"memory_bytes"), What::Jig(config::What::Bound)))?;
-    let worker_operations = crate::worker_settings::operations(&parsed.application.limits.git_component)
-        .ok_or(problem(indexed(0).member(b"limits"), What::Jig(config::What::Bound)))?;
+    let (worker, bytes, worker_operations) = if let Some(agent) = agent {
+        let worker = parsed.workers.into_iter().next().expect("one worker checked");
+        let own = parsed.application.workers.into_iter().next().expect("one application worker checked");
+        let worker = settings::Worker { jig: worker, root: own.root, git: own.git };
+        checks::worker(&crate::worker_settings::root_limits(&worker, agent, &parsed.application.limits), &mut problems);
+        checks::grants(&parsed.engine, &worker.jig.limits, agent, &mut problems);
+        if !problems.is_empty() {
+            return Err(problems);
+        }
+        if let Err(found) = crate::worker_settings::prepare(&worker, agent, &parsed.application.limits) {
+            return Err(Problems::jig(found, &Path::root()));
+        }
+        let bytes = crate::worker_worst_case(&worker, agent, &parsed.application.limits)
+            .ok_or(problem(indexed(0).member(b"memory_bytes"), What::Jig(config::What::Bound)))?;
+        let worker_operations = crate::worker_settings::operations(&parsed.application.limits.git_component)
+            .ok_or(problem(indexed(0).member(b"limits"), What::Jig(config::What::Bound)))?;
+        (Some(worker), bytes, worker_operations)
+    } else {
+        (None, 0, 0)
+    };
     let mut engine = settings::Engine {
         jig: parsed.engine,
         clients: parsed.application.clients,
@@ -411,10 +513,11 @@ fn checked_start(
     }
     let store = crate::store::limits(&root, &engine.jig.limits.core, &root.forge, &engine.jig.limits.store)
         .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Jig(config::What::Bound)))?;
-    let io = checks::process_io(&engine.jig.limits.io, Some(&worker.jig.limits.io)).ok_or(problem(
-        Path::root().member(b"engine").member(b"limits").member(b"io"),
-        What::Jig(config::What::Bound),
-    ))?;
+    let io = match &worker {
+        Some(worker) => checks::process_io(&engine.jig.limits.io, Some(&worker.jig.limits.io)),
+        None => checks::process_io(&engine.jig.limits.io, None),
+    }
+    .ok_or(problem(Path::root().member(b"engine").member(b"limits").member(b"io"), What::Jig(config::What::Bound)))?;
     let prepared_forges = prepare_forges(&engine, forges)?;
     let engine_bytes = match crate::system::startup_worst_case(
         &engine,
@@ -455,7 +558,7 @@ pub fn startup(
     runtime: WorkerRuntime,
     forges: List<crate::ForgeRuntime>,
 ) -> Result<Service, Problems> {
-    with_setup(document, directories, files, agent, seeds, accounts, runtime, forges, None)
+    with_setup(document, directories, files, Some(agent), seeds, accounts, Some(runtime), forges, None)
 }
 /// Build the standalone service with the binary's checked, resolved forge setup.
 #[expect(clippy::too_many_arguments, reason = "startup receives the checked setup beside the same runtime facts")]
@@ -463,31 +566,42 @@ pub fn with_setup(
     document: &[u8],
     directories: &config::Directories,
     files: &settings::Files,
-    agent: &settings::Agent,
+    agent: Option<&settings::Agent>,
     seeds: &settings::Seeds,
     accounts: Option<AccountsRuntime>,
-    runtime: WorkerRuntime,
+    runtime: Option<WorkerRuntime>,
     forges: List<crate::ForgeRuntime>,
     setup: Option<&temper_forge_setup::check::Checked>,
 ) -> Result<Service, Problems> {
     let CheckedStart { engine, worker, requirements, io, forges } =
         checked_start(document, directories, files, agent, seeds, accounts.as_ref(), forges, setup)?;
     let mut problems = Problems::empty();
+    let worker_memory = if let Some(worker) = &worker { worker.jig.memory } else { 0 };
     checks::memory(
         requirements.engine_bytes,
         engine.jig.memory,
         requirements.worker_bytes,
-        worker.jig.memory,
+        worker_memory,
         &mut problems,
     );
     if !problems.is_empty() {
         return Err(problems);
     }
-    let worker = match Worker::new(&worker, agent, &engine.limits, files, runtime, seeds.seed) {
-        Ok(worker) => worker,
-        Err(found) => return Err(Problems::jig(found, &Path::root())),
+    let worker = match worker {
+        Some(worker) => match Worker::new(
+            &worker,
+            agent.expect("checked local agent"),
+            &engine.limits,
+            files,
+            runtime.ok_or(problem(indexed(0), What::Standalone))?,
+            seeds.seed,
+        ) {
+            Ok(worker) => Some(worker),
+            Err(found) => return Err(Problems::jig(found, &Path::root())),
+        },
+        None => None,
     };
-    match Service::prepared(engine, seeds, accounts, forges, Some(worker), requirements.worker_bytes, io) {
+    match Service::prepared(engine, seeds, accounts, forges, worker, requirements.worker_bytes, io) {
         Ok(service) => Ok(service),
         Err(found) => Err(Problems::jig(found, &Path::root())),
     }

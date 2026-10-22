@@ -8,6 +8,8 @@ use skein_lib::{Decimal, List, Writer};
 pub enum What {
     Jig(config::What),
     Standalone,
+    EngineAlone,
+    WorkerAlone,
     Loopback,
     Connectors,
     Absolute,
@@ -76,6 +78,8 @@ fn put(writer: &mut Writer, length: &mut usize, measuring: bool, bytes: &[u8]) {
 fn words(what: What) -> &'static [u8] {
     match what {
         What::Standalone => b"standalone takes one worker, joined to the engine by the in-process name \"workers\"",
+        What::EngineAlone => b"an engine alone takes no local worker, one plaintext loopback listener and workers with distinct digest paths",
+        What::WorkerAlone => b"a worker alone takes one worker dialling a plaintext loopback socket, and only application.workers and application.limits",
         What::Loopback => b"must be a socket address on loopback",
         What::Connectors => b"must be [1], the forge connector",
         What::Absolute => b"must be an absolute path",
@@ -271,6 +275,8 @@ fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
                 | config::What::Unreadable
                 | config::What::Relative,
             )
+            | What::EngineAlone
+            | What::WorkerAlone
             | What::Standalone
             | What::Loopback
             | What::Connectors

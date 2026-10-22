@@ -490,7 +490,7 @@ fn shipped_bounds_fit_the_configured_charters_and_worker() {
     let worker = &service::settings::Worker {
         jig: config::worker(&configuration_document(&value["workers"][0]), 0, &config::Directories::working())
             .expect("worker configuration"),
-        root: named.worker_root,
+        root: named.worker.expect("standalone worker").root,
         git: Some(b"/usr/bin/git".as_slice().into()),
     };
     let mut own = service::limits::profile(service::limits::Profile::Small);
@@ -522,8 +522,8 @@ fn the_owned_example_is_named_without_a_problem() {
     // Only naming a fixture document; no deployment or files are opened.
     let named = temper_service::named(support::owned::EXAMPLE, &jig_protocol_config::Directories::working())
         .expect("owned example named");
-    assert_eq!(named.agent.as_ref(), b"/home/me/temper/owned/agent.json");
-    assert_eq!(named.worker_root.as_ref(), b"workspaces");
+    assert_eq!(named.worker.as_ref().expect("standalone worker").agent.as_ref(), b"/home/me/temper/owned/agent.json");
+    assert_eq!(named.worker.as_ref().expect("standalone worker").root.as_ref(), b"workspaces");
     assert_eq!(named.deployment.as_ref(), b"state");
     for path in [b"forge-1/api_token".as_slice(), b"forge-1/user", b"forge-1/webhook_secret", b"forge-1/git_token"] {
         assert_eq!(

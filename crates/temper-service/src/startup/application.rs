@@ -627,6 +627,35 @@ fn github_listener(forges: &List<Forge>, clients: Option<&Clients>, path: &Path,
         }
     }
 }
+pub(super) fn worker_alone(document: &Document, at: u32, directories: &config::Directories, problems: &mut Problems) {
+    let path = Path::root().member(b"application");
+    let Some(mut object) = read::object(document, at, &path, problems) else { return };
+    let ats = read::list(&mut object, document, b"workers", document.len(), &path, problems);
+    if match &ats {
+        Some(ats) => ats.len() != 1,
+        None => false,
+    } {
+        problems.push(path.member(b"workers"), What::WorkerAlone);
+    }
+    workers(document, ats, document.len(), directories, &path, problems);
+    let mut overrides = List::with_capacity(document.len());
+    if let Some(at) = read::required(&mut object, document, b"limits", &path, problems)
+        && let Some(limits) = configured_limits(document, at, &path.member(b"limits"), problems, &mut overrides)
+    {
+        super::checks::limits(&limits, &limits.git_component, problems);
+        let bounds = temper_protocol_worker_wire::Bounds {
+            repositories: limits.checkout.repositories,
+            name_bytes: limits.checkout.name_bytes,
+            remote_bytes: limits.checkout.name_bytes,
+            conflicts: limits.checkout.conflicts,
+            path_bytes: limits.checkout.path_bytes,
+            token_bytes: temper_protocol_worker_wire::v1::CEILINGS.identity_token,
+            text_bytes: temper_protocol_worker_wire::v1::CEILINGS.identity_name,
+        };
+        super::checks::channel(None, Some(&bounds), &[], &limits, problems);
+    }
+    super::finish_shape(document, object, &path, problems);
+}
 pub fn parse(
     document: &Document,
     at: u32,

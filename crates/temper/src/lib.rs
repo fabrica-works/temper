@@ -307,6 +307,13 @@ fn prepare_with_store(
     bytes: &[u8],
     owned: &mut Vec<Fd>,
 ) -> Result<(service::Service, Box<[u8]>), String> {
+    if service::startup::shape(bytes, &directories.jig())
+        .map_err(|why| String::from_utf8_lossy(&service::startup::lines(&why)).into_owned())?
+        == service::startup::Shape::WorkerAlone
+    {
+        // Until M2's worker-alone start (o/cluster-build) replaces this refusal.
+        return Err("a worker alone is checked; its start is not built yet".into());
+    }
     let setup::Deployment { named, checked, .. } = setup::check(bytes, &directories.jig())?;
     let document =
         config::document(bytes, &config::DocumentLimits { bytes: CONFIG_BYTES, tokens: CONFIG_BYTES, depth: 32 })
@@ -314,18 +321,23 @@ fn prepare_with_store(
     let engine =
         config::engine(&document, member(&document, 0, b"engine"), &directories.jig()).expect("named checked engine");
     let forges = forges(&named.forges)?;
-    let agent = agent::preflight(&named)?;
+    let agent = named.worker.as_ref().map(|_| agent::preflight(&named)).transpose()?;
     let user = skein_shell::effective_user();
     let files = read_files(named.files, user)?;
     let bundle = named.bundle.as_deref().map(|configured| bundle::read(configured, named.bundle_limits)).transpose()?;
-    let root_path = path(&named.worker_root);
-    if std::fs::symlink_metadata(root_path).is_ok() {
+    let runtime = if let Some(worker) = &named.worker {
+        let root_path = path(&worker.root);
+        if std::fs::symlink_metadata(root_path).is_ok() {
+            private_root(root_path, user).map_err(|why| format!("application.workers[0].root: {why}"))?;
+        }
+        let root = skein_shell::make_root(root_path, 0o700)
+            .map_err(|errno| format!("application.workers[0].root: errno {errno}"))?;
+        owned.push(root);
         private_root(root_path, user).map_err(|why| format!("application.workers[0].root: {why}"))?;
-    }
-    let root = skein_shell::make_root(root_path, 0o700)
-        .map_err(|errno| format!("application.workers[0].root: errno {errno}"))?;
-    owned.push(root);
-    private_root(root_path, user).map_err(|why| format!("application.workers[0].root: {why}"))?;
+        Some(service::WorkerRuntime { root, path: root_path.as_os_str().as_bytes().into() })
+    } else {
+        None
+    };
     let accounts = accounts(&engine)?;
     let seed = skein_shell::seed().map_err(|errno| format!("random seed: errno {errno}"))?;
     let crypto = skein_shell::crypto_seed().map_err(|errno| format!("cryptographic seed: errno {errno}"))?;
@@ -341,17 +353,23 @@ fn prepare_with_store(
         bytes,
         &directories.jig(),
         &files,
-        &agent,
+        agent.as_ref(),
         &Seeds { deployment, installation, seed, crypto },
         Some(accounts),
-        service::WorkerRuntime { root, path: root_path.as_os_str().as_bytes().into() },
+        runtime,
         forges,
         Some(&checked),
     )
     .map_err(|why| String::from_utf8_lossy(&service::startup::lines(&why)).into_owned())?;
-    if let Some(program) = agent.programs.first() {
+    if let Some(agent) = &agent
+        && let Some(program) = agent.programs.first()
+    {
         // Source commands use the agent's explicit command environment.
-        let environment = smith_agent_shell::config::read(path(&named.agent))?.service.environment.command_entries();
+        let environment =
+            smith_agent_shell::config::read(path(&named.worker.as_ref().expect("local agent checked").agent))?
+                .service
+                .environment
+                .command_entries();
         let resources = service::program_sources::Resources::configured(program, environment)
             .ok_or("workers[0].agent.configuration: program source resources exceed their bounds")?;
         service.configure_program_sources(resources).map_err(|_| "worker refused program source resources")?;

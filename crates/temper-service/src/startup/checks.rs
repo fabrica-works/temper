@@ -24,6 +24,37 @@ fn in_process(address: &config::Address) -> bool {
         config::Address::Addr(Addr::Ip(_)) | config::Address::Host { .. } => false,
     }
 }
+pub(super) fn loopback(address: &config::Address) -> bool {
+    match address {
+        config::Address::Addr(Addr::Ip(socket)) => socket.ip().is_loopback(),
+        config::Address::Addr(Addr::InProcess(_)) | config::Address::Host { .. } => false,
+    }
+}
+fn engine_alone(engine: &config::Engine, workers: &[config::Worker], problems: &mut Problems) {
+    let hosts = Path::root().member(b"engine").member(b"hosts");
+    if !workers.is_empty() {
+        problems.push(Path::root().member(b"workers"), What::EngineAlone);
+    }
+    if engine.hosts.listener.len() != 1 {
+        problems.push(hosts.member(b"listener"), What::EngineAlone);
+    }
+    for (index, address) in engine.hosts.listener.iter().enumerate() {
+        if !loopback(address) {
+            problems.push(at(index, hosts.member(b"listener")), What::EngineAlone);
+        }
+    }
+    if engine.hosts.workers.is_empty() {
+        problems.push(hosts.member(b"workers"), What::EngineAlone);
+    }
+    for (index, worker) in engine.hosts.workers.iter().enumerate() {
+        for previous in engine.hosts.workers.iter().take(index) {
+            if previous.digest == worker.digest {
+                problems.push(at(index, hosts.member(b"workers")).member(b"digest"), What::EngineAlone);
+                break;
+            }
+        }
+    }
+}
 /// Standalone's requirements on jig's parts, including absolute agent paths.
 pub fn standalone(
     engine: &config::Engine,
@@ -32,18 +63,26 @@ pub fn standalone(
     problems: &mut Problems,
 ) {
     let root = Path::root();
-    if workers.len() != 1 {
-        problems.push(root.member(b"workers"), What::Standalone);
-    }
-    if engine.hosts.listener.len() != 1 || !in_process(engine.hosts.listener.first().expect("parsed listeners")) {
-        problems.push(root.member(b"engine").member(b"hosts").member(b"listener"), What::Standalone);
-    }
-    let hosts_match = match (engine.hosts.workers.first(), workers.first()) {
-        (Some(host), Some(worker)) => host.name == worker.name,
-        (None, _) | (_, None) => false,
+    let alone = match engine.hosts.listener.first() {
+        Some(config::Address::Addr(Addr::Ip(_))) => true,
+        Some(config::Address::Addr(Addr::InProcess(_)) | config::Address::Host { .. }) | None => false,
     };
-    if engine.hosts.workers.len() != 1 || !hosts_match {
-        problems.push(root.member(b"engine").member(b"hosts").member(b"workers"), What::Standalone);
+    if alone {
+        engine_alone(engine, workers, problems);
+    } else {
+        if workers.len() != 1 {
+            problems.push(root.member(b"workers"), What::Standalone);
+        }
+        if engine.hosts.listener.len() != 1 || !in_process(engine.hosts.listener.first().expect("parsed listeners")) {
+            problems.push(root.member(b"engine").member(b"hosts").member(b"listener"), What::Standalone);
+        }
+        let hosts_match = match (engine.hosts.workers.first(), workers.first()) {
+            (Some(host), Some(worker)) => host.name == worker.name,
+            (None, _) | (_, None) => false,
+        };
+        if engine.hosts.workers.len() != 1 || !hosts_match {
+            problems.push(root.member(b"engine").member(b"hosts").member(b"workers"), What::Standalone);
+        }
     }
     match clients.listener {
         config::Address::Addr(Addr::Ip(socket)) if socket.ip().is_loopback() => {}
@@ -53,6 +92,9 @@ pub fn standalone(
     }
     if engine.connectors.as_ref() != [1] {
         problems.push(root.member(b"engine").member(b"connectors"), What::Connectors);
+    }
+    if alone {
+        return;
     }
     for (index, worker) in workers.iter().enumerate() {
         let path = at(index, root.member(b"workers"));
@@ -267,19 +309,30 @@ fn bounded(bounds: &payload::Bounds, engine: bool, problems: &mut Problems) -> O
 }
 /// Each side's application records fit jig's fields and the worker's admission.
 pub fn channel(
-    engine: &payload::Bounds,
-    worker: &payload::Bounds,
+    engine: Option<&payload::Bounds>,
+    worker: Option<&payload::Bounds>,
     forges: &[settings::Forge],
     limits: &limits::Limits,
     problems: &mut Problems,
 ) {
-    names(longest_remote(forges, limits.forge.name_bytes), limits, problems);
+    if engine.is_some() {
+        names(longest_remote(forges, limits.forge.name_bytes), limits, problems);
+    }
     // The engine's terms take the smaller of the two repository bounds
     // (translate::limits), so a checkout's larger one makes the worker's
     // parts past those terms and its hello never opens the link.
-    let repository_shape = engine.repositories == worker.repositories;
-    let engine = bounded(engine, true, problems);
-    let worker = bounded(worker, false, problems);
+    let repository_shape = match (engine, worker) {
+        (Some(engine), Some(worker)) => engine.repositories == worker.repositories,
+        _ => true,
+    };
+    let engine = match engine {
+        Some(engine) => bounded(engine, true, problems),
+        None => None,
+    };
+    let worker = match worker {
+        Some(worker) => bounded(worker, false, problems),
+        None => None,
+    };
     let ceilings = jig_protocol_worker_wire::CEILINGS;
     let mut sizes = [None, None];
     for (index, side) in [engine, worker].iter().enumerate() {

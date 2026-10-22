@@ -77,7 +77,8 @@ pub(crate) fn check(bytes: &[u8], directories: &config::Directories) -> Result<D
         }
     }
     let projects: Vec<_> = named.projects.iter().map(|project| project.number).collect();
-    let mut taken = vec![named.deployment.as_ref(), named.worker_root.as_ref()];
+    let mut taken = vec![named.deployment.as_ref()];
+    taken.extend(named.worker.as_ref().map(|worker| worker.root.as_ref()));
     taken.extend(checked.setup.entries.iter().map(|entry| entry.directory.as_ref()));
     let facts = temper_fake::demo::Facts {
         llm: &named.llm,
