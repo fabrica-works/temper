@@ -75,7 +75,7 @@ impl Service {
     ) -> Result<Self, Problems> {
         let limits =
             limits::engine(&settings.jig.limits, &settings.limits).ok_or(start_problem(b"limits", What::Bound))?;
-        let (forge_settings, forge_roots, forge_owned) = forges;
+        let (mut forge_settings, forge_roots, forge_owned) = forges;
         let shared = crate::forge::shared(&settings.limits, &settings.jig.limits.io);
         settings.jig.limits.clients.wire.keyed_value_some =
             settings.jig.limits.clients.wire.keyed_value_some.min(settings.limits.records.value_bytes);
@@ -126,7 +126,7 @@ impl Service {
         let clients =
             clients::Clients::new(&settings.jig, &settings.clients.listener, seeds, client_room, &limits.journal)?;
         let setup_room = max.checked_add(SETUP_ROUTING_HEADROOM).expect("setup routing headroom");
-        let setup = crate::setup::prepare(&settings, &forge_settings, &seeds.crypto, setup_room)?;
+        let setup = crate::setup::prepare(&settings, &mut forge_settings, &seeds.crypto, setup_room)?;
         let forge = crate::forge::Layer::new(
             forge_settings,
             settings.limits.forge_component,
@@ -136,6 +136,9 @@ impl Service {
         .expect("checked forge limits");
         for configured in &mut settings.forges {
             configured.api_token = None;
+        }
+        for setup in &mut settings.setup {
+            setup.handover = None;
         }
         let notes = Queue::with_capacity(u32::try_from(settings.forges.len()).expect("configured forges"));
         let workers = workers::Workers::configured(&mut settings, seeds.deployment, max)?;

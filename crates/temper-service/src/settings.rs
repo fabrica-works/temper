@@ -85,6 +85,14 @@ pub struct Seeds {
     pub installation: [u8; 16],
 }
 
+/// One checked setup entry and its start-time handover (protocol/setup.md, 8.4).
+#[derive(Debug)]
+pub struct Setup {
+    pub entry: temper_forge_setup::setup::Entry,
+    /// The admin's token, held until the start-time adoptions end.
+    pub handover: Option<Secret>,
+}
+
 /// The engine's settings: jig's part, typed by jig-protocol-config, and
 /// temper's members (protocol/configuration.md, sections 2 and 3).
 #[derive(Debug)]
@@ -95,6 +103,7 @@ pub struct Engine {
     pub files: Files,
     pub forges: Box<[Forge]>,
     pub demo: Option<Demo>,
+    pub setup: Box<[Setup]>,
     pub identities: Box<[Identity]>,
     pub landing: temper_engine_domain::LandingPolicy,
     pub charter: u32,

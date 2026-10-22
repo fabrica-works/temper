@@ -10,6 +10,62 @@ use jig_protocol_config::{self as config, Path, Segment, read};
 pub use problems::{Problem, Problems, What, lines};
 use skein_lib::List;
 
+/// Private handovers the shell reads once before starting a fake forge's adoptions.
+#[must_use]
+pub fn setup_files(checked: &temper_forge_setup::check::Checked) -> Box<[config::File]> {
+    let mut files = List::with_capacity(u32::try_from(checked.setup.entries.len()).expect("checked setup entries"));
+    for (index, entry) in checked.setup.entries.iter().enumerate() {
+        if let temper_forge_setup::setup::Mode::Fake(_) = &entry.mode {
+            files
+                .push(config::File {
+                    at: setup_path(index).member(b"admin_token"),
+                    path: handover_path(entry),
+                    max: 40,
+                    private: true,
+                })
+                .expect("one handover per fake");
+        }
+    }
+    files.into_boxed()
+}
+fn setup_path(index: usize) -> Path {
+    Path::root()
+        .member(b"application")
+        .member(b"setup")
+        .child(Segment::Index(u32::try_from(index).expect("checked setup index")))
+}
+fn handover_path(entry: &temper_forge_setup::setup::Entry) -> Box<[u8]> {
+    temper_forge_setup::place::Place { directory: entry.directory.clone(), user: Box::new([]) }
+        .path(temper_forge_setup::place::File::AdminToken)
+}
+fn setup_values(
+    checked: Option<&temper_forge_setup::check::Checked>,
+    files: &settings::Files,
+    problems: &mut Problems,
+) -> Box<[settings::Setup]> {
+    let Some(checked) = checked else { return Box::new([]) };
+    let mut values = List::with_capacity(u32::try_from(checked.setup.entries.len()).expect("checked setup entries"));
+    for (index, entry) in checked.setup.entries.iter().enumerate() {
+        let mut handover = None;
+        if let temper_forge_setup::setup::Mode::Fake(_) = &entry.mode {
+            let at = setup_path(index).member(b"admin_token");
+            if let Some(bytes) = application::contents(files, &handover_path(entry), 40, at.clone(), problems) {
+                let mut valid = bytes.len() == 40;
+                for byte in &bytes {
+                    valid &= byte.is_ascii_digit() || (b'a'..=b'f').contains(byte);
+                }
+                if valid {
+                    handover = Some(skein_lib::Secret::new(bytes));
+                } else {
+                    problems.push(at, What::Handover);
+                }
+            }
+        }
+        values.push(settings::Setup { entry: entry.clone(), handover }).expect("checked setup entries");
+    }
+    values.into_boxed()
+}
+
 /// The services selected by the document's members (protocol/README.md, 15.1).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Shape {
@@ -403,6 +459,20 @@ pub fn memory_requirements(
 ) -> Result<Requirements, Problems> {
     Ok(checked_start(document, directories, files, Some(agent), seeds, accounts, forges, None)?.requirements)
 }
+/// Derive envelopes including the checked setup which the shell supplies at startup.
+#[expect(clippy::too_many_arguments, reason = "the same startup inputs plus its checked setup")]
+pub fn memory_requirements_with_setup(
+    document: &[u8],
+    directories: &config::Directories,
+    files: &settings::Files,
+    agent: &settings::Agent,
+    seeds: &settings::Seeds,
+    accounts: Option<&AccountsRuntime>,
+    forges: List<crate::ForgeRuntime>,
+    setup: &temper_forge_setup::check::Checked,
+) -> Result<Requirements, Problems> {
+    Ok(checked_start(document, directories, files, Some(agent), seeds, accounts, forges, Some(setup))?.requirements)
+}
 #[expect(
     clippy::too_many_arguments,
     clippy::too_many_lines,
@@ -426,6 +496,10 @@ fn checked_start(
     check_files(&parsed, files)?;
     let mut problems = Problems::empty();
     let resolved = application::resolve(&parsed.application, files, &mut problems);
+    if !problems.is_empty() {
+        return Err(problems);
+    }
+    let setup_values = setup_values(setup, files, &mut problems);
     if !problems.is_empty() {
         return Err(problems);
     }
@@ -501,6 +575,7 @@ fn checked_start(
         files: settings::Files { entries: files.entries.clone() },
         forges: resolved.forges,
         demo: parsed.application.demo,
+        setup: setup_values,
         identities: resolved.identities,
         landing: parsed.application.landing,
         charter: parsed.application.charter,

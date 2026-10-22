@@ -1,6 +1,7 @@
 //! Connection sequencing and serialized installation rewrites (protocol/forge.md, 2.2–2.6).
 use super::{Write, answer, ended, failure_text};
 use alloc::boxed::Box;
+use core::num::NonZeroU64;
 use jig_protocol_store::{SecretOwner, Secrets};
 use skein_forge_connection as connection;
 use skein_forge_setup::{host, reconcile};
@@ -17,6 +18,7 @@ pub(super) enum Kind {
     Install,
     Accept,
     Reconcile,
+    Adopt,
     Follow,
 }
 #[derive(Debug)]
@@ -26,7 +28,15 @@ pub(super) struct Run {
     pub(super) kind: Kind,
     pub(super) internal: bool,
 }
+#[derive(Debug)]
+pub(super) struct Adoption {
+    pub(super) next: NonZeroU64,
+    pub(super) repositories: u64,
+    pub(super) admin_token: Secret,
+    pub(super) access: connection::Access,
+}
 pub(super) struct Lifecycle {
+    pub(super) adoptions: Map<u16, Adoption>,
     reconcile: Map<u16, ()>,
     deleted: Map<(u16, u64), ()>,
     deleting: Map<u16, ()>,
@@ -35,6 +45,11 @@ pub(super) struct Lifecycle {
 }
 impl Lifecycle {
     pub(super) fn ready(&self, runs: &Map<Token, Run>, limit: u32, domain: &root::Domain) -> bool {
+        for (forge, _) in &self.adoptions {
+            if runs.len() < limit && !running(runs, *forge) {
+                return true;
+            }
+        }
         for (forge, ()) in &self.reconcile {
             if runs.len() < limit
                 && connected_in_root(domain, *forge)
@@ -54,6 +69,7 @@ impl Lifecycle {
     pub(super) fn new(forges: u32, installations: u32) -> Self {
         let count = forges.checked_mul(installations).expect("installation tables");
         Self {
+            adoptions: Map::with_capacity(forges),
             reconcile: Map::with_capacity(forges),
             deleted: Map::with_capacity(count),
             deleting: Map::with_capacity(forges),
@@ -78,9 +94,10 @@ pub(super) fn kind(plan: &host::Plan) -> Kind {
         host::Plan::Install { .. } => Kind::Install,
         host::Plan::Accept { .. } => Kind::Accept,
         host::Plan::Reconcile { .. } => Kind::Reconcile,
+        host::Plan::Adopt { .. } => Kind::Adopt,
         host::Plan::Paste { .. } => unreachable!("temper-13 stages Paste"),
-        host::Plan::Check { .. } | host::Plan::TakeOver { .. } | host::Plan::Adopt { .. } => {
-            unreachable!("temper-14 stages Forgejo plans")
+        host::Plan::Check { .. } | host::Plan::TakeOver { .. } => {
+            unreachable!("Check and TakeOver are not staged yet")
         }
         host::Plan::Reachable { .. } => unreachable!("temper-10 stages Reachable"),
     }
@@ -137,6 +154,16 @@ pub(super) enum Purpose {
 pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: reconcile::Outcome) {
     let run = engine.setup.runs.get(&token).expect("ended setup run");
     let (forge, kind) = (run.forge, run.kind);
+    if kind == Kind::Adopt {
+        let adoption = engine.setup.lifecycle.adoptions.get_mut(&forge).expect("live start-time adoption");
+        if adoption.next.get() < adoption.repositories {
+            adoption.next = NonZeroU64::new(adoption.next.get().checked_add(1).expect("bounded repositories"))
+                .expect("next repository");
+        } else {
+            let adoption = engine.setup.lifecycle.adoptions.remove(&forge).expect("last adoption");
+            engine.forge.down(connection::Request::Connect { forge, access: adoption.access });
+        }
+    }
     if kind == Kind::Convert {
         let config = configured(engine, forge);
         let origin = records::origin(connection::settings::Kind::GitHub, &config.api).encode();
@@ -169,6 +196,9 @@ pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: re
 }
 pub(super) fn stopped(engine: &mut crate::engine::Engine, token: Token, failure: reconcile::Failure) {
     let run = engine.setup.runs.get(&token).expect("stopped setup run");
+    if run.kind == Kind::Adopt {
+        engine.setup.lifecycle.adoptions.remove(&run.forge);
+    }
     let mut reason = failure_text(&failure);
     if run.kind == Kind::Convert && failure.why == reconcile::Why::Refused(404) {
         reason = Box::from(
@@ -358,6 +388,36 @@ pub(super) fn advance(engine: &mut crate::engine::Engine) {
             || engine.events.room() < 4
             || busy(engine, *forge)
         {
+            continue;
+        }
+        if let Some(adoption) = engine.setup.lifecycle.adoptions.get(forge) {
+            if engine.setup.runs.len() == engine.setup.env.limits.runs {
+                continue;
+            }
+            let repository = adoption.next;
+            assert!(engine.setup.lifecycle.next_run < (1_u64 << 60_u32), "internal setup names");
+            let run = Token::new(crate::tokens::SETUP | engine.setup.lifecycle.next_run);
+            engine.setup.lifecycle.next_run = engine.setup.lifecycle.next_run.checked_add(1).expect("setup run names");
+            if !engine.setup.served.contains_key(forge) {
+                let reason = *engine.setup.unserved.get(forge).expect("configured setup exclusion");
+                engine.setup.lifecycle.adoptions.remove(forge);
+                ended(engine, run, root::SetupEnd::Stopped { forge: *forge, reason: Box::from(reason) });
+                continue;
+            }
+            engine
+                .setup
+                .runs
+                .insert(
+                    run,
+                    Run {
+                        forge: *forge,
+                        kind: Kind::Adopt,
+                        internal: true,
+                        previous: domain::Connection::NotConnected,
+                    },
+                )
+                .expect("admitted adoption");
+            engine.setup.down(host::Request::Run { run, plan: host::Plan::Adopt { forge: *forge, repository } });
             continue;
         }
         let mut deleted = List::with_capacity(engine.forge_records.bounds.installations);

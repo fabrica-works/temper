@@ -389,8 +389,8 @@ fn tls_forges() -> (crate::settings::Engine, List<crate::ForgeRuntime>) {
 )]
 fn each_github_tls_entry_keeps_its_prepared_name_trust_and_address() {
     let (config, runtime) = tls_forges();
-    let (endpoints, _) = crate::forge::prepare(&config, runtime).unwrap();
-    let setup = prepare(&config, &endpoints, &fixtures::seeds().crypto, 2).unwrap();
+    let (mut endpoints, _) = crate::forge::prepare(&config, runtime).unwrap();
+    let setup = prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2).unwrap();
     assert_eq!(setup.served.len(), 2);
     let (settings, _) = setup.pending.unwrap();
     assert_eq!(settings.forges.len(), 2);
@@ -422,8 +422,8 @@ fn tls_selects_a_larger_host_price_than_plaintext() {
     for index in 0..runtime.len() {
         runtime.get_mut(index).unwrap().address.set_ip([127, 0, 0, 1].into());
     }
-    let (endpoints, _) = crate::forge::prepare(&config, runtime).unwrap();
-    let setup = prepare(&config, &endpoints, &fixtures::seeds().crypto, 2).unwrap();
+    let (mut endpoints, _) = crate::forge::prepare(&config, runtime).unwrap();
+    let setup = prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2).unwrap();
     let (mut settings, _) = setup.pending.unwrap();
     let tls = host::worst_case(&setup.env.limits, &settings).unwrap();
     for index in 0..settings.forges.len() {
@@ -489,8 +489,8 @@ fn setup_memory_includes_the_whole_host_and_its_owner() {
     let mut config = fixtures::engine();
     config.forges[0].kind = crate::settings::Kind::GitHub;
     config.forges[0].api_token = None;
-    let (endpoints, _) = crate::forge::prepare(&config, fixtures::forge_runtime()).unwrap();
-    let setup = prepare(&config, &endpoints, &fixtures::seeds().crypto, 2).unwrap();
+    let (mut endpoints, _) = crate::forge::prepare(&config, fixtures::forge_runtime()).unwrap();
+    let setup = prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2).unwrap();
     let (settings, _) = setup.pending.unwrap();
     assert_eq!(settings.user_agent.as_ref(), crate::forge::USER_AGENT.as_bytes());
     let given = settings.forges.get(0).unwrap().github().unwrap();
@@ -563,8 +563,8 @@ fn invalid_host_limits_stop_after_load_and_setup_overrides_are_checked() {
     config.forges[0].kind = crate::settings::Kind::GitHub;
     config.forges[0].api_token = None;
     config.limits.forge_component.inner = 13;
-    let (endpoints, _) = crate::forge::prepare(&fixtures::engine(), fixtures::forge_runtime()).unwrap();
-    service.engine.setup = prepare(&config, &endpoints, &fixtures::seeds().crypto, 2).unwrap();
+    let (mut endpoints, _) = crate::forge::prepare(&fixtures::engine(), fixtures::forge_runtime()).unwrap();
+    service.engine.setup = prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2).unwrap();
     advance(&mut service.engine);
     assert!(service.end().is_some());
     let mut own = crate::limits::profile(crate::limits::Profile::Small);
@@ -627,3 +627,6 @@ fn accounted(runs: u32, states: u32, tls: bool) -> u64 {
 
 #[path = "setup_lifecycle.rs"]
 mod lifecycle_tests;
+
+#[path = "setup_adoption.rs"]
+mod adoption_tests;

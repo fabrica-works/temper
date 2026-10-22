@@ -90,6 +90,7 @@ pub fn engine() -> settings::Engine {
         files: settings::Files { entries: skein_lib::List::with_capacity(0) },
         forges: forges(),
         demo: None,
+        setup: Box::new([]),
         identities: Box::new([settings::Identity {
             number: 1,
             forge: 1,

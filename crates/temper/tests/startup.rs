@@ -192,6 +192,49 @@ fn temper_box_runs_a_fake_entry_to_serves_link() {
     scratch.remove();
 }
 #[test]
+fn a_fake_entrys_handover_is_read_privately_and_checked_before_serve_starts() {
+    for case in ["missing", "public", "short", "uppercase", "valid"] {
+        let scratch = support::Scratch::startup(&format!("fake-handover-{case}"));
+        let mut value = managed(scratch.path(), true);
+        support::configuration::fake_entry(&mut value["application"]["setup"][0], "127.0.0.1:9");
+        let handover = scratch.path().join("forge-1/admin_token");
+        if case != "missing" {
+            let bytes = match case {
+                "short" => b"0123456789abcdef".as_slice(),
+                "uppercase" => b"0123456789abcdef0123456789abcdef0123456A",
+                _ => b"0123456789abcdef0123456789abcdef01234567",
+            };
+            support::write_private(&handover, bytes);
+            if case == "public" {
+                fs::set_permissions(&handover, fs::Permissions::from_mode(0o644)).expect("public handover");
+            }
+        }
+        support::write_private(&scratch.path().join("temper.json"), &serde_json::to_vec(&value).expect("JSON"));
+        let result = temper::envelope_in(
+            &support::configuration::directories(scratch.path()),
+            &serde_json::to_vec(&value).expect("JSON"),
+        );
+        match case {
+            "valid" => {
+                assert!(result.is_ok());
+            }
+            "missing" | "public" => {
+                let why = if case == "missing" { "absent" } else { "readable by others or reached through a link" };
+                assert_eq!(
+                    result.expect_err("handover refused"),
+                    format!("temper serve: application.setup[0].admin_token: {}: {why}\n", handover.display())
+                );
+            }
+            _ => assert_eq!(
+                result.expect_err("handover refused"),
+                "temper serve: application.setup[0].admin_token: admin_token must be exactly 40 lowercase hexadecimal digits\n"
+            ),
+        }
+        scratch.remove();
+    }
+}
+
+#[test]
 fn a_nonempty_box_configuration_without_a_document_is_refused_naming_it() {
     let scratch = support::Scratch::startup("box-absent-document");
     fs::write(scratch.path().join("other"), b"kept").expect("nonempty configuration");
@@ -913,6 +956,13 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // growing Flight 80 -> 96 B: the 32-call host flight map grows 1,232 B
     // in each of 3,076 owned envelope copies; worker inputs stay fixed.
     let amendment_changes_growth = 3_076 * 1_232;
+    // Start-time fake adoptions add a 32 B inline map and one 1,016 B tree node
+    // (four forge slots, 80 B Adoption values). Held bytes reserve each forge's
+    // 40 B handover, 512 B API token and 128 B hook secret: +3,768 B in total.
+    let fake_adoption_growth = 32 + 1_016 + 4 * (40 + 512 + 128);
+    // The bounded fixture now supplies the checked owned entry, as serve does:
+    // its Forgejo Given, host protocol buffers and bounded plans add 1,194,285,681 B.
+    let forgejo_setup_growth = 1_194_285_681;
     assert_eq!(
         required.engine_bytes,
         79_659_997_210_050_u64
@@ -933,6 +983,8 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + demo_growth
             + listening_growth
             + amendment_changes_growth
+            + fake_adoption_growth
+            + forgejo_setup_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -997,6 +1049,9 @@ fn owned_memory_figures_for_init_match_its_own_document() {
     let required = bounded.requirements();
     // The same listener growth is 240 B here: init has two existing forge
     // Note slots growing 32 -> 40 B, rather than the owned example's one.
+    // The fake-adoption map and held credentials add the same 3,768 B as above.
+    // Supplying init's checked fake entry also counts its host and git program;
+    // its GitHub host was already priced, so this engine term adds 26,262,672 B.
     support::owned::check_memory("../temper-init/template/temper.json", required);
     eprintln!("init requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
     check_bounded_startup(&bounded, required);

@@ -842,7 +842,13 @@ pub struct Resolved {
     pub forges: Box<[settings::Forge]>,
     pub identities: Box<[settings::Identity]>,
 }
-fn contents(files: &settings::Files, name: &[u8], max: u32, at: Path, problems: &mut Problems) -> Option<Box<[u8]>> {
+pub(super) fn contents(
+    files: &settings::Files,
+    name: &[u8],
+    max: u32,
+    at: Path,
+    problems: &mut Problems,
+) -> Option<Box<[u8]>> {
     for (path, value) in &files.entries {
         if path.as_ref() == name {
             if value.expose().len() > usize::try_from(max).expect("file bound") {

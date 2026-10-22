@@ -27,6 +27,7 @@ pub enum What {
     Credentials,
     Escalation,
     Provider,
+    Handover,
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Problem {
@@ -95,6 +96,7 @@ fn words(what: What) -> &'static [u8] {
         What::NoHub => b"the root has no hub, so the fleet must place every run on a worker",
         What::Credentials => b"must be from 1 to accounts.credentials, in engine.limits and in the worker's limits",
         What::Escalation => b"an owner's project must name an escalation role from 0 to 3",
+        What::Handover => b"admin_token must be exactly 40 lowercase hexadecimal digits",
         What::Provider => b"the deployment's provider must not be 0, the forge's sign-in provider",
         What::Jig(what) => match what {
             config::What::Json => b"invalid JSON",
@@ -289,7 +291,8 @@ fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
             | What::NoHub
             | What::Credentials
             | What::Escalation
-            | What::Provider => {}
+            | What::Provider
+            | What::Handover => {}
         }
         put(writer, &mut length, measuring, b"\n");
     }

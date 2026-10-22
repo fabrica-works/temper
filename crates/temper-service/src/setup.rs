@@ -72,7 +72,17 @@ pub(crate) fn worst_case(
         .checked_add(Map::<u16, ()>::worst_case(l.forges)?)? // lifecycle.reconcile
         .checked_add(Map::<u16, ()>::worst_case(l.forges)?)? // lifecycle.deleting
         .checked_add(Map::<u16, &'static [u8]>::worst_case(l.forges)?)? // unserved
-        // BASE stages only auto-Reconcile with empty adopted data; 07/08/09 must bound inputs first.
+        .checked_add(Map::<u16, lifecycle::Adoption>::worst_case(l.forges)?)?
+        // Each fake holds the handover and its files' access until adoption ends (protocol/setup.md, 8.4).
+        .checked_add(
+            u64::from(
+                40_u32
+                    .checked_add(config.limits.forge_component.token_bytes)?
+                    .checked_add(config.limits.forge_component.hook_secret_bytes)?,
+            )
+            .checked_mul(u64::from(l.forges))?,
+        )?
+        // Internal Reconcile has empty adopted data; Adopt retains only its repository id.
         .checked_add(Map::<Token, host::Plan>::worst_case(l.runs)?)?
         .checked_add(Map::<Token, Run>::worst_case(l.runs)?)?
         .checked_add(
@@ -168,6 +178,7 @@ impl Layer {
             return;
         }
         self.closing = true;
+        self.lifecycle.adoptions = Map::with_capacity(self.env.limits.forges);
         self.pages = Queue::with_capacity(self.env.limits.states);
         self.staged = Map::with_capacity(self.env.limits.runs);
         if self.component.is_some() {
@@ -222,10 +233,11 @@ fn forge(plan: &host::Plan) -> u16 {
         | host::Plan::Convert { forge, .. }
         | host::Plan::Install { forge }
         | host::Plan::Accept { forge, .. }
-        | host::Plan::Reconcile { forge, .. } => *forge,
+        | host::Plan::Reconcile { forge, .. }
+        | host::Plan::Adopt { forge, .. } => *forge,
         host::Plan::Paste { .. } => unreachable!("temper-13 stages Paste"),
-        host::Plan::Check { .. } | host::Plan::TakeOver { .. } | host::Plan::Adopt { .. } => {
-            unreachable!("temper-14 stages Forgejo plans")
+        host::Plan::Check { .. } | host::Plan::TakeOver { .. } => {
+            unreachable!("Check and TakeOver are not staged yet")
         }
         host::Plan::Reachable { .. } => unreachable!("temper-10 stages Reachable"),
     }
@@ -348,9 +360,16 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
                 match need {
                     host::Need::Read(item) => {
                         let item = item_record(item);
-                        let value = match engine.forge_records.rows.forge(forge) {
-                            Some(rows) => rows.get(item).ok(),
-                            None => None,
+                        let value = match (engine.setup.lifecycle.adoptions.get(&forge), item) {
+                            (Some(adoption), Item::AdminToken) => Some(adoption.admin_token.expose()),
+                            (Some(adoption), Item::WebhookSecret) => match &adoption.access.webhook_secret {
+                                Some(secret) => Some(secret.expose()),
+                                None => None,
+                            },
+                            _ => match engine.forge_records.rows.forge(forge) {
+                                Some(rows) => rows.get(item).ok(),
+                                None => None,
+                            },
                         };
                         let answer = host::Answer::Read(match value {
                             Some(bytes) => Some(Secret::new(Box::from(bytes))),

@@ -201,10 +201,23 @@ fn checked_fake_setup() -> temper_forge_setup::check::Checked {
 #[test]
 fn the_checked_fake_git_program_reaches_the_services_forge_settings() {
     let checked = checked_fake_setup();
+    let mut files = fixtures::files();
+    let mut entries = List::with_capacity(files.entries.len().checked_add(1).unwrap());
+    for entry in files.entries.into_boxed() {
+        entries.push(entry).unwrap();
+    }
+    files.entries = entries;
+    files
+        .entries
+        .push((
+            b"/data/demo/forge/admin_token".as_slice().into(),
+            skein_lib::Secret::new(b"0123456789abcdef0123456789abcdef01234567".as_slice().into()),
+        ))
+        .unwrap();
     let service = crate::startup::with_setup(
         &fixtures::document(),
         &config::Directories::working(),
-        &fixtures::files(),
+        &files,
         Some(&fixtures::startup_agent()),
         &fixtures::seeds(),
         None,
@@ -1230,4 +1243,58 @@ fn a_worker_alone_checks_its_application_paths_and_its_git_and_channel_limits() 
         assert_eq!(found.problems.len(), 1, "{}: {:?}", core::str::from_utf8(member).unwrap(), found);
         assert_eq!((found.problems.get(0).unwrap().path.clone(), found.problems.get(0).unwrap().what), (path, what));
     }
+}
+
+#[test]
+fn fake_handovers_are_private_and_refused_unless_exactly_40_lowercase_hex_digits() {
+    let checked = checked_fake_setup();
+    let listed = crate::startup::setup_files(&checked);
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].path.as_ref(), b"/data/demo/forge/admin_token");
+    assert!(listed[0].private);
+    assert_eq!(listed[0].max, 40);
+    for value in [
+        b"".as_slice(),
+        b"0123456789abcdef0123456789abcdef0123456",
+        b"0123456789abcdef0123456789abcdef012345678",
+        b"0123456789abcdef0123456789abcdef0123456A",
+        b"0123456789abcdef0123456789abcdef0123456g",
+        b"0123456789abcdef0123456789abcdef0123456\n",
+        b"0123456789abcdef0123456789abcdef01234567",
+    ] {
+        let mut files = fixtures::files();
+        let mut entries = List::with_capacity(files.entries.len().checked_add(1).unwrap());
+        for entry in files.entries.into_boxed() {
+            entries.push(entry).unwrap();
+        }
+        entries.push((listed[0].path.clone(), skein_lib::Secret::new(value.into()))).unwrap();
+        files.entries = entries;
+        let result = fake_start(&checked, &files);
+        if value == b"0123456789abcdef0123456789abcdef01234567" {
+            assert!(result.is_ok());
+        } else {
+            assert!(
+                skein_lib::bytes::find(&lines(&result.err().unwrap()), b"application.setup[0].admin_token:").is_some()
+            );
+        }
+    }
+    let problems = fake_start(&checked, &fixtures::files()).err().unwrap();
+    assert_eq!(lines(&problems).as_ref(), b"application.setup[0].admin_token: not read\n");
+}
+
+fn fake_start(
+    checked: &temper_forge_setup::check::Checked,
+    files: &settings::Files,
+) -> Result<crate::Service, Problems> {
+    crate::startup::with_setup(
+        &fixtures::document(),
+        &config::Directories::working(),
+        files,
+        Some(&fixtures::startup_agent()),
+        &fixtures::seeds(),
+        None,
+        Some(fixtures::worker_runtime()),
+        fixtures::forge_runtime(),
+        Some(checked),
+    )
 }

@@ -323,7 +323,9 @@ fn prepare_with_store(
     let forges = forges(&named.forges)?;
     let agent = named.worker.as_ref().map(|_| agent::preflight(&named)).transpose()?;
     let user = skein_shell::effective_user();
-    let files = read_files(named.files, user)?;
+    let mut named_files = named.files.into_vec();
+    named_files.extend(service::startup::setup_files(&checked));
+    let files = read_files(named_files.into_boxed_slice(), user)?;
     let bundle = named.bundle.as_deref().map(|configured| bundle::read(configured, named.bundle_limits)).transpose()?;
     let runtime = if let Some(worker) = &named.worker {
         let root_path = path(&worker.root);

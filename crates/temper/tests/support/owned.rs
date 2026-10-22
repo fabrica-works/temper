@@ -633,6 +633,7 @@ pub struct Bounded {
     pub files: temper_service::settings::Files,
     pub agent: temper_service::settings::Agent,
     pub seeds: temper_service::settings::Seeds,
+    setup: temper_forge_setup::check::Checked,
     forges: Box<[temper_service::ForgeRuntime]>,
 }
 impl Bounded {
@@ -670,7 +671,7 @@ impl Bounded {
     }
     #[must_use]
     pub fn requirements(&self) -> temper_service::startup::Requirements {
-        temper_service::startup::memory_requirements(
+        temper_service::startup::memory_requirements_with_setup(
             &self.document,
             &jig_protocol_config::Directories::working(),
             &self.files,
@@ -678,19 +679,24 @@ impl Bounded {
             &self.seeds,
             Some(&Self::accounts()),
             self.forges(),
+            &self.setup,
         )
         .unwrap_or_else(|why| panic!("{}", String::from_utf8_lossy(&temper_service::startup::lines(&why))))
     }
     pub fn startup(&self, document: &[u8]) -> Result<temper_service::Service, temper_service::startup::Problems> {
-        temper_service::startup(
+        temper_service::startup::with_setup(
             document,
             &jig_protocol_config::Directories::working(),
             &self.files,
-            &self.agent,
+            Some(&self.agent),
             &self.seeds,
             Some(Self::accounts()),
-            temper_service::WorkerRuntime { root: skein_io::kernel::Fd::new(9), path: b"/worker".as_slice().into() },
+            Some(temper_service::WorkerRuntime {
+                root: skein_io::kernel::Fd::new(9),
+                path: b"/worker".as_slice().into(),
+            }),
             self.forges(),
+            Some(&self.setup),
         )
     }
 }
@@ -799,16 +805,20 @@ fn bounded_document(directory: &Path, mut value: serde_json::Value, forge: tempe
     assert_eq!(agent.programs.len(), 1, "owned example declares Claude Code");
     agent.programs[0].path = path.as_bytes().into();
     agent.programs[0].directory = path.as_bytes().into();
-    let mut entries = List::with_capacity(u32::try_from(named.files.len()).expect("file count"));
+    let setup = checked_setup(&document, &named);
+    let mut named_files = named.files.into_vec();
+    named_files.extend(temper_service::startup::setup_files(&setup));
+    let mut entries = List::with_capacity(u32::try_from(named_files.len()).expect("file count"));
     let token_bytes =
         temper_service::limits::profile(temper_service::limits::Profile::Small).forge_component.token_bytes;
-    for file in named.files {
+    for file in named_files {
         let bytes = match file.path.as_ref() {
             b"forge-1/api_token" | b"demo/forge/api_token" => {
                 vec![b't'; usize::try_from(token_bytes).expect("token bound")]
             }
             b"forge-1/user" | b"demo/forge/user" => b"42".to_vec(),
-            b"forge-1/webhook_secret" => b"webhook-secret".to_vec(),
+            b"forge-1/webhook_secret" | b"demo/forge/webhook_secret" => b"webhook-secret".to_vec(),
+            b"demo/forge/admin_token" => b"0123456789abcdef0123456789abcdef01234567".to_vec(),
             b"forge-1/git_token" | b"demo/forge/git_token" => b"git-token".to_vec(),
             name => fs::read(directory.join(std::ffi::OsStr::from_bytes(name))).expect("fixture file"),
         };
@@ -816,11 +826,77 @@ fn bounded_document(directory: &Path, mut value: serde_json::Value, forge: tempe
     }
     Bounded {
         document,
+        setup,
         files: Files { entries },
         agent,
         seeds: Seeds { deployment: [7; 16], installation: [8; 16], seed: 7, crypto: Secret::new(Box::new([9; 32])) },
         forges: forges.into_boxed(),
     }
+}
+
+// The bounded strings are synthetic, but the setup check is the shell's check on these same members.
+fn checked_setup(bytes: &[u8], named: &temper_service::Named) -> temper_forge_setup::check::Checked {
+    use jig_protocol_config::{self as config, read};
+    use temper_forge_setup::check::{self, Members, User};
+    let document = config::document(bytes, &config::DocumentLimits { bytes: 1_048_576, tokens: 1_048_576, depth: 32 })
+        .expect("bounded document");
+    let application = read::Object::new(&document, 0)
+        .expect("bounded root")
+        .member(&document, b"application")
+        .expect("bounded application");
+    let at = read::Object::new(&document, application)
+        .expect("bounded application object")
+        .member(&document, b"setup")
+        .expect("bounded setup");
+    let mut forges = Vec::new();
+    for forge in &named.forges {
+        let mut identity = None;
+        for candidate in &named.identities {
+            if candidate.number == forge.identity {
+                identity = Some(candidate);
+                break;
+            }
+        }
+        let identity = identity.expect("named forge identity");
+        forges.push(check::Forge {
+            number: forge.number,
+            api: match &forge.api {
+                config::Address::Addr(address) => address.socket(),
+                config::Address::Host { .. } => None,
+            },
+            plaintext: matches!(forge.transport, temper_service::startup::Transport::Plaintext),
+            git: forge.git.clone(),
+            user: match &forge.user {
+                temper_service::startup::User::Id(id) => User::Id(*id),
+                temper_service::startup::User::File(path) => User::File(path.clone()),
+            },
+            api_token: forge.api_token.clone(),
+            webhook_secret: forge.webhook_secret.clone(),
+            identity_token: identity.token.clone(),
+            identity_login: identity.login.clone(),
+        });
+    }
+    let mut listeners = Vec::new();
+    if let config::Address::Addr(address) = &named.clients {
+        listeners.extend(address.socket());
+    }
+    let listener = match &named.webhooks {
+        Some(hooks) => match &hooks.listener {
+            config::Address::Addr(address) => address.socket(),
+            config::Address::Host { .. } => panic!("bounded webhooks use a socket"),
+        },
+        None => None,
+    };
+    listeners.extend(listener);
+    check::checked(
+        &document,
+        at,
+        &config::Directories::working(),
+        &Members { forges: forges.into_boxed_slice(), listeners: listeners.into_boxed_slice() },
+        listener,
+        &named.overrides,
+    )
+    .expect("bounded setup check")
 }
 
 /// Only this drift check writes the document's memory literals, in the established explicit mode.

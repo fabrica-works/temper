@@ -1,8 +1,9 @@
-//! Mapping the configured GitHub forges to the pinned host (protocol/setup.md, 5.1).
+//! Mapping the configured setup forges to the pinned host (protocol/setup.md, 5.1).
 use alloc::boxed::Box;
 use jig_protocol_config::{Path, Problems, What};
 use skein_forge_setup::{github, host};
 use skein_lib::{CryptoRng, List, Writer};
+use temper_forge_setup::setup::Mode;
 
 pub(super) fn fixed(
     config: &crate::settings::Engine,
@@ -14,10 +15,6 @@ pub(super) fn fixed(
     let mut configured = List::with_capacity(own.forge_component.forges);
     for endpoint in &forges.forges {
         let source = source_forge(config, endpoint.number);
-        // Forgejo's Given belongs to temper-14's setup configuration. No plan here uses it.
-        if source.kind != crate::settings::Kind::GitHub {
-            continue;
-        }
         let transport = match &endpoint.transport {
             skein_forge_connection::settings::Transport::Plaintext { name } => {
                 host::Transport::Plaintext { name: name.clone() }
@@ -34,6 +31,15 @@ pub(super) fn fixed(
             host::Transport::Tls { .. } => false,
         };
         if plaintext && !address.ip().is_loopback() {
+            continue;
+        }
+        // GitHub and owned/fake Forgejo entries have setup values; managed Forgejo waits for its setup.
+        if source.kind == crate::settings::Kind::Forgejo {
+            if let Some(given) = forgejo(config, source)? {
+                configured
+                    .push(host::Forge { kind: host::Kind::Forgejo(given), address: endpoint.address, transport })
+                    .expect("configured host forges");
+            }
             continue;
         }
         let url = listener(&config.clients.listener)?;
@@ -91,9 +97,43 @@ pub(super) fn fixed(
     };
     Ok((host::Settings { forges: configured, user_agent: Box::from(crate::forge::USER_AGENT.as_bytes()) }, limits))
 }
+fn forgejo(
+    config: &crate::settings::Engine,
+    source: &crate::settings::Forge,
+) -> Result<Option<skein_forge_setup::given::Given>, Problems> {
+    for setup in &config.setup {
+        if setup.entry.forge != source.number {
+            continue;
+        }
+        match &setup.entry.mode {
+            Mode::Owned(_) | Mode::Fake(_) => {
+                let listener = if source.webhook_secret.is_some() {
+                    match &config.webhooks {
+                        Some(hooks) => match hooks.listener {
+                            skein_io::Addr::Ip(address) => Some(address),
+                            skein_io::Addr::InProcess(_) => unreachable!("checked webhooks listener"),
+                        },
+                        None => None,
+                    }
+                } else {
+                    None
+                };
+                let given = temper_forge_setup::given::values(&setup.entry, listener, &config.limits.setup.plan());
+                if let Err(refused) = skein_forge_setup::given::check(&given) {
+                    let mut found = Problems::empty();
+                    problems(host::Unusable::Given { forge: source.number, refused }, &mut found);
+                    return Err(found);
+                }
+                return Ok(Some(given));
+            }
+            Mode::Managed { .. } => return Ok(None),
+        }
+    }
+    Ok(None)
+}
 pub(crate) fn prepare(
     config: &crate::settings::Engine,
-    forges: &skein_forge_connection::Settings,
+    forges: &mut skein_forge_connection::Settings,
     seed: &skein_lib::Secret,
     batch: u32,
 ) -> Result<super::Layer, Problems> {
@@ -113,9 +153,44 @@ pub(crate) fn prepare(
         if !layer.served.contains_key(&forge.number) {
             let reason: &[u8] = match forge.kind {
                 crate::settings::Kind::GitHub => b"setup host serves plaintext only on loopback",
-                crate::settings::Kind::Forgejo => b"Forgejo setup is temper-14's",
+                crate::settings::Kind::Forgejo => {
+                    let mut reason = b"Forgejo setup has no owned or fake entry".as_slice();
+                    for setup in &config.setup {
+                        if setup.entry.forge == forge.number {
+                            reason = match &setup.entry.mode {
+                                Mode::Managed { .. } => b"managed Forgejo setup is not staged yet",
+                                Mode::Owned(_) | Mode::Fake(_) => b"setup host serves plaintext only on loopback",
+                            };
+                            break;
+                        }
+                    }
+                    reason
+                }
             };
             layer.unserved.insert(forge.number, reason).expect("configured setup exclusions");
+        }
+    }
+    for setup in &config.setup {
+        if let Mode::Fake(fake) = &setup.entry.mode {
+            for index in 0..forges.forges.len() {
+                let forge = forges.forges.get_mut(index).expect("configured forge");
+                if forge.number == setup.entry.forge {
+                    layer
+                        .lifecycle
+                        .adoptions
+                        .insert(
+                            forge.number,
+                            super::lifecycle::Adoption {
+                                next: core::num::NonZeroU64::new(1).expect("first repository"),
+                                repositories: u64::try_from(fake.repositories.len()).expect("checked repositories"),
+                                admin_token: setup.handover.as_ref().expect("checked fake handover").clone(),
+                                access: forge.access.take().expect("fake access from files"),
+                            },
+                        )
+                        .expect("one adoption per fake forge");
+                    break;
+                }
+            }
         }
     }
     Ok(layer)
