@@ -68,7 +68,7 @@ pub fn scripted(scripts: Box<[api::Script]>) -> Recipe {
 }
 
 pub fn peer(recipe: Recipe) -> Result<Peer, skein_fake_peers::Error> {
-    Peer::new(
+    let mut peer = Peer::new(
         (Ipv4Addr::LOCALHOST, 0).into(),
         recipe.transport,
         recipe.limits,
@@ -77,7 +77,13 @@ pub fn peer(recipe: Recipe) -> Result<Peer, skein_fake_peers::Error> {
         recipe.protocol_limits,
         recipe.domain,
         recipe.domain_limits,
-    )
+    )?;
+    peer.accept(skein_llm::Credential {
+        value: crate::fixtures::SECOND_KEY.into(),
+        scheme: skein_llm::Scheme::Key,
+        account_id: Box::new([]),
+    })?;
+    Ok(peer)
 }
 
 /// Bind and drain the peer alone under exact ownership checking.

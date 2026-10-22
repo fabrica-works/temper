@@ -5,6 +5,8 @@ use std::{
     os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::Path,
 };
+/// A second key the fake LLM peer accepts, for the accounts' stories.
+pub const SECOND_KEY: &[u8] = b"real-loop-second-llm-key";
 pub const TOKEN: &[u8] = jig_channel_world::fixtures::TOKEN;
 pub const SEED: u64 = jig_channel_world::fixtures::SEED;
 pub const AGENT: &[u8] = b"/real-loop/temper-agent";
@@ -75,6 +77,7 @@ pub fn write(directory: &Path, llm: SocketAddr, forge: SocketAddr) -> std::io::R
     }
     private(&directory.join("worker.secret"), b"worker-secret")?;
     private(&directory.join("fixture.key"), jig_channel_world::fixtures::KEY)?;
+    private(&directory.join("second.key"), SECOND_KEY)?;
     private(&directory.join("secrets/forge-1.user"), b"42\n")?;
     private(&directory.join("secrets/forge-1.api-token"), b"forge-1-api-token-value")?;
     private(&directory.join("secrets/forge-1.git-token"), b"forge-1-git-token-value")?;
