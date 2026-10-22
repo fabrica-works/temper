@@ -122,8 +122,17 @@ pub fn revision_delegate() -> (Driver, engine::Assignment, u64) {
     (driver, parent, child)
 }
 
+/// jig's two default templates, the walking chat ended by its result.
 #[must_use]
 pub fn templates() -> Box<[jig_domain_core::Template]> {
+    templates_ending(jig_domain_tasks::EndedBy::Result)
+}
+
+/// jig's two default templates, the chat ended as `chat` says: by its
+/// requester, as temper's is configured (domain/agent.md, 4.6). The goal is
+/// ended by its result either way.
+#[must_use]
+pub fn templates_ending(chat: jig_domain_tasks::EndedBy) -> Box<[jig_domain_core::Template]> {
     use jig_domain_people::{TemplateBudget, TemplateDeadline, TemplateExecutor};
     use jig_domain_tasks::{Contract, Flags, Retention};
     Box::new([
@@ -137,7 +146,7 @@ pub fn templates() -> Box<[jig_domain_core::Template]> {
             deadline: TemplateDeadline::None,
             tracked: None,
             flags: Flags {
-                ended_by: jig_domain_tasks::EndedBy::Result,
+                ended_by: chat,
                 conversation: true,
                 listed: false,
                 retention: Retention::Kept,
