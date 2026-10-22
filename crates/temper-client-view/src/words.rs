@@ -274,6 +274,7 @@ pub enum Word {
 // Five chats heading, filter and empty phrases (client/README.md, 3.5).
 // An empty plan's line (5.8) and a waiting agent's Message note (5.11).
 // The composer's line and its chooser replace seven choice phrases (5.5).
+// A task's name over its words in a chat (client/README.md, 3.5).
 const PHRASES: u32 = 610;
 const ALL: [Word; 248] = [
     Word::ChangeModel,
@@ -967,10 +968,6 @@ impl Words {
 }
 const DEMO_REQUEST: &[&[u8]] = &[b"Try a request in ", b"/", b". Follow the task from its branch to a landed change."];
 #[expect(clippy::too_many_lines, reason = "one exhaustive table of the client's English words")]
-#[expect(
-    clippy::match_same_arms,
-    reason = "task speaker labels and chat names have separate wording that can change independently"
-)]
 fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
@@ -1092,8 +1089,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::LiveChats | Word::Live => (&[b"Live"], &[]),
         Word::ClosedChats => (&[b"Closed"], &[]),
         Word::MoreClosedChats => (&[b"More closed chats"], &[]),
-        Word::Chat => (&[b"T", b""], &[Number]),
-        Word::TaskWho => (&[b"T", b""], &[Number]),
+        Word::Chat | Word::TaskWho => (&[b"T", b""], &[Number]),
         Word::ChatSpend => (&[b"Spent ", b"; delegates spent ", b""], &[Number, Number]),
         Word::ChatDelegates => (&[b"", b" delegates"], &[Number]),
         Word::ChoiceProvider | Word::ChatTime => (&[b"", b""], &[Name]),

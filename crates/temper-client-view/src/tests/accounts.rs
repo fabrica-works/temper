@@ -460,6 +460,7 @@ mod memory_literal;
 // Their five phrases add five entries' room, 740 B.
 // Naming navigation and cards adds two phrases (296 B).
 // A committed turn's own text budget prices both conversation drawings.
+// A task's name over its words in a chat adds one phrase (148 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
 const ACCOUNT_BYTES: u64 = 6995924867;
 #[test]

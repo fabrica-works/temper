@@ -858,13 +858,10 @@ fn a_tasks_words_have_an_agent_shell_named_by_the_task() {
     let tree = b.finish();
     let turn = styled(&tree, crate::look::TURN);
     let message = styled(&tree, crate::look::BY_AGENT);
-    let mut agent_in_turn = false;
-    for node in subtree(&tree, turn) {
-        if node.styles.as_slice().contains(&crate::look::BY_AGENT) {
-            agent_in_turn = true;
-        }
+    #[expect(clippy::disallowed_methods, reason = "the view assertion searches the bounded turn's nodes")]
+    {
+        assert!(subtree(&tree, turn).iter().any(|node| node.styles.as_slice().contains(&crate::look::BY_AGENT)));
     }
-    assert!(agent_in_turn);
     let mut paragraphs = List::with_capacity(3);
     for node in subtree(&tree, message) {
         assert_ne!(node.role, Role::Status);
