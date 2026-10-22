@@ -221,6 +221,10 @@ impl Joint {
         const EXECUTORS: u32 = 1;
         const POLICY_OUT: u32 = a::POLICY_MAX_OUT;
         let mut config = walking::config(seed);
+        config.core.connectors = Box::new([1]);
+        for role in config.core.permission_roles.get_mut(&PROJECT).expect("project permissions").iter_mut() {
+            role.connector = 1;
+        }
         let mut rules = config.core.authority.rules().clone();
         let mut policy = config.core.authority.policy(PROJECT).expect("project").clone();
         let kinds: Box<[a::Executor]> = Box::new([a::Executor::Procedure(PROCEDURE)]);
@@ -242,6 +246,19 @@ impl Joint {
     #[must_use]
     pub fn hosted_attempt(&self, task: u64) -> Option<u64> {
         self.hosting.get(&task).copied()
+    }
+
+    /// Whether the client's change panel still has its application route.
+    #[must_use]
+    pub fn watching_change(&self, client: ClientId, task: u64) -> bool {
+        use jig_client_test_domain::family::Kind;
+        use jig_client_world::joint::transport::Watched;
+        self.transport.watches().into_iter().any(|watcher| {
+            let route = self.transport.watch(watcher).expect("live watch");
+            route.client == client
+                && matches!(route.subject, Watched::Application { subject, .. } if subject.kind == Kind::Panel(task))
+                && self.transport.application_watch_token(client, route.native) == Some(watcher)
+        })
     }
 
     /// client/README.md, 8 and 10: a pushed change lands through CI and an agent gate.
@@ -892,6 +909,13 @@ impl Front<Temper> for Joint {
                 },
         }) = event
             && let Some(event) = self.transport.taken(who, *watch)
+        {
+            self.send(translate::party(event));
+        }
+        if let Event::Root(RootEvent::Client {
+            event: jig_client::Event::Up { up: jig_client::Up::FamilyDelivered { watch, .. } },
+        }) = event
+            && let Some(event) = self.transport.application_taken(who, *watch)
         {
             self.send(translate::party(event));
         }

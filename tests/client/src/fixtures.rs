@@ -16,6 +16,26 @@ use temper_engine_domain_world::direct::Driver;
 pub const NOW: skein_lib::Wall = skein_lib::Wall::EPOCH;
 pub const FORGE: u16 = temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Forge);
 pub const FORGE_HOST: &[u8] = b"forge.example";
+/// The stand speaks Forgejo, with walking's forge number, writer and git host.
+#[must_use]
+pub fn forge_settings() -> [temper_service::settings::Forge; 1] {
+    use temper_service::settings::{Forge, Kind, Transport};
+    let mut base = b"http://".to_vec();
+    base.extend_from_slice(FORGE_HOST);
+    [Forge {
+        number: 1,
+        kind: Kind::Forgejo,
+        api: jig_protocol_config::Address::Host { name: FORGE_HOST.into(), port: 80 },
+        transport: Transport::Plaintext,
+        git: base.clone().into(),
+        git_program: None,
+        web: Some(base.into()),
+        api_token: None,
+        webhook_secret: None,
+        user: 1,
+        identity: 1,
+    }]
+}
 pub const REPOSITORIES: &[(&[u8], &[u8], u32)] = &[(b"acme", b"shop", 7), (b"acme", b"second", 8)];
 pub const PARTY: u64 = 1;
 pub const SEED: u64 = 1101;
@@ -771,7 +791,7 @@ pub fn dependency_item(task: u64, find: skein_fake_person::Find) -> skein_fake_p
         },
     ]))
 }
-const FORGE_CONNECTOR: u16 = 0;
+const FORGE_CONNECTOR: u16 = 1;
 const NO_TOOLS: u64 = 0;
 const FORGE_PROCEDURE: u32 = 2;
 const FORGE_CHANGE: u16 = 1;

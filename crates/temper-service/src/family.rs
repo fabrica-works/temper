@@ -125,7 +125,7 @@ pub fn to_root(
 /// Encode the whole retained panel, deriving its public address from configuration
 /// (client/forge.md, 9.2). No domain record carries a deployment's web address.
 #[must_use]
-pub(crate) fn panel(value: forge::Panel, forges: &[crate::settings::Forge], limits: &w::Limits) -> Option<Box<[u8]>> {
+pub fn panel(value: forge::Panel, forges: &[crate::settings::Forge], limits: &w::Limits) -> Option<Box<[u8]>> {
     let pull = match value.pull {
         Some(number) => {
             Some(w::Pull::new(limits, w::PullParts { number, address: address(&value, number, forges)? }).ok()?)

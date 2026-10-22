@@ -2506,6 +2506,7 @@ dependencies = [
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-domain-views",
+ "jig-protocol-config",
  "jig-protocol-transcript",
  "jig-test-domain",
  "skein-fake-person",

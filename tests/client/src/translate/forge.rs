@@ -168,6 +168,120 @@ pub fn request(
         request: adoption(&value, crate::fixtures::FORGE_HOST),
     })
 }
+/// Open only the forge's whole, project-scoped change subject (client/forge.md, 9.2).
+#[must_use]
+pub fn open(
+    transport: &mut Transport,
+    who: ClientId,
+    watch: Token,
+    scope: jig_client::contract::Scope,
+    window: &jig_client::contract::Window,
+    record: &jig_client::Family,
+) -> (Vec<engine::Event>, Option<jig_client_world::joint::packets::Incoming>) {
+    use jig_client_test_domain::family;
+    use jig_client_world::joint::transport::Watched;
+    use temper_client_protocol_wire::{self as w, v1};
+    if record.family == w::FORGE
+        && record.version == w::CLIENT_VERSION
+        && let Some(watching) = w::decode_watching(&record.bytes, &v1::CEILINGS)
+        && let jig_client::contract::Scope::Project(project) = scope
+    {
+        let v1::Watch::Change(change) = watching.into_parts().watch;
+        if change.task() > 0 {
+            let scope = jig_domain_people::ApplicationScope::Project(project);
+            let watcher = transport.open(
+                who,
+                watch,
+                Watched::Application {
+                    subject: family::Subject {
+                        scope: family::Scope::Project(project),
+                        kind: family::Kind::Panel(change.task()),
+                    },
+                    scope,
+                },
+            );
+            return (
+                vec![engine::Event::Party(PartyInput::Watch {
+                    watcher,
+                    sign_in: transport.sign_in(who).expect("authenticated watch"),
+                    subject: jig_domain_core::documents::Watched::Application {
+                        scope,
+                        connector: w::FORGE,
+                        subject: Token::new(change.task()),
+                    },
+                    // The family does not use its window: every panel is whole.
+                    window: jig_domain_core::documents::Window { rows: window.rows, after: None },
+                })],
+                None,
+            );
+        }
+    }
+    (
+        Vec::new(),
+        Some(jig_client_world::joint::packets::Incoming::Callback {
+            client: who,
+            event: jig_client_test_domain::Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::WatchEnded { watch, end: jig_client::contract::WatchEnd::Unknown },
+                },
+            },
+        }),
+    )
+}
+
+fn is_application(transport: &Transport, watcher: Token) -> bool {
+    matches!(
+        transport.watch(watcher).map(|route| &route.subject),
+        Some(jig_client_world::joint::transport::Watched::Application { .. })
+    )
+}
+
+fn ended(
+    transport: &mut Transport,
+    watcher: Token,
+    end: jig_client::contract::WatchEnd,
+) -> Option<(ClientId, client::Event)> {
+    let route = transport.end_watch(watcher)?;
+    if end == jig_client::contract::WatchEnd::SignedOut {
+        transport.signed_out(route.client);
+    }
+    Some((
+        route.client,
+        client::Event::Client {
+            event: jig_client::Event::Up { up: jig_client::Up::WatchEnded { watch: route.native, end } },
+        },
+    ))
+}
+
+fn delivered(transport: &mut Transport, watcher: Token, panel: owner::Panel) -> Option<(ClientId, client::Event)> {
+    if !is_application(transport, watcher) {
+        return None;
+    }
+    let route = transport.watch(watcher).expect("original application route").clone();
+    let bytes = temper_service::family::panel(
+        panel,
+        &crate::fixtures::forge_settings(),
+        &temper_client_protocol_wire::v1::CEILINGS,
+    )
+    .expect("whole forge panel");
+    assert!(transport.delivered(watcher, jig_client_world::joint::transport::Pace::Document));
+    Some((
+        route.client,
+        client::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::FamilyDelivered {
+                    watch: route.native,
+                    record: jig_client::Family {
+                        family: temper_client_protocol_wire::FORGE,
+                        version: temper_client_protocol_wire::CLIENT_VERSION,
+                        bytes,
+                    },
+                },
+            },
+        },
+    ))
+}
+
 /// # Errors
 /// Returns every request belonging to another owner unchanged.
 pub fn incoming(
@@ -176,6 +290,9 @@ pub fn incoming(
     limits: &jig_client::DomainLimits,
 ) -> Result<Option<(ClientId, client::Event)>, Box<engine::Request>> {
     let delivery = match request {
+        engine::Request::Party(PartyRequest::WatchRefused { watcher, why }) if is_application(transport, watcher) => {
+            return Ok(ended(transport, watcher, wire::watches::refused(why)));
+        }
         engine::Request::Party(PartyRequest::Deliver(delivery)) => delivery,
         request @ (engine::Request::Store(_)
         | engine::Request::Worker(_)
@@ -191,6 +308,17 @@ pub fn incoming(
         )) => return Err(Box::new(request)),
     };
     let (to, body) = match delivery {
+        Delivery::Panel { watcher, panel } => return Ok(delivered(transport, watcher, *panel)),
+        Delivery::WatchEnded { watcher, why } if is_application(transport, watcher) => {
+            let end = match why {
+                jig_domain_views::End::Gone => jig_client::contract::WatchEnd::Unknown,
+                why @ (jig_domain_views::End::Unwatched
+                | jig_domain_views::End::NotAllowed
+                | jig_domain_views::End::SignedOut
+                | jig_domain_views::End::Stopping) => wire::watches::ended(why),
+            };
+            return Ok(ended(transport, watcher, end));
+        }
         Delivery::Application { to, outcome: value } => (to, value),
         Delivery::WebReply { to, reply } => {
             // Preserve the affine answer right until its route is known.
@@ -226,8 +354,7 @@ pub fn incoming(
                 },
             )));
         }
-        delivery @ (Delivery::Panel { .. }
-        | Delivery::SourceSignedOut { .. }
+        delivery @ (Delivery::SourceSignedOut { .. }
         | Delivery::Result { .. }
         | Delivery::Host(_)
         | Delivery::Link { .. }
@@ -286,4 +413,290 @@ fn answered(route: &Reply, body: Option<owner::ApplicationOutcome>) -> (ClientId
             },
         },
     )
+}
+
+#[cfg(test)]
+mod watch_tests {
+    use super::*;
+    use jig_client::{Down, Watchable, contract as c};
+    use jig_client_world::joint::transport::Transport;
+    use skein_lib::Token;
+    use temper_client_protocol_wire::{self as w, v1};
+
+    const CLIENT: ClientId = ClientId(0);
+    const NATIVE: Token = Token::new(91);
+    const TASK: u64 = 7;
+    const SIGN_IN: u64 = 23;
+
+    fn transport() -> Transport {
+        let mut transport = Transport::new(c::VersionRange {
+            first: jig_client_protocol_wire::VERSION,
+            last: jig_client_protocol_wire::VERSION,
+        });
+        transport.bind(
+            CLIENT,
+            crate::fixtures::PARTY,
+            jig_domain_people::Identity {
+                key: jig_domain_people::IdentityKey { provider: 0, subject: 1_u64.to_be_bytes().into() },
+                login: b"person".as_slice().into(),
+                name: b"Person".as_slice().into(),
+            },
+        );
+        transport.signed_in(CLIENT, crate::fixtures::PARTY, SIGN_IN);
+        transport
+    }
+
+    fn record(task: u64) -> jig_client::Family {
+        let subject = v1::ChangeSubject::new(&v1::CEILINGS, v1::ChangeSubjectParts { task }).expect("subject");
+        let watching =
+            v1::Watching::new(&v1::CEILINGS, v1::WatchingParts { watch: v1::Watch::Change(subject) }).expect("watch");
+        jig_client::Family { family: w::FORGE, version: w::CLIENT_VERSION, bytes: w::watching(&watching) }
+    }
+
+    fn request(
+        transport: &mut Transport,
+        record: jig_client::Family,
+        scope: c::Scope,
+    ) -> (Vec<engine::Event>, Option<jig_client_world::joint::packets::Incoming>) {
+        let mut request = client::Request::Client {
+            request: jig_client::Request::Down {
+                down: Down::Open {
+                    watch: NATIVE,
+                    subject: Watchable::Family { scope, window: c::Window { rows: 0, after: None }, record },
+                },
+            },
+        };
+        crate::translate::request(transport, CLIENT, &mut request, &crate::fixtures::domain_limits().client.domain)
+    }
+
+    fn open_watch(transport: &mut Transport) -> Token {
+        let (events, packet) = request(transport, record(TASK), c::Scope::Project(1));
+        assert!(packet.is_none());
+        let [engine::Event::Party(PartyInput::Watch { watcher, sign_in, subject, window })] = events.as_slice() else {
+            panic!("one root watch: {events:?}")
+        };
+        assert_eq!(*sign_in, SIGN_IN);
+        assert_eq!(
+            *subject,
+            jig_domain_core::documents::Watched::Application {
+                scope: jig_domain_people::ApplicationScope::Project(1),
+                connector: w::FORGE,
+                subject: Token::new(TASK),
+            }
+        );
+        assert_eq!(window.rows, 0);
+        assert!(window.after.is_none());
+        assert_eq!(transport.application_watch_token(CLIENT, NATIVE), Some(*watcher));
+        let route = transport.watch(*watcher).expect("application route");
+        assert_eq!(route.client, CLIENT);
+        assert_eq!(route.native, NATIVE);
+        assert!(matches!(
+            route.subject,
+            jig_client_world::joint::transport::Watched::Application {
+                subject: jig_client_test_domain::family::Subject {
+                    scope: jig_client_test_domain::family::Scope::Project(1),
+                    kind: jig_client_test_domain::family::Kind::Panel(TASK),
+                },
+                scope: jig_domain_people::ApplicationScope::Project(1),
+            }
+        ));
+        *watcher
+    }
+
+    #[test]
+    fn a_change_watch_opens_the_roots_project_scoped_application_watch() {
+        open_watch(&mut transport());
+    }
+
+    #[test]
+    fn invalid_change_watches_are_unknown_without_entering_the_root() {
+        let mut version = record(TASK);
+        version.version += 1;
+        let mut undecodable = record(TASK);
+        undecodable.bytes = Box::new([]);
+        let mut trailing = record(TASK);
+        trailing.bytes = trailing.bytes.iter().copied().chain([0]).collect();
+        let mut family = record(TASK);
+        family.family += 1;
+        for (record, scope) in [
+            (version, c::Scope::Project(1)),
+            (undecodable, c::Scope::Project(1)),
+            (trailing, c::Scope::Project(1)),
+            (record(0), c::Scope::Project(1)),
+            (family, c::Scope::Project(1)),
+            (record(TASK), c::Scope::Deployment),
+            (record(TASK), c::Scope::Own),
+        ] {
+            let mut transport = transport();
+            let (events, packet) = request(&mut transport, record, scope);
+            assert!(events.is_empty());
+            assert!(transport.watches().is_empty());
+            assert!(matches!(
+                packet,
+                Some(jig_client_world::joint::packets::Incoming::Callback {
+                    client: CLIENT,
+                    event: jig_client_test_domain::Event::Client {
+                        event: jig_client::Event::Up {
+                            up: jig_client::Up::WatchEnded { watch: NATIVE, end: c::WatchEnd::Unknown },
+                        }
+                    },
+                })
+            ));
+        }
+    }
+
+    #[test]
+    fn a_whole_panel_reaches_its_native_client_route_and_is_acknowledged_once() {
+        let mut front =
+            crate::front::Joint::with_change_landing(crate::fixtures::SEED, &crate::fixtures::domain_limits());
+        crate::fixtures::adopt_change_repository(&mut front);
+        front.engine.forge.as_mut().expect("stand").push_branch(7, b"temper/panel");
+        let task = crate::fixtures::goal_with_pushed_change(&mut front, b"temper/panel");
+        let mut transport = transport();
+        transport.signed_in(CLIENT, crate::fixtures::PARTY, front.engine.session());
+        let (events, packet) = request(&mut transport, record(task), c::Scope::Project(1));
+        assert!(packet.is_none());
+        let watcher = transport.application_watch_token(CLIENT, NATIVE).expect("route");
+        for event in events {
+            front.engine.send(event);
+        }
+        front.engine.settle();
+        let panel = front
+            .engine
+            .delivered
+            .iter()
+            .find_map(|delivery| {
+                if let Delivery::Panel { watcher: original, panel } = delivery
+                    && *original == watcher
+                {
+                    Some(panel.clone())
+                } else {
+                    None
+                }
+            })
+            .expect("root's whole panel");
+        let expected = temper_service::family::panel(*panel.clone(), &crate::fixtures::forge_settings(), &v1::CEILINGS)
+            .expect("service encoding");
+        let delivered = incoming(
+            &mut transport,
+            engine::Request::Party(PartyRequest::Deliver(Delivery::Panel { watcher, panel })),
+            &crate::fixtures::domain_limits().client.domain,
+        )
+        .expect("forge route")
+        .expect("delivery");
+        let (
+            who,
+            client::Event::Client {
+                event: jig_client::Event::Up { up: jig_client::Up::FamilyDelivered { watch, record } },
+            },
+        ) = delivered
+        else {
+            panic!("forge's family delivery")
+        };
+        assert_eq!(who, CLIENT);
+        assert_eq!(watch, NATIVE);
+        assert_eq!(record.family, w::FORGE);
+        assert_eq!(record.version, w::CLIENT_VERSION);
+        assert_eq!(record.bytes, expected);
+        let panel = w::decode_change_panel(&record.bytes, &v1::CEILINGS).expect("whole panel bytes");
+        assert_eq!(panel.task(), task);
+        assert_eq!(panel.owner(), b"acme");
+        assert_eq!(panel.name(), b"shop");
+        assert!(
+            matches!(transport.application_taken(CLIENT, NATIVE), Some(jig_domain_core::Event::Delivered { watcher: original }) if original == watcher)
+        );
+        assert!(transport.application_taken(CLIENT, NATIVE).is_none());
+    }
+
+    #[test]
+    fn closing_a_change_watch_unwatches_and_keeps_its_route_until_the_terminal() {
+        let mut transport = transport();
+        let watcher = open_watch(&mut transport);
+        let mut request =
+            client::Request::Client { request: jig_client::Request::Down { down: Down::Close { watch: NATIVE } } };
+        let (events, packet) = crate::translate::request(
+            &mut transport,
+            CLIENT,
+            &mut request,
+            &crate::fixtures::domain_limits().client.domain,
+        );
+        assert!(packet.is_none());
+        assert!(
+            matches!(events.as_slice(), [engine::Event::Party(PartyInput::Unwatch { watcher: original })] if *original == watcher)
+        );
+        assert!(transport.application_watch_token(CLIENT, NATIVE).is_none());
+        assert!(transport.watch(watcher).is_some());
+        let terminal = incoming(
+            &mut transport,
+            engine::Request::Party(PartyRequest::Deliver(Delivery::WatchEnded {
+                watcher,
+                why: jig_domain_views::End::Unwatched,
+            })),
+            &crate::fixtures::domain_limits().client.domain,
+        )
+        .expect("forge terminal")
+        .expect("callback");
+        assert!(matches!(
+            terminal,
+            (
+                CLIENT,
+                client::Event::Client {
+                    event: jig_client::Event::Up {
+                        up: jig_client::Up::WatchEnded { watch: NATIVE, end: c::WatchEnd::Closed }
+                    }
+                }
+            )
+        ));
+        assert!(transport.watch(watcher).is_none());
+    }
+
+    #[test]
+    fn application_refusals_and_ends_use_temper_callbacks_and_retire_the_route() {
+        for why in [
+            jig_domain_core::WatchRefusal::Unknown,
+            jig_domain_core::WatchRefusal::Busy,
+            jig_domain_core::WatchRefusal::NotAllowed,
+            jig_domain_core::WatchRefusal::SignedOut,
+        ] {
+            let mut transport = transport();
+            let watcher = open_watch(&mut transport);
+            let expected = wire::watches::refused(why);
+            let terminal = incoming(
+                &mut transport,
+                engine::Request::Party(PartyRequest::WatchRefused { watcher, why }),
+                &crate::fixtures::domain_limits().client.domain,
+            )
+            .expect("forge refusal")
+            .expect("terminal");
+            assert!(
+                matches!(terminal, (CLIENT, client::Event::Client { event: jig_client::Event::Up { up: jig_client::Up::WatchEnded { watch: NATIVE, end } } }) if end == expected)
+            );
+            assert!(transport.watch(watcher).is_none());
+            assert_eq!(transport.sign_in(CLIENT).is_none(), expected == c::WatchEnd::SignedOut);
+        }
+        for why in [
+            jig_domain_views::End::Gone,
+            jig_domain_views::End::Unwatched,
+            jig_domain_views::End::NotAllowed,
+            jig_domain_views::End::SignedOut,
+            jig_domain_views::End::Stopping,
+        ] {
+            let mut transport = transport();
+            let watcher = open_watch(&mut transport);
+            let expected =
+                if why == jig_domain_views::End::Gone { c::WatchEnd::Unknown } else { wire::watches::ended(why) };
+            let terminal = incoming(
+                &mut transport,
+                engine::Request::Party(PartyRequest::Deliver(Delivery::WatchEnded { watcher, why })),
+                &crate::fixtures::domain_limits().client.domain,
+            )
+            .expect("forge end")
+            .expect("terminal");
+            assert!(
+                matches!(terminal, (CLIENT, client::Event::Client { event: jig_client::Event::Up { up: jig_client::Up::WatchEnded { watch: NATIVE, end } } }) if end == expected)
+            );
+            assert!(transport.watch(watcher).is_none());
+            assert_eq!(transport.sign_in(CLIENT).is_none(), expected == c::WatchEnd::SignedOut);
+        }
+    }
 }

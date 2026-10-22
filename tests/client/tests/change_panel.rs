@@ -1,13 +1,15 @@
 //! client/README.md, 8 and 10; domain/forge.md, 8.2–8.8.
-//! The landing half of the panel story, with each step's external facts at hand.
+//! A task page watches the whole change through CI, its gate and landing.
 use jig_client::contract as c;
-use jig_client_world::harness::{Until, World};
+use jig_client_world::harness::{ClientId, Until, World};
 use jig_domain_tasks as tasks;
 use skein_fake_person::{Find, Step};
 use skein_forge::api;
 use skein_lib::Token;
 use skein_world::domain::Verdict;
 use std::fmt::Write as _;
+use temper_client_domain::forge::panel::State;
+use temper_client_protocol_wire::v1 as w;
 use temper_client_world::{app::Temper, fixtures, front::Joint};
 use temper_engine_domain as engine;
 use temper_engine_domain_world::forge_stand::ForgeStand;
@@ -42,9 +44,47 @@ fn facts(front: &mut Joint) -> Facts {
 }
 
 // Joint polling fires deadlines and settles immediate work at simulated time.
-fn step(world: &mut World<Temper, Joint>) {
+fn step(world: &mut World<Temper, Joint>, person: ClientId, panels: &mut Vec<w::ChangePanel>) {
     let outcome = world.run(Until::Steps(2));
-    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+    assert!(matches!(outcome.verdict, Verdict::Passed | Verdict::Open { .. }), "{outcome:?}");
+    keep_panel(world, person, panels);
+}
+
+fn keep_panel(world: &World<Temper, Joint>, person: ClientId, panels: &mut Vec<w::ChangePanel>) {
+    if let Some(panel) = world.root(person).person().forge().panel() {
+        match &panel.state {
+            State::Loading => {}
+            State::Shown(value) => {
+                if panels.last() != Some(value.as_ref()) {
+                    if let Some(previous) = panels.last() {
+                        assert!(
+                            order(value.step()) >= order(previous.step()),
+                            "panel went backwards: {panels:?} -> {value:?}"
+                        );
+                    }
+                    panels.push(value.as_ref().clone());
+                }
+            }
+            State::Unknown | State::Ended(_) => panic!("change watch ended: {panel:?}"),
+        }
+    }
+}
+
+// client/forge.md, 2.1 and 9.2: the successful handed-branch path.
+fn order(step: &w::Step) -> u8 {
+    match step {
+        w::Step::Producing => 0,
+        w::Step::Opening => 1,
+        w::Step::Checking => 2,
+        w::Step::Gating => 3,
+        w::Step::Queued(_) => 4,
+        w::Step::First => 5,
+        w::Step::Landing => 6,
+        w::Step::Landed(_) => 7,
+        w::Step::Recreating | w::Step::Reopening | w::Step::Updating | w::Step::Resolving | w::Step::Repairing(_) => {
+            panic!("the passing head needs no recovery: {step:?}")
+        }
+    }
 }
 
 fn pull_opened(front: &Joint, goal: u64) -> bool {
@@ -92,11 +132,14 @@ fn a_change_handed_its_pushed_branch_lands_after_ci_and_its_gate() {
     };
     let goal = fixtures::goal_with_pushed_change(world.front(), BRANCH);
 
+    let person = world.client(fixtures::PARTY, fixtures::task_page(goal));
+    let mut panels = Vec::new();
+
     for _ in 0..STEPS {
         if pull_opened(world.front(), goal) {
             break;
         }
-        step(&mut world);
+        step(&mut world, person, &mut panels);
     }
     assert!(pull_opened(world.front(), goal), "pull opened within the step budget");
     let opened = facts(world.front());
@@ -111,7 +154,7 @@ fn a_change_handed_its_pushed_branch_lands_after_ci_and_its_gate() {
         if gate_task(world.front(), goal).is_some() {
             break;
         }
-        step(&mut world);
+        step(&mut world, person, &mut panels);
     }
     let gate = gate_task(world.front(), goal).expect("gate assigned within the step budget");
     let checked = facts(world.front());
@@ -136,10 +179,11 @@ fn a_change_handed_its_pushed_branch_lands_after_ci_and_its_gate() {
     }
     assert!(gate.spec.parameters.contains(&tasks::Parameter::Bytes { name: 8, value: hexadecimal.as_bytes().into() }));
 
-    let person = world.client(fixtures::PARTY, fixtures::task_page(goal));
     world.person(person, vec![Step::See { find: Find::text(b"Shown on the forge."), within: fixtures::WITHIN }]);
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+    keep_panel(&world, person, &mut panels);
+    panel_waiting_for_gate(panels.last().expect("gate panel"), &checked);
 
     let verdict = tasks::TaskResult::Verdict { code: 1, fields: Box::new([]), words: b"approved".as_slice().into() };
     world.front().engine.answer(
@@ -155,7 +199,7 @@ fn a_change_handed_its_pushed_branch_lands_after_ci_and_its_gate() {
         if world.front().engine.task(goal).is_none() {
             break;
         }
-        step(&mut world);
+        step(&mut world, person, &mut panels);
     }
     assert!(world.front().engine.task(goal).is_none(), "change finished within the step budget");
     let gate_key = engine::Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(gate.number)));
@@ -176,7 +220,116 @@ fn a_change_handed_its_pushed_branch_lands_after_ci_and_its_gate() {
     world.person(person, vec![Step::See { find: Find::text(b"Shown on the forge."), within: fixtures::WITHIN }]);
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+    keep_panel(&world, person, &mut panels);
     let root = world.root(person).person();
     let document = root.pages().task().expect("task page").document(root.client()).expect("finished task document");
     finished(document, goal, landed.pull.number);
+    panels_landed(&panels, goal, head, &opened, &checked, merge);
+    quiet(&mut world, person, goal, panels.last().expect("landed panel"), outcome.callbacks);
+}
+
+fn panel_waiting_for_gate(panel: &w::ChangePanel, facts: &Facts) {
+    assert_eq!(panel.step(), &w::Step::Gating);
+    assert_eq!(panel.pull().as_ref().expect("pull opened").number(), facts.pull.number);
+    assert_eq!(panel.head(), &Some(facts.pull.commit));
+    assert_eq!(panel.ci(), &w::Ci::Passed);
+    let [gate] = panel.gates().as_slice() else { panic!("one blocking gate") };
+    assert!(gate.blocks());
+    assert_ne!(gate.verdict(), &w::Verdict::Approved);
+}
+
+fn panels_landed(
+    panels: &[w::ChangePanel],
+    goal: u64,
+    head: api::Commit,
+    opened: &Facts,
+    checked: &Facts,
+    merge: api::Commit,
+) {
+    let last = panels.last().expect("change panel delivered");
+    assert_eq!(last.task(), goal);
+    assert_eq!(last.forge(), REPOSITORY.forge);
+    assert_eq!(last.owner(), b"acme");
+    assert_eq!(last.name(), b"shop");
+    assert_eq!(last.branch(), BRANCH);
+    assert_eq!(last.landing(), BASE);
+    assert_eq!(last.head(), &Some(head));
+    assert_eq!(last.pull().as_ref().expect("pull in panel").number(), opened.pull.number);
+    assert_eq!(last.ci(), &w::Ci::Passed);
+    let [gate] = last.gates().as_slice() else { panic!("one gate in the panel") };
+    assert_eq!(gate.number(), 1);
+    assert_eq!(gate.kind(), &w::GateKind::Review);
+    assert!(gate.blocks());
+    assert_eq!(gate.verdict(), &w::Verdict::Approved);
+    let w::Step::Landed(result) = last.step() else { panic!("landed panel: {panels:?}") };
+    assert_eq!(result.merge(), &merge);
+    assert!(panels.iter().any(|panel| matches!(panel.step(), w::Step::Gating)));
+    for panel in panels {
+        assert_eq!(panel.task(), goal);
+        if let Some(pull) = panel.pull() {
+            assert_eq!(pull.number(), opened.pull.number);
+            assert_eq!(
+                pull.address(),
+                format!("http://forge.example/acme/shop/pulls/{}", opened.pull.number).as_bytes()
+            );
+        }
+        if panel.ci() == &w::Ci::Passed {
+            assert_eq!(panel.head(), &Some(checked.pull.commit));
+        }
+    }
+}
+
+fn quiet(world: &mut World<Temper, Joint>, person: ClientId, goal: u64, last: &w::ChangePanel, mut callbacks: u64) {
+    let handle = world.root(person).person().forge().panel().expect("panel slot").handle.expect("live handle");
+    assert_eq!(
+        world.root(person).person().client().document(handle).expect("live document").state,
+        jig_client::State::Live
+    );
+    assert!(world.front().watching_change(person, goal));
+    // Taking the last delivery can release another task document. Drain those
+    // acknowledgements before checking the retained, idle watch.
+    let mut settled = false;
+    for _ in 0..STEPS {
+        let outcome = world.run(Until::Done);
+        assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+        if outcome.callbacks == callbacks {
+            settled = true;
+            break;
+        }
+        callbacks = outcome.callbacks;
+    }
+    assert!(settled, "final delivery acknowledgements settle within the step budget");
+    // With the final deliveries consumed, settling again has no callback at all.
+    let quiet = world.run(Until::Done);
+    assert_eq!(quiet.verdict, Verdict::Passed, "{quiet:?}");
+    assert_eq!(quiet.callbacks, callbacks, "no new delivery while the retained change is quiet");
+    assert!(world.front().engine.root.quiescent());
+    assert!(world.front().watching_change(person, goal));
+    let panel = world.root(person).person().forge().panel().expect("quiet panel");
+    assert_eq!(panel.handle, Some(handle));
+    assert_eq!(panel.state, State::Shown(Box::new(last.clone())));
+}
+
+#[test]
+fn a_forge_procedure_without_a_change_has_an_unknown_panel() {
+    let mut world = fixtures::world(fixtures::SEED);
+    let task = fixtures::goal_with_forge_panel(world.front());
+    let procedure = world.front().engine.task(task).expect("live procedure").executor;
+    assert_eq!(procedure, tasks::Executor::Procedure { connector: 1, code: 2 });
+    assert!(
+        !world.front().engine.store.rows.values().any(|record| {
+            matches!(record, engine::Record::Forge { row } if matches!(row.as_ref(),
+            temper_engine_domain_forge::Stored::Change(change) if change.task == task))
+        }),
+        "the existing procedure fixture has no connector change"
+    );
+    let person = world.client(fixtures::PARTY, fixtures::task_page(task));
+    world.person(person, vec![Step::See { find: Find::text(b"Shown on the forge."), within: fixtures::WITHIN }]);
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+    let panel = world.root(person).person().forge().panel().expect("procedure's panel slot");
+    assert_eq!(panel.subject.task, task);
+    assert_eq!(panel.state, State::Unknown);
+    assert!(panel.handle.is_none());
+    assert!(!world.front().watching_change(person, task));
 }

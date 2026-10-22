@@ -181,14 +181,18 @@ pub fn request(
             }
         }
         Down::Close { watch } => {
-            if let Some(watcher) = transport.watch_token(who, *watch) {
+            if let Some(watcher) =
+                transport.application_watch_token(who, *watch).or_else(|| transport.watch_token(who, *watch))
+            {
                 let terminals = transport.close_watch(watcher);
                 events.push(party(core::Event::Unwatch { watcher }));
                 events.extend(terminals.into_iter().map(party));
             }
         }
         Down::Read { what: Readable::Family { .. }, .. } => panic!("the front answers family reads"),
-        Down::Open { subject: Watchable::Family { .. }, .. } => panic!("no forge watches"),
+        Down::Open { watch, subject: Watchable::Family { scope, window, record } } => {
+            return forge::open(transport, who, *watch, *scope, window, record);
+        }
         Down::Save { .. } | Down::Erase { .. } => panic!("shell duty never goes on wire"),
     }
     (events, None)
