@@ -1,6 +1,6 @@
 # temper's client
 
-Provisional, 2026-10-14, revised 2026-10-21. temper's client: temper's own
+Provisional, 2026-10-14, revised 2026-10-22. temper's client: temper's own
 presentation on jig's client, `jig-client`. Its crates; its client root,
 which holds `jig-client` and temper's pages, the LLM accounts' and the
 forges' among them; the forge's client family, its words, its one form
@@ -296,7 +296,7 @@ keeps (`../protocol/configuration.md`, section 2).
 | `Chats` | `chats.html`, `first-run.html` | a composer to start a chat; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats, live or closed, newest activity first, each with its status, spend and delegates | `tasks{query}`: requester the person, the chat label, by last activity; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request |
 | `Chat { task }` | `index.html`, `first-run.html` | its chatbar: its number and title, its status, its spend and acts; after it, the demo's banner while either half holds, in any project (5.1, 5.6), and the context line only in the demo's project while the demo is answered (5.6); the conversation: committed turns, the person's words, work summaries, provisional text; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer | `task`, `activity` a page at a time, `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
-| `Task { task }` | `task.html`, `agent-task.html` | a goal: its header, what was asked, its plan as a tree, its latest activity and history, its budget and authority, with Amend, Stop and Cancel; an agent's task: its transcript and a composer, with Amend and Stop | `task`, `tree`, `activity`; `run` while one is live | amend, stop, cancel, release a held task of the plan, message an agent's task |
+| `Task { task }` | `task.html`, `agent-task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree with each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel; an agent's task: its transcript and a composer, with Amend and Stop | `task`, `tree`, `activity`; `run` while one is live | amend, stop, cancel, release a held task of the plan, message an agent's task |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
 | `Adopt { project }` | none: 4.4 | the adoption form, with the picker of the repositories temper can reach on the chosen forge | `me`; the chosen forge's deployment part, for its kind, mode, user and installations (`forge.md`, 5.4); the picker's page, a `Reachable` request (section 8) | adopt a repository (4.4) |
 | `Forges` | none: `forge.md`, 5.4 | each configured forge: its connection, its mode, on GitHub temper's App and its installations, a connect under way and how the last ended, its load | the forge's, through the forge's side (4.2) | connect; replace a key or tokens; install on another account; forget the admin's token (section 8) |
@@ -319,8 +319,9 @@ keeps (`../protocol/configuration.md`, section 2).
   conversation. A chip's executor keeps jig's "Agent". The mockup's
   time beside each turn ("Just now") is not drawn: the view keeps no
   clock (section 11).
-- **A task's page** is of its kind: a tracked task's, as `task.html`
-  lays it out; an agent's task's, as `agent-task.html`. A task with the
+- **A task's page** is of its kind: a tracked task's, a goal's, as
+  `task.html` lays it out (5.8); an agent's task's, as
+  `agent-task.html`. A task with the
   chat label opens as `Chat { task }`. A procedure's task or a person
   task shows a tracked task's header and plan only (section 11).
 - **The forge's parts** of a page (a goal's issue and changes on its
@@ -1091,6 +1092,96 @@ the change's chip in a chat (`forge.md`, 2.4 and 2.5).
   task 2, so the person reads "T2 · CHANGE", Running, then Landed
   (`../draft/first-run.md`, 2.1).
 
+### 5.8 A goal's page
+
+A goal's page is a tracked task's (3.5): an agent's task with a
+priority. It shows its task document, its owner tree and its latest
+activity, as `mockups/task.html` lays them out, and draws each amount
+and each state as the documents supply it: it computes no sum, share
+or difference of their amounts (jig's `client/domain/contract.md`,
+5.1).
+
+- **Its parts, in order:** the bar; the header, "Task details"; the
+  model choice (3.5); "What was asked", with the result the goal gives;
+  "Result", once it has ended; "Plan"; "Latest activity"; "Budget and
+  authority". The confirmation follows while one is open (3.6). The
+  mockup's tabs, Plan history, "From this goal" and "Related" are not
+  drawn: no document supplies them.
+- **The result it gives:** "What was asked" names it after its heading,
+  from the task's result contract, as the mockup's tag: "Result:
+  report", "Result: change", "Result: verdict" or "Result: approval".
+- **Its result,** once the goal has ended: a region "Result" after
+  "What was asked", holding its state and its words as a delegation's
+  card says them (5.7), from the same function: "Completed",
+  "Landed", "Failed", "Cancelled" or "Ended"; the result's words, a
+  landed change's merge commit, or a failed task's reason. A goal that
+  has not ended has no such region. The page reads an ended goal's
+  document once more when its watch ends, so its result stays
+  readable.
+- **A task's state,** in the header and on each plan row, from its
+  chip's owner phase and details (jig's `client/domain/objects.md`,
+  section 3):
+  - waiting on its dependencies (the phase's `dependencies`, those not
+    yet ended): on one, "Waiting for task M"; on several, "Waiting for
+    N tasks", N those listed; and when the list was cut (`more`),
+    "Waiting for more than N tasks";
+  - waiting on no dependency, on its holdings (`holds`): "Waiting for
+    its resources";
+  - ended, with its owner's ending: "Completed", "Failed" or
+    "Cancelled", jig's words for a done, a failed and a cancelled
+    phase;
+  - otherwise, jig's word for its phase.
+
+  Each carries its phase's status token: a waiting state and a
+  cancelled one are quiet, a completed one done, a failed one held.
+- **A plan row's cells:** the "Task N" link and the task's title; its
+  executor; its state; its spend, "N spent", the row's supplied
+  `spent`: what the task and the ended tasks it funded have spent, in
+  the deployment's unit, a whole number. The goal's own row, the
+  tree's root, carries no spend, and shows none: its numbers are its
+  budget's. A procedure's part follows on a line of its own, as
+  before. At phone width the name is on a first line, and the
+  executor, state and spend on a second; no cell is hidden.
+- **The dependency line:** under a row whose task has dependencies
+  (its `dependencies`), a list named "Dependencies of task N", one item
+  per dependency in the supplied order, keyed by its task as an object,
+  holding its "Task M" link and its state: a live dependency's as
+  above, an ended one's supplied status ("Completed", "Failed",
+  "Cancelled"), and none when none was supplied. When the row's list
+  was cut (its `cut`), a last item, with no key: "More dependencies
+  not shown." The browser shows the list's name before its items. The
+  tree's root has no dependency line: its state is the header's. In a
+  row's tree item come the row, its dependency line, its held task's
+  card (3.6), then its children. An added dependency's facts
+  (`Dependency.added`) are not drawn yet (section 11).
+- **Budget and authority,** a region after "Latest activity", as the
+  mockup's side card: "L left of B", what the budget has left of
+  itself; then each fact as a term and its description:
+  - "Spent": what the goal spent itself;
+  - "Delegates spent": what the ended tasks it funded spent;
+  - "Reserved for delegates": what it holds for the live tasks it
+    funds;
+  - "Funded by": a task, as its "Task N" link; a pool, "Your pool"
+    when it is the person's, "Person N's pool" otherwise; a recurring
+    task's, "Task N's recurring budget"; a project's, "Project N's
+    budget";
+  - from its authority: "May spend", what its subtree may spend; "May
+    delegate", "Up to N tasks, M deep"; "Models", "All", their names,
+    or "None", and no such term when the authority leaves them out.
+
+  A cut authority (its `cut`) ends the card with "Some of its
+  authority is not shown." The deadline is the header's ("Due …"). The
+  mockup's bar is not drawn: the words say what it would.
+- **Where it is decided:** pure functions of the domain read the
+  documents: a task's state from its chip (`pages::task::state`), a
+  dependency's from its link, and the result's from the delegation
+  card's (`pages::delegation::facts`). The view lays them out with the
+  phrasebook's words. The page keeps no state beyond what it held.
+- **The look:** TASK_CONTRACT on the result it gives, PLAN_SPEND on a
+  row's spend, DEPENDENCIES on its dependency line, TASK_BUDGET on the
+  budget's card, besides the task page's tokens; `task-pages.css` draws
+  them (`browser.md`, 2.5).
+
 ## 6. The terminal shell
 
 ### 6.1 `temper open DIRECTORY LINK_OR_ADDRESS`
@@ -1562,7 +1653,9 @@ own tests:
   5.7: a call's tasks by its objects and by its acknowledgement, a
   failed call's and another tool's none, the newest watched up to
   `reads`, each unwatched as it leaves, and a card's facts from a
-  task's document in each state); the forge side's steps
+  task's document in each state; a goal's, 5.8: a task's state from
+  its chip in each waiting shape and each ending, and a dependency's
+  from each kind of link); the forge side's steps
   (the form's rules, its request, every outcome, the version check; the
   picker's pages by number, "Next" asking the shown page's number plus
   one, a full last page's "Next" and a page past the last answering no
@@ -1573,7 +1666,11 @@ own tests:
   leaves and asked again when lost, under the first key);
   the view (each page from fixture states, read by skein's fake
   person's queries; a delegation's card in each state, in place of its
-  call's summaries and its heard result; the forge's words for every
+  call's summaries and its heard result; a goal's page, 5.8: its
+  parts in order, the result it gives of each kind, its result in each
+  state and none before it ends, a row's state, spend and dependency
+  line, cut and not, none on the root, and its budget's card with each
+  funder, with and without models, cut and not; the forge's words for every
   path shape and every kind, the form and its picker in each state,
   every outcome, the forges' page with a forge in each state of
   `forge.md`, 5.4);
@@ -1584,7 +1681,8 @@ own tests:
   kept as files beside the tests and changed only by hand: the inbox
   with entries of each kind, the chats, a chat with its conversation and
   a proposal in place, a chat with a delegation's card running and one
-  landed (5.7), a board, a goal's page with its plan, an agent's
+  landed (5.7), a board, a goal's page with its plan, a row's spend
+  and dependency line and its budget (5.8), an agent's
   task, the changes, the adoption form in each state of 4.4 and 4.7,
   its picker on a GitHub and on a Forgejo forge, a forge not connected
   and "Not listed", signed out, the accounts' banner, the accounts page
@@ -1609,7 +1707,11 @@ own tests:
   8), exhaustive both ways. Stories: signing in and seeing the inbox; a
   chat started and answered; a goal proposed in a chat, accepted in the
   inbox, and gone from the chat's card; goals reordered on the board; a
-  held task released from a goal's plan; a repository adopted from the
+  held task released from a goal's plan; a goal's plan saying which
+  task a delegate waits for, the rows' spend and the goal's budget,
+  then, the first delegate ended, its dependant's line saying
+  "Completed" and the goal's budget counting what it spent; an ended
+  goal's result; a repository adopted from the
   navigation's link, its outcome read and the engine holding it;
   refused: not found, a second home, a field the form refuses; a part
   of the forge's saying "Shown on the forge."; the banner with no
@@ -1802,3 +1904,14 @@ own tests:
 - **The pull request's link on the card** (`mockups/first-run.html`,
   "OWNER/NAME#N on Demo forge"): the forge's part, which the forge's
   side does not read yet (4.2). Default: the link to the task's page.
+- **An ended delegate on a goal's plan** (5.8): the owner tree holds
+  live tasks only, so a delegate leaves the plan as it ends, and is
+  read only in its dependants' lines ("Completed") and in its funder's
+  "Delegates spent"; the mockup's done rows have no document to come
+  from. Default: as supplied; a done row waits for a supplied source.
+- **An added dependency** on a goal's plan (5.8): `Dependency.added`
+  says when and by whom a dependency was added. Default: a mark in its
+  item of the dependency line, which keeps its shape.
+- **The rest of a goal's authority:** its tools, grants, executor kinds
+  and note scopes, which jig supplies as codes and patterns, not
+  words. Default: not on the goal's page.

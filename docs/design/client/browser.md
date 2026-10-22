@@ -236,6 +236,16 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   Every control keeps its words as its name. Nothing a person must know
   is said by colour or icon alone (skein's `ui.md`, section 8): a status
   is its word, and its colour only repeats it.
+- **The task pages' stylesheet,** `task-pages.css`, comes third, after
+  `temper.css`, whose variables and rules it builds on: what the task
+  pages add to the look, as `task.html` draws it in the terminal
+  sheets (`README.md`, 5.8): the result a goal gives as an outlined
+  tag at its card's top, a plan row's spend as a fourth, right-aligned
+  cell, a row's dependency line in small muted words under its name,
+  the list's name shown before its items, and the budget's card as the
+  mockup's side card, its terms and descriptions as its key and value
+  rows. `scripts/bundle.sh` passes the three to `skein-ui-bundle` in
+  that order.
 - **The navigation** sits in the banner after the projects, as in the
   mockups. At phone width the banner wraps and the navigation takes its
   own row, scrolling sideways if needed; nothing is hidden behind a menu.
