@@ -302,7 +302,7 @@ keeps (`../protocol/configuration.md`, section 2).
 | `Chats` | `chats.html`; the demo's start at the first run's first step, which `first-run.html` opens | a composer to start a chat, under the level-2 heading "Start a chat", its line and its chooser (5.5) above its text area "Start a chat", with the hint "temper · Enter to start · Shift+Enter for newline"; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats as one list, "Your chats", live and ended together, newest first, under All, Live or Closed (below), each with its number and title, its status, spend and live delegates | `tasks{query}`: requester the person, the chat label, its live group by last activity, its ended pages by when each ended; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request; choose the list's filter; more closed chats |
 | `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the demo's banner while either half holds, in any project (5.1, 5.6), and the context line only in the demo's project while the demo is answered (5.6); the conversation (below): its request, the agent's words with its calls folded, the person's words, provisional text, and its end once it has ended; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer, while the chat lives: its line and its chooser (5.5), its text area "Message" with the placeholder "Message T6…", T6 the chat's number, shown while it is empty and never its name, and the hint "Enter to send · Shift+Enter for newline", and "Send", then a message's refusal or failure, if any: a message or the chat's start accepted draws no status of its own, neither at the conversation's end nor in the composer, since the conversation shows its words, "Being sent", then "Sent" (below); while Message is not offered, its line and chooser alone; an ended chat draws no composer and no composer's line | `task`, `activity` a page at a time, older pages while its window has room (5.4), `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
-| `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree with each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel (5.11); a change: its header and "View on forge ↗", its steps, its step's line, its hold, its tasks live and ended, its gates at its head and its bounds (5.10); an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), with Amend, Stop and its composer (5.11); either's own held card while it is held | `task`, `tree`, `activity` a page at a time, older pages on an agent's task's "Older"; `run` while one is live; a change's panel, through the forge's side (`forge.md`, 9.2); a procedure's ended tasks, a page read once and again on a change | as its document offers them (5.11): on a goal amend, stop, cancel; on an agent's task message, amend, stop; release its own held task or one of its plan |
+| `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree of its delegates, live and ended, with their counts and its filter, each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel (5.11); a change: its header and "View on forge ↗", its steps, its step's line, its hold, its tasks live and ended, its gates at its head and its bounds (5.10); an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), with Amend, Stop and its composer (5.11); either's own held card while it is held | `task`, `tree`, `activity` a page at a time, older pages on an agent's task's "Older"; `run` while one is live; a change's panel, through the forge's side (`forge.md`, 9.2); a goal's or a procedure's ended delegates, a page read once and again on a change | a goal's plan's filter (5.8); as its document offers them (5.11): on a goal amend, stop, cancel; on an agent's task message, amend, stop; release its own held task or one of its plan |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
 | `Adopt { project }` | none: 4.4 | the adoption form, with the picker of the repositories temper can reach on the chosen forge | `me`; the chosen forge's deployment part, for its kind, mode, user and installations (`forge.md`, 5.4); the picker's page, a `Reachable` request (section 8) | adopt a repository (4.4) |
 | `Forges` | `forges.html` | each configured forge: its connection, its mode, on GitHub temper's App and its installations, a connect under way and how the last ended, its load | the forge's, through the forge's side (4.2) | connect; replace a key or tokens; install on another account; forget the admin's token (section 8) |
@@ -1458,11 +1458,48 @@ or difference of their amounts (jig's `client/domain/contract.md`,
   Each carries its phase's status token: a waiting state waiting
   (`STATUS_WAITING`, the mockup's amber), a cancelled one quiet, a
   running one active, a completed one done, a failed one held.
-- **The plan:** the goal is not a row of it. Its delegates, the owner
-  tree's root's children, are the plan's roots; the goal's state is
-  the header's, and its numbers the budget's card's: the tree is live
-  only, so when it holds no row, fold or held count (every delegate
-  ended, or none yet), the region holds one line, "No live tasks."
+- **The plan:** the goal is not a row of it; its state is the
+  header's, and its numbers the budget's card's. Its delegates are the
+  plan's roots: its live ones, the owner tree's root's children, with
+  their own live delegates under them; and its ended ones, one page
+  read from the engine as a procedure's are (5.10): `Read::Tasks`, a
+  `TaskQuery` by `parent` the goal and the ended phase, in the order
+  they were made (`QueryOrder::Ended`, by number), `rows` to a page.
+  The page is read once the goal's document has arrived, and again
+  when its tree or its document changes, one read out at a time; the
+  last page answered stays drawn until the next one answers.
+- **Its rows' order:** the roots by number, the order they were made.
+  An ended delegate is drawn before the first live root with a higher
+  number, or after the last live root when none has one; a live root's
+  own delegates stay under it, in the tree's order. A delegate in both
+  the tree and the page, one that ended after its tree was delivered,
+  is drawn once, as the tree's row. An ended delegate's own delegates
+  are not read: its page shows them (section 11).
+- **An ended row** is a plan row (below) whose state is its ending,
+  "Completed", "Failed" or "Cancelled", with its spend and with no
+  dependency line or held card; its "Task N" link is muted, as the
+  mockup's done row.
+- **Its counts:** a paragraph after the heading, once the read has
+  answered: "Its delegates: N live, M ended.", N the goal's chip's
+  `live_delegates`, as the header's "waiting on N delegates" has it,
+  and M the ended rows in the page; "more than M ended" when the page
+  has more after it (`after`) or was cut (`cut`), as a row's "waiting
+  on more than N tasks" says a cut list. They count the goal's own
+  delegates, not theirs, and the filter does not change them.
+- **Its filter:** after the counts, on a line of its own, "All" and
+  "Live only", two buttons, the chosen one pressed, as the chats
+  list's (3.5); they filter the plan in the page, reading nothing, and
+  "All" is chosen when the page opens. "Live only" leaves out the ended
+  rows and the more line; the live rows, their folds and held cards
+  stay, and the read goes on under either. The filter is drawn from the
+  page's start, before the read answers.
+- **Its words:** until the read answers, a plan with no row, fold or
+  held count says "No live tasks."; once it has answered, under "All",
+  a plan with no row says "None yet." while the goal lives and "None."
+  once it has ended, and under "Live only", a plan with no live row,
+  fold or held count says "No live tasks." Under "All", while the page
+  has more after it or was cut, a last line follows the tree: "More of
+  its ended tasks are not shown." (section 11).
 - **A plan row's cells:** the "Task N" link and the task's title; its
   executor; its state; its spend, "N spent", what the task spent
   itself (its chip's `budget.spent`; not the row's `spent`, which adds
@@ -1501,10 +1538,10 @@ or difference of their amounts (jig's `client/domain/contract.md`,
   link: a heard word of a result's kind from a task (jig's
   `OwnerActivity::Heard`, its word's `kind` a `Result` and its `from`
   a task), then its words; a result line (`Activity::Result`), then
-  its task's title. That is how a person reaches a delegate that has
-  ended, which leaves the plan (section 11): by its result while it is
-  in the latest page, and by its address after. The page reads no
-  older page of a goal's activity (section 11). The chat's page draws
+  its task's title. A person reaches an ended delegate by its plan
+  row while it is in the plan's page, and by its result's line while
+  that is in the latest page (section 11). The page reads no older
+  page of a goal's activity (section 11). The chat's page draws
   its activity as before.
 - **Budget and authority,** a region after "Latest activity", as the
   mockup's side card: "S spent · L left of B", what the goal spent
@@ -1532,19 +1569,28 @@ or difference of their amounts (jig's `client/domain/contract.md`,
 - **Not drawn,** besides the mockup's tabs and cards above: what is
   not supplied, the mockup's charter, model, host, account and pool
   names; the mockup's "made yesterday", a time this page does not
-  say (5.12); ended delegates as rows, with "Live only"
-  and the plan's counts, since the owner tree holds live tasks only
-  (section 11); and, as defaults the user may change (section 11),
+  say (5.12); and, as defaults the user may change (section 11), the
+  heading's "N tasks" and the counts' "N running, M in queues", where
+  the counts say "N live, M ended" of its own delegates (above): the
+  queues are the forge's stage, and the tree is a window of a goal's
+  subtree that counts by phase would mix with rows not drawn; the
+  ended delegates' own delegates; the filter at the heading's right,
+  where it is on its own line after the counts;
   "Wakes on", "Input", "Writes", "Run N" and the pool's line.
 - **Where it is decided:** pure functions of the domain read the
   documents: a task's state from its document's `waits_on` and chip
   in the header and from its chip on a row (`pages::task::state`), a
   dependency's from its link, and the result's from the delegation
   card's (`pages::delegation::facts`). The view lays them out with the
-  phrasebook's words. The page keeps no state beyond what it held.
+  phrasebook's words. The domain's task page holds the ended page, its
+  one read and whether it is stale, as a procedure's (5.10), and the
+  plan's filter, reset at each open; the view merges the ended rows
+  into the tree by number, leaves out a delegate the tree holds,
+  counts the page's rows and draws by the filter.
 - **The look:** TASK_CONTRACT on the result it gives, PLAN_SPEND on a
-  row's spend, DEPENDENCIES on its dependency line, TASK_BUDGET on the
-  budget's card, besides the task page's tokens; `task-pages.css` draws
+  row's spend, DEPENDENCIES on its dependency line, PLAN_DONE on an
+  ended row, FILTERS on its filter, as the chats list's, TASK_BUDGET on
+  the budget's card, besides the task page's tokens; `task-pages.css` draws
   them (`browser.md`, 2.5).
 
 ### 5.9 An agent's task's page
@@ -1756,12 +1802,13 @@ supplies it: the page computes none (jig's `client/domain/contract.md`,
 - **Its tasks:** a region and tree named "Its tasks", the tasks its
   procedure made (the agent producing a change's branch, its repairs
   and reviews), where a goal's and a person task's say "Plan". Its
-  live tasks are 5.8's plan rows. Its ended ones follow, read once
-  from the engine, its children by their ending
-  (`Read::Tasks`, a `TaskQuery` by `parent` and the ended phase, in
-  the order they ended), and read again when its tree or its document
-  changes, one read out at a time; each is a plan row, its state its
-  ending in 5.8's words. Until that read answers, an empty tree says
+  live tasks are 5.8's plan rows. Its ended ones are 5.8's ended
+  rows, read once from the engine, its children in the order they
+  were made (`Read::Tasks`, a `TaskQuery` by `parent` and the ended
+  phase, `QueryOrder::Ended`, by number), and read again when its tree
+  or its document changes, one read out at a time; they are drawn in
+  5.8's rows' order. It has no filter and no counts, as its mockup
+  draws none. Until that read answers, an empty tree says
   "No live tasks." as 5.8's; after it, a region with no row says "None
   yet." while the task lives, "None." once it has ended. When the
   read's page holds less than all of them, a last line: "More of its
@@ -2227,6 +2274,22 @@ turn as the page draws it (section 3.5); the print interval is the only
 pace it keeps. No rule of skein's text shell is added for streaming.
 A command typed while text streams is done as at any time (6.5).
 
+### 6.10 A page's address
+
+The terminal opens at the inbox (3.4) and reaches each page by its
+numbered link (6.5), never by a page's address: `temper open` takes the
+engine's address or the sign-in link (6.1). A browser opens a page by
+its address: a reload, or `/tasks/N` typed or opened, is a new client
+at that address (`browser.md`, 2.3). Of that open, the path and its
+load are the browser's; the rest is the client root's, the same under
+both shells: a root started at a page's address, its pages opening
+that page, asking its reads and drawing it once they answer. The
+client's joint world, `tests/client`, starts its clients so, with no
+shell (`fixtures::task_page`), and proves the root's part: in roadmap
+B2's story a fresh client started at a delegate's address draws its
+heading and its "Task brief", as the browser tier's task pages story
+does at `/tasks/3` (section 10).
+
 ## 7. Signing in and the small store
 
 How jig signs a client in, and how a native client keeps its credential
@@ -2493,10 +2556,12 @@ own tests:
   shape from its executor, priority and label, its thread as a chat's
   (opened, a page, a document's change, a run's text and its end), and
   its run's heading in each phase, with an attempt and none; a
-  procedure's task's, 5.10: its ended tasks read as it opens, by its
-  parent and the ended phase, read again on its tree's or its
-  document's change, one read out at a time, one asked while another
-  is out read once that answers, and the read's page cut; the panel's
+  goal's and a procedure's task's, 5.8 and 5.10: its ended delegates
+  read as it opens, by its parent and the ended phase, read again on
+  its tree's or its document's change, one read out at a time, one
+  asked while another is out read once that answers, and the read's
+  page cut; a goal's plan's filter chosen, and "All" again at its next
+  open; an agent's task with no priority reading none; the panel's
   slot in each state; each step's slot and the steps done; a task's
   page's acts, 5.11: Message, Stop, Cancel and Release each as its
   request, Stop and Cancel only once confirmed, one request per kind
@@ -2546,9 +2611,19 @@ own tests:
   address and none; each step at its slot with its line, the task it
   runs and none, a queue's place with the tasks ahead named, more and
   none; each hold's notice; CI and each verdict at its head, blocking
-  and advisory, and no gate; its bounds; and its ended tasks after its
-  live ones, "No live tasks." before the read, "None yet.", "None."
-  and the more line; the forge's words for every
+  and advisory, and no gate; its bounds; and its ended tasks among its
+  live ones by number, "No live tasks." before the read, "None yet.",
+  "None." and the more line; a goal's plan, 5.8: its ended rows among
+  its live roots by number, before the first, between two and after
+  the last, a delegate in both drawn once as the tree's, each ended
+  row muted with its ending and its spend and no dependency line; its
+  counts, none before the read, live and ended, "more than M ended"
+  with a page after and with a cut page, the same under either
+  filter; its filter, "All" pressed at the start, "Live only" leaving
+  out the ended rows and the more line and keeping the live rows, the
+  folds and the held cards; "No live tasks." before the read and under
+  "Live only", "None yet." and "None." under "All"; the forge's words
+  for every
   path shape and every kind, the form and its picker in each state,
   every outcome, the forges' page with a forge in each state of
   `forge.md`, 5.4);
@@ -2562,7 +2637,8 @@ own tests:
   with entries of each kind, the chats, a chat with its conversation and
   a proposal in place, a chat with a delegation's card running and one
   landed (5.7), a board, a goal's page with its plan, a row's spend
-  and dependency line and its budget (5.8), an agent's
+  and dependency line, an ended row, its counts and its filter, and its
+  budget (5.8), an agent's
   task with its brief, run, conversation and result (5.9), the
   changes, the adoption form in each state of 4.4 and 4.7,
   its picker on a GitHub and on a Forgejo forge, a forge not connected
@@ -2612,7 +2688,15 @@ own tests:
   the first with its state; the first reports, the line says
   "Completed" and the second runs; the second reports, then the
   goal, and its page shows its "Result" and its budget's card as
-  supplied, what its delegates spent among it; a repository adopted
+  supplied, what its delegates spent among it; along the way, each
+  delegate stays on the goal's plan once it has ended, an ended row
+  saying its ending, the advisor's from the story's first step, its
+  counts saying how many are live and how many ended, and "Live only"
+  leaving the ended rows out, saying "No live tasks." once all have
+  ended; and a fresh
+  client started at a delegate's address draws its heading and its
+  "Task brief", the client root's part of the browser's open of a
+  page by its address (6.10); a repository adopted
   from the navigation's link, its outcome read and the engine holding it;
   refused: not found, a second home, a field the form refuses; a part
   of the forge's saying "Shown on the forge."; a change into the fake
@@ -2859,17 +2943,6 @@ own tests:
 - **The pull request's link on the card** (the first-run mockup's
   earlier draft, "OWNER/NAME#N on Demo forge"): the forge's part, which the forge's
   side does not read yet (4.2). Default: the link to the task's page.
-- **An ended delegate on a goal's plan** (5.8): the owner tree holds
-  live tasks only, so a delegate leaves the plan as it ends, and is
-  read only in its dependants' lines ("Completed"), in its funder's
-  "Delegates spent", and in the latest activity's line for its result,
-  whose "Task N" link opens its page, until older lines push it out;
-  the goal's older activity pages, its history, are not read; the
-  mockup's done rows, its "Live only" and its
-  counts ("3 running, 3 in queues, 7 ended") have no document to come
-  from. Default: as supplied; they wait for a supplied source, such as
-  a task query's phases, which a procedure's "Its tasks" reads (5.10)
-  and a goal's plan does not yet.
 - **An added dependency** on a task's page (5.8, 5.9):
   `Dependency.added` says when and by whom a dependency was added.
   Default: a mark in its item of the dependency line, who added it and
@@ -2885,9 +2958,16 @@ own tests:
   - the plan's columns: no heads, the spend "N spent" in its row;
   - "Wakes on" under "What was asked": supplied (`Task.wake`), not
     drawn yet; later, in jig's words;
-  - "Input", "Writes", "Run N", the pool's line under the plan and the
-    plan's counts: not drawn; the first two and the pool's name are
-    not supplied.
+  - "Input", "Writes", "Run N" and the pool's line under the plan:
+    not drawn; the first two and the pool's name are not supplied;
+  - the plan's counts: "Its delegates: N live, M ended." of its own
+    delegates, not the heading's "N tasks" and the counts by phase
+    ("3 running, 3 in queues, 7 ended") of its subtree, which a window
+    of the tree would count wrong and whose queues are the forge's;
+  - its ended delegates' own delegates: not read, each on its parent's
+    page;
+  - its filter: on its own line after the counts, where the mockup
+    puts it at the heading's right.
 - **An agent's task's page against its mockup** (5.9), each a default
   the user may change:
   - its dependencies, which the mockup draws on no agent's page: the
@@ -2929,7 +3009,14 @@ own tests:
   - its step's line, its hold and its bounds, which the mockup does
     not draw;
   - the "Changes" breadcrumb, not drawn until the `Changes` page is.
-- **A procedure's older ended tasks** (5.10): the page reads one page
-  of them and says "More of its ended tasks are not shown." past it.
-  Default: one page, since a change makes a handful; an "Older" read,
-  as an agent's task's conversation has, is the candidate.
+- **Older ended delegates and a goal's older activity** (5.8, 5.10):
+  a goal's plan and a procedure's "Its tasks" read one page of their
+  ended delegates, the first made, and say "More of its ended tasks
+  are not shown." past it; a goal's page reads its latest activity's
+  page, not the older ones. Default: one page of each, since a
+  procedure makes a handful and a goal's plan is read for what is
+  under way. An "Older" read is the candidate, as an agent's task's
+  conversation has: the ended page's `after` as the next query's
+  start, and the activity's older pages by their `before`; with the
+  view's words and tests and the client world's story, about two hours
+  of work.
