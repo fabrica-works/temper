@@ -13,6 +13,25 @@ fn names_are_the_promised_ones() {
     let promised: Vec<&str> = include_str!("../names.txt").lines().collect();
     assert_eq!(names, promised);
 }
+
+#[test]
+fn every_link_has_an_address() {
+    for sample in samples::samples() {
+        let mut view = view(&sample);
+        let mut links = Vec::new();
+        for node in view.tree().nodes() {
+            if node.role == Role::Link {
+                assert!(node.link.is_some() || node.external.is_some(), "{}: link {:?}", sample.name, node.name);
+                links.push(node.id);
+            }
+        }
+        for node in links {
+            let address = temper_client_view::href(&mut view, node).expect("link has an href");
+            assert!(!address.is_empty(), "{}: empty href for {node:?}", sample.name);
+        }
+    }
+}
+
 // Expected words are the shipped view's; available counts are the worlds'
 // live/closed chat lists. Each list is capped independently by the shipped window.
 const SOLO_LIVE: u32 = 2;

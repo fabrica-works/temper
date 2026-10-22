@@ -58,13 +58,11 @@ pub(crate) fn card(b: &mut Builder, task: &c::Task, words: &Words, bindings: &mu
         b.close();
     }
     let name = words.say(Word::Task, &[Hole::Number(facts.task)]);
-    b.open(Role::Link);
-    b.name(&name);
+    crate::link(b, &name, bindings.insert(Act::Go { address: Address::Task { task: facts.task } }));
     b.open(Role::Text);
     b.run(Run::Plain, &name);
     b.run(Run::Plain, " ↗".as_bytes());
     b.close();
-    b.bind(bindings.insert(Act::Go { address: Address::Task { task: facts.task } }));
     b.close();
     b.close();
 }

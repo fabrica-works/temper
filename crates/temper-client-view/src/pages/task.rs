@@ -442,10 +442,8 @@ fn chip(b: &mut Builder, chip: &c::Chip, words: &Words, bindings: &mut Bindings)
 }
 pub(crate) fn task_link(b: &mut Builder, task: u64, words: &Words, bindings: &mut Bindings) {
     let name = words.say(Word::Task, &[Hole::Number(task)]);
-    b.open(Role::Link);
-    b.name(&name);
+    crate::link(b, &name, bindings.insert(Act::Go { address: Address::Task { task } }));
     b.text(Run::Plain, &name);
-    b.bind(bindings.insert(Act::Go { address: Address::Task { task } }));
     b.close();
 }
 fn parent(b: &mut Builder, stack: &mut List<u64>, parent: Option<u64>) {

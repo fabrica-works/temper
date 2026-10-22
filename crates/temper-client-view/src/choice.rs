@@ -25,15 +25,17 @@ fn line(b: &mut Builder, w: &Words, word: W, holes: &[Hole]) {
     b.close();
 }
 fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], act: Act, pressed: bool) {
-    b.open(role);
-    b.name(name);
     if role == Role::Link {
+        crate::link(b, name, bindings.insert(act));
         b.text(skein_ui::Run::Plain, name);
+    } else {
+        b.open(role);
+        b.name(name);
+        b.bind(bindings.insert(act));
     }
     if pressed {
         b.state(State::Pressed);
     }
-    b.bind(bindings.insert(act));
     b.close();
 }
 fn account_link(b: &mut Builder, bindings: &mut Bindings, name: &[u8]) {

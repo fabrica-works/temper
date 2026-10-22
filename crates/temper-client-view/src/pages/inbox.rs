@@ -19,12 +19,14 @@ fn text(b: &mut Builder, role: Role, value: &[u8]) {
     b.close();
 }
 fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], act: Act) {
-    b.open(role);
-    b.name(name);
     if role == Role::Link {
+        crate::link(b, name, bindings.insert(act));
         b.text(Run::Plain, name);
+    } else {
+        b.open(role);
+        b.name(name);
+        b.bind(bindings.insert(act));
     }
-    b.bind(bindings.insert(act));
     b.close();
 }
 pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32) {

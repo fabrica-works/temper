@@ -66,15 +66,17 @@ fn text(builder: &mut Builder, role: Role, words: &[u8], style: Option<skein_ui:
     builder.close();
 }
 fn action(builder: &mut Builder, role: Role, words: &[u8], act: Act, current: bool, bindings: &mut Bindings) {
-    builder.open(role);
-    builder.name(words);
     if role == Role::Link {
+        crate::link(builder, words, bindings.insert(act));
         builder.text(Run::Plain, words);
+    } else {
+        builder.open(role);
+        builder.name(words);
+        builder.bind(bindings.insert(act));
     }
     if current {
         builder.state(skein_ui::State::Current);
     }
-    builder.bind(bindings.insert(act));
     builder.close();
 }
 pub(crate) fn unavailable(root: &Domain) -> Option<crate::words::Word> {
