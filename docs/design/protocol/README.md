@@ -912,7 +912,10 @@ w1, w2       temper serve DIRS     after the engine: each a worker alone
   So `lab/cluster/` holds the fake LLM, the engine and the workers, the
   engine's one forge connected and unreached, as the process tier's
   other documents have theirs; its tasks are chats, and its stories'
-  referee the tasks' ends on their named workers and no survivor. The
+  referee the tasks' ends on their named workers and no survivor. A
+  chat's run holds its worker's one slot until its charter's idle
+  threshold, which the description sets past the story's deadline, so
+  each chat takes a worker of its own, never by timing. The
   fake forge joins the description, after which the engine starts, once
   serve reconciles at its start: the change of serve's command line's
   owner.
