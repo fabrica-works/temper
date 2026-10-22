@@ -857,7 +857,9 @@ w1, w2       temper serve DIRS     after the engine: each a worker alone
 - **No survivors:** each process in a cgroup of its own, its agents and
   git within it; a stop is done once its cgroup is empty, and a process
   left in it is a survivor, killed and reported.
-- **A worker lost,** its tree killed mid-run: the engine's fleet keeps
+- **A worker lost,** its process killed mid-run, then its tree (the
+  worker first, so it cannot report its agent's end as an agent's
+  failure): the engine's fleet keeps
   its runs for its grace, then they are lost and their tasks retry, on a
   worker with a free slot (jig's `domain/engine.md`, section 8). The
   lost attempt is fenced, so nothing it may still have sent counts, and
@@ -959,8 +961,9 @@ workers need no more; a worker of several slots is later (15.7).
   one on w2, each to its end; then the cluster stopped, each process
   exiting 0, no survivor.
 - **A worker lost:** w1 killed mid-run; its task's run is placed on w2
-  past the grace, and lands once. Its tree is killed whole, so the
-  engine sees its link close and no silence is waited on. A waiting
+  past the grace, and lands once. Its process is killed first, then
+  its tree, so the engine sees its link close, not an agent's end, and
+  no silence is waited on. A waiting
   run's turn is committed only when the run ends, so the killed
   attempt's reply never reaches the engine; the retried run resumes
   from the chat's committed turns and answers anew, the reply is in
