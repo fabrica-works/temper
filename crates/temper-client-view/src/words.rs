@@ -62,6 +62,13 @@ pub enum Word {
     Opaque,
     Milestone,
 
+    ToolCalls,
+    ToolSeparator,
+    ToolRepeated,
+    ChatEnded,
+    ChatEndedReport,
+    ChatFailed,
+    ChatCancelled,
     RunBegan,
     RunEnded,
     LinesLeft,
@@ -232,8 +239,9 @@ pub enum Word {
     StopHolds,
 }
 // Room for temper, jig, account, card and forge phrases.
-const PHRASES: u32 = 576;
-const ALL: [Word; 214] = [
+// Seven chat projection phrases, alongside the agent's original work-line words.
+const PHRASES: u32 = 583;
+const ALL: [Word; 221] = [
     Word::WaitRefused,
     Word::DependencyParked,
     Word::WaitInvalid,
@@ -285,6 +293,13 @@ const ALL: [Word; 214] = [
     Word::UnreadTurn,
     Word::Opaque,
     Word::Milestone,
+    Word::ToolCalls,
+    Word::ToolSeparator,
+    Word::ToolRepeated,
+    Word::ChatEnded,
+    Word::ChatEndedReport,
+    Word::ChatFailed,
+    Word::ChatCancelled,
     Word::RunBegan,
     Word::RunEnded,
     Word::LinesLeft,
@@ -517,6 +532,13 @@ impl Word {
             Self::CloseNow => 160,
             Self::DelegateCancel => 155,
             Self::DelegateMove => 156,
+            Self::ToolCalls => 1040,
+            Self::ToolSeparator => 1041,
+            Self::ToolRepeated => 1042,
+            Self::ChatEnded => 1043,
+            Self::ChatEndedReport => 1044,
+            Self::ChatFailed => 1045,
+            Self::ChatCancelled => 1046,
             Self::RunBegan => 150,
             Self::RunEnded => 151,
             Self::LinesLeft => 152,
@@ -731,17 +753,17 @@ impl Words {
                 }
             }
             let id = word.id(connector);
-            let plural = if word == Word::WaitingForDelegates { Some(0) } else { None };
+            let plural = if word == Word::WaitingForDelegates || word == Word::ToolCalls { Some(0) } else { None };
             shapes.push(PhraseShape { id, holes: holes.into_boxed(), plural }).expect("closed shapes fit");
             let other = Form { class: PluralClass::Other, segments: segments.into_boxed() };
-            let forms: Box<[Form]> = if word == Word::WaitingForDelegates {
+            let forms: Box<[Form]> = if word == Word::WaitingForDelegates || word == Word::ToolCalls {
                 Box::new([
                     Form {
                         class: PluralClass::One,
                         segments: Box::new([
-                            Segment::Text(copy_of(b"waiting on ")),
+                            Segment::Text(copy_of(if word == Word::ToolCalls { b"" } else { b"waiting on " })),
                             Segment::Hole { index: 0, kind: HoleKind::Number },
-                            Segment::Text(copy_of(b" delegate")),
+                            Segment::Text(copy_of(if word == Word::ToolCalls { b" tool call" } else { b" delegate" })),
                         ]),
                     },
                     other,
@@ -923,6 +945,13 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::UnreadTurn => (&[b"Turn could not be decoded"], &[]),
         Word::Opaque => (&[b"Opaque content: ", b" bytes"], &[Number]),
         Word::Milestone => (&[b"Milestone ", b""], &[Number]),
+        Word::ToolCalls => (&[b"", b" tool calls"], &[Number]),
+        Word::ToolSeparator => (&[b" \xc2\xb7 "], &[]),
+        Word::ToolRepeated => (&[b"", b" \xc3\x97", b""], &[Name, Number]),
+        Word::ChatEnded => (&[b"Ended"], &[]),
+        Word::ChatEndedReport => (&[b"Ended \xc2\xb7 its report, \xe2\x80\x9c", b"\xe2\x80\x9d"], &[Name]),
+        Word::ChatFailed => (&[b"Failed \xc2\xb7 ", b""], &[Name]),
+        Word::ChatCancelled => (&[b"Cancelled \xc2\xb7 ", b""], &[Name]),
         Word::RunBegan => (&[b"Run ", b" began"], &[Number]),
         Word::RunEnded => (&[b"Run ", b" ended"], &[Number]),
         Word::LinesLeft => (&[b"Earlier lines omitted ", b""], &[Number]),

@@ -1417,13 +1417,13 @@ acts on it as its document offers (5.11).
   time as a chats row says a time. A run's earlier runs are the
   conversation's "Run N began" and "Run N ended": the page has no run
   groups.
-- **The conversation** is a chat's (3.5), from the task's bounded thread
-  (jig-client's `thread`), read as the chat's page reads it, with the
-  chat's view part: its latest window; committed turns, the agent's
-  "Temper"; each call and result as a chat's work lines, a `delegate`
-  call's too, since a delegation's card is the chat's (5.7); "Run N
-  began" and "Run N ended"; the lines omitted before the window; and a
-  live run's provisional text, as the chat's provisional turn.
+- **The conversation,** from the task's bounded thread (jig-client's
+  `thread`), read as the chat's page reads it, is drawn as work, not as
+  a chat's (3.5): its latest window; committed turns, the agent's
+  "Temper"; each call and result as a work line, a `delegate` call's
+  too, since a delegation's card is the chat's (5.7); "Run N began" and
+  "Run N ended"; the lines omitted before the window; and a live run's
+  provisional text, as the chat's provisional turn.
 - **Its result,** once it has ended: a region "Result" after the
   conversation, its state and its words as a goal's "Result" says them
   (5.8), from the same function (`pages::delegation::facts`):
@@ -2365,6 +2365,10 @@ own tests:
   envelope with them. Default: the presets' 3 rows and 512 bytes; a
   transcript bound of its own in jig's thread is the candidate to make
   the CSV chat's first turn whole, jig's.
+- **An agent's conversation drawn as a chat's** (5.9): the agent's
+  page keeps each call, each result and the run markers as work lines,
+  which a chat folds or hides (3.5). Default: as work; the chat's
+  drawing is the candidate, the task pages'.
 - **Which person messages are the person's** (3.5): jig's turns keep no
   provenance, so a chat draws none of a turn's person messages, and
   the person's words from the thread's words alone. A charter whose

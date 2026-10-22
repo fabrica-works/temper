@@ -88,11 +88,20 @@ pub fn demo_chat(cue: &[u8], text: &[u8], report: &[u8]) -> Script {
             Step::Press { find: Find::exactly_named(Role::Button, b"demo") },
             Step::Type { find: Find::named(Role::TextArea, b"Start a chat"), words: cue.into() },
             Step::Press { find: Find::named(Role::Button, b"Start") },
-            // Native's two-row log initially holds the end and result. Once
-            // the report arrives, page back to the turn that carries the answer.
-            Step::See { find: Find::text(report), within: START_WITHIN },
-            Step::See { find: Find::named(Role::Button, b"Older"), within: START_WITHIN },
-            Step::Press { find: Find::named(Role::Button, b"Older") },
+            Step::See {
+                find: Find::text(format!("Ended · its report, “{}”", String::from_utf8_lossy(report)).as_bytes()),
+                within: START_WITHIN,
+            },
+            Step::See {
+                find: Find::exactly_named(Role::Paragraph, b"You")
+                    .within(Box::new([Target::Role { role: Role::Log, name: b"Conversation".as_slice().into() }])),
+                within: START_WITHIN,
+            },
+            Step::See {
+                find: Find::exactly_named(Role::Paragraph, cue)
+                    .within(Box::new([Target::Role { role: Role::Log, name: b"Conversation".as_slice().into() }])),
+                within: START_WITHIN,
+            },
             Step::See {
                 find: Find::text(text)
                     .within(Box::new([Target::Role { role: Role::Log, name: b"Conversation".as_slice().into() }])),
@@ -127,6 +136,8 @@ pub fn demo_change() -> Script {
             // client/README.md, 4.8: a suggested request starts and opens its chat.
             Step::See { find: Find::named(Role::Button, b"Add CSV export to widget"), within: START_WITHIN },
             Step::Press { find: Find::named(Role::Button, b"Add CSV export to widget") },
+            Step::See { find: Find::exactly_named(Role::Paragraph, b"You").within(conversation()), within: START_WITHIN },
+            Step::See { find: Find::exactly_named(Role::Paragraph, b"Add CSV export to widget").within(conversation()), within: START_WITHIN },
             Step::See {
                 find: Find::text("I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.".as_bytes()).within(conversation()),
                 within: START_WITHIN,

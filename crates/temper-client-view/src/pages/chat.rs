@@ -78,11 +78,19 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         context(b, root, task.project, words);
         b.open(Role::Slot);
         b.style(look::THREAD);
-        if let jig_client::thread::window::Edge::More(_) = chat.thread.lines.edges.after {
+        if chat.offers_older() {
             control(b, bindings, Role::Button, &words.say(Word::Older, &[]), Act::Older);
         }
         let person = speakers(task, root.pages().me(root.client()));
-        conversation(b, &chat.thread, words, (rows, text_limit), person, Some((chat, root.client())), bindings);
+        conversation(
+            b,
+            &chat.thread,
+            words,
+            (rows, text_limit),
+            person,
+            Drawn::Chat { request: Some(&task.spec), delegations: Some((chat, root.client())) },
+            bindings,
+        );
         if !chat.cards.is_empty() || !chat.departures().is_empty() {
             b.open(Role::List);
             b.style(look::CARDS);
@@ -179,22 +187,47 @@ pub(crate) fn context(b: &mut Builder, root: &Domain, project: u32, words: &Word
     b.close();
 }
 
+// A chat owns one end line; goal/result cards keep their independent drawing.
 fn result_text(b: &mut Builder, result: &c::TaskResult, words: &Words) {
     match result {
-        c::TaskResult::Document(result) => crate::cards::result(b, result, words),
-        c::TaskResult::Ending(ending) => match ending.as_ref() {
-            c::OwnerChipEnding::Done(value) => {
-                crate::cards::value_nodes(b, value, words);
-            }
-            c::OwnerChipEnding::Failed(reason) => skein_ui::markdown::read(reason.bytes(), 2, b),
-            c::OwnerChipEnding::Cancelled { reason, result, .. } => {
-                skein_ui::markdown::read(reason.bytes(), 2, b);
-                if let Some(value) = result {
-                    crate::cards::value_nodes(b, value, words);
-                }
+        c::TaskResult::Ending(ending) => owner_end(b, ending, words),
+        c::TaskResult::Document(result) => match &result.ending {
+            c::Ending::Task(ending) => owner_end(b, ending, words),
+            c::Ending::Failed { reason } => end_reason(b, Word::ChatFailed, reason.as_ref(), words),
+            c::Ending::Cancelled { reason, .. } => end_reason(b, Word::ChatCancelled, reason.as_ref(), words),
+            c::Ending::Withdrawn { reason } => end_reason(b, Word::ChatCancelled, Some(reason), words),
+            c::Ending::Done | c::Ending::Deleted | c::Ending::Decided { .. } => {
+                end_report(b, result.value.as_ref(), words);
             }
         },
     }
+}
+fn owner_end(b: &mut Builder, ending: &c::OwnerChipEnding, words: &Words) {
+    match ending {
+        c::OwnerChipEnding::Done(value) => end_report(b, Some(value), words),
+        c::OwnerChipEnding::Failed(reason) => {
+            text(b, Role::Paragraph, &words.say(Word::ChatFailed, &[crate::cards::name(reason.bytes())]));
+        }
+        c::OwnerChipEnding::Cancelled { reason, .. } => {
+            text(b, Role::Paragraph, &words.say(Word::ChatCancelled, &[crate::cards::name(reason.bytes())]));
+        }
+    }
+}
+fn end_reason(b: &mut Builder, word: Word, reason: Option<&c::Text>, words: &Words) {
+    let reason = match reason {
+        Some(reason) => reason.bytes(),
+        None => b"",
+    };
+    text(b, Role::Paragraph, &words.say(word, &[crate::cards::name(reason)]));
+}
+fn end_report(b: &mut Builder, value: Option<&c::ResultValue>, words: &Words) {
+    let said = match value {
+        Some(c::ResultValue::Report(report)) if !report.bytes().is_empty() => {
+            words.say(Word::ChatEndedReport, &[crate::cards::name(report.bytes())])
+        }
+        _ => words.say(Word::ChatEnded, &[]),
+    };
+    text(b, Role::Paragraph, &said);
 }
 fn spend(b: &mut Builder, task: &c::Task, words: &Words) {
     text(
@@ -239,16 +272,26 @@ fn composer(
         crate::choice::composer(b, root, Some(task), words, bindings);
     }
 }
+/// The chat projects a request and assistant messages; an agent keeps every work line.
+pub(crate) enum Drawn<'a> {
+    Chat { request: Option<&'a c::SpecificationDocument>, delegations: Option<(&'a Chat, &'a jig_client::Client)> },
+    Lines,
+}
+
 pub(crate) fn conversation(
     b: &mut Builder,
     thread: &Thread,
     words: &Words,
     limits: (u32, u32),
     speakers: Speakers,
-    delegations: Option<(&Chat, &jig_client::Client)>,
+    drawn: Drawn<'_>,
     bindings: &mut Bindings,
 ) {
     let (rows, text_limit) = limits;
+    let (projected, request, delegations) = match drawn {
+        Drawn::Chat { request, delegations } => (true, request, delegations),
+        Drawn::Lines => (false, None, None),
+    };
     let bound = match delegations {
         Some((chat, _)) => chat.delegations.capacity(),
         None => 0,
@@ -257,46 +300,48 @@ pub(crate) fn conversation(
     let mut shown = List::with_capacity(bound);
     b.open(Role::Log);
     b.name(&words.say_card(P::ConversationLog, &[]));
+    if thread.lines.edges.after == jig_client::thread::window::Edge::End
+        && let Some(request) = request
+    {
+        b.open(Role::Region);
+        b.style(look::TURN);
+        let label = if speakers.requester { words.say_card(P::You, &[]) } else { words.say_card(P::Person, &[]) };
+        person_message(b, &label, request.specification.words.bytes(), WordState::Read { message: 0 }, words);
+        if request.specification.words.cut {
+            words.status(b, P::TurnCut, &[]);
+        }
+        b.close();
+    }
     for line in thread.lines().into_boxed() {
-        if let Line::Activity { line } = &line
-            && hidden(&line.event, delegations)
-        {
+        if hidden_line(&line, projected, delegations) {
             continue;
         }
         b.open(Role::Region);
         b.style(look::TURN);
         match line {
             Line::Words { by, words: message, state } => {
-                person_words(b, by, message, state, speakers.person, words);
+                if projected {
+                    person_words(b, by, message, state, speakers.person, words);
+                } else {
+                    person_lines(b, by, message, state, speakers.person, words);
+                }
             }
             Line::Turn { turn, .. } => {
-                committed(
-                    b,
-                    turn,
-                    words,
-                    (rows, text_limit, speakers.requester),
-                    delegations,
-                    (&mut tasks, &mut shown),
-                    bindings,
-                );
-            }
-            Line::Provisional { text, cut, .. } => {
-                b.open(Role::Slot);
-                b.style(look::MESSAGE);
-                b.style(look::BY_AGENT);
-                b.open(Role::Slot);
-                b.style(look::WHO);
-                words.status(b, P::Provisional, &[]);
-                b.close();
-                b.open(Role::Slot);
-                b.style(look::SAYS);
-                markdown(b, text, words, text_limit);
-                if cut {
-                    words.status(b, P::TurnCut, &[]);
+                if projected {
+                    committed(b, turn, words, (rows, text_limit), delegations, (&mut tasks, &mut shown), bindings);
+                } else {
+                    committed_lines(
+                        b,
+                        turn,
+                        words,
+                        (rows, text_limit, speakers.requester),
+                        delegations,
+                        (&mut tasks, &mut shown),
+                        bindings,
+                    );
                 }
-                b.close();
-                b.close();
             }
+            Line::Provisional { text, cut, .. } => provisional(b, text, cut, words, text_limit),
             Line::Undecoded { why, .. } => match why {
                 c::TurnProblem::Version { found } => {
                     words.status(b, P::TurnUnreadVersion, &[Hole::Number(u64::from(found))]);
@@ -317,7 +362,7 @@ pub(crate) fn conversation(
                 text(b, Role::Status, &words.say(Word::LinesLeft, &[Hole::Number(u64::from(lines))]));
             }
             Line::Activity { line } => match &line.event {
-                c::Activity::Owner { source, .. } => super::task::owner_activity(b, &source.line, words),
+                c::Activity::Owner { source, .. } => owner_line(b, &source.line, projected, speakers.person, words),
                 c::Activity::Result { result } => {
                     crate::cards::result(b, result, words);
                 }
@@ -337,6 +382,43 @@ pub(crate) fn conversation(
     live_delegates(b, &mut tasks, delegations, &mut shown, words, bindings);
     b.close();
 }
+fn provisional(b: &mut Builder, message: &[u8], cut: bool, words: &Words, text_limit: u32) {
+    b.open(Role::Slot);
+    b.style(look::MESSAGE);
+    b.style(look::BY_AGENT);
+    b.open(Role::Slot);
+    b.style(look::WHO);
+    words.status(b, P::Provisional, &[]);
+    b.close();
+    b.open(Role::Slot);
+    b.style(look::SAYS);
+    markdown(b, message, words, text_limit);
+    if cut {
+        words.status(b, P::TurnCut, &[]);
+    }
+    b.close();
+    b.close();
+}
+fn owner_line(b: &mut Builder, line: &c::OwnerActivity, projected: bool, person: Option<u64>, words: &Words) {
+    if projected && let c::OwnerActivity::Words { by: c::OwnerRequester::Person(by), words: message, .. } = line {
+        let label = if Some(*by) == person { words.say_card(P::You, &[]) } else { words.say_card(P::Person, &[]) };
+        person_message(b, &label, message.bytes(), WordState::Read { message: 0 }, words);
+        return;
+    }
+    super::task::owner_activity(b, line, words);
+}
+fn hidden_line(line: &Line<'_>, projected: bool, delegations: Option<(&Chat, &jig_client::Client)>) -> bool {
+    match line {
+        Line::RunBegan { .. } | Line::RunEnded { .. } => projected,
+        Line::Activity { line } => hidden(&line.event, projected, delegations),
+        Line::Words { .. }
+        | Line::Turn { .. }
+        | Line::Undecoded { .. }
+        | Line::Provisional { .. }
+        | Line::Left { .. } => false,
+    }
+}
+
 fn live_delegates(
     b: &mut Builder,
     tasks: &mut List<u64>,
@@ -372,6 +454,47 @@ fn person_words(
     person: Option<u64>,
     words: &Words,
 ) {
+    let label = match by {
+        Some(by) if Some(by.number) != person => skein_lib::bytes::copy_of(by.name.bytes()),
+        Some(_) | None => words.say_card(P::You, &[]),
+    };
+    person_message(b, &label, message, state, words);
+}
+fn person_message(b: &mut Builder, label: &[u8], message: &[u8], state: WordState, words: &Words) {
+    b.open(Role::Slot);
+    b.style(look::MESSAGE);
+    b.style(look::BY_PERSON);
+    b.open(Role::Slot);
+    b.style(look::WHO);
+    text(b, Role::Paragraph, label);
+    match state {
+        WordState::BeingSent => words.status(b, P::WordsBeingSent, &[]),
+        WordState::Sent { .. } => words.status(b, P::WordsSent, &[]),
+        WordState::Read { .. } => {}
+    }
+    b.close();
+    b.open(Role::Slot);
+    b.style(look::SAYS);
+    let mut start = 0;
+    for (end, byte) in message.iter().enumerate() {
+        if *byte == b'\n' {
+            text(b, Role::Paragraph, message.get(start..end).expect("paragraph range"));
+            start = end.checked_add(1).expect("next paragraph within message");
+        }
+    }
+    text(b, Role::Paragraph, message.get(start..).expect("last paragraph"));
+    b.close();
+    b.close();
+}
+
+fn person_lines(
+    b: &mut Builder,
+    by: Option<&c::Party>,
+    message: &[u8],
+    state: WordState,
+    person: Option<u64>,
+    words: &Words,
+) {
     b.open(Role::Slot);
     b.style(look::MESSAGE);
     b.style(look::BY_PERSON);
@@ -399,6 +522,80 @@ fn person_words(
 }
 
 fn committed(
+    b: &mut Builder,
+    turn: &c::Turn,
+    words: &Words,
+    limits: (u32, u32),
+    delegations: Option<(&Chat, &jig_client::Client)>,
+    lists: (&mut List<u64>, &mut List<u64>),
+    bindings: &mut Bindings,
+) {
+    let (rows, text_limit) = limits;
+    let (tasks, shown) = lists;
+    for message in prefix(b, turn.messages.as_slice(), rows, words) {
+        let blocks = prefix(b, message.blocks.as_slice(), rows, words);
+        if message.speaker == c::Speaker::Assistant {
+            let mut has_content = false;
+            for block in blocks {
+                match block {
+                    c::Block::Text(value) => {
+                        if !value.bytes().is_empty() {
+                            has_content = true;
+                        }
+                    }
+                    c::Block::Opaque { .. } => has_content = true,
+                    c::Block::Call(_) | c::Block::Result { .. } => {}
+                }
+            }
+            if has_content {
+                b.open(Role::Slot);
+                b.style(look::MESSAGE);
+                b.style(look::BY_AGENT);
+                b.open(Role::Slot);
+                b.style(look::WHO);
+                words.card_text(b, P::Temper, &[]);
+                b.close();
+                b.open(Role::Slot);
+                b.style(look::SAYS);
+                for block in blocks {
+                    match block {
+                        c::Block::Text(value) => markdown(b, value.bytes(), words, text_limit),
+                        c::Block::Opaque { dialect, size } => {
+                            words.card_text(b, P::OpaqueDialect, &[crate::cards::name(dialect.bytes())]);
+                            words.card_text(b, P::OpaqueBytes, &[Hole::Number(*size)]);
+                        }
+                        c::Block::Call(_) | c::Block::Result { .. } => {}
+                    }
+                }
+                b.close();
+                b.close();
+            }
+            for block in blocks {
+                if let c::Block::Call(call) = block {
+                    tasks.clear();
+                    delegation::delegated(call, tasks);
+                    cards(b, tasks, delegations, shown, words, bindings);
+                }
+            }
+            folded_calls(b, blocks, tasks, delegations, words);
+        }
+        // Input messages have no shell. Their results can still be the first
+        // retained anchor of a delegated task (client/README.md, 3.5 and 5.7).
+        for block in blocks {
+            if let c::Block::Result { summary, .. } = block {
+                tasks.clear();
+                delegation::results(summary.bytes(), tasks);
+                if requested(tasks, delegations) {
+                    cards(b, tasks, delegations, shown, words, bindings);
+                }
+            }
+        }
+    }
+    if turn.cut {
+        words.status(b, P::TurnCut, &[]);
+    }
+}
+fn committed_lines(
     b: &mut Builder,
     turn: &c::Turn,
     words: &Words,
@@ -497,6 +694,71 @@ fn committed(
     }
 }
 
+fn other_call(block: &c::Block, tasks: &mut List<u64>, delegations: Option<(&Chat, &jig_client::Client)>) -> bool {
+    let c::Block::Call(call) = block else { return false };
+    tasks.clear();
+    delegation::delegated(call, tasks);
+    !carded(tasks, delegations)
+}
+fn folded_calls(
+    b: &mut Builder,
+    blocks: &[c::Block],
+    tasks: &mut List<u64>,
+    delegations: Option<(&Chat, &jig_client::Client)>,
+    words: &Words,
+) {
+    let mut count = 0_u64;
+    for block in blocks {
+        if other_call(block, tasks, delegations) {
+            count = count.checked_add(1).expect("bounded call count");
+        }
+    }
+    if count == 0 {
+        return;
+    }
+    b.open(Role::Slot);
+    b.style(look::WORK);
+    text(b, Role::Paragraph, &words.say(Word::ToolCalls, &[Hole::Number(count)]));
+    b.open(Role::Paragraph);
+    let mut first = true;
+    for (at, block) in blocks.iter().enumerate() {
+        let c::Block::Call(call) = block else { continue };
+        if !other_call(block, tasks, delegations) {
+            continue;
+        }
+        let mut repeated = 0_u64;
+        let mut earlier = false;
+        for (index, candidate) in blocks.iter().enumerate() {
+            if let c::Block::Call(other) = candidate
+                && other.tool == call.tool
+                && other_call(candidate, tasks, delegations)
+            {
+                repeated = repeated.checked_add(1).expect("bounded repeated calls");
+                if index < at {
+                    earlier = true;
+                }
+            }
+        }
+        if earlier {
+            continue;
+        }
+        if !first {
+            b.text(Run::Plain, &words.say(Word::ToolSeparator, &[]));
+        }
+        first = false;
+        if repeated > 1 {
+            b.text(
+                Run::Plain,
+                &words.say(Word::ToolRepeated, &[crate::cards::name(call.tool.bytes()), Hole::Number(repeated)]),
+            );
+        } else {
+            b.text(Run::Plain, call.tool.bytes());
+        }
+    }
+    b.close();
+    b.close();
+}
+
 fn cards(
     b: &mut Builder,
     tasks: &List<u64>,
@@ -539,7 +801,20 @@ fn carded(tasks: &List<u64>, delegations: Option<(&Chat, &jig_client::Client)>) 
     }
     true
 }
-fn hidden(event: &c::Activity, delegations: Option<(&Chat, &jig_client::Client)>) -> bool {
+fn hidden(event: &c::Activity, projected: bool, delegations: Option<(&Chat, &jig_client::Client)>) -> bool {
+    if projected && let c::Activity::Owner { source, .. } = event {
+        match &source.line {
+            c::OwnerActivity::RunBegan { .. }
+            | c::OwnerActivity::RunEnded { .. }
+            | c::OwnerActivity::Milestone { .. } => return true,
+            c::OwnerActivity::Words { .. }
+            | c::OwnerActivity::Heard(_)
+            | c::OwnerActivity::Notified { .. }
+            | c::OwnerActivity::Turn { .. }
+            | c::OwnerActivity::Decided { .. }
+            | c::OwnerActivity::Kept { .. } => {}
+        }
+    }
     let Some((chat, client)) = delegations else { return false };
     let task = match event {
         c::Activity::Owner { source, .. } => {

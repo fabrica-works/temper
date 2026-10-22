@@ -11,7 +11,6 @@ Spent 7; delegates spent 2
 Conversation:
   You
   Hello
-  * Read
   Temper
   I can help.
   * Writing...

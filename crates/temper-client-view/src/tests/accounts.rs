@@ -451,8 +451,9 @@ mod memory_literal;
 // = 62,605,676 B, giving 5,041,933,507 B; its six phrases fit the reserved book.
 // The context line adds one repository/forge text node; chat words use existing phrase room.
 // Procedure goal slot: five added nodes including its paragraph and link text.
+// The chat projection adds seven phrases while retaining the agent's work-line words.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 5045379691;
+const ACCOUNT_BYTES: u64 = 6973520675;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

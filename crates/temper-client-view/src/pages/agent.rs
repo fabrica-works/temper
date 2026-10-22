@@ -72,7 +72,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             words,
             (rows, page.thread.limits.text),
             super::chat::speakers(task, me),
-            None,
+            super::chat::Drawn::Lines,
             bindings,
         );
         super::task::outcome(b, root, words);

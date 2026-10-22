@@ -52,18 +52,50 @@ fn limits() -> temper_client_domain::Limits {
     limits.client.domain.text = 256;
     limits
 }
-fn event(root: &mut Domain, event: Event, out: &mut Queue<Request>) {
-    temper_client_domain::step(root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, event, out);
+fn up(root: &mut Domain, up: jig_client::Up, receiving: &temper_client_domain::Limits, out: &mut Queue<Request>) {
+    temper_client_domain::step(
+        root,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *receiving },
+        Event::Client { event: jig_client::Event::Up { up } },
+        out,
+    );
 }
+
+fn task_delivery(watch: skein_lib::Token, task: c::Task) -> jig_client::Up {
+    jig_client::Up::Watched { watch, event: c::WatchEvent::Delivered(c::Delivery::Task(Box::new(task))) }
+}
+
 fn root(documents: &[c::Task], called: &[u64], heard: bool) -> Domain {
     root_activity(documents, activity(called, heard), &[])
 }
 fn root_activity(documents: &[c::Task], activity: c::ActivityPage, delegates: &[u64]) -> Domain {
-    let (mut root, _, _) = fixtures::root_at(Address::Chats, &limits());
-    let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits()));
-    event(
+    root_chat(None, documents, activity, delegates)
+}
+fn root_chat(
+    chat_document: Option<&c::Task>,
+    documents: &[c::Task],
+    activity: c::ActivityPage,
+    delegates: &[u64],
+) -> Domain {
+    root_chat_limits(chat_document, documents, activity, delegates, &limits())
+}
+fn root_chat_limits(
+    chat_document: Option<&c::Task>,
+    documents: &[c::Task],
+    activity: c::ActivityPage,
+    delegates: &[u64],
+    receiving: &temper_client_domain::Limits,
+) -> Domain {
+    let chat_number = match chat_document {
+        Some(chat) => chat.chip.task,
+        None => CHAT,
+    };
+    let (mut root, _, _) = fixtures::root_at(Address::Chats, receiving);
+    let mut out = Queue::with_capacity(temper_client_domain::max_out(receiving));
+    temper_client_domain::step(
         &mut root,
-        Event::Went { place: temper_client_domain::Place::Address(Address::Chat { task: CHAT }) },
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *receiving },
+        Event::Went { place: temper_client_domain::Place::Address(Address::Chat { task: chat_number }) },
         &mut out,
     );
     for _ in 0..EXCHANGES {
@@ -72,21 +104,21 @@ fn root_activity(documents: &[c::Task], activity: c::ActivityPage, delegates: &[
             Request::Client {
                 request:
                     jig_client::Request::Down {
-                        down: jig_client::Down::Read { read, what: jig_client::Readable::Jig(c::Read::Activity { .. }) },
+                        down:
+                            jig_client::Down::Read {
+                                read,
+                                what: jig_client::Readable::Jig(c::Read::Activity { before, .. }),
+                            },
                     },
             } => {
-                event(
+                let page = fixtures::first_run::page(&activity, before.as_ref(), receiving.client.domain.rows);
+                up(
                     &mut root,
-                    Event::Client {
-                        event: jig_client::Event::Up {
-                            up: jig_client::Up::ReadDone {
-                                read,
-                                result: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(
-                                    Box::new(activity.clone()),
-                                ))),
-                            },
-                        },
+                    jig_client::Up::ReadDone {
+                        read,
+                        result: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(Box::new(page)))),
                     },
+                    receiving,
                     &mut out,
                 );
             }
@@ -96,12 +128,15 @@ fn root_activity(documents: &[c::Task], activity: c::ActivityPage, delegates: &[
                         down:
                             jig_client::Down::Open {
                                 watch,
-                                subject: jig_client::Watchable::Jig(c::Subject::Task { task: CHAT }),
+                                subject: jig_client::Watchable::Jig(c::Subject::Task { task: number }),
                             },
                     },
-            } => {
-                let mut chat = change();
-                chat.chip.task = CHAT;
+            } if number == chat_number => {
+                let mut chat = match chat_document {
+                    Some(chat) => chat.clone(),
+                    None => change(),
+                };
+                chat.chip.task = chat_number;
                 chat.delegates = List::with_capacity(u32::try_from(delegates.len()).expect("delegates fit"));
                 for task in delegates {
                     let mut chip = change().chip;
@@ -109,18 +144,7 @@ fn root_activity(documents: &[c::Task], activity: c::ActivityPage, delegates: &[
                     chat.delegates.push(c::LiveDelegate { chip, takeover_budget: 0 }).expect("delegate");
                 }
                 chat.activity = activity.rows.get(0).expect("newest activity").position;
-                event(
-                    &mut root,
-                    Event::Client {
-                        event: jig_client::Event::Up {
-                            up: jig_client::Up::Watched {
-                                watch,
-                                event: c::WatchEvent::Delivered(c::Delivery::Task(Box::new(chat))),
-                            },
-                        },
-                    },
-                    &mut out,
-                );
+                up(&mut root, task_delivery(watch, chat), receiving, &mut out);
             }
             Request::Client {
                 request:
@@ -136,18 +160,7 @@ fn root_activity(documents: &[c::Task], activity: c::ActivityPage, delegates: &[
                     if task.chip.task != number {
                         continue;
                     }
-                    event(
-                        &mut root,
-                        Event::Client {
-                            event: jig_client::Event::Up {
-                                up: jig_client::Up::Watched {
-                                    watch,
-                                    event: c::WatchEvent::Delivered(c::Delivery::Task(Box::new(task.clone()))),
-                                },
-                            },
-                        },
-                        &mut out,
-                    );
+                    up(&mut root, task_delivery(watch, task.clone()), receiving, &mut out);
                 }
             }
             Request::Client { .. }
@@ -160,6 +173,7 @@ fn root_activity(documents: &[c::Task], activity: c::ActivityPage, delegates: &[
     assert!(out.is_empty(), "delegation fixture settles");
     root
 }
+
 fn activity(called: &[u64], heard: bool) -> c::ActivityPage {
     let mut objects = List::with_capacity(u32::try_from(called.len()).expect("tasks fit"));
     for task in called {
@@ -440,34 +454,52 @@ fn a_card_shows_once_at_its_call_when_its_result_shares_the_window() {
     let said = fixtures::text(view.tree());
     let call = skein_lib::bytes::find(&said, b"I'll delegate").expect("call turn");
     let card = skein_lib::bytes::find(&said, "T2 · CHANGE".as_bytes()).expect("card");
-    let wake = skein_lib::bytes::find(&said, b"Person").expect("wake turn");
-    assert!(call < card && card < wake, "the card stays at its call");
+    assert!(call < card, "the card stays at its call");
+    let log = view.tree().nodes();
+    let mut regions = 0_u32;
+    for (at, node) in log.iter().enumerate() {
+        if node.role == Role::Region && node.styles.as_slice().contains(&look::TURN) {
+            regions = regions.checked_add(1).expect("region count");
+            if regions > 1 {
+                let end = at.checked_add(usize::try_from(node.size).expect("region size")).expect("region end");
+                for child in &log[at..end] {
+                    if child.role == Role::Paragraph {
+                        assert!(
+                            child.name.as_deref() != Some(b"Person") && child.name.as_deref() != Some(b"You"),
+                            "the result region has no speaker shell"
+                        );
+                    }
+                }
+            }
+        }
+    }
+    assert!(regions > 1, "request and turn regions");
     assert_eq!(work_slots(&view), 0);
 }
 #[test]
-fn a_result_without_its_document_keeps_its_work() {
+fn a_result_without_its_document_draws_no_input_work() {
     let view = view_root(&root_activity(&[], wake(false, WAKE_SUMMARY), &[]));
     assert!(fixtures::find(view.tree(), Role::Region, b"Task 2").is_none());
-    assert_eq!(work_slots(&view), 1);
-    assert!(fixtures::find(view.tree(), Role::Paragraph, WAKE_SUMMARY).is_some());
+    assert_eq!(work_slots(&view), 0);
+    assert!(fixtures::find(view.tree(), Role::Paragraph, WAKE_SUMMARY).is_none());
 }
 #[test]
-fn a_persons_result_keeps_its_work() {
+fn a_persons_result_draws_no_input_work() {
     let summary = b"...\n2: Result from task 2:\nwords";
     let mut task = change();
     task.requester = c::OwnerRequester::Person(CHANGE);
     let view = view_root(&root_activity(&[task], wake(false, summary), &[]));
     assert!(fixtures::find(view.tree(), Role::Region, b"Task 2").is_none());
-    assert_eq!(work_slots(&view), 1);
-    assert!(fixtures::find(view.tree(), Role::Paragraph, b"Tool completed").is_some());
-    assert!(fixtures::find(view.tree(), Role::Paragraph, summary).is_some());
+    assert_eq!(work_slots(&view), 0);
+    assert!(fixtures::find(view.tree(), Role::Paragraph, b"Tool completed").is_none());
+    assert!(fixtures::find(view.tree(), Role::Paragraph, summary).is_none());
 }
 #[test]
-fn a_partly_carded_result_keeps_its_work() {
+fn a_partly_carded_result_draws_no_input_work() {
     let summary = b"Result from task 2:\nlanded\n3: Result from task 3:\nwaiting";
     let view = view_root(&root_activity(&[landed()], wake(false, summary), &[]));
-    assert_eq!(work_slots(&view), 1);
-    assert!(fixtures::find(view.tree(), Role::Paragraph, summary).is_some());
+    assert_eq!(work_slots(&view), 0);
+    assert!(fixtures::find(view.tree(), Role::Paragraph, summary).is_none());
 }
 #[test]
 fn each_state_says_its_words_in_its_status_look() {
@@ -519,9 +551,10 @@ fn a_failed_change_says_its_reason() {
 fn a_delegation_without_its_document_shows_its_call_work() {
     let view = view(None, &[CHANGE], false);
     assert!(fixtures::find(view.tree(), Role::Region, b"Task 2").is_none());
-    assert!(fixtures::find(view.tree(), Role::Paragraph, b"delegate").is_some());
-    assert!(fixtures::find(view.tree(), Role::Paragraph, b"Delegated tasks: 2").is_some());
-    assert_eq!(work_slots(&view), 2);
+    assert!(skein_lib::bytes::find(&fixtures::text(view.tree()), b"delegate").is_some());
+    assert!(fixtures::find(view.tree(), Role::Paragraph, b"1 tool call").is_some());
+    assert!(fixtures::find(view.tree(), Role::Paragraph, b"Delegated tasks: 2").is_none());
+    assert_eq!(work_slots(&view), 1);
 }
 #[test]
 fn a_carded_task_hides_its_heard_result() {
@@ -535,7 +568,7 @@ fn a_carded_task_hides_its_heard_result() {
 fn a_partly_carded_call_keeps_its_work() {
     let view = view(Some(change()), &[CHANGE, 3], false);
     assert!(find(&view, Find::text("T2 · CHANGE".as_bytes())).is_some());
-    assert_eq!(work_slots(&view), 2);
+    assert_eq!(work_slots(&view), 1);
 }
 
 pub(super) fn step_roles() {
@@ -575,4 +608,120 @@ fn work_slots(view: &crate::View) -> u32 {
         }
     }
     count
+}
+
+fn first_run_view(dark: bool, landed_change: bool) -> crate::View {
+    use fixtures::first_run as run;
+    let mut receiving = limits();
+    receiving.client.domain.rows = 3;
+    receiving.client.domain.text = 512;
+    let mut chat = change();
+    chat.chip.task = if dark { 4 } else { CHAT };
+    chat.requester = c::OwnerRequester::Person(fixtures::chat::PARTY);
+    chat.chip.title = c::DocumentText::complete(run::text(if dark { run::DARK } else { run::CSV }));
+    chat.spec.specification.words = chat.chip.title.clone();
+    chat.activity = if dark || !landed_change { 5 } else { 9 };
+    if dark {
+        let report = c::ResultValue::Report(c::DocumentText::complete(run::text(run::REPORT)));
+        let ending = c::Ending::Task(Box::new(c::OwnerChipEnding::Done(report.clone())));
+        chat.chip.phase = c::Phase::Ended;
+        let c::ChipPhase::Owner { phase, details, .. } = chat.chip.details.as_mut() else { panic!("chat owner") };
+        *phase = c::OwnerChipPhase::Ended;
+        details.ending = Some(c::OwnerChipEnding::Done(report.clone()));
+        details.ended_at = Some(Wall::EPOCH);
+        chat.result_contract = c::TaskContractDocument::Report { words: 512 };
+        chat.acts = List::with_capacity(0);
+        chat.result = Some(c::TaskResult::Document(Box::new(c::Result {
+            task: chat.chip.clone(),
+            ending,
+            value: Some(report),
+            at: Some(Wall::EPOCH),
+            details: None,
+            acts: List::with_capacity(0),
+        })));
+    }
+    let document = if landed_change { landed() } else { change() };
+    let root = root_chat_limits(
+        Some(&chat),
+        &[document],
+        run::activity(dark, landed_change),
+        if dark || landed_change { &[] } else { &[CHANGE] },
+        &receiving,
+    );
+    let mut view = crate::View::new(
+        &crate::Limits { tree: fixtures::tree_limits() },
+        &receiving,
+        fixtures::words(),
+        fixtures::FORGE,
+    );
+    fixtures::build(&mut view, &root);
+    view
+}
+fn in_order(said: &[u8], expected: &[&[u8]]) {
+    let mut rest = said;
+    for value in expected {
+        let at = skein_lib::bytes::find(rest, value).expect("next transcript text");
+        rest = &rest[at.checked_add(value.len()).expect("matched text end")..];
+    }
+}
+#[test]
+fn the_csv_chat_keeps_its_512_byte_cut_and_anchors_the_landed_card_before_the_reply() {
+    use fixtures::first_run as run;
+    let view = first_run_view(false, true);
+    let said = fixtures::text(view.tree());
+    in_order(
+        &said,
+        &[
+            b"You",
+            run::CSV,
+            b"Temper",
+            run::DELEGATING,
+            b"1 tool call",
+            b"delegate",
+            b"Earlier text omitted",
+            b"1 tool call",
+            b"wait",
+            "T2 · CHANGE".as_bytes(),
+            b"Temper",
+            run::LANDED,
+            b"1 tool call",
+            b"wait",
+        ],
+    );
+    for hidden in [
+        b"Run 1 began".as_slice(),
+        b"Earlier lines omitted",
+        b"Run 1 ended",
+        b"Begin the work your brief describes.",
+        b"Milestone",
+        b"Delegated tasks",
+        run::MERGE,
+        b"Instructions",
+        b"Tool completed",
+    ] {
+        assert!(skein_lib::bytes::find(&said, hidden).is_none(), "{hidden:?}");
+    }
+    assert!(fixtures::find(view.tree(), Role::Button, b"Older").is_none());
+    assert!(fixtures::find(view.tree(), Role::Status, b"Read").is_none());
+}
+#[test]
+fn the_dark_theme_chat_has_its_whole_answer_and_one_end_line() {
+    use fixtures::first_run as run;
+    let view = first_run_view(true, false);
+    let said = fixtures::text(view.tree());
+    let ending = "Ended · its report, “The demo changes nothing.”".as_bytes();
+    in_order(&said, &[b"You", run::DARK, b"Temper", run::DARK_ANSWER, b"1 tool call", b"finish", ending]);
+    let at = skein_lib::bytes::find(&said, ending).expect("end line");
+    assert!(skein_lib::bytes::find(&said[at + ending.len()..], ending).is_none());
+    for hidden in [b"Done".as_slice(), b"Milestone", b"Earlier text omitted", b"Tool completed", b"Instructions"] {
+        assert!(skein_lib::bytes::find(&said, hidden).is_none(), "{hidden:?}");
+    }
+}
+#[test]
+fn a_failed_chat_has_one_end_line_with_its_reason() {
+    let mut chat = change();
+    chat.chip.task = CHAT;
+    chat.result = Some(c::TaskResult::Ending(Box::new(c::OwnerChipEnding::Failed(document(b"No capacity")))));
+    let view = view_root(&root_chat(Some(&chat), &[], after_call(), &[]));
+    assert!(fixtures::find(view.tree(), Role::Paragraph, "Failed · No capacity".as_bytes()).is_some());
 }

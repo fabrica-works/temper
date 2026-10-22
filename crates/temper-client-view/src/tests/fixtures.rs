@@ -1,3 +1,5 @@
+#[path = "../../../../testing/first_run.rs"]
+pub mod first_run;
 use jig_client::contract as c;
 use jig_client::contract::{OwnerPart, OwnerPartKey, OwnerPartKind, Part};
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Token, Wall, Writer};
@@ -554,7 +556,13 @@ pub mod chat {
         );
         thread
     }
+    pub fn projected_tree(thread: &Thread) -> skein_ui::Tree {
+        drawn_tree(thread, crate::pages::chat::Drawn::Chat { request: None, delegations: None })
+    }
     pub fn tree(thread: &Thread) -> skein_ui::Tree {
+        drawn_tree(thread, crate::pages::chat::Drawn::Lines)
+    }
+    fn drawn_tree(thread: &Thread, drawn: crate::pages::chat::Drawn<'_>) -> skein_ui::Tree {
         let mut b = Builder::new(&fixtures::tree_limits());
         crate::pages::chat::conversation(
             &mut b,
@@ -562,7 +570,7 @@ pub mod chat {
             &fixtures::words(),
             (LINES, TEXT),
             crate::pages::chat::Speakers { person: None, requester: false },
-            None,
+            drawn,
             &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
         );
         b.finish()

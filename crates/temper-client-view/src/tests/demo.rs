@@ -225,20 +225,31 @@ fn conversation_speakers_use_you_temper_or_the_other_person() {
         ("another requester", Some(f::chat::PARTY + 1), false, b"Person", b"Pat"),
     ] {
         let mut b = skein_ui::Builder::new(&f::tree_limits());
+        let request = f::task::document().spec;
+        let mut thread = super::chat::structured_thread();
+        thread.lines.edges.after = jig_client::thread::window::Edge::End;
         crate::pages::chat::conversation(
             &mut b,
-            &super::chat::structured_thread(),
+            &thread,
             &f::words(),
             (f::chat::LINES, f::chat::TEXT),
             crate::pages::chat::Speakers { person, requester },
-            None,
+            crate::pages::chat::Drawn::Chat { request: Some(&request), delegations: None },
             &mut crate::frame::Bindings::new(f::tree_limits().bindings),
         );
         let tree = b.finish();
         let said = f::text(&tree);
-        assert!(skein_lib::bytes::find(&said, person_word).is_some(), "{row}");
+        let mut region = None;
+        for (index, node) in tree.nodes().iter().enumerate() {
+            if node.role == Role::Region {
+                region = Some(index);
+                break;
+            }
+        }
+        let request_text = f::node_text(&tree, region.expect("request region"));
+        assert!(skein_lib::bytes::find(&request_text, person_word).is_some(), "{row}");
         assert!(f::find(&tree, Role::Paragraph, party_word).is_some(), "{row}");
-        assert!(skein_lib::bytes::find(&said, b"Temper").is_some(), "{row}");
+        assert!(skein_lib::bytes::find(&said, b"Temper").is_none(), "{row}: a call-only message has no heading");
     }
 }
 
@@ -261,7 +272,7 @@ fn pending_words_without_a_party_are_named_you() {
         &f::words(),
         (f::chat::LINES, f::chat::TEXT),
         crate::pages::chat::Speakers { person: Some(73), requester: true },
-        None,
+        crate::pages::chat::Drawn::Chat { request: None, delegations: None },
         &mut crate::frame::Bindings::new(f::tree_limits().bindings),
     );
     assert!(f::find(&b.finish(), Role::Paragraph, b"You").is_some());

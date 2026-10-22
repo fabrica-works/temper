@@ -19,10 +19,14 @@ demo · demo/widget on Demo forge
 Signed in as the deployment’s owner
 Conversation:
   You
-  * Read
   Add CSV export to widget
   Temper
   I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.
+  1 tool call
+  delegate
+  * Earlier text omitted
+  1 tool call
+  wait
   Task 2:
     T2 · CHANGE
     * Landed
@@ -34,7 +38,10 @@ Conversation:
       - CI passed
       - Landed
     [9] Task 2 ↗
+  Temper
   CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change.
+  1 tool call
+  wait
 Using Demo model · Default
 [10] Message: (empty) (enter sends)
 Enter to send · Shift+Enter for a new line

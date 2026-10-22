@@ -1,7 +1,7 @@
 use super::fixtures;
 use fixtures::chat::{
     ATTEMPT, BYTES, CLOSE_GRACE, COMMITTED, GRACES, LINES, MESSAGE, PARTY, TASK, TEXT, TURN, chat_header, chat_root,
-    closing, messaging_root, proposal_root, provisional, provisional_with_text, rejecting_chat, tree,
+    closing, messaging_root, projected_tree as tree, proposal_root, provisional, provisional_with_text, rejecting_chat,
 };
 use jig_client::{contract as c, thread::Thread};
 use skein_lib::{List, Wall};
@@ -398,11 +398,11 @@ pub(super) fn structured_thread() -> Thread {
     thread
 }
 #[test]
-fn messages_keep_speaker_who_says_and_work_slots() {
+fn person_words_keep_their_shell_and_only_assistant_calls_keep_work() {
     use crate::look;
     let tree = tree(&structured_thread());
-    for speaker in [look::BY_PERSON, look::BY_AGENT, look::BY_TOOL, look::BY_SYSTEM] {
-        let at = styled(&tree, speaker);
+    {
+        let at = styled(&tree, look::BY_PERSON);
         assert_eq!(tree.nodes()[at].role, Role::Slot);
         assert!(tree.nodes()[at].styles.as_slice().contains(&look::MESSAGE));
         let nodes = subtree(&tree, at);
@@ -420,10 +420,14 @@ fn messages_keep_speaker_who_says_and_work_slots() {
             works = works.checked_add(1).expect("work count");
         }
     }
-    assert_eq!(works, 8);
+    assert_eq!(works, 1);
+    for hidden in [look::BY_TOOL, look::BY_SYSTEM, look::BY_AGENT] {
+        assert!(style_position(tree.nodes(), hidden).is_none(), "inputs and call-only assistant have no shell");
+    }
+    assert!(fixtures::find(&tree, Role::Paragraph, b"1 tool call").is_some());
 }
 #[test]
-fn run_and_omission_markers_keep_the_turn_region() {
+fn only_omission_markers_keep_the_turn_region() {
     let tree = tree(&structured_thread());
     let mut markers = 0_u32;
     for node in tree.nodes() {
@@ -433,7 +437,7 @@ fn run_and_omission_markers_keep_the_turn_region() {
             markers = markers.checked_add(1).expect("marker count");
         }
     }
-    assert_eq!(markers, 3);
+    assert_eq!(markers, 1);
 }
 
 fn chat_event(
@@ -535,12 +539,11 @@ fn chat_with_history() -> temper_client_domain::Domain {
     root
 }
 #[test]
-fn older_precedes_the_log_in_the_thread() {
+fn older_is_not_offered_while_the_window_is_filling() {
     let view = fixtures::page_view(&chat_with_history());
     let nodes = subtree(view.tree(), styled(view.tree(), crate::look::THREAD));
-    assert_eq!(nodes[0].role, Role::Button);
-    assert_eq!(nodes[0].name.as_deref(), Some(b"Older".as_slice()));
-    assert_eq!(nodes[1].role, Role::Log);
+    assert_eq!(nodes[0].role, Role::Log);
+    assert!(fixtures::find(view.tree(), Role::Button, b"Older").is_none());
 }
 #[test]
 fn pending_progress_and_the_answer_stay_before_the_composer() {
@@ -652,4 +655,90 @@ fn the_chatbar_keeps_jigs_word_without_the_requesters_words_wake() {
         let view = header_with_status(c::WaitsOn::News, 0, rule, by);
         assert!(fixtures::find(view.tree(), Role::Status, b"Parked").is_some());
     }
+}
+
+fn assistant_blocks(blocks: &[c::Block]) -> skein_ui::Tree {
+    use fixtures::first_run as run;
+    let mut thread = Thread::new(TASK, &jig_client::thread::Limits { lines: LINES, bytes: BYTES, text: 512 });
+    thread.reading = Some(jig_client::thread::Reading::Latest { known: 0 });
+    let mut rows = List::with_capacity(1);
+    rows.push(run::turn(1, ATTEMPT, 1, &[run::message(c::Speaker::Assistant, blocks)])).expect("turn");
+    thread.page(c::ActivityPage { rows, before: None, after: None, cut: false });
+    tree(&thread)
+}
+#[test]
+fn repeated_calls_fold_in_first_name_order_without_outcomes() {
+    use fixtures::first_run as run;
+    let tree = assistant_blocks(&[
+        run::call(1, b"read", b"{}", Some(b"not drawn")),
+        run::call(2, b"wait", b"{}", None),
+        run::call(3, b"read", b"{}", None),
+    ]);
+    let said = fixtures::text(&tree);
+    assert!(fixtures::find(&tree, Role::Paragraph, b"3 tool calls").is_some());
+    assert!(skein_lib::bytes::find(&said, "read ×2 · wait".as_bytes()).is_some());
+    assert!(skein_lib::bytes::find(&said, b"not drawn").is_none());
+    assert!(skein_lib::bytes::find(&said, b"Temper").is_none());
+}
+#[test]
+fn an_assistants_opaque_block_stays_inside_its_temper_message() {
+    let tree = assistant_blocks(&[c::Block::Opaque { dialect: fixtures::first_run::text(b"opaque-v1"), size: 42 }]);
+    let message = styled(&tree, crate::look::BY_AGENT);
+    let said = fixtures::node_text(&tree, message);
+    assert!(skein_lib::bytes::find(&said, b"TemperContent in opaque-v142 bytes").is_some());
+}
+#[test]
+fn a_persons_words_are_paragraphs_without_a_read_label() {
+    let mut thread = structured_thread();
+    let mut rows = List::with_capacity(1);
+    rows.push(c::ActivityLine {
+        position: 6,
+        at: Wall::EPOCH,
+        event: c::Activity::Words {
+            by: c::Party { number: PARTY, kind: c::PartyKind::Person, name: fixtures::first_run::text(b"Pat") },
+            message: 2,
+            words: fixtures::first_run::text(b"First line\nSecond line"),
+        },
+    })
+    .expect("words");
+    thread.reading = Some(jig_client::thread::Reading::Latest { known: 5 });
+    thread.page(c::ActivityPage { rows, before: None, after: None, cut: false });
+    let tree = tree(&thread);
+    assert!(fixtures::find(&tree, Role::Paragraph, b"First line").is_some());
+    assert!(fixtures::find(&tree, Role::Paragraph, b"Second line").is_some());
+    assert!(fixtures::find(&tree, Role::Status, b"Read").is_none());
+}
+
+#[test]
+fn an_owners_person_words_have_a_person_shell_and_one_paragraph_per_line() {
+    let mut thread = Thread::new(TASK, &jig_client::thread::Limits { lines: LINES, bytes: BYTES, text: 512 });
+    thread.reading = Some(jig_client::thread::Reading::Latest { known: 0 });
+    let mut rows = List::with_capacity(1);
+    rows.push(c::ActivityLine {
+        position: 1,
+        at: Wall::EPOCH,
+        event: c::Activity::Owner {
+            source: Box::new(c::OwnerActivityLine {
+                task: TASK,
+                position: 1,
+                at: Wall::EPOCH,
+                line: c::OwnerActivity::Words {
+                    message: MESSAGE,
+                    by: c::OwnerRequester::Person(PARTY),
+                    kind: c::OwnerMessageKind::Words,
+                    words: fixtures::first_run::text(b"First line\nSecond line"),
+                },
+            }),
+            decoded: None,
+        },
+    })
+    .expect("owner words");
+    thread.page(c::ActivityPage { rows, before: None, after: None, cut: false });
+    let tree = tree(&thread);
+    let person = styled(&tree, crate::look::BY_PERSON);
+    let said = fixtures::node_text(&tree, person);
+    assert!(skein_lib::bytes::find(&said, b"PersonFirst lineSecond line").is_some());
+    assert!(fixtures::find(&tree, Role::Paragraph, b"First line").is_some());
+    assert!(fixtures::find(&tree, Role::Paragraph, b"Second line").is_some());
+    assert!(fixtures::find(&tree, Role::Status, b"Read").is_none());
 }

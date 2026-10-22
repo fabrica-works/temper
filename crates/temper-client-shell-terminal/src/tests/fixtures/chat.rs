@@ -1,3 +1,6 @@
+#[expect(dead_code, reason = "the shared transcript also names the dark-theme request and report for the view tier")]
+#[path = "../../../../../testing/first_run.rs"]
+mod first_run;
 use super::*;
 use skein_ui::{Role, Run};
 fn text(b: &mut skein_ui::Builder, role: Role, words: &[u8]) {
@@ -16,7 +19,6 @@ pub fn page() -> skein_ui::Tree {
     b.name(b"Conversation");
     text(&mut b, Role::Paragraph, b"You");
     text(&mut b, Role::Paragraph, b"Hello");
-    text(&mut b, Role::Status, b"Read");
     text(&mut b, Role::Paragraph, b"Temper");
     golden_cards::report(&mut b, b"I can help.");
     text(&mut b, Role::Status, b"Writing...");
@@ -51,8 +53,7 @@ fn first_run_page(address: client::Address, landed: bool) -> skein_ui::Tree {
     use jig_client::contract as c;
     use skein_lib::{Env, List, Queue, Time, Wall};
     use temper_client_domain::{Event, Request};
-    let mut limits = crate::limits::native().client;
-    limits.client.domain.rows = 8;
+    let limits = crate::limits::native().client;
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     let mut root = client::unlinked(&limits, 16);
     let mut out = Queue::with_capacity(client::max_out(&limits));
@@ -97,12 +98,16 @@ fn first_run_page(address: client::Address, landed: bool) -> skein_ui::Tree {
             Request::Client {
                 request:
                     jig_client::Request::Down {
-                        down: jig_client::Down::Read { read, what: jig_client::Readable::Jig(c::Read::Activity { .. }) },
+                        down:
+                            jig_client::Down::Read {
+                                read,
+                                what: jig_client::Readable::Jig(c::Read::Activity { before, .. }),
+                            },
                     },
             } => Some(jig_client::Up::ReadDone {
                 read,
                 result: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(Box::new(
-                    delegation_activity(landed),
+                    first_run::page(&delegation_activity(landed), before.as_ref(), limits.client.domain.rows),
                 )))),
             }),
             Request::Client {
@@ -153,7 +158,8 @@ fn delegation_task(number: u64, landed: bool) -> contract::Task {
     task.result = None;
     task.chip.phase = c::Phase::Running;
     task.proposals.clear();
-    task.activity = if number == 1 { if landed { 3 } else { 2 } } else { 0 };
+    task.activity = if number == 1 { if landed { 9 } else { 5 } } else { 0 };
+    task.spec.specification.words = c::DocumentText::complete(delegation_text(first_run::CSV));
     if number == 1 {
         task.requester = c::OwnerRequester::Person(1);
         task.wake.words = c::WakeRule::Immediate;
@@ -162,8 +168,15 @@ fn delegation_task(number: u64, landed: bool) -> contract::Task {
         // The first-run fixture has one change, still live until its result arrives.
         details.live_delegates = u32::from(!landed);
         details.wake = task.wake;
+        if !landed {
+            task.delegates = skein_lib::List::with_capacity(1);
+            task.delegates
+                .push(c::LiveDelegate { chip: delegation_task(2, false).chip, takeover_budget: 0 })
+                .expect("live change");
+        }
     }
     if number == 2 {
+        task.requester = c::OwnerRequester::Task(1);
         task.result_contract = c::TaskContractDocument::Change { connector: 1, kind: 1, words: 256 };
         if landed {
             task.result = Some(c::TaskResult::Ending(Box::new(c::OwnerChipEnding::Done(c::ResultValue::Change {
@@ -176,56 +189,7 @@ fn delegation_task(number: u64, landed: bool) -> contract::Task {
     task
 }
 fn delegation_activity(landed: bool) -> contract::ActivityPage {
-    use jig_client::contract as c;
-    use skein_lib::{List, Wall};
-    let mut blocks = List::with_capacity(3);
-    blocks.push(c::Block::Text(delegation_text("I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.".as_bytes()))).expect("agent words");
-    blocks
-        .push(c::Block::Call(c::Call {
-            number: 1,
-            tool: delegation_text(b"delegate"),
-            input: delegation_text(b"{}"),
-            outcome: Some(delegation_text(b"Delegated tasks: 2")),
-            failed: false,
-            objects: List::with_capacity(0),
-            parts: List::with_capacity(0),
-        }))
-        .expect("call");
-    blocks
-        .push(c::Block::Result { call: 1, summary: delegation_text(b"Delegated tasks: 2"), failed: false })
-        .expect("acknowledgement");
-    let mut messages = List::with_capacity(1);
-    messages.push(c::Message { speaker: c::Speaker::Assistant, blocks }).expect("message");
-    let mut rows = List::with_capacity(3);
-    if landed {
-        rows.push(c::ActivityLine { position: 3, at: Wall::EPOCH, event: c::Activity::News { summary: delegation_text("CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change.".as_bytes()), topic: 0, part: None } }).expect("reply");
-    }
-    rows.push(c::ActivityLine {
-        position: 2,
-        at: Wall::EPOCH,
-        event: c::Activity::Turn {
-            name: c::TurnName { attempt: 1, number: 1 },
-            turn: c::TurnRead::Decoded(c::Turn {
-                messages,
-                used: c::Usage { input: 0, output: 0, cached: 0, cache_written: 0 },
-                spent: 0,
-                read_through: Some(1),
-                cut: false,
-            }),
-        },
-    })
-    .expect("turn");
-    rows.push(c::ActivityLine {
-        position: 1,
-        at: Wall::EPOCH,
-        event: c::Activity::Words {
-            by: c::Party { number: 1, kind: c::PartyKind::Person, name: delegation_text(b"Pat") },
-            message: 1,
-            words: delegation_text(b"Add CSV export to widget"),
-        },
-    })
-    .expect("request");
-    c::ActivityPage { rows, before: None, after: None, cut: false }
+    first_run::activity(false, landed)
 }
 
 fn delegation_text(bytes: &[u8]) -> contract::Text {
