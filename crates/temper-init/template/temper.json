@@ -220,7 +220,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 85561660354221,
+    "memory_bytes": 85561658779349,
     "rules": {
       "ceiling": {
         "tools": 1,

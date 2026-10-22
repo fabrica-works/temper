@@ -1029,6 +1029,17 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // The root's settled Option<(Time, Wall)> adds 24 B inline through Engine
     // in Service. Payload envelopes and worker-owned state are unchanged.
     let settled_root_growth = 24;
+    // Jig finishing: the small profile indexes eight sign-ins, replaces one
+    // 8-B token per retained run with a 24-B reconciliation action, and
+    // replaces each 88-B watch snapshot with a 16-B ending. Core also grows
+    // 40 B inline (32-B expiry set header plus 8-B immutable room cache).
+    let expiry_index = skein_lib::Set::<(skein_lib::Wall, u64)>::worst_case(8).expect("small expiry index");
+    let reconciliation_growth = u64::from(temper_engine_domain::VIEWS.runs) * (24 - 8);
+    let ending_release = u64::from(temper_engine_domain::VIEWS.watchers) * (88 - 16);
+    // The same heap delta propagates through the existing 3,076 root and
+    // payload envelopes counted above; only Service owns Core's inline bytes.
+    let finishing_growth = 3_076 * (expiry_index + reconciliation_growth) + 40;
+    let ending_release = 3_076 * ending_release;
     let (github_identity_growth, github_worker_growth) = github_identity_growth();
     assert_eq!(
         required.engine_bytes,
@@ -1054,6 +1065,8 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + forgejo_setup_growth
             + open_questions_growth
             + settled_root_growth
+            + finishing_growth
+            - ending_release
             + github_identity_growth
             + start_growth()
             + GIT_GENERATIONS_GROWTH
