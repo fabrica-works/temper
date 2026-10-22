@@ -239,7 +239,7 @@ impl Running {
     }
     pub fn declared(&mut self) {
         let clock = skein_shell::Clock::new();
-        let deadline = clock.now().now.saturating_add(Duration::from_secs(30));
+        let deadline = clock.now().now.saturating_add(Duration::from_secs(60));
         loop {
             let text = fs::read_to_string(&self.log).expect("runner log");
             if text.contains("declared successfully") {
@@ -271,8 +271,8 @@ impl Drop for Running {
 pub fn answer(port: u16, path: &str, token: Option<&str>) -> std::io::Result<serde_json::Value> {
     use std::io::{Read, Write};
     let mut socket =
-        std::net::TcpStream::connect_timeout(&([127, 0, 0, 1], port).into(), std::time::Duration::from_millis(100))?;
-    socket.set_read_timeout(Some(std::time::Duration::from_secs(1)))?;
+        std::net::TcpStream::connect_timeout(&([127, 0, 0, 1], port).into(), std::time::Duration::from_millis(200))?;
+    socket.set_read_timeout(Some(std::time::Duration::from_secs(2)))?;
     let auth = token.map_or_else(String::new, |token| format!("Authorization: token {token}\r\n"));
     write!(socket, "GET {path} HTTP/1.0\r\nHost: 127.0.0.1\r\n{auth}Connection: close\r\n\r\n")?;
     let mut text = String::new();
@@ -286,7 +286,7 @@ pub fn answer(port: u16, path: &str, token: Option<&str>) -> std::io::Result<ser
 #[must_use]
 pub fn await_answer(port: u16, path: &str, token: Option<&str>) -> serde_json::Value {
     let clock = skein_shell::Clock::new();
-    let deadline = clock.now().now.saturating_add(Duration::from_secs(30));
+    let deadline = clock.now().now.saturating_add(Duration::from_secs(60));
     loop {
         if let Ok(value) = answer(port, path, token) {
             return value;

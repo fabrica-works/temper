@@ -4,7 +4,7 @@ use skein_io::kernel::{Exit, Signal};
 use skein_lib::Duration;
 
 // Each whole-example box story is bounded at 120 seconds.
-const BOX_DEADLINE: Duration = Duration::from_secs(120);
+const BOX_DEADLINE: Duration = Duration::from_secs(240);
 
 #[test]
 fn a_temper_told_to_stop_with_a_sign_in_under_way_ends_at_once() {
@@ -128,7 +128,7 @@ fn an_adopt_cut_by_a_signal_is_made_once() {
 fn temper_serve_prints_its_link_and_drains_on_a_signal() {
     let scratch = support::Scratch::new("drain");
     support::configuration(scratch.path(), &support::Forge::Unreached);
-    let ended = support::until_link_then(scratch.path(), Signal::Terminate, Duration::from_secs(60));
+    let ended = support::until_link_then(scratch.path(), Signal::Terminate, Duration::from_secs(120));
     let link = support::printed_link(&ended.stdout).expect("one printed line");
     assert!(link.starts_with(b"http://127.0.0.1:"), "a loopback link: {}", String::from_utf8_lossy(link));
     assert!(skein_lib::bytes::find(link, b"/jig/v1/sign-in/link?secret=").is_some(), "the deployment's sign-in link");
@@ -239,7 +239,7 @@ fn landing(case: &str, raised: bool) {
     let merged = forgejo.merged_pull().expect("the change's pull request is merged");
     assert_eq!(forgejo.job_state(merged), "success");
     assert!(forgejo.main_readme().ends_with(support::EDIT), "main holds the agent's edit");
-    let second = support::run(scratch.path(), support::person::found(), None, Duration::from_secs(60));
+    let second = support::run(scratch.path(), support::person::found(), None, Duration::from_secs(120));
     assert!(second.finished, "the work is found after the restart");
     assert_eq!(forgejo.merged_pull(), Some(merged), "the forge's state is unchanged by the restart");
     forgejo.stop();
@@ -1807,7 +1807,7 @@ exec "$@"
         },
         None,
         support::boxed::Plan::Stop,
-        Duration::from_secs(3),
+        Duration::from_secs(6),
     );
     let diagnostic = String::from_utf8_lossy(&ended.stderr).into_owned();
     let linked = support::printed_link(&ended.stdout).is_some();

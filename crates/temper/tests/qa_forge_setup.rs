@@ -7,7 +7,7 @@ use serde_json::Value;
 use skein_io::kernel::Exit;
 use skein_lib::Duration;
 
-const WITHIN: Duration = Duration::from_secs(5);
+const WITHIN: Duration = Duration::from_secs(10);
 const FILES: [&str; 4] = ["api_token", "git_token", "user", "webhook_secret"];
 
 fn init(directory: &Path) -> (Value, String) {

@@ -267,13 +267,15 @@ Each is `{artifact.temper} ctl {dir.client}` and then:
 |---|---|---|
 | `sign-in` | `sign-in -`, stdin `{proc.serve.ready.link}` and a newline | the deployment's owner signs in by the full printed link |
 | `add-key` | `add-key 1 {proc.llm.dir}/llm.key --deployment --key lab-llm` | the fake model's key, the deployment's account (`client/tools.md`, 5.5, area 5) |
-| `usable` | `wait accounts --until usable --timeout 100` | the account usable |
-| `forge` | `wait forges --until connected:1 --timeout 100` | the fake's start-time adoption done (`protocol/setup.md`, 8.4) |
+| `usable` | `wait accounts --until usable --timeout 200` | the account usable |
+| `forge` | `wait forges --until connected:1 --timeout 200` | the fake's start-time adoption done (`protocol/setup.md`, 8.4) |
 | `adopt` | `adopt --project 1 --forge 1 --owner fake --name widget --landing main --key lab-adopt` | adopted with CI on, at the form's defaults (`client/tools.md`, 5.3) |
 
 - **Each must exit 0,** or the run fails `action/<name>/exit:<status>`
   (skein's `lab.md`, 7.1). Each wait's timeout is below
   `command_seconds`, so a wait not met fails by its own exit, 3.
+The seed waits allow 200 s (100 s before the user's doubling of 10-22, provisional) each.
+
 - **No sign-out:** `{dir.client}` stays signed in as the owner, and is
   the driver's through `ctl`. Every seed request has been answered, so
   the driver's first call sends nothing kept (`client/tools.md`, 8.2).

@@ -9,13 +9,13 @@ WEB = Path(__file__).resolve().parents[2] / 'cluster-web'
 LINK = 'http://127.0.0.1:9000/jig/v1/sign-in/link?secret=invented-only'
 ADDRESS = '127.0.0.1:9100'
 CHAT = 'http://127.0.0.1:9200/chats/42'
-REPLY = ['wait', 'text', 'First worker replied.', '--in', 'log', 'Conversation', '--timeout', '60']
+REPLY = ['wait', 'text', 'First worker replied.', '--in', 'log', 'Conversation', '--timeout', '120']
 CALLS = [
     ['type', 'text area', 'Start a chat'], ['press', 'button', 'Start', '--exact'],
-    ['wait', 'log', 'Conversation', '--timeout', '60'], REPLY[:-1] + ['90'], ['address'],
-    ['go', '/chats'], ['wait', 'heading', 'Chats', '--exact', '--timeout', '60'],
+    ['wait', 'log', 'Conversation', '--timeout', '120'], REPLY[:-1] + ['180'], ['address'],
+    ['go', '/chats'], ['wait', 'heading', 'Chats', '--exact', '--timeout', '120'],
     ['go', '/chats/42'], REPLY, ['reload'], REPLY, ['shot'], ['back'],
-    ['wait', 'heading', 'Chats', '--exact', '--timeout', '60'], ['address']]
+    ['wait', 'heading', 'Chats', '--exact', '--timeout', '120'], ['address']]
 
 
 class ShellTests(unittest.TestCase):

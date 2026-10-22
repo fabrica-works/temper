@@ -7,7 +7,7 @@ use skein_shell::{Clock, Host};
 use skein_world::{Referee, real};
 use std::{fs, path::Path};
 
-const STOPS_WITHIN: Duration = Duration::from_secs(5);
+const STOPS_WITHIN: Duration = Duration::from_secs(10);
 
 /// `ChatGPT`'s scopes and callback path, with every endpoint on the fake issuer.
 #[must_use]
@@ -191,7 +191,7 @@ pub fn run(directory: &Path, issuer: oauth::Peer) {
         )))
     });
     world.spawn(|| Process::Issuer(Box::new(issuer)));
-    let outcome = world.run(&clock, Duration::from_secs(45));
+    let outcome = world.run(&clock, Duration::from_secs(90));
     let Process::Issuer(issuer) = &outcome.procs[2] else { panic!("issuer") };
     assert!(
         !issuer.observations().iter().any(|event| matches!(event, oauth::Observation::Authorize { .. })),

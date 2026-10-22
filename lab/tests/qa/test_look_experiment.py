@@ -46,7 +46,7 @@ class LookExperiment(unittest.TestCase):
         result = subprocess.run(['/bin/sh', ROOT / 'lab' / experiment / 'stage', artifact,
                                  destination, ROOT / 'lab' / experiment], cwd=self.base,
                                 env=dict(os.environ, TMPDIR=str(self.scratch)),
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
         return result, destination
 
     def test_stage_preserves_gallery_bytes_and_unrelated_files(self):
@@ -103,7 +103,7 @@ class LookExperiment(unittest.TestCase):
         path = self.base / 'invalid.tar'
         path.write_bytes(b'This is not an archive.\n')
         result = subprocess.run(['/bin/sh', ROOT / 'lab/look/stage', path, self.base / 'page', ROOT / 'lab/look'],
-                                cwd=self.base, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
+                                cwd=self.base, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
         self.assertNotEqual(result.returncode, 0)
         self.assertTrue(result.stderr)
 
@@ -183,7 +183,7 @@ class LookExperiment(unittest.TestCase):
                     '--chromium', chromium, '--fonts', '/home/free/src/rust/tmp/lab/browser/fonts',
                     '--mockups', ROOT / 'docs/design/client/mockups', '--page', self.base,
                     '--ready-seconds', '1', '--out', out, *scenes], cwd=self.base,
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
                 self.assertEqual(result.returncode, 2, result.stderr.decode())
                 self.assertIn('out', result.stderr.decode())
                 self.assertNotIn('expectations', result.stderr.decode())
@@ -229,11 +229,11 @@ class LookExperiment(unittest.TestCase):
                     '--chromium', chromium, '--fonts', '/home/free/src/rust/tmp/lab/browser/fonts',
                     '--mockups', mockups, '--page', page, '--ready-seconds', '3', '--out', out, scene_path],
                     cwd=self.base, env=dict(os.environ, TMPDIR=str(self.scratch)),
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=240)
                 self.assertEqual(result.returncode, 0, result.stderr.decode(errors='replace'))
                 for kind in ['structure', 'style']:
                     checked = subprocess.run([SKEIN / 'scripts/lab/look/check', kind, '--capture', out, scene_path],
-                                             cwd=self.base, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
+                                             cwd=self.base, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
                     lines = [json.loads(line) for line in checked.stdout.splitlines()]
                     if experiment == 'look':
                         self.assertEqual(checked.returncode, 0, (lines, checked.stderr.decode()))

@@ -17,7 +17,7 @@ mod configuration;
 mod forgery;
 
 /// How long a story waits for what a page shows.
-pub const WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(5);
+pub const WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(10);
 /// How long a story watches for what a page must not show.
 pub const ABSENT: skein_lib::Duration = skein_lib::Duration::from_secs(1);
 /// The first chat's link on the Chats page.

@@ -7,16 +7,16 @@ import unittest
 
 LIVE = Path(__file__).resolve().parents[2] / 'look-live'
 ADDRESS = '127.0.0.1:9100'
-REPLY = ['wait', 'text', 'First reply.', '--in', 'log', 'Conversation', '--timeout', '60']
+REPLY = ['wait', 'text', 'First reply.', '--in', 'log', 'Conversation', '--timeout', '120']
 PHASES = {
     'send': [(['type', 'text area', 'Start a chat'], 'look-live-chat\n'),
              (['press', 'button', 'Start', '--exact'], ''),
-             (['wait', 'log', 'Conversation', '--timeout', '60'], ''),
+             (['wait', 'log', 'Conversation', '--timeout', '120'], ''),
              (['type', 'text area', 'Message'], 'look-live-sent\n'),
-             (['key', 'Enter'], ''), (REPLY[:-1] + ['90'], '')],
+             (['key', 'Enter'], ''), (REPLY[:-1] + ['180'], '')],
     'reload': [(['reload'], ''), (REPLY, '')],
     'close': [(['press', 'button', 'Close', '--exact'], ''),
-              (['wait', 'dialog', 'Close', '--exact', '--timeout', '60'], '')]}
+              (['wait', 'dialog', 'Close', '--exact', '--timeout', '120'], '')]}
 
 
 class StepsTests(unittest.TestCase):

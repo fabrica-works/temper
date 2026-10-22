@@ -292,7 +292,7 @@ fn one_sided_hook_wiring_is_refused_before_a_fake_connects() {
             document["application"]["forges"][0]["webhook_secret"] = serde_json::Value::Null;
         }
         fs::write(&path, serde_json::to_vec(&document).expect("JSON")).expect("one-sided hook wiring");
-        let outcome = support::boxed::run(scratch.path(), None, support::boxed::Plan::Stop, Duration::from_secs(5));
+        let outcome = support::boxed::run(scratch.path(), None, support::boxed::Plan::Stop, Duration::from_secs(10));
         let stderr = String::from_utf8_lossy(&outcome.stderr);
         assert_eq!(outcome.exit, Some(Exit::Code(1)), "{name}: {stderr}");
         assert!(stderr.contains(refusal), "{name}: {stderr}");
@@ -312,7 +312,7 @@ fn the_default_box_prepares_adopts_and_hands_over_the_link() {
         .output()
         .expect("run init");
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    let outcome = support::boxed::run(scratch.path(), None, support::boxed::Plan::Stop, Duration::from_secs(5));
+    let outcome = support::boxed::run(scratch.path(), None, support::boxed::Plan::Stop, Duration::from_secs(10));
     assert_eq!(outcome.exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&outcome.stderr));
     assert!(support::printed_link(&outcome.stdout).is_some(), "seed must finish and hand over the sign-in link");
     assert_eq!(outcome.left.as_deref(), Some([].as_slice()));

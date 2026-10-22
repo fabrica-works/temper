@@ -18,7 +18,7 @@ pub const SECRET: &[u8] = b"fixture-hook-secret";
 pub const KNOWN_FORGE: &str = "/hooks/1";
 pub const UNKNOWN_FORGE: &str = "/hooks/9";
 // The listener stories allow five seconds for each socket operation.
-const SOCKET_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
+const SOCKET_DEADLINE: std::time::Duration = std::time::Duration::from_secs(10);
 pub const PING: &[u8] = b"ping";
 
 #[must_use]
@@ -122,7 +122,7 @@ pub fn served(directory: &Path, listener: SocketAddr, posts: &[Post<'_>]) -> End
     let streams = binary.take_streams().expect("pipes");
     let fds = streams.descriptors();
     let Streams::Pipes { input, output } = streams else { panic!("pipes") };
-    let within = Duration::from_secs(30);
+    let within = Duration::from_secs(60);
     let mut statuses = Vec::new();
     let mut world = real::World::new(Judge {
         listener,
