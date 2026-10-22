@@ -2,7 +2,7 @@
 
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
-use skein_lib::{Env, Queue, ReplyTo, Time, Token, Wall};
+use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::VecDeque;
 use temper_engine_domain as engine;
 use temper_engine_domain::{Delivery, Key, Record, Write};
@@ -195,6 +195,24 @@ impl Driver {
         crate::poll(&mut self.root, &self.env, &mut self.out);
         self.collect();
         self.root.reclaim();
+    }
+
+    /// Drive immediate work while a story deliberately keeps a fleet deadline armed.
+    pub fn pump(&mut self) {
+        const STEPS: usize = 200; // The direct fixture's settlement step budget.
+        for _ in 0..STEPS {
+            self.advance(true);
+        }
+        assert!(self.events.is_empty() && self.store.pending.is_empty(), "immediate work drained: {:?}", self.root);
+    }
+
+    /// Fire timers at an absolute simulated time; the caller drives their outputs.
+    pub fn fire_at(&mut self, elapsed: Duration) {
+        self.env.now = Time::from_nanos(elapsed.as_nanos());
+        self.env.wall = Wall::from_nanos(elapsed.as_nanos());
+        engine::fire(&mut self.root, &self.env);
+        engine::release(&mut self.root, &self.env, &mut self.out);
+        self.collect();
     }
 
     pub fn settle(&mut self) {

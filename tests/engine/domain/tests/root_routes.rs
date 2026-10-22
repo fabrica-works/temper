@@ -4206,6 +4206,123 @@ fn a_worker_lost_mid_run_resumes_at_the_last_committed_turn() {
     assert_eq!(second.transcript[0].as_ref(), b"step");
 }
 
+/// Every assignment, including its channel, in delivery order.
+fn placements(driver: &Driver) -> Vec<(Token, u64, u64)> {
+    driver
+        .delivered
+        .iter()
+        .filter_map(|delivery| {
+            if let Delivery::Assigned { channel, assignment } = delivery {
+                Some((*channel, assignment.task, assignment.attempt))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+// protocol/README.md, 15.4 and 15.6: the cluster's placement and fencing.
+#[test]
+fn a_lost_workers_run_is_placed_on_the_other_worker_past_its_grace() {
+    const LOST_CHANNEL: Token = Token::new(7);
+    const SURVIVING_CHANNEL: Token = Token::new(8);
+    const LOST_POSITION: u32 = 0;
+    const SURVIVING_POSITION: u32 = 1;
+    const WORKERS: u32 = 2; // The cluster has two configured workers.
+    const PROGRAM_HOSTS: u32 = WORKERS + 1; // Workers and the engine.
+    const SLOTS: u32 = 1; // One run on each worker (README 15.6).
+    const COMMITTED_TURN: u32 = 1;
+    const STALE_TURN: u32 = 2;
+    const SPENT: u64 = 1;
+    const LOST_TRIES: u32 = 1;
+    const FIRST_CHAT: u8 = 31;
+    const SECOND_CHAT: u8 = 32;
+    const COMMITTED_BODY: &[u8] = b"committed on lost worker";
+    const BEFORE_GRACE: Duration = Duration::from_secs(4);
+    const PAST_GRACE: Duration = Duration::from_secs(6);
+    const PAST_RETRY: Duration = Duration::from_secs(7); // Also past the configured lost-retry backoff.
+
+    let mut bounds = limits();
+    bounds.fleet.configured_workers = WORKERS;
+    bounds.fleet.workers = WORKERS;
+    bounds.people.program_hosts = PROGRAM_HOSTS;
+    bounds.accounts.program_hosts = PROGRAM_HOSTS;
+    bounds.journal.deliveries = bounds.fleet.workers * fleet::max_out(&bounds.fleet) + 1;
+    bounds.journal.held = 3 * bounds.journal.deliveries + 16;
+    let configs = [91, 91].map(|seed| {
+        let mut configuration = sharing_config(seed);
+        configuration.core.worker_names =
+            Box::new([b"first-worker".as_slice().into(), b"second-worker".as_slice().into()]);
+        configuration
+    });
+    let mut driver = Driver::configured(Store::new(), configs, &bounds);
+    driver.settle();
+    driver.send(protocol::hello_at(LOST_CHANNEL, LOST_POSITION, SLOTS, Box::new([])));
+    driver.settle();
+    driver.send(protocol::hello_at(SURVIVING_CHANNEL, SURVIVING_POSITION, SLOTS, Box::new([])));
+    driver.settle();
+    driver.sign_in();
+    driver.settle();
+    chat(&mut driver, FIRST_CHAT);
+    driver.settle();
+    let first = driver.last_assignment();
+    chat(&mut driver, SECOND_CHAT);
+    driver.settle();
+    let second = driver.last_assignment();
+    assert_ne!(first.task, second.task);
+    let initial = [(LOST_CHANNEL, first.task, first.attempt), (SURVIVING_CHANNEL, second.task, second.attempt)];
+    assert_eq!(placements(&driver), initial, "one assignment per task, on separate channels");
+    driver.send(protocol::turn(LOST_CHANNEL, first.task, first.attempt, COMMITTED_TURN, SPENT, None, COMMITTED_BODY));
+    driver.settle();
+    let first_turn = Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn {
+        task: first.task,
+        attempt: first.attempt,
+        turn: COMMITTED_TURN,
+    }));
+    assert!(driver.store.rows.contains_key(&first_turn));
+    driver.send(protocol::lost(LOST_CHANNEL));
+    driver.pump();
+    driver.send(protocol::turn(SURVIVING_CHANNEL, second.task, second.attempt, COMMITTED_TURN, SPENT, None, b"done"));
+    driver.pump();
+    driver.answer(SURVIVING_CHANNEL, second.task, second.attempt, SPENT, tasks::End::Parked, engine::Parts::none());
+    driver.pump();
+
+    // The fleet's grace deadline keeps the root nonquiescent until it fires.
+    driver.fire_at(BEFORE_GRACE);
+    driver.pump();
+    assert_eq!(placements(&driver), initial, "no new attempt on any channel before grace");
+    driver.fire_at(PAST_GRACE);
+    driver.settle();
+    assert_eq!(live(&driver, first.task).tries.lost, LOST_TRIES);
+    driver.fire_at(PAST_RETRY);
+    driver.settle();
+    let resumed = driver.last_assignment();
+    assert!(resumed.attempt > first.attempt);
+    assert_eq!(
+        placements(&driver),
+        [
+            (LOST_CHANNEL, first.task, first.attempt),
+            (SURVIVING_CHANNEL, second.task, second.attempt),
+            (SURVIVING_CHANNEL, first.task, resumed.attempt),
+        ]
+    );
+    assert_eq!(resumed.transcript.as_ref(), [Box::<[u8]>::from(COMMITTED_BODY)]);
+    driver.send(protocol::turn(LOST_CHANNEL, first.task, first.attempt, STALE_TURN, SPENT, None, b"fenced"));
+    driver.settle();
+    let old_turns = driver
+        .store
+        .rows
+        .keys()
+        .filter(|key| {
+            matches!(key,
+                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn { task, attempt, .. }))
+                    if *task == first.task && *attempt == first.attempt
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(old_turns, [&first_turn], "the lost attempt commits no later turn");
+}
+
 #[test]
 fn a_worker_frozen_past_its_grace_gets_no_next_attempt_until_its_sum_has_passed() {
     let (mut driver, first) = Driver::chat();
@@ -4580,13 +4697,7 @@ fn a_hello_keeps_its_configured_worker_position() {
     driver.settle();
     driver.send(protocol::hello(Token::new(8), Box::new([])));
     driver.settle();
-    let mut hello = protocol::hello(Token::new(7), Box::new([]));
-    let engine::Event::Worker(engine::WorkerInput::Link { link: engine::Link::Hello { worker, .. }, .. }) = &mut hello
-    else {
-        unreachable!("hello fixture")
-    };
-    *worker = 1;
-    driver.send(hello);
+    driver.send(protocol::hello_at(Token::new(7), 1, 1, Box::new([])));
     driver.settle();
     assert!(driver.protocol.sources.contains(&Token::new(7)), "position one joins while position zero is occupied");
 }

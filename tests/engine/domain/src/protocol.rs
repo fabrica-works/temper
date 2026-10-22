@@ -38,10 +38,16 @@ pub fn hello(channel: Token, hosting: Box<[host::Hosting]>) -> engine::Event {
 /// One worker's hello on `channel` with `slots` slots, listing the runs it hosts.
 #[must_use]
 pub fn hello_slots(channel: Token, slots: u32, hosting: Box<[host::Hosting]>) -> engine::Event {
+    hello_at(channel, 0, slots, hosting)
+}
+
+/// A configured worker's hello at `worker`, with its slots and hosted runs.
+#[must_use]
+pub fn hello_at(channel: Token, worker: u32, slots: u32, hosting: Box<[host::Hosting]>) -> engine::Event {
     link(
         channel,
         engine::Link::Hello {
-            worker: 0,
+            worker,
             hello: host::Hello {
                 slots,
                 stop_bound: Duration::from_millis(100),
