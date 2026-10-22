@@ -92,8 +92,13 @@ fn a_chats_clone_and_push_carry_its_installations_token() {
     assert_eq!(delivered["task"]["chip"]["task"], CODER);
     assert_eq!(change["kind"], 2, "the coder's produced change");
     assert_eq!(change["part"]["key"]["number"], github::REPOSITORY);
-    let local = no_installation_token_pattern_or_app_key_outside_the_secrets_store(&ran);
-    assert_eq!(local, [branch.head], "the pushed head is the coder's one newly created local commit");
+    let files = files_outside_the_secrets_store(&ran);
+    no_installation_token_pattern_or_app_key_outside_the_secrets_store(&ran, &files);
+    assert_eq!(
+        coders_new_commits(&files),
+        [branch.head],
+        "the pushed head is the coder's one newly created local commit"
+    );
 }
 
 fn scripts(at: std::net::SocketAddr) -> Box<[skein_fake_llm_domain::api::Script]> {
@@ -103,9 +108,7 @@ fn scripts(at: std::net::SocketAddr) -> Box<[skein_fake_llm_domain::api::Script]
     scripts.into_boxed_slice()
 }
 
-// Also read the fake checkout's local object names: the coder is the only
-// repository-bearing agent, and creates one object beyond its checked-out base.
-fn no_installation_token_pattern_or_app_key_outside_the_secrets_store(ran: &Ran) -> Vec<u64> {
+fn no_installation_token_pattern_or_app_key_outside_the_secrets_store(ran: &Ran, files: &[std::path::PathBuf]) {
     use skein_lib::{
         Writer,
         base64::{self, Alphabet},
@@ -124,9 +127,20 @@ fn no_installation_token_pattern_or_app_key_outside_the_secrets_store(ran: &Ran)
         assert!(skein_lib::bytes::find(bytes, key).is_none(), "App DER outside jig's secrets store");
         assert!(skein_lib::bytes::find(bytes, &encoded).is_none(), "App base64 outside jig's secrets store");
     };
+    for path in files {
+        clean(&std::fs::read(path).expect("scratch file"));
+    }
+    for call in ran.calls() {
+        clean(&call.stdout);
+        clean(&call.stderr);
+    }
+}
+
+// Walk once for both checks, never following a symlink into the secrets store.
+fn files_outside_the_secrets_store(ran: &Ran) -> Vec<std::path::PathBuf> {
     let secrets = ran.path().join("state/secrets");
     assert!(secrets.is_dir(), "the excluded directory is jig's secrets store");
-    let mut created = Vec::new();
+    let mut files = Vec::new();
     let mut pending = vec![ran.path().to_path_buf()];
     while let Some(path) = pending.pop() {
         if path == secrets {
@@ -138,24 +152,27 @@ fn no_installation_token_pattern_or_app_key_outside_the_secrets_store(ran: &Ran)
                 std::fs::read_dir(path).expect("scratch directory").map(|entry| entry.expect("scratch entry").path()),
             );
         } else if metadata.is_file() {
-            let bytes = std::fs::read(&path).expect("scratch file");
-            clean(&bytes);
-            if path.ends_with(".git/temper-head") {
-                let base = u64::from_le_bytes(bytes.try_into().expect("fake checkout head"));
-                let objects = path.parent().expect("git directory").join("objects");
-                for object in std::fs::read_dir(objects).expect("local objects") {
-                    let name = object.expect("local object").file_name();
-                    let commit: u64 = name.to_str().expect("object name").parse().expect("counted object");
-                    if commit != base {
-                        created.push(commit);
-                    }
-                }
-            }
+            files.push(path);
         }
     }
-    for call in ran.calls() {
-        clean(&call.stdout);
-        clean(&call.stderr);
+    files
+}
+
+// Each fake checkout's temper-head is its original base. The coder alone
+// creates a local object beyond that base; the story compares it to the push.
+fn coders_new_commits(files: &[std::path::PathBuf]) -> Vec<u64> {
+    let mut created = Vec::new();
+    for path in files.iter().filter(|path| path.ends_with(".git/temper-head")) {
+        let bytes = std::fs::read(path).expect("fake checkout head");
+        let base = u64::from_le_bytes(bytes.try_into().expect("fake checkout head"));
+        let objects = path.parent().expect("git directory").join("objects");
+        for object in std::fs::read_dir(objects).expect("local objects") {
+            let name = object.expect("local object").file_name();
+            let commit: u64 = name.to_str().expect("object name").parse().expect("counted object");
+            if commit != base {
+                created.push(commit);
+            }
+        }
     }
     created
 }

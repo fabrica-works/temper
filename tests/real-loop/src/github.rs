@@ -17,6 +17,19 @@ const ACME: u64 = 10;
 const UMBRA: u64 = 20;
 // The layer retains at most this many git calls; a full ring fails the story.
 const GIT_RECORDS: u32 = 128;
+const WIRE_BYTES: u32 = 32_768;
+
+// A whole bounded tree, git's JSON/base64 framing and the App's documents
+// fit 32 KiB. Peer admission checks this against the domain's file bounds.
+pub(crate) fn protocol_limits() -> skein_fake_forge_protocol::Limits {
+    let mut limits = forge::protocol_limits();
+    limits.http.body = u64::from(WIRE_BYTES);
+    limits.documents.json.string = WIRE_BYTES;
+    limits.documents.json.length = WIRE_BYTES;
+    limits.documents.writer.length = WIRE_BYTES;
+    limits.documents.body_bytes = WIRE_BYTES;
+    limits
+}
 
 #[derive(Clone, Copy)]
 pub struct Fixture {
@@ -179,7 +192,16 @@ pub(crate) struct State {
 impl State {
     pub(crate) fn new(fixture: Fixture) -> (Self, Peer) {
         let mut config = temper_fake_git_hosted::fixtures::CONFIG;
-        config.limits.calls = forge::protocol_limits().calls;
+        // These smoke repositories have two small files each. The GitHub
+        // layer pads every API response to its admitted wire capacity, so
+        // do not inherit the checkout sweep's 256 files of 64 KiB each.
+        config.limits.files = 4;
+        config.limits.content_bytes = 1024;
+        // domain/testing.md, 2.4: the scenario sets mergeability's settling
+        // short, at the same 10--50 ms scale as the forge client's polls.
+        config.settle_min = Duration::from_millis(10);
+        config.settle_max = Duration::from_millis(50);
+        config.limits.calls = protocol_limits().calls;
         config.limits.title_bytes = 512;
         config.limits.body_bytes = 2048;
         let clock = skein_shell::Clock::new().now();
@@ -196,7 +218,7 @@ impl State {
         }
         domain::grant(&mut domain, b"acme/app", APP.bot, api::Permission::Admin);
         let handle = Rc::new(RefCell::new(Forge::new(domain, config)));
-        let wire = forge::protocol_limits();
+        let wire = protocol_limits();
         let limits = layer::Limits {
             deliveries: layer::delivery::Limits { entries: 64, payload_bytes: wire.documents.body_bytes },
             http: wire.http,
