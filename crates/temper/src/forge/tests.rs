@@ -3,7 +3,7 @@ use crate::tests::configuration;
 use std::{fs, os::unix::ffi::OsStrExt};
 
 #[test]
-fn reconcile_gives_only_the_fake_its_repositories_in_document_order() {
+fn reconcile_adopts_no_repositories() {
     let directory = std::env::temp_dir().join(format!("temper-reconcile-settings-{}", std::process::id()));
     fs::create_dir(&directory).expect("settings scratch");
     let directories = jig_protocol_config::Directories::given(
@@ -27,8 +27,7 @@ fn reconcile_gives_only_the_fake_its_repositories_in_document_order() {
         let deployment = crate::setup::check(&serde_json::to_vec(&value).expect("fixture JSON"), &directories)
             .expect("checked deployment");
         let settings = reconcile_settings(&deployment.named, &deployment.checked, 1).expect("settings");
-        let expected: &[u64] = if fake { &[1, 2] } else { &[] };
-        assert_eq!(settings.given.adopted.as_ref(), expected);
+        assert!(settings.given.adopted.is_empty());
         assert_eq!(settings.given.listener, None, "the box makes no hook");
     }
     fs::remove_dir_all(directory).expect("settings scratch removed");

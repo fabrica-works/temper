@@ -291,12 +291,12 @@ it, and nothing but the setup host writes what it makes.
 - **States,** for GitHub's browser steps, are its own, in memory: at
   most `setup.states`, each living `setup.state_life_ms`, an hour at
   most; a restart forgets them (17.2).
-- **At each start,** once the records are loaded: an owned or fake
-  forge's handover, when its file exists, by `TakeOver` (6.5); then
-  `Reconcile` for each managed, owned and fake Forgejo; and GitHub's
-  `Reconcile` after each
-  GitHub forge connects (17.5). The deployment's page shows a forge
-  "Connecting" until its plan is done and it connects.
+- **At each start,** once the records are loaded: an owned forge's
+  handover, when its file exists, by `TakeOver` (6.5); then `Reconcile`
+  for each managed and owned Forgejo; the fake's start-time adoption
+  (8.4); and GitHub's `Reconcile` after each GitHub forge connects
+  (17.5). The deployment's page shows a forge "Connecting" until its
+  plan is done and it connects.
 - **At the box's `started`,** for an owned forge set up from the client
   while the engine serves (7.1): its handover by `TakeOver`, then its
   `Reconcile`, then its connect, as a pasted admin's token is taken
@@ -313,8 +313,8 @@ it, and nothing but the setup host writes what it makes.
 
 | Plan | Forge | When | skein's `forge-setup.md` |
 |---|---|---|---|
-| `Reconcile { forge, adopted }` | Forgejo, managed, owned or fake | each start; a managed connect; the box's `started` (5.1) | section 4 |
-| `Adopt { forge, repository }` | Forgejo, managed, owned or fake | an adoption, before its reads | 4.5 |
+| `Reconcile { forge, adopted }` | Forgejo, managed, owned or fake | each managed or owned start; a managed connect; the box's `started` (5.1); a fake's box step before serve (8.4) | section 4 |
+| `Adopt { forge, repository }` | Forgejo, managed, owned or fake | an adoption, before its reads; the fake's start (8.4) | 4.5 |
 | `Check { forge }` | Forgejo, connected | a connect; a replacement | 4.6 |
 | `TakeOver { forge, admin_token }` | Forgejo, owned or fake | a start that finds the handover; an owned forge's `started` from the box (5.1) | 4.7 |
 | `Reachable { forge, installation?, page }` | every kind | the picker | 4.8 |
@@ -1615,15 +1615,16 @@ them as it does any Forgejo.
   it names `skein.test` as its server and trusts that file alone
   (configuration.md, section 12), as the QA loop's serve and agent do.
   The fake removes none of them at its stop: serve's setup host
-  removes the admin token when it takes it (section 3), and the run's
+  leaves the admin token for later starts (8.4), and the run's
   directories go with the run.
 - **A runner** starts the fakes first, learns their addresses from
   their ready lines, then writes temper's document naming them and the
-  files the fakes wrote, and starts `temper serve`.
-- **`temper serve`** takes the fake's handover and reconciles it as an
-  owned forge's (5.1, 6.5): `TakeOver`, then `Reconcile`, which makes the
-  bot and its tokens on the fake. A fake not yet bound when the start's
-  reconcile reaches it is reconcile's wait for the forge (5.3).
+  files the fakes wrote, runs `temper forge reconcile` to make the bot,
+  its tokens and the webhooks' secret, and starts `temper serve`.
+- **`temper serve`** runs the fake's start-time adoption (8.4), reading
+  its handover and webhooks' secret, then connecting it with the bot's
+  files once every repository's `Adopt` is done. It runs no `Reconcile`
+  on a fake, so those tokens stay the box step's.
 - **`temper fake seed DIRS`,** a link step: `temper ctl` calls
   (`../client/tools.md`, section 10), each a child of the binary's own
   run, its DIRECTORY the demo's `client`. A call is the person's own
@@ -2159,13 +2160,16 @@ it checks of this document:
   change landed, its delegated task ended landed, and the test's own
   clone of `demo/widget` by the demo's link, run as the worker runs
   git, holds `main` one commit past the seeded head, its `src/main.rs`
-  the coding agent's edit (8.4). It lands by the fake's deliveries:
-  `demo/widget` holds one hook, at the box's webhooks' listener, which
-  the test reads on the fake's API with the handover's token, and the
-  story ends well within the time it took on polls alone, within the
-  tier's budget. A second box on the same directories signs in again,
-  its seed finding its acts done, and its clone holds the seeded head,
-  since the fake keeps no state across its starts.
+  the coding agent's edit (8.4). The test reads the one hook on
+  `demo/widget`, at the box's webhooks' listener, on the fake's API with
+  the handover's token, and prints each box run's time, asserting no
+  time. A delivery's acceptance is shown by
+  `tests/real-loop/tests/forge.rs`'s
+  `a_forge_delivery_is_accepted_by_the_engines_listener`; its secret's
+  matching is checked by the step tests. A second box on the same
+  directories signs in again, its seed finding its acts done, and its
+  clone holds the seeded head, since the fake keeps no state across
+  its starts.
 - **A first run set up for real,** a test of its own: `temper box` on
   three empty scratch directories, forge 3's `mirror` a local file
   server over TLS with skein's test root, serving at the pinned paths

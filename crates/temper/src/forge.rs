@@ -301,11 +301,7 @@ pub fn reconcile_settings(
     }
     let io = jig_protocol_config::profile(jig_protocol_config::Profile::Small).io;
     let setup_index = checked.setup.entries.iter().position(|entry| entry.forge == number).expect("checked entry");
-    let mut given = temper_forge_setup::given::values(entry, webhook_listener(named)?, &checked.limits);
-    if let Mode::Fake(fake) = &entry.mode {
-        // Stand in for access at adoption until it is built (protocol/setup.md, 8.4).
-        given.adopted = (1..=u64::try_from(fake.repositories.len()).expect("checked repositories")).collect();
-    }
+    let given = temper_forge_setup::given::values(entry, webhook_listener(named)?, &checked.limits);
     Ok(temper_forge_setup_shell::reconcile::Settings {
         setup_index: u32::try_from(setup_index).expect("bounded setup entries"),
         given,

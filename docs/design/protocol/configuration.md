@@ -347,14 +347,15 @@ and the checks of the forge's own members against each entry are
 setup.md, section 8's. An owned forge's orgs are its person's,
 `mode.owned.person.orgs`, which reconcile makes when missing; a setup
 names no other orgs. `temper serve` checks it whole, and the engine's
-setup host reconciles each managed, owned and fake forge at each start,
+setup host reconciles each managed and owned forge at each start,
 and an owned forge whose setup says `"start": "asked"` once the box has
-started it (setup.md, 7.1; the setup host in the engine). Of the files
-`setup` names, `temper serve` reads one: an owned or fake forge's
-handover, `admin_token`, taken once (section 6). A fake forge's `git`
-it names and never reads: the program the engine's routing names in
-each of that forge's repositories' records, for the worker to spawn
-(channel.md, section 4).
+started it (setup.md, 7.1; the setup host in the engine). A fake forge
+runs start-time adoption instead (setup.md, 8.4). Of the files `setup`
+names, `temper serve` reads one: the handover, `admin_token`, taken
+once for an owned forge (section 6), read and left for a fake's later
+starts. A fake forge's `git` it names and never reads: the program the
+engine's routing names in each of that forge's repositories' records,
+for the worker to spawn (channel.md, section 4).
 
 **`demo`:** a first run's demo, or `null` for none, never missing
 (section 10): the fake LLM the box runs, its address, its LLM provider,

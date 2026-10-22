@@ -16,6 +16,7 @@ pub fn facts() -> Facts<'static> {
             clients: NonZeroU16::new(8367).expect("the default port is nonzero"),
             forge: NonZeroU16::new(8369).expect("the fake forge port is nonzero"),
             llm: NonZeroU16::new(8370).expect("the default LLM port is nonzero"),
+            webhooks: NonZeroU16::new(8371).expect("the default webhooks port is nonzero"),
         },
     }
 }
@@ -32,6 +33,7 @@ pub fn cases() -> [(&'static str, Facts<'static>); 5] {
                     clients: NonZeroU16::new(41023).expect("the kernel-port fixture is nonzero"),
                     forge: NonZeroU16::new(41024).expect("the kernel forge port is nonzero"),
                     llm: NonZeroU16::new(65535).expect("the kernel LLM port is nonzero"),
+                    webhooks: NonZeroU16::new(41025).expect("the kernel webhooks port is nonzero"),
                 },
                 ..facts()
             },
@@ -44,6 +46,7 @@ pub fn cases() -> [(&'static str, Facts<'static>); 5] {
                     clients: NonZeroU16::new(41023).expect("the kernel-port fixture is nonzero"),
                     forge: NonZeroU16::new(41024).expect("the kernel forge port is nonzero"),
                     llm: NonZeroU16::new(65535).expect("the kernel LLM port is nonzero"),
+                    webhooks: NonZeroU16::new(41025).expect("the kernel webhooks port is nonzero"),
                 },
                 ..facts()
             },

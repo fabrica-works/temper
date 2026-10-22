@@ -181,10 +181,10 @@ serve  after  llm
 | Credential | Made from | Where | Read by |
 |---|---|---|---|
 | the fake model's key | the fake LLM from its decimal u64 `--seed` | fake-written 0600 output, expected at `{proc.llm.dir}/llm.key`; exact output interface pending (11.1) | the fake LLM; the seed's `add-key` |
-| the fake forge's admin token | the fake forge from its decimal u64 `--seed` | fake-written 0600 output, expected at `{proc.forge.dir}/setup/admin_token`; exact output interface pending | the fake forge; serve's setup host, once, which removes it (`protocol/setup.md`, section 3) |
+| the fake forge's admin token | the fake forge from its decimal u64 `--seed` | fake-written 0600 output, expected at `{proc.forge.dir}/setup/admin_token`; exact output interface pending | the fake forge; serve's setup host at each start, leaving it for later starts (`protocol/setup.md`, 8.4) |
 | the sign-in link | serve | its ready line | the seed's `sign-in`, which spends it (`client/README.md`, 6.7) |
 | the owner's client token | the sign-in | `{dir.client}` | the seed's acts; the driver's `ctl` |
-| the bot's tokens | serve's reconcile on the fake | jig's secrets' store in `{dir.data}` | serve |
+| the bot's tokens | `temper forge reconcile` on the fake, before serve | the fake entry's files in `{dir.data}` | serve |
 | the worker's secret and digest | a fixed pair of the experiment's, as the process tier's | `{proc.serve.dir}/secrets/` | serve |
 
 - **No machine secret:** no file, argument or environment of the
@@ -264,7 +264,7 @@ Each is `{artifact.temper} ctl {dir.client}` and then:
 | `sign-in` | `sign-in -`, stdin `{proc.serve.ready.link}` and a newline | the deployment's owner signs in by the full printed link |
 | `add-key` | `add-key 1 {proc.llm.dir}/llm.key --deployment --key lab-llm` | the fake model's key, the deployment's account (`client/tools.md`, 5.5, area 5) |
 | `usable` | `wait accounts --until usable --timeout 100` | the account usable |
-| `forge` | `wait forges --until connected:1 --timeout 100` | reconcile on the fake done (`protocol/setup.md`, 8.4) |
+| `forge` | `wait forges --until connected:1 --timeout 100` | the fake's start-time adoption done (`protocol/setup.md`, 8.4) |
 | `adopt` | `adopt --project 1 --forge 1 --owner fake --name widget --landing main --key lab-adopt` | adopted with CI on, at the form's defaults (`client/tools.md`, 5.3) |
 
 - **Each must exit 0,** or the run fails `action/<name>/exit:<status>`

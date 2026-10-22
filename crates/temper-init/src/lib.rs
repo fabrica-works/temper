@@ -33,6 +33,7 @@ pub struct Ports {
     pub clients: NonZeroU16,
     pub forge: NonZeroU16,
     pub llm: NonZeroU16,
+    pub webhooks: NonZeroU16,
 }
 
 /// The directories init writes into, each absolute (configuration.md, 12).

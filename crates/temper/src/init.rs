@@ -94,14 +94,19 @@ impl Io {
         }
         result
     }
-    fn ports(&mut self, preferred: [u16; 3]) -> Result<temper_init::Ports, String> {
+    fn ports(&mut self, preferred: [u16; 4]) -> Result<temper_init::Ports, String> {
         let (clients_socket, clients) = self.port(preferred[0])?;
         let result = (|| {
             let (forge_socket, forge) = self.port(preferred[1])?;
             let result = (|| {
                 let (llm_socket, llm) = self.port(preferred[2])?;
+                let result = (|| {
+                    let (webhooks_socket, webhooks) = self.port(preferred[3])?;
+                    self.close(webhooks_socket);
+                    Ok(temper_init::Ports { clients, forge, llm, webhooks })
+                })();
                 self.close(llm_socket);
-                Ok(temper_init::Ports { clients, forge, llm })
+                result
             })();
             self.close(forge_socket);
             result
@@ -155,12 +160,12 @@ pub(crate) struct Written {
     pub missing_git: bool,
 }
 /// Refusals are checked before directories or files are created. The held
-/// listeners reserve all three ports until they have all been chosen, then close.
+/// listeners reserve all four ports until they have all been chosen, then close.
 pub(crate) fn write(
     directories: &Directories,
     environment: &[EnvironmentEntry],
     binary: &Path,
-    preferred: [u16; 3],
+    preferred: [u16; 4],
 ) -> Result<Written, String> {
     let document = directories.document();
     for destination in [
@@ -230,7 +235,7 @@ pub(crate) fn write(
 }
 pub(crate) fn core(directories: &Directories) -> Result<Written, String> {
     let binary = std::env::current_exe().map_err(|why| why.to_string())?;
-    write(directories, &skein_shell::environment(), &binary, [8367, 8369, 8370])
+    write(directories, &skein_shell::environment(), &binary, [8367, 8369, 8370, 8371])
 }
 pub(crate) fn run(directories: &Directories) -> Result<u8, String> {
     let written = core(directories)?;

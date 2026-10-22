@@ -26,6 +26,7 @@ pub(crate) fn documents(facts: &Facts<'_>, directories: &Directories<'_>) -> (Bo
     forge_git.put(&forge).expect("the socket was counted");
     let forge_git = forge_git.finish();
     let llm = listener(facts.ports.llm);
+    let webhooks = listener(facts.ports.webhooks);
     let listener = listener(facts.ports.clients);
     let values = [
         (b"binary".as_slice(), json(Value::Text(Some(facts.binary)))),
@@ -35,6 +36,7 @@ pub(crate) fn documents(facts: &Facts<'_>, directories: &Directories<'_>) -> (Bo
         (b"forge".as_slice(), json(Value::Text(Some(&forge)))),
         (b"forge_git".as_slice(), json(Value::Text(Some(&forge_git)))),
         (b"llm".as_slice(), json(Value::Text(Some(&llm)))),
+        (b"webhooks".as_slice(), json(Value::Text(Some(&webhooks)))),
         (b"bundle".as_slice(), json(Value::Text(facts.bundle))),
         (b"programs".as_slice(), json(Value::Programs { claude: facts.claude, directory: &programs })),
     ];

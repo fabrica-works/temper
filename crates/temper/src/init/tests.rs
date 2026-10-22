@@ -49,6 +49,22 @@ fn path_lookup_uses_only_absolute_executable_candidates_in_order() {
     }
 }
 #[test]
+fn a_taken_default_webhooks_port_gets_a_distinct_kernel_port() {
+    let holder = match TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 8371)) {
+        Ok(listener) => Some(listener),
+        Err(why) if why.kind() == std::io::ErrorKind::AddrInUse => None,
+        Err(why) => panic!("hold webhooks port: {why}"),
+    };
+    let mut io = Io::open().expect("startup io");
+    let ports = io.ports([0, 0, 0, 8371]).expect("reserved ports");
+    assert_ne!(ports.webhooks.get(), 8371);
+    for other in [ports.clients, ports.forge, ports.llm] {
+        assert_ne!(ports.webhooks, other);
+    }
+    drop(holder);
+}
+
+#[test]
 fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
     let mut rows = Vec::new();
     for held in [false, true] {
@@ -58,8 +74,7 @@ fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
             }
         }
     }
-    rows.push((false, false, false, false, false));
-    rows.push((false, false, false, true, true));
+    rows.extend([(false, false, false, false, false), (false, false, false, true, true)]);
     for (held, claude, bundle, git, same) in rows {
         let row = format!("facts-{held}-{claude}-{bundle}-{git}-{same}");
         let root = scratch(&row);
@@ -77,10 +92,11 @@ fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
             TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred clients listener"),
             TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred forge listener"),
             TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred LLM listener"),
+            TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred webhooks listener"),
         ];
         let mut preferred = listeners.each_ref().map(|listener| listener.local_addr().expect("port").port());
         if same {
-            preferred[1] = preferred[0];
+            preferred = [preferred[0], preferred[0], preferred[2], preferred[0]];
         }
         let holder = if held {
             Some(listeners)
@@ -109,6 +125,16 @@ fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
             .expect("forge address")
             .parse()
             .expect("forge socket");
+        let webhooks: std::net::SocketAddr = document["application"]["webhooks"]["listener"]["socket"]
+            .as_str()
+            .expect("webhooks address")
+            .parse()
+            .expect("webhooks socket");
+        assert_eq!(webhooks.port() == preferred[3], !held && !same, "{row}");
+        for other in [address, forge, llm] {
+            assert_ne!(webhooks.port(), other.port(), "{row}: webhooks reservation differs");
+        }
+        assert!(TcpListener::bind(webhooks).is_ok(), "{row}: webhooks reservation released");
         assert_eq!(document["application"]["forges"][0]["git"], format!("http://{forge}"), "{row}");
         assert_eq!(
             document["application"]["setup"][0]["mode"]["fake"]["listen"],
@@ -213,7 +239,7 @@ fn init_refusals_leave_every_file_and_directory_untouched() {
             fs::write(&destination, b"kept").expect("existing file");
         }
         let before = snapshot(&root);
-        let why = write(&dirs, &env, &root.join("bin/temper"), [0, 0, 0]).expect_err("refused");
+        let why = write(&dirs, &env, &root.join("bin/temper"), [0, 0, 0, 0]).expect_err("refused");
         assert_eq!(why, format!("{}: already exists", destination.display()));
         assert_eq!(snapshot(&root), before, "{row}: every file and directory untouched");
         fs::remove_dir_all(root).expect("cleanup");
@@ -244,7 +270,7 @@ fn generated_configuration_passes_the_same_checks_as_serve() {
     let root = scratch("acceptance");
     let dirs = directories(&root);
     let env = environment(&root, true);
-    write(&dirs, &env, &root.join("bin/temper"), [0, 0, 0]).expect("init");
+    write(&dirs, &env, &root.join("bin/temper"), [0, 0, 0, 0]).expect("init");
     let bytes = fs::read(dirs.document()).expect("document");
     let deployment = crate::setup::check(&bytes, &dirs.jig()).expect("init document passes setup and named");
     let demo = deployment.demo.expect("init declares the demo");

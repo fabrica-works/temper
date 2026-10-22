@@ -734,6 +734,7 @@ pub fn bounded_template(directory: &Path) -> Bounded {
                 clients: NonZeroU16::new(8367).expect("clients port"),
                 forge: NonZeroU16::new(8369).expect("the fake forge port is nonzero"),
                 llm: NonZeroU16::new(8370).expect("LLM port"),
+                webhooks: NonZeroU16::new(8371).expect("webhooks port"),
             },
         },
         &Directories { config: directory.as_os_str().as_bytes(), data: directory.as_os_str().as_bytes() },

@@ -834,7 +834,7 @@
         "user": {
           "file": "demo/forge/user"
         },
-        "webhook_secret": null
+        "webhook_secret": "demo/forge/webhook_secret"
       },
       {
         "number": 2,
@@ -896,7 +896,11 @@
       },
       "bundle": "$bundle"
     },
-    "webhooks": null,
+    "webhooks": {
+      "listener": {
+        "socket": "$webhooks"
+      }
+    },
     "setup": [
       {
         "forge": 1,

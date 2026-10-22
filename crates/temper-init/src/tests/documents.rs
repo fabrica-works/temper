@@ -77,6 +77,16 @@ fn the_default_is_the_owned_example_so_edited() {
     for (row, facts) in cases() {
         let answered = files(&facts, &DIRECTORIES, &[0; 32], &[0xab; 32]).expect("valid facts");
         let actual = parse(content(&answered, b"temper.json"));
+        let ports = [
+            "/application/clients/listener/socket",
+            "/application/forges/0/api/socket",
+            "/application/demo/llm/listen/socket",
+            "/application/webhooks/listener/socket",
+        ]
+        .map(|path| actual.pointer(path).expect("written listener").as_str().expect("socket"));
+        for (index, port) in ports.iter().enumerate() {
+            assert!(!ports[..index].contains(port), "{row}: four distinct ports");
+        }
         let mut expected = owned.clone();
         assert_eq!(replace_org_patterns(&mut expected), 40, "{row}");
         for (path, value) in [
@@ -108,7 +118,7 @@ fn the_default_is_the_owned_example_so_edited() {
                 json!([
                     {"number": 1_u16, "kind": "forgejo", "api": {"socket": format!("127.0.0.1:{}", facts.ports.forge)},
                      "transport": "plaintext", "git": format!("http://127.0.0.1:{}", facts.ports.forge), "web": null,
-                     "api_token": "demo/forge/api_token", "user": {"file": "demo/forge/user"}, "webhook_secret": null},
+                     "api_token": "demo/forge/api_token", "user": {"file": "demo/forge/user"}, "webhook_secret": "demo/forge/webhook_secret"},
                     {"number": 2_u16, "kind": "github", "api": null, "transport": null, "git": null, "web": null}
                 ]),
             ),
@@ -129,7 +139,7 @@ fn the_default_is_the_owned_example_so_edited() {
                 }]),
             ),
             ("/application/demo", demo(facts.ports.llm.get())),
-            ("/application/webhooks", Value::Null),
+            ("/application/webhooks", json!({"listener": {"socket": format!("127.0.0.1:{}", facts.ports.webhooks)}})),
             ("/application/clients/listener/socket", json!(format!("127.0.0.1:{}", facts.ports.clients))),
             (
                 "/application/clients/bundle",
@@ -367,6 +377,7 @@ fn no_placeholder_is_left() {
                 (b"\"$forge\"".as_slice(), 2),
                 (b"\"$forge_git\"".as_slice(), 1),
                 (b"\"$llm\"".as_slice(), 2),
+                (b"\"$webhooks\"".as_slice(), 1),
             ]
             .as_slice(),
         ),

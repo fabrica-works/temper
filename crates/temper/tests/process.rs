@@ -573,6 +573,8 @@ fn first_run(restart: bool) {
         let client = scratch.path().join(run);
         fs::create_dir(&client).expect("fresh client root");
         fs::set_permissions(&client, fs::Permissions::from_mode(0o700)).expect("private client root");
+        let clock = skein_shell::Clock::new();
+        let began = clock.now().now;
         let ended = support::boxed::run_story(
             scratch.path(),
             flags.clone(),
@@ -581,6 +583,7 @@ fn first_run(restart: bool) {
             BOX_DEADLINE,
             || demo_main(&paths[0], &paths[1], &client, run == "first"),
         );
+        eprintln!("{run} run: {} ms", clock.now().now.saturating_since(began).as_nanos() / 1_000_000);
         let stderr = String::from_utf8_lossy(&ended.stderr);
         assert_eq!(ended.exit, Some(Exit::Code(0)), "{run}: {stderr}");
         assert!(ended.finished, "{run}: {stderr}");
@@ -716,6 +719,17 @@ fn demo_main(config: &std::path::Path, data: &std::path::Path, root: &std::path:
         fs::read(checkout.join(".git/temper-head")).expect("cloned head").try_into().expect("counted id"),
     );
     assert_eq!(fake_forge_commit_id(count), head, "clone holds the API's landing head");
+    let admin_token = fs::read_to_string(data.join("demo/forge/admin_token")).expect("preparation's handover token");
+    let hooks = support::owned::answer(address.port(), "/api/v1/repos/demo/widget/hooks", Some(admin_token.trim()))
+        .expect("the handover's admin can read repository hooks");
+    let hooks = hooks.as_array().expect("repository hooks");
+    assert_eq!(hooks.len(), 1, "one hook for demo/widget");
+    let listener: std::net::SocketAddr = document["application"]["webhooks"]["listener"]["socket"]
+        .as_str()
+        .expect("chosen webhooks address")
+        .parse()
+        .expect("loopback");
+    assert_eq!(hooks[0]["config"]["url"], format!("http://127.0.0.1:{}/hooks/1", listener.port()));
     head
 }
 
