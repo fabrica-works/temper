@@ -44,7 +44,14 @@ impl Proc {
 impl Host for Proc {
     fn iterate(&mut self, now: Time, wall: Wall) {
         if !matches!(self, Self::Llm(llm) if llm.scripts.is_some()) {
-            self.host_mut().iterate(now, wall);
+            let host = self.host_mut();
+            if host.work_pending(now)
+                || !host.completions().is_empty()
+                || host.next_deadline().is_some_and(|deadline| deadline <= now)
+                || host.next_policy_deadline().is_some_and(|deadline| deadline <= now)
+            {
+                host.iterate(now, wall);
+            }
         }
     }
     fn drain(&mut self) {
