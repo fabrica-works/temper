@@ -376,14 +376,25 @@ impl Referee<Process> for AnswerJudge {
         self.settled
     }
 }
-const ANSWER_CALLS: usize = 8;
+const ANSWER_CALLS: usize = 9;
 
 fn answer_peer() -> skein_fake_peers::llm::Peer {
-    let mut script = jig_channel_world::fixtures::one_chat(b"Hello");
-    script.result = br#"{"form":"report","text":"Process answer","fields":{}}"#.as_slice().into();
+    use skein_fake_llm_domain::api::{Finish, Line, Turn};
+    // The chat is ended by its requester (domain/agent.md, 4.6): its answer is the
+    // turn's text, and the finish only ends the turn.
     let mut recipe = temper_real_loop_world::llm::scripted(Box::new([skein_fake_llm_domain::api::Script {
         cue: Box::default(),
-        turns: jig_channel_world::fixtures::provider_turns(&script),
+        turns: Box::new([Turn {
+            lines: Box::new([
+                Line::Text { text: super::ANSWER.into() },
+                Line::Call {
+                    name: b"finish".as_slice().into(),
+                    arguments: br#"{"form":"report","text":"Done.","fields":{}}"#.as_slice().into(),
+                },
+            ]),
+            finish: Finish::ToolCalls,
+            tokens: 1,
+        }]),
     }]));
     recipe.credential = skein_llm::Credential::bearer(ACCESS.into());
     skein_fake_peers::llm::Peer::new(
@@ -436,6 +447,8 @@ pub fn answered(directory: &Path, issuer: oauth::Peer) {
                     "--json",
                 ])),
                 ctl::Step::Run(ctl::Call::new(&["wait", "task", "1", "--until", "replied", "--json"])),
+                // The wait returns the task's status; read its committed conversation separately.
+                ctl::Step::Run(ctl::Call::new(&["chat", "1", "--json"])),
             ],
             Some(&streams),
             None,
@@ -450,7 +463,7 @@ pub fn answered(directory: &Path, issuer: oauth::Peer) {
     });
     let outcome = world.run(&clock, super::WITHIN);
     let Process::Calls(calls) = &outcome.procs[1] else { panic!("ctl calls") };
-    let [_, me, _, _, _, ready, _, conversation] = calls.ends() else { panic!("signed-in chat calls") };
+    let [_, me, _, _, _, ready, _, _, conversation] = calls.ends() else { panic!("signed-in chat calls") };
     let person = ctl::json(me)["party"]["number"].as_u64().expect("person number");
     let ready = ctl::json(ready);
     let account = ready["accounts"]["party"]
@@ -467,9 +480,10 @@ pub fn answered(directory: &Path, issuer: oauth::Peer) {
         }),
         "usable signed-in source"
     );
-    assert!(
-        String::from_utf8_lossy(&conversation.stdout).contains("Process answer"),
-        "chat answered: {}",
+    assert_eq!(
+        String::from_utf8_lossy(&conversation.stdout).matches("Process answer").count(),
+        1,
+        "chat answered once: {}",
         String::from_utf8_lossy(&conversation.stdout)
     );
     let Process::Peer(peer) = &outcome.procs[4] else { panic!("LLM peer") };
