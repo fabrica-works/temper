@@ -523,8 +523,12 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
                     engine.notes.push(crate::Note::ForgeUnkept { number: forge, installation });
                 }
             }
-            // Until serve's webhooks line (protocol/README.md, 15.3) takes the bound address.
-            skein_forge_connection::Event::Listening { .. } => {}
+            skein_forge_connection::Event::Listening { addr } => {
+                if let Some(addr) = addr.socket() {
+                    let note = crate::Note::Listening { listener: crate::Listening::Webhooks, addr };
+                    engine.listening.try_push(note).expect("one note per listener bind");
+                }
+            }
             skein_forge_connection::Event::ListenerLost => stop::hooks(engine),
             skein_forge_connection::Event::Stopped { forge, why } => {
                 crate::setup::lifecycle::stopped_connection(engine, forge);

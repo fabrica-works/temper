@@ -264,6 +264,20 @@ fn a_lost_webhooks_listener_drains_the_service_and_stops_it() {
 }
 
 #[test]
+fn a_bound_webhooks_listener_announces_its_address_once() {
+    let mut service = fixtures::started();
+    let addr = ([127, 0, 0, 1], 54321).into();
+    service.engine.forge.above.push(skein_forge_connection::Event::Listening { addr: skein_io::Addr::Ip(addr) });
+    let mut forge = fixtures::ForgeFace::new();
+    for _ in 0_u32..64 {
+        forge.turn(&mut service);
+    }
+    assert_eq!(service.listening().pop(), Some(crate::Note::Listening { listener: crate::Listening::Webhooks, addr }));
+    assert!(service.listening().is_empty());
+    assert_eq!(service.end(), None);
+}
+
+#[test]
 fn a_hook_secret_bound_names_its_limit() {
     let mut found = jig_protocol_config::Problems::empty();
     forge::problems(skein_forge_connection::Unusable::SecretBytes { bytes: 16 }, &mut found);
