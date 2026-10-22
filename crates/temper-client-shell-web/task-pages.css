@@ -64,29 +64,40 @@
 .temper-agent-lineage a:hover { text-decoration: underline; }
 .temper-agent-lineage > div + div::before { content: "/" / ""; flex: none; }
 .temper-chat:has(> .temper-agent-lineage) .temper-chatbar .temper-status-waiting { color: #8b7957; }
-.temper-chat:has(> .temper-agent-lineage) .temper-chatbar h1 { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.temper-chat:has(> .temper-agent-lineage) .temper-chatbar h1 { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; color: var(--temper-ink); font-size: 12px; }
 /* One scrolling column keeps brief, run, conversation and result in order. */
 .temper-chat:has(> .temper-agent-lineage) > .temper-thread { overflow-y: auto; overflow-x: hidden; padding-top: 18px; scrollbar-width: thin; scrollbar-color: #d9d1c5 transparent; }
 .temper-chat:has(> .temper-agent-lineage) > .temper-thread > [role=log] { flex: none; min-height: 0; padding-top: 0; overflow: visible; }
 .temper-chat .temper-thread > .temper-agent-brief { margin-bottom: 20px; padding: 11px 15px; border-left: 2px solid #d8bba5; background: #f8f5f0; }
-.temper-agent-brief > h2 { margin: 0; color: #a15a43; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.temper-agent-brief > h2 { margin: 0; color: #a15a43; font-size: 10px; font-weight: 700; line-height: 2.054; letter-spacing: .08em; text-transform: uppercase; }
 .temper-agent-brief p { margin: 5px 0 7px; font-size: 12px; }
-.temper-agent-brief > p:last-of-type { color: #91887c; font-size: 10px; }
-.temper-agent-run > h2 { display: flex; align-items: center; gap: 12px; margin: 20px 0 17px; color: #605a51; font-size: 10px; font-weight: 700; }
+.temper-agent-brief > p:last-of-type { margin: 0; color: #91887c; font-size: 10px; }
+.temper-agent-brief > .temper-dependencies { margin: 7px 0 0; }
+.temper-agent-brief .temper-dependencies .temper-status-waiting { color: #8b7957; }
+.temper-agent-run > h2 { display: flex; align-items: center; gap: 12px; margin: 0 0 17px; color: #605a51; font-size: 10px; font-weight: 700; line-height: 1.58; letter-spacing: inherit; }
 .temper-agent-run > h2::after { content: ''; height: 1px; flex: 1; background: var(--temper-line); }
 .temper-agent-run > p { margin: -11px 0 19px; color: #a39b90; font-size: 10px; }
 .temper-chat:has(> .temper-agent-lineage) .temper-thread > .temper-agent-result { width: min(931px, calc(100% - 173px)); margin: 2px max(32px, calc((100% - 1040px) / 2)) 18px auto; padding: 10px 13px; border-left: 2px solid #84a98f; background: #f2f7f1; font-size: 11px; }
-.temper-agent-result > h2 { display: block; margin: 0 0 4px; color: #477b59; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.temper-agent-result > h2 { display: block; margin: 0 0 4px; color: #477b59; font-size: 10px; line-height: 1.58; letter-spacing: .06em; text-transform: uppercase; }
+.temper-agent-result > .temper-details { display: block; margin: 0; padding: 0; border-radius: 0; background: transparent; }
+.temper-agent-result > [role=status] { margin-bottom: 4px; color: #477b59; font-size: 10px; }
 .temper-agent-result p { margin: 0; }
+/* Inline code and provisional text keep the conversation's terminal look. */
+.temper-chat:has(> .temper-agent-lineage) .temper-says :not(pre) > span > code { background: #f4f0ea; padding: 0 3px; border-radius: 3px; font: .92em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.temper-chat:has(> .temper-agent-lineage) .temper-by-agent:has(> .temper-who > [role=status]) > .temper-who > [role=status] { color: #4c8067; }
+.temper-chat:has(> .temper-agent-lineage) .temper-by-agent:has(> .temper-who > [role=status]) > .temper-says { color: #59534c; }
+.temper-chat:has(> .temper-agent-lineage) .temper-by-agent:has(> .temper-who > [role=status]) > .temper-says > p:last-child::after { content: ''; display: inline-block; width: 5px; height: 12px; margin-left: 2px; background: #aa6a50; vertical-align: -2px; }
 @media (max-width: 760px) {
   .temper-chat:has(> .temper-agent-lineage) > .temper-agent-lineage { padding-inline: 16px; }
-  .temper-chat:has(> .temper-agent-lineage) .temper-chatbar > div:first-child { min-width: 0; width: auto; }
-  .temper-chat:has(> .temper-agent-lineage) .temper-chatbar > div:last-child { flex: none; }
-  .temper-chat:has(> .temper-agent-lineage) .temper-chatbar h1 { max-width: 42vw; }
+  .temper-chat:has(> .temper-agent-lineage) .temper-chatbar { height: 37px; flex-wrap: nowrap; padding-block: 0; }
+  .temper-chat:has(> .temper-agent-lineage) .temper-chatbar > div:first-child { min-width: 0; width: auto; flex-wrap: nowrap; }
+  .temper-chat:has(> .temper-agent-lineage) .temper-chatbar > div:last-child { display: none; }
+  .temper-chat:has(> .temper-agent-lineage) .temper-chatbar h1 { max-width: calc(42vw + 5ch); }
   .temper-chat:has(> .temper-agent-lineage) .temper-thread > .temper-agent-result { width: calc(100% - 102px); margin-right: 16px; }
 }
 @media (max-width: 430px) {
   .temper-chat:has(> .temper-agent-lineage) .temper-chatbar > div:first-child { max-width: calc(100% - 87px); }
-  .temper-chat:has(> .temper-agent-lineage) .temper-chatbar h1 { max-width: 34vw; }
+  .temper-chat:has(> .temper-agent-lineage) .temper-chatbar h1 { max-width: calc(34vw + 3ch); }
+  .temper-chat:has(> .temper-agent-lineage) .temper-chatbar [role=status] { display: none; }
   .temper-chat:has(> .temper-agent-lineage) .temper-thread > .temper-agent-result { width: calc(100% - 32px); }
 }
