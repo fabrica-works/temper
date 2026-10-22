@@ -250,7 +250,7 @@ fn jig_endings_keep_unknown_and_other_reasons_apart_from_loading() {
         (c::WatchEnd::Unknown, State::Unknown),
         (c::WatchEnd::NotAllowed, State::Ended(Why::NotAllowed)),
         (c::WatchEnd::SignedOut, State::Ended(Why::SignedOut)),
-        (c::WatchEnd::SubjectEnded, State::Ended(Why::SubjectEnded)),
+        (c::WatchEnd::SubjectEnded, State::Unknown),
         (c::WatchEnd::NotServed, State::Ended(Why::NotServed)),
     ] {
         let (mut root, watch, _) = opened();

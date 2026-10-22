@@ -93,9 +93,14 @@ pub(super) fn watched(side: &mut Side, handle: Handle, watched: Watched, out: &m
             out.push(Request::Client { asked: jig_client::Event::Unwatch { handle } });
             State::Unknown
         }
+        // A subject that left the engine is a part its owner no longer knows (jig's root.md, 6).
+        Watched::Ended(Why::Unknown | Why::SubjectEnded) => {
+            panel.handle = None;
+            State::Unknown
+        }
         Watched::Ended(why) => {
             panel.handle = None;
-            if why == Why::Unknown { State::Unknown } else { State::Ended(why) }
+            State::Ended(why)
         }
     };
     if panel.state != state {

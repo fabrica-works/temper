@@ -310,14 +310,7 @@ pub fn incoming(
     let (to, body) = match delivery {
         Delivery::Panel { watcher, panel } => return Ok(delivered(transport, watcher, *panel)),
         Delivery::WatchEnded { watcher, why } if is_application(transport, watcher) => {
-            let end = match why {
-                jig_domain_views::End::Gone => jig_client::contract::WatchEnd::Unknown,
-                why @ (jig_domain_views::End::Unwatched
-                | jig_domain_views::End::NotAllowed
-                | jig_domain_views::End::SignedOut
-                | jig_domain_views::End::Stopping) => wire::watches::ended(why),
-            };
-            return Ok(ended(transport, watcher, end));
+            return Ok(ended(transport, watcher, wire::watches::ended(why)));
         }
         Delivery::Application { to, outcome: value } => (to, value),
         Delivery::WebReply { to, reply } => {
@@ -683,8 +676,7 @@ mod watch_tests {
         ] {
             let mut transport = transport();
             let watcher = open_watch(&mut transport);
-            let expected =
-                if why == jig_domain_views::End::Gone { c::WatchEnd::Unknown } else { wire::watches::ended(why) };
+            let expected = wire::watches::ended(why);
             let terminal = incoming(
                 &mut transport,
                 engine::Request::Party(PartyRequest::Deliver(Delivery::WatchEnded { watcher, why })),

@@ -43,7 +43,11 @@ fn facts(front: &mut Joint) -> Facts {
     Facts { pull, checks, main }
 }
 
-// Joint polling fires deadlines and settles immediate work at simulated time.
+// Joint polling fires deadlines and settles immediate work at simulated time. A run of two
+// iterations brings the client at most one panel: the transport holds the next until the
+// client takes this one (one document in flight), a later iteration's poll sends it, and it
+// is due at least the world's least latency (1 ms) after that poll. Keeping the panel after
+// each run so checks every delivery's order, not a sample of them.
 fn step(world: &mut World<Temper, Joint>, person: ClientId, panels: &mut Vec<w::ChangePanel>) {
     let outcome = world.run(Until::Steps(2));
     assert!(matches!(outcome.verdict, Verdict::Passed | Verdict::Open { .. }), "{outcome:?}");
