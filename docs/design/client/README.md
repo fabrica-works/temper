@@ -1199,7 +1199,10 @@ the change's chip in a chat (`forge.md`, 2.4 and 2.5).
   conversation's window holds: its call, or else a result block that
   carries its result, whose summary has a line "Result from task N:"
   after the inbox entry's "M: " (temper's inbox words,
-  `temper-engine-domain`'s `inbox_words`); or else, while the task
+  `temper-engine-domain`'s `inbox_words`); or else the chat's heard
+  result from the task (its activity's `Heard`, a result from task N),
+  which comes before the chat's resumed turn carries a result block and
+  is never drawn as words of its own; or else, while the task
   lives, after the window's last line, as one of the chat's live
   delegates (its document's `delegates`). The chat's window holds a
   small conversation whole, its turns with their calls'
@@ -1217,7 +1220,7 @@ the change's chip in a chat (`forge.md`, 2.4 and 2.5).
   ended. When the chat hears a delegate's result, it reads that task's
   document again once, so a cached running card takes its durable result
   without waiting for the chat's resumed turn or the watch's end.
-  It watches those its thread's calls and results name, the
+  It watches those its thread's calls, results and heard results name, the
   newest first, then its live delegates, up to the domain's `reads`;
   one past them, or that neither names any longer, is unwatched, and
   leaving the page closes them all. A delegation whose document has

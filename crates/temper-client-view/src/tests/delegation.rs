@@ -723,13 +723,20 @@ fn the_csv_chat_receives_the_whole_turn_and_anchors_the_landed_card_at_its_call(
 }
 // QA frame 004: the change's result reached the parked chat, before the
 // resumed turn and before its independently watched task document caught up.
+// Whole, the first turn's delegate call anchors the card; cut, the heard
+// result does, and it is never drawn as bare words (client/README.md, 5.7).
 #[test]
 fn the_csv_chat_keeps_its_card_and_header_together_as_the_result_arrives() {
+    for turn_text in [2048, 512] {
+        csv_chat_hears_its_result(turn_text);
+    }
+}
+fn csv_chat_hears_its_result(turn_text: u32) {
     use fixtures::first_run as run;
     let mut receiving = limits();
     receiving.client.domain.rows = 3;
     receiving.client.domain.text = 512;
-    receiving.client.domain.turn_text = 2048;
+    receiving.client.domain.turn_text = turn_text;
     let mut activity = run::activity(false, true, receiving.client.domain.turn_text);
     let mut rows = List::with_capacity(6);
     for line in &activity.rows {
@@ -761,6 +768,8 @@ fn the_csv_chat_keeps_its_card_and_header_together_as_the_result_arrives() {
         fixtures::FORGE,
     );
     fixtures::build(&mut view, &root);
+    let cut = fixtures::find(view.tree(), Role::Status, b"Earlier text omitted").is_some();
+    assert_eq!(cut, turn_text < 2048, "the first turn is cut only below its 1.2 KB");
     assert_csv_card(&view, false);
     let Some(Request::Client {
         request:
@@ -786,7 +795,7 @@ fn the_csv_chat_keeps_its_card_and_header_together_as_the_result_arrives() {
     assert_csv_card(&view, true);
 }
 fn assert_csv_card(view: &crate::View, landed: bool) {
-    assert_eq!(change_cards(view), 1, "the decoded delegate call keeps exactly one card");
+    assert_eq!(change_cards(view), 1, "exactly one card for the change, at its call or its heard result");
     let mut bare_hex = false;
     for (index, _) in view.tree().nodes().iter().enumerate() {
         let text = fixtures::node_text(view.tree(), index);

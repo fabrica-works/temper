@@ -258,12 +258,7 @@ impl Chat {
     fn heard_result(&self, task: u64) -> bool {
         for line in &self.thread.lines.rows {
             if let c::Activity::Owner { source, .. } = &line.event
-                && let c::OwnerActivity::Heard(c::OwnerWord {
-                    from: c::OwnerRequester::Task(number),
-                    kind: c::OwnerMessageKind::Result(_),
-                    ..
-                }) = &source.line
-                && *number == task
+                && delegation::heard(&source.line) == Some(task)
             {
                 return true;
             }
@@ -292,7 +287,27 @@ impl Chat {
         let mut called = List::with_capacity(bound);
         // Thread's borrowed lines are chronological, so visit the anchors backwards.
         'turns: for line in self.thread.lines().iter().rev() {
-            let jig_client::thread::Line::Turn { turn, .. } = line else { continue };
+            let turn = match line {
+                jig_client::thread::Line::Turn { turn, .. } => turn,
+                // A heard result names its delegate as a result block does, before
+                // the chat's resumed turn carries one (client/README.md, 5.7).
+                jig_client::thread::Line::Activity { line } => {
+                    if let c::Activity::Owner { source, .. } = &line.event
+                        && let Some(task) = delegation::heard(&source.line)
+                        && !tasks.as_slice().contains(&task)
+                        && tasks.push(task).is_err()
+                    {
+                        break 'turns;
+                    }
+                    continue;
+                }
+                jig_client::thread::Line::Words { .. }
+                | jig_client::thread::Line::Undecoded { .. }
+                | jig_client::thread::Line::Provisional { .. }
+                | jig_client::thread::Line::RunBegan { .. }
+                | jig_client::thread::Line::RunEnded { .. }
+                | jig_client::thread::Line::Left { .. } => continue,
+            };
             for message in turn.messages.iter().rev() {
                 for block in message.blocks.iter().rev() {
                     called.clear();

@@ -215,6 +215,20 @@ pub fn results(summary: &[u8], into: &mut List<u64>) {
         }
     }
 }
+/// The task whose result a chat heard (jig's owner activity `Heard`, a result from a task).
+#[must_use]
+pub fn heard(line: &c::OwnerActivity) -> Option<u64> {
+    if let c::OwnerActivity::Heard(c::OwnerWord {
+        from: c::OwnerRequester::Task(task),
+        kind: c::OwnerMessageKind::Result(_),
+        ..
+    }) = line
+    {
+        Some(*task)
+    } else {
+        None
+    }
+}
 fn digits(bytes: &[u8]) -> usize {
     let mut end = 0;
     while let Some(byte) = bytes.get(end)

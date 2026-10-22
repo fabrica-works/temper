@@ -342,6 +342,7 @@ pub(crate) fn conversation(
     }
     for line in thread.lines().into_boxed() {
         if hidden_line(&line, projected, delegations) {
+            heard_card(b, &line, delegations, (&mut tasks, &mut shown), words, bindings);
             continue;
         }
         b.open(Role::Region);
@@ -409,6 +410,28 @@ pub(crate) fn conversation(
     // The live delegates anchor follows the window's last line (client/README.md, 5.7).
     live_delegates(b, &mut tasks, delegations, &mut shown, words, bindings);
     b.close();
+}
+/// A delegate's heard result anchors its card, as a result block does (client/README.md, 5.7).
+fn heard_card(
+    b: &mut Builder,
+    line: &Line<'_>,
+    delegations: Option<(&Chat, &jig_client::Client)>,
+    (tasks, shown): (&mut List<u64>, &mut List<u64>),
+    words: &Words,
+    bindings: &mut Bindings,
+) {
+    if let Line::Activity { line } = line
+        && let c::Activity::Owner { source, .. } = &line.event
+        && let Some(task) = delegation::heard(&source.line)
+        && !shown.as_slice().contains(&task)
+    {
+        tasks.clear();
+        tasks.push(task).expect("one heard delegate fits");
+        b.open(Role::Region);
+        b.style(look::TURN);
+        cards(b, tasks, delegations, shown, words, bindings);
+        b.close();
+    }
 }
 fn provisional(b: &mut Builder, message: &[u8], cut: bool, words: &Words, text_limit: u32) {
     b.open(Role::Slot);
@@ -846,18 +869,7 @@ fn hidden(event: &c::Activity, projected: bool, delegations: Option<(&Chat, &jig
     }
     let Some((chat, client)) = delegations else { return false };
     let task = match event {
-        c::Activity::Owner { source, .. } => {
-            if let c::OwnerActivity::Heard(c::OwnerWord {
-                from: c::OwnerRequester::Task(task),
-                kind: c::OwnerMessageKind::Result(_),
-                ..
-            }) = &source.line
-            {
-                Some(*task)
-            } else {
-                None
-            }
-        }
+        c::Activity::Owner { source, .. } => delegation::heard(&source.line),
         c::Activity::Result { result } => Some(result.task.task),
         c::Activity::Words { .. }
         | c::Activity::RunBegan { .. }
