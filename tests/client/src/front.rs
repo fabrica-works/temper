@@ -208,30 +208,140 @@ impl Joint {
     /// A real forge procedure is admitted by this scenario's policy.
     #[must_use]
     pub(crate) fn with_procedures(seed: u64, limits: &client::Limits) -> Self {
+        const SLOTS: u32 = 1;
+        let [(bootstrap, engine_limits), (config, _)] = std::array::from_fn(|_| Self::procedure_config(seed));
+        Self::with_engine(seed, limits, Store::new(), [bootstrap, config], &engine_limits, SLOTS)
+    }
+    fn procedure_config(seed: u64) -> (engine::Config, engine::Limits) {
         use jig_domain_authority as a;
         const PROJECT: u32 = 1;
         const PROCEDURE: u32 = 2;
         const EXECUTORS: u32 = 1;
         const POLICY_OUT: u32 = a::POLICY_MAX_OUT;
+        let mut config = walking::config(seed);
+        let mut rules = config.core.authority.rules().clone();
+        let mut policy = config.core.authority.policy(PROJECT).expect("project").clone();
+        let kinds: Box<[a::Executor]> = Box::new([a::Executor::Procedure(PROCEDURE)]);
+        rules.ceiling.delegation.kinds.clone_from(&kinds);
+        policy.ceiling.delegation.kinds.clone_from(&kinds);
+        policy.roles[0].authority.delegation.kinds = kinds;
+        let mut authority_limits = *config.core.authority.limits();
+        authority_limits.executors = EXECUTORS;
+        let mut domain = a::Domain::new(rules, authority_limits).expect("procedure policy limits");
+        let mut out = skein_lib::Queue::with_capacity(POLICY_OUT);
+        a::step(&mut domain, a::Event::Policy { project: PROJECT, policy }, &mut out);
+        assert_eq!(out.pop(), Some(a::PolicyFact::Added { project: PROJECT }));
+        config.core.authority = domain;
+        let mut engine_limits = engine_limits();
+        engine_limits.authority = authority_limits;
+        (config, engine_limits)
+    }
+    /// The last attempt assigned to the joint's scripted worker, if any.
+    #[must_use]
+    pub fn hosted_attempt(&self, task: u64) -> Option<u64> {
+        self.hosting.get(&task).copied()
+    }
+
+    /// client/README.md, 8 and 10: a pushed change lands through CI and an agent gate.
+    #[must_use]
+    pub fn with_change_landing(seed: u64, limits: &client::Limits) -> Self {
         const SLOTS: u32 = 1;
+        use jig_domain_authority as a;
         let [(bootstrap, engine_limits), (config, _)] = std::array::from_fn(|_| {
-            let mut config = walking::config(seed);
+            let (mut config, mut limits) = Self::procedure_config(seed);
+            let connector = config.core.connectors[0];
+            // Same agent gate and rule as forge_routes.rs's configured_policy
+            // (domain/forge.md, 8.3 and 8.7), on the client world's repository.
+            let landing: Box<[engine::LandingRule]> = Box::new([engine::LandingRule {
+                connector,
+                kind: 4,
+                enforce: true,
+                pattern: a::Pattern {
+                    segments: [b"forge".as_slice(), fixtures::FORGE_HOST, b"acme", b"shop", b"branch"]
+                        .map(Box::from)
+                        .into(),
+                    last: a::Last::Exact(b"main".as_slice().into()),
+                },
+                ci: true,
+                up_to_date: true,
+                gates: Box::new([engine::Gate { number: 1, blocking: true, freshness: engine::Freshness::Exact }]),
+                approvals: Box::new([]),
+            }]);
+            config.landing.deployment.clone_from(&landing);
+            assert!(config.landing.projects.insert(1, landing).is_ok());
             let mut rules = config.core.authority.rules().clone();
-            let mut policy = config.core.authority.policy(PROJECT).expect("project").clone();
-            let kinds: Box<[a::Executor]> = Box::new([a::Executor::Procedure(PROCEDURE)]);
-            rules.ceiling.delegation.kinds.clone_from(&kinds);
-            policy.ceiling.delegation.kinds.clone_from(&kinds);
-            policy.roles[0].authority.delegation.kinds = kinds;
-            let mut authority_limits = *config.core.authority.limits();
-            authority_limits.executors = EXECUTORS;
-            let mut domain = a::Domain::new(rules, authority_limits).expect("procedure policy limits");
-            let mut out = skein_lib::Queue::with_capacity(POLICY_OUT);
-            a::step(&mut domain, a::Event::Policy { project: PROJECT, policy }, &mut out);
-            assert_eq!(out.pop(), Some(a::PolicyFact::Added { project: PROJECT }));
+            let mut policy = config.core.authority.policy(1).expect("project").clone();
+            rules.ceiling.delegation.kinds = Box::new([a::Executor::Charter(1), a::Executor::Procedure(2)]);
+            rules.ceiling.delegation.depth = 2;
+            // This pushed-branch path needs read, push, open, land and its goal's issue.
+            let grants: Box<[a::Grant]> = [1, 2, 3, 4, 8]
+                .map(|kind| a::Grant {
+                    connector,
+                    kind,
+                    pattern: a::Pattern {
+                        segments: [b"forge".as_slice(), fixtures::FORGE_HOST, b"acme"].map(Box::from).into(),
+                        last: a::Last::Open(b"shop".as_slice().into()),
+                    },
+                })
+                .into();
+            // As in configured_policy, goal projections can write their issue and comments.
+            let projections = [7, 13].map(|kind| a::Grant { kind, ..grants[0].clone() });
+            rules.ceiling.grants = grants.iter().cloned().chain(projections).collect();
+            policy.ceiling.grants.clone_from(&rules.ceiling.grants);
+            policy.projections.clone_from(&rules.ceiling.grants);
+            policy.roles[0].authority.grants = grants;
+            policy.ceiling.delegation = rules.ceiling.delegation.clone();
+            policy.roles[0].authority.delegation = rules.ceiling.delegation.clone();
+            let mut maintainer = policy.roles[0].clone();
+            maintainer.number = 1;
+            let mut member = maintainer.clone();
+            member.number = 2;
+            policy.roles = Box::new([policy.roles[0].clone(), maintainer, member]);
+            limits.authority.roles = 3;
+            limits.authority.requirements = 8;
+            limits.authority.facts = 8;
+            limits.authority.executors = 2;
+            limits.authority.grants = 7;
+            limits.authority.segments = 9;
+            limits.authority.segment_bytes = 64;
+            limits.documents.grants = limits.authority.grants;
+            limits.documents.executors = limits.authority.executors;
+            // Task offers name all three roles; this joint serves the person's page.
+            limits.documents.lines = 3;
+            limits.tasks.tasks = 3;
+            limits.tasks.project_tasks = 3;
+            limits.tasks.tree_tasks = 3;
+            limits.tasks.depth = 2;
+            limits.tasks.parameters = 5;
+            // A gate's brief spec includes its branch and hexadecimal head.
+            limits.tasks.spec_bytes = 128;
+            limits.tasks.contract_choices = 2;
+            limits.tasks.executor_kinds = 2;
+            limits.tasks.authority_grants = 5;
+            limits.tasks.authority_segments = 9;
+            limits.tasks.authority_bytes = 512;
+            limits.tasks.inbox_bytes = 1024;
+            limits.people.inbox_tasks = 6;
+            // configured_policy uses jig's Small profile's creation-request bound.
+            limits.people.amendment_bytes = 8_192;
+            // The core prices deployment, project, task and every grant's note scope.
+            limits.notes.scopes = 3 + limits.authority.grants;
+            limits.journal.writes = 8192;
+            limits.journal.held = 1024;
+            limits.journal.deliveries = 256;
+            limits.journal.result_bytes = 4096;
+            limits.journal.run_bytes = 8192;
+            limits.brief.sections = 5;
+            limits.brief.brief_bytes = 768;
+            limits.brief.read_bytes = 512;
+            limits.brief.budgets.pull = 384;
+            limits.brief.budgets.ci = 384;
+            let mut domain = a::Domain::new(rules, limits.authority).expect("landing authority");
+            let mut out = skein_lib::Queue::with_capacity(a::POLICY_MAX_OUT);
+            a::step(&mut domain, a::Event::Policy { project: 1, policy }, &mut out);
+            assert_eq!(out.pop(), Some(a::PolicyFact::Added { project: 1 }));
             config.core.authority = domain;
-            let mut engine_limits = engine_limits();
-            engine_limits.authority = authority_limits;
-            (config, engine_limits)
+            (config, limits)
         });
         Self::with_engine(seed, limits, Store::new(), [bootstrap, config], &engine_limits, SLOTS)
     }

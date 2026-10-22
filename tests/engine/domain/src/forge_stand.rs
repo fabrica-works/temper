@@ -32,6 +32,12 @@ impl ForgeStand {
     }
     #[must_use]
     pub fn with(repositories: &[(&[u8], &[u8], u32)]) -> ForgeStand {
+        Self::with_checks(repositories, &[])
+    }
+
+    /// Repositories with the named required CI contexts, all passing.
+    #[must_use]
+    pub fn with_checks(repositories: &[(&[u8], &[u8], u32)], contexts: &[&[u8]]) -> ForgeStand {
         let mut config = temper_engine_forge_world::fake_config();
         config.limits.repositories = u32::try_from(repositories.len()).expect("bounded repositories");
         config.latency_min = skein_lib::Duration::ZERO;
@@ -52,7 +58,7 @@ impl ForgeStand {
                     tree: Box::new([]),
                     labels: Box::new([]),
                     checks: raw::Checks {
-                        contexts: Box::new([]),
+                        contexts: contexts.iter().map(|context| Box::from(*context)).collect(),
                         latency_min: skein_lib::Duration::ZERO,
                         latency_max: skein_lib::Duration::ZERO,
                         silent: 0,
@@ -82,6 +88,96 @@ impl ForgeStand {
             repositories: names,
             calls: 0,
         }
+    }
+
+    /// Push one commit on a new branch, as `forge_routes.rs`'s `check_gate_landing` does.
+    pub fn push_branch(&mut self, repository: u32, branch: &[u8]) {
+        assert!(self.quiescent(), "push between stand calls");
+        let name = self.repositories.get(&repository).expect("configured repository").clone();
+        // Finish setup's CI before making the push's synchronous calls.
+        while self.domain.is_due(self.env.now) {
+            fake::fire(&mut self.domain, &self.env, &mut self.out);
+        }
+        assert!(self.out.is_empty(), "setup emits no replies or hooks");
+        // Read this repository's base: commit ids depend on repository creation order.
+        fake::step(
+            &mut self.domain,
+            &self.env,
+            fake::Event::Call {
+                reply_to: ReplyTo::new(Token::new(10_000)),
+                user: 1,
+                repository: name.clone(),
+                op: raw::Op::Git(raw::Git::Fetch { want: raw::Want::Default }),
+            },
+            &mut self.out,
+        );
+        fake::fire(&mut self.domain, &self.env, &mut self.out);
+        let Some(fake::Request::Reply { result: Ok(raw::Answer::Commit(commit)), .. }) = self.out.pop() else {
+            panic!("repository's main head");
+        };
+        fake::step(
+            &mut self.domain,
+            &self.env,
+            fake::Event::Call {
+                reply_to: ReplyTo::new(Token::new(10_001)),
+                user: 1,
+                repository: name.clone(),
+                op: raw::Op::Git(raw::Git::Create { branch: branch.into(), commit }),
+            },
+            &mut self.out,
+        );
+        fake::fire(&mut self.domain, &self.env, &mut self.out);
+        assert!(matches!(
+            self.out.pop(),
+            Some(fake::Request::Reply { result: Ok(raw::Answer::Branch(raw::Created::Created)), .. })
+        ));
+        fake::advance(&mut self.domain, &self.env, &name, branch, b"file", b"review this diff", 1)
+            .expect("pushed change head");
+        // The push's zero-latency CI is complete before the engine starts.
+        while self.domain.is_due(self.env.now) {
+            fake::fire(&mut self.domain, &self.env, &mut self.out);
+        }
+        assert!(self.quiescent(), "push emits no unrelated replies or hooks");
+        self.domain.reclaim();
+    }
+
+    /// Observe between engine steps, with no pending calls or due fake work.
+    ///
+    /// Reads leave the fake as the engine sees it: rate limiting and faults
+    /// are disabled, latencies and CI outcomes are fixed, and this never moves
+    /// time or fires another event. Internally the fake advances its RNG,
+    /// answered tally and reclaimed call-slot generation; none of those changes
+    /// repository ids, CI ids, quotas or future event times in this stand.
+    /// The engine's `calls`, `pending` and translation limits stay untouched.
+    pub fn read(&mut self, repository: api::Repository, read: api::Read) -> api::Answer {
+        assert!(self.quiescent(), "read between stand calls");
+        assert!(!self.domain.is_due(self.env.now), "finish fake work before observing");
+        assert_eq!(repository.forge, 1);
+        let op = api::Op::Read(read);
+        let name = translate::locate_name(&op)
+            .unwrap_or_else(|| self.repositories.get(&repository.repository).expect("configured repository").clone());
+        let observation = Token::new(90_001);
+        fake::step(
+            &mut self.domain,
+            &self.env,
+            fake::Event::Call {
+                reply_to: ReplyTo::new(observation),
+                user: 1,
+                repository: name,
+                op: translate::op(&op, &self.limits),
+            },
+            &mut self.out,
+        );
+        fake::fire(&mut self.domain, &self.env, &mut self.out);
+        let Some(fake::Request::Reply { to, result }) = self.out.pop() else {
+            panic!("one synchronous observation reply");
+        };
+        assert_eq!(to.into_token(), observation);
+        let answer = translate::answer(&op, result.expect("stand observation"), &self.limits);
+        self.domain.reclaim();
+        assert!(self.quiescent());
+        assert!(!self.domain.is_due(self.env.now));
+        answer
     }
 
     pub fn call(&mut self, call: Token, repository: api::Repository, op: api::Op, limits: &skein_forge_client::Limits) {

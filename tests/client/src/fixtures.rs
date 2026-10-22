@@ -781,6 +781,66 @@ pub fn goal_with_forge_panel(front: &mut Joint) -> u64 {
     make_goal(front, true)
 }
 
+/// Adopt before pushing under temper's prefix: adoption refuses an unowned branch there.
+pub fn adopt_change_repository(front: &mut Joint) {
+    front.engine.sign_in();
+    front.engine.settle();
+    adopt_goal_repository(&mut front.engine);
+    // forge_routes.rs's worker also receives the repository's application credential.
+    front.engine.send(engine::Event::Credential { number: 1, generation: 1, valid: Duration::from_secs(3600) });
+    front.engine.settle();
+    assert!(front.engine_adopted(ADOPT_FORGE, u32::try_from(GOAL_REPOSITORY).expect("repository id")));
+}
+
+/// A tracked change on the landing joint, handed a branch already pushed on its stand.
+/// The repository and sign-in are prepared by `adopt_change_repository`.
+/// Leaves the joint's immediate work for the story to drive one step at a time.
+pub fn goal_with_pushed_change(front: &mut Joint, branch: &[u8]) -> u64 {
+    let driver = &mut front.engine;
+    let jig_domain_people::Ask::Create { mut batch, .. } = driver.chat_ask(GOAL_PROJECT, GOAL_BRIEF) else {
+        panic!("create fixture");
+    };
+    // These grants come from this joint's configured forge connector.
+    let connector = batch[0].authority.grants[0].connector;
+    batch[0].tracked = Some(GOAL_PRIORITY);
+    batch[0].label = GOAL_LABEL;
+    batch[0].flags.conversation = false;
+    batch[0].flags.listed = true;
+    batch[0].authority.tools = NO_TOOLS;
+    batch[0].parameters = Box::new([
+        jig_domain_people::Parameter::Resource { name: REPOSITORY_PARAMETER, connector, resource: GOAL_REPOSITORY },
+        jig_domain_people::Parameter::Bytes { name: 3, value: branch.into() },
+    ]);
+    batch[0].executor = jig_domain_people::TaskExecutor::Procedure { connector, code: FORGE_PROCEDURE };
+    batch[0].contract = jig_domain_people::Contract::Change { connector, kind: FORGE_CHANGE, words: REPORT_BYTES };
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
+        reply_to: skein_lib::ReplyTo::new(GOAL_REPLY),
+        sign_in: driver.session(),
+        key: GOAL_KEY,
+        ask: jig_domain_people::Ask::Create { project: GOAL_PROJECT, batch },
+    }));
+    // Commit creation, leaving subsequent procedure work visible to the caller.
+    for _ in 0..200 {
+        driver.advance(true);
+        if let Some(task) = driver.delivered.iter().find_map(|delivery| {
+            if let engine::Delivery::WebReply {
+                to,
+                reply: jig_domain_people::Reply::Outcome(jig_domain_people::Outcome::Created { first, .. }),
+            } = delivery
+                && *to == skein_lib::ReplyTo::new(GOAL_REPLY)
+            {
+                Some(*first)
+            } else {
+                None
+            }
+        }) {
+            return task;
+        }
+    }
+    panic!("pushed change creation: {:?}", driver.delivered);
+}
+
 const ADOPT_FORGE: u16 = 1;
 const ADOPT_REPLY: Token = Token::new(1203);
 const ADOPT_KEY: [u8; 16] = [43; 16];
