@@ -1182,6 +1182,8 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             // withdrawn values and their account-id capacity are gone (wire v5).
             + 4_578_373_384
             + socket_growth
+            // Jig's deployment roster adds 7,288 B per small core, across 3,076 roots/handoffs.
+            + 3_076 * 7_288
             // The sign-in adds token and issuer trust, at the shell's admitted root bounds.
             + skein_tls::roots_worst_case(2 * 1024, 65_536).expect("sign-in trust bound")
             - skein_tls::roots_worst_case(0, 0).expect("prior empty trust bound")

@@ -25,7 +25,9 @@ fn a_lost_tools_key_answer_recovers_one_account() {
     call(&mut front, &mut root, 4, &[b"accounts", b"--json"], None);
     let printed = root.agent().printed(4).expect("one account projection");
     let text = std::str::from_utf8(&printed.stdout).expect("JSON");
-    assert_eq!(text.matches("\"display\"").count(), 1, "{text}");
+    // The first owner also sees the fixture's preseeded deployment account.
+    const ADDED_PARTY_ACCOUNTS: usize = 1;
+    assert_eq!(text.matches("\"holder\":{\"party\":").count(), ADDED_PARTY_ACCOUNTS, "{text}");
     accounts::assert_no_carried(&front);
 }
 #[test]

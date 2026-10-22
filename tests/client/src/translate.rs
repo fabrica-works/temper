@@ -254,6 +254,11 @@ fn account_document_limits(
             }
         }
     }
+    if let jig_domain_core::documents::Document::Deployment(value) = document {
+        // Deployment collections share the engine's document-line bound,
+        // independently of the client's smaller UI rows.
+        whole.rows = whole.rows.max(value.accounts.capacity());
+    }
     whole
 }
 fn delivery_packet(

@@ -310,14 +310,13 @@ fn prepare_account(
             .tree()
             .nodes()
             .iter()
-            .find(|node| {
-                node.role == skein_ui::Role::Button
-                    && an_unnamed_project(node.name.as_deref())
-                    && !node.states.iter().any(|state| *state == skein_ui::State::Pressed)
-            })
-            .map(|node| node.id)
+            .find(|node| node.role == skein_ui::Role::Button && an_unnamed_project(node.name.as_deref()))
+            .map(|node| (node.id, node.states.iter().any(|state| *state == skein_ui::State::Pressed)))
     {
-        assert!(client.act(node, skein_ui::Act::Press), "offered project selection");
+        let (node, pressed) = node;
+        if !pressed {
+            assert!(client.act(node, skein_ui::Act::Press), "offered project selection");
+        }
         *selected = true;
     }
     let Some(actor) = provision else { return false };
