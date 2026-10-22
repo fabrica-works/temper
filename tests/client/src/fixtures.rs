@@ -401,6 +401,134 @@ const DELEGATE_COMPLETION: u32 = 1;
 const DELEGATE_POSITION: u32 = 1;
 const RETRY_AT: Time = Time::from_nanos(2_000_000_000);
 const NO_SPEND: u64 = 0;
+const DELEGATE_SPEND: u64 = 3;
+const DEPENDENT_DELEGATES: u32 = 2;
+pub struct Dependents {
+    pub goal: u64,
+    pub first: u64,
+    pub second: u64,
+}
+/// A tracked goal with two report delegates; the first has spent, the second waits for it.
+pub fn goal_with_dependent_delegates(front: &mut Joint) -> Dependents {
+    use temper_engine_domain_world::fixtures::report_delegate;
+    *front = Joint::with_delegates(SEED, &domain_limits());
+    let goal = make_goal_with_delegation(front, false, Some(DEPENDENT_DELEGATES));
+    let driver = &mut front.engine;
+    let parent = driver.last_assignment();
+    assert_eq!(parent.task, goal);
+    driver.call(
+        QUESTION_WORKER,
+        goal,
+        parent.attempt,
+        DELEGATE_CALL,
+        engine::Call {
+            completion: DELEGATE_COMPLETION,
+            position: DELEGATE_POSITION,
+            tool: engine::Tool::Delegate {
+                batch: Box::new([
+                    report_delegate(b"Investigate the change", Box::new([])),
+                    report_delegate(b"Use the findings", Box::new([engine::Dependency::Batch(0)])),
+                ]),
+            },
+        },
+    );
+    driver.settle();
+    let Some(engine::CallAnswer::Delegated(children)) = driver.answered(DELEGATE_CALL) else {
+        panic!("dependent delegates admitted: {:?}", driver.answered(DELEGATE_CALL));
+    };
+    let dependents = Dependents { goal, first: children[0].task, second: children[1].task };
+    driver.answer(QUESTION_WORKER, goal, parent.attempt, NO_SPEND, tasks::End::Parked, engine::Parts::none());
+    driver.settle();
+    let first = driver.last_assignment();
+    assert_eq!(first.task, dependents.first, "first delegate runs before its dependant");
+    driver.send(temper_engine_domain_world::protocol::turn(
+        QUESTION_WORKER,
+        first.task,
+        first.attempt,
+        FIRST_REPLY_TURN,
+        DELEGATE_SPEND,
+        None,
+        b"Findings in progress",
+    ));
+    driver.settle();
+    dependents
+}
+/// The same goal after its first delegate's report unblocks the second.
+pub fn goal_with_a_finished_dependency(front: &mut Joint) -> Dependents {
+    let dependents = goal_with_dependent_delegates(front);
+    let driver = &mut front.engine;
+    let first = driver.last_assignment();
+    driver.answer(
+        QUESTION_WORKER,
+        first.task,
+        first.attempt,
+        driver.task(first.task).expect("running first delegate").run_spent,
+        tasks::End::Finished {
+            result: tasks::TaskResult::Report { words: b"The change is feasible".as_slice().into() },
+            cancel_delegates: false,
+        },
+        engine::Parts::none(),
+    );
+    driver.settle();
+    assert!(
+        driver.delivered.iter().any(|delivery| matches!(delivery,
+            engine::Delivery::Assigned { assignment, .. } if assignment.task == dependents.second
+        )),
+        "dependant runs after the report"
+    );
+    dependents
+}
+const BUDGET_WATCH: Token = Token::new(1204);
+/// A tracked goal whose worker finished with a report retained by the engine.
+pub fn finished_goal(front: &mut Joint) -> u64 {
+    *front = Joint::with_questions(SEED, &domain_limits());
+    let goal = make_goal(front, false);
+    let driver = &mut front.engine;
+    let run = driver.last_assignment();
+    assert_eq!(run.task, goal);
+    driver.answer(
+        QUESTION_WORKER,
+        goal,
+        run.attempt,
+        NO_SPEND,
+        tasks::End::Finished {
+            result: tasks::TaskResult::Report { words: b"The repository is ready".as_slice().into() },
+            cancel_delegates: false,
+        },
+        engine::Parts::none(),
+    );
+    driver.settle();
+    goal
+}
+/// Read the engine's supplied budget, including availability, without computing it in the story.
+pub fn task_budget(front: &mut Joint, task: u64) -> jig_domain_core::documents::BudgetLine {
+    use jig_domain_core::documents::{Document, Watched, Window};
+    let driver = &mut front.engine;
+    driver.send(engine::Event::Party(engine::PartyInput::Watch {
+        watcher: BUDGET_WATCH,
+        sign_in: driver.session(),
+        subject: Watched::Task { task },
+        window: Window { rows: driver.env.limits.documents.rows, after: None },
+    }));
+    driver.settle();
+    let budget = driver
+        .delivered
+        .iter()
+        .rev()
+        .find_map(|delivery| {
+            if let engine::Delivery::Document { watcher: BUDGET_WATCH, document } = delivery
+                && let Document::Task(document) = document.as_ref()
+            {
+                Some(document.budget)
+            } else {
+                None
+            }
+        })
+        .expect("goal budget document");
+    driver.send(engine::Event::Party(engine::PartyInput::Unwatch { watcher: BUDGET_WATCH }));
+    driver.settle();
+    budget
+}
 /// A tracked goal with a failed delegate, held by the real engine.
 pub fn goal_with_held_delegate(front: &mut Joint) -> (u64, u64) {
     *front = Joint::with_questions(SEED, &domain_limits());
@@ -455,6 +583,9 @@ fn fail_delegate(driver: &mut Driver, held: u64) {
     driver.settle();
 }
 fn make_goal(front: &mut Joint, procedure: bool) -> u64 {
+    make_goal_with_delegation(front, procedure, None)
+}
+fn make_goal_with_delegation(front: &mut Joint, procedure: bool, delegates: Option<u32>) -> u64 {
     let driver = &mut front.engine;
     driver.sign_in();
     driver.settle();
@@ -469,6 +600,9 @@ fn make_goal(front: &mut Joint, procedure: bool) -> u64 {
     batch[0].label = GOAL_LABEL;
     batch[0].flags.conversation = false;
     batch[0].flags.listed = true;
+    if let Some(delegates) = delegates {
+        batch[0].authority.delegation.tasks = delegates;
+    }
     if procedure {
         batch[0].authority.tools = NO_TOOLS;
         batch[0].parameters = Box::new([jig_domain_people::Parameter::Resource {
@@ -512,6 +646,17 @@ pub fn plan_item(task: u64, status: &[u8]) -> skein_fake_person::Find {
         role: skein_ui::Role::TreeItem,
         name: format!("Task {task}").into_bytes().into_boxed_slice(),
     }]))
+}
+#[must_use]
+pub fn dependency_item(task: u64, find: skein_fake_person::Find) -> skein_fake_person::Find {
+    use skein_fake_person::Target;
+    find.within(Box::new([
+        Target::ExactRole { role: skein_ui::Role::TreeItem, name: format!("Task {task}").into_bytes().into() },
+        Target::ExactRole {
+            role: skein_ui::Role::List,
+            name: format!("Dependencies of task {task}").into_bytes().into(),
+        },
+    ]))
 }
 const FORGE_CONNECTOR: u16 = 0;
 const NO_TOOLS: u64 = 0;
