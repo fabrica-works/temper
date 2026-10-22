@@ -821,7 +821,7 @@ pub fn step_4_4(observed: &Observed) -> Vec<Miss> {
 fn pace_inbox(misses: &mut Vec<Miss>, observed: &Observed) {
     use super::{PACE_ANSWER, PACE_QUESTION, PACE_QUESTION_MESSAGE};
     const ONE: usize = 1;
-    let rows = document(observed, Read::PaceAsked).pointer("/inbox/rows").and_then(Value::as_array);
+    let rows = document(observed, Read::PaceAsked).pointer("/needs/rows").and_then(Value::as_array);
     step_check(
         misses,
         "4.4",
@@ -903,7 +903,7 @@ fn pace_note(misses: &mut Vec<Miss>, observed: &Observed) {
 }
 fn pace_model(misses: &mut Vec<Miss>, observed: &Observed) {
     use super::{DEFAULT_MODEL, PACE_ANSWER};
-    let a = &document(observed, Read::AEnded)["task"];
+    let a = task_document(observed, Read::AEnded);
     step_check(
         misses,
         "4.4",
@@ -936,7 +936,7 @@ fn pace_accounts(misses: &mut Vec<Miss>, observed: &Observed) {
         numbers == [Some(SECOND_ACCOUNT), Some(FIRST_ACCOUNT)] && places == [Some(0), Some(1)]
     });
     step_check(misses, "4.4", ranked, ORDER, "deployment accounts must put the second account first");
-    let a = &document(observed, Read::AEnded)["task"];
+    let a = task_document(observed, Read::AEnded);
     step_check(
         misses,
         "4.4",
@@ -944,7 +944,7 @@ fn pace_accounts(misses: &mut Vec<Miss>, observed: &Observed) {
         ORDER,
         "A must keep its original account",
     );
-    let survey = &document(observed, Read::SurveyEnded)["task"];
+    let survey = task_document(observed, Read::SurveyEnded);
     step_check(
         misses,
         "4.4",
@@ -985,7 +985,7 @@ mod pace_tests {
             documents: BTreeMap::from([
                 (
                     Read::PaceAsked,
-                    json!({"inbox":{"rows":[{"task":{"live":{"task":DIRECTOR}},
+                    json!({"needs":{"rows":[{"task":{"live":{"task":DIRECTOR}},
                     "project":PROJECT,"object":{"question":{"message":PACE_QUESTION_MESSAGE}}}]}}),
                 ),
                 (
@@ -1026,7 +1026,7 @@ mod pace_tests {
         const MISSES: usize = 3;
         const QUESTION_ROW: usize = 0;
         let mut observed = met();
-        observed.documents.get_mut(&Read::PaceAsked).expect("inbox")["inbox"]["rows"][QUESTION_ROW]["project"] =
+        observed.documents.get_mut(&Read::PaceAsked).expect("inbox")["needs"]["rows"][QUESTION_ROW]["project"] =
             Value::Null;
         observed.documents.get_mut(&Read::AEnded).expect("A")["task"]["spec_revision"] = Value::Null;
         observed.documents.get_mut(&Read::Ranked).expect("ranked")["accounts"]["deployment"]

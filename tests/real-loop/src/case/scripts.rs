@@ -28,6 +28,12 @@ fn wait(words: &str) -> Turn {
         tokens: 20,
     }
 }
+fn then_wait(mut turn: Turn, words: &str) -> Turn {
+    let mut lines = turn.lines.into_vec();
+    lines.extend(wait(words).lines);
+    turn.lines = lines.into_boxed_slice();
+    turn
+}
 fn report(words: &str) -> Turn {
     call(b"finish", &json!({"form":"report","text":words,"fields":{}}))
 }
@@ -170,7 +176,8 @@ fn amend() -> Turn {
     call(
         b"amend",
         &json!({"target":super::A,"revision":0,"amendment":{
-        "reason":super::PACE_ANSWER,"llm":{"main":{"model":super::DEFAULT_MODEL_NUMBER}}}}),
+        "reason":super::PACE_ANSWER,"spec":{"words":super::PACE_A_RESUMED_SPEC,"parameters":[]},
+        "llm":{"main":{"model":super::DEFAULT_MODEL_NUMBER}}}}),
     )
 }
 
@@ -191,26 +198,38 @@ pub fn step_4_4(_forge: SocketAddr) -> Box<[Script]> {
                 report(PACE_REPORT),
             ]),
         },
+        // At the same position, the longer cue wins by being listed first.
+        // Smith's recap resets the fake's assistant-message turn count.
         Script {
-            cue: Agent::A.cue().into(),
+            cue: super::PACE_A_RESUMED_SPEC.as_bytes().into(),
             turns: Box::new([
-                pace_question(),
-                wait("Asked about the pace."),
-                call(
-                    b"delegate",
-                    &json!({"batch":[{
-                        "executor":{"kind":"agent","charter":1},
-                        "spec":{"words":SURVEY_SPEC,"parameters":[]},
-                        "contract":{"kind":"report","words":128},
-                        "llm":{"main":{"model":DEFAULT_MODEL_NUMBER}},
-                        "authority":{"tools":0,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},
-                            "budget":{"spend":10},"notes":0}
-                    }]}),
+                then_wait(
+                    call(
+                        b"delegate",
+                        &json!({"batch":[{
+                            "executor":{"kind":"agent","charter":1},
+                            "spec":{"words":SURVEY_SPEC,"parameters":[]},
+                            "contract":{"kind":"report","words":128},
+                            "llm":{"main":{"model":DEFAULT_MODEL_NUMBER}},
+                            "authority":{"tools":0,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},
+                                // Leave room for A's current run's reservation.
+                                // Five units admit the model's four-unit reserve floor.
+                                "budget":{"spend":5},"notes":0}
+                        }]}),
+                    ),
+                    "Survey delegated.",
                 ),
-                wait("Survey delegated."),
                 report(PACE_REPORT),
+                // The old conversation has two assistant turns at the model
+                // change; the resumed one reports at assistant position one.
+                Turn {
+                    lines: Box::new([Line::Text { text: super::PACE_ANSWER.as_bytes().into() }]),
+                    finish: Finish::Stop,
+                    tokens: 20,
+                },
             ]),
         },
+        Script { cue: Agent::A.cue().into(), turns: Box::new([pace_question(), wait("Asked about the pace.")]) },
         Script { cue: Agent::Survey.cue().into(), turns: Box::new([report(SURVEY_REPORT)]) },
     ])
 }

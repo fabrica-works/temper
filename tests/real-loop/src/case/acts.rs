@@ -117,10 +117,10 @@ fn held(key: &'static str, act: Option<calls::Step>) -> Vec<calls::Step> {
 }
 
 const PACE_DIRECTOR_ENDED: usize = 3;
-const PACE_ASKED: usize = 5;
-const RANKED: usize = 7;
-const SURVEY_ENDED: usize = 10;
-const PACE_A_ENDED: usize = 11;
+const PACE_ASKED: usize = 6;
+const RANKED: usize = 8;
+const SURVEY_ENDED: usize = 11;
+const PACE_A_ENDED: usize = 12;
 pub const READS_4_4: &[(Read, usize)] = &[
     (Read::DirectorEnded, PACE_DIRECTOR_ENDED),
     (Read::PaceAsked, PACE_ASKED),
@@ -138,13 +138,24 @@ pub fn step_4_4() -> Vec<calls::Step> {
         call(D1, argv!["chat", "--project", number(PROJECT), "--key", "pace", PACE_PERSON]),
         start(D1, argv!["wait", "task", number(DIRECTOR), "--until", "ended", "--json"]),
         call(D1, argv!["wait", "inbox", "--until", "waiting"]),
+        // The director has read A's question before the person reads it:
+        // the question must outlive the run's acknowledgement (jig's
+        // domain/tasks.md, 8.2).
+        calls::until(D1, argv!["chat", number(DIRECTOR)], super::PACE_PENDING.as_bytes(), b"A delegated."),
         call(D1, argv!["inbox", "--kind", "questions", "--json"]),
         call(D1, argv!["rank", number(SECOND_ACCOUNT), "1"]),
         call(D1, argv!["accounts", "--json"]),
-        calls::until(D1, argv!["chat", number(DIRECTOR)], super::PACE_PENDING.as_bytes(), b"A delegated."),
-        call(D1, argv!["answer", number(DIRECTOR), number(PACE_QUESTION_MESSAGE), PACE_ANSWER]),
-        call(D1, argv!["wait", "task", number(SURVEY), "--until", "ended", "--json"]),
-        call(D1, argv!["wait", "task", number(A), "--until", "ended", "--json"]),
+        call(D1, argv!["answer", number(DIRECTOR), number(PACE_QUESTION_MESSAGE), PACE_ANSWER, "--key", "pace-answer"]),
+        // Read after delegation; ended parents can outpace a new live watch.
+        // Use historical reads, as the held stories do for the director.
+        calls::until(
+            D1,
+            argv!["task", number(A), "--json"],
+            super::SURVEY_SPEC.as_bytes(),
+            super::PACE_A_SPEC.as_bytes(),
+        ),
+        calls::until(D1, argv!["task", number(SURVEY), "--json"], b"\"phase\":\"ended\"", b"\"phase\":\"running\""),
+        calls::until(D1, argv!["task", number(A), "--json"], b"\"phase\":\"ended\"", b"\"phase\":\"running\""),
         join(PACE_DIRECTOR_ENDED),
     ]
 }

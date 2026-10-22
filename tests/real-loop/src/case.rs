@@ -28,6 +28,8 @@ pub const PACE_NOTE: &str = "Pace";
 pub const PACE_PENDING: &str = "The pace question is waiting for your answer.";
 pub const PACE_A_SPEC: &str =
     "@case_a Ask the director whether to keep the pace; on its direction, have a survey delegated and report.";
+// Distinct from the initial question's cue after smith recaps on a model change.
+pub const PACE_A_RESUMED_SPEC: &str = "@case_a resumed Have the survey delegated and report on the pace direction.";
 pub const HELD_PERSON: &str = "@case_director Delegate A's report and wait for it.";
 pub const HELD_A_SPEC: &str = "@case_a Report when your account allows the work to continue.";
 pub const SURVEY_SPEC: &str = "@case_survey Survey the work that needs no taste and report.";
@@ -164,5 +166,19 @@ pub fn fixture() -> forge::Fixture {
             value["engine"]["limits"]["overrides"]["documents.text_bytes"] = 512.into();
             landing::admit(value);
         },
+    }
+}
+
+#[must_use]
+pub fn fixture_4_4() -> forge::Fixture {
+    forge::Fixture {
+        configure: |value, agent, forge| {
+            (fixture().configure)(value, agent, forge);
+            // The survey's delegate and wait share one completion. Its
+            // resumed script then cannot collide with the model-change recap.
+            agent["profile"]["declared"]["calls_per_response"] = 2.into();
+            value["workers"][0]["limits"]["overrides"]["hub.run_calls"] = 2.into();
+        },
+        ..fixture()
     }
 }
