@@ -217,11 +217,18 @@ fn the_demo_answer_carries_no_key_path_socket_or_placeholder() {
 #[test]
 fn a_configured_demo_does_not_answer_other_or_malformed_reads() {
     let service = fixtures::demo_service();
+    let reading = wire::reading(&w::Reading::new(&w::CEILINGS, w::ReadingParts { read: w::Read::Demo }).unwrap());
+    let mut malformed = reading.clone();
+    *malformed.last_mut().expect("read tag") = 1;
+    let mut writer = skein_lib::Writer::new(reading.len().checked_add(1).expect("one trailing byte fits"));
+    writer.put(&reading).expect("reading room");
+    writer.put(&[0]).expect("trailing byte room");
+    let trailing = writer.finish();
     for (row, family, version, record) in [
-        ("family", 2, wire::CLIENT_VERSION, Box::from([0, 2, 0].as_slice())),
-        ("version", wire::FORGE, wire::CLIENT_VERSION + 1, Box::from([0, 2, 0].as_slice())),
-        ("malformed", wire::FORGE, wire::CLIENT_VERSION, Box::from([0, 2, 1].as_slice())),
-        ("trailing", wire::FORGE, wire::CLIENT_VERSION, Box::from([0, 2, 0, 0].as_slice())),
+        ("family", 2, wire::CLIENT_VERSION, reading.clone()),
+        ("version", wire::FORGE, wire::CLIENT_VERSION + 1, reading),
+        ("malformed", wire::FORGE, wire::CLIENT_VERSION, malformed),
+        ("trailing", wire::FORGE, wire::CLIENT_VERSION, trailing),
     ] {
         let mut input = demo_read(people::ApplicationScope::Deployment);
         let kit::ToApplication::Read { family: f, version: v, record: r, .. } = &mut input else { panic!("read") };

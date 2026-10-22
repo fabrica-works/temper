@@ -42,12 +42,19 @@ pub const fn owner(number: u16) -> Option<Owner> {
     }
 }
 /// Every record's version, served by both ends (client/README.md, 4.6).
-pub const CLIENT_VERSION: u32 = 2;
+pub const CLIENT_VERSION: u32 = 3;
 
 /// The demo's maximum number of suggested requests (client/README.md, 4.6).
 pub const CUES: u32 = 8;
 /// Each suggested request's maximum UTF-8 byte length (client/README.md, 4.6).
 pub const CUE_BYTES: u32 = 256;
+
+/// The pull request address's maximum byte length (client/README.md, 4.6).
+pub const ADDRESS_BYTES: u32 = 2048;
+/// The change panel's maximum number of gates (client/README.md, 4.6).
+pub const GATES: u32 = 64;
+/// The queued change's maximum number of tasks ahead (client/README.md, 4.6).
+pub const TASKS_AHEAD: u32 = 64;
 
 /// A side's bounds on the forge family's fields (client/README.md, 4.4 and 4.6).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -62,6 +69,13 @@ pub struct Bounds {
 #[must_use]
 pub fn limits(bounds: &Bounds) -> Option<v1::Limits> {
     let limits = v1::Limits {
+        pull_address: ADDRESS_BYTES,
+        queued_ahead: TASKS_AHEAD,
+        change_panel_owner: bounds.field_bytes,
+        change_panel_name: bounds.field_bytes,
+        change_panel_branch: bounds.field_bytes,
+        change_panel_landing: bounds.field_bytes,
+        change_panel_gates: GATES,
         demo_answer_owner: bounds.field_bytes,
         demo_answer_name: bounds.field_bytes,
         demo_answer_cues: CUES,
@@ -136,6 +150,43 @@ pub fn decode_demo_answer(bytes: &[u8], limits: &v1::Limits) -> Option<v1::DemoA
         if cue.is_empty() {
             return None;
         }
+    }
+    Some(record)
+}
+
+/// Encode which of the family's subjects is watched (client/README.md, 4.6).
+#[must_use]
+pub fn watching(record: &v1::Watching) -> Box<[u8]> {
+    let mut writer = Writer::new(usize::try_from(record.measure()).expect("measured length fits usize"));
+    record.encode(&mut writer).expect("measured room");
+    writer.finish()
+}
+/// Decode one complete family watch (client/README.md, 4.6).
+#[must_use]
+pub fn decode_watching(bytes: &[u8], limits: &v1::Limits) -> Option<v1::Watching> {
+    let mut reader = Reader::new(bytes);
+    let record = v1::Watching::decode(limits, &mut reader).ok()?;
+    if reader.is_empty() { Some(record) } else { None }
+}
+/// Encode the change's whole panel (client/README.md, 4.6; client/forge.md, 9.2).
+#[must_use]
+pub fn change_panel(record: &v1::ChangePanel) -> Box<[u8]> {
+    let mut writer = Writer::new(usize::try_from(record.measure()).expect("measured length fits usize"));
+    record.encode(&mut writer).expect("measured room");
+    writer.finish()
+}
+/// Decode a complete panel, refusing a queued place before 1 (client/README.md, 4.6).
+#[must_use]
+pub fn decode_change_panel(bytes: &[u8], limits: &v1::Limits) -> Option<v1::ChangePanel> {
+    let mut reader = Reader::new(bytes);
+    let record = v1::ChangePanel::decode(limits, &mut reader).ok()?;
+    if !reader.is_empty() {
+        return None;
+    }
+    if let v1::Step::Queued(queued) = record.step()
+        && queued.place() == 0
+    {
+        return None;
     }
     Some(record)
 }

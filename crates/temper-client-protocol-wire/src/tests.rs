@@ -53,6 +53,13 @@ fn limits_take_each_bound_from_its_source_field() {
     assert_eq!(
         fixtures::limits(),
         v1::Limits {
+            pull_address: crate::ADDRESS_BYTES,
+            queued_ahead: crate::TASKS_AHEAD,
+            change_panel_owner: 16,
+            change_panel_name: 16,
+            change_panel_branch: 16,
+            change_panel_landing: 16,
+            change_panel_gates: crate::GATES,
             demo_answer_owner: 16,
             demo_answer_name: 16,
             demo_answer_cues: crate::CUES,
@@ -145,6 +152,81 @@ fn demo_cues_obey_their_count_and_text_bounds() {
         assert_eq!(answer.is_ok(), accepted, "{row}");
         if let Ok(answer) = answer {
             assert_eq!(crate::decode_demo_answer(&crate::demo_answer(&answer), &limits), Some(answer), "{row}");
+        }
+    }
+}
+
+#[test]
+fn a_change_watch_round_trips_and_refuses_trailing_bytes() {
+    let limits = fixtures::limits();
+    let subject = v1::ChangeSubject::new(&limits, v1::ChangeSubjectParts { task: 17 }).expect("change task");
+    let watch = v1::Watching::new(&limits, v1::WatchingParts { watch: v1::Watch::Change(subject) }).expect("watch");
+    let bytes = crate::watching(&watch);
+    assert_eq!(crate::decode_watching(&bytes, &limits), Some(watch));
+    let trailing = fixtures::trailing(&bytes);
+    assert_eq!(crate::decode_watching(&trailing, &limits), None);
+}
+
+#[test]
+fn each_change_panel_round_trips_unchanged() {
+    let limits = fixtures::limits();
+    for (row, panel) in fixtures::panel_rows().as_slice().iter().enumerate() {
+        assert_eq!(crate::decode_change_panel(&crate::change_panel(panel), &limits).as_ref(), Some(panel), "row {row}");
+    }
+}
+
+#[test]
+fn a_change_panel_of_another_version_is_refused() {
+    let limits = fixtures::limits();
+    let panel = v1::ChangePanel::new(&limits, fixtures::panel_parts()).expect("panel");
+    let mut bytes = crate::change_panel(&panel);
+    *bytes.get_mut(1).expect("u16 version") = u8::try_from(crate::CLIENT_VERSION + 1).expect("test version fits");
+    assert_eq!(
+        v1::ChangePanel::decode(&limits, &mut Reader::new(&bytes)).expect_err("another version"),
+        v1::Problem { path: v1::Path::ChangePanelVersion, reason: skein_codec::Reason::Version }
+    );
+    assert_eq!(crate::decode_change_panel(&bytes, &limits), None);
+}
+
+#[test]
+fn a_change_panel_refuses_trailing_bytes_and_a_zero_queue_place() {
+    let limits = fixtures::limits();
+    for (row, place, trailing) in [("first", 1, false), ("zero", 0, false), ("trailing", 1, true)] {
+        let parts = v1::ChangePanelParts {
+            step: v1::Step::Queued(fixtures::queued(place, 0, &limits)),
+            ..fixtures::panel_parts()
+        };
+        let panel = v1::ChangePanel::new(&limits, parts).expect("schema panel");
+        let bytes = crate::change_panel(&panel);
+        let bytes = if trailing { fixtures::trailing(&bytes) } else { bytes };
+        assert_eq!(
+            crate::decode_change_panel(&bytes, &limits),
+            if place == 0 || trailing { None } else { Some(panel) },
+            "{row}"
+        );
+    }
+}
+
+#[test]
+fn change_panel_bounds_accept_at_and_refuse_one_past() {
+    let limits = fixtures::limits();
+    for (field, path, bound) in [
+        (fixtures::PanelBound::Address, v1::Path::PullAddress, crate::ADDRESS_BYTES),
+        (fixtures::PanelBound::Ahead, v1::Path::QueuedAhead, crate::TASKS_AHEAD),
+        (fixtures::PanelBound::Gates, v1::Path::ChangePanelGates, crate::GATES),
+        (fixtures::PanelBound::Owner, v1::Path::ChangePanelOwner, fixtures::BOUNDS.field_bytes),
+        (fixtures::PanelBound::Name, v1::Path::ChangePanelName, fixtures::BOUNDS.field_bytes),
+        (fixtures::PanelBound::Branch, v1::Path::ChangePanelBranch, fixtures::BOUNDS.field_bytes),
+        (fixtures::PanelBound::Landing, v1::Path::ChangePanelLanding, fixtures::BOUNDS.field_bytes),
+    ] {
+        for count in [bound, bound + 1] {
+            let made = fixtures::panel_at_bound(field, count);
+            if count == bound {
+                let panel = made.expect("at bound");
+                assert_eq!(crate::decode_change_panel(&crate::change_panel(&panel), &limits), Some(panel), "{path:?}");
+            } else {
+                assert_eq!(made.expect_err("past bound"), v1::Problem { path, reason: skein_codec::Reason::Bound });
+            }
         }
     }
 }

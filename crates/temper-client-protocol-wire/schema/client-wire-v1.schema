@@ -1,4 +1,4 @@
-family temper-client-wire 2
+family temper-client-wire 3
 
 # The role, as temper-engine-domain-forge's Role, in its order.
 enum Role { owned, adopted, fork, context }
@@ -13,6 +13,25 @@ versioned record Adopt { project: u32 home: bool forge: u16 owner: bytes 1024 na
 enum Read { demo }
 versioned record Reading { read: Read }
 versioned record DemoAnswer { project: u32 forge: u16 provider: u32 owner: bytes 1024 name: bytes 1024 cues: list 8 text 256 }
+
+# A change's watched panel (client/README.md, 4.6; client/forge.md, 9.2).
+record ChangeSubject { task: u64 }
+enum Watch { change: ChangeSubject }
+versioned record Watching { watch: Watch }
+record Pull { number: u64 address: bytes 2048 }
+record Queued { place: u32 ahead: list 64 u64 }
+record GateReason { gate: u64 }
+enum Reason { ci, gate: GateReason, semantic }
+record Repairing { reason: Reason }
+record Landed { merge: fixed 32 }
+enum Step { producing, opening, recreating, reopening, checking, gating, queued: Queued, first, updating, resolving, repairing: Repairing, landing, landed: Landed }
+enum Hold { stalled, repairs, resolutions, updates, moved, missing, closed, retargeted, failed, rejected }
+enum Ci { unknown, pending, passed, failed }
+enum GateKind { review, approval, check }
+enum Verdict { none, pending, approved, changes }
+record Gate { number: u64 kind: GateKind blocks: bool verdict: Verdict }
+record Used { used: u32 limit: u32 }
+versioned record ChangePanel { task: u64 forge: u16 owner: bytes 1024 name: bytes 1024 branch: bytes 1024 landing: bytes 1024 head: option fixed 32 pull: option Pull step: Step hold: option Hold runs: option u64 ci: Ci gates: list 64 Gate repairs: Used resolutions: Used updates: Used }
 
 # Its outcome (client/README.md, 4.6 and 4.7).
 record Kinds { read: bool push: bool open: bool land: bool review: bool status: bool comment: bool issue: bool branch: bool }
