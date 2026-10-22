@@ -392,7 +392,6 @@ fn cancel(driver: &mut Driver, parent: &engine::Assignment, call: u64, target: u
 }
 
 #[test]
-#[ignore = "M4 (C): ended prerequisite outside the working set"]
 fn a_cancelled_dependency_is_refused_by_name() {
     // jig's domain/tasks.md 7: a cancelled prerequisite cannot be newly added.
     let (mut driver, parent) = story();
@@ -456,7 +455,6 @@ fn a_cancel_ends_a_parked_kept_task_immediately() {
 }
 
 #[test]
-#[ignore = "M4 (C): ended prerequisite outside the working set"]
 fn a_failed_dependency_is_refused_by_name() {
     // jig's domain/tasks.md 7: an already failed prerequisite is refused, naming it.
     let (mut driver, parent) = story();
@@ -486,7 +484,6 @@ fn a_failed_dependency_is_refused_by_name() {
 }
 
 #[test]
-#[ignore = "M4 (C): ended prerequisite's reach"]
 fn an_already_done_retained_dependency_does_not_keep() {
     // jig's domain/tasks.md 7: a done prerequisite counts as met, even if its end raced the add.
     let (mut driver, parent) = story();

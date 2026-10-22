@@ -893,6 +893,10 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // reads and their bounded IDs/results; temper drops its own reader.
     // Net engine growth is 6,680,579,880 B; worker inputs stay fixed.
     let preparing_dependency_reads_growth = 6_680_579_880_u64;
+    // Jig f2e7e8a2 -> bd80e9be: core amendment reads retain dependency places,
+    // attempted IDs and the original replay bytes while loading ended rows.
+    // Each of the 3,076 root/envelope copies grows 366,256 B; workers stay fixed.
+    let amendment_dependency_reads_growth = 3_076 * 366_256;
     // The root's 32 observation Facts grow 120 B inline for StepRefused's problem.
     // Its 3,076 owned envelope copies add 11,811,840 B; worker inputs stay fixed.
     let procedure_refusal_growth = 3_076 * 32 * 120;
@@ -923,6 +927,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + git_program_growth
             + added_dependencies_growth
             + preparing_dependency_reads_growth
+            + amendment_dependency_reads_growth
             + procedure_refusal_growth
             + forge_body_intake_growth
             + demo_growth

@@ -146,6 +146,10 @@ fn refusal_scripts(target: u64, dependency: u64, cancel: bool) -> Box<[Script]> 
         call_turn(b"wait", &json!({})),
         report_turn(),
     ]);
+    if cancel {
+        // The cancelled delegate's result can wake the wait before the report's arrives: finish again once it has.
+        turns.push(report_turn());
+    }
     Box::new([
         Script { cue: b"@qa-parent".as_slice().into(), turns: turns.into() },
         Script { cue: b"@qa-report".as_slice().into(), turns: Box::new([report_turn()]) },
@@ -237,7 +241,6 @@ fn unreachable_dependency_refusal_names_the_task_to_the_agent() {
 }
 
 #[test]
-#[ignore = "M4 (C): ended prerequisite outside the working set"]
 fn cancelled_dependency_refusal_names_the_task_to_the_agent() {
     // jig's domain/tasks.md 7; engine.md 7.3: adding a cancelled prerequisite is refused, naming it.
     let ran = refusal_story(|_| refusal_scripts(REPORT_TASK, PREREQUISITE_TASK, true), false);
@@ -262,6 +265,8 @@ fn failed_prerequisite_scripts(_: SocketAddr) -> Box<[Script]> {
         amend,
         call_turn(b"cancel", &json!({"target":REPORT_TASK,"reason":"report cannot continue"})),
         report_turn(),
+        // The cancelled report's result refuses the first finish: finish again once it is read.
+        report_turn(),
     ]);
     scripts.iter_mut().find(|script| script.cue.as_ref() == b"@qa-report").expect("report script").turns =
         Box::new([call_turn(b"wait", &json!({}))]);
@@ -271,7 +276,6 @@ fn failed_prerequisite_scripts(_: SocketAddr) -> Box<[Script]> {
 }
 
 #[test]
-#[ignore = "M4 (C): ended prerequisite outside the working set"]
 fn failed_dependency_refusal_names_the_task_to_the_agent() {
     // jig's domain/tasks.md 7; engine.md 7.3: adding a failed prerequisite is refused, naming it.
     let ran = refusal_story(failed_prerequisite_scripts, false);
