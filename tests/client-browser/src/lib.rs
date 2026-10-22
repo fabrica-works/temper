@@ -1,5 +1,6 @@
 //! The browser tier (client/browser.md, 4.3): Chromium against `temper serve`, on a scratch deployment whose
-//! forge and LLM endpoint are unreached, serving the bundle the gate builds. Its helpers are jig's
+//! forge and LLM endpoint are unreached, or the box's first-run demo with its own fakes, serving the
+//! bundle the gate builds. Its helpers are jig's
 //! `tests/client-browser/src/lib.rs`'s, for temper's binary and bundle.
 use skein_fake_person::{Find, Step as PersonStep};
 use skein_fake_person_browser::{
@@ -85,17 +86,25 @@ fn live() -> Find {
     Find::exactly_named(Role::Status, b"Live")
 }
 
-/// A scratch deployment for one story's `temper serve`.
+/// A scratch deployment for one story's `temper serve` or `temper box`.
 pub struct Tier {
     scratch: skein_scratch::Scratch,
     forged: Box<[u8]>,
+    command: &'static str,
 }
 impl Tier {
     #[must_use]
     pub fn new(name: &str) -> Self {
         let scratch = skein_scratch::Scratch::new(name);
         configuration::write(scratch.path(), &temper(), &bundle());
-        Self { scratch, forged: forgery::request() }
+        Self { scratch, forged: forgery::request(), command: "serve" }
+    }
+    /// The first-run demo, with the box's own fake LLM, forge and seed.
+    #[must_use]
+    pub fn demo(name: &str) -> Self {
+        let scratch = skein_scratch::Scratch::new(name);
+        configuration::demo(scratch.path(), &temper(), &bundle());
+        Self { scratch, forged: forgery::request(), command: "box" }
     }
     /// Account offers with a static public key set, served by the same scratch server before Visit.
     #[must_use]
@@ -150,15 +159,8 @@ impl Tier {
     }
     #[must_use]
     pub fn setup(&self) -> Setup<'_> {
-        let args = vec![
-            "serve".into(),
-            "--config".into(),
-            self.scratch.path().into(),
-            "--data".into(),
-            self.scratch.path().into(),
-            "--cache".into(),
-            self.scratch.path().into(),
-        ];
+        let mut args = vec![self.command.into()];
+        args.extend(configuration::flags(self.scratch.path()));
         Setup {
             server: temper(),
             args: args.clone(),

@@ -116,3 +116,69 @@ pub(crate) fn write(directory: &Path, program: &Path, bundle: &Path) {
     private(&directory.join("agent.json"), &agent);
     private(&directory.join("temper.json"), &value);
 }
+
+/// The three directories share the scratch root, as the process tier's flags do.
+pub(crate) fn flags(directory: &Path) -> Vec<std::ffi::OsString> {
+    ["--config", "--data", "--cache"].into_iter().flat_map(|flag| [flag.into(), directory.into()]).collect()
+}
+
+/// Let init write its first-run deployment, then name the gate's bundle and reserve every loopback port.
+pub(crate) fn demo(directory: &Path, program: &Path, bundle: &Path) {
+    fs::set_permissions(directory, fs::Permissions::from_mode(0o700)).expect("private demo directory");
+    let initialized =
+        std::process::Command::new(program).arg("init").args(flags(directory)).output().expect("initialize the demo");
+    assert!(initialized.status.success(), "demo init: {}", String::from_utf8_lossy(&initialized.stderr));
+    let path = directory.join("temper.json");
+    let mut value: serde_json::Value =
+        serde_json::from_slice(&fs::read(&path).expect("demo deployment")).expect("JSON");
+    let sockets = [
+        &value["application"]["clients"]["listener"]["socket"],
+        &value["application"]["forges"][0]["api"]["socket"],
+        &value["application"]["demo"]["llm"]["listen"]["socket"],
+        &value["application"]["webhooks"]["listener"]["socket"],
+    ];
+    // Keep all reservations until both documents are written, so the kernel cannot draw one twice.
+    let listeners = sockets.map(|_| std::net::TcpListener::bind("127.0.0.1:0").expect("reserve demo port"));
+    let replacements = std::array::from_fn::<_, 4, _>(|index| {
+        (
+            sockets[index].as_str().expect("demo socket").to_owned(),
+            listeners[index].local_addr().expect("demo address").to_string(),
+        )
+    });
+    replace_sockets(&mut value, &replacements);
+    value["application"]["clients"]["bundle"] = serde_json::json!(bundle);
+    private(&path, &serde_json::to_vec(&value).expect("demo JSON"));
+    let path = directory.join("agent.json");
+    let mut agent = serde_json::from_slice(&fs::read(&path).expect("demo agent")).expect("JSON");
+    replace_sockets(&mut agent, &replacements);
+    private(&path, &serde_json::to_vec(&agent).expect("demo agent JSON"));
+}
+
+/// Update references to a reserved listener in both documents, including the forge's git URL.
+fn replace_sockets(value: &mut serde_json::Value, replacements: &[(String, String)]) {
+    match value {
+        serde_json::Value::String(text) => {
+            for (before, after) in replacements {
+                if text == before {
+                    text.clone_from(after);
+                    break;
+                }
+                if text.strip_prefix("http://") == Some(before.as_str()) {
+                    *text = format!("http://{after}");
+                    break;
+                }
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                replace_sockets(item, replacements);
+            }
+        }
+        serde_json::Value::Object(items) => {
+            for item in items.values_mut() {
+                replace_sockets(item, replacements);
+            }
+        }
+        serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) => {}
+    }
+}

@@ -352,7 +352,10 @@ proves.
 A page gets a story here only for what of its own a browser alone
 shows. The inbox, a task's page and the adoption form have none beyond
 their addresses: one story opens each present page's address directly
-and reads its heading. A later page that has such behaviour brings its
+and reads its heading. The task pages' story runs on `temper box`'s demo,
+with its own fakes, from a procedure's plan to its agent and back by
+the lineage bar, each by its address, and opens the agent's page fresh
+by its address. A later page that has such behaviour brings its
 story with it: the accounts page's sign-in address, an external link
 that opens a tab of its own.
 
