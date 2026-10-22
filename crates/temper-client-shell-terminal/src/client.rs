@@ -375,7 +375,7 @@ impl Host for NativeClient {
                 }
                 kept.push(record).expect("counted store");
             }
-            self.event(domain::Event::Start { address: self.address.clone(), kept });
+            self.event(domain::Event::Start { address: self.address.clone(), kept, with: None });
             let with = self.with.take().or_else(|| credential.map(jig_client::With::Held));
             if let Some(with) = with {
                 self.event(domain::Event::Client { event: jig_client::Event::SignIn { with } });

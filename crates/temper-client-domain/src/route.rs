@@ -8,9 +8,13 @@ pub(crate) fn forge(root: &mut Domain, env: &Env<Limits>, event: forge::Event, o
 }
 pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::Start { address, kept } => {
+        Event::Start { address, kept, with } => {
             if !root.unlinked {
                 client(root, env, jig_client::Event::Start { kept }, out);
+            }
+            // Start restores the client; sign-in must precede the page's one-shot reads.
+            if let Some(with) = with {
+                client(root, env, jig_client::Event::SignIn { with }, out);
             }
             told(root, env, jig_client::Told::Link { link: root.client.link().state }, out);
             pages(root, env, crate::pages::Event::Started, out);

@@ -200,7 +200,11 @@ pub fn agent_root(document: c::Task, tree: Option<c::Delivery>, conversation: bo
     temper_client_domain::step(
         &mut root,
         &env,
-        Event::Start { address: temper_client_domain::Address::Task { task: TASK }, kept: List::with_capacity(0) },
+        Event::Start {
+            address: temper_client_domain::Address::Task { task: TASK },
+            kept: List::with_capacity(0),
+            with: None,
+        },
         &mut out,
     );
     for event in [

@@ -204,7 +204,7 @@ pub fn page(address: &temper_client_domain::Address, signed_out: bool) -> skein_
     client::step(
         &mut root,
         &env,
-        Event::Start { address: address.clone(), kept: skein_lib::List::with_capacity(0) },
+        Event::Start { address: address.clone(), kept: skein_lib::List::with_capacity(0), with: None },
         &mut out,
     );
     for event in [

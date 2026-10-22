@@ -11,7 +11,7 @@ pub enum Action {
 #[derive(Debug)]
 pub enum Event {
     Forge(crate::forge::Event),
-    Start { address: Address, kept: List<jig_client::Record> },
+    Start { address: Address, kept: List<jig_client::Record>, with: Option<jig_client::With> },
     Went { place: Place },
     Act { action: Action },
     Client { event: jig_client::Event },

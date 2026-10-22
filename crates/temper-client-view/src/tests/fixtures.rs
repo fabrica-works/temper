@@ -224,7 +224,12 @@ fn root_at_with_demo(
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
     let mut root = temper_client_domain::unlinked(limits, SEED);
     let mut out = Queue::with_capacity(temper_client_domain::max_out(limits));
-    temper_client_domain::step(&mut root, &env, Event::Start { address, kept: List::with_capacity(0) }, &mut out);
+    temper_client_domain::step(
+        &mut root,
+        &env,
+        Event::Start { address, kept: List::with_capacity(0), with: None },
+        &mut out,
+    );
     for event in [
         jig_client::Event::StartUnlinked { kept: List::with_capacity(0) },
         jig_client::Event::SignIn { with: jig_client::With::Transport },

@@ -2443,6 +2443,7 @@ dependencies = [
  "jig-client",
  "jig-client-protocol-http",
  "jig-client-protocol-link",
+ "jig-client-protocol-wire",
  "jig-client-shell-web",
  "jig-client-test-records",
  "skein-lib",

@@ -126,7 +126,12 @@ impl App for Temper {
                     domain::Event::Client { event: jig_client::Event::SignIn { with: jig_client::With::Transport } },
                     out,
                 );
-                domain::step(root, env, domain::Event::Start { address, kept: List::with_capacity(0) }, out);
+                domain::step(
+                    root,
+                    env,
+                    domain::Event::Start { address, kept: List::with_capacity(0), with: None },
+                    out,
+                );
             }
         }
     }

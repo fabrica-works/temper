@@ -7,7 +7,7 @@ const ADDRESS: &[u8] = b"http://127.0.0.1:9/authorize?state=test";
 fn fixture() -> Host {
     let mut host = Host::new(11, Time::ZERO, Wall::EPOCH);
     host.root = root::unlinked(&host.env.limits, 11);
-    host.event(Event::Start { address: Address::Accounts, kept: List::with_capacity(0) });
+    host.event(Event::Start { address: Address::Accounts, kept: List::with_capacity(0), with: None });
     host.client(jig_client::Event::StartUnlinked { kept: List::with_capacity(0) });
     host.client(jig_client::Event::SignIn { with: jig_client::With::Transport });
     host.client(jig_client::Event::Up { up: jig_client::Up::Served { served: true, versions: None } });
@@ -198,4 +198,115 @@ fn the_web_preset_has_a_literal_price() {
 #[test]
 fn the_web_preset_sends_a_whole_suggested_request() {
     assert!(limits::client().client.domain.text >= temper_client_protocol_wire::CUE_BYTES);
+}
+
+// Wire fixtures keep the regression on Host's linked root and public transport surface.
+fn encoded(size: u32, write: impl FnOnce(&mut skein_lib::Writer) -> Result<(), skein_lib::Overflow>) -> Box<[u8]> {
+    let mut writer = skein_lib::Writer::new(usize::try_from(size).expect("fixture fits"));
+    write(&mut writer).expect("measured fixture");
+    writer.finish()
+}
+fn owned(record: Box<[u8]>) -> jig_client_protocol_wire::v11::Owned {
+    use jig_client_protocol_wire::{VERSION, v11 as w};
+    w::Owned::new(&w::CEILINGS, w::OwnedParts { owner: w::Owner::Jig, version: VERSION, record })
+        .expect("fixture envelope")
+}
+fn streamed(host: &mut Host, event: &jig_client_protocol_wire::v11::StreamEvent) {
+    use skein_lib::base64::{self, Alphabet};
+    let bytes = encoded(event.measure(), |writer| event.encode(writer));
+    let size = base64::encoded_len(Alphabet::Standard, u32::try_from(bytes.len()).expect("fixture fits"))
+        .expect("base64 fits");
+    let mut writer = skein_lib::Writer::new(usize::try_from(size).expect("fixture fits"));
+    base64::encode(Alphabet::Standard, &bytes, &mut writer).expect("measured base64");
+    let mut piece = b"data: ".to_vec();
+    piece.extend_from_slice(&writer.finish());
+    piece.extend_from_slice(b"\n\n");
+    host.heard(Heard::Piece { bytes: piece.into_boxed_slice() });
+}
+#[test]
+fn the_first_task_activity_answer_survives_transport_sign_in() {
+    use jig_client_protocol_wire::{VERSION, v11 as w};
+    use skein_lib::{Duration, Reader};
+    // task_record's chip is task 9; the answer carries one committed run marker.
+    const TASK_PATH: &[u8] = b"/tasks/9";
+    const RUN: u64 = 44;
+    const ONE_LINE: u32 = 1;
+    let mut host = Host::new(11, Time::ZERO, Wall::EPOCH);
+    host.start(TASK_PATH, Vec::new(), None);
+    let activity = host
+        .requests()
+        .into_iter()
+        .find_map(|request| match request {
+            Asked::Exchange { id, call, .. } if call.path.as_ref() == b"/jig/v1/read" => Some(id),
+            Asked::Exchange { .. }
+            | Asked::OpenStream { .. }
+            | Asked::CloseStream
+            | Asked::Save { .. }
+            | Asked::Erase { .. } => None,
+        })
+        .expect("first activity read left the host");
+    host.heard(Heard::StreamOpened);
+    let mut served = List::with_capacity(1);
+    served
+        .push(
+            w::Served::new(&w::CEILINGS, w::ServedParts { owner: w::Owner::Jig, first: VERSION, last: VERSION })
+                .expect("served version"),
+        )
+        .expect("one served family");
+    streamed(
+        &mut host,
+        &w::StreamEvent::Hello(
+            w::Hello::new(&w::CEILINGS, w::HelloParts { stream: [7; 16], served, heartbeat: Duration::from_secs(30) })
+                .expect("hello"),
+        ),
+    );
+    let watch = host
+        .requests()
+        .into_iter()
+        .find_map(|request| {
+            let Asked::Exchange { call, .. } = request else { return None };
+            if call.path.as_ref() != b"/jig/v1/watch" {
+                return None;
+            }
+            let open = w::Open::decode(&w::CEILINGS, &mut Reader::new(&call.body)).expect("watch envelope");
+            let subject = w::Subject::decode(&w::CEILINGS, &mut Reader::new(open.subject().record())).expect("subject");
+            if matches!(subject, w::Subject::Task(_)) { Some(open.watch()) } else { None }
+        })
+        .expect("task watch");
+    let mut task = jig_client_test_records::task_record().into_parts();
+    task.chip = jig_client_test_records::owner_waiting_chip_record();
+    let document = w::DeliveryValue::Task(Box::new(w::Task::new(&w::CEILINGS, task).expect("agent task")));
+    streamed(
+        &mut host,
+        &w::StreamEvent::Delivery(
+            w::Delivery::new(
+                &w::CEILINGS,
+                w::DeliveryParts {
+                    watch,
+                    document: owned(encoded(document.measure(), |writer| document.encode(writer))),
+                },
+            )
+            .expect("task delivery"),
+        ),
+    );
+    let event = w::Activity::RunBegan(
+        w::ActivityRunBegan::new(
+            &w::CEILINGS,
+            w::ActivityRunBeganParts { attempt: RUN, how: w::RunBeginning::Resumed, why: Box::from([]) },
+        )
+        .expect("run marker"),
+    );
+    let line =
+        w::ActivityLine::new(&w::CEILINGS, w::ActivityLineParts { position: 1, at: 1, event }).expect("activity line");
+    let page = jig_client_test_records::activity_rows(&[line]);
+    let value = w::ReadValue::Activity(page);
+    let answer = w::ReadAnswer::Value(owned(encoded(value.measure(), |writer| value.encode(writer))));
+    host.heard(Heard::Answered {
+        exchange: activity,
+        status: 200,
+        body: encoded(answer.measure(), |writer| answer.encode(writer)),
+    });
+    build(&mut host);
+    let shown = host.view.tree().nodes().iter().filter(|node| node.name.as_deref() == Some(b"Run 44 began")).count();
+    assert_eq!(shown, usize::try_from(ONE_LINE).expect("one line fits"), "first activity answer must reach the page");
 }

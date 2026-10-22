@@ -52,12 +52,11 @@ impl Host {
             }
         }
         self.address = self.opened(path);
-        self.event(Event::Start { address: self.address.clone(), kept });
         let with = match secret {
             Some(bytes) => jig_client::With::Link(Secret::new(bytes)),
             None => jig_client::With::Transport,
         };
-        self.client(jig_client::Event::SignIn { with });
+        self.event(Event::Start { address: self.address.clone(), kept, with: Some(with) });
     }
     // The page a path names; a path that prints otherwise is replaced by the printed one.
     fn opened(&mut self, path: &[u8]) -> Address {

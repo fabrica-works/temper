@@ -199,7 +199,7 @@ pub fn start_accounts(
     crate::step(
         root,
         &env(&limits),
-        Event::Start { address: Address::Adopt { project: PROJECT }, kept: List::with_capacity(0) },
+        Event::Start { address: Address::Adopt { project: PROJECT }, kept: List::with_capacity(0), with: None },
         &mut out,
     );
     crate::step(root, &env(&limits), Event::Client { event: jig_client::Event::StartUnlinked { kept } }, &mut out);
