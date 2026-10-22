@@ -400,12 +400,42 @@ keeps (`../protocol/configuration.md`, section 2).
   delegate" or "N delegates" while it has live ones, and when it
   ended or was last active, as 5.12's ago ("1 h 28 min ago").
 - **The inbox** (`inbox.html`) shows what needs the person, then the
-  updates, each entry its card (section 1). A card that waits on the
-  person says for how long, "Waiting 12 min" (5.12's span), from its
-  object's time: a proposal's wait, a question's, a hold's, a person
-  task's; on a chat's page too, a proposal's card says "waiting 12
-  min". An update says when it came, "12 min ago" (5.12's ago): a
-  result's time, a reply's last activity.
+  updates, each entry its card (section 1), under two headings, each
+  with how many entries it lists beside it, the updates' as new ones
+  since what is read leaves them (below): "Needs you 2", "Updates 2
+  new", or "0"; "2+" and "2+ new" where the inbox's document says its
+  list was cut (jig's `more`, an owner inbox's next page, a filtered
+  page's `cut`), so that a count never says less than there is; with
+  none, "Nothing needs you." or "No updates.". Its filters sit in the
+  first heading's row: the projects, each a button; the kinds in one
+  disclosure, folded until the person opens it, holding "All kinds"
+  and each kind, the chosen one pressed, and named "Kind" while every
+  kind is shown, "Kind · Question" once one is chosen, in the word its
+  pressed button says, so that the folded menu says what the list is
+  filtered by; then "All goals" and "Goal". A filter chosen keeps the
+  browser's address, the inbox's "/", so the disclosure stays as the
+  person left it.
+- **A card that needs the person** begins with a line: its kind as a
+  tag, "Proposal", its project and the task's link, "Task N", and at
+  its right how long it waits, "Waiting 12 min" (5.12's span), from
+  its object's time: a proposal's wait, a question's, a hold's, a
+  person task's; on a chat's page too, a proposal's card says "waiting
+  12 min". Its title, where it has one, is its heading: a proposal's,
+  the goal it proposes; a question's, a held task's or a person
+  task's, the task's. A proposal's card is the chat's, its title, its
+  text, its rows and its acts, without the chat's "Open in inbox ↗".
+- **An update's card** begins with its project and the task's link,
+  "Task N", which opens it and so marks it seen (below). Its heading
+  says what came: "T10 Add a --json flag to tally report replied" for
+  a reply, "T10 … is done" for a result done, "T10 … ended" for
+  another, its ending in words after it. Then a result's first line;
+  and last, how many of the chat's turns are unread, where the inbox's
+  entry counts them, and when it came (5.12's ago), a result's time, a
+  reply's last activity: "1 new · 12 min ago", "5+ new · …" where the
+  count is limited, "12 min ago" alone for a result or a count not
+  given. A reply draws neither its request nor its words: no field
+  carries a reply's first line (mockups README, Where each value comes
+  from).
 - **A question** in the inbox is a delegate's, asked of a task the
   person requested, their chat among them (jig's `domain/people.md`,
   section 6). Its card, under "Needs you": "Question", its project, the
@@ -436,7 +466,8 @@ keeps (`../protocol/configuration.md`, section 2).
   one refused or failed is sent again at the next move. What is read
   leaves the inbox's updates, and a task forgotten once read is erased
   then (jig's `domain/people.md`, section 6). The pages draw no mark of
-  their own for what is unread.
+  their own for what is unread, beyond the inbox's counts of it
+  (above).
 - **A task's page** is of its kind, as `task.html` lays each out: a
   tracked task's, a goal's (5.8); an agent's task's, for an agent's
   task with no priority (5.9). A task with the chat label opens as
