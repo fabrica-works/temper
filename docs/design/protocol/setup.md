@@ -1750,9 +1750,12 @@ them as it does any Forgejo.
     A change in `Landing`, or held over it, adds none of its own: its
     `Entry` stands for it until the merge settles, and its `Landed`
     row after, if temper made the merge. A head is the fake's commit,
-    its first 8 bytes big-endian and the rest zero; any other is
-    undecided: `store unreadable`. So is a `Landed` row whose task has
-    no `Change` row, or a `Change` row with no `pull` or `last_head`.
+    in skein's `fake-forge.md`, section 3's form: `mix(count)`
+    big-endian (the SplitMix64 finalizer), the count big-endian, then
+    four zero bytes, padded to 32 bytes with zeros in the store. Any
+    other is undecided: `store unreadable`. So is a `Landed` row whose
+    task has no `Change` row, or a `Change` row with no `pull` or
+    `last_head`.
     Rows of other forges' repositories are skipped. The decisions may
     be incomplete when the `Landed` rows number the forge domain's
     `landings` limit (store.md, section 7), or when a decision's

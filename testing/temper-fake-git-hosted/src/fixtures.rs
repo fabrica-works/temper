@@ -390,12 +390,10 @@ pub fn masked(bytes: &[u8]) -> Vec<u8> {
             && bytes.get(at + length).is_none_or(|b| !b.is_ascii_alphanumeric())
         {
             let digits = &bytes[at..at + length];
-            let digits =
-                if length == 40 && digits[16..].iter().all(|b| *b == b'0') && digits[..16].iter().any(|b| *b != b'0') {
-                    &digits[..16]
-                } else {
-                    digits
-                };
+            let counted = length == 40
+                && u64::from_str_radix(std::str::from_utf8(&digits[16..32]).expect("ASCII count"), 16)
+                    .is_ok_and(|count| id(count).as_slice() == digits);
+            let digits = if counted { &digits[..16] } else { digits };
             let number =
                 u64::from_str_radix(std::str::from_utf8(digits).expect("ASCII id"), 16).expect("masked or counted id");
             if number == 0 {

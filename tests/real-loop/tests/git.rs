@@ -63,7 +63,7 @@ fn hosted_git_commits_the_staged_real_files() {
     let result =
         disk.run(&Command::CommitTree { tree: tree_id, parent: commit(BASE), merging: Some(commit(TOPIC)) }, &message);
     assert_eq!(result.exit, 0);
-    assert_eq!(result.stdout, b"0000000000000003000000000000000000000000\n");
+    assert_eq!(result.stdout, b"1d0b14e4db018fed000000000000000300000000\n");
     assert!(result.stderr.is_empty());
     let forge = disk.forge();
     let object = forge.domain.object(FIRST_COMMIT).expect("new commit");
@@ -96,8 +96,8 @@ fn hosted_commit_tree_keeps_exact_parents() {
     let tree = disk.run(&Command::WriteTree, b"");
     let tree = invocation::object(tree.stdout.strip_suffix(b"\n").expect("one tree id")).expect("tree id");
     let rows = [
-        (None, b"0000000000000003000000000000000000000000\n".as_slice(), FIRST_COMMIT, None),
-        (Some(commit(TOPIC)), b"0000000000000004000000000000000000000000\n".as_slice(), SECOND_COMMIT, Some(TOPIC)),
+        (None, b"1d0b14e4db018fed000000000000000300000000\n".as_slice(), FIRST_COMMIT, None),
+        (Some(commit(TOPIC)), b"6e73e372e2338aca000000000000000400000000\n".as_slice(), SECOND_COMMIT, Some(TOPIC)),
     ];
     for (merging, expected, number, second) in rows {
         let result = disk.run(&Command::CommitTree { tree, parent: commit(BASE), merging }, b"unchanged\n");

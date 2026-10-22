@@ -62,7 +62,16 @@ fn limits() -> Limits {
     }
 }
 fn commit(number: u64) -> temper_worker_domain_checkout::git::Commit {
-    invocation::object(&crate::id::id(number)).expect("counted id")
+    temper_worker_domain_checkout::git::Commit::new(skein_fake_forge_protocol::routes::object(number).bytes)
+}
+#[test]
+fn git_ids_and_counts_share_the_forge_codec() {
+    for count in [0, BASE, TOPIC, STORED, u64::MAX] {
+        let object = skein_fake_forge_protocol::routes::object(count);
+        assert_eq!(crate::id::id(count).as_slice(), skein_forge::forgejo::id::write(&object).as_ref());
+        assert_eq!(crate::answer::count(commit(count)), count);
+    }
+    assert_ne!(&crate::id::id(BASE)[..7], &crate::id::id(TOPIC)[..7]);
 }
 fn spawn(command: &Command) -> k::Spawn {
     let kind = match command {
@@ -498,7 +507,7 @@ fn commits_and_merges_discard_their_placeholders_before_keeping_output_or_files(
         }
         net.close(&mut connection);
         let (printed, checkout) = kept.expect("a complete run");
-        assert_eq!(printed, Some(*b"0000000000000003000000000000000000000000"), "{name}: output");
+        assert_eq!(printed, Some(*b"1d0b14e4db018fed000000000000000300000000"), "{name}: output");
         assert!(checkout.exists(b"repo/.git/objects/3"), "{name}: final commit");
         assert!(!checkout.exists(b"repo/.git/objects/18446744073709551615"), "{name}: discarded placeholder");
         assert_eq!(net.seen, [call], "{name}: write once");

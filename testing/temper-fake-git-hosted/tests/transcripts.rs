@@ -46,6 +46,14 @@ const CASES: &[(&str, Fault)] = &[
     ("fetch-wrong-token", Fault::WrongToken),
 ];
 #[test]
+fn masking_keeps_whole_and_short_fake_ids_equal_and_count_zero_distinct_from_zero_id() {
+    let first = temper_fake_git_hosted::id::id(0);
+    let second = temper_fake_git_hosted::id::id(1);
+    let bytes =
+        [first.as_slice(), b" ", &first[..16], b" ", &second, b" 0000000000000000000000000000000000000000"].concat();
+    assert_eq!(fixtures::masked(&bytes), b"<id:1> <id:1> <id:2> <zero>");
+}
+#[test]
 fn each_transcript_s_exit_and_masked_stdout_match_the_fake_s() {
     for &(case, fault) in CASES {
         let real = transcripts::read(case);
@@ -332,7 +340,7 @@ fn hosted_git_stages_files_and_commits_the_requested_parents_without_moving_head
     let message = vec![b'm'; 4100];
     let result = disk.run(&scenario, &command, &message);
     assert_eq!(result.exit, 0);
-    assert_eq!(result.stdout, b"0000000000000003000000000000000000000000\n");
+    assert_eq!(result.stdout, b"1d0b14e4db018fed000000000000000300000000\n");
     assert!(result.stderr.is_empty());
     let forge = scenario.transport.forge.borrow();
     let object = forge.domain.object(3).expect("new commit");
@@ -395,8 +403,8 @@ fn hosted_commit_tree_stores_unchanged_trees_with_exactly_the_requested_parents(
     let tree = disk.run(&scenario, &Command::WriteTree, b"");
     let tree = invocation::object(tree.stdout.strip_suffix(b"\n").expect("one tree id")).expect("tree id");
     let rows = [
-        (None, b"0000000000000003000000000000000000000000\n".as_slice(), 3, None),
-        (Some(commit(2)), b"0000000000000004000000000000000000000000\n".as_slice(), 4, Some(2)),
+        (None, b"1d0b14e4db018fed000000000000000300000000\n".as_slice(), 3, None),
+        (Some(commit(2)), b"6e73e372e2338aca000000000000000400000000\n".as_slice(), 4, Some(2)),
     ];
     for (merging, expected, number, second) in rows {
         let result = disk.run(&scenario, &Command::CommitTree { tree, parent: commit(1), merging }, b"unchanged\n");

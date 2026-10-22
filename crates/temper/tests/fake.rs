@@ -497,7 +497,7 @@ fn forge_run() {
             "POST",
             "/api/v1/repos/fake/widget/branches",
             &auth,
-            br#"{"new_branch_name":"work","old_ref_name":"0000000000000001000000000000000000000000"}"#,
+            br#"{"new_branch_name":"work","old_ref_name":"910a2dec89025cc1000000000000000100000000"}"#,
         );
         assert!(branch.starts_with(b"HTTP/1.1 201"), "{}", String::from_utf8_lossy(&branch));
         let lines = fs::read_to_string(&observations).expect("valid fixture");
@@ -757,10 +757,10 @@ struct GitRow {
 fn git_run() {
     use checkout_git::Kind;
     // The seeded repository has commit 1. One commit-tree stores commit 2.
-    const BASE: &[u8] = b"0000000000000001000000000000000000000000";
-    const STORED: &[u8] = b"0000000000000002000000000000000000000000";
+    const BASE: &[u8] = b"910a2dec89025cc1000000000000000100000000";
+    const STORED: &[u8] = b"975835de1c9756ce000000000000000200000000";
     // The FNV tree id for forge::FILES with new.txt = "new\n" added.
-    const TREE: &[u8] = b"7ec978a5592769d8000000000000000000000000";
+    const TREE: &[u8] = b"a48b10c7a2c77a727ec978a5592769d800000000";
     let object = |id| invocation::object(id).expect("fixture object id");
     let clone = || {
         git_step(
@@ -811,12 +811,12 @@ fn git_run() {
                     ..git_step(GitCommand::Add, Some(Kind::Commit), "work/widget")
                 },
                 GitStep {
-                    stdout: "7ec978a5592769d8000000000000000000000000\n",
+                    stdout: "a48b10c7a2c77a727ec978a5592769d800000000\n",
                     ..git_step(GitCommand::WriteTree, Some(Kind::Commit), "work/widget")
                 },
                 GitStep {
                     input: b"made by the process\n",
-                    stdout: "0000000000000002000000000000000000000000\n",
+                    stdout: "975835de1c9756ce000000000000000200000000\n",
                     ..git_step(
                         GitCommand::CommitTree { tree: object(TREE), parent: object(BASE), merging: None },
                         Some(Kind::Commit),
@@ -824,7 +824,7 @@ fn git_run() {
                     )
                 },
                 GitStep {
-                    stdout: "To {remote}\n*\t0000000000000002000000000000000000000000:refs/heads/work\t[new branch]\nDone\n",
+                    stdout: "To {remote}\n*\t975835de1c9756ce000000000000000200000000:refs/heads/work\t[new branch]\nDone\n",
                     ..git_step(
                         GitCommand::Push {
                             remote: Box::new([]),

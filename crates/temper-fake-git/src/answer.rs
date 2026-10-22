@@ -169,7 +169,11 @@ fn failed(remote: &[u8], fault: Fault) -> Answer {
     Answer { exit: 128, stdout: Vec::new(), stderr: stderr.into_bytes() }
 }
 pub(crate) fn count(commit: Commit) -> u64 {
-    u64::from_be_bytes(commit.raw()[..8].try_into().expect("eight-byte count"))
+    skein_fake_forge_protocol::routes::commit(&skein_forge::forgejo::id::ObjectId {
+        format: skein_forge::forgejo::id::ObjectFormat::Sha1,
+        bytes: commit.raw(),
+    })
+    .expect("the shared fake commit spelling")
 }
 fn count_bytes(bytes: &[u8]) -> u64 {
     u64::from_le_bytes(bytes.try_into().expect("stored eight-byte count"))
@@ -247,8 +251,10 @@ fn fetch(checkout: &mut Checkout, at: &[u8], transport: &mut impl Transport, rem
             } else {
                 b'+'
             };
+            // An absent previous head is git's zero marker, not the fake's count-zero id.
+            let previous_id = if previous == 0 { [b'0'; 40] } else { id(previous) };
             Answer::success(
-                format!("{} {} {} refs/temper/fetched\n", char::from(flag), text(&id(previous)), text(&id(commit)))
+                format!("{} {} {} refs/temper/fetched\n", char::from(flag), text(&previous_id), text(&id(commit)))
                     .into_bytes(),
             )
         }

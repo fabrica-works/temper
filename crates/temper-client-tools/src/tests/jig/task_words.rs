@@ -5,7 +5,7 @@ const FORGE: u16 = temper_client_protocol_wire::number(temper_client_protocol_wi
 const DELEGATE: u64 = 2;
 const BRANCH_SEGMENTS: u32 = 3;
 const ACTIVITY_ROWS: u32 = 3;
-const MERGE: &[u8] = b"0000000000000003000000000000000000000000";
+const MERGE: &[u8] = b"1d0b14e4db018fed000000000000000300000000";
 const INSTRUCTIONS: &[u8] =
     b"Answer on port 8080 unless the store's file names another one, and keep the /health endpoint small.";
 const REPORT: &[u8] = b"widget --csv prints the table\nand preserves its column order";

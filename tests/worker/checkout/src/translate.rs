@@ -1,7 +1,7 @@
 //! Between the checkout's operations and the fakes, as the protocol layer
 //! and io would translate them: io names a workspace's directory by its token,
 //! and a repository's by the workspace's and the repository's name; a commit
-//! is the fake forge's count, in the first bytes of the domain's hash.
+//! uses the fake forge's shared object spelling (skein's fake-forge.md, 3).
 
 use skein_lib::Token;
 use temper_fake_checkout::Checkout;
@@ -12,7 +12,7 @@ use temper_worker_domain_checkout::git::{Commit, Done, Fault, Missing, Op, Place
 #[must_use]
 pub fn commit(fake: u64) -> Commit {
     let mut raw = [0; 32];
-    raw[..8].copy_from_slice(&fake.to_be_bytes());
+    raw[..20].copy_from_slice(&skein_fake_forge_domain::object_bytes(fake));
     Commit::new(raw)
 }
 
@@ -21,9 +21,10 @@ pub fn commit(fake: u64) -> Commit {
 pub fn fake(commit: Commit) -> u64 {
     let raw = commit.raw();
     let mut count = [0; 8];
-    count.copy_from_slice(&raw[..8]);
-    assert!(raw[8..].iter().all(|byte| *byte == 0), "a commit the forge named");
-    u64::from_be_bytes(count)
+    count.copy_from_slice(&raw[8..16]);
+    let count = u64::from_be_bytes(count);
+    assert_eq!(commit, self::commit(count), "a commit the forge named");
+    count
 }
 
 /// Where io keeps the workspace `workspace`.

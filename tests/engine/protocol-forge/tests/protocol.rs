@@ -552,8 +552,7 @@ fn github_reaches_ready_through_its_accepted_installations() {
 
     // Empty origins refuse a pinned Job before metadata, redirect or blob requests.
     let requests = world.requests().to_vec();
-    let mut head = [0; 32];
-    head[..8].copy_from_slice(&1_u64.to_be_bytes());
+    let head = skein_fake_forge_protocol::routes::object(1).bytes;
     world.call(
         1,
         skein_forge::api::Repository { forge: fixtures::FORGE, repository: 2 },

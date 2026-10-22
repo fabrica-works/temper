@@ -9,8 +9,8 @@ use fixtures::{BASE_COMMIT, INITIAL_COMMIT, OWNER, PUSHER, answer_producer, asse
 const REVIEW_PASSES: u32 = 1000;
 const RESOLVE_COMMIT: u32 = 6;
 const GATE_COMMIT: u32 = 8;
-const BASE_DIGITS: &[u8] = b"0000000000000003000000000000000000000000";
-const HEAD_DIGITS: &[u8] = b"0000000000000002000000000000000000000000";
+const BASE_DIGITS: &[u8] = b"1d0b14e4db018fed000000000000000300000000";
+const HEAD_DIGITS: &[u8] = b"975835de1c9756ce000000000000000200000000";
 
 #[test]
 fn a_resolution_delegate_carries_its_base_as_hexadecimal_text() {

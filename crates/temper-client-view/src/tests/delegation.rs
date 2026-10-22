@@ -12,7 +12,7 @@ const STEPS: u32 = 4;
 const TITLE: &[u8] = b"Export widget's table as CSV";
 const MERGE: &[u8] = b"1a2b3c4abcdef0123456789abcdef0123456789abcd";
 const WAKE_SUMMARY: &[u8] =
-    b"Begin the work your brief describes.\n\n2: Result from task 2:\n0000000000000003000000000000000000000000";
+    b"Begin the work your brief describes.\n\n2: Result from task 2:\n1d0b14e4db018fed000000000000000300000000";
 const LATER: &[u8] = b"The change is running.";
 fn text(bytes: &[u8]) -> c::Text {
     c::Text::new(Box::from(bytes), 256).expect("fixture text")
@@ -745,7 +745,7 @@ fn csv_chat_hears_its_result(turn_text: u32) {
             if let c::Activity::Owner { source, .. } = &mut line.event
                 && let c::OwnerActivity::Heard(word) = &mut source.line
             {
-                word.words = run::text(b"0000000000000003000000000000000000000000");
+                word.words = run::text(b"1d0b14e4db018fed000000000000000300000000");
             }
             rows.push(line).expect("before resumed turn");
         }

@@ -736,7 +736,8 @@ fn demo_main(config: &std::path::Path, data: &std::path::Path, root: &std::path:
 }
 
 fn fake_forge_commit_id(count: u64) -> String {
-    format!("{count:016x}{}", "0".repeat(24))
+    String::from_utf8(skein_forge::forgejo::id::write(&skein_fake_forge_protocol::routes::object(count)).into_vec())
+        .expect("fake commit hex")
 }
 
 // protocol/README.md, 15.6: the description's first process stories.

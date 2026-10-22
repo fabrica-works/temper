@@ -99,7 +99,7 @@ pub fn handles(out: &mut Queue<Request>) -> Box<[Handle]> {
 }
 pub const DELEGATE: u64 = 12;
 pub const WAKE_SUMMARY: &[u8] =
-    b"Begin the work your brief describes.\n\n2: Result from task 2:\n0000000000000003000000000000000000000000";
+    b"Begin the work your brief describes.\n\n2: Result from task 2:\n1d0b14e4db018fed000000000000000300000000";
 pub fn with_delegate() -> Fixture {
     let mut fixture = opened();
     let mut task = task();
