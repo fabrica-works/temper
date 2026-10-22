@@ -189,6 +189,116 @@ fn a_task_watch_ending_reads_how_the_task_ended_before_answering() {
         assert_eq!(answer.stdout, f::met_json(&expected.stdout), "{phase:?}");
     }
 }
+// Both a refused opening and an admitted watch's end use the same final read.
+// The task read has a live form and a historical document/result form.
+const FINAL_TASK_FORMS: usize = 2;
+// Any application family is unexpected on the jig task read.
+const UNEXPECTED_FAMILY: u16 = 1;
+const TASK_ENDS: &[c::WatchEnd] = &[c::WatchEnd::SubjectEnded, c::WatchEnd::Unknown];
+
+fn final_task_reads(task: c::Task, ending: c::Ending) -> [c::ReadResult; FINAL_TASK_FORMS] {
+    [f::task_result(task.clone()), f::historical_task_result(task, ending)]
+}
+
+fn final_read(end: c::WatchEnd, json: bool) -> (f::Harness, u32, skein_lib::Token, skein_lib::Token) {
+    let flags = f::extended(f::UNTIL_ENDED, f::SHORT_TIMEOUT);
+    let (mut root, call) =
+        if json { f::waiting_call(f::WAIT_TASK, flags.as_slice()) } else { f::plain_wait(flags.as_slice()) };
+    let watch = root.end(call, &f::task_watch(), end);
+    assert!(root.answer(call).is_none(), "{end:?}: final read pending without any delivery");
+    let (read, what) = root.reads.get(&call).expect("final read");
+    assert_eq!(*what, c::Read::Task { task: f::TASK });
+    let read = *read;
+    assert_eq!(crate::root::next_deadline(&root.root), None);
+    assert_eq!(root.watches.len(), f::SHARED_WATCHES);
+    (root, call, watch, read)
+}
+
+fn settled_final_read(root: &mut f::Harness, call: u32, watch: skein_lib::Token, read: skein_lib::Token) {
+    assert!(root.reads.is_empty());
+    assert_eq!(root.watches.len(), f::SHARED_WATCHES);
+    let handle = jig_client::Handle { asker: crate::root::RUNNER.asker(), number: u64::from(call) << 32 };
+    assert!(root.root.client().document(handle).is_none(), "call's watch handle released");
+    assert_eq!(crate::root::next_deadline(&root.root), None);
+    root.client(jig_client::Event::Up { up: jig_client::Up::ReadDone { read, result: jig_client::Readout::Limit } });
+    root.client(jig_client::Event::Up { up: jig_client::Up::WatchEnded { watch, end: c::WatchEnd::SubjectEnded } });
+    root.now = Time::ZERO.checked_add(f::WAIT_SPAN).expect("old wait deadline");
+    root.fire();
+    root.client(jig_client::Event::Up { up: jig_client::Up::SignedOut });
+    assert!(root.answer(call).is_none(), "no second answer after late terminals, timer or shared sign-out");
+    assert_eq!(crate::root::next_deadline(&root.root), None);
+}
+
+#[test]
+fn a_task_ending_before_delivery_reads_its_terminal_result() {
+    for end in TASK_ENDS {
+        for (phase, ending) in [
+            (c::Phase::Ended, c::Ending::Deleted),
+            (c::Phase::Done, c::Ending::Done),
+            (c::Phase::Failed, c::Ending::Failed { reason: None }),
+            (c::Phase::Cancelled, c::Ending::Cancelled { by: c::Actor::Task(f::OTHER_TASK), reason: None, at: None }),
+        ] {
+            for result in final_task_reads(f::ended_task(phase), ending) {
+                let expected = f::read_answer(f::TASK_JSON_CALL, result.clone());
+                let (mut root, call, watch, read) = final_read(*end, true);
+                root.serve(call, result);
+                let answer = root.answer(call).expect("matching terminal read");
+                assert_eq!(answer.status, 0, "{end:?}, {phase:?}");
+                assert_eq!(answer.stdout, f::met_json(&expected.stdout), "{end:?}, {phase:?}");
+                settled_final_read(&mut root, call, watch, read);
+            }
+        }
+    }
+}
+
+#[test]
+fn a_final_task_read_must_match_the_number_and_terminal_phase() {
+    let phases = f::LIVE_PHASES.len().checked_add(f::ENDED_PHASES.len()).expect("fixture phase count");
+    let mut tasks = skein_lib::List::with_capacity(u32::try_from(phases).expect("fixture phases fit"));
+    for phase in f::LIVE_PHASES {
+        tasks.push(f::ended_task(*phase)).expect("one row per live phase");
+    }
+    for phase in f::ENDED_PHASES {
+        let mut wrong = f::ended_task(*phase);
+        wrong.chip.task = f::OTHER_TASK;
+        tasks.push(wrong).expect("one wrong task per terminal phase");
+    }
+    for end in TASK_ENDS {
+        for task in &tasks {
+            // Historical keys are self-consistent even for the wrong task number.
+            for result in final_task_reads(task.clone(), c::Ending::Done) {
+                let (mut root, call, watch, read) = final_read(*end, true);
+                root.serve(call, result);
+                let answer = root.answer(call).expect("invalid final task fails visibly");
+                assert_eq!(answer.status, 1, "{end:?}: {task:?}");
+                assert!(answer.stdout.is_empty());
+                assert!(!answer.stderr.is_empty());
+                settled_final_read(&mut root, call, watch, read);
+            }
+        }
+    }
+}
+
+#[test]
+fn a_final_task_read_rejects_an_unexpected_successful_document() {
+    for end in TASK_ENDS {
+        for result in [
+            jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Me(Box::new(f::me(f::PARTY))))),
+            jig_client::Readout::Family {
+                family: UNEXPECTED_FAMILY,
+                record: Some(Box::from(b"unexpected".as_slice())),
+            },
+        ] {
+            let (mut root, call, watch, read) = final_read(*end, true);
+            root.serve_readout(call, result);
+            let answer = root.answer(call).expect("unexpected document fails visibly");
+            assert_eq!(answer.status, 1);
+            assert!(answer.stdout.is_empty());
+            assert!(!answer.stderr.is_empty());
+            settled_final_read(&mut root, call, watch, read);
+        }
+    }
+}
 #[test]
 fn an_already_ended_delivery_reads_the_final_task() {
     let (mut root, call) = f::waiting_call(f::WAIT_TASK, f::UNTIL_ENDED);
@@ -201,12 +311,17 @@ fn an_already_ended_delivery_reads_the_final_task() {
 }
 #[test]
 fn a_task_ended_text_uses_the_final_reads_part() {
-    let (mut root, call) = f::plain_wait(f::UNTIL_ENDED);
-    root.end(call, &f::task_watch(), c::WatchEnd::SubjectEnded);
-    let task = f::ended_task(c::Phase::Cancelled);
-    let expected = f::read_answer(f::TASK_CALL, f::task_result(task.clone()));
-    root.serve(call, f::task_result(task));
-    assert_eq!(root.answer(call).expect("final text").stdout, f::appended(&expected.stdout, b"met\n"));
+    for end in TASK_ENDS {
+        for result in final_task_reads(f::ended_task(c::Phase::Done), c::Ending::Done) {
+            let expected = f::read_answer(f::TASK_CALL, result.clone());
+            let (mut root, call, watch, read) = final_read(*end, false);
+            root.serve(call, result);
+            let answer = root.answer(call).expect("final text");
+            assert_eq!(answer.status, 0);
+            assert_eq!(answer.stdout, f::appended(&expected.stdout, b"met\n"));
+            settled_final_read(&mut root, call, watch, read);
+        }
+    }
 }
 #[test]
 fn a_run_or_tree_ending_meets_ended() {
@@ -280,21 +395,24 @@ fn client_watch_failures_exit_1() {
 }
 #[test]
 fn final_read_failures_keep_the_reads_status() {
-    let mut root = f::signed_in(f::PARTY);
-    for (result, status) in [
-        (jig_client::Readout::Limit, 1),
-        (jig_client::Readout::NotServed { family: None, served: None }, 1),
-        (jig_client::Readout::Jig(c::ReadResult::None(c::ReadNone::SignedOut)), 1),
-        (jig_client::Readout::Jig(c::ReadResult::None(c::ReadNone::Unreachable)), 1),
-        (jig_client::Readout::Jig(c::ReadResult::None(c::ReadNone::Unknown)), 2),
-        (jig_client::Readout::Jig(c::ReadResult::None(c::ReadNone::Refused)), 2),
-    ] {
-        let argv = f::extended(f::WAIT_TASK, f::UNTIL_ENDED);
-        let call = root.submit(argv.as_slice());
-        root.end(call, &f::task_watch(), c::WatchEnd::SubjectEnded);
-        root.serve_readout(call, result);
-        assert_eq!(root.answer(call).expect("final read failed").status, status);
-        assert_eq!(crate::root::next_deadline(&root.root), None);
+    for end in TASK_ENDS {
+        for (result, status) in [
+            (jig_client::Readout::Limit, 1),
+            (jig_client::Readout::NotServed { family: None, served: None }, 1),
+            (jig_client::Readout::Jig(c::ReadResult::None(c::ReadNone::Busy)), 1),
+            (jig_client::Readout::Jig(c::ReadResult::None(c::ReadNone::SignedOut)), 1),
+            (jig_client::Readout::Jig(c::ReadResult::None(c::ReadNone::Unreachable)), 1),
+            (jig_client::Readout::Jig(c::ReadResult::None(c::ReadNone::Unknown)), 2),
+            (jig_client::Readout::Jig(c::ReadResult::None(c::ReadNone::Refused)), 2),
+        ] {
+            let (mut root, call, watch, read) = final_read(*end, true);
+            root.serve_readout(call, result);
+            let answer = root.answer(call).expect("final read failed");
+            assert_eq!(answer.status, status);
+            assert!(answer.stdout.is_empty());
+            assert!(!answer.stderr.is_empty());
+            settled_final_read(&mut root, call, watch, read);
+        }
     }
 }
 #[test]
@@ -376,8 +494,32 @@ fn a_client_handle_limit_exits_1() {
 }
 #[test]
 fn sign_out_during_the_final_read_exits_1() {
-    let (mut root, call) = f::finishing_call();
-    root.client(jig_client::Event::Up { up: jig_client::Up::SignedOut });
-    assert_eq!(root.answer(call).expect("signed out final read").status, 1);
-    assert_eq!(crate::root::next_deadline(&root.root), None);
+    for end in TASK_ENDS {
+        let (mut root, call, watch, read) = final_read(*end, true);
+        root.client(jig_client::Event::Up { up: jig_client::Up::SignedOut });
+        assert_eq!(root.answer(call).expect("signed out final read").status, 1);
+        root.serve(call, f::historical_task_result(f::ended_task(c::Phase::Done), c::Ending::Done));
+        settled_final_read(&mut root, call, watch, read);
+    }
+}
+
+#[test]
+fn an_unknown_watch_for_other_conditions_keeps_status_2() {
+    for (argv, flags, watch) in [
+        (f::WAIT_TASK, f::UNTIL_REPLIED, f::task_watch()),
+        (f::WAIT_TASK, f::UNTIL_RUNNING, f::task_watch()),
+        (f::WAIT_TASK, &[][..], f::task_watch()),
+        (f::WAIT_RUN, f::UNTIL_ENDED, f::run_watch()),
+        (f::WAIT_TREE, f::UNTIL_ENDED, f::tree_watch()),
+    ] {
+        let (mut root, call) = f::waiting_call(argv, flags);
+        root.end(call, &watch, c::WatchEnd::Unknown);
+        let answer = root.answer(call).expect("unknown subject");
+        assert_eq!(answer.status, 2);
+        assert!(answer.stdout.is_empty());
+        assert!(skein_lib::bytes::find(&answer.stderr, b"unknown").is_some());
+        assert!(root.reads.is_empty());
+        assert_eq!(root.watches.len(), f::SHARED_WATCHES);
+        assert_eq!(crate::root::next_deadline(&root.root), None);
+    }
 }

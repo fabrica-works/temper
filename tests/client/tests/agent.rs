@@ -79,7 +79,11 @@ fn a_chat_the_agent_closes_ends() {
     let closed = call(&mut world, agent, &[b"close", task.to_string().as_bytes(), b"--key", b"bye"]);
     let number =
         fixtures::give(&mut world, agent, &[b"wait", b"task", task.to_string().as_bytes(), b"--until", b"ended"]);
-    world.run(Until::Steps(2));
+    // The later point read crosses the same client's wire after its watch.
+    // Its answer is an event barrier while the closing run is still held here.
+    let current = call(&mut world, agent, &[b"task", task.to_string().as_bytes()]);
+    assert_eq!(current.status, 0, "{current:?}");
+    assert!(world.root(agent).agent().printed(number).is_none(), "watch waits before the run ends");
     let attempt = world.front().engine.task(task).expect("closing chat").attempt;
     world.front().engine.answer(
         skein_lib::Token::new(7),
@@ -105,6 +109,26 @@ fn a_chat_the_agent_closes_ends() {
     );
     assert_eq!(printed.status, 0, "{printed:?}");
     assert!(printed.stdout.ends_with(b"met\n"), "{printed:?}");
+
+    // The committed ended row must exist before opening another wait; this
+    // exercises real watch refusal and the authorized historical read path.
+    let key = temper_engine_domain::Key::Core(jig_domain_core::Key::Tasks(jig_domain_tasks::Key::Ended(task)));
+    let Some(temper_engine_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Ended(row)))) =
+        world.front().engine.store.rows.get(&key)
+    else {
+        panic!("task end was committed before the late wait");
+    };
+    let jig_domain_tasks::Phase::Ended(jig_domain_tasks::Ending::Done(jig_domain_tasks::TaskResult::Report { words })) =
+        &row.phase
+    else {
+        panic!("the committed task has its completed report");
+    };
+    assert_eq!(words.as_ref(), b"Closed by the run");
+    assert!(world.front().engine.task(task).is_none(), "live task name was retired");
+    let late = call(&mut world, agent, &[b"wait", b"task", task.to_string().as_bytes(), b"--until", b"ended"]);
+    assert_eq!(late.status, 0, "{late:?}");
+    assert_eq!(late.stdout, printed.stdout, "late wait prints the same real final report");
+    assert!(late.stderr.is_empty(), "{late:?}");
 }
 
 // The fixture forge has repository acme/shop as 7 on forge 1.

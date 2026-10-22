@@ -307,14 +307,15 @@ fn ended(
         {
             continue;
         }
-        if why == Why::SubjectEnded {
+        if wait.until == Some(Condition::Ended)
+            && wait.name == b"task"
+            && (why == Why::Unknown || why == Why::SubjectEnded)
+        {
+            finishing(runner, number, out);
+        } else if why == Why::SubjectEnded {
             if wait.until == Some(Condition::Ended) {
-                if wait.name == b"task" {
-                    finishing(runner, number, out);
-                } else {
-                    // The renderer digests the last document, including current run text.
-                    complete(runner, client, env, number, Ok(None), out);
-                }
+                // The renderer digests the last document, including current run text.
+                complete(runner, client, env, number, Ok(None), out);
             } else {
                 complete(runner, client, env, number, Err(b"ended"), out);
             }
@@ -351,9 +352,12 @@ fn page(
         return false;
     }
     let wait = runner.waits.remove(&number).expect("finishing wait");
+    let Some(Value::Subject(Subject::Task(expected))) = value(&wait.called.call, 0) else {
+        unreachable!("finishing task wait")
+    };
     let printed = match page {
-        Readout::Jig(c::ReadResult::Value(value)) if render::read_task(value).is_some() => {
-            let (task, result) = render::read_task(value).expect("task read");
+        Readout::Jig(c::ReadResult::Value(value)) if final_task(*expected, value).is_some() => {
+            let (task, result) = final_task(*expected, value).expect("matching terminal task read");
             let delivery = c::Delivery::Task(Box::new(task.clone()));
             render::waiting(
                 render::document::waiting::Waiting {
@@ -370,17 +374,43 @@ fn page(
                 runner.parts.expect("host vocabulary"),
             )
         }
-        Readout::Limit | Readout::NotServed { .. } | Readout::Jig(_) | Readout::Family { .. } => render::read(
-            page,
-            client,
-            runner.me(),
-            wait.called.json,
-            &env.limits,
-            runner.parts.expect("host vocabulary"),
-        ),
+        Readout::Jig(c::ReadResult::Value(_)) => {
+            render::failure(b"tools' bug; unexpected final task; report it as a finding", wait.called.json, 1)
+        }
+        Readout::Limit | Readout::NotServed { .. } | Readout::Jig(c::ReadResult::None(_)) | Readout::Family { .. } => {
+            render::read(
+                page,
+                client,
+                runner.me(),
+                wait.called.json,
+                &env.limits,
+                runner.parts.expect("host vocabulary"),
+            )
+        }
     };
     runner::finish(wait.called, printed, out);
     true
+}
+
+// A closed watch alone proves neither the requested identity nor completion.
+fn final_task(expected: u64, value: &c::ReadValue) -> Option<(&c::Task, Option<&c::Result>)> {
+    let (task, result) = render::read_task(value)?;
+    if task.chip.task != expected {
+        return None;
+    }
+    match task.chip.phase {
+        c::Phase::Ended | c::Phase::Done | c::Phase::Failed | c::Phase::Cancelled => Some((task, result)),
+        c::Phase::Waiting
+        | c::Phase::Idle
+        | c::Phase::Due
+        | c::Phase::Preparing
+        | c::Phase::Claimed
+        | c::Phase::Running
+        | c::Phase::BackingOff
+        | c::Phase::Active
+        | c::Phase::Closing
+        | c::Phase::Held => None,
+    }
 }
 
 // The existing me dependency flag records the owner join for Accounts; no new

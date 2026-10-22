@@ -282,6 +282,22 @@ pub(crate) fn goal(number: u64, waits_on: c::WaitsOn) -> c::Task {
 pub(crate) fn task_result(task: c::Task) -> c::ReadResult {
     c::ReadResult::Value(c::ReadValue::Task(Box::new(task)))
 }
+pub(crate) fn historical_task_result(task: c::Task, ending: c::Ending) -> c::ReadResult {
+    let result = c::Result {
+        task: task.chip.clone(),
+        ending,
+        value: Some(c::ResultValue::Report(document_text(b"Final task report"))),
+        at: None,
+        details: None,
+        acts: List::with_capacity(EMPTY),
+    };
+    c::ReadResult::Value(c::ReadValue::Historical(Box::new(c::OwnerHistorical {
+        key: c::ObjectKey::Task(task.chip.task),
+        value: c::OwnerHistoricalValue::Task { document: Box::new(task), result: Box::new(result) },
+        at: None,
+        by: None,
+    })))
+}
 pub(crate) fn golden(name: &str) -> Box<[u8]> {
     let path = std::path::Path::new("src/tests/golden").join(name).with_extension("txt");
     std::fs::read(path).expect("checked golden").into_boxed_slice()
