@@ -599,16 +599,19 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
   .temper-chat > .temper-choice { width: min(1040px, calc(100% - 20px)); padding: 8px 10px; }
 }
 
-/* .terminal-dialog and .welcome: the Accounts and adoption page bodies. */
+/* accounts.html's page and cards; .welcome keeps adoption's own column. */
 .temper-main.temper-page > :is(.temper-accounts-page, .temper-adoption-page) { width: 100%; margin: 0; color: var(--temper-ink); }
-:is(.temper-accounts-page, .temper-adoption-page) > :not(.temper-pagebar) { width: min(760px, calc(100% - 48px)); margin-inline: auto; }
+.temper-accounts-page > :not(.temper-pagebar) { width: min(1160px, calc(100% - 48px)); margin-inline: auto; }
+.temper-adoption-page > :not(.temper-pagebar) { width: min(760px, calc(100% - 48px)); margin-inline: auto; }
 :is(.temper-accounts-page, .temper-adoption-page) .temper-pagebar { height: auto; min-height: 37px; padding-block: 9px; }
 :is(.temper-accounts-page, .temper-adoption-page) .temper-pagebar h1 { margin: 0; font: 700 11px/1.58 var(--temper-mono); }
 /* .first-run-panel: supplied regions and the standalone form are cards. */
-:is(.temper-accounts-page, .temper-adoption-page) :is(section, form), .temper-adoption-page > .temper-card { border: 1px solid #dbd4ca; border-radius: 9px; background: #fffefd; padding: 20px; margin-block: 12px; min-width: 0; }
+.temper-accounts-page :is(section, form) { border: 1px solid var(--temper-line); border-radius: 5px; background: #fffefd; padding: 15px 18px; margin-block: 12px; min-width: 0; }
+.temper-adoption-page :is(section, form), .temper-adoption-page > .temper-card { border: 1px solid #dbd4ca; border-radius: 9px; background: #fffefd; padding: 20px; margin-block: 12px; min-width: 0; }
 :is(.temper-accounts-page, .temper-adoption-page) h2 { margin: 22px 0 9px; font: 700 14px/1.3 var(--temper-mono); }
 :is(.temper-accounts-page, .temper-adoption-page) section h2 { margin-top: 0; }
 :is(.temper-accounts-page, .temper-adoption-page) h3 { margin: 0 0 9px; font: 700 12px/1.58 var(--temper-mono); overflow-wrap: anywhere; }
+.temper-accounts-page section h3 { font-size: 14px; }
 :is(.temper-accounts-page, .temper-adoption-page) :is(p, [role=status]) { margin-block: 6px 0; font-size: 11px; color: #756e65; overflow-wrap: anywhere; }
 :is(.temper-accounts-page, .temper-adoption-page) [role=alert] { margin-top: 12px; font-size: 11px; color: var(--temper-red); overflow-wrap: anywhere; }
 /* .kv: preserve the source's complete text and supplied order. */
@@ -622,8 +625,11 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 .temper-adoption-page > .temper-card > .temper-card:has(> .temper-card) { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 14px; }
 :is(.temper-accounts-page, .temper-adoption-page) div:has(> input:not([type=radio]):not([type=checkbox])) { min-width: 0; }
 :is(.temper-accounts-page form, .temper-adoption-page > .temper-card > .temper-card) > .temper-card:has(> input:not([type=radio]):not([type=checkbox])) { display: flex; flex-direction: column; justify-content: flex-end; }
-:is(.temper-accounts-page, .temper-adoption-page) label[for]:has(+ input:not([type=radio], [type=checkbox])) { display: block; margin: 12px 0 5px; color: #756e65; font: 11px/1.58 var(--temper-mono); overflow-wrap: anywhere; }
-:is(.temper-accounts-page, .temper-adoption-page) input:not([type=radio]):not([type=checkbox]) { display: block; width: 100%; min-width: 0; border: 1px solid #d8d0c5; background: #fff; color: var(--temper-ink); border-radius: 8px; padding: 9px 11px; font: 12px/1.58 var(--temper-mono); }
+.temper-accounts-page label[for]:has(+ input:not([type=radio], [type=checkbox])) { display: block; margin: 12px 0 5px; color: #756e65; font: 11px/1.58 var(--temper-mono); overflow-wrap: anywhere; }
+.temper-accounts-page input:not([type=radio]):not([type=checkbox]) { display: block; width: 100%; min-width: 0; border: 1px solid #d8d0c5; background: #fff; color: var(--temper-ink); border-radius: 8px; padding: 9px 11px; font: 12px/1.58 var(--temper-mono); }
+/* The forges form's .forge-field, with the renderer's sibling label. */
+.temper-adoption-page label[for]:has(+ input:not([type=radio], [type=checkbox])) { display: block; margin: 12px 0 4px; color: #77756e; font: 10px/1.58 var(--temper-mono); overflow-wrap: anywhere; }
+.temper-adoption-page input:not([type=radio]):not([type=checkbox]) { display: block; width: 100%; min-width: 0; border: 1px solid #dcd4c9; background: #fffefd; color: var(--temper-ink); border-radius: 5px; padding: 6px 8px; font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 /* Existing model validation marks both the field and its adjacent explanation. */
 :is(.temper-accounts-page, .temper-adoption-page) input[aria-invalid=true]:not([type=radio]):not([type=checkbox]) { border-color: var(--temper-red); }
 :is(.temper-accounts-page, .temper-adoption-page) input[aria-invalid=true] + [role=status] { color: var(--temper-red); }
@@ -651,9 +657,16 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 .temper-page .temper-adoption-page > .temper-card > button { justify-self: start; margin-top: 17px; background: var(--temper-accent); border-color: var(--temper-accent); color: #fff; }
 :is(.temper-accounts-page, .temper-adoption-page) button:disabled { opacity: .55; cursor: default; }
 :is(.temper-accounts-page, .temper-adoption-page) a { color: var(--temper-accent); text-decoration: underline; overflow-wrap: anywhere; }
-/* .first-run-panel on a phone: 16px edges and one field per row. */
+@media (max-width: 850px) {
+  .temper-accounts-page > :not(.temper-pagebar) { width: calc(100% - 34px); }
+}
+@media (max-width: 760px) {
+  .temper-accounts-page > :not(.temper-pagebar) { width: calc(100% - 28px); }
+  .temper-accounts-page :is(section, form) { padding: 18px; }
+}
+/* .first-run-panel on a phone: adoption's 16px edges and one field per row. */
 @media (max-width: 600px) {
-  :is(.temper-accounts-page, .temper-adoption-page) > :not(.temper-pagebar) { width: calc(100% - 32px); }
+  .temper-adoption-page > :not(.temper-pagebar) { width: calc(100% - 32px); }
   .temper-accounts-page form, .temper-adoption-page > .temper-card > .temper-card:has(> .temper-card) { grid-template-columns: minmax(0, 1fr); }
   :is(.temper-accounts-page, .temper-adoption-page) .temper-pagebar { padding-inline: 16px; }
 }
