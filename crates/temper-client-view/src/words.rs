@@ -148,6 +148,7 @@ pub enum Word {
     Chat,
     TaskWho,
     ChatSpend,
+    ChatbarSpend,
     ChatDelegates,
     ChatTime,
     ChatHint,
@@ -335,8 +336,8 @@ pub enum Word {
 // The change panel adds 86 forge phrases (2000–2085).
 // Three empty and partial ended-children phrases (5.10).
 // A chat's numbered composer placeholder (3.5).
-const PHRASES: u32 = 773;
-const ALL: [Word; 303] = [
+const PHRASES: u32 = 774;
+const ALL: [Word; 304] = [
     Word::TimeYesterdayWord,
     Word::TimeJustNow,
     Word::TimeUnderMinute,
@@ -472,6 +473,7 @@ const ALL: [Word; 303] = [
     Word::Chat,
     Word::TaskWho,
     Word::ChatSpend,
+    Word::ChatbarSpend,
     Word::ChatDelegates,
     Word::ChatTime,
     Word::ChatHint,
@@ -786,6 +788,7 @@ impl Word {
             Self::Chat => 143,
             Self::TaskWho => 1075,
             Self::ChatSpend => 144,
+            Self::ChatbarSpend => 1400,
             Self::ChatDelegates => 145,
             Self::ChatTime => 184,
             Self::ChatHint => 185,
@@ -1305,6 +1308,9 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::ClosedChats => (&[b"Closed"], &[]),
         Word::MoreClosedChats => (&[b"More closed chats"], &[]),
         Word::Chat | Word::TaskWho => (&[b"T", b""], &[Number]),
+        Word::ChatbarSpend => {
+            (&[b"", b" spent \xc2\xb7 of ", b" \xc2\xb7 delegates spent ", b""], &[Number, Number, Number])
+        }
         Word::ChatSpend => (&[b"Spent ", b"; delegates spent ", b""], &[Number, Number]),
         Word::ChatDelegates => (&[b"", b" delegates"], &[Number]),
         Word::ChoiceProvider | Word::ChatTime => (&[b"", b""], &[Name]),

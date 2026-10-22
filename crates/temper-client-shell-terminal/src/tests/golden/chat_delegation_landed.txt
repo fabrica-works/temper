@@ -12,7 +12,7 @@ Menu:
 T1 · Add CSV export to widget:
   * waiting on your words
   Demo model
-  Spent 0; delegates spent 0
+  0 spent · of 1 · delegates spent 0
 Demo:
   This is a demo, running on a demo model and a demo forge.
   [7] Connect a model

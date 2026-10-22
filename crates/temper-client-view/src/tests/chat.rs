@@ -44,7 +44,7 @@ fn a_chats_header_says_its_status_and_spend() {
 #[test]
 fn a_chats_header_says_its_spend_including_delegates() {
     let tree = chat_header();
-    assert!(fixtures::find(&tree, Role::Paragraph, b"Spent 7; delegates spent 2").is_some());
+    assert!(fixtures::find(&tree, Role::Paragraph, "7 spent · of 7 · delegates spent 2".as_bytes()).is_some());
 }
 
 #[test]
@@ -346,7 +346,7 @@ fn the_chat_bar_contains_identity_spend_and_acts() {
     );
     for (role, name) in [
         (Role::Heading { level: 1 }, heading.as_ref()),
-        (Role::Paragraph, b"Spent 7; delegates spent 2"),
+        (Role::Paragraph, "7 spent · of 7 · delegates spent 2".as_bytes()),
         (Role::Status, b"Parked"),
         (Role::Button, b"Stop"),
         (Role::Button, b"Close"),
@@ -1354,5 +1354,31 @@ fn the_chatbar_and_chats_line_share_every_status_phrase() {
             &fixtures::words(),
         );
         assert!(fixtures::find(&b.finish(), Role::Status, expected).is_some(), "chatbar: {expected:?}");
+    }
+}
+
+#[test]
+fn the_chatbar_draws_the_supplied_budget_including_zero() {
+    use temper_client_domain::{Address, Event};
+    for (budget, phrase) in
+        [(0, "7 spent · of 0 · delegates spent 2".as_bytes()), (100, "7 spent · of 100 · delegates spent 2".as_bytes())]
+    {
+        let (mut root, _, watch) = fixtures::root_at(Address::Chat { task: TASK }, &fixtures::domain_limits());
+        let mut task = fixtures::task::document();
+        task.chip.task = TASK;
+        task.budget.numbers.budget = budget;
+        fixtures::root_event(
+            &mut root,
+            Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Watched {
+                        watch: watch.unwrap(),
+                        event: c::WatchEvent::Delivered(c::Delivery::Task(Box::new(task))),
+                    },
+                },
+            },
+        );
+        let view = fixtures::page_view(&root);
+        assert!(fixtures::find(view.tree(), Role::Paragraph, phrase).is_some());
     }
 }

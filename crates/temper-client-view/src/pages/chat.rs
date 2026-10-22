@@ -339,8 +339,12 @@ fn spend(b: &mut Builder, task: &c::Task, words: &Words) {
         b,
         Role::Paragraph,
         &words.say(
-            Word::ChatSpend,
-            &[Hole::Number(task.budget.numbers.spent), Hole::Number(task.budget.numbers.spent_below)],
+            Word::ChatbarSpend,
+            &[
+                Hole::Number(task.budget.numbers.spent),
+                Hole::Number(task.budget.numbers.budget),
+                Hole::Number(task.budget.numbers.spent_below),
+            ],
         ),
     );
 }
