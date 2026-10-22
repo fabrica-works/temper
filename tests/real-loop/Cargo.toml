@@ -9,6 +9,7 @@ publish.workspace = true
 [dependencies]
 jig-protocol-config.workspace = true
 jig-protocol-store.workspace = true
+jig-protocol-worker-wire.workspace = true
 temper-protocol-store.workspace = true
 temper-engine-domain.workspace = true
 temper.workspace = true
@@ -19,6 +20,7 @@ temper-fake-git-hosted.workspace = true
 temper-worker-protocol-git.workspace = true
 skein-scratch.workspace = true
 skein-io.workspace = true
+skein-channel.workspace = true
 smith-agent-shell.workspace = true
 serde_json.workspace = true
 skein-fake-peers.workspace = true

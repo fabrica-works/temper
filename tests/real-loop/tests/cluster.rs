@@ -10,6 +10,7 @@ use temper_real_loop_world::{
 const WORKERS: &[&str] = &["w1", "w2"];
 const CHATS: usize = 2;
 const RUNS_PER_WORKER: usize = 1;
+const LINKS_PER_WORKER: usize = 1;
 const FIRST_SIGN_IN: usize = 0;
 const FIRST_CHAT: usize = 2;
 const SECOND_CHAT: usize = 3;
@@ -70,7 +71,7 @@ fn two_workers_each_run_a_chat_to_its_end() {
     let mut placed = Vec::new();
     for name in WORKERS {
         let worker = cluster.worker(name);
-        assert!(worker.linked() > 0, "{name} linked");
+        assert_eq!(worker.linked(), LINKS_PER_WORKER, "{name} linked once");
         assert_eq!(worker.end(), Some(&End::Drained), "{name} drained");
         assert_eq!(worker.ran().len(), RUNS_PER_WORKER, "{name} ran one chat");
         placed.extend_from_slice(worker.ran());

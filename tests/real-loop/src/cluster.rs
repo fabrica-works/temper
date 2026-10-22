@@ -142,8 +142,8 @@ impl Shape {
 
 // Observe the worker's own received assignments and successful agent spawns.
 const WIRE_BYTES: usize = 65_536;
-// jig's protocol/channel.md, 4.1: Assignment starts with the task's u64.
-const ASSIGNMENT: u16 = 0x0180;
+// skein's channel.md, 3: the eight-byte frame header.
+const HEADER_BYTES: usize = 8;
 #[derive(Default)]
 pub(crate) struct Runs {
     fd: Option<skein_io::kernel::Fd>,
@@ -161,17 +161,22 @@ impl Runs {
             (Op::Recv { fd, buf }, Ok(Done::Count(count))) if Some(*fd) == self.fd => {
                 self.bytes.extend_from_slice(&buf[..*count as usize]);
                 assert!(self.bytes.len() <= WIRE_BYTES, "bounded worker wire");
-                while self.bytes.len() >= 8 {
-                    let length = u32::from_be_bytes(self.bytes[4..8].try_into().expect("frame length")) as usize;
-                    if self.bytes.len() < 8 + length {
+                while self.bytes.len() >= HEADER_BYTES {
+                    let header =
+                        skein_channel::parse_header(&self.bytes[..HEADER_BYTES]).expect("channel frame header");
+                    let end = HEADER_BYTES + usize::try_from(header.body_len).expect("bounded frame body");
+                    if self.bytes.len() < end {
                         break;
                     }
-                    let kind = u16::from_be_bytes(self.bytes[..2].try_into().expect("frame kind"));
-                    if kind == ASSIGNMENT {
-                        self.pending =
-                            Some(skein_lib::Reader::new(&self.bytes[8..8 + length]).u64().expect("assignment task"));
+                    if header.kind == jig_protocol_worker_wire::Kind::Assignment.number() {
+                        let assignment = jig_protocol_worker_wire::Assignment::decode(
+                            &jig_protocol_worker_wire::CEILINGS,
+                            &mut skein_lib::Reader::new(&self.bytes[HEADER_BYTES..end]),
+                        )
+                        .expect("assignment");
+                        self.pending = Some(assignment.task());
                     }
-                    self.bytes.drain(..8 + length);
+                    self.bytes.drain(..end);
                 }
             }
             (Op::Spawn { spawn }, Ok(Done::Spawned { .. })) if spawn.program.as_ref() == fixtures::AGENT => {

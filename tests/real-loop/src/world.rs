@@ -100,7 +100,7 @@ pub(crate) fn run(
     let mut world = World::new_controlled_checked(|controls| Judge {
         controls,
         workers: Vec::new(),
-        engine_stopping: None,
+        engine_stopping: false,
         stopping: false,
         finished: false,
         armed: false,
@@ -142,7 +142,7 @@ pub(crate) fn run_forge(
     let mut world = World::new_controlled(|controls| Judge {
         controls,
         workers: Vec::new(),
-        engine_stopping: None,
+        engine_stopping: false,
         stopping: false,
         finished: false,
         armed: false,
@@ -206,10 +206,11 @@ fn host<R: Referee<Proc>>(
         agent::roots,
     );
 }
+#[expect(clippy::struct_excessive_bools, reason = "independent referee cues for placement and shutdown")]
 struct Judge {
     controls: Controls,
     workers: Vec<&'static str>,
-    engine_stopping: Option<()>,
+    engine_stopping: bool,
     stopping: bool,
     armed: bool,
     finished: bool,
@@ -299,9 +300,9 @@ impl Referee<Proc> for Judge {
             }
             self.stopping = true;
         }
-        if self.stopping && workers.iter().all(Host::is_empty) && self.engine_stopping.is_none() {
+        if self.stopping && workers.iter().all(Host::is_empty) && !self.engine_stopping {
             self.controls.signal(engine_index, ServiceSignal::Terminate);
-            self.engine_stopping = Some(());
+            self.engine_stopping = true;
         }
         if service.is_empty() && !self.finished {
             peer.shutdown();
@@ -351,7 +352,7 @@ impl Referee<Proc> for Judge {
             && pending > 0;
         if placing
             || workers_changed
-            || (self.stopping && workers.iter().all(Host::is_empty) && self.engine_stopping.is_none())
+            || (self.stopping && workers.iter().all(Host::is_empty) && !self.engine_stopping)
             || forge_changed
             || lock_changed
             || (peer.address().is_some() && service.address.is_none())
@@ -386,7 +387,7 @@ pub(crate) fn run_cluster(
     let mut world = World::new_controlled_checked(|controls| Judge {
         controls,
         workers: workers.to_vec(),
-        engine_stopping: None,
+        engine_stopping: false,
         stopping: false,
         finished: false,
         armed: false,
