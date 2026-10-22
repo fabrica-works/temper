@@ -134,6 +134,24 @@ Live scenes cover what the gallery cannot show: a dialog in the top
 layer, a run's live text, focus and caret after a send, the page after a
 reload. They are few, since each costs a cluster.
 
+- **Read in place:** the capture reads the hand's page as the seed left
+  it, through the look's reads the hand answers to the lab alone and
+  `browse` never sends (skein's `lab-browser.md`, 8.10), its viewport
+  changed for each width and given back; the mockup's side as ever, on
+  the same Chromium and switches.
+- **Captured as the seed goes:** each scene's capture is a seed action
+  after the actions that make its state, so one cluster gives several
+  scenes in turn.
+- **Their focus is held:** a live scene names the part that holds the
+  focus, which `look-structure` checks; the caret is where the focus
+  is, and the shot does not draw it (3.4).
+- **The frame's regions:** a live page's content carries the clock (a
+  turn's time, the day), so its regions are the frame's, and its
+  judgement stands for their crops alone (`lab/README.md`, "The live
+  scenes").
+- **No run's live text** until temper's agent processes give it
+  (`protocol/llm.md`, 7).
+
 ### 3.4 Capturing
 
 - **One browser for both sides:** the lab's Chromium, its version and
@@ -372,7 +390,12 @@ signed in and on temper's first page, and nothing of the pages' paths.
 - **The gallery against the live page:** for each page with a live
   scene, the gallery's outline and the live one's agree, but for the
   parts only a live page has. A disagreement is the gallery's finding,
-  classed `experiment`.
+  classed `experiment`. The gallery's state that stands for the page is
+  the live scene's experiment's to name; the outlines agree in their
+  named lines, the frame's and the controls' (3.1), each with its
+  landmarks and its count, and the lines with no name, the page's
+  content, are the parts only a live page has (`lab/README.md`, "The
+  live scenes").
 
 ## 9. Findings
 

@@ -596,3 +596,173 @@ evidence, never goldens.
   `browse`: the refusal taken, every other exit refused, the smoke's
   calls in order, and a missed wait or a wrong address ending it with
   1.
+
+# The live scenes
+
+`look-live/` takes the look's scenes for what the gallery cannot show
+(`docs/design/draft/qa-web.md`, 3.3) on the hand's page in
+`cluster-web/`'s cluster: focus after a send, the page after a reload,
+a dialog in the top layer. Each is captured beside its mockup as the
+look's scenes are, and checked by the look's two checks; and the
+gallery's outline of each such page is held to the live one (qa-web.md,
+8.2). skein's `docs/design/lab-browser.md` designs the capture's live
+side (5.1) and the hand's look reads (8.10). It has no driver: the
+seed makes each state through `browse`, and the judge is the lab
+owner, as for `look/`. No scene expects a run's live text, which
+temper's agent processes do not give (`docs/design/protocol/llm.md`,
+7).
+
+## Its files
+
+- **`cluster-web/`'s, copied** byte for byte, as `cluster-web/`
+  copies `cluster/`'s (above), but `llm.json`, which adds one cue,
+  `look-live-chat`: a reply and `wait`, a second reply and `wait`, then
+  `finish`. So the person's message wakes the first wait, the first
+  reply commits, and the second turn waits 60 s uncommitted: a quiet
+  page to capture, its composer kept, where `cluster-first-chat`'s
+  second turn would finish the chat and take its composer away.
+  `experiment.json`'s processes are `cluster-web/`'s member for
+  member; the browser is at 1440×900, and the capture changes its
+  viewport for each width (lab-browser.md, 8.10).
+- **`stage`,** `look/`'s byte for byte: the gallery printout extracted
+  into `{dir.page}/gallery`.
+- **`steps`,** POSIX sh, the seed's `browse` steps (below), one phase an
+  invocation, each call's output printed, ending at the first that
+  does not exit 0, with its status.
+- **`scenes/`:** the live scenes, `look-scene/1` with a live page
+  (lab-browser.md, section 4). **`gallery/`:** the gallery's states
+  that stand for their pages, served scenes with no mockup, captured
+  alone for the gallery's check.
+- **`checks/gallery`:** the gallery's check (below).
+- **`dirs`:** `cluster-web/`'s `client`, `hand` and `spent`; `look`,
+  each live capture's `--out` under it by its scene's name; `page`, the
+  gallery staged.
+- **`cost`:** `temper-m1-calibration`, the cluster's: 120 s a command
+  holds a capture of one scene at two widths.
+
+## The scenes
+
+Each at `desktop` (1440×900) and `phone` (390×844, mobile), on the
+chat page `/chats/1`, the cluster's first task. Its regions are the
+frame's, none of the conversation's, whose turns carry their times:
+the banner, the navigation, the chatbar and the composer, as `look/`'s
+`chat` finds them, and in `chat-closing` the dialog, `dialog "Close"`.
+The names are `look/`'s `chat`'s, but the proposal's words (Accept,
+Reject with reason, Accept goal), which a chat at rest has none of.
+
+| Scene | Mockup | State | Focus |
+|---|---|---|---|
+| `chat-sent` | `/chat.html?world=solo&task=T6&bare` | a message sent from the chat's composer by Enter, the first reply in | `textbox "Message"` |
+| `chat-reloaded` | the same | `chat-sent`'s page reloaded, the first reply in | `heading` (the main's first level-1, the chatbar's: skein's `ui-web.md`, 7, "Going to another page") |
+| `chat-closing` | none | Close pressed: its confirmation, a dialog in the top layer | the dialog's first button (shown modal: skein's `ui-web.md`, 7) |
+
+- **The mockup is the solo world's chat at rest** (`chat.html?task=T6`,
+  "A chat at rest, and its delegate's card"): the nearest to the live
+  chat, whose content differs (its delegate's card, its turns), which
+  the judge accepts as departures citing qa-web.md, 2 ("real data
+  only").
+- **`chat-closing` has no mockup:** no mockup draws a confirmation, so
+  its first judged capture is its expectations (qa-web.md, 3.1).
+- **The phone's width is the same page made narrow,** its state made
+  at the desktop's: the banner's navigation and Sign out then sit in
+  the closed "Menu" (`docs/design/client/README.md`), which no scene
+  opens.
+
+## The seed
+
+`cluster-web/`'s actions through `signed-in`, then, each `steps`
+phase `/bin/sh {experiment}/steps PHASE {runner}/hand/browse
+{proc.browser.ready.address}`:
+
+| Action | What | For |
+|---|---|---|
+| `drain` | `browse trouble` | the sign-in's trouble read, so each capture's is its own scene's (lab-browser.md, 5.1) |
+| `stage` | `look/`'s stage of the gallery into `{dir.page}/gallery` | the gallery's scenes |
+| `send` | `steps send`: `type "text area" "Start a chat"` (`look-live-chat`), `press button Start --exact`, `wait log Conversation`; `type "text area" Message` (`look-live-sent`), `key Enter`, `wait text "First reply." --in log Conversation` | `chat-sent`'s state |
+| `capture-sent` | the live capture of `scenes/chat-sent.json`, `--out {dir.look}/chat-sent` | |
+| `reload` | `steps reload`: `reload`, the same wait | `chat-reloaded`'s |
+| `capture-reloaded` | the live capture of `scenes/chat-reloaded.json` | |
+| `close` | `steps close`: `press button Close --exact`, `wait dialog Close --exact` | `chat-closing`'s |
+| `capture-closing` | the live capture of `scenes/chat-closing.json` | |
+
+A live capture is `{runner}/look/capture` with the settings' browser by
+its templates, `--mockups {source}/docs/design/client/mockups --live
+{proc.browser.ready.address} --live-out {dir.hand} --ready-seconds 20`.
+The three captures and their steps take about 30 s, inside the second
+turn's quiet minute.
+
+## The checks
+
+- **The collections:** `look`, `{dir.look}` copied; `hand`, as
+  `cluster-web/`'s; `gallery`, the served capture of `gallery/`'s
+  scenes, `--page {dir.page}/gallery`, no mockups.
+- **`look-structure` and `look-style`** over the three live scenes,
+  one `--capture` each (lab-browser.md, 5.4): the outline, readiness,
+  trouble and order, the focus (`focus/page`), and the regions'
+  values, as `look/`'s.
+- **`gallery`** (qa-web.md, 8.2): `/usr/bin/python3 -I -B -S
+  {experiment}/checks/gallery --live {collected.look} --gallery
+  {collected.gallery}/capture chat-sent=chat chat-reloaded=chat
+  chat-closing=chat-closing`, each pair a live scene and the gallery
+  scene of `gallery/` that stands for its page: `chat`,
+  `/chat-solo-T6.html`, the chat at rest; `chat-closing`,
+  `/chat-closing.html`, its Close pressed. A gallery scene's names are
+  its live scene's.
+  - **What agrees:** at each width, the page sides' outlines (5.3
+    there), their named lines alone, each as an entry with its
+    landmarks (`banner > navigation "Main navigation" > link "Chats"`),
+    counted. A named line is the frame's or a control's (the scenes'
+    names); the lines with no name are the page's content (turns,
+    cards, their counts), which a live page has and the gallery's
+    sample does not: the parts only a live page has.
+  - **Each disagreement fails** `<scene>/<width>/gallery/missing/<role>[/<name>]`
+    (fewer on the live page than in the gallery) or
+    `.../gallery/extra/...` (more), its role and name signed as
+    skein's look checks sign them; its summary names both counts. A
+    disagreement is the gallery's finding, classed `experiment`
+    (qa-web.md, 9), unless the judge finds the live page wrong.
+  - **Statuses** (skein's `lab.md`, 7.2): 0 agreeing, 1 with a line,
+    2 when a record or an outline is missing or unreadable, or a pair
+    names a scene no record holds.
+
+## Judging and the bar
+
+As `look/`'s (above), its judgements in
+`~/src/rust/tmp/lab/judgements/look-live/`, one file a live scene, by
+the same format, and its bar by `look_bar.py`. A live width's picture
+digest stands for its regions' crops alone, its viewports' shots
+listed as null: the live page's viewport shows its turns' times and
+the day, which move with the clock, so its digest moves with every
+run. A width is live when its record's page side holds `focus`
+(lab-browser.md, 5.2). The judge still reads the pair. The planted
+twin and the blind judge are `look/`'s alone.
+
+## Running it
+
+```sh
+lab/look-live-judge SKEIN
+```
+
+From a clean temper checkout at its commit C: builds `temper`, the
+bundle and the gallery (release) through `heavy`, packs the bundle
+and the gallery's printout as `look_pack.py` packs them, makes the
+subject (`--artifact temper=… --artifact bundle=… --artifact
+gallery=…`), validates `look-live`, runs skein's `lab judge` on it
+(three seeds), and prints the key, the verdict and the bar. It runs on
+demand, never in the gate.
+
+## Its tests
+
+- **`lab/tests/unit/test_look_live.py`,** in the gate, pure: the
+  copies equal `cluster-web/`'s and `look/`'s (`llm.json` but for its
+  cue), the processes `cluster-web/`'s; each scene canonical, live,
+  its names `look/`'s `chat`'s less the proposal's, its mockup's file
+  in `client/mockups/`; each gallery scene's page a name of
+  `tools/gallery/names.txt` and its names its live scene's; the seed's
+  order and the checks' captures; and the gallery check's decisions on
+  outlines written as fixtures: agreeing, an entry missing and one
+  extra, unnamed lines left out, counts, landmarks apart, the
+  statuses.
+- **`lab/tests/process/test_look_live.py`,** on demand: `steps` under
+  the real shell against a stand-in for `browse`: each phase's calls
+  in order, and a missed wait ending it with 1.
