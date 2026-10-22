@@ -336,7 +336,7 @@ impl Judge {
                     assert_eq!(seen.activity[0]["rows"][0]["position"], seen.task.as_ref().expect("task")["activity"]);
                     drop(seen);
                     self.stage = Stage::Tree;
-                    self.deadline = Some(now.saturating_add(Duration::from_secs(1)));
+                    self.deadline = Some(now.saturating_add(Duration::from_secs(2)));
                     self.next(procs, &["task", "1", "--tree"], false);
                 }
             }
@@ -443,7 +443,7 @@ impl Referee<Proc> for Judge {
             self.answered(now, procs);
         }
         if matches!(self.stage, Stage::Done) && !self.stopping && procs[2..2 + PAGES].iter().all(Host::is_empty) {
-            self.deadline = Some(now.saturating_add(Duration::from_secs(1)));
+            self.deadline = Some(now.saturating_add(Duration::from_secs(2)));
             self.controls.signal(1, ServiceSignal::Terminate);
             self.stopping = true;
         }
