@@ -171,7 +171,7 @@ const HOLDS: [Holds; samples::N] = [
     Holds {
         name: "accounts-first-run-1",
         heading: "Accounts",
-        parts: &[Part::Named { role: Role::Heading { level: 3 }, name: "Demo model" }],
+        parts: &[Part::Named { role: Role::Heading { level: 3 }, name: "Demo API key" }],
     },
     Holds {
         name: "signed-out",
