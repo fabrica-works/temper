@@ -205,8 +205,10 @@ in the lower world that owns it, never here.
   (below); a chat adding a landing dependency to its live report delegate,
   kept until the change lands and started after Met (`fuzzy_landing`); the
   first run's green light, a question answered in the person's inbox before
-  the change it holds (`fuzzy_green_light`, below); and GitHub's, one
-  per feature of a GitHub forge (below).
+  the change it holds (`fuzzy_green_light`, below); the first run's
+  repair, a change whose first head fails CI for its content, repaired
+  and landed (`fuzzy_repair`, below); and GitHub's, one per feature of a
+  GitHub forge (below).
 - **The first run's green light,** one story (`fuzzy_green_light`), on
   the first run's cast (`../client/mockups/README.md`, "The first
   run"): the person asks their chat T1 "Add CSV export to widget"; T1
@@ -255,6 +257,55 @@ in the lower world that owns it, never here.
     file, on the tier's shared hosts. It is fuzzy, past the 1 s guide by
     the change procedure's landing path, as `fuzzy_landing` is, and its
     forge's records stay within the harness's bound.
+- **The first run's repair,** one story (`fuzzy_repair`), on the first
+  run's cast, its green light left to `fuzzy_green_light`: the person
+  asks their chat T1 "Add CSV export to widget"; T1 delegates the change
+  T2; its coder T3 turns widget's rows into CSV in `src/main.rs` and
+  leaves the table's header as it was; the change pushes that head and
+  opens its pull request, and CI fails there; the change delegates the
+  repair T4, whose brief carries CI's failing output (forge.md, 8.4);
+  T4 writes the CSV header on the change's branch and delivers a new
+  head; CI passes there, the reviewer T5 approves at it, the change
+  lands, and T1 says so.
+  - **A real failure, by the fake's contract.** The forge's CI judges
+    the pushed tree by its content cue (4.2): a head passes only when
+    `src/main.rs` holds the CSV header line. The first head fails for
+    what it holds, as a check of the program's output would; the story
+    sets no status and names no head, and nothing compiles (CI that
+    runs a workflow's steps is open, section 10).
+  - **Every judgement a script,** one call per response: T1 delegates
+    the change, says so and waits, and on its result reports. The coder
+    reads, edits the rows and finishes with a change; the repair reads,
+    edits the header and finishes with a change; the reviewer approves.
+    The repair's script is cued by the engine's own task words, "Repair
+    the failed CI on the change branch", which open its system text
+    before anything of the change's: skein's fake LLM takes the
+    earliest cue there, so were the coder's first, the repair would
+    replay the coder's script and the story fail. The numbers are a
+    fresh deployment's: the coder, the repair and the reviewer are T2's
+    delegates, in that order, and no review runs at a head CI failed
+    (forge.md, 8.3).
+  - **The person's acts,** by `temper ctl`: sign in; adopt the
+    repository first, as `fuzzy_green_light` does; start the chat and
+    wait for its end; read the change T2 and the repair T4.
+  - **What it checks:** CI at each of the change's heads, from the
+    forge's records in order: the first head failed, the change's
+    branch moved once, and the new head passed and merged at exactly
+    that head. T4 is the change's one repair, its words the engine's; it
+    was told why, its brief holding the failed check, its description,
+    the failed step by name and its log's end, at the failing head
+    (forge.md, 8.4), and it started from the change's branch, its read
+    holding the first head's source. widget's CSV source whole on main.
+    T2's result is the landing, naming the forge's merge commit: what
+    the chat's card reads to draw the change Landed, through the
+    failure and the repair, in which it stays Running
+    (../client/README.md, 5.7, whose drawing the view's tests own); T1
+    told that result before its report. Its fixture sizes the brief's
+    CI section to carry the failure whole.
+  - It is fuzzy, past the 1 s guide by the landing path and its
+    repair, as `fuzzy_green_light` is, and its forge's records stay
+    within the harness's bound. Its fixture, scripts and checks are
+    its own, in its test file, on the tier's shared hosts.
 - **An account first,** with area 5's tools (../client/tools.md, 5.5):
   a story whose agents run adds a key the fake LLM peer accepts, from
   the client, before its first task, and waits for its account to be
