@@ -37,6 +37,10 @@ fn configured(hooks: bool) -> crate::settings::Engine {
 }
 fn service(hooks: bool) -> crate::Service {
     let config = configured(hooks);
+    assert_eq!(
+        crate::startup::application::configured(&config).as_ref(),
+        [domain::Configured { number: 1, kind: domain::Kind::Forgejo, mode: domain::Mode::Fake, asked: false }]
+    );
     let mut service = crate::Service::engine(config, &fixtures::seeds(), None, fixtures::forge_runtime()).unwrap();
     service.engine.as_mut().expect("engine").store = fixtures::records_store();
     advance(service.engine.as_mut().expect("engine"));
@@ -192,15 +196,17 @@ fn owned_gets_forgejo_given_and_managed_stays_unserved_without_start_time_plans(
         config.setup[0].entry.mode = if managed {
             Mode::Managed { admin_token: b"/data/admin".as_slice().into() }
         } else {
-            Mode::Owned(temper_forge_setup::setup::Owned {
-                orgs: Box::new([]),
-                fetch: temper_forge_setup::setup::Fetch { forgejo: false, runner: false, mirror: None },
-                forgejo: b"/bin/forgejo".as_slice().into(),
-                runner: None,
-                listen: ([127, 0, 0, 1], 9).into(),
-                person: Account { login: b"owner".as_slice().into(), email: b"owner@example.test".as_slice().into() },
-            })
+            fixtures::owned_setup(1).entry.mode
         };
+        assert_eq!(
+            crate::startup::application::configured(&config).as_ref(),
+            [domain::Configured {
+                number: 1,
+                kind: domain::Kind::Forgejo,
+                mode: if managed { domain::Mode::Managed } else { domain::Mode::Owned },
+                asked: false,
+            }]
+        );
         let (mut endpoints, _) = crate::forge::prepare(&config, fixtures::forge_runtime()).unwrap();
         let setup = prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2).unwrap();
         assert!(setup.lifecycle.adoptions.is_empty());

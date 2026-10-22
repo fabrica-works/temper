@@ -672,7 +672,6 @@ impl World {
                 | engine::Request::Store(_)
                 | engine::Request::Account(_)
                 | engine::Request::SetUp { .. }
-                | engine::Request::SetUpRefused { .. }
                 | engine::Request::Setup { .. }
                 | engine::Request::Busy(_)
                 | engine::Request::Drained) => panic!("unexpected escalation output {other:?}"),
@@ -785,6 +784,7 @@ impl World {
                 .expect("independent exact final report and funding"),
             Delivery::Link { down: host::LinkDown::Grant { .. }, .. } => {}
             Delivery::Application { .. }
+            | Delivery::Forges { .. }
             | Delivery::Panel { .. }
             | Delivery::WebReply { .. }
             | Delivery::CarriedUnused { .. }

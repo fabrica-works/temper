@@ -367,7 +367,7 @@ pub enum PartyInput {
         sign_in: u64,
         key: [u8; 16],
         digest: [u8; 32],
-        request: forge::Adoption,
+        request: forge::Ask,
         /// The number and digest of a value the request carried, already kept
         /// in the secrets' store (jig's `protocol/client.md`, 5).
         carried: Option<core::Carried>,
@@ -464,11 +464,7 @@ pub enum Request {
     /// Routed to the protocol layer's box link; nothing committed (domain/root.md, 5.1).
     SetUp {
         forge: u16,
-    },
-    /// Routed to the protocol layer's box link; nothing committed (domain/root.md, 5.1).
-    SetUpRefused {
-        forge: u16,
-        why: forge::SetUpRefusal,
+        request: Token,
     },
     /// Run the staged plan named by this token; credential values stay in routing.
     Setup {
@@ -678,7 +674,8 @@ pub(crate) fn delivery_output(delivery: Delivery) -> Request {
         | Delivery::Assigned { .. }
         | Delivery::Refuse { .. }
         | Delivery::TurnBusy { .. }) => Request::Worker(WorkerRequest::Deliver(delivery)),
-        delivery @ (Delivery::Panel { .. }
+        delivery @ (Delivery::Forges { .. }
+        | Delivery::Panel { .. }
         | Delivery::Application { .. }
         | Delivery::WebReply { .. }
         | Delivery::CarriedUnused { .. }

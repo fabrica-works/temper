@@ -774,11 +774,11 @@ fn a_change_produced_opened_checked_queued_and_landed() {
                     panic!("unexpected delegate")
                 }
                 top::Request::SetUp { .. }
-                | top::Request::SetUpRefused { .. }
                 | top::Request::ChangeDecision { .. }
                 | top::Request::Resource { .. }
                 | top::Request::Adopted { .. }
                 | top::Request::Save { .. }
+                | top::Request::MarkedForges
                 | top::Request::Marked { .. }
                 | top::Request::Erase { .. }
                 | top::Request::Taken { .. }

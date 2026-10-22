@@ -11,7 +11,7 @@ fn an_adoption_locates_its_repository_before_any_other_read() {
             request: Token::new(4),
             token: Token::new(9),
             retention: Duration::from_secs(60),
-            adoption: fixtures::adoption(),
+            ask: Ask::Adopt(fixtures::adoption()),
         },
     );
     let sent = ready(&mut d);
@@ -46,7 +46,7 @@ fn an_adoption_refuses_fields_outside_its_bounds_before_a_call() {
                     request: Token::new(4),
                     token: Token::new(9),
                     retention: Duration::from_secs(60),
-                    adoption: request,
+                    ask: Ask::Adopt(request),
                 },
             );
             assert_eq!(
@@ -68,7 +68,7 @@ fn a_core_refusal_is_kept_as_jigs_refusal() {
             request: Token::new(4),
             token: Token::new(9),
             retention: Duration::from_secs(60),
-            adoption: fixtures::adoption(),
+            ask: Ask::Adopt(fixtures::adoption()),
         },
     );
     let requests = outputs(
@@ -93,7 +93,7 @@ fn a_full_outcome_table_answers_the_application_again_busy() {
                 request,
                 token: request,
                 retention: Duration::from_secs(60),
-                adoption: fixtures::adoption(),
+                ask: Ask::Adopt(fixtures::adoption()),
             },
         );
         outputs(
@@ -107,7 +107,7 @@ fn a_full_outcome_table_answers_the_application_again_busy() {
             request: Token::new(99),
             token: Token::new(99),
             retention: Duration::from_secs(60),
-            adoption: fixtures::adoption(),
+            ask: Ask::Adopt(fixtures::adoption()),
         },
     );
     assert_eq!(requests.as_ref(), &[Request::ApplicationAgain { request: Token::new(99), why: people::Again::Busy }]);
@@ -125,7 +125,7 @@ fn a_kept_outcome_is_saved_with_the_end_of_its_retention() {
             request: Token::new(4),
             token: Token::new(9),
             retention: Duration::from_secs(60),
-            adoption,
+            ask: Ask::Adopt(adoption),
         },
     );
     let row = Stored::Application {
@@ -148,7 +148,7 @@ fn an_outcome_past_its_retention_is_erased_at_the_next_application() {
             request: Token::new(4),
             token: Token::new(10),
             retention: Duration::from_secs(60),
-            adoption: fixtures::adoption(),
+            ask: Ask::Adopt(fixtures::adoption()),
         },
     );
     assert!(requests.contains(&Request::Erase { key: Key::Application(9) }));
@@ -164,7 +164,7 @@ fn not_installed_is_a_terminal_application_refusal_rather_than_a_retry() {
             request: Token::new(4),
             token: Token::new(9),
             retention: Duration::from_secs(60),
-            adoption: fixtures::adoption(),
+            ask: Ask::Adopt(fixtures::adoption()),
         },
     );
     let sent = ready(&mut d);
@@ -193,6 +193,8 @@ fn a_configured_forge_without_a_writer_refuses_adoption_before_any_read() {
         4,
         skein_forge_client::Config { namespace: Box::from(b"test".as_slice()), writers: Box::new([]) },
         &[GitIdentity { forge: 1, credential: 1 }],
+        &[],
+        false,
     )
     .unwrap();
     outputs(
@@ -201,7 +203,7 @@ fn a_configured_forge_without_a_writer_refuses_adoption_before_any_read() {
             request: Token::new(4),
             token: Token::new(9),
             retention: Duration::from_secs(60),
-            adoption: fixtures::adoption(),
+            ask: Ask::Adopt(fixtures::adoption()),
         },
     );
     assert_eq!(
@@ -223,7 +225,7 @@ fn a_stopped_forge_keeps_its_writer_but_refuses_adoption_before_a_read() {
             request: Token::new(4),
             token: Token::new(9),
             retention: Duration::from_secs(60),
-            adoption: fixtures::adoption(),
+            ask: Ask::Adopt(fixtures::adoption()),
         },
     );
     assert_eq!(

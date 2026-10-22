@@ -4,14 +4,14 @@ use temper_engine_domain as root;
 
 pub(crate) mod box_link;
 
+#[expect(clippy::too_many_lines, reason = "one exhaustive dispatcher routes root outputs to their components")]
 pub(crate) fn request(engine: &mut Engine, request: root::Request) {
     match request {
-        root::Request::SetUp { forge } => {
+        root::Request::SetUp { forge, request } => {
             let mut out = skein_lib::Queue::with_capacity(3);
-            engine.box_link.ask(forge, &mut out);
+            engine.box_link.ask(forge, request, &mut out);
             box_link::drain(engine, &mut out);
         }
-        root::Request::SetUpRefused { forge, why } => crate::setup::lifecycle::set_up_refused(engine, forge, why),
         root::Request::Setup { run } => crate::setup::request(engine, run),
         root::Request::Store(request) => store(engine, request),
         root::Request::Account(request) => {
@@ -25,10 +25,7 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
         root::Request::ToChild(released) => engine.events.push(root::Event::Released(released)),
         root::Request::Busy(event) => {
             use temper_engine_domain_forge::Event;
-            #[expect(
-                clippy::wildcard_enum_match_arm,
-                reason = "only the four routing producers below cross this boundary"
-            )]
+            #[expect(clippy::wildcard_enum_match_arm, reason = "only the routing producers below cross this boundary")]
             match *event {
                 Event::Client(skein_forge_client::Event::Answered { call, cost, result, free, rate }) => {
                     engine.forge.down(skein_forge_connection::Request::Returned(skein_forge_connection::Answered {
@@ -41,10 +38,12 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
                 }
                 // skein's forge-connection.md, section 2: no returned-hint request; never offer it again.
                 // protocol/forge.md, 2: these views are not kept; restart publishes connections and skein's forge-connection.md, 4.4's baseline.
-                Event::Hint { .. } | Event::Connection { .. } | Event::Installation { .. } => {}
-                other => unreachable!(
-                    "only forge::{{event,hinted}} and setup::lifecycle::{{state,installation_event}} produce root forge inputs: {other:?}"
-                ),
+                Event::Hint { .. }
+                | Event::Connection { .. }
+                | Event::Installation { .. }
+                | Event::BoxClosed
+                | Event::SetUpAnswered { .. } => {}
+                other => unreachable!("only forge, setup and box link routing produce root forge inputs: {other:?}"),
             }
         }
         root::Request::Drained => stop::drained(engine),
@@ -57,6 +56,18 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
                 engine.admission = None;
             }
             let event = match request {
+                root::PartyRequest::Deliver(root::Delivery::Forges { watcher, forges }) => {
+                    match crate::family::forges(forges, &temper_client_protocol_wire::v1::CEILINGS) {
+                        Some(record) => Some(jig_protocol_engine_clients::Event::Application(
+                            jig_protocol_engine_clients::FromApplication::Delivery {
+                                watcher,
+                                family: temper_client_protocol_wire::FORGE,
+                                record,
+                            },
+                        )),
+                        None => Some(jig_protocol_engine_clients::Event::Abort),
+                    }
+                }
                 root::PartyRequest::Deliver(root::Delivery::Panel { watcher, panel }) => {
                     match crate::family::panel(
                         *panel,
@@ -167,6 +178,7 @@ fn worker(engine: &mut Engine, request: root::WorkerRequest) {
             },
             root::Delivery::Procedure { .. }
             | root::Delivery::Application { .. }
+            | root::Delivery::Forges { .. }
             | root::Delivery::Panel { .. }
             | root::Delivery::WebReply { .. }
             | root::Delivery::CarriedUnused { .. }

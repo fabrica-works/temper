@@ -1139,3 +1139,30 @@ fn resolve_forge(directories: &config::Directories, forge: &mut Forge, fp: &Path
         *value = resolved;
     }
 }
+
+/// Public forge configuration for the connector, decided before its first input.
+pub(crate) fn configured(settings: &settings::Engine) -> Box<[temper_engine_domain_forge::Configured]> {
+    use temper_engine_domain_forge::{Configured, Kind, Mode};
+    let mut rows = List::with_capacity(u32::try_from(settings.forges.len()).expect("configured forges"));
+    for forge in &settings.forges {
+        let mut mode = Mode::Connected;
+        let mut asked = false;
+        for setup in &settings.setup {
+            if setup.entry.forge == forge.number {
+                mode = match &setup.entry.mode {
+                    temper_forge_setup::setup::Mode::Managed { .. } => Mode::Managed,
+                    temper_forge_setup::setup::Mode::Owned(_) => Mode::Owned,
+                    temper_forge_setup::setup::Mode::Fake(_) => Mode::Fake,
+                };
+                asked = setup.entry.asked;
+                break;
+            }
+        }
+        let kind = match forge.kind {
+            settings::Kind::Forgejo => Kind::Forgejo,
+            settings::Kind::GitHub => Kind::GitHub,
+        };
+        rows.push(Configured { number: forge.number, kind, mode, asked }).expect("configured forges");
+    }
+    rows.into_boxed()
+}

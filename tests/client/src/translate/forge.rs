@@ -169,7 +169,7 @@ pub fn request(
         key,
         digest: digest(&value),
         carried: None,
-        request: adoption(&value, crate::fixtures::FORGE_HOST),
+        request: temper_engine_domain_forge::Ask::Adopt(adoption(&value, crate::fixtures::FORGE_HOST)),
     })
 }
 /// Open only the forge's whole, project-scoped change subject (client/forge.md, 9.2).
@@ -302,7 +302,6 @@ pub fn incoming(
         | engine::Request::Forge { .. }
         | engine::Request::Account(_)
         | engine::Request::SetUp { .. }
-        | engine::Request::SetUpRefused { .. }
         | engine::Request::Setup { .. }
         | engine::Request::ToChild(_)
         | engine::Request::Busy(_)
@@ -352,7 +351,8 @@ pub fn incoming(
                 },
             )));
         }
-        delivery @ (Delivery::SourceSignedOut { .. }
+        delivery @ (Delivery::Forges { .. }
+        | Delivery::SourceSignedOut { .. }
         | Delivery::Result { .. }
         | Delivery::Host(_)
         | Delivery::Link { .. }
@@ -379,7 +379,7 @@ pub fn incoming(
     Ok(Some(answered(&route, body)))
 }
 /// The application's outcome, answered on its keyed route as the forge family's bytes.
-fn answered(route: &Reply, body: Option<owner::ApplicationOutcome>) -> (ClientId, client::Event) {
+fn answered(route: &Reply, body: Option<owner::Answered>) -> (ClientId, client::Event) {
     let Reply::Keyed { client, attempt, owner: KeyedOwner::Application { connector }, .. } = *route else {
         panic!("application reply route")
     };
@@ -520,7 +520,7 @@ mod watch_tests {
         let mut transport = transport();
         let event = super::request(&mut transport, CLIENT, NATIVE, [5; 16], c::Scope::Project(7), &record);
         let engine::Event::Party(PartyInput::Application { request, .. }) = event else { panic!("root adoption") };
-        assert_eq!(request, super::adoption(&adoption, crate::fixtures::FORGE_HOST));
+        assert_eq!(request, owner::Ask::Adopt(super::adoption(&adoption, crate::fixtures::FORGE_HOST)));
     }
 
     #[test]

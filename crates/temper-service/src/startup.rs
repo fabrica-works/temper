@@ -658,7 +658,7 @@ pub fn startup(
     runtime: WorkerRuntime,
     forges: List<crate::ForgeRuntime>,
 ) -> Result<Service, Problems> {
-    with_setup(document, directories, files, Some(agent), seeds, accounts, Some(runtime), forges, None)
+    with_setup(document, directories, files, Some(agent), seeds, accounts, Some(runtime), forges, None, false)
 }
 /// Build the standalone service with the binary's checked, resolved forge setup.
 #[expect(clippy::too_many_arguments, reason = "startup receives the checked setup beside the same runtime facts")]
@@ -672,6 +672,7 @@ pub fn with_setup(
     runtime: Option<WorkerRuntime>,
     forges: List<crate::ForgeRuntime>,
     setup: Option<&temper_forge_setup::check::Checked>,
+    under_box: bool,
 ) -> Result<Service, Problems> {
     let CheckedStart { engine, worker, requirements, io, forges, not_set_up } =
         checked_start(document, directories, files, agent, seeds, accounts.as_ref(), forges, setup)?;
@@ -701,7 +702,7 @@ pub fn with_setup(
         },
         None => None,
     };
-    match Service::prepared(engine, seeds, accounts, forges, worker, requirements.worker_bytes, io) {
+    match Service::prepared(engine, seeds, accounts, forges, worker, requirements.worker_bytes, io, under_box) {
         Ok(mut service) => {
             for number in &not_set_up {
                 crate::setup::lifecycle::state(

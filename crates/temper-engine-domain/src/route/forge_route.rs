@@ -1983,12 +1983,10 @@ pub(crate) fn outputs(
     for _ in 0..out.len() {
         let request = out.pop().expect("connector output count");
         match request {
-            forge::Request::SetUp { forge } => {
-                assert!(super::now(domain, Request::SetUp { forge }), "forge set up door reserved");
+            forge::Request::SetUp { forge, request } => {
+                assert!(super::now(domain, Request::SetUp { forge, request }), "forge set up door reserved");
             }
-            forge::Request::SetUpRefused { forge, why } => {
-                assert!(super::now(domain, Request::SetUpRefused { forge, why }), "forge refusal door reserved");
-            }
+
             forge::Request::ApplicationPart { request, adoption, repository } => {
                 super::applications::part(domain, request, adoption, repository);
             }
@@ -2037,6 +2035,14 @@ pub(crate) fn outputs(
                 domain.work.push(Work::Brief(event));
             }
             forge::Request::BriefTaken { .. } => unreachable!("the root takes completed sections directly"),
+            forge::Request::MarkedForges => {
+                let mut subjects = List::with_capacity(1);
+                subjects.push(Token::new(0)).expect("one forges subject");
+                domain.work.push(Work::Core(jig_domain_core::Event::Marked {
+                    connector: domain.config.forge_connector,
+                    subjects,
+                }));
+            }
             forge::Request::Marked { tasks } => {
                 const {
                     assert!(

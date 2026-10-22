@@ -469,7 +469,15 @@ pub fn root(
     }
     let landing = domain::LandingPolicy { deployment: engine.landing.deployment.clone(), projects };
     let (forge, identities) = crate::forge::config(engine, seeds.deployment);
-    let config = domain::Config { core, landing, forge, identities, forge_charter: engine.charter };
+    let config = domain::Config {
+        core,
+        landing,
+        forge,
+        identities,
+        forge_charter: engine.charter,
+        forges: super::application::configured(engine),
+        under_box: false,
+    };
     let mut numbers = List::with_capacity(engine.jig.limits.core.authority.projects);
     for project in &engine.jig.projects {
         numbers.push(project.number).expect("bounded projects");

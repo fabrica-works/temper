@@ -102,6 +102,8 @@ impl Protocol {
                 writers: Box::new([skein_forge_client::Writer { forge: REPO.forge, author }]),
             },
             &[top::GitIdentity { forge: REPO.forge, credential: 1 }],
+            &[],
+            false,
         )
         .expect("configured connector")
     }
@@ -122,7 +124,7 @@ impl Protocol {
                 request: Token::new(100 + attempt),
                 token: Token::new(100 + attempt),
                 retention: Duration::from_secs(60),
-                adoption: top::Adoption {
+                ask: top::Ask::Adopt(top::Adoption {
                     project: 5,
                     home: role != top::Role::Context,
                     forge: REPO.forge,
@@ -134,7 +136,7 @@ impl Protocol {
                     landing: Box::from(&b"main"[..]),
                     ci: true,
                     checks: Box::new([]),
-                },
+                }),
             });
             self.run_for(1);
             if !self.stored.contains_key(&top::Key::Repository(REPO)) {
@@ -406,7 +408,7 @@ impl Protocol {
                 top::Request::ApplicationPart { request, .. } => {
                     top::step(&mut self.top, &self.env, top::Event::Adopt { request }, &mut self.top_out);
                 }
-                top::Request::ApplicationDone { .. } | top::Request::Marked { .. } => {}
+                top::Request::ApplicationDone { .. } | top::Request::MarkedForges | top::Request::Marked { .. } => {}
                 top::Request::ApplicationAgain { .. } => panic!("application capacity available"),
                 top::Request::Adopted { reply_to, result } => {
                     let outcome = match &result {
@@ -453,7 +455,6 @@ impl Protocol {
                     self.seen.push(top::Request::RestartDone { stage }).expect("world output capacity");
                 }
                 other @ (top::Request::SetUp { .. }
-                | top::Request::SetUpRefused { .. }
                 | top::Request::Resource { .. }
                 | top::Request::Taken { .. }
                 | top::Request::Refused { .. }

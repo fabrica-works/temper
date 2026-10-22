@@ -339,7 +339,6 @@ fn stopping_continues_projection_deferred_finishing_without_new_commits() {
                 Request::Party(crate::PartyRequest::Deliver(crate::Delivery::WebReply { .. })) => {}
                 other @ (Request::Setup { .. }
                 | Request::SetUp { .. }
-                | Request::SetUpRefused { .. }
                 | Request::Store(_)
                 | Request::Worker(_)
                 | Request::Party(_)

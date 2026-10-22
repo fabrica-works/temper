@@ -29,6 +29,8 @@ pub struct Config {
     /// The charter the forge's procedures start their agent work under, one
     /// of the core's charters (domain/root.md, 6).
     pub forge_charter: u32,
+    pub forges: Box<[forge::Configured]>,
+    pub under_box: bool,
 }
 
 /// What the root keeps of its configuration once its children hold theirs.

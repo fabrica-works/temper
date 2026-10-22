@@ -48,7 +48,7 @@ pub struct Domain {
     pub(crate) brief_sections: Map<u64, Box<[BriefSection]>>,
     pub(crate) run_workspaces: Map<u64, PreparedWorkspace>,
     pub(crate) forge: forge::Domain,
-    pub(crate) application: Option<(Token, forge::Adoption)>,
+    pub(crate) application: Option<(Token, forge::Ask)>,
     pub(crate) next_application_owner: u64,
     pub(crate) adoption_restore: Map<Token, Option<forge::Repository>>,
     pub(crate) forge_subscribing: Map<Token, forge::Subscriber>,
@@ -173,8 +173,15 @@ impl Domain {
             skein_forge_client::Config { namespace: Box::new([]), writers: Box::new([]) },
         );
         forge_config.namespace = Box::from(config.core.deployment);
-        let mut forge = forge::Domain::new(&limits.forge, config.core.seed, forge_config, &config.identities)
-            .expect("valid forge configuration");
+        let mut forge = forge::Domain::new(
+            &limits.forge,
+            config.core.seed,
+            forge_config,
+            &config.identities,
+            &config.forges,
+            config.under_box,
+        )
+        .expect("valid forge configuration");
         let built = policy_translate::build_landing(
             &config.landing.deployment,
             false,
@@ -535,7 +542,6 @@ pub(crate) fn stage_now(domain: &mut Domain, out: &mut Queue<Request>) {
             | Request::Party(_)
             | Request::Setup { .. }
             | Request::SetUp { .. }
-            | Request::SetUpRefused { .. }
             | Request::Forge { .. }
             | Request::Store(crate::StoreRequest::Load { .. } | crate::StoreRequest::Read { .. })
             | Request::ToChild(_)
@@ -791,6 +797,7 @@ fn released_into(domain: &mut Domain, _env: &Env<Limits>, released: Released, ou
         | Delivery::ForgeCall { .. }
         | Delivery::Procedure { .. }
         | Delivery::Assigned { .. }
+        | Delivery::Forges { .. }
         | Delivery::Panel { .. }
         | Delivery::Application { .. }
         | Delivery::WebReply { .. }
@@ -915,7 +922,14 @@ pub fn refused(mut config: Config, limits: &Limits) -> Box<[Refused]> {
         skein_forge_client::Config { namespace: Box::new([]), writers: Box::new([]) },
     );
     forge_config.namespace = Box::from(config.core.deployment);
-    let Ok(mut forge) = forge::Domain::new(&limits.forge, config.core.seed, forge_config, &config.identities) else {
+    let Ok(mut forge) = forge::Domain::new(
+        &limits.forge,
+        config.core.seed,
+        forge_config,
+        &config.identities,
+        &config.forges,
+        config.under_box,
+    ) else {
         refused.push(Refused::Forges).expect("counted refusals");
         return refused.into_boxed();
     };

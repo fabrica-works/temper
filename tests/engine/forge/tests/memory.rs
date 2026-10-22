@@ -26,6 +26,8 @@ fn bounded_connector_tables_and_client_fit_the_declared_heap() {
                 writers: Box::new([skein_forge_client::Writer { forge: REPO.forge, author: 1 }]),
             },
             &[top::GitIdentity { forge: REPO.forge, credential: 1 }],
+            &[],
+            false,
         )
         .expect("admitted limits");
         let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
