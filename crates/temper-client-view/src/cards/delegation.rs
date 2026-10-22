@@ -51,6 +51,7 @@ pub(crate) fn card(b: &mut Builder, task: &c::Task, words: &Words, bindings: &mu
             b.style(look::STEP);
             if index < usize::from(done) {
                 b.style(look::STEP_DONE);
+                b.state(skein_ui::State::Completed);
             }
             words.text(b, *step, &[]);
             b.close();

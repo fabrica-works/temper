@@ -85,7 +85,7 @@ fn result_anchor_preserves_the_landed_words_and_task_link() {
     // of the result's merge commit, and keeps the four stand-in steps in
     // their design order.
     person.wait_for(
-        format!("Task 2:\n    T2 · CHANGE\n    * Landed\n    ### Export widget's table as CSV\n    CI passed. Landed · merge commit {merge}\n    Steps:\n      - Branch pushed\n      - Pull request opened\n      - CI passed\n      - Landed\n", merge = demo_merge_short_id()).as_bytes(),
+        format!("Task 2:\n    T2 · CHANGE\n    * Landed\n    ### Export widget's table as CSV\n    CI passed. Landed · merge commit {merge}\n    Steps:\n      - Branch pushed (completed)\n      - Pull request opened (completed)\n      - CI passed (completed)\n      - Landed (completed)\n", merge = demo_merge_short_id()).as_bytes(),
         WITHIN,
     );
     person.type_on(b"Task 2", b"");

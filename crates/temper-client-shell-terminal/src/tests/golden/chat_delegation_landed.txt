@@ -33,10 +33,10 @@ Conversation:
     ### Export widget's table as CSV
     CI passed. Landed · merge commit 1a2b3c4
     Steps:
-      - Branch pushed
-      - Pull request opened
-      - CI passed
-      - Landed
+      - Branch pushed (completed)
+      - Pull request opened (completed)
+      - CI passed (completed)
+      - Landed (completed)
     [8] Task 2 ↗
   1 tool call
   wait

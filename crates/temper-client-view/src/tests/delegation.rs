@@ -421,6 +421,27 @@ fn a_landed_change_ticks_its_steps_and_says_its_merge_commit() {
     assert!(find(&view, Find::text("CI passed. Landed · merge commit 1a2b3c4".as_bytes())).is_some());
     steps(&view, true);
 }
+fn completed_steps(task: c::Task) -> u32 {
+    let view = view(Some(task), &[CHANGE], false);
+    let mut count = 0_u32;
+    for node in view.tree().nodes() {
+        if node.states.as_slice().contains(&skein_ui::State::Completed) {
+            assert_eq!(node.role, Role::Item);
+            assert!(node.styles.as_slice().contains(&look::STEP));
+            assert!(node.styles.as_slice().contains(&look::STEP_DONE));
+            count = count.checked_add(1).expect("completed step count");
+        }
+    }
+    count
+}
+#[test]
+fn a_landed_cards_four_steps_are_completed_items() {
+    assert_eq!(completed_steps(landed()), STEPS);
+}
+#[test]
+fn a_running_cards_steps_are_not_completed() {
+    assert_eq!(completed_steps(change()), 0);
+}
 fn wake(called: bool, summary: &[u8]) -> c::ActivityPage {
     let mut blocks = List::with_capacity(1);
     blocks.push(c::Block::Result { call: 8, summary: text(summary), failed: false }).expect("wake result");
