@@ -85,32 +85,37 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         if let Some(change) = change {
             super::change::start(b, change, words, bindings);
         }
-        if let Some(document) = root.client().document(page.tree)
+        let word = match task.chip.executor {
+            c::Executor::Procedure { .. } => Word::ItsTasks,
+            c::Executor::Agent { .. } | c::Executor::Party { .. } | c::Executor::Role { .. } => Word::Plan,
+        };
+        let ended = match &page.ended {
+            Some(task::Ended { page: Some(page), .. }) if word == Word::ItsTasks => Some((
+                page.as_ref(),
+                match task.chip.phase {
+                    c::Phase::Ended | c::Phase::Done | c::Phase::Failed | c::Phase::Cancelled => true,
+                    c::Phase::Waiting
+                    | c::Phase::Idle
+                    | c::Phase::Due
+                    | c::Phase::Preparing
+                    | c::Phase::Claimed
+                    | c::Phase::Running
+                    | c::Phase::Active
+                    | c::Phase::BackingOff
+                    | c::Phase::Closing
+                    | c::Phase::Held => false,
+                },
+            )),
+            Some(_) | None => None,
+        };
+        let tree = if let Some(document) = root.client().document(page.tree)
             && let Some(Latest::Jig(tree)) = document.latest
         {
-            let word = match task.chip.executor {
-                c::Executor::Procedure { .. } => Word::ItsTasks,
-                c::Executor::Agent { .. } | c::Executor::Party { .. } | c::Executor::Role { .. } => Word::Plan,
-            };
-            let ended = match &page.ended {
-                Some(task::Ended { page: Some(page), .. }) if word == Word::ItsTasks => Some((
-                    page.as_ref(),
-                    match task.chip.phase {
-                        c::Phase::Ended | c::Phase::Done | c::Phase::Failed | c::Phase::Cancelled => true,
-                        c::Phase::Waiting
-                        | c::Phase::Idle
-                        | c::Phase::Due
-                        | c::Phase::Preparing
-                        | c::Phase::Claimed
-                        | c::Phase::Running
-                        | c::Phase::Active
-                        | c::Phase::BackingOff
-                        | c::Phase::Closing
-                        | c::Phase::Held => false,
-                    },
-                )),
-                Some(_) | None => None,
-            };
+            Some(tree)
+        } else {
+            None
+        };
+        if tree.is_some() || ended.is_some() {
             plan(b, tree, root, words, bindings, rows, Plan { word, ended });
         }
         if let Some(change) = change {
@@ -649,7 +654,7 @@ pub(crate) struct Plan<'a> {
 }
 pub(crate) fn plan(
     b: &mut Builder,
-    tree: &c::Delivery,
+    tree: Option<&c::Delivery>,
     root: &Domain,
     words: &Words,
     bindings: &mut Bindings,
@@ -666,7 +671,7 @@ pub(crate) fn plan(
     let mut has_tree_content = false;
     let mut empty = false;
     match tree {
-        c::Delivery::OwnerTree(tree) => {
+        Some(c::Delivery::OwnerTree(tree)) => {
             has_tree_content = !tree.rows.is_empty();
             empty = tree.rows.is_empty() && tree.held_below == 0 && tree.folded.is_empty();
             let mut stack = List::with_capacity(tree.rows.len());
@@ -696,7 +701,7 @@ pub(crate) fn plan(
             parent(b, &mut stack, None);
             has_tree_content |= folded(b, &[], tree.held_below, words);
         }
-        c::Delivery::Tree(tree) => {
+        Some(c::Delivery::Tree(tree)) => {
             let mut stack = List::with_capacity(tree.nodes.len());
             for node in &tree.nodes {
                 parent(b, &mut stack, node.parent);
@@ -711,19 +716,22 @@ pub(crate) fn plan(
             parent(b, &mut stack, None);
             has_tree_content |= counts(b, tree.folded, tree.held_below, words);
         }
-        c::Delivery::OwnerProject(_)
-        | c::Delivery::Me(_)
-        | c::Delivery::Task(_)
-        | c::Delivery::OwnerProposal(_)
-        | c::Delivery::Chips(_)
-        | c::Delivery::Inbox(_)
-        | c::Delivery::OwnerInbox(_)
-        | c::Delivery::Tasks(_)
-        | c::Delivery::Run(_)
-        | c::Delivery::RunState(_)
-        | c::Delivery::Deployment(_)
-        | c::Delivery::OwnerDeployment(_)
-        | c::Delivery::OwnerAccounts(_) => {}
+        Some(
+            c::Delivery::OwnerProject(_)
+            | c::Delivery::Me(_)
+            | c::Delivery::Task(_)
+            | c::Delivery::OwnerProposal(_)
+            | c::Delivery::Chips(_)
+            | c::Delivery::Inbox(_)
+            | c::Delivery::OwnerInbox(_)
+            | c::Delivery::Tasks(_)
+            | c::Delivery::Run(_)
+            | c::Delivery::RunState(_)
+            | c::Delivery::Deployment(_)
+            | c::Delivery::OwnerDeployment(_)
+            | c::Delivery::OwnerAccounts(_),
+        )
+        | None => {}
     }
     let (has_ended, more) = match ended {
         Some((page, _)) => ended_rows(b, tree, root, words, bindings, rows, page),
@@ -748,7 +756,7 @@ pub(crate) fn plan(
 }
 fn ended_rows(
     b: &mut Builder,
-    tree: &c::Delivery,
+    tree: Option<&c::Delivery>,
     root: &Domain,
     words: &Words,
     bindings: &mut Bindings,
@@ -762,7 +770,7 @@ fn ended_rows(
         for line in lines {
             let mut shown = false;
             match tree {
-                c::Delivery::OwnerTree(tree) => {
+                Some(c::Delivery::OwnerTree(tree)) => {
                     for row in &tree.rows {
                         if row.chip.task == line.chip.task {
                             shown = true;
@@ -770,7 +778,7 @@ fn ended_rows(
                         }
                     }
                 }
-                c::Delivery::Tree(tree) => {
+                Some(c::Delivery::Tree(tree)) => {
                     for node in &tree.nodes {
                         if node.chip.task != tree.task && node.chip.task == line.chip.task {
                             shown = true;
@@ -778,19 +786,22 @@ fn ended_rows(
                         }
                     }
                 }
-                c::Delivery::OwnerProject(_)
-                | c::Delivery::Me(_)
-                | c::Delivery::Task(_)
-                | c::Delivery::OwnerProposal(_)
-                | c::Delivery::Chips(_)
-                | c::Delivery::Inbox(_)
-                | c::Delivery::OwnerInbox(_)
-                | c::Delivery::Tasks(_)
-                | c::Delivery::Run(_)
-                | c::Delivery::RunState(_)
-                | c::Delivery::Deployment(_)
-                | c::Delivery::OwnerDeployment(_)
-                | c::Delivery::OwnerAccounts(_) => {}
+                Some(
+                    c::Delivery::OwnerProject(_)
+                    | c::Delivery::Me(_)
+                    | c::Delivery::Task(_)
+                    | c::Delivery::OwnerProposal(_)
+                    | c::Delivery::Chips(_)
+                    | c::Delivery::Inbox(_)
+                    | c::Delivery::OwnerInbox(_)
+                    | c::Delivery::Tasks(_)
+                    | c::Delivery::Run(_)
+                    | c::Delivery::RunState(_)
+                    | c::Delivery::Deployment(_)
+                    | c::Delivery::OwnerDeployment(_)
+                    | c::Delivery::OwnerAccounts(_),
+                )
+                | None => {}
             }
             if !shown {
                 chip(b, &line.chip, words, bindings);

@@ -100,7 +100,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             if delegates || !page.cards.is_empty() {
                 super::task::plan(
                     b,
-                    tree,
+                    Some(tree),
                     root,
                     words,
                     bindings,

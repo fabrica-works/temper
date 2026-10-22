@@ -112,8 +112,10 @@
 .temper-page:has(> .temper-task-acts) > * { grid-column: 1 / -1; }
 .temper-main.temper-page:has(> .temper-task-acts) > .temper-task-heading { grid-column: 1; grid-row: 2; width: auto; margin-left: max(24px, calc((100vw - 1160px) / 2)); margin-right: 0; }
 .temper-main.temper-page > .temper-task-acts { grid-column: 2; grid-row: 2; display: flex; flex-wrap: wrap; align-content: flex-start; align-items: center; gap: 7px; width: auto; max-width: 320px; margin: 22px max(24px, calc((100vw - 1160px) / 2)) 19px 0; }
-.temper-task-acts > button { min-height: 28px; margin: 0; padding: 5px 9px; border: 1px solid #dcd5ca; border-radius: 4px; background: var(--temper-paper); color: var(--temper-ink); font: 600 11px/1.35 var(--temper-mono); white-space: nowrap; }
-.temper-task-acts > button:hover { border-color: #c9b7a8; background: #faf7f2; }
+.temper-task-acts > :is(button, a) { min-height: 28px; margin: 0; padding: 5px 9px; border: 1px solid #dcd5ca; border-radius: 4px; background: var(--temper-paper); color: var(--temper-ink); font: 600 11px/1.35 var(--temper-mono); white-space: nowrap; }
+.temper-task-acts > :is(button, a):hover { border-color: #c9b7a8; background: #faf7f2; }
+/* .task-toolbar .button: an external link in the toolbar, drawn as its buttons. */
+.temper-task-acts > a { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; }
 .temper-task-acts > .temper-task-danger { color: var(--temper-red); }
 /* Admissions have words in place of buttons; retain their supplied order. */
 .temper-task-acts > p, .temper-task-acts > [role=status] { flex: 0 0 100%; margin: 0; font-size: 11px; line-height: 1.58; overflow-wrap: anywhere; }
@@ -148,25 +150,27 @@
 @media (max-width: 600px) { .temper-task-amend { margin-inline: 14px; } }
 
 /* .card.card-pad: the change's panel, containing its supplied parts. */
-.temper-change { margin: 0 24px 22px; padding: 18px 22px; border: 1px solid var(--temper-line); border-radius: 11px; background: var(--temper-paper); min-width: 0; overflow-wrap: anywhere; }
+.temper-change { margin: 0 24px 22px; padding: 15px 18px; border: 1px solid var(--temper-line); border-radius: 5px; background: var(--temper-paper); min-width: 0; overflow-wrap: anywhere; }
 /* .tag.accent: the change's identity in the header. */
-.temper-task-heading > .temper-meta:first-of-type > .temper-change-tag:first-child { background: var(--temper-accent-pale); color: var(--temper-accent-dark); padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+.temper-task-heading > .temper-meta:first-of-type > .temper-change-tag:first-child { background: var(--temper-accent-pale); color: var(--temper-accent-dark); padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
 /* .steps: six columns, with the supplied current and completed slots. */
-.temper-change .temper-steps { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; margin: 22px 0; padding: 0; list-style: none; }
+.temper-change .temper-steps { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; margin: 15px 0; padding: 0; list-style: none; }
 /* .step: the quiet slots ahead of the current step. */
-.temper-change .temper-step { border-top: 3px solid var(--temper-line); padding-top: 9px; font-size: 11px; color: var(--temper-muted); }
+.temper-change .temper-step { border-top: 3px solid var(--temper-line); padding-top: 9px; font-size: 10px; color: var(--temper-muted); }
 /* .step.done: completed slots. */
 .temper-change .temper-step-done { border-color: var(--temper-green); color: var(--temper-green); }
 /* .step.current: the supplied current slot. */
 .temper-change .temper-step-current { border-color: var(--temper-accent); color: var(--temper-accent-dark); font-weight: 700; }
 /* .notice: the held step and its reason. */
-.temper-change .temper-change-hold { padding: 15px 18px; border-radius: 11px; background: var(--temper-amber-pale); color: var(--temper-amber); border: 1px solid var(--temper-line); font-size: 12px; line-height: 1.5; }
+.temper-change .temper-change-hold { padding: 11px 14px; border-radius: 4px; background: var(--temper-amber-pale); color: #6f5738; border: 1px solid #ecdfc7; font-size: 11px; line-height: 1.5; }
 /* .gate: a name and its verdict in one row. */
-.temper-change .temper-gate { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--temper-line); font-size: 11px; }
-/* .section-heading: the two regions inside the change's card. */
-.temper-change > [role=region] > h2 { margin: 20px 0 7px; font-size: 14px; font-weight: 700; }
+.temper-change .temper-gate { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid #f0ede8; /* style.css .gate */ font-size: 11px; }
+/* .section-heading h3: the two regions inside the change's card. */
+.temper-change > [role=region] > h2 { margin: 23px 0 9px; font-size: 12px; font-weight: 700; line-height: 1.35; }
 /* .gate strong: the name carries the row's weight. */
 .temper-change .temper-gate > p:first-child { font-weight: 700; }
+/* .gate strong.muted: "No other gate.", a name with no verdict. */
+.temper-change .temper-gate > p:only-child { color: var(--temper-muted); }
 /* .gate span: its state stays muted. */
 .temper-change .temper-gate > p { margin: 0; }
 .temper-change .temper-gate > p + p { color: var(--temper-muted); }

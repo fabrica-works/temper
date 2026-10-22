@@ -348,6 +348,15 @@ pub fn root_with_ended(
     tree: c::Delivery,
     page: Option<c::TaskPage>,
 ) -> temper_client_domain::Domain {
+    root_with_optional_tree_and_ended(document, Some(tree), page)
+}
+
+/// Optionally deliver the tree before the document, then answer its ended read.
+pub fn root_with_optional_tree_and_ended(
+    document: c::Task,
+    tree: Option<c::Delivery>,
+    page: Option<c::TaskPage>,
+) -> temper_client_domain::Domain {
     use jig_client::{Event as E, Up};
     use temper_client_domain::{Event, Request};
     let limits = domain_limits();
@@ -355,9 +364,11 @@ pub fn root_with_ended(
         root_at_with_tree(temper_client_domain::Address::Task { task: document.chip.task }, &limits);
     let env = Env { now: NO_TIME, wall: AT_EPOCH, limits };
     let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));
-    for (watch, value) in
-        [(tree_watch.expect("tree watch"), tree), (watch.expect("task watch"), c::Delivery::Task(Box::new(document)))]
-    {
+    for (watch, value) in [
+        (tree_watch.expect("tree watch"), tree),
+        (watch.expect("task watch"), Some(c::Delivery::Task(Box::new(document)))),
+    ] {
+        let Some(value) = value else { continue };
         temper_client_domain::step(
             &mut root,
             &env,

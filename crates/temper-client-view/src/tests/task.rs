@@ -100,7 +100,7 @@ fn a_plans_chip_links_to_its_tasks_page_by_number() {
     let mut bindings = crate::frame::Bindings::new(fixtures::tree_limits().bindings);
     crate::pages::task::plan(
         &mut builder,
-        &delivery,
+        Some(&delivery),
         &f::held_root(),
         &fixtures::words(),
         &mut bindings,
@@ -128,7 +128,7 @@ fn a_plan_with_no_live_task_says_so_in_its_region() {
         let mut builder = Builder::new(&fixtures::tree_limits());
         crate::pages::task::plan(
             &mut builder,
-            &delivery,
+            Some(&delivery),
             &f::held_root(),
             &fixtures::words(),
             &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
@@ -521,7 +521,7 @@ fn every_phase_has_the_same_status_token_in_the_header_and_its_plan_row() {
         let mut builder = Builder::new(&fixtures::tree_limits());
         crate::pages::task::plan(
             &mut builder,
-            &delivery,
+            Some(&delivery),
             &root,
             &fixtures::words(),
             &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
@@ -1078,7 +1078,7 @@ fn plan(delivery: &c::Delivery) -> Tree {
     let mut builder = Builder::new(&fixtures::tree_limits());
     crate::pages::task::plan(
         &mut builder,
-        delivery,
+        Some(delivery),
         &f::root(c::Executor::Agent { charter: CHARTER }, Some(PRIORITY)),
         &fixtures::words(),
         &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
@@ -1475,7 +1475,7 @@ fn both_plan_shapes_omit_the_goal_and_its_hold_and_keep_its_folds() {
         let mut builder = Builder::new(&fixtures::tree_limits());
         crate::pages::task::plan(
             &mut builder,
-            &delivery,
+            Some(&delivery),
             &root,
             &fixtures::words(),
             &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
@@ -2436,6 +2436,29 @@ fn its_empty_tasks_says_none_yet_while_it_lives_and_none_once_it_ends() {
         let region = subtree(&tree, region_index(&tree, b"Its tasks"));
         assert!(named(region, Role::Paragraph, expected));
         assert!(!named(region, Role::Paragraph, b"No live tasks."));
+    }
+}
+#[test]
+fn its_tasks_without_a_tree_draws_its_answered_ended_page() {
+    for (phase, empty_word) in [(c::Phase::Ended, b"None.".as_slice()), (c::Phase::Running, b"None yet.")] {
+        for empty in [false, true] {
+            let lines = [ended_line(ENDED_CHILD, c::OwnerTaskStatus::Done)];
+            let page = tasks_page(if empty { &[] } else { &lines }, false, false);
+            let root = f::root_with_optional_tree_and_ended(procedure_document(phase), None, Some(page));
+            let view = fixtures::page_view(&root);
+            let tree = view.tree();
+            let region = subtree(tree, region_index(tree, b"Its tasks"));
+            assert!(named(region, Role::Heading { level: 2 }, b"Its tasks"));
+            assert_eq!(named(region, Role::Paragraph, empty_word), empty);
+            assert!(!named(region, Role::Paragraph, b"No live tasks."));
+            assert_eq!(named(region, Role::TreeItem, b"Task 23"), !empty);
+            assert_eq!(named(region, Role::Link, b"Task 23"), !empty);
+            if !empty {
+                let child = subtree(tree, index_of(tree, Role::TreeItem, b"Task 23"));
+                assert!(named(child, Role::Status, b"Completed"));
+                assert!(has_style(child, look::PLAN_ROW));
+            }
+        }
     }
 }
 #[test]
