@@ -90,7 +90,9 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
     `ui-web.md`, 5.2; and, as jig's reference shell has it, the test
     address `/test/panic`, at which the shell panics at start, for
     skein's `panic` story (4.1);
-  - `host`: the client host: temper's client root and view, jig's
+  - `host`: the client host: temper's client root and view, and the
+    view's patch queue, reserved at start at the view's limit on
+    patches and drained each turn (skein's `ui-web.md`, 5.2); jig's
     mapping under `/jig` and its stream; the root's requests to jig's
     adapter (`jig-client-shell-web`'s `adapter`) and skein's transport,
     and their reports back to the root; and the wake, skein's timer

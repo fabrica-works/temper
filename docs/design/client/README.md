@@ -1173,7 +1173,8 @@ forge's form and its outcome's lines, the kinds' list at its longest,
 and one paragraph per part not read. Their text across a tree,
 `text_bytes`, is the nodes at a node's most text: a lower cap would be
 a guess, which skein-ui's builder turns into a panic on the page past
-it. skein's text shell counts its worst-case print from these limits,
+it. Their patches are four a node, the most a diff emits (skein's
+`ui.md`, section 7). skein's text shell counts its worst-case print from these limits,
 and reserves for each print only what that page's tree may print
 (6.8).
 
