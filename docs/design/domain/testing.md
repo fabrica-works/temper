@@ -606,9 +606,10 @@ and 10).
   stops them in reverse. Its stories: a task on each worker; a worker
   lost, killed mid-run; a worker hung, stopped past the grace and
   continued; a worker started later, and one restarted; and a mixed
-  document refused, exit 1. Each story's referee is the tier's, the
-  forge's state read from the fake forge's API, and no process of the
-  cluster outliving it. Without delegated cgroups the cluster's tests
+  document refused, exit 1. Each story's referee is the tier's: what
+  the engine records, read through the client (the forge's state, from
+  the fake forge's API, once it joins: ../protocol/README.md, 15.5), and
+  no process of the cluster outliving it. Without delegated cgroups the cluster's tests
   fail at their start, saying why (section 10).
 - **Outside the suites:** nextest profile `process`, run by
   `scripts/proof-one-process.sh`, which builds the binary and the fake

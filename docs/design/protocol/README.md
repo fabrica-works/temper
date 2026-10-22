@@ -884,6 +884,9 @@ w1, w2       temper serve DIRS     after the engine: each a worker alone
   each directory by `{proc.P.dir}` (skein's `lab.md`, 4.2). A cost
   class's `stop_seconds` is above each worker's stop bound and the
   engine's drain.
+  The experiment is the lab's canonical JSON (skein's `lab.md`, 2.2),
+  and each process's `memory_bytes` is the one its own document states,
+  within the lab's integers.
 - **Two readers.** skein's lab runner runs it as any experiment (skein's
   `lab.md`, section 5), its driver null until the lab's drivers come
   (15.7). temper's process tier reads it with
@@ -955,12 +958,33 @@ workers need no more; a worker of several slots is later (15.7).
   one on w2, each to its end; then the cluster stopped, each process
   exiting 0, no survivor.
 - **A worker lost:** w1 killed mid-run; its task's run is placed on w2
-  past the grace, and lands once.
+  past the grace, and lands once. Its tree is killed whole, so the
+  engine sees its link close and no silence is waited on. The retried
+  run resumes from the chat's committed turns, so w1's reply is in
+  them once, and the lost attempt's run ends as lost in the task's
+  activity. The killed process's end is the story's, not a failure.
 - **A worker hung:** w1 stopped past the grace, then continued; its run,
-  placed on w2, lands once, and w1's attempt lands nothing.
+  placed on w2, lands once, and w1's attempt lands nothing. First, a
+  stop past the engine's silence alone, continued within the fleet's
+  grace, heals: w1 links again and the same attempt answers there,
+  nothing placed twice. Then a stop held until the run is seen on w2
+  (never a length of time): once continued, w1 links again, its
+  listing of the fenced attempt is cancelled and what it sends of it
+  dropped, and w1 takes a new run on its one slot, which shows it
+  acted on the cancel; the fenced attempt's activity and turns are as
+  they were before the continue.
 - **A worker started later:** w2 started once w1's slot is taken; the
-  second task waits, then runs on w2 once it links. A restarted worker
-  links again at its position.
+  second task waits, claimed and unplaced, then runs on w2 once it
+  links. A restarted worker links again at its position: w1, its run
+  ended, is stopped alone, exits 0, and is started again on its own
+  directories; it prints `linked` again, is the engine's w1 again, and
+  takes a new run.
+- **Every story waits on what shows each step,** read through the
+  client and the processes' lines, never on a clock, within one bound;
+  w2 starts only once w1 holds its run, so which worker takes a chat is
+  never left to placement's order; and each chat is closed and ended
+  before the cluster stops, since a worker's ending under a waiting
+  run fails it into a retry.
 - **A mixed document,** each shape's departures, refuses its start,
   exiting 1 and naming the path.
 
