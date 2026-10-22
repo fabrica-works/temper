@@ -564,7 +564,7 @@ person's; the names are o/web-look's words for the pages:
    turn commits (`docs/design/protocol/llm.md`, 7; an agent process
    gives no provisional text, `client/tools.md`). The cue's turn writes
    the reply, then calls `wait`, which ends at the charter's
-   `waiting_ms`, 60 s (`cluster/engine.json`): the reply shows 60 s
+   `waiting_ms`, 120 s (`cluster/engine.json`): the reply shows 120 s
    after Start, most of a run's time, and the wait's 180 s (90 s before the user's doubling of 10-22, provisional) leave it a
    margin. A shorter fixture or `waiting_ms` would only hide it.
 3. `address`: the chat's, `/chats/<task>` on the origin, kept.

@@ -46,11 +46,11 @@ class FilesTests(unittest.TestCase):
                 self.assertEqual((LIVE / name).read_bytes(), (WEB / name).read_bytes())
         self.assertEqual((LIVE / 'stage').read_bytes(), (LOOK / 'stage').read_bytes())
         expected = (WEB / 'engine.json').read_bytes().replace(
-            b'"waiting_ms": 60000', b'"waiting_ms": 300000').replace(
-            b'"time_ms": 65000', b'"time_ms": 305000')
+            b'"waiting_ms": 120000', b'"waiting_ms": 300000').replace(
+            b'"time_ms": 130000', b'"time_ms": 310000')
         self.assertEqual((LIVE / 'engine.json').read_bytes(), expected)
         before, after = template(WEB / 'engine.json'), template(LIVE / 'engine.json')
-        before['engine']['charters'][0].update(waiting_ms=300000, time_ms=305000)
+        before['engine']['charters'][0].update(waiting_ms=300000, time_ms=310000)
         self.assertEqual(before, after)
         self.assertFalse((LIVE / 'checks/trouble').exists())
         self.assertEqual({p.relative_to(LIVE).as_posix() for p in LIVE.rglob('*') if p.is_file()},
