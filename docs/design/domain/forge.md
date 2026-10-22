@@ -290,8 +290,9 @@ temper-engine-domain-forge              the connector's top: resources and holds
   ask: the routing tells it each, as it does the others. `SetUp` is a
   keyed request, admitted by the core first (`../client/README.md`,
   section 8): the connector keeps its answer as its outcome, in memory
-  alone, the latest per forge under its request's token, and answers
-  unknown for a token it no longer holds.
+  alone, the latest per configured forge under its request's token and
+  one more for any forge not configured, and answers unknown for a
+  token it no longer holds.
 - **The deployment's forges,** the subject `forges`
   (`../client/forge.md`, 5.4): the connector makes its document from
   each configured forge's connection, as the routing last told it, and

@@ -865,15 +865,17 @@ for its kind, its user's login and its installations. Its nodes:
   as kept work at start (6.6; jig's `protocol/client.md`, section 10).
 - **The request, `Requesting`:** which of the family's requests it is,
   `Request`, as `Reading` names a read: `adopt`, `Adopt`, or `set_up`,
-  `SetUp` (below). Each is answered by its own record, `AdoptAnswer` or
-  `SetUpAnswer`, which the client decodes by the request it sent.
+  `SetUp` (below). Each is answered by the family's one record,
+  `Answer`, whose outcome is one of either request's (below); the client
+  refuses as undecodable an outcome that does not fit the request it
+  sent.
 - **`Adopt`:** the project (u32); the forge's number
   (u16); the owner, the name, the prefix and the landing branch (byte
   strings); the role (owned, fork or context); home and ci (booleans);
   the checks (a list of u32); and, when the owner and name are a picker
   row's, the forge's id for the repository and its owner's id (u64
   each, both or neither).
-- **Its outcome:**
+- **Its outcome,** `Answer`'s:
   - *adopted,* with the repository as the forge connector recorded it:
     its forge's number, its kind and its id; its owner and name; its role;
     whether it is the project's home; what temper may do there (the
@@ -897,12 +899,12 @@ for its kind, its user's login and its installations. Its nodes:
   `client/domain/contract.md`, 3.3), and the form shows it in jig's
   words.
 - **`SetUp`:** the forge's number (u16), of the deployment's scope
-  (section 8). Its outcome, `SetUpAnswer`: *setting up*, the box asked
-  for the forge's group; *refused*, with why: not offered (the forge's
-  connection does not offer it, or no such forge), not under the box,
-  or busy (`../protocol/forge.md`, 2.8); or *unknown*, its outcome no
-  longer held (section 8). A refusal at admission is jig's answer, as
-  for `Adopt`.
+  (section 8). Its outcome, `Answer`'s: *setting up*, the box asked
+  for the forge's group; *set up refused*, with why: not offered (the
+  forge's connection does not offer it, or no such forge), not under
+  the box, or busy (`../protocol/forge.md`, 2.8); or *unknown*, its
+  outcome no longer held (section 8), the same unknown as an
+  adoption's. A refusal at admission is jig's answer, as for `Adopt`.
 - **The small store's record of a pending request** is `jig-client`'s
   kept request, its request encoded by this crate as the family's bytes
   at `CLIENT_VERSION` (jig's `protocol/client.md`, section 10).
@@ -2591,7 +2593,8 @@ does for the client:
   restart, the key is unknown, as one past the retention is. A
   `SetUp`'s outcome is kept in memory alone too, as the ask it answers
   is (`../protocol/forge.md`, 2.8): the forge connector holds the
-  latest per forge, under its request's token, and the same key sent
+  latest per configured forge, and one more for a forge not configured,
+  under its request's token, and the same key sent
   again while it is held answers the same outcome and asks the box
   nothing; once a later `SetUp` of that forge replaces it, or after a
   restart, the key answers unknown.
