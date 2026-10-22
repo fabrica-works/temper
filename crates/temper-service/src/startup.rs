@@ -31,6 +31,29 @@ pub fn setup_files(checked: &temper_forge_setup::check::Checked) -> Box<[config:
     }
     files.into_boxed()
 }
+/// The same bounded read request is served before admission and by the running host.
+pub fn handover_reads(
+    document: &[u8],
+    directories: &config::Directories,
+    checked: &temper_forge_setup::check::Checked,
+) -> Result<Box<[crate::HandoverRead]>, Problems> {
+    let parsed = load(document, directories, false)?.1.expect("checked engine");
+    let mut reads = List::with_capacity(u32::try_from(checked.records_only.len()).expect("checked forges"));
+    for entry in &checked.setup.entries {
+        // temper-15 removes old forms; their existing file reads stay above.
+        if checked.records_only.contains(&entry.forge) {
+            reads
+                .push(crate::HandoverRead {
+                    forge: entry.forge,
+                    run: skein_lib::Token::new(0),
+                    path: handover_path(entry),
+                    max: parsed.application.limits.records.value_bytes,
+                })
+                .expect("one read per local forge");
+        }
+    }
+    Ok(reads.into_boxed())
+}
 fn setup_path(index: usize) -> Path {
     Path::root()
         .member(b"application")
@@ -45,6 +68,7 @@ fn setup_values(
     checked: Option<&temper_forge_setup::check::Checked>,
     files: &settings::Files,
     problems: &mut Problems,
+    max: u32,
 ) -> Box<[settings::Setup]> {
     let Some(checked) = checked else { return Box::new([]) };
     let mut values = List::with_capacity(u32::try_from(checked.setup.entries.len()).expect("checked setup entries"));
@@ -64,6 +88,22 @@ fn setup_values(
                     handover = Some(skein_lib::Secret::new(bytes));
                 } else {
                     problems.push_file(at, What::Handover, Some(handover_path(entry)));
+                }
+            }
+        }
+        if checked.records_only.contains(&entry.forge) {
+            let path = handover_path(entry);
+            for (name, value) in &files.entries {
+                if *name == path {
+                    if value.expose().len() > usize::try_from(max).expect("record bound") {
+                        problems.push_file(
+                            setup_path(index).member(b"admin_token"),
+                            What::Handover,
+                            Some(path.clone()),
+                        );
+                    } else {
+                        handover = Some(value.clone());
+                    }
                 }
             }
         }
@@ -538,7 +578,7 @@ fn checked_start(
     if !problems.is_empty() {
         return Err(problems);
     }
-    let setup_values = setup_values(setup, files, &mut problems);
+    let setup_values = setup_values(setup, files, &mut problems, parsed.application.limits.records.value_bytes);
     if !problems.is_empty() {
         return Err(problems);
     }

@@ -776,6 +776,9 @@ pub fn bounded_records(directory: &Path) -> Bounded {
         .remove("orgs")
         .expect("bounded records fixture");
     value["application"]["setup"][0]["mode"]["owned"]["person"]["orgs"] = orgs;
+    // The records-only certificate also admits the longest configured directory
+    // and a full records.value_bytes handover, without real filesystem reads.
+    value["application"]["setup"][0]["directory"] = format!("/{}", "p".repeat(4095)).into();
     bounded_document(
         directory,
         value,
@@ -881,6 +884,16 @@ fn bounded_document(directory: &Path, mut value: serde_json::Value, forge: tempe
     let setup = checked_setup(&document, &named);
     let mut named_files = named.files.into_vec();
     named_files.extend(temper_service::startup::setup_files(&setup));
+    for read in temper_service::startup::handover_reads(&document, &jig_protocol_config::Directories::working(), &setup)
+        .expect("bounded handover declarations")
+    {
+        named_files.push(jig_protocol_config::File {
+            at: jig_protocol_config::Path::root(),
+            path: read.path,
+            max: read.max,
+            private: true,
+        });
+    }
     let mut entries = List::with_capacity(u32::try_from(named_files.len()).expect("file count"));
     let token_bytes =
         temper_service::limits::profile(temper_service::limits::Profile::Small).forge_component.token_bytes;
@@ -894,6 +907,7 @@ fn bounded_document(directory: &Path, mut value: serde_json::Value, forge: tempe
                 b"webhook-secret".to_vec()
             }
             b"demo/forge/admin_token" => b"0123456789abcdef0123456789abcdef01234567".to_vec(),
+            name if name.ends_with(b"/admin_token") => vec![b't'; usize::try_from(file.max).expect("handover bound")],
             b"forge-1/git_token" | b"demo/forge/git_token" | b"forge-3/git_token" => b"git-token".to_vec(),
             name => fs::read(directory.join(std::ffi::OsStr::from_bytes(name))).expect("fixture file"),
         };

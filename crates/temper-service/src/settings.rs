@@ -89,7 +89,7 @@ pub struct Seeds {
 #[derive(Debug)]
 pub struct Setup {
     pub entry: temper_forge_setup::setup::Entry,
-    /// The admin's token, held until the start-time adoptions end.
+    /// The private handover for `TakeOver`; temper-15 removes the old fake-adoption use.
     pub handover: Option<Secret>,
 }
 

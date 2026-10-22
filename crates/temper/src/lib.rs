@@ -349,7 +349,23 @@ fn prepare_with_limits(
     let user = skein_shell::effective_user();
     let mut named_files = named.files.into_vec();
     named_files.extend(service::startup::setup_files(&checked));
-    let files = read_files_with_asked(named_files.into_boxed_slice(), named.asked_files, user)?;
+    let mut files = read_files_with_asked(named_files.into_boxed_slice(), named.asked_files, user)?;
+    let reads = service::startup::handover_reads(bytes, &directories.jig(), &checked)
+        .map_err(|why| String::from_utf8_lossy(&service::startup::lines(&why)).into_owned())?;
+    let mut entries = List::with_capacity(
+        files.entries.len().checked_add(u32::try_from(reads.len()).expect("checked handovers")).expect("checked files"),
+    );
+    for entry in files.entries.into_boxed() {
+        entries.push(entry).expect("checked files");
+    }
+    for read in reads {
+        match host::read_handover(&read) {
+            Ok(Some(value)) => entries.push((read.path, value)).expect("checked handovers"),
+            Ok(None) => {}
+            Err(why) => return Err(format!("{}: the handover is unreadable: {why:?}", path(&read.path).display())),
+        }
+    }
+    files.entries = entries;
     let bundle = named.bundle.as_deref().map(|configured| bundle::read(configured, named.bundle_limits)).transpose()?;
     let runtime = if let Some(worker) = &named.worker {
         let root_path = path(&worker.root);

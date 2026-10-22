@@ -18,6 +18,8 @@ pub(super) enum Kind {
     Install,
     Accept,
     Reconcile,
+    LocalTakeOver,
+    LocalRemoval,
     LocalReconcile,
     LocalConnect,
     Adopt,
@@ -45,6 +47,38 @@ pub(super) struct Local {
     pub(super) webhooks: bool,
     pub(super) bot_login: Box<[u8]>,
     pub(super) identity: crate::settings::Identity,
+    pub(super) handover: Option<Secret>,
+    pub(super) path: Box<[u8]>,
+    pub(super) file: FileStep,
+    pub(super) trigger: Trigger,
+}
+#[derive(PartialEq, Eq, Debug)]
+pub(super) enum Trigger {
+    Start,
+    StartAsked,
+    Asked,
+}
+#[derive(Debug)]
+pub(super) enum FileStep {
+    Idle,
+    Reading { run: Token, sent: bool },
+    Read(Result<Option<Secret>, crate::HandoverUnread>),
+    Removing { run: Token, sent: bool },
+    Removed { run: Token, result: Result<(), i32> },
+}
+impl FileStep {
+    fn completed(&self) -> bool {
+        match self {
+            Self::Read(_) | Self::Removed { .. } => true,
+            Self::Idle | Self::Reading { .. } | Self::Removing { .. } => false,
+        }
+    }
+    fn idle(&self) -> bool {
+        match self {
+            Self::Idle => true,
+            Self::Read(_) | Self::Removed { .. } | Self::Reading { .. } | Self::Removing { .. } => false,
+        }
+    }
 }
 #[derive(Debug)]
 pub(super) enum Reconcile {
@@ -58,6 +92,7 @@ pub(super) struct Lifecycle {
     deleting: Map<u16, ()>,
     pub(super) installations: Map<(u16, u64), domain::Installation>,
     next_run: u64,
+    restored: bool,
 }
 impl Lifecycle {
     pub(super) fn local(&self, forge: u16) -> Option<&Local> {
@@ -75,8 +110,7 @@ impl Lifecycle {
     pub(super) fn ready(&self, runs: &Map<Token, Run>, limit: u32, domain: &root::Domain) -> bool {
         for (_, pending) in &self.reconcile {
             if let Reconcile::Local(local) = pending
-                && local.pending
-                && local.restored
+                && (local.pending && local.restored || local.file.completed())
             {
                 return true;
             }
@@ -115,6 +149,7 @@ impl Lifecycle {
             deleting: Map::with_capacity(forges),
             installations: Map::with_capacity(count),
             next_run: 1,
+            restored: false,
         }
     }
 }
@@ -156,10 +191,8 @@ pub(super) fn kind(plan: &host::Plan) -> Kind {
         host::Plan::Reconcile { .. } => Kind::Reconcile,
         host::Plan::Adopt { .. } => Kind::Adopt,
         host::Plan::Paste { .. } => unreachable!("temper-13 stages Paste"),
-        // 14a1-iii introduces the handover and TakeOver; Check remains a later plan.
-        host::Plan::Check { .. } | host::Plan::TakeOver { .. } => {
-            unreachable!("Check is not staged; 14a1-iii introduces TakeOver")
-        }
+        host::Plan::TakeOver { .. } => Kind::LocalTakeOver,
+        host::Plan::Check { .. } => unreachable!("Check is not staged"),
         host::Plan::Reachable { .. } => unreachable!("temper-10 stages Reachable"),
     }
 }
@@ -216,6 +249,12 @@ pub(super) enum Purpose {
 pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: reconcile::Outcome) {
     let run = engine.setup.runs.get(&token).expect("ended setup run");
     let (forge, kind) = (run.forge, run.kind);
+    if kind == Kind::LocalTakeOver {
+        engine.setup.runs.get_mut(&token).expect("takeover done").kind = Kind::LocalRemoval;
+        engine.setup.lifecycle.local_mut(forge).expect("local takeover").file =
+            FileStep::Removing { run: token, sent: false };
+        return;
+    }
     if kind == Kind::LocalReconcile {
         engine.setup.runs.get_mut(&token).expect("reconcile done").kind = Kind::LocalConnect;
         let origin = records::origin(connection::settings::Kind::Forgejo, &configured(engine, forge).api).encode();
@@ -267,17 +306,16 @@ pub(super) fn stopped(engine: &mut crate::engine::Engine, token: Token, failure:
     if run.kind == Kind::Adopt {
         engine.setup.lifecycle.adoptions.remove(&run.forge);
     }
-    if run.kind == Kind::LocalReconcile {
+    if run.kind == Kind::LocalReconcile || run.kind == Kind::LocalTakeOver {
         let forge = run.forge;
-        engine.notes.push(crate::Note::ForgeSetupStopped {
-            number: forge,
-            why: crate::SetupStopped::Stopped {
-                plan: crate::SetupPlan::Reconcile,
-                step: crate::SetupStep { stage: failure.step, why: failure.why },
-            },
-        });
+        let plan =
+            if run.kind == Kind::LocalTakeOver { crate::SetupPlan::TakeOver } else { crate::SetupPlan::Reconcile };
         engine.setup.runs.remove(&token);
-        state(engine, forge, domain::Connection::NotConnected);
+        local_stopped(
+            engine,
+            forge,
+            crate::SetupStopped::Stopped { plan, step: crate::SetupStep { stage: failure.step, why: failure.why } },
+        );
         return;
     }
     let mut reason = failure_text(&failure);
@@ -489,7 +527,7 @@ pub(super) fn advance(engine: &mut crate::engine::Engine) {
         {
             continue;
         }
-        if start_pending(engine, *forge) {
+        if file_answer(engine, *forge) || start_pending(engine, *forge) {
             continue;
         }
         if busy(engine, *forge) {
@@ -591,15 +629,26 @@ pub(super) fn refused(engine: &mut crate::engine::Engine, run: Token, forge: u16
 
 /// Called only once the root has completed its restore, never by the records loader.
 pub(crate) fn restored(engine: &mut crate::engine::Engine) {
+    if engine.setup.lifecycle.restored {
+        return;
+    }
     for forge in &engine.workers.forges {
         if let Some(local) = engine.setup.lifecycle.local_mut(forge.number) {
             local.restored = true;
         }
     }
+    engine.setup.lifecycle.restored = true;
 }
 fn local_stopped(engine: &mut crate::engine::Engine, forge: u16, why: crate::SetupStopped) {
+    let local = engine.setup.lifecycle.local_mut(forge).expect("local failure");
+    local.handover = None;
+    let connection = match local.trigger {
+        Trigger::Start => domain::Connection::NotConnected,
+        Trigger::StartAsked if why == crate::SetupStopped::NotPrepared => domain::Connection::NotSetUp,
+        Trigger::StartAsked | Trigger::Asked => domain::Connection::SetUpFailed { why: local_failure(forge, &why) },
+    };
     engine.notes.push(crate::Note::ForgeSetupStopped { number: forge, why });
-    state(engine, forge, domain::Connection::NotConnected);
+    state(engine, forge, connection);
 }
 fn start_pending(engine: &mut crate::engine::Engine, forge: u16) -> bool {
     if let Some(local) = engine.setup.lifecycle.local(forge)
@@ -621,7 +670,23 @@ fn start_local(engine: &mut crate::engine::Engine, forge: u16) {
         local_stopped(engine, forge, crate::SetupStopped::Missing);
         return;
     }
-    // 14a1-iii introduces TakeOver; only an already kept AdminToken can start here.
+    if let Some(admin_token) = engine.setup.lifecycle.local_mut(forge).expect("local start").handover.take() {
+        let run = next_run(&mut engine.setup.lifecycle);
+        engine
+            .setup
+            .runs
+            .insert(
+                run,
+                Run { forge, kind: Kind::LocalTakeOver, internal: true, previous: domain::Connection::NotConnected },
+            )
+            .expect("admitted local takeover");
+        state(engine, forge, domain::Connection::Connecting);
+        super::run_plan(engine, run, host::Plan::TakeOver { forge, admin_token });
+        return;
+    }
+    reconcile_local(engine, forge);
+}
+fn reconcile_local(engine: &mut crate::engine::Engine, forge: u16) {
     let Some(rows) = engine.forge_records.rows.forge(forge) else {
         local_stopped(engine, forge, crate::SetupStopped::NotPrepared);
         return;
@@ -639,7 +704,7 @@ fn start_local(engine: &mut crate::engine::Engine, forge: u16) {
         Err(_) => false,
     };
     if !valid {
-        engine.notes.push(crate::Note::ForgeNotConnected { number: forge, why: records::NotConnected::Unreadable });
+        records_failed(engine, forge, records::NotConnected::Unreadable);
         return;
     }
     let expected = records::origin(connection::settings::Kind::Forgejo, &configured(engine, forge).api);
@@ -656,7 +721,7 @@ fn start_local(engine: &mut crate::engine::Engine, forge: u16) {
             Some(_) => None,
         };
         if let Some(why) = why {
-            engine.notes.push(crate::Note::ForgeNotConnected { number: forge, why });
+            records_failed(engine, forge, why);
             return;
         }
     }
@@ -679,7 +744,20 @@ fn start_local(engine: &mut crate::engine::Engine, forge: u16) {
     state(engine, forge, domain::Connection::Connecting);
     super::run_plan(engine, run, host::Plan::Reconcile { forge, adopted });
 }
-fn connect_local(engine: &mut crate::engine::Engine, forge: u16) {
+#[expect(clippy::disallowed_macros, reason = "record refusal contains only public origin information")]
+fn records_failed(engine: &mut crate::engine::Engine, forge: u16, why: records::NotConnected) {
+    if engine.setup.lifecycle.local(forge).expect("local failure").trigger != Trigger::Start {
+        state(
+            engine,
+            forge,
+            domain::Connection::SetUpFailed {
+                why: bounded_reason(alloc::format!("reconciling: {why}").into_bytes().into_boxed_slice()),
+            },
+        );
+    }
+    engine.notes.push(crate::Note::ForgeNotConnected { number: forge, why });
+}
+pub(super) fn connect_local(engine: &mut crate::engine::Engine, forge: u16) {
     let expected = records::origin(connection::settings::Kind::Forgejo, &configured(engine, forge).api);
     let rows = engine.forge_records.rows.forge(forge).expect("reconciled records");
     let local = engine.setup.lifecycle.local_mut(forge).expect("local connection");
@@ -702,7 +780,7 @@ fn connect_local(engine: &mut crate::engine::Engine, forge: u16) {
         skein_forge_setup::item::fits(skein_forge_setup::item::Item::GitToken, token, &engine.forge_records.bounds),
         "kept GitToken validated"
     );
-    if engine.values.identities.newest(local.identity.number).is_none() {
+    {
         local.identity.token = Secret::new(Box::from(token));
         let value = crate::translate::identity(&local.identity, &engine.workers.encoding.limits)
             .expect("checked identity bounds");
@@ -716,4 +794,171 @@ fn connect_local(engine: &mut crate::engine::Engine, forge: u16) {
         });
     }
     crate::forge::connect(engine, forge, Ok(crate::forge::Start::Restored(start)));
+}
+
+#[expect(clippy::disallowed_macros, reason = "closed credential-free setup diagnostic")]
+fn local_failure(forge: u16, why: &crate::SetupStopped) -> Box<[u8]> {
+    let text = match why {
+        crate::SetupStopped::NotPrepared => Box::from(b"the box's preparation left no handover".as_slice()),
+        crate::SetupStopped::Missing => Box::from(b"taking the handover: setup host missing".as_slice()),
+        crate::SetupStopped::Busy => Box::from(b"taking the handover: setup host busy".as_slice()),
+        crate::SetupStopped::Stopped { plan, step } => {
+            let action = match plan {
+                crate::SetupPlan::TakeOver => "taking the handover",
+                crate::SetupPlan::Reconcile => "reconciling",
+            };
+            alloc::format!("{action}: {:?}: {:?}", step.stage, step.why).into_bytes().into_boxed_slice()
+        }
+        crate::SetupStopped::Removal { errno, .. } => {
+            alloc::format!("removing the handover: forge {forge}'s admin_token: errno {errno}")
+                .into_bytes()
+                .into_boxed_slice()
+        }
+        crate::SetupStopped::Unreadable { why, .. } => {
+            alloc::format!("the handover is unreadable: forge {forge}'s admin_token: {why:?}")
+                .into_bytes()
+                .into_boxed_slice()
+        }
+    };
+    bounded_reason(text)
+}
+/// The client's setup reason is at most 256 bytes, including UTF-8 boundaries.
+#[expect(clippy::disallowed_methods, reason = "the diagnostic boundary cuts text at a UTF-8 character boundary")]
+pub(super) fn bounded_reason(text: Box<[u8]>) -> Box<[u8]> {
+    let text = core::str::from_utf8(&text).expect("diagnostic is UTF-8");
+    let mut end = text.len().min(256);
+    while !text.is_char_boundary(end) {
+        end = end.checked_sub(1).expect("a character starts before the bound");
+    }
+    Box::from(text.as_bytes().get(..end).expect("bounded character boundary"))
+}
+/// The box's preparation may create a fresh token on every ask.
+pub(crate) fn started(engine: &mut crate::engine::Engine, forge: u16) {
+    if engine.setup.closing || engine.drain.is_some() || engine.end.is_some() {
+        return;
+    }
+    if engine.setup.lifecycle.local(forge).is_none() {
+        // temper-15 retains old-form access; 14a2 moves the template to records and removes the box's reconcile step.
+        state(engine, forge, domain::Connection::NotConnected);
+        return;
+    }
+    let local = engine.setup.lifecycle.local_mut(forge).expect("local start");
+    local.trigger = Trigger::Asked;
+    local.pending = false;
+    if !local.file.idle() || busy(engine, forge) {
+        local_stopped(engine, forge, crate::SetupStopped::Busy);
+        return;
+    }
+    let run = next_run(&mut engine.setup.lifecycle);
+    engine.setup.lifecycle.local_mut(forge).expect("local start").file = FileStep::Reading { run, sent: false };
+    state(engine, forge, domain::Connection::Connecting);
+}
+pub(crate) fn take_read(engine: &mut crate::engine::Engine) -> Option<crate::HandoverRead> {
+    if engine.setup.closing || engine.drain.is_some() || engine.end.is_some() {
+        return None;
+    }
+    for configured in &engine.workers.forges {
+        let forge = configured.number;
+        if let Some(local) = engine.setup.lifecycle.local_mut(forge)
+            && let FileStep::Reading { run, sent } = &mut local.file
+            && !*sent
+        {
+            *sent = true;
+            return Some(crate::HandoverRead {
+                forge,
+                run: *run,
+                path: local.path.clone(),
+                max: engine.setup.value_bytes,
+            });
+        }
+    }
+    None
+}
+pub(crate) fn read(
+    engine: &mut crate::engine::Engine,
+    forge: u16,
+    run: Token,
+    answer: Result<Option<Secret>, crate::HandoverUnread>,
+) {
+    if engine.setup.closing || engine.drain.is_some() || engine.end.is_some() {
+        return;
+    }
+    let Some(local) = engine.setup.lifecycle.local_mut(forge) else { return };
+    let expected = match &local.file {
+        FileStep::Reading { run: active, sent } => *sent && *active == run,
+        FileStep::Idle | FileStep::Read(_) | FileStep::Removing { .. } | FileStep::Removed { .. } => false,
+    };
+    if !expected {
+        return;
+    }
+    local.file = FileStep::Read(match answer {
+        Ok(value) => {
+            // Shell inputs are bounded again at the service boundary before retention.
+            if let Some(value) = &value
+                && value.expose().len() > usize::try_from(engine.setup.value_bytes).expect("record bound")
+            {
+                Err(crate::HandoverUnread::TooLarge)
+            } else {
+                Ok(value)
+            }
+        }
+        Err(why) => Err(why),
+    });
+}
+pub(crate) fn take_removal(engine: &mut crate::engine::Engine) -> Option<crate::HandoverRemoval> {
+    if engine.setup.closing || engine.drain.is_some() || engine.end.is_some() {
+        return None;
+    }
+    for configured in &engine.workers.forges {
+        let forge = configured.number;
+        if let Some(local) = engine.setup.lifecycle.local_mut(forge)
+            && let FileStep::Removing { run, sent } = &mut local.file
+            && !*sent
+        {
+            *sent = true;
+            return Some(crate::HandoverRemoval { forge, run: *run, path: local.path.clone() });
+        }
+    }
+    None
+}
+pub(crate) fn removed(engine: &mut crate::engine::Engine, forge: u16, run: Token, result: Result<(), i32>) {
+    if engine.setup.closing || engine.drain.is_some() || engine.end.is_some() {
+        return;
+    }
+    let Some(local) = engine.setup.lifecycle.local_mut(forge) else { return };
+    let expected = match &local.file {
+        FileStep::Removing { run: active, sent } => *sent && *active == run,
+        FileStep::Idle | FileStep::Read(_) | FileStep::Reading { .. } | FileStep::Removed { .. } => false,
+    };
+    if !expected {
+        return;
+    }
+    local.file = FileStep::Removed { run, result };
+}
+/// Shell completions wait for the ordinary step's output room before doing work.
+fn file_answer(engine: &mut crate::engine::Engine, forge: u16) -> bool {
+    let Some(local) = engine.setup.lifecycle.local_mut(forge) else { return false };
+    if !local.file.completed() {
+        return false;
+    }
+    match core::mem::replace(&mut local.file, FileStep::Idle) {
+        FileStep::Read(Ok(value)) => {
+            local.handover = value;
+            start_local(engine, forge);
+        }
+        FileStep::Read(Err(why)) => {
+            let path = local.path.clone();
+            local_stopped(engine, forge, crate::SetupStopped::Unreadable { path, why });
+        }
+        FileStep::Removed { run, result } => {
+            let path = local.path.clone();
+            engine.setup.runs.remove(&run).expect("removal waits after TakeOver Done");
+            match result {
+                Ok(()) => reconcile_local(engine, forge),
+                Err(errno) => local_stopped(engine, forge, crate::SetupStopped::Removal { path, errno }),
+            }
+        }
+        FileStep::Idle | FileStep::Reading { .. } | FileStep::Removing { .. } => unreachable!("completed file IO"),
+    }
+    true
 }

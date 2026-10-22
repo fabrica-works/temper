@@ -2,6 +2,7 @@ use super::*;
 use crate::tests::fixtures;
 use skein_forge_setup::github::manifest::Target;
 use skein_lib::{List, Rng};
+use temper_engine_domain_forge as domain;
 use temper_protocol_records as records;
 
 fn service(states: u32, life: Duration) -> crate::Service {
@@ -872,12 +873,25 @@ fn local_service(config: crate::settings::Engine, store: crate::store::Store) ->
     service
 }
 fn restore_local(service: &mut crate::Service) {
+    // The generic kernel refuses unhandled network connects. Hold local work
+    // until restore completes, then give its real setup streams to Face.
+    let pending = match service.engine.as_mut().unwrap().setup.lifecycle.local_mut(1) {
+        Some(local) => {
+            let pending = local.pending;
+            local.pending = false;
+            Some(pending)
+        }
+        None => None,
+    };
     for _ in 0_u32..4096 {
         fixtures::turn(service);
         let engine = service.engine.as_mut().unwrap();
         if engine.domain.ready() {
-            // Drain the shell's IO until restore, then hold setup IO at its stream seam.
+            if let Some(pending) = pending {
+                engine.setup.lifecycle.local_mut(1).unwrap().pending = pending;
+            }
             crate::engine::iterate(engine, Time::from_nanos(1), Wall::from_nanos(1));
+            advance(engine);
             return;
         }
     }
@@ -916,6 +930,19 @@ fn kept_local_records_wait_for_restore_done_and_origin_before_connecting_as_the_
         assert!(engine.domain.adopted_ids(1).is_empty());
         restore_local(&mut service);
         assert_eq!(service.engine.as_ref().unwrap().domain.adopted_ids(1).as_ref(), &[41]);
+        let engine = service.engine.as_mut().unwrap();
+        let before = (engine.setup.io.len(), engine.setup.runs.len(), engine.setup.writes.len());
+        crate::engine::iterate(engine, Time::from_nanos(1), Wall::from_nanos(1));
+        assert_eq!(
+            (engine.setup.io.len(), engine.setup.runs.len(), engine.setup.writes.len()),
+            before,
+            "a second restore iterate changes no local setup work"
+        );
+        // A completed walk is never repeated, including for an already stopped local start.
+        engine.setup.lifecycle.local_mut(1).unwrap().restored = false;
+        lifecycle::restored(engine);
+        assert!(!engine.setup.lifecycle.local(1).unwrap().restored);
+        engine.setup.lifecycle.local_mut(1).unwrap().restored = true;
         let mut face = Face::new();
         reconcile_to_repository(&mut service, &mut face);
         assert!(service.engine.as_ref().unwrap().forge.starts.is_empty(), "held Reconcile has no access");
@@ -1138,8 +1165,8 @@ fn local_stops_missing_busy_and_origin_mismatch_leave_the_other_forge_served() {
         let engine = service.engine.as_ref().unwrap();
         let mut named = false;
         for note in &engine.notes {
-            named |= match (note, expected) {
-                (crate::Note::ForgeSetupStopped { number: 1, why }, Some(expected)) => *why == expected,
+            named |= match (note, expected.as_ref()) {
+                (crate::Note::ForgeSetupStopped { number: 1, why }, Some(expected)) => why == expected,
                 (crate::Note::ForgeNotConnected { number: 1, why: records::NotConnected::OtherForge { .. } }, None) => {
                     fault != 5
                 }
@@ -1166,4 +1193,418 @@ fn no_setup_events(engine: &crate::engine::Engine) {
             panic!("admin and setup stop text never enter root events");
         }
     }
+}
+
+fn told_local(engine: &crate::engine::Engine, expected: &domain::Connection) -> bool {
+    for event in &engine.events {
+        if let root::Event::Forge(event) = event
+            && let domain::Event::Connection { forge: 1, state } = event.as_ref()
+            && state == expected
+        {
+            return true;
+        }
+    }
+    false
+}
+fn with_handover(token: &[u8]) -> crate::settings::Engine {
+    let mut config = local_config(true, false);
+    config.setup[0].handover = Some(Secret::new(token.into()));
+    config
+}
+fn takeover_to_kept(service: &mut crate::Service, face: &mut Face) {
+    local_sent(service, face, b"GET /api/v1/user ");
+    face.reply(service, br#"{"id":1,"login":"temper-admin","is_admin":true}"#);
+    let engine = service.engine.as_mut().unwrap();
+    assert_eq!(engine.setup.writes.len(), 1);
+    assert_eq!(engine.setup.writes.first().unwrap().1.number, records::number(1, Item::AdminToken));
+    assert!(service.take_handover_removal().is_none(), "no removal before Kept");
+    let engine = service.engine.as_mut().unwrap();
+    assert!(engine.setup.answers.is_empty(), "Written waits for Kept");
+    let Some(StoreEvent::Kept { owner }) = engine.store.above.pop() else { panic!("durable AdminToken") };
+    answer(engine, StoreEvent::Kept { owner });
+    let Some((_, host::Answer::Written)) = engine.setup.answers.pop() else { panic!("Kept answers Written") };
+    assert!(service.take_handover_removal().is_none(), "Kept alone does not remove");
+    local_sent(service, face, b"GET /api/v1/settings/api ");
+    face.reply(service, br#"{"max_response_items":50,"default_paging_num":10}"#);
+    local_sent(service, face, b"GET /api/v1/admin/users/temper-admin/tokens");
+}
+fn takeover_done(service: &mut crate::Service, face: &mut Face) -> crate::HandoverRemoval {
+    takeover_to_kept(service, face);
+    face.hold_done = true;
+    face.reply(service, b"[]");
+    assert!(face.done.is_some());
+    assert!(service.take_handover_removal().is_none(), "held Done blocks removal");
+    service.engine.as_mut().unwrap().setup.above.push(face.done.take().unwrap());
+    advance(service.engine.as_mut().unwrap());
+    let remove = service.take_handover_removal().expect("Done requests removal");
+    assert!(service.take_handover_removal().is_none(), "one correlated removal");
+    assert!(service.engine.as_ref().unwrap().forge.starts.is_empty());
+    remove
+}
+fn box_started(service: &mut crate::Service) -> crate::HandoverRead {
+    while service.notes().pop().is_some() {}
+    let engine = service.engine.as_mut().unwrap();
+    let mut out = Queue::with_capacity(3);
+    engine.box_link = crate::route::box_link::Link::new(128, true);
+    engine.box_link.ask(1, Token::new(456), &mut out);
+    crate::route::box_link::drain(engine, &mut out);
+    engine.box_link.write = None;
+    engine.box_link.read(b"started 1\n", &mut out);
+    crate::route::box_link::drain(engine, &mut out);
+    assert!(told_local(engine, &domain::Connection::Connecting));
+    service.take_handover_read().expect("box preparation requests the handover")
+}
+fn finish_local(service: &mut crate::Service, face: &mut Face) {
+    face.hold_done = false;
+    reconcile_to_repository(service, face);
+    face.reply(service, br#"{"permission":"write","user":{"id":42,"login":"temper"}}"#);
+    let engine = service.engine.as_mut().unwrap();
+    assert!(engine.forge.starts.is_empty());
+    let Some(StoreEvent::Kept { owner }) = engine.store.above.pop() else { panic!("durable Origin") };
+    answer(engine, StoreEvent::Kept { owner });
+    assert_eq!(engine.forge.starts.get(0).unwrap().1.user, 42);
+    lifecycle::connected(engine, 1);
+}
+#[test]
+fn takeover_waits_for_kept_done_and_correlated_removal_before_restored_reconcile() {
+    let mut service = local_with_other(with_handover(b"test-admin"), local_store(false));
+    restore_local(&mut service);
+    let mut face = Face::new();
+    let remove = takeover_done(&mut service, &mut face);
+    other_progresses(&mut service);
+    service.handover_removed(2, remove.run, Ok(()));
+    advance(service.engine.as_mut().unwrap());
+    service.handover_removed(1, Token::new(0), Ok(()));
+    advance(service.engine.as_mut().unwrap());
+    let lifecycle::FileStep::Removing { .. } = service.engine.as_ref().unwrap().setup.lifecycle.local(1).unwrap().file
+    else {
+        panic!("unrelated removal answers change nothing")
+    };
+    service.handover_removed(1, remove.run, Ok(()));
+    advance(service.engine.as_mut().unwrap());
+    finish_local(&mut service, &mut face);
+    let engine = service.engine.as_mut().unwrap();
+    assert_eq!(engine.values.identities.newest(1).unwrap().0, 1);
+    engine.forge.starts.clear();
+    engine.forge_records.rows.push(
+        records::number(1, Item::GitToken),
+        Secret::new(records::encode(b"replacement-git").into_boxed_slice()),
+        engine.setup.value_bytes,
+    );
+    lifecycle::connect_local(engine, 1);
+    assert_eq!(engine.values.identities.newest(1).unwrap().0, 2, "every local connect puts the current git token");
+    let identity = fixtures::decoded_identity(engine.values.identities.newest(1).unwrap().1);
+    let temper_protocol_worker_wire::v1::Kind::Forgejo(token) = identity.kind() else { panic!("local git identity") };
+    assert!(token.token().expose() == b"replacement-git", "the next generation serves the replacement");
+    for generation in [1, 2] {
+        let mut count = 0_u32;
+        for event in &engine.events {
+            if let root::Event::Credential { number: 1, generation: found, .. } = event
+                && *found == generation
+            {
+                count = count.checked_add(1).unwrap();
+            }
+        }
+        assert_eq!(count, 1);
+    }
+}
+#[test]
+fn restart_always_takes_a_present_handover_even_when_the_record_differs() {
+    for next in [Some(b"test-admin".as_slice()), Some(b"different-admin".as_slice()), None] {
+        let mut service = local_service(with_handover(b"test-admin"), local_store(false));
+        restore_local(&mut service);
+        let mut face = Face::new();
+        let remove = takeover_done(&mut service, &mut face);
+        service.handover_removed(1, remove.run, Err(21_i32));
+        advance(service.engine.as_mut().unwrap());
+        let engine = service.engine.as_mut().unwrap();
+        assert!(engine.forge.starts.is_empty());
+        assert!(engine.setup.runs.is_empty(), "failed removal blocks reconcile");
+        let store = core::mem::replace(&mut engine.store, fixtures::records_store());
+        let config = match next {
+            Some(value) => with_handover(value),
+            None => local_config(true, false),
+        };
+        let mut restarted = local_service(config, store);
+        restore_local(&mut restarted);
+        let engine = restarted.engine.as_ref().unwrap();
+        let kind = engine.setup.runs.first().unwrap().1.kind;
+        assert_eq!(kind, if next.is_some() { Kind::LocalTakeOver } else { Kind::LocalReconcile });
+        if let Some(value) = next {
+            let mut face = Face::new();
+            let remove = takeover_done(&mut restarted, &mut face);
+            let engine = restarted.engine.as_ref().unwrap();
+            assert!(
+                engine.forge_records.rows.forge(1).unwrap().get(Item::AdminToken).unwrap() == value,
+                "the present handover replaces the record"
+            );
+            restarted.handover_removed(1, remove.run, Ok(()));
+            advance(restarted.engine.as_mut().unwrap());
+            assert_eq!(restarted.engine.as_ref().unwrap().setup.runs.first().unwrap().1.kind, Kind::LocalReconcile);
+        }
+    }
+}
+#[test]
+fn an_asked_forge_takes_its_handover_at_started_and_connects() {
+    let mut config = local_config(true, false);
+    config.setup[0].entry.asked = true;
+    let mut service = local_service(config, local_store(false));
+    restore_local(&mut service);
+    assert!(!service.engine.as_ref().unwrap().setup.lifecycle.local(1).unwrap().pending);
+    let engine = service.engine.as_ref().unwrap();
+    assert!(
+        told_local(engine, &domain::Connection::NotSetUp)
+            || engine.domain.forge_connection(1) == domain::Connection::NotSetUp,
+        "the stopped local start preserves the client's setup offer"
+    );
+    let read = box_started(&mut service);
+    assert!(service.take_handover_read().is_none());
+    service.handover_read(1, read.run, Ok(Some(Secret::new(b"test-admin".as_slice().into()))));
+    advance(service.engine.as_mut().unwrap());
+    let mut face = Face::new();
+    let remove = takeover_done(&mut service, &mut face);
+    service.handover_removed(1, remove.run, Ok(()));
+    advance(service.engine.as_mut().unwrap());
+    finish_local(&mut service, &mut face);
+    let engine = service.engine.as_ref().unwrap();
+    assert_eq!(engine.values.identities.newest(1).unwrap().0, 1);
+    assert!(told_local(engine, &domain::Connection::Connected { id: 42, login: b"temper".as_slice().into() }));
+}
+#[test]
+fn a_takeover_that_stops_at_started_fails_naming_its_step_and_keeps_the_file() {
+    let mut service = local_with_other(local_config(true, false), local_store(false));
+    restore_local(&mut service);
+    let read = box_started(&mut service);
+    service.handover_read(1, read.run, Ok(Some(Secret::new(Box::new([])))));
+    advance(service.engine.as_mut().unwrap());
+    advance(service.engine.as_mut().unwrap());
+    assert!(service.take_handover_removal().is_none());
+    let engine = service.engine.as_ref().unwrap();
+    assert!(told_local(
+        engine,
+        &domain::Connection::SetUpFailed { why: b"taking the handover: Admin: Missing".as_slice().into() }
+    ));
+    assert!(engine.forge.starts.is_empty());
+    other_progresses(&mut service);
+}
+#[test]
+fn a_failed_removal_at_started_blocks_reconcile_and_the_next_ask_takes_it_over_again() {
+    let mut service = local_service(local_config(true, false), local_store(false));
+    restore_local(&mut service);
+    for attempt in 0_u32..2 {
+        let read = box_started(&mut service);
+        service.handover_read(1, read.run, Ok(Some(Secret::new(b"test-admin".as_slice().into()))));
+        advance(service.engine.as_mut().unwrap());
+        let mut face = Face::new();
+        let remove = takeover_done(&mut service, &mut face);
+        service.handover_removed(1, remove.run, if attempt == 1 { Ok(()) } else { Err(21_i32) });
+        advance(service.engine.as_mut().unwrap());
+        let engine = service.engine.as_ref().unwrap();
+        assert!(engine.forge.starts.is_empty());
+        if attempt == 0 {
+            assert!(engine.setup.runs.is_empty());
+            assert!(told_local(
+                engine,
+                &domain::Connection::SetUpFailed {
+                    why: b"removing the handover: forge 1's admin_token: errno 21".as_slice().into()
+                }
+            ));
+        } else {
+            assert_eq!(engine.setup.runs.first().unwrap().1.kind, Kind::LocalReconcile);
+        }
+    }
+}
+#[test]
+fn takeover_stops_missing_and_busy_keep_the_handover_and_isolate_the_forge() {
+    for fault in 0_u8..4 {
+        let config = if fault == 1 { with_handover(b"") } else { with_handover(b"test-admin") };
+        let mut service = local_with_other(config, local_store(false));
+        for _ in 0_u32..8 {
+            crate::forge::records::advance(service.engine.as_mut().unwrap());
+        }
+        advance(service.engine.as_mut().unwrap());
+        if fault == 2 {
+            service.engine.as_mut().unwrap().setup.served.remove(&1);
+        }
+        if fault == 3 {
+            service
+                .engine
+                .as_mut()
+                .unwrap()
+                .setup
+                .runs
+                .insert(
+                    Token::new(76),
+                    Run {
+                        forge: 1,
+                        kind: Kind::Adopt,
+                        internal: true,
+                        previous: temper_engine_domain_forge::Connection::NotConnected,
+                    },
+                )
+                .unwrap();
+        }
+        restore_local(&mut service);
+        if fault == 0 {
+            let mut face = Face::new();
+            local_sent(&mut service, &mut face, b"GET /api/v1/user ");
+            face.wire.write(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n");
+            for _ in 0_u32..1024 {
+                face.turn(&mut service);
+            }
+        }
+        let expected = match fault {
+            0 | 1 => crate::SetupStopped::Stopped {
+                plan: crate::SetupPlan::TakeOver,
+                step: crate::SetupStep {
+                    stage: reconcile::Stage::Admin,
+                    why: if fault == 0 { reconcile::Why::Refused(403) } else { reconcile::Why::Missing },
+                },
+            },
+            2 => crate::SetupStopped::Missing,
+            3 => crate::SetupStopped::Busy,
+            _ => unreachable!(),
+        };
+        let engine = service.engine.as_ref().unwrap();
+        let mut named = false;
+        for note in &engine.notes {
+            if let crate::Note::ForgeSetupStopped { number: 1, why } = note {
+                named |= *why == expected;
+            }
+        }
+        assert!(named, "fault {fault} has its typed failure");
+        assert!(engine.forge.starts.is_empty());
+        assert!(engine.setup.lifecycle.local(1).unwrap().handover.is_none(), "stops discard the staged secret");
+        assert!(service.take_handover_removal().is_none(), "stops retain the file");
+        other_progresses(&mut service);
+    }
+}
+#[test]
+fn unreadable_or_missing_handover_at_started_is_a_named_retryable_failure() {
+    for answer in [Ok(None), Err(crate::HandoverUnread::Unsafe(skein_io::file::Unsafe::Link))] {
+        let mut service = local_service(local_config(true, false), local_store(false));
+        restore_local(&mut service);
+        let read = box_started(&mut service);
+        service.handover_read(1, read.run, answer);
+        advance(service.engine.as_mut().unwrap());
+        let engine = service.engine.as_ref().unwrap();
+        let mut failed = false;
+        for event in &engine.events {
+            if let root::Event::Forge(event) = event
+                && let domain::Event::Connection { forge: 1, state: domain::Connection::SetUpFailed { why } } =
+                    event.as_ref()
+            {
+                failed |= why.as_ref() == b"the box's preparation left no handover"
+                    || why.starts_with(b"the handover is unreadable: forge 1's admin_token: ");
+            }
+        }
+        assert!(failed);
+        assert!(engine.setup.runs.is_empty());
+        assert!(service.take_handover_removal().is_none());
+        let read = box_started(&mut service);
+        service.handover_read(1, read.run, Ok(Some(Secret::new(b"test-admin".as_slice().into()))));
+        advance(service.engine.as_mut().unwrap());
+        assert_eq!(service.engine.as_ref().unwrap().setup.runs.first().unwrap().1.kind, Kind::LocalTakeOver);
+    }
+}
+#[test]
+fn closing_discards_pending_file_correlations_and_late_answers() {
+    for removal in [false, true] {
+        let mut service = local_service(local_config(true, false), local_store(false));
+        restore_local(&mut service);
+        let read = box_started(&mut service);
+        let run = if removal {
+            service.handover_read(1, read.run, Ok(Some(Secret::new(b"test-admin".as_slice().into()))));
+            advance(service.engine.as_mut().unwrap());
+            takeover_done(&mut service, &mut Face::new()).run
+        } else {
+            read.run
+        };
+        service.engine.as_mut().unwrap().setup.close();
+        service.handover_read(1, run, Ok(Some(Secret::new(b"test-admin".as_slice().into()))));
+        advance(service.engine.as_mut().unwrap());
+        service.handover_removed(1, run, Ok(()));
+        advance(service.engine.as_mut().unwrap());
+        assert!(service.take_handover_read().is_none());
+        assert!(service.take_handover_removal().is_none());
+        assert!(service.engine.as_ref().unwrap().forge.starts.is_empty());
+    }
+}
+
+#[test]
+#[expect(clippy::disallowed_methods, reason = "the diagnostic protocol test checks UTF-8 after truncation")]
+fn setup_reasons_fit_the_wire_at_a_character_boundary() {
+    let mut text = skein_lib::Writer::new(257);
+    text.put(&[b'x'; 255]).unwrap();
+    text.put("é".as_bytes()).unwrap();
+    for (text, length) in [
+        (Box::from([b'x'; 255].as_slice()), 255),
+        (Box::from([b'x'; 256].as_slice()), 256),
+        (Box::from([b'x'; 257].as_slice()), 256),
+        (text.finish(), 255),
+    ] {
+        let reason = lifecycle::bounded_reason(text);
+        assert_eq!(reason.len(), length);
+        core::str::from_utf8(&reason).unwrap();
+    }
+}
+
+#[test]
+fn file_answers_wait_for_output_room_and_ignore_other_correlations() {
+    let mut service = local_service(local_config(true, false), local_store(false));
+    restore_local(&mut service);
+    let read = box_started(&mut service);
+    service.handover_read(2, read.run, Ok(None));
+    service.handover_read(1, Token::new(0), Ok(None));
+    let lifecycle::FileStep::Reading { sent: true, .. } =
+        service.engine.as_ref().unwrap().setup.lifecycle.local(1).unwrap().file
+    else {
+        panic!("unrelated read answers change nothing")
+    };
+    let engine = service.engine.as_mut().unwrap();
+    while engine.notes.room() > 0 {
+        engine.notes.push(crate::Note::ForgeSetupStopped { number: 2, why: crate::SetupStopped::Busy });
+    }
+    service.handover_read(1, read.run, Ok(Some(Secret::new(b"test-admin".as_slice().into()))));
+    advance(service.engine.as_mut().unwrap());
+    assert!(service.engine.as_ref().unwrap().setup.runs.is_empty(), "read waits for output room");
+    while service.notes().pop().is_some() {}
+    advance(service.engine.as_mut().unwrap());
+    let remove = takeover_done(&mut service, &mut Face::new());
+    let engine = service.engine.as_mut().unwrap();
+    while engine.notes.room() > 0 {
+        engine.notes.push(crate::Note::ForgeSetupStopped { number: 2, why: crate::SetupStopped::Busy });
+    }
+    service.handover_removed(1, remove.run, Ok(()));
+    advance(service.engine.as_mut().unwrap());
+    assert_eq!(service.engine.as_ref().unwrap().setup.runs.first().unwrap().1.kind, Kind::LocalRemoval);
+    while service.notes().pop().is_some() {}
+    advance(service.engine.as_mut().unwrap());
+    assert_eq!(service.engine.as_ref().unwrap().setup.runs.first().unwrap().1.kind, Kind::LocalReconcile);
+}
+
+#[test]
+fn a_missing_file_at_started_reconciles_the_kept_token_and_names_a_stop() {
+    let mut service = local_with_other(local_config(true, false), local_store(true));
+    restore_local(&mut service);
+    let mut face = Face::new();
+    for asked in [false, true] {
+        if asked {
+            let read = box_started(&mut service);
+            service.handover_read(1, read.run, Ok(None));
+            advance(service.engine.as_mut().unwrap());
+        }
+        assert_eq!(service.engine.as_ref().unwrap().setup.runs.first().unwrap().1.kind, Kind::LocalReconcile);
+        assert!(service.take_handover_removal().is_none());
+        local_sent(&mut service, &mut face, b"GET /api/v1/user ");
+        face.wire.write(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n");
+        for _ in 0_u32..1024 {
+            face.turn(&mut service);
+        }
+    }
+    assert!(told_local(
+        service.engine.as_ref().unwrap(),
+        &domain::Connection::SetUpFailed { why: b"reconciling: Admin: Refused(403)".as_slice().into() }
+    ));
+    other_progresses(&mut service);
 }

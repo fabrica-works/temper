@@ -209,6 +209,11 @@ fn local_starts(config: &crate::settings::Engine, layer: &mut super::Layer) -> R
         if !config.records_only.contains(&setup.entry.forge) {
             continue; // temper-15 removes old-form file startup and its fake adoption.
         }
+        if let Some(value) = &setup.handover
+            && value.expose().len() > usize::try_from(own.records.value_bytes).expect("record bound")
+        {
+            return Err(problem(b"records.value_bytes"));
+        }
         let source = source_forge(config, setup.entry.forge);
         assert!(source.api_token.is_none(), "records-only starts without access");
         let mut joined = None;
@@ -221,6 +226,15 @@ fn local_starts(config: &crate::settings::Engine, layer: &mut super::Layer) -> R
         let login = &setup.entry.bot.login;
         let local = super::lifecycle::Local {
             pending: true,
+            handover: setup.handover.clone(),
+            path: temper_forge_setup::place::Place { directory: setup.entry.directory.clone(), user: Box::new([]) }
+                .path(temper_forge_setup::place::File::AdminToken),
+            file: super::lifecycle::FileStep::Idle,
+            trigger: if setup.entry.asked {
+                super::lifecycle::Trigger::StartAsked
+            } else {
+                super::lifecycle::Trigger::Start
+            },
             restored: false,
             limits: {
                 let mut limits = own.setup.plan();

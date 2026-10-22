@@ -57,6 +57,14 @@ impl skein_shell::Host for Host {
         Some(Exit::Code(code))
     }
     fn drain(&mut self) {
+        while let Some(read) = self.service.take_handover_read() {
+            let answer = read_handover(&read);
+            self.service.handover_read(read.forge, read.run, answer);
+        }
+        while let Some(remove) = self.service.take_handover_removal() {
+            let removed = remove_handover(&remove);
+            self.service.handover_removed(remove.forge, remove.run, removed);
+        }
         while let Some(note) = self.service.listening().pop() {
             let lines = note_line(note);
             eprint!("{lines}");
@@ -77,6 +85,31 @@ impl skein_shell::Host for Host {
                 self.service.shutdown();
             }
         }
+    }
+}
+
+pub(crate) fn read_handover(
+    read: &temper_service::HandoverRead,
+) -> Result<Option<skein_lib::Secret>, temper_service::HandoverUnread> {
+    use temper_service::HandoverUnread;
+    match skein_shell::read_private_file(crate::path(&read.path), read.max, skein_shell::effective_user()) {
+        Ok(value) => {
+            let bytes = value.expose();
+            let bytes = bytes.strip_suffix(b"\n").unwrap_or(bytes);
+            Ok(Some(skein_lib::Secret::new(bytes.into())))
+        }
+        Err(skein_shell::Unread::Absent) => Ok(None),
+        Err(skein_shell::Unread::NotAFile) => Err(HandoverUnread::NotAFile),
+        Err(skein_shell::Unread::TooLarge { .. }) => Err(HandoverUnread::TooLarge),
+        Err(skein_shell::Unread::Unsafe(why)) => Err(HandoverUnread::Unsafe(why)),
+        Err(skein_shell::Unread::Kernel(error)) => Err(HandoverUnread::Kernel(crate::errno(error))),
+    }
+}
+fn remove_handover(remove: &temper_service::HandoverRemoval) -> Result<(), i32> {
+    match std::fs::remove_file(crate::path(&remove.path)) {
+        Ok(()) => Ok(()),
+        Err(why) if why.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(why) => Err(why.raw_os_error().expect("unlink returns an errno")),
     }
 }
 
@@ -166,7 +199,13 @@ fn note_line(note: temper_service::Note) -> String {
                 SetupStopped::NotPrepared => "prepare it with `temper forge prepare`".into(),
                 SetupStopped::Missing => "setup host missing".into(),
                 SetupStopped::Busy => "setup host busy".into(),
-                SetupStopped::Stopped { plan: SetupPlan::Reconcile, step } => {
+                SetupStopped::Removal { path, errno } => {
+                    format!("removing the handover: {}: errno {errno}", crate::path(&path).display())
+                }
+                SetupStopped::Unreadable { path, why } => {
+                    format!("the handover is unreadable: {}: {why:?}", crate::path(&path).display())
+                }
+                SetupStopped::Stopped { plan, step } => {
                     let reason = match step.why {
                         SetupWhy::Refused(status) => format!("refused {status}"),
                         why @ (SetupWhy::Missing
@@ -182,7 +221,11 @@ fn note_line(note: temper_service::Note) -> String {
                         | SetupWhy::Down
                         | SetupWhy::Unexpected) => format!("{why:?}"),
                     };
-                    format!("reconciling stopped at {:?}: {reason}", step.stage)
+                    let action = match plan {
+                        SetupPlan::Reconcile => "reconciling",
+                        SetupPlan::TakeOver => "taking the handover",
+                    };
+                    format!("{action} stopped at {:?}: {reason}", step.stage)
                 }
             };
             format!("temper serve: forge {number}: Not connected: {why}\n")
@@ -416,4 +459,51 @@ fn setup_stops_print_the_forge_plan_and_typed_step_without_a_subject() {
             format!("temper serve: forge 3: Not connected: {line}\n")
         );
     }
+}
+
+#[test]
+fn the_shell_removes_only_the_named_handover_and_reports_unlink_failure() {
+    use std::os::unix::ffi::OsStrExt;
+    let directory =
+        std::env::temp_dir().join(format!("temper-handover-{}", skein_shell::seed().expect("scratch name")));
+    std::fs::create_dir(&directory).expect("handover fixture");
+    let path = directory.join("admin_token");
+    let removal = temper_service::HandoverRemoval {
+        forge: 1,
+        run: skein_lib::Token::new(7),
+        path: path.as_os_str().as_bytes().into(),
+    };
+    assert!(remove_handover(&removal).is_ok(), "an absent handover counts as removed");
+    std::fs::create_dir(&path).expect("handover fixture");
+    std::fs::write(path.join("held"), b"").expect("handover fixture");
+    let errno = remove_handover(&removal).expect_err("an unlink failure is never acknowledged as removed");
+    let line = note_line(temper_service::Note::ForgeSetupStopped {
+        number: removal.forge,
+        why: temper_service::SetupStopped::Removal { path: removal.path.clone(), errno },
+    });
+    assert!(line.contains("removing the handover:") && line.contains(path.to_str().expect("handover fixture")));
+    std::fs::remove_dir_all(&path).expect("handover fixture");
+    std::fs::write(&path, b"").expect("handover fixture");
+    assert!(remove_handover(&removal).is_ok());
+    assert!(!path.exists());
+    std::fs::remove_dir(&directory).expect("handover fixture");
+}
+#[test]
+fn the_shell_trims_only_the_handovers_final_newline() {
+    use std::os::unix::{ffi::OsStrExt, fs::PermissionsExt};
+    let directory =
+        std::env::temp_dir().join(format!("temper-handover-read-{}", skein_shell::seed().expect("scratch name")));
+    std::fs::create_dir(&directory).expect("handover fixture");
+    let path = directory.join("admin_token");
+    std::fs::write(&path, b"test-admin\n").expect("handover fixture");
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).expect("handover fixture");
+    let read = temper_service::HandoverRead {
+        forge: 1,
+        run: skein_lib::Token::new(7),
+        path: path.as_os_str().as_bytes().into(),
+        max: 11,
+    };
+    let answer = read_handover(&read).expect("handover fixture").expect("handover fixture");
+    assert!(answer.expose() == b"test-admin", "the final LF is not part of the handover");
+    std::fs::remove_dir_all(directory).expect("handover fixture");
 }

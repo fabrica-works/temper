@@ -64,16 +64,40 @@ use jig_protocol_config::Problems;
 pub use skein_forge_setup::reconcile::{Stage as SetupStage, Why as SetupWhy};
 
 /// A startup setup failure contains only closed, credential-free values.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum SetupStopped {
     NotPrepared,
     Stopped { plan: SetupPlan, step: SetupStep },
     Missing,
     Busy,
+    Removal { path: Box<[u8]>, errno: i32 },
+    Unreadable { path: Box<[u8]>, why: HandoverUnread },
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SetupPlan {
     Reconcile,
+    TakeOver,
+}
+/// Closed file refusals carry no file contents.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum HandoverUnread {
+    NotAFile,
+    TooLarge,
+    Unsafe(skein_io::file::Unsafe),
+    Kernel(i32),
+}
+#[derive(Debug)]
+pub struct HandoverRead {
+    pub forge: u16,
+    pub run: skein_lib::Token,
+    pub path: Box<[u8]>,
+    pub max: u32,
+}
+#[derive(Debug)]
+pub struct HandoverRemoval {
+    pub forge: u16,
+    pub run: skein_lib::Token,
+    pub path: Box<[u8]>,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct SetupStep {

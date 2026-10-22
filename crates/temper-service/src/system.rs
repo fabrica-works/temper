@@ -244,6 +244,27 @@ impl Service {
             links: Queue::with_capacity(queue),
         })
     }
+    pub fn take_handover_read(&mut self) -> Option<crate::HandoverRead> {
+        crate::setup::lifecycle::take_read(self.engine.as_mut()?)
+    }
+    pub fn handover_read(
+        &mut self,
+        forge: u16,
+        run: Token,
+        answer: Result<Option<skein_lib::Secret>, crate::HandoverUnread>,
+    ) {
+        if let Some(engine) = &mut self.engine {
+            crate::setup::lifecycle::read(engine, forge, run, answer);
+        }
+    }
+    pub fn take_handover_removal(&mut self) -> Option<crate::HandoverRemoval> {
+        crate::setup::lifecycle::take_removal(self.engine.as_mut()?)
+    }
+    pub fn handover_removed(&mut self, forge: u16, run: Token, result: Result<(), i32>) {
+        if let Some(engine) = &mut self.engine {
+            crate::setup::lifecycle::removed(engine, forge, run, result);
+        }
+    }
     /// A manifest page can be reloaded until its own setup clock or capacity ends it.
     #[must_use]
     pub fn setup_page(&self, forge: u16, state: &[u8], now: Time) -> Option<&[u8]> {
@@ -843,6 +864,27 @@ fn checked_setup_bytes(settings: &settings::Engine) -> Option<u64> {
 fn startup_operations(io: &io::Limits, queue: u32, worker_operations: u32) -> Option<u32> {
     io::operations(io)?.checked_add(queue.checked_mul(4)?)?.checked_add(worker_operations)
 }
+fn handover_diagnostics(settings: &settings::Engine, queue: u32, events: u32) -> Option<u64> {
+    // Client reasons fit 256 bytes; only operator Notes carry the full path.
+    // Supplement the root's fixed reason allowance in retained connections
+    // and event/request handoffs, and price the full Note separately.
+    let mut file_diagnostic = 0_u64;
+    for setup in &settings.setup {
+        if settings.records_only.contains(&setup.entry.forge) {
+            file_diagnostic = file_diagnostic.max(u64::try_from(setup.entry.directory.len()).ok()?.checked_add(108)?);
+        }
+    }
+    let file_copies = u64::from(events)
+        .checked_mul(2)?
+        .checked_add(u64::from(queue))?
+        .checked_add(u64::try_from(settings.forges.len()).ok()?.checked_mul(2)?)?
+        .checked_add(4)?;
+    let reason_growth =
+        if file_diagnostic == 0 { 0 } else { 256_u64.checked_sub(temper_engine_domain_forge::STOPPED_TEXT_BYTES)? };
+    reason_growth
+        .checked_mul(file_copies)?
+        .checked_add(file_diagnostic.checked_mul(u64::try_from(settings.forges.len()).ok()?.checked_add(1)?)?)
+}
 fn memory(
     settings: &settings::Engine,
     root: &temper_engine_domain::Limits,
@@ -862,6 +904,7 @@ fn memory(
         settings.limits.forge.name_bytes.max(temper_protocol_worker_wire::v1::CEILINGS.identity_login),
     )?;
     let mut bytes = retained
+        .checked_add(handover_diagnostics(settings, queue, events)?)?
         .checked_add(connections)?
         .checked_add(crate::forge::held_worst_case(settings)?)?
         .checked_add(u64::try_from(size_of::<Service>()).ok()?)?

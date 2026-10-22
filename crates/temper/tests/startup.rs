@@ -1218,6 +1218,9 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + 18_056
             // The resolved client-capacity pair retained beside Checked: 24 + 25 B.
             + 49
+            // iii: handover/file-correlation state, Note layout and the one-time
+            // restored guard. File/Secret payloads are certified separately below.
+            + 624
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -1285,6 +1288,22 @@ fn records_only_owned_memory_admits_checked_input_at_the_exact_bound() {
     let scratch = support::Scratch::startup("records-owned-memory");
     let bounded = support::owned::bounded_records(scratch.path());
     let required = bounded.requirements();
+    let mut handovers = 0_u32;
+    for (path, value) in &bounded.files.entries {
+        if path.ends_with(b"/admin_token") {
+            assert_eq!(path.len(), 4096 + b"/admin_token".len());
+            assert_eq!(value.expose().len(), 4096);
+            handovers += 1;
+        }
+    }
+    assert_eq!(handovers, 1);
+    // iii's path, Secret, staged/read/removal/diagnostic overlap is admitted
+    // at both bounds; the embedded worker's certified envelope is unchanged.
+    assert_eq!(required.worker_bytes, 3_283_176_433_542);
+    eprintln!(
+        "records-only handover requirements: engine {}, worker {} bytes",
+        required.engine_bytes, required.worker_bytes
+    );
     check_bounded_startup(&bounded, required);
     scratch.remove();
 }
@@ -1555,6 +1574,7 @@ fn owned_memory_figures_for_a_worker_alone_include_its_process_and_no_engine() {
     // Holding the box pipe adds 24 B to the worker-alone process's Service.
     // Configured forges and volatile setup answers add 80 B through Service's
     // engine option here; an embedded worker's payload is unchanged.
+    // iii's one-time restored guard adds 8 B to that engine option's layout.
     let figure = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/figures/worker-alone-memory.txt");
     if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1") {
         fs::write(&figure, format!("{}\n", required.worker_bytes)).expect("worker-alone fixture");
@@ -1633,4 +1653,101 @@ fn an_asked_owned_forges_absent_files_are_left_out_but_existing_files_stay_priva
         }
         scratch.remove();
     }
+}
+
+fn records_owned(directory: &std::path::Path) {
+    let config = directory.join("temper.json");
+    let mut value: serde_json::Value =
+        serde_json::from_slice(&fs::read(&config).expect("configuration")).expect("JSON");
+    let forge = value["application"]["forges"][0].as_object_mut().expect("forge");
+    for member in ["api_token", "user", "webhook_secret"] {
+        forge.remove(member);
+    }
+    value["application"]["identities"][0].as_object_mut().expect("identity").remove("token");
+    let orgs =
+        value["application"]["setup"][0].as_object_mut().expect("setup").remove("orgs").expect("handover fixture");
+    value["application"]["setup"][0]["mode"]["owned"]["person"]["orgs"] = orgs;
+    support::write_private(&config, &serde_json::to_vec(&value).expect("configuration"));
+}
+#[test]
+fn records_only_handover_reads_are_private_optional_bounded_and_only_read_admin_token() {
+    for row in ["absent", "exact", "over", "newline", "public", "link", "parent-link", "directory", "unreadable"] {
+        let scratch = owned_example(&format!("handover-{row}"));
+        let directory = scratch.path();
+        records_owned(directory);
+        let forge = directory.join("forge-1");
+        fs::create_dir(&forge).expect("forge directory");
+        fs::set_permissions(&forge, fs::Permissions::from_mode(0o700)).expect("handover fixture");
+        let token = forge.join("admin_token");
+        // Every other old file is deliberately unsafe and must stay unread.
+        for name in ["api_token", "user", "git_token", "webhook_secret"] {
+            fs::write(forge.join(name), b"unused").expect("handover fixture");
+            fs::set_permissions(forge.join(name), fs::Permissions::from_mode(0o644)).expect("handover fixture");
+        }
+        match row {
+            "absent" => {}
+            "directory" => fs::create_dir(&token).expect("handover fixture"),
+            "link" => symlink(forge.join("api_token"), &token).expect("handover fixture"),
+            "parent-link" => {
+                fs::rename(&forge, directory.join("actual-forge")).expect("handover fixture");
+                symlink(directory.join("actual-forge"), &forge).expect("handover fixture");
+                support::write_private(&token, b"test-admin");
+            }
+            "exact" | "over" => support::write_private(&token, &vec![b'x'; if row == "exact" { 4096 } else { 4097 }]),
+            "newline" => support::write_private(&token, b"test-admin\n"),
+            "public" | "unreadable" => {
+                support::write_private(&token, b"test-admin");
+                fs::set_permissions(&token, fs::Permissions::from_mode(if row == "public" { 0o644 } else { 0o000 }))
+                    .expect("handover fixture");
+            }
+            _ => unreachable!(),
+        }
+        let answer = temper::prepare_in(&support::configuration::directories(directory));
+        if matches!(row, "absent" | "exact" | "newline") || (row == "unreadable" && skein_shell::effective_user() == 0)
+        {
+            assert!(answer.is_ok(), "{row}: bounded private handover accepted");
+        } else {
+            let why = answer.err().expect("unsafe handover refuses startup");
+            assert!(why.contains(&token.display().to_string()), "names the file");
+            assert!(why.contains("the handover is unreadable"));
+            assert!(!why.contains("test-admin"), "no handover in diagnostic");
+        }
+        if row == "unreadable" {
+            fs::set_permissions(&token, fs::Permissions::from_mode(0o600)).expect("handover fixture");
+        }
+        scratch.remove();
+    }
+}
+#[test]
+fn old_form_owned_does_not_read_a_handover() {
+    let scratch = owned_example("old-form-no-handover");
+    let forge = scratch.path().join("forge-1");
+    fs::create_dir(&forge).expect("handover fixture");
+    fs::create_dir(forge.join("admin_token")).expect("handover fixture");
+    // Asked old-form entries permit absent legacy files.
+    let config = scratch.path().join("temper.json");
+    let mut value: serde_json::Value =
+        serde_json::from_slice(&fs::read(&config).expect("handover fixture")).expect("handover fixture");
+    value["application"]["setup"][0]["start"] = "asked".into();
+    support::write_private(&config, &serde_json::to_vec(&value).expect("handover fixture"));
+    assert!(temper::prepare_in(&support::configuration::directories(scratch.path())).is_ok());
+    scratch.remove();
+}
+
+#[test]
+fn tls_is_refused_before_reading_the_handover() {
+    let scratch = owned_example("tls-before-handover");
+    records_owned(scratch.path());
+    fs::create_dir(scratch.path().join("forge-1")).expect("handover fixture");
+    fs::create_dir(scratch.path().join("forge-1/admin_token")).expect("handover fixture");
+    let config = scratch.path().join("temper.json");
+    let mut value: serde_json::Value =
+        serde_json::from_slice(&fs::read(&config).expect("handover fixture")).expect("handover fixture");
+    value["application"]["forges"][0]["transport"] =
+        serde_json::json!({"tls":{"server_name":"localhost", "trust":null}});
+    support::write_private(&config, &serde_json::to_vec(&value).expect("handover fixture"));
+    let why = temper::prepare_in(&support::configuration::directories(scratch.path())).err().expect("TLS refused");
+    assert!(!why.contains("the handover is unreadable"));
+    assert!(scratch.path().join("forge-1/admin_token").is_dir());
+    scratch.remove();
 }

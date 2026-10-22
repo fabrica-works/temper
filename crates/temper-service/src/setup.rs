@@ -89,8 +89,21 @@ pub(crate) fn worst_case(
             .ok()?,
         )?;
     }
+    let mut handovers = 0_u64;
+    for setup in &config.setup {
+        if config.records_only.contains(&setup.entry.forge) {
+            // Checked input, Files, Local, staged plan and shell read scratch overlap.
+            // The path is retained locally and cloned for a correlated read/removal.
+            let path = u64::try_from(setup.entry.directory.len()).ok()?.checked_add(12)?;
+            handovers = handovers
+                .checked_add(u64::try_from(size_of::<crate::HandoverRead>()).ok()?)?
+                .checked_add(path.checked_mul(3)?)?
+                .checked_add(u64::from(config.limits.records.value_bytes).checked_mul(5)?)?;
+        }
+    }
     // Retained strings, codec parts and their encoded copy can coexist.
-    host.checked_add(local_bytes.checked_mul(3)?)?
+    host.checked_add(handovers)?
+        .checked_add(local_bytes.checked_mul(3)?)?
         // Token, encoded identity, and copied parts overlap during the records handoff.
         .checked_add(u64::from(config.limits.records.value_bytes).checked_mul(4)?)?
         .checked_add(Map::<u16, ()>::worst_case(l.forges)?)? // served
@@ -215,6 +228,7 @@ impl Layer {
         }
         self.closing = true;
         self.lifecycle.adoptions = Map::with_capacity(self.env.limits.forges);
+        self.lifecycle.reconcile = Map::with_capacity(self.env.limits.forges);
         self.pages = Queue::with_capacity(self.env.limits.states);
         self.staged = Map::with_capacity(self.env.limits.runs);
         if self.component.is_some() {
