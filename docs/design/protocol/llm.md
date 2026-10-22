@@ -1,6 +1,6 @@
 # LLM calls
 
-Provisional, 2026-10-03, revised 2026-10-19. Where temper's LLM calls
+Provisional, 2026-10-03, revised 2026-10-22. Where temper's LLM calls
 are made, and what temper adds around them: the host tools its engine
 serves, whose declarations, decoding and rendering are temper's; and the
 charter and a run's result, which `temper-engine-smith` translates. The
@@ -221,10 +221,13 @@ tested; successful installation and execution remain an upstream wait.
   `jig-protocol-tools`). temper's root takes its own `Tool` vocabulary.
   Default: keep `temper-engine-smith` until the root's tools are next
   reconciled with jig's.
-- **A run's live text** on a conversation's page: smith's channel carries
-  facts without content, so agent processes give no text until it does
-  (jig's `protocol/channel.md`, 6.4). Default: a run is shown by its
-  activity, and its words as each turn commits.
+- **A run's live text** on a conversation's page: smith's channel
+  carries it at the host's ask, but jig's assignment carries no ask and
+  its workers' facts no content, so agent processes give no text until
+  jig's transport is built (jig's `protocol/channel.md`, 6.4) and
+  temper's assignment then asks for it and its worker passes the pieces
+  on. Default: a run is shown by its activity, and its words as each
+  turn commits.
 - **Agents in the worker's process,** `smith-inline-agent`, for one
   person's machine, with no containment and no process per run (jig's
   `protocol/service.md`, section 6). Default: agent processes.
