@@ -476,7 +476,10 @@ fn groups_fetch_before_preparation() {
     use crate::{Group, Stage, Steps};
     let flags: Box<[Box<[u8]>]> =
         [b"--config".as_slice(), b"/config", b"--data", b"/data", b"--cache", b"/cache"].map(Box::from).into();
-    let cmd = |action, forge, which| command(action, forge, which, &flags);
+    let cmd = |action, forge, which| {
+        let step = command(action, forge, which, &flags);
+        if which == Some("forgejo") { step.with_ready(([127, 0, 0, 1], 3000).into()) } else { step }
+    };
     let serve = || {
         let mut args = vec![b"serve".as_slice().into()];
         args.extend_from_slice(&flags);

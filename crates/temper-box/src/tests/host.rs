@@ -35,6 +35,25 @@ fn the_steps_start_in_order_and_a_stop_leaves_no_child() {
     harness.sim.assert_quiescent(harness.pid);
     harness.sim.assert_no_open_fds(harness.pid);
 }
+
+#[test]
+fn an_owned_version_probe_stops_or_times_out_without_starting_the_runner() {
+    for stop in [false, true] {
+        let steps =
+            [long(b"forgejo", &[b"never"]).with_ready(([127, 0, 0, 1], 3000).into()), long(b"runner", &[b"never"])];
+        let mut harness = Harness::new(&steps);
+        harness.run_until_idle();
+        assert_eq!(harness.spawn_times(b"forgejo").len(), 1);
+        assert_eq!(harness.spawn_times(b"runner").len(), 0, "no version endpoint answers");
+        if stop {
+            harness.terminate();
+        }
+        assert_eq!(harness.run_to_end(), Exit::Code(u8::from(!stop)));
+        assert_eq!(harness.spawn_times(b"runner").len(), 0, "the barrier never passed");
+        harness.sim.assert_quiescent(harness.pid);
+        harness.sim.assert_no_open_fds(harness.pid);
+    }
+}
 #[test]
 fn a_stop_signals_each_long_step_twice_last_first() {
     let steps = [long(b"forgejo", &[b"never"]), long(b"runner", &[b"never"]), long(b"serve", &[b"never"])];
@@ -217,7 +236,7 @@ fn records_are_probed_before_start_and_written_private_or_reported() {
         } else if writable {
             assert_eq!(&*replies, b"step 3 prepare\nstep 3 run\nstarted 3\n");
         } else {
-            assert_eq!(&*replies, b"step 3 prepare\nfailed 3 record not written\n");
+            assert_eq!(&*replies, b"step 3 prepare\nstep 3 run\nfailed 3 record not written\n");
             assert!(Harness::contains(&harness.stderr(), b"box/started/3"));
         }
         if writable && name != "unreadable" {

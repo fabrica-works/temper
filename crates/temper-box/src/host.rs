@@ -5,6 +5,7 @@ use crate::{
     lines::{self, Lines},
     machine::{Input, Machine, Order, Outcome, Said, Why},
     pipe::{self, Command, Line, Reader},
+    ready::Ready,
     records::Records,
     sink::Sink,
 };
@@ -17,7 +18,7 @@ use skein_lib::{
     Decimal, Duration, Env, List, Queue, Time, Token, Wall,
     stream::{Down, Read, Up},
 };
-use temper_forge_setup::{Kind, Steps};
+use temper_forge_setup::{Kind, Step, Steps};
 /// The descriptors and command inherited from the binary.
 #[derive(Debug)]
 pub struct Settings {
@@ -55,6 +56,31 @@ struct Child {
     hold: bool,
     line: Option<Box<[u8]>>,
     stdin: Option<Sink>,
+    ready: Option<Ready>,
+}
+impl Child {
+    #[expect(clippy::manual_map, reason = "programming-model.md: match rather than Option::map")]
+    fn new(serve: &[u8], step: &Step) -> Self {
+        Self {
+            owner: None,
+            process: None,
+            pipes: [Pipe::new(lines::route(serve, step.name(), 1)), Pipe::new(false)],
+            spawn: false,
+            hold: false,
+            line: None,
+            stdin: None,
+            ready: match step.ready() {
+                Some(address) => Some(Ready::new(address)),
+                None => None,
+            },
+        }
+    }
+    fn ready_settled(&self) -> bool {
+        match &self.ready {
+            Some(ready) => ready.settled(),
+            None => true,
+        }
+    }
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Phase {
@@ -130,17 +156,7 @@ impl Service {
                     .checked_add(3)
                     .expect("prefix"),
             );
-            children
-                .push(Child {
-                    owner: None,
-                    process: None,
-                    pipes: [Pipe::new(lines::route(&settings.serve, step.name(), 1)), Pipe::new(false)],
-                    spawn: false,
-                    hold: false,
-                    line: None,
-                    stdin: None,
-                })
-                .expect("one child per step");
+            children.push(Child::new(&settings.serve, step)).expect("one child per step");
             inputs = inputs.saturating_add(u64::try_from(step.name().len()).expect("name length"));
             inputs = inputs.saturating_add(u64::try_from(size_of_val(step.arguments())).expect("argument slots"));
             for argument in step.arguments() {
@@ -178,7 +194,8 @@ impl Service {
             .saturating_add(Sink::worst_case(reply_entries, limits.line_bytes))
             .saturating_add(u64::from(limits.line_bytes).saturating_mul(2))
             .saturating_add(Records::worst_case(count))
-            .saturating_add(link_memory(&steps));
+            .saturating_add(link_memory(&steps))
+            .saturating_add(u64::from(count).saturating_mul(Ready::worst_case()));
         Ok(Self {
             io,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: bounds },
@@ -212,6 +229,14 @@ impl Service {
         self.machine.input(self.env.now, input, &mut self.orders);
     }
     fn event(&mut self, event: Event) {
+        for state in &mut self.children {
+            if let Some(ready) = &mut state.ready
+                && ready.owns(&event)
+            {
+                ready.event(event, self.env.now, &mut self.requests);
+                return;
+            }
+        }
         match event {
             Event::Shutdown { .. } => self.input(Input::Terminate),
             Event::Spawned { owner, child, pipes } => {
@@ -405,6 +430,10 @@ impl Service {
                                 Why::NotStarted { step } => {
                                     pipe::not_started(self.steps.get(step).expect("step").step.name())
                                 }
+                                Why::NotReady { step } => lines::joined(&[
+                                    self.steps.get(step).expect("step").step.name(),
+                                    b" version unavailable",
+                                ]),
                                 Why::NotWritten => skein_lib::bytes::copy_of(pipe::not_written()),
                             };
                             pipe::failed(forge, &why, self.line_bytes)
@@ -414,6 +443,15 @@ impl Service {
                         control.sink.push(line).expect("reply room checked");
                     }
                 }
+            }
+            Order::Wait { step } => {
+                self.children
+                    .get_mut(step)
+                    .expect("step")
+                    .ready
+                    .as_mut()
+                    .expect("version endpoint")
+                    .start(self.env.now);
             }
             Order::Hold { step } => self.children.get_mut(step).expect("machine step").hold = true,
             Order::Spawn { step } => {
@@ -425,6 +463,9 @@ impl Service {
                 self.children.get_mut(step).expect("machine step").spawn = true;
             }
             Order::Signal { step } => {
+                if let Some(ready) = &mut self.children.get_mut(step).expect("step").ready {
+                    ready.cancel(&mut self.requests);
+                }
                 if let Some(child) = self.children.get(step).expect("machine step").process {
                     self.requests.push(Request::Signal {
                         child,
@@ -434,6 +475,9 @@ impl Service {
                 }
             }
             Order::Close { step } => {
+                if let Some(ready) = &mut self.children.get_mut(step).expect("step").ready {
+                    ready.cancel(&mut self.requests);
+                }
                 if self.steps.get(step).expect("step").step.name() == self.settings.serve.as_ref()
                     && let Some(control) = self.control.take()
                 {
@@ -449,8 +493,20 @@ impl Service {
     }
     fn children(&mut self) {
         for (step, state) in self.children.iter_mut().enumerate() {
-            if self.requests.room() < 6 {
+            if self.requests.room() < 6 || self.orders.room() < self.machine.max_out() {
                 break;
+            }
+            if let Some(ready) = &mut state.ready {
+                if self.machine.outcome().is_some() {
+                    ready.cancel(&mut self.requests);
+                }
+                if let Some(ok) = ready.tick(self.env.now, &mut self.serial, &mut self.requests) {
+                    self.machine.input(
+                        self.env.now,
+                        if ok { Input::Ready { step } } else { Input::NotReady { step } },
+                        &mut self.orders,
+                    );
+                }
             }
             if let Some(stdin) = &mut state.stdin {
                 stdin.tick(true, &mut self.requests);
@@ -479,7 +535,7 @@ impl Service {
                     pipe.reading = true;
                 }
             }
-            let mut settled = state.stdin.is_none();
+            let mut settled = state.stdin.is_none() && state.ready_settled();
             for pipe in &state.pipes {
                 settled &= pipe.settled();
             }
@@ -619,6 +675,9 @@ impl Service {
             return;
         }
         for state in &self.children {
+            if !state.ready_settled() {
+                return;
+            }
             for pipe in &state.pipes {
                 if !pipe.settled() {
                     return;
@@ -802,7 +861,7 @@ impl skein_shell::Host for Service {
         {
             return true;
         }
-        if let Some(at) = self.machine.next_deadline()
+        if let Some(at) = self.next_deadline()
             && at <= now
         {
             return true;
@@ -839,7 +898,7 @@ impl skein_shell::Host for Service {
                     return true;
                 }
             }
-            let mut settled = state.stdin.is_none();
+            let mut settled = state.stdin.is_none() && state.ready_settled();
             for pipe in &state.pipes {
                 settled &= pipe.settled();
             }
@@ -853,13 +912,22 @@ impl skein_shell::Host for Service {
         false
     }
     fn next_deadline(&self) -> Option<Time> {
-        match (self.io.next_deadline(), self.machine.next_deadline()) {
+        let deadline = self.next_policy_deadline();
+        match (self.io.next_deadline(), deadline) {
             (Some(a), Some(b)) => Some(a.min(b)),
             (a, None) | (None, a) => a,
         }
     }
     fn next_policy_deadline(&self) -> Option<Time> {
-        self.machine.next_deadline()
+        let mut deadline = self.machine.next_deadline();
+        for state in &self.children {
+            if let Some(ready) = &state.ready
+                && let Some(at) = ready.next_deadline()
+            {
+                deadline = Some(deadline.unwrap_or(at).min(at));
+            }
+        }
+        deadline
     }
     fn is_empty(&self) -> bool {
         self.phase == Phase::Closing

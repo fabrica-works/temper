@@ -27,6 +27,13 @@ fn a_managed_and_an_owned_forge_run_the_six_steps_of_the_design_tree() {
         ],
     );
     let commands = steps(&fixtures::setup(), &flags()).always;
+    let Mode::Owned(owned) = &fixtures::setup().entries[1].mode else { panic!("owned") };
+    assert_eq!(commands[1].ready(), Some(owned.listen));
+    for (index, step) in commands.iter().enumerate() {
+        if index != 1 {
+            assert_eq!(step.ready(), None);
+        }
+    }
     let expected: &[&[&[u8]]] = &[
         &[b"forge", b"prepare", b"--config", b"/config", b"--data", b"/data", b"--cache", b"/cache", b"2"],
         &[b"forge", b"run", b"--config", b"/config", b"--data", b"/data", b"--cache", b"/cache", b"2", b"forgejo"],
@@ -116,6 +123,8 @@ fn asked_groups_keep_their_place_and_end_in_their_reconcile() {
         assert_eq!((group.forge, group.before), (2, 0));
         assert_eq!(group.steps.len(), if runner { 4 } else { 3 });
         assert_eq!(group.steps[0].0, crate::Stage::Prepare);
+        let Mode::Owned(owned) = &setup.entries[1].mode else { panic!("owned") };
+        assert_eq!(group.steps[1].1.ready(), Some(owned.listen));
         for (stage, step) in &group.steps[1..group.steps.len() - 1] {
             assert_eq!(*stage, crate::Stage::Run);
             assert_eq!(step.kind(), Kind::Long);

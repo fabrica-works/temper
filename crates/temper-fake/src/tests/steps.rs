@@ -52,7 +52,8 @@ fn documents_give_the_box_its_whole_ordered_steps() {
         "forgejo 2",
         &["forge", "run", "--config", "C", "--data", "D", "--cache", "K", "2", "forgejo"],
         Kind::Long,
-    );
+    )
+    .with_ready("127.0.0.1:3002".parse().unwrap());
     let runner2 = command(
         "runner 2",
         &["forge", "run", "--config", "C", "--data", "D", "--cache", "K", "2", "runner"],

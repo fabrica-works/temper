@@ -275,16 +275,16 @@ fn asked_groups_follow_their_chains_records_failures_and_stop() {
             (I(Closed { step: 1 }), &[Spawn { step: 2 }, progress(2)]),
             (I(Started { step: 2 }), &[]),
             (I(Exited { step: 2, exit: Exit::Code(0) }), &[Close { step: 2 }]),
-            (I(Closed { step: 2 }), &[Record { forge: 3 }]),
+            (I(Closed { step: 2 }), &[Spawn { step: 3 }, progress(3)]),
         ],
     );
     let mut running = prepared.clone();
     running = append(
         &running,
         &[
-            (I(Written { forge: 3 }), &[Spawn { step: 3 }, progress(3)]),
             (I(Started { step: 3 }), &[Spawn { step: 4 }, progress(4)]),
-            (I(Started { step: 4 }), &[Say { said: Said::Started { forge: 3 } }]),
+            (I(Started { step: 4 }), &[Record { forge: 3 }]),
+            (I(Written { forge: 3 }), &[Say { said: Said::Started { forge: 3 } }]),
         ],
     );
     let mut cases = skein_lib::List::with_capacity(16);
@@ -311,7 +311,11 @@ fn asked_groups_follow_their_chains_records_failures_and_stop() {
         &[
             (I(Ask { forge: 3 }), &[]),
             (I(Ask { forge: 4 }), &[failed(4, Why::Busy)]),
-            (I(NotWritten { forge: 3 }), &[failed(3, Why::NotWritten)]),
+            (I(Started { step: 3 }), &[Spawn { step: 4 }, progress(4)]),
+            (I(Started { step: 4 }), &[Record { forge: 3 }]),
+            (I(NotWritten { forge: 3 }), &[Close { step: 3 }, Close { step: 4 }]),
+            (I(Closed { step: 3 }), &[]),
+            (I(Closed { step: 4 }), &[failed(3, Why::NotWritten)]),
             (I(Ask { forge: 3 }), &[Spawn { step: 1 }, progress(1)]),
         ],
     );
@@ -344,7 +348,6 @@ fn asked_groups_follow_their_chains_records_failures_and_stop() {
     long_failed = append(
         &long_failed,
         &[
-            (I(Written { forge: 3 }), &[Spawn { step: 3 }, progress(3)]),
             (I(Started { step: 3 }), &[Spawn { step: 4 }, progress(4)]),
             (I(Exited { step: 3, exit: Exit::Signal(9) }), &[Close { step: 3 }]),
             (I(Closed { step: 3 }), &[]),
@@ -421,10 +424,10 @@ fn asked_groups_follow_their_chains_records_failures_and_stop() {
         machine.start(Time::ZERO, &[], &mut out);
         assert!(out.is_empty());
         machine.input(Time::ZERO, Ask { forge: 9 }, &mut out);
+        assert_eq!(out.pop(), Some(Spawn { step: 0 }));
+        assert_eq!(out.pop(), Some(progress(0)));
+        machine.input(Time::ZERO, Started { step: 0 }, &mut out);
         if !long {
-            assert_eq!(out.pop(), Some(Spawn { step: 0 }));
-            assert_eq!(out.pop(), Some(progress(0)));
-            machine.input(Time::ZERO, Started { step: 0 }, &mut out);
             machine.input(Time::ZERO, Exited { step: 0, exit: Exit::Code(0) }, &mut out);
             assert_eq!(out.pop(), Some(Close { step: 0 }));
             machine.input(Time::ZERO, Closed { step: 0 }, &mut out);
@@ -432,11 +435,6 @@ fn asked_groups_follow_their_chains_records_failures_and_stop() {
         assert_eq!(out.pop(), Some(Record { forge: 9 }));
         assert!(out.is_empty());
         machine.input(Time::ZERO, Written { forge: 9 }, &mut out);
-        if long {
-            assert_eq!(out.pop(), Some(Spawn { step: 0 }));
-            assert_eq!(out.pop(), Some(progress(0)));
-            machine.input(Time::ZERO, Started { step: 0 }, &mut out);
-        }
         assert_eq!(out.pop(), Some(Say { said: Said::Started { forge: 9 } }));
         assert!(out.is_empty());
     }
@@ -740,8 +738,6 @@ fn an_asked_groups_final_once_step_gates_started_and_failure_allows_another_ask(
         let mut out = Queue::with_capacity(32);
         machine.start(Time::ZERO, &[], &mut out);
         machine.input(Time::ZERO, Input::Ask { forge: 3 }, &mut out);
-        assert_eq!(out.pop(), Some(Order::Record { forge: 3 }));
-        machine.input(Time::ZERO, Input::Written { forge: 3 }, &mut out);
         for step in 0..3 {
             assert_eq!(out.pop(), Some(Order::Spawn { step }));
             assert_eq!(out.pop(), Some(Order::Say { said: Said::Step { step } }));
@@ -752,6 +748,8 @@ fn an_asked_groups_final_once_step_gates_started_and_failure_allows_another_ask(
         if code == 0 {
             assert_eq!(out.pop(), Some(Order::Close { step: 2 }));
             machine.input(Time::ZERO, Input::Closed { step: 2 }, &mut out);
+            assert_eq!(out.pop(), Some(Order::Record { forge: 3 }));
+            machine.input(Time::ZERO, Input::Written { forge: 3 }, &mut out);
             assert_eq!(out.pop(), Some(Order::Say { said: Said::Started { forge: 3 } }));
         } else {
             for step in 0..3 {
@@ -763,8 +761,113 @@ fn an_asked_groups_final_once_step_gates_started_and_failure_allows_another_ask(
                 Some(Order::Say { said: Said::Failed { forge: 3, why: Why::Exited { step: 2, exit: Exit::Code(1) } } })
             );
             machine.input(Time::ZERO, Input::Ask { forge: 3 }, &mut out);
-            assert_eq!(out.pop(), Some(Order::Record { forge: 3 }));
+            assert_eq!(out.pop(), Some(Order::Spawn { step: 0 }));
+            assert_eq!(out.pop(), Some(Order::Say { said: Said::Step { step: 0 } }));
         }
         assert!(out.is_empty());
+    }
+}
+
+#[test]
+fn an_owned_version_gates_the_runner_and_record_on_ask_and_restart() {
+    use super::fixtures::step;
+    use crate::{
+        layout,
+        machine::{Machine, Said, Why},
+    };
+    use skein_lib::{Queue, Time};
+    use temper_forge_setup::{Group, Stage, Steps};
+    let placed = layout::flatten(Steps {
+        always: Box::new([step(b"serve", Kind::Long)]),
+        asked: Box::new([Group {
+            forge: 3,
+            before: 0,
+            steps: Box::new([
+                (Stage::Run, step(b"forgejo 3", Kind::Long).with_ready(([127, 0, 0, 1], 3000).into())),
+                (Stage::Run, step(b"runner 3", Kind::Long)),
+                (Stage::Run, step(b"reconcile 3", Kind::Once)),
+            ]),
+        }]),
+    });
+    for recorded in [false, true] {
+        for ending in ["ready", "timeout", "stop", "exit"] {
+            let mut machine = Machine::new(&limits::small(), &placed).unwrap();
+            let mut out = Queue::with_capacity(32);
+            let now = Time::ZERO;
+            machine.start(now, if recorded { &[3] } else { &[] }, &mut out);
+            if !recorded {
+                assert_eq!(out.pop(), Some(Order::Spawn { step: 3 }));
+                machine.input(now, Input::Started { step: 3 }, &mut out);
+                machine.input(now, Input::Ask { forge: 3 }, &mut out);
+            }
+            assert_eq!(out.pop(), Some(Order::Spawn { step: 0 }));
+            if !recorded {
+                assert_eq!(out.pop(), Some(Order::Say { said: Said::Step { step: 0 } }));
+            }
+            machine.input(now, Input::Started { step: 0 }, &mut out);
+            assert_eq!(out.pop(), Some(Order::Wait { step: 0 }));
+            assert!(out.is_empty(), "{recorded}/{ending}: no runner or record before version");
+            match ending {
+                "ready" => {
+                    machine.input(now, Input::Ready { step: 0 }, &mut out);
+                    assert_eq!(out.pop(), Some(Order::Spawn { step: 1 }));
+                    if !recorded {
+                        assert_eq!(out.pop(), Some(Order::Say { said: Said::Step { step: 1 } }));
+                    }
+                    machine.input(now, Input::Ready { step: 0 }, &mut out);
+                    assert!(out.is_empty(), "a stale ready cannot skip reconcile");
+                    machine.input(now, Input::Started { step: 1 }, &mut out);
+                    assert_eq!(out.pop(), Some(Order::Spawn { step: 2 }));
+                    if !recorded {
+                        assert_eq!(out.pop(), Some(Order::Say { said: Said::Step { step: 2 } }));
+                    }
+                    machine.input(now, Input::Started { step: 2 }, &mut out);
+                    machine.input(now, Input::Exited { step: 2, exit: Exit::Code(0) }, &mut out);
+                    assert_eq!(out.pop(), Some(Order::Close { step: 2 }));
+                    machine.input(now, Input::Closed { step: 2 }, &mut out);
+                    if recorded {
+                        assert_eq!(out.pop(), Some(Order::Spawn { step: 3 }));
+                    } else {
+                        assert_eq!(out.pop(), Some(Order::Record { forge: 3 }));
+                        machine.input(now, Input::Written { forge: 3 }, &mut out);
+                        assert_eq!(out.pop(), Some(Order::Say { said: Said::Started { forge: 3 } }));
+                    }
+                }
+                "timeout" => {
+                    machine.input(now, Input::NotReady { step: 0 }, &mut out);
+                    if recorded {
+                        assert_eq!(machine.outcome(), Some(Outcome::GaveUp { step: 0, restarts: 0 }));
+                    } else {
+                        assert_eq!(out.pop(), Some(Order::Close { step: 0 }));
+                        machine.input(now, Input::Closed { step: 0 }, &mut out);
+                        assert_eq!(
+                            out.pop(),
+                            Some(Order::Say { said: Said::Failed { forge: 3, why: Why::NotReady { step: 0 } } })
+                        );
+                    }
+                }
+                "stop" => {
+                    machine.input(now, Input::Terminate, &mut out);
+                    machine.input(now, Input::Ready { step: 0 }, &mut out);
+                    assert_eq!(out.pop(), Some(Order::Signal { step: if recorded { 0 } else { 3 } }));
+                    assert!(out.is_empty(), "ready during stop launches nothing");
+                }
+                "exit" => {
+                    machine.input(now, Input::Exited { step: 0, exit: Exit::Code(1) }, &mut out);
+                    assert_eq!(out.pop(), Some(Order::Close { step: 0 }));
+                    machine.input(now, Input::Closed { step: 0 }, &mut out);
+                    if !recorded {
+                        assert_eq!(
+                            out.pop(),
+                            Some(Order::Say {
+                                said: Said::Failed { forge: 3, why: Why::Exited { step: 0, exit: Exit::Code(1) } }
+                            })
+                        );
+                    }
+                    assert!(out.is_empty(), "exit while waiting starts nothing");
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 }
