@@ -352,9 +352,11 @@ fn suggestions(
     bindings: &mut Bindings,
 ) {
     let Some(chats) = root.pages().chats() else { return };
-    b.open(Role::Slot);
+    let heading = words.say(Word::DemoHeading, &[]);
+    b.open(Role::Region);
+    b.name(&heading);
     b.style(crate::look::INVITATION);
-    text(b, Role::Heading { level: 1 }, &words.say(Word::DemoHeading, &[]));
+    text(b, Role::Heading { level: 1 }, &heading);
     text(
         b,
         Role::Paragraph,

@@ -195,3 +195,33 @@ fn the_context_repository_has_its_own_node_and_style() {
         assert_eq!(crate::look::NAMES.styles[usize::from(crate::look::REPOSITORY.token)], b"temper-repository");
     }
 }
+
+#[test]
+fn the_invitation_is_a_named_region_with_its_parts_in_order() {
+    let root = f::demo_root(Address::Chats, f::PROJECT, true);
+    let view = f::page_view(&root);
+    let tree = view.tree();
+    let region = f::find(tree, Role::Region, b"What shall we change?").expect("named invitation region");
+    let nodes = tree.nodes();
+    let mut at = 0;
+    for (index, node) in nodes.iter().enumerate() {
+        if node.id == region {
+            at = index;
+        }
+    }
+    assert_eq!(nodes[at].styles.as_slice(), [crate::look::INVITATION]);
+    let end = at + usize::try_from(nodes[at].size).unwrap();
+    let mut child = at + 1;
+    for (role, name) in [
+        (Role::Heading { level: 1 }, b"What shall we change?".as_slice()),
+        (Role::Paragraph, b"Try a request in acme/shop. Follow the task from its branch to a landed change."),
+        (Role::List, b"Suggested requests"),
+        (Role::Paragraph, b"The demo model plays these requests from a script."),
+    ] {
+        assert!(child < end, "part belongs to invitation");
+        assert_eq!(nodes[child].role, role);
+        assert_eq!(nodes[child].name.as_deref(), Some(name));
+        child += usize::try_from(nodes[child].size).unwrap();
+    }
+    assert_eq!(child, end, "all four parts stay inside the region");
+}
