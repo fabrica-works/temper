@@ -90,7 +90,7 @@
       look: [
         ['chats.html', 'Chats: the demo’s start'],
         ['accounts.html', 'Accounts: the demo model’s key, the one account'],
-        ['forges.html', 'Forges: the demo’s, connected; GitHub, not connected; a Forgejo here, not set up'],
+        ['forges.html', 'Forges: no forge of yours yet, and the demo’s, folded'],
         ['workers.html', 'Workers: one, in temper’s process'],
         ['changes.html', 'Changes: demo/widget on Demo forge, nothing in flight'],
       ],
@@ -198,7 +198,9 @@
         ['accounts.html', 'Accounts: the new key, and the demo model’s'],
         ['chats.html', 'Chats: no demo’s start; the banner, a demo forge alone'],
         ['chat.html?task=T1', 'T1: its composer’s line names the new key'],
-        ['forges.html', 'Forges: still the demo’s alone, connected'],
+        ['connect-forge.html', 'Connect a forge: GitHub, Forgejo on this machine, a Forgejo elsewhere'],
+        ['connect-forge.html?forge=3', 'Forgejo on this machine: the set-up’s details'],
+        ['forges.html', 'Forges: still no forge of yours'],
       ],
       apply(w, id) {
         w.accounts.unshift({ name: 'OpenAI', provider: 'OpenAI', holder: 'Sam', at: id,
@@ -209,10 +211,11 @@
     },
     {
       id: '6', label: '6', hour: 16 / 60, act: 2, title: 'Setting up a Forgejo',
-      summary: 'Sam follows “Connect a forge” and keeps the set-up’s defaults: the organization work, the repository hello, and a new project named after it. temper box has fetched Forgejo and its runner and is preparing them; the row shows each step as the box reports it.',
+      summary: 'Sam follows “Connect a forge”, chooses Forgejo on this machine and keeps its defaults: the organization work, the repository hello, and a new project named after it. temper box has fetched Forgejo and its runner and is preparing them; the flow shows each step, and the banner says where it is.',
       look: [
-        ['forges.html', 'Forges: forge 3 setting up, at its preparation'],
-        ['chats.html', 'Chats: the banner still says a demo forge'],
+        ['connect-forge.html?forge=3', 'Connect a forge: setting up, at its preparation'],
+        ['chats.html', 'Chats: the banner’s status'],
+        ['forges.html', 'Forges: forge 3, setting up'],
       ],
       apply(w) {
         const f = w.forges.find(f => f.n === 3);
@@ -222,12 +225,15 @@
     },
     {
       id: '7', label: '7', hour: 19 / 60, act: 2, title: 'A Forgejo connected',
-      summary: 'Forgejo and its runner started. temper connected as its bot, made work/hello with a README and a CI workflow, and adopted it into the new project hello; the workflow’s first run passed on this machine. Sam never signed in to Forgejo. A real model and a real forge are connected, so the demo’s banner is gone.',
+      summary: 'Forgejo and its runner started. temper connected as its bot, made work/hello with a README and a CI workflow, and adopted it into the new project hello; the workflow’s first run passed. The flow ends on the work: Sam opens hello, a project with no chat yet. A real model and a real forge are connected, so the demo’s banner is gone.',
       look: [
-        ['forges.html', 'Forges: forge 3 connected, its repository and its acts'],
+        ['connect-forge.html?forge=3', 'Connect a forge: ready, and Open hello'],
+        ['chats.html?project=hello', 'Chats in hello: no chat yet, no banner'],
+        ['forges.html', 'Forges: forge 3, and the demo’s line'],
         ['changes.html?project=hello', 'Changes in hello: work/hello, CI passing'],
-        ['chats.html', 'Chats: no banner'],
-        ['forges.html#other-states', 'Forges, below: forge 3’s other states, and a managed and a connected Forgejo'],
+        ['connect-forge.html', 'Connect a forge: GitHub and a Forgejo elsewhere left'],
+        ['connect-forge.html#other-states', 'Connect a forge, below: its other paths'],
+        ['forges.html#other-states', 'Forges, below: other rows, and a managed and a connected Forgejo'],
       ],
       apply(w) {
         const f = w.forges.find(f => f.n === 3);

@@ -23,7 +23,8 @@ Each file also opens directly in a browser, with no build step; serving it keeps
 | Every task, as one tree | `tasks.html` | none: jig's `client/domain/pages.md`, 6.3 |
 | A task: a goal's plan, an agent's transcript, a change's stages (`?task=T12`) | `task.html` | `Task { task }` |
 | The changes of each repository, with their queues and the open findings | `changes.html` | `Changes { project }` |
-| The deployment’s forges: each one’s connection, access and load, and its acts | `forges.html` | `Forges` |
+| The person’s forges: each one’s connection, access and load, and its acts; the demo’s, folded | `forges.html` | `Forges` |
+| Connecting a forge: choose, the details, setting up, ready (?forge=N) | `connect-forge.html` | none: drawn ahead (below) |
 | The workers, their slots and health | `workers.html` | none: jig's `client/domain/pages.md`, 7 |
 | The LLM accounts, their sources and plans' windows | `accounts.html` | `Accounts` |
 | The first run, at its first step: the link `temper box` prints | `first-run.html` | opens `chats.html` in the first run |
@@ -36,7 +37,7 @@ Each file also opens directly in a browser, with no build step; serving it keeps
 - **The step.** `pages.js` draws every page from the world at the step in the address (`?world=`, `?step=`), so the pages agree at each step. The dark bar above each page is the mockups' own: ‹ and › move the step, **Steps** lists the whole case, the step's title opens what it shows and where to look, and **View** switches the world and what is marked.
 - **What is drawn:** the reference case's hour 0, the solo world's one step, and the first run's seven. The case's later steps are listed, and are added one act at a time.
 - **Acts:** a button or link for an act shows a note instead of acting, unless a later step draws what it does: then it leads to that step (the first run's suggested requests). Nothing is sent anywhere.
-- **For a capture:** `?bare` draws the page alone, without the bar and the marks, and every link keeps it (`chat.html?world=solo&task=T10&bare`). A page's state is its address: the world, the step and the task.
+- **For a capture:** `?bare` draws the page alone, without the bar and the marks, and every link keeps it (`chat.html?world=solo&task=T10&bare`). A page's state is its address: the world, the step and the task. `?project=` shows another project; the chats, tasks, board and changes pages follow it.
 
 ## Where each value comes from
 
@@ -64,7 +65,7 @@ What temper does not have yet, drawn as temper-on-temper.md's section 6 wants it
 - **6.5, open findings:** a finding on a goal's page, the board and the changes page, where a failure that matches an open finding attaches to it and leaves the queue running.
 - **6.7, fleet occupancy:** a worker's free slots, and the director's read of them.
 
-Marked "ahead" (slate, with the annotations): what the owned Forgejo’s rows draw before temper designs it. **B4 M4:** the set-up’s first repository, and "New repository", made by temper with the admin’s token once temper-15 moves that token into the engine. **jig:** a project made after the first start; jig makes projects only at a deployment’s first start. **sign-in:** "Open Forgejo" signing the person in through temper, as Forgejo’s OpenID provider; until then, the person signs in with the password the preparation wrote.
+Marked "ahead" (slate, with the annotations): what the owned Forgejo’s rows draw before temper designs it. **client:** the flow as a page of its own. **B4 M4:** the set-up’s first repository, and "New repository", made by temper with the admin’s token once temper-15 moves that token into the engine. **jig:** a project made after the first start; jig makes projects only at a deployment’s first start. **sign-in:** "Open Forgejo" signing the person in through temper, as Forgejo’s OpenID provider; until then, the person signs in with the password the preparation wrote.
 
 Two pages follow jig's pages, which temper's client leaves out (the client README, 5.3 and 11): **Tasks**, every task of the project as one tree (jig's `client/domain/pages.md`, 6.3), and **Workers**, the deployment's hosts (7).
 
@@ -79,8 +80,8 @@ Not drawn: two ideas that would change temper's engine, not only its pages. A ch
 3. **The change landed:** T2's card says Landed, every step ticked, "CI passed. Landed · merge commit e3b8d41"; T1 says so in its script's third turn.
 4. **A text-only request:** "Add a dark theme to widget", the chat T4, answered in words; then its script's `finish` ends it, so its page has no composer.
 5. **A model connected:** an OpenAI API key added. The model's half of the demo ends (4.8): the banner says a demo forge alone, the chats page has no demo's start, and the composers' line names the new key.
-6. **Setting up a Forgejo:** the set-up’s defaults kept (work/hello, a new project hello); the box has fetched and is preparing.
-7. **A Forgejo connected:** temper connected as its bot, made work/hello and adopted it into the new project hello; its first CI run passed. The banner is gone.
+6. **Setting up a Forgejo:** chosen in the flow, its defaults kept (work/hello, a new project hello); the box has fetched and is preparing. The flow shows each step, and the banner says where it is.
+7. **A Forgejo connected:** temper connected as its bot, made work/hello and adopted it into the new project hello; its first CI run passed. The flow ends on the new project, opened with no chat yet. The banner is gone.
 
 Where the documents disagree, or leave a word open, the mockup takes one side and says so here:
 
@@ -88,8 +89,8 @@ Where the documents disagree, or leave a word open, the mockup takes one side an
 - **T1's next run takes the new account** (step 5), where temper's stays on the demo model. The draft says the demo model "stays the demo project's" (`../../draft/first-run.md`, 2.2). setup.md 8.3 says a task with no model chosen takes the first of its charter's models that has a usable account, and the demo model is last in both charters. jig resolves that default once, at the task's Create, and records it, so a new chat's first run takes gpt-6-luna on the new key while T1, created before it, keeps the demo model. The mockup draws T1 on gpt-6-luna too: re-resolving a task's default for each run is jig's to decide.
 - **The coding agent's title is the change's** (T3, "Export widget's table as CSV"): setup.md 8.4 makes the change's title its agent's brief, and a chip is the spec's first line. The other worlds title that agent "Produce TN's branch", a stand-in for a title temper's procedure does not word yet.
 - **The dark theme's words** are a stand-in. Their content is the demo's follow-up (`../../draft/first-run.md`, section 8). The empty search and the fallback are not drawn: they take step 4's shape.
-- **"Connect a forge" is a link,** to `forges.html`. The client has no forges page yet, so until it does the button is disabled (client README, 5.6).
-- **The forges page** draws forge.md 5.4, with the rows of a later design: "Connected as LOGIN", the id on an Account line; an Access line in place of the mode (temper’s own admin token, one the person gave, or the bot’s tokens), since owned and managed differ only in who holds the admin’s token; and, for an owned forge, a Runs line, what temper runs on this machine. An owned forge’s set-up takes the first repository, its organization and its project, and temper makes and adopts it. Its "A Forgejo elsewhere" adds the setup entry that connecting as its admin needs. A section under the page, mockup-only, draws forge 3’s other states and a managed and a connected Forgejo.
+- **"Connect a forge" is a link,** to `connect-forge.html`. The client has no forges page yet, so until it does the button is disabled (client README, 5.6).
+- **The forges page** shows only the person’s forges (connecting, setting up, set up failed, connected, stopped), and the demo’s, folded. A forge not acted on is a choice in the “Connect a forge” flow: Choose → Details → Setting up (Connecting for GitHub) → Ready, ending on the new project. The banner shows the set-up’s status and a link to it; the Forges nav item’s dot is amber while setting up or connecting, red when a forge needs the person. The rows draw forge.md 5.4 with an Account line, an Access line in place of the mode, and an owned forge’s Runs line. Mockup-only galleries on both pages compare the flow’s other paths and the other forge rows, including managed and connected Forgejo. The flow’s “A Forgejo elsewhere” includes the setup entry that connecting as its admin needs.
 
 The earlier first-run mockup, a story of its own, also drew "Reset demo", a turn's "Just now", the composer's placeholder, "Landed into main" and the pull request's link on the card. The client leaves each out (client README, section 11), and so does this world.
 

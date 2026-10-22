@@ -239,3 +239,30 @@ h3 { font-size: 14px; line-height: 1.35; letter-spacing: -.015em; margin-bottom:
 @media (max-width: 850px) { .app { grid-template-columns: 66px minmax(0,1fr); }   .profile div { display: none; }    .profile { padding: 12px 0 0; } .page { width: min(100% - 42px, 1120px); }  .topbar { padding: 0 22px; } .two-col, .inbox-split { grid-template-columns: 1fr; } .board-row { grid-template-columns: 25px 1fr 155px; } .board-row .right { display: none; } }
 @media (max-width: 600px) { .section-heading { display: block; } .section-heading .filter-row { margin-top: 9px; } }
 @media (max-width: 600px) { .app { display: block; }     .topbar { height: 52px; position: static; padding: 0 17px; } .top-actions .status, .top-actions .tiny { display: none; } .page { width: calc(100% - 32px); padding-top: 26px; } .page-header { display: block; } .page-header .button { margin-top: 15px; } .stats-row { grid-template-columns: repeat(2,1fr); } .board-row { grid-template-columns: 22px 1fr; } .board-row > :nth-child(3) { grid-column: 2; }           .queue-row { grid-template-columns: 20px 1fr; } .queue-row > :nth-child(n+3) { grid-column: 2; } .steps { grid-template-columns: repeat(3,1fr); row-gap: 14px; } .chat-list { grid-template-columns: 1fr; } .welcome { margin: 20px auto 36px; } }
+
+/* Connecting a forge, and managing the forges the person has acted on. */
+.forge-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.forge-choices > .card { display: flex; flex-direction: column; align-items: flex-start; }
+.forge-choices p, .forge-flow p { font-size: 11px; line-height: 1.6; }
+.forge-choices .button { margin-top: auto; }
+.flow-steps.steps { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0 20px; }
+.flow-steps .step { font-size: 10px; }
+.forge-flow pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 10px; background: #f8f5f0; padding: 12px; border: 1px solid var(--term-line); }
+.forge-row > summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 16px; position: relative; padding: 18px 20px 18px 38px; cursor: pointer; list-style: none; }
+.forge-row > summary::-webkit-details-marker { display: none; }
+.forge-row > summary::before { content: '›'; position: absolute; left: 18px; top: 18px; transition: transform .15s; }
+.forge-row[open] > summary::before { transform: rotate(90deg); }
+.forge-row > .card-pad { border-top: 1px solid var(--line); }
+.forge-name { font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+.forge-name small { display: block; margin-top: 4px; font-size: 10px; color: var(--muted); font-weight: 400; }
+.forge-row .tag { align-self: start; }
+.forge-summary-line { grid-column: 1 / -1; }
+.forge-summary-line p { margin: 0; }
+.forge-demo summary { color: var(--muted); font-size: 11px; }
+.forge-progress li.failed, .forge-failure { color: var(--red); font-size: 11px; }
+.forge-progress li.failed::before { content: '✕'; color: var(--red); }
+.banner-status { color: var(--amber); font-size: 11px; }
+.nav-mark { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-left: 5px; vertical-align: 1px; }
+.nav-mark.amber { background: var(--amber); }
+.nav-mark.red { background: var(--red); }
+@media (max-width: 760px) { .forge-choices { grid-template-columns: 1fr; } }
