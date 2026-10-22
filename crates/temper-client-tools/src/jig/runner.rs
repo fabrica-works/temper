@@ -7,7 +7,7 @@ use jig_client::{
 };
 use skein_lib::{Deadlines, Env, Queue};
 mod accounts;
-mod acts;
+pub(crate) mod acts;
 pub(crate) mod reads;
 mod recovery;
 #[derive(Debug)]
@@ -47,6 +47,7 @@ pub enum Out {
     Ready,
     Kept { line: Box<[u8]> },
     Printed { number: u32, printed: Printed },
+    DraftAmendment { called: Box<Called>, task: Box<jig_client::contract::Task> },
 }
 impl Runner {
     #[must_use]

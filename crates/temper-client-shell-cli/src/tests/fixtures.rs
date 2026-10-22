@@ -87,7 +87,11 @@ impl Frame {
     pub fn act(words: &[&[u8]]) -> Self {
         let parsed = arguments::parse(words).expect("fixture call");
         let file_parent = arguments::file_root(&parsed).map(|_| FILE_PARENT);
-        let host = OneShot::new(
+        let files = arguments::text_files(&parsed)
+            .into_iter()
+            .map(|(index, _)| (index, Fd::new(30 + i32::from(index))))
+            .collect();
+        let host = OneShot::with_text_files(
             Invocation { directory: Some(b"directory".as_slice().into()), parsed },
             Startup {
                 parent: Some(Fd::new(1)),
@@ -99,6 +103,7 @@ impl Frame {
                 user: USER,
                 seed: 1,
             },
+            files,
         )
         .expect("native limits");
         Self {

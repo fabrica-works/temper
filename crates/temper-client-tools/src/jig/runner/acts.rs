@@ -1,5 +1,5 @@
 //! Offered acts are read once, then kept by the shared client's request table.
-mod choice;
+pub(crate) mod choice;
 use super::{Called, Out, Runner, finish};
 use crate::jig::{
     Limits,
@@ -19,7 +19,7 @@ pub(super) struct Sent {
     called: Called,
     operation: Operation,
 }
-pub(super) fn me<'a>(runner: &Runner, client: &'a Client) -> Option<&'a c::Me> {
+pub(crate) fn me<'a>(runner: &Runner, client: &'a Client) -> Option<&'a c::Me> {
     match client.document(runner.me())?.latest? {
         Latest::Jig(c::Delivery::Me(me)) => Some(me),
         Latest::Jig(_) | Latest::Family(_) => None,
@@ -51,12 +51,13 @@ pub(super) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, cal
     });
     runner.acts.insert(called.call_number, Reading { called, document: None });
 }
-pub(super) enum Failed {
+pub(crate) enum Failed {
     Fixed(&'static [u8]),
     Unknown { what: &'static [u8], name: Box<[u8]> },
     EffortRequired { name: Box<[u8]> },
+    Detail(Box<[u8]>),
 }
-type Prepared = Result<(Request, Option<c::Recipient>), Failed>;
+pub(crate) type Prepared = Result<(Request, Option<c::Recipient>), Failed>;
 fn chat(call: &Call, me: &c::Me, limits: &Limits) -> Prepared {
     let project = super::reads::project(call, me).ok_or(Failed::Fixed(b"unknown project"))?;
     let Ok(mut ask) = shapes::chat(me, project, words(call, 1, limits)?) else {
@@ -96,7 +97,7 @@ fn chat(call: &Call, me: &c::Me, limits: &Limits) -> Prepared {
         shapes::Fall::Refused(_) | shapes::Fall::NotOffered(_) => Err(Failed::Fixed(b"chat exceeds offered bounds")),
     }
 }
-fn words(call: &Call, index: usize, limits: &Limits) -> Result<c::Text, Failed> {
+pub(crate) fn words(call: &Call, index: usize, limits: &Limits) -> Result<c::Text, Failed> {
     let bytes = match value(call, index) {
         Some(Value::Text(bytes)) => bytes.as_ref(),
         None => b"",
@@ -180,6 +181,12 @@ pub(super) fn page(
         finish(called, printed, out);
         return;
     };
+    if called.call.tool == 31
+        && let Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(task))) = &page
+    {
+        out.push(Out::DraftAmendment { called: Box::new(called), task: task.clone() });
+        return;
+    }
     let ask = match &page {
         Readout::Jig(c::ReadResult::Value(document)) => build(&called.call, document, me, &env.limits, None),
         Readout::Limit | Readout::NotServed { .. } | Readout::Jig(_) | Readout::Family { .. } => {
@@ -199,7 +206,7 @@ pub(super) fn page(
 }
 fn build(call: &Call, document: &c::ReadValue, me: &c::Me, limits: &Limits, project: Option<u32>) -> Prepared {
     if call.tool == 31 {
-        return choice::amend(call, document, me, limits);
+        return Err(Failed::Fixed(b"unexpected amendment document"));
     }
     let (project, offers) = match document {
         c::ReadValue::Task(task) => (task.project, &task.acts),
@@ -358,7 +365,7 @@ fn decision(call: &Call, limits: &Limits) -> Result<c::Decision, Failed> {
         _ => c::Decision::PassedUp,
     })
 }
-pub(super) enum Request {
+pub(crate) enum Request {
     Ask(c::Ask),
     Account { ask: c::Ask, context: render::outcome::Account },
     AddKey { holder: c::AccountHolder, provider: u32, join: Option<u32> },
@@ -366,7 +373,7 @@ pub(super) enum Request {
     DeclareProgram { holder: c::AccountHolder, provider: u32, join: Option<u32>, name: Box<[u8]> },
     CheckProgram { holder: c::AccountHolder, source: u32 },
 }
-pub(super) fn prepared(
+pub(crate) fn prepared(
     runner: &mut Runner,
     client: &Client,
     _env: &Env<Limits>,
@@ -379,6 +386,7 @@ pub(super) fn prepared(
         Err(why) => {
             let printed = match why {
                 Failed::Fixed(why) => render::failure(why, called.json, 1),
+                Failed::Detail(why) => render::failure(&why, called.json, 1),
                 Failed::Unknown { what, name } => choice::named(b"unknown ", what, &name, called.json),
                 Failed::EffortRequired { name } => choice::named(b"effort required", b"", &name, called.json),
             };

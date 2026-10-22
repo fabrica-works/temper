@@ -21,3 +21,5 @@ mod choices;
 mod amend_choice;
 
 mod task_words;
+
+mod amend_controls;

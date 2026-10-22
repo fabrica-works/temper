@@ -1,4 +1,4 @@
-mod fixtures;
+pub(crate) mod fixtures;
 use crate::{directory, limits};
 use skein_io::kernel::{Exit, ServiceSignal};
 const SIGN_IN_FIRST: skein_lib::Duration = skein_lib::Duration::from_millis(100);

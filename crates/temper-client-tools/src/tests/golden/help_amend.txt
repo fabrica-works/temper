@@ -1,8 +1,16 @@
-amend N --spec R --model M [--effort E] REASON [--key NAME]
-Change a task's main model at its shown spec revision
+amend N [--rev R] [--priority P | --untracked] [--deadline T | --no-deadline] [--instructions FILE] [--spec FILE] [--dependency M]... [--no-dependencies] [--model M [--effort E]] REASON [--key NAME]
+Amend a task: each change named, the rest kept
 Result: amend
   task: Task number
-  spec: Shown specification revision
+  rev: Shown spec revision; none for a tracked task's priority alone
+  priority: Track the task at this priority
+  untracked: Stop tracking the task
+  deadline: New deadline, as 2026-10-24T17:00Z
+  no-deadline: Remove the deadline
+  instructions: File of the whole instructions, or -; empty for none
+  spec: File of the spec's words, or -
+  dependency: A dependency; repeated, the whole list
+  no-dependencies: Remove every dependency
   model: Configured model name
   effort: Effort offered by that model
-  reason: Reason for changing the model
+  reason: Reason for the amendment

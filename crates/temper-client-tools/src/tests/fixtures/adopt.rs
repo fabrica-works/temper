@@ -97,7 +97,9 @@ impl Harness {
                     assert!(self.answers.insert(number, printed).is_none());
                 }
                 crate::jig::runner::Out::Kept { line } => self.kept_lines.push(line).expect("kept line"),
-                crate::jig::runner::Out::Client { .. } | crate::jig::runner::Out::Ready => panic!("answer output"),
+                crate::jig::runner::Out::Client { .. }
+                | crate::jig::runner::Out::Ready
+                | crate::jig::runner::Out::DraftAmendment { .. } => panic!("answer output"),
             }
         }
     }

@@ -8,6 +8,8 @@ use skein_io::{
 use skein_lib::{Duration, Queue, Time, Token};
 use std::net::SocketAddr;
 const OWNER: Token = Token::new(1);
+// The existing five slots plus the two amendment text parents.
+pub(crate) const FILE_SLOTS: u32 = 7;
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Stage {
     Start,
@@ -30,6 +32,8 @@ pub(crate) struct Directory {
     io: FileIo,
     root: Option<Token>,
     file_root: Option<Token>,
+    text_roots: Vec<(u8, Token)>,
+    text_root: Option<Token>,
     private: Option<Token>,
     check: Option<Token>,
     leaf: Box<[u8]>,
@@ -60,9 +64,10 @@ impl Directory {
         class: Class,
         user: u32,
         seed: u64,
+        files: Vec<(u8, Fd)>,
     ) -> Self {
         let mut io = FileIo::new(
-            5,
+            FILE_SLOTS,
             u32::try_from(limits::native().root.tools.ask_bytes).expect("call bound"),
             1,
             Duration::from_secs(30),
@@ -71,8 +76,14 @@ impl Directory {
         io.seed_randomness(seed);
         let root = parent.map(|fd| io.adopt_root(fd).expect("parent slot"));
         let file_root = file_parent.map(|fd| io.adopt_root(fd).expect("file parent slot"));
+        let mut text_roots = Vec::new();
+        for (index, fd) in files {
+            text_roots.push((index, io.adopt_root(fd).expect("text file parent slot")));
+        }
         Self {
             io,
+            text_roots,
+            text_root: None,
             root,
             file_root,
             private: None,
@@ -294,6 +305,7 @@ impl Directory {
                 .take()
                 .or_else(|| self.check.take())
                 .or_else(|| self.private.take())
+                .or_else(|| self.close_text_root())
                 .or_else(|| self.file_root.take())
                 .or_else(|| self.root.take())
             {
@@ -348,7 +360,7 @@ impl Directory {
             Stage::KeyClose => file::Request::Close { owner: OWNER, file: self.key.expect("key file") },
             Stage::Link => file::Request::Load {
                 owner: OWNER,
-                root: self.file_root.expect("FILE's parent"),
+                root: self.text_root.or(self.file_root).expect("FILE's parent"),
                 path: self.link_path.take().expect("link file"),
                 max: self.link_max,
                 no_follow: true,
@@ -395,6 +407,26 @@ impl Directory {
         }
         self.link_max = temper_client_tools::limits::KEY_BYTES + 1;
         self.stage = Stage::KeyOpen;
+    }
+    fn close_text_root(&mut self) -> Option<Token> {
+        let (_, root) = self.text_roots.pop()?;
+        Some(root)
+    }
+    pub(crate) fn load_text(&mut self, index: u8, path: &[u8]) {
+        self.text_root = None;
+        for (argument, root) in &self.text_roots {
+            if *argument == index {
+                self.text_root = Some(*root);
+            }
+        }
+        if self.text_root.is_none() {
+            self.fail(b"text file could not be read: file has no parent");
+            return;
+        }
+        let start = path.iter().rposition(|byte| *byte == b'/').map_or(0, |at| at + 1);
+        self.link_path = Some(path[start..].into());
+        self.link_max = u32::try_from(limits::native().root.tools.ask_bytes).expect("text bound");
+        self.stage = Stage::Link;
     }
     pub(crate) fn load_call(&mut self, path: &[u8]) {
         self.load_link(path);

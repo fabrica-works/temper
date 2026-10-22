@@ -640,10 +640,27 @@ fn fail_delegate(driver: &mut Driver, held: u64) {
     );
     driver.settle();
 }
+/// Two tracked roots reserve only themselves, leaving room for each other.
+pub fn amend_tasks(front: &mut Joint) -> (u64, u64) {
+    const DEPENDENCY_KEY: [u8; 16] = [42; 16];
+    const ROOT_BUDGET: u64 = 1; // walking's minimum run spend, leaving funding for both roots.
+    let goal = make_goal_named(front, false, Some(0), GOAL_KEY, Some(ROOT_BUDGET));
+    let dependency = make_goal_named(front, false, Some(0), DEPENDENCY_KEY, Some(ROOT_BUDGET));
+    (goal, dependency)
+}
 fn make_goal(front: &mut Joint, procedure: bool) -> u64 {
     make_goal_with_delegation(front, procedure, None)
 }
 fn make_goal_with_delegation(front: &mut Joint, procedure: bool, delegates: Option<u32>) -> u64 {
+    make_goal_named(front, procedure, delegates, GOAL_KEY, None)
+}
+fn make_goal_named(
+    front: &mut Joint,
+    procedure: bool,
+    delegates: Option<u32>,
+    key: [u8; 16],
+    budget: Option<u64>,
+) -> u64 {
     let driver = &mut front.engine;
     driver.sign_in();
     driver.settle();
@@ -654,6 +671,10 @@ fn make_goal_with_delegation(front: &mut Joint, procedure: bool, delegates: Opti
     else {
         panic!("create fixture");
     };
+    if let Some(budget) = budget {
+        batch[0].budget = jig_domain_people::Budget::Named;
+        batch[0].authority.spend = budget;
+    }
     batch[0].tracked = Some(GOAL_PRIORITY);
     batch[0].label = GOAL_LABEL;
     batch[0].flags.conversation = false;
@@ -677,7 +698,7 @@ fn make_goal_with_delegation(front: &mut Joint, procedure: bool, delegates: Opti
         models: Box::new([]),
         reply_to: skein_lib::ReplyTo::new(GOAL_REPLY),
         sign_in: driver.session(),
-        key: GOAL_KEY,
+        key,
         ask: jig_domain_people::Ask::Create { project: GOAL_PROJECT, batch },
     }));
     driver.settle();
@@ -759,11 +780,40 @@ pub fn agent(world: &mut World<Temper, Joint>) -> jig_client_world::harness::Cli
 }
 #[must_use]
 pub fn call(words: &[&[u8]]) -> crate::app::Event {
+    use std::os::unix::ffi::OsStrExt;
     match temper_client_tools::table::parse(words).unwrap_or_else(|error| panic!("agent call usage: {error:?}")) {
-        temper_client_tools::jig::call::Parsed::Call { call, json } => {
+        temper_client_tools::jig::call::Parsed::Call { mut call, json } => {
+            // The world supplies the host's already-loaded amendment text.
+            if temper_client_tools::table::TOOLS[usize::from(call.tool)].name == b"amend" {
+                for slot in &mut call.values {
+                    if let Some(temper_client_tools::jig::call::Values::One(
+                        temper_client_tools::jig::call::Value::File(path),
+                    )) = slot
+                    {
+                        let bytes = std::fs::read(std::path::Path::new(std::ffi::OsStr::from_bytes(path)))
+                            .expect("world's text file");
+                        let stripped = bytes.strip_suffix(b"\n").unwrap_or(&bytes);
+                        *slot = Some(temper_client_tools::jig::call::Values::One(
+                            temper_client_tools::jig::call::Value::Text(stripped.into()),
+                        ));
+                    }
+                }
+            }
             crate::app::Event::Call { number: 0, call, json, value: None }
         }
-        temper_client_tools::jig::call::Parsed::File { .. } => panic!("agent call is a file"),
+        temper_client_tools::jig::call::Parsed::File { file, json } => {
+            let temper_client_tools::jig::call::Source::Path(path) = &file else { panic!("world call needs a file") };
+            let bytes =
+                std::fs::read(std::path::Path::new(std::ffi::OsStr::from_bytes(path))).expect("world's call file");
+            let call = temper_client_tools::jig::json::call(
+                temper_client_tools::table::TOOLS,
+                &bytes,
+                file,
+                &temper_client_tools::limits::tools(),
+            )
+            .expect("world's JSON call");
+            crate::app::Event::Call { number: 0, call, json, value: None }
+        }
     }
 }
 pub fn give(world: &mut World<Temper, Joint>, agent: jig_client_world::harness::ClientId, words: &[&[u8]]) -> u32 {

@@ -37,7 +37,7 @@ pub fn file_root(parsed: &Parsed) -> Option<Box<[u8]>> {
         Parsed::File { file: Source::Path(path), .. } => path.as_ref(),
         Parsed::File { file: Source::Stdin, .. } => return None,
         Parsed::Call { call, .. } => {
-            if class(call) == Class::Help {
+            if class(call) == Class::Help || TOOLS[usize::from(call.tool)].name == b"amend" {
                 return None;
             }
             call.values.iter().find_map(|values| {
@@ -87,4 +87,25 @@ pub(crate) fn key_file(call: &Call) -> Option<&[u8]> {
         Some(Values::One(Value::File(path))) => Some(path),
         _ => None,
     }
+}
+
+/// Amendment text files each get their own parent, opened before the loop.
+#[must_use]
+pub fn text_files(parsed: &Parsed) -> Vec<(u8, Box<[u8]>)> {
+    let mut files = Vec::new();
+    let Parsed::Call { call, .. } = parsed else { return files };
+    if TOOLS[usize::from(call.tool)].name != b"amend" {
+        return files;
+    }
+    for (index, slot) in call.values.iter().enumerate() {
+        if let Some(Values::One(Value::File(path))) = slot {
+            let parent = match path.iter().rposition(|byte| *byte == b'/') {
+                Some(0) => b"/".as_slice(),
+                Some(at) => &path[..at],
+                None => b".",
+            };
+            files.push((u8::try_from(index).expect("argument index"), parent.into()));
+        }
+    }
+    files
 }

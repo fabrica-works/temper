@@ -67,7 +67,7 @@ const USAGES: &[&[u8]] = &[
     b"forget ACCOUNT [--source sign_in|key|program] [--key NAME]\n",
     b"rank ACCOUNT POSITION [--source sign_in|key|program] [--key NAME]\n",
     b"retry ACCOUNT [--source sign_in|key|program] [--key NAME]\n",
-    b"amend N --spec R --model M [--effort E] REASON [--key NAME]\n",
+    b"amend N [--rev R] [--priority P | --untracked] [--deadline T | --no-deadline] [--instructions FILE] [--spec FILE] [--dependency M]... [--no-dependencies] [--model M [--effort E]] REASON [--key NAME]\n",
     b"declare PROVIDER ADAPTER NAME [--account A] --key NAME\n",
     b"verify ACCOUNT [--source sign_in|key|program] [--key NAME]\n",
 ];

@@ -40,7 +40,9 @@ impl OneShot {
                 self.directory.load_key(arguments::key_file(call).expect("key file"));
             }
             Parsed::Call { call, .. } => {
-                if self.class != Class::SignIn && call.values.contains(&Some(Values::One(Value::Stdin))) {
+                if let Some((index, path)) = text_file(call) {
+                    self.directory.load_text(index, path);
+                } else if self.class != Class::SignIn && call.values.contains(&Some(Values::One(Value::Stdin))) {
                     self.input = Some(Vec::new());
                     self.read_input();
                 } else {
@@ -61,11 +63,9 @@ impl OneShot {
             Parsed::File { file, json } => match jig::json::call(TOOLS, &bytes, file, &self.root_env.limits.tools) {
                 Ok(call) => {
                     let specs = TOOLS[usize::from(call.tool)].forms[usize::from(call.form)];
-                    if specs
-                        .iter()
-                        .zip(call.values.iter())
-                        .any(|(spec, value)| spec.kind == Kind::File && value.is_some())
-                    {
+                    if specs.iter().zip(call.values.iter()).any(|(spec, value)| {
+                        spec.kind == Kind::File && matches!(value, Some(Values::One(Value::File(_) | Value::Stdin)))
+                    }) {
                         self.fail(b"usage: temper ctl DIRECTORY TOOL [ARGUMENT...]");
                         return;
                     }
@@ -74,6 +74,7 @@ impl OneShot {
                     self.call = Some(Parsed::Call { call, json });
                     self.prepare_start();
                 }
+                Err(jig::argv::Usage::AmendmentRevision) => self.fail(b"amend needs --rev R"),
                 Err(_) => self.fail(b"usage: temper ctl DIRECTORY TOOL [ARGUMENT...]"),
             },
             Parsed::Call { call, json } if arguments::key_file(&call).is_some() => {
@@ -88,13 +89,18 @@ impl OneShot {
                 self.preparing = false;
             }
             Parsed::Call { mut call, json } => {
-                for slot in &mut call.values {
-                    if *slot == Some(Values::One(Value::Stdin)) {
-                        *slot = Some(Values::One(Value::Text(bytes.clone())));
+                let file = text_file_index(&call);
+                let specs = TOOLS[usize::from(call.tool)].forms[usize::from(call.form)];
+                for (index, (spec, slot)) in specs.iter().zip(call.values.iter_mut()).enumerate() {
+                    if file == Some(index) || (file.is_none() && *slot == Some(Values::One(Value::Stdin))) {
+                        let text =
+                            if spec.kind == Kind::File { bytes.strip_suffix(b"\n").unwrap_or(&bytes) } else { &bytes };
+                        *slot = Some(Values::One(Value::Text(text.into())));
                     }
                 }
+                self.directory.start(self.class);
                 self.call = Some(Parsed::Call { call, json });
-                self.preparing = false;
+                self.prepare_start();
             }
         }
     }
@@ -104,7 +110,7 @@ impl OneShot {
     fn file_input(&self) -> bool {
         match &self.call {
             Some(Parsed::File { file: Source::Path(_), .. }) => true,
-            Some(Parsed::Call { call, .. }) => arguments::key_file(call).is_some(),
+            Some(Parsed::Call { call, .. }) => arguments::key_file(call).is_some() || text_file(call).is_some(),
             _ => false,
         }
     }
@@ -137,5 +143,128 @@ impl OneShot {
             Up::Failed(_) => self.fail(b"input could not be read"),
             Up::Room => unreachable!("stdin never writes"),
         }
+    }
+}
+
+fn text_file_index(call: &jig::call::Call) -> Option<usize> {
+    let (index, _) = text_file(call)?;
+    Some(usize::from(index))
+}
+fn text_file(call: &jig::call::Call) -> Option<(u8, &[u8])> {
+    if TOOLS[usize::from(call.tool)].name != b"amend" {
+        return None;
+    }
+    for (index, slot) in call.values.iter().enumerate() {
+        if let Some(Values::One(Value::File(path))) = slot {
+            return Some((u8::try_from(index).expect("argument index"), path));
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::fixtures::Frame;
+    use skein_io::kernel::Fd;
+
+    const WORDS: &[u8] = b"Run the checks\n\n";
+    fn amendment(words: &[&str]) -> Frame {
+        let mut frame = Frame::read(words);
+        // Stop at DIRECTORY after input preparation; no engine is needed to inspect it.
+        frame.absent = true;
+        frame
+    }
+    fn text(frame: &Frame, index: usize) -> &[u8] {
+        let Some(Parsed::Call { call, .. }) = &frame.host.call else { panic!("prepared call") };
+        let Some(Some(Values::One(Value::Text(bytes)))) = call.values.get(index) else { panic!("loaded text") };
+        bytes
+    }
+    #[test]
+    fn amend_reads_instructions_from_a_file() {
+        let mut frame =
+            amendment(&["amend", "41", "--rev", "7", "--instructions", "/instructions/link-file", "because"]);
+        frame.link = WORDS;
+        frame.drain();
+        assert_eq!(text(&frame, 6), b"Run the checks\n");
+        assert_eq!(frame.link_root, Some(Fd::new(36)));
+    }
+    #[test]
+    fn amend_reads_instructions_from_stdin() {
+        let mut frame = amendment(&["amend", "41", "--rev", "7", "--instructions", "-", "because"]);
+        frame.input = WORDS;
+        frame.drain();
+        assert_eq!(text(&frame, 6), b"Run the checks\n");
+    }
+    #[test]
+    fn amend_sends_empty_instructions() {
+        let mut frame =
+            amendment(&["amend", "41", "--rev", "7", "--instructions", "/instructions/link-file", "because"]);
+        frame.link = b"\n";
+        frame.drain();
+        assert_eq!(text(&frame, 6), b"");
+    }
+    #[test]
+    fn amend_loads_both_files_from_their_own_parents() {
+        let mut frame = amendment(&[
+            "amend",
+            "41",
+            "--rev",
+            "7",
+            "--instructions",
+            "/instructions/link-file",
+            "--spec",
+            "/spec/link",
+            "because",
+        ]);
+        frame.link = WORDS;
+        frame.drain();
+        assert_eq!(text(&frame, 6), b"Run the checks\n");
+        assert_eq!(text(&frame, 7), b"Run the checks\n");
+        assert_eq!(frame.link_root, Some(Fd::new(37)));
+        assert_eq!(frame.link_leaf.as_deref(), Some(b"link".as_slice()));
+    }
+    #[test]
+    fn amend_loads_a_file_and_stdin_before_directory() {
+        let mut frame = amendment(&[
+            "amend",
+            "41",
+            "--rev",
+            "7",
+            "--instructions",
+            "/instructions/link-file",
+            "--spec",
+            "-",
+            "because",
+        ]);
+        frame.link = WORDS;
+        frame.input = b"Build\n";
+        frame.drain();
+        assert_eq!(text(&frame, 6), b"Run the checks\n");
+        assert_eq!(text(&frame, 7), b"Build");
+    }
+    #[test]
+    fn amend_call_carries_both_texts_inline() {
+        let mut frame = amendment(&["--call", "call.json"]);
+        frame.link = br#"{"tool":"amend","arguments":{"task":41,"rev":7,"instructions":"Run\n","spec":"Build","reason":"because"}}"#;
+        frame.drain();
+        assert_eq!(text(&frame, 6), b"Run\n");
+        assert_eq!(text(&frame, 7), b"Build");
+        assert_eq!(frame.link_leaf.as_deref(), Some(b"call.json".as_slice()));
+    }
+    #[test]
+    fn a_json_amend_without_revision_has_the_specific_usage_error() {
+        let mut frame = amendment(&["--call", "call.json"]);
+        frame.link = br#"{"tool":"amend","arguments":{"task":41,"instructions":"Run","reason":"because"}}"#;
+        frame.drain();
+        assert_eq!(frame.stderr(), b"temper ctl: amend needs --rev R\n");
+        assert!(!frame.opened(b"directory"));
+    }
+    #[test]
+    fn the_old_spec_revision_form_asks_for_rev() {
+        assert_eq!(
+            crate::arguments::parse(&[b"amend", b"41", b"--spec", b"8", b"--model", b"chosen-model", b"because"]),
+            Err(jig::argv::Usage::AmendmentRevision)
+        );
     }
 }

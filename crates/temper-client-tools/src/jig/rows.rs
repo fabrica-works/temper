@@ -351,17 +351,34 @@ pub const RETRY: Tool = Tool {
 const MODEL: super::table::Argument = flag(b"model", b"M", Kind::Text, Optional, b"Configured model name");
 const EFFORT: super::table::Argument = flag(b"effort", b"E", Kind::Text, Optional, b"Effort offered by that model");
 
-/// The model change is amend's only CHANGE form until the rest of area 2.
+/// The published whole dependency list fits one client document window.
+pub const DEPENDENCIES: u32 = 32;
+
+/// Each named control is replaced whole on the task's supplied document.
 pub const AMEND: Tool = Tool {
     name: b"amend",
-    line: b"Change a task's main model at its shown spec revision",
+    line: b"Amend a task: each change named, the rest kept",
     result: b"amend",
     forms: &[&[
         positional(b"task", b"N", Kind::Number, Required, b"Task number"),
-        flag(b"spec", b"R", Kind::Number, Required, b"Shown specification revision"),
-        flag(b"model", b"M", Kind::Text, Required, b"Configured model name"),
+        flag(b"rev", b"R", Kind::Number, Optional, b"Shown spec revision; none for a tracked task's priority alone"),
+        flag(b"priority", b"P", Kind::Number, Optional, b"Track the task at this priority"),
+        switch(b"untracked", b"Stop tracking the task"),
+        flag(b"deadline", b"T", Kind::Literal, Optional, b"New deadline, as 2026-10-24T17:00Z"),
+        switch(b"no-deadline", b"Remove the deadline"),
+        flag(b"instructions", b"FILE", Kind::File, Optional, b"File of the whole instructions, or -; empty for none"),
+        flag(b"spec", b"FILE", Kind::File, Optional, b"File of the spec's words, or -"),
+        super::table::repeated(
+            b"dependency",
+            b"M",
+            Kind::Number,
+            DEPENDENCIES,
+            b"A dependency; repeated, the whole list",
+        ),
+        switch(b"no-dependencies", b"Remove every dependency"),
+        MODEL,
         EFFORT,
-        positional(b"reason", b"REASON", Kind::Text, Required, b"Reason for changing the model"),
+        positional(b"reason", b"REASON", Kind::Text, Required, b"Reason for the amendment"),
     ]],
     keyed: Keyed::Optional,
     area: 2,

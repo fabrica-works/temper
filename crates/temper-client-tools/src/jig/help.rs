@@ -3,6 +3,9 @@ use super::table::{Argument, Keyed, Kind, Occurs, Place, Tool};
 use skein_lib::{Overflow, Writer};
 /// Write every form in the table's published argument order.
 pub fn usage(tool: &Tool, out: &mut Writer) -> Result<(), Overflow> {
+    if tool.name == b"amend" {
+        return out.put(b"amend N [--rev R] [--priority P | --untracked] [--deadline T | --no-deadline] [--instructions FILE] [--spec FILE] [--dependency M]... [--no-dependencies] [--model M [--effort E]] REASON [--key NAME]\n");
+    }
     for form in tool.forms {
         out.put(tool.name)?;
         for argument in *form {

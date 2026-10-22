@@ -26,6 +26,7 @@ pub enum Usage {
     Key,
     Condition,
     Json,
+    AmendmentRevision,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Unwritten {
@@ -292,7 +293,7 @@ pub fn check(table: &[&Tool], call: &Call, limits: &Limits) -> Result<(), Usage>
         check_choice(call, 2, 3, limits)?;
     }
     if tool.name == b"amend" {
-        check_choice(call, 2, 3, limits)?;
+        check_amend(call, limits)?;
     }
     if tool.area == 5 && tool.keyed != Keyed::Never {
         for (index, (arg, slot)) in args.iter().zip(&call.values).enumerate() {
@@ -591,4 +592,82 @@ fn check_choice(call: &Call, model: usize, effort: usize, limits: &Limits) -> Re
         return Err(Usage::Missing { argument });
     }
     Ok(())
+}
+
+fn present(call: &Call, index: usize) -> bool {
+    match call.values.get(index) {
+        Some(Some(_)) => true,
+        Some(None) | None => false,
+    }
+}
+fn check_amend(call: &Call, limits: &Limits) -> Result<(), Usage> {
+    check_choice(call, 10, 11, limits)?;
+    let mut change = false;
+    let mut needs_revision = false;
+    for index in 2..12 {
+        if present(call, index) {
+            change = true;
+            needs_revision |= index != 2;
+        }
+    }
+    if needs_revision && crate::jig::call::number(call, 1).is_none() {
+        return Err(Usage::AmendmentRevision);
+    }
+    if !change {
+        return Err(Usage::Missing { argument: 2 });
+    }
+    for (first, second) in [(2, 3), (4, 5), (8, 9)] {
+        if present(call, first) && present(call, second) {
+            return Err(Usage::Twice { argument: u8::try_from(second).expect("amend argument") });
+        }
+    }
+    if let Some(Value::Text(text)) = crate::jig::call::value(call, 4) {
+        deadline(text).ok_or(Usage::Kind { argument: 4 })?;
+    }
+    if let Some(priority) = crate::jig::call::number(call, 2) {
+        u32::try_from(priority).or(Err(Usage::Kind { argument: 2 }))?;
+    }
+    Ok(())
+}
+/// UTC Gregorian date to the minute, representable by Wall's nanoseconds.
+#[must_use]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "four-digit years after 1970 and validated calendar fields bound every calendar intermediate"
+)]
+pub fn deadline(text: &[u8]) -> Option<skein_lib::Wall> {
+    if text.len() != 17
+        || text.get(4) != Some(&b'-')
+        || text.get(7) != Some(&b'-')
+        || text.get(10) != Some(&b'T')
+        || text.get(13) != Some(&b':')
+        || text.get(16) != Some(&b'Z')
+    {
+        return None;
+    }
+    let year = value::number(text.get(..4)?)?;
+    let month = value::number(text.get(5..7)?)?;
+    let day = value::number(text.get(8..10)?)?;
+    let hour = value::number(text.get(11..13)?)?;
+    let minute = value::number(text.get(14..16)?)?;
+    if year < 1970 || !(1..=12).contains(&month) || hour > 23 || minute > 59 {
+        return None;
+    }
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let lengths = [31, if leap { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if day == 0 || day > *lengths.get(usize::try_from(month.checked_sub(1)?).ok()?)? {
+        return None;
+    }
+    let before = year.checked_sub(1)?;
+    let mut days = (year - 1970).checked_mul(365)? + (before / 4 - 1969 / 4) - (before / 100 - 1969 / 100)
+        + (before / 400 - 1969 / 400);
+    for length in lengths.iter().take(usize::try_from(month.checked_sub(1)?).ok()?) {
+        days = days.checked_add(*length)?;
+    }
+    let seconds = days
+        .checked_add(day.checked_sub(1)?)?
+        .checked_mul(86400)?
+        .checked_add(hour.checked_mul(3600)?)?
+        .checked_add(minute.checked_mul(60)?)?;
+    Some(skein_lib::Wall::from_nanos(seconds.checked_mul(1_000_000_000)?))
 }

@@ -101,30 +101,30 @@ fn amend_requires_an_offer() {
     assert_eq!((answer.status, answer.stderr.as_ref()), (1, b"amendment not offered\n".as_slice()));
 }
 #[test]
-fn amend_requires_the_model_flag() {
+fn amend_requires_a_change() {
     assert_eq!(
-        f::parse(&["amend", "41", "--spec", "7", "because"]),
+        f::parse(&["amend", "41", "--rev", "7", "because"]),
         Err(crate::jig::argv::Usage::Missing { argument: 2 })
     );
 }
 #[test]
-fn amend_requires_the_spec_revision() {
+fn amend_requires_a_revision_for_a_model_change() {
     assert_eq!(
         f::parse(&["amend", "41", "--model", "chosen-model", "because"]),
-        Err(crate::jig::argv::Usage::Missing { argument: 1 })
+        Err(crate::jig::argv::Usage::AmendmentRevision)
     );
 }
 #[test]
 fn amend_requires_a_reason() {
     assert_eq!(
-        f::parse(&["amend", "41", "--spec", "7", "--model", "chosen-model"]),
-        Err(crate::jig::argv::Usage::Missing { argument: 4 })
+        f::parse(&["amend", "41", "--rev", "7", "--model", "chosen-model"]),
+        Err(crate::jig::argv::Usage::Missing { argument: 12 })
     );
 }
 #[test]
 fn amend_refuses_an_unknown_model() {
     let (mut root, call) = f::send_choice_amend(
-        &["amend", "41", "--spec", "7", "--model", "unknown", "because"],
+        &["amend", "41", "--rev", "7", "--model", "unknown", "because"],
         f::choice_task(c::Admission::Allowed),
     );
     assert!(root.sends.is_empty());
@@ -134,7 +134,7 @@ fn amend_refuses_an_unknown_model() {
 #[test]
 fn amend_refuses_an_unknown_effort() {
     let (mut root, call) = f::send_choice_amend(
-        &["amend", "41", "--spec", "7", "--model", "chosen-model", "--effort", "unknown", "because"],
+        &["amend", "41", "--rev", "7", "--model", "chosen-model", "--effort", "unknown", "because"],
         f::choice_task(c::Admission::Allowed),
     );
     assert!(root.sends.is_empty());
@@ -167,7 +167,7 @@ fn a_named_amend_sends_the_callers_key() {
 #[test]
 fn an_unnamed_amend_draws_a_key() {
     let (root, call) = f::send_choice_amend(
-        &["amend", "41", "--spec", "7", "--model", "chosen-model", "--effort", "high", "because"],
+        &["amend", "41", "--rev", "7", "--model", "chosen-model", "--effort", "high", "because"],
         f::choice_task(c::Admission::Allowed),
     );
     assert_eq!(root.sent_name(call), Some(*root.saved.get(&call).expect("drawn key saved")));
@@ -240,14 +240,13 @@ fn amend_renders_a_moved_spec_refusal() {
     );
 }
 #[test]
-fn task_offers_print_the_model_amend_form() {
+fn task_offers_print_the_general_amend_form() {
     let (mut root, call, _) = f::task_read();
-    let task = f::choice_task(c::Admission::Allowed);
+    let mut task = f::choice_task(c::Admission::Allowed);
+    task.spec_revision = c::Revision { value: 8 };
     root.serve(call, f::task_result(task));
     let answer = root.answer(call).expect("task read");
-    assert!(
-        skein_lib::bytes::find(&answer.stdout, b"amend 41 --spec 8 --model M [--effort E] REASON --key NAME").is_some()
-    );
+    assert!(skein_lib::bytes::find(&answer.stdout, b"amend 41 --rev 8 CHANGE... REASON --key NAME").is_some());
 }
 
 #[test]
@@ -261,7 +260,7 @@ fn amend_refusal_keeps_the_named_retry() {
         },
     );
     assert_eq!(root.answer(call).expect("refusal").stderr.as_ref(),
-        b"amend: Authority missing\npropose instead: amend 41 because --spec 7 --model chosen-model --effort high --key model-amend\n");
+        b"amend: Authority missing\npropose instead: amend 41 because --rev 7 --model chosen-model --effort high --key model-amend\n");
 }
 #[test]
 fn a_named_amend_is_stable_across_clocks() {
@@ -282,7 +281,7 @@ fn amend_requires_an_effort_for_a_model_with_efforts() {
     let mut task = f::choice_task(c::Admission::Allowed);
     task.llm.as_mut().expect("prior choice").main = f::model_effort(f::MODEL_NAME, Some(f::EFFORT_NAME));
     let (mut root, call) =
-        f::send_choice_amend(&["amend", "41", "--spec", "7", "--model", "chosen-model", "because"], task);
+        f::send_choice_amend(&["amend", "41", "--rev", "7", "--model", "chosen-model", "because"], task);
     assert!(root.sends.is_empty());
     let answer = root.answer(call).expect("usage error");
     assert_eq!((answer.status, answer.stderr.as_ref()), (1, b"effort required: chosen-model\n".as_slice()));
@@ -296,11 +295,12 @@ fn amend_sends_no_effort_for_an_effortless_model() {
     assert_eq!(change.llm, Some(expected));
 }
 #[test]
-fn task_without_llm_offers_no_model_form() {
+fn task_without_llm_offers_the_general_amend_form() {
     let (mut root, call, _) = f::task_read();
     let mut task = f::choice_task(c::Admission::Allowed);
+    task.spec_revision = c::Revision { value: 8 };
     task.llm = None;
     root.serve(call, f::task_result(task));
     let answer = root.answer(call).expect("task read");
-    assert!(skein_lib::bytes::find(&answer.stdout, b"amend (no tool)\n").is_some());
+    assert!(skein_lib::bytes::find(&answer.stdout, b"amend 41 --rev 8 CHANGE... REASON --key NAME").is_some());
 }

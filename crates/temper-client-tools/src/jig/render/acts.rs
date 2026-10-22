@@ -73,7 +73,7 @@ pub fn text(task: &Task, me: Option<&Me>, book: &Phrasebook, out: &mut Text) {
         out.put(b"\n");
     }
 }
-fn has_tool(task: &Task, act: ActKind) -> bool {
+fn has_tool(_task: &Task, act: ActKind) -> bool {
     match act {
         ActKind::Message
         | ActKind::Answer
@@ -84,8 +84,8 @@ fn has_tool(task: &Task, act: ActKind) -> bool {
         | ActKind::LeaveHeld
         | ActKind::Stop
         | ActKind::Cancel
-        | ActKind::Adopt => true,
-        ActKind::Amend => task.llm.is_some(),
+        | ActKind::Adopt
+        | ActKind::Amend => true,
         ActKind::Take
         | ActKind::HandBack
         | ActKind::Move
@@ -154,9 +154,9 @@ fn call(task: &Task, act: ActKind, out: &mut Text) {
         ActKind::Amend => {
             out.put(b"amend ");
             out.number(task.chip.task);
-            out.put(b" --spec ");
+            out.put(b" --rev ");
             out.number(task.spec_revision.value);
-            out.put(b" --model M [--effort E] REASON");
+            out.put(b" CHANGE... REASON");
         }
         // Non-tool offers have already been printed without their admission.
         ActKind::Take

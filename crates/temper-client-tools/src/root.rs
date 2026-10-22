@@ -120,6 +120,13 @@ fn drain(
                 runner::Out::Ready => out.push(Request::Ready),
                 runner::Out::Kept { line } => out.push(Request::Kept { line }),
                 runner::Out::Printed { number, printed } => out.push(Request::Printed { number, printed }),
+                runner::Out::DraftAmendment { called, task } => {
+                    let prepared = match runner::acts::me(&root.runner, &root.client) {
+                        Some(me) => crate::amend::prepare(&called.call, &task, me, &env.limits.tools),
+                        None => Err(runner::acts::Failed::Fixed(b"signed out")),
+                    };
+                    runner::acts::prepared(&mut root.runner, &root.client, &tools_env(env), *called, prepared, child);
+                }
             }
         } else {
             return;

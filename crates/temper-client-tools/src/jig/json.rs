@@ -247,6 +247,10 @@ fn decode_value(table: &[&Tool], doc: &Document, at: u32, spec: &Argument, limit
         | Kind::Tool => require(doc, at, JsonKind::String)?,
     }
     let bytes = text(doc, at)?;
+    // Amendment FILE arguments carry their loaded words in a JSON call.
+    if spec.kind == Kind::File && (spec.name == b"instructions" || spec.name == b"spec") {
+        return Ok(Value::Text(Box::from(bytes)));
+    }
     if spec.kind == Kind::Subject {
         let mut words = List::with_capacity(u32::try_from(bytes.len()).or(Err(Usage::Json))?);
         let mut start = 0_usize;

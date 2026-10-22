@@ -60,14 +60,14 @@ pub(crate) fn chat_task(root: &Harness, call: u32) -> &c::NewTask {
     tasks.get(0).expect("one chat task")
 }
 
-/// The user's revision is older than the new read; it must not be substituted.
+/// The task document matches the caller's shown revision.
 pub(crate) const CHOICE_SPEC: u64 = 7;
 pub(crate) const MODEL_AMEND: &[&str] =
-    &["amend", "41", "--spec", "7", "--model", "chosen-model", "--effort", "high", "because", "--key", "model-amend"];
+    &["amend", "41", "--rev", "7", "--model", "chosen-model", "--effort", "high", "because", "--key", "model-amend"];
 pub(crate) fn choice_task(admission: c::Admission) -> c::Task {
     let mut task = offered(&[c::ActKind::Amend]);
     task.acts.get_mut(0).expect("amend offer").admission = admission;
-    task.spec_revision = c::Revision { value: CHOICE_SPEC + 1 };
+    task.spec_revision = c::Revision { value: CHOICE_SPEC };
     task.llm = Some(prior_choice());
     task
 }
@@ -94,4 +94,4 @@ pub(crate) fn model_change(effort: Option<&[u8]>) -> Box<c::Amendment> {
 }
 
 pub(crate) const EFFORTLESS_AMEND: &[&str] =
-    &["amend", "41", "--spec", "7", "--model", "plain-model", "because", "--key", "plain-amend"];
+    &["amend", "41", "--rev", "7", "--model", "plain-model", "because", "--key", "plain-amend"];

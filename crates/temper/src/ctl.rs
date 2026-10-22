@@ -14,7 +14,13 @@ fn start(arguments: &[OsString], clock: &Clock) -> Result<u8, String> {
         Some((directory, words)) => (Some(*directory), words),
         None => return Err("usage: temper ctl DIRECTORY TOOL [ARGUMENT...]".into()),
     };
-    let parsed = arguments::parse(words).map_err(|_| "usage: temper ctl DIRECTORY TOOL [ARGUMENT...]")?;
+    let parsed = arguments::parse(words).map_err(|why| {
+        if why == temper_client_tools::jig::argv::Usage::AmendmentRevision {
+            "amend needs --rev R"
+        } else {
+            "usage: temper ctl DIRECTORY TOOL [ARGUMENT...]"
+        }
+    })?;
     let help = matches!(&parsed, temper_client_tools::jig::call::Parsed::Call { call, .. } if arguments::class(call) == arguments::Class::Help);
     let mut owned = Vec::new();
     let result = (|| {
@@ -36,10 +42,17 @@ fn start(arguments: &[OsString], clock: &Clock) -> Result<u8, String> {
                 Ok::<_, String>(root)
             })
             .transpose()?;
+        let mut text_files = Vec::new();
+        for (index, directory) in arguments::text_files(&parsed) {
+            let root = skein_shell::open_root(super::path(&directory))
+                .map_err(|errno| format!("FILE parent: errno {errno}"))?;
+            owned.push(root);
+            text_files.push((index, root));
+        }
         let seed = skein_shell::seed().map_err(|errno| format!("random seed: errno {errno}"))?;
         let signals = skein_shell::open_termination_signals().map_err(|errno| format!("signals: errno {errno}"))?;
         owned.push(signals);
-        let mut host = OneShot::new(
+        let mut host = OneShot::with_text_files(
             Invocation { directory, parsed },
             Startup {
                 parent,
@@ -51,6 +64,7 @@ fn start(arguments: &[OsString], clock: &Clock) -> Result<u8, String> {
                 user: skein_shell::effective_user(),
                 seed,
             },
+            text_files,
         )
         .map_err(|_| "client limits refused")?;
         let mut kernel = Kernel::open(Config { operations: host.operations() }).map_err(|why| why.to_string())?;

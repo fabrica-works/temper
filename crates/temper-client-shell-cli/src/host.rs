@@ -78,6 +78,16 @@ impl OneShot {
     /// # Errors
     /// Returns unusable client limits; the shipped preset is representable.
     pub fn new(call: Invocation, startup: Startup) -> Result<Self, jig_client::Unusable> {
+        Self::with_text_files(call, startup, Vec::new())
+    }
+    /// Construct with each amendment text file's parent opened before the loop.
+    /// # Errors
+    /// Returns unusable client limits.
+    pub fn with_text_files(
+        call: Invocation,
+        startup: Startup,
+        files: Vec<(u8, Fd)>,
+    ) -> Result<Self, jig_client::Unusable> {
         let limits = limits::native();
         let class = match &call.parsed {
             Parsed::Call { call, .. } => arguments::class(call),
@@ -90,7 +100,7 @@ impl OneShot {
         let stdin = Some(io.adopt_read_pipe(startup.stdin).expect("stdin slot"));
         let signals = Some(io.adopt_signals(startup.signals).expect("signal slot"));
         let memory = io::worst_case(&limits.io).expect("io envelope")
-            + FileIo::worst_case(5, u32::try_from(limits.root.tools.ask_bytes).expect("call bound"), 1, u32::try_from(limits.root.tools.ask_bytes).expect("call bound")).expect("file envelope")
+            + FileIo::worst_case(crate::directory::FILE_SLOTS, u32::try_from(limits.root.tools.ask_bytes).expect("call bound"), 1, u32::try_from(limits.root.tools.ask_bytes).expect("call bound")).expect("file envelope")
             + Queue::<Complete>::worst_case(ROOM).expect("completions")
             + Queue::<Submit>::worst_case(ROOM).expect("submissions") * 3
             + Queue::<io::Event>::worst_case(ROOM).expect("io events")
@@ -115,6 +125,7 @@ impl OneShot {
                 class,
                 startup.user,
                 startup.seed,
+                files,
             ),
             call: Some(call.parsed),
             class,

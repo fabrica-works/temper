@@ -35,6 +35,11 @@ pub(super) fn valid(
         }
         Kind::Text => return valid_text(value, argument, limits),
         Kind::File => {
+            if let Value::Text(_) = value
+                && (spec.name == b"instructions" || spec.name == b"spec")
+            {
+                return valid_text(value, argument, limits);
+            }
             if *value == Value::Stdin {
                 return Ok(());
             }

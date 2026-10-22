@@ -87,7 +87,7 @@ pub(crate) const EVERY_TOOL: &[&[&str]] = &[
     &["forget", "43"],
     &["rank", "43", "1"],
     &["retry", "43"],
-    &["amend", "41", "--spec", "7", "--model", "chosen-model", "because"],
+    &["amend", "41", "--rev", "7", "--model", "chosen-model", "because"],
     &["declare", "9", "helper", "work-login", "--key", "declare"],
     &["verify", "43"],
 ];
@@ -418,10 +418,18 @@ impl Harness {
         self.submit_value(words, None)
     }
     pub fn submit_value(&mut self, words: &[&str], value: Option<skein_lib::Secret>) -> u32 {
-        self.next = self.next.checked_add(1).expect("fixture calls fit");
         let crate::jig::call::Parsed::Call { call, json } = parse(words).expect("fixture call") else {
             panic!("parsed call")
         };
+        self.submit_prepared(call, json, value)
+    }
+    pub fn submit_prepared(
+        &mut self,
+        call: crate::jig::call::Call,
+        json: bool,
+        value: Option<skein_lib::Secret>,
+    ) -> u32 {
+        self.next = self.next.checked_add(1).expect("fixture calls fit");
         let count = match call.tool {
             1 | 2 | 4 | 5 | 6 | 9..=15 | 31 => SINGLE_READ,
             3 => {
