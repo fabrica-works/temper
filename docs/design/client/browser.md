@@ -585,6 +585,7 @@ view draws, never changing a view to suit a sample.
 | `task-reference-T28` | the reference world's change T28, queued 2nd after T26 |
 | `task-reference-T24` | the reference world's change T24, landed, its ended task T25 |
 | `task-reference-T12` | the reference world's goal T12, its plan with its ended delegates T13, T14 and T24 |
+| `task-solo-T9` | the solo world's agent T9, its run's committed calls and words within the shipped window |
 
 ### 7.3 Its tests
 

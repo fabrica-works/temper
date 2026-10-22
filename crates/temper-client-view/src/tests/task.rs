@@ -1836,6 +1836,11 @@ fn an_agents_conversation_is_drawn_as_a_chats() {
     assert!(skein_lib::bytes::find(&fixtures::node_text(tree, log), b"Checking the credentials.").is_some());
     assert!(has_style(nodes, look::WORK));
     assert!(named(nodes, Role::Paragraph, b"delegate"));
+    super::chat::assert_call_fold(tree, "1 tool call · delegate".as_bytes(), &[b"delegateDelegated tasks: 17"]);
+    let content = children(tree, styled(tree, look::SAYS));
+    let first = *content.as_slice().first().expect("message text");
+    assert_eq!(fixtures::node_text(tree, first).as_ref(), b"Checking the credentials.");
+    assert!(first < index_of(tree, Role::Disclosure, "1 tool call · delegate".as_bytes()));
     assert!(!has_style(nodes, look::CARD));
     let mut thread = jig_client::thread::Thread::new(
         TASK,
@@ -1846,6 +1851,48 @@ fn an_agents_conversation_is_drawn_as_a_chats() {
     let chat = fixtures::chat::tree(&thread);
     let chat_log = index_of(&chat, Role::Log, b"Conversation");
     assert_eq!(fixtures::node_text(tree, log), fixtures::node_text(&chat, chat_log));
+}
+#[test]
+fn an_agents_message_folds_each_call_and_keeps_results_in_their_message() {
+    use fixtures::first_run as run;
+    let assistant = run::message(
+        c::Speaker::Assistant,
+        &[run::call(1, b"read", b"", Some(b"First file")), run::call(2, b"read", b"", Some(b"Second file"))],
+    );
+    let tool = run::message(
+        c::Speaker::Tool,
+        &[
+            c::Block::Result { call: 1, summary: run::text(b"Read completed"), failed: false },
+            c::Block::Result { call: 2, summary: run::text(b"Read failed"), failed: true },
+        ],
+    );
+    let mut page = f::activity(false);
+    page.rows.push(run::turn(1, 1, 1, &[assistant, tool], 512)).unwrap();
+    let mut task = f::delegate();
+    task.activity = 1;
+    let view = fixtures::page_view(&f::agent_root_with_page(task, Some(f::tree()), page));
+    let tree = view.tree();
+    super::chat::assert_call_fold(tree, "2 tool calls · read ×2".as_bytes(), &[b"readFirst file", b"readSecond file"]);
+    let fold = index_of(tree, Role::Disclosure, "2 tool calls · read ×2".as_bytes());
+    let result_message = styled(tree, look::BY_TOOL);
+    assert!(fold < result_message);
+    let mut says = None;
+    for (at, node) in tree.nodes().iter().enumerate().skip(result_message) {
+        if node.styles.as_slice().contains(&look::SAYS) {
+            says = Some(at);
+            break;
+        }
+    }
+    let says = says.expect("result body");
+    let result_lines = children(tree, says);
+    assert_eq!(result_lines.len(), 2);
+    for (at, words) in result_lines.iter().zip([b"Tool completedRead completed".as_slice(), b"Tool failedRead failed"])
+    {
+        let node = &tree.nodes()[*at];
+        assert_eq!(node.role, Role::Slot);
+        assert!(node.styles.as_slice().contains(&look::WORK));
+        assert_eq!(fixtures::node_text(tree, *at).as_ref(), words);
+    }
 }
 #[test]
 // client/README.md, 5.9: the conversation draws "Run N began" and

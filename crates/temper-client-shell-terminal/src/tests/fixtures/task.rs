@@ -198,10 +198,14 @@ pub fn agent_task_page() -> skein_ui::Tree {
     b.open(Role::Slot);
     b.style(look::SAYS);
     skein_ui::markdown::read(b"Checking the credentials.", 3, &mut b);
+    b.open(Role::Disclosure);
+    b.style(look::WORK);
+    b.name("1 tool call · read_file".as_bytes());
     b.open(Role::Slot);
     b.style(look::WORK);
     text(&mut b, Role::Paragraph, b"read_file");
     text(&mut b, Role::Paragraph, b"Read token.rs");
+    b.close();
     b.close();
     b.close();
     b.close();

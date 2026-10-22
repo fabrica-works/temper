@@ -1004,17 +1004,14 @@ fn committed_lines(
         b.close();
         b.open(Role::Slot);
         b.style(look::SAYS);
-        for block in prefix(b, message.blocks.as_slice(), rows, words) {
+        let blocks = prefix(b, message.blocks.as_slice(), rows, words);
+        for block in blocks {
             match block {
                 c::Block::Text(value) => skein_ui::markdown::read(value.bytes(), 2, b),
                 c::Block::Call(call) => {
                     tasks.clear();
                     delegation::delegated(call, tasks);
                     cards(b, tasks, delegations, shown, words, bindings);
-                    if carded(tasks, delegations) {
-                        continue;
-                    }
-                    call_line(b, call);
                 }
                 c::Block::Result { call, summary, failed } => {
                     tasks.clear();
@@ -1048,6 +1045,7 @@ fn committed_lines(
                 }
             }
         }
+        folded_calls(b, blocks, tasks, delegations, words);
         b.close();
         b.close();
     }

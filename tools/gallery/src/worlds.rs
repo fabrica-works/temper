@@ -1484,6 +1484,12 @@ fn activity(w: World, task: u64) -> c::ActivityPage {
             events.push(tools_line(&[("delegate", 1)], &[7], false, 3)).expect("world activity");
             events.push(agent_line("T7 found it: **92%** of the time is the CSV splitter allocating a string per line.\n\nA reused buffer cuts the run from 40 s to 1.8 s. Shall I make that a change?", 4, Some(1))).expect("world activity");
         }
+        (Solo, 9) => {
+            events.push(tools_line(&[("read", 4), ("shell", 1)], &[], false, 1)).expect("world activity");
+            events.push(agent_line("Errors carry their line now, and an embedded newline moves it on. The column next: counted from the start of its line, quotes included.", 2, None)).expect("world activity");
+            events.push(tools_line(&[("edit", 3), ("shell", 2)], &[], false, 3)).expect("world activity");
+            // Its last mockup turn is live; static gallery states show committed turns only (browser.md, 7.1).
+        }
         (Solo, 10) => {
             events.push(agent_line("That changes `report`'s output and its tests, and lands into main, so I've proposed it as a goal of yours, with a budget of its own.", 2, Some(1))).expect("world activity");
             events.push(tools_line(&[("read", 2), ("propose", 1)], &[], true, 3)).expect("world activity");
@@ -1510,6 +1516,7 @@ fn activity(w: World, task: u64) -> c::ActivityPage {
         (Reference, 1) => &[-64, -50, -50],
         (Solo, 6) => &[-118, -117, -88],
         (Solo, 10) => &[-14, -12],
+        (Solo, 9) => &[-21, -15, -14],
         (FirstRun { step: 2 }, 1) => &[1, 1, 1],
         (FirstRun { step: 3 | 4 }, 1) => &[1, 1, 1, 4, 4],
         (FirstRun { step: 4 }, 4) => &[5, 5],

@@ -283,6 +283,16 @@ const HOLDS: [Holds; samples::N] = [
             },
         ],
     },
+    Holds {
+        name: "task-solo-T9",
+        heading: "T9 · Produce T8's branch",
+        parts: &[
+            Part::Named { role: Role::Log, name: "Conversation" },
+            Part::Named { role: Role::Disclosure, name: "3 tool calls · read ×3" },
+            Part::Named { role: Role::Disclosure, name: "3 tool calls · edit ×3" },
+            Part::Named { role: Role::Paragraph, name: "Errors carry their line now" },
+        ],
+    },
 ];
 fn in_main(role: Role, name: &str) -> Find {
     Find::named(role, name.as_bytes())

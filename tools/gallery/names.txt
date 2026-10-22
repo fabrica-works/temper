@@ -29,3 +29,4 @@ accounts-refused
 task-reference-T28
 task-reference-T24
 task-reference-T12
+task-solo-T9

@@ -229,7 +229,11 @@ fn the_conversation_tokens_stay_on_their_roles() {
         for tree in [&message_tree, proposal.tree(), composer.tree()] {
             for node in tree.nodes() {
                 if node.styles.as_slice().contains(&token) {
-                    assert_eq!(node.role, role);
+                    if token == WORK && node.role == Role::Disclosure {
+                        assert!(!node.states.as_slice().contains(&skein_ui::State::Expanded));
+                    } else {
+                        assert_eq!(node.role, role);
+                    }
                     found = true;
                 }
             }

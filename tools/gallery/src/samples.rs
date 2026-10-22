@@ -32,7 +32,7 @@ pub struct Sample {
     pub address: Address,
     pub then: Then,
 }
-pub const N: usize = 31;
+pub const N: usize = 32;
 #[must_use]
 pub fn samples() -> [Sample; N] {
     use Then::{
@@ -91,6 +91,7 @@ pub fn samples() -> [Sample; N] {
         Sample { name: "task-reference-T28", world: Reference, address: Address::Task { task: 28 }, then: Shown },
         Sample { name: "task-reference-T24", world: Reference, address: Address::Task { task: 24 }, then: Shown },
         Sample { name: "task-reference-T12", world: Reference, address: Address::Task { task: 12 }, then: Shown },
+        Sample { name: "task-solo-T9", world: Solo, address: Address::Task { task: 9 }, then: Shown },
     ]
 }
 #[must_use]
