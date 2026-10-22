@@ -75,8 +75,8 @@ class FilesTests(unittest.TestCase):
         names = [n for n in chat['names'] if n not in ('Accept', 'Accept goal', 'Reject with reason')]
         composer = dict(role='textbox', name='Message', match='exact')
         dialog = dict(role='dialog', name='Close', match='exact')
-        focuses = [composer, dict(role='heading', name='', match='words'),
-                   dict(role='button', name='', match='words')]
+        # A reload is a fresh document: its focus is the platform's (ui-web.md, 7).
+        focuses = [composer, None, dict(role='button', name='', match='words')]
         for name, focus in zip(SCENES, focuses):
             with self.subTest(scene=name):
                 path = LIVE / 'scenes' / (name + '.json')
@@ -92,9 +92,8 @@ class FilesTests(unittest.TestCase):
                                                     else composer, focus=focus))
                 if name == 'chat-closing':
                     self.assertIsNone(scene['mockup'])
-                    self.assertEqual(scene['regions'], [
-                        dict(name='banner', page=dict(role='banner', name='', match='words'), mockup=None),
-                        dict(name='dialog', page=dialog, mockup=None)])
+                    # A modal's live tree holds the dialog alone: no banner region.
+                    self.assertEqual(scene['regions'], [dict(name='dialog', page=dialog, mockup=None)])
                 else:
                     self.assertEqual(scene['mockup'], dict(path='/chat.html?world=solo&task=T6&bare',
                                                          ready=chat['mockup']['ready']))
@@ -104,6 +103,8 @@ class FilesTests(unittest.TestCase):
                                if r['name'] in ('banner', 'navigation', 'chatbar', 'composer')]
                     next(r for r in regions if r['name'] == 'chatbar')['page'] = dict(
                         role='region', name='T1', match='words')
+                    # The T6 mockup's composer is T6's.
+                    next(r for r in regions if r['name'] == 'composer')['mockup']['name'] = 'Message T6'
                     self.assertEqual(scene['regions'], regions)
         gallery_names = (ROOT / 'tools/gallery/names.txt').read_text().splitlines()
         for name in ('chat', 'chat-closing'):
@@ -152,7 +153,7 @@ class FilesTests(unittest.TestCase):
             for kind in ('structure', 'style')] + [dict(name='gallery', env={}, argv=[
                 '/usr/bin/python3', '-I', '-B', '-S', '{experiment}/checks/gallery', '--live',
                 '{collected.look}', '--gallery', '{collected.gallery}/capture',
-                'chat-sent=chat', 'chat-reloaded=chat', 'chat-closing=chat-closing'])])
+                'chat-sent=chat', 'chat-reloaded=chat', 'chat-closing=chat-closing:modal'])])
 
 
 class LauncherTests(unittest.TestCase):
@@ -290,6 +291,28 @@ class GalleryTests(unittest.TestCase):
             'main > form > button "Send"': 1})
         self.assertEqual(gallery.frame('dialog\n  button\ndialog\n  button\n'),
                          {'dialog': 2, 'dialog > button': 2})
+
+    def test_modal_pair_compares_the_dialog_alone(self):
+        # skein's outline prints no dialog line; under a modal the live tree
+        # holds the dialog's lines alone, outside every landmark.
+        modal = FRAME + 'button "Confirm"\nbutton "Cancel"\n'
+        live = 'button "Confirm"\nbutton "Cancel"\n'
+        self.assertEqual(gallery.compare(live, modal, 'chat-closing', 'desktop', modal=True), [])
+        self.assertEqual(gallery.compare('button "Confirm"\n', modal, 'chat-closing', 'desktop', modal=True),
+                         [dict(fail='chat-closing/desktop/gallery/missing/button/Cancel',
+                               summary='button "Cancel": live 0, gallery 1')])
+
+    def test_lost_banner_fails_a_pair_not_declared_modal(self):
+        lost = FRAME[FRAME.index('main'):]
+        fails = {r['fail'] for r in self.compare(lost)}
+        self.assertIn('chat-sent/desktop/gallery/missing/banner', fails)
+        self.assertIn('chat-sent/desktop/gallery/missing/button/Sign%20out', fails)
+
+    def test_modal_pair_syntax(self):
+        status, records = gallery.judge(Path('/nonexistent'), Path('/nonexistent'),
+                                        ['chat-closing=chat-closing:other'])
+        self.assertEqual((status, records), (2, [dict(
+            undecided='chat-closing=chat-closing:other: expected LIVE=GALLERY[:modal]')]))
 
     def test_signature_encoding_and_roles(self):
         for entry, signature in [('banner > button "a > é/\\\""', 'button/a%20%3E%20%C3%A9%2F%22'),

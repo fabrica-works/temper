@@ -657,14 +657,16 @@ Each at `desktop` (1440×900) and `phone` (390×844, mobile), on the
 chat page `/chats/1`, the cluster's first task. Its regions are the
 frame's, none of the conversation's, whose turns carry their times:
 the banner, the navigation, the chatbar and the composer, as `look/`'s
-`chat` finds them, and in `chat-closing` the dialog, `dialog "Close"`.
+`chat` finds them (the composer's mockup, T6's), and in `chat-closing`
+the dialog alone, `dialog "Close"`: shown modal, it leaves the page
+behind it inert, out of the accessibility tree.
 The names are `look/`'s `chat`'s, but the proposal's words (Accept,
 Reject with reason, Accept goal), which a chat at rest has none of.
 
 | Scene | Mockup | State | Focus |
 |---|---|---|---|
 | `chat-sent` | `/chat.html?world=solo&task=T6&bare` | a message sent from the chat's composer by Enter, the first reply in | `textbox "Message"` |
-| `chat-reloaded` | the same | `chat-sent`'s page reloaded, the first reply in | `heading` (the main's first level-1, the chatbar's: skein's `ui-web.md`, 7, "Going to another page") |
+| `chat-reloaded` | the same | `chat-sent`'s page reloaded, the first reply in | none: a reload is a fresh document, not "Going to another page" (skein's `ui-web.md`, 7), so its focus is the platform's, the document's |
 | `chat-closing` | none | Close pressed: its confirmation, a dialog in the top layer | the dialog's first button (shown modal: skein's `ui-web.md`, 7) |
 
 - **The mockup is the solo world's chat at rest** (`chat.html?task=T6`,
@@ -714,7 +716,7 @@ turn's quiet five minutes.
 - **`gallery`** (qa-web.md, 8.2): `/usr/bin/python3 -I -B -S
   {experiment}/checks/gallery --live {collected.look} --gallery
   {collected.gallery}/capture chat-sent=chat chat-reloaded=chat
-  chat-closing=chat-closing`, each pair a live scene and the gallery
+  chat-closing=chat-closing:modal`, each pair a live scene and the gallery
   scene of `gallery/` that stands for its page: `chat`,
   `/chat-solo-T6.html`, the chat at rest; `chat-closing`,
   `/chat-closing.html`, its Close pressed. A gallery scene's names are
@@ -723,7 +725,12 @@ turn's quiet five minutes.
     page sides' outlines (lab-browser.md, 5.3) are cut to the frame:
     the `banner`'s subtree, the chatbar's (`main`'s first `region`),
     each `dialog`'s, and the composer's lines (`textbox "Message"`,
-    `button "Send"`) wherever they sit under `main`. Every line there
+    `button "Send"`) wherever they sit under `main`. A pair declared
+    modal (`chat-closing=chat-closing:modal`) is cut to its dialog's
+    lines alone, on both sides: a modal leaves the page behind it inert,
+    out of the live tree, and skein's outline prints no `dialog` line,
+    so the lines outside every landmark are the dialog's. A page that
+    lost its banner fails every other pair. Every line there
     is compared as the outline prints it, with its landmarks
     (`banner > navigation "Main navigation" > link "Chats"`), counted;
     the outline prints only the scene's names, so a title, a project's

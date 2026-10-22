@@ -76,9 +76,26 @@ def entry_signature(kind, entry):
     return tail + '/' + _encoded(name) if name else tail
 
 
-def compare(live, gallery, scene, width):
+def modal_frame(text):
+    """Count a modal pair's frame: the lines outside every landmark.
+
+    A modal dialog leaves the page behind it inert, out of the live tree,
+    and skein's outline prints no dialog line: the lines at the top that
+    are no landmark are the dialog's.
+    """
+    counts = Counter()
+    for line in text.splitlines():
+        if line and not line.startswith(' '):
+            role, _ = label(line)
+            if role not in LANDMARKS:
+                counts[line] += 1
+    return counts
+
+
+def compare(live, gallery, scene, width, modal=False):
     """Pure comparison; group identical signatures, retaining landmark evidence."""
-    left, right = frame(live), frame(gallery)
+    cut = modal_frame if modal else frame
+    left, right = cut(live), cut(gallery)
     groups = {}
     for entry in sorted(left.keys() | right.keys()):
         a, b = left[entry], right[entry]
@@ -142,8 +159,11 @@ def judge(live_dir, gallery_dir, pairs):
     for pair in pairs:
         try:
             live, separator, gallery = pair.partition('=')
-            if not separator or not NAME.fullmatch(live) or not NAME.fullmatch(gallery):
-                raise ValueError('expected LIVE=GALLERY')
+            gallery, colon, kind = gallery.partition(':')
+            modal = kind == 'modal'
+            if (not separator or not NAME.fullmatch(live) or not NAME.fullmatch(gallery)
+                    or (colon and not modal)):
+                raise ValueError('expected LIVE=GALLERY[:modal]')
             directory = live_dir / live
             a = scene_widths(parse((directory / 'capture.json').read_bytes()), live)
             b = scene_widths(parse((gallery_dir / 'capture.json').read_bytes()), gallery)
@@ -155,7 +175,7 @@ def judge(live_dir, gallery_dir, pairs):
                 if width not in a or width not in b:
                     raise ValueError('width absent from one capture')
                 records.extend(compare(read_outline(directory, a[width]),
-                                       read_outline(gallery_dir, b[width]), live, width))
+                                       read_outline(gallery_dir, b[width]), live, width, modal))
             except errors as error:
                 records.append(dict(undecided=f'{live}/{width}: {error}'))
     status = 1 if any('fail' in record for record in records) else 2 if records else 0
