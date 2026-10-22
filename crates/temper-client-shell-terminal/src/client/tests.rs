@@ -70,3 +70,22 @@ fn kept_work_of_another_version_prints_its_line_once() {
         )]
     );
 }
+
+#[test]
+fn the_deadline_takes_the_earlier_policy_or_view_time_from_the_same_clocks() {
+    let now = Time::from_nanos(100);
+    let wall = Wall::from_nanos(1000);
+    for (policy, next, expected) in [
+        (Some(105), Some(1020), Some(105)),
+        (Some(130), Some(1020), Some(120)),
+        (None, Some(1020), Some(120)),
+        (Some(130), None, Some(130)),
+        (None, None, None),
+        (None, Some(990), Some(100)),
+    ] {
+        assert_eq!(
+            deadline(policy.map(Time::from_nanos), next.map(Wall::from_nanos), now, wall),
+            expected.map(Time::from_nanos)
+        );
+    }
+}

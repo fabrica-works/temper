@@ -405,3 +405,25 @@ fn print_refuses_a_directory_not_its_own() {
     assert_eq!(fs::read(&file).expect("file untouched"), b"keep me");
     assert_eq!(fs::read_dir(scratch.path()).expect("directory untouched").count(), 1);
 }
+
+#[test]
+fn times_read_against_each_mockup_worlds_fixed_now() {
+    for (name, expected) in [
+        ("chats-solo", "1 h 28 min ago"),
+        ("chats-reference", "50 min ago"),
+        ("inbox-solo", "Waiting 12 min"),
+        ("inbox-solo", "Waiting 18 min"),
+        ("chat-solo-T10", "waiting 12 min"),
+        ("chat-first-run-4-T4", "Ended 21:05"),
+    ] {
+        let sample = samples::samples().into_iter().find(|sample| sample.name == name).expect("named sample");
+        let view = view(&sample);
+        assert!(
+            view.tree()
+                .nodes()
+                .iter()
+                .any(|node| node.text.iter().any(|run| String::from_utf8_lossy(&run.text).contains(expected))),
+            "{name}: {expected}"
+        );
+    }
+}
