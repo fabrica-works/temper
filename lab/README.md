@@ -260,8 +260,12 @@ canonical JSON (skein's `lab.md`, 2.2), shown spread out:
 ```json
 {"format": "look-judgements/1",
  "scene": "chat",
- "widths": [{"name": "desktop", "pictures": ["sha256:…"]},
-            {"name": "phone", "pictures": ["sha256:…", "sha256:…"]}],
+ "widths": [{"name": "desktop",
+             "pictures": [{"digest": "sha256:…", "seen": "judged"}]},
+            {"name": "phone",
+             "pictures": [{"digest": "sha256:…", "seen": "judged"},
+                          {"digest": "sha256:…",
+                           "seen": "6 px, largest channel delta 3: corners"}]}],
  "differences": [
    {"id": "composer-stack", "width": "desktop",
     "signatures": ["style/composer/font-family"],
@@ -285,10 +289,13 @@ canonical JSON (skein's `lab.md`, 2.2), shown spread out:
   JSON list of its shots' digests as the capture's record names them:
   the mockup's viewport (null without a mockup), the page's, then each
   region's mockup crop and page crop in the scene's order, null for one
-  not taken. A list, since a state may draw a few pixels apart from one
-  run to the next: the judge adds a digest once it has seen that
-  nothing in the pictures moved. A scene whose pictures moved is judged
-  again; one whose pictures stand is not (qa-web.md, 5.2).
+  not taken. A list, since Chromium's raster is not exact from one run
+  to the next: the antialiasing of a rounded corner may differ by a few
+  levels, so one state may draw under several digests. The judge adds a
+  digest once it has checked that nothing in the pictures moved, and its
+  `seen` records the check: the pixels that differ and the largest
+  channel delta. A scene whose pictures moved is judged again; one whose
+  pictures stand is not (qa-web.md, 5.2).
 - **A difference:** `id`, a name unique in the file; `width`; its
   `signatures`, the tails after `<scene>/<width>/` as the checks print
   them, each in at most one difference of its width; `tag`; `place`,
@@ -299,9 +306,11 @@ canonical JSON (skein's `lab.md`, 2.2), shown spread out:
   at least one; `silent`, a `question`, at least two `options` and a
   `recommendation`.
 - **Findings and questions are named** `<scene>/<id>`. The findings go
-  to the lab owner's parent as they are made, which routes them through
-  the director (qa-web.md, 9); the questions and the notes go to the
-  user in one batch. `python3 -I lab/look_bar.py batch` prints the three
+  to the lab owner's parent in batches as they are made, grouped by the
+  page's owner, and it routes them through the director (qa-web.md, 9):
+  a finding is filed once routed, and the lab's candidates of its
+  signatures stay as they are. The questions and the notes go to the
+  user in one batch at the end of the judging. `python3 -I lab/look_bar.py batch` prints the three
   lists from the files, each with its scene, width, signatures, the
   pair's paths and its citation.
 
@@ -313,10 +322,18 @@ after each key's verdict.
 
 - **Each scene's verdict on each judged run:** `pass`, or `fail` and its
   signatures' count, and whether the runs' signatures are the same.
-- **With `planted`** (the planted twin): each judged run's planted
-  signatures, those present of all. Its other failures are the healthy
-  key's or the fault's, and its pictures differ by design, so it has no
-  unjudged list: the blind judge (below) judges it.
+- **With `planted`** (the planted twin), given the healthy key: each
+  judged run's planted signatures, those present of all; and its
+  signatures beside the healthy key's run in the same place of its three
+  (the look draws nothing from a seed), as two sets, planted − healthy
+  and healthy − planted. The judge confirms that each line of the first
+  is the token's reach or the composer's move, and that the second is
+  empty or explained. The first holds more than the planted six: the
+  token also draws the banner's bottom border in every other scene and
+  the task's cards' borders, and the moved composer moves the
+  conversation too (at temper 1e1ca838, 6 + 26 + 1 = 33). Its pictures
+  differ by design, so it has no unjudged list: the blind judge (below)
+  judges its chat.
 - **Without `planted`, the unjudged list.** A judged run's failing
   signature is judged when it is a look check's, `<scene>/<width>/<tail>`,
   its scene's judgements hold that width with the run's picture digest,
@@ -325,21 +342,36 @@ after each key's verdict.
   why: `departure-gone`, always; `not a look check` (the runner's own);
   `not judged` (no judgements for the scene or the width); `pictures
   moved`; `no difference`; `still failing` (judged the page's way, its
-  departure or expectation not in the scene). Each check's `undecided`
-  line is listed too. `unjudged: none` when nothing is.
+  departure or expectation not in the scene). The `undecided` lines are
+  listed too: a look check prints one, and the run records it, for a
+  part it cannot judge (a record's file missing or changed, a call it
+  needs refused, a region's mockup part not found: skein's
+  `lab-browser.md`, 5.4). `unjudged: none` when nothing is.
 
 ### The planted chat's blind judge
 
 The judge must name both planted differences (qa-web.md, 5.4) without
-being told them. A fresh Claude session, whose working directory holds
-only copies of a planted run's chat pictures (the pair and the regions'
-pairs at both widths, named by width and region), is asked to compare
-each mockup with temper's page and to name every difference it sees. It
-sees neither `planted.css`, nor the experiment's name, nor the planted
-signatures, nor the healthy run's chat, and reads the copies alone,
-which its transcript shows. Its words and transcript are kept in
-`judgements/look/blind/`; the bar holds when they name the changed
-token and the composer's move.
+being told them:
+- **What it sees:** copies of a planted run's chat pictures, the pair
+  and the regions' pairs at both widths, in a fresh directory outside
+  `~/src/rust` with no `CLAUDE.md` on the path above it, under neutral
+  names (the width and the region): no path it sees holds `planted`, a
+  key, the experiment's name or a run's id. It sees neither
+  `planted.css`, nor the planted signatures, nor the healthy run's
+  chat.
+- **How it runs:** `claude -p --restricted --tools Read`, a fresh
+  session with auto memory off, from that directory. Its prompt lists
+  the files and asks it to compare each mockup with temper's page and
+  to name every difference it sees; it says nothing of a fault.
+- **What is kept,** in `judgements/look/blind/`: the prompt verbatim,
+  its words, and its transcript (`--output-format stream-json`).
+- **Shown blind by a command:** `python3 -I lab/look_bar.py blind --dir
+  DIR --transcript FILE --forbid WORD...` fails on a file under the
+  directory whose path holds a forbidden word, a tool other than Read
+  in the transcript, or a path the transcript names outside the
+  directory, and prints the paths it read.
+- **The bar holds** when its words name the changed token and the
+  composer's move.
 
 ## Running it
 
@@ -355,9 +387,10 @@ three seeds a key (skein's `lab.md`, section 8), printing each key and
 verdict, then the key's bar (above). More runs of a seed are `lab run
 --seed N`. The lab is `~/src/rust/tmp/lab`, whose `settings.json` names
 the browser and the `look` cost class. It runs on demand, never in the
-gate; its shots are evidence, never goldens. `python3 -I
-lab/look_bar.py bar --key KEY EXPERIMENT` prints a key's bar again
-without a run.
+gate; its shots are evidence, never goldens. Given both experiments,
+the planted key's bar is beside the healthy key's. `python3 -I
+lab/look_bar.py bar --key KEY [--healthy KEY] EXPERIMENT` prints a
+key's bar again without a run.
 
 ## Its tests
 
@@ -373,6 +406,9 @@ outside USTAR's limits. `test_look_bar.py` checks the bar on records and
 judgements written as fixtures: the picture digest; a signature judged
 by a finding and by a question; each reason of the unjudged list; a
 scene's verdicts the same on three runs and not; the planted signatures
-counted; a judgements file refused for each rule above; and the batch.
+counted, and the planted and healthy sets' two differences; a
+judgements file refused for each rule above; the batch; and the blind
+check on a transcript that stays in its directory and on ones that
+leave it, use another tool or see a forbidden name.
 The checks' own decisions are skein's, tested there on capture
 fixtures.
