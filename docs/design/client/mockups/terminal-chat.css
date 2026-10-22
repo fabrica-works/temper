@@ -23,8 +23,6 @@
 .terminal-count { color: #a45c43; margin-left: 3px; font-weight: 700; }
 .terminal-top-right { margin-left: auto; display: flex; gap: 20px; align-items: center; white-space: nowrap; }
 .terminal-live { display: flex; align-items: center; gap: 8px; color: #767066; font-size: 11px; }
-.terminal-compare { color: #746c62; font-size: 11px; }
-.terminal-compare:hover { color: var(--term-accent); text-decoration: underline; }
 .terminal-mobile-menu { display: none; position: relative; margin-left: auto; }
 
 .terminal-chatbar { height: 37px; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 0 25px; border-bottom: 1px solid var(--term-line); background: #fcfbf8; font-size: 11px; }
@@ -69,12 +67,8 @@
 .terminal-proposal-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 13px; }
 .terminal-proposal-actions button, .terminal-proposal-actions a { border: 1px solid #ddd6cb; background: transparent; border-radius: 5px; min-height: 30px; padding: 5px 9px; color: #6a6258; font: 600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .terminal-proposal-actions button:hover { border-color: #ba9c89; color: #9d5139; }
-.terminal-proposal-actions .terminal-primary { background: var(--term-accent); border-color: var(--term-accent); color: #fff; }
-.terminal-proposal-actions .terminal-primary:hover { background: #a8563e; color: #fff; }
 .terminal-proposal-actions a { border-color: transparent; }
 .terminal-proposal-actions a:hover { color: #9d5139; text-decoration: underline; }
-.terminal-proposal-result { margin-top: 11px; color: #4c8067; font-size: 11px; }
-.terminal-proposal-result.rejected { color: #a65d53; }
 .terminal-added-messages .terminal-turn { margin-top: 17px; }
 .terminal-added-messages .terminal-role time { display: block; }
 
@@ -89,14 +83,12 @@
 .terminal-send:hover { background: #a8563e; }
 .terminal-send:disabled { background: #d8cbc2; }
 .terminal-composer-area[hidden] { display: none; }
-.terminal-toast { position: fixed; z-index: 20; right: 18px; bottom: 70px; padding: 9px 13px; border-radius: 6px; color: #fff; background: #35312d; box-shadow: 0 8px 25px rgba(0,0,0,.14); font-size: 11px; }
 .terminal-dialog { width: min(420px, calc(100% - 32px)); border: 1px solid #dbd4ca; border-radius: 9px; background: #fffefd; color: var(--term-ink); padding: 20px; box-shadow: 0 22px 70px rgba(35,30,25,.22); }
 .terminal-dialog::backdrop { background: rgba(30,26,22,.34); }
 .terminal-dialog h2 { font: 700 14px ui-monospace, monospace; margin-bottom: 9px; }
 .terminal-dialog p { color: #756e65; font-size: 11px; }
 .terminal-dialog label { display: block; font-size: 11px; margin: 12px 0 5px; }
 .terminal-dialog textarea { display: block; width: 100%; min-height: 75px; border: 1px solid #d8d0c5; border-radius: 5px; padding: 8px; resize: vertical; font: inherit; }
-.terminal-dialog .terminal-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 17px; }
 .terminal-dialog button { border: 1px solid #d8d0c5; background: #fffefd; border-radius: 5px; padding: 6px 10px; font: 600 11px ui-monospace, monospace; }
 .terminal-dialog button[type="submit"] { background: var(--term-accent); border-color: var(--term-accent); color: #fff; }
 
@@ -132,8 +124,70 @@
   .terminal-phase { display: none; }
   .terminal-turn { display: block; }
   .terminal-role { display: flex; gap: 8px; margin-bottom: 4px; }
-  .terminal-role time { display: inline; }
+  .terminal-role time, .provisional-mark { display: inline; }
   .terminal-work, .terminal-proposal { margin-left: 0; }
   .terminal-proposal dl div { grid-template-columns: 70px minmax(0,1fr); }
   .terminal-composer textarea { font-size: 12px; }
 }
+
+/* An agent's task: its lineage, brief and runs. */
+.agent-lineage { flex: none; min-height: 31px; display: flex; align-items: center; gap: 9px; padding: 5px 25px; border-bottom: 1px solid var(--term-line); color: #989084; font-size: 10px; white-space: nowrap; overflow: hidden; }
+.agent-lineage a { color: #8e5542; flex: none; }
+.agent-lineage a:hover { text-decoration: underline; }
+.agent-lineage-current { overflow: hidden; text-overflow: ellipsis; }
+.agent-taskbar .terminal-chat-meta button[hidden] { display: none; }
+.agent-task-page .terminal-thread-inner { padding-top: 18px; }
+.agent-brief { margin-bottom: 20px; padding: 11px 15px; border-left: 2px solid #d8bba5; background: #f8f5f0; }
+.agent-kicker { color: #a15a43; font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+.agent-brief p { margin: 5px 0 7px; font-size: 12px; }
+.agent-brief-meta { color: #91887c; font-size: 10px; }
+.agent-run-heading { display: flex; align-items: center; gap: 12px; margin: 20px 0 17px; color: #797166; font-size: 10px; }
+.agent-run-heading::after { content: ''; height: 1px; flex: 1; background: var(--term-line); }
+.agent-run-heading strong { color: #605a51; font-weight: 700; }
+.agent-run-meta { margin: -11px 0 19px; color: #a39b90; font-size: 10px; }
+.agent-result { margin: 2px 0 18px 109px; padding: 10px 13px; border-left: 2px solid #84a98f; background: #f2f7f1; font-size: 11px; }
+.agent-result strong { display: block; color: #477b59; font-size: 10px; letter-spacing: .06em; margin-bottom: 4px; }
+.agent-result p { margin: 0; }
+.agent-event { margin: 5px 0 17px 109px; padding: 8px 11px; border-left: 2px solid #e2d9cd; color: #857d73; font-size: 11px; background: #faf8f4; }
+.agent-event strong { color: #5e574e; }
+.agent-event a { color: #a15a43; }
+.agent-event a:hover { text-decoration: underline; }
+@keyframes agent-blink { 50% { opacity: 0; } }
+.agent-steer-note { width: min(1040px, 100%); margin: 0 auto 6px; color: #91897e; font-size: 10px; }
+.agent-steer-area[hidden] { display: none; }
+.terminal-phase.waiting { color: #8b7957; }
+@media (max-width: 760px) {
+  .agent-lineage { padding-inline: 16px; }
+  .agent-taskbar .terminal-chat-identity { min-width: 0; }
+  .agent-taskbar .terminal-chat-meta { flex: none; }
+  .agent-taskbar .terminal-title { max-width: 42vw; }
+  .agent-result, .agent-event { margin-left: 70px; }
+}
+@media (max-width: 430px) {
+  .agent-taskbar .terminal-chat-identity { max-width: calc(100% - 87px); }
+  .agent-taskbar .terminal-title { max-width: 34vw; }
+  .agent-result, .agent-event { margin-left: 0; }
+}
+
+/* A chat's bar: its links. */
+.terminal-chat-meta .chatbar-link { color: #756e65; font-size: 11px; }
+.terminal-chat-meta .chatbar-link:hover { color: var(--term-accent); text-decoration: underline; }
+.terminal-day button { border: 0; background: none; color: #9d5139; font: inherit; padding: 0; }
+
+/* A chat's heading: its number and title, one level-1 heading. */
+.chatbar-heading { display: contents; font: inherit; letter-spacing: inherit; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* The line naming the account and model the next run takes. */
+.composer-line { width: min(1040px, 100%); margin: 0 auto 6px; font-size: 10px; color: var(--term-muted); }
+
+/* A turn still streaming, before it commits. */
+.terminal-turn.provisional .terminal-turn-content p { color: #59534c; }
+.provisional-mark { display: block; color: #4c8067; font-size: 10px; letter-spacing: 0; text-transform: none; }
+.stream-caret { display: inline-block; width: 5px; height: 12px; margin-left: 2px; background: #aa6a50; vertical-align: -2px; animation: agent-blink 1s steps(1) infinite; }
+
+/* A proposal's acts, and a delegation's card. */
+.terminal-proposal-actions .terminal-primary { background: var(--term-accent); border-color: var(--term-accent); color: #fff; }
+.terminal-proposal-actions .terminal-primary:hover { background: #a8563e; color: #fff; }
+.task-card-result { font-size: 11px; color: #4f4a43; margin: 0 0 4px; }
+.task-card > .text-link { font-size: 11px; }

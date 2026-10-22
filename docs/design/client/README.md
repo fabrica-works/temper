@@ -294,21 +294,21 @@ keeps (`../protocol/configuration.md`, section 2).
 |---|---|---|---|---|
 | `Inbox` (home) | `inbox.html` | what needs the person, across projects, filtered by project, kind and goal (its root): proposals, questions, held tasks, person tasks; then updates (results, replies) | `inbox` with its filters; the `proposal` or `task` an entry's card needs | accept, reject with a reason, answer, release, leave held, take, hand back; seen |
 | `Chats` | `chats.html`, `first-run.html` | a composer to start a chat; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats, live or closed, newest activity first, each with its status, spend and delegates | `tasks{query}`: requester the person, the chat label, by last activity; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request |
-| `Chat { task }` | `index.html`, `first-run.html` | its chatbar: its number and title, its status, its spend and acts; after it, the demo's banner while either half holds, in any project (5.1, 5.6), and the context line only in the demo's project while the demo is answered (5.6); the conversation: committed turns, the person's words, work summaries, provisional text; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer | `task`, `activity` a page at a time, `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
+| `Chat { task }` | `chat.html`, `first-run.html` | its chatbar: its number and title, its status, its spend and acts; after it, the demo's banner while either half holds, in any project (5.1, 5.6), and the context line only in the demo's project while the demo is answered (5.6); the conversation: committed turns, the person's words, work summaries, provisional text; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer | `task`, `activity` a page at a time, `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
-| `Task { task }` | `task.html`, `agent-task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree with each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel; an agent's task: its transcript and a composer, with Amend and Stop | `task`, `tree`, `activity`; `run` while one is live | amend, stop, cancel, release a held task of the plan, message an agent's task |
+| `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree with each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel; an agent's task: its transcript and a composer, with Amend and Stop | `task`, `tree`, `activity`; `run` while one is live | amend, stop, cancel, release a held task of the plan, message an agent's task |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
 | `Adopt { project }` | none: 4.4 | the adoption form, with the picker of the repositories temper can reach on the chosen forge | `me`; the chosen forge's deployment part, for its kind, mode, user and installations (`forge.md`, 5.4); the picker's page, a `Reachable` request (section 8) | adopt a repository (4.4) |
 | `Forges` | none: `forge.md`, 5.4 | each configured forge: its connection, its mode, on GitHub temper's App and its installations, a connect under way and how the last ended, its load | the forge's, through the forge's side (4.2) | connect; replace a key or tokens; install on another account; forget the admin's token (section 8) |
-| `Accounts` | none: 5.5 | the person's LLM accounts, then, for an owner, the deployment's: each with its LLM provider and display name, its holder, its sources in order, each with its state in words and, for a program's, on which hosts (5.5), the runs using it and the tasks waiting for it; the sign-ins and checks under way, and how the last ended; the three ways to add one | `accounts` (jig's `client/domain/contract.md`, 7.1); `me`'s LLM providers | sign in with an LLM provider; sign a source out; add a key, to an account or as one of its own; replace a key; remove a source or an account; declare a program's login; check it again; move an account, or a source, up or down; resume a limited source |
+| `Accounts` | `accounts.html` | the person's LLM accounts, then, for an owner, the deployment's: each with its LLM provider and display name, its holder, its sources in order, each with its state in words and, for a program's, on which hosts (5.5), the runs using it and the tasks waiting for it; the sign-ins and checks under way, and how the last ended; the three ways to add one | `accounts` (jig's `client/domain/contract.md`, 7.1); `me`'s LLM providers | sign in with an LLM provider; sign a source out; add a key, to an account or as one of its own; replace a key; remove a source or an account; declare a program's login; check it again; move an account, or a source, up or down; resume a limited source |
 
 - **Words and facts:** a chat's status from jig's facts (jig's
   `client/domain/client.md`, section 19), in jig's words, with temper's
-  own where the mockups word it otherwise ("Waiting for you",
-  "Parked"); a conversation from jig's thread model; jig's enums and a
-  decision's facts in jig's words, under temper's phrasebook (5.1);
+  own in places ("Waiting for you", "Parked"); a conversation from
+  jig's thread model; jig's enums and a decision's facts in jig's
+  words, under temper's phrasebook (5.1);
   each card temper's own (section 1).
-- **A chat's chatbar** (`index.html`, `first-run.html`): its level-1
+- **A chat's chatbar** (`chat.html`, `first-run.html`): its level-1
   heading "TN · TITLE", the chat's task number and its title (a
   chat's first message); its status; then "Demo model" while the
   demo's model half holds and the chat is in the demo's project (5.6),
@@ -319,9 +319,8 @@ keeps (`../protocol/configuration.md`, section 2).
   conversation. A chip's executor keeps jig's "Agent". The mockup's
   time beside each turn ("Just now") is not drawn: the view keeps no
   clock (section 11).
-- **A task's page** is of its kind: a tracked task's, a goal's, as
-  `task.html` lays it out (5.8); an agent's task's, as
-  `agent-task.html`. A task with the
+- **A task's page** is of its kind, as `task.html` lays each out: a
+  tracked task's, a goal's (5.8); an agent's task's. A task with the
   chat label opens as `Chat { task }`. A procedure's task or a person
   task shows a tracked task's header and plan only (section 11).
 - **The forge's parts** of a page (a goal's issue and changes on its
@@ -778,8 +777,8 @@ of each (`../draft/first-run.md`, 3.6).
 - **Its state:** skein-ui's view (the last tree, a spare, node ids never
   reused); temper's phrasebook, English, with jig's words for jig's
   enums and a decision's facts (`jig-client`'s `words`) under it,
-  overridden phrase by phrase where the mockups word them otherwise
-  ("Funds 40 from your pool · 120 left, 80 after", `inbox.html`), and
+  overridden phrase by phrase where temper words them otherwise
+  ("Funds 40 from your pool · 120 left, 80 after"), and
   temper's own phrase for what `jig-client`'s `words` does not say (an
   executor, an outcome); temper's bindings for the last tree; its
   limits.
@@ -878,8 +877,9 @@ the person from `me`; "Chats"; then, for the project the person is in,
 "Board" and "Changes"; and after them "Adopt a repository", to
 `Adopt { project }`; then "Forges", to `Forges`, and last, "Accounts",
 to `Accounts`, both whatever the project. With no project chosen, the
-project's entries are not offered. The mockups' fifth entry, "Tasks",
-a list of a project's tasks, is not in the client (section 11). "Adopt
+project's entries are not offered. The mockups' "Tasks", a list of a
+project's tasks, and "Workers", the deployment's hosts, are not in the
+client (section 11). "Adopt
 a repository" and "Forges" are offered whatever the person's role: the
 engine judges each, and a refusal says why, since the client never
 computes what a party may do.
@@ -1105,8 +1105,9 @@ or difference of their amounts (jig's `client/domain/contract.md`,
   model choice (3.5); "What was asked", with the result the goal gives;
   "Result", once it has ended; "Plan"; "Latest activity"; "Budget and
   authority". The confirmation follows while one is open (3.6). The
-  mockup's tabs, Plan history, "From this goal" and "Related" are not
-  drawn: no document supplies them.
+  mockup's tabs, and its cards for findings (a gap,
+  `mockups/README.md`), notes, history, placement and changes, are not
+  drawn.
 - **The result it gives:** "What was asked" names it after its heading,
   from the task's result contract, as the mockup's tag: "Result:
   report", "Result: change", "Result: verdict" or "Result: approval".
@@ -1777,8 +1778,9 @@ own tests:
   spend; jig's `client/domain/pages.md`, section 6, and the forge's
   parts in `forge.md`, 5.3 and 7.3); the deployment's page but its LLM
   accounts, which the accounts page shows an owner, and its forges,
-  which the forges' page shows (3.5); the "Tasks"
-  list of a project; a procedure's task and a person task beyond a
+  which the forges' page shows (3.5); the "Tasks" list of a project and
+  the deployment's hosts, which the mockups draw ("Tasks", "Workers"),
+  after jig's pages (`client/domain/pages.md`, 6.3 and 7); a procedure's task and a person task beyond a
   tracked task's header and plan; making a service and showing its
   credential once; another party's kept work. Default: not in temper's
   client; the person acts on them through the engine's configuration,

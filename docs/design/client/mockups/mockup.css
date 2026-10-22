@@ -1,0 +1,104 @@
+/* The mockups' own chrome, never the product: the bar above each page
+   (the world, its step, what is marked), the sources' marks, and the
+   annotations (the reference case's names, the gaps temper lacks). All
+   slate, never the product's warm palette, so they read as notes on the
+   page. */
+
+:root {
+  --mock-bar: 32px;
+  --note: #56708f;
+  --note-pale: #eef2f6;
+  --note-line: #b9c6d6;
+  --src-engine: #2f6fd0;
+  --src-config: #8a4fc8;
+  --src-written: #d0802a;
+  --src-ops: #3a9089;
+}
+
+/* The bar: above the product. */
+body.mock { padding-top: var(--mock-bar); }
+body.mock .terminal-shell { height: calc(100dvh - var(--mock-bar)); }
+body.mock.terminal-pages .terminal-topbar { top: var(--mock-bar); }
+body.mock .drawer { top: calc(var(--mock-bar) + 49px); }
+
+.mockbar { position: fixed; inset: 0 0 auto; z-index: 40; height: var(--mock-bar); display: flex; align-items: center; gap: 14px; padding: 0 14px 0 18px; background: #2b2f36; color: #dfe5ec; font: 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: -.01em; }
+.mockbar-mark { color: #9fb3c9; font-weight: 700; letter-spacing: .1em; white-space: nowrap; }
+.mockbar-step { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.mockbar button { border: 1px solid #485260; background: transparent; color: #dfe5ec; border-radius: 4px; height: 22px; padding: 0 8px; font: inherit; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.mockbar button:hover:not(:disabled) { border-color: #8ea3bb; color: #fff; }
+.mockbar button:disabled { opacity: .4; cursor: default; }
+.mockbar-now { display: flex; gap: 10px; align-items: baseline; min-width: 0; overflow: hidden; }
+.mockbar-now b { color: #fff; white-space: nowrap; }
+.mockbar-now span { color: #a9b5c3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mockbar-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.mockbar-pop { position: fixed; z-index: 41; top: calc(var(--mock-bar) + 6px); width: min(460px, calc(100vw - 24px)); max-height: calc(100dvh - var(--mock-bar) - 20px); overflow-y: auto; background: #fbfcfd; color: #2c333c; border: 1px solid var(--note-line); border-radius: 6px; box-shadow: 0 18px 50px rgba(30,40,55,.22); padding: 14px 16px; font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.mockbar-pop h4 { margin: 0 0 6px; font-size: 11px; color: var(--note); letter-spacing: .08em; text-transform: uppercase; }
+.mockbar-pop p { margin: 0 0 10px; }
+.mockbar-pop ol, .mockbar-pop ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.mockbar-pop a { display: block; padding: 4px 6px; border-radius: 3px; }
+.mockbar-pop a:hover { background: var(--note-pale); color: var(--note); }
+.mockbar-pop .step-item { display: grid; grid-template-columns: 34px 1fr; gap: 6px; padding: 3px 6px; border-radius: 3px; }
+.mockbar-pop .step-item.current { background: var(--note-pale); font-weight: 700; }
+.mockbar-pop .step-item.later { color: #9aa4b0; }
+.mockbar-pop .act { margin: 10px 0 3px; color: var(--note); font-weight: 700; }
+.mockbar-pop .act:first-child { margin-top: 0; }
+
+/* The View menu: the world, and what is marked. */
+.view-pop h4 { margin-top: 12px; }
+.view-pop h4:first-child { margin-top: 0; }
+.view-toggle { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 6px; padding: 4px 6px; border-radius: 3px; cursor: pointer; }
+.view-toggle:hover { background: var(--note-pale); }
+.view-toggle input { margin: 2px 0 0; accent-color: var(--note); }
+.view-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 6px !important; }
+.mockbar-legend { display: none; gap: 10px; color: #c6d0db; font-size: 10px; }
+body.mock-sources .mockbar-legend { display: flex; }
+.mockbar-legend span::before, .view-legend span::before { content: ''; display: inline-block; width: 9px; height: 3px; margin-right: 5px; vertical-align: 2px; border-radius: 1px; background: var(--c); }
+.legend-engine { --c: var(--src-engine); }
+.legend-config { --c: var(--src-config); }
+.legend-written { --c: var(--src-written); }
+.legend-ops { --c: var(--src-ops); }
+
+/* Sources: each value underlined by where it comes from, while asked. A
+   gradient paints the line, so a value inside another shows its own. */
+.src-engine { --c: var(--src-engine); }
+.src-config { --c: var(--src-config); }
+.src-written { --c: var(--src-written); }
+.src-ops { --c: var(--src-ops); }
+body.mock-sources span.src { background-image: linear-gradient(var(--c), var(--c)); background-size: 100% 2px; background-repeat: no-repeat; background-position: 0 100%; padding-bottom: 1px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+body.mock-sources div.src { box-shadow: inset 2px 0 0 var(--c); padding-left: 8px; }
+body.mock-sources .src:hover { background-color: color-mix(in srgb, var(--c) 10%, transparent); }
+.src-tip { position: fixed; z-index: 60; max-width: 340px; padding: 7px 10px; border-radius: 5px; background: #2b2f36; color: #e3e8ee; box-shadow: 0 10px 30px rgba(30,40,55,.25); font: 10.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; pointer-events: none; }
+.src-tip b { display: block; font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: #fff; }
+.src-tip b::before { content: ''; display: inline-block; width: 9px; height: 3px; margin-right: 6px; vertical-align: 2px; background: var(--c); }
+.src-tip[hidden] { display: none; }
+
+/* The case's names and the gaps, beside the product's words. */
+.case-ref, .gap { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; border-radius: 3px; font: 600 9.5px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 0; vertical-align: 1px; white-space: nowrap; font-style: normal; }
+.case-ref { color: var(--note); background: var(--note-pale); }
+.gap { color: var(--note); border: 1px dashed var(--note-line); background: transparent; }
+body.mock-plain .case-ref, body.mock-plain .gap, body.mock-plain .gap-note, body.mock-plain .mock-note { display: none !important; }
+.gap-note { margin: 12px 0 0; padding-top: 9px; border-top: 1px dashed var(--note-line); color: var(--note); font-size: 10.5px; }
+.mock-note { color: var(--note); font-size: 10.5px; margin-left: 8px; }
+
+/* What the current step changed. */
+.fresh { position: relative; }
+.fresh::before { content: ''; position: absolute; left: -9px; top: 4px; bottom: 4px; width: 3px; border-radius: 2px; background: var(--note); }
+body.mock-plain .fresh::before { display: none; }
+
+/* The contents page. */
+.mock-index { width: min(760px, calc(100% - 32px)); margin: 0 auto; padding: 34px 0 60px; font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #2c333c; }
+.mock-index h1 { font: 700 20px/1.3 ui-monospace, monospace; margin: 0 0 8px; }
+.mock-index h2 { font: 700 11px/1.3 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--note); margin: 22px 0 8px; }
+.mock-index p { margin: 0 0 12px; }
+.mock-index ul, .mock-index ol { margin: 0 0 12px; padding-left: 20px; }
+.mock-index a { color: var(--note); text-decoration: underline; text-underline-offset: 2px; }
+.mock-index [class^="legend-"] { box-shadow: inset 0 -2px 0 var(--c); }
+
+@media (max-width: 1100px) {
+  body.mock-sources .mockbar-legend { display: none; }
+}
+@media (max-width: 760px) {
+  .mockbar { gap: 8px; padding: 0 8px; }
+  .mockbar-mark, .mockbar-now { display: none; }
+  body.mock .drawer { top: calc(var(--mock-bar) + 45px); }
+}

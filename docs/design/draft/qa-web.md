@@ -23,7 +23,7 @@ a driver reaches the pages by (section 6), its stories and checks
   three seeds a verdict. The records gain nothing but a finding's class
   (section 9).
 - **A scene** is a mockup's state beside temper's at one width: the
-  mockup's page and the acts that reach its state, temper's page from
+  mockup's page at the address that names its state, temper's page from
   the gallery or a live cluster, and the regions paired between them
   (section 3).
 - **Three views of each scene:** its structure, an outline of the
@@ -79,10 +79,11 @@ a driver reaches the pages by (section 6), its stories and checks
 
 A file in the look experiment's `scenes/`, one per page state:
 
-- **its mockup:** a page of `client/mockups/` and the acts that reach its
-  state there, since the mockups are interactive (a proposal shown, a
-  filter set): by role and name, or by a selector where the mockup gives
-  a part no role;
+- **its mockup:** a page of `client/mockups/` at the address that names
+  its state, its world, step and task, drawn bare, without the mockups'
+  bar and marks (`client/mockups/README.md`); for `first-run.html`, a
+  story, the acts that reach its state, by role and name, or by a
+  selector where the mockup gives a part no role;
 - **temper's state:** a gallery state by its name (3.2), or, for a live
   scene, the seed actions that make it (3.3); and the page's address;
 - **its widths:** 1440×900 and 390×844, both for every scene, as
@@ -94,9 +95,8 @@ A file in the look experiment's `scenes/`, one per page state:
   controls', never content;
 - **its expectations and departures** (5.3).
 
-A page no mockup draws as a page (the accounts page and the adoption
-form, whose look comes from `first-run.html`'s dialogs) is a scene with
-no mockup: its first judged capture is its expectations, so it is held
+A page no mockup draws as a page (the adoption form, whose look comes
+from `first-run.html`'s dialogs) is a scene with no mockup: its first judged capture is its expectations, so it is held
 to itself from then on.
 
 ### 3.2 The gallery
@@ -375,8 +375,8 @@ signed in and on temper's first page, and nothing of the pages' paths.
   section 4); the two checks (5.1); `lab/look/` with its scenes, and
   `lab/look-planted/` with the stylesheet of 5.4.
 - **The scenes:** every page the browser has that a mockup draws (the
-  chats, a chat, the inbox, a task's page, the demo's first screen),
-  and the accounts page and the adoption form as scenes of their own
+  chats, a chat, the inbox, a task's page, the accounts page, the
+  demo's first screen), and the adoption form as a scene of its own
   (3.1).
 - **The first campaign:** each scene judged, each difference made an
   expectation, a departure or a question, and the user's answers taken.
