@@ -461,13 +461,14 @@ fn a_chats_line_counts_the_delegates_it_waits_on() {
 }
 
 #[test]
-fn a_chats_line_keeps_jigs_word_for_news_without_a_wake_policy() {
+fn a_chats_line_reads_its_owner_wake_policy_for_news() {
     let mut line = line();
     line.waits_on = WaitsOn::News;
     let ChipPhase::Owner { details, .. } = line.chip.details.as_mut() else { panic!("owner") };
     details.wake.words = WakeRule::Immediate;
+    details.live_delegates = 0;
     let (tree, _) = tree(&line);
-    assert!(fixtures::find(&tree, Role::Status, b"Parked").is_some());
+    assert!(fixtures::find(&tree, Role::Status, b"waiting on your words").is_some());
 }
 
 fn filter(root: &mut Domain, filter: temper_client_domain::pages::chats::Filter) {

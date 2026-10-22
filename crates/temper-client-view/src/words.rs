@@ -1460,13 +1460,8 @@ pub fn jig_language() -> Language {
                 Segment::Text(copy_of(b" after")),
             ]);
         }
-        let literal = if phrase.id == JigWord::Status(StatusWord::WaitingForYou).id() {
-            Some(b"Waiting for you".as_slice())
-        } else if phrase.id == JigWord::Status(StatusWord::Parked).id() {
-            Some(b"Parked".as_slice())
-        } else {
-            None
-        };
+        let literal =
+            if phrase.id == JigWord::Status(StatusWord::Parked).id() { Some(b"Parked".as_slice()) } else { None };
         if let Some(literal) = literal {
             phrase.forms.first_mut().expect("English word has a form").segments =
                 Box::new([Segment::Text(copy_of(literal))]);

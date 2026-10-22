@@ -274,22 +274,39 @@ pub(crate) fn status(
     } else {
         0
     });
-    let waits_on = if delegates == Some(0) && *waits_on == WaitsOn::Delegates { &WaitsOn::News } else { waits_on };
-    let narrowed =
-        if (*waits_on == WaitsOn::Delegates || (delegates.is_some() && *waits_on == WaitsOn::News)) && live > 0 {
-            Some(words.say(Word::WaitingForDelegates, &[Hole::Number(u64::from(live))]))
-        } else if *waits_on == WaitsOn::News
-            && requester == OwnerRequester::Person(me.party.number)
-            && let Some(wake) = wake
-            && match wake.words {
-                WakeRule::Never => false,
-                WakeRule::Immediate | WakeRule::Batch { .. } => true,
-            }
-        {
-            Some(words.say(Word::WaitingForYourWords, &[]))
-        } else {
-            None
-        };
+    let waits_on = if live == 0 && *waits_on == WaitsOn::Delegates { &WaitsOn::News } else { waits_on };
+    let wake = match wake {
+        Some(wake) => Some(wake),
+        None => match chip.details.as_ref() {
+            ChipPhase::Owner { details, .. } => Some(&details.wake),
+            ChipPhase::Active(_)
+            | ChipPhase::Waiting { .. }
+            | ChipPhase::Idle { .. }
+            | ChipPhase::Starting
+            | ChipPhase::Running { .. }
+            | ChipPhase::WaitingForWords { .. }
+            | ChipPhase::BackingOff { .. }
+            | ChipPhase::Procedure { .. }
+            | ChipPhase::Person { .. }
+            | ChipPhase::Closing(_)
+            | ChipPhase::Held { .. }
+            | ChipPhase::Ended { .. } => None,
+        },
+    };
+    let narrowed = if (*waits_on == WaitsOn::Delegates || *waits_on == WaitsOn::News) && live > 0 {
+        Some(words.say(Word::WaitingForDelegates, &[Hole::Number(u64::from(live))]))
+    } else if *waits_on == WaitsOn::News
+        && requester == OwnerRequester::Person(me.party.number)
+        && let Some(wake) = wake
+        && match wake.words {
+            WakeRule::Never => false,
+            WakeRule::Immediate | WakeRule::Batch { .. } => true,
+        }
+    {
+        Some(words.say(Word::WaitingForYourWords, &[]))
+    } else {
+        None
+    };
     if let Some(name) = narrowed {
         b.open(Role::Status);
         b.style(crate::look::STATUS_WAITING);
@@ -327,7 +344,21 @@ pub(crate) fn status(
     };
     b.open(Role::Status);
     b.style(token);
-    let name = words.say_word(jig_client::words::Word::status(&status), holes.as_slice());
+    let name = match status {
+        jig_client::facts::ChatStatus::WaitingForYou { .. } => words.say(Word::WaitingForYou, &[]),
+        jig_client::facts::ChatStatus::Starting
+        | jig_client::facts::ChatStatus::Writing
+        | jig_client::facts::ChatStatus::Tool { .. }
+        | jig_client::facts::ChatStatus::Working { .. }
+        | jig_client::facts::ChatStatus::WaitingFor(_)
+        | jig_client::facts::ChatStatus::Parked
+        | jig_client::facts::ChatStatus::Retrying { .. }
+        | jig_client::facts::ChatStatus::Held(_)
+        | jig_client::facts::ChatStatus::Closing
+        | jig_client::facts::ChatStatus::Ended { .. } => {
+            words.say_word(jig_client::words::Word::status(&status), holes.as_slice())
+        }
+    };
     b.name(&name);
     b.text(Run::Plain, &name);
     b.close();

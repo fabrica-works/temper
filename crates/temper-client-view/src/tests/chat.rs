@@ -1295,3 +1295,64 @@ fn a_chat_rebuilds_its_day_at_midnight_and_keeps_the_turn_clock() {
         while patches.pop().is_some() {}
     }
 }
+
+#[test]
+fn the_chatbar_and_chats_line_share_every_status_phrase() {
+    const STATES: u32 = 17;
+    let mut rows = List::with_capacity(STATES);
+    for (line, _) in super::chats::status_rows() {
+        rows.push(line).unwrap();
+    }
+    for (waits_on, live, wake) in [
+        (c::WaitsOn::Delegates, 1, c::WakeRule::Never),
+        (c::WaitsOn::Delegates, 2, c::WakeRule::Never),
+        (c::WaitsOn::News, 0, c::WakeRule::Immediate),
+        (c::WaitsOn::News, 0, c::WakeRule::Never),
+        (c::WaitsOn::News, 2, c::WakeRule::Never),
+        (c::WaitsOn::Delegates, 0, c::WakeRule::Immediate),
+    ] {
+        let mut line = super::chats::line();
+        line.waits_on = waits_on;
+        let c::ChipPhase::Owner { details, .. } = line.chip.details.as_mut() else { panic!("owner") };
+        details.live_delegates = live;
+        details.wake.words = wake;
+        rows.push(line).unwrap();
+    }
+    let expected = [
+        b"waiting on an answer from you".as_slice(),
+        b"Held",
+        b"Retrying",
+        b"Starting",
+        b"Writing",
+        b"Using tool search",
+        b"Working",
+        b"Waiting for another party",
+        b"Parked",
+        b"Closing",
+        b"Ended",
+        b"waiting on 1 delegate",
+        b"waiting on 2 delegates",
+        b"waiting on your words",
+        b"Parked",
+        b"waiting on 2 delegates",
+        b"waiting on your words",
+    ];
+    for (line, expected) in rows.iter().zip(expected) {
+        let (line_tree, _) = super::chats::tree(line);
+        assert!(fixtures::find(&line_tree, Role::Status, expected).is_some(), "chats line: {expected:?}");
+        let c::ChipPhase::Owner { details, .. } = line.chip.details.as_ref() else { panic!("owner") };
+        let root = fixtures::root_in_project(None);
+        let me = root.pages().me(root.client()).unwrap();
+        let mut b = skein_ui::Builder::new(&fixtures::tree_limits());
+        crate::pages::chats::status(
+            &mut b,
+            &line.chip,
+            (&line.waits_on, Some(details.live_delegates)),
+            (line.project, line.requester),
+            Some(&details.wake),
+            me,
+            &fixtures::words(),
+        );
+        assert!(fixtures::find(&b.finish(), Role::Status, expected).is_some(), "chatbar: {expected:?}");
+    }
+}
