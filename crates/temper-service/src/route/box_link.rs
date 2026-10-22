@@ -1,5 +1,4 @@
 //! The routing's box link: serve's side of the box's pipe (protocol/forge.md, 2.8).
-#![cfg_attr(not(test), expect(dead_code, reason = "task C (o/forgejo-setup-m2) wires the box link"))]
 
 use alloc::boxed::Box;
 use skein_lib::{Decimal, List, Queue, Writer, bytes};
@@ -35,6 +34,7 @@ pub(crate) enum Out {
 }
 
 pub(crate) struct Link {
+    pub(crate) write: Option<Box<[u8]>>,
     piped: bool,
     asked: Option<u16>,
     line_bytes: u32,
@@ -44,29 +44,19 @@ pub(crate) struct Link {
 impl Link {
     /// With no pipe, every ask is refused `NotUnderTheBox`.
     pub(crate) fn new(line_bytes: u32, piped: bool) -> Link {
-        Link { piped, asked: None, line_bytes, partial: List::with_capacity(line_bytes), skipping: false }
+        Link { write: None, piped, asked: None, line_bytes, partial: List::with_capacity(line_bytes), skipping: false }
     }
     /// The caller reserves three output slots before asking.
     pub(crate) fn ask(&mut self, forge: u16, out: &mut Queue<Out>) {
         let refusal = if !self.piped {
             Some(Refused::NotUnderTheBox)
-        } else if self.asked.is_some() {
+        } else if self.asked.is_some() || self.write.is_some() {
             Some(Refused::Busy)
         } else {
             None
         };
         if let Some(reason) = refusal {
-            let text = match reason {
-                Refused::NotUnderTheBox => b"not under the box".as_slice(),
-                Refused::Busy => b"busy".as_slice(),
-            };
             out.push(Out::Answered { forge, answer: Err(reason) });
-            out.push(Out::Named(joined(&[
-                b"box link: refused forge ",
-                Decimal::of(u64::from(forge)).as_bytes(),
-                b": ",
-                text,
-            ])));
             return;
         }
         self.asked = Some(forge);
@@ -112,6 +102,7 @@ impl Link {
             return;
         }
         self.piped = false;
+        self.write = None;
         self.partial.clear();
         self.skipping = false;
         out.push(Out::Named(Box::from(b"box link: the box closed the pipe".as_slice())));
@@ -202,4 +193,43 @@ fn joined(parts: &[&[u8]]) -> Box<[u8]> {
         writer.put(part).expect("computed line length");
     }
     writer.finish()
+}
+
+/// One drain for asks, pipe lines and pipe terminals (protocol/forge.md, 2.8).
+pub(crate) fn drain(engine: &mut crate::engine::Engine, out: &mut Queue<Out>) {
+    use crate::setup::lifecycle::{set_up_refused, state};
+    use temper_engine_domain_forge::{Connection, SetUpRefusal, SetUpStep};
+    for _ in 0..out.len() {
+        match out.pop().expect("box link outputs") {
+            Out::Write(line) => {
+                assert!(engine.box_link.write.is_none(), "one box line pending");
+                engine.box_link.write = Some(line);
+            }
+            Out::SettingUp { forge, step } => {
+                let step = match step {
+                    None => None,
+                    Some(Step::Fetch) => Some(SetUpStep::Fetch),
+                    Some(Step::Prepare) => Some(SetUpStep::Prepare),
+                    Some(Step::Run) => Some(SetUpStep::Run),
+                };
+                state(engine, forge, Connection::SettingUp { step });
+            }
+            Out::Failed { forge, why } => state(engine, forge, Connection::SetUpFailed { why }),
+            Out::Started { forge } => {
+                // Transitional: M4 (o/forgejo-setup) reads the forge's files and sends Request::Connect here (protocol/forge.md, 2.2).
+                state(engine, forge, Connection::NotConnected);
+            }
+            Out::Answered { forge, answer } => match answer {
+                Ok(()) => {}
+                Err(refused) => {
+                    let why = match refused {
+                        Refused::NotUnderTheBox => SetUpRefusal::NotUnderTheBox,
+                        Refused::Busy => SetUpRefusal::Busy,
+                    };
+                    set_up_refused(engine, forge, why);
+                }
+            },
+            Out::Named(line) => engine.notes.push(crate::Note::BoxLink { line }),
+        }
+    }
 }

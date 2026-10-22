@@ -158,6 +158,7 @@ fn note_line(note: temper_service::Note) -> String {
             };
             format!("temper serve: forge {number}: set up refused: {why}\n")
         }
+        temper_service::Note::BoxLink { line } => format!("{}\n", String::from_utf8_lossy(&line)),
         temper_service::Note::ForgeStopped { number, why } => stopped_line(number, why),
         temper_service::Note::ForgeNotConnected { number, why } => {
             format!("temper serve: forge {number}: not connected: {why}\n")

@@ -87,6 +87,10 @@ pub enum Note {
         number: u16,
         why: temper_engine_domain_forge::SetUpRefusal,
     },
+    /// A diagnostic from the box link (protocol/forge.md, 2.8).
+    BoxLink {
+        line: Box<[u8]>,
+    },
     ForgeStopped {
         number: u16,
         why: skein_forge_connection::Stopped,

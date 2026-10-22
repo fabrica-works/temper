@@ -457,6 +457,7 @@ pub struct Requirements {
     pub worker_bytes: u64,
 }
 struct CheckedStart {
+    not_set_up: List<u16>,
     engine: settings::Engine,
     worker: Option<settings::Worker>,
     requirements: Requirements,
@@ -564,6 +565,13 @@ fn checked_start(
     if !problems.is_empty() {
         return Err(problems);
     }
+    let mut not_set_up =
+        List::with_capacity(u32::try_from(parsed.application.asked_owned.len()).expect("asked forges"));
+    for number in &parsed.application.asked_owned {
+        if application::missing_asked_files(&parsed.application, files, *number) {
+            not_set_up.push(*number).expect("asked forges");
+        }
+    }
     let (worker, bytes, worker_operations) = if let Some(agent) = agent {
         let worker = parsed.workers.into_iter().next().expect("one worker checked");
         let own = parsed.application.workers.into_iter().next().expect("one application worker checked");
@@ -623,6 +631,7 @@ fn checked_start(
         Err(found) => return Err(Problems::jig(found, &Path::root())),
     };
     Ok(CheckedStart {
+        not_set_up,
         engine,
         worker,
         requirements: Requirements { engine_bytes, worker_bytes: bytes },
@@ -664,7 +673,7 @@ pub fn with_setup(
     forges: List<crate::ForgeRuntime>,
     setup: Option<&temper_forge_setup::check::Checked>,
 ) -> Result<Service, Problems> {
-    let CheckedStart { engine, worker, requirements, io, forges } =
+    let CheckedStart { engine, worker, requirements, io, forges, not_set_up } =
         checked_start(document, directories, files, agent, seeds, accounts.as_ref(), forges, setup)?;
     let mut problems = Problems::empty();
     let worker_memory = if let Some(worker) = &worker { worker.jig.memory } else { 0 };
@@ -693,7 +702,16 @@ pub fn with_setup(
         None => None,
     };
     match Service::prepared(engine, seeds, accounts, forges, worker, requirements.worker_bytes, io) {
-        Ok(service) => Ok(service),
+        Ok(mut service) => {
+            for number in &not_set_up {
+                crate::setup::lifecycle::state(
+                    service.engine.as_mut().expect("engine startup"),
+                    *number,
+                    temper_engine_domain_forge::Connection::NotSetUp,
+                );
+            }
+            Ok(service)
+        }
         Err(found) => Err(Problems::jig(found, &Path::root())),
     }
 }

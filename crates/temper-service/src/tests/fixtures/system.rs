@@ -1,7 +1,10 @@
 use crate::{Service, Worker, WorkerRuntime};
 use alloc::collections::BTreeMap;
 use skein_io::kernel::{Complete, Done, Error, Exit, Fd, Op};
-use skein_lib::{Time, Wall};
+use skein_lib::{List, Queue, Time, Wall};
+
+// The scripted box story uses 128-byte lines and captures fewer bytes than one line.
+pub const BOX_BYTES: u32 = 128;
 
 pub struct SystemStand {
     pub service: Service,
@@ -64,8 +67,10 @@ pub struct Kernel {
     pub spawned: u32,
     pub files: u32,
     pub root_closed: bool,
-    pub closed: skein_lib::List<Fd>,
+    pub closed: List<Fd>,
     pub box_writes: u32,
+    pub box_answers: Queue<u8>,
+    pub box_written: List<u8>,
     pub box_read_cancelled: bool,
 }
 impl Kernel {
@@ -77,8 +82,10 @@ impl Kernel {
             spawned: 0,
             files: 0,
             root_closed: false,
-            closed: skein_lib::List::with_capacity(256),
+            closed: List::with_capacity(256),
             box_writes: 0,
+            box_answers: Queue::with_capacity(BOX_BYTES),
+            box_written: List::with_capacity(BOX_BYTES),
             box_read_cancelled: false,
         }
     }
@@ -105,6 +112,13 @@ impl Kernel {
             }
             Ok(Done::Spawned { pidfd: self.descriptor() })
         }
+    }
+    fn box_read(&mut self, buf: &mut [u8]) -> Done {
+        let count = buf.len().min(usize::try_from(self.box_answers.len()).unwrap());
+        for target in buf.iter_mut().take(count) {
+            *target = self.box_answers.pop().unwrap();
+        }
+        Done::Count(u32::try_from(count).unwrap())
     }
     pub fn answer(&mut self, service: &mut Service) {
         for _ in 0..service.submissions.len() {
@@ -138,14 +152,21 @@ impl Kernel {
                     Ok(Done::Count(0))
                 }
                 Op::Spawn { spawn } => self.spawn(spawn),
-                Op::PipeRead { fd, .. } if *fd == Fd::new(4) => {
-                    // The box has written nothing; io's bounded read remains in flight.
-                    service.submissions.push(submit);
-                    continue;
+                Op::PipeRead { fd, buf } if *fd == Fd::new(4) => {
+                    if self.box_answers.is_empty() {
+                        // The box has written nothing; io's bounded read remains in flight.
+                        service.submissions.push(submit);
+                        continue;
+                    }
+                    Ok(self.box_read(buf))
                 }
                 Op::PipeWrite { fd, bytes, from } if *fd == Fd::new(3) => {
                     self.box_writes = self.box_writes.checked_add(1).unwrap();
-                    let left = bytes.len().checked_sub(usize::try_from(*from).unwrap()).unwrap();
+                    let written = bytes.get(usize::try_from(*from).unwrap()..).unwrap();
+                    for byte in written {
+                        self.box_written.push(*byte).unwrap();
+                    }
+                    let left = written.len();
                     Ok(Done::Count(u32::try_from(left).unwrap()))
                 }
                 Op::PipeRead { fd, buf } => {

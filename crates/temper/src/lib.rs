@@ -324,13 +324,20 @@ fn prepare_with_store(
     bytes: &[u8],
     owned: &mut Vec<Fd>,
 ) -> Result<(service::Service, Box<[u8]>), String> {
+    prepare_with_limits(directories, bytes, owned).map(|(service, store, _)| (service, store))
+}
+fn prepare_with_limits(
+    directories: &Directories,
+    bytes: &[u8],
+    owned: &mut Vec<Fd>,
+) -> Result<(service::Service, Box<[u8]>, u32), String> {
     if service::startup::shape(bytes, &directories.jig())
         .map_err(|why| String::from_utf8_lossy(&service::startup::lines(&why)).into_owned())?
         == service::startup::Shape::WorkerAlone
     {
-        return worker_alone::prepare(directories, bytes, owned).map(|service| (service, Box::new([]) as Box<[u8]>));
+        return worker_alone::prepare(directories, bytes, owned).map(|service| (service, Box::new([]) as Box<[u8]>, 0));
     }
-    let setup::Deployment { named, checked, .. } = setup::check(bytes, &directories.jig())?;
+    let setup::Deployment { named, checked, limits, .. } = setup::check(bytes, &directories.jig())?;
     let document =
         config::document(bytes, &config::DocumentLimits { bytes: CONFIG_BYTES, tokens: CONFIG_BYTES, depth: 32 })
             .expect("named checked document");
@@ -399,7 +406,7 @@ fn prepare_with_store(
     if let Some(bundle) = bundle {
         service.adopt_bundle(bundle);
     }
-    Ok((service, named.deployment))
+    Ok((service, named.deployment, limits.line_bytes))
 }
 fn close(owned: Vec<Fd>) {
     for fd in owned {
@@ -433,8 +440,8 @@ fn serve(directories: &Directories, boxed: bool) -> Result<Exit, String> {
     }
     let bytes = directories.read()?;
     let mut owned = Vec::new();
-    let prepared = prepare_with_store(directories, &bytes, &mut owned);
-    let (mut service, store) = match prepared {
+    let prepared = prepare_with_limits(directories, &bytes, &mut owned);
+    let (mut service, store, line_bytes) = match prepared {
         Ok(prepared) => prepared,
         Err(why) => {
             close(owned);
@@ -443,7 +450,7 @@ fn serve(directories: &Directories, boxed: bool) -> Result<Exit, String> {
     };
     if boxed {
         owned.extend([Fd::new(3), Fd::new(4)]);
-        if let Err(fd) = service.adopt_box(Fd::new(3), Fd::new(4)) {
+        if let Err(fd) = service.adopt_box(Fd::new(3), Fd::new(4), line_bytes) {
             close(owned);
             return Err(format!("--box: fd {} refused", fd.raw()));
         }

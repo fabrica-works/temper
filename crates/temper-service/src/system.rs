@@ -1,7 +1,7 @@
 //! One process, joined through io's workers channel (protocol/README.md, 8).
 use crate::{
-    AccountsRuntime, End, Stop, Worker, accounts, clients, engine, limits, settings, stop, store, translate, values,
-    workers,
+    AccountsRuntime, End, Stop, Worker, accounts, clients, engine, limits, route::box_link, settings, stop, store,
+    translate, values, workers,
 };
 use alloc::boxed::Box;
 use jig_protocol_config::{Path, Problems, What};
@@ -26,12 +26,28 @@ pub struct Service {
     signals: Option<Token>,
     signals_closing: bool,
     bytes: u64,
+    memory_limit: u64,
     links: Queue<Box<[u8]>>,
 }
 struct BoxPipe {
     requests: Token,
     answers: Token,
-    closing: bool,
+    state: BoxPipeState,
+    reading: bool,
+    output: BoxOutput,
+    read_bytes: u32,
+}
+#[derive(PartialEq, Eq)]
+enum BoxPipeState {
+    Open,
+    Ended,
+    Closing,
+}
+#[derive(PartialEq, Eq)]
+enum BoxOutput {
+    Idle,
+    Waiting,
+    Room,
 }
 // Existing reservation for setup/forge handoffs beside a root routing pass.
 const SETUP_ROUTING_HEADROOM: u32 = 2;
@@ -154,7 +170,10 @@ impl Service {
         let store = store::Store::new(&limits, &store_limits, &config.core.settings.models, seeds.installation);
         let demo = settings.demo;
         let own = settings.limits;
+        let memory_limit =
+            settings.jig.memory.checked_add(worker_bytes).ok_or(start_problem(b"memory_bytes", What::Bound))?;
         Ok(Self {
+            memory_limit,
             worker,
             engine: Some(engine::Engine::new(
                 config,
@@ -202,6 +221,7 @@ impl Service {
             return Err(crate::worker_settings::problem(b"memory_bytes", what));
         }
         Ok(Self {
+            memory_limit: settings.jig.memory,
             engine: None,
             worker: Some(Worker::new(settings, agent, limits, files, runtime, seed)?),
             io: Io::new(&io_limits),
@@ -267,7 +287,7 @@ impl Service {
             || self.end().is_some() && self.signals.is_some() && !self.signals_closing
             || self.end().is_some()
                 && match &self.box_pipe {
-                    Some(pipe) => !pipe.closing,
+                    Some(pipe) => pipe.state != BoxPipeState::Closing,
                     None => false,
                 }
     }
@@ -308,16 +328,33 @@ impl Service {
             None => true,
         }
     }
-    /// Hold the box's pipes without taking lines or writing (protocol/setup.md, 7.1).
+    /// Adopt the box's lines and requests (protocol/setup.md, 7.1).
     /// io may keep a bounded read pending until close cancels it.
     /// On refusal the caller retains both descriptors.
-    pub fn adopt_box(&mut self, requests: Fd, answers: Fd) -> Result<(), Fd> {
+    pub fn adopt_box(&mut self, requests: Fd, answers: Fd, line_bytes: u32) -> Result<(), Fd> {
         if self.box_pipe.is_some() || self.io_env.limits.sockets.saturating_sub(self.io.sockets()) < 2 {
             return Err(requests);
         }
+        // io's envelope already counts pipe intake, output and operation buffers.
+        // The link adds its partial and outgoing lines, including LF.
+        // The temporary output queue is counted at startup, even without a pipe.
+        let Some(extra) = box_bytes(line_bytes) else { return Err(requests) };
+        let Some(bytes) = self.bytes.checked_add(extra) else { return Err(requests) };
+        if bytes > self.memory_limit || self.engine.is_none() || line_bytes == 0 {
+            return Err(requests);
+        }
+        self.bytes = bytes;
+        self.engine.as_mut().expect("box engine").box_link = box_link::Link::new(line_bytes, true);
         let requests = self.io.adopt_write_pipe(requests, None).expect("two reserved pipe slots");
         let answers = self.io.adopt_read_pipe(answers).expect("second reserved pipe slot");
-        self.box_pipe = Some(BoxPipe { requests, answers, closing: false });
+        self.box_pipe = Some(BoxPipe {
+            requests,
+            answers,
+            state: BoxPipeState::Open,
+            reading: false,
+            output: BoxOutput::Idle,
+            read_bytes: line_bytes.min(self.io_env.limits.intake),
+        });
         Ok(())
     }
     /// Adopt the shell's termination-signal source.
@@ -616,6 +653,7 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
     if let Some(engine) = &mut service.engine {
         engine.abort_if_ended();
     }
+    box_io(service);
     service.route_components();
     if let Some(engine) = &mut service.engine {
         for _ in 0..engine.clients.links.len() {
@@ -641,9 +679,9 @@ fn close_sources(service: &mut Service) {
     if service.end().is_some()
         && service.raw_submissions.room() >= io::MAX_OUT_DOWN.submissions.saturating_mul(2)
         && let Some(pipe) = &mut service.box_pipe
-        && !pipe.closing
+        && pipe.state != BoxPipeState::Closing
     {
-        pipe.closing = true;
+        pipe.state = BoxPipeState::Closing;
         for entity in [pipe.requests, pipe.answers] {
             io::down(&mut service.io, &service.io_env, io::Request::Close { entity }, &mut service.raw_submissions);
         }
@@ -667,6 +705,9 @@ fn route_events(service: &mut Service) {
         if let Some(worker) = &service.worker
             && !worker.room()
         {
+            break;
+        }
+        if box_notes_full(service) {
             break;
         }
         let event = service.told.pop().expect("io event count");
@@ -693,6 +734,12 @@ fn route_events(service: &mut Service) {
             if let io::Event::Closed { .. } = event {
                 service.signals = None;
             }
+            continue;
+        }
+        if let Some(pipe) = &service.box_pipe
+            && (owner == Some(pipe.requests) || owner == Some(pipe.answers))
+        {
+            box_event(service, event);
             continue;
         }
         if let Some(worker) = &mut service.worker
@@ -808,6 +855,7 @@ fn memory(
         .checked_add(Queue::<Box<[u8]>>::worst_case(queue)?)?
         .checked_add(Queue::<crate::Note>::worst_case(u32::try_from(settings.forges.len()).ok()?)?)?
         .checked_add(Queue::<crate::Note>::worst_case(3)?)?
+        .checked_add(Queue::<box_link::Out>::worst_case(3)?)?
         .checked_add(u64::try_from(settings.forges.len()).ok()?.checked_mul(crate::setup::diagnostics::worst_case()?)?)?
         .checked_add(u64::from(queue).checked_mul(u64::from(io.output).checked_add(512)?)?)?
         .checked_add(Map::<Token, (Token, Option<Token>)>::worst_case(operations)?)?
@@ -904,4 +952,126 @@ fn forget_handover(settings: &mut settings::Engine) {
     for setup in &mut settings.setup {
         setup.handover = None;
     }
+}
+
+fn box_notes_full(service: &Service) -> bool {
+    let Some(engine) = &service.engine else { return false };
+    let Some(pipe) = &service.box_pipe else { return false };
+    pipe.state == BoxPipeState::Open
+        && engine.notes.room() == 0
+        && match service.told.iter().next() {
+            Some(event) => box_owner(event, pipe),
+            None => false,
+        }
+}
+fn box_owner(event: &io::Event, pipe: &BoxPipe) -> bool {
+    match event {
+        io::Event::Stream { owner, .. } | io::Event::Failed { owner, .. } | io::Event::Closed { owner } => {
+            *owner == pipe.requests || *owner == pipe.answers
+        }
+        io::Event::Listening { .. }
+        | io::Event::Accepted { .. }
+        | io::Event::Connecting { .. }
+        | io::Event::Connected { .. }
+        | io::Event::Output { .. }
+        | io::Event::Spawned { .. }
+        | io::Event::Exited { .. }
+        | io::Event::Usage { .. }
+        | io::Event::Window { .. }
+        | io::Event::Resized
+        | io::Event::Shutdown { .. } => false,
+    }
+}
+fn box_event(service: &mut Service, event: io::Event) {
+    use skein_lib::stream::Up;
+    let pipe = service.box_pipe.as_mut().expect("box event");
+    if pipe.state != BoxPipeState::Open {
+        return;
+    }
+    let engine = service.engine.as_mut().expect("box engine");
+    let mut out = Queue::with_capacity(3);
+    match event {
+        io::Event::Stream { owner, up } => match up {
+            Up::Bytes(bytes) => {
+                assert!(owner == pipe.answers, "box read owner");
+                pipe.reading = false;
+                engine.box_link.read(&bytes, &mut out);
+            }
+            Up::Room => {
+                assert!(owner == pipe.requests, "box write owner");
+                pipe.output = BoxOutput::Room;
+            }
+            Up::End | Up::Failed(_) => {
+                pipe.state = BoxPipeState::Ended;
+                engine.box_link.closed(&mut out);
+            }
+        },
+        io::Event::Failed { .. } | io::Event::Closed { .. } => {
+            pipe.state = BoxPipeState::Ended;
+            engine.box_link.closed(&mut out);
+        }
+        io::Event::Listening { .. }
+        | io::Event::Accepted { .. }
+        | io::Event::Connecting { .. }
+        | io::Event::Connected { .. }
+        | io::Event::Output { .. }
+        | io::Event::Spawned { .. }
+        | io::Event::Exited { .. }
+        | io::Event::Usage { .. }
+        | io::Event::Window { .. }
+        | io::Event::Resized
+        | io::Event::Shutdown { .. } => unreachable!("box pipe event"),
+    }
+    box_link::drain(engine, &mut out);
+}
+fn box_io(service: &mut Service) {
+    use skein_lib::stream::{Delimiter, Down, Read};
+    let Some(pipe) = &mut service.box_pipe else { return };
+    if pipe.state != BoxPipeState::Open {
+        return;
+    }
+    if !pipe.reading && service.raw_submissions.room() >= io::MAX_OUT_DOWN.submissions && service.io.takes() {
+        io::down(
+            &mut service.io,
+            &service.io_env,
+            io::Request::Stream {
+                stream: pipe.answers,
+                down: Down::Demand { read: Read::Scan { until: Delimiter::LF, max: pipe.read_bytes }, room: 0 },
+            },
+            &mut service.raw_submissions,
+        );
+        pipe.reading = true;
+    }
+    let engine = service.engine.as_mut().expect("box engine");
+    if engine.box_link.write.is_some()
+        && service.raw_submissions.room() >= io::MAX_OUT_DOWN.submissions
+        && service.io.takes()
+    {
+        if pipe.output == BoxOutput::Room {
+            let line = engine.box_link.write.take().expect("box line ready");
+            io::down(
+                &mut service.io,
+                &service.io_env,
+                io::Request::Stream { stream: pipe.requests, down: Down::Send(line) },
+                &mut service.raw_submissions,
+            );
+            pipe.output = BoxOutput::Idle;
+        } else if pipe.output == BoxOutput::Idle {
+            // Full output credit waits for the preceding line to leave io.
+            io::down(
+                &mut service.io,
+                &service.io_env,
+                io::Request::Stream {
+                    stream: pipe.requests,
+                    down: Down::Demand { read: Read::Nothing, room: service.io_env.limits.output },
+                },
+                &mut service.raw_submissions,
+            );
+            pipe.output = BoxOutput::Waiting;
+        }
+    }
+}
+
+fn box_bytes(line_bytes: u32) -> Option<u64> {
+    u64::from(line_bytes).checked_add(1)?.checked_mul(2)
 }

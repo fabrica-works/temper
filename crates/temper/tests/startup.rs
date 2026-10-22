@@ -1132,6 +1132,9 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     let (github_identity_growth, github_worker_growth) = github_identity_growth();
     // Holding the box pipe adds 24 B to Service; the worker payload is unchanged.
     let box_pipe_growth = 24;
+    // The unpiped link and pipe flow-control fields grow Service by 72 B.
+    // The transient drain queue reserves three 24-B outputs, even without a pipe.
+    let box_link_growth = 72 + 3 * 24;
     assert_eq!(
         required.engine_bytes,
         79_659_997_210_050_u64
@@ -1165,6 +1168,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + GIT_GENERATIONS_GROWTH
             - metadata_ids_release
             + box_pipe_growth
+            + box_link_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.

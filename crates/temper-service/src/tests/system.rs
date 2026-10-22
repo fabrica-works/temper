@@ -163,8 +163,8 @@ fn the_box_pipes_carry_no_service_data_and_close_on_drain_or_abort() {
     use skein_io::kernel::Fd;
     for abort in [false, true] {
         let mut stand = fixtures::one_process();
-        stand.service.adopt_box(Fd::new(3), Fd::new(4)).unwrap();
-        assert_eq!(stand.service.adopt_box(Fd::new(5), Fd::new(6)), Err(Fd::new(5)));
+        stand.service.adopt_box(Fd::new(3), Fd::new(4), 128).unwrap();
+        assert_eq!(stand.service.adopt_box(Fd::new(5), Fd::new(6), 128), Err(Fd::new(5)));
         fixtures::until_hosting(&mut stand);
         let mut pending_reads = 0_u32;
         for submit in &stand.service.submissions {
@@ -192,6 +192,11 @@ fn the_box_pipes_carry_no_service_data_and_close_on_drain_or_abort() {
         assert_eq!(stand.service.end(), Some(if abort { &End::Aborted } else { &End::Drained }));
         assert!(stand.service.is_empty());
         assert!(stand.kernel.box_read_cancelled, "close cancelled io's pending read");
+        for note in stand.service.notes().iter() {
+            if let crate::Note::BoxLink { line } = note {
+                panic!("our close is not the box closing: {line:?}");
+            }
+        }
         assert_eq!(stand.kernel.box_writes, 0);
         for fd in [Fd::new(3), Fd::new(4)] {
             let mut count = 0_u32;
@@ -203,4 +208,92 @@ fn the_box_pipes_carry_no_service_data_and_close_on_drain_or_abort() {
             assert_eq!(count, 1);
         }
     }
+}
+
+#[test]
+fn a_scripted_box_answers_the_engines_asks() {
+    use skein_io::kernel::Fd;
+    use temper_engine_domain as root;
+    use temper_engine_domain_forge::{Connection, Event, SetUpRefusal, SetUpStep};
+    const OWNED: u16 = 3;
+    const OTHER: u16 = 4;
+    // Allow the root continuations and memory-store handoffs, then output credit and IO.
+    fn turns(stand: &mut fixtures::system::SystemStand) {
+        const TURNS: u8 = 64;
+        for _ in 0..TURNS {
+            stand.turn();
+        }
+    }
+    const LINE_BYTES: u32 = fixtures::system::BOX_BYTES;
+    let mut stand = fixtures::one_process();
+    stand.service.adopt_box(Fd::new(3), Fd::new(4), LINE_BYTES).unwrap();
+    fixtures::until_hosting(&mut stand);
+    // SystemStand has fixed membership and an in-memory store. Startup's
+    // absent-file state is tested separately; inject its root inputs here.
+    for forge in [OWNED, OTHER] {
+        crate::setup::lifecycle::state(stand.service.engine.as_mut().unwrap(), forge, Connection::NotSetUp);
+    }
+    turns(&mut stand);
+    let ask = root::Event::Forge(Box::new(Event::SetUp { forge: OWNED }));
+    stand.service.engine.as_mut().unwrap().events.push(ask);
+    turns(&mut stand);
+    assert_eq!(stand.kernel.box_written.as_slice(), b"start 3\n");
+    assert_eq!(
+        stand.service.engine.as_ref().unwrap().domain.forge_connection(OWNED),
+        Connection::SettingUp { step: None }
+    );
+
+    for byte in b"step 3 prepare\n" {
+        stand.kernel.box_answers.push(*byte);
+    }
+    turns(&mut stand);
+    assert_eq!(
+        stand.service.engine.as_ref().unwrap().domain.forge_connection(OWNED),
+        Connection::SettingUp { step: Some(SetUpStep::Prepare) }
+    );
+    assert_eq!(stand.kernel.box_written.as_slice(), b"start 3\n");
+
+    for byte in b"failed 3 prepare 3 exited 1\n" {
+        stand.kernel.box_answers.push(*byte);
+    }
+    turns(&mut stand);
+    assert_eq!(
+        stand.service.engine.as_ref().unwrap().domain.forge_connection(OWNED),
+        Connection::SetUpFailed { why: b"prepare 3 exited 1".as_slice().into() }
+    );
+    assert_eq!(stand.kernel.box_written.as_slice(), b"start 3\n");
+
+    stand.service.engine.as_mut().unwrap().events.push(root::Event::Forge(Box::new(Event::SetUp { forge: OWNED })));
+    turns(&mut stand);
+    assert_eq!(stand.kernel.box_written.as_slice(), b"start 3\nstart 3\n");
+    assert_eq!(
+        stand.service.engine.as_ref().unwrap().domain.forge_connection(OWNED),
+        Connection::SettingUp { step: None }
+    );
+
+    stand.service.engine.as_mut().unwrap().events.push(root::Event::Forge(Box::new(Event::SetUp { forge: OTHER })));
+    turns(&mut stand);
+    assert_eq!(stand.kernel.box_written.as_slice(), b"start 3\nstart 3\n");
+    assert_eq!(
+        stand.service.engine.as_ref().unwrap().domain.forge_connection(OWNED),
+        Connection::SettingUp { step: None }
+    );
+    assert_eq!(stand.service.engine.as_ref().unwrap().domain.forge_connection(OTHER), Connection::NotSetUp);
+    assert_eq!(stand.service.notes().pop(), Some(crate::Note::SetUpRefused { number: OTHER, why: SetUpRefusal::Busy }));
+    assert!(stand.service.notes().is_empty(), "one refusal note");
+
+    for byte in b"started 9\n" {
+        stand.kernel.box_answers.push(*byte);
+    }
+    turns(&mut stand);
+    assert_eq!(stand.kernel.box_written.as_slice(), b"start 3\nstart 3\n");
+    assert_eq!(
+        stand.service.engine.as_ref().unwrap().domain.forge_connection(OWNED),
+        Connection::SettingUp { step: None }
+    );
+    assert_eq!(
+        stand.service.notes().pop(),
+        Some(crate::Note::BoxLink { line: b"box link: dropped started for forge 9, not asked".as_slice().into() })
+    );
+    assert!(stand.service.notes().is_empty());
 }

@@ -1,15 +1,15 @@
 //! Exhaustive root routing to its protocol components.
 use crate::{engine::Engine, stop};
 use temper_engine_domain as root;
-use temper_engine_domain_forge::SetUpRefusal;
 
 pub(crate) mod box_link;
 
 pub(crate) fn request(engine: &mut Engine, request: root::Request) {
     match request {
         root::Request::SetUp { forge } => {
-            // Transitional: task C (o/forgejo-setup-m2) gives SetUp to the box link.
-            crate::setup::lifecycle::set_up_refused(engine, forge, SetUpRefusal::NotUnderTheBox);
+            let mut out = skein_lib::Queue::with_capacity(3);
+            engine.box_link.ask(forge, &mut out);
+            box_link::drain(engine, &mut out);
         }
         root::Request::SetUpRefused { forge, why } => crate::setup::lifecycle::set_up_refused(engine, forge, why),
         root::Request::Setup { run } => crate::setup::request(engine, run),

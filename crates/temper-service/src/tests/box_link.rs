@@ -53,9 +53,7 @@ fn another_ask_is_refused_busy_until_started_or_failed() {
             &mut out,
             &[
                 Out::Answered { forge: FORGE, answer: Err(Refused::Busy) },
-                named(b"box link: refused forge 7: busy"),
                 Out::Answered { forge: OTHER, answer: Err(Refused::Busy) },
-                named(b"box link: refused forge 8: busy"),
             ],
         );
         link.read(ending, &mut out);
@@ -68,14 +66,9 @@ fn another_ask_is_refused_busy_until_started_or_failed() {
 fn every_ask_is_refused_not_under_the_box_without_a_pipe() {
     let mut link = Link::new(LINE_BYTES, false);
     let mut out = Queue::with_capacity(OUTPUTS);
-    for (forge, message) in [
-        (FORGE, b"box link: refused forge 7: not under the box".as_slice()),
-        (OTHER, b"box link: refused forge 8: not under the box".as_slice()),
-        (FORGE, b"box link: refused forge 7: not under the box".as_slice()),
-    ] {
+    for forge in [FORGE, OTHER, FORGE] {
         link.ask(forge, &mut out);
         assert_eq!(out.pop(), Some(Out::Answered { forge, answer: Err(Refused::NotUnderTheBox) }));
-        assert_eq!(out.pop(), Some(named(message)));
         assert_eq!(out.pop(), None);
     }
     link.read(b"started 7\n", &mut out);
@@ -220,13 +213,7 @@ fn the_pipe_closed_fails_the_ask_and_refuses_every_later_one() {
     tells(&mut out, &[]);
     for _ in [FORGE, FORGE] {
         link.ask(FORGE, &mut out);
-        tells(
-            &mut out,
-            &[
-                Out::Answered { forge: FORGE, answer: Err(Refused::NotUnderTheBox) },
-                named(b"box link: refused forge 7: not under the box"),
-            ],
-        );
+        tells(&mut out, &[Out::Answered { forge: FORGE, answer: Err(Refused::NotUnderTheBox) }]);
     }
 }
 #[test]

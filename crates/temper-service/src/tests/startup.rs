@@ -1416,7 +1416,7 @@ fn start_owned(asked: bool, files: &settings::Files) -> Result<crate::Service, P
         fixtures::forge_runtime(),
     )
 }
-fn assert_owned_not_connected(files: &settings::Files) {
+fn assert_owned_not_set_up(files: &settings::Files) {
     let mut service = start_owned(true, files).expect("absent asked files are allowed");
     let engine = service.engine.as_mut().unwrap();
     assert_eq!(engine.forge.component.start(1), Some(skein_forge_connection::start::Start::Unconnected));
@@ -1426,13 +1426,17 @@ fn assert_owned_not_connected(files: &settings::Files) {
     for _ in 0_u8..32 {
         face.turn(&mut service);
     }
+    assert_eq!(
+        service.engine.as_ref().unwrap().domain.forge_connection(1),
+        temper_engine_domain_forge::Connection::NotSetUp
+    );
     assert!(face.sent().is_empty());
     assert!(service.engine.as_ref().unwrap().forge.starts.is_empty(), "no Connect request");
     assert!(service.engine.as_ref().unwrap().credentials.is_empty());
     assert_eq!(service.end(), None);
 }
 #[test]
-fn an_asked_owned_forge_without_any_files_starts_not_connected() {
+fn an_asked_owned_forge_without_any_files_starts_not_set_up() {
     let mut files = fixtures::files();
     for name in [
         b"secrets/forge-1.api-token".as_slice(),
@@ -1442,7 +1446,7 @@ fn an_asked_owned_forge_without_any_files_starts_not_connected() {
     ] {
         files.entries = fixtures::without(files.entries, name);
     }
-    assert_owned_not_connected(&files);
+    assert_owned_not_set_up(&files);
 }
 #[test]
 fn an_asked_owned_forges_partial_files_never_grant_access() {
@@ -1454,7 +1458,7 @@ fn an_asked_owned_forges_partial_files_never_grant_access() {
     ] {
         let mut files = fixtures::files();
         files.entries = fixtures::without(files.entries, absent);
-        assert_owned_not_connected(&files);
+        assert_owned_not_set_up(&files);
     }
 }
 #[test]

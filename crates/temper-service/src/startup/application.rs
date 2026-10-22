@@ -949,7 +949,7 @@ pub fn git_programs(forges: &mut [settings::Forge], setup: &temper_forge_setup::
         }
     }
 }
-fn missing_asked_files(members: &Members, files: &settings::Files, number: u16) -> bool {
+pub(super) fn missing_asked_files(members: &Members, files: &settings::Files, number: u16) -> bool {
     if !members.asked_owned.contains(&number) {
         return false;
     }
