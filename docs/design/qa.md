@@ -145,7 +145,11 @@ forge    temper fake forge, from its document, port 0          ready "listening 
 - **The cluster's processes,** an engine alone and workers alone, each
   a `temper serve` of its own after the same fakes, are `lab/cluster/`'s
   (`protocol/README.md`, section 15), by the same lines; M1's
-  experiment keeps one serve, standalone.
+  experiment keeps one serve, standalone. `lab/cluster/` names no
+  driver, seed action, fault or check: the runner starts it and stops it
+  in reverse with no survivor, and the process tier's stories read it
+  (`protocol/README.md`, 15.5 and 15.6). Its fake forge joins it once
+  serve reconciles at its start (11.1).
 
 ### 4.2 Its processes
 
@@ -626,7 +630,7 @@ and arrives through the director.
 | the git route's `objects` (skein's `fake-forge.md`, section 4) | skein's fake forge | 8.4 |
 | TLS on the fake LLM with skein's test root, and the root's file to trust | first-run | M1; no plaintext variant |
 | fake forge deliveries across processes to the hook registered on serve's bound webhook address | first-run | M1's story |
-| serve's actual bound webhook address available to reconcile; its listeners' ready lines are designed, `listening <listener> <address>` on stderr (`protocol/README.md`, 15.3), and built with the cluster, the webhooks' address from skein's 14h (skein's `forge-connection.md`, 6.4) | serve's CLI owner, routed from QA's S2 by the director; the lines o/cluster-build's | delivery readiness |
+| serve's actual bound webhook address available to reconcile, and serve reconciling a fake forge at its start, after which the fake forge joins `lab/cluster/` (`protocol/README.md`, 15.5); its listeners' ready lines, `listening <listener> <address>` on stderr (`protocol/README.md`, 15.3), are built, the webhooks' address from skein's 14h (skein's `forge-connection.md`, 6.4) | serve's CLI owner, routed from QA's S2 by the director | delivery readiness; the cluster's fake forge |
 | fake-owned key/token derivation from decimal u64 seeds and 0600 output files named by the experiment; exact interfaces | first-run, director 253's default | seed, setup handover; runner invents no bytes |
 | `wait forges --until connected:1` (area 6) | github | the seed, as the demo's |
 | serve's link on its stdout, or a private channel for it | the director (the serve survey) | the seed's sign-in |
