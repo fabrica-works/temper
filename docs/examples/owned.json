@@ -23,9 +23,28 @@
         {
           "name": "openai",
           "number": 1,
-          "signed_in_plan": false,
+          "signed_in_plan": true,
+          "manage_usage": "https://chatgpt.com/settings/usage",
           "models": ["gpt-6-luna"],
-          "sources": {"keys": true}
+          "sources": {
+            "keys": true,
+            "sign_in": {
+              "issuer": "https://auth.openai.com",
+              "client": "dynamic_agent_client",
+              "name_hint": "temper",
+              "authorization": "https://auth.openai.com/api/accounts/authorize",
+              "token": "https://auth.openai.com/api/accounts/oauth/token",
+              "revocation": "https://auth.openai.com/api/accounts/oauth/revoke",
+              "keys": "https://auth.openai.com/.well-known/jwks.json",
+              "transport": "tls",
+              "server_name": "auth.openai.com",
+              "scopes": ["openid", "profile", "email", "offline_access", "resource.invoke", "chatgpt.tokens.use.direct"],
+              "must_grant": ["chatgpt.tokens.use.direct"],
+              "resource": "https://api.openai.com/v1",
+              "redirect_path": "auth/callback",
+              "redirect_port": 1455
+            }
+          }
         }
       ],
       "endpoints": [
@@ -188,7 +207,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 85582252938227,
+    "memory_bytes": 85582656033779,
     "rules": {
       "ceiling": {
         "tools": 1,

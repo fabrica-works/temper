@@ -1152,7 +1152,7 @@ runs it (section 7).
   SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper --test startup -E 'test(owned_memory_figures)'
   ```
 
-  At these pins the engine requires 85,582,252,938,083 bytes and the worker
+  At these pins the engine requires 85,582,656,033,779 bytes and the worker
   3,283,176,433,282 bytes. Ordinary runs fail on drift and never write the
   example. Program declarations survive startup; runnable program grants
   still wait for smith's program backend and jig's program sources.

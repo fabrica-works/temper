@@ -1732,7 +1732,7 @@ impl skein_world::Referee<support::cluster::Root> for ClusterChatJudge {
 }
 
 #[test]
-#[ignore = "until accounts_runtime resolves sign-in endpoints at connect (o/accounts-jp13b's M3)"]
+#[ignore = "backlog: a start without DNS fails while sign-in endpoints resolve at start (director 554)"]
 fn a_default_box_with_a_sign_in_registration_starts_without_dns() {
     use std::{ffi::OsString, fs, os::unix::fs::PermissionsExt};
     let scratch = support::Scratch::new("first-run-no-dns");
@@ -1763,17 +1763,10 @@ fn a_default_box_with_a_sign_in_registration_starts_without_dns() {
         }
     }
     fs::write(agent_path, serde_json::to_vec(&agent).expect("local agent fixture")).expect("local preflight endpoints");
-    // The shipped providers offer keys only. Add a registration solely to reach
-    // the separate sign-in startup resolver while retaining all default forges.
+    // The default registration reaches the sign-in startup resolver.
     let document_path = paths[0].join("temper.json");
     let mut document: serde_json::Value =
         serde_json::from_slice(&fs::read(&document_path).expect("default document")).expect("JSON");
-    document["engine"]["llm"]["providers"][0]["sources"]["sign_in"] = serde_json::json!({
-        "issuer":"https://issuer.example", "client":"client", "scopes":[],
-        "authorization":"https://issuer.example/auth", "token":"https://issuer.example/token",
-        "keys":"https://issuer.example/keys", "transport":"tls", "server_name":"issuer.example",
-        "must_grant":[], "redirect_path":"callback", "redirect_port":3000
-    });
     document["application"]["limits"]["overrides"]["git_component.operations"] = 1.into();
     document["application"]["limits"]["overrides"]["checkout.workspaces"] = 1.into();
     fs::write(document_path, serde_json::to_vec(&document).expect("sign-in fixture")).expect("registered sign-in");

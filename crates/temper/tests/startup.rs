@@ -1182,6 +1182,9 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             // withdrawn values and their account-id capacity are gone (wire v5).
             + 4_578_373_384
             + socket_growth
+            // The sign-in adds token and issuer trust, at the shell's admitted root bounds.
+            + skein_tls::roots_worst_case(2 * 1024, 65_536).expect("sign-in trust bound")
+            - skein_tls::roots_worst_case(0, 0).expect("prior empty trust bound")
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -1412,7 +1415,11 @@ fn init_prints_written_files_account_guidance_and_explicit_start_flags_on_stderr
             writeln!(expected, "init: wrote {}", scratch.path().join(name).display()).expect("string");
         }
         assert!(lines.starts_with(&expected), "files are reported in write order");
-        assert!(lines.contains("init: after starting, add an OpenAI API key from the accounts page\n"));
+        assert!(
+            lines.contains(
+                "init: after starting, continue with ChatGPT or add an OpenAI API key from the accounts page\n"
+            )
+        );
         let path = scratch.path().display();
         assert!(
             lines.ends_with(&format!("init: start it with temper box --config {path} --data {path} --cache {path}\n"))

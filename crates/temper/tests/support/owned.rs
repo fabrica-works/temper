@@ -661,12 +661,50 @@ impl Bounded {
         forges
     }
     #[must_use]
-    pub fn accounts() -> temper_service::AccountsRuntime {
-        temper_service::AccountsRuntime {
-            providers: skein_lib::List::with_capacity(0),
+    pub fn accounts(&self) -> temper_service::AccountsRuntime {
+        use skein_oauth_accounts::{Endpoint, Origin, Transport};
+        let value: serde_json::Value = serde_json::from_slice(&self.document).expect("bounded document");
+        let mut runtime = temper_service::AccountsRuntime {
+            providers: skein_lib::List::with_capacity(2),
             trust_roots: 0,
             trust_root_bytes: 0,
+        };
+        for provider in value["engine"]["llm"]["providers"].as_array().expect("providers") {
+            let Some(sign_in) = provider["sources"].get("sign_in") else { continue };
+            // Synthetic transports check registration and memory without resolving or opening endpoints.
+            let endpoint = || {
+                let (trust, _) =
+                    skein_tls::Config::from_der(&[skein_tls_world::pki::ROOT.into()], &[]).expect("fixture trust");
+                Endpoint {
+                    address: "127.0.0.1:9".parse().expect("unopened stand-in"),
+                    transport: Transport::Tls {
+                        server_name: skein_tls::Name::new(sign_in["server_name"].as_str().expect("TLS name"))
+                            .expect("configured TLS name"),
+                        trust,
+                    },
+                }
+            };
+            let mut origins = skein_lib::List::with_capacity(1);
+            origins
+                .push(Origin {
+                    uri: sign_in["issuer"].as_str().expect("issuer").as_bytes().into(),
+                    endpoint: endpoint(),
+                })
+                .expect("one shared issuer origin");
+            runtime
+                .providers
+                .push((
+                    u32::try_from(provider["number"].as_u64().expect("provider number")).expect("u32 provider"),
+                    endpoint(),
+                    origins,
+                ))
+                .expect("bounded providers");
+            // The shell prepares trust twice: the token endpoint and the shared issuer origin.
+            // Each trust() accepts at most 1024 roots, each at most 65536 bytes.
+            runtime.trust_roots += 2 * 1024;
+            runtime.trust_root_bytes = 65_536;
         }
+        runtime
     }
     #[must_use]
     pub fn requirements(&self) -> temper_service::startup::Requirements {
@@ -676,7 +714,7 @@ impl Bounded {
             &self.files,
             &self.agent,
             &self.seeds,
-            Some(&Self::accounts()),
+            Some(&self.accounts()),
             self.forges(),
             Some(&self.setup),
         )
@@ -689,7 +727,7 @@ impl Bounded {
             &self.files,
             Some(&self.agent),
             &self.seeds,
-            Some(Self::accounts()),
+            Some(self.accounts()),
             Some(temper_service::WorkerRuntime {
                 root: skein_io::kernel::Fd::new(9),
                 path: b"/worker".as_slice().into(),

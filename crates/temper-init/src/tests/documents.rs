@@ -42,13 +42,24 @@ fn replace_org_patterns(document: &mut Value) -> u32 {
 }
 
 #[test]
-fn the_owned_example_offers_openai_keys_at_the_public_api() {
+fn the_owned_example_offers_openai_keys_and_chatgpts_sign_in() {
     let owned = parse(fixtures::OWNED);
     assert_eq!(
         owned["engine"]["llm"]["providers"],
         json!([{
-            "name": "openai", "number": 1_u32, "signed_in_plan": false,
-            "models": ["gpt-6-luna"], "sources": {"keys": true}
+            "name": "openai", "number": 1_u32, "signed_in_plan": true,
+            "manage_usage": "https://chatgpt.com/settings/usage",
+            "models": ["gpt-6-luna"], "sources": {"keys": true, "sign_in": {
+                "issuer": "https://auth.openai.com", "client": "dynamic_agent_client", "name_hint": "temper",
+                "authorization": "https://auth.openai.com/api/accounts/authorize",
+                "token": "https://auth.openai.com/api/accounts/oauth/token",
+                "revocation": "https://auth.openai.com/api/accounts/oauth/revoke",
+                "keys": "https://auth.openai.com/.well-known/jwks.json",
+                "transport": "tls", "server_name": "auth.openai.com",
+                "scopes": ["openid", "profile", "email", "offline_access", "resource.invoke", "chatgpt.tokens.use.direct"],
+                "must_grant": ["chatgpt.tokens.use.direct"], "resource": "https://api.openai.com/v1",
+                "redirect_path": "auth/callback", "redirect_port": 1_455_u16
+            }}
         }])
     );
     let endpoint = &owned["engine"]["llm"]["endpoints"][0];
