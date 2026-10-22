@@ -50,10 +50,10 @@
 
       // The default document's forges, by number (setup.md, 8.3).
       forges: [
-        { n: 1, kind: 'Forgejo', name: 'Demo forge', web: 'http://127.0.0.1:8369', mode: 'owned', state: 'connected', login: 'temper', id: 2,
+        { n: 1, kind: 'Forgejo', name: 'Demo forge', web: 'http://127.0.0.1:8369', mode: 'fake', state: 'connected', login: 'temper', id: 2,
           load: { used: 9, rate: 600, window: 'minute', reserve: 60, uses: [['fresh reads', 5], ['writes', 0], ['keeping up', 4], ['the slow pass', 0]], outbox: { waiting: 0, uncertain: 0 }, hooks: [['demo/widget', 0]] } },
         { n: 2, kind: 'GitHub', web: 'https://github.com', mode: 'connected', state: 'not connected' },
-        { n: 3, kind: 'Forgejo', web: 'http://127.0.0.1:8368', mode: 'owned', state: 'not set up', box: true },
+        { n: 3, kind: 'Forgejo', web: 'http://127.0.0.1:8368', mode: 'owned', state: 'not set up', box: true, versions: { forgejo: '17.0.0', runner: '13.2.0' }, label: 'temper-host', person: 'sam', setup: { org: 'work', repo: 'hello', project: 'hello', newProject: true } },
       ],
 
       landings: [],
@@ -207,11 +207,41 @@
         w.config.next = { account: 'OpenAI', model: 'gpt-6-luna' };
       },
     },
+    {
+      id: '6', label: '6', hour: 16 / 60, act: 2, title: 'Setting up a Forgejo',
+      summary: 'Sam follows “Connect a forge” and keeps the set-up’s defaults: the organization work, the repository hello, and a new project named after it. temper box has fetched Forgejo and its runner and is preparing them; the row shows each step as the box reports it.',
+      look: [
+        ['forges.html', 'Forges: forge 3 setting up, at its preparation'],
+        ['chats.html', 'Chats: the banner still says a demo forge'],
+      ],
+      apply(w) {
+        const f = w.forges.find(f => f.n === 3);
+        f.state = 'setting up';
+        f.setup.step = 'preparing';
+      },
+    },
+    {
+      id: '7', label: '7', hour: 19 / 60, act: 2, title: 'A Forgejo connected',
+      summary: 'Forgejo and its runner started. temper connected as its bot, made work/hello with a README and a CI workflow, and adopted it into the new project hello; the workflow’s first run passed on this machine. Sam never signed in to Forgejo. A real model and a real forge are connected, so the demo’s banner is gone.',
+      look: [
+        ['forges.html', 'Forges: forge 3 connected, its repository and its acts'],
+        ['changes.html?project=hello', 'Changes in hello: work/hello, CI passing'],
+        ['chats.html', 'Chats: no banner'],
+        ['forges.html#other-states', 'Forges, below: forge 3’s other states, and a managed and a connected Forgejo'],
+      ],
+      apply(w) {
+        const f = w.forges.find(f => f.n === 3);
+        Object.assign(f, { state: 'connected', login: 'temper', id: 2,
+          load: { used: 14, rate: 600, window: 'minute', reserve: 60, uses: [['fresh reads', 8], ['writes', 3], ['keeping up', 3], ['the slow pass', 0]], outbox: { waiting: 0, uncertain: 0 }, hooks: [['work/hello', 18]] } });
+        delete f.setup.step;
+        w.repos.hello = { name: 'work/hello', forge: 3, branch: 'main', tip: 'a41c9e2', ci: { state: 'passing', at: 18 }, after: null, queue: [], project: 'hello' };
+      },
+    },
   ];
 
   MOCKUPS.worlds['first-run'] = {
     name: 'First run',
-    about: 'the owner’s first run after temper box: the demo’s start, a suggested request landed on the demo forge by the demo model’s script, a text-only one, then a real model connected',
+    about: 'the owner’s first run after temper box: the demo’s start, a suggested request landed on the demo forge by the demo model’s script, a text-only one, then a real model connected, and a Forgejo set up here',
     HOUR0: Date.UTC(2026, 9, 22, 21, 0),
     initial, steps, upcoming: [], acts: { 1: 'The demo', 2: 'Going real' },
   };

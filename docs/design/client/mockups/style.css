@@ -212,15 +212,23 @@ h3 { font-size: 14px; line-height: 1.35; letter-spacing: -.015em; margin-bottom:
 .forge-card h2 small { font-weight: 400; color: var(--muted); font-size: 11px; margin-left: 6px; }
 .forge-card .repo-lines { margin-top: 10px; }
 .forge-acts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; margin-top: 4px; }
-.forge-act h3 { font-size: 12px; margin: 0 0 4px; }
-.forge-act p { margin: 0 0 10px; font-size: 11px; line-height: 1.6; color: var(--muted); }
+.forge-act h3, .forge-setup h3 { font-size: 12px; margin: 0 0 4px; }
+.forge-act p, .forge-setup p { margin: 0 0 10px; font-size: 11px; line-height: 1.6; color: var(--muted); }
 .forge-act .button { margin-top: 2px; }
 .forge-field { display: grid; gap: 4px; margin: 0 0 10px; font-size: 10px; color: var(--muted); }
-.forge-field input, .forge-field textarea { width: 100%; box-sizing: border-box; border: 1px solid #dcd4c9; border-radius: 5px; padding: 6px 8px; background: #fffefd; color: var(--term-ink); font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; resize: vertical; }
+.forge-field input, .forge-field textarea, .forge-field select { width: 100%; box-sizing: border-box; border: 1px solid #dcd4c9; border-radius: 5px; padding: 6px 8px; background: #fffefd; color: var(--term-ink); font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; resize: vertical; }
 .forge-elsewhere p { font-size: 11px; line-height: 1.6; margin: 0 0 10px; }
 .forge-elsewhere summary { cursor: pointer; font-size: 11px; font-weight: 700; margin: 4px 0 10px; }
-.forge-elsewhere pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 10px; background: #f8f5f0; padding: 12px; border: 1px solid var(--term-line); margin: 0 0 10px; }
-@media (max-width: 760px) { .forge-acts { grid-template-columns: 1fr; } }
+.forge-elsewhere pre, .forge-setup pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 10px; background: #f8f5f0; padding: 12px; border: 1px solid var(--term-line); margin: 0 0 10px; }
+.forge-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.forge-facts { padding-left: 16px; font-size: 11px; color: var(--muted); }
+.forge-progress { list-style: none; padding: 0; display: grid; gap: 6px; font-size: 11px; }
+.forge-progress li::before { content: '○'; color: var(--faint); display: inline-block; width: 18px; }
+.forge-progress .done::before { content: '✓'; color: var(--green); }
+.forge-progress .current { font-weight: 700; }
+.forge-progress .current::before { content: '●'; color: var(--accent); }
+.forge-setup .forge-failure { font-size: 11px; color: var(--red); }
+@media (max-width: 760px) { .forge-acts, .forge-fields { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .demo-strip .first-run-banner { padding: 6px 16px; } }
 @media (max-width: 430px) {
   .task-card .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }

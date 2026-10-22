@@ -76,9 +76,15 @@ body.mock-sources .src:hover { background-color: color-mix(in srgb, var(--c) 10%
 .case-ref, .gap { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; border-radius: 3px; font: 600 9.5px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 0; vertical-align: 1px; white-space: nowrap; font-style: normal; }
 .case-ref { color: var(--note); background: var(--note-pale); }
 .gap { color: var(--note); border: 1px dashed var(--note-line); background: transparent; }
-body.mock-plain .case-ref, body.mock-plain .gap, body.mock-plain .gap-note, body.mock-plain .mock-note { display: none !important; }
+body.mock-plain .case-ref, body.mock-plain .gap, body.mock-plain .gap-note, body.mock-plain .mock-note, body.mock-plain .mock-variants { display: none !important; }
 .gap-note { margin: 12px 0 0; padding-top: 9px; border-top: 1px dashed var(--note-line); color: var(--note); font-size: 10.5px; }
 .mock-note { color: var(--note); font-size: 10.5px; margin-left: 8px; }
+
+.mock-variants { margin-top: 26px; padding: 18px; border: 1px dashed var(--note-line); background: var(--note-pale); }
+.mock-variants > h2, .mock-variants > h3, .mock-variants > p { color: var(--note); font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.mock-variants > h2 { font-weight: 700; margin: 0 0 6px; }
+.mock-variants > h3 { font-weight: 700; margin: 18px 0 6px; }
+.mock-variants > p { margin: 0 0 12px; }
 
 /* What the current step changed. */
 .fresh { position: relative; }
