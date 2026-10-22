@@ -13,6 +13,10 @@ use std::{
 };
 
 pub struct ServiceHost {
+    pub(crate) cluster: Option<crate::cluster::Shape>,
+    pub(crate) workers_address: Option<SocketAddr>,
+    pub(crate) notes: Vec<temper_service::Note>,
+    pub(crate) runs: crate::cluster::Runs,
     pub(crate) service: Option<temper_service::Service>,
     pub(crate) address: Option<SocketAddr>,
     pub(crate) link: Vec<u8>,
@@ -42,6 +46,15 @@ impl ServiceHost {
         fixture: Option<crate::forge::Fixture>,
         direct_key: bool,
     ) -> Self {
+        Self::with_shape(path, signals, fixture, direct_key, None)
+    }
+    fn with_shape(
+        path: PathBuf,
+        signals: Fd,
+        fixture: Option<crate::forge::Fixture>,
+        direct_key: bool,
+        cluster: Option<crate::cluster::Shape>,
+    ) -> Self {
         let forge = fixture
             .is_none()
             .then(|| TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("held forge listener"));
@@ -55,14 +68,24 @@ impl ServiceHost {
         if let Some(fixture) = fixture {
             crate::forge::write(&path, address, &fixture).expect("forge documents");
         }
-        let config = std::fs::read(path.join("temper.json")).expect("standalone document");
-        let mut envelope = temper::envelope_in(&directories(&path), &config).expect("standalone admission envelope");
+        if let Some(shape) = &cluster {
+            shape.write(path.parent().expect("cluster scratch"));
+        }
+        let roots = Self::directories(&path, cluster.is_some());
+        let config = std::fs::read(roots.document()).expect("standalone document");
+        let mut envelope = temper::envelope_in(&roots, &config).expect("standalone admission envelope");
         // The deferred document names port 0 in its LLM, API and git addresses.
         // Each kernel-assigned port can add four decimal digits at preparation.
         if fixture.is_some() {
             envelope.0 += 3 * 4;
+        } else if cluster.is_some() {
+            envelope.0 += 4;
         }
         Self {
+            cluster,
+            workers_address: None,
+            notes: Vec::new(),
+            runs: crate::cluster::Runs::default(),
             service: None,
             address: None,
             link: Vec::new(),
@@ -85,12 +108,44 @@ impl ServiceHost {
     }
 }
 impl ServiceHost {
+    pub(crate) fn cluster(path: &std::path::Path, signals: Fd, shape: crate::cluster::Shape) -> Self {
+        Self::with_shape(path.join("data"), signals, None, false, Some(shape))
+    }
+    fn directories(path: &std::path::Path, cluster: bool) -> temper::directories::Directories {
+        if cluster {
+            let path = path.parent().expect("cluster scratch");
+            crate::cluster::directories_in([&path.join("config"), &path.join("data"), &path.join("cache")])
+        } else {
+            directories(path)
+        }
+    }
+    fn ready(&self) -> bool {
+        self.cluster.as_ref().is_none_or(crate::cluster::Shape::ready)
+            && self.fixture.is_none_or(|_| self.forge_address.is_some())
+    }
+    #[must_use]
+    pub fn end(&self) -> Option<&crate::End> {
+        self.service.as_ref().and_then(temper_service::Service::end)
+    }
+    #[must_use]
+    pub fn ran(&self) -> &[u64] {
+        &self.runs.tasks
+    }
+    /// Worker openings retained from the shipped service's diagnostics.
+    #[must_use]
+    pub fn linked(&self) -> usize {
+        self.notes.iter().filter(|note| matches!(note, temper_service::Note::Linked { .. })).count()
+    }
     /// Links printed by this service start, independent of the scratch's old file.
     #[must_use]
     pub fn links(&self) -> u32 {
         self.links
     }
-    pub(crate) fn arm_watch(&mut self) {
+    pub(crate) fn arm_watch(&mut self, call: usize) {
+        if self.watch.call != Some(call) {
+            self.watch = watch::Watch::default();
+            self.watch.call = Some(call);
+        }
         self.watch.armed = true;
     }
     pub fn arm(&mut self, key: skein_lib::RequestKey) {
@@ -114,7 +169,7 @@ impl ServiceHost {
 impl Host for ServiceHost {
     fn iterate(&mut self, now: Time, wall: Wall) {
         if self.service.is_none()
-            && self.fixture.is_none_or(|_| self.forge_address.is_some())
+            && self.ready()
             && let Some(address) = self.address
         {
             let forge = self
@@ -127,8 +182,15 @@ impl Host for ServiceHost {
             if let Some(fixture) = self.fixture {
                 crate::forge::write(&self.path, forge, &fixture).expect("forge documents");
             }
-            let mut service = temper::prepare_in(&directories(&self.path)).expect("standalone preparation");
-            if self.fixture.is_some() {
+            if let Some(shape) = &self.cluster {
+                shape.write(self.path.parent().expect("cluster scratch"));
+            }
+            let mut service = temper::prepare_in(&Self::directories(&self.path, self.cluster.is_some()))
+                .expect("standalone preparation");
+            if self.cluster.is_some() {
+                assert!(service.worst_case() <= self.envelope.0, "cluster fits admission");
+                assert!(service.operations() <= self.envelope.1, "cluster operations fit admission");
+            } else if self.fixture.is_some() {
                 assert!(service.worst_case() <= self.envelope.0, "bound ports fit deferred admission");
                 assert_eq!(service.operations(), self.envelope.1, "preparation preserves operations");
             } else {
@@ -146,14 +208,24 @@ impl Host for ServiceHost {
                 if self.fixture.is_some() {
                     self.hook_wire.complete(complete, self.hooks, &mut self.seen.responses);
                 }
+                if let Some(crate::cluster::Shape::Worker { engine: Some(engine), .. }) = self.cluster {
+                    self.runs.complete(complete, engine);
+                }
                 self.watch.complete(complete);
                 for cue in &mut self.cues {
                     cue.complete(complete);
                 }
             }
             temper_service::iterate(service, now, wall);
-            while service.listening().pop().is_some() {}
-            while service.notes().pop().is_some() {}
+            while let Some(note) = service.listening().pop() {
+                if let temper_service::Note::Listening { listener: temper_service::Listening::Workers, addr } = note {
+                    self.workers_address = Some(addr);
+                }
+                self.notes.push(note);
+            }
+            while let Some(note) = service.notes().pop() {
+                self.notes.push(note);
+            }
             while let Some(link) = service.links().pop() {
                 self.links += 1;
                 self.link.clear();
@@ -180,11 +252,7 @@ impl Host for ServiceHost {
         }
     }
     fn work_pending(&self, now: Time) -> bool {
-        self.service
-            .as_ref()
-            .map_or(self.address.is_some() && self.fixture.is_none_or(|_| self.forge_address.is_some()), |service| {
-                service.work_pending(now)
-            })
+        self.service.as_ref().map_or(self.address.is_some() && self.ready(), |service| service.work_pending(now))
     }
     fn next_deadline(&self) -> Option<Time> {
         self.service.as_ref().and_then(temper_service::Service::next_deadline)
@@ -197,6 +265,7 @@ impl Host for ServiceHost {
     }
     fn worst_case(&self) -> u64 {
         self.envelope.0
+            + if self.cluster.is_some() { crate::cluster::Runs::MEMORY } else { 0 }
             + watch::Watch::memory()
             + cue::CUES as u64 * Cue::memory()
             + if self.fixture.is_some() { hooks::Hooks::memory() } else { 0 }

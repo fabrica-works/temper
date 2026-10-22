@@ -11,6 +11,7 @@ const BYTES: usize = 65_536;
 const CONNECTIONS: usize = 8;
 #[derive(Default)]
 pub(super) struct Watch {
+    pub(super) call: Option<usize>,
     pub(super) armed: bool,
     pub(super) delivered: bool,
     connections: BTreeMap<i32, Connection>,

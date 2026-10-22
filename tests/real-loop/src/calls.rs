@@ -259,11 +259,9 @@ impl Caller {
         self.steps.iter().filter(|step| matches!(step, Step::Kill { .. })).count()
     }
     pub(crate) fn provisioned(mut steps: Vec<Step>, scratch: PathBuf, root: Fd) -> Self {
-        let Some((position, at)) = steps
-            .iter()
-            .enumerate()
-            .find_map(|(index, step)| if let Step::SignIn { at } = step { Some((index, *at)) } else { None })
-        else {
+        let Some((position, at)) = steps.iter().enumerate().find_map(|(index, step)| {
+            if let Step::SignIn { at } | Step::SameParty { at } = step { Some((index, *at)) } else { None }
+        }) else {
             return Self::new(steps, scratch, root);
         };
         // A real keyed request follows the story's first sign-in. Its setup result
@@ -566,6 +564,7 @@ impl Caller {
             return;
         };
         match step {
+            Step::FixtureReady if self.running.iter().any(Option::is_some) => return,
             Step::FixtureReady => self.fixture_ready(),
             Step::Advance => {
                 if !self.advanced.get() {
@@ -659,6 +658,7 @@ impl Caller {
     }
     fn can_advance(&self) -> bool {
         match self.steps.get(self.next) {
+            Some(Step::FixtureReady) => self.running.iter().all(Option::is_none),
             Some(Step::Advance) => self.advanced.get(),
             Some(Step::Held { .. }) => self.held.get(),
             Some(Step::SameParty { .. }) if self.retry_link.is_some() => {
