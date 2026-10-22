@@ -1848,6 +1848,37 @@ fn an_agents_conversation_is_drawn_as_a_chats() {
     assert_eq!(fixtures::node_text(tree, log), fixtures::node_text(&chat, chat_log));
 }
 #[test]
+// client/README.md, 5.9: the conversation draws "Run N began" and
+// "Run N ended"; milestones are not among its lines.
+fn an_agent_pages_conversation_draws_its_runs_but_not_its_milestones() {
+    let mut task = f::delegate();
+    task.activity = 3;
+    let mut page = f::activity(false);
+    page.rows = List::with_capacity(3);
+    for (position, line) in [
+        (1, c::OwnerActivity::RunBegan { attempt: 1, why: c::OwnerRunWhy::Made, resumed: false }),
+        (2, c::OwnerActivity::Milestone { position: 2 }),
+        (3, c::OwnerActivity::RunEnded { attempt: 1, end: c::OwnerRunEnd::Finished, spent: 0 }),
+    ] {
+        page.rows
+            .push(c::ActivityLine {
+                position,
+                at: skein_lib::Wall::EPOCH,
+                event: c::Activity::Owner {
+                    source: Box::new(c::OwnerActivityLine { task: TASK, position, at: skein_lib::Wall::EPOCH, line }),
+                    decoded: None,
+                },
+            })
+            .expect("run and milestone lines");
+    }
+    let view = fixtures::page_view(&f::agent_root_with_page(task, Some(f::tree()), page));
+    let tree = view.tree();
+    let said = fixtures::node_text(tree, index_of(tree, Role::Log, b"Conversation"));
+    assert!(skein_lib::bytes::find(&said, b"Run 1 began").is_some());
+    assert!(skein_lib::bytes::find(&said, b"Run 1 ended").is_some());
+    assert!(skein_lib::bytes::find(&said, b"Milestone").is_none(), "milestones stay out of the conversation");
+}
+#[test]
 fn an_ended_agents_task_shows_its_result() {
     let mut task = f::delegate();
     f::phase(&mut task, c::OwnerChipPhase::Ended);

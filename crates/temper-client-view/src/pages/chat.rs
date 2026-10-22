@@ -1067,11 +1067,14 @@ fn carded(tasks: &List<u64>, delegations: Option<(&Chat, &jig_client::Client)>) 
     true
 }
 fn hidden(event: &c::Activity, projected: bool, delegations: Option<(&Chat, &jig_client::Client)>) -> bool {
-    if projected && let c::Activity::Owner { source, .. } = event {
+    if let c::Activity::Owner { source, .. } = event {
         match &source.line {
-            c::OwnerActivity::RunBegan { .. }
-            | c::OwnerActivity::RunEnded { .. }
-            | c::OwnerActivity::Milestone { .. } => return true,
+            c::OwnerActivity::Milestone { .. } => return true,
+            c::OwnerActivity::RunBegan { .. } | c::OwnerActivity::RunEnded { .. } => {
+                if projected {
+                    return true;
+                }
+            }
             c::OwnerActivity::Words { .. }
             | c::OwnerActivity::Heard(_)
             | c::OwnerActivity::Notified { .. }

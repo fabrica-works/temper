@@ -70,7 +70,7 @@
 .temper-agent-lineage a:hover { text-decoration: underline; }
 .temper-agent-lineage > div + div::before { content: "/" / ""; flex: none; }
 .temper-chat:has(> .temper-agent-lineage) .temper-chatbar .temper-status-waiting { color: #8b7957; }
-.temper-chat:has(> .temper-agent-lineage) .temper-chatbar h1 { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; color: var(--temper-ink); font-size: 12px; }
+.temper-chat:has(> .temper-agent-lineage) .temper-chatbar h1 { display: block; flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--temper-ink); font-size: 12px; }
 /* One scrolling column keeps brief, run, conversation and result in order. */
 .temper-chat:has(> .temper-agent-lineage) > .temper-thread { overflow-y: auto; overflow-x: hidden; padding-top: 18px; scrollbar-width: thin; scrollbar-color: #d9d1c5 transparent; }
 .temper-chat:has(> .temper-agent-lineage) > .temper-thread > [role=log] { flex: none; min-height: 0; padding-top: 0; overflow: visible; }
@@ -83,7 +83,7 @@
 .temper-agent-run > h2 { display: flex; align-items: center; gap: 12px; margin: 0 0 17px; color: #605a51; font-size: 10px; font-weight: 700; line-height: 1.58; letter-spacing: inherit; }
 .temper-agent-run > h2::after { content: ''; height: 1px; flex: 1; background: var(--temper-line); }
 .temper-agent-run > p { margin: -11px 0 19px; color: #a39b90; font-size: 10px; }
-.temper-chat:has(> .temper-agent-lineage) .temper-thread > .temper-agent-result { width: min(931px, calc(100% - 173px)); margin: 2px max(32px, calc((100% - 1040px) / 2)) 18px auto; padding: 10px 13px; border-left: 2px solid #84a98f; background: #f2f7f1; font-size: 11px; }
+.temper-chat:has(> .temper-agent-lineage) .temper-thread > [role=log] ~ .temper-agent-result { width: min(931px, calc(100% - 173px)); margin: 2px max(32px, calc((100% - 1040px) / 2)) 18px auto; padding: 10px 13px; border-left: 2px solid #84a98f; background: #f2f7f1; font-size: 11px; }
 .temper-agent-result > h2 { display: block; margin: 0 0 4px; color: #477b59; font-size: 10px; line-height: 1.58; letter-spacing: .06em; text-transform: uppercase; }
 .temper-agent-result > .temper-details { display: block; margin: 0; padding: 0; border-radius: 0; background: transparent; }
 .temper-agent-result > [role=status] { margin-bottom: 4px; color: #477b59; font-size: 10px; }
@@ -99,11 +99,11 @@
   .temper-chat:has(> .temper-agent-lineage) .temper-chatbar > div:first-child { min-width: 0; width: 100%; flex-wrap: nowrap; }
   .temper-chat:has(> .temper-agent-lineage) .temper-chatbar > div:last-child { display: flex; flex-wrap: wrap; }
   .temper-chat:has(> .temper-agent-lineage) .temper-chatbar h1 { max-width: calc(42vw + 5ch); }
-  .temper-chat:has(> .temper-agent-lineage) .temper-thread > .temper-agent-result { width: calc(100% - 102px); margin-right: 16px; }
+  .temper-chat:has(> .temper-agent-lineage) .temper-thread > [role=log] ~ .temper-agent-result { width: calc(100% - 102px); margin-right: 16px; }
 }
 @media (max-width: 430px) {
   .temper-chat:has(> .temper-agent-lineage) .temper-chatbar h1 { max-width: calc(34vw + 3ch); }
-  .temper-chat:has(> .temper-agent-lineage) .temper-thread > .temper-agent-result { width: calc(100% - 32px); }
+  .temper-chat:has(> .temper-agent-lineage) .temper-thread > [role=log] ~ .temper-agent-result { width: calc(100% - 32px); }
 }
 
 /* Task acts (client/README.md, 5.11): .page-header and .task-toolbar.
