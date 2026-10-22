@@ -197,7 +197,7 @@ ready by its `main`. The page is the gallery's state by its name
 - **Standing departures:** with the network closed, the mockups'
   Google Fonts stylesheet is refused and their families fall back to
   the lab's DejaVu, while temper draws its bundled faces; each such
-  difference in `faces` or `font-family`, and the mockups' refused
+  difference in `faces`, and the mockups' refused
   request in their trouble, is a departure citing qa-web.md, 11, until
   the mockups' fonts sit beside them. Nothing in `client/mockups/`
   changes.

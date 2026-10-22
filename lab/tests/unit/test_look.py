@@ -33,7 +33,16 @@ class LookTests(unittest.TestCase):
                 self.assertEqual(scene['widths'], WIDTHS)
                 self.assertRegex(scene['page']['path'], r'^/[A-Za-z0-9-]+\.html$')
                 self.assertEqual(scene['expectations'], [])
-                self.assertEqual(scene['departures'], [])
+                for departure in scene['departures']:
+                    self.assertEqual(set(departure), {'id', 'width', 'signature', 'cites'})
+                    self.assertIn(departure['width'], ('desktop', 'phone'))
+                    self.assertEqual(departure['cites'],
+                                     'temper docs/design/draft/qa-web.md 11')
+                    signature = departure['signature']
+                    self.assertTrue(
+                        signature == 'trouble/mockup/network/fonts.googleapis.com:443'
+                        or signature in {'style/' + region['name'] + '/faces'
+                                         for region in scene['regions']})
                 self.assertEqual(scene['page']['ready'],
                                  dict(role='main', name='', match='words'))
                 for region in scene['regions']:
