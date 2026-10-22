@@ -432,7 +432,19 @@ pub fn assert_converged(directory: &Path, instance: &skein_throwaway_forgejo::In
     let account: serde_json::Value = serde_json::from_slice(&account.body).expect("account JSON");
     assert_eq!(account["is_admin"], false);
     assert!(account["full_name"].as_str().expect("full name").contains("temper:bot"));
-    let org = instance.exchange(&Outgoing::get("/api/v1/orgs/acme", Some(admin))).expect("org answers");
+    let issued = instance
+        .exchange(&Outgoing::json(
+            "POST",
+            "/api/v1/admin/users/ada/tokens",
+            Some(admin),
+            br#"{"name":"convergence-read","scopes":["read:organization"]}"#,
+        ))
+        .expect("person token answers");
+    assert_eq!(issued.status, 201);
+    let issued: serde_json::Value = serde_json::from_slice(&issued.body).expect("person token JSON");
+    let person = Token::new(issued["sha1"].as_str().expect("person token").into());
+    let org = instance.exchange(&Outgoing::get("/api/v1/orgs/acme", Some(&person))).expect("org answers");
+    assert_eq!(org.status, 200);
     let org: serde_json::Value = serde_json::from_slice(&org.body).expect("org JSON");
     assert_eq!(org["visibility"], "private");
 }

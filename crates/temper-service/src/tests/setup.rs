@@ -65,12 +65,12 @@ fn routing_service(states: u32, life: Duration) -> crate::Service {
     service
 }
 
-fn start(service: &mut crate::Service, run: u64, plan: host::Plan) {
+pub(super) fn start(service: &mut crate::Service, run: u64, plan: host::Plan) {
     let run = Token::new(run);
     service.engine.as_mut().expect("engine").setup.staged.insert(run, plan).unwrap();
     crate::route::request(service.engine.as_mut().expect("engine"), root::Request::Setup { run });
 }
-fn terminal(service: &mut crate::Service) -> root::SetupEnd {
+pub(super) fn terminal(service: &mut crate::Service) -> root::SetupEnd {
     for _ in 0_u32..4 {
         advance(service.engine.as_mut().expect("engine"));
     }
@@ -88,7 +88,7 @@ fn manifest(service: &mut crate::Service, run: u64) -> Box<[u8]> {
     };
     state
 }
-fn row(service: &mut crate::Service, item: Item, bytes: &[u8]) {
+pub(super) fn row(service: &mut crate::Service, item: Item, bytes: &[u8]) {
     service.engine.as_mut().expect("engine").forge_records.rows.push(
         records::number(1, item),
         Secret::new(records::encode(bytes).into_boxed_slice()),
@@ -196,15 +196,15 @@ fn code() -> Secret {
     Secret::new(Box::from(skein_lib::Decimal::of(Rng::new(805).next_u64()).as_bytes()))
 }
 
-struct Face {
+pub(super) struct Face {
     owner: Option<Token>,
-    wire: skein_world::stream::Wire,
+    pub(super) wire: skein_world::stream::Wire,
 }
 impl Face {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self { owner: None, wire: skein_world::stream::Wire::new(7) }
     }
-    fn turn(&mut self, service: &mut crate::Service) {
+    pub(super) fn turn(&mut self, service: &mut crate::Service) {
         for _ in 0_u32..service.engine.as_mut().expect("engine").setup.io.len() {
             match service.engine.as_mut().expect("engine").setup.io.pop().unwrap() {
                 skein_io::Request::Connect { owner, .. } => {
@@ -265,7 +265,7 @@ impl Face {
             self.turn(service);
         }
     }
-    fn sent(&mut self, service: &mut crate::Service) {
+    pub(super) fn sent(&mut self, service: &mut crate::Service) {
         for _ in 0_u32..1024 {
             self.turn(service);
         }

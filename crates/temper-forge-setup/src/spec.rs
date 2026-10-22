@@ -173,7 +173,7 @@ pub fn admin_token(owned: &Owned, place: &Place, name: &[u8]) -> Spec {
             name,
             b"--raw",
             b"--scopes",
-            b"write:admin,write:organization,write:user",
+            b"write:admin,read:user,write:repository",
         ]),
     )
 }

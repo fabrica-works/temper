@@ -167,7 +167,7 @@ fn the_admin_token_asks_for_three_scopes_under_a_suffixed_name() {
         b"temper-admin-0123456789abcdef",
         b"--raw",
         b"--scopes",
-        b"write:admin,write:organization,write:user",
+        b"write:admin,read:user,write:repository",
     ];
     assert_eq!(spec.arguments.len(), expected.len());
     for (arg, expected) in spec.arguments.iter().zip(expected) {

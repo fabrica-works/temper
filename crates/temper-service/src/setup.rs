@@ -448,6 +448,9 @@ pub(crate) fn tag(mut request: skein_io::Request) -> skein_io::Request {
     request
 }
 #[cfg(test)]
+#[path = "tests/setup_scopes.rs"]
+mod scopes_tests;
+#[cfg(test)]
 #[path = "tests/setup.rs"]
 mod tests;
 
