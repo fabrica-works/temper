@@ -112,7 +112,7 @@ def load_judgements(data):
         path = f'judgements.differences.{i}'
         place = difference.get('place') if type(difference) is dict else None
         extra = {'mockup': ('finding',), 'page': (), 'silent': ('question',)}.get(place, ()) if type(place) is str else ()
-        optional = {'mockup': ('expectations',), 'page': ('departures', 'expectations')}.get(place, ()) if type(place) is str else ()
+        optional = ('departures', 'expectations')
         d = shape(difference, ('id', 'width', 'signatures', 'tag', 'place', 'cites', 'seen') + extra,
                   optional, path)
         for key in ('id', 'width'):
@@ -139,8 +139,8 @@ def load_judgements(data):
                 names(d[key], path + '.' + key, 0 if place == 'page' else 1)
         if place == 'mockup':
             finding = shape(d.get('finding'), ('class', 'title', 'owner'), (), path + '.finding')
-            if finding.get('class') not in ('world', 'look'):
-                error(path + '.finding.class', 'expected world or look')
+            if finding.get('class') not in ('world', 'look', 'experiment'):
+                error(path + '.finding.class', 'expected world, look or experiment')
             for key in ('title', 'owner'):
                 text(finding.get(key), path + '.finding.' + key)
         elif place == 'page':
@@ -226,7 +226,7 @@ def bar(lab, experiment_dir, key, judgements_dir, healthy_key=None):
     groups = _runs(lab, experiment['name'], key)
     runs = [run for group in groups for run in group]
     judgements = _judgements(judgements_dir)
-    lines, holds = [], []
+    lines, holds = [], True
     scenes = list(dict.fromkeys(s['name'] for run in runs for s in run['capture']['scenes']))
     for scene in scenes:
         sets = [{s for s in run['signatures'] if (m := LOOK.fullmatch(s)) and m[1] == scene}
@@ -234,16 +234,17 @@ def bar(lab, experiment_dir, key, judgements_dir, healthy_key=None):
         verdicts = [f"{run['id']}: " + (f'fail {len(s)}' if s else 'pass')
                     for run, s in zip(runs, sets)]
         same = all(s == sets[0] for s in sets)
+        holds = holds and same
         lines.append(f"{scene}: " + '; '.join(verdicts) + ('; same' if same else '; differs'))
     planted = experiment['planted']
     if planted:
         for run in runs:
             missing = [s for s in planted if s not in run['signatures']]
-            holds.append(not missing)
+            holds = holds and not missing
             lines.append(f"{run['id']}: planted {len(planted) - len(missing)}/{len(planted)}")
             lines.extend('  missing ' + s for s in missing)
         if not runs:
-            holds.append(False)
+            holds = False
         if healthy_key:
             healthy = _runs(lab, experiment['name'], healthy_key)
             if len(groups) != len(healthy) or any(not a or not b for a, b in zip(groups, healthy)):
@@ -263,6 +264,7 @@ def bar(lab, experiment_dir, key, judgements_dir, healthy_key=None):
             for item in run['record']['undecided']:
                 unjudged[item['check'] + ': ' + item['reason'], 'undecided'].add(run['id'])
         lines.append('unjudged:' if unjudged else 'unjudged: none')
+        holds = holds and not unjudged
         for (signature, reason), ids in sorted(unjudged.items()):
             lines.append(f'  {signature} — {reason} ({len(ids)} runs)')
     return '\n'.join(lines) + '\n', holds
@@ -301,6 +303,9 @@ def batch(judgements_dir, lab, name, key):
                     (f"; {finding['class']}" if finding else '') + ': ' + title,
                     '  Signatures: ' + ', '.join(d['signatures']), '  Cites: ' + d['cites']]
             item.extend('  Pair: ' + p for p in _pair_paths(runs[0], scene, d))
+            entries = d.get('departures', []) + d.get('expectations', [])
+            if d['place'] in ('mockup', 'silent') and entries:
+                item.append('  entries: ' + ', '.join(entries))
             if finding:
                 findings[finding['owner']].append('\n'.join(item))
             elif d['place'] == 'silent':
@@ -404,8 +409,7 @@ def main(argv=None):
             name = _read(args.experiment / 'experiment.json')['name']
             judgements = args.judgements or args.lab / 'judgements' / name
             if args.command == 'bar':
-                output, checks = bar(args.lab, args.experiment, args.key, judgements, args.healthy)
-                holds = all(checks)
+                output, holds = bar(args.lab, args.experiment, args.key, judgements, args.healthy)
             else:
                 output, holds = batch(judgements, args.lab, name, args.key), True
         print(output, end='')

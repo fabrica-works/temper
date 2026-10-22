@@ -1,7 +1,9 @@
 """The look bar on small recorded fixtures, without a browser or a real lab."""
 import copy
+from contextlib import redirect_stdout
 import hashlib
 import importlib.util
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -80,6 +82,18 @@ class BarTests(unittest.TestCase):
     def bar(self, key='key', healthy=None):
         return look.bar(self.lab, self.experiment, key, self.judged, healthy)
 
+    def bar_exit(self):
+        with redirect_stdout(io.StringIO()):
+            return look.main(['bar', '--lab', str(self.lab), '--key', 'key',
+                              '--judgements', str(self.judged), str(self.experiment)])
+
+    def test_bar_exit_without_planted(self):
+        self.assertFalse(self.bar()[1])
+        self.assertEqual(self.bar_exit(), 1)
+        self.judge()
+        self.assertTrue(self.bar()[1])
+        self.assertEqual(self.bar_exit(), 0)
+
     def test_picture_digest_refusal_and_missing_part(self):
         w = width()
         w['mockup'] = None
@@ -139,17 +153,43 @@ class BarTests(unittest.TestCase):
         text, _ = self.bar()
         self.assertEqual(text.count('look-style: shot missing — undecided (2 runs)'), 1)
 
+    def test_undecided_beside_failure_from_same_check(self):
+        self.make_key('key', [[SIG]], [dict(check='look-style', reason='shot missing')])
+        text, holds = self.bar()
+        self.assertIn(SIG + ' — not judged (1 runs)', text)
+        self.assertIn('look-style: shot missing — undecided (1 runs)', text)
+        self.assertFalse(holds)
+        self.assertEqual(self.bar_exit(), 1)
+
     def test_unjudged_none(self):
         self.make_key('key', [[], [], []])
         self.assertIn('unjudged: none', self.bar()[0])
-        self.assertEqual(self.bar()[1], [])
+        self.assertTrue(self.bar()[1])
+        self.assertEqual(self.bar_exit(), 0)
 
     def test_scene_verdict_same(self):
         self.assertIn('chat: r0: fail 1; r1: fail 1; r2: fail 1; same', self.bar()[0])
 
     def test_scene_verdict_differs(self):
         self.make_key('key', [[SIG], [OTHER], []])
+        value = judgements()
+        value['differences'].append(judgement('silent', 'order', 'order/composer'))
+        self.judge(value)
         self.assertIn('chat: r0: fail 1; r1: fail 1; r2: pass; differs', self.bar()[0])
+        self.assertIn('unjudged: none', self.bar()[0])
+        self.assertFalse(self.bar()[1])
+        self.assertEqual(self.bar_exit(), 1)
+
+    def test_planted_requires_same_scene_signatures(self):
+        self.write(self.experiment / 'experiment.json', dict(name='look', planted=[SIG]))
+        self.assertTrue(self.bar()[1])
+        self.assertEqual(self.bar_exit(), 0)
+        self.make_key('key', [[SIG], [SIG, OTHER], [SIG]])
+        text, holds = self.bar()
+        self.assertEqual(text.count('planted 1/1'), 3)
+        self.assertIn('; differs', text)
+        self.assertFalse(holds)
+        self.assertEqual(self.bar_exit(), 1)
 
     def test_all_judged_runs_in_seed_order(self):
         path = self.lab / 'keys/look/key/verdict.json'
@@ -159,7 +199,7 @@ class BarTests(unittest.TestCase):
     def test_planted_missing(self):
         self.write(self.experiment / 'experiment.json', dict(name='look', planted=[SIG, OTHER]))
         text, holds = self.bar()
-        self.assertEqual(holds, [False] * 3)
+        self.assertFalse(holds)
         self.assertEqual(text.count('planted 1/2'), 3)
         self.assertIn('missing ' + OTHER, text)
         self.assertNotIn('unjudged', text)
@@ -205,8 +245,40 @@ class BarTests(unittest.TestCase):
         self.assertEqual(path.stat().st_mode & 0o777, 0o600)
         self.assertEqual(path.read_bytes(), look.canonical(judgements()))
 
+    def test_batch_entries_under_finding_and_question(self):
+        value = judgements()
+        value['differences'].append(judgement('silent', 'order', 'order/composer'))
+        for difference, name in zip(value['differences'], ('color', 'order')):
+            difference['departures'] = [name + '-departure']
+            difference['expectations'] = [name + '-expectation']
+        self.judge(value)
+        text = look.batch(self.judged, self.lab, 'look', 'key')
+        findings, questions = text.split('## Questions')
+        self.assertIn('  entries: color-departure, color-expectation\n', findings)
+        self.assertIn('  entries: order-departure, order-expectation\n', questions)
+
 
 class JudgementTests(unittest.TestCase):
+    def test_experiment_class_accepted_other_class_refused(self):
+        value = judgements()
+        value['differences'][0]['finding']['class'] = 'experiment'
+        self.assertEqual(look.load_judgements(look.canonical(value)), value)
+        value['differences'][0]['finding']['class'] = 'other'
+        with self.assertRaisesRegex(ValueError, 'finding.class'):
+            look.load_judgements(look.canonical(value))
+
+    def test_entries_on_mockup_and_silent(self):
+        for place in ('mockup', 'silent'):
+            for member in ('departures', 'expectations'):
+                with self.subTest(place=place, member=member):
+                    value = judgements()
+                    value['differences'] = [judgement(place)]
+                    value['differences'][0][member] = ['accepted-part']
+                    self.assertEqual(look.load_judgements(look.canonical(value)), value)
+                    value['differences'][0][member] = ['Bad']
+                    with self.assertRaisesRegex(ValueError, member):
+                        look.load_judgements(look.canonical(value))
+
     def test_load_judgements_refusals(self):
         rows = [
             (('format',), 'other', 'format'), (('scene',), 'Chat', 'scene'),
@@ -272,7 +344,7 @@ class JudgementTests(unittest.TestCase):
             look.load_judgements(json.dumps(judgements()).encode())
 
     def test_place_members_refused(self):
-        for place, extra in (('page', dict(finding={})), ('silent', dict(expectations=['name'])),
+        for place, extra in (('page', dict(finding={})), ('silent', dict(finding={})),
                              ('mockup', dict(question={})), ('page', dict(departures=[])),
                              ('silent', dict(question=dict(options=['One'], recommendation='')))):
             value = judgements()

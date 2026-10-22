@@ -301,8 +301,10 @@ canonical JSON (skein's `lab.md`, 2.2), shown spread out:
   them, each in at most one difference of its width; `tag`; `place`,
   `mockup`, `page` or `silent`; `cites`, the text it is judged by;
   `seen`, what the pictures show, in a line. Then by place: `mockup`, a
-  `finding` (`class`, `title` and `owner`, the page's owner) and the
-  `expectations` written for it, if any; `page`, its `departures` and `expectations`, the scene's ids,
+  `finding` (`class`, `title` and `owner`, the page's owner), classed
+  `world` (words, order, a missing part or name), `look` (appearance) or
+  `experiment` (the scene's or the gallery's, qa-web.md, 9);
+  `page`, its `departures` and `expectations`, the scene's ids,
   at least one; `silent`, a `question`, at least two `options` and a
   `recommendation`.
 - **Findings and questions are named** `<scene>/<id>`. The findings go
@@ -314,11 +316,18 @@ canonical JSON (skein's `lab.md`, 2.2), shown spread out:
   lists from the files, each with its scene, width, signatures, the
   pair's paths and its citation.
 
+A `mockup` or `silent` difference may also list the `departures` and
+`expectations` written for the part of its line judged the page's way:
+the line keeps failing by its other part, and is judged by its finding
+or question.
+
 ### The bar
 
 `lab/look_bar.py`, beside `look_pack.py`, reads a key's records in the
 lab and the judgements, and prints the key's bar; `look-judge` prints it
 after each key's verdict.
+`look_bar.py bar` exits 0 when the bar holds, 1 when it does not, 2 on
+input it cannot read.
 
 - **Each scene's verdict on each judged run:** `pass`, or `fail` and its
   signatures' count, and whether the runs' signatures are the same.
@@ -346,7 +355,10 @@ after each key's verdict.
   listed too: a look check prints one, and the run records it, for a
   part it cannot judge (a record's file missing or changed, a call it
   needs refused, a region's mockup part not found: skein's
-  `lab-browser.md`, 5.4). `unjudged: none` when nothing is.
+  `lab-browser.md`, 5.4). A check that prints both exits 1, and the runner
+  records its failures and its undecided alike (skein's
+  `scripts/lab/runner/checks.py`, `command`): the bar lists both, and
+  neither hides the other. `unjudged: none` when nothing is.
 
 ### The planted chat's blind judge
 
