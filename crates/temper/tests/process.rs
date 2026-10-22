@@ -926,6 +926,7 @@ fn the_cluster_stops_in_reverse_each_exiting_0() {
 
 // Both the idle threshold and ordinary time allowance hold an open chat's slot.
 // Past the story's deadline, a run that parks has already failed it.
+const KILL_SIGNAL: u32 = 9;
 const CHAT_HOLDS_ITS_SLOT: Duration = support::WITHIN.saturating_mul(2);
 
 // A lost link heals: a stall past the 1 s silence loses it. The worker's contact
@@ -951,6 +952,16 @@ fn a_worker_started_later_takes_the_waiting_task() {
 #[test]
 fn a_worker_restarted_on_its_directories_links_at_its_position() {
     cluster_chats("cluster_restarted", ClusterStory::Restart);
+}
+
+#[test]
+fn an_unexpected_member_exit_is_reported_after_its_client_settles() {
+    let failure = std::panic::catch_unwind(|| cluster_chats("cluster_unexpected", ClusterStory::Unexpected))
+        .expect_err("unexpected member fails the story");
+    let message = failure.downcast_ref::<String>().expect("member diagnostic");
+    assert!(message.contains("w1 exited unexpectedly: Some(Signal(9))"), "{message}");
+    assert!(message.contains("linked w1 "), "stderr tail: {message}");
+    assert!(!message.contains("EBUSY") && !message.contains("ResourceBusy"), "{message}");
 }
 
 fn cluster_chats(case: &str, story: ClusterStory) {
@@ -994,6 +1005,7 @@ const REPLY_ONCE: usize = 1;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ClusterStory {
     Each,
+    Unexpected,
     Later,
     Restart,
 }
@@ -1003,6 +1015,7 @@ enum ClusterChatStage {
     Created,
     Replied,
     WaitingSlot,
+    Crashed,
     StoppedOne,
     Relinking,
     Closed,
@@ -1086,10 +1099,14 @@ impl ClusterChatJudge {
     fn poll(&self, client: &mut support::cluster::Root) {
         use support::ctl::Call;
         let task = self.current();
-        let mut calls = vec![Call::new(&["task", task, "--json"]), Call::new(&["accounts", "--json"])];
-        if matches!(self.stage, ClusterChatStage::Verifying) {
-            calls.push(Call::new(&["activity", task, "--json"]));
-        }
+        let calls = if matches!(self.stage, ClusterChatStage::Verifying) {
+            vec![Call::new(&["task", task, "--activity", &temper_client_tools::limits::ROWS.to_string(), "--json"])]
+        } else if matches!(self.stage, ClusterChatStage::Replied) {
+            // The live reply watch returns a task; read.waiting() still checks its exact work and placement.
+            vec![Call::new(&["wait", "task", task, "--until", "replied", "--json"]), Call::new(&["accounts", "--json"])]
+        } else {
+            vec![Call::new(&["task", task, "--json"]), Call::new(&["accounts", "--json"])]
+        };
         self.queue(client, calls);
     }
     fn read(&mut self, client: &mut support::cluster::Root, ends: &[support::Ended]) -> Option<ClusterRead> {
@@ -1107,19 +1124,16 @@ impl ClusterChatJudge {
         }
         let (mut read, page) = match ends {
             [task, accounts] => {
-                return Some(ClusterRead {
-                    task: json(task),
-                    accounts: json(accounts),
-                    rows: Vec::new(),
-                    turns: false,
-                });
+                let task = json(task);
+                let task = if matches!(self.stage, ClusterChatStage::Replied) { task["task"].clone() } else { task };
+                return Some(ClusterRead::new(task, json(accounts)));
             }
-            [task, accounts, activity] => (
-                ClusterRead { task: json(task), accounts: json(accounts), rows: Vec::new(), turns: false },
-                json(activity),
-            ),
-            [activity] => (self.reading.take().expect("continued activity"), json(activity)),
-            _ => panic!("task, accounts, activity or continued activity"),
+            [activity] if self.reading.is_some() => (self.reading.take().expect("continued activity"), json(activity)),
+            [packet] => {
+                let packet = json(packet);
+                (ClusterRead::new(packet["task"].clone(), serde_json::Value::Null), packet["activity"].clone())
+            }
+            _ => panic!("task/accounts, task with activity, or continued activity"),
         };
         complete_cluster_json(&page);
         read.rows.extend(page["rows"].as_array().expect("activity rows").iter().cloned());
@@ -1131,19 +1145,10 @@ impl ClusterChatJudge {
                 .rows
                 .iter()
                 .filter_map(|row| {
-                    let turn = &row["event"]["owner"]["source"]["line"]["turn"];
-                    turn.is_object().then(|| {
-                        Call::new(&[
-                            "turn",
-                            task,
-                            &format!(
-                                "{}.{}",
-                                turn["attempt"].as_u64().expect("turn attempt"),
-                                turn["turn"].as_u64().expect("turn number")
-                            ),
-                            "--json",
-                        ])
-                    })
+                    let turn = row.pointer("/event/owner/source/line/turn")?;
+                    let attempt = turn["attempt"].as_u64().expect("turn attempt");
+                    let number = turn["turn"].as_u64().expect("turn number");
+                    Some(Call::new(&["turn", task, &format!("{attempt}.{number}"), "--json"]))
                 })
                 .collect();
             if calls.is_empty() {
@@ -1156,12 +1161,7 @@ impl ClusterChatJudge {
         None
     }
     fn advance_read(&mut self, client: &mut support::cluster::Root, read: &ClusterRead) {
-        self.last_read = format!(
-            "phase {}, attempt {}, observation {}",
-            read.owner()["phase"],
-            read.owner()["details"]["attempt"],
-            read.owner()["details"]["observation"]
-        );
+        self.last_read = read.owner().to_string();
         match self.stage {
             ClusterChatStage::WaitingSlot => {
                 if read.owner()["phase"] == serde_json::json!({"active": "due"})
@@ -1205,6 +1205,7 @@ impl ClusterChatJudge {
             ClusterChatStage::Start
             | ClusterChatStage::Created
             | ClusterChatStage::StoppedOne
+            | ClusterChatStage::Crashed
             | ClusterChatStage::Closed
             | ClusterChatStage::Stopping => unreachable!("read stage"),
         }
@@ -1222,7 +1223,17 @@ impl ClusterChatJudge {
             } else {
                 assert_eq!(worker, if first || self.story == ClusterStory::Restart { "w1" } else { "w2" });
             }
-            if first {
+            if self.story == ClusterStory::Unexpected {
+                self.queue(
+                    client,
+                    vec![
+                        support::ctl::Call::new(&["wait", "task", self.current(), "--until", "ended"]),
+                        support::ctl::Call::new(&["unknown"]),
+                    ],
+                );
+                self.members.signal("w1", Signal::Kill);
+                self.stage = ClusterChatStage::Crashed;
+            } else if first {
                 if self.story == ClusterStory::Restart {
                     self.close(client, true);
                 } else {
@@ -1260,6 +1271,9 @@ struct ClusterRead {
     turns: bool,
 }
 impl ClusterRead {
+    fn new(task: serde_json::Value, accounts: serde_json::Value) -> Self {
+        Self { task, accounts, rows: Vec::new(), turns: false }
+    }
     fn owner(&self) -> &serde_json::Value {
         &self.task["chip"]["details"]["owner"]
     }
@@ -1269,21 +1283,15 @@ impl ClusterRead {
     fn attempt(&self) -> u64 {
         self.owner()["details"]["attempt"].as_u64().expect("chat attempt")
     }
+    fn hosts(&self) -> &[serde_json::Value] {
+        self.accounts["accounts"]["deployment_facts"]["program_hosts"].as_array().expect("deployment hosts")
+    }
     fn connected(&self, name: &str) -> bool {
-        self.accounts["accounts"]["deployment_facts"]["program_hosts"]
-            .as_array()
-            .expect("deployment hosts")
-            .iter()
-            .any(|host| host["name"] == name && host["connected"] == true)
+        self.hosts().iter().any(|host| host["name"] == name && host["connected"] == true)
     }
     fn worker(&self) -> Option<&str> {
         let channel = self.owner()["details"]["observation"]["channel"].as_u64()?;
-        self.accounts["accounts"]["deployment_facts"]["program_hosts"]
-            .as_array()
-            .expect("deployment hosts")
-            .iter()
-            .find(|host| host["channel"] == channel && host["connected"] == true)?["name"]
-            .as_str()
+        self.hosts().iter().find(|host| host["channel"] == channel && host["connected"] == true)?["name"].as_str()
     }
     fn replies(&self, text: &str) -> usize {
         self.rows
@@ -1298,85 +1306,101 @@ impl ClusterRead {
     }
 }
 fn complete_cluster_json(value: &serde_json::Value) {
-    match value {
-        serde_json::Value::Object(fields) => {
-            for (key, value) in fields {
-                if key == "cut" {
-                    assert_eq!(value, false, "complete committed transcript");
-                }
-                if key == "bytes_left" {
-                    assert_eq!(value, 0, "complete turn text");
-                }
-                complete_cluster_json(value);
-            }
-        }
-        serde_json::Value::Array(items) => {
-            for item in items {
-                complete_cluster_json(item);
-            }
-        }
-        serde_json::Value::Null
-        | serde_json::Value::Bool(_)
-        | serde_json::Value::Number(_)
-        | serde_json::Value::String(_) => {}
+    if let Some(cut) = value.get("cut") {
+        assert_eq!(cut, false, "complete committed transcript");
+    }
+    if let Some(left) = value.get("bytes_left") {
+        assert_eq!(left, 0, "complete turn text");
+    }
+    for item in
+        value.as_object().into_iter().flat_map(serde_json::Map::values).chain(value.as_array().into_iter().flatten())
+    {
+        complete_cluster_json(item);
     }
 }
+
 impl skein_world::Referee<support::cluster::Root> for ClusterChatJudge {
     fn act(&mut self, now: skein_lib::Time, hosts: &mut [support::cluster::Root]) {
         use skein_shell::Host;
         use support::ctl::json;
-        let (client, hosts) = hosts.split_last_mut().expect("cluster client root");
-        if matches!(self.stage, ClusterChatStage::Start) && self.members.is_up() {
-            self.begin(client);
-        } else if matches!(self.stage, ClusterChatStage::StoppedOne) {
-            if self.members.ended("w1") {
-                self.members.restart("w1");
-                self.stage = ClusterChatStage::Relinking;
-                self.poll(client);
-            }
-        } else if client.is_empty() && !matches!(self.stage, ClusterChatStage::Start | ClusterChatStage::Stopping) {
-            let support::cluster::Root::Client { calls, .. } = client else { panic!("client root") };
-            let calls = calls.take().expect("completed cluster calls");
-            for ended in calls.ends() {
-                assert_eq!(ended.exit, Some(Exit::Code(0)), "ctl: {}", String::from_utf8_lossy(&ended.stderr));
-            }
-            match self.stage {
-                ClusterChatStage::Created => {
-                    let created = json(calls.ends().last().expect("created chat"));
-                    let task = created["outcome"]["done"]["owner"]["created"]["first"]
-                        .as_u64()
-                        .unwrap_or_else(|| panic!("created chat number: {created}"))
-                        .to_string();
-                    self.tasks.push(task);
-                    self.stage = if self.story == ClusterStory::Later && self.tasks.len() == CLUSTER_CHATS {
-                        ClusterChatStage::WaitingSlot
-                    } else {
-                        ClusterChatStage::Replied
-                    };
-                    self.poll(client);
+        self.members.act(now, hosts);
+        if self.members.failed() {
+            self.stage = ClusterChatStage::Stopping;
+            return;
+        }
+        let (client, _) = hosts.split_last_mut().expect("cluster client root");
+        if matches!(self.stage, ClusterChatStage::StoppedOne) && self.members.ended("w1") {
+            self.members.restart("w1");
+            self.stage = ClusterChatStage::Relinking;
+            self.poll(client);
+        }
+        if self.members.is_up() {
+            if matches!(self.stage, ClusterChatStage::Start) {
+                self.begin(client);
+            } else if client.is_empty() && !matches!(self.stage, ClusterChatStage::Start | ClusterChatStage::Stopping) {
+                let support::cluster::Root::Client { calls, .. } = client else { panic!("client root") };
+                let calls = calls.take().expect("completed cluster calls");
+                for ended in calls.ends() {
+                    assert_eq!(ended.exit, Some(Exit::Code(0)), "ctl: {}", String::from_utf8_lossy(&ended.stderr));
                 }
-                ClusterChatStage::Replied
-                | ClusterChatStage::WaitingSlot
-                | ClusterChatStage::Relinking
-                | ClusterChatStage::Verifying => {
-                    if let Some(read) = self.read(client, calls.ends()) {
-                        self.advance_read(client, &read);
+                match self.stage {
+                    ClusterChatStage::Created => {
+                        let created = json(calls.ends().last().expect("created chat"));
+                        let task = created["outcome"]["done"]["owner"]["created"]["first"]
+                            .as_u64()
+                            .unwrap_or_else(|| panic!("created chat number: {created}"))
+                            .to_string();
+                        self.tasks.push(task);
+                        self.stage = if self.story == ClusterStory::Later && self.tasks.len() == CLUSTER_CHATS {
+                            ClusterChatStage::WaitingSlot
+                        } else {
+                            ClusterChatStage::Replied
+                        };
+                        self.poll(client);
                     }
-                }
-                ClusterChatStage::Closed => {
-                    self.stage = ClusterChatStage::Verifying;
-                    self.poll(client);
-                }
-                ClusterChatStage::Start | ClusterChatStage::Stopping | ClusterChatStage::StoppedOne => {
-                    unreachable!("active calls")
+                    ClusterChatStage::Replied
+                    | ClusterChatStage::WaitingSlot
+                    | ClusterChatStage::Relinking
+                    | ClusterChatStage::Verifying => {
+                        if let Some(read) = self.read(client, calls.ends()) {
+                            self.advance_read(client, &read);
+                        }
+                    }
+                    ClusterChatStage::Closed => {
+                        self.stage = ClusterChatStage::Verifying;
+                        self.poll(client);
+                    }
+                    ClusterChatStage::Start
+                    | ClusterChatStage::Stopping
+                    | ClusterChatStage::StoppedOne
+                    | ClusterChatStage::Crashed => {
+                        unreachable!("active calls")
+                    }
                 }
             }
         }
-        self.members.act(now, hosts);
     }
     fn observe(&mut self, now: skein_lib::Time, hosts: &[support::cluster::Root]) {
-        let (_, hosts) = hosts.split_last().expect("cluster client root");
+        use skein_shell::Host;
+        let (client, hosts) = hosts.split_last().expect("cluster client root");
         self.members.observe(now, hosts);
+        if self.members.failed() {
+            if self.story != ClusterStory::Unexpected {
+                return;
+            }
+            let support::cluster::Root::Client { calls: Some(calls), .. } = client else {
+                panic!("failed client's calls")
+            };
+            if self.story == ClusterStory::Unexpected && matches!(self.stage, ClusterChatStage::Crashed) {
+                assert!(!calls.is_empty(), "in-flight child not yet reaped");
+            }
+            if self.story == ClusterStory::Unexpected && self.members.stopped().is_some() {
+                assert!(calls.is_empty(), "client settled before remaining members stop");
+                let [cancelled] = calls.ends() else { panic!("one in-flight call; queued unknown never started") };
+                assert_eq!(cancelled.exit, Some(Exit::Signal(KILL_SIGNAL)), "client killed, waited and reaped");
+            }
+            return;
+        }
         if let Some(stopped) = self.members.stopped() {
             let expected = if self.story == ClusterStory::Restart {
                 vec![("w1", FIRST_LIFE), ("w1", SECOND_LIFE), ("engine", FIRST_LIFE), ("llm", FIRST_LIFE)]
@@ -1408,6 +1432,7 @@ impl skein_world::Referee<support::cluster::Root> for ClusterChatJudge {
                     ClusterChatStage::Created => "chat creation",
                     ClusterChatStage::Replied => "waiting run and connected placement",
                     ClusterChatStage::WaitingSlot => "due second chat without attempt or observation",
+                    ClusterChatStage::Crashed => "unexpected exit with a call in flight",
                     ClusterChatStage::Closed => "closed chats ended",
                     ClusterChatStage::Verifying => "ended done and complete committed turns",
                     ClusterChatStage::StoppedOne => "w1's first life settled",

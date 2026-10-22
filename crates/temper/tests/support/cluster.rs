@@ -19,6 +19,7 @@ use std::{
 // qa.md, 10.1: temper-m1-calibration, the approved class the cluster runs under until it has its own.
 const READY_SECONDS: u64 = 60;
 const STOP_SECONDS: u64 = 10;
+const STDERR_TAIL_LINES: usize = 20;
 // lab/cluster/engine.json's fleet.grace_ms: above each worker's stop bound, 2300 (jig-protocol-config worker.rs:38), which a hello must be under (jig-domain-fleet channel.rs:174); reached only on a lost link.
 pub(crate) const FLEET_GRACE_MS: u64 = 3000;
 const _: () = assert!(FLEET_GRACE_MS < STOP_SECONDS * 1000);
@@ -187,6 +188,7 @@ impl Cluster {
                 stopping: false,
                 stopped: Vec::new(),
                 failure: None,
+                settling_client: false,
             },
             hosts,
         )
@@ -395,6 +397,7 @@ pub struct Members {
     stopping: bool,
     stopped: Vec<Stopped>,
     failure: Option<String>,
+    settling_client: bool,
 }
 /// The recorded exit of one member, in order of exit.
 pub struct Stopped {
@@ -451,7 +454,7 @@ impl Members {
     }
     #[must_use]
     pub fn stopped(&self) -> Option<&[Stopped]> {
-        (self.stopping && self.stopped.len() == self.started.len()).then_some(&self.stopped)
+        (self.stopping && !self.settling_client && self.stopped.len() == self.started.len()).then_some(&self.stopped)
     }
     /// Kill the named member's whole tree, recording an intentional ending.
     pub fn kill(&mut self, process: &str) {
@@ -503,6 +506,15 @@ impl Members {
         };
     }
     pub fn act(&mut self, now: Time, hosts: &mut [Root]) {
+        if self.settling_client {
+            if let Some(Root::Client { calls: Some(calls), .. }) = hosts.get_mut(self.states.len()) {
+                calls.cancel();
+                if !calls.is_empty() {
+                    return;
+                }
+            }
+            self.settling_client = false;
+        }
         for (i, action) in std::mem::take(&mut self.actions) {
             match action {
                 Action::End(ending) => self.ending(i, ending, now, hosts),
@@ -631,9 +643,12 @@ impl Members {
                 }
             }
             if binary.exit_status().is_some() && !matches!(self.states[i], State::Stopping { .. } | State::Ended) {
-                self.failure =
-                    Some(format!("{name} exited unexpectedly: {}", String::from_utf8_lossy(binary.stderr())));
+                let stderr = String::from_utf8_lossy(binary.stderr());
+                let tail: Vec<_> = stderr.lines().rev().take(STDERR_TAIL_LINES).collect();
+                let tail = tail.into_iter().rev().collect::<Vec<_>>().join("\n");
+                self.failure = Some(format!("{name} exited unexpectedly: {:?}\n{tail}", binary.exit_status()));
                 self.stopping = true;
+                self.settling_client = true;
                 self.states[i] = State::Stopping {
                     deadline: now.saturating_add(Duration::from_secs(STOP_SECONDS)),
                     ending: Ending::Cluster,
@@ -674,6 +689,10 @@ impl Members {
     pub fn overdue(&self, _now: Time) -> Option<String> {
         None
     } // act escalates, then awaits settlement.
+    #[must_use]
+    pub fn failed(&self) -> bool {
+        self.failure.is_some()
+    }
     #[must_use]
     pub fn passed(&self) -> bool {
         if self.stopped().is_none() {

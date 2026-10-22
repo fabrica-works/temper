@@ -1,6 +1,6 @@
 //! Executable calls beside serve, with every descriptor on one real ring.
 use super::{Ended, Process, WITHIN};
-use skein_io::kernel::{Complete, Done, Exit, Fd, Op, Pipe, Signal, Spawn, Submit, Target, Way};
+use skein_io::kernel::{Complete, Done, Error, Exit, Fd, Op, Pipe, Signal, Spawn, Submit, Target, Way};
 use skein_lib::{Duration, Queue, Time, Token, Wall};
 use skein_shell::{Clock, Host};
 use skein_world::{Referee, end_to_end::Streams, real};
@@ -16,6 +16,7 @@ const STDERR: Token = Token::new(5);
 const WAIT: Token = Token::new(6);
 const REAP: Token = Token::new(7);
 const CUT: Token = Token::new(8);
+const CANCEL: Token = Token::new(9);
 const STARTED: u64 = 1 << 31;
 const OWN_CLOSE: u64 = 1 << 32;
 // Poll pending promptly without holding up the interrupted call.
@@ -91,6 +92,8 @@ struct Child {
     waiting: bool,
     closing: u32,
     ended: Ended,
+    cancelled: bool,
+    signals: u32,
 }
 impl Child {
     fn new(input: Vec<u8>, base: u64) -> Self {
@@ -105,6 +108,8 @@ impl Child {
             waiting: false,
             closing: 0,
             ended: Ended { exit: None, stdout: Vec::new(), stderr: Vec::new() },
+            cancelled: false,
+            signals: 0,
         }
     }
     fn token(&self, token: Token) -> Token {
@@ -117,7 +122,20 @@ impl Child {
             kind: Op::Close { fd },
         });
     }
-    fn completed(&mut self, complete: Complete, submit: &mut Queue<Submit>) {
+    fn completed(&mut self, complete: Complete, submit: &mut Queue<Submit>, cancelling: bool) {
+        if complete.op == self.token(CANCEL) || cancelling && complete.op == self.token(CUT) {
+            assert!(
+                matches!(complete.result, Ok(_) | Err(Error::NotFound | Error::Other(3))),
+                "ctl cancellation signal"
+            );
+            self.signals -= 1;
+            return;
+        }
+        if cancelling && complete.op == self.token(WRITE) && complete.result.is_err() {
+            self.writing = false;
+            self.written = self.input.len();
+            return;
+        }
         let done = complete.result.expect("ctl operation succeeds");
         match Token::new(complete.op.raw() - self.base) {
             SPAWN => {
@@ -161,13 +179,21 @@ impl Child {
                 let fd = self.pidfd.take().expect("reaped ctl pidfd");
                 self.close(fd, submit);
             }
-            CUT => {}
+            CUT => self.signals -= 1,
             _ => panic!("ctl operation token"),
         }
     }
-    fn drive(&mut self, submit: &mut Queue<Submit>) {
+    fn drive(&mut self, submit: &mut Queue<Submit>, cancelling: bool) {
         if self.pidfd.is_none() {
             return;
+        }
+        if cancelling && !self.cancelled && self.ended.exit.is_none() {
+            self.cancelled = true;
+            self.signals += 1;
+            submit.push(Submit {
+                op: self.token(CANCEL),
+                kind: Op::Signal { pidfd: self.pidfd.expect("ctl pidfd"), signal: Signal::Kill, to: Target::Child },
+            });
         }
         if !self.writing
             && let Some(fd) = self.pipes[0]
@@ -203,7 +229,7 @@ impl Child {
         }
     }
     fn finished(&self) -> bool {
-        self.ended.exit.is_some() && self.pidfd.is_none() && self.closing == 0
+        self.ended.exit.is_some() && self.pidfd.is_none() && self.closing == 0 && self.signals == 0
     }
 }
 
@@ -225,6 +251,7 @@ pub struct Calls {
     action: Option<Action>,
     started: Option<(Child, usize)>,
     cutting: bool,
+    cancelling: bool,
     retry: Option<Time>,
     forgejo: Option<u32>,
     ends: Vec<Ended>,
@@ -244,7 +271,22 @@ impl Calls {
     }
     /// Queue another step before this batch runs.
     pub fn push(&mut self, step: Step) {
-        self.steps.push_back(step);
+        if !self.cancelling {
+            self.steps.push_back(step);
+        }
+    }
+    /// An owner abandoning these calls must cancel: stop admission and retries;
+    /// kill in-flight children once their spawn
+    /// completes, tolerating natural exit. Drain pipes, wait, reap and close as
+    /// usual: `is_empty` remains false until every child and descriptor settles.
+    /// Repeated cancellation has the same effect as one request. A future
+    /// per-call Binary tree could also make abandonment without cancellation safe.
+    pub fn cancel(&mut self) {
+        self.cancelling = true;
+        self.steps.clear();
+        self.retry = None;
+        self.cutting = false;
+        self.action = self.child.as_ref().map(|_| Action::Run);
     }
     /// Completed calls, in the order their steps ran.
     #[must_use]
@@ -264,6 +306,7 @@ impl Calls {
             action: None,
             started: None,
             cutting: false,
+            cancelling: false,
             retry: None,
             forgejo,
             ends: Vec::new(),
@@ -363,7 +406,7 @@ impl Calls {
         }
     }
     fn advance(&mut self, now: Time) {
-        if self.child.is_some() || self.cutting || self.retry.is_some_and(|retry| retry > now) {
+        if self.cancelling || self.child.is_some() || self.cutting || self.retry.is_some_and(|retry| retry > now) {
             return;
         }
         if let Some(Action::Until(call, _)) = &self.action {
@@ -382,7 +425,8 @@ impl Calls {
                 self.start(call, false);
             }
             Some(Step::Cut) => {
-                let (child, _) = self.started.as_ref().expect("call still running at cut");
+                let (child, _) = self.started.as_mut().expect("call still running at cut");
+                child.signals += 1;
                 self.cutting = true;
                 self.submit.push(Submit {
                     op: child.token(CUT),
@@ -424,9 +468,9 @@ impl Host for Calls {
                 complete.result.expect("fixture descriptor closed");
                 self.closing -= 1;
             } else if complete.op.raw() >= STARTED {
-                self.started.as_mut().expect("started call").0.completed(complete, &mut self.submit);
+                self.started.as_mut().expect("started call").0.completed(complete, &mut self.submit, self.cancelling);
             } else {
-                self.child.as_mut().expect("running ctl").completed(complete, &mut self.submit);
+                self.child.as_mut().expect("running ctl").completed(complete, &mut self.submit, self.cancelling);
             }
         }
         self.finish(now);
@@ -434,10 +478,10 @@ impl Host for Calls {
             self.advance(now);
         }
         if let Some(child) = &mut self.child {
-            child.drive(&mut self.submit);
+            child.drive(&mut self.submit, self.cancelling);
         }
         if let Some((child, _)) = &mut self.started {
-            child.drive(&mut self.submit);
+            child.drive(&mut self.submit, self.cancelling);
         }
         if self.done()
             && let Some(root) = self.root.take()
