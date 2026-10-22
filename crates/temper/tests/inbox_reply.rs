@@ -36,7 +36,8 @@ fn card(builder: &mut Builder, title: &[u8], heading: &[u8]) {
     builder.close();
     builder.close();
 }
-fn fixture(reply_title: Option<&[u8]>, nested: bool) -> View {
+// A reply card is headed by its own task, as the inbox draws it: "T2 Land a small change replied".
+fn fixture(reply: Option<(&[u8], &[u8])>, nested: bool) -> View {
     let mut view = View::new(&LIMITS);
     let mut builder = view.builder();
     builder.open(Role::Page);
@@ -45,8 +46,8 @@ fn fixture(reply_title: Option<&[u8]>, nested: bool) -> View {
         builder.name(b"Other task");
     }
     card(&mut builder, TITLE, b"Updates");
-    if let Some(title) = reply_title {
-        card(&mut builder, title, b"Reply");
+    if let Some((title, heading)) = reply {
+        card(&mut builder, title, heading);
     }
     if nested {
         builder.close();
@@ -62,7 +63,7 @@ fn reply() -> Find {
 
 #[test]
 fn a_reply_is_found_after_the_same_tasks_result() {
-    let view = fixture(Some(TITLE), false);
+    let view = fixture(Some((TITLE, b"T2 Land a small change replied")), false);
     let find = reply();
     assert_eq!(TreeFace::new(view.tree()).find(&find), Found::Absent, "kit keeps first-match scoping");
     assert_eq!(ReplyFace::new(view.tree()).find(&find), Found::Node(REPLY));
@@ -76,6 +77,6 @@ fn a_result_alone_does_not_satisfy_the_reply() {
 
 #[test]
 fn another_tasks_reply_does_not_satisfy_the_reply() {
-    let view = fixture(Some(b"T3 \xc2\xb7 Another task"), true);
+    let view = fixture(Some((b"T3 \xc2\xb7 Another task", b"T3 Another task replied")), true);
     assert_eq!(ReplyFace::new(view.tree()).find(&reply()), Found::Absent);
 }
