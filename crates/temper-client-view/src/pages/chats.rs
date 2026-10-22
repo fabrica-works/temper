@@ -41,7 +41,11 @@ pub(crate) fn main(
     if let Some(demo) = demo {
         start(b, root, demo, words, bindings);
     } else {
+        b.style(crate::look::PAGE);
+        b.open(Role::Slot);
+        b.style(crate::look::PAGEBAR);
         text(b, Role::Heading { level: 1 }, &words.say(Word::Chats, &[]));
+        b.close();
     }
     if let Some(chats) = root.pages().chats() {
         if root.pages().me(root.client()).is_some() && root.pages().project().is_some() {
@@ -89,6 +93,8 @@ pub(crate) fn main(
 }
 fn list(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, times: &mut Times) {
     let Some(chats) = root.pages().chats() else { return };
+    b.open(Role::Slot);
+    b.style(crate::look::HEADING);
     text(b, Role::Heading { level: 2 }, &words.say(Word::YourChats, &[]));
     b.open(Role::Slot);
     b.style(crate::look::FILTERS);
@@ -103,6 +109,7 @@ fn list(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, 
         b.bind(bindings.insert(Act::ChatFilter { filter }));
         b.close();
     }
+    b.close();
     b.close();
     let live = match chats.live(root.client()) {
         Some(live) if chats.filter != Filter::Closed => live.rows.as_slice(),
@@ -121,7 +128,12 @@ fn list(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, 
             Filter::Live => Word::NoLiveChats,
             Filter::Closed => Word::NoClosedChats,
         };
-        text(b, Role::Paragraph, &words.say(word, &[]));
+        let empty = words.say(word, &[]);
+        b.open(Role::Paragraph);
+        b.name(&empty);
+        b.style(crate::look::EMPTY);
+        b.text(Run::Plain, &empty);
+        b.close();
     } else {
         b.open(Role::List);
         b.name(&words.say(Word::YourChats, &[]));

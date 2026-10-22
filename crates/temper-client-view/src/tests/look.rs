@@ -117,12 +117,13 @@ fn each_style_or_region_is_named_under_temper() {
 }
 #[test]
 fn each_pages_main_carries_the_main_token() {
-    let builds: [fn() -> temper_client_domain::Domain; 3] =
-        [fixtures::signed_out, fixtures::out_of_date, fixtures::chats_root];
+    let builds: [fn() -> temper_client_domain::Domain; 2] = [fixtures::signed_out, fixtures::out_of_date];
     for build in builds {
         let view = fixtures::page_view(&build());
         assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN])]);
     }
+    let view = fixtures::page_view(&fixtures::chats_root());
+    assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN, PAGE])]);
     let view = fixtures::page_view(&fixtures::task::held_root());
     assert_eq!(fixtures::styles(view.tree(), Role::Main).as_ref(), [Box::from([MAIN, PAGE])]);
     let view = fixtures::page_view(&fixtures::inbox_root());

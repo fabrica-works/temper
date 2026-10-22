@@ -346,8 +346,15 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 .temper-pagebar { height: 37px; padding: 0 25px; background: #fcfbf8; border-bottom: 1px solid var(--temper-line); display: flex; align-items: center; }
 .temper-pagebar h1 { margin: 0; font: 700 11px/1.58 var(--temper-mono); letter-spacing: -.015em; }
 /* .section-heading and .filter-row: groups wrap together and retain their words. */
-.temper-page .temper-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 21px; margin-bottom: 9px; }
-.temper-pagebar + .temper-heading { margin-top: 22px; }
+.temper-page .temper-heading, .temper-main:has(> .temper-chatbar) > .temper-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 21px; margin-bottom: 9px; }
+.temper-pagebar + .temper-heading, .temper-pagebar + h2 { margin-top: 22px; }
+.temper-entry + .temper-heading { margin-top: 23px; }
+/* The chats page: its composer keeps the welcome's 760px and More its own width, at the column's left. */
+.temper-main.temper-page > :is(.temper-choice, .temper-entry), .temper-main.temper-page > .temper-rows + button { margin-left: max(24px, calc((100% - 1160px) / 2)); margin-right: auto; }
+.temper-main.temper-page > :is(.temper-choice, .temper-entry) { width: min(760px, calc(100% - 48px)); }
+.temper-main.temper-page > .temper-rows + button { width: auto; }
+/* .empty-state: an empty list's words in a dashed box. */
+.temper-empty { margin: 0; padding: 22px; border: 1px dashed #dcd5ca; border-radius: 12px; color: #77756e; font-size: 12px; text-align: center; }
 .temper-heading h2 { flex: none; margin: 0; font-size: 14px; }
 .temper-filters, .temper-filters > div { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
 .temper-filters { justify-content: flex-end; min-width: 0; }
@@ -406,18 +413,22 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 /* .page at 850px. */
 @media (max-width: 850px) {
   .temper-page > :not(.temper-pagebar):not(dialog) { width: calc(100% - 34px); }
+  .temper-main.temper-page > :is(.temper-choice, .temper-entry), .temper-main.temper-page > .temper-rows + button { margin-left: 17px; }
+  .temper-main.temper-page > :is(.temper-choice, .temper-entry) { width: min(760px, calc(100% - 34px)); }
 }
 /* .topbar, .page and .updates-list at 760px. */
 @media (max-width: 760px) {
   .temper-main.temper-page { width: 100%; padding: 0 0 58px; }
   .temper-pagebar { height: 35px; padding: 0 16px; }
   .temper-page > :not(.temper-pagebar):not(dialog) { width: calc(100% - 28px); }
-  .temper-pagebar + .temper-heading { margin-top: 16px; }
+  .temper-pagebar + .temper-heading, .temper-pagebar + h2 { margin-top: 16px; }
+  .temper-main.temper-page > :is(.temper-choice, .temper-entry), .temper-main.temper-page > .temper-rows + button { margin-left: 14px; }
+  .temper-main.temper-page > :is(.temper-choice, .temper-entry) { width: calc(100% - 28px); }
   .temper-page .temper-updates { grid-template-columns: 1fr; }
 }
 /* .section-heading at 600px: filters below the heading, all controls retained. */
 @media (max-width: 600px) {
-  .temper-page .temper-heading { flex-wrap: wrap; row-gap: 0; }
+  .temper-page .temper-heading, .temper-main:has(> .temper-chatbar) > .temper-heading { flex-wrap: wrap; row-gap: 0; }
   .temper-heading .temper-filters { flex: 0 0 100%; margin-top: 8px; justify-content: flex-start; }
   .temper-page .temper-card textarea { width: 100%; }
 }
@@ -639,14 +650,6 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
   .temper-unavailable, body > noscript, #app:not(:empty):not(:has(*)) { width: calc(100% - 28px); }
 }
 
-/* .terminal-pages .page: Chats has the list width; demo start retains its own frame. */
-.temper-main:not(.temper-page):not(.temper-chat):has(> h1):not(:has(> .temper-chatbar)) { width: min(1160px, calc(100% - 48px)); }
-@media (max-width: 850px) {
-  .temper-main:not(.temper-page):not(.temper-chat):has(> h1):not(:has(> .temper-chatbar)) { width: calc(100% - 34px); }
-}
-@media (max-width: 760px) {
-  .temper-main:not(.temper-page):not(.temper-chat):has(> h1):not(:has(> .temper-chatbar)) { width: calc(100% - 28px); }
-}
 /* .demo-strip: only Chats, Inbox and Accounts; chat and demo-start notices stay boxed. */
 #app:has(> .temper-main:not(.temper-chat) > :is(h1, .temper-heading, .temper-accounts-page)) > section.temper-accounts { width: 100%; margin: 0; padding: 4px 25px; border: 0; border-bottom: 1px solid var(--temper-line); gap: 4px 18px; }
 #app:has(> .temper-main:not(.temper-chat) > :is(h1, .temper-heading, .temper-accounts-page)) > section.temper-accounts p { flex: 0 1 auto; }

@@ -697,3 +697,57 @@ fn an_accepted_start_draws_no_applied_status() {
     let view = fixtures::page_view(&root);
     assert!(fixtures::find(view.tree(), Role::Status, b"Applied").is_none());
 }
+
+fn index_of(nodes: &[skein_ui::Node], id: skein_ui::NodeId) -> usize {
+    let mut at = None;
+    for (index, node) in nodes.iter().enumerate() {
+        if node.id == id {
+            at = Some(index);
+        }
+    }
+    at.expect("node in the tree")
+}
+fn main_of(nodes: &[skein_ui::Node]) -> usize {
+    let mut main = None;
+    for (index, node) in nodes.iter().enumerate() {
+        if node.role == Role::Main {
+            main = Some(index);
+        }
+    }
+    main.expect("a main")
+}
+#[test]
+fn the_chats_page_opens_with_its_bar_and_draws_its_list_as_the_mockup() {
+    let chats = fixtures::page_view(&fixtures::chats_root());
+    let nodes = chats.tree().nodes();
+    let main = main_of(nodes);
+    assert!(nodes[main].styles.as_slice().contains(&crate::look::PAGE));
+    let bar = main + 1;
+    assert_eq!(nodes[bar].styles.as_slice(), [crate::look::PAGEBAR]);
+    assert_eq!(nodes[bar + 1].role, Role::Heading { level: 1 });
+    assert_eq!(nodes[bar + 1].name.as_deref(), Some(b"Chats".as_slice()));
+    let after = bar + usize::try_from(nodes[bar].size).unwrap();
+    assert_eq!(nodes[after].role, Role::Heading { level: 2 });
+    assert_eq!(nodes[after].name.as_deref(), Some(b"Start a chat".as_slice()));
+    let demo = fixtures::page_view(&fixtures::demo_root(temper_client_domain::Address::Chats, fixtures::PROJECT, true));
+    let demo_nodes = demo.tree().nodes();
+    assert!(!demo_nodes[main_of(demo_nodes)].styles.as_slice().contains(&crate::look::PAGE));
+    for node in demo_nodes {
+        assert!(!node.styles.as_slice().contains(&crate::look::PAGEBAR), "the demo's start keeps no bar");
+    }
+    for (page, view) in [("chats", &chats), ("demo", &demo)] {
+        let nodes = view.tree().nodes();
+        let heading = index_of(nodes, fixtures::find(view.tree(), Role::Heading { level: 2 }, b"Your chats").unwrap());
+        let row = heading - 1;
+        assert_eq!(nodes[row].role, Role::Slot, "{page}");
+        assert_eq!(nodes[row].styles.as_slice(), [crate::look::HEADING], "{page}");
+        let end = row + usize::try_from(nodes[row].size).unwrap();
+        for name in [b"All".as_slice(), b"Live", b"Closed"] {
+            let button = index_of(nodes, fixtures::find(view.tree(), Role::Button, name).unwrap());
+            assert!(row < button && button < end, "{page}: {} in the heading row", name.escape_ascii());
+        }
+        let empty = index_of(nodes, fixtures::find(view.tree(), Role::Paragraph, b"No chats yet.").unwrap());
+        assert_eq!(empty, end, "{page}: the empty words follow the heading row");
+        assert_eq!(nodes[empty].styles.as_slice(), [crate::look::EMPTY], "{page}");
+    }
+}
