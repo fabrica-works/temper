@@ -6,6 +6,7 @@ exec python3 -I -B -S - "$0" "$@" <<'PYTHON'
 import os
 from pathlib import Path
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -56,9 +57,13 @@ def main():
             return 4
         artifact = scratch / 'bundle.tar'
         artifact.write_bytes(pack(output))
+        # Cargo links the binary into deps/; a subject's artifact has one link.
+        binary = scratch / 'temper'
+        shutil.copyfile(temper, binary)
+        binary.chmod(0o700)
         subject = run([lab, 'subject', '--repository', repository,
                        '--commit', commit.stdout.strip(), '--exclude', 'lab',
-                       '--artifact', 'temper=' + str(temper),
+                       '--artifact', 'temper=' + str(binary),
                        '--artifact', 'bundle=' + str(artifact)], repository)
     if subject.returncode:
         return subject.returncode
