@@ -440,8 +440,9 @@ mod memory_literal;
 // A chat's 5 delegation cards (client/README.md, 5.7): 5 x (66 markdown + 14)
 // nodes x 574,364 B + 5 x 8 B of carded tasks = 229,745,640 B, so 4,824,814,379 B.
 // Cards remembered across the window: 5 x 8 B = 40 B, so 4,824,814,419 B.
+// The live delegates' trailing region adds 574,364 B, so 4,825,388,783 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 4824814419;
+const ACCOUNT_BYTES: u64 = 4825388783;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

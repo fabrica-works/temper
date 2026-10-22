@@ -20,10 +20,10 @@ impl Limits {
             .checked_add(32)?;
         let card = proposed.checked_mul(receiving.rows)?.checked_add(128)?;
         let cards = card.checked_mul(receiving.reads.checked_add(1)?)?;
-        // Each watched task has one card at the call that made it: fourteen
-        // structural nodes, plus the result's markdown.
+        // Each watched task has one card at its first anchor: fourteen structural
+        // nodes plus the result's markdown, and one region for live delegates.
         let delegations = temper_client_domain::pages::delegation::bound(domain);
-        let delegated = markdown.checked_add(14)?.checked_mul(delegations)?;
+        let delegated = markdown.checked_add(14)?.checked_mul(delegations)?.checked_add(1)?;
         // A transcript window, with a window of messages and blocks in each turn.
         let turns = markdown
             .checked_add(16)?

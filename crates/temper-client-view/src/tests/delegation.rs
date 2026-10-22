@@ -13,6 +13,7 @@ const TITLE: &[u8] = b"Export widget's table as CSV";
 const MERGE: &[u8] = b"1a2b3c4abcdef0123456789abcdef0123456789abcd";
 const WAKE_SUMMARY: &[u8] =
     b"Begin the work your brief describes.\n\n2: Result from task 2:\n0000000000000003000000000000000000000000";
+const LATER: &[u8] = b"The change is running.";
 fn text(bytes: &[u8]) -> c::Text {
     c::Text::new(Box::from(bytes), 256).expect("fixture text")
 }
@@ -55,9 +56,9 @@ fn event(root: &mut Domain, event: Event, out: &mut Queue<Request>) {
     temper_client_domain::step(root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, event, out);
 }
 fn root(documents: &[c::Task], called: &[u64], heard: bool) -> Domain {
-    root_activity(documents, activity(called, heard))
+    root_activity(documents, activity(called, heard), &[])
 }
-fn root_activity(documents: &[c::Task], activity: c::ActivityPage) -> Domain {
+fn root_activity(documents: &[c::Task], activity: c::ActivityPage, delegates: &[u64]) -> Domain {
     let (mut root, _, _) = fixtures::root_at(Address::Chats, &limits());
     let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits()));
     event(
@@ -101,6 +102,12 @@ fn root_activity(documents: &[c::Task], activity: c::ActivityPage) -> Domain {
             } => {
                 let mut chat = change();
                 chat.chip.task = CHAT;
+                chat.delegates = List::with_capacity(u32::try_from(delegates.len()).expect("delegates fit"));
+                for task in delegates {
+                    let mut chip = change().chip;
+                    chip.task = *task;
+                    chat.delegates.push(c::LiveDelegate { chip, takeover_budget: 0 }).expect("delegate");
+                }
                 chat.activity = activity.rows.get(0).expect("newest activity").position;
                 event(
                     &mut root,
@@ -283,6 +290,67 @@ fn steps(view: &crate::View, done: bool) {
         }
     }
 }
+fn after_call() -> c::ActivityPage {
+    let mut rows = List::with_capacity(1);
+    rows.push(c::ActivityLine {
+        position: 3,
+        at: Wall::EPOCH,
+        event: c::Activity::News { topic: 0, summary: text(LATER), part: None },
+    })
+    .expect("later activity");
+    c::ActivityPage { rows, before: None, after: None, cut: false }
+}
+fn last_turn(view: &crate::View) -> &[skein_ui::Node] {
+    let nodes = view.tree().nodes();
+    for (index, node) in nodes.iter().enumerate() {
+        if node.role != Role::Log {
+            continue;
+        }
+        let end = index.checked_add(usize::try_from(node.size).expect("log size")).expect("log end");
+        let mut child = index.checked_add(1).expect("first child");
+        let mut last = child;
+        while child < end {
+            assert_eq!(nodes[child].role, Role::Region);
+            last = child;
+            child = child.checked_add(usize::try_from(nodes[child].size).expect("turn size")).expect("next turn");
+        }
+        return &nodes[last..end];
+    }
+    panic!("conversation log absent");
+}
+fn change_cards(view: &crate::View) -> u32 {
+    let mut cards = 0_u32;
+    for node in view.tree().nodes() {
+        if node.role == Role::Region && node.name.as_deref() == Some(b"Task 2") {
+            cards = cards.checked_add(1).expect("card count");
+        }
+    }
+    cards
+}
+#[test]
+fn a_running_change_shows_its_card_after_the_conversation_once_its_call_has_left() {
+    let view = view_root(&root_activity(&[change()], after_call(), &[CHANGE]));
+    assert_eq!(change_cards(&view), 1);
+    let region = fixtures::find(view.tree(), Role::Region, b"Task 2").expect("task card");
+    assert!(find(&view, Find::text("T2 · CHANGE".as_bytes())).is_some());
+    status(&view, b"Running", look::STATUS_ACTIVE);
+    let last = last_turn(&view);
+    assert_eq!(last[0].styles.as_slice(), [look::TURN]);
+    assert_eq!(last[1].id, region, "the card follows the conversation's last line");
+}
+#[test]
+fn a_live_delegate_carded_at_its_call_shows_once() {
+    let view = view_root(&root_activity(&[change()], activity(&[CHANGE], false), &[CHANGE]));
+    assert_eq!(change_cards(&view), 1);
+}
+#[test]
+fn a_live_delegate_without_its_document_shows_nothing_after_the_conversation() {
+    let view = view_root(&root_activity(&[], after_call(), &[CHANGE]));
+    assert_eq!(change_cards(&view), 0);
+    let last = last_turn(&view);
+    assert_eq!(last[1].role, Role::Paragraph);
+    assert_eq!(last[1].name.as_deref(), Some(LATER), "the last region is still the conversation's line");
+}
 #[test]
 fn a_running_change_shows_its_card_at_its_call() {
     let mut view = view(Some(change()), &[CHANGE], false);
@@ -344,7 +412,7 @@ fn wake(called: bool, summary: &[u8]) -> c::ActivityPage {
 }
 #[test]
 fn a_landed_change_shows_its_card_at_its_result_once_its_call_has_left() {
-    let view = view_root(&root_activity(&[landed()], wake(false, WAKE_SUMMARY)));
+    let view = view_root(&root_activity(&[landed()], wake(false, WAKE_SUMMARY), &[]));
     assert!(fixtures::find(view.tree(), Role::Region, b"Task 2").is_some());
     assert!(find(&view, Find::text("T2 · CHANGE".as_bytes())).is_some());
     status(&view, b"Landed", look::STATUS_DONE);
@@ -353,7 +421,7 @@ fn a_landed_change_shows_its_card_at_its_result_once_its_call_has_left() {
 }
 #[test]
 fn a_card_shows_once_at_its_call_when_its_result_shares_the_window() {
-    let view = view_root(&root_activity(&[landed()], wake(true, WAKE_SUMMARY)));
+    let view = view_root(&root_activity(&[landed()], wake(true, WAKE_SUMMARY), &[]));
     let mut cards = 0_u32;
     for node in view.tree().nodes() {
         if node.role == Role::Region && node.name.as_deref() == Some(b"Task 2") {
@@ -370,7 +438,7 @@ fn a_card_shows_once_at_its_call_when_its_result_shares_the_window() {
 }
 #[test]
 fn a_result_without_its_document_keeps_its_work() {
-    let view = view_root(&root_activity(&[], wake(false, WAKE_SUMMARY)));
+    let view = view_root(&root_activity(&[], wake(false, WAKE_SUMMARY), &[]));
     assert!(fixtures::find(view.tree(), Role::Region, b"Task 2").is_none());
     assert_eq!(work_slots(&view), 1);
     assert!(fixtures::find(view.tree(), Role::Paragraph, WAKE_SUMMARY).is_some());
@@ -380,7 +448,7 @@ fn a_persons_result_keeps_its_work() {
     let summary = b"...\n2: Result from task 2:\nwords";
     let mut task = change();
     task.requester = c::OwnerRequester::Person(CHANGE);
-    let view = view_root(&root_activity(&[task], wake(false, summary)));
+    let view = view_root(&root_activity(&[task], wake(false, summary), &[]));
     assert!(fixtures::find(view.tree(), Role::Region, b"Task 2").is_none());
     assert_eq!(work_slots(&view), 1);
     assert!(fixtures::find(view.tree(), Role::Paragraph, b"Tool completed").is_some());
@@ -389,7 +457,7 @@ fn a_persons_result_keeps_its_work() {
 #[test]
 fn a_partly_carded_result_keeps_its_work() {
     let summary = b"Result from task 2:\nlanded\n3: Result from task 3:\nwaiting";
-    let view = view_root(&root_activity(&[landed()], wake(false, summary)));
+    let view = view_root(&root_activity(&[landed()], wake(false, summary), &[]));
     assert_eq!(work_slots(&view), 1);
     assert!(fixtures::find(view.tree(), Role::Paragraph, summary).is_some());
 }

@@ -176,7 +176,7 @@ impl Chat {
         if self.run.is_none() && self.thread.loaded >= self.thread.committed {
             self.thread.end_run();
         }
-        self.delegations(out);
+        self.delegations(client, out);
         true
     }
     #[must_use]
@@ -209,8 +209,16 @@ impl Chat {
         }
         None
     }
-    fn delegations(&mut self, out: &mut Queue<Request>) {
+    fn delegations(&mut self, client: &Client, out: &mut Queue<Request>) {
         let bound = self.delegations.capacity();
+        let mut live = List::with_capacity(bound);
+        if let Some(task) = self.task(client) {
+            for delegate in &task.delegates {
+                if live.push(delegate.chip.task).is_err() {
+                    break;
+                }
+            }
+        }
         let mut tasks = List::with_capacity(bound);
         let mut called = List::with_capacity(bound);
         // Thread's borrowed lines are chronological, so visit the anchors backwards.
@@ -230,6 +238,12 @@ impl Chat {
                         }
                     }
                 }
+            }
+        }
+        // The live delegates anchor follows the window's anchors (client/README.md, 5.7).
+        for task in &live {
+            if !tasks.as_slice().contains(task) && tasks.push(*task).is_err() {
+                break;
             }
         }
         for delegation in &self.delegations {
@@ -523,7 +537,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         // Refresh moves final documents, retaining only the old and new list slots.
         .checked_add(List::<delegation::Delegation>::worst_case(delegation::bound(limits))?.checked_mul(2)?)?
         .checked_add(u64::from(delegation::bound(limits)).checked_mul(limits.client.domain.document_bytes)?)?
-        .checked_add(List::<u64>::worst_case(delegation::bound(limits))?.checked_mul(2)?)?
+        .checked_add(List::<u64>::worst_case(delegation::bound(limits))?.checked_mul(3)?)?
         .checked_add(List::<jig_client::thread::Line<'_>>::worst_case(
             limits.client.domain.rows.checked_mul(4)?.checked_add(1)?,
         )?)?

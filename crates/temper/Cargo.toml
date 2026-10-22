@@ -88,6 +88,10 @@ path = "tests/live.rs"
 name = "qa_serving"
 path = "tests/qa_serving.rs"
 
+[[test]]
+name = "qa_delegation"
+path = "tests/qa_delegation.rs"
+
 [lints.rust]
 unsafe_code = "forbid"
 elided_lifetimes_in_paths = "deny"

@@ -265,7 +265,36 @@ pub(crate) fn conversation(
         }
         b.close();
     }
+    // The live delegates anchor follows the window's last line (client/README.md, 5.7).
+    live_delegates(b, &mut tasks, delegations, &mut shown, words, bindings);
     b.close();
+}
+fn live_delegates(
+    b: &mut Builder,
+    tasks: &mut List<u64>,
+    delegations: Option<(&Chat, &jig_client::Client)>,
+    shown: &mut List<u64>,
+    words: &Words,
+    bindings: &mut Bindings,
+) {
+    tasks.clear();
+    if let Some((chat, client)) = delegations
+        && let Some(document) = chat.task(client)
+    {
+        for delegate in &document.delegates {
+            let task = delegate.chip.task;
+            if !shown.as_slice().contains(&task) && chat.delegation(client, task).is_some() && tasks.push(task).is_err()
+            {
+                break;
+            }
+        }
+    }
+    if !tasks.is_empty() {
+        b.open(Role::Region);
+        b.style(look::TURN);
+        cards(b, tasks, delegations, shown, words, bindings);
+        b.close();
+    }
 }
 fn committed(
     b: &mut Builder,

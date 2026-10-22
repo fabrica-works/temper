@@ -221,6 +221,36 @@ fn a_departed_proposal_keeps_its_identity_for_the_explanation() {
 }
 
 const DELEGATED: u64 = 2;
+fn live_delegate() -> c::Task {
+    let mut task = f::task();
+    task.delegates = skein_lib::List::with_capacity(1);
+    let mut chip = task.chip.clone();
+    chip.task = DELEGATED;
+    task.delegates.push(c::LiveDelegate { chip, takeover_budget: 0 }).expect("live delegate");
+    task
+}
+#[test]
+fn a_live_delegate_is_watched_before_its_call_names_it() {
+    let mut f = f::opened();
+    while f.out.pop().is_some() {}
+    let handle = jig_client::Handle { asker: crate::owner::Owner::Pages.asker(), number: f.chat.next };
+    f::deliver(&mut f.client, f.watch, live_delegate());
+    f.chat.told(&f.client, Told::Changed { handle: f.chat.document }, &mut f.out);
+    assert_eq!(watches(&mut f.out).as_ref(), [(handle, DELEGATED)]);
+}
+#[test]
+fn a_delegate_that_ends_is_unwatched_once_nothing_names_it() {
+    let mut f = f::opened();
+    while f.out.pop().is_some() {}
+    f::deliver(&mut f.client, f.watch, live_delegate());
+    f.chat.told(&f.client, Told::Changed { handle: f.chat.document }, &mut f.out);
+    let handle = watches(&mut f.out)[0].0;
+    let mut task = f::task();
+    task.delegates = skein_lib::List::with_capacity(0);
+    f::deliver(&mut f.client, f.watch, task);
+    f.chat.told(&f.client, Told::Changed { handle: f.chat.document }, &mut f.out);
+    assert_eq!(f::handles(&mut f.out).as_ref(), [handle]);
+}
 #[test]
 fn a_chat_watches_a_delegated_task_when_only_its_result_remains() {
     let mut f = f::opened();

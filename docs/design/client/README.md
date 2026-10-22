@@ -294,7 +294,7 @@ keeps (`../protocol/configuration.md`, section 2).
 |---|---|---|---|---|
 | `Inbox` (home) | `inbox.html` | what needs the person, across projects, filtered by project, kind and goal (its root): proposals, questions, held tasks, person tasks; then updates (results, replies) | `inbox` with its filters; the `proposal` or `task` an entry's card needs | accept, reject with a reason, answer, release, leave held, take, hand back; seen |
 | `Chats` | `chats.html`, `first-run.html` | a composer to start a chat; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats, live or closed, newest activity first, each with its status, spend and delegates | `tasks{query}`: requester the person, the chat label, by last activity; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request |
-| `Chat { task }` | `index.html`, `first-run.html` | its chatbar: its number and title, its status, its spend and acts; in the demo's project while the demo is answered, the demo's banner and the context line (5.6); the conversation: committed turns, the person's words, work summaries, provisional text; each task it delegated as that task's card, at the call that made it or else at the result it sent back (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer | `task`, `activity` a page at a time, `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls and results name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
+| `Chat { task }` | `index.html`, `first-run.html` | its chatbar: its number and title, its status, its spend and acts; in the demo's project while the demo is answered, the demo's banner and the context line (5.6); the conversation: committed turns, the person's words, work summaries, provisional text; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer | `task`, `activity` a page at a time, `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
 | `Task { task }` | `task.html`, `agent-task.html` | a goal: its header, what was asked, its plan as a tree, its latest activity and history, its budget and authority, with Amend, Stop and Cancel; an agent's task: its transcript and a composer, with Amend and Stop | `task`, `tree`, `activity`; `run` while one is live | amend, stop, cancel, release a held task of the plan, message an agent's task |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
@@ -1030,22 +1030,28 @@ the change's chip in a chat (`forge.md`, 2.4 and 2.5).
   conversation's window holds: its call, or else a result block that
   carries its result, whose summary has a line "Result from task N:"
   after the inbox entry's "M: " (temper's inbox words,
-  `temper-engine-domain`'s `inbox_words`). Both presets keep two lines
-  (`rows`), so when the task ends, the chat's wake turn and its run's
-  end push the call out, and the result that woke the chat is what is
-  left of the delegation. Those words name a person's number as well
-  as a task's: a result shows a card only once its task's document
-  says this chat requested it (its `requester`), and keeps its work
-  summary otherwise; such a number still takes one of the watches
-  while the thread names it.
+  `temper-engine-domain`'s `inbox_words`); or else, while the task
+  lives, after the window's last line, as one of the chat's live
+  delegates (its document's `delegates`). Both presets keep two lines
+  (`rows`), so the chat's next turn and its run's end push the call
+  out while the task runs, and when it ends, the result that woke the
+  chat is what is left of the delegation. Their turn's text budget
+  (`text`, 256 bytes) cuts the call's acknowledgement as well, so a
+  call shows its card only once jig's thread keys its tasks (section
+  11). Those words name a person's number as well as a task's: a
+  result shows a card only once its task's document says this chat
+  requested it (its `requester`), and keeps its work summary
+  otherwise; such a number still takes one of the watches while the
+  thread names it.
 - **What it reads.** The chat page watches each such task's document
   (`Subject::Task`), as the task's own page does: its chip, its result
   contract, its hold and its result, which stay readable once it has
   ended. It watches those its thread's calls and results name, the
-  newest first, up to the domain's `reads`; one past them, or that the
-  thread no longer names, is unwatched, and leaving the page closes
-  them all. A delegation whose document has not arrived, or past the
-  bound, shows as its anchor's work summary, as any call does.
+  newest first, then its live delegates, up to the domain's `reads`;
+  one past them, or that neither names any longer, is unwatched, and
+  leaving the page closes them all. A delegation whose document has
+  not arrived, or past the bound, shows as its anchor's work summary,
+  as any call does.
 - **Its parts,** in the mockup's order, a region named "Task N":
   - a line with its number and kind, "TN · CHANGE", and its state; the
     kind is its result contract's: CHANGE, REPORT, VERDICT, APPROVAL;

@@ -172,8 +172,9 @@ mod memory_literal;
 // + 14) nodes x 574,364 B + 12 x 8 B of carded tasks = 3,639,170,400 B,
 // so 123,313,273,904 B.
 // Cards remembered across the window: 12 x 8 B = 96 B, so 123,313,274,000 B.
+// Live delegates add 12 x 8 B of scratch and a 574,364 B region: 123,313,848,460 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 123313274000;
+const WEB_BYTES: u64 = 123313848460;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {
