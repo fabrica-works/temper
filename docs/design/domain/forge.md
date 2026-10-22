@@ -278,25 +278,41 @@ temper-engine-domain-forge              the connector's top: resources and holds
   entry failed `NotConnected` is committed again once the forge
   connects, since it reached no forge. The client shows why on the
   forge's row (`../client/forge.md`, the deployment's page).
+- **The offer to set a forge up,** decided here alone. The host gives
+  the connector, at construction as it gives the configuration, each
+  configured forge's number, kind, mode and setup start, and whether
+  serve runs under the box (`--box`, `../protocol/setup.md`, 7.1). One
+  function gives a forge's offer from those, the box and the forge's
+  connection: *offered* for an owned forge whose setup says `"start":
+  "asked"`, under the box with its pipe open, its connection not set
+  up, setting up or set up failed (setting up so that its row keeps
+  showing the set up under way); *not under the box* for such a forge,
+  in such a state, without the box or once its pipe closed; *not
+  offered* otherwise, and for a forge not configured. The row and the
+  answer read the same function, so they never disagree.
 - **Setting up a forge,** `SetUp { forge }` (`../client/README.md`,
-  section 8): the root gives it to the connector, which admits it by
-  the forge's connection alone, not set up or set up failed, the
-  states only an owned forge whose setup says `"start": "asked"`
-  enters (`../protocol/forge.md`, 8.1). Any other connection, or a
-  forge not configured, refuses it "not offered". Admitted or refused,
-  it goes out to the routing's box link, which asks the box or refuses
-  it, "not under the box" or "busy", and answers it
-  (`../protocol/forge.md`, 2.8). The connector changes no state at the
-  ask: the routing tells it each, as it does the others. `SetUp` is a
+  section 8): the root gives it to the connector, which refuses it by
+  the forge's offer when not offered, "not offered" or "not under the
+  box"; "busy" while any forge is setting up, itself included; and
+  otherwise asks the routing's box link to ask the box
+  (`../protocol/forge.md`, 2.8). The link decides nothing: it carries
+  the ask out and the box's lines in, which the routing tells the
+  connector as connections, and the box's answer back. The pipe's
+  close comes to the connector as the root's `BoxClosed`: each offer
+  becomes not under the box, and a forge setting up becomes set up
+  failed, "the box closed the pipe". The connector changes no state at
+  the ask: the routing tells it each, as it does the others. `SetUp` is a
   keyed request, admitted by the core first (`../client/README.md`,
   section 8): the connector keeps its answer as its outcome, in memory
   alone, the latest per configured forge under its request's token and
   one more for any forge not configured, and answers unknown for a
   token it no longer holds.
 - **The deployment's forges,** the subject `forges`
-  (`../client/forge.md`, 5.4): the connector makes its document from
-  each configured forge's connection, as the routing last told it, and
-  marks the subject at each connection it is told, so that a watch
+  (`../client/forge.md`, 5.4): the connector makes its document, one
+  row per configured forge in number order, each its number, kind,
+  mode, connection as the routing last told it, and offer, all its own
+  (nothing is added where it is encoded), and
+  marks the subject at each connection it is told and at `BoxClosed`, so that a watch
   follows a set up through its steps and a connect to its end. Nothing
   of it is kept.
 - **An adoption on a forge not connected** is refused as such, before
@@ -1388,9 +1404,11 @@ Its stories of access and of GitHub's ways, the root and routing
 scripted: a forge connected while temper runs, an adoption refused as
 not connected before it and made after it, the writer given then and
 restored at the next start; an owned forge set up from the client,
-`SetUp` admitted when not set up and when set up failed, refused "not
-offered" while setting up, connecting, connected, stopped or not
-configured, each state the routing tells kept as told and none
+each state's row and `SetUp`'s answer checked together, with and
+without the box: asked when offered and none sets up, "busy" while
+any sets up, "not offered" connecting, connected, stopped, not owned
+or asked, or not configured, "not under the box" without the box and
+after `BoxClosed`, each state the routing tells kept as told and none
 restored; a forge stopped while a change waits on it,
 nothing narrowed, its entry committed again once it connects; a managed
 Forgejo's adoption whose access is refused, refused and named, and one

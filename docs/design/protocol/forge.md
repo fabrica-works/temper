@@ -537,20 +537,21 @@ service's io.
 - **Under the box alone.** `temper serve --box` adopts fds 3 and 4
   (setup.md, 7.1), and the link writes its lines on fd 3 and holds one
   read on fd 4, a line at most `box.line_bytes` (configuration.md,
-  section 7), its line feed included, as the box counts it. Without `--box` there is no pipe, and
-  every ask is refused "not under the box".
-- **An ask** is the root's `SetUp { forge }` once the root has admitted
-  it by the forge's connection (`../domain/forge.md`, 4.1). The link
-  writes `start FORGE` and tells the root the forge setting up, with no
-  step yet. One ask at a time: from its `start` until `started` or
-  `failed` answers it, every other ask is refused "busy". The link
-  answers each ask once, by the request's token the root gave it:
-  setting up, or its refusal, which is named in the log and changes no
-  state. The root's own refusal, "not offered", a forge whose connection
-  does not offer it, reaches the link to be answered the same way. The
-  answer goes back to the root, whose forge connector keeps it as the
-  `SetUp` request's outcome, in memory alone, and the asking client
-  reads it (`../client/README.md`, section 8).
+  section 7), its line feed included, as the box counts it. Without `--box` there is no pipe and
+  no link; the engine's forge domain, told so at its construction,
+  refuses every ask "not under the box" (`../domain/forge.md`, 4.1).
+  The link decides nothing: it carries the domain's asks out and the
+  box's lines in.
+- **An ask** is the forge domain's, once it has decided the `SetUp {
+  forge }` by the forge's offer (`../domain/forge.md`, 4.1), which
+  refuses "not offered", "not under the box" and "busy" itself. The
+  link writes `start FORGE`, tells the root the forge setting up, with
+  no step yet, and answers the ask by the request's token the root gave
+  it: setting up. The domain asks once at a time, so a second ask while
+  one runs is a fault of the domain's: the link answers it "busy",
+  named in the log. The answer goes back to the root, whose forge
+  connector keeps it as the `SetUp` request's outcome, in memory alone,
+  and the asking client reads it (`../client/README.md`, section 8).
 - **The box's lines,** for the forge asked:
   - `step FORGE STEP`, `STEP` one of `fetch`, `prepare` and `run`: the
     forge setting up, at that step;
@@ -564,9 +565,10 @@ service's io.
   line past `box.line_bytes`, named by its bound, skipped to its line
   feed.
 - **The pipe closed:** fd 4 at its end, or a read or a write on the
-  pipe failing, ends the link, named in the log once. An ask in flight
-  ends with its forge's set up failed, "the box closed the pipe", and
-  every later ask is refused "not under the box". serve's own end is
+  pipe failing, ends the link, named in the log once, and the link
+  tells the root `BoxClosed`: the forge domain fails an ask in flight,
+  "the box closed the pipe", and offers no set up after it
+  (`../domain/forge.md`, 4.1). serve's own end is
   the box's to make (setup.md, 7.2).
 - **Nothing kept.** The link's ask and the states it tells are in
   memory alone (8.1): a restart makes a pipe and a link afresh, with no

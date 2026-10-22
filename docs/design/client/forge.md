@@ -460,8 +460,8 @@ section 8), offered by kind, mode and state:
 | Replace | GitHub, connected or stopped; a Forgejo of the connected mode, connected or stopped | a new App key, or a new API token, git token or both, pasted, which must answer as the forge's user (on GitHub, the same App); the old is erased once the new is kept |
 | Install on another account | GitHub, connected | a fresh link to install temper's App, shown as text; the person picks the account and its repositories, the page advising selected ones over all |
 | Forget the admin's token | managed | the admin's token erased; the forge is connected, its bot and tokens kept, and adopting a repository grants nothing more: the person makes the bot a collaborator |
-| Set up a Forgejo here | owned, not set up, under the box | the box asked to run the forge's steps (`../protocol/setup.md`, 7.1): its binaries fetched, its preparation, Forgejo and its runner started, then its handover taken and reconciled; the person signs in to it as their login, with the password its preparation wrote (`person_password`, `../protocol/setup.md`, section 9) |
-| Set up again | owned, set up failed | the same ask again: what the last one left is kept, a fetched binary hashed and not fetched again |
+| Set up a Forgejo here | the row's offer offered, not set up (`README.md`, 4.6) | the box asked to run the forge's steps (`../protocol/setup.md`, 7.1): its binaries fetched, its preparation, Forgejo and its runner started, then its handover taken and reconciled; the person signs in to it as their login, with the password its preparation wrote (`person_password`, `../protocol/setup.md`, section 9) |
+| Set up again | the row's offer offered, set up failed | the same ask again: what the last one left is kept, a fetched binary hashed and not fetched again |
 
 A pasted value is a field of its own (`README.md`, 3.6 and section 8),
 emptied as the request leaves and shown nowhere, then or after; the

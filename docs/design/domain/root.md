@@ -217,14 +217,18 @@ to the forge; a timer to the child that armed it. What temper adds:
 - **An adoption,** an application request, goes to the core to admit by
   key, then to the forge (5.4).
 - **A forge's set up,** `SetUp { forge }` (`../client/README.md`,
-  section 8), goes to the forge, which admits it by the forge's
-  connection (forge.md, 4.1), then out to the protocol layer's box link,
-  admitted or refused, which asks the box or refuses it, and answers it
-  (`../protocol/forge.md`, 2.8). It is keyed: the core admits it by key,
+  section 8), goes to the forge, which decides it by the forge's offer
+  (forge.md, 4.1), refusing it there or asking the protocol layer's box
+  link, which carries the ask to the box and its lines back
+  (`../protocol/forge.md`, 2.8). The root's configuration carries each
+  configured forge's number, kind, mode and setup start, and whether
+  serve runs under the box, which the root gives the forge at
+  construction; the root's event `BoxClosed`, from the link at the
+  pipe's close, goes to the forge. It is keyed: the core admits it by key,
   of the deployment's scope, first, and its answer comes back from the
   link to the forge, which keeps it as the request's outcome, in memory
-  alone. Nothing of it is committed: the states it moves are in memory,
-  as every connection's is.
+  alone. Nothing of it is committed: the states and offers it moves are
+  in memory, as every connection's is.
 - **A watch of the deployment's forges,** the subject `forges`
   (`../client/forge.md`, 5.4), goes to the core to admit on the party's
   deployment role, and its documents come from the forge as a change's

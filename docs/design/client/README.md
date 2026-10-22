@@ -960,7 +960,10 @@ for its kind, its user's login and its installations. Its nodes:
   named one (fetch, prepare or run); set up failed, with why (text of
   at most 256 bytes, the box's line bound); connecting; connected, with
   the user's id (u64) and login (a byte string bounded as `Adopt`'s);
-  or stopped, with the component's reason. The read of the forges, the
+  or stopped, with the component's reason; and its offer, the forge
+  domain's (`../domain/forge.md`, 4.1): offered, not under the box, or
+  not offered, which is what "Set up a Forgejo here", "Set up again"
+  and the commands to run by hand follow (`forge.md`, 5.4). The read of the forges, the
   tools' `forges` (`tools.md`, 5.5, area 6), is the watch's first
   document.
 - **The forge's documents' records:** its other reads, subjects and
@@ -2612,9 +2615,9 @@ does for the client:
   routing hands the root the watch of `forges`, with the deployment's
   scope; the core admits it on the party's deployment role and asks the
   forge for the document, and again each time the forge marks it: at
-  every connection the routing tells it (`../domain/forge.md`, 4.1).
-  The routing encodes each document, adding each forge's kind and mode
-  from the configuration.
+  every connection the routing tells it and at the box's close
+  (`../domain/forge.md`, 4.1). Every field of a row is the forge
+  domain's: the routing encodes the document as it is, adding nothing.
 - **The forge's reads and watches** are decoded by
   `temper-client-protocol-wire` the same way and go to the root
   (`../domain/root.md`, 5.3; `forge.md`, section 9). One the wire has
