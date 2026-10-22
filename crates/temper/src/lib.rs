@@ -222,9 +222,15 @@ fn file_path(at: config::Path) -> String {
     String::from_utf8_lossy(&bytes).trim_end().strip_suffix(": not read").expect("path and reason").into()
 }
 fn read_files(names: Box<[config::File]>, user: u32) -> Result<Files, String> {
-    let mut entries = List::with_capacity(u32::try_from(names.len()).expect("bounded files"));
+    read_files_with_asked(names, Box::new([]), user)
+}
+fn read_files_with_asked(names: Box<[config::File]>, asked: Box<[config::File]>, user: u32) -> Result<Files, String> {
+    let count = names.len().checked_add(asked.len()).expect("bounded files");
+    let mut entries = List::with_capacity(u32::try_from(count).expect("bounded files"));
     let mut refused = String::new();
-    for file in names {
+    for (file, optional) in
+        names.into_iter().map(|file| (file, false)).chain(asked.into_iter().map(|file| (file, true)))
+    {
         let resolved = path(&file.path);
         let value = if file.private {
             skein_shell::read_private_file(resolved, file.max, user)
@@ -233,6 +239,7 @@ fn read_files(names: Box<[config::File]>, user: u32) -> Result<Files, String> {
         };
         match value {
             Ok(value) => entries.push((file.path, value)).expect("named capacity"),
+            Err(skein_shell::Unread::Absent) if optional => {}
             Err(why) => {
                 writeln!(refused, "{}: {}: {}", file_path(file.at), path(&file.path).display(), unread(why))
                     .expect("writing into a string");
@@ -334,7 +341,7 @@ fn prepare_with_store(
     let user = skein_shell::effective_user();
     let mut named_files = named.files.into_vec();
     named_files.extend(service::startup::setup_files(&checked));
-    let files = read_files(named_files.into_boxed_slice(), user)?;
+    let files = read_files_with_asked(named_files.into_boxed_slice(), named.asked_files, user)?;
     let bundle = named.bundle.as_deref().map(|configured| bundle::read(configured, named.bundle_limits)).transpose()?;
     let runtime = if let Some(worker) = &named.worker {
         let root_path = path(&worker.root);

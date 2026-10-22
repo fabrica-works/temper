@@ -1482,3 +1482,33 @@ fn serve_box_refuses_closed_or_non_pipe_descriptors_before_starting() {
     }
 }
 
+#[test]
+fn an_asked_owned_forges_absent_files_are_left_out_but_existing_files_stay_private() {
+    for public in [false, true] {
+        let scratch = owned_example(if public { "asked-public-file" } else { "asked-absent-files" });
+        let config = scratch.path().join("temper.json");
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&fs::read(&config).expect("configuration file")).expect("configuration JSON");
+        value["application"]["setup"][0]["start"] = "asked".into();
+        support::write_private(&config, &serde_json::to_vec(&value).expect("configuration JSON"));
+        if public {
+            fs::create_dir(scratch.path().join("forge-1")).expect("forge directory");
+            support::write_private(&scratch.path().join("forge-1/api_token"), b"api-token");
+            fs::set_permissions(scratch.path().join("forge-1/api_token"), fs::Permissions::from_mode(0o644))
+                .expect("public token permissions");
+        }
+        let prepared = temper::prepare_in(&support::configuration::directories(scratch.path()));
+        if public {
+            assert_eq!(
+                prepared.err().expect("unsafe asked file refused"),
+                format!(
+                    "temper serve: application.forges[0].api_token: {}/forge-1/api_token: readable by others or reached through a link\n",
+                    scratch.path().display()
+                )
+            );
+        } else {
+            assert!(prepared.is_ok(), "absent asked files are allowed: {:?}", prepared.err());
+        }
+        scratch.remove();
+    }
+}

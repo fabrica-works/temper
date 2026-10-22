@@ -15,6 +15,7 @@ pub struct Members {
     pub webhooks: Option<Webhooks>,
     pub forges: Box<[Forge]>,
     pub demo: Option<settings::Demo>,
+    pub asked_owned: Box<[u16]>,
     pub identities: Box<[Identity]>,
     pub landing: temper_engine_domain::LandingPolicy,
     /// The landing's projects in the document's order, which names a refused one's path.
@@ -666,6 +667,14 @@ pub(super) fn worker_alone(
     super::finish_shape(document, object, &path, problems);
     Some((worker?, limits?))
 }
+fn webhooks(document: &Document, at: Option<u32>, path: &Path, problems: &mut Problems) -> Option<Webhooks> {
+    let at = at?;
+    if document.token(at)?.kind == Kind::Null {
+        return None;
+    }
+    let value = clients(document, at, &path.member(b"webhooks"), false, problems)?;
+    Some(Webhooks { listener: value.listener })
+}
 pub fn parse(
     document: &Document,
     at: u32,
@@ -696,13 +705,7 @@ pub fn parse(
     };
     let landing_at = read::required(&mut object, document, b"landing", &path, problems);
     let at = read::required(&mut object, document, b"webhooks", &path, problems);
-    let mut webhooks = None;
-    if let Some(at) = at
-        && document.token(at)?.kind != Kind::Null
-        && let Some(value) = self::clients(document, at, &path.member(b"webhooks"), false, problems)
-    {
-        webhooks = Some(Webhooks { listener: value.listener });
-    }
+    let webhooks = webhooks(document, at, &path, problems);
     read::finish(object, document, &path, problems);
     let forge_count = match &forge_ats {
         Some(ats) => ats.len(),
@@ -765,6 +768,7 @@ pub fn parse(
         webhooks,
         forges: forges.into_boxed(),
         demo,
+        asked_owned: asked_owned(document, setup_at),
         identities: identities.into_boxed(),
         workers: workers.into_boxed(),
         charter: charter?,
@@ -774,7 +778,43 @@ pub fn parse(
         landing_projects,
     })
 }
+// Read only the startup view; the setup owner checks the complete entries.
+fn asked_entry(document: &Document, at: u32) -> Option<u16> {
+    let mut entry = config::read::Object::new(document, at).ok()?;
+    let start = config::read::text(document, entry.member(document, b"start")?, 4096).ok()?;
+    if start.as_ref() != b"asked" {
+        return None;
+    }
+    let mut mode = config::read::Object::new(document, entry.member(document, b"mode")?).ok()?;
+    mode.member(document, b"owned")?;
+    let number = config::read::integer(document, entry.member(document, b"forge")?, u64::from(u16::MAX)).ok()?;
+    Some(u16::try_from(number).expect("bounded forge number"))
+}
+fn asked_owned(document: &Document, at: Option<u32>) -> Box<[u16]> {
+    let entries = match at {
+        Some(at) => match config::read::list(document, at, document.len()) {
+            Ok(entries) => entries,
+            Err(_) => return Box::new([]),
+        },
+        None => return Box::new([]),
+    };
+    let mut asked = List::with_capacity(entries.len());
+    for at in entries.into_boxed() {
+        if let Some(number) = asked_entry(document, at) {
+            asked.push(number).expect("setup capacity");
+        }
+    }
+    asked.into_boxed()
+}
+/// Files required at startup, including every forge except asked owned ones.
 pub fn files(members: &Members, api_token_bytes: u32, token_bytes: u32) -> Box<[config::File]> {
+    listed_files(members, api_token_bytes, token_bytes, false)
+}
+/// Transitional credentials of asked owned forges; their absence is allowed at startup.
+pub fn asked_files(members: &Members, api_token_bytes: u32, token_bytes: u32) -> Box<[config::File]> {
+    listed_files(members, api_token_bytes, token_bytes, true)
+}
+fn listed_files(members: &Members, api_token_bytes: u32, token_bytes: u32, asked: bool) -> Box<[config::File]> {
     let count = members
         .forges
         .len()
@@ -785,7 +825,8 @@ pub fn files(members: &Members, api_token_bytes: u32, token_bytes: u32) -> Box<[
     let mut files = List::with_capacity(u32::try_from(count).expect("bounded files"));
     for (index, forge) in members.forges.iter().enumerate() {
         let path = read::index(&Path::root().member(b"application").member(b"forges"), index);
-        if forge.kind == settings::Kind::Forgejo {
+        let include = members.asked_owned.contains(&forge.number) == asked;
+        if include && forge.kind == settings::Kind::Forgejo {
             files
                 .push(config::File {
                     at: path.member(b"api_token"),
@@ -795,7 +836,7 @@ pub fn files(members: &Members, api_token_bytes: u32, token_bytes: u32) -> Box<[
                 })
                 .expect("bounded files");
         }
-        if let User::File(name) = &forge.user {
+        if include && let User::File(name) = &forge.user {
             files
                 .push(config::File {
                     at: path.member(b"user").member(b"file"),
@@ -805,7 +846,7 @@ pub fn files(members: &Members, api_token_bytes: u32, token_bytes: u32) -> Box<[
                 })
                 .expect("bounded files");
         }
-        if let Some(name) = &forge.webhook_secret {
+        if include && let Some(name) = &forge.webhook_secret {
             files
                 .push(config::File {
                     at: path.member(b"webhook_secret"),
@@ -818,7 +859,7 @@ pub fn files(members: &Members, api_token_bytes: u32, token_bytes: u32) -> Box<[
         match &forge.transport {
             Transport::Plaintext => {}
             Transport::Tls { trust, .. } => {
-                if let Some(trust) = trust {
+                if !asked && let Some(trust) = trust {
                     files
                         .push(config::File {
                             at: path.member(b"transport").member(b"tls").member(b"trust"),
@@ -832,7 +873,9 @@ pub fn files(members: &Members, api_token_bytes: u32, token_bytes: u32) -> Box<[
         }
     }
     for (index, identity) in members.identities.iter().enumerate() {
-        if identity.token.is_empty() {
+        if identity.token.is_empty()
+            || members.asked_owned.contains(&identity.forge.expect("checked identity join")) != asked
+        {
             continue;
         }
         files
@@ -906,12 +949,68 @@ pub fn git_programs(forges: &mut [settings::Forge], setup: &temper_forge_setup::
         }
     }
 }
+fn missing_asked_files(members: &Members, files: &settings::Files, number: u16) -> bool {
+    if !members.asked_owned.contains(&number) {
+        return false;
+    }
+    for forge in &members.forges {
+        if forge.number != number {
+            continue;
+        }
+        if files.contents(&forge.api_token).is_none() {
+            return true;
+        }
+        if let User::File(name) = &forge.user
+            && files.contents(name).is_none()
+        {
+            return true;
+        }
+        if let Some(name) = &forge.webhook_secret
+            && files.contents(name).is_none()
+        {
+            return true;
+        }
+    }
+    for identity in &members.identities {
+        if identity.forge == Some(number) && !identity.token.is_empty() && files.contents(&identity.token).is_none() {
+            return true;
+        }
+    }
+    false
+}
+fn resolved_user(
+    forge: &Forge,
+    files: &settings::Files,
+    path: &Path,
+    missing: bool,
+    problems: &mut Problems,
+) -> Option<u64> {
+    match &forge.user {
+        User::Id(value) => Some(*value),
+        User::File(name) if missing && files.contents(name).is_none() => Some(0),
+        User::File(name) => {
+            let at = path.member(b"user").member(b"file");
+            match contents(files, name, USER_BYTES, at.clone(), problems) {
+                Some(value) => match read::decimal(&value) {
+                    Some(value) => Some(value),
+                    None => {
+                        problems.push(at, What::Jig(config::What::Form));
+                        None
+                    }
+                },
+                None => None,
+            }
+        }
+    }
+}
 pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Problems) -> Option<Resolved> {
     let mut forges = List::with_capacity(u32::try_from(members.forges.len()).expect("bounded forges"));
     let mut identities = List::with_capacity(u32::try_from(members.identities.len()).expect("bounded identities"));
     for (index, forge) in members.forges.iter().enumerate() {
         let path = read::index(&Path::root().member(b"application").member(b"forges"), index);
+        let missing = missing_asked_files(members, files, forge.number);
         let token = match forge.kind {
+            settings::Kind::Forgejo if missing => None,
             settings::Kind::Forgejo => Some(config::secret(contents(
                 files,
                 &forge.api_token,
@@ -923,6 +1022,7 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
         };
         let mut webhook_secret = None;
         if let Some(name) = &forge.webhook_secret
+            && (!missing || files.contents(name).is_some())
             && let Some(value) = contents(
                 files,
                 name,
@@ -934,22 +1034,7 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
             webhook_secret = Some(config::secret(value));
         }
         let transport = resolved_transport(&forge.transport, files, &path, problems);
-        let user = match &forge.user {
-            User::Id(value) => Some(*value),
-            User::File(name) => {
-                let at = path.member(b"user").member(b"file");
-                match contents(files, name, USER_BYTES, at.clone(), problems) {
-                    Some(value) => match read::decimal(&value) {
-                        Some(value) => Some(value),
-                        None => {
-                            problems.push(at, What::Jig(config::What::Form));
-                            None
-                        }
-                    },
-                    None => None,
-                }
-            }
-        };
+        let user = resolved_user(forge, files, &path, missing, problems);
         if let Some(user) = user {
             forges
                 .push(settings::Forge {
@@ -961,7 +1046,7 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
                     git_program: None,
                     web: forge.web.clone(),
                     api_token: token,
-                    webhook_secret,
+                    webhook_secret: if missing { None } else { webhook_secret },
                     user,
                     identity: forge.identity,
                 })
@@ -970,7 +1055,9 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
     }
     for (index, identity) in members.identities.iter().enumerate() {
         let path = read::index(&Path::root().member(b"application").member(b"identities"), index).member(b"token");
-        let token = if identity.token.is_empty() {
+        let token = if identity.token.is_empty()
+            || missing_asked_files(members, files, identity.forge.expect("checked identity join"))
+        {
             Some(Box::from(b"".as_slice()))
         } else {
             contents(

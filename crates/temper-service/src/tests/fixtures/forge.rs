@@ -9,6 +9,7 @@ pub struct ForgeFace {
     capture_answers: bool,
     now: Time,
     worker_owner: Option<Token>,
+    hooks: Option<(Token, Token)>,
 }
 struct Peer {
     number: u16,
@@ -24,6 +25,7 @@ impl ForgeFace {
             capture_answers: false,
             now: Time::from_nanos(1),
             worker_owner: None,
+            hooks: None,
         }
     }
     pub fn connected(&mut self, service: &mut crate::Service) {
@@ -147,6 +149,11 @@ impl ForgeFace {
     fn forge_io(&mut self, engine: &mut crate::engine::Engine) {
         for _ in 0_u32..engine.forge.io.len() {
             match engine.forge.io.pop().unwrap() {
+                io::Request::Listen { owner, addr } => {
+                    let listener = Token::new(79);
+                    self.hooks = Some((owner, listener));
+                    engine.forge.up(io::Event::Listening { owner, listener, addr });
+                }
                 io::Request::Connect { owner, addr } => {
                     let number = match addr {
                         io::Addr::Ip(address) => address.port().checked_sub(2999).expect("fixture forge port"),
@@ -172,6 +179,13 @@ impl ForgeFace {
                     self.peers.get_mut(&owner.expect("stream peer")).unwrap().wire.take(down);
                 }
                 io::Request::Close { entity } | io::Request::Abort { entity } => {
+                    if let Some((owner, listener)) = self.hooks
+                        && entity == listener
+                    {
+                        self.hooks = None;
+                        engine.forge.up(io::Event::Closed { owner });
+                        continue;
+                    }
                     let mut owner = None;
                     for (token, peer) in &self.peers {
                         if peer.socket == entity || *token == entity {
@@ -183,8 +197,7 @@ impl ForgeFace {
                     self.peers.remove(&owner);
                     engine.forge.up(io::Event::Closed { owner });
                 }
-                io::Request::Listen { .. }
-                | io::Request::Bind { .. }
+                io::Request::Bind { .. }
                 | io::Request::Reject { .. }
                 | io::Request::Output { .. }
                 | io::Request::Spawn { .. }

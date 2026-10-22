@@ -154,6 +154,7 @@ fn check_redirects(engine: &config::Engine, application: &application::Members, 
 #[derive(Debug)]
 pub struct Named {
     pub files: Box<[config::File]>,
+    pub asked_files: Box<[config::File]>,
     pub redirects: Box<[RedirectPort]>,
     pub deployment: Box<[u8]>,
     pub llm: config::Llm,
@@ -402,6 +403,11 @@ pub fn named(document: &[u8], directories: &config::Directories) -> Result<Named
     let files = all_files(&parsed);
     Ok(Named {
         files,
+        asked_files: application::asked_files(
+            &parsed.application,
+            API_TOKEN_BYTES,
+            jig_protocol_worker_wire::CEILINGS.application_value_secret,
+        ),
         redirects: redirects(&parsed.engine),
         clients: parsed.application.clients.listener,
         bundle: parsed.application.clients.bundle,
@@ -429,6 +435,17 @@ fn check_files(parsed: &Parsed, files: &settings::Files) -> Result<(), Problems>
             Some(contents) if contents.len() <= usize::try_from(file.max).expect("file bound") => {}
             Some(_) => problems.push(file.at, What::Jig(config::What::Bound)),
             None => problems.push(file.at, What::Jig(config::What::Unreadable)),
+        }
+    }
+    for file in application::asked_files(
+        &parsed.application,
+        API_TOKEN_BYTES,
+        jig_protocol_worker_wire::CEILINGS.application_value_secret,
+    ) {
+        if let Some(contents) = files.contents(&file.path)
+            && contents.len() > usize::try_from(file.max).expect("file bound")
+        {
+            problems.push(file.at, What::Jig(config::What::Bound));
         }
     }
     if problems.is_empty() { Ok(()) } else { Err(problems) }

@@ -1390,3 +1390,120 @@ fn a_worker_alones_complete_envelope_must_fit_its_own_memory() {
     .unwrap();
     assert_eq!(lines(&found).as_ref(), b"workers[0].memory_bytes: the worst case passes memory_bytes by 1 bytes\n");
 }
+
+fn owned_start_document(asked: bool) -> Box<[u8]> {
+    let setup = br#"[{"forge":1,"directory":"forge-1","bot":{"login":"temper","email":"temper@example.test"},"orgs":[],
+        "start":"asked","mode":{"owned":{"forgejo":"/opt/forgejo","runner":null,
+        "listen":{"socket":"127.0.0.1:9"},"person":{"login":"ada","email":"ada@example.test"}}}}]"#;
+    let input = fixtures::with(&fixtures::document(), b"application.setup", setup);
+    let input = fixtures::with(&input, b"application.forges[0].webhook_secret", br#""secrets/forge-1.webhook-secret""#);
+    let input = fixtures::with(&input, b"application.webhooks", br#"{"listener":{"socket":"127.0.0.1:7102"}}"#);
+    if asked {
+        input
+    } else {
+        core::str::from_utf8(&input).unwrap().replace("\"start\":\"asked\",", "").into_bytes().into_boxed_slice()
+    }
+}
+fn start_owned(asked: bool, files: &settings::Files) -> Result<crate::Service, Problems> {
+    crate::startup(
+        &owned_start_document(asked),
+        &config::Directories::working(),
+        files,
+        &fixtures::startup_agent(),
+        &fixtures::seeds(),
+        None,
+        fixtures::worker_runtime(),
+        fixtures::forge_runtime(),
+    )
+}
+fn assert_owned_not_connected(files: &settings::Files) {
+    let mut service = start_owned(true, files).expect("absent asked files are allowed");
+    let engine = service.engine.as_mut().unwrap();
+    assert_eq!(engine.forge.component.start(1), Some(skein_forge_connection::start::Start::Unconnected));
+    assert!(engine.values.identities.newest(1).is_none(), "no partial identity");
+    engine.store = fixtures::memory_store();
+    let mut face = fixtures::ForgeFace::new();
+    for _ in 0_u8..32 {
+        face.turn(&mut service);
+    }
+    assert!(face.sent().is_empty());
+    assert!(service.engine.as_ref().unwrap().forge.starts.is_empty(), "no Connect request");
+    assert!(service.engine.as_ref().unwrap().credentials.is_empty());
+    assert_eq!(service.end(), None);
+}
+#[test]
+fn an_asked_owned_forge_without_any_files_starts_not_connected() {
+    let mut files = fixtures::files();
+    for name in [
+        b"secrets/forge-1.api-token".as_slice(),
+        b"secrets/forge-1.user",
+        b"secrets/forge-1.git-token",
+        b"secrets/forge-1.webhook-secret",
+    ] {
+        files.entries = fixtures::without(files.entries, name);
+    }
+    assert_owned_not_connected(&files);
+}
+#[test]
+fn an_asked_owned_forges_partial_files_never_grant_access() {
+    for absent in [
+        b"secrets/forge-1.user".as_slice(),
+        b"secrets/forge-1.api-token",
+        b"secrets/forge-1.git-token",
+        b"secrets/forge-1.webhook-secret",
+    ] {
+        let mut files = fixtures::files();
+        files.entries = fixtures::without(files.entries, absent);
+        assert_owned_not_connected(&files);
+    }
+}
+#[test]
+fn an_unasked_owned_forges_absent_api_token_still_refuses_startup() {
+    let mut files = fixtures::files();
+    files.entries = fixtures::without(files.entries, b"secrets/forge-1.api-token");
+    assert_eq!(
+        lines(&start_owned(false, &files).err().unwrap()).as_ref(),
+        b"application.forges[0].api_token: not read\n"
+    );
+}
+#[test]
+fn an_asked_owned_forge_with_all_files_starts_from_their_access() {
+    let mut service = start_owned(true, &fixtures::files()).unwrap();
+    let engine = service.engine.as_mut().unwrap();
+    assert_eq!(engine.workers.forges[0].user, 42);
+    assert!(engine.values.identities.newest(1).is_some(), "identity from its file");
+    engine.store = fixtures::memory_store();
+    let mut face = fixtures::ForgeFace::new();
+    face.connected(&mut service);
+    assert!(skein_lib::bytes::find(face.sent(), b"Authorization: token api-token\r\n").is_some());
+    assert_eq!(service.end(), None);
+}
+#[test]
+fn asked_files_keep_the_same_paths_bounds_and_privacy_as_required_files() {
+    let required = crate::startup::named(&owned_start_document(false), &config::Directories::working()).unwrap();
+    let asked = crate::startup::named(&owned_start_document(true), &config::Directories::working()).unwrap();
+    assert_eq!(asked.asked_files.len(), 4);
+    for file in asked.asked_files {
+        let original = required.files.iter().find(|original| original.path == file.path).unwrap();
+        assert_eq!(file.at, original.at);
+        assert_eq!(file.max, original.max);
+        assert_eq!(file.private, original.private);
+        assert!(!asked.files.iter().any(|required| required.path == file.path));
+    }
+}
+#[test]
+fn an_asked_file_present_past_its_bound_still_refuses_startup() {
+    let mut files = fixtures::files();
+    files.entries = fixtures::without(files.entries, b"secrets/forge-1.api-token");
+    files
+        .entries
+        .push((
+            b"secrets/forge-1.api-token".as_slice().into(),
+            skein_lib::Secret::new(Box::from([b'a'; 4097].as_slice())),
+        ))
+        .unwrap();
+    assert_eq!(
+        lines(&start_owned(true, &files).err().unwrap()).as_ref(),
+        b"application.forges[0].api_token: past its bound\n"
+    );
+}
