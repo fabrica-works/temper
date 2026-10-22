@@ -482,7 +482,7 @@ fn task_document(observed: &Observed, read: Read) -> &Value {
 
 #[must_use]
 pub fn step_4_5_refused(observed: &Observed) -> Vec<Miss> {
-    use super::{FIRST_ACCOUNT, REFUSED_A, REFUSED_A_SPEC, RESUMED_REPORT};
+    use super::{FIRST_ACCOUNT, REFUSED_A_SPEC, RESUMED_REPORT};
     let mut misses = Vec::new();
     let waiting = document(observed, Read::AWaiting);
     let accounts = document(observed, Read::Refused);
@@ -490,7 +490,7 @@ pub fn step_4_5_refused(observed: &Observed) -> Vec<Miss> {
     let director = task_document(observed, Read::DirectorEnded);
     for (met, promise, what) in [
         (
-            number(waiting, "/chip/task") == Some(REFUSED_A)
+            number(waiting, "/chip/task") == Some(A)
                 && number(waiting, "/run_wait/account/account") == Some(FIRST_ACCOUNT)
                 && text(waiting, "/run_wait/account/why") == "refused",
             ACCOUNT_WAIT,
@@ -506,7 +506,7 @@ pub fn step_4_5_refused(observed: &Observed) -> Vec<Miss> {
             "the refused account must need sign_in_again",
         ),
         (
-            number(a, "/chip/task") == Some(REFUSED_A)
+            number(a, "/chip/task") == Some(A)
                 && number(a, "/spec_revision/value") == Some(0)
                 && number(a, "/kept_account") == Some(FIRST_ACCOUNT)
                 && a.pointer("/result/ending/task/done").is_some()
@@ -558,7 +558,7 @@ mod account_tests {
         ACCOUNT_WAIT, Agent, BTreeMap, DIRECTOR, Kit, Observed, Read, SURVIVES, Told, Value, assert_met,
         step_4_5_refused,
     };
-    use crate::case::{FIRST_ACCOUNT, REFUSED_A, REFUSED_A_SPEC, RESUMED_REPORT};
+    use crate::case::{A, FIRST_ACCOUNT, REFUSED_A_SPEC, RESUMED_REPORT};
     use serde_json::json;
 
     fn told(agent: Agent, words: &str, credential: u32) -> Told {
@@ -569,7 +569,7 @@ mod account_tests {
             documents: BTreeMap::from([
                 (
                     Read::AWaiting,
-                    json!({"chip":{"task":REFUSED_A},
+                    json!({"chip":{"task":A},
                     "run_wait":{"account":{"account":FIRST_ACCOUNT,"why":"refused"}}}),
                 ),
                 (
@@ -579,7 +579,7 @@ mod account_tests {
                 ),
                 (
                     Read::AEnded,
-                    json!({"task":{"chip":{"task":REFUSED_A},"spec_revision":{"value":0},
+                    json!({"task":{"chip":{"task":A},"spec_revision":{"value":0},
                     "kept_account":FIRST_ACCOUNT,"delegates":[],
                     "result":{"ending":{"task":{"done":{}}},"value":{"report":{"bytes":RESUMED_REPORT}}}}}),
                 ),
@@ -712,12 +712,12 @@ fn pace_note(misses: &mut Vec<Miss>, observed: &Observed) {
     );
 }
 fn pace_model(misses: &mut Vec<Miss>, observed: &Observed) {
-    use super::{DEFAULT_MODEL, PACE_A, PACE_ANSWER};
+    use super::{DEFAULT_MODEL, PACE_ANSWER};
     let a = &document(observed, Read::AEnded)["task"];
     step_check(
         misses,
         "4.4",
-        number(a, "/chip/task") == Some(PACE_A)
+        number(a, "/chip/task") == Some(A)
             && number(a, "/project") == Some(PROJECT)
             && number(a, "/spec_revision/value") == Some(1)
             && text(a, "/llm/main/model") == DEFAULT_MODEL
@@ -738,7 +738,7 @@ fn pace_model(misses: &mut Vec<Miss>, observed: &Observed) {
     );
 }
 fn pace_accounts(misses: &mut Vec<Miss>, observed: &Observed) {
-    use super::{FIRST_ACCOUNT, PACE_A, SECOND_ACCOUNT, SURVEY, SURVEY_REPORT};
+    use super::{FIRST_ACCOUNT, SECOND_ACCOUNT, SURVEY, SURVEY_REPORT};
     let rows = document(observed, Read::Ranked).pointer("/accounts/deployment").and_then(Value::as_array);
     let ranked = rows.is_some_and(|rows| {
         let numbers: Vec<_> = rows.iter().map(|row| number(row, "/number")).collect();
@@ -750,7 +750,7 @@ fn pace_accounts(misses: &mut Vec<Miss>, observed: &Observed) {
     step_check(
         misses,
         "4.4",
-        number(a, "/chip/task") == Some(PACE_A) && number(a, "/kept_account") == Some(FIRST_ACCOUNT),
+        number(a, "/chip/task") == Some(A) && number(a, "/kept_account") == Some(FIRST_ACCOUNT),
         ORDER,
         "A must keep its original account",
     );
@@ -782,8 +782,8 @@ mod pace_tests {
         assert_met, step_4_4,
     };
     use crate::case::{
-        DEFAULT_MODEL, FIRST_ACCOUNT, PACE_A, PACE_ANSWER, PACE_NOTE, PACE_QUESTION, PACE_QUESTION_MESSAGE,
-        SECOND_ACCOUNT, SURVEY, SURVEY_REPORT,
+        A, DEFAULT_MODEL, FIRST_ACCOUNT, PACE_ANSWER, PACE_NOTE, PACE_QUESTION, PACE_QUESTION_MESSAGE, SECOND_ACCOUNT,
+        SURVEY, SURVEY_REPORT,
     };
     use serde_json::json;
 
@@ -805,7 +805,7 @@ mod pace_tests {
                 ),
                 (
                     Read::AEnded,
-                    json!({"task":{"chip":{"task":PACE_A},"project":PROJECT,
+                    json!({"task":{"chip":{"task":A},"project":PROJECT,
                     "spec_revision":{"value":1},"llm":{"main":{"model":DEFAULT_MODEL,"effort":null}},
                     "kept_account":FIRST_ACCOUNT}}),
                 ),

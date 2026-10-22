@@ -156,7 +156,7 @@ fn recall() -> Turn {
 fn amend() -> Turn {
     call(
         b"amend",
-        &json!({"target":super::PACE_A,"revision":0,"amendment":{
+        &json!({"target":super::A,"revision":0,"amendment":{
         "reason":super::PACE_ANSWER,"llm":{"main":{"model":super::DEFAULT_MODEL_NUMBER}}}}),
     )
 }

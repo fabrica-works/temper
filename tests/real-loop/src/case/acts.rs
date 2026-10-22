@@ -61,9 +61,9 @@ pub fn step_4_1() -> Vec<calls::Step> {
     ]
 }
 
-const REFUSED_DIRECTOR_ENDED: usize = 7;
-const A_WAITING: usize = 4;
-const REFUSED: usize = 5;
+const REFUSED_DIRECTOR_ENDED: usize = 8;
+const A_WAITING: usize = 5;
+const REFUSED: usize = 6;
 const REFUSED_A_ENDED: usize = 3;
 pub const READS_4_5_REFUSED: &[(Read, usize)] = &[
     (Read::DirectorEnded, REFUSED_DIRECTOR_ENDED),
@@ -74,15 +74,16 @@ pub const READS_4_5_REFUSED: &[(Read, usize)] = &[
 
 #[must_use]
 pub fn step_4_5_refused() -> Vec<calls::Step> {
-    use super::{FIRST_ACCOUNT, REFUSED_A, REFUSED_PERSON, SECOND_KEY_FILE};
+    use super::{FIRST_ACCOUNT, REFUSED_PERSON, SECOND_KEY_FILE};
     vec![
         sign_in(D1),
         call(D1, argv!["chat", "--project", number(PROJECT), "--key", "refused", REFUSED_PERSON]),
         call(D1, argv!["wait", "task", number(DIRECTOR), "--until", "replied"]),
         // Arm A before replacement: after its result the requester can end
         // before a new watch has hydrated A through that historical parent.
-        start(D1, argv!["wait", "task", number(REFUSED_A), "--until", "ended", "--json"]),
-        calls::until(D1, argv!["task", number(REFUSED_A), "--json"], b"\"why\":\"refused\"", b"\"run_wait\":null"),
+        start(D1, argv!["wait", "task", number(A), "--until", "ended", "--json"]),
+        call(D1, argv!["wait", "task", number(A), "--until", "phase:due"]),
+        call(D1, argv!["task", number(A), "--json"]),
         call(D1, argv!["accounts", "--json"]),
         call(D1, argv!["replace-key", number(FIRST_ACCOUNT), calls::file(SECOND_KEY_FILE)]),
         join(REFUSED_A_ENDED),
@@ -105,7 +106,7 @@ pub const READS_4_4: &[(Read, usize)] = &[
 
 #[must_use]
 pub fn step_4_4() -> Vec<calls::Step> {
-    use super::{PACE_A, PACE_ANSWER, PACE_PERSON, PACE_QUESTION_MESSAGE, SECOND_ACCOUNT, SECOND_KEY_FILE, SURVEY};
+    use super::{PACE_ANSWER, PACE_PERSON, PACE_QUESTION_MESSAGE, SECOND_ACCOUNT, SECOND_KEY_FILE, SURVEY};
     vec![
         sign_in(D1),
         call(D1, argv!["add-key", "1", calls::file(SECOND_KEY_FILE), "--deployment", "--key", "second-llm"]),
@@ -118,7 +119,7 @@ pub fn step_4_4() -> Vec<calls::Step> {
         calls::until(D1, argv!["chat", number(DIRECTOR)], super::PACE_PENDING.as_bytes(), b"A delegated."),
         call(D1, argv!["answer", number(DIRECTOR), number(PACE_QUESTION_MESSAGE), PACE_ANSWER]),
         call(D1, argv!["wait", "task", number(SURVEY), "--until", "ended", "--json"]),
-        call(D1, argv!["wait", "task", number(PACE_A), "--until", "ended", "--json"]),
+        call(D1, argv!["wait", "task", number(A), "--until", "ended", "--json"]),
         join(PACE_DIRECTOR_ENDED),
     ]
 }
