@@ -1596,6 +1596,8 @@ fn a_goals_toolbar_offers_stop_then_cancel_and_confirms_both() {
         let buttons = children(tree, toolbar);
         assert_eq!(tree.nodes()[buttons.as_slice()[0]].name.as_deref(), Some(b"Stop".as_slice()));
         assert_eq!(tree.nodes()[buttons.as_slice()[1]].name.as_deref(), Some(b"Cancel".as_slice()));
+        assert_eq!(tree.nodes()[buttons.as_slice()[1]].styles.as_slice(), [look::TASK_DANGER]);
+        assert!(tree.nodes()[buttons.as_slice()[0]].styles.is_empty());
         assert!(region_index(tree, b"Task details") < toolbar);
         press_button(&mut root, name);
         let view = fixtures::page_view(&root);

@@ -98,6 +98,9 @@ pub(crate) fn act(
     match admission {
         c::Admission::Allowed | c::Admission::Bounded { .. } => {
             b.open(Role::Button);
+            if kind == c::ActKind::Cancel {
+                b.style(look::TASK_DANGER);
+            }
             b.name(&words.say(word, &[]));
             b.bind(bindings.insert(act));
             b.close();
