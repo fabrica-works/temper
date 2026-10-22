@@ -4735,3 +4735,6 @@ fn a_hello_keeps_its_configured_worker_position() {
 
 #[path = "root_routes/added_dependencies.rs"]
 mod added_dependencies;
+
+#[path = "root_routes/open_chat.rs"]
+mod open_chat;

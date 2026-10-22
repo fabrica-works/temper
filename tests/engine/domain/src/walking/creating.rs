@@ -34,6 +34,7 @@ pub fn goal_from(
     member.authority.spend = terms.budget;
     member.authority.deadline = terms.deadline;
     member.tracked = Some(terms.priority);
+    member.flags.ended_by = people::EndedBy::Result;
     member.flags.conversation = false;
     member.flags.listed = true;
     member.label = 2;

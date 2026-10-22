@@ -2627,6 +2627,8 @@ dependencies = [
 name = "temper-engine-domain-world"
 version = "0.0.0"
 dependencies = [
+ "jig-client",
+ "jig-client-world",
  "jig-conformance",
  "jig-core-world",
  "jig-domain-accounts",
