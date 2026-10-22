@@ -95,6 +95,17 @@ fn card_controls(b: &mut Builder, root: &Domain, card: &Card, words: &Words, bin
         let Some(admission) = jig_client::facts::offer(acts::offers(page), act) else { continue };
         match admission {
             Admission::Allowed | Admission::Bounded { .. } => {
+                let rejecting = act == ActKind::Reject && proposal_object(card.object);
+                if rejecting {
+                    b.open(Role::Disclosure);
+                    b.name(&words.say(Word::Reject, &[]));
+                    if let Some(open) = root.pages().confirmation()
+                        && open.object == card.object
+                        && open.act == ActKind::Reject
+                    {
+                        b.state(skein_ui::State::Expanded);
+                    }
+                }
                 if act == ActKind::Answer || act == ActKind::Reject || act == ActKind::LeaveHeld {
                     b.open(Role::TextArea);
                     b.name(&words.say(if act == ActKind::Answer { Word::AnswerWords } else { Word::Reason }, &[]));
@@ -112,9 +123,12 @@ fn card_controls(b: &mut Builder, root: &Domain, card: &Card, words: &Words, bin
                     b,
                     bindings,
                     words,
-                    word,
+                    if rejecting { Word::RejectProposal } else { word },
                     Act::Decide { object: card.object, revision: acts::revision(page), act },
                 );
+                if rejecting {
+                    b.close();
+                }
             }
             Admission::Proposed { to } => {
                 words.card_text(b, P::ProposeInstead, &[]);

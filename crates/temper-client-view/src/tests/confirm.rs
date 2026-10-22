@@ -176,6 +176,7 @@ fn proposal_rows_and_task_release_keep_their_own_shapes() {
                 Role::Text,
                 Role::Description,
                 Role::Button,
+                Role::Disclosure,
                 Role::TextArea,
                 Role::Button,
                 Role::Link,
@@ -211,3 +212,52 @@ fn proposal_rows_and_task_release_keep_their_own_shapes() {
     }
 }
 
+#[test]
+fn proposal_rejection_starts_in_a_closed_disclosure_in_both_pages() {
+    for root in [fixtures::chat::proposal_root(), root(ActKind::Reject, Admission::Allowed)] {
+        let view = fixtures::page_view(&root);
+        let nodes = view.tree().nodes();
+        let at = super::chat::named_position(nodes, Role::Disclosure, Some(b"Reject with reason"))
+            .expect("reject disclosure");
+        assert!(!nodes[at].states.as_slice().contains(&skein_ui::State::Expanded));
+        let children = super::inbox::subtree(view.tree(), at);
+        assert!(super::chat::named_position(children, Role::TextArea, Some(b"Reason")).is_some());
+        assert!(super::chat::named_position(children, Role::Button, Some(b"Reject")).is_some());
+        assert!(super::chat::named_position(children, Role::Button, Some(b"Accept")).is_none());
+    }
+}
+#[test]
+fn a_rejecting_chat_keeps_its_reason_disclosure_open() {
+    let view = fixtures::page_view(&fixtures::chat::rejecting_chat());
+    let disclosure = fixtures::find(view.tree(), Role::Disclosure, b"Reject with reason").expect("reject disclosure");
+    assert!(view.tree().find(disclosure).unwrap().states.as_slice().contains(&skein_ui::State::Expanded));
+}
+#[test]
+fn releases_card_tree_stays_byte_identical() {
+    let root = fixtures::task::held_root();
+    let mut loaded = None;
+    for card in root.pages().cards().unwrap() {
+        if card.page.is_some() {
+            loaded = Some(card);
+            break;
+        }
+    }
+    let card = loaded.unwrap();
+    let mut builder = skein_ui::Builder::new(&fixtures::tree_limits());
+    crate::confirm::card(
+        &mut builder,
+        &root,
+        card,
+        &fixtures::words(),
+        &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+        2,
+    );
+    let tree = builder.finish();
+    // Test-only diagnostic serialization freezes all of Release's node fields.
+    let actual = alloc::fmt::format(format_args!("{:?}", tree.nodes()));
+    if let Some(path) = std::env::var_os("TEMPER_RECORD_RELEASE") {
+        std::fs::write(path, &actual).unwrap();
+        return;
+    }
+    assert_eq!(actual.as_bytes(), std::fs::read("src/tests/release-card.txt").unwrap());
+}

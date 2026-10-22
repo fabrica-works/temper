@@ -153,6 +153,7 @@ pub enum Word {
     ProposalLanding,
     ProposalBudget,
     ProposalInbox,
+    RejectProposal,
     ChatDelegates,
     ChatTime,
     ChatHint,
@@ -340,8 +341,8 @@ pub enum Word {
 // The change panel adds 86 forge phrases (2000–2085).
 // Three empty and partial ended-children phrases (5.10).
 // A chat's numbered composer placeholder (3.5).
-const PHRASES: u32 = 778;
-const ALL: [Word; 308] = [
+const PHRASES: u32 = 779;
+const ALL: [Word; 309] = [
     Word::TimeYesterdayWord,
     Word::TimeJustNow,
     Word::TimeUnderMinute,
@@ -482,6 +483,7 @@ const ALL: [Word; 308] = [
     Word::ProposalLanding,
     Word::ProposalBudget,
     Word::ProposalInbox,
+    Word::RejectProposal,
     Word::ChatDelegates,
     Word::ChatTime,
     Word::ChatHint,
@@ -801,6 +803,7 @@ impl Word {
             Self::ProposalLanding => 1402,
             Self::ProposalBudget => 1403,
             Self::ProposalInbox => 1404,
+            Self::RejectProposal => 1405,
             Self::ChatDelegates => 145,
             Self::ChatTime => 184,
             Self::ChatHint => 185,
@@ -1356,6 +1359,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::DemoScript => (&[b"The demo model plays these requests from a script."], &[]),
         Word::ChatHint => (&[b"temper \xc2\xb7 Enter to start \xc2\xb7 Shift+Enter for newline"], &[]),
         Word::Accept => (&[b"Accept"], &[]),
+        Word::RejectProposal => (&[b"Reject"], &[]),
         Word::Reject => (&[b"Reject with reason"], &[]),
         Word::Answer => (&[b"Answer"], &[]),
         Word::Release => (&[b"Release task"], &[]),

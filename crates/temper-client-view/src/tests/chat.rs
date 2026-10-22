@@ -206,7 +206,7 @@ fn a_chat_proposal_offers_rejection_with_a_reason() {
     let root = proposal_root();
     let mut view = fixtures::view();
     let tree = fixtures::build(&mut view, &root);
-    assert!(fixtures::find(tree, Role::Button, b"Reject with reason").is_some());
+    assert!(fixtures::find(tree, Role::Button, b"Reject").is_some());
 }
 #[test]
 fn rejecting_in_the_chat_shows_the_reason_in_its_confirmation() {

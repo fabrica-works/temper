@@ -753,3 +753,9 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
   .temper-chat .temper-turn > .temper-kind-proposal, .temper-chat .temper-cards > .temper-card { margin-left: 0; }
   .temper-proposal-facts { grid-template-columns: 70px minmax(0, 1fr); }
 }
+
+/* Rejection's editor stays folded until the person asks for it. */
+.temper-kind-proposal > details { display: inline-block; margin: 13px 8px 0 0; vertical-align: top; }
+.temper-kind-proposal > details > summary { cursor: pointer; color: var(--temper-accent-dark); font-size: 11px; }
+.temper-kind-proposal > details[open] { display: block; }
+.temper-chat .temper-kind-proposal > details button { background: transparent; border-color: #ddd6cb; color: #6a6258; }
