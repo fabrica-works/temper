@@ -260,10 +260,17 @@ impl Decision {
             return None;
         }
         let batch = journal.decision(&reserved)?;
-        let mut decision = Decision::new(limits);
-        decision.reserved = reserved;
-        decision.batch = Some(batch);
-        Some(decision)
+        assert!(worst_case(limits).is_some(), "valid root journal limits");
+        Some(Decision {
+            limits: *limits,
+            reserved,
+            // The header goes straight into the Skein batch. A read-only
+            // store terminal reserves no writes, not even a header slot.
+            writes: List::with_capacity(reserved.writes.saturating_sub(1)),
+            deliveries: Queue::with_capacity(reserved.held),
+            overrun: false,
+            batch: Some(batch),
+        })
     }
 
     /// A replacement at the same key keeps its original position. All child callbacks finish before

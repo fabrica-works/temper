@@ -6,6 +6,10 @@ use crate::decision::{
 use crate::{Deployment, Family, Key, Record, TurnRecord, Write};
 use alloc::boxed::Box;
 use skein_lib::{JournalRoom, List, Queue, Token, Wall};
+
+#[global_allocator]
+static HEAP: skein_world::domain::heap::Counting = skein_world::domain::heap::Counting;
+
 mod result;
 mod resume;
 mod resume_fixture;
@@ -197,9 +201,10 @@ fn fresh_numbers_and_unused_gaps_are_durable_in_the_decisions_header() {
 fn same_key_saves_and_erases_collapse_to_the_last_write_before_commit() {
     let mut j = Journal::new(DEPLOYMENT, &LIMITS);
     let mut out = Queue::with_capacity(1);
-    let mut d = Decision::new(&LIMITS);
+    let mut d = Decision::reserve_room(&mut j.inner, &LIMITS, JournalRoom { writes: 3, held: 0 }).unwrap();
     d.write(&LIMITS, turn(1, 2)).unwrap();
     d.write(&LIMITS, turn(2, 3)).unwrap();
+    assert!(!d.room_for(1, 0), "replacement still fits when all child slots are full");
     d.write(
         &LIMITS,
         Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn {
@@ -219,7 +224,8 @@ fn same_key_saves_and_erases_collapse_to_the_last_write_before_commit() {
 
 #[test]
 fn rejected_payloads_are_returned_without_replacing_admitted_ownership() {
-    let mut d = Decision::new(&LIMITS);
+    let mut j = Journal::new(DEPLOYMENT, &LIMITS);
+    let mut d = Decision::reserve_room(&mut j.inner, &LIMITS, JournalRoom { writes: 2, held: 1 }).unwrap();
     d.write(&LIMITS, turn(1, 3)).unwrap();
     let refused = d.write(&LIMITS, turn(1, 65)).unwrap_err();
     assert_eq!(refused, turn(1, 65));
@@ -232,7 +238,6 @@ fn rejected_payloads_are_returned_without_replacing_admitted_ownership() {
         d.write(&LIMITS, Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment))))
             .is_err()
     );
-    let mut j = Journal::new(DEPLOYMENT, &LIMITS);
     let mut out = Queue::with_capacity(1);
     accept(&mut j, &LIMITS, d, &mut out).unwrap();
     let (_, writes) = commit(&mut out);
@@ -245,17 +250,206 @@ fn rejected_payloads_are_returned_without_replacing_admitted_ownership() {
 
 #[test]
 fn a_decision_past_its_reserved_write_room_stops_the_root_journal() {
+    for writes in 1..=3 {
+        let mut journal = Journal::new(DEPLOYMENT, &LIMITS);
+        let mut out = Queue::with_capacity(1);
+        let mut decision = Decision::reserve_room(&mut journal.inner, &LIMITS, JournalRoom { writes, held: 1 })
+            .expect("smaller route room admitted");
+        for number in 1..writes {
+            decision.write(&LIMITS, turn(number, 1)).expect("reserved write room");
+        }
+        decision.deliver(&LIMITS, ack(1)).unwrap();
+        assert!(!decision.room_for(1, 0), "the deployment header owns the other slot");
+        let refused = turn(writes, 1);
+        let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(row)))) = &refused
+        else {
+            panic!("turn");
+        };
+        let address = row.transcript.as_ptr();
+        let refused = decision.carry_write(&LIMITS, refused).unwrap_err();
+        let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(row)))) = refused
+        else {
+            panic!("original refused turn");
+        };
+        assert_eq!(row.transcript.as_ptr(), address, "refusal moves the original payload back");
+        assert_eq!(row.turn, writes);
+        accept(&mut journal, &LIMITS, decision, &mut out).expect("overrun is accepted to stop");
+        assert!(journal.stopped());
+        resume(&mut journal, &mut out);
+        assert!(out.is_empty(), "no partial commit or held delivery escapes an overrun");
+        assert!(!takes(&journal, &LIMITS));
+    }
+}
+
+#[test]
+fn reserved_buffers_allocate_only_the_admitted_room_even_when_global_maxima_grow() {
+    use skein_world::domain::heap::Meter;
+
+    let write_slot = u64::try_from(size_of::<Write>()).unwrap();
+    let delivery_slot = u64::try_from(size_of::<Delivery>()).unwrap();
+    let output_slot = u64::try_from(size_of::<crate::Output>()).unwrap();
+    let rooms =
+        [JournalRoom { writes: 0, held: 0 }, JournalRoom { writes: 1, held: 0 }, JournalRoom { writes: 3, held: 2 }];
+    let mut observed = [[(0, 0); 3]; 2];
+    let mut expected = [(0, 0); 3];
+    for (maximum, (writes, deliveries)) in [(64, 32), (4096, 2048)].into_iter().enumerate() {
+        let limits = Limits { writes, deliveries, held: deliveries, ..LIMITS };
+        for (at, reserved) in rooms.into_iter().enumerate() {
+            // Journal storage is startup state. Measure the whole admitted
+            // decision, including its two Skein batch containers.
+            let mut journal = SkeinJournal::new(&journal_limits(&limits));
+            let meter = Meter::new();
+            meter.start();
+            let decision = Decision::reserve_room(&mut journal, &limits, reserved).unwrap();
+            let measured = meter.end();
+            let batch = u64::from(reserved.writes) * write_slot + u64::from(reserved.held) * output_slot;
+            let private =
+                u64::from(reserved.writes.saturating_sub(1)) * write_slot + u64::from(reserved.held) * delivery_slot;
+            expected[at] = (batch + private, batch + private);
+            observed[maximum][at] = (measured.held(), measured.peak());
+            drop(decision);
+            assert_eq!(meter.held(), 0, "dropping the decision frees every metered slot");
+        }
+    }
+    assert_eq!(observed[0], expected, "only reserved slots, with no transient maximum-sized buffers");
+    assert_eq!(observed[1], expected, "larger global maxima cost the same for the same reservation");
+    assert_eq!(observed[0], observed[1]);
+}
+
+#[test]
+fn reserved_bounds_keep_the_header_and_release_exactly_the_admitted_deliveries() {
+    for (reserved, persist_header) in [
+        (JournalRoom { writes: 0, held: 0 }, false),
+        (JournalRoom { writes: 0, held: 2 }, false),
+        (JournalRoom { writes: 1, held: 0 }, true),
+        (JournalRoom { writes: 1, held: 2 }, true),
+        (JournalRoom { writes: 1, held: 2 }, false),
+        (JournalRoom { writes: 3, held: 0 }, true),
+        (JournalRoom { writes: 3, held: 2 }, true),
+        (JournalRoom { writes: 3, held: 2 }, false),
+    ] {
+        let mut journal = Journal::bootstrap(DEPLOYMENT.id, &LIMITS);
+        let mut decision = Decision::reserve_room(&mut journal.inner, &LIMITS, reserved).unwrap();
+        for number in 1..reserved.writes {
+            decision.carry_write(&LIMITS, turn(number, 1)).unwrap();
+        }
+        for number in 1..=reserved.held {
+            decision.carry_delivery(&LIMITS, ack(number)).unwrap();
+        }
+        assert!(!decision.room_for(1, 0), "header owns the first write slot");
+        assert!(!decision.room_for(0, 1), "held room is exactly full");
+        let header = Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(
+            DEPLOYMENT,
+        ))));
+        assert_eq!(decision.write(&LIMITS, header.clone()), Err(header), "caller cannot own the header slot");
+        crate::decision::accept_routed(&mut journal.inner, &mut journal.counters, &LIMITS, decision, persist_header)
+            .unwrap();
+        let mut out = Queue::with_capacity(1);
+        if reserved.writes <= 1 && !persist_header {
+            assert!(crate::decision::commit(&mut journal.inner, &LIMITS).is_none());
+            assert!(journal.counters.dirty(), "read-only store terminals never persist the dirty header");
+        } else {
+            out.push(crate::decision::commit(&mut journal.inner, &LIMITS).unwrap());
+            let (number, writes) = commit(&mut out);
+            assert_eq!((number, writes.len()), (1, usize::try_from(reserved.writes).unwrap()));
+            assert_eq!(
+                writes[0],
+                Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(
+                    Deployment { commits: 1, ..DEPLOYMENT }
+                ))))
+            );
+            for number in 1..reserved.writes {
+                assert_eq!(writes[usize::try_from(number).unwrap()], turn(number, 1));
+            }
+            resume(&mut journal, &mut out);
+            assert!(out.is_empty(), "held effects wait for the header's commit");
+            committed(&mut journal, number);
+        }
+        for number in 1..=reserved.held {
+            resume(&mut journal, &mut out);
+            assert_eq!(acknowledged(&mut out), number, "each admitted delivery releases once, in order");
+        }
+        resume(&mut journal, &mut out);
+        assert!(out.is_empty());
+        assert!(!journal.stopped());
+    }
+}
+
+#[test]
+fn a_delivery_past_its_reserved_room_returns_ownership_and_stops_without_partial_outputs() {
+    for reserved in [
+        JournalRoom { writes: 0, held: 0 },
+        JournalRoom { writes: 1, held: 0 },
+        JournalRoom { writes: 1, held: 1 },
+        JournalRoom { writes: 3, held: 2 },
+    ] {
+        let mut journal = Journal::new(DEPLOYMENT, &LIMITS);
+        let mut decision = Decision::reserve_room(&mut journal.inner, &LIMITS, reserved).unwrap();
+        for number in 1..reserved.writes {
+            decision.write(&LIMITS, turn(number, 1)).unwrap();
+        }
+        for number in 1..=reserved.held {
+            decision.deliver(&LIMITS, ack(number)).unwrap();
+        }
+        let words = bytes(3);
+        let address = words.as_ptr();
+        let refused = decision.carry_delivery(&LIMITS, Delivery::Result { person: 7, task: 9, words }).unwrap_err();
+        let Delivery::Result { person, task, words } = refused else { panic!("original refused result") };
+        assert_eq!((person, task, words.as_ptr(), words.len()), (7, 9, address, 3));
+        let mut out = Queue::with_capacity(1);
+        accept(&mut journal, &LIMITS, decision, &mut out).unwrap();
+        assert!(journal.stopped());
+        resume(&mut journal, &mut out);
+        assert!(out.is_empty(), "no admitted prefix escapes an overrun");
+        assert_eq!(journal.deployment().commits, 0);
+    }
+}
+
+#[test]
+fn full_size_decisions_keep_all_ownership_when_a_full_journal_refuses_them() {
     let mut journal = Journal::new(DEPLOYMENT, &LIMITS);
+    for reserved in
+        [JournalRoom { writes: LIMITS.writes + 1, held: 0 }, JournalRoom { writes: 1, held: LIMITS.deliveries + 1 }]
+    {
+        assert!(Decision::reserve_room(&mut journal.inner, &LIMITS, reserved).is_none());
+        assert!(takes(&journal, &LIMITS), "an oversized request reserves nothing");
+    }
     let mut out = Queue::with_capacity(1);
-    let mut decision = Decision::reserve_room(&mut journal.inner, &LIMITS, JournalRoom { writes: 2, held: 1 })
-        .expect("smaller route room admitted");
-    decision.write(&LIMITS, turn(1, 1)).expect("reserved write room");
-    assert!(!decision.room_for(1, 0), "the deployment header owns the other slot");
-    assert!(decision.write(&LIMITS, turn(2, 1)).is_err());
-    accept(&mut journal, &LIMITS, decision, &mut out).expect("overrun is accepted to stop");
-    assert!(journal.stopped());
-    assert!(out.is_empty());
+    for number in 1..=LIMITS.commits {
+        let mut decision = Decision::reserve(&mut journal.inner, &LIMITS).unwrap();
+        decision.write(&LIMITS, turn(number, 1)).unwrap();
+        accept(&mut journal, &LIMITS, decision, &mut out).unwrap();
+        assert_eq!(commit(&mut out).0, u64::from(number));
+    }
     assert!(!takes(&journal, &LIMITS));
+    assert!(Decision::reserve(&mut journal.inner, &LIMITS).is_none());
+    let mut decision = Decision::new(&LIMITS);
+    for number in 1..LIMITS.writes {
+        decision.write(&LIMITS, turn(number, 1)).unwrap();
+    }
+    for number in 1..=LIMITS.deliveries {
+        decision.deliver(&LIMITS, ack(number)).unwrap();
+    }
+    assert!(!decision.room_for(1, 0));
+    assert!(!decision.room_for(0, 1));
+    let decision = accept(&mut journal, &LIMITS, decision, &mut out).unwrap_err();
+    assert!(out.is_empty());
+    committed(&mut journal, u64::from(LIMITS.commits));
+    accept(&mut journal, &LIMITS, decision, &mut out).unwrap();
+    let (number, writes) = commit(&mut out);
+    assert_eq!((number, writes.len()), (3, usize::try_from(LIMITS.writes).unwrap()));
+    for number in 1..LIMITS.writes {
+        assert_eq!(writes[usize::try_from(number).unwrap()], turn(number, 1));
+    }
+    resume(&mut journal, &mut out);
+    assert!(out.is_empty(), "refused and retried effects still wait for their own commit");
+    committed(&mut journal, number);
+    for number in 1..=LIMITS.deliveries {
+        resume(&mut journal, &mut out);
+        assert_eq!(acknowledged(&mut out), number);
+    }
+    resume(&mut journal, &mut out);
+    assert!(out.is_empty());
 }
 
 #[test]

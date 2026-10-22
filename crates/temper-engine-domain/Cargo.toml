@@ -24,5 +24,8 @@ skein-forge-client.workspace = true
 temper-engine-domain-forge-change.workspace = true
 temper-engine-domain-forge-issues.workspace = true
 
+[dev-dependencies]
+skein-world.workspace = true
+
 [lints]
 workspace = true

@@ -2594,6 +2594,7 @@ dependencies = [
  "skein-forge",
  "skein-forge-client",
  "skein-lib",
+ "skein-world",
  "temper-engine-domain-forge",
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-issues",
