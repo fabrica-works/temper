@@ -232,6 +232,16 @@ fn long_provisional_text_says_that_earlier_text_was_omitted() {
 }
 
 #[test]
+fn the_message_composer_keeps_its_name_and_has_a_numbered_placeholder() {
+    let view = fixtures::page_view(&messaging_root());
+    let id = fixtures::person_find(view.tree(), Role::TextArea, b"Message").expect("composer named Message");
+    let composer = view.tree().find(id).expect("composer node");
+    assert_eq!(composer.name.as_deref(), Some(b"Message".as_slice()));
+    // messaging_root's chat is TASK, T9.
+    assert_eq!(composer.placeholder.as_deref(), Some("Message T9…".as_bytes()));
+}
+
+#[test]
 fn enter_in_the_message_composer_sends() {
     let mut view = fixtures::page_view(&messaging_root());
     let composer = fixtures::find(view.tree(), Role::TextArea, b"Message").expect("composer");

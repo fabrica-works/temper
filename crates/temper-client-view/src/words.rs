@@ -123,6 +123,7 @@ pub enum Word {
     RunEnded,
     LinesLeft,
     Message,
+    MessagePlaceholder,
     Send,
     Stop,
     Close,
@@ -333,8 +334,9 @@ pub enum Word {
 // Forty-seven time form, calendar and placement phrases (5.12).
 // The change panel adds 86 forge phrases (2000–2085).
 // Three empty and partial ended-children phrases (5.10).
-const PHRASES: u32 = 772;
-const ALL: [Word; 302] = [
+// A chat's numbered composer placeholder (3.5).
+const PHRASES: u32 = 773;
+const ALL: [Word; 303] = [
     Word::TimeYesterdayWord,
     Word::TimeJustNow,
     Word::TimeUnderMinute,
@@ -445,6 +447,7 @@ const ALL: [Word; 302] = [
     Word::RunEnded,
     Word::LinesLeft,
     Word::Message,
+    Word::MessagePlaceholder,
     Word::Send,
     Word::Stop,
     Word::Close,
@@ -766,6 +769,7 @@ impl Word {
             Self::RunEnded => 151,
             Self::LinesLeft => 152,
             Self::Message => 146,
+            Self::MessagePlaceholder => 1077,
             Self::Send => 147,
             Self::Stop => 148,
             Self::Older => 149,
@@ -1279,6 +1283,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::RunEnded => (&[b"Run ", b" ended"], &[Number]),
         Word::LinesLeft => (&[b"Earlier lines omitted ", b""], &[Number]),
         Word::Message => (&[b"Message"], &[]),
+        Word::MessagePlaceholder => (&[b"Message T", b"\xe2\x80\xa6"], &[Number]),
         Word::Send => (&[b"Send"], &[]),
         Word::CancelDelegate => (&[b"Cancel delegate ", b""], &[Number]),
         Word::TakeDelegate => (&[b"Take delegate ", b""], &[Number]),

@@ -367,6 +367,7 @@ fn composer(
         b.style(look::ENTRY);
         b.open(Role::TextArea);
         b.name(&words.say(Word::Message, &[]));
+        b.placeholder(&words.say(Word::MessagePlaceholder, &[Hole::Number(task.chip.task)]));
         b.state(State::SubmitsOnEnter);
         b.style(look::COMPOSER);
         b.value(&chat.words, shown);

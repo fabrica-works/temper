@@ -221,8 +221,9 @@ mod memory_literal;
 // Parent-based plan ordering adds 56 B per bounded tree row: 3 rows, 168 B.
 // skein f043ea16: b6ea7b9c's placeholder and completed state; boxed patch attributes, no slotless splice room.
 // The page reserves its patch queue once, at four patches a node.
+// A chat's composer placeholder adds one phrase (148 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274387665581;
+const WEB_BYTES: u64 = 274387665729;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {
