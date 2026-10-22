@@ -553,6 +553,24 @@ fn configuration_document(value: &serde_json::Value) -> skein_json::Document {
 }
 
 #[test]
+fn the_shipped_chat_is_ended_by_its_requester() {
+    let scratch = support::Scratch::startup("owned-ending-authority");
+    let bounded = support::owned::bounded(scratch.path());
+    let value: serde_json::Value = serde_json::from_slice(&bounded.document).expect("deployment JSON");
+    let engine = jig_protocol_config::engine(
+        &configuration_document(&value["engine"]),
+        0,
+        &jig_protocol_config::Directories::working(),
+    )
+    .expect("engine configuration");
+    assert_eq!(engine.templates[0].number, 1);
+    assert_eq!(engine.templates[0].flags.ended_by, jig_domain_tasks::EndedBy::Requester);
+    assert_eq!(engine.templates[1].number, 2);
+    assert_eq!(engine.templates[1].flags.ended_by, jig_domain_tasks::EndedBy::Result);
+    scratch.remove();
+}
+
+#[test]
 fn shipped_bounds_fit_the_configured_charters_and_worker() {
     use jig_protocol_config as config;
     use temper_service as service;

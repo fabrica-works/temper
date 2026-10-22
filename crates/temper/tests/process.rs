@@ -1467,7 +1467,11 @@ impl ClusterChatJudge {
         }
     }
     fn verify(&mut self, client: &mut support::cluster::Root, read: &ClusterRead) {
-        assert!(read.owner()["details"]["ending"]["done"].is_object(), "chat ended done: {}", read.task);
+        // The chat is ended by its requester (domain/agent.md, 4.6): its person's Close
+        // cancels it, and the grace turn's finish is no result.
+        let cancelled = &read.owner()["details"]["ending"]["cancelled"];
+        assert_eq!(cancelled["by"]["person"], 1, "chat closed by its person: {}", read.task);
+        assert!(cancelled["result"].is_null(), "a closed chat keeps no finish's result: {}", read.task);
         let text = if self.tasks.first().is_some_and(|task| task == self.current())
             || (self.story == ClusterStory::Hung && self.tasks.get(1).is_some_and(|task| task == self.current()))
         {
@@ -1491,7 +1495,8 @@ impl ClusterChatJudge {
             let ends: Vec<_> = lines.iter().filter(|line| line["run_ended"].is_object()).collect();
             assert_eq!(ends.len(), REPLY_ONCE, "same healed attempt ended once");
             assert_eq!(ends[0]["run_ended"]["attempt"], attempt);
-            assert_eq!(ends[0]["run_ended"]["end"], "finished");
+            // An Open chat's finish parks its run (jig's domain/tasks.md, 5.8).
+            assert_eq!(ends[0]["run_ended"]["end"], "parked");
             self.checking.pop_front();
             self.queue(
                 client,
@@ -1689,7 +1694,7 @@ impl ClusterChatJudge {
         let lines: Vec<_> = read.rows.iter().map(|row| &row["event"]["owner"]["source"]["line"]).collect();
         assert_eq!(lines.iter().filter(|line| line["run_began"].is_object()).count(), LOST_AND_RETRY);
         for (attempt, end) in
-            [(old, serde_json::json!({"failed": {"class": "lost"}})), (replacement, serde_json::json!("finished"))]
+            [(old, serde_json::json!({"failed": {"class": "lost"}})), (replacement, serde_json::json!("parked"))]
         {
             assert!(lines.iter().any(|line| line["run_began"]["attempt"] == attempt), "attempt began");
             let ended = lines.iter().find(|line| line["run_ended"]["attempt"] == attempt).expect("attempt ended");
