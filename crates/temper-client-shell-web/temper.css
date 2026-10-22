@@ -95,9 +95,11 @@ a { color: inherit; text-decoration: none; }
 .temper-status-retrying { color: var(--temper-amber); background: var(--temper-amber-pale); }
 .temper-status-active { color: var(--temper-green); background: var(--temper-green-pale); }
 .temper-status-quiet { color: #6d695f; background: #f3f1eb; }
+/* .first-run-context: the project and signed-in role. */
+.temper-context { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; color: var(--temper-muted); font-size: 11px; margin: 0 0 18px; }
 /* .first-run-empty: one invitation and a wrapping row of paper suggestions. */
 .temper-invitation { margin: 42px 0; }
-.temper-invitation > h2 { margin: 0; font: 700 18px/1.4 var(--temper-mono); letter-spacing: -.025em; }
+.temper-invitation > h1 { margin: 0; font: 700 18px/1.4 var(--temper-mono); letter-spacing: -.025em; }
 .temper-invitation > p { margin: 12px 0 0; color: var(--temper-muted); font-size: 12px; }
 .temper-invitation > ul { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; list-style: none; padding: 0; margin: 13px 0 0; border: 0; }
 .temper-invitation > ul > li { min-width: 0; max-width: 100%; padding: 0; border: 0; }

@@ -67,30 +67,14 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         b.close();
         b.close();
         crate::frame::demo_banner(b, root, words, bindings);
+        context(b, root, task.project, words);
         b.open(Role::Slot);
         b.style(look::THREAD);
         if let jig_client::thread::window::Edge::More(_) = chat.thread.lines.edges.after {
             control(b, bindings, Role::Button, &words.say(Word::Older, &[]), Act::Older);
         }
-        let me = root.pages().me(root.client());
-        #[expect(clippy::manual_map, reason = "view code spells out the signed-in person")]
-        let person = match me {
-            Some(me) => Some(me.party.number),
-            None => None,
-        };
-        let requester = match task.requester {
-            c::OwnerRequester::Person(number) => Some(number) == person,
-            c::OwnerRequester::Task(_) | c::OwnerRequester::Deployment { .. } => false,
-        };
-        conversation(
-            b,
-            &chat.thread,
-            words,
-            (rows, text_limit),
-            (person, requester),
-            Some((chat, root.client())),
-            bindings,
-        );
+        let person = speakers(task, root.pages().me(root.client()));
+        conversation(b, &chat.thread, words, (rows, text_limit), person, Some((chat, root.client())), bindings);
         if !chat.cards.is_empty() || !chat.departures().is_empty() {
             b.open(Role::List);
             b.style(look::CARDS);
@@ -129,6 +113,60 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
     crate::confirm::main(b, root, words, bindings, rows);
     b.close();
 }
+/// The signed-in person and whether they requested this chat.
+pub(crate) struct Speakers {
+    pub(crate) person: Option<u64>,
+    pub(crate) requester: bool,
+}
+
+fn speakers(task: &c::Task, me: Option<&c::Me>) -> Speakers {
+    #[expect(clippy::manual_map, reason = "view code spells out the signed-in person")]
+    let person = match me {
+        Some(me) => Some(me.party.number),
+        None => None,
+    };
+    let requester = match task.requester {
+        c::OwnerRequester::Person(number) => Some(number) == person,
+        c::OwnerRequester::Task(_) | c::OwnerRequester::Deployment { .. } => false,
+    };
+    Speakers { person, requester }
+}
+
+pub(crate) fn context(b: &mut Builder, root: &Domain, project: u32, words: &Words) {
+    let Some(demo) = root.forge().demo() else { return };
+    if project != demo.project {
+        return;
+    }
+    let Some(me) = root.pages().me(root.client()) else { return };
+    let project = match super::project_name(root.pages(), root.client(), project) {
+        Some(name) => skein_lib::bytes::copy_of(name),
+        None => words.say(Word::Project, &[Hole::Number(u64::from(project))]),
+    };
+    b.open(Role::Slot);
+    b.style(look::CONTEXT);
+    let repository = words.say(Word::DemoRepository, &[Hole::Name(demo.owner.clone()), Hole::Name(demo.name.clone())]);
+    b.open(Role::Paragraph);
+    b.text(Run::Plain, &project);
+    b.text(Run::Plain, &repository);
+    b.close();
+    let mut owner = false;
+    for project in &me.projects {
+        if project.project == demo.project && project.role == c::HeldRole::Owner {
+            owner = true;
+            break;
+        }
+    }
+    let signed = if me.deployment_role == Some(c::HeldRole::Owner) {
+        words.say(Word::SignedDeploymentOwner, &[])
+    } else if owner {
+        words.say(Word::SignedProjectOwner, &[])
+    } else {
+        words.say(Word::SignedName, &[Hole::Name(skein_lib::bytes::copy_of(me.party.name.bytes()))])
+    };
+    text(b, Role::Paragraph, &signed);
+    b.close();
+}
+
 fn result_text(b: &mut Builder, result: &c::TaskResult, words: &Words) {
     match result {
         c::TaskResult::Document(result) => crate::cards::result(b, result, words),
@@ -194,7 +232,7 @@ pub(crate) fn conversation(
     thread: &Thread,
     words: &Words,
     limits: (u32, u32),
-    person: (Option<u64>, bool),
+    speakers: Speakers,
     delegations: Option<(&Chat, &jig_client::Client)>,
     bindings: &mut Bindings,
 ) {
@@ -217,14 +255,14 @@ pub(crate) fn conversation(
         b.style(look::TURN);
         match line {
             Line::Words { by, words: message, state } => {
-                person_words(b, by, message, state, person.0, words);
+                person_words(b, by, message, state, speakers.person, words);
             }
             Line::Turn { turn, .. } => {
                 committed(
                     b,
                     turn,
                     words,
-                    (rows, text_limit, person.1),
+                    (rows, text_limit, speakers.requester),
                     delegations,
                     (&mut tasks, &mut shown),
                     bindings,

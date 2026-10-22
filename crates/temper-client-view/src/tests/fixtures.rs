@@ -93,14 +93,24 @@ pub fn path(segments: &[&[u8]]) -> List<Box<[u8]>> {
     path
 }
 pub fn text(tree: &skein_ui::Tree) -> Box<[u8]> {
+    nodes_text(tree.nodes())
+}
+/// The text of a node and its descendants, in tree order.
+pub fn node_text(tree: &skein_ui::Tree, index: usize) -> Box<[u8]> {
+    let end = index
+        .checked_add(usize::try_from(tree.nodes()[index].size).expect("fixture subtree fits"))
+        .expect("fixture index fits");
+    nodes_text(&tree.nodes()[index..end])
+}
+fn nodes_text(nodes: &[skein_ui::Node]) -> Box<[u8]> {
     let mut bytes = 0_usize;
-    for node in tree.nodes() {
+    for node in nodes {
         for run in &node.text {
             bytes = bytes.checked_add(run.text.len()).expect("fixture text fits");
         }
     }
     let mut writer = Writer::new(bytes);
-    for node in tree.nodes() {
+    for node in nodes {
         for run in &node.text {
             writer.put(&run.text).expect("text counted");
         }
@@ -546,7 +556,7 @@ pub mod chat {
             thread,
             &fixtures::words(),
             (LINES, TEXT),
-            (None, false),
+            crate::pages::chat::Speakers { person: None, requester: false },
             None,
             &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
         );
@@ -826,10 +836,22 @@ pub fn demo_choice_root(
     model: bool,
     llm: Option<c::LlmChoice>,
 ) -> temper_client_domain::Domain {
+    demo_frame_root(address, project, model, llm, None)
+}
+pub fn demo_frame_root(
+    address: temper_client_domain::Address,
+    project: u32,
+    model: bool,
+    llm: Option<c::LlmChoice>,
+    frame: Option<c::Me>,
+) -> temper_client_domain::Domain {
     let (mut root, me_watch, task_watch, _, _) =
         root_at_with_demo(address.clone(), &domain_limits(), b"Project", Some((project, model)));
     let template = chat::messaging_root();
-    let mut me = template.pages().me(template.client()).expect("chat template").clone();
+    let mut me = match frame {
+        Some(me) => me,
+        None => template.pages().me(template.client()).expect("chat template").clone(),
+    };
     let mut charters = List::with_capacity(1);
     charters.push(1).expect("chat charter");
     me.projects.get_mut(0).expect("demo project").creating = Some(c::Creating {

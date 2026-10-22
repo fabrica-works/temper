@@ -3,6 +3,7 @@ mod choice;
 mod confirm;
 mod delegation;
 mod demo;
+mod demo_start;
 mod fixtures;
 mod forge_page;
 mod frame;

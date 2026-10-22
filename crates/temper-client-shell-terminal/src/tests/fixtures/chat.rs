@@ -42,20 +42,21 @@ pub fn page() -> skein_ui::Tree {
 
 /// The first run, through the production chat view and delegation card.
 pub fn delegation_page(landed: bool) -> skein_ui::Tree {
+    first_run_page(client::Address::Chat { task: 1 }, landed)
+}
+pub fn first_run() -> skein_ui::Tree {
+    first_run_page(client::Address::Chats, true)
+}
+fn first_run_page(address: client::Address, landed: bool) -> skein_ui::Tree {
     use jig_client::contract as c;
     use skein_lib::{Env, List, Queue, Time, Wall};
-    use temper_client_domain::{Address, Event, Request};
+    use temper_client_domain::{Event, Request};
     let mut limits = crate::limits::native().client;
     limits.client.domain.rows = 8;
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     let mut root = client::unlinked(&limits, 16);
     let mut out = Queue::with_capacity(client::max_out(&limits));
-    client::step(
-        &mut root,
-        &env,
-        Event::Start { address: Address::Chat { task: 1 }, kept: List::with_capacity(0) },
-        &mut out,
-    );
+    client::step(&mut root, &env, Event::Start { address, kept: List::with_capacity(0) }, &mut out);
     for event in [
         jig_client::Event::StartUnlinked { kept: List::with_capacity(0) },
         jig_client::Event::SignIn { with: jig_client::With::Transport },
@@ -75,6 +76,7 @@ pub fn delegation_page(landed: bool) -> skein_ui::Tree {
                 let delivery = match subject {
                     c::Subject::Me => {
                         let mut me = jig_client_world::stories::frame(1);
+                        me.deployment_role = Some(c::HeldRole::Owner);
                         me.projects.get_mut(0).expect("demo project").name =
                             Some(c::DocumentText::complete(delegation_text(b"demo")));
                         Some(c::Delivery::Me(Box::new(me)))

@@ -4,13 +4,13 @@ use temper_client_domain::{Action, Address, Event, pages::Act};
 #[test]
 fn the_demo_banner_follows_the_frame_on_work_pages() {
     for (row, address, demo, shown) in [
-        ("chats", Address::Chats, true, true),
+        ("other project chats", Address::Chats, true, true),
         ("inbox", Address::Inbox { filter: temper_client_domain::address::Filter::ALL }, true, true),
         ("task", Address::Task { task: 9 }, true, true),
         ("accounts", Address::Accounts, true, false),
         ("no demo", Address::Chats, false, false),
     ] {
-        let root = if demo { f::demo_root(address, f::PROJECT, true) } else { f::chats_root() };
+        let root = if demo { f::demo_root(address, f::SECOND_PROJECT, true) } else { f::chats_root() };
         let mut view = f::page_view(&root);
         assert_eq!(f::find(view.tree(), Role::Region, b"Demo").is_some(), shown, "{row}");
         if shown {
@@ -52,7 +52,7 @@ fn suggestions_show_only_in_the_demo_project_with_the_model_half() {
         let root = if demo { f::demo_root(Address::Chats, project, model) } else { f::chats_root() };
         let view = f::page_view(&root);
         assert_eq!(
-            f::find(view.tree(), Role::Heading { level: 2 }, b"What shall we change?").is_some(),
+            f::find(view.tree(), Role::Heading { level: 1 }, b"What shall we change?").is_some(),
             shown,
             "{row}"
         );
@@ -230,7 +230,7 @@ fn conversation_speakers_use_you_temper_or_the_other_person() {
             &super::chat::structured_thread(),
             &f::words(),
             (f::chat::LINES, f::chat::TEXT),
-            (person, requester),
+            crate::pages::chat::Speakers { person, requester },
             None,
             &mut crate::frame::Bindings::new(f::tree_limits().bindings),
         );
@@ -260,7 +260,7 @@ fn pending_words_without_a_party_are_named_you() {
         &thread,
         &f::words(),
         (f::chat::LINES, f::chat::TEXT),
-        (Some(73), true),
+        crate::pages::chat::Speakers { person: Some(73), requester: true },
         None,
         &mut crate::frame::Bindings::new(f::tree_limits().bindings),
     );

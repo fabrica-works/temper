@@ -135,6 +135,8 @@ pub const STEPS: Style = Style { owner: owner(), token: 64 };
 pub const STEP: Style = Style { owner: owner(), token: 65 };
 /// A completed step on a change's delegation card.
 pub const STEP_DONE: Style = Style { owner: owner(), token: 66 };
+/// The demo's project, repository and signed-in role.
+pub const CONTEXT: Style = Style { owner: owner(), token: 67 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -207,6 +209,7 @@ pub const NAMES: Names<'static> = Names {
         b"temper-steps",
         b"temper-step",
         b"temper-step-done",
+        b"temper-context",
     ],
     regions: &[b"temper-link"],
 };

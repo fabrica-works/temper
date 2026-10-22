@@ -15,6 +15,8 @@ Demo:
   This is a demo, running on a demo model and a demo forge.
   [8] Connect a model
   [-] Connect a forge (disabled)
+demo · demo/widget on Demo forge
+Signed in as the deployment's owner
 Conversation:
   You
   * Read

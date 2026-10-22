@@ -25,8 +25,11 @@ fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], ac
 pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, text_limit: u32) {
     b.open(Role::Main);
     b.style(crate::look::MAIN);
-    text(b, Role::Heading { level: 1 }, &words.say(Word::Chats, &[]));
-    suggestions(b, root, words, bindings);
+    if demo_start(root) {
+        start(b, root, words, bindings);
+    } else {
+        text(b, Role::Heading { level: 1 }, &words.say(Word::Chats, &[]));
+    }
     if let Some(chats) = root.pages().chats() {
         if root.pages().me(root.client()).is_some() && root.pages().project().is_some() {
             crate::choice::composer(b, root, None, words, bindings);
@@ -92,6 +95,29 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
     }
     b.close();
 }
+fn start(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings) {
+    b.open(Role::Slot);
+    b.style(crate::look::CHATBAR);
+    b.open(Role::Slot);
+    text(b, Role::Paragraph, &words.say(Word::NewChat, &[]));
+    b.open(Role::Status);
+    b.style(crate::look::STATUS_QUIET);
+    let ready = words.say(Word::Ready, &[]);
+    b.name(&ready);
+    b.text(Run::Plain, &ready);
+    b.close();
+    b.close();
+    b.open(Role::Slot);
+    text(b, Role::Paragraph, &words.say(Word::DemoModelName, &[]));
+    b.close();
+    b.close();
+    crate::frame::demo_banner(b, root, words, bindings);
+    if let Some(project) = root.pages().project() {
+        super::chat::context(b, root, project, words);
+    }
+    suggestions(b, root, words, bindings);
+}
+
 pub(crate) fn row(b: &mut Builder, root: &Domain, line: &TaskLine, words: &Words, bindings: &mut Bindings) {
     b.open(Role::Item);
     b.style(crate::look::ROW);
@@ -185,6 +211,16 @@ pub(crate) fn status(
     b.close();
 }
 
+pub(crate) fn demo_start(root: &Domain) -> bool {
+    if *root.pages().address() != Address::Chats {
+        return false;
+    }
+    match root.demo() {
+        Some((demo, halves)) => halves.model && root.pages().project() == Some(demo.project),
+        None => false,
+    }
+}
+
 fn suggestions(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings) {
     let Some((demo, halves)) = root.demo() else { return };
     if !halves.model || root.pages().project() != Some(demo.project) {
@@ -193,7 +229,7 @@ fn suggestions(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bin
     let Some(chats) = root.pages().chats() else { return };
     b.open(Role::Slot);
     b.style(crate::look::INVITATION);
-    text(b, Role::Heading { level: 2 }, &words.say(Word::DemoHeading, &[]));
+    text(b, Role::Heading { level: 1 }, &words.say(Word::DemoHeading, &[]));
     text(
         b,
         Role::Paragraph,

@@ -95,6 +95,12 @@ pub enum Word {
     DemoModelName,
     DemoUsing,
     Default,
+    DemoRepository,
+    SignedDeploymentOwner,
+    SignedProjectOwner,
+    SignedName,
+    NewChat,
+    Ready,
     Demo,
     DemoModel,
     ConnectModel,
@@ -158,7 +164,7 @@ pub enum Word {
     SignOutLost,
     Unshowable,
 }
-const ALL: [Word; 144] = [
+const ALL: [Word; 150] = [
     Word::WaitRefused,
     Word::DependencyParked,
     Word::WaitInvalid,
@@ -243,6 +249,12 @@ const ALL: [Word; 144] = [
     Word::DemoModelName,
     Word::DemoUsing,
     Word::Default,
+    Word::DemoRepository,
+    Word::SignedDeploymentOwner,
+    Word::SignedProjectOwner,
+    Word::SignedName,
+    Word::NewChat,
+    Word::Ready,
     Word::Demo,
     Word::DemoModel,
     Word::ConnectModel,
@@ -397,6 +409,12 @@ impl Word {
             Self::DemoModelName => 277,
             Self::DemoUsing => 278,
             Self::Default => 279,
+            Self::DemoRepository => 282,
+            Self::SignedDeploymentOwner => 283,
+            Self::SignedProjectOwner => 284,
+            Self::SignedName => 285,
+            Self::NewChat => 286,
+            Self::Ready => 287,
             Self::Demo => 187,
             Self::DemoModel => 188,
             Self::ConnectModel => 189,
@@ -497,7 +515,7 @@ impl Words {
                     holes
                         .push(HoleShape {
                             kind: *kind,
-                            bytes: if word == Word::DemoRequest {
+                            bytes: if word == Word::DemoRequest || word == Word::DemoRepository {
                                 temper_client_domain::forge::DEMO_FIELD_BYTES
                             } else if *kind == HoleKind::Name {
                                 joined
@@ -696,6 +714,12 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::DemoModelName => (&[b"Demo model"], &[]),
         Word::DemoUsing => (&[b"Using Demo model \xc2\xb7 ", b""], &[Name]),
         Word::Default => (&[b"Default"], &[]),
+        Word::DemoRepository => (&[b" \xc2\xb7 ", b"/", b" on Demo forge"], &[Name, Name]),
+        Word::SignedDeploymentOwner => (&[b"Signed in as the deployment's owner"], &[]),
+        Word::SignedProjectOwner => (&[b"Signed in as the project's owner"], &[]),
+        Word::SignedName => (&[b"Signed in as ", b""], &[Name]),
+        Word::NewChat => (&[b"New chat"], &[]),
+        Word::Ready => (&[b"Ready"], &[]),
         Word::Demo => (&[b"Demo"], &[]),
         Word::DemoModel => (&[b"This is a demo, running on a demo model."], &[]),
         Word::ConnectModel => (&[b"Connect a model"], &[]),
