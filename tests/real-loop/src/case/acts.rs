@@ -122,8 +122,8 @@ fn held(key: &'static str, act: Option<calls::Step>) -> Vec<calls::Step> {
 const PACE_DIRECTOR_ENDED: usize = 3;
 const PACE_ASKED: usize = 6;
 const RANKED: usize = 8;
-const SURVEY_ENDED: usize = 11;
-const PACE_A_ENDED: usize = 12;
+const SURVEY_ENDED: usize = 10;
+const PACE_A_ENDED: usize = 11;
 pub const READS_4_4: &[(Read, usize)] = &[
     (Read::DirectorEnded, PACE_DIRECTOR_ENDED),
     (Read::PaceAsked, PACE_ASKED),
@@ -141,25 +141,20 @@ pub fn step_4_4() -> Vec<calls::Step> {
         call(D1, argv!["chat", "--project", number(PROJECT), "--key", "pace", PACE_PERSON]),
         start(D1, argv!["wait", "task", number(DIRECTOR), "--until", "ended", "--json"]),
         call(D1, argv!["wait", "inbox", "--until", "waiting"]),
-        // The director has read A's question before the person reads it:
-        // the question must outlive the run's acknowledgement (jig's
-        // domain/tasks.md, 8.2).
-        calls::until(D1, argv!["chat", number(DIRECTOR)], super::PACE_PENDING.as_bytes(), b"A delegated."),
+        // A's question makes the director due. Wait for its acknowledgement
+        // run to park before the person reads the question: it must outlive
+        // that acknowledgement (jig's domain/tasks.md, 8.2). Polling chat
+        // instead races its live run watch with that run's end and can retry.
+        call(D1, argv!["wait", "task", number(DIRECTOR), "--until", "phase:idle"]),
         call(D1, argv!["inbox", "--kind", "questions", "--json"]),
         call(D1, argv!["rank", number(SECOND_ACCOUNT), "1"]),
         call(D1, argv!["accounts", "--json"]),
         call(D1, argv!["answer", number(DIRECTOR), number(PACE_QUESTION_MESSAGE), PACE_ANSWER, "--key", "pace-answer"]),
-        // Wait for delegation by condition. Keep the ended-phase reads below:
-        // fresh waits exit unknown once their task's live row is gone (jig's
-        // routing/views.rs admission and documents/small.rs visible()).
-        calls::until(
-            D1,
-            argv!["task", number(A), "--json"],
-            super::SURVEY_SPEC.as_bytes(),
-            super::PACE_A_SPEC.as_bytes(),
-        ),
-        calls::until(D1, argv!["task", number(SURVEY), "--json"], b"\"phase\":\"ended\"", b"\"phase\":\"running\""),
-        calls::until(D1, argv!["task", number(A), "--json"], b"\"phase\":\"ended\"", b"\"phase\":\"running\""),
+        // The director reports after A, which reports after the survey. Its
+        // existing live watch is the completion barrier; read their historical
+        // documents once afterwards, without polling or opening ended watches.
         join(PACE_DIRECTOR_ENDED),
+        call(D1, argv!["task", number(SURVEY), "--json"]),
+        call(D1, argv!["task", number(A), "--json"]),
     ]
 }
