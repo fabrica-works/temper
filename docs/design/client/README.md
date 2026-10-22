@@ -1427,8 +1427,9 @@ acts on it as its document offers (5.11).
 - **Its result,** once it has ended: a region "Result" after the
   conversation, its state and its words as a goal's "Result" says them
   (5.8), from the same function (`pages::delegation::facts`):
-  "Completed", "Failed", "Cancelled" or "Ended", and the report's
-  words, or a failed task's reason. The mockup's "RESULT" capitals are
+  "Completed", "Landed" (done with a change's result, as 5.8 says),
+  "Failed", "Cancelled" or "Ended", and the report's words, or a
+  failed task's reason. The mockup's "RESULT" capitals are
   the look's. A task that has not ended has no such region.
 - **Its plan,** while its owner tree holds a delegate, or a held task's
   card, its own or a delegate's: a goal's "Plan" (5.8), its rows, their
