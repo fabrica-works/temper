@@ -228,10 +228,12 @@ pub enum Word {
     NoRun,
     RunStarted,
     ItsTasks,
+    SteerNote,
+    StopHolds,
 }
 // Room for temper, jig, account, card and forge phrases.
 const PHRASES: u32 = 576;
-const ALL: [Word; 212] = [
+const ALL: [Word; 214] = [
     Word::WaitRefused,
     Word::DependencyParked,
     Word::WaitInvalid,
@@ -444,6 +446,8 @@ const ALL: [Word; 212] = [
     Word::NoRun,
     Word::RunStarted,
     Word::ItsTasks,
+    Word::SteerNote,
+    Word::StopHolds,
 ];
 impl Word {
     #[expect(clippy::too_many_lines, reason = "one exhaustive table keeps the frame phrase IDs stable")]
@@ -666,6 +670,8 @@ impl Word {
             Self::NoRun => 1035,
             Self::RunStarted => 1036,
             Self::ItsTasks => 1037,
+            Self::SteerNote => 1038,
+            Self::StopHolds => 1039,
         };
         let owner =
             if number >= 100 { crate::frame::owner() } else { temper_client_domain::forge::words::owner(connector) };
@@ -1046,6 +1052,8 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::NoRun => (&[b"No run now"], &[]),
         Word::RunStarted => (&[b"Started ", b""], &[Name]),
         Word::ItsTasks => (&[b"Its tasks"], &[]),
+        Word::SteerNote => (&[b"Steer this task \xc2\xb7 words reach its live run at the next turn."], &[]),
+        Word::StopHolds => (&[b"Its run stops, and the task is held until it is released."], &[]),
     }
 }
 

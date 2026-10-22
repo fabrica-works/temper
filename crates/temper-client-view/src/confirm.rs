@@ -104,8 +104,27 @@ pub(crate) fn controls(b: &mut Builder, root: &Domain, card: &Card, words: &Word
 }
 pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32) {
     let Some(open) = root.pages().confirmation() else { return };
-    if open.act == ActKind::Cancel {
+    if open.act == ActKind::Cancel && root.pages().chat().is_some() {
         close(b, root, words, bindings);
+        return;
+    }
+    if let Some(page) = root.pages().task()
+        && open.object == jig_client::contract::ObjectKey::Task(page.number)
+        && (open.act == ActKind::Stop || open.act == ActKind::Cancel)
+        && let Some(task) = page.document(root.client())
+    {
+        let word = if open.act == ActKind::Stop { Word::Stop } else { Word::Cancel };
+        b.open(Role::Dialog);
+        b.name(&words.say(word, &[]));
+        b.text(Run::Plain, &words.say(word, &[]));
+        if open.act == ActKind::Stop {
+            words.text(b, Word::StopHolds, &[]);
+        } else {
+            crate::cards::decision(b, words, Some(&ReadValue::Task(Box::new(task.clone()))), ActKind::Cancel);
+        }
+        button(b, bindings, words, Word::Confirm, Act::Confirm);
+        button(b, bindings, words, Word::Cancel, Act::Cancel);
+        b.close();
         return;
     }
     let Some(cards) = root.pages().cards() else { return };

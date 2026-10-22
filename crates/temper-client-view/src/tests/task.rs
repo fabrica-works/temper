@@ -111,9 +111,7 @@ fn a_plans_chip_links_to_its_tasks_page_by_number() {
     let link = &tree.nodes()[index_of(&tree, Role::Link, b"Task 12")];
     assert_eq!(
         bindings.decode(link.binding.expect("bound").token, skein_ui::Act::Press),
-        Some(temper_client_domain::Action::Pages(temper_client_domain::pages::Act::Go {
-            address: temper_client_domain::Address::Task { task: CHILD }
-        }))
+        Some(Action::Pages(Act::Go { address: temper_client_domain::Address::Task { task: CHILD } }))
     );
 }
 
@@ -230,7 +228,7 @@ fn has_release_card(tree: &Tree) -> bool {
     false
 }
 #[test]
-fn a_released_plans_item_keeps_its_decision_result_while_running() {
+fn a_released_tasks_card_keeps_its_decision_result_while_running() {
     use temper_client_domain::{Action, Event, pages::Act};
     let mut root = f::held_root();
     for act in [
@@ -239,19 +237,18 @@ fn a_released_plans_item_keeps_its_decision_result_while_running() {
     ] {
         fixtures::root_event(&mut root, Event::Act { action: Action::Pages(act) });
     }
-    let mut tree = f::tree();
-    let c::Delivery::OwnerTree(value) = &mut tree else { panic!("owner tree") };
-    value.root.phase = c::Phase::Running;
+    let mut chip = f::document().chip;
+    chip.task = TASK;
+    chip.phase = c::Phase::Running;
     let limits = fixtures::tree_limits();
     let mut builder = Builder::new(&limits);
-    crate::pages::task::plan(
+    crate::pages::task::controls(
         &mut builder,
-        &tree,
+        &chip,
         &root,
         &fixtures::words(),
         &mut crate::frame::Bindings::new(limits.bindings),
         fixtures::domain_limits().client.domain.rows,
-        crate::words::Word::Plan,
     );
     assert!(has_release_card(&builder.finish()));
 }
@@ -519,7 +516,8 @@ fn the_goals_held_card_keeps_its_key_without_a_goal_row() {
     assert_eq!(item.role, Role::Item);
     assert_eq!(item.key, Some(skein_ui::Key { owner: crate::frame::owner(), kind: 2, a: TASK, b: 0 }));
     let plan = styled(tree, look::PLAN);
-    assert_eq!(children(tree, plan).as_slice(), [hold]);
+    assert!(children(tree, plan).is_empty());
+    assert!(hold < plan);
     assert!(fixtures::find(tree, Role::TreeItem, b"Task 9").is_none());
 }
 pub(super) fn activity_tree(rows: bool) -> Tree {
@@ -838,9 +836,7 @@ fn the_budget_card_names_each_funder() {
             let id = link.expect("funder link");
             assert_eq!(
                 crate::act(&mut view, id, skein_ui::Act::Press),
-                Some(temper_client_domain::Action::Pages(temper_client_domain::pages::Act::Go {
-                    address: temper_client_domain::Address::Task { task }
-                }))
+                Some(Action::Pages(Act::Go { address: temper_client_domain::Address::Task { task } }))
             );
         }
     }
@@ -1241,7 +1237,7 @@ fn the_header_says_its_exact_wait_and_goal_priority_in_both_shells() {
     }
 }
 #[test]
-fn both_plan_shapes_omit_the_goal_and_keep_its_hold_and_folds() {
+fn both_plan_shapes_omit_the_goal_and_its_hold_and_keep_its_folds() {
     let root = f::held_root();
     let mut owner = f::tree();
     let c::Delivery::OwnerTree(tree) = &mut owner else { panic!("owner tree") };
@@ -1290,11 +1286,11 @@ fn both_plan_shapes_omit_the_goal_and_keep_its_hold_and_folds() {
         assert!(fixtures::find(&tree, Role::TreeItem, b"Task 9").is_none());
         let top = children(&tree, styled(&tree, look::PLAN));
         let nodes = tree.nodes();
-        assert_eq!(nodes[top.as_slice()[0]].styles.as_slice(), [look::PLAN_HOLD]);
-        assert_eq!(nodes[top.as_slice()[1]].role, Role::Paragraph);
-        assert_eq!(nodes[top.as_slice()[1]].name.as_deref(), Some(b"Folded: 2 Running".as_slice()));
-        assert_eq!(nodes[top.as_slice()[2]].role, Role::TreeItem);
-        assert_eq!(nodes[top.as_slice()[2]].name.as_deref(), Some(b"Task 12".as_slice()));
+        assert!(!has_style(tree.nodes(), look::PLAN_HOLD));
+        assert_eq!(nodes[top.as_slice()[0]].role, Role::Paragraph);
+        assert_eq!(nodes[top.as_slice()[0]].name.as_deref(), Some(b"Folded: 2 Running".as_slice()));
+        assert_eq!(nodes[top.as_slice()[1]].role, Role::TreeItem);
+        assert_eq!(nodes[top.as_slice()[1]].name.as_deref(), Some(b"Task 12".as_slice()));
     }
 }
 
@@ -1331,7 +1327,6 @@ fn an_agents_task_has_its_parts_in_order() {
         assert!(!named(tree.nodes(), Role::Heading { level: 2 }, name));
     }
     for node in tree.nodes() {
-        assert!(!node.styles.as_slice().contains(&look::CHOICE));
         assert!(!node.styles.as_slice().contains(&look::COMPOSER));
         assert!(!node.styles.as_slice().contains(&look::COMPOSER_AREA));
         assert_ne!(node.role, Role::TextArea);
@@ -1370,9 +1365,7 @@ fn the_lineage_bar_links_the_parent_by_number_with_its_title() {
             let number = if lineage { CHILD } else { OTHER_DEPENDENCY };
             assert_eq!(
                 crate::act(&mut view, id, skein_ui::Act::Press),
-                Some(temper_client_domain::Action::Pages(temper_client_domain::pages::Act::Go {
-                    address: temper_client_domain::Address::Task { task: number },
-                })),
+                Some(Action::Pages(Act::Go { address: temper_client_domain::Address::Task { task: number } })),
             );
         }
     }
@@ -1569,4 +1562,283 @@ fn an_agents_page_carries_its_tokens_on_their_roles() {
     )))));
     let ended = agent(task);
     assert_eq!(ended.tree().nodes()[styled(ended.tree(), look::AGENT_RESULT)].role, Role::Region);
+}
+
+use temper_client_domain::{Action, Domain, Event, pages::Act};
+fn offers(task: &mut c::Task, values: &[(c::ActKind, c::Admission)]) {
+    task.acts = List::with_capacity(u32::try_from(values.len()).expect("fixture offers"));
+    for (act, admission) in values {
+        task.acts.push(c::Offered { act: *act, admission: admission.clone(), effect: None }).expect("offer");
+    }
+}
+fn press(root: &mut Domain, act: Act) {
+    fixtures::root_event(root, Event::Act { action: Action::Pages(act) });
+}
+fn press_button(root: &mut Domain, name: &[u8]) {
+    let mut view = fixtures::page_view(root);
+    let id = fixtures::find(view.tree(), Role::Button, name).expect("offered button");
+    let action = crate::act(&mut view, id, skein_ui::Act::Press).expect("button binding");
+    fixtures::root_event(root, Event::Act { action });
+}
+fn contains(tree: &Tree, expected: &[u8]) -> bool {
+    skein_lib::bytes::find(&fixtures::text(tree), expected).is_some()
+}
+#[test]
+fn a_goals_toolbar_offers_stop_then_cancel_and_confirms_both() {
+    for (name, dialog) in [(b"Stop".as_slice(), b"Stop".as_slice()), (b"Cancel", b"Cancel")] {
+        let mut task = f::document();
+        offers(&mut task, &[(c::ActKind::Stop, c::Admission::Allowed), (c::ActKind::Cancel, c::Admission::Allowed)]);
+        let mut root = f::root_with(task);
+        let view = fixtures::page_view(&root);
+        let tree = view.tree();
+        let toolbar = styled(tree, look::TASK_ACTS);
+        assert_eq!(tree.nodes()[toolbar].role, Role::Slot);
+        let buttons = children(tree, toolbar);
+        assert_eq!(tree.nodes()[buttons.as_slice()[0]].name.as_deref(), Some(b"Stop".as_slice()));
+        assert_eq!(tree.nodes()[buttons.as_slice()[1]].name.as_deref(), Some(b"Cancel".as_slice()));
+        assert!(region_index(tree, b"Task details") < toolbar);
+        press_button(&mut root, name);
+        let view = fixtures::page_view(&root);
+        assert!(fixtures::find(view.tree(), Role::Dialog, dialog).is_some());
+        assert!(!has_style(view.tree().nodes(), look::TASK_ACTS));
+        assert!(fixtures::find(view.tree(), Role::Button, b"Confirm").is_some());
+        press_button(&mut root, b"Cancel");
+        assert!(root.pages().confirmation().is_none());
+        assert!(root.pages().task().expect("page").pending.is_empty());
+    }
+}
+#[test]
+fn task_acts_show_their_name_and_admission_or_nothing_when_absent() {
+    for admission in [
+        None,
+        Some(c::Admission::Refused(c::Refusal::NotOffered)),
+        Some(c::Admission::Proposed { to: c::Recipient::Party(PARTY) }),
+    ] {
+        let mut task = f::document();
+        offers(&mut task, &[]);
+        if let Some(admission) = &admission {
+            offers(&mut task, &[(c::ActKind::Stop, admission.clone()), (c::ActKind::Cancel, admission.clone())]);
+        }
+        let view = goal(task);
+        for name in [b"Stop".as_slice(), b"Cancel"] {
+            assert!(fixtures::find(view.tree(), Role::Button, name).is_none());
+            assert_eq!(fixtures::find(view.tree(), Role::Paragraph, name).is_some(), admission.is_some());
+        }
+        match admission {
+            Some(c::Admission::Refused(_)) => assert!(contains(view.tree(), b"This act is not offered")),
+            Some(c::Admission::Proposed { .. }) => assert!(contains(view.tree(), b"This needs a proposal to")),
+            None => assert!(!has_style(view.tree().nodes(), look::TASK_ACTS)),
+            _ => unreachable!("fixture admissions"),
+        }
+    }
+}
+#[test]
+fn task_cancel_says_the_supplied_impact_and_stop_says_it_holds() {
+    let mut task = f::document();
+    offers(&mut task, &[(c::ActKind::Cancel, c::Admission::Allowed), (c::ActKind::Stop, c::Admission::Allowed)]);
+    task.acts.get_mut(0).expect("cancel").effect = Some(c::Effect::Cancel(c::Impact {
+        tasks: c::PhaseCounts {
+            waiting: 2,
+            running: 3,
+            held: 4,
+            closing: 5,
+            ended: 0,
+            done: 0,
+            failed: 0,
+            cancelled: 0,
+        },
+        live_runs: 6,
+        proposals: 7,
+    }));
+    let mut root = f::root_with(task);
+    press_button(&mut root, b"Cancel");
+    let view = fixtures::page_view(&root);
+    for expected in [
+        b"Dangerous action: review its consequences".as_slice(),
+        b"2 waiting tasks",
+        b"3 running tasks",
+        b"4 held tasks",
+        b"5 closing tasks",
+        b"6 live runs",
+        b"7 proposals will be withdrawn",
+        b"Effects not yet begun will be withdrawn; begun effects will settle",
+    ] {
+        assert!(contains(view.tree(), expected), "{expected:?}");
+    }
+    press_button(&mut root, b"Cancel");
+    press_button(&mut root, b"Stop");
+    let view = fixtures::page_view(&root);
+    assert!(contains(view.tree(), b"Its run stops, and the task is held until it is released."));
+}
+#[test]
+fn an_agents_taskbar_has_stop_and_its_composer_has_the_steering_note() {
+    let mut task = f::delegate();
+    offers(&mut task, &[(c::ActKind::Stop, c::Admission::Allowed), (c::ActKind::Message, c::Admission::Allowed)]);
+    let mut root = f::agent_root(task, Some(f::tree()), true);
+    let mut view = fixtures::page_view(&root);
+    let tree = view.tree();
+    let bar = styled(tree, look::CHATBAR);
+    assert!(named(subtree(tree, bar), Role::Button, b"Stop"));
+    let composer = styled(tree, look::COMPOSER_AREA);
+    let steer = styled(tree, look::AGENT_STEER);
+    assert_eq!(tree.nodes()[steer].role, Role::Paragraph);
+    assert!(contains(tree, "Steer this task · words reach its live run at the next turn.".as_bytes()));
+    let textarea = fixtures::find(tree, Role::TextArea, b"Message").expect("message");
+    assert!(named(subtree(tree, composer), Role::Button, b"Send"));
+    assert!(index_of(tree, Role::Log, b"Conversation") < composer);
+    let action = crate::act(&mut view, textarea, skein_ui::Act::Input { value: Box::from(*b"Steer") });
+    assert_eq!(action, Some(Action::Pages(Act::MessageWords { words: Box::from(*b"Steer") })));
+    press_button(&mut root, b"Stop");
+    let view = fixtures::page_view(&root);
+    assert!(!named(subtree(view.tree(), styled(view.tree(), look::CHATBAR)), Role::Button, b"Stop"));
+}
+#[test]
+fn an_agents_refused_or_proposed_message_says_why_in_the_composers_place() {
+    for admission in
+        [c::Admission::Refused(c::Refusal::NotWaiting), c::Admission::Proposed { to: c::Recipient::Party(PARTY) }]
+    {
+        let mut task = f::delegate();
+        offers(&mut task, &[(c::ActKind::Message, admission.clone())]);
+        let view = agent(task);
+        let tree = view.tree();
+        let composer = styled(tree, look::COMPOSER_AREA);
+        assert!(named(subtree(tree, composer), Role::Paragraph, b"Message"));
+        assert!(fixtures::find(tree, Role::TextArea, b"Message").is_none());
+        assert!(fixtures::find(tree, Role::Button, b"Send").is_none());
+        assert!(!has_style(tree.nodes(), look::AGENT_STEER));
+        if let c::Admission::Proposed { .. } = admission {
+            assert!(contains(tree, b"This needs a proposal to"));
+        } else {
+            let expected = fixtures::words().say_word(jig_client::words::Word::refusal(&c::Refusal::NotWaiting), &[]);
+            assert!(contains(tree, &expected));
+        }
+    }
+}
+#[test]
+fn the_own_held_card_follows_the_goals_toolbar_or_the_agents_run_heading() {
+    let source = f::held_root();
+    let mut task = source.pages().task().expect("page").document(source.client()).expect("task").clone();
+    let release = task.acts.as_slice()[0].clone();
+    offers(&mut task, &[(c::ActKind::Cancel, c::Admission::Allowed)]);
+    task.acts = {
+        let mut acts = List::with_capacity(2);
+        acts.push(release).unwrap();
+        acts.push(task.acts.as_slice()[0].clone()).unwrap();
+        acts
+    };
+    for agent in [false, true] {
+        let root = if agent {
+            task.priority = None;
+            task.activity = 1;
+            f::agent_root(task.clone(), Some(tree_delivery()), true)
+        } else {
+            f::supplied_root(task.clone(), true)
+        };
+        let view = fixtures::page_view(&root);
+        let tree = view.tree();
+        let hold = styled(tree, look::PLAN_HOLD);
+        let preceding = styled(tree, if agent { look::AGENT_RUN } else { look::TASK_ACTS });
+        assert!(preceding < hold);
+        assert!(hold < styled(tree, look::PLAN));
+        assert!(named(subtree(tree, hold), Role::Button, b"Release task"));
+    }
+}
+fn tree_delivery() -> c::Delivery {
+    let mut delivery = f::tree();
+    let c::Delivery::OwnerTree(tree) = &mut delivery else { panic!("tree") };
+    tree.root.phase = c::Phase::Held;
+    delivery
+}
+#[test]
+fn an_agents_older_button_reads_before_the_full_window() {
+    let mut task = f::delegate();
+    task.activity = 2;
+    let mut page = f::activity(true);
+    let mut second = page.rows.as_slice()[0].clone();
+    second.position = 2;
+    page.rows = {
+        let first = page.rows.as_slice()[0].clone();
+        let mut rows = List::with_capacity(2);
+        rows.push(first).unwrap();
+        rows.push(second).unwrap();
+        rows
+    };
+    page.before = Some(c::Cursor::new(Box::from(*b"older"), 32).expect("cursor"));
+    let mut root = f::agent_root_with_page(task, Some(f::tree()), page);
+    let mut view = fixtures::page_view(&root);
+    let id = fixtures::find(view.tree(), Role::Button, b"Older").expect("older");
+    let action = crate::act(&mut view, id, skein_ui::Act::Press).expect("older action");
+    assert_eq!(action, Action::Pages(Act::Older));
+    fixtures::root_event(&mut root, Event::Act { action });
+    match root.pages().task().expect("page").thread.reading {
+        Some(jig_client::thread::Reading::Older) => {}
+        Some(jig_client::thread::Reading::Latest { .. } | jig_client::thread::Reading::Newer) | None => {
+            panic!("older read pending")
+        }
+    }
+}
+
+fn confirming_stop(root: &mut Domain) -> skein_lib::Token {
+    press(root, Act::Stop);
+    let limits = fixtures::domain_limits();
+    let mut out = skein_lib::Queue::with_capacity(temper_client_domain::max_out(&limits));
+    temper_client_domain::step(
+        root,
+        &skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits },
+        Event::Act { action: Action::Pages(Act::Confirm) },
+        &mut out,
+    );
+    while let Some(request) = out.pop() {
+        if let temper_client_domain::Request::Client {
+            request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, .. } },
+        } = request
+        {
+            return attempt;
+        }
+    }
+    panic!("stop sent");
+}
+#[test]
+fn task_acts_show_progress_and_the_answer_after_the_toolbar_or_conversation() {
+    for agent in [false, true] {
+        for (answer, expected) in [
+            (c::Answer::Done(c::Outcome::Changed), b"Applied".as_slice()),
+            (c::Answer::Refused { refusal: c::Refusal::NotOffered, at: None }, b"This act is not offered"),
+        ] {
+            let mut task = f::delegate();
+            offers(&mut task, &[(c::ActKind::Stop, c::Admission::Allowed)]);
+            let mut root = if agent { f::agent_root(task, Some(f::tree()), true) } else { f::root_with(task) };
+            let attempt = confirming_stop(&mut root);
+            let page = root.pages().task().expect("page");
+            let key = page.pending.as_slice()[0].0;
+            let progress = root.client().pending(key).expect("pending").progress;
+            let mut builder = Builder::new(&fixtures::tree_limits());
+            crate::confirm::progress_text(&mut builder, &fixtures::words(), progress);
+            let expected_progress = fixtures::text(&builder.finish());
+            assert!(contains(fixtures::page_view(&root).tree(), &expected_progress));
+            fixtures::root_event(
+                &mut root,
+                Event::Client {
+                    event: jig_client::Event::Up {
+                        up: jig_client::Up::Answer {
+                            attempt,
+                            envelope: skein_lib::RequestEnvelope::Final,
+                            answer: Some(jig_client::Answered::Jig(answer)),
+                            why: None,
+                        },
+                    },
+                },
+            );
+            let view = fixtures::page_view(&root);
+            assert!(contains(view.tree(), expected));
+            assert!(root.pages().task().expect("page").pending.is_empty());
+            let anchor = if agent {
+                index_of(view.tree(), Role::Log, b"Conversation")
+            } else {
+                styled(view.tree(), look::TASK_ACTS)
+            };
+            let outcome = index_of(view.tree(), Role::Status, expected);
+            assert!(anchor < outcome);
+        }
+    }
 }

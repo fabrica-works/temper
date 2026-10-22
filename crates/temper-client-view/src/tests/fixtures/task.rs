@@ -45,6 +45,13 @@ fn root_with_hold(executor: c::Executor, priority: Option<u32>, held: bool) -> t
     document.chip.executor = executor;
     document.priority = priority;
     if held {
+        phase(
+            &mut document,
+            c::OwnerChipPhase::Held {
+                reason: c::HoldCategory::Failures { class: c::HoldFailure::Run },
+                revision: HOLD_REVISION.value,
+            },
+        );
         document.hold = Some(c::TaskHold::Owner(Box::new(c::OwnerChipHold {
             circle: None,
             account: None,
@@ -191,6 +198,13 @@ pub fn phase(task: &mut c::Task, phase: c::OwnerChipPhase) {
     *old = phase;
 }
 pub fn agent_root(document: c::Task, tree: Option<c::Delivery>, conversation: bool) -> temper_client_domain::Domain {
+    agent_root_with_page(document, tree, activity(conversation))
+}
+pub fn agent_root_with_page(
+    document: c::Task,
+    tree: Option<c::Delivery>,
+    page: c::ActivityPage,
+) -> temper_client_domain::Domain {
     use jig_client::{Event as E, Up};
     use temper_client_domain::{Event, Request};
     let limits = domain_limits();
@@ -244,9 +258,7 @@ pub fn agent_root(document: c::Task, tree: Option<c::Delivery>, conversation: bo
                     },
             } => Some(Up::ReadDone {
                 read,
-                result: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(Box::new(activity(
-                    conversation,
-                ))))),
+                result: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(Box::new(page.clone())))),
             }),
             Request::Client {
                 request:

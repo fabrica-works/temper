@@ -52,6 +52,7 @@ pub enum Act {
     },
     Send,
     Stop,
+    /// Close the page's task: a chat's close, or a task page's cancel (client/README.md, 5.11).
     Close,
     DelegateFate {
         task: u64,
@@ -278,9 +279,11 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
             }
         }
         Event::Act { act: Act::Filter { filter } } => out.push(Request::Show { address: Address::Inbox { filter } }),
-        Event::Act { act: act @ (Act::MessageWords { .. } | Act::Send | Act::Stop | Act::Older) } => {
+        Event::Act { act: act @ (Act::MessageWords { .. } | Act::Send | Act::Older) } => {
             if let Some(chat) = &mut pages.chat {
                 chat.act(env, client, act, &mut pages.serial, out);
+            } else if let Some(task) = &mut pages.task {
+                task.act(env, client, act, &mut pages.serial, out);
             }
         }
         Event::Act { act: Act::Seen } => {
@@ -293,6 +296,7 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
         Event::Act {
             act:
                 act @ (Act::Close
+                | Act::Stop
                 | Act::DelegateFate { .. }
                 | Act::Decide { .. }
                 | Act::CardWords { .. }
@@ -440,11 +444,27 @@ fn page_told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Req
 }
 
 fn confirmation(pages: &mut Pages, env: &Env<Limits>, client: &Client, act: Act, out: &mut Queue<Request>) {
+    if let Act::Confirm = act
+        && let Some(page) = &mut pages.task
+        && let Some(open) = &pages.confirm
+        && open.object == jig_client::contract::ObjectKey::Task(page.number)
+        && let jig_client::contract::ActKind::Stop | jig_client::contract::ActKind::Cancel = open.act
+    {
+        let kind =
+            if open.act == jig_client::contract::ActKind::Stop { task::Sending::Stop } else { task::Sending::Cancel };
+        pages.confirm = None;
+        page.send(env, client, kind, &mut pages.serial, out);
+        return;
+    }
     let closing = match &pages.confirm {
         Some(open) => open.act == jig_client::contract::ActKind::Cancel,
         None => false,
     };
     match act {
+        Act::Stop if pages.chat.is_some() => {
+            pages.chat.as_mut().expect("open chat").act(env, client, Act::Stop, &mut pages.serial, out);
+        }
+        Act::Stop => task_confirmation(pages, client, jig_client::contract::ActKind::Stop),
         Act::Close => {
             if let Some(chat) = &mut pages.chat {
                 chat.prepare_close(client);
@@ -456,6 +476,8 @@ fn confirmation(pages: &mut Pages, env: &Env<Limits>, client: &Client, act: Act,
                         again: None,
                     });
                 }
+            } else {
+                task_confirmation(pages, client, jig_client::contract::ActKind::Cancel);
             }
         }
         Act::DelegateFate { task, fate } => {
@@ -487,12 +509,25 @@ fn confirmation(pages: &mut Pages, env: &Env<Limits>, client: &Client, act: Act,
         | Act::Suggest { .. }
         | Act::MessageWords { .. }
         | Act::Send
-        | Act::Stop
         | Act::Older
         | Act::ClosedChats
         | Act::Filter { .. }
         | Act::Seen
         | Act::Go { .. } => unreachable!("only deciding acts routed here"),
+    }
+}
+
+fn task_confirmation(pages: &mut Pages, client: &Client, act: jig_client::contract::ActKind) {
+    if let Some(page) = &pages.task
+        && let Some(task) = page.document(client)
+        && chat::allowed(task, act)
+    {
+        pages.confirm = Some(crate::acts::Confirm {
+            object: jig_client::contract::ObjectKey::Task(page.number),
+            revision: None,
+            act,
+            again: None,
+        });
     }
 }
 

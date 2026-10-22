@@ -616,3 +616,211 @@ fn an_agents_thread_reads_on_until_the_announced_tail() {
     assert_eq!(page.thread.loaded, f::POSITION);
     assert!(f.out.is_empty());
 }
+
+use crate::pages::{self, Act, Pages, task::Sending};
+const WORDS: &[u8] = b"Keep the public interface";
+fn task_pages(mut task: c::Task) -> (Pages, jig_client::Client) {
+    task.label = 1234; // A task page, distinct from the chat template.
+    let fixture = f::with_delegate();
+    let mut pages = Pages::new();
+    let env = fixtures::env(&fixtures::limits());
+    let mut out = Queue::with_capacity(OUTPUTS);
+    pages::step(
+        &mut pages,
+        &env,
+        &fixture.client,
+        pages::Event::Went { address: crate::Address::Task { task: f::TASK } },
+        &mut out,
+    );
+    let handle = pages.task().expect("task page").document;
+    pages::step(
+        &mut pages,
+        &env,
+        &fixture.client,
+        pages::Event::Told {
+            told: Told::Page {
+                handle,
+                page: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(Box::new(task)))),
+            },
+        },
+        &mut out,
+    );
+    (pages, fixture.client)
+}
+fn page_act(pages: &mut Pages, client: &jig_client::Client, act: Act) -> Queue<Request> {
+    let mut out = Queue::with_capacity(OUTPUTS);
+    pages::step(pages, &fixtures::env(&fixtures::limits()), client, pages::Event::Act { act }, &mut out);
+    out
+}
+fn offered_task(kind: c::ActKind, admission: Option<c::Admission>) -> c::Task {
+    let mut task = f::task();
+    task.priority = None;
+    task.chip.executor = c::Executor::Agent { charter: 1 };
+    task.acts = match admission {
+        Some(admission) => fixtures::acts::offered(kind, admission),
+        None => List::with_capacity(0),
+    };
+    task
+}
+#[test]
+fn an_agents_send_is_one_message_only_when_allowed() {
+    for (admission, sent) in [
+        (Some(c::Admission::Allowed), true),
+        (Some(c::Admission::Refused(c::Refusal::NotOffered)), false),
+        (Some(c::Admission::Proposed { to: c::Recipient::Party(fixtures::PARTY) }), false),
+        (None, false),
+    ] {
+        let (mut pages, client) = task_pages(offered_task(c::ActKind::Message, admission));
+        page_act(&mut pages, &client, Act::MessageWords { words: Box::from(WORDS) });
+        let mut out = page_act(&mut pages, &client, Act::Send);
+        let asks = fixtures::acts::sent(&mut out);
+        if sent {
+            assert_eq!(
+                asks.as_ref(),
+                [c::Ask::Message { project: fixtures::PROJECT, task: f::TASK, words: fixtures::acts::text(WORDS) }]
+            );
+            assert!(pages.task().expect("page").words.is_empty());
+            // A second nonempty message joins the same in-flight kind.
+            page_act(&mut pages, &client, Act::MessageWords { words: Box::from(*b"Again") });
+            assert!(fixtures::acts::sent(&mut page_act(&mut pages, &client, Act::Send)).is_empty());
+        } else {
+            assert!(asks.is_empty());
+            assert_eq!(pages.task().expect("page").words.as_ref(), WORDS);
+        }
+    }
+}
+#[test]
+fn a_goals_page_has_no_message_composer_or_older_read() {
+    let mut task = offered_task(c::ActKind::Message, Some(c::Admission::Allowed));
+    task.priority = Some(PRIORITY);
+    let (mut pages, client) = task_pages(task);
+    page_act(&mut pages, &client, Act::MessageWords { words: Box::from(WORDS) });
+    assert!(pages.task().expect("page").words.is_empty());
+    assert!(fixtures::acts::sent(&mut page_act(&mut pages, &client, Act::Send)).is_empty());
+    assert!(page_act(&mut pages, &client, Act::Older).is_empty());
+}
+#[test]
+fn task_stop_waits_for_confirmation_and_joins_its_pending_kind() {
+    let (mut pages, client) = task_pages(offered_task(c::ActKind::Stop, Some(c::Admission::Allowed)));
+    assert!(fixtures::acts::sent(&mut page_act(&mut pages, &client, Act::Stop)).is_empty());
+    assert_eq!(pages.confirmation().expect("confirmation").act, c::ActKind::Stop);
+    assert_eq!(
+        fixtures::acts::sent(&mut page_act(&mut pages, &client, Act::Confirm)).as_ref(),
+        [c::Ask::Stop { project: fixtures::PROJECT, task: f::TASK }]
+    );
+    assert!(pages.confirmation().is_none());
+    page_act(&mut pages, &client, Act::Stop);
+    assert!(fixtures::acts::sent(&mut page_act(&mut pages, &client, Act::Confirm)).is_empty());
+    assert_eq!(pages.task().expect("page").pending.as_slice()[0].1, Sending::Stop);
+}
+#[test]
+fn dismissing_task_stop_sends_nothing() {
+    let (mut pages, client) = task_pages(offered_task(c::ActKind::Stop, Some(c::Admission::Allowed)));
+    page_act(&mut pages, &client, Act::Stop);
+    assert!(page_act(&mut pages, &client, Act::Cancel).is_empty());
+    assert!(pages.confirmation().is_none());
+    assert!(fixtures::acts::sent(&mut page_act(&mut pages, &client, Act::Confirm)).is_empty());
+}
+#[test]
+fn an_unavailable_task_act_opens_no_confirmation() {
+    for admission in [
+        None,
+        Some(c::Admission::Refused(c::Refusal::NotOffered)),
+        Some(c::Admission::Proposed { to: c::Recipient::Party(fixtures::PARTY) }),
+    ] {
+        for (kind, act) in [(c::ActKind::Stop, Act::Stop), (c::ActKind::Cancel, Act::Close)] {
+            let (mut pages, client) = task_pages(offered_task(kind, admission.clone()));
+            assert!(fixtures::acts::sent(&mut page_act(&mut pages, &client, act)).is_empty());
+            assert!(pages.confirmation().is_none());
+        }
+    }
+}
+#[test]
+fn task_close_confirms_cancel_with_the_pages_reason_and_no_grace() {
+    let (mut pages, client) = task_pages(offered_task(c::ActKind::Cancel, Some(c::Admission::Allowed)));
+    assert!(fixtures::acts::sent(&mut page_act(&mut pages, &client, Act::Close)).is_empty());
+    assert_eq!(pages.confirmation().expect("confirmation").act, c::ActKind::Cancel);
+    assert_eq!(
+        fixtures::acts::sent(&mut page_act(&mut pages, &client, Act::Confirm)).as_ref(),
+        [c::Ask::Cancel {
+            project: fixtures::PROJECT,
+            task: f::TASK,
+            reason: fixtures::acts::text(b"Cancelled from its page"),
+            grace: None,
+        }]
+    );
+}
+#[test]
+fn a_task_answer_sets_the_outcome_and_clears_pending() {
+    let (mut pages, client) = task_pages(offered_task(c::ActKind::Stop, Some(c::Admission::Allowed)));
+    page_act(&mut pages, &client, Act::Stop);
+    page_act(&mut pages, &client, Act::Confirm);
+    let key = pages.task().expect("page").pending.as_slice()[0].0;
+    let mut out = Queue::with_capacity(OUTPUTS);
+    pages::step(
+        &mut pages,
+        &fixtures::env(&fixtures::limits()),
+        &client,
+        pages::Event::Told { told: Told::Pending { key } },
+        &mut out,
+    );
+    assert!(!pages.task().expect("page").pending.is_empty());
+    pages::step(
+        &mut pages,
+        &fixtures::env(&fixtures::limits()),
+        &client,
+        pages::Event::Told { told: Told::Answered { key, outcome: jig_client::Outcome::Unknown } },
+        &mut out,
+    );
+    let page = pages.task().expect("page");
+    assert!(page.pending.is_empty());
+    assert_eq!(page.outcome, Some(jig_client::Outcome::Unknown));
+}
+#[test]
+fn older_on_an_agents_page_reads_the_cursor_before_its_window() {
+    use jig_client::thread::window::Edge;
+    let (mut page, mut fixture) = opened();
+    page.shape = Shape::Agent;
+    page.thread.reading = None;
+    let cursor = c::Cursor::new(Box::from(*b"older"), 32).expect("cursor");
+    page.thread.lines.edges.after = Edge::More(cursor.clone());
+    while fixture.out.pop().is_some() {}
+    page.act(&fixtures::env(&fixtures::limits()), &fixture.client, Act::Older, &mut 0, &mut fixture.out);
+    assert_eq!(
+        fixture.out.pop(),
+        Some(Request::Client(Event::Read {
+            handle: page.activity,
+            read: Readable::Jig(c::Read::Activity { task: f::TASK, before: Some(cursor) }),
+        }))
+    );
+}
+
+#[test]
+fn a_message_answer_reconciles_its_conversation_words() {
+    for outcome in [
+        jig_client::Outcome::Unknown,
+        jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Refused {
+            refusal: c::Refusal::NotWaiting,
+            at: None,
+        })),
+    ] {
+        let (mut pages, client) = task_pages(offered_task(c::ActKind::Message, Some(c::Admission::Allowed)));
+        page_act(&mut pages, &client, Act::MessageWords { words: Box::from(WORDS) });
+        page_act(&mut pages, &client, Act::Send);
+        let page = pages.task().expect("page");
+        let key = page.pending.as_slice()[0].0;
+        assert!(!page.thread.words.rows.is_empty());
+        let mut out = Queue::with_capacity(OUTPUTS);
+        pages::step(
+            &mut pages,
+            &fixtures::env(&fixtures::limits()),
+            &client,
+            pages::Event::Told { told: Told::Answered { key, outcome: outcome.clone() } },
+            &mut out,
+        );
+        let page = pages.task().expect("page");
+        assert!(page.pending.is_empty());
+        assert_eq!(page.outcome, Some(outcome));
+        assert!(page.thread.words.rows.is_empty());
+    }
+}

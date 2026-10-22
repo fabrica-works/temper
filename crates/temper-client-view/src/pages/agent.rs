@@ -4,10 +4,14 @@ use crate::{
     look,
     words::{Word, Words},
 };
+use alloc::boxed::Box;
 use jig_client::{Latest, contract as c};
 use skein_lib::bytes::copy_of;
-use skein_ui::{Builder, Role, Run, phrases::Hole};
-use temper_client_domain::{Domain, pages::task};
+use skein_ui::{Builder, Role, Run, State, phrases::Hole};
+use temper_client_domain::{
+    Domain,
+    pages::{Act, task},
+};
 
 fn text(b: &mut Builder, role: Role, value: &[u8]) {
     b.open(role);
@@ -37,6 +41,9 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         b.open(Role::Slot);
         super::task::executor(b, task.chip.executor, words);
         text(b, Role::Paragraph, &words.say(Word::RowSpent, &[Hole::Number(task.budget.numbers.spent)]));
+        if root.pages().confirmation().is_none() {
+            super::task::act(b, task, c::ActKind::Stop, Word::Stop, Act::Stop, words, bindings);
+        }
         b.close();
         b.close();
         b.open(Role::Slot);
@@ -52,6 +59,13 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         if let Some(run) = task::run(task) {
             run_heading(b, run, words);
         }
+        super::task::controls(b, &task.chip, root, words, bindings, rows);
+        if let jig_client::thread::window::Edge::More(_) = page.thread.lines.edges.after {
+            b.open(Role::Button);
+            b.name(&words.say(Word::Older, &[]));
+            b.bind(bindings.insert(Act::Older));
+            b.close();
+        }
         super::chat::conversation(
             b,
             &page.thread,
@@ -61,6 +75,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             None,
             bindings,
         );
+        super::task::outcome(b, root, words);
         super::task::result(b, task, words, look::AGENT_RESULT);
         if let Some(document) = root.client().document(page.tree)
             && let Some(Latest::Jig(tree)) = document.latest
@@ -87,6 +102,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             }
         }
         b.close();
+        composer(b, root, page, task, words, bindings);
     }
     crate::confirm::main(b, root, words, bindings, rows);
     b.close();
@@ -126,6 +142,47 @@ fn run_heading(b: &mut Builder, run: task::Run, words: &Words) {
     text(b, Role::Heading { level: 2 }, &heading);
     if let Some(at) = since {
         text(b, Role::Paragraph, &words.run_started(at));
+    }
+    b.close();
+}
+
+fn composer(b: &mut Builder, root: &Domain, page: &task::Task, task: &c::Task, words: &Words, bindings: &mut Bindings) {
+    let Some(admission) = jig_client::facts::offer(task.acts.as_slice(), c::ActKind::Message) else {
+        crate::choice::composer(b, root, Some(task), words, bindings);
+        return;
+    };
+    b.open(Role::Slot);
+    b.style(look::COMPOSER_AREA);
+    match admission {
+        c::Admission::Allowed | c::Admission::Bounded { .. } => {
+            b.open(Role::Paragraph);
+            b.style(look::AGENT_STEER);
+            words.text(b, Word::SteerNote, &[]);
+            b.close();
+            crate::choice::composer(b, root, Some(task), words, bindings);
+            b.open(Role::Slot);
+            b.style(look::ENTRY);
+            b.open(Role::TextArea);
+            b.name(&words.say(Word::Message, &[]));
+            b.state(State::SubmitsOnEnter);
+            b.style(look::COMPOSER);
+            b.value(&page.words, temper_client_domain::pages::shown(root.pages()));
+            b.bind(bindings.insert(Act::MessageWords { words: Box::default() }));
+            b.close();
+            b.open(Role::Paragraph);
+            b.style(look::HINT);
+            words.text(b, Word::ChatSendHint, &[]);
+            b.close();
+            b.open(Role::Button);
+            b.name(&words.say(Word::Send, &[]));
+            b.bind(bindings.insert(Act::Send));
+            b.close();
+            b.close();
+        }
+        c::Admission::Proposed { .. } | c::Admission::Refused(_) => {
+            super::task::act(b, task, c::ActKind::Message, Word::Message, Act::Send, words, bindings);
+            crate::choice::composer(b, root, Some(task), words, bindings);
+        }
     }
     b.close();
 }

@@ -1,9 +1,9 @@
 //! One task's borrowed documents, first activity page and live run handle.
-use super::{Request, inbox::Card};
+use super::{Act, Request, inbox::Card};
 use crate::{Address, Limits, owner::Owner};
 use alloc::boxed::Box;
-use jig_client::{Client, Handle, Latest, Readable, Readout, Told, Watchable, contract as c};
-use skein_lib::{List, Queue, Wall};
+use jig_client::{Client, Handle, Key, Latest, Readable, Readout, Told, Watchable, contract as c};
+use skein_lib::{Env, List, Queue, Wall};
 /// A task's state as a goal's page says it (client/README.md, 5.8).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum State {
@@ -222,6 +222,13 @@ pub enum Shape {
     Agent,
     HeaderAndPlan,
 }
+/// A task page's request kinds, one in flight per kind (client/README.md, 5.11).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Sending {
+    Message,
+    Stop,
+    Cancel,
+}
 #[derive(Debug)]
 pub struct Task {
     pub number: u64,
@@ -236,6 +243,9 @@ pub struct Task {
     pub next: u64,
     pub through: Option<u64>,
     pub cards: List<Card>,
+    pub words: Box<[u8]>,
+    pub pending: List<(Key, Sending)>,
+    pub outcome: Option<jig_client::Outcome>,
 }
 impl Task {
     pub(crate) fn new(number: u64, first: u64, limits: &Limits, out: &mut Queue<Request>) -> Self {
@@ -264,6 +274,9 @@ impl Task {
             next: first.checked_add(3).expect("task handles fit"),
             through: None,
             cards: List::with_capacity(limits.client.domain.reads),
+            words: Box::default(),
+            pending: List::with_capacity(3),
+            outcome: None,
         }
     }
     #[must_use]
@@ -275,6 +288,113 @@ impl Task {
             Latest::Jig(c::Delivery::Task(task)) => Some(task),
             Latest::Jig(_) | Latest::Family(_) => None,
         }
+    }
+    pub(crate) fn act(
+        &mut self,
+        env: &Env<Limits>,
+        client: &Client,
+        act: Act,
+        serial: &mut u64,
+        out: &mut Queue<Request>,
+    ) {
+        if self.shape != Shape::Agent {
+            return;
+        }
+        match act {
+            Act::MessageWords { words } => {
+                if words.len() <= usize::try_from(env.limits.client.domain.text).expect("text bound fits") {
+                    self.words = words;
+                }
+            }
+            Act::Send => self.send(env, client, Sending::Message, serial, out),
+            Act::Older => {
+                if let Some(older) = self.thread.older() {
+                    read(self.activity, older, out);
+                }
+            }
+            Act::Project { .. }
+            | Act::Choice(_)
+            | Act::SignOut
+            | Act::Accounts(_)
+            | Act::ChatWords { .. }
+            | Act::StartChat
+            | Act::Suggest { .. }
+            | Act::Stop
+            | Act::Close
+            | Act::DelegateFate { .. }
+            | Act::ClosedChats
+            | Act::Filter { .. }
+            | Act::Seen
+            | Act::Decide { .. }
+            | Act::CardWords { .. }
+            | Act::Again { .. }
+            | Act::Confirm
+            | Act::Cancel
+            | Act::Go { .. } => unreachable!("only composer and older acts routed here"),
+        }
+    }
+    pub(crate) fn send(
+        &mut self,
+        env: &Env<Limits>,
+        client: &Client,
+        kind: Sending,
+        serial: &mut u64,
+        out: &mut Queue<Request>,
+    ) {
+        let Some(task) = self.document(client) else { return };
+        let ask = match kind {
+            Sending::Message
+                if self.shape == Shape::Agent
+                    && !self.words.is_empty()
+                    && super::chat::allowed(task, c::ActKind::Message) =>
+            {
+                c::Ask::Message {
+                    project: task.project,
+                    task: self.number,
+                    words: c::Text::new(self.words.clone(), env.limits.client.domain.text).expect("composer bounded"),
+                }
+            }
+            Sending::Stop if super::chat::allowed(task, c::ActKind::Stop) => {
+                c::Ask::Stop { project: task.project, task: self.number }
+            }
+            Sending::Cancel if super::chat::allowed(task, c::ActKind::Cancel) => c::Ask::Cancel {
+                project: task.project,
+                task: self.number,
+                reason: c::Text::new(Box::from(*b"Cancelled from its page"), u32::MAX)
+                    .expect("page cancellation reason fits"),
+                grace: None,
+            },
+            Sending::Message | Sending::Stop | Sending::Cancel => return,
+        };
+        for (_, pending) in &self.pending {
+            if *pending == kind {
+                return;
+            }
+        }
+        *serial = serial.checked_add(1).expect("task keys fit");
+        let key = Key { asker: Owner::Pages.asker(), number: *serial };
+        if let c::Ask::Message { words, .. } = &ask {
+            let Some(Latest::Jig(c::Delivery::Me(me))) = latest(client, super::me_handle()) else { return };
+            if !self.thread.sending(key, me.party.number, words.clone(), 0) {
+                return;
+            }
+            self.words = Box::default();
+        }
+        self.pending.push((key, kind)).expect("one request per task act fits");
+        self.outcome = None;
+        out.push(Request::Client(jig_client::Event::Send {
+            key,
+            name: None,
+            request: jig_client::Ask::Jig(Box::new(ask)),
+        }));
+    }
+    fn pending_kind(&self, key: Key) -> Option<Sending> {
+        for (pending, kind) in &self.pending {
+            if *pending == key {
+                return Some(*kind);
+            }
+        }
+        None
     }
     pub(crate) fn leave(&self, out: &mut Queue<Request>) -> u64 {
         for handle in [Some(self.document), Some(self.tree), Some(self.activity), self.run].into_iter().flatten() {
@@ -302,6 +422,25 @@ impl Task {
             }
         }
         match told {
+            Told::Answered { key, outcome } if self.pending_kind(key).is_some() => {
+                if self.pending_kind(key) == Some(Sending::Message) {
+                    if let jig_client::Outcome::Answered(jig_client::Answered::Jig(answer)) = &outcome {
+                        self.thread.answered(key, answer);
+                    } else {
+                        self.thread.words.refused(key);
+                    }
+                }
+                let mut kept = List::with_capacity(self.pending.capacity());
+                for row in &self.pending {
+                    if row.0 != key {
+                        kept.push(*row).expect("remaining pending fits");
+                    }
+                }
+                self.pending = kept;
+                self.outcome = Some(outcome);
+            }
+            Told::Pending { key } if self.pending_kind(key).is_some() => {}
+
             Told::Changed { handle } if handle == self.document => {
                 if let Some(Latest::Jig(c::Delivery::Task(task))) = latest(client, handle) {
                     self.changed(task, out);
@@ -474,14 +613,16 @@ fn latest(client: &Client, handle: Handle) -> Option<&Latest> {
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    // Activity, the final task, and bounded held-task cards and their words.
+    // Activity, the final task, the last outcome, and bounded held-task cards and their words.
     // An agent's task also retains a chat's thread and its borrowed view lines.
     limits
         .client
         .domain
         .document_bytes
-        .checked_mul(u64::from(limits.client.domain.reads).checked_add(2)?)?
+        .checked_mul(u64::from(limits.client.domain.reads).checked_add(3)?)?
         .checked_add(List::<Card>::worst_case(limits.client.domain.reads)?)?
+        .checked_add(List::<(Key, Sending)>::worst_case(3)?)?
+        .checked_add(u64::from(limits.client.domain.text))?
         .checked_add(u64::from(limits.client.domain.reads).checked_mul(u64::from(limits.client.domain.text))?)?
         .checked_add(jig_client::thread::worst_case(&super::chat::thread_limits(limits))?)?
         .checked_add(List::<jig_client::thread::Line<'_>>::worst_case(

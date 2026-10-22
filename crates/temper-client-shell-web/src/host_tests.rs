@@ -182,7 +182,7 @@ mod memory_literal;
 // The context line adds one repository/forge text node; chat words use existing phrase room.
 // Procedure goal slot: five added nodes including its paragraph and link text.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 124065252224;
+const WEB_BYTES: u64 = 124066301128;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

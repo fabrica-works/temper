@@ -48,6 +48,20 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         text(b, Role::Paragraph, &words.say(Word::Task, &[Hole::Number(task.chip.task)]));
         b.close();
         header(b, task, root.pages().me(root.client()), words, bindings);
+        if page.shape == Shape::Tracked {
+            if root.pages().confirmation().is_none()
+                && (jig_client::facts::offer(task.acts.as_slice(), c::ActKind::Stop).is_some()
+                    || jig_client::facts::offer(task.acts.as_slice(), c::ActKind::Cancel).is_some())
+            {
+                b.open(Role::Slot);
+                b.style(look::TASK_ACTS);
+                act(b, task, c::ActKind::Stop, Word::Stop, Act::Stop, words, bindings);
+                act(b, task, c::ActKind::Cancel, Word::Cancel, Act::Close, words, bindings);
+                b.close();
+            }
+            outcome(b, root, words);
+            controls(b, &task.chip, root, words, bindings, rows);
+        }
         crate::choice::composer(b, root, Some(task), words, bindings);
         if page.shape == Shape::Tracked {
             asked(b, task, words);
@@ -69,6 +83,46 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
     }
     crate::confirm::main(b, root, words, bindings, rows);
     b.close();
+}
+/// An offered act by its admission (client/README.md, 5.11).
+pub(crate) fn act(
+    b: &mut Builder,
+    task: &c::Task,
+    kind: c::ActKind,
+    word: Word,
+    act: Act,
+    words: &Words,
+    bindings: &mut Bindings,
+) {
+    let Some(admission) = jig_client::facts::offer(task.acts.as_slice(), kind) else { return };
+    match admission {
+        c::Admission::Allowed | c::Admission::Bounded { .. } => {
+            b.open(Role::Button);
+            b.name(&words.say(word, &[]));
+            b.bind(bindings.insert(act));
+            b.close();
+        }
+        c::Admission::Proposed { to } => {
+            text(b, Role::Paragraph, &words.say(word, &[]));
+            words.card_text(b, crate::cards::P::ProposeInstead, &[]);
+            crate::cards::recipient(b, words, to);
+        }
+        c::Admission::Refused(refusal) => {
+            text(b, Role::Paragraph, &words.say(word, &[]));
+            words.refusal(b, refusal, 0);
+        }
+    }
+}
+pub(crate) fn outcome(b: &mut Builder, root: &Domain, words: &Words) {
+    let Some(page) = root.pages().task() else { return };
+    for (key, _) in &page.pending {
+        if let Some(pending) = root.client().pending(*key) {
+            crate::confirm::progress_text(b, words, pending.progress);
+        }
+    }
+    if let Some(outcome) = &page.outcome {
+        super::chats::outcome_text(b, words, outcome, 0);
+    }
 }
 pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words: &Words, bindings: &mut Bindings) {
     region(b, Word::TaskHeader, words);
@@ -440,7 +494,6 @@ pub(crate) fn plan(
     match tree {
         c::Delivery::OwnerTree(tree) => {
             let mut stack = List::with_capacity(tree.rows.len());
-            controls(b, &tree.root, root, words, bindings, rows);
             owner_folds(b, tree, tree.root.task, words);
             for row in &tree.rows {
                 parent(b, &mut stack, Some(row.parent));
@@ -459,9 +512,7 @@ pub(crate) fn plan(
                 parent(b, &mut stack, node.parent);
                 if node.chip.task != tree.task {
                     chip(b, &node.chip, words, bindings);
-                }
-                controls(b, &node.chip, root, words, bindings, rows);
-                if node.chip.task != tree.task {
+                    controls(b, &node.chip, root, words, bindings, rows);
                     stack.push(node.chip.task).expect("tree stack fits");
                 }
                 counts(b, node.folded, node.held_below, words);
@@ -516,7 +567,14 @@ pub(crate) fn dependencies(
     }
     b.close();
 }
-fn controls(b: &mut Builder, chip: &c::Chip, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32) {
+pub(crate) fn controls(
+    b: &mut Builder,
+    chip: &c::Chip,
+    root: &Domain,
+    words: &Words,
+    bindings: &mut Bindings,
+    rows: u32,
+) {
     if let Some(page) = root.pages().task() {
         for card in &page.cards {
             if card.object == c::ObjectKey::Task(chip.task) && (chip.phase == c::Phase::Held || card.key.is_some()) {
