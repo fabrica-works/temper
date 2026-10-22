@@ -472,6 +472,8 @@ fn synthetic_frame(builder: &mut skein_ui::Builder, behind: bool) {
     builder.open(Role::Paragraph);
     builder.text(Run::Plain, b"temper");
     builder.close();
+    builder.open(Role::Disclosure);
+    builder.name(b"Menu");
     builder.open(Role::Button);
     builder.name(b"Shop");
     builder.state(skein_ui::State::Pressed);
@@ -502,6 +504,7 @@ fn synthetic_frame(builder: &mut skein_ui::Builder, behind: bool) {
     builder.open(Role::Button);
     builder.name(b"Sign out");
     builder.bind(binding());
+    builder.close();
     builder.close();
     builder.close();
 }

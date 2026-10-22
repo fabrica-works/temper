@@ -1,13 +1,14 @@
 == What shall we change? == Live
 temper
-[1] demo (pressed)
-Main navigation:
-  [2] Inbox
-  [3] Chats (current)
-  [4] Adopt a repository
-  [5] Accounts
-* Pat
-[6] Sign out
+Menu:
+  [1] demo (pressed)
+  Main navigation:
+    [2] Inbox
+    [3] Chats (current)
+    [4] Adopt a repository
+    [5] Accounts
+  * Pat
+  [6] Sign out
 New chat
 * Ready
 Demo model

@@ -27,14 +27,13 @@ button { cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 /* .terminal-topbar: one sticky banner in the mockup's order. */
 .temper-banner { position: sticky; top: 0; z-index: 12; min-height: 49px; display: flex; align-items: center; gap: 16px; padding: 0 23px; border-bottom: 1px solid var(--temper-line); background: var(--temper-topbar); }
-.temper-banner > button { min-width: 0; max-width: 18em; overflow: hidden; text-overflow: ellipsis; border: 0; border-radius: 5px; padding: 5px 0; background: transparent; color: #5f5a52; white-space: nowrap; }
-.temper-banner > button[aria-pressed=true] { color: var(--temper-ink); font-weight: 700; }
-.temper-banner > button:hover { color: var(--temper-accent); }
+.temper-menu > button { min-width: 0; max-width: 18em; overflow: hidden; text-overflow: ellipsis; border: 0; border-radius: 5px; padding: 5px 0; background: transparent; color: #5f5a52; white-space: nowrap; }
+.temper-menu > button[aria-pressed=true] { color: var(--temper-ink); font-weight: 700; }
+.temper-menu > button:hover { color: var(--temper-accent); }
 /* .terminal-brand and .terminal-divider: decorative mask and rule. */
 .temper-brand { display: flex; align-items: center; gap: 8px; margin: 0; font: 700 16px/1 'DM Sans', ui-sans-serif, system-ui, sans-serif; letter-spacing: -.045em; white-space: nowrap; }
 .temper-brand::before { content: ''; width: 19px; height: 19px; flex: none; background: var(--temper-accent); mask: url(files/brand.svg) center / contain no-repeat; }
-.temper-brand::after { content: ''; width: 1px; height: 17px; margin-left: 8px; background: #d9d2c8; flex: none; }
-.temper-brand:has(+ .temper-corner)::after { display: none; }
+.temper-brand::after { content: ''; width: 1px; height: 17px; margin-left: 8px; background: #d9d2c8; flex: none; display: none; }
 /* .terminal-nav and .terminal-count: quiet links and current page. */
 .temper-navigation { align-self: stretch; display: flex; align-items: center; gap: 4px; margin-left: 12px; }
 .temper-navigation a { padding: 5px 10px; border-radius: 5px; font-size: 11px; color: #736c62; white-space: nowrap; }
@@ -49,6 +48,40 @@ a { color: inherit; text-decoration: none; }
 .temper-corner > [role=alert] { flex: 1 1 12em; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; color: var(--temper-red); font-size: 11px; }
 .temper-corner > button { min-height: 28px; margin-block: calc((1lh + 6px - 28px) / 2); border: 0; border-radius: 5px; background: transparent; color: #756e65; font-size: 11px; padding: 3px 0; }
 .temper-corner > button:hover { color: var(--temper-accent); }
+/* The mockup's menu panel is also the fallback where closed details cannot be drawn.
+   Menu remains the summary's accessible word under our three-bar mask. */
+.temper-menu { position: relative; margin-left: auto; }
+.temper-menu > summary { position: relative; display: block; width: 28px; height: 28px; overflow: hidden; color: #6c655d; text-indent: 100%; list-style: none; cursor: pointer; white-space: nowrap; }
+.temper-menu > summary::-webkit-details-marker { display: none; }
+.temper-menu > summary::before { content: ''; position: absolute; inset: 5px; background: currentColor; mask: url(files/menu.svg) center / contain no-repeat; }
+.temper-menu[open] { position: absolute; top: 100%; right: 23px; z-index: 10; display: grid; width: 190px; padding: 7px; background: var(--temper-paper); border: 1px solid var(--temper-line); border-radius: 8px; box-shadow: 0 10px 30px rgba(40,30,20,.12); }
+.temper-menu[open] > summary { position: absolute; right: -1px; bottom: calc(100% + 11px); }
+.temper-menu .temper-navigation, .temper-menu .temper-corner { display: grid; gap: 0; margin-left: 0; align-items: stretch; }
+.temper-menu > button, .temper-menu .temper-navigation a, .temper-menu .temper-corner > button { display: block; width: 100%; max-width: 100%; padding: 7px 9px; font-size: 12px; text-align: left; }
+.temper-menu .temper-corner > button { margin-block: 0; }
+.temper-menu .temper-corner > [data-region=temper-link] { flex-direction: column; align-items: flex-start; }
+.temper-menu .temper-corner > [data-region=temper-link], .temper-menu .temper-corner > [role=status], .temper-menu .temper-corner > [role=alert] { padding: 7px 9px; font-size: 12px; }
+/* Only browsers that can draw closed details flatten the wide banner. */
+@supports selector(::details-content) {
+  @media (min-width: 761px) {
+    .temper-menu, .temper-menu[open] { display: contents; }
+    .temper-menu::details-content { content-visibility: visible; display: contents; }
+    .temper-menu > summary { display: none; }
+    .temper-brand::after { display: block; }
+    .temper-brand:has(+ .temper-menu > summary + .temper-corner)::after { display: none; }
+    .temper-menu > button { display: block; width: auto; max-width: 18em; padding: 5px 0; font-size: inherit; text-align: center; }
+    .temper-menu .temper-navigation { display: flex; gap: 4px; margin-left: 12px; align-items: center; }
+    .temper-menu .temper-navigation a { display: inline; width: auto; max-width: none; padding: 5px 10px; font-size: 11px; text-align: start; }
+    .temper-menu .temper-corner { display: flex; gap: 20px; margin-left: auto; align-items: center; }
+    .temper-menu .temper-corner > button { width: auto; max-width: none; margin-block: calc((1lh + 6px - 28px) / 2); padding: 3px 0; font-size: 11px; text-align: center; }
+    .temper-menu .temper-corner > [data-region=temper-link] { flex-direction: row; align-items: center; }
+    .temper-menu .temper-corner > [data-region=temper-link], .temper-menu .temper-corner > [role=status], .temper-menu .temper-corner > [role=alert] { padding: 0; font-size: 11px; }
+    @media (max-width: 1100px) {
+      .temper-menu .temper-navigation { gap: 0; margin-left: 0; }
+      .temper-menu .temper-navigation a { padding-inline: 8px; }
+    }
+  }
+}
 .temper-live, .temper-connecting, .temper-offline { display: inline-flex; align-items: center; gap: 8px; }
 .temper-live::before, .temper-connecting::before, .temper-offline::before { content: ''; width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--temper-muted); }
 .temper-live::before { background: #6b9a77; box-shadow: 0 0 0 3px #dfe9dc; }
@@ -133,20 +166,14 @@ section.temper-accounts button:hover { text-decoration: underline; }
 /* .terminal-topbar at 1100px: tighter spacing, all words retained. */
 @media (max-width: 1100px) {
   .temper-banner { gap: 11px; padding-inline: 17px; }
+  .temper-menu[open] { right: 17px; }
   .temper-navigation { gap: 0; margin-left: 0; }
   .temper-navigation a { padding-inline: 8px; }
 }
-/* .terminal-topbar at 760px: visible navigation on its own scrolling row. */
+/* .terminal-topbar at 760px: brand and Menu alone; the panel holds every choice. */
 @media (max-width: 760px) {
-  .temper-banner { flex-wrap: wrap; gap: 0 11px; padding-block: 4px; }
-  .temper-banner > button { max-width: min(18em, calc((100% - 130px) / 2)); }
-  /* The status joins brand and projects when it fits; the navigation keeps a whole row below. */
-  .temper-banner:has(> .temper-navigation)::after { content: ''; flex: 0 0 100%; }
-  .temper-navigation { order: 1; flex: 0 1 auto; max-width: 100%; min-width: 0; overflow-x: auto; }
-  .temper-navigation a { flex: none; display: inline-flex; align-items: center; min-height: 28px; }
-  .temper-corner { gap: 10px; min-height: 28px; }
-  .temper-brand:not(:has(+ button))::after { display: none; }
-  .temper-corner > button { margin-block: 0; }
+  .temper-banner { min-height: 45px; }
+  .temper-menu[open] > summary { bottom: calc(100% + 9px); }
   .temper-main { width: calc(100% - 28px); padding-top: 16px; }
   .temper-accounts { width: calc(100% - 28px); margin-top: 16px; }
   .temper-hint { display: none; }

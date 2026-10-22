@@ -1,11 +1,12 @@
 == Chats == Live
 temper
-[1] Shop (pressed)
-[2] Inbox
-[3] Chats
-[4] Adopt a repository
-* Pat
-[5] Sign out
+Menu:
+  [1] Shop (pressed)
+  [2] Inbox
+  [3] Chats
+  [4] Adopt a repository
+  * Pat
+  [5] Sign out
 [6] Start a chat: (empty)
 [7] Start
 ## Your chats

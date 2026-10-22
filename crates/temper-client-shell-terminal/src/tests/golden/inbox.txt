@@ -1,11 +1,12 @@
 == Inbox == Live
 temper
-[1] Shop (pressed)
-[2] Inbox
-[3] Chats
-[4] Adopt a repository
-* Pat
-[5] Sign out
+Menu:
+  [1] Shop (pressed)
+  [2] Inbox
+  [3] Chats
+  [4] Adopt a repository
+  * Pat
+  [5] Sign out
 [6] All projects
 [7] Shop
 [8] Second

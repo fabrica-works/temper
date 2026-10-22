@@ -171,6 +171,8 @@ pub const TASK_AMEND: Style = Style { owner: owner(), token: 82 };
 pub const ENDED: Style = Style { owner: owner(), token: 83 };
 /// The day before a chat's turns (client/README.md, 5.12).
 pub const DAY: Style = Style { owner: owner(), token: 84 };
+/// The banner's menu, folded by the browser at phone width.
+pub const MENU: Style = Style { owner: owner(), token: 85 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -261,6 +263,7 @@ pub const NAMES: Names<'static> = Names {
         b"temper-task-amend",
         b"temper-ended",
         b"temper-day",
+        b"temper-menu",
     ],
     regions: &[b"temper-link"],
 };

@@ -224,6 +224,7 @@ pub enum Word {
     Again,
     DoNotRepeat,
     Brand,
+    Menu,
     SignedOut,
     OutOfDate,
     SignedOutMain,
@@ -324,7 +325,7 @@ pub enum Word {
 // A task's name over its words in a chat (client/README.md, 3.5).
 // Forty-seven time form, calendar and placement phrases (5.12).
 const PHRASES: u32 = 657;
-const ALL: [Word; 294] = [
+const ALL: [Word; 295] = [
     Word::TimeYesterdayWord,
     Word::TimeJustNow,
     Word::TimeUnderMinute,
@@ -534,6 +535,7 @@ const ALL: [Word; 294] = [
     Word::Again,
     Word::DoNotRepeat,
     Word::Brand,
+    Word::Menu,
     Word::SignedOut,
     Word::OutOfDate,
     Word::SignedOutMain,
@@ -841,6 +843,7 @@ impl Word {
             Self::Again => 136,
             Self::DoNotRepeat => 137,
             Self::Brand => 100,
+            Self::Menu => 1076,
             Self::InboxTitle => 110,
             Self::NeedsYou => 111,
             Self::InboxUpdates => 112,
@@ -1315,6 +1318,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::Again => (&[b"Repeat the effect"], &[]),
         Word::DoNotRepeat => (&[b"Do not repeat the effect"], &[]),
         Word::Brand => (&[b"temper"], &[]),
+        Word::Menu => (&[b"Menu"], &[]),
         Word::MainNavigation => (&[b"Main navigation"], &[]),
         Word::KindFrom => (&[b"", b" from ", b""], &[Name, Name]),
         Word::NoLiveTasks => (&[b"No live tasks."], &[]),
