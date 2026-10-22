@@ -229,8 +229,12 @@ pub(crate) fn row(
         b,
         Role::Paragraph,
         &words.say(
-            Word::ChatSpend,
-            &[Hole::Number(line.budget.numbers.spent), Hole::Number(line.budget.numbers.spent_below)],
+            Word::ChatbarSpend,
+            &[
+                Hole::Number(line.budget.numbers.spent),
+                Hole::Number(line.budget.numbers.budget),
+                Hole::Number(line.budget.numbers.spent_below),
+            ],
         ),
     );
     if let jig_client::contract::ChipPhase::Owner { details, .. } = line.chip.details.as_ref()

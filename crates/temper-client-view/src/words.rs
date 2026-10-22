@@ -147,7 +147,6 @@ pub enum Word {
     MoreClosedChats,
     Chat,
     TaskWho,
-    ChatSpend,
     ChatbarSpend,
     ProposalWhy,
     ProposalLanding,
@@ -341,7 +340,7 @@ pub enum Word {
     MessageOnceRuns,
 }
 // Room for temper, jig, account, card and forge phrases.
-// Seven chat projection phrases, alongside the agent's original work-line words.
+// Six chat projection phrases, alongside the agent's original work-line words.
 // Eleven amendment editor phrases (client/README.md, 5.11), and five added
 // dependency mark phrases (5.8).
 // Two names for navigation and cards.
@@ -354,8 +353,8 @@ pub enum Word {
 // Three empty and partial ended-children phrases (5.10).
 // A chat's numbered composer placeholder (3.5).
 // Twelve inbox count, filter, empty and update-line phrases (3.5).
-const PHRASES: u32 = 791;
-const ALL: [Word; 321] = [
+const PHRASES: u32 = 790;
+const ALL: [Word; 320] = [
     Word::TimeYesterdayWord,
     Word::TimeJustNow,
     Word::TimeUnderMinute,
@@ -490,7 +489,6 @@ const ALL: [Word; 321] = [
     Word::MoreClosedChats,
     Word::Chat,
     Word::TaskWho,
-    Word::ChatSpend,
     Word::ChatbarSpend,
     Word::ProposalWhy,
     Word::ProposalLanding,
@@ -822,7 +820,6 @@ impl Word {
             Self::MoreClosedChats => 142,
             Self::Chat => 143,
             Self::TaskWho => 1075,
-            Self::ChatSpend => 144,
             Self::ChatbarSpend => 1400,
             Self::ProposalWhy => 1401,
             Self::ProposalLanding => 1402,
@@ -1367,7 +1364,6 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::ProposalLanding => (&[b"Landing"], &[]),
         Word::ProposalBudget => (&[b"Budget"], &[]),
         Word::ProposalInbox => (&[b"Open in inbox \xe2\x86\x97"], &[]),
-        Word::ChatSpend => (&[b"Spent ", b"; delegates spent ", b""], &[Number, Number]),
         Word::ChatDelegates => (&[b"", b" delegates"], &[Number]),
         Word::ChoiceProvider | Word::ChatTime => (&[b"", b""], &[Name]),
         Word::ChatSendHint => (&[b"Enter to send \xc2\xb7 Shift+Enter for newline"], &[]),

@@ -102,7 +102,7 @@ fn a_chats_row_says_its_status_from_jigs_facts() {
 #[test]
 fn a_chats_row_says_its_spend_and_delegates() {
     let (tree, _) = tree(&line());
-    assert!(fixtures::find(&tree, Role::Paragraph, b"Spent 7; delegates spent 2").is_some());
+    assert!(fixtures::find(&tree, Role::Paragraph, "7 spent · of 100 · delegates spent 2".as_bytes()).is_some());
     assert!(fixtures::find(&tree, Role::Paragraph, b"3 delegates").is_some());
 }
 #[test]
