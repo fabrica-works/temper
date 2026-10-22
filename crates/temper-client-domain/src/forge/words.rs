@@ -295,7 +295,7 @@ impl ResourceWord {
             Self::DeleteBranch => 21,
             Self::OtherKind => 22,
             Self::Shown => 23,
-            Self::AdoptedBranch => 24,
+            Self::AdoptedBranch => 25,
         };
         PhraseId { owner: owner(connector), number }
     }

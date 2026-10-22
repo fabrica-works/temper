@@ -1364,7 +1364,11 @@ Each is named here and designed when it comes.
   - an account's lines in `me`, as the record's fields;
   - charter and procedure numbers in creation bounds and delegation
     authority, and an authority's tool and note numbers;
-  - a bounded authority's walls, as nanoseconds.
+  - a bounded authority's walls, as nanoseconds;
+  - a change contract on a connector other than the forge's, in the
+    header, as `change, connector C kind K`;
+  - a choice's option in a result, as `option N`, not the option's
+    words, which the contract holds.
 - **Waiting on one forge:** `wait forges` watches every forge's row, so
   another forge's change answers a wait with no condition. Default:
   `--until settled` or `--until connected:F` names what is waited for; a

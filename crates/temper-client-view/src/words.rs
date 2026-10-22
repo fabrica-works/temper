@@ -434,7 +434,7 @@ impl Word {
             Self::Behind => 107,
             Self::SignOut => 108,
             Self::SignOutLost => 109,
-            Self::Unshowable => 25,
+            Self::Unshowable => 24,
         };
         let owner =
             if number >= 100 { crate::frame::owner() } else { temper_client_domain::forge::words::owner(connector) };
