@@ -144,10 +144,6 @@ pub(crate) fn document() -> Vec<u8> {
     ] {
         value["engine"]["limits"]["overrides"][name] = count.into();
     }
-    // The native deployment account controls use the real membership in project zero.
-    let mut deployment = value["engine"]["projects"][0].clone();
-    deployment["number"] = 0.into();
-    value["engine"]["projects"].as_array_mut().expect("projects").push(deployment);
     value["engine"]["limits"]["overrides"]["people.projects"] = 2.into();
     value["engine"]["limits"]["overrides"]["authority.projects"] = 2.into();
     value["engine"]["limits"]["overrides"]["tasks.funders"] = 4.into();

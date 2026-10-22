@@ -85,7 +85,7 @@ pub fn limits() -> engine::Limits {
         inbox_tasks: 4,
         inbox_recipients: 16,
         sign_ins: 2,
-        projects: 1,
+        projects: 2, // The configured project and the deployment roster.
         holdings: 2,
         initial_owners: 1,
         requests: 4,

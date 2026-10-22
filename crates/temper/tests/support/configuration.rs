@@ -34,10 +34,6 @@ pub fn documents(directory: &Path, program: &str) -> (Vec<u8>, Vec<u8>) {
     value["engine"]["limits"]["overrides"]["people.sign_ins"] = 2.into();
     value["engine"]["limits"]["overrides"]["views.watchers"] = 16.into();
     value["engine"]["limits"]["overrides"]["views.watchers_per_party"] = 16.into();
-    // The native deployment account controls use the real membership in project zero.
-    let mut deployment = value["engine"]["projects"][0].clone();
-    deployment["number"] = 0.into();
-    value["engine"]["projects"].as_array_mut().expect("projects").push(deployment);
     value["engine"]["limits"]["overrides"]["people.projects"] = 2.into();
     value["engine"]["limits"]["overrides"]["authority.projects"] = 2.into();
     value["engine"]["limits"]["overrides"]["tasks.funders"] = 4.into();

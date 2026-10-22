@@ -188,10 +188,6 @@ pub(crate) fn key_documents(directory: &Path) -> std::io::Result<()> {
     let config_path = directory.join("temper.json");
     let mut config: serde_json::Value = serde_json::from_slice(&std::fs::read(&config_path)?)?;
     config["engine"]["llm"]["endpoints"][0]["dialect"] = 3.into();
-    // Give the fixture owner a real deployment membership for the joined read.
-    let mut deployment = config["engine"]["projects"][0].clone();
-    deployment["number"] = 0.into();
-    config["engine"]["projects"].as_array_mut().expect("projects").push(deployment);
     config["engine"]["limits"]["overrides"]["people.projects"] = 2.into();
     config["engine"]["limits"]["overrides"]["authority.projects"] = 2.into();
     // Each project needs its period and the owner's pool in the tasks ledger.

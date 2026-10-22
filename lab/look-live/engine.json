@@ -196,41 +196,6 @@
             }}
           ]
         }}
-      }},
-      {{
-        "number": 0,
-        "roles": [{{"connector": 1, "permission": 1, "role": 0}}],
-        "policy": {{
-          "templates": [],
-          "escalation_role": 0,
-          "period_spend": 100,
-          "projections": [],
-          "requirements": [],
-          "ceiling": {{
-            "tools": 0,
-            "grants": [],
-            "delegation": {{"kinds": [{{"kind": "charter", "number": 1}}], "tasks": 8, "depth": 8}},
-            "budget": {{"spend": 100, "deadline_unix_seconds": null}},
-            "notes": 0,
-            "note_resources": []
-          }},
-          "roles": [
-            {{
-              "number": 0,
-              "period_spend": 100,
-              "requests": 511,
-              "decides": 31,
-              "authority": {{
-                "tools": 0,
-                "grants": [],
-                "delegation": {{"kinds": [{{"kind": "charter", "number": 1}}], "tasks": 8, "depth": 8}},
-                "budget": {{"spend": 100, "deadline_unix_seconds": null}},
-                "notes": 0,
-                "note_resources": []
-              }}
-            }}
-          ]
-        }}
       }}
     ]
   }},

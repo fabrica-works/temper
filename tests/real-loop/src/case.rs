@@ -152,11 +152,6 @@ pub fn fixture() -> forge::Fixture {
         },
         configure: |value, agent, forge| {
             (landing::fixture().configure)(value, agent, forge);
-            // The direct service fixture has no binary-added deployment project.
-            // Its owner role in project zero makes deployment accounts readable.
-            let mut deployment = value["engine"]["projects"][0].clone();
-            deployment["number"] = 0.into();
-            value["engine"]["projects"].as_array_mut().expect("projects").push(deployment);
             value["engine"]["limits"]["overrides"]["people.projects"] = 2.into();
             value["engine"]["limits"]["overrides"]["authority.projects"] = 2.into();
             value["engine"]["limits"]["overrides"]["tasks.funders"] = 4.into();
