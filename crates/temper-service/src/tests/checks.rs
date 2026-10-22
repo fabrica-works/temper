@@ -212,9 +212,9 @@ fn a_channel_limit_past_a_ceiling_names_the_limit() {
 }
 #[test]
 fn one_ios_entities_hold_both_services_and_their_children() {
-    let document = fixtures::with(&fixtures::document(), b"application.limits.overrides", br#"{"checkout.name_bytes":600,"checkout.repositories":4,"git_component.stdout_bytes":2048,"git_component.operations":9}"#);
+    let document = fixtures::with(&fixtures::document(), b"application.limits.overrides", br#"{"checkout.name_bytes":600,"checkout.repositories":4,"git_component.stdout_bytes":2048,"git_component.operations":13}"#);
     let found = crate::named(&document, &jig_protocol_config::Directories::working()).unwrap_err();
-    assert_eq!(&*lines(&found), b"engine.limits.io.sockets: 52 bytes, past its bound of 48\n".as_slice());
+    assert_eq!(&*lines(&found), b"engine.limits.io.sockets: 68 bytes, past its bound of 64\n".as_slice());
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -349,10 +349,10 @@ fn a_webhook_secret_past_its_bound_is_refused() {
 #[test]
 fn hook_connections_past_the_process_sockets_are_refused() {
     let document =
-        fixtures::with(&fixtures::webhook_document(), b"application.limits.overrides", br#"{"checkout.name_bytes":600,"checkout.repositories":4,"git_component.stdout_bytes":2048,"forge_component.hooks":40}"#);
+        fixtures::with(&fixtures::webhook_document(), b"application.limits.overrides", br#"{"checkout.name_bytes":600,"checkout.repositories":4,"git_component.stdout_bytes":2048,"forge_component.hooks":56}"#);
     assert_eq!(
         &*lines(&crate::named(&document, &jig_protocol_config::Directories::working()).unwrap_err()),
-        b"engine.limits.io.sockets: 69 bytes, past its bound of 48\n"
+        b"engine.limits.io.sockets: 85 bytes, past its bound of 64\n"
     );
 }
 #[test]

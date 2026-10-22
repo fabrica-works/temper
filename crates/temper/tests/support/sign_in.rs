@@ -28,8 +28,6 @@ pub fn configuration(directory: &Path) -> oauth::Peer {
         "authorization":format!("{origin}/authorize"), "token":format!("{origin}/token"),
         "keys":format!("{origin}/keys"), "resource":format!("{origin}/v1"), "transport":"plaintext"
     });
-    // This story needs one pending sign-in, within the shipped socket budget.
-    value["engine"]["limits"]["overrides"]["accounts.sign_ins"] = 1.into();
     super::write_private(&path, &serde_json::to_vec(&value).expect("configuration JSON"));
     let profile = jig_protocol_config::profile::profile(jig_protocol_config::profile::Profile::Small);
     let limits = skein_fake_oauth::Limits {

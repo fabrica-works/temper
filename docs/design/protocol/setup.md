@@ -1152,8 +1152,8 @@ runs it (section 7).
   SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper --test startup -E 'test(owned_memory_figures)'
   ```
 
-  At these pins the engine requires 79,538,334,051,202 bytes and the worker
-  2,343,588,716,154 bytes. Ordinary runs fail on drift and never write the
+  At these pins the engine requires 85,582,252,938,083 bytes and the worker
+  3,283,176,433,282 bytes. Ordinary runs fail on drift and never write the
   example. Program declarations survive startup; runnable program grants
   still wait for smith's program backend and jig's program sources.
 - **Three loopback addresses,** Forgejo's (`listen`, `127.0.0.1:3000`),

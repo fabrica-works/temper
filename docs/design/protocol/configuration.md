@@ -633,7 +633,7 @@ have one, an engine alone none. Each:
     are counted. The sockets are temper's own, a constant of
     `temper-service`'s limits module that its io check takes in place
     of the sum of jig's engine's and worker's, and `small`'s hold a
-    document with both listeners, as the owned example has (setup.md,
+    document with both listeners and a sign-in, as the owned example has (setup.md,
     8.1);
   - the channel's (channel.md, section 8): each of temper's largest
     parts within the ceiling jig's schema gives its field; the largest

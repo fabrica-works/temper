@@ -1134,6 +1134,16 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // The unpiped link and pipe flow-control fields grow Service by 72 B.
     // The transient drain queue reserves three 24-B outputs, even without a pipe.
     let box_link_growth = 72 + 3 * 24;
+    // The standalone socket admission grows 48 -> 64 to hold the owned sign-in.
+    // Engine and worker use the same small stream bounds; named listeners stay present.
+    let mut before_io = engine.limits.io;
+    before_io.sockets = 48;
+    let mut after_io = before_io;
+    after_io.sockets = temper_service::limits::SOCKETS;
+    // Four operations per added socket also grow the two process routing maps by 9,024 B.
+    let socket_growth = skein_io::worst_case(&after_io).expect("current io bound")
+        - skein_io::worst_case(&before_io).expect("prior io bound")
+        + 9_024;
     assert_eq!(
         required.engine_bytes,
         79_659_997_210_050_u64
@@ -1171,6 +1181,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             // Jig M2: two close outputs enlarge journal/store and routing envelopes;
             // withdrawn values and their account-id capacity are gone (wire v5).
             + 4_578_373_384
+            + socket_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.

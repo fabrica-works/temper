@@ -277,7 +277,7 @@ const CLIENTS: Clients = Clients {
     bundle_bytes: 16 << 20,
 };
 /// The standalone process's socket admission.
-pub const SOCKETS: u32 = 48;
+pub const SOCKETS: u32 = 64;
 
 /// Constant small-profile values in each owner's limits.
 #[must_use]
