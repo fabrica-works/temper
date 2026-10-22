@@ -1842,3 +1842,18 @@ fn task_acts_show_progress_and_the_answer_after_the_toolbar_or_conversation() {
         }
     }
 }
+
+#[test]
+fn a_held_procedure_goal_shows_its_own_release_before_its_plan() {
+    let source = f::held_root();
+    let mut task = source.pages().task().expect("page").document(source.client()).expect("task").clone();
+    task.chip.executor = c::Executor::Procedure { connector: fixtures::FORGE, kind: PROCEDURE };
+    task.priority = None;
+    let root = f::supplied_root(task, true);
+    let view = fixtures::page_view(&root);
+    let tree = view.tree();
+    let release = index_of(tree, Role::Button, b"Release task");
+    let plan = region_index(tree, b"Its tasks");
+    assert!(region_index(tree, b"Task details") < release);
+    assert!(release < plan);
+}

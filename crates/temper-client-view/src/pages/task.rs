@@ -60,8 +60,8 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
                 b.close();
             }
             outcome(b, root, words);
-            controls(b, &task.chip, root, words, bindings, rows);
         }
+        controls(b, &task.chip, root, words, bindings, rows);
         crate::choice::composer(b, root, Some(task), words, bindings);
         if page.shape == Shape::Tracked {
             asked(b, task, words);
