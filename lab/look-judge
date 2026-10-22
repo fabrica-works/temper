@@ -47,12 +47,12 @@ def main():
     commit = run(['git', 'rev-parse', 'HEAD'], repository)
     if commit.returncode:
         return 4
-    build = run(['heavy', 'cargo', 'build', '--release', '-p', 'temper-gallery'],
+    build = run(['heavy', 'cargo', 'build', '--release', '-p', 'temper-client-gallery'],
                 repository, capture=False)
     if build.returncode:
         return 4
     target = Path(os.environ.get('CARGO_TARGET_DIR', 'target'))
-    gallery = (repository / target / 'release' / 'temper-gallery').resolve()
+    gallery = (repository / target / 'release' / 'temper-client-gallery').resolve()
     with tempfile.TemporaryDirectory(prefix='temper-look-') as scratch:
         scratch = Path(scratch)
         output = scratch / 'gallery'
