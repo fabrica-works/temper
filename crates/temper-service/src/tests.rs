@@ -24,6 +24,7 @@ mod worker_git;
 
 mod checks;
 mod family;
+mod qa_box_link;
 mod root_checks;
 mod startup;
 mod system;

@@ -259,3 +259,19 @@ fn serve_with_box_refuses_without_the_boxs_pipes() {
     assert!(stderr.contains("fd 3") || stderr.contains("fd 4"), "refusal names the missing pipe fd: {stderr}");
     scratch.remove();
 }
+
+#[test]
+fn qa_box_drain_does_not_report_its_own_pipe_as_closed() {
+    // protocol/forge.md 2.8: pipe failure is named once; serve's own end is the box's to make.
+    let scratch = support::Scratch::startup("qa-m2-box-drain");
+    init(scratch.path());
+    let ended = support::boxed::run(scratch.path(), None, support::boxed::Plan::Stop, WITHIN);
+    assert!(support::printed_link(&ended.stdout).is_some(), "box reaches sign-in");
+    assert_eq!(ended.exit, Some(Exit::Code(0)));
+    assert!(ended.left.as_ref().is_some_and(Vec::is_empty));
+    let stderr = String::from_utf8_lossy(&ended.stderr);
+    assert!(!stderr.contains("box closed"), "normal drain must not report box closed: {stderr}");
+    assert!(!stderr.contains("box link:"), "an idle link has no diagnostic at drain: {stderr}");
+    assert!(!scratch.path().join("forge-3").exists(), "no ask, no owned forge preparation");
+    scratch.remove();
+}
