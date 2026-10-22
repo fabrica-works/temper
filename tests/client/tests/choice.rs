@@ -14,10 +14,7 @@ fn a_model_choice_reaches_the_next_run_document() {
             Step::Press { find: Find::exactly_named(Role::Button, b"scripted") },
             Step::Type { find: Find::named(Role::TextArea, b"Start a chat"), words: Box::from(*b"Hello") },
             Step::Send { find: Find::named(Role::TextArea, b"Start a chat") },
-            Step::See {
-                find: Find::exactly_named(Role::Paragraph, b"Requested for next run: scripted"),
-                within: fixtures::WITHIN,
-            },
+            Step::See { find: Find::exactly_named(Role::Paragraph, b"Using scripted"), within: fixtures::WITHIN },
         ],
     );
     let outcome = world.run(Until::Done);

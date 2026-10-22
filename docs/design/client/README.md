@@ -1082,20 +1082,46 @@ against the real issuer (JP13). The words for each offered source are:
     is usable for the work's payer (`PayerReadiness`). `me`'s order,
     the configuration's, stands in for the charter's, which jig's
     contract does not carry (section 11).
-  - *The account* is the choice's account preference; else a task's
-    kept account (`kept_account`); else the payer's first account, in
-    the accounts' order, of MODEL's LLM provider with a usable source.
-    That source words the line, with the names the banner and the
-    accounts use (above): "Using your OpenAI API key · MODEL" for a
-    key; "Using ChatGPT plan · MODEL · Manage usage" for a signed-in
-    plan, "Manage usage" an external link to the account's
-    manage-usage address, where the document gives one; "Using your
-    Claude subscription, through Claude Code · MODEL" for a program's
-    login; for the demo's LLM provider, 5.6's line.
-  - *Unsettled:* while the accounts or the provider's readiness are
-    not yet read, "Using MODEL"; with no model settled, "Using the
-    default model"; with no account to serve MODEL, "MODEL · needs an
-    account".
+  - *The account* is named only when the payer is you: your new chat,
+    or a task funded by your pool. The accounts document lists only
+    your own accounts, in `(place, number)` order. In this slice the
+    view translates jig's account selection and coverage (jig's
+    `selection.rs` and `coverage.rs`): an eligible account preference,
+    then an eligible kept account, wins, even while held; else the
+    first account of MODEL's provider whose coverage serves you and
+    whose deciding source is usable. Explicit uses replace defaults;
+    absent uses serve the holder. A plan serves its holder. Program
+    endpoints skip direct sources, and direct endpoints skip program
+    sources; a held deciding source stops that account, and a waiting
+    direct source does too. A program source without usable evidence
+    may pass to the next program source. Mixed provider offers do not
+    establish a model's endpoint kind, so name no account. Another
+    payer's work, or a cut document or account, names no account.
+    The source words the line, with the configured provider name from
+    `me`: "Using your OpenAI API key · MODEL" for a key; "Using ChatGPT
+    plan · MODEL · Manage usage" for a signed-in plan, the last an
+    external link where the document gives a safe manage-usage address;
+    "Using your Claude subscription, through Claude Code · MODEL" for
+    a program's login.
+  - *The readiness cross-check:* the payer's row must read `Usable`
+    before any account is named. The document's source `usable` is a
+    fact, while jig's selection reads its grant at the moment it
+    chooses: these may differ across expiry. When the translation
+    picks an account but readiness does not read `Usable`, the line
+    falls back to "Using MODEL". An eligible preferred or kept account
+    whose deciding source is held or waiting reads "MODEL · needs an
+    account" when readiness passes that cross-check.
+  - *The demo:* its line is keyed by MODEL's provider, the delivered
+    `Demo.provider`, because its account is the deployment's and is
+    outside the viewer's accounts document. Unless an eligible own
+    preferred or kept account wins, use 5.6's "Using Demo model ·
+    Default". Only `Unavailable` readiness changes it to "MODEL ·
+    needs an account"; an unknown or missing row keeps the demo line,
+    including on another member's chat.
+  - *Unsettled:* with no model settled, "Using the default model".
+    Otherwise, when no account is named, `Usable` or `Unknown`
+    readiness reads "Using MODEL", and `Unavailable` reads "MODEL ·
+    needs an account", subject to the expiry and demo rules above.
 - **Each state,** with its acts:
 
   | State | Words | Acts |
@@ -1169,7 +1195,7 @@ OWNER/NAME is the demo's repository, and the cues the demo's, copied in:
   role on the project is `Owner`, else "Signed in as NAME", the
   person's name as the banner shows it. OWNER/NAME is a node of its
   own, for the look.
-- **The composer's line,** for the demo's account: "Using Demo model ·
+- **The composer's line,** for the demo's LLM provider: "Using Demo model ·
   Default" (5.5). The demo's LLM provider serves one model, so the
   line names no other. While the model's half holds, a new chat's line
   is the demo's, since its model is the one with a usable account; a
@@ -2446,6 +2472,14 @@ own tests:
   template's default as it would resolve it for the person, or each
   charter's order (a jig addition, past story-b's M2). Default: `me`'s
   order, which the owned example's charters keep.
+- **The composer's selected account and source** (5.5): jig's
+  `PayerReadiness` could carry the account and source its selection
+  chose (`jig-domain-core`'s `catalogue.rs` already calls `select`).
+  The view could then read jig's choice for every payer without
+  translating selection over the viewer's own account slice. Default:
+  name an account only in that slice, with the readiness cross-check
+  and expiry fallback in 5.5; other work names the model alone, with
+  the demo provider's exception.
 - **A turn's time** ("21:01" in the mockups, "Just now" in the
   first-run mockup's earlier draft): the view keeps no clock to say it
   against. Default: not drawn.

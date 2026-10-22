@@ -10,27 +10,29 @@ use skein_ui::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
+    ChangeModel,
+    UsingModel,
+    UsingDefault,
+    UsingKey,
+    UsingPlan,
+    UsingProgram,
+    ModelNeedsAccount,
+    ModelEffort,
+
     WaitRefused,
     DependencyParked,
     WaitInvalid,
     ChoiceDraft,
     ChoiceDraftDefault,
-    ChoicePreferenceName,
     WaitingAccountName,
     WaitingAccount,
     ChoiceProvider,
     NeedsAccount,
     AccountReadinessUnknown,
-    ChoiceTemplate,
     AccountBanner,
     AccountSignIn,
     AccountProgram,
     AccountKey,
-    ChoiceDefault,
-    ChoiceRequested,
-    ChoiceEffort,
-    ChoicePreference,
-    ChoiceKept,
     ChoiceApply,
     ChoiceReset,
     AccountWaiting,
@@ -270,29 +272,31 @@ pub enum Word {
 // Two names for navigation and cards.
 // Five chats heading, filter and empty phrases (client/README.md, 3.5).
 // An empty plan's line (5.8) and a waiting agent's Message note (5.11).
-const PHRASES: u32 = 608;
-const ALL: [Word; 246] = [
+// The composer's line and its chooser replace seven choice phrases (5.5).
+const PHRASES: u32 = 609;
+const ALL: [Word; 247] = [
+    Word::ChangeModel,
+    Word::UsingModel,
+    Word::UsingDefault,
+    Word::UsingKey,
+    Word::UsingPlan,
+    Word::UsingProgram,
+    Word::ModelNeedsAccount,
+    Word::ModelEffort,
     Word::WaitRefused,
     Word::DependencyParked,
     Word::WaitInvalid,
     Word::ChoiceDraft,
     Word::ChoiceDraftDefault,
-    Word::ChoicePreferenceName,
     Word::WaitingAccountName,
     Word::WaitingAccount,
     Word::ChoiceProvider,
     Word::NeedsAccount,
     Word::AccountReadinessUnknown,
-    Word::ChoiceTemplate,
     Word::AccountBanner,
     Word::AccountSignIn,
     Word::AccountProgram,
     Word::AccountKey,
-    Word::ChoiceDefault,
-    Word::ChoiceRequested,
-    Word::ChoiceEffort,
-    Word::ChoicePreference,
-    Word::ChoiceKept,
     Word::ChoiceApply,
     Word::ChoiceReset,
     Word::AccountWaiting,
@@ -527,27 +531,28 @@ impl Word {
             Self::OutOfDate => 181,
             Self::SignedOutMain => 182,
             Self::OutOfDateMain => 183,
+            Self::ChangeModel => 1067,
+            Self::UsingModel => 1068,
+            Self::UsingDefault => 1069,
+            Self::UsingKey => 1070,
+            Self::UsingPlan => 1071,
+            Self::UsingProgram => 1072,
+            Self::ModelNeedsAccount => 1073,
+            Self::ModelEffort => 1074,
             Self::WaitRefused => 1029,
             Self::DependencyParked => 1030,
             Self::WaitInvalid => 1028,
             Self::ChoiceDraft => 1024,
             Self::ChoiceDraftDefault => 1025,
-            Self::ChoicePreferenceName => 1026,
             Self::WaitingAccountName => 1027,
             Self::WaitingAccount => 1023,
             Self::ChoiceProvider => 1020,
             Self::NeedsAccount => 1021,
             Self::AccountReadinessUnknown => 1022,
-            Self::ChoiceTemplate => 1019,
             Self::AccountBanner => 1000,
             Self::AccountSignIn => 1001,
             Self::AccountProgram => 1002,
             Self::AccountKey => 1003,
-            Self::ChoiceDefault => 1004,
-            Self::ChoiceRequested => 1005,
-            Self::ChoiceEffort => 1006,
-            Self::ChoicePreference => 1007,
-            Self::ChoiceKept => 1008,
             Self::ChoiceApply => 1009,
             Self::ChoiceReset => 1010,
             Self::AccountWaiting => 1011,
@@ -794,6 +799,23 @@ pub struct Words {
     /// The checked joined bound of ordinary Name holes.
     pub name_bytes: u32,
 }
+fn hole_bytes(word: Word, kind: HoleKind, last: bool, joined: u32) -> Result<u32, Invalid> {
+    if word == Word::DemoRequest || word == Word::DemoRepository {
+        return Ok(temper_client_domain::forge::DEMO_FIELD_BYTES);
+    }
+    let model_name = joined.min(crate::choice::MODEL_SHOWN);
+    if word == Word::ModelEffort {
+        return Ok(model_name);
+    }
+    if last
+        && [Word::UsingModel, Word::UsingKey, Word::UsingPlan, Word::UsingProgram, Word::ModelNeedsAccount]
+            .contains(&word)
+    {
+        let doubled = model_name.checked_mul(2).ok_or(Invalid::Overflow)?;
+        return doubled.checked_add(3).ok_or(Invalid::Overflow);
+    }
+    Ok(if kind == HoleKind::Name { joined } else { 0 })
+}
 impl Words {
     pub fn english(connector: u16, text: u32, shell: Shell) -> Result<Words, Invalid> {
         let joined = match text.checked_mul(2) {
@@ -815,13 +837,7 @@ impl Words {
                     holes
                         .push(HoleShape {
                             kind: *kind,
-                            bytes: if word == Word::DemoRequest || word == Word::DemoRepository {
-                                temper_client_domain::forge::DEMO_FIELD_BYTES
-                            } else if *kind == HoleKind::Name {
-                                joined
-                            } else {
-                                0
-                            },
+                            bytes: hole_bytes(word, *kind, index.checked_add(1) == Some(kinds.len()), joined)?,
                         })
                         .expect("three holes fit");
                     segments
@@ -987,26 +1003,27 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::BudgetDeadline => (&[b"Deadline"], &[]),
         Word::BudgetDeadlineDate => (&[b"", b""], &[HoleKind::Date]),
         Word::BudgetDeadlineMoment => (&[b"", b" UTC"], &[HoleKind::Moment]),
+        Word::ChangeModel => (&[b"Change model"], &[]),
+        Word::UsingModel => (&[b"Using ", b""], &[Name]),
+        Word::UsingDefault => (&[b"Using the default model"], &[]),
+        Word::UsingKey => (&[b"Using your ", b" API key \xc2\xb7 ", b""], &[Name, Name]),
+        Word::UsingPlan => (&[b"Using ", b" plan \xc2\xb7 ", b""], &[Name, Name]),
+        Word::UsingProgram => (&[b"Using your ", b" subscription, through ", b" \xc2\xb7 ", b""], &[Name, Name, Name]),
+        Word::ModelNeedsAccount => (&[b"", b" \xc2\xb7 needs an account"], &[Name]),
+        Word::ModelEffort => (&[b"", b" \xc2\xb7 ", b""], &[Name, Name]),
         Word::WaitRefused => (&[b"Next run refused"], &[]),
         Word::DependencyParked => (&[b"parked"], &[]),
         Word::WaitInvalid => (&[b"The requested account cannot serve this work"], &[]),
         Word::ChoiceDraft => (&[b"Next run if applied: ", b""], &[Name]),
         Word::ChoiceDraftDefault => (&[b"Next run if applied: engine default"], &[]),
-        Word::ChoicePreferenceName => (&[b"Requested account: ", b""], &[Name]),
         Word::WaitingAccountName => (&[b"Waiting account: ", b""], &[Name]),
         Word::WaitingAccount => (&[b"Waiting account: ", b""], &[Number]),
         Word::NeedsAccount => (&[b"needs an account"], &[]),
         Word::AccountReadinessUnknown => (&[b"Account readiness unknown"], &[]),
-        Word::ChoiceTemplate => (&[b"Template default for next run: ", b""], &[Name]),
         Word::AccountBanner => (&[b"Agents need an LLM account to run."], &[]),
         Word::AccountSignIn => (&[b"Sign in with an LLM provider"], &[]),
         Word::AccountProgram => (&[b"Use a program login"], &[]),
         Word::AccountKey => (&[b"Use an API key"], &[]),
-        Word::ChoiceDefault => (&[b"Engine default for next run"], &[]),
-        Word::ChoiceRequested => (&[b"Requested for next run: ", b""], &[Name]),
-        Word::ChoiceEffort => (&[b"Effort: ", b""], &[Name]),
-        Word::ChoicePreference => (&[b"Requested account: ", b""], &[Number]),
-        Word::ChoiceKept => (&[b"Last claimed account: ", b""], &[Number]),
         Word::ChoiceApply => (&[b"Apply to next run"], &[]),
         Word::ChoiceReset => (&[b"Reset choice"], &[]),
         Word::AccountWaiting => (&[b"Starting: waiting for an account"], &[]),
@@ -1072,7 +1089,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::ChatSpend => (&[b"Spent ", b"; delegates spent ", b""], &[Number, Number]),
         Word::ChatDelegates => (&[b"", b" delegates"], &[Number]),
         Word::ChoiceProvider | Word::ChatTime => (&[b"", b""], &[Name]),
-        Word::ChatSendHint => (&[b"Enter to send \xc2\xb7 Shift+Enter for a new line"], &[]),
+        Word::ChatSendHint => (&[b"Enter to send \xc2\xb7 Shift+Enter for newline"], &[]),
         Word::DemoBoth => (&[b"This is a demo, running on a demo model and a demo forge."], &[]),
         Word::DemoForge => (&[b"This is a demo, running on a demo forge."], &[]),
         Word::ConnectForge => (&[b"Connect a forge"], &[]),
@@ -1096,7 +1113,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::DemoRequest => (DEMO_REQUEST, &[Name, Name]),
         Word::SuggestedRequests => (&[b"Suggested requests"], &[]),
         Word::DemoScript => (&[b"The demo model plays these requests from a script."], &[]),
-        Word::ChatHint => (&[b"Enter to start \xc2\xb7 Shift+Enter for a new line"], &[]),
+        Word::ChatHint => (&[b"temper \xc2\xb7 Enter to start \xc2\xb7 Shift+Enter for newline"], &[]),
         Word::Accept => (&[b"Accept"], &[]),
         Word::Reject => (&[b"Reject with reason"], &[]),
         Word::Answer => (&[b"Answer"], &[]),

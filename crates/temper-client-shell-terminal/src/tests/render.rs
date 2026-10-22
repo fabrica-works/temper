@@ -52,6 +52,9 @@ fn each_fixture_page_prints_as_its_golden_file() {
         ("control_text", fixtures::control_text()),
     ] {
         let print = fixtures::print(&tree);
+        if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some() {
+            std::fs::write(fixtures::golden(name), print.text.as_slice()).expect("write golden file");
+        }
         let golden = std::fs::read(fixtures::golden(name)).expect("golden file");
         assert_eq!(String::from_utf8_lossy(print.text.as_slice()), String::from_utf8_lossy(&golden), "page {name}");
     }

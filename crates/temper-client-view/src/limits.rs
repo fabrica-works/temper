@@ -80,14 +80,14 @@ impl Limits {
         // Catalogue: me_project_models x (1 Item + 1 Button + 2 Paragraphs),
         // plus me_model_efforts x 1 Button for the selected model. Fixed room:
         // 2 Slots + 1 List + 18 Paragraphs (including pending/refusal room)
-        // + 3 Statuses + 6 Links + 2 Buttons = 32. Thus 64 x 4 + 16 + 32 = 304 nodes.
-        // Each adds the unchanged UI node/text/run/patch price plus one forge
-        // and one frame binding: at the fixture/web text price,
-        // 304 x 574,364 B = 174,606,656 B (including the UI scratch trees).
+        // + 3 Statuses + 6 Links + 2 Buttons = 32, plus the disclosure
+        // and the plan line's separator, link and text priced below.
         let choices = temper_client_domain::pages::choice::MODELS
             .checked_mul(4)?
             .checked_add(temper_client_domain::pages::choice::EFFORTS)?
-            .checked_add(32)?;
+            .checked_add(32)?
+            // Change model disclosure and the plan line's separator/link/text.
+            .checked_add(4)?;
         // A goal's result: region, heading, status, their text and words slot plus
         // markdown; its contract paragraph and text. Budget: region, heading, balance,
         // six term/description pairs, a funder link, models term and cut line,
@@ -127,7 +127,9 @@ impl Limits {
             .checked_add(16)?
             // Your chats replaces two headings with a heading, filters and empty words.
             // The merge retains only scalar keys and borrowed lines on the stack.
-            .checked_add(4)?;
+            .checked_add(4)?
+            // Start a chat heading and its text outside the demo start.
+            .checked_add(2)?;
         let tree = skein_ui::Limits {
             nodes,
             depth: receiving.rows.checked_add(34)?,

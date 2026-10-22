@@ -66,26 +66,7 @@ pub(crate) fn composer(b: &mut Builder, root: &Domain, task: Option<&c::Task>, w
     let draft = root.pages().choice();
     b.open(Role::Slot);
     b.style(crate::look::CHOICE);
-    match draft.context {
-        Some(choice::Context::Task { .. }) if draft.requested != draft.original => {
-            requested(b, root, draft.original.as_ref(), W::ChoiceRequested, w);
-            if draft.requested.is_some() {
-                requested(b, root, draft.requested.as_ref(), W::ChoiceDraft, w);
-            } else {
-                line(b, w, W::ChoiceDraftDefault, &[]);
-            }
-        }
-        Some(choice::Context::Template { .. }) if draft.requested == draft.original => {
-            requested(b, root, draft.requested.as_ref(), W::ChoiceTemplate, w);
-        }
-        Some(choice::Context::Template { .. } | choice::Context::Task { .. }) | None => {
-            let label = if demo_model(root) { W::DemoUsing } else { W::ChoiceRequested };
-            requested(b, root, draft.requested.as_ref(), label, w);
-        }
-    }
-    if let Some(task) = task {
-        committed(b, root, task, w, bindings);
-    }
+    using(b, root, task, w);
     if let Some(me) = temper_client_domain::pages::accounts::current_me(root.client())
         && let Some(project) = draft.project()
         && let Some(models) = choice::models(me, project)
@@ -96,6 +77,8 @@ pub(crate) fn composer(b: &mut Builder, root: &Domain, task: Option<&c::Task>, w
             None => true,
         }
     {
+        b.open(Role::Disclosure);
+        b.name(&w.say(W::ChangeModel, &[]));
         b.open(Role::List);
         b.style(crate::look::ROWS);
         let selected_model = draft.selected(me);
@@ -132,15 +115,25 @@ pub(crate) fn composer(b: &mut Builder, root: &Domain, task: Option<&c::Task>, w
         }
         b.close();
         control(b, bindings, Role::Button, &w.say(W::ChoiceReset, &[]), Act::Choice(C::Default), false);
-        if task.is_some() && draft.requested != draft.original && draft.valid(me) {
-            control(b, bindings, Role::Button, &w.say(W::ChoiceApply, &[]), Act::Choice(C::Apply), false);
+        if task.is_some() && draft.requested != draft.original {
+            match &draft.requested {
+                Some(choice) => line(b, w, W::ChoiceDraft, &[Hole::Name(shown(choice.main.model.bytes(), w))]),
+                None => line(b, w, W::ChoiceDraftDefault, &[]),
+            }
+            if draft.valid(me) {
+                control(b, bindings, Role::Button, &w.say(W::ChoiceApply, &[]), Act::Choice(C::Apply), false);
+            }
         }
+        b.close();
     }
     if draft.pending.is_some() {
         line(b, w, W::ChoicePending, &[]);
     }
     if let Some(outcome) = &draft.outcome {
         crate::pages::chats::outcome_text(b, w, outcome, 0);
+    }
+    if let Some(task) = task {
+        waiting(b, root, task.run_wait, w, bindings);
     }
     b.close();
 }
@@ -171,30 +164,294 @@ pub(crate) fn shown(name: &[u8], w: &Words) -> Box<[u8]> {
     out.finish()
 }
 
-fn demo_model(root: &Domain) -> bool {
-    match root.demo() {
-        Some((demo, halves)) => halves.model && root.pages().choice().project() == Some(demo.project),
-        None => false,
+/// Keep payer selection shared with the catalogue's provider readiness.
+fn payer(me: &c::Me, task: Option<&c::Task>) -> Option<c::OwnerAccountUse> {
+    match task {
+        None => Some(c::OwnerAccountUse::Party(me.party.number)),
+        Some(task) => match task.budget.funder {
+            c::Funder::Pool { person, .. } => Some(c::OwnerAccountUse::Party(person)),
+            c::Funder::Period { project, .. } | c::Funder::Recurring { project, .. } => {
+                Some(c::OwnerAccountUse::Project(project))
+            }
+            c::Funder::Task(_) => None,
+        },
     }
 }
-
-fn requested(b: &mut Builder, root: &Domain, choice: Option<&c::LlmChoice>, label: W, w: &Words) {
-    let Some(choice) = choice else {
-        let draft = root.pages().choice();
-        if demo_model(root) && draft.requested == draft.original {
-            line(b, w, W::DemoUsing, &[Hole::Name(w.say(W::Default, &[]))]);
+fn readiness(doc: &c::OwnerAccounts, provider: Option<u32>, payer: Option<c::OwnerAccountUse>) -> c::Readiness {
+    for row in &doc.readiness {
+        if Some(row.provider) == provider && Some(row.payer) == payer {
+            return row.readiness;
+        }
+    }
+    c::Readiness::Unknown
+}
+// Translation of jig-domain-core coverage.rs and jig-domain-accounts selection.rs.
+// The own-party slice alone preserves jig's payer/explicit/deployment ordering.
+fn eligible(row: &c::OwnerAccountLine, viewer: u64, provider: Option<u32>) -> bool {
+    if row.provider != provider || row.holder != c::OwnerAccountHolder::Party(viewer) {
+        return false;
+    }
+    // In the own-holder slice, plan and non-plan coverage coincide.
+    match &row.uses {
+        Some(uses) => uses.as_slice().contains(&c::OwnerAccountUse::Party(viewer)),
+        None => true,
+    }
+}
+fn pinned(
+    doc: &c::OwnerAccounts,
+    viewer: u64,
+    provider: Option<u32>,
+    pins: [Option<u32>; 2],
+) -> Option<&c::OwnerAccountLine> {
+    for number in pins.into_iter().flatten() {
+        for row in &doc.accounts {
+            if row.number == number && eligible(row, viewer, provider) {
+                return Some(row);
+            }
+        }
+    }
+    None
+}
+fn program_endpoint(me: &c::Me, provider: Option<u32>) -> Option<bool> {
+    for offer in &me.providers {
+        if Some(offer.provider) == provider {
+            if offer.programs_cut {
+                return None;
+            }
+            if offer.programs.is_empty() {
+                return Some(false);
+            }
+            // Me has no per-model endpoint: mixed offers cannot establish its kind.
+            return if offer.key || offer.sign_in || offer.none { None } else { Some(true) };
+        }
+    }
+    None
+}
+fn held(state: c::OwnerAccountState) -> bool {
+    match state {
+        c::OwnerAccountState::Asking | c::OwnerAccountState::Granted => false,
+        // The public Later state also carries jig's Limited state.
+        c::OwnerAccountState::Later { .. }
+        | c::OwnerAccountState::SignInAgain
+        | c::OwnerAccountState::Misconfigured
+        | c::OwnerAccountState::Unloaded { .. }
+        | c::OwnerAccountState::Cancelled
+        | c::OwnerAccountState::Closing => true,
+    }
+}
+fn chosen_source(row: &c::OwnerAccountLine, program: bool) -> Option<&c::OwnerAccountSource> {
+    for source in &row.sources {
+        let fits = match source.kind {
+            c::OwnerAccountKind::Program => program,
+            c::OwnerAccountKind::Key | c::OwnerAccountKind::SignIn | c::OwnerAccountKind::None => !program,
+        };
+        if !fits {
+            continue;
+        }
+        if held(source.state) {
+            return None;
+        }
+        if source.usable {
+            return Some(source);
+        }
+        if !program {
+            return None;
+        }
+    }
+    None
+}
+#[expect(clippy::manual_find, reason = "the programming model uses bounded loops, not closures")]
+fn selected_account(
+    doc: &c::OwnerAccounts,
+    viewer: u64,
+    provider: Option<u32>,
+    program: bool,
+) -> Option<&c::OwnerAccountLine> {
+    for row in &doc.accounts {
+        if eligible(row, viewer, provider) && (row.cut || chosen_source(row, program).is_some()) {
+            return Some(row);
+        }
+    }
+    None
+}
+fn using(b: &mut Builder, root: &Domain, task: Option<&c::Task>, w: &Words) {
+    let draft = root.pages().choice();
+    let choice = match task {
+        Some(_) => draft.original.as_ref(),
+        None => draft.requested.as_ref(),
+    };
+    let me = temper_client_domain::pages::accounts::current_me(root.client());
+    let doc = temper_client_domain::pages::accounts::document(root.client());
+    let payer = match me {
+        Some(me) => payer(me, task),
+        None => None,
+    };
+    let models = match (me, draft.project()) {
+        (Some(me), Some(project)) => choice::models(me, project),
+        _ => None,
+    };
+    let mut model = None;
+    if let Some(models) = models {
+        for offered in models {
+            let matches = match choice {
+                Some(choice) => offered.name == choice.main.model,
+                None => match doc {
+                    Some(doc) => readiness(doc, offered.provider, payer) == c::Readiness::Usable,
+                    None => false,
+                },
+            };
+            if matches {
+                model = Some(offered);
+                break;
+            }
+        }
+    }
+    let name = match choice {
+        Some(choice) => choice.main.model.bytes(),
+        None => match model {
+            Some(model) => model.name.bytes(),
+            None => {
+                line(b, w, W::UsingDefault, &[]);
+                return;
+            }
+        },
+    };
+    let mut name = shown(name, w);
+    if let Some(choice) = choice
+        && let Some(effort) = &choice.main.effort
+    {
+        name = w.say(W::ModelEffort, &[Hole::Name(name), Hole::Name(shown(effort.bytes(), w))]);
+    }
+    let provider = match model {
+        Some(model) => model.provider,
+        None => None,
+    };
+    using_line(b, root, task, choice, provider, name, w);
+}
+fn using_line(
+    b: &mut Builder,
+    root: &Domain,
+    task: Option<&c::Task>,
+    choice: Option<&c::LlmChoice>,
+    provider: Option<u32>,
+    name: Box<[u8]>,
+    w: &Words,
+) {
+    let me = temper_client_domain::pages::accounts::current_me(root.client());
+    let doc = temper_client_domain::pages::accounts::document(root.client());
+    let payer = match me {
+        Some(me) => payer(me, task),
+        None => None,
+    };
+    let ready = match doc {
+        Some(doc) => readiness(doc, provider, payer),
+        None => c::Readiness::Unknown,
+    };
+    let preferred = match choice {
+        Some(choice) => choice.account,
+        None => None,
+    };
+    let kept = match task {
+        Some(task) => task.kept_account,
+        None => None,
+    };
+    let own = match me {
+        Some(me) => payer == Some(c::OwnerAccountUse::Party(me.party.number)),
+        None => false,
+    };
+    let pin = match (me, doc) {
+        (Some(me), Some(doc)) if own => pinned(doc, me.party.number, provider, [preferred, kept]),
+        (Some(_), Some(_)) | (None, _) | (_, None) => None,
+    };
+    // Demo.provider is public even when its deployment-held account is outside this slice.
+    if pin.is_none()
+        && let Some(demo) = root.forge().demo()
+        && provider == Some(demo.provider)
+    {
+        if ready == c::Readiness::Unavailable {
+            line(b, w, W::ModelNeedsAccount, &[Hole::Name(name)]);
         } else {
-            line(b, w, W::ChoiceDefault, &[]);
+            line(b, w, W::DemoUsing, &[Hole::Name(w.say(W::Default, &[]))]);
         }
         return;
+    }
+    let (Some(me), Some(doc)) = (me, doc) else {
+        line(b, w, W::UsingModel, &[Hole::Name(name)]);
+        return;
     };
-    line(b, w, label, &[Hole::Name(shown(choice.main.model.bytes(), w))]);
-    if let Some(effort) = &choice.main.effort {
-        line(b, w, W::ChoiceEffort, &[Hole::Name(shown(effort.bytes(), w))]);
+    let program = program_endpoint(me, provider);
+    let account = if own
+        && !doc.cut
+        && let Some(program) = program
+    {
+        match pin {
+            Some(row) => Some(row),
+            None => selected_account(doc, me.party.number, provider, program),
+        }
+    } else {
+        None
+    };
+    if let Some(account) = account {
+        if account.cut || ready != c::Readiness::Usable {
+            line(b, w, W::UsingModel, &[Hole::Name(name)]);
+        } else if let Some(source) = chosen_source(account, program.expect("selected with a known endpoint")) {
+            using_account(b, root, account, source, name, w);
+        } else {
+            line(b, w, W::ModelNeedsAccount, &[Hole::Name(name)]);
+        }
+    } else {
+        let word = if ready == c::Readiness::Unavailable { W::ModelNeedsAccount } else { W::UsingModel };
+        line(b, w, word, &[Hole::Name(name)]);
     }
-    if let Some(account) = choice.account {
-        account_line(b, root, w, account, (W::ChoicePreference, W::ChoicePreferenceName));
+}
+fn using_account(
+    b: &mut Builder,
+    root: &Domain,
+    account: &c::OwnerAccountLine,
+    source: &c::OwnerAccountSource,
+    name: Box<[u8]>,
+    w: &Words,
+) {
+    let mut provider_name = None;
+    if let Some(me) = temper_client_domain::pages::accounts::current_me(root.client()) {
+        for offer in &me.providers {
+            if Some(offer.provider) == account.provider {
+                provider_name = Some(skein_lib::bytes::copy_of(offer.name.bytes()));
+                break;
+            }
+        }
     }
+    let Some(provider_name) = provider_name else {
+        line(b, w, W::UsingModel, &[Hole::Name(name)]);
+        return;
+    };
+    let text = match source.kind {
+        c::OwnerAccountKind::Key => w.say(W::UsingKey, &[Hole::Name(provider_name), Hole::Name(name)]),
+        c::OwnerAccountKind::SignIn => w.say(W::UsingPlan, &[Hole::Name(provider_name), Hole::Name(name)]),
+        c::OwnerAccountKind::Program => w.say(
+            W::UsingProgram,
+            &[Hole::Name(provider_name), Hole::Name(source.name.clone().unwrap_or_default()), Hole::Name(name)],
+        ),
+        c::OwnerAccountKind::None => w.say(W::UsingModel, &[Hole::Name(name)]),
+    };
+    b.open(Role::Paragraph);
+    b.style(crate::look::ACCOUNT_LINE);
+    b.name(&text);
+    b.text(skein_ui::Run::Plain, &text);
+    if source.kind == c::OwnerAccountKind::SignIn
+        && let Some(address) = &account.manage_usage
+        && skein_ui::markdown::safe_url(address)
+        && c::valid_manage_usage(address)
+    {
+        b.text(skein_ui::Run::Plain, &w.say(W::ToolSeparator, &[]));
+        b.open(Role::Link);
+        let text = w.say(W::Usage, &[]);
+        b.name(&text);
+        b.text(skein_ui::Run::Plain, &text);
+        b.external(address);
+        b.close();
+    }
+    b.close();
 }
 #[expect(clippy::manual_find, reason = "the programming model uses bounded loops, not closures")]
 fn account_row(root: &Domain, account: u32) -> Option<&c::OwnerAccountLine> {
@@ -222,25 +479,10 @@ fn provider(b: &mut Builder, root: &Domain, task: Option<&c::Task>, number: Opti
             break;
         }
     }
-    let payer = match task {
-        None => Some(c::OwnerAccountUse::Party(me.party.number)),
-        Some(task) => match task.budget.funder {
-            c::Funder::Pool { person, .. } => Some(c::OwnerAccountUse::Party(person)),
-            c::Funder::Period { project, .. } | c::Funder::Recurring { project, .. } => {
-                Some(c::OwnerAccountUse::Project(project))
-            }
-            c::Funder::Task(_) => None,
-        },
+    let readiness = match temper_client_domain::pages::accounts::document(root.client()) {
+        Some(doc) => readiness(doc, Some(number), payer(me, task)),
+        None => c::Readiness::Unknown,
     };
-    let mut readiness = c::Readiness::Unknown;
-    if let Some(doc) = temper_client_domain::pages::accounts::document(root.client()) {
-        for row in &doc.readiness {
-            if row.provider == number && Some(row.payer) == payer {
-                readiness = row.readiness;
-                break;
-            }
-        }
-    }
     match readiness {
         c::Readiness::Unavailable => line(b, w, W::NeedsAccount, &[]),
         c::Readiness::Unknown => line(b, w, W::AccountReadinessUnknown, &[]),
@@ -252,37 +494,6 @@ fn editable(task: &c::Task) -> bool {
         Some(c::Admission::Allowed | c::Admission::Bounded { .. } | c::Admission::Proposed { .. }) => true,
         Some(c::Admission::Refused(_)) | None => false,
     }
-}
-fn committed(b: &mut Builder, root: &Domain, task: &c::Task, w: &Words, bindings: &mut Bindings) {
-    if let Some(account) = task.kept_account {
-        line(b, w, W::ChoiceKept, &[Hole::Number(u64::from(account))]);
-        if let Some(row) = account_row(root, account) {
-            b.open(Role::Paragraph);
-            b.style(crate::look::ACCOUNT_LINE);
-            if let Some(name) = &row.provider_name {
-                b.text(skein_ui::Run::Plain, name.bytes());
-                b.text(skein_ui::Run::Plain, b" \xc2\xb7 ");
-            }
-            b.text(skein_ui::Run::Plain, row.display.bytes());
-            if row.plan {
-                b.text(skein_ui::Run::Plain, b" \xc2\xb7 ");
-                b.text(skein_ui::Run::Plain, &crate::accounts::words::say(w, crate::accounts::words::Word::Plan, &[]));
-            }
-            if let Some(address) = &row.manage_usage
-                && skein_ui::markdown::safe_url(address)
-                && c::valid_manage_usage(address)
-            {
-                b.open(Role::Link);
-                let text = w.say(W::Usage, &[]);
-                b.name(&text);
-                b.text(skein_ui::Run::Plain, &text);
-                b.external(address);
-                b.close();
-            }
-            b.close();
-        }
-    }
-    waiting(b, root, task.run_wait, w, bindings);
 }
 pub(crate) fn waiting(
     b: &mut Builder,

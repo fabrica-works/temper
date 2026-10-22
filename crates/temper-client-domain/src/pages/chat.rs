@@ -26,6 +26,7 @@ pub struct Chat {
     pub words: Box<[u8]>,
     pub pending: List<(Key, Sending)>,
     pub outcome: Option<jig_client::Outcome>,
+    pub outcome_kind: Option<Sending>,
     pub seen: u64,
     pub cards: List<super::inbox::Card>,
     pub delegations: List<delegation::Delegation>,
@@ -55,6 +56,7 @@ impl Chat {
             words: Box::default(),
             pending: List::with_capacity(4),
             outcome: None,
+            outcome_kind: None,
             seen: 0,
             cards: List::with_capacity(limits.client.domain.reads),
             delegations: List::with_capacity(delegation::bound(limits)),
@@ -122,21 +124,7 @@ impl Chat {
                     self.thread.failed();
                 }
             }
-            Told::Answered { key, outcome } if self.pending_key(key) => {
-                if let jig_client::Outcome::Answered(jig_client::Answered::Jig(answer)) = &outcome {
-                    self.thread.answered(key, answer);
-                } else {
-                    self.thread.words.refused(key);
-                }
-                let mut kept = List::with_capacity(self.pending.capacity());
-                for row in &self.pending {
-                    if row.0 != key {
-                        kept.push(*row).expect("remaining pending fits");
-                    }
-                }
-                self.pending = kept;
-                self.outcome = Some(outcome);
-            }
+            Told::Answered { key, outcome } if self.pending_key(key) => self.answered(key, outcome),
             Told::Pending { key } if self.pending_key(key) => {}
             Told::Page { handle, page } if self.card_handle(handle) => {
                 for index in 0..self.cards.len() {
@@ -185,6 +173,24 @@ impl Chat {
         }
         self.delegations(client, out);
         true
+    }
+    fn answered(&mut self, key: Key, outcome: jig_client::Outcome) {
+        if let jig_client::Outcome::Answered(jig_client::Answered::Jig(answer)) = &outcome {
+            self.thread.answered(key, answer);
+        } else {
+            self.thread.words.refused(key);
+        }
+        self.outcome_kind = None;
+        let mut kept = List::with_capacity(self.pending.capacity());
+        for row in &self.pending {
+            if row.0 == key {
+                self.outcome_kind = Some(row.1);
+            } else {
+                kept.push(*row).expect("remaining pending fits");
+            }
+        }
+        self.pending = kept;
+        self.outcome = Some(outcome);
     }
     fn room(&self) -> bool {
         self.thread.lines.rows.len() <= LINES.saturating_sub(self.rows)
@@ -498,6 +504,7 @@ impl Chat {
         let key = Key { asker: Owner::Pages.asker(), number: *serial };
         self.pending.push((key, Sending::Close)).expect("one close fits");
         self.outcome = None;
+        self.outcome_kind = None;
         out.push(Request::Client(jig_client::Event::Send {
             key,
             name: None,
@@ -614,6 +621,7 @@ impl Chat {
         }
         self.pending.push((key, kind)).expect("one request per chat act fits");
         self.outcome = None;
+        self.outcome_kind = None;
         out.push(Request::Client(jig_client::Event::Send {
             key,
             name: None,

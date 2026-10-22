@@ -114,14 +114,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         if let Some(result) = &task.result {
             result_text(b, result, words);
         }
-        for (key, _) in &chat.pending {
-            if let Some(pending) = root.client().pending(*key) {
-                crate::confirm::progress_text(b, words, pending.progress);
-            }
-        }
-        if let Some(outcome) = &chat.outcome {
-            super::chats::outcome_text(b, words, outcome, 0);
-        }
+        act_status(b, root, chat, words);
         b.close();
         composer(b, root, chat, task, words, bindings, temper_client_domain::pages::shown(root.pages()));
     }
@@ -147,6 +140,20 @@ fn heading(b: &mut Builder, title: &[u8], suffix: &[u8]) {
     b.close();
 }
 
+fn act_status(b: &mut Builder, root: &Domain, chat: &Chat, words: &Words) {
+    for (key, kind) in &chat.pending {
+        if *kind != temper_client_domain::pages::chat::Sending::Message
+            && let Some(pending) = root.client().pending(*key)
+        {
+            crate::confirm::progress_text(b, words, pending.progress);
+        }
+    }
+    if chat.outcome_kind != Some(temper_client_domain::pages::chat::Sending::Message)
+        && let Some(outcome) = &chat.outcome
+    {
+        super::chats::outcome_text(b, words, outcome, 0);
+    }
+}
 /// The signed-in person and whether they requested this chat.
 pub(crate) struct Speakers {
     pub(crate) person: Option<u64>,
@@ -276,6 +283,9 @@ fn composer(
     if task.result.is_some() {
         return;
     }
+    if let c::ChipPhase::Owner { phase: c::OwnerChipPhase::Ended, .. } = task.chip.details.as_ref() {
+        return;
+    }
     if temper_client_domain::pages::chat::allowed(task, c::ActKind::Message) {
         b.open(Role::Slot);
         b.style(look::COMPOSER_AREA);
@@ -294,6 +304,12 @@ fn composer(
         words.text(b, Word::ChatSendHint, &[]);
         b.close();
         control(b, bindings, Role::Button, &words.say(Word::Send, &[]), Act::Send);
+        if chat.outcome_kind == Some(temper_client_domain::pages::chat::Sending::Message)
+            && let Some(outcome) = &chat.outcome
+            && !super::chats::accepted(outcome)
+        {
+            super::chats::outcome_text(b, words, outcome, 0);
+        }
         b.close();
         b.close();
     } else {

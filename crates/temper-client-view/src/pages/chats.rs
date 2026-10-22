@@ -38,6 +38,9 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
     }
     if let Some(chats) = root.pages().chats() {
         if root.pages().me(root.client()).is_some() && root.pages().project().is_some() {
+            if demo.is_none() {
+                text(b, Role::Heading { level: 2 }, &words.say(Word::StartChat, &[]));
+            }
             crate::choice::composer(b, root, None, words, bindings);
             b.open(Role::Slot);
             b.style(crate::look::ENTRY);
@@ -63,13 +66,15 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
                 b.bind(bindings.insert(Act::StartChat));
                 b.close();
             }
+            if chats.refusal.is_some() {
+                words.refusal(b, &jig_client::contract::Refusal::NotOffered, text_limit);
+            }
+            if let Some(outcome) = &chats.outcome
+                && !accepted(outcome)
+            {
+                outcome_text(b, words, outcome, text_limit);
+            }
             b.close();
-        }
-        if chats.refusal.is_some() {
-            words.refusal(b, &jig_client::contract::Refusal::NotOffered, text_limit);
-        }
-        if let Some(outcome) = &chats.outcome {
-            outcome_text(b, words, outcome, text_limit);
         }
         list(b, root, words, bindings);
     }
@@ -212,6 +217,15 @@ pub(crate) fn row(b: &mut Builder, root: &Domain, line: &TaskLine, words: &Words
     b.text(Run::Plain, &words.chat_time(line.ended_at.unwrap_or(line.last_activity)));
     b.close();
     b.close();
+}
+
+/// A successful start/message is already represented by the conversation.
+pub(crate) fn accepted(outcome: &jig_client::Outcome) -> bool {
+    let jig_client::Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Done(_))) = outcome
+    else {
+        return false;
+    };
+    true
 }
 
 pub(crate) fn outcome_text(b: &mut Builder, words: &Words, outcome: &jig_client::Outcome, text_limit: u32) {

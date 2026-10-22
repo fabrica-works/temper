@@ -135,6 +135,8 @@ pub fn demo_change() -> Script {
         begin: Begin::Link,
         steps: Box::new([
             Step::Go { address: Address::Chats },
+            Step::See { find: Find::exactly_named(Role::Paragraph, "Using Demo model · Default".as_bytes()), within: START_WITHIN },
+            Step::See { find: Find::exactly_named(Role::Disclosure, b"Change model"), within: START_WITHIN },
             // client/README.md, 4.8: a suggested request starts and opens its chat.
             Step::See { find: Find::named(Role::Button, b"Add CSV export to widget"), within: START_WITHIN },
             Step::Press { find: Find::named(Role::Button, b"Add CSV export to widget") },
@@ -155,6 +157,7 @@ pub fn demo_change() -> Script {
             Step::See { find: Find::text("T2 · CHANGE".as_bytes()).within(card()), within: START_WITHIN },
             Step::See { find: Find::exactly_named(Role::Status, b"Landed").within(card()), within: START_WITHIN },
             Step::See { find: Find::text("CI passed. Landed · merge commit ".as_bytes()).within(card()), within: START_WITHIN },
+            Step::Gone { find: Find::exactly_named(Role::Status, b"Applied"), within: START_WITHIN },
             // The owner's chat log holds the result's words alone, not its ending.
             Step::Go { address: Address::Task { task: CHANGE } },
             Step::See {

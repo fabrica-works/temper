@@ -75,13 +75,7 @@ fn first_run_page(address: client::Address, landed: bool) -> skein_ui::Tree {
                     },
             } => {
                 let delivery = match subject {
-                    c::Subject::Me => {
-                        let mut me = jig_client_world::stories::frame(1);
-                        me.deployment_role = Some(c::HeldRole::Owner);
-                        me.projects.get_mut(0).expect("demo project").name =
-                            Some(c::DocumentText::complete(delegation_text(b"demo")));
-                        Some(c::Delivery::Me(Box::new(me)))
-                    }
+                    c::Subject::Me => Some(c::Delivery::Me(Box::new(demo_me()))),
                     c::Subject::Task { task } => Some(c::Delivery::Task(Box::new(delegation_task(task, landed)))),
                     c::Subject::Accounts if landed => Some(c::Delivery::OwnerAccounts(Box::new(demo_accounts()))),
                     c::Subject::Deployment
@@ -145,6 +139,27 @@ fn first_run_page(address: client::Address, landed: bool) -> skein_ui::Tree {
     temper_client_view::build(&mut view, &root, &mut Queue::with_capacity(tree_limits().patches));
     copy_tree(view.tree())
 }
+fn demo_me() -> contract::Me {
+    use jig_client::contract as c;
+    use skein_lib::List;
+    let mut me = jig_client_world::stories::frame(1);
+    me.deployment_role = Some(c::HeldRole::Owner);
+    let mut models = List::with_capacity(1);
+    models
+        .push(c::MeModel {
+            name: delegation_text(b"demo"),
+            provider: Some(3),
+            prices: c::ModelPrices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1000 },
+            description: None,
+            window: 1024,
+            output: 128,
+            efforts: List::with_capacity(0),
+        })
+        .expect("demo model");
+    me.projects.get_mut(0).expect("demo project").models = models;
+    me.projects.get_mut(0).expect("demo project").name = Some(c::DocumentText::complete(delegation_text(b"demo")));
+    me
+}
 fn delegation_task(number: u64, landed: bool) -> contract::Task {
     use jig_client::contract as c;
     let mut task = jig_client_world::stories::conversations::chat(number, b"First run", skein_lib::Wall::EPOCH);
@@ -155,6 +170,8 @@ fn delegation_task(number: u64, landed: bool) -> contract::Task {
         b"Export widget's table as CSV"
     }));
     task.hold = None;
+    task.kept_account = Some(1);
+    task.budget.funder = c::Funder::Pool { project: 1, person: 1, period: 1 };
     task.result = None;
     task.chip.phase = c::Phase::Running;
     task.proposals.clear();
@@ -197,11 +214,52 @@ fn delegation_text(bytes: &[u8]) -> contract::Text {
 }
 
 fn demo_accounts() -> contract::OwnerAccounts {
+    use jig_client::contract as c;
+    use skein_lib::List;
+    let mut readiness = List::with_capacity(1);
+    readiness
+        .push(c::PayerReadiness {
+            provider: 3,
+            payer: c::OwnerAccountUse::Party(1),
+            readiness: c::Readiness::Usable,
+            settled: Some(true),
+        })
+        .expect("demo readiness");
+    let mut sources = List::with_capacity(1);
+    sources
+        .push(c::OwnerAccountSource {
+            name: None,
+            place: 1,
+            number: 1,
+            kind: c::OwnerAccountKind::None,
+            state: c::OwnerAccountState::Granted,
+            usable: true,
+            expiring: false,
+            attention: false,
+            spent_until: None,
+        })
+        .expect("demo source");
+    let mut accounts = List::with_capacity(1);
+    accounts
+        .push(c::OwnerAccountLine {
+            number: 1,
+            place: 1,
+            uses: None,
+            plan: false,
+            provider: Some(3),
+            provider_name: None,
+            manage_usage: None,
+            display: c::DocumentText::complete(delegation_text(b"Demo")),
+            holder: c::OwnerAccountHolder::Deployment,
+            sources,
+            cut: false,
+        })
+        .expect("demo account");
     contract::OwnerAccounts {
         program_hosts: skein_lib::List::with_capacity(0),
-        readiness: skein_lib::List::with_capacity(0),
+        readiness,
         readiness_cut: false,
-        accounts: skein_lib::List::with_capacity(0),
+        accounts,
         signing: skein_lib::List::with_capacity(0),
         last_end: None,
         usable: true,

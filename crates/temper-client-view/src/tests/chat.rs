@@ -364,7 +364,7 @@ fn the_chat_entry_has_the_true_hint_between_message_and_send() {
     assert_eq!(nodes[send].name.as_deref(), Some(b"Send".as_slice()));
     assert_eq!(
         fixtures::words().say(crate::words::Word::ChatSendHint, &[]).as_ref(),
-        b"Enter to send \xc2\xb7 Shift+Enter for a new line"
+        b"Enter to send \xc2\xb7 Shift+Enter for newline"
     );
 }
 #[test]
@@ -605,8 +605,7 @@ fn older_is_not_offered_while_the_window_is_filling() {
     assert_eq!(nodes[0].role, Role::Log);
     assert!(fixtures::find(view.tree(), Role::Button, b"Older").is_none());
 }
-#[test]
-fn pending_progress_and_the_answer_stay_before_the_composer() {
+fn answered_message(answer: c::Answer) -> temper_client_domain::Domain {
     use temper_client_domain::{Action, Event, Request, pages::Act};
     let mut root = chat_with_history();
     let mut out = skein_lib::Queue::with_capacity(temper_client_domain::max_out(&fixtures::domain_limits()));
@@ -615,12 +614,13 @@ fn pending_progress_and_the_answer_stay_before_the_composer() {
     }
     assert_eq!(root.pages().chat().expect("chat").pending.len(), 1);
     let pending = fixtures::page_view(&root);
+    assert!(fixtures::find(pending.tree(), Role::Status, b"Being sent").is_some());
     let thread = styled(pending.tree(), crate::look::THREAD);
     let area = styled(pending.tree(), crate::look::COMPOSER_AREA);
     let log = named_position(pending.tree().nodes(), Role::Log, None).expect("log");
     let end = log.checked_add(usize::try_from(pending.tree().nodes()[log].size).expect("log size")).expect("log end");
-    assert!(named_position(&pending.tree().nodes()[end..area], Role::Status, None).is_some());
-    assert!(thread < log && end < area);
+    assert!(named_position(&pending.tree().nodes()[end..area], Role::Status, None).is_none());
+    assert!(thread < log && end <= area, "thread={thread} log={log} end={end} area={area}");
     chat_event(&mut root, Event::Client { event: jig_client::Event::Stored }, &mut out);
     let mut attempt = None;
     for request in &out {
@@ -639,17 +639,34 @@ fn pending_progress_and_the_answer_stay_before_the_composer() {
                 up: jig_client::Up::Answer {
                     attempt,
                     envelope: skein_lib::RequestEnvelope::Final,
-                    answer: Some(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Changed))),
+                    answer: Some(jig_client::Answered::Jig(answer)),
                     why: None,
                 },
             },
         },
         &mut out,
     );
+    root
+}
+#[test]
+fn a_messages_progress_and_acceptance_stay_in_the_conversation() {
+    let root =
+        answered_message(c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::Said { task: TASK, message: MESSAGE })));
     let answered = fixtures::page_view(&root);
+    assert!(fixtures::find(answered.tree(), Role::Status, b"Sent").is_some());
     let applied = fixtures::words().say_card(crate::cards::P::Applied, &[]);
-    let status = named_position(answered.tree().nodes(), Role::Status, Some(&applied)).expect("applied outcome");
-    assert!(status < styled(answered.tree(), crate::look::COMPOSER_AREA));
+    assert!(named_position(answered.tree().nodes(), Role::Status, Some(&applied)).is_none());
+}
+#[test]
+fn a_refused_message_draws_its_refusal_after_send() {
+    let root = answered_message(c::Answer::Refused { refusal: c::Refusal::NotOffered, at: None });
+    let view = fixtures::page_view(&root);
+    let nodes = view.tree().nodes();
+    let send = named_position(nodes, Role::Button, Some(b"Send")).unwrap();
+    let status = named_position(nodes, Role::Status, Some(b"This act is not offered")).unwrap();
+    assert!(send < status);
+    let area = styled(view.tree(), crate::look::COMPOSER_AREA);
+    assert!(status < area + usize::try_from(nodes[area].size).unwrap());
 }
 
 fn header_with_status(waits_on: c::WaitsOn, live: u32, wake: c::WakeRule, requester: c::OwnerRequester) -> crate::View {

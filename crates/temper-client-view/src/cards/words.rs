@@ -175,7 +175,7 @@ impl CardWord {
             Self::ProposedTasks => (46, &[b"Proposed tasks"], &[]),
             Self::NoHeldRole => (47, &[b"No held role was supplied"], &[]),
             Self::ConversationLog => (0, &[b"Conversation"], &[]),
-            Self::WordsBeingSent => (1, &[b"Sending your words"], &[]),
+            Self::WordsBeingSent => (1, &[b"Being sent"], &[]),
             Self::WordsSent => (2, &[b"Sent"], &[]),
             Self::WordsRead => (3, &[b"Read"], &[]),
             Self::Provisional => (4, &[b"Writing..."], &[]),

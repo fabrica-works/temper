@@ -43,5 +43,5 @@ Conversation:
   wait
 Using Demo model · Default
 [10] Message: (empty) (enter sends)
-Enter to send · Shift+Enter for a new line
+Enter to send · Shift+Enter for newline
 [11] Send

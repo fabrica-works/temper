@@ -881,6 +881,21 @@ pub fn demo_frame_root(
         Some(me) => me,
         None => template.pages().me(template.client()).expect("chat template").clone(),
     };
+    let mut models = List::with_capacity(2);
+    for name in [b"demo".as_slice(), b"selected"] {
+        models
+            .push(c::MeModel {
+                name: c::Text::new(Box::from(name), 32).unwrap(),
+                provider: Some(17),
+                prices: c::ModelPrices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1000 },
+                description: None,
+                window: 1024,
+                output: 128,
+                efforts: List::with_capacity(0),
+            })
+            .unwrap();
+    }
+    me.projects.get_mut(0).unwrap().models = models;
     let mut charters = List::with_capacity(1);
     charters.push(1).expect("chat charter");
     me.projects.get_mut(0).expect("demo project").creating = Some(c::Creating {
@@ -924,6 +939,8 @@ pub fn demo_frame_root(
         task.chip.title = c::DocumentText::complete(c::Text::new(b"Ship the update".as_slice().into(), 32).unwrap());
         task.project = PROJECT;
         task.llm = llm;
+        task.kept_account = Some(2);
+        task.budget.funder = c::Funder::Pool { project: PROJECT, person: 73, period: 1 };
         task.requester = c::OwnerRequester::Person(root.pages().me(root.client()).unwrap().party.number);
         task.acts = List::with_capacity(1);
         task.acts
@@ -942,6 +959,168 @@ pub fn demo_frame_root(
         );
     }
     root
+}
+
+/// T1 keeps its demo account after another provider's key becomes usable.
+pub fn demo_kept_root() -> temper_client_domain::Domain {
+    let address = temper_client_domain::Address::Chat { task: 1 };
+    let (mut root, me_watch, task_watch, _, account_watch) =
+        root_at_with_demo(address.clone(), &domain_limits(), b"Shop", Some((PROJECT, false)));
+    let template = demo_root(address, PROJECT, false);
+    let mut me = template.pages().me(template.client()).unwrap().clone();
+    let mut models = List::with_capacity(3);
+    let mut other = me.projects.get(0).unwrap().models.get(0).unwrap().clone();
+    other.provider = Some(18);
+    other.name = c::Text::new(Box::from(b"other".as_slice()), 32).unwrap();
+    models.push(other).unwrap();
+    for model in &me.projects.get(0).unwrap().models {
+        models.push(model.clone()).unwrap();
+    }
+    me.projects.get_mut(0).unwrap().models = models;
+    let mut doc = temper_client_domain::pages::accounts::document(root.client()).unwrap().clone();
+    let mut rows = List::with_capacity(2);
+    let mut other = doc.accounts.get(1).unwrap().clone();
+    other.sources = doc.accounts.get(0).unwrap().sources.clone();
+    other.sources.get_mut(0).unwrap().kind = c::OwnerAccountKind::Key;
+    rows.push(other).unwrap();
+    rows.push(doc.accounts.get(0).unwrap().clone()).unwrap();
+    doc.accounts = rows;
+    let mut readiness = List::with_capacity(2);
+    readiness
+        .push(c::PayerReadiness {
+            provider: 18,
+            payer: c::OwnerAccountUse::Party(73),
+            readiness: c::Readiness::Usable,
+            settled: Some(true),
+        })
+        .unwrap();
+    readiness.push(*doc.readiness.get(0).unwrap()).unwrap();
+    doc.readiness = readiness;
+    let mut task = template.pages().chat().unwrap().task(template.client()).unwrap().clone();
+    task.llm = Some(c::LlmChoice {
+        account: None,
+        main: c::ModelEffort { model: c::Text::new(Box::from(b"demo".as_slice()), 32).unwrap(), effort: None },
+        subagents: List::with_capacity(0),
+    });
+    for (watch, value) in [
+        (me_watch, c::Delivery::Me(Box::new(me))),
+        (account_watch.unwrap(), c::Delivery::OwnerAccounts(Box::new(doc))),
+        (task_watch.unwrap(), c::Delivery::Task(Box::new(task))),
+    ] {
+        root_event(
+            &mut root,
+            temper_client_domain::Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Watched { watch, event: c::WatchEvent::Delivered(value) },
+                },
+            },
+        );
+    }
+    root
+}
+
+pub fn hidden_demo_root(ready: Option<c::Readiness>, payer: u64) -> temper_client_domain::Domain {
+    let address = temper_client_domain::Address::Chat { task: 1 };
+    let (mut root, me_watch, task_watch, _, account_watch) =
+        root_at_with_demo(address.clone(), &domain_limits(), b"Shop", Some((PROJECT, true)));
+    let template = demo_root(address, PROJECT, true);
+    let me = template.pages().me(template.client()).unwrap().clone();
+    let mut task = template.pages().chat().unwrap().task(template.client()).unwrap().clone();
+    task.llm = Some(c::LlmChoice {
+        account: None,
+        main: c::ModelEffort { model: c::Text::new(Box::from(b"demo".as_slice()), 32).unwrap(), effort: None },
+        subagents: List::with_capacity(0),
+    });
+    task.budget.funder = c::Funder::Pool { project: PROJECT, person: payer, period: 1 };
+    let mut doc = demo_accounts(true);
+    doc.accounts.clear();
+    match ready {
+        Some(ready) => doc.readiness.get_mut(0).unwrap().readiness = ready,
+        None => doc.readiness.clear(),
+    }
+    for (watch, value) in [
+        (me_watch, c::Delivery::Me(Box::new(me))),
+        (task_watch.unwrap(), c::Delivery::Task(Box::new(task))),
+        (account_watch.unwrap(), c::Delivery::OwnerAccounts(Box::new(doc))),
+    ] {
+        root_event(
+            &mut root,
+            temper_client_domain::Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Watched { watch, event: c::WatchEvent::Delivered(value) },
+                },
+            },
+        );
+    }
+    root
+}
+
+fn demo_accounts(model: bool) -> c::OwnerAccounts {
+    let mut rows = List::with_capacity(2);
+    let mut sources = List::with_capacity(1);
+    sources
+        .push(c::OwnerAccountSource {
+            name: None,
+            place: 1,
+            number: 2,
+            kind: c::OwnerAccountKind::None,
+            state: c::OwnerAccountState::Granted,
+            usable: true,
+            expiring: false,
+            attention: false,
+            spent_until: None,
+        })
+        .unwrap();
+    rows.push(c::OwnerAccountLine {
+        number: 2,
+        place: 1,
+        uses: None,
+        plan: false,
+        provider: Some(17),
+        provider_name: None,
+        manage_usage: None,
+        display: c::DocumentText::complete(c::Text::new(Box::from(b"Demo".as_slice()), 32).unwrap()),
+        holder: c::OwnerAccountHolder::Deployment,
+        sources,
+        cut: false,
+    })
+    .unwrap();
+    if !model {
+        rows.push(c::OwnerAccountLine {
+            number: 1,
+            place: 1,
+            uses: None,
+            plan: false,
+            provider: Some(18),
+            provider_name: None,
+            manage_usage: None,
+            display: c::DocumentText::complete(c::Text::new(b"Other".as_slice().into(), 32).unwrap()),
+            holder: c::OwnerAccountHolder::Party(73),
+            sources: List::with_capacity(0),
+            cut: true,
+        })
+        .unwrap();
+    }
+    let mut readiness = List::with_capacity(1);
+    readiness
+        .push(c::PayerReadiness {
+            provider: 17,
+            payer: c::OwnerAccountUse::Party(73),
+            readiness: c::Readiness::Usable,
+            settled: Some(true),
+        })
+        .unwrap();
+    c::OwnerAccounts {
+        program_hosts: List::with_capacity(0),
+        readiness,
+        readiness_cut: false,
+        accounts: rows,
+        signing: List::with_capacity(0),
+        last_end: None,
+        usable: true,
+        settled: true,
+        cut: false,
+    }
 }
 
 fn deliver_demo(root: &mut temper_client_domain::Domain, read: Token, watch: Token, project: u32, model: bool) {
@@ -974,34 +1153,7 @@ fn deliver_demo(root: &mut temper_client_domain::Domain, read: Token, watch: Tok
             },
         },
     );
-    let mut rows = List::with_capacity(1);
-    if !model {
-        rows.push(c::OwnerAccountLine {
-            number: 1,
-            place: 1,
-            uses: None,
-            plan: false,
-            provider: Some(18),
-            provider_name: None,
-            manage_usage: None,
-            display: c::DocumentText::complete(c::Text::new(b"Other".as_slice().into(), 32).unwrap()),
-            holder: c::OwnerAccountHolder::Party(73),
-            sources: List::with_capacity(0),
-            cut: true,
-        })
-        .unwrap();
-    }
-    let accounts = c::OwnerAccounts {
-        program_hosts: List::with_capacity(0),
-        readiness: List::with_capacity(0),
-        readiness_cut: false,
-        accounts: rows,
-        signing: List::with_capacity(0),
-        last_end: None,
-        usable: true,
-        settled: true,
-        cut: false,
-    };
+    let accounts = demo_accounts(model);
     root_event(
         root,
         temper_client_domain::Event::Client {

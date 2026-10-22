@@ -608,3 +608,87 @@ fn delegate_counts_are_plural_and_absent_at_zero() {
         }
     }
 }
+
+#[test]
+fn start_a_chat_heads_the_composer_except_at_the_demos_start() {
+    for demo in [false, true] {
+        let root = if demo {
+            fixtures::demo_root(temper_client_domain::Address::Chats, fixtures::PROJECT, true)
+        } else {
+            // A template makes the ordinary chats composer available.
+            super::choice::ordinary_chats()
+        };
+        let view = fixtures::page_view(&root);
+        let nodes = view.tree().nodes();
+        let (mut heading, mut slot, mut hint) = (None, None, None);
+        for (at, node) in nodes.iter().enumerate() {
+            if node.role == (Role::Heading { level: 2 }) && node.name.as_deref() == Some(b"Start a chat") {
+                heading = Some(at);
+            }
+            if node.styles.as_slice().contains(&crate::look::CHOICE) {
+                slot = Some(at);
+            }
+            if node.styles.as_slice().contains(&crate::look::HINT) {
+                hint = Some(at);
+            }
+        }
+        assert_eq!(heading.is_some(), !demo);
+        if let Some(heading) = heading {
+            assert!(heading < slot.unwrap());
+        }
+        let hint = hint.unwrap();
+        assert_eq!(
+            fixtures::node_text(view.tree(), hint).as_ref(),
+            "temper · Enter to start · Shift+Enter for newline".as_bytes()
+        );
+    }
+}
+
+#[test]
+fn an_accepted_start_draws_no_applied_status() {
+    use temper_client_domain::{self as d, Action, Event, pages::Act};
+    let mut root = fixtures::demo_root(d::Address::Chats, fixtures::PROJECT, true);
+    let limits = fixtures::domain_limits();
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+    let mut out = Queue::with_capacity(d::max_out(&limits));
+    for act in [Act::ChatWords { words: Box::from(b"Hello".as_slice()) }, Act::StartChat] {
+        d::step(&mut root, &env, Event::Act { action: Action::Pages(act) }, &mut out);
+    }
+    assert!(root.pages().chats().unwrap().start.is_some());
+    d::step(
+        &mut root,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
+        Event::Client { event: jig_client::Event::Stored },
+        &mut out,
+    );
+    let mut attempt = None;
+    for request in &out {
+        if let Request::Client {
+            request: jig_client::Request::Down { down: jig_client::Down::Send { attempt: token, .. } },
+        } = request
+        {
+            attempt = Some(*token);
+        }
+    }
+    let attempt = attempt.unwrap();
+    fixtures::root_event(
+        &mut root,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Answer {
+                    attempt,
+                    envelope: skein_lib::RequestEnvelope::Final,
+                    answer: Some(jig_client::Answered::Jig(Answer::Done(Outcome::Owner(OwnerOutcome::Created {
+                        first: 1,
+                        last: 1,
+                        given: None,
+                    })))),
+                    why: None,
+                },
+            },
+        },
+    );
+    assert!(root.pages().chats().unwrap().outcome.is_some());
+    let view = fixtures::page_view(&root);
+    assert!(fixtures::find(view.tree(), Role::Status, b"Applied").is_none());
+}

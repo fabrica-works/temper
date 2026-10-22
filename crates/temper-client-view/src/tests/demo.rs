@@ -194,13 +194,13 @@ fn a_chats_banner_follows_its_chatbar_in_every_project() {
     }
 }
 #[test]
-fn the_demo_composer_names_its_default_or_requested_model_only_in_its_project() {
+fn the_demo_account_always_names_default_whatever_the_model_or_project() {
     use jig_client::contract as c;
     for (row, project, model, requested, expected) in [
         ("default", f::PROJECT, true, false, "Using Demo model · Default"),
-        ("requested", f::PROJECT, true, true, "Using Demo model · selected"),
-        ("another project", f::SECOND_PROJECT, true, false, "Engine default for next run"),
-        ("forge alone", f::PROJECT, false, false, "Engine default for next run"),
+        ("requested", f::PROJECT, true, true, "Using Demo model · Default"),
+        ("another project", f::SECOND_PROJECT, true, false, "Using Demo model · Default"),
+        ("forge alone", f::PROJECT, false, false, "Using Demo model · Default"),
     ] {
         let choice = if requested {
             Some(c::LlmChoice {
@@ -279,4 +279,28 @@ fn pending_words_without_a_party_are_named_you() {
         &mut crate::frame::Bindings::new(f::tree_limits().bindings),
     );
     assert!(f::find(&b.finish(), Role::Paragraph, b"You").is_some());
+}
+
+#[test]
+fn t1_keeps_the_demo_line_after_another_providers_key() {
+    let root = f::demo_kept_root();
+    assert!(!root.demo().unwrap().1.model);
+    let view = f::page_view(&root);
+    assert!(f::find(view.tree(), Role::Paragraph, "Using Demo model · Default".as_bytes()).is_some());
+}
+
+#[test]
+fn the_hidden_deployment_demo_account_needs_only_its_public_provider() {
+    use jig_client::contract::Readiness;
+    for (ready, payer, expected) in [
+        (Some(Readiness::Usable), 73, "Using Demo model · Default"),
+        (Some(Readiness::Unknown), 73, "Using Demo model · Default"),
+        (None, 73, "Using Demo model · Default"),
+        (Some(Readiness::Unavailable), 73, "demo · needs an account"),
+        (Some(Readiness::Usable), 74, "Using Demo model · Default"),
+    ] {
+        let root = f::hidden_demo_root(ready, payer);
+        let view = f::page_view(&root);
+        assert!(f::find(view.tree(), Role::Paragraph, expected.as_bytes()).is_some());
+    }
 }

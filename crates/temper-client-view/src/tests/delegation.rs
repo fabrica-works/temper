@@ -874,3 +874,14 @@ fn a_failed_chat_has_one_end_line_with_its_reason() {
     let view = view_root(&root_chat(Some(&chat), &[], after_call(), &[]));
     assert!(fixtures::find(view.tree(), Role::Paragraph, "Failed · No capacity".as_bytes()).is_some());
 }
+
+#[test]
+fn an_ended_chat_has_no_composer_line_or_chooser() {
+    let view = first_run_view(true, true);
+    for node in view.tree().nodes() {
+        for token in [look::COMPOSER_AREA, look::CHOICE, look::ACCOUNT_LINE] {
+            assert!(!node.styles.as_slice().contains(&token));
+        }
+        assert!(!(node.role == Role::Disclosure && node.name.as_deref() == Some(b"Change model")));
+    }
+}
