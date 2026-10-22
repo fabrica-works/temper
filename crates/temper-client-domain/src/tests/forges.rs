@@ -1,0 +1,254 @@
+use super::fixtures;
+use crate::forge::{
+    self, family,
+    forges::{Connection, Kind, Mode, Offer, Row, SetUpAnswer, SetUpOutcome, SetUpRefusal, Step, ask, rows, watch},
+    words,
+};
+use jig_client::{Answered, Ask, Family, Watchable, contract as c};
+use skein_lib::List;
+use temper_client_protocol_wire::{self as wire, v1 as w};
+fn limits() -> w::Limits {
+    forge::wire_limits(&fixtures::limits().forge).unwrap()
+}
+fn answer(outcome: w::Outcome) -> Family {
+    Family {
+        family: wire::FORGE,
+        version: wire::CLIENT_VERSION,
+        bytes: wire::answer(&w::Answer::new(&limits(), w::AnswerParts { outcome }).unwrap()),
+    }
+}
+#[test]
+fn set_up_is_a_deployment_request_and_forges_a_deployment_watch() {
+    let Ask::Family { scope, record } = ask(3, &fixtures::limits().forge).unwrap() else { panic!("family") };
+    assert_eq!(scope, c::Scope::Deployment);
+    assert_eq!((record.family, record.version), (wire::FORGE, wire::CLIENT_VERSION));
+    let w::Request::SetUp(request) = wire::decode_requesting(&record.bytes, &limits()).unwrap().into_parts().request
+    else {
+        panic!("set up")
+    };
+    assert_eq!(request.forge(), 3);
+    let Watchable::Family { scope, window, record } = watch(&fixtures::limits().forge).unwrap() else {
+        panic!("family")
+    };
+    assert_eq!(scope, c::Scope::Deployment);
+    assert_eq!(window, c::Window { rows: 0, after: None });
+    assert_eq!(*wire::decode_watching(&record.bytes, &limits()).unwrap().watch(), w::Watch::Forges);
+}
+#[test]
+fn set_up_accepts_only_its_outcomes_and_the_shared_unknown() {
+    for (wire, expected) in [
+        (w::Outcome::SettingUp, SetUpOutcome::SettingUp),
+        (w::Outcome::Unknown, SetUpOutcome::Unknown),
+        (
+            w::Outcome::SetUpRefused(
+                w::SetUpRefused::new(&limits(), w::SetUpRefusedParts { why: w::SetUpRefusal::NotOffered }).unwrap(),
+            ),
+            SetUpOutcome::Refused(SetUpRefusal::NotOffered),
+        ),
+        (
+            w::Outcome::SetUpRefused(
+                w::SetUpRefused::new(&limits(), w::SetUpRefusedParts { why: w::SetUpRefusal::NotUnderTheBox }).unwrap(),
+            ),
+            SetUpOutcome::Refused(SetUpRefusal::NotUnderTheBox),
+        ),
+        (
+            w::Outcome::SetUpRefused(
+                w::SetUpRefused::new(&limits(), w::SetUpRefusedParts { why: w::SetUpRefusal::Busy }).unwrap(),
+            ),
+            SetUpOutcome::Refused(SetUpRefusal::Busy),
+        ),
+    ] {
+        let record = answer(wire);
+        assert_eq!(family::set_up_answer(&record, &limits()), Some(expected));
+        assert_eq!(
+            forge::forges::answer(&Answered::Family(record), &fixtures::limits().forge),
+            Some(SetUpAnswer::Outcome(expected))
+        );
+    }
+    let adoption = answer(w::Outcome::ForgeRefused(
+        w::ForgeRefused::new(&limits(), w::ForgeRefusedParts { reason: w::ForgeReason::NoSuchForge }).unwrap(),
+    ));
+    assert_eq!(family::set_up_answer(&adoption, &limits()), None);
+    let link =
+        jig_client_protocol_link::Limits::new(fixtures::limits().client.domain, fixtures::limits().client.exchanges)
+            .unwrap();
+    for outcome in [
+        w::Outcome::SettingUp,
+        w::Outcome::SetUpRefused(
+            w::SetUpRefused::new(&limits(), w::SetUpRefusedParts { why: w::SetUpRefusal::Busy }).unwrap(),
+        ),
+    ] {
+        assert_eq!(family::answer(&answer(outcome), &limits(), &link), None);
+    }
+    let mut record = answer(w::Outcome::SettingUp);
+    record.bytes = Box::from(b"bad".as_slice());
+    assert_eq!(family::set_up_answer(&record, &limits()), None);
+}
+fn cases() -> Box<[(w::Connection, Connection, &'static [u8])]> {
+    Box::new([
+        (w::Connection::NotConnected, Connection::NotConnected, b"Not connected"),
+        (w::Connection::NotSetUp, Connection::NotSetUp, b"Not set up"),
+        (
+            w::Connection::SettingUp(w::SettingUp::new(&limits(), w::SettingUpParts { step: None }).unwrap()),
+            Connection::SettingUp { step: None },
+            b"Setting up",
+        ),
+        (
+            w::Connection::SettingUp(
+                w::SettingUp::new(&limits(), w::SettingUpParts { step: Some(w::SetUpStep::Fetch) }).unwrap(),
+            ),
+            Connection::SettingUp { step: Some(Step::Fetch) },
+            b"Setting up: fetching",
+        ),
+        (
+            w::Connection::SettingUp(
+                w::SettingUp::new(&limits(), w::SettingUpParts { step: Some(w::SetUpStep::Prepare) }).unwrap(),
+            ),
+            Connection::SettingUp { step: Some(Step::Prepare) },
+            b"Setting up: preparing",
+        ),
+        (
+            w::Connection::SettingUp(
+                w::SettingUp::new(&limits(), w::SettingUpParts { step: Some(w::SetUpStep::Run) }).unwrap(),
+            ),
+            Connection::SettingUp { step: Some(Step::Run) },
+            b"Setting up: starting",
+        ),
+        (
+            w::Connection::SetUpFailed(
+                w::SetUpFailed::new(&limits(), w::SetUpFailedParts { why: Box::from(b"fetch failed".as_slice()) })
+                    .unwrap(),
+            ),
+            Connection::SetUpFailed { why: Box::from(b"fetch failed".as_slice()) },
+            b"Set up failed: fetch failed",
+        ),
+        (w::Connection::Connecting, Connection::Connecting, b"Connecting"),
+        (
+            w::Connection::Connected(
+                w::Connected::new(&limits(), w::ConnectedParts { id: 42, login: Box::from(b"bot".as_slice()) })
+                    .unwrap(),
+            ),
+            Connection::Connected { id: 42, login: Box::from(b"bot".as_slice()) },
+            b"Connected as bot (42)",
+        ),
+        (
+            w::Connection::Stopped(
+                w::Stopped::new(&limits(), w::StoppedParts { reason: Box::from(b"retired".as_slice()) }).unwrap(),
+            ),
+            Connection::Stopped { reason: Box::from(b"retired".as_slice()) },
+            b"Stopped: retired",
+        ),
+    ])
+}
+#[test]
+fn every_connection_decodes_into_the_forges_words() {
+    let mut records = List::with_capacity(10);
+    let mut expected = List::with_capacity(10);
+    for (index, (connection, state, words)) in cases().into_iter().enumerate() {
+        let (kind, mode, offer, k, m, o) = match index % 4 {
+            0 => (
+                w::Kind::Forgejo,
+                w::Mode::Connected,
+                w::Offer::NotOffered,
+                Kind::Forgejo,
+                Mode::Connected,
+                Offer::NotOffered,
+            ),
+            1 => (w::Kind::Github, w::Mode::Managed, w::Offer::Offered, Kind::GitHub, Mode::Managed, Offer::Offered),
+            2 => (
+                w::Kind::Forgejo,
+                w::Mode::Owned,
+                w::Offer::NotUnderTheBox,
+                Kind::Forgejo,
+                Mode::Owned,
+                Offer::NotUnderTheBox,
+            ),
+            _ => (w::Kind::Github, w::Mode::Fake, w::Offer::NotOffered, Kind::GitHub, Mode::Fake, Offer::NotOffered),
+        };
+        let number = u16::try_from(index + 1).unwrap();
+        records
+            .push(w::ForgeRow::new(&limits(), w::ForgeRowParts { number, kind, mode, connection, offer }).unwrap())
+            .unwrap();
+        let row = Row { number, kind: k, mode: m, offer: o, connection: state };
+        assert_eq!(words::forge_connection(&row).as_ref(), words);
+        expected.push(row).unwrap();
+    }
+    let record = Family {
+        family: wire::FORGE,
+        version: wire::CLIENT_VERSION,
+        bytes: wire::forges(&w::Forges::new(&limits(), w::ForgesParts { forges: records }).unwrap()),
+    };
+    assert_eq!(rows(&record, &fixtures::limits().forge).unwrap().as_ref(), expected.as_slice());
+    for bytes in [b"bad".as_slice(), &record.bytes[..record.bytes.len() - 1]] {
+        assert!(rows(&Family { bytes: bytes.into(), ..record.clone() }, &fixtures::limits().forge).is_none());
+    }
+    assert!(rows(&Family { version: wire::CLIENT_VERSION + 1, ..record.clone() }, &fixtures::limits().forge).is_none());
+    assert!(rows(&Family { family: wire::FORGE + 1, ..record }, &fixtures::limits().forge).is_none());
+}
+#[test]
+fn the_offer_drives_the_manual_words_and_setup_actions() {
+    let mut row = Row {
+        number: 3,
+        kind: Kind::Forgejo,
+        mode: Mode::Owned,
+        connection: Connection::NotSetUp,
+        offer: Offer::Offered,
+    };
+    assert_eq!(words::forge_set_up_action(&row), Some(b"Set up a Forgejo here".as_slice()));
+    row.offer = Offer::NotUnderTheBox;
+    assert_eq!(words::forge_set_up_action(&row), None);
+    assert_eq!(words::forge_connection(&row).as_ref(), b"Not set up: run `temper forge fetch 3`, `temper forge prepare 3`, `temper forge run 3 forgejo` and `temper forge run 3 runner`, then restart `temper serve`");
+    row.connection = Connection::SetUpFailed { why: Box::from(b"why".as_slice()) };
+    row.offer = Offer::Offered;
+    assert_eq!(words::forge_set_up_action(&row), Some(b"Set up again".as_slice()));
+    for (kind, text) in [(Kind::Forgejo, b"Forgejo".as_slice()), (Kind::GitHub, b"GitHub")] {
+        assert_eq!(words::forge_kind(kind), text);
+    }
+    for (mode, text) in [
+        (Mode::Connected, b"connected".as_slice()),
+        (Mode::Managed, b"managed"),
+        (Mode::Owned, b"owned"),
+        (Mode::Fake, b"fake"),
+    ] {
+        assert_eq!(words::forge_mode(mode), text);
+    }
+    for (outcome, text) in [
+        (SetUpOutcome::SettingUp, b"setting up".as_slice()),
+        (SetUpOutcome::Refused(SetUpRefusal::NotOffered), b"not offered"),
+        (SetUpOutcome::Refused(SetUpRefusal::NotUnderTheBox), b"not under the box"),
+        (SetUpOutcome::Refused(SetUpRefusal::Busy), b"busy"),
+        (SetUpOutcome::Unknown, b"unknown"),
+    ] {
+        assert_eq!(words::set_up_outcome(outcome), text);
+    }
+    row.connection = Connection::Stopped { reason: Box::from([255u8]) };
+    assert_eq!(words::forge_connection(&row).as_ref(), "Stopped: �".as_bytes());
+}
+
+#[test]
+fn an_out_of_order_document_is_refused() {
+    let mut forges = List::with_capacity(2);
+    for number in [3, 1] {
+        forges
+            .push(
+                w::ForgeRow::new(
+                    &limits(),
+                    w::ForgeRowParts {
+                        number,
+                        kind: w::Kind::Forgejo,
+                        mode: w::Mode::Owned,
+                        connection: w::Connection::NotSetUp,
+                        offer: w::Offer::Offered,
+                    },
+                )
+                .unwrap(),
+            )
+            .unwrap();
+    }
+    let record = Family {
+        family: wire::FORGE,
+        version: wire::CLIENT_VERSION,
+        bytes: wire::forges(&w::Forges::new(&limits(), w::ForgesParts { forges }).unwrap()),
+    };
+    assert!(rows(&record, &fixtures::limits().forge).is_none());
+}

@@ -8,6 +8,7 @@
     clippy::wildcard_enum_match_arm
 )]
 use crate::forge;
+use alloc::boxed::Box;
 use jig_client_protocol_link as link;
 use skein_lib::{List, Reader, Writer};
 use temper_client_protocol_wire::{self as wire, v1 as w};
@@ -157,4 +158,82 @@ pub fn demo(record: &[u8], limits: &w::Limits) -> Option<forge::Demo> {
         name: answer.name,
         cues: answer.cues.into_boxed(),
     })
+}
+
+#[must_use]
+pub fn set_up(forge: u16, limits: &w::Limits) -> Option<jig_client::Family> {
+    let request = w::SetUp::new(limits, w::SetUpParts { forge }).ok()?;
+    let record = w::Requesting::new(limits, w::RequestingParts { request: w::Request::SetUp(request) }).ok()?;
+    Some(jig_client::Family { family: wire::FORGE, version: wire::CLIENT_VERSION, bytes: wire::requesting(&record) })
+}
+#[must_use]
+pub fn set_up_answer(record: &jig_client::Family, limits: &w::Limits) -> Option<forge::forges::SetUpOutcome> {
+    use forge::forges::{SetUpOutcome as O, SetUpRefusal as R};
+    if record.family != wire::FORGE || record.version != wire::CLIENT_VERSION {
+        return None;
+    }
+    let mut reader = Reader::new(&record.bytes);
+    let answer = w::Answer::decode(limits, &mut reader).ok()?;
+    if !reader.is_empty() {
+        return None;
+    }
+    Some(match answer.into_parts().outcome {
+        w::Outcome::SettingUp => O::SettingUp,
+        w::Outcome::SetUpRefused(why) => O::Refused(match why.into_parts().why {
+            w::SetUpRefusal::NotOffered => R::NotOffered,
+            w::SetUpRefusal::NotUnderTheBox => R::NotUnderTheBox,
+            w::SetUpRefusal::Busy => R::Busy,
+        }),
+        w::Outcome::Unknown => O::Unknown,
+        w::Outcome::Adopted(_) | w::Outcome::CoreRefused(_) | w::Outcome::ForgeRefused(_) => return None,
+    })
+}
+#[must_use]
+pub fn forges(bytes: &[u8], limits: &w::Limits) -> Option<Box<[forge::forges::Row]>> {
+    use forge::forges::{Connection as C, Kind, Mode, Offer, Row, Step};
+    let record = wire::decode_forges(bytes, limits)?.into_parts();
+    let mut rows = List::with_capacity(record.forges.len());
+    for row in record.forges.into_boxed() {
+        let row = row.into_parts();
+        let connection = match row.connection {
+            w::Connection::NotConnected => C::NotConnected,
+            w::Connection::NotSetUp => C::NotSetUp,
+            w::Connection::SettingUp(value) => C::SettingUp {
+                step: match value.into_parts().step {
+                    Some(w::SetUpStep::Fetch) => Some(Step::Fetch),
+                    Some(w::SetUpStep::Prepare) => Some(Step::Prepare),
+                    Some(w::SetUpStep::Run) => Some(Step::Run),
+                    None => None,
+                },
+            },
+            w::Connection::SetUpFailed(value) => C::SetUpFailed { why: value.into_parts().why },
+            w::Connection::Connecting => C::Connecting,
+            w::Connection::Connected(value) => {
+                let value = value.into_parts();
+                C::Connected { id: value.id, login: value.login }
+            }
+            w::Connection::Stopped(value) => C::Stopped { reason: value.into_parts().reason },
+        };
+        rows.push(Row {
+            number: row.number,
+            kind: match row.kind {
+                w::Kind::Forgejo => Kind::Forgejo,
+                w::Kind::Github => Kind::GitHub,
+            },
+            mode: match row.mode {
+                w::Mode::Connected => Mode::Connected,
+                w::Mode::Managed => Mode::Managed,
+                w::Mode::Owned => Mode::Owned,
+                w::Mode::Fake => Mode::Fake,
+            },
+            offer: match row.offer {
+                w::Offer::NotOffered => Offer::NotOffered,
+                w::Offer::NotUnderTheBox => Offer::NotUnderTheBox,
+                w::Offer::Offered => Offer::Offered,
+            },
+            connection,
+        })
+        .ok()?;
+    }
+    Some(rows.into_boxed())
 }

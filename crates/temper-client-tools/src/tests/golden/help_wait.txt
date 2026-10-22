@@ -1,10 +1,15 @@
 wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
-Wait for a watch's change or condition
+wait forges [--since DIGEST] [--until settled|connected:F] [--timeout DURATION]
+Wait for a subject's change or condition
 Result: wait
   subject: Watch subject
   since: Wait for a different digest
   until: Wait for a condition
   timeout: Timeout, 300 seconds by default
+  subject: The deployment's forges
+  since: Wait past this digest
+  until: settled: none setting up or connecting; connected:F: forge F connected
+  timeout: At most 3600 seconds; default 300 seconds
 Subjects and --until conditions:
   me: waiting
   inbox: waiting|updates (no subject flags)
