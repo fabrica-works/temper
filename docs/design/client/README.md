@@ -298,7 +298,7 @@ keeps (`../protocol/configuration.md`, section 2).
 | `Chats` | `chats.html`; the demo's start at the first run's first step, which `first-run.html` opens | a composer to start a chat, under the level-2 heading "Start a chat", its line and its chooser (5.5) above its text area "Start a chat", with the hint "temper · Enter to start · Shift+Enter for newline"; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats as one list, "Your chats", live and ended together, newest first, under All, Live or Closed (below), each with its number and title, its status, spend and live delegates | `tasks{query}`: requester the person, the chat label, its live group by last activity, its ended pages by when each ended; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request; choose the list's filter; more closed chats |
 | `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the demo's banner while either half holds, in any project (5.1, 5.6), and the context line only in the demo's project while the demo is answered (5.6); the conversation (below): its request, the agent's words with its calls folded, the person's words, provisional text, and its end once it has ended; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer, while the chat lives: its line and its chooser (5.5), its text area "Message" with the hint "Enter to send · Shift+Enter for newline", and "Send", then a message's refusal or failure, if any: a message or the chat's start accepted draws no status of its own, neither at the conversation's end nor in the composer, since the conversation shows its words, "Being sent", then "Sent" (below); while Message is not offered, its line and chooser alone; an ended chat draws no composer and no composer's line | `task`, `activity` a page at a time, older pages while its window has room (5.4), `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
-| `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree with each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel (5.11); an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), with Amend, Stop and its composer (5.11); either's own held card while it is held | `task`, `tree`, `activity` a page at a time, older pages on an agent's task's "Older"; `run` while one is live | as its document offers them (5.11): on a goal amend, stop, cancel; on an agent's task message, amend, stop; release its own held task or one of its plan |
+| `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree with each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel (5.11); an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), with Amend, Stop and its composer (5.11); either's own held card while it is held | `task`, `tree`, `activity` a page at a time, older pages on an agent's task's "Older"; `run` while one is live; a change's panel, through the forge's side (`forge.md`, 9.2) | as its document offers them (5.11): on a goal amend, stop, cancel; on an agent's task message, amend, stop; release its own held task or one of its plan |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
 | `Adopt { project }` | none: 4.4 | the adoption form, with the picker of the repositories temper can reach on the chosen forge | `me`; the chosen forge's deployment part, for its kind, mode, user and installations (`forge.md`, 5.4); the picker's page, a `Reachable` request (section 8) | adopt a repository (4.4) |
 | `Forges` | `forges.html` | each configured forge: its connection, its mode, on GitHub temper's App and its installations, a connect under way and how the last ended, its load | the forge's, through the forge's side (4.2) | connect; replace a key or tokens; install on another account; forget the admin's token (section 8) |
@@ -769,12 +769,13 @@ for its kind, its user's login and its installations. Its nodes:
   subjects, so no request, read or subject of their own reaches the
   engine.
 - **`CLIENT_VERSION`:** the version of every record below, 1 at first,
-  2 since the demo's read, moved as `../protocol/README.md`, section 9
-  says: at most once in a plan, at its first landing that changes one
-  of these records, and shared by plans that run at once. A request, an
-  outcome or a field added to the family (the FORGE requests of section
-  8, the picker's ids in `Adopt`, the forge's kind in the adopted
-  outcome, the demo's read) changes them, so it is such a move, never a
+  2 since the demo's read, 3 since a change's panel, moved as
+  `../protocol/README.md`, section 9 says: at most once in a plan, at
+  its first landing that changes one of these records, and shared by
+  plans that run at once. A request, an outcome, a read, a subject or a
+  field added to the family (the FORGE requests of section 8, the
+  picker's ids in `Adopt`, the forge's kind in the adopted outcome, the
+  demo's read, a change's panel) changes them, so it is such a move, never a
   second version served beside the first. The engine serves exactly one
   version (jig's `protocol/client.md`, section 9): a client of another
   is out of date for the forge (4.4), and its kept adoption is dropped
@@ -824,6 +825,35 @@ for its kind, its user's login and its installations. Its nodes:
   configuration's order (section 8). On the wire it is `Reading`'s
   `demo`, `Reading` naming which of the family's reads a read is, and
   its answer `DemoAnswer`; none is the read's empty answer.
+- **A change's panel, the subject `change`** (`forge.md`, 9.2): of a
+  project's scope, its window unused, naming the change task's number
+  (u64). On the wire it is `Watching`'s `change`, `Watching` naming
+  which of the family's subjects a watch is, as `Reading` names a read.
+  Its document, `ChangePanel`:
+  - the task (u64); the repository's forge's number (u16), its owner
+    and name; the change's branch and its landing branch (byte strings,
+    each bounded as `Adopt`'s); its head: none before its branch is
+    pushed, or a commit (32 bytes, as the forge connector keeps one);
+  - its pull request: none yet, or its number (u64) and its address on
+    the forge (a byte string of at most 2048 bytes, empty for a forge
+    with no `web`);
+  - its step: producing, opening, recreating, reopening, checking,
+    gating, queued (its place, from 1 (u32), and the tasks ahead of it,
+    nearest first, at most 64 (u64 each)), first, updating, resolving,
+    repairing (its reason: CI, a gate by its number (u64), or a semantic
+    conflict), landing, or landed (its merge commit, 32 bytes);
+  - its hold: none, or why: stalled; past its repairs, its resolutions
+    or its updates; its branch moved; its branch missing; its pull
+    request closed; its pull request retargeted; a delegate or effect
+    failed; a person rejected a gate. A held change's step is the one it
+    was held at;
+  - the task its step runs: none, or its number (u64);
+  - CI at its head: unknown, pending, passed or failed;
+  - its gates, at most 64, each with its number (u64), its kind (review,
+    approval or check), whether it blocks (bool), and its verdict at the
+    head: none, pending, approved, or changes asked;
+  - its repairs, its resolutions and its updates, each used of its
+    limit (u32 each).
 - **The forge's documents' records:** its reads, subjects and
   documents, and its other requests, beside `Adopt` (`forge.md`,
   section 9).
@@ -2167,6 +2197,14 @@ does for the client:
   no record for does not decode: the routing answers the read with no
   record (unknown) and refuses the watch as unknown, without the root,
   as jig's reference service answers an undecodable one.
+- **A change's panel** (4.6; `forge.md`, 9.2): the routing hands the
+  root the watch, with its scope and the change's number; the core
+  admits it on the party's role in the project and asks the forge for
+  the document (`../domain/root.md`, 5.3), and again each time the
+  forge marks its subject. Each document leaves held in the decision
+  that made it, released once that decision's commit is durable, and
+  the routing encodes it, building the pull request's address from
+  that forge's configured `web` and its kind (`forge.md`, 9.2).
 - **The demo's read** (4.6, 4.8) is answered by the routing from the
   configuration alone, without the root, to any signed-in party:
   none while `application.demo` is null, and otherwise its `project`,
@@ -2205,7 +2243,11 @@ own tests:
   and the admin's token's refusals in words, "Not listed"'s words from
   each forge's read and installations; each FORGE request
   and outcome of section 8, a carried value's fields emptied as it
-  leaves and asked again when lost, under the first key);
+  leaves and asked again when lost, under the first key; a change's
+  panel watched as a change's task page opens and closed as it leaves,
+  in the task's project's scope, each delivery decoded and kept whole,
+  a document of another version or one that does not decode ending the
+  watch as unknown, and unknown and ended kept apart from loading);
   the view (each page from fixture states, read by skein's fake
   person's queries; a delegation's card in each state, in place of its
   call's summaries and its heard result; a goal's page, 5.8: its
@@ -2238,7 +2280,9 @@ own tests:
   `forge.md`, 5.4);
   `temper-client-protocol-wire` (golden bytes, bounds and fuzz targets,
   as skein's `codec.md`, section 6 has them); and the engine's routing
-  of the forge's family both ways.
+  of the forge's family both ways, a change's panel's watch to the root
+  with its scope, and its document encoded with the pull request's
+  address on a GitHub forge, on a Forgejo and with no `web`.
 - **Golden text:** temper's pages as skein's text shell prints them,
   kept as files beside the tests and changed only by hand: the inbox
   with entries of each kind, the chats, a chat with its conversation and
@@ -2297,7 +2341,14 @@ own tests:
   supplied, what its delegates spent among it; a repository adopted
   from the navigation's link, its outcome read and the engine holding it;
   refused: not found, a second home, a field the form refuses; a part
-  of the forge's saying "Shown on the forge."; the banner with no
+  of the forge's saying "Shown on the forge."; a change into the fake
+  forge's repository, handed its pushed branch, its panel watched from
+  its task's page as it goes from opening to landed: its deliveries
+  following its steps in order, never going back, its pull request's
+  number, CI passed at its head,
+  its gate's verdict, and at its end its merge commit, the watch kept
+  open with nothing moving it; a task that is no change watched as
+  unknown; the banner with no
   account, a key added on the accounts page and the banner gone, and
   the key in no record of the small store; a key's request lost and
   sent again by the person, making one account; a sign-in started, its

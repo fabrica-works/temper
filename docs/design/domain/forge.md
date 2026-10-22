@@ -940,6 +940,38 @@ merge, kind 4, on a pattern of landing branches (jig's
   (`../protocol/git.md`, 4.8), an update merges the base in
   (section 10), and a branch found moved backwards is drift (8.5).
 
+### 8.8 Its panel
+
+What the connector makes of a change for the client's panel
+(`../client/forge.md`, 9.2), as the core asks for the document
+(`root.md`, 5.3), from its record and its working set:
+
+- **From its record:** its repository, by owner and name from the
+  repository's record; its branch, landing branch and head; its pull
+  request's number; its state, with the step it was held at; the task
+  its one delegate runs; its gates and their verdicts, each judged at
+  the current head with its freshness (8.3); and its repairs,
+  resolutions and updates used, with their limits from
+  `change_policy`.
+- **CI at its head** is what its last step read (5.3), kept in memory
+  beside its record, one verdict per change: a restart forgets it, and
+  the panel says unknown until the change's next step reads it again.
+- **Its place in its queue** is computed as the document is made,
+  in section 9's order among the changes queued or first in its
+  landing branch at the core's time: its place from 1, and the tasks
+  ahead of it, nearest first.
+- **Marked** as 9.2 of the client's says: its own subject each time its
+  record is saved and each time a step reads a CI verdict at its head
+  other than the one kept; and, when it enters its landing branch's
+  queue, leaves it or moves in it, the changes behind it, nearest first,
+  within the views' subjects marked per change (`root.md`, section 10).
+  One past that bound shows its new place at its own next mark.
+- **In its project's scope:** a change into a repository the project
+  holds. Any other task, or a scope that is not that project, is
+  unknown.
+- **Kept as long as its record:** the record outlives the task's end, so
+  a landed or cancelled change still has its panel.
+
 ## 9. Landing queues
 
 One per landing branch that has changes ready. A repository belongs to

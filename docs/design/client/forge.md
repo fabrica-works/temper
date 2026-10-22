@@ -592,8 +592,9 @@ project or the deployment (jig's `client/domain/contract.md`, 7.5; jig's
 `client/domain/root.md`, section 7), their records in
 `temper-client-protocol-wire` beside `Adopt` (`README.md`, 4.6).
 The first read served is the demo's (`README.md`, 4.6 and 4.8), from
-the configuration alone; the first part, the deployment's, its forges
-(5.4); a change's result and its hold (2.5) follow.
+the configuration alone; the first watch, a change's panel (9.2); the
+deployment's part, its forges (5.4), and a change's result and its hold
+(2.5) follow.
 
 | The client | jig's part and slot | The domain |
 |---|---|---|
@@ -682,8 +683,66 @@ address, as temper builds the manifest from it
   opens the manifest's page once to see its form post to the configured
   `web`; no test calls github.com.
 
+### 9.2 A change's panel, watched
+
+A change's panel (section 2) is the family's first subject, `change`,
+watched by the forge's client side while the change's task page is open
+(`README.md`, 3.5). Its document, `ChangePanel` (`README.md`, 4.6), is
+made by the forge connector from what it keeps of the change
+(`../domain/forge.md`, 8.8).
+
+- **Its subject** names the change task by its number, in the scope of
+  the task's project. jig admits the watch on the party's role in that
+  project (jig's `client/domain/contract.md`, 7.2). The connector
+  answers unknown for a task that is not a change into a repository the
+  project holds, and the page's slot says the panel is unknown (jig's
+  `client/domain/root.md`, section 6). The watch's window is unused:
+  the document is whole within its bounds.
+- **Level-triggered,** as every watch: each delivery is the whole panel
+  as it is when made, and a slow client sees fewer of them. The
+  connector marks the subject when the change's record changes (its
+  step, its pull request, a gate's verdict, a bound used, its hold),
+  and when a step reads CI at its head and finds a verdict other than
+  the one kept. When a change enters its landing branch's queue, leaves
+  it or moves in it, the changes behind it are marked too.
+- **What it carries:**
+  - the repository, by its forge's number and its owner and name
+    (2.5); the change's branch and its landing branch; its head;
+  - its pull request: its number once opened, and its address on the
+    forge;
+  - its step, the one 2.1 names, with what the step says: its place in
+    its queue and the tasks ahead of it, a repair's reason, or its merge
+    commit once landed;
+  - its hold, with the step it was held at;
+  - the task its step runs (its producer, a repair, a resolution or a
+    gate's review), at most one at a time;
+  - CI at its head;
+  - its gates (2.2), each with its number, its kind, whether it is
+    blocking or advisory, and its verdict at the current head, a clean
+    update's carry counted (`../domain/forge.md`, 8.3);
+  - its repairs, resolutions and updates, each used of its limit (8.4).
+- **The address on the forge is the engine's.** The routing builds it as
+  it encodes the document, from the forge's configured `web` and its
+  kind: `WEB/OWNER/NAME/pull/N` on GitHub, `WEB/OWNER/NAME/pulls/N` on
+  Forgejo. A forge with no `web` gives no address, and the page offers
+  no "View on forge" (`README.md`, 5.10).
+- **Not in it,** since the connector's records do not keep them: the
+  requirements at its head, judged only at the merge
+  (`../domain/forge.md`, 8.7); its heads in order; each CI context and its failing job;
+  the pull request's title and mergeability as the forge has them; its
+  stall's times; its place in GitHub's merge queue (section 10).
+- **As long as the change's record:** a change that has landed or ended
+  keeps its last panel, delivered when its page opens, and nothing marks
+  it again.
+
 ## 10. Open questions
 
+- **A change's requirements, heads and CI contexts in its panel** (2.2;
+  9.2). Default: left out until the connector keeps them beside the
+  change's record (a judgment of each requirement at the current head,
+  its heads with what made each, each context's state and its failing
+  job), each a field of `ChangePanel` added in the version move that
+  first needs it.
 - **A change's files in the client:** whether the panel lists the files a
   change touches, from the connector's read, short of showing the diff.
 - **Conflicts seen early** (`../domain/forge.md`, section 20):

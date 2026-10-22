@@ -218,6 +218,13 @@ to the forge; a timer to the child that armed it. What temper adds:
   key, then to the forge (5.4).
 - **A hint that comes before decisions open** is dropped, since the
   restart reads afresh (9.1).
+- **A watch of the forge's subject,** a change's panel
+  (`../client/forge.md`, 9.2), goes to the core to admit on the
+  party's role in its project; the core's ask for its document goes to
+  the forge (5.3), which makes it or answers unknown; the forge's marks
+  of its subjects go to the core; and each document leaves held in the
+  decision that asked for it, out to the protocol layer to encode once
+  that decision's commit is durable.
 
 ### 5.2 Host calls
 
