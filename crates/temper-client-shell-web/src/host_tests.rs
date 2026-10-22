@@ -223,7 +223,7 @@ mod memory_literal;
 // The page reserves its patch queue once, at four patches a node.
 // A chat's composer placeholder adds one phrase (148 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274387669033;
+const WEB_BYTES: u64 = 274387675275;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

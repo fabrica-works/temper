@@ -590,8 +590,8 @@ fn a_delegation_without_its_document_shows_its_call_work() {
     let view = view(None, &[CHANGE], false);
     assert!(fixtures::find(view.tree(), Role::Region, b"Task 2").is_none());
     assert!(skein_lib::bytes::find(&fixtures::text(view.tree()), b"delegate").is_some());
-    assert!(fixtures::find(view.tree(), Role::Paragraph, b"1 tool call").is_some());
-    assert!(fixtures::find(view.tree(), Role::Paragraph, b"Delegated tasks: 2").is_none());
+    assert!(fixtures::find(view.tree(), Role::Disclosure, "1 tool call · delegate".as_bytes()).is_some());
+    assert!(fixtures::find(view.tree(), Role::Paragraph, b"Delegated tasks: 2").is_some());
     assert_eq!(work_slots(&view), 1);
 }
 #[test]
@@ -641,7 +641,7 @@ fn a_calls_cards_keep_its_task_order() {
 fn work_slots(view: &crate::View) -> u32 {
     let mut count = 0_u32;
     for node in view.tree().nodes() {
-        if node.styles.as_slice().contains(&look::WORK) {
+        if node.role == Role::Slot && node.styles.as_slice().contains(&look::WORK) {
             count = count.checked_add(1).expect("work slot count");
         }
     }
@@ -707,6 +707,7 @@ fn in_order(said: &[u8], expected: &[&[u8]]) {
 fn the_csv_chat_receives_the_whole_turn_and_anchors_the_landed_card_at_its_call() {
     use fixtures::first_run as run;
     let view = first_run_view(false, true);
+    super::chat::assert_call_fold(view.tree(), "1 tool call · wait".as_bytes(), &[b"wait"]);
     let said = fixtures::text(view.tree());
     in_order(
         &said,
@@ -716,11 +717,9 @@ fn the_csv_chat_receives_the_whole_turn_and_anchors_the_landed_card_at_its_call(
             b"Temper",
             run::DELEGATING,
             "T2 · CHANGE".as_bytes(),
-            b"1 tool call",
             b"wait",
             b"Temper",
             run::LANDED,
-            b"1 tool call",
             b"wait",
         ],
     );
@@ -880,7 +879,7 @@ fn the_dark_theme_chat_has_its_whole_answer_and_one_end_line() {
     let view = first_run_view(true, false);
     let said = fixtures::text(view.tree());
     let ending = "Ended 00:00 · its report, “The demo changes nothing.”".as_bytes();
-    in_order(&said, &[b"You", run::DARK, b"Temper", run::DARK_ANSWER, b"1 tool call", b"finish", ending]);
+    in_order(&said, &[b"You", run::DARK, b"Temper", run::DARK_ANSWER, b"finish", ending]);
     let at = skein_lib::bytes::find(&said, ending).expect("end line");
     assert!(skein_lib::bytes::find(&said[at + ending.len()..], ending).is_none());
     for hidden in [b"Done".as_slice(), b"Milestone", b"Earlier text omitted", b"Tool completed", b"Instructions"] {

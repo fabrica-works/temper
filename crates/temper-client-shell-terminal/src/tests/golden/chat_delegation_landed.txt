@@ -38,13 +38,13 @@ Conversation:
       - CI passed (completed)
       - Landed (completed)
     [8] Task 2 ↗
-  1 tool call
-  wait
+  1 tool call · wait:
+    wait
   Temper
   00:00
   CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change.
-  1 tool call
-  wait
+  1 tool call · wait:
+    wait
 Using Demo model · Default
 [9] Message: (empty) (enter sends)
 Enter to send · Shift+Enter for newline

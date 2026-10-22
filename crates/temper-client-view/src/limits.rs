@@ -1,5 +1,7 @@
 //! Checked envelope for temper's frame, cards, transcript and tree.
-use crate::words::Words;
+use crate::words::{Word, Words};
+use alloc::boxed::Box;
+use skein_ui::phrases::Hole;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     pub tree: skein_ui::Limits,
@@ -15,6 +17,7 @@ impl Limits {
             .max(domain.forge.field_bytes.checked_add(64)?);
         // An account heading joins the provider, plan/display and holder's words.
         let text = text.max(receiving.text.checked_add(words.name_bytes.min(256).checked_mul(3)?)?.checked_add(64)?);
+        let text = text.max(fold_bytes(receiving, words)?);
         let markdown = skein_ui::markdown::max_nodes(receiving.text)?;
         // Each grant and note scope has a bounded sequence of pattern segments.
         let pattern = receiving.segments.checked_add(2)?.checked_mul(2)?;
@@ -40,7 +43,7 @@ impl Limits {
         let turn = skein_ui::markdown::max_nodes(receiving.turn_text)?
             .checked_add(blocks.checked_mul(2_u32.checked_add(5)?)?)?
             // Per message: message/who/says slots, Temper paragraph and text,
-            // fold slot, paragraph and text (client/README.md, 3.5).
+            // a call disclosure, and spare cut room (client/README.md, 3.5).
             .checked_add(receiving.rows.checked_mul(8)?)?
             // One turn region and a two-node cut status.
             .checked_add(3)?;
@@ -155,6 +158,16 @@ impl Limits {
         Some(limits)
     }
 }
+// A disclosure joins admitted tool names, count, separators and repetition
+// suffixes into one name (client/README.md, 3.5), beyond the turn's text budget.
+fn fold_bytes(receiving: &jig_client::DomainLimits, words: &Words) -> Option<u32> {
+    let calls = u64::from(receiving.rows);
+    let count = words.say(Word::ToolCalls, &[Hole::Number(calls)]);
+    let separator = words.say(Word::ToolSeparator, &[]);
+    let repeated = words.say(Word::ToolRepeated, &[Hole::Name(Box::default()), Hole::Number(calls)]);
+    let extra = u32::try_from(separator.len().checked_add(repeated.len())?).ok()?;
+    receiving.turn_text.checked_add(u32::try_from(count.len()).ok()?)?.checked_add(receiving.rows.checked_mul(extra)?)
+}
 #[must_use]
 pub fn worst_case(limits: &Limits, domain: &temper_client_domain::Limits, words: &Words) -> Option<u64> {
     skein_ui::worst_case(&limits.tree)?
@@ -182,6 +195,9 @@ pub fn worst_case(limits: &Limits, domain: &temper_client_domain::Limits, words:
             domain.client.domain.rows.checked_mul(3)?,
         )?)?
         .checked_add(u64::from(limits.tree.text_per_node).checked_mul(4)?)?
+        // A fold's owned name fragments and its joined disclosure name.
+        .checked_add(skein_lib::List::<Box<[u8]>>::worst_case(domain.client.domain.rows)?)?
+        .checked_add(u64::from(limits.tree.text_per_node).checked_mul(2)?)?
         .checked_add(skein_ui::phrases::worst_case(words.book.limits())?)?
         .checked_add(u64::from(words.capacity()?))
 }

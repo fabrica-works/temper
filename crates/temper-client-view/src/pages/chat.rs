@@ -1014,13 +1014,7 @@ fn committed_lines(
                     if carded(tasks, delegations) {
                         continue;
                     }
-                    b.open(Role::Slot);
-                    b.style(look::WORK);
-                    text(b, Role::Paragraph, call.tool.bytes());
-                    if let Some(summary) = &call.outcome {
-                        text(b, Role::Paragraph, summary.bytes());
-                    }
-                    b.close();
+                    call_line(b, call);
                 }
                 c::Block::Result { call, summary, failed } => {
                     tasks.clear();
@@ -1062,6 +1056,17 @@ fn committed_lines(
     }
 }
 
+// Both conversation drawings keep a call's name and outcome as one work line.
+fn call_line(b: &mut Builder, call: &c::Call) {
+    b.open(Role::Slot);
+    b.style(look::WORK);
+    text(b, Role::Paragraph, call.tool.bytes());
+    if let Some(summary) = &call.outcome {
+        text(b, Role::Paragraph, summary.bytes());
+    }
+    b.close();
+}
+
 fn other_call(block: &c::Block, tasks: &mut List<u64>, delegations: Option<(&Chat, &jig_client::Client)>) -> bool {
     let c::Block::Call(call) = block else { return false };
     if let Some((chat, _)) = delegations {
@@ -1091,11 +1096,10 @@ fn folded_calls(
     if count == 0 {
         return;
     }
-    b.open(Role::Slot);
-    b.style(look::WORK);
-    text(b, Role::Paragraph, &words.say(Word::ToolCalls, &[Hole::Number(count)]));
-    b.open(Role::Paragraph);
-    let mut first = true;
+    let count = words.say(Word::ToolCalls, &[Hole::Number(count)]);
+    let separator = words.say(Word::ToolSeparator, &[]);
+    let mut names = List::with_capacity(u32::try_from(blocks.len()).expect("bounded blocks"));
+    let mut length = count.len();
     for (at, block) in blocks.iter().enumerate() {
         let c::Block::Call(call) = block else { continue };
         if !other_call(block, tasks, delegations) {
@@ -1117,20 +1121,31 @@ fn folded_calls(
         if earlier {
             continue;
         }
-        if !first {
-            b.text(Run::Plain, &words.say(Word::ToolSeparator, &[]));
-        }
-        first = false;
-        if repeated > 1 {
-            b.text(
-                Run::Plain,
-                &words.say(Word::ToolRepeated, &[crate::cards::name(call.tool.bytes()), Hole::Number(repeated)]),
-            );
+        let name = if repeated > 1 {
+            words.say(Word::ToolRepeated, &[crate::cards::name(call.tool.bytes()), Hole::Number(repeated)])
         } else {
-            b.text(Run::Plain, call.tool.bytes());
+            skein_lib::bytes::copy_of(call.tool.bytes())
+        };
+        length = length.checked_add(separator.len()).expect("bounded separator");
+        length = length.checked_add(name.len()).expect("bounded fold line");
+        names.push(name).expect("one name per block at most");
+    }
+    let mut name = skein_lib::Writer::new(length);
+    name.put(&count).expect("count fits fold line");
+    for part in &names {
+        name.put(&separator).expect("separator fits fold line");
+        name.put(part).expect("tool fits fold line");
+    }
+    b.open(Role::Disclosure);
+    b.style(look::WORK);
+    b.name(&name.finish());
+    for block in blocks {
+        if other_call(block, tasks, delegations)
+            && let c::Block::Call(call) = block
+        {
+            call_line(b, call);
         }
     }
-    b.close();
     b.close();
 }
 

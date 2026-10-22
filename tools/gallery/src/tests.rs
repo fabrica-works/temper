@@ -67,6 +67,7 @@ const HOLDS: [Holds; samples::N] = [
         parts: &[
             Part::Named { role: Role::Button, name: "Accept" },
             Part::Named { role: Role::Heading { level: 2 }, name: "JSON output for tally report" },
+            Part::Named { role: Role::Disclosure, name: "2 tool calls · read ×2" },
         ],
     },
     Holds {
@@ -150,7 +151,10 @@ const HOLDS: [Holds; samples::N] = [
     Holds {
         name: "chat-first-run-2-T1",
         heading: "T1 · Add CSV export to widget",
-        parts: &[Part::Named { role: Role::Link, name: "Task 2" }],
+        parts: &[
+            Part::Named { role: Role::Link, name: "Task 2" },
+            Part::Named { role: Role::Disclosure, name: "1 tool call · wait" },
+        ],
     },
     Holds {
         name: "chat-first-run-3-T1",
