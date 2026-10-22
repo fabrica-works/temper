@@ -1,8 +1,11 @@
-use jig_client_world::harness::Until;
-use skein_fake_person::{Find, Step, Target};
+use jig_client_world::{
+    harness::{App, Until},
+    observe,
+};
+use skein_fake_person::{Face, Find, Found, Step, Target, TreeFace};
 use skein_ui::Role;
 use skein_world::domain::Verdict;
-use temper_client_world::fixtures;
+use temper_client_world::{app::Temper, fixtures};
 
 #[test]
 fn a_goals_plan_says_which_task_a_delegate_waits_for() {
@@ -307,13 +310,58 @@ fn a_held_task_released_from_a_goals_plan_runs_again() {
 #[test]
 fn a_chat_reply_is_identified_by_its_task_in_the_native_inbox() {
     let mut world = fixtures::world(fixtures::SEED);
-    fixtures::replied_chat(world.front(), b"Hello");
+    let task = fixtures::replied_chat(world.front(), b"Hello");
     let person = world.client(fixtures::PARTY, fixtures::inbox());
     let reply = Find::named(Role::Heading { level: 3 }, b"Reply")
         .within(Box::new([skein_fake_person::Target::Role { role: Role::Item, name: Box::from(*b"Hello") }]));
     world.person(person, vec![Step::See { find: reply, within: fixtures::WITHIN }]);
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+
+    fixtures::finish_replied_chat(world.front(), task);
+    world.person(
+        person,
+        vec![
+            Step::See { find: Find::named(Role::Status, b"Done"), within: fixtures::WITHIN },
+            Step::See { find: Find::named(Role::Heading { level: 3 }, b"Reply"), within: fixtures::WITHIN },
+        ],
+    );
+    assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);
+    let tree = world.tree(person);
+    for (object, heading) in [
+        (jig_client::contract::ObjectKey::Result(task), b"Updates".as_slice()),
+        (jig_client::contract::ObjectKey::Task(task), b"Reply".as_slice()),
+    ] {
+        let item = tree
+            .nodes()
+            .iter()
+            .find(|node| node.role == Role::Item && Temper::card(tree, node.id) == Some(observe::key(object)))
+            .expect("independent same-task inbox card");
+        let mut face = TreeFace::subtree(tree, item.id).expect("card subtree");
+        assert_eq!(face.find(&Find::named(Role::Item, b"Hello")), Found::Node(item.id));
+        assert!(matches!(face.find(&Find::exactly_named(Role::Heading { level: 3 }, heading)), Found::Node(_)));
+    }
+    let root = world.root(person).person();
+    let inbox = root.pages().inbox().expect("inbox");
+    let Some(jig_client::Latest::Jig(jig_client::contract::Delivery::OwnerInbox(owner))) =
+        root.client().document(inbox.entries).and_then(|document| document.latest)
+    else {
+        panic!("owner inbox delivered")
+    };
+    assert_eq!(owner.results_seen, 0, "Result read position is independent of conversation Seen");
+    let reply = owner
+        .updates
+        .iter()
+        .find(|row| {
+            row.task_number() == task && matches!(row.object, jig_client::contract::OwnerInboxObject::Reply { .. })
+        })
+        .expect("same-task unread Reply");
+    assert_eq!(reply.unread, Some(true));
+    let line = reply.reply.as_ref().expect("Reply task context");
+    assert!(line.ended_at.is_some());
+    let conversation = line.conversation.expect("conversation read position");
+    assert_eq!(conversation.seen, 0);
+    assert!(conversation.unread.value > 0);
 }
 
 #[test]

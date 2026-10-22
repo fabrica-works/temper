@@ -386,6 +386,22 @@ pub fn replied_chat(front: &mut Joint, words: &[u8]) -> u64 {
     front.engine.settle();
     task
 }
+/// Finish a replied chat normally, retaining its unread turn beside its Result.
+pub fn finish_replied_chat(front: &mut Joint, task: u64) {
+    let run = front.engine.task(task).expect("running replied chat");
+    front.engine.answer(
+        QUESTION_WORKER,
+        task,
+        run.attempt,
+        run.run_spent,
+        tasks::End::Finished {
+            result: tasks::TaskResult::Report { words: b"The chat is complete".as_slice().into() },
+            cancel_delegates: false,
+        },
+        engine::Parts::none(),
+    );
+    front.engine.settle();
+}
 #[must_use]
 pub fn chat_page(task: u64) -> temper_client_domain::Address {
     temper_client_domain::Address::Chat { task }

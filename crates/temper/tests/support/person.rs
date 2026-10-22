@@ -1,11 +1,48 @@
 //! A real native client driven by jig's finite semantic-tree script.
 use jig_client_protocol_link::Signing;
-use skein_fake_person::{Doing, Find, Next, Step, Target, TreeFace};
+use skein_fake_person::{Doing, Face, Find, Found, Next, Step, Target, TreeFace};
 use skein_io::kernel::{Complete, Done, Fd, Op, Submit};
 use skein_lib::{Queue, Time, Token, Wall};
 use skein_shell::Host;
 use temper_client_domain::Address;
 use temper_client_shell_terminal::client::{NativeClient, Settings, Start};
+/// Resolve the process story's Reply and task title together on one Item.
+/// Other semantic queries and interaction checks retain `TreeFace`'s contract.
+pub struct ReplyFace<'a> {
+    tree: &'a skein_ui::Tree,
+}
+impl<'a> ReplyFace<'a> {
+    #[must_use]
+    pub fn new(tree: &'a skein_ui::Tree) -> Self {
+        Self { tree }
+    }
+}
+impl Face for ReplyFace<'_> {
+    fn find(&mut self, find: &Find) -> Found {
+        if find.target == Find::named(skein_ui::Role::Heading { level: 3 }, b"Reply").target
+            && let [scope @ Target::Role { role: skein_ui::Role::Item, .. }] = find.within.as_ref()
+        {
+            let item = Find { within: Box::new([]), target: scope.clone() };
+            for node in self.tree.nodes().iter().filter(|node| node.role == skein_ui::Role::Item) {
+                let Some(mut face) = TreeFace::subtree(self.tree, node.id) else { continue };
+                // A descendant Item matching the title does not qualify this root.
+                if face.find(&item) == Found::Node(node.id)
+                    && let reply @ Found::Node(_) = face.find(find)
+                {
+                    return reply;
+                }
+            }
+            return Found::Absent;
+        }
+        TreeFace::new(self.tree).find(find)
+    }
+    fn role(&self, node: skein_ui::NodeId) -> Option<skein_ui::Role> {
+        TreeFace::new(self.tree).role(node)
+    }
+    fn allows(&self, node: skein_ui::NodeId, act: &skein_ui::Act) -> bool {
+        TreeFace::new(self.tree).allows(node, act)
+    }
+}
 const START_WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(20);
 // Measured 21 s from Start to landed + one missed slow poll of 40 s = 61 s.
 const DEMO_LANDS_WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(61);
@@ -329,7 +366,7 @@ impl Person {
         let signing_wake = self.wake;
         if client.started() && self.project == ProjectSelection::Selected && !self.finished && self.failed.is_none() {
             let before = self.actor.at();
-            match self.actor.next(&mut TreeFace::new(client.tree()), now) {
+            match self.actor.next(&mut ReplyFace::new(client.tree()), now) {
                 Next::Do(Doing::Act { node, act }) => assert!(client.act(node, act), "offered person act"),
                 Next::Do(Doing::Go { address }) => client.go(address),
                 Next::Do(Doing::Reload) => panic!("chat script has no reload"),
@@ -462,7 +499,8 @@ pub fn found() -> Script {
         ]),
     }
 }
-fn inbox_reply(task: &[u8]) -> Step<Address> {
+#[must_use]
+pub fn inbox_reply(task: &[u8]) -> Step<Address> {
     Step::See {
         find: Find::named(skein_ui::Role::Heading { level: 3 }, b"Reply")
             .within(Box::new([Target::Role { role: skein_ui::Role::Item, name: task.into() }])),
