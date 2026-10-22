@@ -149,6 +149,7 @@ jig-client-fake-person-browser  jig's attack stories (jig's `protocol/browser.md
 temper-client-world             tests/client: temper's client joined to temper's engine root (section 10)
 skein-fake-person-browser       the person in Chromium, through skein-browser (browser.md, section 4)
 temper-client-browser-world     tests/client-browser: the browser tier (browser.md, section 4)
+temper-gallery                  tools/gallery: the browser's pages in named states, as static documents (browser.md, section 7)
 ```
 
 - **The crate graph.** `temper-client-domain` depends on skein-lib,

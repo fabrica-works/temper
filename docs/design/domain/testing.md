@@ -1308,6 +1308,7 @@ tests/*/*/tests/*.rs                a world's focused tests
 tests/*/*/tests/fuzzy_*.rs          its fuzzy tests: random worlds, domains driven at random
 tests/fake-checkout                 temper-fake-checkout: working trees' git, over skein's fake checkout
 tools/git-transcripts               git's transcripts, from real git against skein's throwaway Forgejo (../protocol/git.md, section 9)
+tools/gallery                       temper-gallery: the browser's pages in named states, printed for screenshots (../client/browser.md, section 7), its tests in the view's world
 scripts/proof-one-process.sh        the process tier
 scripts/proof-live.sh               the live tier
 scripts/after-landing.sh            the process tier, after each landing

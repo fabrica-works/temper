@@ -1,6 +1,6 @@
 # The browser
 
-Provisional, 2026-10-05, revised 2026-10-20. temper's browser client: a
+Provisional, 2026-10-05, revised 2026-10-22. temper's browser client: a
 second shell of temper's client (`README.md`), beside the terminal, on
 skein's browser parts. What its pages do is the client's (`README.md`;
 `forge.md`), with the mockups' look (`mockups/`, reference material),
@@ -52,6 +52,9 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   browser, and nothing a world can show (section 4).
 - **A real browser at the top, driven from Rust,** by `skein-browser`
   (section 4).
+- **The gallery** prints the browser's pages in named states as static
+  documents, beside the bundle's stylesheets, for screenshots held to
+  the mockups: no server, no script, no network (section 7).
 
 ## 2. What temper brings to the browser
 
@@ -410,6 +413,9 @@ tests 4.1's stories take and 4.2's story, the tier reaches its 12.
   `skein-ui.css` does. Default: light only (2.5).
 - **Other browsers** than Chromium are `skein-browser`'s question
   (skein's `browser.md`).
+- **The kit's stylesheet without a bundle:** the gallery takes
+  `skein-ui.css` by running skein's bundler with no module (7.1).
+  Default: so, until skein's bundler offers the stylesheet alone.
 
 ## 6. In two milestones
 
@@ -437,3 +443,116 @@ tests 4.1's stories take and 4.2's story, the tier reaches its 12.
   its configuration and limits (2.2); `temper-client-domain`'s address
   codec (2.3); the view's style tokens, its composers' `SubmitsOnEnter`
   and its signed-out words (2.4, 2.5); the new shell and the tier.
+
+## 7. The gallery
+
+`temper-gallery` (`tools/gallery`), a program of temper's workspace,
+prints the browser's pages in named states into a directory, as static
+documents, for screenshots beside the mockups (`../draft/qa-web.md`,
+3.2) and a person's eye. It is a tool, not a test of the pages: what
+the pages do is the worlds' (section 4), and the gallery draws what the
+view draws, never changing a view to suit a sample.
+
+### 7.1 What it prints
+
+- **One command:** `cargo run -p temper-gallery -- OUT`. It reads no
+  configuration, environment, clock or network, and starts no server.
+  `OUT` is replaced whole when it holds the gallery's `index.html`,
+  made when it is missing, and refused otherwise.
+- **Each state's page** as `OUT/NAME.html`: the view's tree for the
+  state, made a page by skein's `Page` with the shell's look (`Look`
+  with `look::NAMES`, primary input `Control`) and its prefix, its
+  links given the hrefs the shell gives them (2.3), by the view's one
+  href function, which the shell's host calls too. The page's root is
+  the document's `#app`, as skein's `Dom` mounts it; dialogs carry
+  `open`, since a static document has no top layer. The title is the
+  shell's: the page's heading, then "temper".
+- **The bundle's stylesheets and files,** under `OUT/bundle/`, made by
+  skein's bundler from the stylesheets and files `scripts/bundle.sh`
+  passes, in its order (2.5), with no module: each page links them as
+  the bundle's page does, so `temper.css`'s files resolve as they do
+  in the bundle. The bundle's own page and its empty module are unused.
+- **An index,** `OUT/index.html`: each state's name, in the gallery's
+  order, linking its page, with its mockup's address beside it where a
+  mockup draws it.
+- **Static:** no script runs, so focus, caret, scroll and a run's live
+  text are not shown; what only the live page shows is a live scene's
+  (`../draft/qa-web.md`, 3.3).
+
+### 7.2 Its states
+
+- **A state** is a world at a page's address, then what is done there:
+  the client's root stepped from start by the documents a world
+  delivers, then by the person's acts or the engine's answers that the
+  state names (a close pressed, a reject's reason box, a refusal), as a
+  page would be. No page state is set by hand.
+- **The worlds are the mockups':** reference, solo and the first run at
+  its steps, their words copied from `mockups/world-*.js` where temper's
+  model holds them, so that a picture differs from its mockup by look,
+  not content. A value the model has no place for is left out, never
+  invented. The gallery's own documents carry what the domain's
+  fixtures don't: spend in the contract's unit (0.8, not 1), and the
+  providers, accounts and their holders by name.
+- **Its bounds** are the browser's shipped client limits
+  (`temper-client-shell-terminal`'s `native()`, which the browser's
+  shell takes), with the windows a world needs widened (its rows, reads,
+  text), each widening named with its reason; the view's bounds are
+  derived from them as the shell derives its own.
+- **Names,** binding once landed: a state a mockup draws is named by
+  its address, `<page>-<world>[-<step>][-<task>]` (`chat-solo-T10` for
+  `chat.html?world=solo&task=T10`, `chats-first-run-1` for
+  `chats.html?world=first-run&step=1`); one no mockup draws takes a
+  plain name (`signed-out`, `chats-empty`, `adoption-refused`). A name
+  is never reused for another state, and one leaves only with the
+  scenes that capture it.
+
+| Name | The state |
+|---|---|
+| `chats-solo` | the solo world's chats |
+| `chat-solo-T10` | the solo world's chat T10, its proposal in place |
+| `inbox-solo` | the solo world's inbox: a proposal, a question |
+| `task-solo-T3` | the solo world's goal T3, its plan and budget |
+| `accounts-solo` | the solo world's accounts |
+| `chats-first-run-1` | the first run's first screen: the demo's start |
+| `adoption` | the adoption form, empty |
+| `adoption-filled` | the adoption form, filled in |
+| `adoption-refused` | the adoption form after a refusal, its alert |
+| `chats-reference` | the reference world's chats |
+| `chat-reference-T1` | the reference world's chat T1 |
+| `chat-solo-T6` | the solo world's chat T6 |
+| `chat-first-run-2-T1` | the first run's chat T1 at step 2, its change running |
+| `chat-first-run-3-T1` | the first run's chat T1 at step 3, its change landed |
+| `chat-first-run-4-T4` | the first run's chat T4 at step 4, ended |
+| `inbox-reference` | the reference world's inbox |
+| `accounts-reference` | the reference world's accounts |
+| `accounts-first-run-1` | the first run's accounts at step 1: the demo's key |
+| `signed-out` | signed out |
+| `out-of-date` | a bundle older than the engine |
+| `chats-empty` | the chats with none, outside the demo |
+| `inbox-empty` | nothing needs the person |
+| `chat-closing` | `chat-solo-T6` with Close pressed: its confirmation |
+| `chat-rejecting` | `chat-solo-T10` with Reject pressed: the reason's box |
+| `task-held` | a goal's plan with a held task, Release offered |
+| `task-releasing` | `task-held` with Release pressed: its confirmation |
+| `accounts-signin` | a sign-in started, its address shown |
+| `accounts-refused` | an account's request refused, its alert |
+
+### 7.3 Its tests
+
+In `tools/gallery`'s own tests, in the view's world: each state's tree
+read by skein's fake person (`../domain/testing.md`, 4.4), as the
+gallery builds it.
+
+- **The names:** the states' names, in order, are `tools/gallery/names.txt`,
+  kept by hand, so a name gone, changed or added fails until the file
+  says so; the scenes read the same file.
+- **Each state holds what its name says:** a table of rows, each a
+  name, its page's heading and the one part the state is about, found
+  by role and name (the proposal in `chat-solo-T10`, the three
+  suggested requests in `chats-first-run-1`, the alert in
+  `adoption-refused`).
+- **The print:** the program run into a scratch directory writes every
+  name's page, the index linking each, and the bundle's stylesheets in
+  `scripts/bundle.sh`'s order, read from that script.
+- **Their cost:** together at most 0.5 s of the default suite; no
+  fuzzy test.
