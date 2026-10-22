@@ -978,7 +978,8 @@ workers need no more; a worker of several slots is later (15.7).
   the fenced attempt's activity and the chat's turns are as they were
   before the continue, and the reply is in them once.
 - **A worker started later:** w2 started once w1's slot is taken; the
-  second task waits, claimed and unplaced, then runs on w2 once it
+  second task waits, due and unplaced, with no attempt (the engine
+  admits a run only once a slot is free), then runs on w2 once it
   links. A restarted worker links again at its position: w1, its run
   ended, is stopped alone, exits 0, and is started again on its own
   directories; it prints `linked` again, is the engine's w1 again, and
