@@ -168,6 +168,9 @@ mod tests {
             &mut root,
             Event::Start { address: domain::Address::Task { task: TASK }, kept: List::with_capacity(0), with: None },
         );
+        // Successful sign-in ends the pre-sign-in read; its owner asks anew
+        // before the first me (client/README.md, 3.4). Keep that output too.
+        let before_sign_in = requests.len();
         for event in [
             jig_client::Event::StartUnlinked { kept: List::with_capacity(0) },
             jig_client::Event::SignIn { with: jig_client::With::Transport },
@@ -188,7 +191,8 @@ mod tests {
                 }
             }
         }
-        let mut after = deliver(&mut root, me_watch.expect("Me watch"), c::Delivery::Me(Box::new(fixture_me(b"Shop"))));
+        let mut after = requests.split_off(before_sign_in);
+        after.extend(deliver(&mut root, me_watch.expect("Me watch"), c::Delivery::Me(Box::new(fixture_me(b"Shop")))));
         let task_watch = task_watch.expect("task watch");
         after.extend(deliver(&mut root, task_watch, c::Delivery::Task(Box::new(document.clone()))));
         let tree_watch = tree_watch.expect("tree watch");
@@ -406,7 +410,11 @@ mod tests {
     // 5.11's untracking changes the document to an agent's page, which reads it.
     #[test]
     fn untracking_opens_the_agents_thread() {
-        let (mut root, watch, _, _) = opened(goal());
+        let (mut root, watch, _, requests) = opened(goal());
+        // Complete the goal's initial page before changing shape. A pending
+        // latest read coalesces changes, as the agent test above checks.
+        let initial = activity_reads(&requests).into_iter().next().expect("goal's initial activity read");
+        drop(answer(&mut root, initial, empty_activity()));
         let requests = deliver(&mut root, watch, c::Delivery::Task(Box::new(agent())));
         let task = root.pages().task().expect("task page");
         assert_eq!(task.shape, domain::pages::task::Shape::Agent);
