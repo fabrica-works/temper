@@ -91,6 +91,7 @@ pub(crate) fn client_limits() -> temper_client_shell_terminal::limits::Limits {
     limits.client.client.domain.parts = 4;
     limits.client.client.domain.reads = 8;
     limits.client.client.domain.text = 64;
+    limits.client.client.domain.turn_text = 64;
     limits.client.client.domain.document_bytes = 65_536;
     limits.client.client.domain.requests.bytes = 262_144;
     limits.client.client.domain.ask_bytes = limits.client.client.domain.requests.bytes;

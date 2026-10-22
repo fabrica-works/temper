@@ -42,36 +42,38 @@ pub fn call(number: u64, name: &[u8], input: &[u8], outcome: Option<&[u8]>) -> c
 }
 // Jig's translated vocabulary shares one text budget across a turn, including
 // call inputs and repeated result summaries (jig-protocol-transcript::Budget).
-fn received(value: &c::Text, left: &mut usize, cut: &mut bool) -> c::Text {
+fn received(value: &c::Text, left: &mut usize, cut: &mut bool, turn_text: u32) -> c::Text {
     let length = value.bytes().len().min(*left);
     *cut |= length < value.bytes().len();
     *left = left.checked_sub(length).expect("receiving text budget");
-    c::Text::new(Box::from(&value.bytes()[..length]), 512).expect("receiving prefix")
+    c::Text::new(Box::from(&value.bytes()[..length]), turn_text).expect("receiving prefix")
 }
 #[expect(clippy::manual_map, reason = "fixtures spell out options under the step-code lints")]
-pub fn turn(position: u64, attempt: u64, number: u32, messages: &[c::Message]) -> c::ActivityLine {
+pub fn turn(position: u64, attempt: u64, number: u32, messages: &[c::Message], turn_text: u32) -> c::ActivityLine {
     let mut kept = List::with_capacity(u32::try_from(messages.len()).expect("messages fit"));
-    let mut left = 512;
+    let mut left = usize::try_from(turn_text).expect("receiving turn text fits");
     let mut cut = messages.len() > 3;
     for message in messages.iter().take(3) {
         let mut blocks = List::with_capacity(3);
         cut |= message.blocks.len() > 3;
         for block in message.blocks.as_slice().iter().take(3) {
             let block = match block {
-                c::Block::Text(value) => c::Block::Text(received(value, &mut left, &mut cut)),
+                c::Block::Text(value) => c::Block::Text(received(value, &mut left, &mut cut, turn_text)),
                 c::Block::Call(call) => {
                     let mut call = call.clone();
-                    call.tool = received(&call.tool, &mut left, &mut cut);
-                    call.input = received(&call.input, &mut left, &mut cut);
+                    call.tool = received(&call.tool, &mut left, &mut cut, turn_text);
+                    call.input = received(&call.input, &mut left, &mut cut, turn_text);
                     call.outcome = match &call.outcome {
-                        Some(value) => Some(received(value, &mut left, &mut cut)),
+                        Some(value) => Some(received(value, &mut left, &mut cut, turn_text)),
                         None => None,
                     };
                     c::Block::Call(call)
                 }
-                c::Block::Result { call, summary, failed } => {
-                    c::Block::Result { call: *call, summary: received(summary, &mut left, &mut cut), failed: *failed }
-                }
+                c::Block::Result { call, summary, failed } => c::Block::Result {
+                    call: *call,
+                    summary: received(summary, &mut left, &mut cut, turn_text),
+                    failed: *failed,
+                },
                 c::Block::Opaque { .. } => block.clone(),
             };
             blocks.push(block).expect("block");
@@ -107,7 +109,7 @@ fn result(summary: &[u8]) -> c::Message {
     message(c::Speaker::Person, &[c::Block::Result { call: 3, summary: text(summary), failed: false }])
 }
 /// Nine retained rows for settled T1; five for T4. No invented Words/News rows.
-pub fn activity(dark: bool, landed: bool) -> c::ActivityPage {
+pub fn activity(dark: bool, landed: bool, turn_text: u32) -> c::ActivityPage {
     let task = if dark { 4 } else { 1 };
     let attempt = if dark { 4 } else { 1 };
     let mut rows = List::with_capacity(9);
@@ -122,7 +124,7 @@ pub fn activity(dark: bool, landed: bool) -> c::ActivityPage {
             rows.push(turn(8, 3, 1, &[
                 result(b"Begin the work your brief describes.\n\n2: Result from task 2:\n1a2b3c4abcdef0123456789abcdef0123456789abcd"),
                 message(c::Speaker::Assistant, &[c::Block::Text(text(LANDED)), call(3, b"wait", b"{}", None)]),
-            ])).expect("resumed turn");
+            ], turn_text)).expect("resumed turn");
             rows.push(owner(
                 task,
                 7,
@@ -150,7 +152,7 @@ pub fn activity(dark: bool, landed: bool) -> c::ActivityPage {
         }
         rows.push(owner(task, 5, c::OwnerActivity::RunEnded { attempt, end: c::OwnerRunEnd::Parked, spent: 0 }))
             .expect("parked");
-        rows.push(turn(4, attempt, 2, &[message(c::Speaker::Assistant, &[call(3, b"wait", b"{}", None)])]))
+        rows.push(turn(4, attempt, 2, &[message(c::Speaker::Assistant, &[call(3, b"wait", b"{}", None)])], turn_text))
             .expect("waiting turn");
     }
     rows.push(turn(
@@ -177,6 +179,7 @@ pub fn activity(dark: bool, landed: bool) -> c::ActivityPage {
             ),
             result(if dark { b"accepted" } else { ACK }),
         ],
+        turn_text,
     ))
     .expect("first turn");
     rows.push(owner(task, 2, c::OwnerActivity::RunBegan { attempt, why: c::OwnerRunWhy::Made, resumed: false }))

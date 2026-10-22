@@ -8,7 +8,11 @@ impl Limits {
     #[must_use]
     pub fn of(domain: &temper_client_domain::Limits, words: &Words) -> Option<Limits> {
         let receiving = &domain.client.domain;
-        let text = words.capacity()?.max(receiving.text.checked_mul(2)?).max(domain.forge.field_bytes.checked_add(64)?);
+        let text = words
+            .capacity()?
+            .max(receiving.text.checked_mul(2)?)
+            .max(receiving.turn_text)
+            .max(domain.forge.field_bytes.checked_add(64)?);
         let markdown = skein_ui::markdown::max_nodes(receiving.text)?;
         // Each grant and note scope has a bounded sequence of pattern segments.
         let pattern = receiving.segments.checked_add(2)?.checked_mul(2)?;
@@ -24,12 +28,14 @@ impl Limits {
         // nodes plus the result's markdown, and one region for live delegates.
         let delegations = temper_client_domain::pages::delegation::bound(domain);
         let delegated = markdown.checked_add(14)?.checked_mul(delegations)?.checked_add(1)?;
+        // Both chat and agent pages price a committed turn by turn_text; fields
+        // and cards retain text. One turn node holds at most turn_text bytes.
         // A decoded turn shares text across texts, names, inputs, outcomes and
         // summaries (jig-protocol-transcript's Budget; client/README.md, 5.4).
         // Splitting that text among rows squared blocks adds two markdown nodes
         // per block; five structural nodes cover a call's slot and two paragraphs.
         let blocks = receiving.rows.checked_mul(receiving.rows)?;
-        let turn = markdown
+        let turn = skein_ui::markdown::max_nodes(receiving.turn_text)?
             .checked_add(blocks.checked_mul(2_u32.checked_add(5)?)?)?
             // Per message: message/who/says slots, Temper paragraph and text,
             // fold slot, paragraph and text (client/README.md, 3.5).

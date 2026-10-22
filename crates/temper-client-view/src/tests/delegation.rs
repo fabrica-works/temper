@@ -50,6 +50,7 @@ fn limits() -> temper_client_domain::Limits {
     let mut limits = fixtures::domain_limits();
     limits.client.domain.rows = 8;
     limits.client.domain.text = 256;
+    limits.client.domain.turn_text = 256;
     limits
 }
 fn up(root: &mut Domain, up: jig_client::Up, receiving: &temper_client_domain::Limits, out: &mut Queue<Request>) {
@@ -615,6 +616,7 @@ fn first_run_view(dark: bool, landed_change: bool) -> crate::View {
     let mut receiving = limits();
     receiving.client.domain.rows = 3;
     receiving.client.domain.text = 512;
+    receiving.client.domain.turn_text = 2048;
     let mut chat = change();
     chat.chip.task = if dark { 4 } else { CHAT };
     chat.requester = c::OwnerRequester::Person(fixtures::chat::PARTY);
@@ -644,7 +646,7 @@ fn first_run_view(dark: bool, landed_change: bool) -> crate::View {
     let root = root_chat_limits(
         Some(&chat),
         &[document],
-        run::activity(dark, landed_change),
+        run::activity(dark, landed_change, receiving.client.domain.turn_text),
         if dark || landed_change { &[] } else { &[CHANGE] },
         &receiving,
     );
@@ -665,7 +667,7 @@ fn in_order(said: &[u8], expected: &[&[u8]]) {
     }
 }
 #[test]
-fn the_csv_chat_keeps_its_512_byte_cut_and_anchors_the_landed_card_before_the_reply() {
+fn the_csv_chat_receives_the_whole_turn_and_anchors_the_landed_card_at_its_call() {
     use fixtures::first_run as run;
     let view = first_run_view(false, true);
     let said = fixtures::text(view.tree());
@@ -676,12 +678,9 @@ fn the_csv_chat_keeps_its_512_byte_cut_and_anchors_the_landed_card_before_the_re
             run::CSV,
             b"Temper",
             run::DELEGATING,
-            b"1 tool call",
-            b"delegate",
-            b"Earlier text omitted",
+            "T2 · CHANGE".as_bytes(),
             b"1 tool call",
             b"wait",
-            "T2 · CHANGE".as_bytes(),
             b"Temper",
             run::LANDED,
             b"1 tool call",
@@ -691,6 +690,7 @@ fn the_csv_chat_keeps_its_512_byte_cut_and_anchors_the_landed_card_before_the_re
     for hidden in [
         b"Run 1 began".as_slice(),
         b"Earlier lines omitted",
+        b"Earlier text omitted",
         b"Run 1 ended",
         b"Begin the work your brief describes.",
         b"Milestone",
@@ -701,6 +701,7 @@ fn the_csv_chat_keeps_its_512_byte_cut_and_anchors_the_landed_card_before_the_re
     ] {
         assert!(skein_lib::bytes::find(&said, hidden).is_none(), "{hidden:?}");
     }
+    assert_eq!(TreeFace::new(view.tree()).find(&Find::exactly_named(Role::Paragraph, b"delegate")), Found::Absent);
     assert!(fixtures::find(view.tree(), Role::Button, b"Older").is_none());
     assert!(fixtures::find(view.tree(), Role::Status, b"Read").is_none());
 }

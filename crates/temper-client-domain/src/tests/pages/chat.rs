@@ -436,6 +436,7 @@ fn an_ended_delegation_reads_its_task_and_keeps_its_result() {
 fn the_chat_composer_keeps_the_send_bound_when_receiving_grows() {
     let mut limits = fixtures::limits();
     limits.client.domain.text = 2048;
+    limits.client.domain.turn_text = 2048;
     let mut f = f::opened();
     let mut serial = SERIAL;
     let bound = usize::try_from(temper_client_protocol_wire::CUE_BYTES).unwrap();

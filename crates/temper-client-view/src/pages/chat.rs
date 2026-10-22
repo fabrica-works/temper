@@ -327,13 +327,13 @@ pub(crate) fn conversation(
             }
             Line::Turn { turn, .. } => {
                 if projected {
-                    committed(b, turn, words, (rows, text_limit), delegations, (&mut tasks, &mut shown), bindings);
+                    committed(b, turn, words, rows, delegations, (&mut tasks, &mut shown), bindings);
                 } else {
                     committed_lines(
                         b,
                         turn,
                         words,
-                        (rows, text_limit, speakers.requester),
+                        (rows, speakers.requester),
                         delegations,
                         (&mut tasks, &mut shown),
                         bindings,
@@ -520,16 +520,17 @@ fn person_lines(
     b.close();
 }
 
+// Decoded turns already share the receiving turn_text budget; both drawings
+// retain their text whole, independently of provisional/field text.
 fn committed(
     b: &mut Builder,
     turn: &c::Turn,
     words: &Words,
-    limits: (u32, u32),
+    rows: u32,
     delegations: Option<(&Chat, &jig_client::Client)>,
     lists: (&mut List<u64>, &mut List<u64>),
     bindings: &mut Bindings,
 ) {
-    let (rows, text_limit) = limits;
     let (tasks, shown) = lists;
     for message in prefix(b, turn.messages.as_slice(), rows, words) {
         let blocks = prefix(b, message.blocks.as_slice(), rows, words);
@@ -558,7 +559,7 @@ fn committed(
                 b.style(look::SAYS);
                 for block in blocks {
                     match block {
-                        c::Block::Text(value) => markdown(b, value.bytes(), words, text_limit),
+                        c::Block::Text(value) => skein_ui::markdown::read(value.bytes(), 2, b),
                         c::Block::Opaque { dialect, size } => {
                             words.card_text(b, P::OpaqueDialect, &[crate::cards::name(dialect.bytes())]);
                             words.card_text(b, P::OpaqueBytes, &[Hole::Number(*size)]);
@@ -598,12 +599,12 @@ fn committed_lines(
     b: &mut Builder,
     turn: &c::Turn,
     words: &Words,
-    limits: (u32, u32, bool),
+    limits: (u32, bool),
     delegations: Option<(&Chat, &jig_client::Client)>,
     lists: (&mut List<u64>, &mut List<u64>),
     bindings: &mut Bindings,
 ) {
-    let (rows, text_limit, requester) = limits;
+    let (rows, requester) = limits;
     let (tasks, shown) = lists;
     for message in prefix(b, turn.messages.as_slice(), rows, words) {
         b.open(Role::Slot);
@@ -637,7 +638,7 @@ fn committed_lines(
         b.style(look::SAYS);
         for block in prefix(b, message.blocks.as_slice(), rows, words) {
             match block {
-                c::Block::Text(value) => markdown(b, value.bytes(), words, text_limit),
+                c::Block::Text(value) => skein_ui::markdown::read(value.bytes(), 2, b),
                 c::Block::Call(call) => {
                     tasks.clear();
                     delegation::delegated(call, tasks);

@@ -1022,21 +1022,22 @@ Each of an authority's lists shows at most the rows per window, then
 jig's mark (jig's `client/domain/view.md`, section 7), which adds
 nothing to the view's limits.
 
-Both presets receive the dark theme's turn and the CSV chat's later turn
-whole: three rows (`rows`, which bounds a turn's messages and a message's
-blocks as well as a page's lines), and 512 bytes of text (`text`, which jig's
-transcript shares among one turn's texts, its calls' names, inputs and
-outcomes, and its results' summaries). The CSV chat's first turn in the
-first run stays cut because its `delegate` input alone is about 1.2 KB.
+Both presets receive the dark theme's turn and the CSV chat's turns whole:
+three rows (`rows`, which bounds a turn's messages and a message's blocks
+as well as a page's lines), 512 bytes of field and provisional text (`text`),
+and 2048 bytes of a committed turn's shared text (`turn_text`, which jig's
+transcript shares among its texts, its calls' names, inputs and outcomes,
+and its results' summaries). The CSV chat's first turn fits with its
+`delegate` input of about 1.2 KB, so its card appears at that call (5.7).
 A chat's window holds 16 lines (the domain's chat page), and the page
 reads the page before its oldest while an older one remains and the
 window has room for a page, `rows` lines, so a conversation of a dozen
 lines shows whole, with no "Older". Past that, "Older" reads the page
 before, and the lines the window lets go are said ("Earlier lines omitted N", jig's
 `Left`). The engine's pages keep their own rows (its
-`documents.rows`, at most the client's). These bounds rise for every
-page, since jig's transcript reads the client's (section 11).
-The transcript is priced by each turn's shared text budget.
+`documents.rows`, at most the client's). Committed turns on both the chat
+and agent task pages are priced by `turn_text`; cards and other fields
+retain `text`.
 
 ### 5.5 LLM accounts' words
 
@@ -2385,12 +2386,6 @@ own tests:
 - **A turn's time** ("21:01" in the mockups, "Just now" in the
   first-run mockup's earlier draft): the view keeps no clock to say it
   against. Default: not drawn.
-- **A chat's own receiving bounds** (5.4): jig's transcript cuts a
-  turn by the client's `rows` and `text`, which every page shares, so
-  a whole turn in the chat raises them for all, and the view's priced
-  envelope with them. Default: the presets' 3 rows and 512 bytes; a
-  transcript bound of its own in jig's thread is the candidate to make
-  the CSV chat's first turn whole, jig's.
 - **An agent's conversation drawn as a chat's** (5.9): the agent's
   page keeps each call, each result and the run markers as work lines,
   which a chat folds or hides (3.5). Default: as work; the chat's

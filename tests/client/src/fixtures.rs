@@ -52,6 +52,7 @@ pub fn domain_limits() -> Limits {
                 kept: 4,
                 projects: 4,
                 text: 64,
+                turn_text: 64,
                 rows: 4,
                 fields: 4,
                 segments: 9,
@@ -875,7 +876,7 @@ pub fn codec_for(limits: &jig_client::DomainLimits) -> jig_protocol_transcript::
     let bytes = limits.document_bytes.min(u64::from(jig_client_protocol_wire::CEILINGS.turn_carried_bytes));
     jig_protocol_transcript::Limits::new(
         u32::try_from(bytes).expect("wire bound fits"),
-        jig_client::contract::TurnLimits { messages: limits.rows, blocks: limits.rows, text: limits.text },
+        jig_client::contract::TurnLimits { messages: limits.rows, blocks: limits.rows, text: limits.turn_text },
     )
 }
 /// Commit smith's session turn through the worker's real turn boundary.

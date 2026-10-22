@@ -682,7 +682,7 @@ fn assistant_blocks(blocks: &[c::Block]) -> skein_ui::Tree {
     let mut thread = Thread::new(TASK, &jig_client::thread::Limits { lines: LINES, bytes: BYTES, text: 512 });
     thread.reading = Some(jig_client::thread::Reading::Latest { known: 0 });
     let mut rows = List::with_capacity(1);
-    rows.push(run::turn(1, ATTEMPT, 1, &[run::message(c::Speaker::Assistant, blocks)])).expect("turn");
+    rows.push(run::turn(1, ATTEMPT, 1, &[run::message(c::Speaker::Assistant, blocks)], 512)).expect("turn");
     thread.page(c::ActivityPage { rows, before: None, after: None, cut: false });
     tree(&thread)
 }
@@ -761,4 +761,27 @@ fn an_owners_person_words_have_a_person_shell_and_one_paragraph_per_line() {
     assert!(fixtures::find(&tree, Role::Paragraph, b"First line").is_some());
     assert!(fixtures::find(&tree, Role::Paragraph, b"Second line").is_some());
     assert!(fixtures::find(&tree, Role::Status, b"Read").is_none());
+}
+
+#[test]
+fn committed_text_exceeds_field_text_on_both_conversation_pages() {
+    use fixtures::first_run as run;
+    let value = [b'x'; 256];
+    let mut thread = Thread::new(TASK, &jig_client::thread::Limits { lines: LINES, bytes: BYTES, text: TEXT });
+    thread.reading = Some(jig_client::thread::Reading::Latest { known: 0 });
+    let mut rows = List::with_capacity(1);
+    rows.push(run::turn(
+        1,
+        ATTEMPT,
+        1,
+        &[run::message(c::Speaker::Assistant, &[c::Block::Text(run::text(&value))])],
+        2048,
+    ))
+    .expect("committed turn");
+    thread.page(c::ActivityPage { rows, before: None, after: None, cut: false });
+    for projected in [true, false] {
+        let drawn = if projected { fixtures::chat::projected_tree(&thread) } else { fixtures::chat::tree(&thread) };
+        assert!(skein_lib::bytes::find(&fixtures::text(&drawn), &value).is_some(), "chat projection {projected}");
+        assert!(fixtures::find(&drawn, Role::Status, b"Earlier text omitted").is_none());
+    }
 }

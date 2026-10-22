@@ -13,8 +13,10 @@ use temper_client_domain as client;
 pub const EXCHANGES: u32 = 8;
 /// Each exchange's deadline, including a quiet engine.
 pub const DEADLINE: Duration = Duration::from_secs(30);
-/// Fits the dark-theme and later CSV turns; CSV's first stays cut (client/README.md, 5.4).
+/// Field text and provisional conversation text (client/README.md, 5.4).
 pub const CONVERSATION_TEXT: u32 = 512;
+/// Shared text of one committed turn, including its calls (client/README.md, 5.4).
+pub const TURN_TEXT: u32 = 2048;
 /// Root, native transport and io bounds.
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
@@ -57,6 +59,7 @@ pub fn native() -> Limits {
                     kept: 16,
                     projects: 2,
                     text: CONVERSATION_TEXT,
+                    turn_text: TURN_TEXT,
                     rows: 3,
                     fields: 16,
                     segments: 9,

@@ -47,6 +47,7 @@ pub fn client() -> client::Limits {
             kept: 16,
             projects: 2,
             text: TEXT,
+            turn_text: TEXT,
             rows: ROWS,
             fields: 16,
             segments: 9,

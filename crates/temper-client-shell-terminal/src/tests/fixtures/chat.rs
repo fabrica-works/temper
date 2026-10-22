@@ -189,7 +189,7 @@ fn delegation_task(number: u64, landed: bool) -> contract::Task {
     task
 }
 fn delegation_activity(landed: bool) -> contract::ActivityPage {
-    first_run::activity(false, landed)
+    first_run::activity(false, landed, crate::limits::native().client.client.domain.turn_text)
 }
 
 fn delegation_text(bytes: &[u8]) -> contract::Text {

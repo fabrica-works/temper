@@ -13,6 +13,7 @@ fn the_tools_preset_is_the_terminals_but_its_rows() {
     let mut terminal = temper_client_shell_terminal::limits::native().client;
     terminal.client.domain.rows = limits::ROWS;
     terminal.client.domain.text = limits::TEXT;
+    terminal.client.domain.turn_text = limits::TEXT;
     assert_eq!(limits::client(), terminal);
 }
 #[test]
