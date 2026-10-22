@@ -165,6 +165,8 @@ pub const TASK_ACTS: Style = Style { owner: owner(), token: 79 };
 pub const AGENT_STEER: Style = Style { owner: owner(), token: 80 };
 /// The goal toolbar's Cancel button (client/README.md, 5.11).
 pub const TASK_DANGER: Style = Style { owner: owner(), token: 81 };
+/// The task page's amendment editor (client/README.md, 5.11).
+pub const TASK_AMEND: Style = Style { owner: owner(), token: 82 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -252,6 +254,7 @@ pub const NAMES: Names<'static> = Names {
         b"temper-task-acts",
         b"temper-agent-steer",
         b"temper-task-danger",
+        b"temper-task-amend",
     ],
     regions: &[b"temper-link"],
 };

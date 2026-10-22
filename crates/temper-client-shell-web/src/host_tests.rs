@@ -183,6 +183,8 @@ mod memory_literal;
 // The context line adds one repository/forge text node; chat words use existing phrase room.
 // Procedure goal slot: five added nodes including its paragraph and link text.
 // The chat projection adds seven phrases while retaining the agent's work-line words.
+// Amendment editor: sixteen nodes and eleven phrases; the web root also retains
+// its bounded draft, typed specification and separate amendment outcome.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
 const WEB_BYTES: u64 = 247923240683;
 #[test]

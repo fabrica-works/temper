@@ -115,7 +115,9 @@ impl Limits {
             .max(account_nodes)
             .checked_add(choices)?
             // The context line splits the repository from its forge suffix.
-            .checked_add(1)?;
+            .checked_add(1)?
+            // Task amendment region, fields, buttons and explanatory text leaves (5.11).
+            .checked_add(16)?;
         let tree = skein_ui::Limits {
             nodes,
             depth: receiving.rows.checked_add(34)?,

@@ -1575,8 +1575,12 @@ Its rules:
   sends `Ask::Amend` with the drafted change, the drafted revision
   (none for a tracked task's priority alone, 3.7) and the reason
   "Amended from its page"; a refusal as moved in between says so with
-  "Look again" (below). Amend is drawn by its admission as every act
-  is: proposable, the page proposes nothing. The model choice for the
+  "Look again" (below). Its outcome is the editor's: pending, then the
+  answer in jig's words in the region, a refusal as moved with "Look
+  again". A done amendment leaves the region holding its outcome alone,
+  where it was made, until "Amend" opens another draft.
+  Amend is drawn by its admission as every act is: proposable, the page
+  proposes nothing. The model choice for the
   next runs stays the choice line's (3.5), its own amendment, not
   repeated in the editor. Instructions, dependencies, the deadline,
   wake and an addressee are `temper ctl amend`'s alone (`tools.md`,

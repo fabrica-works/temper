@@ -50,15 +50,22 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         header(b, task, root.pages().me(root.client()), words, bindings);
         if page.shape == Shape::Tracked {
             if root.pages().confirmation().is_none()
-                && (jig_client::facts::offer(task.acts.as_slice(), c::ActKind::Stop).is_some()
+                && match &page.amending {
+                    Some(open) => open.done,
+                    None => true,
+                }
+                && (jig_client::facts::offer(task.acts.as_slice(), c::ActKind::Amend).is_some()
+                    || jig_client::facts::offer(task.acts.as_slice(), c::ActKind::Stop).is_some()
                     || jig_client::facts::offer(task.acts.as_slice(), c::ActKind::Cancel).is_some())
             {
                 b.open(Role::Slot);
                 b.style(look::TASK_ACTS);
+                act(b, task, c::ActKind::Amend, Word::Amend, Act::Amend, words, bindings);
                 act(b, task, c::ActKind::Stop, Word::Stop, Act::Stop, words, bindings);
                 act(b, task, c::ActKind::Cancel, Word::Cancel, Act::Close, words, bindings);
                 b.close();
             }
+            amendment(b, root, words, bindings);
             outcome(b, root, words);
         }
         controls(b, &task.chip, root, words, bindings, rows);
@@ -118,14 +125,99 @@ pub(crate) fn act(
 }
 pub(crate) fn outcome(b: &mut Builder, root: &Domain, words: &Words) {
     let Some(page) = root.pages().task() else { return };
-    for (key, _) in &page.pending {
-        if let Some(pending) = root.client().pending(*key) {
+    for (key, kind) in &page.pending {
+        if *kind != task::Sending::Amend
+            && let Some(pending) = root.client().pending(*key)
+        {
             crate::confirm::progress_text(b, words, pending.progress);
         }
     }
     if let Some(outcome) = &page.outcome {
         super::chats::outcome_text(b, words, outcome, 0);
     }
+}
+fn amendment_outcome(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings) {
+    let Some(page) = root.pages().task() else { return };
+    let Some(open) = &page.amending else { return };
+    for (key, kind) in &page.pending {
+        if *kind == task::Sending::Amend
+            && let Some(pending) = root.client().pending(*key)
+        {
+            crate::confirm::progress_text(b, words, pending.progress);
+        }
+    }
+    if let Some(outcome) = &open.outcome {
+        super::chats::outcome_text(b, words, outcome, 0);
+        if let jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Refused {
+            refusal: c::Refusal::Moved { .. },
+            ..
+        })) = outcome
+        {
+            button(b, Word::LookAgain, Act::AmendAgain, words, bindings);
+        }
+    }
+}
+
+fn button(b: &mut Builder, word: Word, act: Act, words: &Words, bindings: &mut Bindings) {
+    b.open(Role::Button);
+    b.name(&words.say(word, &[]));
+    b.bind(bindings.insert(act));
+    b.close();
+}
+/// The page's two amendment controls (client/README.md, 5.11).
+pub(crate) fn amendment(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings) {
+    let Some(page) = root.pages().task() else { return };
+    let Some(open) = &page.amending else { return };
+    let Some(task) = page.document(root.client()) else { return };
+    b.open(Role::Region);
+    b.style(look::TASK_AMEND);
+    b.name(&words.say(Word::AmendTask, &[Hole::Number(page.number)]));
+    if open.done {
+        amendment_outcome(b, root, words, bindings);
+        b.close();
+        return;
+    }
+    if open.cut {
+        text(b, Role::Paragraph, &words.say(Word::SpecTooLong, &[]));
+    } else {
+        b.open(Role::TextArea);
+        b.name(&words.say(Word::Specification, &[]));
+        b.value(&open.words, 0);
+        b.bind(bindings.insert(Act::AmendWords { words: Box::default() }));
+        b.close();
+    }
+    if let Some(tracking) = open.tracking {
+        b.open(Role::Check);
+        b.name(&words.say(Word::Tracked, &[]));
+        b.bind(bindings.insert(Act::AmendTracked));
+        if let c::Tracking::Tracked { .. } = tracking {
+            b.state(skein_ui::State::Pressed);
+        }
+        b.close();
+        b.open(Role::TextField);
+        b.name(&words.say(Word::AmendPriority, &[]));
+        let priority = match tracking {
+            c::Tracking::Tracked { priority } => priority,
+            c::Tracking::Untracked => 0,
+        };
+        b.value(skein_lib::Decimal::of(u64::from(priority)).as_bytes(), 0);
+        b.bind(bindings.insert(Act::AmendPriority { priority }));
+        if tracking == c::Tracking::Untracked {
+            b.state(skein_ui::State::Disabled);
+        }
+        b.close();
+    }
+    if open.no_change {
+        text(b, Role::Status, &words.say(Word::NoChange, &[]));
+    }
+    if open.draft.moved(task) {
+        text(b, Role::Status, &words.say(Word::TaskChanged, &[]));
+    } else {
+        act(b, task, c::ActKind::Amend, Word::SendAmendment, Act::SendAmendment, words, bindings);
+    }
+    button(b, Word::Discard, Act::DiscardAmendment, words, bindings);
+    amendment_outcome(b, root, words, bindings);
+    b.close();
 }
 pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words: &Words, bindings: &mut Bindings) {
     region(b, Word::TaskHeader, words);

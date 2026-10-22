@@ -39,18 +39,29 @@ pub fn seen(tree: &Tree) -> Vec<Seen> {
         if node.styles.as_slice().contains(&temper_client_view::look::DEPENDENCIES) {
             links_end = index.checked_add(usize::try_from(node.size).expect("link subtree fits")).expect("tree fits");
         }
-        if node.role != Role::Item || index < links_end {
+        // The editor is the task's visible decision, named by its number, as
+        // "Hold revision N" names a card's revision (client/README.md, 5.11).
+        let amending =
+            node.role == Role::Region && node.styles.as_slice().contains(&temper_client_view::look::TASK_AMEND);
+        if (node.role != Role::Item && !amending) || index < links_end {
             continue;
         }
-        let Some(key) = node.key.and_then(identity) else {
-            continue;
+        let key = if amending {
+            node.name
+                .as_deref()
+                .and_then(|name| name.strip_prefix(b"Amend task "))
+                .and_then(skein_ui::number)
+                .map(|task| observe::key(ObjectKey::Task(task)))
+        } else {
+            node.key.and_then(identity)
         };
+        let Some(key) = key else { continue };
         let end = index.checked_add(usize::try_from(node.size).expect("card subtree fits")).expect("tree fits");
         let mut state = CardSeen::Waiting;
         let mut revision = None;
         for child in &tree.nodes()[index..end] {
             if let Some(name) = child.name.as_deref() {
-                if let Some(number) = name.strip_prefix(b"Hold revision ") {
+                if !amending && let Some(number) = name.strip_prefix(b"Hold revision ") {
                     revision = skein_ui::number(number);
                 }
                 if child.role == Role::Status {

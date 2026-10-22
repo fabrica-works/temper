@@ -37,6 +37,11 @@ impl Bindings {
                         filter.goal = if value.is_empty() { None } else { Some(skein_ui::number(&value)?) };
                         Act::Filter { filter }
                     }
+                    (Act::AmendWords { .. }, skein_ui::Act::Input { value }) => Act::AmendWords { words: value },
+                    (Act::AmendPriority { .. }, skein_ui::Act::Input { value }) => {
+                        Act::AmendPriority { priority: u32::try_from(skein_ui::number(&value)?).ok()? }
+                    }
+                    (Act::AmendTracked, skein_ui::Act::Toggle) => Act::AmendTracked,
                     (Act::ChatWords { .. }, skein_ui::Act::Input { value }) => Act::ChatWords { words: value },
                     (Act::MessageWords { .. }, skein_ui::Act::Input { value }) => Act::MessageWords { words: value },
                     (Act::CardWords { object, .. }, skein_ui::Act::Input { value }) => {

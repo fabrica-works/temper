@@ -237,11 +237,23 @@ pub enum Word {
     ItsTasks,
     SteerNote,
     StopHolds,
+    Amend,
+    AmendTask,
+    Specification,
+    Tracked,
+    AmendPriority,
+    SendAmendment,
+    Discard,
+    NoChange,
+    SpecTooLong,
+    TaskChanged,
+    LookAgain,
 }
 // Room for temper, jig, account, card and forge phrases.
 // Seven chat projection phrases, alongside the agent's original work-line words.
-const PHRASES: u32 = 583;
-const ALL: [Word; 221] = [
+// Eleven amendment editor phrases (client/README.md, 5.11).
+const PHRASES: u32 = 594;
+const ALL: [Word; 232] = [
     Word::WaitRefused,
     Word::DependencyParked,
     Word::WaitInvalid,
@@ -463,6 +475,17 @@ const ALL: [Word; 221] = [
     Word::ItsTasks,
     Word::SteerNote,
     Word::StopHolds,
+    Word::Amend,
+    Word::AmendTask,
+    Word::Specification,
+    Word::Tracked,
+    Word::AmendPriority,
+    Word::SendAmendment,
+    Word::Discard,
+    Word::NoChange,
+    Word::SpecTooLong,
+    Word::TaskChanged,
+    Word::LookAgain,
 ];
 impl Word {
     #[expect(clippy::too_many_lines, reason = "one exhaustive table keeps the frame phrase IDs stable")]
@@ -694,6 +717,17 @@ impl Word {
             Self::ItsTasks => 1037,
             Self::SteerNote => 1038,
             Self::StopHolds => 1039,
+            Self::Amend => 1047,
+            Self::AmendTask => 1048,
+            Self::Specification => 1049,
+            Self::Tracked => 1050,
+            Self::AmendPriority => 1051,
+            Self::SendAmendment => 1052,
+            Self::Discard => 1053,
+            Self::NoChange => 1054,
+            Self::SpecTooLong => 1055,
+            Self::TaskChanged => 1056,
+            Self::LookAgain => 1057,
         };
         let owner =
             if number >= 100 { crate::frame::owner() } else { temper_client_domain::forge::words::owner(connector) };
@@ -1082,6 +1116,17 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::RunStarted => (&[b"Started ", b""], &[Name]),
         Word::ItsTasks => (&[b"Its tasks"], &[]),
         Word::SteerNote => (&[b"Steer this task \xc2\xb7 words reach its live run at the next turn."], &[]),
+        Word::Amend => (&[b"Amend"], &[]),
+        Word::AmendTask => (&[b"Amend task ", b""], &[Number]),
+        Word::Specification => (&[b"Specification"], &[]),
+        Word::Tracked => (&[b"Tracked"], &[]),
+        Word::AmendPriority => (&[b"Priority"], &[]),
+        Word::SendAmendment => (&[b"Send amendment"], &[]),
+        Word::Discard => (&[b"Discard"], &[]),
+        Word::NoChange => (&[b"No change"], &[]),
+        Word::SpecTooLong => (&[b"This task's specification is too long to edit here: use `temper ctl amend`"], &[]),
+        Word::TaskChanged => (&[b"This task changed since the editor opened"], &[]),
+        Word::LookAgain => (&[b"Look again"], &[]),
         Word::StopHolds => (&[b"Its run stops, and the task is held until it is released."], &[]),
     }
 }

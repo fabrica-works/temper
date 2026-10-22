@@ -82,6 +82,9 @@ pub fn root_with(mut document: c::Task) -> temper_client_domain::Domain {
     supplied_root(document, false)
 }
 pub fn supplied_root(document: c::Task, held: bool) -> temper_client_domain::Domain {
+    supplied_root_watching(document, held).0
+}
+pub fn supplied_root_watching(document: c::Task, held: bool) -> (temper_client_domain::Domain, Token) {
     use jig_client::{Event as E, Up};
     let limits = domain_limits();
     let (mut root, _, watch, tree_watch) =
@@ -145,7 +148,7 @@ pub fn supplied_root(document: c::Task, held: bool) -> temper_client_domain::Dom
             }
         }
     }
-    root
+    (root, watch.expect("task watch"))
 }
 
 pub const HOLD_REVISION: c::Revision = c::Revision { value: 7 };

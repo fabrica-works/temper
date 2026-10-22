@@ -228,6 +228,41 @@ pub enum Sending {
     Message,
     Stop,
     Cancel,
+    Amend,
+}
+/// The page's open amendment; its draft is 3.7's (client/README.md, 5.11).
+#[derive(Debug)]
+pub struct Amending {
+    pub draft: crate::amend::Draft,
+    pub words: Box<[u8]>,
+    pub cut: bool,
+    pub tracking: Option<c::Tracking>,
+    pub no_change: bool,
+    pub done: bool,
+    pub outcome: Option<jig_client::Outcome>,
+}
+impl Amending {
+    fn of(task: &c::Task, shape: Shape) -> Self {
+        let mut draft = crate::amend::Draft::of(task);
+        let words = task.spec.specification.words.bytes.clone();
+        let cut = draft.words(words.clone()).is_err();
+        Self {
+            draft,
+            words: if cut { Box::default() } else { words.into_bytes() },
+            cut,
+            tracking: if shape == Shape::Tracked {
+                Some(match task.priority {
+                    Some(priority) => c::Tracking::Tracked { priority },
+                    None => c::Tracking::Untracked,
+                })
+            } else {
+                None
+            },
+            no_change: false,
+            done: false,
+            outcome: None,
+        }
+    }
 }
 #[derive(Debug)]
 pub struct Task {
@@ -246,6 +281,7 @@ pub struct Task {
     pub words: Box<[u8]>,
     pub pending: List<(Key, Sending)>,
     pub outcome: Option<jig_client::Outcome>,
+    pub amending: Option<Amending>,
 }
 impl Task {
     pub(crate) fn new(number: u64, first: u64, limits: &Limits, out: &mut Queue<Request>) -> Self {
@@ -275,8 +311,9 @@ impl Task {
             through: None,
             cards: List::with_capacity(limits.client.domain.reads),
             words: Box::default(),
-            pending: List::with_capacity(3),
+            pending: List::with_capacity(4),
             outcome: None,
+            amending: None,
         }
     }
     #[must_use]
@@ -312,7 +349,14 @@ impl Task {
                     read(self.activity, older, out);
                 }
             }
-            Act::Project { .. }
+            Act::Amend
+            | Act::AmendWords { .. }
+            | Act::AmendTracked
+            | Act::AmendPriority { .. }
+            | Act::DiscardAmendment
+            | Act::SendAmendment
+            | Act::AmendAgain
+            | Act::Project { .. }
             | Act::Choice(_)
             | Act::SignOut
             | Act::Accounts(_)
@@ -331,6 +375,99 @@ impl Task {
             | Act::Confirm
             | Act::Cancel
             | Act::Go { .. } => unreachable!("only composer and older acts routed here"),
+        }
+    }
+    /// The task page's amendment acts (client/README.md, 5.11).
+    pub(crate) fn amend(
+        &mut self,
+        env: &Env<Limits>,
+        client: &Client,
+        act: Act,
+        serial: &mut u64,
+        out: &mut Queue<Request>,
+    ) {
+        match act {
+            Act::Amend | Act::AmendAgain => {
+                if let Some(open) = &self.amending
+                    && !open.done
+                    && act == Act::Amend
+                {
+                    return;
+                }
+                if let Some(task) = self.document(client)
+                    && (self.shape == Shape::Tracked || self.shape == Shape::Agent)
+                    && super::chat::allowed(task, c::ActKind::Amend)
+                {
+                    self.amending = Some(Amending::of(task, self.shape));
+                }
+            }
+            Act::DiscardAmendment => {
+                if let Some(open) = &self.amending
+                    && open.done
+                {
+                    return;
+                }
+                self.amending = None;
+            }
+            Act::AmendWords { words } => {
+                if let Some(open) = &mut self.amending
+                    && !open.done
+                    && !open.cut
+                    && let Ok(text) = c::Text::new(words, env.limits.client.domain.text)
+                {
+                    open.words = text.clone().into_bytes();
+                    open.draft.words(text).expect("whole specification");
+                    open.no_change = false;
+                }
+            }
+            Act::AmendTracked => {
+                if let Some(open) = &mut self.amending
+                    && !open.done
+                    && let Some(tracking) = open.tracking
+                {
+                    let tracking = match tracking {
+                        c::Tracking::Tracked { .. } => c::Tracking::Untracked,
+                        c::Tracking::Untracked => c::Tracking::Tracked { priority: 0 },
+                    };
+                    open.tracking = Some(tracking);
+                    open.draft.track(tracking);
+                    open.no_change = false;
+                }
+            }
+            Act::AmendPriority { priority } => {
+                if let Some(open) = &mut self.amending
+                    && !open.done
+                    && let Some(c::Tracking::Tracked { .. }) = open.tracking
+                {
+                    let tracking = c::Tracking::Tracked { priority };
+                    open.tracking = Some(tracking);
+                    open.draft.track(tracking);
+                    open.no_change = false;
+                }
+            }
+            Act::SendAmendment => self.send(env, client, Sending::Amend, serial, out),
+            Act::Project { .. }
+            | Act::Choice(_)
+            | Act::SignOut
+            | Act::Accounts(_)
+            | Act::ChatWords { .. }
+            | Act::StartChat
+            | Act::Suggest { .. }
+            | Act::MessageWords { .. }
+            | Act::Send
+            | Act::Stop
+            | Act::Close
+            | Act::DelegateFate { .. }
+            | Act::Older
+            | Act::ClosedChats
+            | Act::Filter { .. }
+            | Act::Seen
+            | Act::Decide { .. }
+            | Act::CardWords { .. }
+            | Act::Again { .. }
+            | Act::Confirm
+            | Act::Cancel
+            | Act::Go { .. } => unreachable!("only amendment acts routed here"),
         }
     }
     pub(crate) fn send(
@@ -364,7 +501,24 @@ impl Task {
                     .expect("page cancellation reason fits"),
                 grace: None,
             },
-            Sending::Message | Sending::Stop | Sending::Cancel => return,
+            Sending::Amend if super::chat::allowed(task, c::ActKind::Amend) => {
+                let Some(open) = &self.amending else { return };
+                if open.done || open.draft.moved(task) {
+                    return;
+                }
+                let Some(drafted) = open.draft.amendment() else {
+                    self.amending.as_mut().expect("open amendment").no_change = true;
+                    return;
+                };
+                c::Ask::Amend {
+                    project: task.project,
+                    task: self.number,
+                    revision: drafted.revision,
+                    change: Box::new(drafted.change),
+                    reason: c::Text::new(Box::from(*b"Amended from its page"), u32::MAX).expect("page reason fits"),
+                }
+            }
+            Sending::Message | Sending::Stop | Sending::Cancel | Sending::Amend => return,
         };
         for (_, pending) in &self.pending {
             if *pending == kind {
@@ -381,7 +535,11 @@ impl Task {
             self.words = Box::default();
         }
         self.pending.push((key, kind)).expect("one request per task act fits");
-        self.outcome = None;
+        if kind == Sending::Amend {
+            self.amending.as_mut().expect("open amendment").outcome = None;
+        } else {
+            self.outcome = None;
+        }
         out.push(Request::Client(jig_client::Event::Send {
             key,
             name: None,
@@ -405,6 +563,32 @@ impl Task {
         }
         self.next
     }
+    fn answered(&mut self, key: Key, outcome: jig_client::Outcome) {
+        if self.pending_kind(key) == Some(Sending::Message) {
+            if let jig_client::Outcome::Answered(jig_client::Answered::Jig(answer)) = &outcome {
+                self.thread.answered(key, answer);
+            } else {
+                self.thread.words.refused(key);
+            }
+        }
+        if self.pending_kind(key) == Some(Sending::Amend) {
+            if let Some(open) = &mut self.amending {
+                if let jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(_))) = &outcome {
+                    open.done = true;
+                }
+                open.outcome = Some(outcome);
+            }
+        } else {
+            self.outcome = Some(outcome);
+        }
+        let mut kept = List::with_capacity(self.pending.capacity());
+        for row in &self.pending {
+            if row.0 != key {
+                kept.push(*row).expect("remaining pending fits");
+            }
+        }
+        self.pending = kept;
+    }
     pub(crate) fn told(&mut self, client: &Client, told: Told, out: &mut Queue<Request>) -> bool {
         if let Told::Page { handle, page: Readout::Jig(c::ReadResult::Value(value)) } = &told {
             for index in 0..self.cards.len() {
@@ -423,21 +607,7 @@ impl Task {
         }
         match told {
             Told::Answered { key, outcome } if self.pending_kind(key).is_some() => {
-                if self.pending_kind(key) == Some(Sending::Message) {
-                    if let jig_client::Outcome::Answered(jig_client::Answered::Jig(answer)) = &outcome {
-                        self.thread.answered(key, answer);
-                    } else {
-                        self.thread.words.refused(key);
-                    }
-                }
-                let mut kept = List::with_capacity(self.pending.capacity());
-                for row in &self.pending {
-                    if row.0 != key {
-                        kept.push(*row).expect("remaining pending fits");
-                    }
-                }
-                self.pending = kept;
-                self.outcome = Some(outcome);
+                self.answered(key, outcome);
             }
             Told::Pending { key } if self.pending_kind(key).is_some() => {}
 
@@ -614,15 +784,19 @@ fn latest(client: &Client, handle: Handle) -> Option<&Latest> {
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     // Activity, the final task, the last outcome, and bounded held-task cards and their words.
+    // Three more document bounds cover the draft base (spec, authority, instructions,
+    // dependencies and model), its replacement spec, and its retained outcome.
+    // The editor also keeps one bounded specification field and its inline state.
     // An agent's task also retains a chat's thread and its borrowed view lines.
     limits
         .client
         .domain
         .document_bytes
-        .checked_mul(u64::from(limits.client.domain.reads).checked_add(3)?)?
+        .checked_mul(u64::from(limits.client.domain.reads).checked_add(6)?)?
         .checked_add(List::<Card>::worst_case(limits.client.domain.reads)?)?
-        .checked_add(List::<(Key, Sending)>::worst_case(3)?)?
-        .checked_add(u64::from(limits.client.domain.text))?
+        .checked_add(List::<(Key, Sending)>::worst_case(4)?)?
+        .checked_add(u64::try_from(size_of::<Amending>()).ok()?)?
+        .checked_add(u64::from(limits.client.domain.text).checked_mul(2)?)?
         .checked_add(u64::from(limits.client.domain.reads).checked_mul(u64::from(limits.client.domain.text))?)?
         .checked_add(jig_client::thread::worst_case(&super::chat::thread_limits(limits))?)?
         .checked_add(List::<jig_client::thread::Line<'_>>::worst_case(

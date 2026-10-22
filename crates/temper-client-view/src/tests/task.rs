@@ -1619,10 +1619,17 @@ fn task_acts_show_their_name_and_admission_or_nothing_when_absent() {
         let mut task = f::document();
         offers(&mut task, &[]);
         if let Some(admission) = &admission {
-            offers(&mut task, &[(c::ActKind::Stop, admission.clone()), (c::ActKind::Cancel, admission.clone())]);
+            offers(
+                &mut task,
+                &[
+                    (c::ActKind::Amend, admission.clone()),
+                    (c::ActKind::Stop, admission.clone()),
+                    (c::ActKind::Cancel, admission.clone()),
+                ],
+            );
         }
         let view = goal(task);
-        for name in [b"Stop".as_slice(), b"Cancel"] {
+        for name in [b"Amend".as_slice(), b"Stop", b"Cancel"] {
             assert!(fixtures::find(view.tree(), Role::Button, name).is_none());
             assert_eq!(fixtures::find(view.tree(), Role::Paragraph, name).is_some(), admission.is_some());
         }
@@ -1858,4 +1865,199 @@ fn a_held_procedure_goal_shows_its_own_release_before_its_plan() {
     let plan = region_index(tree, b"Its tasks");
     assert!(region_index(tree, b"Task details") < release);
     assert!(release < plan);
+}
+
+fn send_amendment(root: &mut Domain) -> skein_lib::Token {
+    let limits = fixtures::domain_limits();
+    let mut out = skein_lib::Queue::with_capacity(temper_client_domain::max_out(&limits));
+    temper_client_domain::step(
+        root,
+        &skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits },
+        Event::Act { action: Action::Pages(Act::SendAmendment) },
+        &mut out,
+    );
+    let mut attempt = None;
+    while let Some(request) = out.pop() {
+        if let temper_client_domain::Request::Client {
+            request: jig_client::Request::Down { down: jig_client::Down::Send { attempt: token, .. } },
+        } = request
+        {
+            attempt = Some(token);
+        }
+    }
+    attempt.expect("amendment sent")
+}
+fn amend_root(agent: bool, cut: bool) -> Domain {
+    let mut task = f::delegate();
+    task.spec.specification.words.cut = cut;
+    offers(
+        &mut task,
+        &[
+            (c::ActKind::Amend, c::Admission::Allowed),
+            (c::ActKind::Stop, c::Admission::Allowed),
+            (c::ActKind::Cancel, c::Admission::Allowed),
+        ],
+    );
+    if agent { f::agent_root(task, Some(f::tree()), true) } else { f::root_with(task) }
+}
+#[test]
+fn amend_is_first_in_the_goals_toolbar_and_agents_taskbar() {
+    for agent in [false, true] {
+        let mut root = amend_root(agent, false);
+        let view = fixtures::page_view(&root);
+        let tree = view.tree();
+        assert!(index_of(tree, Role::Button, b"Amend") < index_of(tree, Role::Button, b"Stop"));
+        press_button(&mut root, b"Stop");
+        assert!(fixtures::find(fixtures::page_view(&root).tree(), Role::Button, b"Amend").is_none());
+    }
+}
+#[test]
+fn amendment_has_specification_and_goal_tracking_controls_and_discard() {
+    for agent in [false, true] {
+        let mut root = amend_root(agent, false);
+        press_button(&mut root, b"Amend");
+        let mut view = fixtures::page_view(&root);
+        let tree = view.tree();
+        let region = styled(tree, look::TASK_AMEND);
+        assert_eq!(tree.nodes()[region].role, Role::Region);
+        assert_eq!(tree.nodes()[region].name.as_deref(), Some(b"Amend task 9".as_slice()));
+        assert!(named(subtree(tree, region), Role::TextArea, b"Specification"));
+        assert_eq!(named(subtree(tree, region), Role::Check, b"Tracked"), !agent);
+        assert_eq!(named(subtree(tree, region), Role::TextField, b"Priority"), !agent);
+        assert!(named(subtree(tree, region), Role::Button, b"Send amendment"));
+        assert!(!named(tree.nodes(), Role::Button, b"Amend"));
+        let field = fixtures::find(tree, Role::TextArea, b"Specification").unwrap();
+        assert_eq!(
+            crate::act(&mut view, field, skein_ui::Act::Input { value: Box::from(*b"New spec") }),
+            Some(Action::Pages(Act::AmendWords { words: Box::from(*b"New spec") }))
+        );
+        if !agent {
+            let check = fixtures::find(view.tree(), Role::Check, b"Tracked").unwrap();
+            assert_eq!(crate::act(&mut view, check, skein_ui::Act::Toggle), Some(Action::Pages(Act::AmendTracked)));
+            let priority = fixtures::find(view.tree(), Role::TextField, b"Priority").unwrap();
+            assert_eq!(
+                crate::act(&mut view, priority, skein_ui::Act::Input { value: Box::from(*b"23") }),
+                Some(Action::Pages(Act::AmendPriority { priority: 23 }))
+            );
+            assert!(crate::act(&mut view, priority, skein_ui::Act::Input { value: Box::from(*b"invalid") }).is_none());
+        }
+        press_button(&mut root, b"Discard");
+        assert!(!has_style(fixtures::page_view(&root).tree().nodes(), look::TASK_AMEND));
+    }
+}
+#[test]
+fn a_cut_specification_has_an_explanation_and_no_textarea() {
+    let mut root = amend_root(false, true);
+    press_button(&mut root, b"Amend");
+    let view = fixtures::page_view(&root);
+    assert!(fixtures::find(view.tree(), Role::TextArea, b"Specification").is_none());
+    assert!(contains(view.tree(), b"This task's specification is too long to edit here: use `temper ctl amend`"));
+}
+#[test]
+fn no_change_is_shown_until_an_amendment_is_edited() {
+    let mut root = amend_root(false, false);
+    press_button(&mut root, b"Amend");
+    press_button(&mut root, b"Send amendment");
+    assert!(contains(fixtures::page_view(&root).tree(), b"No change"));
+    press(&mut root, Act::AmendPriority { priority: PRIORITY + 1 });
+    assert!(!contains(fixtures::page_view(&root).tree(), b"No change"));
+}
+#[test]
+fn a_moved_amendment_hides_send_and_its_refusal_offers_look_again() {
+    let mut task = f::document();
+    task.chip.task = TASK;
+    task.chip.executor = c::Executor::Agent { charter: CHARTER };
+    task.priority = Some(PRIORITY);
+    offers(&mut task, &[(c::ActKind::Amend, c::Admission::Allowed)]);
+    let (mut root, watch) = f::supplied_root_watching(task, false);
+    press_button(&mut root, b"Amend");
+    press(&mut root, Act::AmendWords { words: Box::from(*b"New spec") });
+    let attempt = send_amendment(&mut root);
+    let page = root.pages().task().unwrap();
+    let mut task = page.document(root.client()).unwrap().clone();
+    task.spec_revision.value += 1;
+    let revision = task.spec_revision;
+    // Deliver the changed document on the existing watch, as the engine does.
+    fixtures::root_event(
+        &mut root,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch,
+                    event: c::WatchEvent::Delivered(c::Delivery::Task(Box::new(task))),
+                },
+            },
+        },
+    );
+    let view = fixtures::page_view(&root);
+    assert!(contains(view.tree(), b"This task changed since the editor opened"));
+    assert!(fixtures::find(view.tree(), Role::Button, b"Send amendment").is_none());
+    fixtures::root_event(
+        &mut root,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Answer {
+                    attempt,
+                    envelope: skein_lib::RequestEnvelope::Final,
+                    answer: Some(jig_client::Answered::Jig(c::Answer::Refused {
+                        refusal: c::Refusal::Moved { now: revision, what: c::Moved::Spec },
+                        at: None,
+                    })),
+                    why: None,
+                },
+            },
+        },
+    );
+    press_button(&mut root, b"Look again");
+    assert_eq!(root.pages().task().unwrap().amending.as_ref().unwrap().draft.revision(), revision);
+    assert!(fixtures::find(fixtures::page_view(&root).tree(), Role::Button, b"Send amendment").is_some());
+}
+
+#[test]
+fn amendment_progress_and_done_stay_in_its_region_until_amend_again() {
+    for agent in [false, true] {
+        let mut root = amend_root(agent, false);
+        press_button(&mut root, b"Amend");
+        press(&mut root, Act::AmendWords { words: Box::from(*b"New spec") });
+        let attempt = send_amendment(&mut root);
+        let page = root.pages().task().expect("task page");
+        let key = page.pending.as_slice()[0].0;
+        let progress = root.client().pending(key).expect("pending amendment").progress;
+        let mut builder = Builder::new(&fixtures::tree_limits());
+        crate::confirm::progress_text(&mut builder, &fixtures::words(), progress);
+        let expected = fixtures::text(&builder.finish());
+        let view = fixtures::page_view(&root);
+        let region = styled(view.tree(), look::TASK_AMEND);
+        let progress_node = index_of(view.tree(), Role::Status, &expected);
+        assert!(
+            region < progress_node
+                && progress_node < region + usize::try_from(view.tree().nodes()[region].size).unwrap()
+        );
+        fixtures::root_event(
+            &mut root,
+            Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Answer {
+                        attempt,
+                        envelope: skein_lib::RequestEnvelope::Final,
+                        answer: Some(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Changed))),
+                        why: None,
+                    },
+                },
+            },
+        );
+        let view = fixtures::page_view(&root);
+        let region = styled(view.tree(), look::TASK_AMEND);
+        let nodes = subtree(view.tree(), region);
+        assert!(named(nodes, Role::Status, b"Applied"));
+        assert!(!named(nodes, Role::TextArea, b"Specification"));
+        assert!(!named(nodes, Role::Check, b"Tracked"));
+        assert!(!named(nodes, Role::TextField, b"Priority"));
+        assert!(!named(nodes, Role::Button, b"Send amendment"));
+        assert!(!named(nodes, Role::Button, b"Discard"));
+        press_button(&mut root, b"Amend");
+        let view = fixtures::page_view(&root);
+        assert!(fixtures::find(view.tree(), Role::TextArea, b"Specification").is_some());
+        assert!(!contains(view.tree(), b"Applied"));
+    }
 }

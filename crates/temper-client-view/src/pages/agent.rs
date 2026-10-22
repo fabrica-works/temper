@@ -41,13 +41,20 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         b.open(Role::Slot);
         super::task::executor(b, task.chip.executor, words);
         text(b, Role::Paragraph, &words.say(Word::RowSpent, &[Hole::Number(task.budget.numbers.spent)]));
-        if root.pages().confirmation().is_none() {
+        if root.pages().confirmation().is_none()
+            && match &page.amending {
+                Some(open) => open.done,
+                None => true,
+            }
+        {
+            super::task::act(b, task, c::ActKind::Amend, Word::Amend, Act::Amend, words, bindings);
             super::task::act(b, task, c::ActKind::Stop, Word::Stop, Act::Stop, words, bindings);
         }
         b.close();
         b.close();
         b.open(Role::Slot);
         b.style(look::THREAD);
+        super::task::amendment(b, root, words, bindings);
         b.open(Role::Region);
         b.style(look::AGENT_BRIEF);
         b.name(&words.say(Word::TaskBrief, &[]));

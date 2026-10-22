@@ -45,6 +45,13 @@ pub fn page() -> skein_ui::Tree {
         text(&mut b, Role::Paragraph, words);
     }
     b.close();
+    b.open(Role::Slot);
+    b.style(temper_client_view::look::TASK_ACTS);
+    b.open(Role::Button);
+    b.name(b"Amend");
+    b.bind(binding());
+    b.close();
+    b.close();
     region(&mut b, b"What was asked");
     text(&mut b, Role::Paragraph, "Result · report".as_bytes());
     text(&mut b, Role::Paragraph, b"Rotate tokens safely.");
@@ -131,6 +138,10 @@ pub fn agent_task_page() -> skein_ui::Tree {
     b.open(Role::Slot);
     text(&mut b, Role::Paragraph, b"Agent");
     text(&mut b, Role::Paragraph, b"7 spent");
+    b.open(Role::Button);
+    b.name(b"Amend");
+    b.bind(binding());
+    b.close();
     b.close();
     b.close();
     b.open(Role::Slot);

@@ -824,3 +824,160 @@ fn a_message_answer_reconciles_its_conversation_words() {
         assert!(page.thread.words.rows.is_empty());
     }
 }
+
+fn amend_pages(goal: bool) -> (Pages, jig_client::Client) {
+    let mut task = offered_task(c::ActKind::Amend, Some(c::Admission::Allowed));
+    if goal {
+        task.priority = Some(PRIORITY);
+    }
+    task_pages(task)
+}
+#[test]
+fn amend_opens_only_when_the_task_offers_it_allowed() {
+    for (admission, opens) in [
+        (Some(c::Admission::Allowed), true),
+        (Some(c::Admission::Refused(c::Refusal::NotOffered)), false),
+        (Some(c::Admission::Proposed { to: c::Recipient::Party(fixtures::PARTY) }), false),
+        (None, false),
+    ] {
+        let (mut pages, client) = task_pages(offered_task(c::ActKind::Amend, admission));
+        assert!(page_act(&mut pages, &client, Act::Amend).is_empty());
+        assert_eq!(pages.task().unwrap().amending.is_some(), opens);
+    }
+}
+#[test]
+fn edited_words_send_one_amendment_with_the_base_revision_and_pages_reason() {
+    let (mut pages, client) = amend_pages(false);
+    let base = pages.task().unwrap().document(&client).unwrap().spec_revision;
+    page_act(&mut pages, &client, Act::Amend);
+    page_act(&mut pages, &client, Act::AmendWords { words: Box::from(WORDS) });
+    let asks = fixtures::acts::sent(&mut page_act(&mut pages, &client, Act::SendAmendment));
+    let [c::Ask::Amend { project, task, revision, change, reason }] = asks.as_ref() else { panic!("one amendment") };
+    assert_eq!((*project, *task, *revision), (fixtures::PROJECT, f::TASK, Some(base)));
+    assert_eq!(reason.bytes(), b"Amended from its page");
+    let mut spec = pages.task().unwrap().document(&client).unwrap().spec.whole().unwrap();
+    spec.words = fixtures::acts::text(WORDS);
+    assert_eq!(change.spec, Some(spec));
+    assert!(fixtures::acts::sent(&mut page_act(&mut pages, &client, Act::SendAmendment)).is_empty());
+}
+#[test]
+fn a_goals_priority_alone_sends_no_spec_revision() {
+    let (mut pages, client) = amend_pages(true);
+    page_act(&mut pages, &client, Act::Amend);
+    page_act(&mut pages, &client, Act::AmendPriority { priority: PRIORITY + 1 });
+    let asks = fixtures::acts::sent(&mut page_act(&mut pages, &client, Act::SendAmendment));
+    let [c::Ask::Amend { revision, change, .. }] = asks.as_ref() else { panic!("priority amendment") };
+    assert_eq!(*revision, None);
+    assert_eq!(change.tracked, Some(c::Tracking::Tracked { priority: PRIORITY + 1 }));
+}
+#[test]
+fn sending_no_change_says_so_until_an_edit_and_discard_drops_the_editor() {
+    let (mut pages, client) = amend_pages(true);
+    page_act(&mut pages, &client, Act::Amend);
+    assert!(page_act(&mut pages, &client, Act::SendAmendment).is_empty());
+    assert!(pages.task().unwrap().amending.as_ref().unwrap().no_change);
+    page_act(&mut pages, &client, Act::AmendTracked);
+    assert!(!pages.task().unwrap().amending.as_ref().unwrap().no_change);
+    assert_eq!(pages.task().unwrap().amending.as_ref().unwrap().tracking, Some(c::Tracking::Untracked));
+    page_act(&mut pages, &client, Act::DiscardAmendment);
+    assert!(pages.task().unwrap().amending.is_none());
+}
+#[test]
+fn a_cut_specification_opens_read_only_and_ignores_words() {
+    let mut task = offered_task(c::ActKind::Amend, Some(c::Admission::Allowed));
+    task.spec.specification.words.cut = true;
+    let (mut pages, client) = task_pages(task);
+    page_act(&mut pages, &client, Act::Amend);
+    page_act(&mut pages, &client, Act::AmendWords { words: Box::from(WORDS) });
+    let open = pages.task().unwrap().amending.as_ref().unwrap();
+    assert!(open.cut);
+    assert!(open.words.is_empty());
+    assert!(open.draft.amendment().is_none());
+}
+fn amend_answer(pages: &mut Pages, client: &jig_client::Client, answer: c::Answer) {
+    let key = pages.task().unwrap().pending.as_slice()[0].0;
+    pages::step(
+        pages,
+        &fixtures::env(&fixtures::limits()),
+        client,
+        pages::Event::Told {
+            told: Told::Answered { key, outcome: jig_client::Outcome::Answered(jig_client::Answered::Jig(answer)) },
+        },
+        &mut Queue::with_capacity(OUTPUTS),
+    );
+}
+#[test]
+fn a_done_amendment_stays_as_its_outcome_until_amend_again() {
+    let (mut pages, client) = amend_pages(false);
+    page_act(&mut pages, &client, Act::Amend);
+    page_act(&mut pages, &client, Act::AmendWords { words: Box::from(WORDS) });
+    page_act(&mut pages, &client, Act::SendAmendment);
+    amend_answer(&mut pages, &client, c::Answer::Done(c::Outcome::Changed));
+    let open = pages.task().unwrap().amending.as_ref().unwrap();
+    assert!(open.done);
+    assert_eq!(
+        open.outcome,
+        Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Changed))))
+    );
+    assert!(pages.task().unwrap().pending.is_empty());
+    assert!(page_act(&mut pages, &client, Act::SendAmendment).is_empty());
+    page_act(&mut pages, &client, Act::DiscardAmendment);
+    assert!(pages.task().unwrap().amending.as_ref().unwrap().done);
+    page_act(&mut pages, &client, Act::AmendWords { words: Box::from(*b"Ignored") });
+    assert_eq!(pages.task().unwrap().amending.as_ref().unwrap().words.as_ref(), WORDS);
+    page_act(&mut pages, &client, Act::Amend);
+    let open = pages.task().unwrap().amending.as_ref().unwrap();
+    assert!(!open.done);
+    assert!(open.outcome.is_none());
+    assert!(open.draft.amendment().is_none());
+}
+#[test]
+fn a_moved_refusal_keeps_the_editor_and_look_again_redrafts_the_current_document() {
+    let (mut pages, client) = amend_pages(false);
+    page_act(&mut pages, &client, Act::Amend);
+    page_act(&mut pages, &client, Act::AmendWords { words: Box::from(WORDS) });
+    page_act(&mut pages, &client, Act::SendAmendment);
+    let mut task = pages.task().unwrap().document(&client).unwrap().clone();
+    task.spec_revision.value += 1;
+    let revision = task.spec_revision;
+    let handle = pages.task().unwrap().document;
+    pages::step(
+        &mut pages,
+        &fixtures::env(&fixtures::limits()),
+        &client,
+        pages::Event::Told {
+            told: Told::Page {
+                handle,
+                page: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(Box::new(task)))),
+            },
+        },
+        &mut Queue::with_capacity(OUTPUTS),
+    );
+    amend_answer(
+        &mut pages,
+        &client,
+        c::Answer::Refused { refusal: c::Refusal::Moved { now: revision, what: c::Moved::Spec }, at: None },
+    );
+    assert!(
+        pages.task().unwrap().amending.as_ref().unwrap().draft.moved(pages.task().unwrap().document(&client).unwrap())
+    );
+    assert!(page_act(&mut pages, &client, Act::SendAmendment).is_empty());
+    page_act(&mut pages, &client, Act::AmendAgain);
+    let open = pages.task().unwrap().amending.as_ref().unwrap();
+    assert_eq!(open.draft.revision(), revision);
+    assert!(open.draft.amendment().is_none());
+    assert!(open.outcome.is_none());
+}
+#[test]
+fn amendment_words_are_bounded_and_must_be_utf8() {
+    let (mut pages, client) = amend_pages(false);
+    page_act(&mut pages, &client, Act::Amend);
+    let original = pages.task().unwrap().amending.as_ref().unwrap().words.clone();
+    let bound = usize::try_from(fixtures::limits().client.domain.text).unwrap();
+    for words in [skein_lib::bytes::zeroed(bound + 1), Box::from([0xff])] {
+        page_act(&mut pages, &client, Act::AmendWords { words });
+        assert_eq!(pages.task().unwrap().amending.as_ref().unwrap().words, original);
+    }
+    page_act(&mut pages, &client, Act::AmendWords { words: skein_lib::bytes::zeroed(bound) });
+    assert_eq!(pages.task().unwrap().amending.as_ref().unwrap().words.len(), bound);
+}

@@ -13,12 +13,13 @@ Refresh token handling
 * running · writing
 Agent
 7 spent
+[7] Amend
 Task brief:
   ## Task brief
   Rotate tokens safely.
   Asked by task 12
   Dependencies of task 34:
-    - [7] Task 17
+    - [8] Task 17
       * Completed
 ## Run 1 · live now
 Started 10-22 03:48Z

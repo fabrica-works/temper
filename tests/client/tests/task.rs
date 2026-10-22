@@ -557,3 +557,45 @@ fn a_client_closed_on_a_tasks_page_opens_at_the_inbox_again() {
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
 }
+
+#[test]
+fn a_goals_specification_amended_from_its_page_reaches_the_engine() {
+    let mut world = fixtures::world(fixtures::SEED);
+    let (goal, _) = fixtures::goal_with_held_delegate(world.front());
+    let revision = world.front().engine.task(goal).expect("goal").revisions.spec;
+    let person = world.client(fixtures::PARTY, fixtures::task_page(goal));
+    let words = b"Rotate tokens and preserve existing sessions";
+    world.person(
+        person,
+        vec![
+            Step::See { find: Find::named(Role::Button, b"Amend"), within: fixtures::WITHIN },
+            Step::Press { find: Find::named(Role::Button, b"Amend") },
+            Step::Type { find: Find::named(Role::TextArea, b"Specification"), words: words.as_slice().into() },
+            Step::Press { find: Find::named(Role::Button, b"Send amendment") },
+            Step::See {
+                find: Find::named(Role::Status, b"Applied").within(Box::new([Target::Role {
+                    role: Role::Region,
+                    name: format!("Amend task {goal}").into_bytes().into_boxed_slice(),
+                }])),
+                within: fixtures::WITHIN,
+            },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+    let task = world.front().engine.task(goal).expect("amended goal");
+    assert_eq!(task.spec.words.as_ref(), words);
+    assert!(task.revisions.spec > revision);
+    assert!(
+        world
+            .root(person)
+            .person()
+            .pages()
+            .task()
+            .expect("goal page")
+            .amending
+            .as_ref()
+            .expect("amendment outcome")
+            .done
+    );
+}

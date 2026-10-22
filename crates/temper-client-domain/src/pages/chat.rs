@@ -495,6 +495,13 @@ impl Chat {
             | Act::Cancel
             | Act::Close
             | Act::DelegateFate { .. }
+            | Act::Amend
+            | Act::AmendWords { .. }
+            | Act::AmendTracked
+            | Act::AmendPriority { .. }
+            | Act::DiscardAmendment
+            | Act::SendAmendment
+            | Act::AmendAgain
             | Act::Go { .. } => unreachable!("only conversation acts routed here"),
         }
     }

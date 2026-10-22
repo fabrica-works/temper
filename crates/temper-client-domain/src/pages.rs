@@ -51,6 +51,24 @@ pub enum Act {
         words: Box<[u8]>,
     },
     Send,
+    /// Open the task page's amendment editor (client/README.md, 5.11).
+    Amend,
+    /// Edit the amendment's specification (client/README.md, 5.11).
+    AmendWords {
+        words: Box<[u8]>,
+    },
+    /// Toggle the goal's tracking (client/README.md, 5.11).
+    AmendTracked,
+    /// Edit the goal's priority (client/README.md, 5.11).
+    AmendPriority {
+        priority: u32,
+    },
+    /// Drop the open amendment (client/README.md, 5.11).
+    DiscardAmendment,
+    /// Send the drafted amendment (client/README.md, 5.11).
+    SendAmendment,
+    /// Reread the task after a moved refusal (client/README.md, 5.11).
+    AmendAgain,
     Stop,
     /// Close the page's task: a chat's close, or a task page's cancel (client/README.md, 5.11).
     Close,
@@ -233,23 +251,7 @@ pub fn me_handle() -> Handle {
 }
 pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::Started => {
-            pages.accounts.leave(out);
-            pages.accounts_open = false;
-            pages.address = Address::Inbox { filter: crate::address::Filter::ALL };
-            pages.project = None;
-            if !pages.watching {
-                pages.watching = true;
-                out.push(Request::Client(jig_client::Event::Watch {
-                    handle: me_handle(),
-                    subject: Watchable::Jig(Subject::Me),
-                }));
-                out.push(Request::Client(jig_client::Event::Watch {
-                    handle: accounts::handle(),
-                    subject: Watchable::Jig(Subject::Accounts),
-                }));
-            }
-        }
+        Event::Started => started(pages, out),
         Event::Went { address } => went(pages, env, address, out),
         Event::AccountKey { value } => {
             if pages.accounts_open && accounts::current_me(client).is_some() {
@@ -284,6 +286,22 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
                 chat.act(env, client, act, &mut pages.serial, out);
             } else if let Some(task) = &mut pages.task {
                 task.act(env, client, act, &mut pages.serial, out);
+            }
+        }
+        Event::Act {
+            act:
+                act @ (Act::Amend
+                | Act::AmendWords { .. }
+                | Act::AmendTracked
+                | Act::AmendPriority { .. }
+                | Act::DiscardAmendment
+                | Act::SendAmendment
+                | Act::AmendAgain),
+        } => {
+            if pages.confirm.is_none()
+                && let Some(task) = &mut pages.task
+            {
+                task.amend(env, client, act, &mut pages.serial, out);
             }
         }
         Event::Act { act: Act::Seen } => {
@@ -332,6 +350,23 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
     choice::refresh(pages, client);
     redirect_chat(pages, client, out);
     pages.shown = pages.shown.checked_add(1).expect("pages shown count fits");
+}
+fn started(pages: &mut Pages, out: &mut Queue<Request>) {
+    pages.accounts.leave(out);
+    pages.accounts_open = false;
+    pages.address = Address::Inbox { filter: crate::address::Filter::ALL };
+    pages.project = None;
+    if !pages.watching {
+        pages.watching = true;
+        out.push(Request::Client(jig_client::Event::Watch {
+            handle: me_handle(),
+            subject: Watchable::Jig(Subject::Me),
+        }));
+        out.push(Request::Client(jig_client::Event::Watch {
+            handle: accounts::handle(),
+            subject: Watchable::Jig(Subject::Accounts),
+        }));
+    }
 }
 pub fn fire(_pages: &mut Pages, _env: &Env<Limits>, _client: &Client, _out: &mut Queue<Request>) {}
 #[must_use]
@@ -500,7 +535,14 @@ fn confirmation(pages: &mut Pages, env: &Env<Limits>, client: &Client, act: Act,
         act @ (Act::Decide { .. } | Act::CardWords { .. } | Act::Again { .. } | Act::Confirm) => {
             crate::acts::step(pages, env, act, out);
         }
-        Act::Choice(_)
+        Act::Amend
+        | Act::AmendWords { .. }
+        | Act::AmendTracked
+        | Act::AmendPriority { .. }
+        | Act::DiscardAmendment
+        | Act::SendAmendment
+        | Act::AmendAgain
+        | Act::Choice(_)
         | Act::Project { .. }
         | Act::Accounts(_)
         | Act::SignOut
