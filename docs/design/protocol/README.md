@@ -664,8 +664,11 @@ temper: its tiers, fakes, layout and budgets. What checks this layer:
 Each document keeps its own; these cross them:
 
 - **Names while running.** io connects to addresses, resolved at
-  startup, while a forge's address may move behind its CDN. Default: a
-  restart resolves names again; skein's DNS client would mend it.
+  startup, while a forge's address may move behind its CDN, and a name
+  that does not resolve at the start leaves its forge unreachable for
+  that run, not the start refused (setup.md, 8.3). Default: a restart
+  resolves names again; skein's DNS client, or skein-forge-connection
+  resolving at its connect, would mend it (a skein addition).
 - **HTTP/1.1 only.** Forgejo serves it; a forge that required HTTP/2
   would need skein to grow it. Default: HTTP/1.1.
 - **Generating the routing** (jig's `protocol/service.md`, section 9).

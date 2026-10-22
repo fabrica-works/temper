@@ -129,8 +129,18 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
      route, which the mapping leaves to the page, answered with the
      page's policy and `Referrer-Policy: no-referrer` (jig's
      `protocol/browser.md`, 12.1 and 12.2);
-  2. with no bundle configured, every other path not found, as
-     `README.md`, section 8 says;
+  2. with no bundle configured, a `GET` of any other path but under
+     `/bundle/` and `/robots.txt`, the printed link's route among them,
+     answers `200` temper's page for no bundle, every other request
+     not found, as `README.md`, section 8 says. The page is fixed HTML
+     in the binary, under the page's policy, with no script, style or
+     picture: the level-1 heading "temper", then "This temper serves
+     no browser client: its configuration names no bundle
+     (application.clients.bundle).", "Open the link in a terminal with
+     temper open DIRECTORY LINK." and "To serve the browser, install
+     temper with scripts/install.sh, or build a bundle with
+     scripts/bundle.sh, name its directory in application.clients.bundle,
+     and restart temper." (`../protocol/setup.md`, 8.2);
   3. a request other than `GET`: `405`;
   4. `/bundle/<digest>/…`: the bundle's files, immutable; any other path
      under `/bundle/`: not found;

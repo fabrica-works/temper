@@ -295,8 +295,8 @@ keeps (`../protocol/configuration.md`, section 2).
 | Address | Mockup | Shows | Watches and reads | Acts |
 |---|---|---|---|---|
 | `Inbox` (home) | `inbox.html` | what needs the person, across projects, filtered by project, kind and goal (its root): proposals, questions, held tasks, person tasks; then updates (results, replies) | `inbox` with its filters; the `proposal` or `task` an entry's card needs | accept, reject with a reason, answer, release, leave held, take, hand back; seen |
-| `Chats` | `chats.html`; the demo's start at the first run's first step, which `first-run.html` opens | a composer to start a chat; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats as one list, "Your chats", live and ended together, newest first, under All, Live or Closed (below), each with its number and title, its status, spend and live delegates | `tasks{query}`: requester the person, the chat label, its live group by last activity, its ended pages by when each ended; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request; choose the list's filter; more closed chats |
-| `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the demo's banner while either half holds, in any project (5.1, 5.6), and the context line only in the demo's project while the demo is answered (5.6); the conversation (below): its request, the agent's words with its calls folded, the person's words, provisional text, and its end once it has ended; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer, while the chat lives: an ended chat draws no composer and no composer's line | `task`, `activity` a page at a time, older pages while its window has room (5.4), `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
+| `Chats` | `chats.html`; the demo's start at the first run's first step, which `first-run.html` opens | a composer to start a chat, under the level-2 heading "Start a chat", its line and its chooser (5.5) above its text area "Start a chat", with the hint "temper · Enter to start · Shift+Enter for newline"; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats as one list, "Your chats", live and ended together, newest first, under All, Live or Closed (below), each with its number and title, its status, spend and live delegates | `tasks{query}`: requester the person, the chat label, its live group by last activity, its ended pages by when each ended; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request; choose the list's filter; more closed chats |
+| `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the demo's banner while either half holds, in any project (5.1, 5.6), and the context line only in the demo's project while the demo is answered (5.6); the conversation (below): its request, the agent's words with its calls folded, the person's words, provisional text, and its end once it has ended; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer, while the chat lives: its line and its chooser (5.5), its text area "Message" with the hint "Enter to send · Shift+Enter for newline", and "Send", then a message's refusal or failure, if any: a message or the chat's start accepted draws no status of its own, neither at the conversation's end nor in the composer, since the conversation shows its words, "Being sent", then "Sent" (below); while Message is not offered, its line and chooser alone; an ended chat draws no composer and no composer's line | `task`, `activity` a page at a time, older pages while its window has room (5.4), `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
 | `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree with each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel (5.11); an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), with Amend, Stop and its composer (5.11); either's own held card while it is held | `task`, `tree`, `activity` a page at a time, older pages on an agent's task's "Older"; `run` while one is live | as its document offers them (5.11): on a goal amend, stop, cancel; on an agent's task message, amend, stop; release its own held task or one of its plan |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
@@ -415,13 +415,24 @@ keeps (`../protocol/configuration.md`, section 2).
   the chat plays the cue's script; the composer's text is left as it
   was.
 - **The work's account and model.** A chat's composer names the
-  account and model its next run takes, and offers the models `me`
+  account and model its next run takes in one line, the composer's line
+  (5.5), and under it offers the models `me`
   serves for the project (jig's `client/domain/contract.md`, 5.3), each
   with its efforts, and "needs an account" beside an LLM provider no
   usable account of the person's work serves; a choice is the task's
   LLM choice, from the chat's next run (jig's `domain/tasks.md`, section
-  3). Setting a goal names its planner's model and effort, the
-  template's by default. A goal's page shows its model, effort and
+  3). The offer is the chooser, a disclosure named "Change model"
+  (skein's `ui.md`, its disclosure): a browser shows it folded to its
+  name until the person opens it, while the terminal and the fake
+  person find its content whole. In it, in order: each model's LLM
+  provider, its readiness and its button, the chosen model's efforts,
+  "Reset choice", and, on a task's composer while the draft differs
+  from its choice, "Next run if applied: MODEL" (or "…: engine
+  default") and "Apply to next run". A request in flight and its
+  outcome, and a task's wait for its account, stay outside it, after
+  the line. The demo's model stays offered as configured once another
+  account serves the work. Setting a goal names its planner's model and
+  effort, the template's by default. A goal's page shows its model, effort and
   account, changed by amending the task, and an agent's task's page
   shows them in its composer's line, as a chat's (5.11); a task waiting
   for its account
@@ -1055,10 +1066,31 @@ against the real issuer (JP13). The words for each offered source are:
 - **An account** is its provider and display name, "ChatGPT ·
   alice@example.com"; a key-only account, "OpenAI API key"; a program's,
   "Claude subscription · claude-alice".
-- **The composer's line:** "Using ChatGPT plan · MODEL · Manage usage";
-  "Using your Claude subscription, through Claude Code · MODEL"; "Using
-  your OpenAI API key · MODEL"; "Manage usage" an external link to the
-  provider's manage-usage address, where the document gives one.
+- **The composer's line** names the account and model the work's next
+  run takes, one line above the chooser (3.5), from what jig gives
+  every page: `me`, the accounts document and its readiness:
+  - *MODEL* is the draft's model (a task's LLM choice; a new chat's,
+    its template's), then " · EFFORT" where the choice names an effort.
+    Where the template names none, it is the charter's default as jig
+    resolves it at Create (`../protocol/setup.md`, 8.3): the first
+    model `me` offers for the project, in its order, whose LLM provider
+    is usable for the work's payer (`PayerReadiness`). `me`'s order,
+    the configuration's, stands in for the charter's, which jig's
+    contract does not carry (section 11).
+  - *The account* is the choice's account preference; else a task's
+    kept account (`kept_account`); else the payer's first account, in
+    the accounts' order, of MODEL's LLM provider with a usable source.
+    That source words the line, with the names the banner and the
+    accounts use (above): "Using your OpenAI API key · MODEL" for a
+    key; "Using ChatGPT plan · MODEL · Manage usage" for a signed-in
+    plan, "Manage usage" an external link to the account's
+    manage-usage address, where the document gives one; "Using your
+    Claude subscription, through Claude Code · MODEL" for a program's
+    login; for the demo's LLM provider, 5.6's line.
+  - *Unsettled:* while the accounts or the provider's readiness are
+    not yet read, "Using MODEL"; with no model settled, "Using the
+    default model"; with no account to serve MODEL, "MODEL · needs an
+    account".
 - **Each state,** with its acts:
 
   | State | Words | Acts |
@@ -1121,7 +1153,8 @@ OWNER/NAME is the demo's repository, and the cues the demo's, copied in:
   the demo's `llm.asked` cues in order and never its `llm.cued`
   (`../protocol/setup.md`, 8.4), each named by its cue's words; "The
   demo model plays these requests from a script."; then the page's
-  composer and "Your chats", as on any chats page (3.5). A chat starts with its first message, so the start has
+  composer, with no heading of its own, and "Your chats", as on any
+  chats page (3.5). A chat starts with its first message, so the start has
   no task and no number; once a suggestion or the composer starts the
   chat, its page keeps the frame (3.5).
 - **The context line,** after the banner: "PROJECT · OWNER/NAME on Demo
@@ -1131,10 +1164,12 @@ OWNER/NAME is the demo's repository, and the cues the demo's, copied in:
   role on the project is `Owner`, else "Signed in as NAME", the
   person's name as the banner shows it. OWNER/NAME is a node of its
   own, for the look.
-- **The composer's line,** while the model's half holds and the draft
-  is for the demo's project: "Using Demo model · MODEL", MODEL the
-  requested model's name, or "Default" while none is requested, in
-  place of the line naming what the next run takes.
+- **The composer's line,** for the demo's account: "Using Demo model ·
+  Default" (5.5). The demo's LLM provider serves one model, so the
+  line names no other. While the model's half holds, a new chat's line
+  is the demo's, since its model is the one with a usable account; a
+  chat the demo's model ran keeps the demo's line after it, since jig
+  records the model at Create (`../protocol/setup.md`, 8.3).
 - **Its names:** the configuration names the demo's provider, model
   and forge by identifiers ("demo"), so the phrasebook names them
   "Demo model" and "Demo forge", as the demo's scripted words do.
@@ -1929,8 +1964,9 @@ does for the client:
   to jig's component, which says whether it claims it (jig's clients'
   listener claims `/jig/...`); then to temper's forge routes,
   `/forges/...` (the routes, below); then to the browser's page and
-  bundle, when the configuration names a bundle (`browser.md`, 2.2).
-  Every other path is answered not found.
+  bundle, when the configuration names a bundle, or else to the page
+  for no bundle (`browser.md`, 2.2). Every other path is answered not
+  found.
 - **The routes,** temper's beside jig's: a GitHub connect's browser
   steps, `GET /forges/N/github/manifest`, `redirect` and `setup`, N the
   forge's number, each the setup's host's run for the state its query
@@ -1955,8 +1991,10 @@ does for the client:
   spends nothing, and the mapping leaves it to the application's page
   (jig's `protocol/browser.md`, section 11). With a bundle, temper's
   server answers it with the page, which signs the browser in by it
-  (`browser.md`, 2.4); with none, not found, with `Referrer-Policy:
-  no-referrer`, and the link is `temper open`'s alone (6.1).
+  (`browser.md`, 2.4); with none, the page for no bundle, which says
+  so and names `temper open` (`browser.md`, 2.2), with
+  `Referrer-Policy: no-referrer`, and the link is `temper open`'s alone
+  (6.1).
 - **jig's example guards, as they are** (jig's `protocol/browser.md`,
   12.2), the Host allow-list holding the listener's own address. The
   terminal sends its credential as a bearer token; the cookie is the
@@ -2383,6 +2421,15 @@ own tests:
 - **The composer's placeholder** ("Try a suggested request…", the
   first-run mockup's earlier draft): skein-ui's text area has none, and adding
   one is a change to skein's API and a repin. Default: not drawn.
+- **A new chat's default model on its composer's line** (5.5): jig
+  resolves a template's default at Create from its charter's models, in
+  the charter's order, and its contract gives the client no charter's
+  order, so the line takes `me`'s, which is the configuration's. A
+  charter that orders its models otherwise makes the line name another
+  model than the chat then runs. jig could give, in `me`, each
+  template's default as it would resolve it for the person, or each
+  charter's order (a jig addition, past story-b's M2). Default: `me`'s
+  order, which the owned example's charters keep.
 - **A turn's time** ("21:01" in the mockups, "Just now" in the
   first-run mockup's earlier draft): the view keeps no clock to say it
   against. Default: not drawn.

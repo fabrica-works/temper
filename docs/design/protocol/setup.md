@@ -1158,7 +1158,13 @@ directory is empty (7.1).
     login is never a reason the first run does not start;
   - *the bundle,* `<the binary's directory>/../share/temper/bundle` when
     it holds `index.html`: `clients.bundle`; else `null`, and init says
-    the browser is not served;
+    the browser is not served. That directory is where
+    `scripts/install.sh PREFIX` puts the bundle, beside the binary it
+    installs at `PREFIX/bin/temper`: a temper installed so starts its
+    first run with the browser. Without one, the link still signs in a
+    terminal (`temper open`), and a browser that opens it is answered
+    the clients' listener's page for no bundle (`../client/browser.md`,
+    2.2), never a bare `404`;
   - *the clients' listener's port:* 8367, when a socket binds
     `127.0.0.1:8367`, else the port the kernel assigns to a bind of port
     0; the port written fixed, as a GitHub forge requires
@@ -1224,7 +1230,14 @@ defaults for a person's real work are open (section 16).
     it up from the client (`../draft/first-run.md`, 3.8; 6.5).
 
   GitHub and the owned Forgejo are in the document from the first run,
-  so that connecting either from the client needs no restart.
+  so that connecting either from the client needs no restart. A start
+  resolves each forge's `api` name once (README.md, section 14); a name
+  that does not resolve, GitHub's on a machine without DNS, refuses no
+  start: that forge starts not connected, and each connect of it,
+  restored or asked, is answered unreachable, naming the host, until a
+  start that resolves it. The other forges start as they would. A
+  forge so held never hands skein's connection an address of the
+  kernel's: no placeholder reaches a socket.
 - **Two `setup` entries:**
   - forge 1's, fake, in `demo/forge`, its `git` the demo's link (8.2),
     its bot `temper`, its `owner` `demo`, its one repository `widget`,
@@ -1270,7 +1283,11 @@ defaults for a person's real work are open (section 16).
   its payer (jig's `jig-domain-core` `llm.rs`), so on a first run, whose
   one account is the demo's, a chat and the coding agent of the change
   it delegates both run on the demo model, with no pick, until the
-  person adds an account.
+  person adds an account. jig resolves that default once, at the task's
+  Create, and records it: a chat started before the account stays on
+  the demo model, and a chat started after takes the charter's first,
+  `gpt-6-luna` once an OpenAI key serves it. The composer's line says
+  which, before the start (`../client/README.md`, 5.5).
 - **One worker,** in the process, its `root` `workspaces` in the data
   directory, its `git` the machine's, or null (8.2); the deployment's directory
   `deployment` in the data directory; the clients' listener
@@ -1493,7 +1510,9 @@ them as it does any Forgejo.
     same mapping as an owned forge's (5.3); the listener only when the
     forge names its `webhook_secret`, else none and no hook, since a
     secret `Adopt` drew would be a record the forge's connection, still
-    built from its files, never reads;
+    built from its files, never reads. One side alone never comes: the
+    configuration's checks refuse a webhooks' listener without a
+    secret, and a secret without the listener;
   - *its answers:* the admin's token is the handover, the entry's
     `admin_token`, 40 lowercase hexadecimal digits, read once at the
     start, refused otherwise, naming the file; the setup host holds it
