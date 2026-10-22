@@ -345,9 +345,11 @@ input it cannot read.
   and healthy − planted. The judge confirms that each line of the first
   is the token's reach or the composer's move, and that the second is
   empty or explained. The first holds more than the planted six: the
-  token also draws the banner's bottom border in every other scene and
-  the task's cards' borders, and the moved composer moves the
-  conversation too (at temper 1e1ca838, 6 + 26 + 1 = 33). Its pictures
+  token also draws the banner's bottom border in every other scene, the
+  chatbar's, and the cards' borders of the chats, the inbox and the
+  task, and the moved composer moves the chatbar and the conversation
+  too (at temper e35fcec58, 53: 46 border colours and 7 lines of the
+  composer's move). Its pictures
   differ by design, so it has no unjudged list: the blind judge (below)
   judges its chat.
 - **Without `planted`, the unjudged list.** A judged run's failing
