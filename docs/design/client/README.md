@@ -1109,9 +1109,13 @@ or difference of their amounts (jig's `client/domain/contract.md`,
   mockup's tabs, and its cards for findings (a gap,
   `mockups/README.md`), notes, history, placement and changes, are not
   drawn.
+- **The header** begins "Goal · priority N", then the task's number,
+  its executor and its project, as before; its state follows the
+  title (below), then who asked. The deadline is the budget's card's.
 - **The result it gives:** "What was asked" names it after its heading,
-  from the task's result contract, as the mockup's tag: "Result:
-  report", "Result: change", "Result: verdict" or "Result: approval".
+  from the task's result contract, as the mockup's tag: "Result ·
+  report", "Result · change", "Result · verdict" or "Result ·
+  approval".
 - **Its result,** once the goal has ended: a region "Result" after
   "What was asked", holding its state and its words as a delegation's
   card says them (5.7), from the same function: "Completed",
@@ -1119,31 +1123,47 @@ or difference of their amounts (jig's `client/domain/contract.md`,
   landed change's merge commit, or a failed task's reason. A goal that
   has not ended has no such region. The page reads an ended goal's
   document once more when its watch ends, so its result stays
-  readable.
-- **A task's state,** in the header and on each plan row, from its
-  chip's owner phase and details (jig's `client/domain/objects.md`,
-  section 3):
-  - waiting on its dependencies (the phase's `dependencies`, those not
-    yet ended): on one, "Waiting for task M"; on several, "Waiting for
-    N tasks", N those listed; and when the list was cut (`more`),
-    "Waiting for more than N tasks";
-  - waiting on no dependency, on its holdings (`holds`): "Waiting for
-    its resources";
+  readable. The mockup ends no goal: this region is temper's.
+- **A task's state,** in the mockup's words, in lower case:
+  - in the header, from what the engine computes the task waits on
+    (`Task.waits_on`): on its dependencies, "waiting on task M" for
+    one, "waiting on N tasks" for several, N their supplied `count`;
+    on its delegates, "waiting on N delegates" ("1 delegate"), N its
+    chip's `live_delegates`; on a party, "waiting on an answer from
+    you" when the person is that party or holds that role, "waiting
+    on an answer from person N" or "from role N" otherwise; on news,
+    "waiting on news". Waiting on nothing, it says what a row would;
+  - on a plan row, which has no `waits_on`, from its chip's owner phase
+    (jig's `client/domain/objects.md`, section 3): waiting on its
+    dependencies (the phase's `dependencies`, those not yet ended),
+    "waiting on task M" on one, "waiting on N tasks" on several, N
+    those listed, and "waiting on more than N tasks" when the list was
+    cut (`more`); waiting on no dependency but on its holdings
+    (`holds`), "waiting on its resources";
+  - running, in both, with the work its owner observed
+    (`observation`): "running · writing", or "running · a tool ·
+    NAME", the tool's name as supplied; "running" alone when no
+    observation is supplied, which jig allows, or for any other work;
   - ended, with its owner's ending: "Completed", "Failed" or
-    "Cancelled", jig's words for a done, a failed and a cancelled
-    phase;
+    "Cancelled", as 5.7 words them;
   - otherwise, jig's word for its phase.
 
   Each carries its phase's status token: a waiting state and a
-  cancelled one are quiet, a completed one done, a failed one held.
+  cancelled one are quiet, a running one active, a completed one done,
+  a failed one held.
+- **The plan:** the goal is not a row of it. Its delegates, the owner
+  tree's root's children, are the plan's roots; the goal's state is
+  the header's, and its numbers the budget's card's.
 - **A plan row's cells:** the "Task N" link and the task's title; its
-  executor; its state; its spend, "N spent", the row's supplied
-  `spent`: what the task and the ended tasks it funded have spent, in
-  the deployment's unit, a whole number. The goal's own row, the
-  tree's root, carries no spend, and shows none: its numbers are its
-  budget's. A procedure's part follows on a line of its own, as
-  before. At phone width the name is on a first line, and the
-  executor, state and spend on a second; no cell is hidden.
+  executor; its state; its spend, "N spent", what the task spent
+  itself (its chip's `budget.spent`; not the row's `spent`, which adds
+  what the ended tasks it funded spent), in the deployment's unit, a
+  whole number. The cells have no heads, since tree items are not a
+  grid's cells; the mockup heads its columns "Task", "Kind", "Model",
+  "On", "State" and "Spent" (a default the user may change, section
+  11). A procedure's part follows on a line of its own, as before. At
+  phone width the name is on a first line, and the executor, state
+  and spend on a second; no cell is hidden.
 - **The dependency line:** under a row whose task has dependencies
   (its `dependencies`), a list named "Dependencies of task N", one item
   per dependency in the supplied order, keyed by its task as an object,
@@ -1151,31 +1171,44 @@ or difference of their amounts (jig's `client/domain/contract.md`,
   above, an ended one's supplied status ("Completed", "Failed",
   "Cancelled"), and none when none was supplied. When the row's list
   was cut (its `cut`), a last item, with no key: "More dependencies
-  not shown." The browser shows the list's name before its items. The
-  tree's root has no dependency line: its state is the header's. In a
+  not shown." The browser shows the list's name before its items. In a
   row's tree item come the row, its dependency line, its held task's
-  card (3.6), then its children. An added dependency's facts
-  (`Dependency.added`) are not drawn yet (section 11).
+  card (3.6), then its children. The mockup's worlds declare no
+  dependency, so it draws none: this line is temper's, for B2. An
+  added dependency's facts (`Dependency.added`) are not drawn yet
+  (section 11).
 - **Budget and authority,** a region after "Latest activity", as the
-  mockup's side card: "L left of B", what the budget has left of
-  itself; then each fact as a term and its description:
-  - "Spent": what the goal spent itself;
+  mockup's side card: "S spent · L left of B", what the goal spent
+  itself and what its budget has left of itself, both as supplied;
+  then each fact as a term and its description:
   - "Delegates spent": what the ended tasks it funded spent;
   - "Reserved for delegates": what it holds for the live tasks it
     funds;
   - "Funded by": a task, as its "Task N" link; a pool, "Your pool"
-    when it is the person's, "Person N's pool" otherwise; a recurring
-    task's, "Task N's recurring budget"; a project's, "Project N's
-    budget";
-  - from its authority: "May spend", what its subtree may spend; "May
-    delegate", "Up to N tasks, M deep"; "Models", "All", their names,
-    or "None", and no such term when the authority leaves them out.
+    when it is the person's, "Person N's pool" otherwise, since a pool
+    names its person by number where the mockup names them; a
+    recurring task's, "Task N's recurring budget"; a project's,
+    "Project N's budget";
+  - "Deadline": its time, as the header said it ("Due …"), or "None"
+    (a default the user may change, section 11);
+  - from its authority, which the mockup's card leaves out: "May
+    spend", what its subtree may spend; "May delegate", "Up to N
+    tasks, M deep"; "Models", "All", their names, or "None", and no
+    such term when the authority leaves them out.
 
   A cut authority (its `cut`) ends the card with "Some of its
-  authority is not shown." The deadline is the header's ("Due …"). The
-  mockup's bar is not drawn: the words say what it would.
+  authority is not shown." The mockup's bar is not drawn: the words
+  say what it would.
+- **Not drawn,** besides the mockup's tabs and cards above: what is
+  not supplied, the mockup's charter, model, host, account and pool
+  names; what needs the clock the view does not keep, "made
+  yesterday" (section 11); ended delegates as rows, with "Live only"
+  and the plan's counts, since the owner tree holds live tasks only
+  (section 11); and, as defaults the user may change (section 11),
+  "Wakes on", "Input", "Writes", "Run N" and the pool's line.
 - **Where it is decided:** pure functions of the domain read the
-  documents: a task's state from its chip (`pages::task::state`), a
+  documents: a task's state from its document's `waits_on` and chip
+  in the header and from its chip on a row (`pages::task::state`), a
   dependency's from its link, and the result's from the delegation
   card's (`pages::delegation::facts`). The view lays them out with the
   phrasebook's words. The page keeps no state beyond what it held.
@@ -1656,8 +1689,9 @@ own tests:
   failed call's and another tool's none, the newest watched up to
   `reads`, each unwatched as it leaves, and a card's facts from a
   task's document in each state; a goal's, 5.8: a task's state from
-  its chip in each waiting shape and each ending, and a dependency's
-  from each kind of link); the forge side's steps
+  what it waits on and from its chip, in each waiting shape, running
+  with and without an observation, and in each ending, and a
+  dependency's from each kind of link); the forge side's steps
   (the form's rules, its request, every outcome, the version check; the
   picker's pages by number, "Next" asking the shown page's number plus
   one, a full last page's "Next" and a page past the last answering no
@@ -1670,9 +1704,9 @@ own tests:
   person's queries; a delegation's card in each state, in place of its
   call's summaries and its heard result; a goal's page, 5.8: its
   parts in order, the result it gives of each kind, its result in each
-  state and none before it ends, a row's state, spend and dependency
-  line, cut and not, none on the root, and its budget's card with each
-  funder, with and without models, cut and not; the forge's words for every
+  state and none before it ends, no row for the goal, a row's state,
+  own spend and dependency line, cut and not, and its budget's card
+  with each funder, with a deadline and none, with and without models, cut and not; the forge's words for every
   path shape and every kind, the form and its picker in each state,
   every outcome, the forges' page with a forge in each state of
   `forge.md`, 5.4);
@@ -1913,11 +1947,26 @@ own tests:
 - **An ended delegate on a goal's plan** (5.8): the owner tree holds
   live tasks only, so a delegate leaves the plan as it ends, and is
   read only in its dependants' lines ("Completed") and in its funder's
-  "Delegates spent"; the mockup's done rows have no document to come
-  from. Default: as supplied; a done row waits for a supplied source.
+  "Delegates spent"; the mockup's done rows, its "Live only" and its
+  counts ("3 running, 3 in queues, 7 ended") have no document to come
+  from. Default: as supplied; they wait for a supplied source, such as
+  a task query's phases.
 - **An added dependency** on a goal's plan (5.8): `Dependency.added`
   says when and by whom a dependency was added. Default: a mark in its
   item of the dependency line, which keeps its shape.
 - **The rest of a goal's authority:** its tools, grants, executor kinds
   and note scopes, which jig supplies as codes and patterns, not
   words. Default: not on the goal's page.
+- **A goal's page against its mockup** (5.8), each a default the user
+  may change:
+  - the deadline: the budget's card's "Deadline", "None" when it has
+    none, and not the header's;
+  - the plan's columns: no heads, the spend "N spent" in its row;
+  - "Wakes on" under "What was asked": supplied (`Task.wake`), not
+    drawn yet; later, in jig's words;
+  - "Input", "Writes", "Run N", the pool's line under the plan and the
+    plan's counts: not drawn; the first two and the pool's name are
+    not supplied;
+  - a delegate's dependencies on its own page, which the mockup draws
+    on no agent's page: the dependency line under its brief, for B2,
+    the agent's page's section once it has one.
