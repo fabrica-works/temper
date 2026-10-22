@@ -233,6 +233,15 @@ fn root_at_with_demo(
     project_name: &[u8],
     demo: Option<(u32, bool)>,
 ) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>) {
+    root_at_with_activity(address, limits, project_name, demo, None)
+}
+fn root_at_with_activity(
+    address: temper_client_domain::Address,
+    limits: &Limits,
+    project_name: &[u8],
+    demo: Option<(u32, bool)>,
+    activity: Option<c::ActivityPage>,
+) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>) {
     use jig_client::contract::{Delivery, Subject, WatchEvent};
     use temper_client_domain::{Event, Request};
     let env = Env { now: Time::ZERO, wall: NOW, limits: *limits };
@@ -241,27 +250,38 @@ fn root_at_with_demo(
     temper_client_domain::step(
         &mut root,
         &env,
-        Event::Start { address, kept: List::with_capacity(0), with: None },
+        Event::Client { event: jig_client::Event::StartUnlinked { kept: List::with_capacity(0) } },
         &mut out,
     );
-    for event in [
-        jig_client::Event::StartUnlinked { kept: List::with_capacity(0) },
-        jig_client::Event::SignIn { with: jig_client::With::Transport },
-        jig_client::Event::Up { up: jig_client::Up::Served { served: true, versions: None } },
-    ] {
-        temper_client_domain::step(&mut root, &env, Event::Client { event }, &mut out);
-    }
+    // Sign in before opening the page's one-shot activity read.
+    temper_client_domain::step(
+        &mut root,
+        &env,
+        Event::Start { address, kept: List::with_capacity(0), with: Some(jig_client::With::Transport) },
+        &mut out,
+    );
+    temper_client_domain::step(
+        &mut root,
+        &env,
+        Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Served { served: true, versions: None } } },
+        &mut out,
+    );
     let mut watch = None;
     let mut inbox_watch = None;
     let mut tree_watch = None;
     let mut account_watch = None;
+    let mut activity_read = None;
     for _ in 0..out.len() {
+        let request = out.pop();
+        if let Some(read) = activity_token(request.as_ref()) {
+            activity_read = Some(read);
+        }
         if let Some(Request::Client {
             request:
                 jig_client::Request::Down {
                     down: jig_client::Down::Open { watch: token, subject: jig_client::Watchable::Jig(subject) },
                 },
-        }) = out.pop()
+        }) = request
         {
             if subject == Subject::Me {
                 watch = Some(token);
@@ -287,6 +307,7 @@ fn root_at_with_demo(
         },
         &mut out,
     );
+    answer_activity(&mut root, &env, activity_read, activity, &mut out);
     if let Some((project, model)) = demo {
         let mut read = None;
         while let Some(request) = out.pop() {
@@ -309,6 +330,51 @@ fn root_at_with_demo(
         );
     }
     (root, watch.expect("me opened"), inbox_watch, tree_watch, account_watch)
+}
+fn activity_token(request: Option<&temper_client_domain::Request>) -> Option<Token> {
+    if let Some(temper_client_domain::Request::Client {
+        request:
+            jig_client::Request::Down {
+                down: jig_client::Down::Read { read, what: jig_client::Readable::Jig(c::Read::Activity { .. }) },
+            },
+    }) = request
+    {
+        Some(*read)
+    } else {
+        None
+    }
+}
+fn answer_activity(
+    root: &mut temper_client_domain::Domain,
+    env: &Env<Limits>,
+    mut read: Option<Token>,
+    activity: Option<c::ActivityPage>,
+    out: &mut Queue<temper_client_domain::Request>,
+) {
+    let Some(page) = activity else { return };
+    // Signing in can replace a page's initial read. Answer its current one.
+    for _ in 0..out.len() {
+        let request = out.pop();
+        if let Some(token) = activity_token(request.as_ref()) {
+            read = Some(token);
+        }
+        if let Some(request) = request {
+            out.push(request);
+        }
+    }
+    temper_client_domain::step(
+        root,
+        env,
+        temper_client_domain::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::ReadDone {
+                    read: read.expect("activity read"),
+                    result: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(Box::new(page)))),
+                },
+            },
+        },
+        out,
+    );
 }
 pub fn adoption_root() -> temper_client_domain::Domain {
     adoption_page(PROJECT, b"shop")
@@ -706,9 +772,26 @@ pub mod chat {
         root
     }
     pub fn proposal_root() -> temper_client_domain::Domain {
+        proposal_root_with_activity(None)
+    }
+    pub fn proposal_root_with_activity(activity: Option<c::ActivityPage>) -> temper_client_domain::Domain {
+        proposal_root_with_document(activity, None)
+    }
+    pub fn proposal_root_with_document(
+        activity: Option<c::ActivityPage>,
+        document: Option<c::ReadValue>,
+    ) -> temper_client_domain::Domain {
         use temper_client_domain::Event;
-        let limits = fixtures::domain_limits();
-        let (mut root, _, watch) = fixtures::root_at(temper_client_domain::Address::Chat { task: TASK }, &limits);
+        let mut limits = fixtures::domain_limits();
+        limits.client.domain.rows = 4;
+        limits.client.domain.turn_text = 512;
+        let (mut root, _, watch, _, _) = fixtures::root_at_with_activity(
+            temper_client_domain::Address::Chat { task: TASK },
+            &limits,
+            b"Shop",
+            None,
+            activity,
+        );
         let mut task = fixtures::task::document();
         task.chip.task = TASK;
         task.proposals = List::with_capacity(SINGLE_TEMPLATE);
@@ -731,16 +814,19 @@ pub mod chat {
         for act in [c::ActKind::Accept, c::ActKind::Reject] {
             acts.push(c::Offered { act, admission: c::Admission::Allowed, effect: None }).expect("offer");
         }
-        let page = c::ReadValue::OwnerProposal(Box::new(c::OwnerProposal {
-            key: PROPOSAL,
-            project: fixtures::PROJECT,
-            reason: c::DocumentText::complete(c::Text::new(Box::from(*b"Make a goal"), TEXT).expect("reason")),
-            action: c::OwnerProposalAction::Batch(List::with_capacity(EMPTY_BATCH)),
-            as_holder: true,
-            waiting: c::OwnerProposalWaiting { holder: c::OwnerHistoryHolder::Person(PARTY), since: Wall::EPOCH },
-            funding: List::with_capacity(EMPTY_BATCH),
-            acts,
-        }));
+        let page = match document {
+            Some(page) => page,
+            None => c::ReadValue::OwnerProposal(Box::new(c::OwnerProposal {
+                key: PROPOSAL,
+                project: fixtures::PROJECT,
+                reason: c::DocumentText::complete(c::Text::new(Box::from(*b"Make a goal"), TEXT).expect("reason")),
+                action: c::OwnerProposalAction::Batch(List::with_capacity(EMPTY_BATCH)),
+                as_holder: true,
+                waiting: c::OwnerProposalWaiting { holder: c::OwnerHistoryHolder::Person(PARTY), since: Wall::EPOCH },
+                funding: List::with_capacity(EMPTY_BATCH),
+                acts,
+            })),
+        };
         let mut answered = false;
         while let Some(request) = out.pop() {
             if let temper_client_domain::Request::Client {

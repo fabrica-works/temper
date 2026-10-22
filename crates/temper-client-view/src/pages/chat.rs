@@ -93,25 +93,23 @@ pub(crate) fn main(
             words,
             (rows, text_limit),
             person,
-            (Drawn::Chat { request: Some(&task.spec), delegations: Some((chat, root.client())) }, Some(times)),
+            (Drawn::ChatPage { request: Some(&task.spec), root }, Some(times)),
             bindings,
         );
-        if !chat.cards.is_empty() || !chat.departures().is_empty() {
+        let mut unanchored = false;
+        for card in &chat.cards {
+            if proposal_anchor(chat, card.object, rows).is_none() {
+                unanchored = true;
+            }
+        }
+        if unanchored || !chat.departures().is_empty() {
             b.open(Role::List);
             b.style(look::CARDS);
         }
         for card in &chat.cards {
-            b.open(Role::Item);
-            b.name(&super::inbox::card_name(root, card.object, Word::Proposal, words));
-            b.style(look::CARD);
-            b.key(super::inbox::card_key(card.object));
-            if let Some(page) = &card.page
-                && let Some(since) = super::inbox::waiting_since(page)
-            {
-                proposal_wait(b, words, times, since);
+            if proposal_anchor(chat, card.object, rows).is_none() {
+                proposal_card(b, root, card, words, bindings, (rows, Some(times)), Role::Item);
             }
-            crate::confirm::card(b, root, card, words, bindings, rows);
-            b.close();
         }
         for object in chat.departures() {
             b.open(Role::Item);
@@ -120,7 +118,7 @@ pub(crate) fn main(
             words.status(b, P::CardLeft, &[]);
             b.close();
         }
-        if !chat.cards.is_empty() || !chat.departures().is_empty() {
+        if unanchored || !chat.departures().is_empty() {
             b.close();
         }
         if let Some(result) = &task.result {
@@ -226,6 +224,55 @@ pub(crate) fn context(b: &mut Builder, root: &Domain, project: u32, words: &Word
     };
     text(b, Role::Paragraph, &signed);
     b.close();
+}
+
+// A proposal keeps one keyed card at its first visible call, or in the tail.
+fn proposal_card(
+    b: &mut Builder,
+    root: &Domain,
+    card: &temper_client_domain::pages::inbox::Card,
+    words: &Words,
+    bindings: &mut Bindings,
+    (rows, times): (u32, Option<&mut Times>),
+    role: Role,
+) {
+    b.open(role);
+    b.name(&super::inbox::card_name(root, card.object, Word::Proposal, words));
+    b.style(look::CARD);
+    b.style(look::KIND_PROPOSAL);
+    if role == Role::Item {
+        b.key(super::inbox::card_key(card.object));
+    }
+    if let Some(page) = &card.page
+        && let Some(since) = super::inbox::waiting_since(page)
+        && let Some(times) = times
+    {
+        proposal_wait(b, words, times, since);
+    }
+    crate::confirm::card(b, root, card, words, bindings, rows);
+    b.close();
+}
+
+// Only assistant calls inside the displayed row bounds can stand for a card.
+fn proposal_anchor(chat: &Chat, object: c::ObjectKey, rows: u32) -> Option<(c::TurnName, usize, usize)> {
+    let bound = usize::try_from(rows).expect("row bound fits");
+    for line in chat.thread.lines().into_boxed() {
+        if let Line::Turn { name, turn, .. } = line {
+            for (message_at, message) in turn.messages.iter().take(bound).enumerate() {
+                if message.speaker != c::Speaker::Assistant {
+                    continue;
+                }
+                for (block_at, block) in message.blocks.iter().take(bound).enumerate() {
+                    if let c::Block::Call(call) = block
+                        && call.objects.as_slice().contains(&object)
+                    {
+                        return Some((name, message_at, block_at));
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 // A proposal's wait, muted beside its first line as the inbox's.
@@ -396,8 +443,36 @@ fn composer(
 }
 /// The chat projects a request and assistant messages; an agent keeps every work line.
 pub(crate) enum Drawn<'a> {
-    Chat { request: Option<&'a c::SpecificationDocument>, delegations: Option<(&'a Chat, &'a jig_client::Client)> },
+    ChatPage {
+        request: Option<&'a c::SpecificationDocument>,
+        root: &'a Domain,
+    },
+    #[cfg(test)]
+    Chat {
+        request: Option<&'a c::SpecificationDocument>,
+        delegations: Option<(&'a Chat, &'a jig_client::Client)>,
+    },
     Lines,
+}
+
+struct Drawing<'a> {
+    projected: bool,
+    request: Option<&'a c::SpecificationDocument>,
+    delegations: Option<(&'a Chat, &'a jig_client::Client)>,
+    proposals: Option<&'a Domain>,
+}
+fn drawing(drawn: Drawn<'_>) -> Drawing<'_> {
+    match drawn {
+        Drawn::ChatPage { request, root } => Drawing {
+            projected: true,
+            request,
+            delegations: Some((root.pages().chat().expect("chat page"), root.client())),
+            proposals: Some(root),
+        },
+        #[cfg(test)]
+        Drawn::Chat { request, delegations } => Drawing { projected: true, request, delegations, proposals: None },
+        Drawn::Lines => Drawing { projected: false, request: None, delegations: None, proposals: None },
+    }
 }
 
 pub(crate) fn conversation(
@@ -423,10 +498,7 @@ pub(crate) fn conversation_with_times(
     bindings: &mut Bindings,
 ) {
     let (rows, text_limit) = limits;
-    let (projected, request, delegations) = match drawn {
-        Drawn::Chat { request, delegations } => (true, request, delegations),
-        Drawn::Lines => (false, None, None),
-    };
+    let Drawing { projected, request, delegations, proposals } = drawing(drawn);
     let bound = match delegations {
         Some((chat, _)) => chat.delegations.capacity(),
         None => 0,
@@ -461,14 +533,21 @@ pub(crate) fn conversation_with_times(
                     person_lines(b, by, message, state, speakers.person, words, clock.as_deref());
                 }
             }
-            Line::Turn { turn, .. } => {
+            Line::Turn { name, turn, .. } => {
                 if projected {
                     committed(
                         b,
                         turn,
                         words,
                         (rows, clock.as_deref()),
-                        delegations,
+                        Committed {
+                            delegations,
+                            proposals: match proposals {
+                                Some(root) => Some((root, name)),
+                                None => None,
+                            },
+                            times: times.as_deref_mut(),
+                        },
                         (&mut tasks, &mut shown),
                         bindings,
                     );
@@ -790,17 +869,22 @@ fn person_lines(
 
 // Decoded turns already share the receiving turn_text budget; both drawings
 // retain their text whole, independently of provisional/field text.
+struct Committed<'a> {
+    delegations: Option<(&'a Chat, &'a jig_client::Client)>,
+    proposals: Option<(&'a Domain, c::TurnName)>,
+    times: Option<&'a mut Times>,
+}
 fn committed(
     b: &mut Builder,
     turn: &c::Turn,
     words: &Words,
     (rows, clock): (u32, Option<&[u8]>),
-    delegations: Option<(&Chat, &jig_client::Client)>,
+    Committed { delegations, proposals, mut times }: Committed<'_>,
     lists: (&mut List<u64>, &mut List<u64>),
     bindings: &mut Bindings,
 ) {
     let (tasks, shown) = lists;
-    for message in prefix(b, turn.messages.as_slice(), rows, words) {
+    for (message_at, message) in prefix(b, turn.messages.as_slice(), rows, words).iter().enumerate() {
         let blocks = prefix(b, message.blocks.as_slice(), rows, words);
         if message.speaker == c::Speaker::Assistant {
             let mut has_content = false;
@@ -839,11 +923,29 @@ fn committed(
                 b.close();
                 b.close();
             }
-            for block in blocks {
+            for (block_at, block) in blocks.iter().enumerate() {
                 if let c::Block::Call(call) = block {
                     tasks.clear();
                     delegation::delegated(call, tasks);
                     cards(b, tasks, delegations, shown, words, bindings);
+                    if let Some((root, name)) = proposals {
+                        let chat = root.pages().chat().expect("chat page");
+                        for card in &chat.cards {
+                            if call.objects.as_slice().contains(&card.object)
+                                && proposal_anchor(chat, card.object, rows) == Some((name, message_at, block_at))
+                            {
+                                proposal_card(
+                                    b,
+                                    root,
+                                    card,
+                                    words,
+                                    bindings,
+                                    (rows, times.as_deref_mut()),
+                                    Role::Region,
+                                );
+                            }
+                        }
+                    }
                 }
             }
             folded_calls(b, blocks, tasks, delegations, words);
@@ -966,6 +1068,13 @@ fn committed_lines(
 
 fn other_call(block: &c::Block, tasks: &mut List<u64>, delegations: Option<(&Chat, &jig_client::Client)>) -> bool {
     let c::Block::Call(call) = block else { return false };
+    if let Some((chat, _)) = delegations {
+        for card in &chat.cards {
+            if call.objects.as_slice().contains(&card.object) {
+                return false;
+            }
+        }
+    }
     tasks.clear();
     delegation::delegated(call, tasks);
     !carded(tasks, delegations)

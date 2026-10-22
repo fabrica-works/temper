@@ -181,7 +181,7 @@ fn the_close_confirmation_says_the_cancellations_facts() {
 }
 
 #[test]
-fn a_proposal_waiting_in_the_chat_is_shown_after_its_conversation() {
+fn an_unanchored_proposal_is_shown_once_after_its_conversation() {
     let root = proposal_root();
     let mut view = fixtures::view();
     let tree = fixtures::build(&mut view, &root);
@@ -195,6 +195,7 @@ fn a_proposal_waiting_in_the_chat_is_shown_after_its_conversation() {
             accept = Some(index);
         }
     }
+    assert_eq!(named_count(tree, Role::Button, b"Accept"), 1);
     assert!(
         accept.expect("proposal's accept act") >= conversation_end.expect("conversation"),
         "card after conversation"
@@ -273,7 +274,8 @@ fn a_chats_card_carries_the_card_token() {
     let cards = fixtures::styles(view.tree(), Role::Item);
     assert!(!cards.is_empty());
     for card in &cards {
-        assert_eq!(card.as_ref(), [crate::look::CARD]);
+        assert!(card.as_ref().contains(&crate::look::CARD));
+        assert!(card.as_ref().contains(&crate::look::KIND_PROPOSAL));
     }
 }
 #[test]
@@ -292,7 +294,7 @@ fn style_position(nodes: &[skein_ui::Node], token: skein_ui::Style) -> Option<us
     }
     None
 }
-fn named_position(nodes: &[skein_ui::Node], role: Role, name: Option<&[u8]>) -> Option<usize> {
+pub(super) fn named_position(nodes: &[skein_ui::Node], role: Role, name: Option<&[u8]>) -> Option<usize> {
     for (index, node) in nodes.iter().enumerate() {
         if node.role == role && (name.is_none() || node.name.as_deref() == name) {
             return Some(index);
@@ -1381,4 +1383,87 @@ fn the_chatbar_draws_the_supplied_budget_including_zero() {
         let view = fixtures::page_view(&root);
         assert!(fixtures::find(view.tree(), Role::Paragraph, phrase).is_some());
     }
+}
+
+#[test]
+fn a_proposal_stands_once_at_its_first_call_after_the_messages_text() {
+    use fixtures::first_run as run;
+    let object = c::ObjectKey::Proposal(fixtures::chat::PROPOSAL);
+    let mut proposal = run::call(3, b"propose", b"{}", None);
+    let c::Block::Call(call) = &mut proposal else { panic!("call") };
+    call.objects = List::with_capacity(1);
+    call.objects.push(object).unwrap();
+    let mut message = run::message(
+        c::Speaker::Assistant,
+        &[
+            c::Block::Text(run::text(b"A proposal follows")),
+            run::call(1, b"read", b"{}", None),
+            run::call(2, b"read", b"{}", None),
+        ],
+    );
+    let mut blocks = List::with_capacity(4);
+    for block in &message.blocks {
+        blocks.push(block.clone()).unwrap();
+    }
+    blocks.push(proposal.clone()).unwrap();
+    message.blocks = blocks;
+    let mut rows = List::with_capacity(2);
+    let mut first = run::turn(1, ATTEMPT, 1, &[], 512);
+    let c::Activity::Turn { turn: c::TurnRead::Decoded(turn), .. } = &mut first.event else { panic!("decoded turn") };
+    turn.messages = List::with_capacity(1);
+    turn.messages.push(message).unwrap();
+    rows.push(first).unwrap();
+    rows.push(run::turn(2, ATTEMPT, 2, &[run::message(c::Speaker::Assistant, &[proposal])], 512)).unwrap();
+    let root = fixtures::chat::proposal_root_with_activity(Some(c::ActivityPage {
+        rows,
+        before: None,
+        after: None,
+        cut: false,
+    }));
+    let mut builder = skein_ui::Builder::new(&fixtures::tree_limits());
+    crate::pages::chat::main(
+        &mut builder,
+        &root,
+        &fixtures::words(),
+        &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+        4,
+        TEXT,
+        &mut crate::words::Times::new(fixtures::NOW),
+    );
+    let tree = builder.finish();
+    let mut turn = None;
+    for (at, node) in tree.nodes().iter().enumerate() {
+        if node.styles.as_slice().contains(&crate::look::TURN)
+            && skein_lib::bytes::find(&fixtures::node_text(&tree, at), b"A proposal follows").is_some()
+        {
+            turn = Some(at);
+            break;
+        }
+    }
+    assert!(
+        turn.is_some(),
+        "assistant turn: {:?}; rows {:?}",
+        fixtures::text(&tree),
+        root.pages().chat().unwrap().thread.lines.rows
+    );
+    let turn = turn.unwrap();
+    let children = subtree(&tree, turn);
+    let card = style_position(children, crate::look::CARD).expect("proposal inside first turn");
+    let message = style_position(children, crate::look::MESSAGE).expect("message");
+    assert!(card >= message + usize::try_from(children[message].size).unwrap());
+    assert_eq!(named_count(&tree, Role::Button, b"Accept"), 1);
+    assert!(fixtures::find(&tree, Role::Paragraph, b"2 tool calls").is_some());
+    let said = fixtures::text(&tree);
+    assert!(skein_lib::bytes::find(&said, "read ×2".as_bytes()).is_some());
+    assert!(skein_lib::bytes::find(&said, b"propose").is_none());
+}
+
+fn named_count(tree: &skein_ui::Tree, role: Role, name: &[u8]) -> u32 {
+    let mut count = 0_u32;
+    for node in tree.nodes() {
+        if node.role == role && node.name.as_deref() == Some(name) {
+            count = count.checked_add(1).unwrap();
+        }
+    }
+    count
 }
