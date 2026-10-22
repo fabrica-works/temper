@@ -186,7 +186,7 @@ mod memory_literal;
 // Amendment editor: sixteen nodes and eleven phrases; the web root also retains
 // its bounded draft, typed specification and separate amendment outcome.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 247923240683;
+const WEB_BYTES: u64 = 247939788695;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {
