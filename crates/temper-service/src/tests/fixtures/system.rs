@@ -64,14 +64,47 @@ pub struct Kernel {
     pub spawned: u32,
     pub files: u32,
     pub root_closed: bool,
+    pub closed: skein_lib::List<Fd>,
+    pub box_writes: u32,
+    pub box_read_cancelled: bool,
 }
 impl Kernel {
     pub fn new() -> Self {
-        Self { next: 20, pipes: BTreeMap::new(), unusable: false, spawned: 0, files: 0, root_closed: false }
+        Self {
+            next: 20,
+            pipes: BTreeMap::new(),
+            unusable: false,
+            spawned: 0,
+            files: 0,
+            root_closed: false,
+            closed: skein_lib::List::with_capacity(256),
+            box_writes: 0,
+            box_read_cancelled: false,
+        }
     }
     fn descriptor(&mut self) -> Fd {
         self.next = self.next.checked_add(1).unwrap();
         Fd::new(self.next)
+    }
+    fn spawn(&mut self, spawn: &mut skein_io::kernel::Spawn) -> Result<Done, Error> {
+        assert_eq!(&*spawn.program, b"/usr/bin/git");
+        assert_eq!(spawn.args.last().unwrap().as_ref(), b"version");
+        self.spawned = self.spawned.checked_add(1).unwrap();
+        if self.unusable {
+            Err(Error::NotFound)
+        } else {
+            for pipe in &mut spawn.pipes {
+                let fd = self.descriptor();
+                pipe.parent = Some(fd);
+                let bytes = match pipe.child {
+                    0 | 2 => b"".as_slice(),
+                    1 => b"git version 2.53.0\n",
+                    _ => panic!("standard pipe"),
+                };
+                self.pipes.insert(fd, (bytes.into(), 0));
+            }
+            Ok(Done::Spawned { pidfd: self.descriptor() })
+        }
     }
     pub fn answer(&mut self, service: &mut Service) {
         for _ in 0..service.submissions.len() {
@@ -82,6 +115,7 @@ impl Kernel {
                 Op::Listen { .. } | Op::MakeDirectory { .. } => Ok(Done::Nothing),
                 Op::Close { fd } => {
                     self.root_closed |= *fd == Fd::new(9);
+                    self.closed.push(*fd).unwrap();
                     self.pipes.remove(fd);
                     Ok(Done::Nothing)
                 }
@@ -103,25 +137,16 @@ impl Kernel {
                     self.files = self.files.checked_add(1).unwrap();
                     Ok(Done::Count(0))
                 }
-                Op::Spawn { spawn } => {
-                    assert_eq!(&*spawn.program, b"/usr/bin/git");
-                    assert_eq!(spawn.args.last().unwrap().as_ref(), b"version");
-                    self.spawned = self.spawned.checked_add(1).unwrap();
-                    if self.unusable {
-                        Err(Error::NotFound)
-                    } else {
-                        for pipe in &mut spawn.pipes {
-                            let fd = self.descriptor();
-                            pipe.parent = Some(fd);
-                            let bytes = match pipe.child {
-                                0 | 2 => b"".as_slice(),
-                                1 => b"git version 2.53.0\n",
-                                _ => panic!("standard pipe"),
-                            };
-                            self.pipes.insert(fd, (bytes.into(), 0));
-                        }
-                        Ok(Done::Spawned { pidfd: self.descriptor() })
-                    }
+                Op::Spawn { spawn } => self.spawn(spawn),
+                Op::PipeRead { fd, .. } if *fd == Fd::new(4) => {
+                    // The box has written nothing; io's bounded read remains in flight.
+                    service.submissions.push(submit);
+                    continue;
+                }
+                Op::PipeWrite { fd, bytes, from } if *fd == Fd::new(3) => {
+                    self.box_writes = self.box_writes.checked_add(1).unwrap();
+                    let left = bytes.len().checked_sub(usize::try_from(*from).unwrap()).unwrap();
+                    Ok(Done::Count(u32::try_from(left).unwrap()))
                 }
                 Op::PipeRead { fd, buf } => {
                     let (bytes, at) = self.pipes.get_mut(fd).expect("spawned pipe");
@@ -143,6 +168,9 @@ impl Kernel {
                     for _ in 0..service.submissions.len() {
                         let held = service.submissions.pop().unwrap();
                         if held.op == *target {
+                            if let Op::PipeRead { fd, .. } = &held.kind {
+                                self.box_read_cancelled |= *fd == Fd::new(4);
+                            }
                             service.completions.push(Complete {
                                 op: held.op,
                                 kind: held.kind,

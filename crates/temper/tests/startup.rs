@@ -1082,6 +1082,8 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
         skein_lib::List::<[skein_lib::Wall; 2]>::worst_case(accounts.accounts).expect("deployment fact walls");
     let source_deadline_growth = 3_076 * (source_slots + fact_queue + deployment_scratch);
     let (github_identity_growth, github_worker_growth) = github_identity_growth();
+    // Holding the box pipe adds 24 B to Service; the worker payload is unchanged.
+    let box_pipe_growth = 24;
     assert_eq!(
         required.engine_bytes,
         79_659_997_210_050_u64
@@ -1114,6 +1116,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + start_growth()
             + GIT_GENERATIONS_GROWTH
             - metadata_ids_release
+            + box_pipe_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -1429,6 +1432,7 @@ fn owned_memory_figures_for_a_worker_alone_include_its_process_and_no_engine() {
     )
     .expect("worker-alone fixture");
     assert_eq!(required.engine_bytes, 0);
+    // Holding the box pipe adds 24 B to the worker-alone process's Service.
     let figure = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/figures/worker-alone-memory.txt");
     if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1") {
         fs::write(&figure, format!("{}\n", required.worker_bytes)).expect("worker-alone fixture");
@@ -1457,3 +1461,24 @@ fn owned_memory_figures_for_a_worker_alone_include_its_process_and_no_engine() {
     assert!(service.setup_page(1, b"state", skein_lib::Time::ZERO).is_none());
     scratch.remove();
 }
+
+#[test]
+fn serve_box_refuses_closed_or_non_pipe_descriptors_before_starting() {
+    for (redirections, fd) in [("3>&- 4>&-", 3_u8), ("3>/dev/null 4>&-", 3), ("3>&0 4>&-", 4)] {
+        let output = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(format!("exec \"$1\" serve --box {redirections}"))
+            .arg("serve-box-test")
+            .arg(env!("CARGO_BIN_EXE_temper"))
+            .stdin(std::process::Stdio::piped())
+            .output()
+            .expect("serve child");
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty());
+        assert_eq!(
+            String::from_utf8(output.stderr).expect("UTF-8 diagnostic"),
+            format!("temper serve: --box: fd {fd} is not an open pipe\n")
+        );
+    }
+}
+

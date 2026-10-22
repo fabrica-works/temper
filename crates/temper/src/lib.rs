@@ -9,7 +9,7 @@ use std::{
     ffi::OsString,
     fmt::Write,
     net::ToSocketAddrs,
-    os::unix::ffi::OsStrExt,
+    os::unix::{ffi::OsStrExt, fs::FileTypeExt},
     path::{Path, PathBuf},
 };
 use temper_service::{
@@ -33,13 +33,13 @@ mod program_login;
 mod setup;
 mod worker_alone;
 pub use host::Host;
-pub const USAGE: &str = "usage: temper init [DIRECTORIES] | temper serve [DIRECTORIES] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge fetch [DIRECTORIES] FORGE | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper fake llm --document FILE [--ready PREFIX] [--seed N] | temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge check [DIRECTORIES] N OBSERVATIONS STORE | temper fake seed [DIRECTORIES] | temper fake git ARGS... | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
+pub const USAGE: &str = "usage: temper init [DIRECTORIES] | temper serve [DIRECTORIES] [--box] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge fetch [DIRECTORIES] FORGE | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper fake llm --document FILE [--ready PREFIX] [--seed N] | temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge check [DIRECTORIES] N OBSERVATIONS STORE | temper fake seed [DIRECTORIES] | temper fake git ARGS... | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
 const CONFIG_BYTES: u32 = 1 << 20;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
     Init { directories: Directories },
-    Serve { directories: Directories },
+    Serve { directories: Directories, boxed: bool },
     Box { directories: Directories },
     ProgramLogin { directories: Directories, name: OsString },
     Agent { configuration: PathBuf },
@@ -117,7 +117,7 @@ pub fn configure_with(
     let rest = os(&rest);
     match command.as_ref() {
         b"init" if rest.is_empty() => Ok(Command::Init { directories }),
-        b"serve" if rest.is_empty() => Ok(Command::Serve { directories }),
+        b"serve" if rest.is_empty() || rest == ["--box"] => Ok(Command::Serve { directories, boxed: !rest.is_empty() }),
         b"box" if rest.is_empty() => Ok(Command::Box { directories }),
         b"program-login" if rest.len() == 1 => Ok(Command::ProgramLogin { directories, name: rest[0].clone() }),
         b"forge" => {
@@ -145,7 +145,9 @@ pub fn configure_with(
 pub fn run(command: Command) -> Result<u8, String> {
     let exit = match command {
         Command::Init { directories } => return init::run(&directories).map_err(|why| prefixed("temper init", &why)),
-        Command::Serve { directories } => serve(&directories).map_err(|why| prefixed("temper serve", &why))?,
+        Command::Serve { directories, boxed } => {
+            serve(&directories, boxed).map_err(|why| prefixed("temper serve", &why))?
+        }
         Command::Box { directories } => box_command::run(&directories).map_err(|why| prefixed("temper box", &why))?,
         Command::Agent { configuration } => smith_agent_shell::run(&configuration, Box::new(std::io::stderr()))
             .map_err(|why| prefixed("temper agent", &why))?,
@@ -414,7 +416,14 @@ pub fn prepare_in(directories: &Directories) -> Result<service::Service, String>
     }
     result.map_err(|why| prefixed("temper serve", &why))
 }
-fn serve(directories: &Directories) -> Result<Exit, String> {
+fn serve(directories: &Directories, boxed: bool) -> Result<Exit, String> {
+    if boxed {
+        for fd in [3, 4] {
+            if !std::fs::metadata(format!("/proc/self/fd/{fd}")).is_ok_and(|m| m.file_type().is_fifo()) {
+                return Err(format!("--box: fd {fd} is not an open pipe"));
+            }
+        }
+    }
     let bytes = directories.read()?;
     let mut owned = Vec::new();
     let prepared = prepare_with_store(directories, &bytes, &mut owned);
@@ -425,6 +434,13 @@ fn serve(directories: &Directories) -> Result<Exit, String> {
             return Err(why);
         }
     };
+    if boxed {
+        owned.extend([Fd::new(3), Fd::new(4)]);
+        if let Err(fd) = service.adopt_box(Fd::new(3), Fd::new(4)) {
+            close(owned);
+            return Err(format!("--box: fd {} refused", fd.raw()));
+        }
+    }
     let opened = skein_shell::open_termination_signals()
         .map_err(|errno| format!("signals: errno {errno}"))
         .and_then(|signals| {
@@ -445,3 +461,38 @@ fn serve(directories: &Directories) -> Result<Exit, String> {
 }
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod box_tests {
+
+    #[test]
+    fn serve_box_flag_is_carried_to_the_command() {
+        for boxed in [false, true] {
+            let mut args = ["serve", "--config", "/c", "--data", "/d", "--cache", "/k"]
+                .iter()
+                .map(|word| Box::from(word.as_bytes()))
+                .collect::<Vec<_>>();
+            if boxed {
+                args.push(Box::from(b"--box".as_slice()));
+            }
+            let super::Command::Serve { boxed: found, .. } =
+                super::configure_with(&args, &[], b"/").expect("serve arguments")
+            else {
+                panic!("serve command");
+            };
+            assert_eq!(found, boxed);
+        }
+    }
+
+    #[test]
+    fn serve_refuses_unknown_or_repeated_flags() {
+        for flags in [&["--other"][..], &["--box", "--box"][..]] {
+            let args = core::iter::once("serve")
+                .chain(flags.iter().copied())
+                .chain(["--config", "/c", "--data", "/d", "--cache", "/k"])
+                .map(|word| Box::from(word.as_bytes()))
+                .collect::<Vec<_>>();
+            assert!(super::configure_with(&args, &[], b"/").is_err());
+        }
+    }
+}

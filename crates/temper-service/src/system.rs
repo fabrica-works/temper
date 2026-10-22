@@ -22,10 +22,16 @@ pub struct Service {
     raw_submissions: Queue<Submit>,
     kernel: accounts::Kernel,
     pub(crate) told: Queue<io::Event>,
+    box_pipe: Option<BoxPipe>,
     signals: Option<Token>,
     signals_closing: bool,
     bytes: u64,
     links: Queue<Box<[u8]>>,
+}
+struct BoxPipe {
+    requests: Token,
+    answers: Token,
+    closing: bool,
 }
 // Existing reservation for setup/forge handoffs beside a root routing pass.
 const SETUP_ROUTING_HEADROOM: u32 = 2;
@@ -165,6 +171,7 @@ impl Service {
             raw_submissions: Queue::with_capacity(queue),
             told: Queue::with_capacity(queue),
             kernel: accounts::Kernel::new(operations),
+            box_pipe: None,
             signals: None,
             signals_closing: false,
             bytes: bytes.checked_add(worker_bytes).ok_or(start_problem(b"memory_bytes", What::Bound))?,
@@ -204,6 +211,7 @@ impl Service {
             raw_submissions: Queue::with_capacity(queue),
             told: Queue::with_capacity(queue),
             kernel: accounts::Kernel::new(operations),
+            box_pipe: None,
             signals: None,
             signals_closing: false,
             bytes,
@@ -257,6 +265,11 @@ impl Service {
             || !self.told.is_empty()
             || !self.raw_submissions.is_empty()
             || self.end().is_some() && self.signals.is_some() && !self.signals_closing
+            || self.end().is_some()
+                && match &self.box_pipe {
+                    Some(pipe) => !pipe.closing,
+                    None => false,
+                }
     }
     /// A first call drains; another aborts.
     pub fn shutdown(&mut self) {
@@ -294,6 +307,18 @@ impl Service {
             }
             None => true,
         }
+    }
+    /// Hold the box's pipes without taking lines or writing (protocol/setup.md, 7.1).
+    /// io may keep a bounded read pending until close cancels it.
+    /// On refusal the caller retains both descriptors.
+    pub fn adopt_box(&mut self, requests: Fd, answers: Fd) -> Result<(), Fd> {
+        if self.box_pipe.is_some() || self.io_env.limits.sockets.saturating_sub(self.io.sockets()) < 2 {
+            return Err(requests);
+        }
+        let requests = self.io.adopt_write_pipe(requests, None).expect("two reserved pipe slots");
+        let answers = self.io.adopt_read_pipe(answers).expect("second reserved pipe slot");
+        self.box_pipe = Some(BoxPipe { requests, answers, closing: false });
+        Ok(())
     }
     /// Adopt the shell's termination-signal source.
     pub fn adopt_signals(&mut self, descriptor: Fd) -> Result<(), Fd> {
@@ -587,14 +612,7 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
             }
         }
     }
-    if service.end().is_some()
-        && !service.signals_closing
-        && service.raw_submissions.room() >= io::MAX_OUT_DOWN.submissions
-        && let Some(entity) = service.signals
-    {
-        service.signals_closing = true;
-        io::down(&mut service.io, &service.io_env, io::Request::Close { entity }, &mut service.raw_submissions);
-    }
+    close_sources(service);
     if let Some(engine) = &mut service.engine {
         engine.abort_if_ended();
     }
@@ -610,6 +628,26 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
     }
     service.kernel.publish(&mut service.raw_submissions, &mut service.submissions);
     service.io.reclaim();
+}
+fn close_sources(service: &mut Service) {
+    if service.end().is_some()
+        && !service.signals_closing
+        && service.raw_submissions.room() >= io::MAX_OUT_DOWN.submissions
+        && let Some(entity) = service.signals
+    {
+        service.signals_closing = true;
+        io::down(&mut service.io, &service.io_env, io::Request::Close { entity }, &mut service.raw_submissions);
+    }
+    if service.end().is_some()
+        && service.raw_submissions.room() >= io::MAX_OUT_DOWN.submissions.saturating_mul(2)
+        && let Some(pipe) = &mut service.box_pipe
+        && !pipe.closing
+    {
+        pipe.closing = true;
+        for entity in [pipe.requests, pipe.answers] {
+            io::down(&mut service.io, &service.io_env, io::Request::Close { entity }, &mut service.raw_submissions);
+        }
+    }
 }
 fn route_events(service: &mut Service) {
     for _ in 0..service.told.len() {

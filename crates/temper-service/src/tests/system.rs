@@ -157,3 +157,50 @@ fn standalone_announces_clients_without_announcing_in_process_workers() {
     stand.turn();
     assert!(stand.service.listening().is_empty());
 }
+
+#[test]
+fn the_box_pipes_carry_no_service_data_and_close_on_drain_or_abort() {
+    use skein_io::kernel::Fd;
+    for abort in [false, true] {
+        let mut stand = fixtures::one_process();
+        stand.service.adopt_box(Fd::new(3), Fd::new(4)).unwrap();
+        assert_eq!(stand.service.adopt_box(Fd::new(5), Fd::new(6)), Err(Fd::new(5)));
+        fixtures::until_hosting(&mut stand);
+        let mut pending_reads = 0_u32;
+        for submit in &stand.service.submissions {
+            if let skein_io::kernel::Op::PipeRead { fd, .. } = &submit.kind
+                && *fd == Fd::new(4)
+            {
+                pending_reads = pending_reads.checked_add(1).unwrap();
+            }
+        }
+        assert_eq!(pending_reads, 1, "io's read is still pending; nothing reached the service");
+        assert!(!stand.kernel.box_read_cancelled);
+        assert_eq!(stand.kernel.box_writes, 0);
+        assert!(!stand.kernel.closed.as_slice().contains(&Fd::new(3)));
+        assert!(!stand.kernel.closed.as_slice().contains(&Fd::new(4)));
+        stand.service.shutdown();
+        if abort {
+            stand.service.shutdown();
+        }
+        for _ in 0_u16..256 {
+            stand.turn();
+            if stand.service.is_empty() {
+                break;
+            }
+        }
+        assert_eq!(stand.service.end(), Some(if abort { &End::Aborted } else { &End::Drained }));
+        assert!(stand.service.is_empty());
+        assert!(stand.kernel.box_read_cancelled, "close cancelled io's pending read");
+        assert_eq!(stand.kernel.box_writes, 0);
+        for fd in [Fd::new(3), Fd::new(4)] {
+            let mut count = 0_u32;
+            for closed in &stand.kernel.closed {
+                if *closed == fd {
+                    count = count.checked_add(1).unwrap();
+                }
+            }
+            assert_eq!(count, 1);
+        }
+    }
+}
