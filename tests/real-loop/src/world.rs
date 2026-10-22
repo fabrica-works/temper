@@ -110,6 +110,7 @@ pub(crate) fn run(
         wake: None,
         forge: None,
         github: None,
+        llm_history: LlmHistory::default(),
     });
     world.spawn(|| {
         Proc::Llm(Box::new(Llm { peer: llm::peer(recipe()).expect("independent LLM peer"), scripts: None, cue: false }))
@@ -153,6 +154,7 @@ pub(crate) fn run_forge(
         wake: None,
         forge: Some(state.clone()),
         github: None,
+        llm_history: LlmHistory::default(),
     });
     world.spawn(|| {
         Proc::Llm(Box::new(Llm {
@@ -249,6 +251,26 @@ struct Judge {
     wake: Option<Time>,
     forge: Option<std::rc::Rc<std::cell::RefCell<Option<forge::State>>>>,
     github: Option<crate::github::State>,
+    llm_history: LlmHistory,
+}
+
+#[derive(Default)]
+struct LlmHistory {
+    seen: usize,
+    pending: i64,
+    visits: usize,
+}
+impl LlmHistory {
+    fn observe(&mut self, observations: &[skein_fake_peers::llm::Observation]) -> i64 {
+        // Deferred forge/GitHub peers are replaced before they run; a driven peer only appends.
+        let suffix = observations.get(self.seen..).expect("LLM observation history never shrinks");
+        self.visits += suffix.len();
+        self.pending = suffix.iter().fold(self.pending, |n, event| {
+            n + i64::from(matches!(event, Query { .. })) - i64::from(matches!(event, Answered { .. }))
+        });
+        self.seen = observations.len();
+        self.pending
+    }
 }
 impl Referee<Proc> for Judge {
     fn act(&mut self, now: Time, procs: &mut [Proc]) {
@@ -395,9 +417,7 @@ impl Referee<Proc> for Judge {
                     && !caller.advanced.get()
                     && (!forge.observations().is_empty() || !service.seen.responses().is_empty()))
         });
-        let pending = peer.observations().iter().fold(0_i64, |n, event| {
-            n + i64::from(matches!(event, Query { .. })) - i64::from(matches!(event, Answered { .. }))
-        });
+        let pending = self.llm_history.observe(peer.observations());
         let placing = placed(workers) && pending > 0;
         if caller.adding_worker().is_some_and(|name| {
             workers.iter().any(|proc| matches!(proc, Proc::Service(worker)
@@ -499,6 +519,7 @@ fn cluster_judge(
         wake: None,
         forge,
         github: None,
+        llm_history: LlmHistory::default(),
     }
 }
 
@@ -552,4 +573,76 @@ fn placed(workers: &[Proc]) -> bool {
         && workers
             .iter()
             .all(|proc| matches!(proc, Proc::Service(worker) if !worker_started(worker) || worker.runs.assigned()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LlmHistory;
+    use skein_fake_llm_domain::api;
+    use skein_fake_peers::llm::Observation::{self, Accepted, Answered, Closed, Credential, Head, Query};
+    use skein_lib::Token;
+
+    #[test]
+    fn llm_history_matches_every_prefix_and_visits_each_record_once() {
+        let connection = Token::new(1);
+        let query = || Query {
+            connection,
+            query: api::Query {
+                credential: None,
+                caching: api::Caching::Unscoped,
+                model: b"fake".as_slice().into(),
+                system: Box::new([]),
+                tools: Box::new([]),
+                choice: api::ToolChoice::None,
+                messages: Box::new([]),
+                max_tokens: 1,
+            },
+        };
+        let answered = || Answered { connection: Some(connection), result: Ok(()) };
+        let detached = || Answered { connection: None, result: Err(api::Error::Unavailable) };
+        let rows: [(&str, Vec<Observation>); 7] = [
+            ("empty", vec![]),
+            ("balanced", vec![query(), answered()]),
+            ("duplicate queries and waves", vec![query(), query(), answered(), detached(), query(), answered()]),
+            ("closed route", vec![query(), Closed { connection }, detached()]),
+            ("negative prefix", vec![detached(), query(), query(), answered()]),
+            ("pending", vec![query(), answered(), query()]),
+            (
+                "other records",
+                vec![
+                    Accepted { connection },
+                    Head { connection, headers: Box::new([]) },
+                    Credential {
+                        connection,
+                        route: skein_llm::Provider::OpenAi,
+                        scheme: Some(skein_llm::Scheme::Key),
+                        index: Some(0),
+                    },
+                    Closed { connection },
+                ],
+            ),
+        ];
+        for (name, records) in rows {
+            let mut history = LlmHistory::default();
+            let mut reference_visits = 0;
+            for length in 0..=records.len() {
+                for _ in 0..3 {
+                    let prefix = &records[..length];
+                    let expected = prefix.iter().fold(0_i64, |n, event| {
+                        n + i64::from(matches!(event, Query { .. })) - i64::from(matches!(event, Answered { .. }))
+                    });
+                    reference_visits += prefix.len();
+                    let pending = history.observe(prefix);
+                    assert_eq!(pending, expected, "{name}, prefix {length}");
+                    for placed in [false, true] {
+                        assert_eq!(placed && pending > 0, placed && expected > 0, "{name}, prefix {length}");
+                    }
+                    assert_eq!(history.visits, length, "{name}, prefix {length}");
+                }
+            }
+            assert_eq!(history.seen, records.len(), "{name}");
+            assert_eq!(history.visits, records.len(), "{name}");
+            assert_eq!(reference_visits > history.visits, !records.is_empty(), "{name}");
+        }
+    }
 }
