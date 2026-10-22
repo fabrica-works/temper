@@ -78,6 +78,13 @@ impl Shape {
         let mut document: serde_json::Value =
             serde_json::from_slice(&std::fs::read(data.join("temper.json")).expect("base document"))
                 .expect("base JSON");
+        // Link deadlines exceed PATIENCE, so load cannot lose a link or run in this story.
+        // Loss and grace belong to the engine's domain world (domain/testing.md, 2.4).
+        // The stop bound stays below fleet grace (protocol/README.md, 15.3).
+        let ping_ms = crate::PATIENCE.as_nanos().div_euclid(1_000_000) + 1;
+        let silence_ms = 3 * ping_ms;
+        let [grace_ms, agent_stop_ms, delivery_ms, save_ms] = [10_u64, 5, 5, 5];
+        let stop_bound_ms = ping_ms + silence_ms + grace_ms + agent_stop_ms.max(delivery_ms) + save_ms;
         match self {
             Self::Engine(workers) => {
                 document["workers"] = json!([]);
@@ -87,10 +94,10 @@ impl Shape {
                     workers.iter().map(|name| json!({"name":name,"digest":format!("secrets/{name}.digest")})).collect();
                 // One attempt per one-slot worker: the fleet counts attempts across the whole fleet.
                 document["engine"]["limits"]["overrides"]["fleet.attempts"] = workers.len().into();
-                document["engine"]["limits"]["overrides"]["fleet.grace_ms"] = 100.into();
+                document["engine"]["limits"]["overrides"]["fleet.grace_ms"] = (stop_bound_ms + 1).into();
                 document["engine"]["limits"]["overrides"]["hub.turns"] = 1.into();
-                document["engine"]["limits"]["overrides"]["link.ping_ms"] = 10.into();
-                document["engine"]["limits"]["overrides"]["link.silence_ms"] = 50.into();
+                document["engine"]["limits"]["overrides"]["link.ping_ms"] = ping_ms.into();
+                document["engine"]["limits"]["overrides"]["link.silence_ms"] = silence_ms.into();
                 for name in workers {
                     let secret = format!("{name}-fixture-secret");
                     let mut digest = String::new();
@@ -116,10 +123,9 @@ impl Shape {
                 worker["name"] = (*name).into();
                 worker["secret"] = format!("secrets/{name}.secret").into();
                 worker["engine"] = json!({"socket": engine.unwrap_or(([127,0,0,1],0).into()).to_string()});
-                worker["graces"] = json!({"grace_ms":10,"agent_stop_ms":5,"delivery_ms":5,"save_ms":5});
-                // 10 + 50 + 10 + max(5, 5) + 5 = 80 ms, below the fleet's 100 ms.
-                worker["limits"]["overrides"]["link.ping_ms"] = 10.into();
-                worker["limits"]["overrides"]["link.silence_ms"] = 50.into();
+                worker["graces"] = json!({"grace_ms":grace_ms,"agent_stop_ms":agent_stop_ms,"delivery_ms":delivery_ms,"save_ms":save_ms});
+                worker["limits"]["overrides"]["link.ping_ms"] = ping_ms.into();
+                worker["limits"]["overrides"]["link.silence_ms"] = silence_ms.into();
                 document = json!({"workers":document["workers"],"application":{"workers":document["application"]["workers"],"limits":document["application"]["limits"]}});
                 fixtures::private(
                     &data.join(format!("secrets/{name}.secret")),
