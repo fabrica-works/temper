@@ -780,6 +780,31 @@ fn programs_directories_are_checked_at_the_name_before_startup_effects() {
     }
 }
 
+fn github_identity_growth() -> (u64, u64) {
+    // Worker-wire v3: Identity's old token plus three text fields was
+    // 4 + 4096 + 3*(4 + 256) = 4,880 B. GitHub's kind has a one-byte tag,
+    // a four-byte list length and eight entries (u64 account, length-prefixed
+    // 256-B login and 512-B token), then the same three texts: 7,057 B.
+    let github_grant_growth = (1 + 4 + 8 * (8 + 4 + 256 + 4 + 512) + 3 * (4 + 256)) - (4 + 4_096 + 3 * (4 + 256));
+    // Each of two repositories adds an option tag and u64 account on the wire,
+    // and 16 B inline in decoded Items. The engine holds one encoded identity;
+    // its six channels (two workers + four opening) reserve two assignments
+    // each. Translation holds two decoded/converted envelopes for each of
+    // 32 requests plus one transient. Items remains the largest payload heap.
+    // Three extra u32 limits in both Encoding and Worker add 24 B to Service.
+    // Jig's 7,934-B credential bound still exceeds the new identity, so grant
+    // envelopes keep their size. Only the application identity table grows.
+    let repository_account_growth = 2 * (1 + 8);
+    let github_identity_growth =
+        github_grant_growth + (6 * 2 + 2 * (32 + 1)) * repository_account_growth + 2 * 16 + 2 * 3 * 4;
+    // Two identity generations for each of three credential slots; one incoming
+    // assignment body and two transient body/framed copies in the worker link.
+    // Service's inline limits are charged to the engine above, so this worker
+    // grows 13,116 B. A worker alone also owns Service's 24 B (13,140 B total).
+    let github_worker_growth = 2 * 3 * github_grant_growth + 3 * repository_account_growth;
+    (github_identity_growth, github_worker_growth)
+}
+
 #[test]
 fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     let scratch = support::Scratch::startup("owned-memory-figures");
@@ -969,6 +994,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // The root's settled Option<(Time, Wall)> adds 24 B inline through Engine
     // in Service. Payload envelopes and worker-owned state are unchanged.
     let settled_root_growth = 24;
+    let (github_identity_growth, github_worker_growth) = github_identity_growth();
     assert_eq!(
         required.engine_bytes,
         79_659_997_210_050_u64
@@ -993,6 +1019,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + forgejo_setup_growth
             + open_questions_growth
             + settled_root_growth
+            + github_identity_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -1008,12 +1035,10 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     let admission_growth = 3_035_662_234_u64;
     // Four held grants add 4 * 32 B in the host; the worker link's
     // transient list holds accounts + credentials = 4 + 3 grants (224 B).
-    // The original admission cause stays separate.
-    let grant_growth = 4 * 32 + (4 + 3) * 32;
-    // This repin adds 0 B per worker owner: host/channel, source commands,
-    // grant carriers and IO queues retain their previous sizes. The term-by-term
-    // startup measurement remains 3,283,176,427,773 B.
-    assert_eq!(required.worker_bytes, 2_343_551_746_598_u64 + worker_growth + admission_growth + grant_growth);
+    // Include v3's identity generations and assignment carriers; the original
+    // admission cause stays separate.
+    let grant_wire_growth = 4 * 32 + (4 + 3) * 32 + github_worker_growth;
+    assert_eq!(required.worker_bytes, 2_343_551_746_598_u64 + worker_growth + admission_growth + grant_wire_growth);
 
     support::owned::check_memory("../../docs/examples/owned.json", required);
     eprintln!("owned requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
@@ -1060,6 +1085,9 @@ fn owned_memory_figures_for_init_match_its_own_document() {
     // The fake-adoption map and held credentials add the same 3,768 B as above.
     // Supplying init's checked fake entry also counts its host and git program;
     // its GitHub host was already priced, so this engine term adds 26,262,672 B.
+    // Worker-wire v3 adds the same channel/Items/Service growth as above, but
+    // init holds two encoded identities: 3,637 + 2,177 = 5,814 B engine growth.
+    // Its worker has the same three credential slots and grows 13,116 B.
     support::owned::check_memory("../temper-init/template/temper.json", required);
     eprintln!("init requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
     check_bounded_startup(&bounded, required);
