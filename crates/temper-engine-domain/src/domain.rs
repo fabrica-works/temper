@@ -29,8 +29,8 @@ use temper_engine_domain_forge_change as forge_change;
 /// (jig's domain/root.md, sections 2–4).
 #[derive(Debug)]
 pub struct Domain {
-    /// A completed empty fleet/finish pass, valid only until continuation state
-    /// or either injected clock changes. Journal release remains independent.
+    /// Retired M1 latch storage, kept for the existing route reset sites.
+    /// Resume readiness is derived from the core and never reads this field.
     pub(crate) settled: Option<(Time, Wall)>,
     #[cfg(test)]
     pub(crate) empty_resumes: u32,
@@ -423,8 +423,17 @@ pub(crate) fn admits(domain: &Domain, limits: &Limits) -> bool {
 }
 
 // Whether this close was empty, including the automatic deployment header.
-// Only the fleet Resume branch may use it to mark the instant settled.
-pub(crate) fn close(domain: &mut Domain, env: &Env<Limits>, mut decision: Decision, out: &mut Queue<Request>) -> bool {
+pub(crate) fn close(domain: &mut Domain, env: &Env<Limits>, decision: Decision, out: &mut Queue<Request>) -> bool {
+    finish_close(domain, env, decision, out, false)
+}
+
+fn finish_close(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    mut decision: Decision,
+    out: &mut Queue<Request>,
+    finishing_only: bool,
+) -> bool {
     if domain.core.restart_failure().is_some() {
         out.push(Request::Stop);
         return false;
@@ -441,6 +450,9 @@ pub(crate) fn close(domain: &mut Domain, env: &Env<Limits>, mut decision: Decisi
         && domain.work.is_empty()
         && domain.store_answers.is_empty()
         && out.is_empty();
+    if finishing_only {
+        assert!(decision.write_free() && !domain.core.counters.dirty(), "stopping finishing makes no commit");
+    }
     crate::decision::accept_routed(
         &mut domain.journal,
         &mut domain.core.counters,
@@ -601,6 +613,10 @@ pub(crate) fn resume_routed(domain: &mut Domain, env: &Env<Limits>, out: &mut Qu
     // work stays with the connector and no run is placed (jig's
     // `domain/engine.md`, 6.1).
     if domain.core.stopping() {
+        if domain.core.finish_owed() {
+            let decision = route_decision(domain, &env.limits).expect("stopping finishing room checked");
+            finish_close(domain, env, decision, out, true);
+        }
         return;
     }
     if domain.ready() || connector_restarting(domain) {
@@ -623,8 +639,14 @@ pub(crate) fn resume_routed(domain: &mut Domain, env: &Env<Limits>, out: &mut Qu
             close(domain, env, decision, out);
             return;
         }
-        if domain.settled == Some((env.now, env.wall)) && !domain.core.fleet.is_ready() {
-            return;
+        if !domain.core.fleet.is_ready() && !domain.core.finish_owed() {
+            let due = match domain.next_deadline(env) {
+                Some(deadline) => deadline <= env.now,
+                None => false,
+            };
+            if !due {
+                return;
+            }
         }
         let mut decision = route_decision(domain, &env.limits).expect("journal room checked before fleet continuation");
         let routed = jig_domain_core::resume_fleet(&mut domain.core, &environment_core(env));
@@ -632,10 +654,6 @@ pub(crate) fn resume_routed(domain: &mut Domain, env: &Env<Limits>, out: &mut Qu
         route_core_requests(domain, env, &mut decision, routed);
         route_into(domain, env, &mut decision);
         if close(domain, env, decision, out) && fleet_empty {
-            // finish_decision ran its watch/retained-run maintenance. Quiet
-            // changes are idempotent at this instant; fleet readiness is still
-            // checked on reuse. Committed inputs always invalidate this mark.
-            domain.settled = Some((env.now, env.wall));
             #[cfg(test)]
             {
                 domain.empty_resumes = domain.empty_resumes.checked_add(1).expect("test decision count");

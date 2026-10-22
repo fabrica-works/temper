@@ -223,6 +223,10 @@ pub struct Decision {
 pub type Journal = SkeinJournal<Write, crate::Output>;
 
 impl Decision {
+    pub(crate) fn write_free(&self) -> bool {
+        !self.overrun && self.writes.is_empty()
+    }
+
     pub(crate) fn empty(&self) -> bool {
         !self.overrun && self.writes.is_empty() && self.deliveries.is_empty()
     }

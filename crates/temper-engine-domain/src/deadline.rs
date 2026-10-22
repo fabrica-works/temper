@@ -23,6 +23,7 @@ impl Domain {
             ] {
                 next = earliest(next, deadline);
             }
+            next = earliest(next, wall_deadline(self.core.people.next_wall_expiry(), env.now, env.wall));
             next = earliest(next, wall_deadline(self.core.effect_deadline(), env.now, env.wall));
         }
         if self.ready() || crate::restart::connector_restarting(self) {
