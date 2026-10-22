@@ -11,10 +11,10 @@ Task details:
   Task 9
   Refresh token handling
   Agent
-  * Running
+  * running
   Shop
   Asked by Pat
-  Priority 1
+  Goal · priority 1
 What was asked:
   ## What was asked
   Result · report
@@ -23,17 +23,22 @@ What was asked:
 Plan:
   ## Plan
   Plan:
-    - [6] Task 9
-      Refresh token handling
+    - [6] Task 12
+      Review the change
       Agent
-      * Running
-      - [7] Task 12
-        Review the change
-        Agent
-        * Held
-        Held: out of tries
-        Hold revision 7
-        The next run resumes its conversation; tries count again from zero
+      * Held
+      4 spent
+      Held: out of tries
+      Hold revision 7
+      The next run resumes its conversation; tries count again from zero
+    - [7] Task 13
+      Write the release notes
+      Agent
+      * waiting on task 12
+      0 spent
+      Dependencies of task 13:
+        - [8] Task 12
+          * Held
     * Held below: 1
 Latest activity:
   ## Latest activity

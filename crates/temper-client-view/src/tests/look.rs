@@ -15,7 +15,7 @@ fn the_looks_names_pass_skeins_check() {
 }
 #[test]
 fn each_style_or_region_is_named_under_temper() {
-    let named: [(skein_ui::Style, &[u8]); 70] = [
+    let named: [(skein_ui::Style, &[u8]); 72] = [
         (BANNER, b"temper-banner"),
         (NAVIGATION, b"temper-navigation"),
         (MAIN, b"temper-main"),
@@ -86,6 +86,8 @@ fn each_style_or_region_is_named_under_temper() {
         (UNAVAILABLE, b"temper-unavailable"),
         (TASK_CONTRACT, b"temper-task-contract"),
         (TASK_BUDGET, b"temper-task-budget"),
+        (PLAN_SPEND, b"temper-plan-spend"),
+        (DEPENDENCIES, b"temper-dependencies"),
     ];
     for (style, name) in named {
         assert_eq!(NAMES.style(style), Some(name));
@@ -261,6 +263,7 @@ fn the_task_tokens_stay_on_their_roles() {
     crate::pages::task::header(&mut builder, &task, None, &fixtures::words());
     let done = builder.finish();
     let activity = super::task::activity_tree(true);
+    let plan = super::task::dependency_plan();
     for (token, role) in [
         (TASK_HEADING, Role::Region),
         (TASK_CONTRACT, Role::Paragraph),
@@ -268,12 +271,14 @@ fn the_task_tokens_stay_on_their_roles() {
         (TASK_CARD, Role::Region),
         (PLAN, Role::Tree),
         (PLAN_ROW, Role::Slot),
+        (PLAN_SPEND, Role::Paragraph),
+        (DEPENDENCIES, Role::List),
         (PLAN_HOLD, Role::List),
         (EVENTS, Role::List),
         (STATUS_DONE, Role::Status),
     ] {
         let mut found = false;
-        for tree in [view.tree(), &done, &activity] {
+        for tree in [view.tree(), &done, &activity, &plan] {
             for node in tree.nodes() {
                 if node.styles.as_slice().contains(&token) {
                     assert_eq!(node.role, role);

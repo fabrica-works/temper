@@ -56,16 +56,30 @@ fn a_tracked_task_has_its_regions_in_order() {
 }
 #[test]
 fn a_plans_chip_links_to_its_tasks_page_by_number() {
-    let root = f::root(c::Executor::Agent { charter: CHARTER }, Some(PRIORITY));
-    let mut view = fixtures::view();
-    let link = fixtures::find(fixtures::build(&mut view, &root), Role::Link, b"Task 9").expect("numbered task");
+    let mut delivery = f::tree();
+    let c::Delivery::OwnerTree(owner) = &mut delivery else { panic!("owner tree") };
+    owner.rows = List::with_capacity(ONE);
+    owner.rows.push(row()).expect("row");
+    let mut builder = Builder::new(&fixtures::tree_limits());
+    let mut bindings = crate::frame::Bindings::new(fixtures::tree_limits().bindings);
+    crate::pages::task::plan(
+        &mut builder,
+        &delivery,
+        &f::held_root(),
+        &fixtures::words(),
+        &mut bindings,
+        fixtures::domain_limits().client.domain.rows,
+    );
+    let tree = builder.finish();
+    let link = &tree.nodes()[index_of(&tree, Role::Link, b"Task 12")];
     assert_eq!(
-        crate::act(&mut view, link, skein_ui::Act::Press),
+        bindings.decode(link.binding.expect("bound").token, skein_ui::Act::Press),
         Some(temper_client_domain::Action::Pages(temper_client_domain::pages::Act::Go {
-            address: temper_client_domain::Address::Task { task: TASK }
+            address: temper_client_domain::Address::Task { task: CHILD }
         }))
     );
 }
+
 fn asked(part: c::Part) -> Tree {
     let mut task = f::document();
     task.resources = List::with_capacity(ONE);
@@ -97,50 +111,22 @@ fn a_forge_panel_on_the_page_says_shown_on_the_forge() {
 }
 #[test]
 fn a_plans_items_are_nested_under_their_supplied_parent() {
-    let mut tree = f::tree();
-    let c::Delivery::OwnerTree(value) = &mut tree else { panic!("owner tree") };
-    let mut chip = value.root.clone();
-    chip.task = CHILD;
-    value.rows = List::with_capacity(ONE);
-    value
-        .rows
-        .push(c::OwnerTreeRow {
-            chip,
-            parent: TASK,
-            depth: ONE,
-            proposals: List::with_capacity(NO_ROWS),
-            spent: 0,
-            dependencies: List::with_capacity(NO_ROWS),
-            cut: false,
-        })
-        .expect("child");
-    let mut b = Builder::new(&fixtures::tree_limits());
-    crate::pages::task::plan(
-        &mut b,
-        &tree,
-        &f::root(c::Executor::Agent { charter: CHARTER }, Some(PRIORITY)),
-        &fixtures::words(),
-        &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
-        fixtures::domain_limits().client.domain.rows,
-    );
-    let tree = b.finish();
-    let parent = fixtures::find(&tree, Role::TreeItem, b"Task 9").expect("parent");
-    let child = fixtures::find(&tree, Role::TreeItem, b"Task 12").expect("child");
-    let nodes = tree.nodes();
-    let mut parent_index = None;
-    let mut child_index = None;
-    for (index, node) in nodes.iter().enumerate() {
-        if node.id == parent {
-            parent_index = Some(index);
-        }
-        if node.id == child {
-            child_index = Some(index);
-        }
-    }
-    let parent_index = parent_index.expect("parent index");
-    let child_index = child_index.expect("child index");
-    assert!(child_index < parent_index + usize::try_from(nodes[parent_index].size).expect("parent size"));
+    let mut delivery = f::tree();
+    let c::Delivery::OwnerTree(owner) = &mut delivery else { panic!("owner tree") };
+    owner.rows = List::with_capacity(2);
+    owner.rows.push(row()).expect("row");
+    let mut child = row();
+    child.chip.task = GRANDCHILD;
+    child.parent = CHILD;
+    child.depth = 2;
+    owner.rows.push(child).expect("child");
+    let tree = plan(&delivery);
+    let parent_index = index_of(&tree, Role::TreeItem, b"Task 12");
+    let child_index = index_of(&tree, Role::TreeItem, b"Task 13");
+    assert!(child_index < parent_index + usize::try_from(tree.nodes()[parent_index].size).expect("parent size"));
+    assert!(fixtures::find(&tree, Role::TreeItem, b"Task 9").is_none());
 }
+
 #[test]
 fn the_release_confirmation_says_what_releasing_does() {
     use temper_client_domain::{Action, Event, pages::Act};
@@ -287,7 +273,7 @@ fn the_title_sits_between_the_headers_two_meta_rows_without_a_title_paragraph() 
     assert_eq!(nodes[parts[3]].styles.as_slice(), [look::META]);
     assert!(!named(nodes, Role::Paragraph, task.chip.title.bytes()));
     let first = subtree(&tree, parts[1]);
-    assert!(named(first, Role::Paragraph, b"Priority 1"));
+    assert!(named(first, Role::Paragraph, "Goal · priority 1".as_bytes()));
     assert!(named(first, Role::Paragraph, b"Shop"));
     let meta = children(&tree, parts[1]);
     let chip = subtree(&tree, meta.as_slice()[1]);
@@ -342,7 +328,7 @@ fn the_first_meta_omits_absent_priority_and_uses_the_project_fallback_and_proced
     });
     let tree = header(&task, None);
     let first = subtree(&tree, styled(&tree, look::META));
-    assert!(!named(first, Role::Paragraph, b"Priority 1"));
+    assert!(!named(first, Role::Paragraph, "Goal · priority 1".as_bytes()));
     assert!(named(
         first,
         Role::Paragraph,
@@ -437,11 +423,16 @@ fn every_phase_has_the_same_status_token_in_the_header_and_its_plan_row() {
     for (phase, token) in PHASES {
         let mut task = titled();
         task.chip.phase = phase;
+        task.waits_on = c::WaitsOn::Nothing;
         let header = header(&task, None);
         assert_eq!(fixtures::styles(&header, Role::Status).as_ref(), [Box::from([token])]);
         let mut delivery = f::tree();
         let c::Delivery::OwnerTree(tree) = &mut delivery else { panic!("owner") };
-        tree.root = task.chip;
+        let mut row = row();
+        row.chip = task.chip;
+        row.chip.task = CHILD;
+        tree.rows = List::with_capacity(ONE);
+        tree.rows.push(row).expect("row");
         let mut builder = Builder::new(&fixtures::tree_limits());
         crate::pages::task::plan(
             &mut builder,
@@ -457,7 +448,7 @@ fn every_phase_has_the_same_status_token_in_the_header_and_its_plan_row() {
                 let row = children(&tree, index).as_slice()[0];
                 assert_eq!(tree.nodes()[row].styles.as_slice(), [look::PLAN_ROW]);
                 let parts = subtree(&tree, row);
-                assert!(named(parts, Role::Link, b"Task 9"));
+                assert!(named(parts, Role::Link, b"Task 12"));
                 let mut count = 0_u32;
                 for status in parts {
                     if status.role == Role::Status {
@@ -471,7 +462,7 @@ fn every_phase_has_the_same_status_token_in_the_header_and_its_plan_row() {
     }
 }
 #[test]
-fn the_held_card_keeps_its_key_in_a_list_after_its_plan_row() {
+fn the_goals_held_card_keeps_its_key_without_a_goal_row() {
     let view = fixtures::page_view(&f::held_root());
     let tree = view.tree();
     let hold = styled(tree, look::PLAN_HOLD);
@@ -481,16 +472,9 @@ fn the_held_card_keeps_its_key_in_a_list_after_its_plan_row() {
     let item = &tree.nodes()[items.as_slice()[0]];
     assert_eq!(item.role, Role::Item);
     assert_eq!(item.key, Some(skein_ui::Key { owner: crate::frame::owner(), kind: 2, a: TASK, b: 0 }));
-    let mut parent = None;
-    for (index, node) in tree.nodes().iter().enumerate() {
-        if node.role == Role::TreeItem {
-            parent = Some(index);
-            break;
-        }
-    }
-    let parent = parent.expect("parent");
-    let parts = children(tree, parent);
-    assert_eq!(parts.as_slice(), [styled(tree, look::PLAN_ROW), hold]);
+    let plan = styled(tree, look::PLAN);
+    assert_eq!(children(tree, plan).as_slice(), [hold]);
+    assert!(fixtures::find(tree, Role::TreeItem, b"Task 9").is_none());
 }
 pub(super) fn activity_tree(rows: bool) -> Tree {
     let mut page = c::ActivityPage { rows: List::with_capacity(1), after: None, before: None, cut: false };
@@ -878,4 +862,378 @@ fn joined(parts: &[&[u8]]) -> Box<[u8]> {
         writer.put(part).expect("measured expected words");
     }
     writer.finish()
+}
+
+const DEPENDENCY: u64 = 17;
+const OTHER_DEPENDENCY: u64 = 23;
+const GRANDCHILD: u64 = 13;
+const ROW_SPENT: u64 = 5;
+fn owner_phase(chip: &mut c::Chip, phase: c::OwnerChipPhase) {
+    chip.phase = phase.compact();
+    let c::ChipPhase::Owner { phase: target, .. } = chip.details.as_mut() else { panic!("owner") };
+    *target = phase;
+}
+fn row() -> c::OwnerTreeRow {
+    let mut chip = f::document().chip;
+    chip.task = CHILD;
+    let c::ChipPhase::Owner { details, .. } = chip.details.as_mut() else { panic!("owner") };
+    details.budget.numbers.spent = ROW_SPENT;
+    c::OwnerTreeRow {
+        chip,
+        parent: TASK,
+        depth: ONE,
+        proposals: List::with_capacity(NO_ROWS),
+        spent: ROW_SPENT + 7,
+        dependencies: List::with_capacity(NO_ROWS),
+        cut: false,
+    }
+}
+fn plan(delivery: &c::Delivery) -> Tree {
+    let mut builder = Builder::new(&fixtures::tree_limits());
+    crate::pages::task::plan(
+        &mut builder,
+        delivery,
+        &f::root(c::Executor::Agent { charter: CHARTER }, Some(PRIORITY)),
+        &fixtures::words(),
+        &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+        fixtures::domain_limits().client.domain.rows,
+    );
+    builder.finish()
+}
+fn plan_with_row(row: c::OwnerTreeRow) -> Tree {
+    let mut delivery = f::tree();
+    let c::Delivery::OwnerTree(tree) = &mut delivery else { panic!("owner tree") };
+    tree.rows = List::with_capacity(ONE);
+    tree.rows.push(row).expect("row");
+    plan(&delivery)
+}
+fn index_of(tree: &Tree, role: Role, name: &[u8]) -> usize {
+    for (index, node) in tree.nodes().iter().enumerate() {
+        if node.role == role && node.name.as_deref() == Some(name) {
+            return index;
+        }
+    }
+    panic!("named node");
+}
+fn assert_status(tree: &Tree, name: &[u8], token: skein_ui::Style) {
+    let index = index_of(tree, Role::Status, name);
+    assert_eq!(tree.nodes()[index].styles.as_slice(), [token]);
+    assert_eq!(fixtures::node_text(tree, index).as_ref(), name);
+}
+
+#[test]
+fn a_plan_row_says_what_its_task_waits_for() {
+    let cases: &[(&[u64], bool, bool, &[u8])] = &[
+        (&[DEPENDENCY], false, true, b"waiting on task 17"),
+        (&[DEPENDENCY, OTHER_DEPENDENCY], false, false, b"waiting on 2 tasks"),
+        (&[DEPENDENCY], true, true, b"waiting on more than 1 tasks"),
+        (&[], true, true, b"waiting on more than 0 tasks"),
+        (&[], false, true, b"waiting on its resources"),
+        (&[], false, false, b"Waiting"),
+    ];
+    for (numbers, more, holds, expected) in cases {
+        let mut row = row();
+        let mut dependencies = List::with_capacity(2);
+        for number in *numbers {
+            dependencies.push(*number).expect("dependency");
+        }
+        owner_phase(&mut row.chip, c::OwnerChipPhase::Waiting { dependencies, more: *more, holds: *holds });
+        let tree = plan_with_row(row);
+        assert_status(&tree, expected, look::STATUS_QUIET);
+        assert!(skein_lib::bytes::find(&fixtures::text(&tree), expected).is_some());
+    }
+}
+fn document_text(words: &[u8]) -> c::DocumentText {
+    c::DocumentText::complete(c::Text::new(skein_lib::bytes::copy_of(words), 32).expect("document text"))
+}
+#[test]
+fn an_ended_row_says_its_ending() {
+    let cases: [(c::OwnerChipEnding, &[u8], skein_ui::Style); 3] = [
+        (c::OwnerChipEnding::Done(c::ResultValue::Report(document_text(b"Done"))), b"Completed", look::STATUS_DONE),
+        (c::OwnerChipEnding::Failed(document_text(b"Failed")), b"Failed", look::STATUS_HELD),
+        (
+            c::OwnerChipEnding::Cancelled {
+                reason: document_text(b"Cancelled"),
+                result: None,
+                by: c::OwnerRequester::Person(PARTY),
+                at: skein_lib::Wall::EPOCH,
+            },
+            b"Cancelled",
+            look::STATUS_QUIET,
+        ),
+    ];
+    for (ending, expected, token) in cases {
+        let mut row = row();
+        owner_phase(&mut row.chip, c::OwnerChipPhase::Ended);
+        let c::ChipPhase::Owner { details, .. } = row.chip.details.as_mut() else { panic!("owner") };
+        details.ending = Some(ending);
+        assert_status(&plan_with_row(row), expected, token);
+    }
+}
+#[test]
+fn a_rows_spend_is_its_supplied_spent() {
+    let tree = plan_with_row(row());
+    let spend = styled(&tree, look::PLAN_SPEND);
+    let node = &tree.nodes()[spend];
+    assert_eq!(node.role, Role::Paragraph);
+    assert_eq!(node.name.as_deref(), Some(b"5 spent".as_slice()));
+    assert_eq!(fixtures::node_text(&tree, spend).as_ref(), b"5 spent");
+    let slot = styled(&tree, look::PLAN_ROW);
+    let parts = children(&tree, slot);
+    assert_eq!(parts.as_slice().last(), Some(&spend));
+    assert_eq!(tree.nodes()[parts.as_slice()[2]].role, Role::Status);
+    let mut row = row();
+    *row.chip.details = c::ChipPhase::Starting;
+    for node in plan_with_row(row).nodes() {
+        assert!(!node.styles.as_slice().contains(&look::PLAN_SPEND));
+    }
+}
+fn dependency_row() -> c::OwnerTreeRow {
+    let mut row = row();
+    let mut live = f::document().chip;
+    live.task = DEPENDENCY;
+    owner_phase(&mut live, c::OwnerChipPhase::Active(c::RunStage::Running { attempt: 1 }));
+    row.dependencies = List::with_capacity(3);
+    for link in [
+        c::OwnerTaskLink::Live(live),
+        c::OwnerTaskLink::Stored { number: OTHER_DEPENDENCY, status: Some(c::OwnerTaskStatus::Done) },
+        c::OwnerTaskLink::Stored { number: TASK, status: None },
+    ] {
+        row.dependencies.push(link).expect("dependency");
+    }
+    row
+}
+#[test]
+fn a_rows_dependency_line_lists_its_dependencies() {
+    let mut delivery = f::tree();
+    let c::Delivery::OwnerTree(owner) = &mut delivery else { panic!("owner tree") };
+    owner.rows = List::with_capacity(2);
+    owner.rows.push(dependency_row()).expect("row");
+    let mut child = row();
+    child.chip.task = GRANDCHILD;
+    child.parent = CHILD;
+    child.depth = 2;
+    owner.rows.push(child).expect("child");
+    let tree = plan(&delivery);
+    let list = styled(&tree, look::DEPENDENCIES);
+    assert_eq!(tree.nodes()[list].role, Role::List);
+    assert_eq!(tree.nodes()[list].name.as_deref(), Some(b"Dependencies of task 12".as_slice()));
+    let items = children(&tree, list);
+    assert_eq!(items.len(), 3);
+    for (index, number, name, status) in [
+        (0, DEPENDENCY, b"Task 17".as_slice(), Some(b"running".as_slice())),
+        (1, OTHER_DEPENDENCY, b"Task 23", Some(b"Completed".as_slice())),
+        (2, TASK, b"Task 9", None),
+    ] {
+        let item = items.as_slice()[index];
+        assert_eq!(tree.nodes()[item].role, Role::Item);
+        assert_eq!(tree.nodes()[item].key, Some(crate::pages::inbox::card_key(c::ObjectKey::Task(number))));
+        let parts = children(&tree, item);
+        let link = &tree.nodes()[parts.as_slice()[0]];
+        assert_eq!(link.role, Role::Link);
+        assert_eq!(link.name.as_deref(), Some(name));
+        assert!(link.binding.is_some());
+        if let Some(status) = status {
+            assert_eq!(parts.len(), 2);
+            assert_eq!(tree.nodes()[parts.as_slice()[1]].name.as_deref(), Some(status));
+        } else {
+            assert_eq!(parts.len(), 1);
+        }
+    }
+    assert_status(&tree, b"running", look::STATUS_ACTIVE);
+    assert_status(&tree, b"Completed", look::STATUS_DONE);
+    for (index, node) in tree.nodes().iter().enumerate() {
+        if node.role == Role::TreeItem && node.name.as_deref() == Some(b"Task 12") {
+            let parts = children(&tree, index);
+            assert_eq!(parts.len(), 3);
+            assert_eq!(tree.nodes()[parts.as_slice()[0]].styles.as_slice(), [look::PLAN_ROW]);
+            assert_eq!(parts.as_slice()[1], list);
+            assert_eq!(tree.nodes()[parts.as_slice()[2]].role, Role::TreeItem);
+        }
+    }
+}
+#[test]
+fn a_cut_dependency_line_ends_with_its_last_line() {
+    for populated in [false, true] {
+        let mut row = if populated { dependency_row() } else { row() };
+        row.cut = true;
+        let tree = plan_with_row(row);
+        let list = styled(&tree, look::DEPENDENCIES);
+        let items = children(&tree, list);
+        assert_eq!(items.len(), if populated { 4 } else { 1 });
+        let item = *items.as_slice().last().expect("cut item");
+        assert_eq!(tree.nodes()[item].role, Role::Item);
+        assert_eq!(tree.nodes()[item].key, None);
+        let parts = children(&tree, item);
+        assert_eq!(parts.len(), 1);
+        let line = &tree.nodes()[parts.as_slice()[0]];
+        assert_eq!(line.role, Role::Paragraph);
+        assert_eq!(line.name.as_deref(), Some(b"More dependencies not shown.".as_slice()));
+    }
+}
+#[test]
+fn the_goal_has_no_plan_row() {
+    let mut delivery = f::tree();
+    let c::Delivery::OwnerTree(owner) = &mut delivery else { panic!("owner tree") };
+    let mut dependencies = List::with_capacity(ONE);
+    dependencies.push(DEPENDENCY).expect("dependency");
+    owner_phase(&mut owner.root, c::OwnerChipPhase::Waiting { dependencies, more: false, holds: false });
+    let c::ChipPhase::Owner { details, .. } = owner.root.details.as_mut() else { panic!("owner") };
+    details.dependencies = List::with_capacity(ONE);
+    details
+        .dependencies
+        .push(c::Dependency { number: DEPENDENCY, pending: true, added: None, keeps: true, status: None })
+        .expect("dependency fact");
+    let tree = plan(&delivery);
+    assert!(fixtures::find(&tree, Role::TreeItem, b"Task 9").is_none());
+    for node in tree.nodes() {
+        assert!(!node.styles.as_slice().contains(&look::DEPENDENCIES));
+        assert!(!node.styles.as_slice().contains(&look::PLAN_ROW));
+    }
+}
+#[test]
+fn the_header_says_what_the_task_waits_for() {
+    let mut task = titled();
+    let mut dependencies = List::with_capacity(ONE);
+    dependencies.push(DEPENDENCY).expect("dependency");
+    task.waits_on = c::WaitsOn::Dependencies { pending: dependencies, count: 1 };
+    assert_status(&header(&task, None), b"waiting on task 17", look::STATUS_QUIET);
+}
+
+pub(super) fn dependency_plan() -> Tree {
+    plan_with_row(dependency_row())
+}
+
+fn observed(chip: &mut c::Chip, work: Option<c::OwnerChipWork>) {
+    owner_phase(chip, c::OwnerChipPhase::Active(c::RunStage::Running { attempt: ONE.into() }));
+    let c::ChipPhase::Owner { details, .. } = chip.details.as_mut() else { panic!("owner") };
+    if let Some(work) = work {
+        details.observation = Some(c::OwnerChipObservation {
+            channel: skein_lib::Token::new(1),
+            work,
+            since: skein_lib::Wall::EPOCH,
+            reported_at: skein_lib::Wall::EPOCH,
+            started: None,
+        });
+    } else {
+        details.observation = None;
+    }
+}
+#[test]
+fn a_running_row_and_header_say_the_observed_work() {
+    let cases: [(Option<c::OwnerChipWork>, &[u8]); 4] = [
+        (None, b"running"),
+        (Some(c::OwnerChipWork::Writing), "running · writing".as_bytes()),
+        (
+            Some(c::OwnerChipWork::Tool { call: Box::from(*b"call"), tool: Box::from(*b"read_file") }),
+            "running · a tool · read_file".as_bytes(),
+        ),
+        (Some(c::OwnerChipWork::Waiting), b"running"),
+    ];
+    for (work, expected) in cases {
+        let mut row = row();
+        observed(&mut row.chip, work);
+        let mut task = titled();
+        task.chip = row.chip.clone();
+        task.waits_on = c::WaitsOn::Nothing;
+        assert_status(&header(&task, None), expected, look::STATUS_ACTIVE);
+        assert_status(&plan_with_row(row), expected, look::STATUS_ACTIVE);
+    }
+}
+fn party_wait(whom: c::Whom) -> c::WaitsOn {
+    c::WaitsOn::Party { whom, entries: ONE, task: CHILD, kind: c::WaitedFor::Question }
+}
+#[test]
+fn the_header_says_its_exact_wait_and_goal_priority_in_both_shells() {
+    let mut task = titled();
+    task.priority = Some(PRIORITY);
+    let root = f::held_root();
+    let mut me = root.pages().me(root.client()).expect("me").clone();
+    me.projects.get_mut(0).expect("project").role = c::HeldRole::Owner;
+    let mut pending = List::with_capacity(ONE);
+    pending.push(DEPENDENCY).expect("pending");
+    let cases: [(c::WaitsOn, &[u8]); 6] = [
+        (c::WaitsOn::Dependencies { pending, count: 3 }, b"waiting on 3 tasks"),
+        (party_wait(c::Whom::Person(me.party.number)), b"waiting on an answer from you"),
+        (party_wait(c::Whom::Role { project: task.project, role: 0 }), b"waiting on an answer from you"),
+        (party_wait(c::Whom::Person(DEPENDENCY)), b"waiting on an answer from person 17"),
+        (party_wait(c::Whom::Role { project: task.project, role: 7 }), b"waiting on an answer from role 7"),
+        (c::WaitsOn::News, b"waiting on news"),
+    ];
+    for words in [fixtures::words(), fixtures::browser_words()] {
+        for (waits_on, expected) in &cases {
+            task.waits_on = waits_on.clone();
+            let mut builder = Builder::new(&fixtures::tree_limits());
+            crate::pages::task::header(&mut builder, &task, Some(&me), &words);
+            let tree = builder.finish();
+            assert_status(&tree, expected, look::STATUS_QUIET);
+            assert!(fixtures::find(&tree, Role::Paragraph, "Goal · priority 1".as_bytes()).is_some());
+        }
+        task.waits_on = c::WaitsOn::Delegates;
+        for (count, expected) in
+            [(0, b"waiting on 0 delegates".as_slice()), (1, b"waiting on 1 delegate"), (2, b"waiting on 2 delegates")]
+        {
+            let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() else { panic!("owner") };
+            details.live_delegates = count;
+            let mut builder = Builder::new(&fixtures::tree_limits());
+            crate::pages::task::header(&mut builder, &task, Some(&me), &words);
+            assert_status(&builder.finish(), expected, look::STATUS_QUIET);
+        }
+    }
+}
+#[test]
+fn both_plan_shapes_omit_the_goal_and_keep_its_hold_and_folds() {
+    let root = f::held_root();
+    let mut owner = f::tree();
+    let c::Delivery::OwnerTree(tree) = &mut owner else { panic!("owner tree") };
+    tree.root.phase = c::Phase::Held;
+    tree.rows = List::with_capacity(ONE);
+    tree.rows.push(row()).expect("row");
+    tree.folded = List::with_capacity(ONE);
+    tree.folded
+        .push(c::OwnerTreeFold {
+            parent: TASK,
+            phases: c::OwnerPhaseCounts { running: 2, ..c::OwnerPhaseCounts::ZERO },
+            held_below: 0,
+        })
+        .expect("root fold");
+    let counts =
+        c::PhaseCounts { ended: 0, waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 };
+    let mut legacy = c::Tree { task: TASK, nodes: List::with_capacity(2), folded: counts, held_below: 0 };
+    for (chip, parent, folded) in
+        [(tree.root.clone(), None, c::PhaseCounts { running: 2, ..counts }), (row().chip, Some(TASK), counts)]
+    {
+        legacy
+            .nodes
+            .push(c::TreeNode {
+                chip,
+                parent,
+                dependencies: List::with_capacity(NO_ROWS),
+                proposals: List::with_capacity(NO_ROWS),
+                spend: ROW_SPENT + 7,
+                folded,
+                held_below: 0,
+            })
+            .expect("node");
+    }
+    for delivery in [owner, c::Delivery::Tree(Box::new(legacy))] {
+        let mut builder = Builder::new(&fixtures::tree_limits());
+        crate::pages::task::plan(
+            &mut builder,
+            &delivery,
+            &root,
+            &fixtures::words(),
+            &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+            fixtures::domain_limits().client.domain.rows,
+        );
+        let tree = builder.finish();
+        assert!(fixtures::find(&tree, Role::TreeItem, b"Task 9").is_none());
+        let top = children(&tree, styled(&tree, look::PLAN));
+        let nodes = tree.nodes();
+        assert_eq!(nodes[top.as_slice()[0]].styles.as_slice(), [look::PLAN_HOLD]);
+        assert_eq!(nodes[top.as_slice()[1]].role, Role::Paragraph);
+        assert_eq!(nodes[top.as_slice()[1]].name.as_deref(), Some(b"Folded: 2 Running".as_slice()));
+        assert_eq!(nodes[top.as_slice()[2]].role, Role::TreeItem);
+        assert_eq!(nodes[top.as_slice()[2]].name.as_deref(), Some(b"Task 12".as_slice()));
+    }
 }

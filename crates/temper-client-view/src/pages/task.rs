@@ -11,8 +11,8 @@ use temper_client_domain::{
     Address, Domain,
     pages::{
         Act,
-        delegation::{self, Kind, State},
-        task::Shape,
+        delegation::{self, Kind, State as ResultState},
+        task::{self, Shape, State},
     },
 };
 fn text(b: &mut Builder, role: Role, value: &[u8]) {
@@ -65,7 +65,7 @@ pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words:
     b.open(Role::Slot);
     b.style(look::META);
     if let Some(priority) = task.priority {
-        text(b, Role::Paragraph, &words.say(Word::Priority, &[Hole::Number(u64::from(priority))]));
+        text(b, Role::Paragraph, &words.say(Word::GoalPriority, &[Hole::Number(u64::from(priority))]));
     }
     b.open(Role::Slot);
     text(b, Role::Paragraph, &words.say(Word::Task, &[Hole::Number(task.chip.task)]));
@@ -94,7 +94,7 @@ pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words:
     text(b, Role::Heading { level: 1 }, task.chip.title.bytes());
     b.open(Role::Slot);
     b.style(look::META);
-    phase(b, task.chip.phase, words);
+    state(b, task::header_state(task, me), words);
     requester(b, task.requester, me, words);
     b.close();
     b.close();
@@ -124,10 +124,44 @@ fn requester(b: &mut Builder, by: c::OwnerRequester, me: Option<&c::Me>, words: 
     };
     text(b, Role::Paragraph, &words.say(word, &[Hole::Number(number)]));
 }
-fn phase(b: &mut Builder, phase: c::Phase, words: &Words) {
+fn state(b: &mut Builder, state: State, words: &Words) {
+    let (name, token) = match state {
+        State::Phase(phase) => (words.say_word(jig_client::words::Word::Phase(phase), &[]), phase_token(phase)),
+        State::WaitingFor(number) => (words.say(Word::WaitingForTask, &[Hole::Number(number)]), look::STATUS_QUIET),
+        State::WaitingForTasks { count, more } => (
+            words.say(
+                if more { Word::WaitingForMoreTasks } else { Word::WaitingForTasks },
+                &[Hole::Number(u64::from(count))],
+            ),
+            look::STATUS_QUIET,
+        ),
+        State::WaitingForHoldings => (words.say(Word::WaitingForHoldings, &[]), look::STATUS_QUIET),
+        State::WaitingForDelegates(count) => {
+            (words.say(Word::WaitingForDelegates, &[Hole::Number(u64::from(count))]), look::STATUS_QUIET)
+        }
+        State::WaitingForYou => (words.say(Word::WaitingForYou, &[]), look::STATUS_QUIET),
+        State::WaitingForParty(whom) => {
+            let (word, number) = match whom {
+                c::Whom::Person(person) => (Word::WaitingForPerson, person),
+                c::Whom::Role { role, .. } => (Word::WaitingForRole, u64::from(role)),
+            };
+            (words.say(word, &[Hole::Number(number)]), look::STATUS_QUIET)
+        }
+        State::WaitingForNews => (words.say(Word::WaitingForNews, &[]), look::STATUS_QUIET),
+        State::Running => (words.say(Word::Running, &[]), look::STATUS_ACTIVE),
+        State::Writing => (words.say(Word::Writing, &[]), look::STATUS_ACTIVE),
+        State::Tool(tool) => (words.say(Word::RunningTool, &[Hole::Name(tool)]), look::STATUS_ACTIVE),
+        State::Ended(status) => {
+            let phase = match status {
+                c::OwnerTaskStatus::Done => c::Phase::Done,
+                c::OwnerTaskStatus::Failed => c::Phase::Failed,
+                c::OwnerTaskStatus::Cancelled => c::Phase::Cancelled,
+            };
+            (words.say_word(jig_client::words::Word::Phase(phase), &[]), phase_token(phase))
+        }
+    };
     b.open(Role::Status);
-    b.style(phase_token(phase));
-    let name = words.say_word(jig_client::words::Word::Phase(phase), &[]);
+    b.style(token);
     b.name(&name);
     b.text(Run::Plain, &name);
     b.close();
@@ -189,8 +223,9 @@ pub(crate) fn asked(b: &mut Builder, task: &c::Task, words: &Words) {
 pub(crate) fn result(b: &mut Builder, task: &c::Task, words: &Words) {
     let facts = delegation::facts(task);
     match facts.state {
-        State::Running | State::Held => return,
-        State::Done | State::Landed | State::Failed | State::Cancelled | State::Ended => {}
+        ResultState::Running | ResultState::Held => return,
+        ResultState::Done | ResultState::Landed | ResultState::Failed | ResultState::Cancelled | ResultState::Ended => {
+        }
     }
     region(b, Word::GoalResult, words);
     b.style(look::TASK_CARD);
@@ -294,7 +329,15 @@ fn chip(b: &mut Builder, chip: &c::Chip, words: &Words, bindings: &mut Bindings)
     text(b, Role::Paragraph, chip.title.bytes());
     b.close();
     executor(b, chip.executor, words);
-    phase(b, chip.phase, words);
+    state(b, task::row_state(chip), words);
+    if let c::ChipPhase::Owner { details, .. } = chip.details.as_ref() {
+        b.open(Role::Paragraph);
+        b.style(look::PLAN_SPEND);
+        let name = words.say(Word::RowSpent, &[Hole::Number(details.budget.numbers.spent)]);
+        b.name(&name);
+        b.text(Run::Plain, &name);
+        b.close();
+    }
     if let c::ChipPhase::Owner { details, .. } = chip.details.as_ref()
         && let Some(part) = &details.procedure
     {
@@ -357,14 +400,13 @@ pub(crate) fn plan(
     b.name(&words.say(Word::Plan, &[]));
     match tree {
         c::Delivery::OwnerTree(tree) => {
-            let mut stack = List::with_capacity(tree.rows.len().checked_add(1).expect("tree stack fits"));
-            chip(b, &tree.root, words, bindings);
+            let mut stack = List::with_capacity(tree.rows.len());
             controls(b, &tree.root, root, words, bindings, rows);
-            stack.push(tree.root.task).expect("root fits");
             owner_folds(b, tree, tree.root.task, words);
             for row in &tree.rows {
                 parent(b, &mut stack, Some(row.parent));
                 chip(b, &row.chip, words, bindings);
+                dependencies(b, row, words, bindings);
                 controls(b, &row.chip, root, words, bindings, rows);
                 stack.push(row.chip.task).expect("tree stack fits");
                 owner_folds(b, tree, row.chip.task, words);
@@ -376,9 +418,13 @@ pub(crate) fn plan(
             let mut stack = List::with_capacity(tree.nodes.len());
             for node in &tree.nodes {
                 parent(b, &mut stack, node.parent);
-                chip(b, &node.chip, words, bindings);
+                if node.chip.task != tree.task {
+                    chip(b, &node.chip, words, bindings);
+                }
                 controls(b, &node.chip, root, words, bindings, rows);
-                stack.push(node.chip.task).expect("tree stack fits");
+                if node.chip.task != tree.task {
+                    stack.push(node.chip.task).expect("tree stack fits");
+                }
                 counts(b, node.folded, node.held_below, words);
             }
             parent(b, &mut stack, None);
@@ -399,6 +445,29 @@ pub(crate) fn plan(
         | c::Delivery::OwnerAccounts(_) => {}
     }
     b.close();
+    b.close();
+}
+fn dependencies(b: &mut Builder, row: &c::OwnerTreeRow, words: &Words, bindings: &mut Bindings) {
+    if row.dependencies.is_empty() && !row.cut {
+        return;
+    }
+    b.open(Role::List);
+    b.name(&words.say(Word::Dependencies, &[Hole::Number(row.chip.task)]));
+    b.style(look::DEPENDENCIES);
+    for link in &row.dependencies {
+        b.open(Role::Item);
+        b.key(super::inbox::card_key(c::ObjectKey::Task(link.number())));
+        task_link(b, link.number(), words, bindings);
+        if let Some(value) = task::link_state(link) {
+            state(b, value, words);
+        }
+        b.close();
+    }
+    if row.cut {
+        b.open(Role::Item);
+        text(b, Role::Paragraph, &words.say(Word::DependenciesCut, &[]));
+        b.close();
+    }
     b.close();
 }
 fn controls(b: &mut Builder, chip: &c::Chip, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32) {

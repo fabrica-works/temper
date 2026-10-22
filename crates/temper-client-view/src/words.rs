@@ -191,10 +191,27 @@ pub enum Word {
     SignOut,
     SignOutLost,
     Unshowable,
+
+    WaitingForTask,
+    WaitingForTasks,
+    WaitingForMoreTasks,
+    WaitingForHoldings,
+    RowSpent,
+    Dependencies,
+    DependenciesCut,
+    WaitingForDelegates,
+    WaitingForYou,
+    WaitingForPerson,
+    WaitingForRole,
+    WaitingForNews,
+    Running,
+    Writing,
+    RunningTool,
+    GoalPriority,
 }
 // Room for temper, jig, account, card and forge phrases.
-const PHRASES: u32 = 544;
-const ALL: [Word; 177] = [
+const PHRASES: u32 = 560;
+const ALL: [Word; 193] = [
     Word::WaitRefused,
     Word::DependencyParked,
     Word::WaitInvalid,
@@ -372,6 +389,22 @@ const ALL: [Word; 177] = [
     Word::SignOut,
     Word::SignOutLost,
     Word::Unshowable,
+    Word::WaitingForTask,
+    Word::WaitingForTasks,
+    Word::WaitingForMoreTasks,
+    Word::WaitingForHoldings,
+    Word::RowSpent,
+    Word::Dependencies,
+    Word::DependenciesCut,
+    Word::WaitingForDelegates,
+    Word::WaitingForYou,
+    Word::WaitingForPerson,
+    Word::WaitingForRole,
+    Word::WaitingForNews,
+    Word::Running,
+    Word::Writing,
+    Word::RunningTool,
+    Word::GoalPriority,
 ];
 impl Word {
     #[expect(clippy::too_many_lines, reason = "one exhaustive table keeps the frame phrase IDs stable")]
@@ -558,6 +591,23 @@ impl Word {
             Self::SignOut => 108,
             Self::SignOutLost => 109,
             Self::Unshowable => 24,
+
+            Self::WaitingForTask => 288,
+            Self::WaitingForTasks => 289,
+            Self::WaitingForMoreTasks => 290,
+            Self::WaitingForHoldings => 291,
+            Self::RowSpent => 292,
+            Self::Dependencies => 293,
+            Self::DependenciesCut => 294,
+            Self::WaitingForDelegates => 295,
+            Self::WaitingForYou => 296,
+            Self::WaitingForPerson => 297,
+            Self::WaitingForRole => 298,
+            Self::WaitingForNews => 299,
+            Self::Running => 330,
+            Self::Writing => 331,
+            Self::RunningTool => 332,
+            Self::GoalPriority => 334,
         };
         let owner =
             if number >= 100 { crate::frame::owner() } else { temper_client_domain::forge::words::owner(connector) };
@@ -617,13 +667,25 @@ impl Words {
                 }
             }
             let id = word.id(connector);
-            shapes.push(PhraseShape { id, holes: holes.into_boxed(), plural: None }).expect("closed shapes fit");
-            phrases
-                .push(Phrase {
-                    id,
-                    forms: Box::new([Form { class: PluralClass::Other, segments: segments.into_boxed() }]),
-                })
-                .expect("closed phrases fit");
+            let plural = if word == Word::WaitingForDelegates { Some(0) } else { None };
+            shapes.push(PhraseShape { id, holes: holes.into_boxed(), plural }).expect("closed shapes fit");
+            let other = Form { class: PluralClass::Other, segments: segments.into_boxed() };
+            let forms: Box<[Form]> = if word == Word::WaitingForDelegates {
+                Box::new([
+                    Form {
+                        class: PluralClass::One,
+                        segments: Box::new([
+                            Segment::Text(copy_of(b"waiting on ")),
+                            Segment::Hole { index: 0, kind: HoleKind::Number },
+                            Segment::Text(copy_of(b" delegate")),
+                        ]),
+                    },
+                    other,
+                ])
+            } else {
+                Box::new([other])
+            };
+            phrases.push(Phrase { id, forms }).expect("closed phrases fit");
         }
         for word in jig_client::words::ALL {
             shapes.push(word.shape(text)).expect("jig word shapes fit");
@@ -885,6 +947,23 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::SignOut => (&[b"Sign out"], &[]),
         Word::SignOutLost => (&[b"Sign out did not reach the engine."], &[]),
         Word::Unshowable => (&[b"Cannot show this part."], &[]),
+
+        Word::WaitingForTask => (&[b"waiting on task ", b""], &[Number]),
+        Word::WaitingForTasks => (&[b"waiting on ", b" tasks"], &[Number]),
+        Word::WaitingForMoreTasks => (&[b"waiting on more than ", b" tasks"], &[Number]),
+        Word::WaitingForHoldings => (&[b"waiting on its resources"], &[]),
+        Word::RowSpent => (&[b"", b" spent"], &[Number]),
+        Word::Dependencies => (&[b"Dependencies of task ", b""], &[Number]),
+        Word::DependenciesCut => (&[b"More dependencies not shown."], &[]),
+        Word::WaitingForDelegates => (&[b"waiting on ", b" delegates"], &[Number]),
+        Word::WaitingForYou => (&[b"waiting on an answer from you"], &[]),
+        Word::WaitingForPerson => (&[b"waiting on an answer from person ", b""], &[Number]),
+        Word::WaitingForRole => (&[b"waiting on an answer from role ", b""], &[Number]),
+        Word::WaitingForNews => (&[b"waiting on news"], &[]),
+        Word::Running => (&[b"running"], &[]),
+        Word::Writing => (&[b"running \xc2\xb7 writing"], &[]),
+        Word::RunningTool => (&[b"running \xc2\xb7 a tool \xc2\xb7 ", b""], &[Name]),
+        Word::GoalPriority => (&[b"Goal \xc2\xb7 priority ", b""], &[Number]),
     }
 }
 

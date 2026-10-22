@@ -443,8 +443,10 @@ mod memory_literal;
 // The live delegates' trailing region adds 574,364 B, so 4,825,388,783 B.
 // Goal cards add 236 nodes x 574,364 B and 4,736 B for the larger phrasebook,
 // giving 4,960,943,423 B.
+// Plan rows add 32 x 574,364 B, phrases 2,368 B and a tool name 32 B,
+// less 8 B of root stack: +18,382,040 B, giving 4,979,325,463 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 4960943423;
+const ACCOUNT_BYTES: u64 = 4979325463;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

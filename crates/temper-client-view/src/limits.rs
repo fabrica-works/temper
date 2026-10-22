@@ -64,11 +64,17 @@ impl Limits {
             .checked_add(2)?
             .checked_add(34)?
             .checked_add(jig_client::contract::AUTHORITY_MODELS.checked_mul(2)?)?;
+        // Each plan row adds a spend paragraph, dependency list and cut item
+        // with a paragraph: six nodes including their text children. Each
+        // dependency adds an item, link and status with text: five nodes,
+        // bounded by jig's receiving rows count per row.
+        let dependencies = receiving.rows.checked_mul(5)?.checked_add(6)?.checked_mul(receiving.rows)?;
         let nodes = cards
             .checked_add(turns)?
             .checked_add(delegated)?
             .checked_add(goal)?
             .checked_add(receiving.rows.checked_mul(32)?)?
+            .checked_add(dependencies)?
             .checked_add(receiving.projects.checked_mul(4)?)?
             .checked_add(128)?
             .max(account_nodes)
@@ -95,7 +101,9 @@ impl Limits {
 #[must_use]
 pub fn worst_case(limits: &Limits, domain: &temper_client_domain::Limits, words: &Words) -> Option<u64> {
     skein_ui::worst_case(&limits.tree)?
-        .checked_add(skein_lib::List::<u64>::worst_case(domain.client.domain.rows.checked_add(1)?)?)?
+        // One transient row/header state can own an observed tool name.
+        .checked_add(u64::from(domain.client.domain.text))?
+        .checked_add(skein_lib::List::<u64>::worst_case(domain.client.domain.rows)?)?
         .checked_add(
             skein_lib::List::<u64>::worst_case(temper_client_domain::pages::delegation::bound(domain))?
                 .checked_mul(2)?,

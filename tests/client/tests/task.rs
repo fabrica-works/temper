@@ -51,7 +51,7 @@ fn a_held_task_released_from_a_goals_plan_runs_again() {
                 within: fixtures::WITHIN,
             },
             Step::Press { find: Find::named(Role::Button, b"Confirm") },
-            Step::See { find: fixtures::plan_item(held, b"Running"), within: fixtures::WITHIN },
+            Step::See { find: fixtures::plan_item(held, b"running"), within: fixtures::WITHIN },
         ],
     );
     let outcome = world.run(Until::Done);

@@ -143,6 +143,10 @@ pub const UNAVAILABLE: Style = Style { owner: owner(), token: 68 };
 pub const TASK_CONTRACT: Style = Style { owner: owner(), token: 69 };
 /// A goal's budget and authority.
 pub const TASK_BUDGET: Style = Style { owner: owner(), token: 70 };
+/// A plan row's spend.
+pub const PLAN_SPEND: Style = Style { owner: owner(), token: 71 };
+/// A plan row's dependency line.
+pub const DEPENDENCIES: Style = Style { owner: owner(), token: 72 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -219,6 +223,8 @@ pub const NAMES: Names<'static> = Names {
         b"temper-unavailable",
         b"temper-task-contract",
         b"temper-task-budget",
+        b"temper-plan-spend",
+        b"temper-dependencies",
     ],
     regions: &[b"temper-link"],
 };

@@ -139,3 +139,207 @@ fn a_moved_hold_is_refused_and_the_card_asks_to_look_again() {
     assert_eq!(pages.cards().expect("cards").get(FIRST_CARD).expect("held").outcome, Some(outcome));
     assert!(fixtures::acts::sent(&mut fixtures::acts::act(&mut pages, Act::Confirm)).is_empty());
 }
+
+use crate::pages::task::{State, header_state, link_state, row_state};
+use skein_lib::{List, Wall};
+const DEPENDENCY: u64 = 17;
+const OTHER_DEPENDENCY: u64 = 23;
+#[test]
+fn a_tasks_state_says_what_it_waits_for() {
+    let cases: &[(&[u64], bool, bool, State)] = &[
+        (&[DEPENDENCY], false, false, State::WaitingFor(DEPENDENCY)),
+        (&[DEPENDENCY], false, true, State::WaitingFor(DEPENDENCY)),
+        (&[DEPENDENCY, OTHER_DEPENDENCY], false, false, State::WaitingForTasks { count: 2, more: false }),
+        (&[DEPENDENCY], true, true, State::WaitingForTasks { count: 1, more: true }),
+        (&[], true, true, State::WaitingForTasks { count: 0, more: true }),
+        (&[], false, true, State::WaitingForHoldings),
+        (&[], false, false, State::Phase(c::Phase::Waiting)),
+    ];
+    for (numbers, more, holds, expected) in cases {
+        let mut task = f::task();
+        let mut dependencies = List::with_capacity(WINDOW);
+        for number in *numbers {
+            dependencies.push(*number).expect("waiting dependencies");
+        }
+        f::phase(&mut task, c::OwnerChipPhase::Waiting { dependencies, more: *more, holds: *holds });
+        assert_eq!(row_state(&task.chip), expected.clone());
+    }
+}
+#[test]
+fn an_ended_task_says_its_owners_ending() {
+    for (ending, expected) in [
+        (
+            Some(c::OwnerChipEnding::Done(c::ResultValue::Report(f::document_text(b"Done")))),
+            State::Ended(c::OwnerTaskStatus::Done),
+        ),
+        (Some(c::OwnerChipEnding::Failed(f::document_text(b"Failed"))), State::Ended(c::OwnerTaskStatus::Failed)),
+        (
+            Some(c::OwnerChipEnding::Cancelled {
+                reason: f::document_text(b"Cancelled"),
+                result: None,
+                by: c::OwnerRequester::Person(fixtures::PARTY),
+                at: Wall::EPOCH,
+            }),
+            State::Ended(c::OwnerTaskStatus::Cancelled),
+        ),
+        (None, State::Phase(c::Phase::Ended)),
+    ] {
+        let mut task = f::task();
+        f::phase(&mut task, c::OwnerChipPhase::Ended);
+        let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() else { panic!("owner") };
+        details.ending = ending;
+        assert_eq!(row_state(&task.chip), expected);
+        task.waits_on = c::WaitsOn::News;
+        assert_eq!(header_state(&task, None), expected);
+    }
+}
+#[test]
+fn another_phase_says_jigs_phase() {
+    let mut task = f::task();
+    f::phase(&mut task, c::OwnerChipPhase::Active(c::RunStage::Idle));
+    let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() else { panic!("owner") };
+    details.ending = Some(c::OwnerChipEnding::Failed(f::document_text(b"Old ending")));
+    assert_eq!(row_state(&task.chip), State::Phase(task.chip.phase));
+    task.chip.phase = c::Phase::Waiting;
+    *task.chip.details = c::ChipPhase::Waiting {
+        dependencies: {
+            let mut dependencies = List::with_capacity(1);
+            dependencies.push(DEPENDENCY).expect("dependency");
+            dependencies
+        },
+        hold: None,
+    };
+    assert_eq!(row_state(&task.chip), State::Phase(c::Phase::Waiting));
+}
+#[test]
+fn a_dependencys_state_comes_from_its_link() {
+    let mut task = f::task();
+    let mut dependencies = List::with_capacity(1);
+    dependencies.push(DEPENDENCY).expect("dependency");
+    f::phase(&mut task, c::OwnerChipPhase::Waiting { dependencies, more: false, holds: false });
+    let chip = task.chip;
+    let expected = State::WaitingFor(DEPENDENCY);
+    assert_eq!(link_state(&c::OwnerTaskLink::Live(chip.clone())), Some(expected.clone()));
+    assert_eq!(link_state(&c::OwnerTaskLink::Retained { chip, at: Some(Wall::EPOCH) }), Some(expected.clone()));
+    for status in [c::OwnerTaskStatus::Done, c::OwnerTaskStatus::Failed, c::OwnerTaskStatus::Cancelled] {
+        assert_eq!(
+            link_state(&c::OwnerTaskLink::Stored { number: DEPENDENCY, status: Some(status) }),
+            Some(State::Ended(status))
+        );
+    }
+    assert_eq!(link_state(&c::OwnerTaskLink::Stored { number: DEPENDENCY, status: None }), None);
+}
+
+const ATTEMPT: u64 = f::ATTEMPT;
+fn observation(work: c::OwnerChipWork) -> c::OwnerChipObservation {
+    c::OwnerChipObservation {
+        channel: skein_lib::Token::new(1),
+        work,
+        since: Wall::EPOCH,
+        reported_at: Wall::EPOCH,
+        started: None,
+    }
+}
+#[test]
+fn a_running_rows_state_says_its_observed_work() {
+    for (work, expected) in [
+        (None, State::Running),
+        (Some(c::OwnerChipWork::Writing), State::Writing),
+        (
+            Some(c::OwnerChipWork::Tool { call: Box::from(*b"call"), tool: Box::from(*b"read_file") }),
+            State::Tool(Box::from(*b"read_file")),
+        ),
+        (Some(c::OwnerChipWork::Preparing), State::Running),
+        (Some(c::OwnerChipWork::Starting), State::Running),
+        (Some(c::OwnerChipWork::Active), State::Running),
+        (Some(c::OwnerChipWork::Waiting), State::Running),
+        (Some(c::OwnerChipWork::Ending), State::Running),
+    ] {
+        let mut task = f::task();
+        f::phase(&mut task, c::OwnerChipPhase::Active(c::RunStage::Running { attempt: ATTEMPT }));
+        let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() else { panic!("owner") };
+        if let Some(work) = work {
+            details.observation = Some(observation(work));
+        } else {
+            details.observation = None;
+        }
+        assert_eq!(row_state(&task.chip), expected);
+        task.waits_on = c::WaitsOn::Nothing;
+        assert_eq!(header_state(&task, None), expected);
+    }
+}
+fn pending(numbers: &[u64]) -> List<u64> {
+    let mut pending = List::with_capacity(WINDOW);
+    for number in numbers {
+        pending.push(*number).expect("pending task");
+    }
+    pending
+}
+#[test]
+fn the_headers_dependencies_use_the_supplied_exact_count() {
+    for (numbers, count, expected) in [
+        (&[DEPENDENCY][..], 1, State::WaitingFor(DEPENDENCY)),
+        (&[DEPENDENCY, OTHER_DEPENDENCY][..], 2, State::WaitingForTasks { count: 2, more: false }),
+        (&[DEPENDENCY][..], 3, State::WaitingForTasks { count: 3, more: false }),
+        (&[][..], 1, State::WaitingForTasks { count: 1, more: false }),
+    ] {
+        let mut task = f::task();
+        task.waits_on = c::WaitsOn::Dependencies { pending: pending(numbers), count };
+        assert_eq!(header_state(&task, None), expected);
+    }
+}
+#[test]
+fn the_headers_delegates_use_the_chips_live_count() {
+    for count in [0, 1, 3] {
+        let mut task = f::task();
+        task.waits_on = c::WaitsOn::Delegates;
+        let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() else { panic!("owner") };
+        details.live_delegates = count;
+        assert_eq!(header_state(&task, None), State::WaitingForDelegates(count));
+    }
+}
+fn party_wait(whom: c::Whom) -> c::WaitsOn {
+    c::WaitsOn::Party { whom, entries: 1, task: DEPENDENCY, kind: c::WaitedFor::Question }
+}
+#[test]
+fn the_headers_party_is_you_only_for_the_person_or_a_held_project_role() {
+    let mut task = f::task();
+    let mut me = fixtures::chats::me();
+    task.waits_on = party_wait(c::Whom::Person(me.party.number));
+    assert_eq!(header_state(&task, Some(&me)), State::WaitingForYou);
+    assert_eq!(header_state(&task, None), State::WaitingForParty(c::Whom::Person(me.party.number)));
+    task.waits_on = party_wait(c::Whom::Person(DEPENDENCY));
+    assert_eq!(header_state(&task, Some(&me)), State::WaitingForParty(c::Whom::Person(DEPENDENCY)));
+    for (held, number) in [
+        (c::HeldRole::Owner, 0),
+        (c::HeldRole::Maintainer, 1),
+        (c::HeldRole::Member, 2),
+        (c::HeldRole::Observer, 3),
+        (c::HeldRole::Policy { role: 7 }, 7),
+    ] {
+        me.projects.get_mut(0).expect("project").role = held;
+        let whom = c::Whom::Role { project: task.project, role: number };
+        task.waits_on = party_wait(whom);
+        assert_eq!(header_state(&task, Some(&me)), State::WaitingForYou);
+        assert_eq!(header_state(&task, None), State::WaitingForParty(whom));
+        let other_project = c::Whom::Role { project: task.project + 1, role: number };
+        task.waits_on = party_wait(other_project);
+        assert_eq!(header_state(&task, Some(&me)), State::WaitingForParty(other_project));
+    }
+    let whom = c::Whom::Role { project: task.project, role: 8 };
+    task.waits_on = party_wait(whom);
+    assert_eq!(header_state(&task, Some(&me)), State::WaitingForParty(whom));
+    me.projects.clear();
+    assert_eq!(header_state(&task, Some(&me)), State::WaitingForParty(whom));
+}
+#[test]
+fn the_header_says_news_or_falls_back_to_the_row_when_nothing_is_pending() {
+    let mut task = f::task();
+    task.waits_on = c::WaitsOn::News;
+    assert_eq!(header_state(&task, None), State::WaitingForNews);
+    f::phase(&mut task, c::OwnerChipPhase::Waiting { dependencies: pending(&[DEPENDENCY]), more: false, holds: false });
+    for waits_on in [c::WaitsOn::Nothing, c::WaitsOn::Dependencies { pending: pending(&[]), count: 0 }] {
+        task.waits_on = waits_on;
+        assert_eq!(header_state(&task, None), State::WaitingFor(DEPENDENCY));
+    }
+}

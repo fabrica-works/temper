@@ -4,6 +4,180 @@ use crate::{Address, Limits, owner::Owner};
 use alloc::boxed::Box;
 use jig_client::{Client, Handle, Latest, Readable, Readout, Told, Watchable, contract as c};
 use skein_lib::{List, Queue};
+/// A task's state as a goal's page says it (client/README.md, 5.8).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum State {
+    /// jig's word for its phase.
+    Phase(c::Phase),
+    /// Waiting on one listed dependency: this task.
+    WaitingFor(u64),
+    /// Waiting on `count` listed dependencies, and on more when the list was cut.
+    WaitingForTasks { count: u32, more: bool },
+    /// Waiting on no dependency, for its holdings.
+    WaitingForHoldings,
+    /// Waiting for the supplied number of live delegates.
+    WaitingForDelegates(u32),
+    /// Waiting for an answer from the reader.
+    WaitingForYou,
+    /// Waiting for an answer from another person or role.
+    WaitingForParty(c::Whom),
+    /// Waiting for news.
+    WaitingForNews,
+    /// Running without more specific observed work.
+    Running,
+    /// Observed writing.
+    Writing,
+    /// Observed using this tool.
+    Tool(Box<[u8]>),
+    /// Ended, with its owner's ending.
+    Ended(c::OwnerTaskStatus),
+}
+/// A task's state from its chip.
+#[must_use]
+pub fn row_state(chip: &c::Chip) -> State {
+    if chip.phase == c::Phase::Running {
+        if let c::ChipPhase::Owner { details, .. } = chip.details.as_ref()
+            && let Some(observation) = &details.observation
+        {
+            match &observation.work {
+                c::OwnerChipWork::Writing => return State::Writing,
+                c::OwnerChipWork::Tool { tool, .. } => return State::Tool(tool.clone()),
+                c::OwnerChipWork::Preparing
+                | c::OwnerChipWork::Starting
+                | c::OwnerChipWork::Active
+                | c::OwnerChipWork::Waiting
+                | c::OwnerChipWork::Ending => {}
+            }
+        }
+        return State::Running;
+    }
+    match chip.details.as_ref() {
+        c::ChipPhase::Owner { phase: c::OwnerChipPhase::Waiting { dependencies, more, holds }, .. } => {
+            if dependencies.len() == 1 && !more {
+                State::WaitingFor(*dependencies.as_slice().first().expect("one dependency"))
+            } else if !dependencies.is_empty() || *more {
+                State::WaitingForTasks { count: dependencies.len(), more: *more }
+            } else if *holds {
+                State::WaitingForHoldings
+            } else {
+                State::Phase(chip.phase)
+            }
+        }
+        c::ChipPhase::Owner { phase: c::OwnerChipPhase::Ended, details } => match &details.ending {
+            Some(c::OwnerChipEnding::Done(_)) => State::Ended(c::OwnerTaskStatus::Done),
+            Some(c::OwnerChipEnding::Failed(_)) => State::Ended(c::OwnerTaskStatus::Failed),
+            Some(c::OwnerChipEnding::Cancelled { .. }) => State::Ended(c::OwnerTaskStatus::Cancelled),
+            None => State::Phase(chip.phase),
+        },
+        c::ChipPhase::Owner {
+            phase:
+                c::OwnerChipPhase::Active(_)
+                | c::OwnerChipPhase::Person { .. }
+                | c::OwnerChipPhase::Closing(_)
+                | c::OwnerChipPhase::Held { .. },
+            ..
+        }
+        | c::ChipPhase::Active(_)
+        | c::ChipPhase::Waiting { .. }
+        | c::ChipPhase::Idle { .. }
+        | c::ChipPhase::Starting
+        | c::ChipPhase::Running { .. }
+        | c::ChipPhase::WaitingForWords { .. }
+        | c::ChipPhase::BackingOff { .. }
+        | c::ChipPhase::Procedure { .. }
+        | c::ChipPhase::Person { .. }
+        | c::ChipPhase::Closing(_)
+        | c::ChipPhase::Held { .. }
+        | c::ChipPhase::Ended { .. } => State::Phase(chip.phase),
+    }
+}
+/// A goal's header state from its exact wait, falling back to its chip.
+#[must_use]
+pub fn header_state(task: &c::Task, me: Option<&c::Me>) -> State {
+    match task.chip.phase {
+        c::Phase::Ended | c::Phase::Done | c::Phase::Failed | c::Phase::Cancelled => return row_state(&task.chip),
+        c::Phase::Waiting
+        | c::Phase::Idle
+        | c::Phase::Due
+        | c::Phase::Preparing
+        | c::Phase::Claimed
+        | c::Phase::Running
+        | c::Phase::Active
+        | c::Phase::BackingOff
+        | c::Phase::Closing
+        | c::Phase::Held => {}
+    }
+    match &task.waits_on {
+        c::WaitsOn::Dependencies { pending, count } => {
+            if *count == 1 && pending.len() == 1 {
+                State::WaitingFor(*pending.as_slice().first().expect("one pending task"))
+            } else if *count != 0 {
+                State::WaitingForTasks { count: *count, more: false }
+            } else {
+                row_state(&task.chip)
+            }
+        }
+        c::WaitsOn::Delegates => match task.chip.details.as_ref() {
+            c::ChipPhase::Owner { details, .. } => State::WaitingForDelegates(details.live_delegates),
+            c::ChipPhase::Active(_)
+            | c::ChipPhase::Waiting { .. }
+            | c::ChipPhase::Idle { .. }
+            | c::ChipPhase::Starting
+            | c::ChipPhase::Running { .. }
+            | c::ChipPhase::WaitingForWords { .. }
+            | c::ChipPhase::BackingOff { .. }
+            | c::ChipPhase::Procedure { .. }
+            | c::ChipPhase::Person { .. }
+            | c::ChipPhase::Closing(_)
+            | c::ChipPhase::Held { .. }
+            | c::ChipPhase::Ended { .. } => row_state(&task.chip),
+        },
+        c::WaitsOn::Party { whom, .. } => {
+            if let Some(me) = me
+                && reader(*whom, task.project, me)
+            {
+                State::WaitingForYou
+            } else {
+                State::WaitingForParty(*whom)
+            }
+        }
+        c::WaitsOn::News => State::WaitingForNews,
+        c::WaitsOn::Nothing => row_state(&task.chip),
+    }
+}
+// Jig's facts::reader is private; keep its person and project-role identity rule.
+fn reader(whom: c::Whom, project: u32, me: &c::Me) -> bool {
+    match whom {
+        c::Whom::Person(person) => person == me.party.number,
+        c::Whom::Role { project: held_project, role } => {
+            if held_project != project {
+                return false;
+            }
+            for held in &me.projects {
+                let number = match held.role {
+                    c::HeldRole::Owner => 0,
+                    c::HeldRole::Maintainer => 1,
+                    c::HeldRole::Member => 2,
+                    c::HeldRole::Observer => 3,
+                    c::HeldRole::Policy { role } => role,
+                };
+                if held.project == project && number == role {
+                    return true;
+                }
+            }
+            false
+        }
+    }
+}
+/// A dependency's state from its link; none when a stored link has no status.
+#[must_use]
+pub fn link_state(link: &c::OwnerTaskLink) -> Option<State> {
+    match link {
+        c::OwnerTaskLink::Live(chip) | c::OwnerTaskLink::Retained { chip, .. } => Some(row_state(chip)),
+        c::OwnerTaskLink::Stored { status: Some(status), .. } => Some(State::Ended(*status)),
+        c::OwnerTaskLink::Stored { status: None, .. } => None,
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Shape {
     Unknown,

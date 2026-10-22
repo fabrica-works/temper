@@ -10,16 +10,26 @@ fn region(b: &mut skein_ui::Builder, name: &[u8]) {
     b.name(name);
     text(b, Role::Heading { level: 2 }, name);
 }
-fn chip(b: &mut skein_ui::Builder, name: &[u8], title: &[u8], phase: &[u8]) {
+fn chip(b: &mut skein_ui::Builder, name: &[u8], title: &[u8], phase: &[u8], spent: &[u8]) {
     b.open(Role::TreeItem);
     b.name(name);
+    b.open(Role::Slot);
+    b.style(temper_client_view::look::PLAN_ROW);
+    b.open(Role::Slot);
     b.open(Role::Link);
     b.name(name);
     b.bind(binding());
     b.close();
     text(b, Role::Paragraph, title);
+    b.close();
     text(b, Role::Paragraph, b"Agent");
     text(b, Role::Status, phase);
+    b.open(Role::Paragraph);
+    b.style(temper_client_view::look::PLAN_SPEND);
+    b.name(spent);
+    b.text(Run::Plain, spent);
+    b.close();
+    b.close();
 }
 pub fn page() -> skein_ui::Tree {
     let mut b = skein_ui::Builder::new(&tree_limits());
@@ -30,8 +40,8 @@ pub fn page() -> skein_ui::Tree {
     for words in [b"Task 9".as_slice(), b"Refresh token handling", b"Agent"] {
         text(&mut b, Role::Paragraph, words);
     }
-    text(&mut b, Role::Status, b"Running");
-    for words in [b"Shop".as_slice(), b"Asked by Pat", b"Priority 1"] {
+    text(&mut b, Role::Status, b"running");
+    for words in [b"Shop".as_slice(), b"Asked by Pat", "Goal · priority 1".as_bytes()] {
         text(&mut b, Role::Paragraph, words);
     }
     b.close();
@@ -43,9 +53,22 @@ pub fn page() -> skein_ui::Tree {
     region(&mut b, b"Plan");
     b.open(Role::Tree);
     b.name(b"Plan");
-    chip(&mut b, b"Task 9", b"Refresh token handling", b"Running");
-    chip(&mut b, b"Task 12", b"Review the change", b"Held");
+    chip(&mut b, b"Task 12", b"Review the change", b"Held", b"4 spent");
     golden_cards::held(&mut b);
+    b.close();
+    chip(&mut b, b"Task 13", b"Write the release notes", b"waiting on task 12", b"0 spent");
+    b.open(Role::List);
+    b.name(b"Dependencies of task 13");
+    b.style(temper_client_view::look::DEPENDENCIES);
+    b.open(Role::Item);
+    b.key(skein_ui::Key { owner: temper_client_view::frame::owner(), kind: 0, a: 12, b: 0 });
+    b.open(Role::Link);
+    b.name(b"Task 12");
+    b.text(Run::Plain, b"Task 12");
+    b.bind(binding());
+    b.close();
+    text(&mut b, Role::Status, b"Held");
+    b.close();
     b.close();
     b.close();
     text(&mut b, Role::Status, b"Held below: 1");
