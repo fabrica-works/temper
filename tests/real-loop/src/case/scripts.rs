@@ -1,4 +1,4 @@
-//! Every judgement of reference-case.md, 4.1, played word for word.
+//! The reference case's judgements, played word for word (domain/testing.md, 5.3).
 use super::{
     A, A_REPORT, A_SPEC_PREFIX, A_SPEC_SUFFIX, ANSWERED, ASKED, Agent, DESIGN_DELEGATED, DESIGN_DOC, DESIGN_LINE,
     DESIGN_REPORT, DESIGN_SPEC, DESIGN_TITLE, DESIGN_WORDS, DIRECTOR, DIRECTOR_REPORT, GREEN_LIGHT,
@@ -97,5 +97,107 @@ pub fn step_4_1(forge: SocketAddr) -> Box<[Script]> {
                 &json!({"form":"verdict","label":"1","text":REVIEWED,"fields":{},"items":[]}),
             )]),
         },
+    ])
+}
+
+// Account stories use no forge grants and adopt no repository.
+fn owner(spec: &str, survey: bool) -> Turn {
+    call(
+        b"delegate",
+        &json!({"batch":[{
+            "executor":{"kind":"agent","charter":1},"tracked":{"priority":1},
+            "spec":{"words":spec,"parameters":[]},"contract":{"kind":"report","words":128},
+            "llm":{"main":{"model":OWNER_MODEL_NUMBER,"effort":OWNER_EFFORT_NUMBER}},
+            "authority":{"tools":3,"grants":[],
+                "delegation":{"kinds":[{"kind":"agent","number":1}],"tasks":u8::from(survey),"depth":1},
+                "budget":{"spend":20},"notes":0}
+        }]}),
+    )
+}
+
+#[must_use]
+pub fn step_4_5_refused(_forge: SocketAddr) -> Box<[Script]> {
+    use super::{REFUSED_A_SPEC, RESUMED_REPORT};
+    let mut resumed = report(RESUMED_REPORT);
+    let mut lines = vec![Line::Fail {
+        error: skein_fake_llm_domain::api::Error::Unauthorized,
+        report: skein_fake_llm_domain::api::Report::none(),
+        credentials: Box::new([0]),
+    }];
+    lines.extend(resumed.lines);
+    resumed.lines = lines.into();
+    Box::new([
+        Script {
+            cue: Agent::Director.cue().into(),
+            turns: Box::new([owner(REFUSED_A_SPEC, false), wait("A delegated."), report(RESUMED_REPORT)]),
+        },
+        Script { cue: Agent::A.cue().into(), turns: Box::new([resumed]) },
+    ])
+}
+
+// When a director can ask its own person, swap this turn and its placement.
+fn pace_question() -> Turn {
+    call(b"message", &json!({"target":DIRECTOR,"form":"question","words":super::PACE_QUESTION}))
+}
+fn note() -> Turn {
+    call(
+        b"note",
+        &json!({"scope":{"kind":"project","project":super::PROJECT},
+        "description":super::PACE_NOTE,"body":super::PACE_ANSWER}),
+    )
+}
+fn recall() -> Turn {
+    call(
+        b"recall",
+        &json!({"kind":"search","scopes":[{"kind":"project","project":super::PROJECT}],
+        "query":super::PACE_NOTE}),
+    )
+}
+fn amend() -> Turn {
+    call(
+        b"amend",
+        &json!({"target":super::PACE_A,"revision":0,"amendment":{
+        "reason":super::PACE_ANSWER,"llm":{"main":{"model":super::DEFAULT_MODEL_NUMBER}}}}),
+    )
+}
+
+#[must_use]
+pub fn step_4_4(_forge: SocketAddr) -> Box<[Script]> {
+    use super::{DEFAULT_MODEL_NUMBER, PACE_A_SPEC, PACE_REPORT, SURVEY_REPORT, SURVEY_SPEC};
+    Box::new([
+        Script {
+            cue: Agent::Director.cue().into(),
+            turns: Box::new([
+                owner(PACE_A_SPEC, true),
+                wait("A delegated."),
+                wait(super::PACE_PENDING),
+                note(),
+                amend(),
+                wait("The answer is kept and A's model amended."),
+                recall(),
+                report(PACE_REPORT),
+            ]),
+        },
+        Script {
+            cue: Agent::A.cue().into(),
+            turns: Box::new([
+                pace_question(),
+                wait("Asked about the pace."),
+                call(
+                    b"delegate",
+                    &json!({"batch":[{
+                        "executor":{"kind":"agent","charter":1},
+                        "spec":{"words":SURVEY_SPEC,"parameters":[]},
+                        "contract":{"kind":"report","words":128},
+                        "llm":{"main":{"model":DEFAULT_MODEL_NUMBER}},
+                        "authority":{"tools":0,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},
+                            "budget":{"spend":10},"notes":0}
+                    }]}),
+                ),
+                wait("Survey delegated."),
+                report(PACE_REPORT),
+            ]),
+        },
+        Script { cue: Agent::Survey.cue().into(), turns: Box::new([report(SURVEY_REPORT)]) },
     ])
 }

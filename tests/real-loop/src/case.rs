@@ -1,4 +1,4 @@
-//! The reference case's cast and first kit tree (domain/testing.md, 5.3).
+//! The reference case's cast, accounts and first kit tree (domain/testing.md, 5.3).
 use crate::{fixtures, forge, landing};
 use serde_json::json;
 use skein_fake_forge_domain::{self as domain, api};
@@ -14,6 +14,28 @@ pub const DIRECTOR: u64 = 1;
 pub const A: u64 = 2;
 pub const DESIGN: u64 = 3;
 pub const QUESTION: u64 = 6;
+pub const FIRST_ACCOUNT: u64 = 1;
+pub const SECOND_ACCOUNT: u64 = 3;
+pub const SECOND_KEY_FILE: &str = "second.key";
+pub const DEFAULT_MODEL: &str = "fake";
+pub const DEFAULT_MODEL_NUMBER: u8 = 0;
+pub const REFUSED_A: u64 = 2;
+pub const PACE_A: u64 = 2;
+pub const SURVEY: u64 = 3;
+pub const PACE_QUESTION_MESSAGE: u64 = 1;
+pub const PACE_PERSON: &str = "@case_director Ask about the pace and keep my answer.";
+pub const PACE_QUESTION: &str = "Claude spends eight times what the week can sustain. I recommend moving what needs no taste to Codex and switching s2 to the second subscription. Keep the pace?";
+pub const PACE_ANSWER: &str = "Keep the pace while the hardware allows; move what needs no taste.";
+pub const PACE_NOTE: &str = "Pace";
+pub const PACE_PENDING: &str = "The pace question is waiting for your answer.";
+pub const PACE_A_SPEC: &str =
+    "@case_a Ask the director whether to keep the pace; on its direction, have a survey delegated and report.";
+pub const REFUSED_PERSON: &str = "@case_director Delegate A's report and wait for it.";
+pub const REFUSED_A_SPEC: &str = "@case_a Report when your account allows the work to continue.";
+pub const SURVEY_SPEC: &str = "@case_survey Survey the work that needs no taste and report.";
+pub const RESUMED_REPORT: &str = "The work continued on its account.";
+pub const PACE_REPORT: &str = "The pace is kept and the survey is done.";
+pub const SURVEY_REPORT: &str = "Work needing no taste can move.";
 // The fake forge's one repository stands as kit, since forge.rs names it,
 // until the fixture holds two.
 pub const KIT: &str = "acme/app";
@@ -51,6 +73,7 @@ pub enum Agent {
     A,
     Design,
     Review,
+    Survey,
 }
 impl Agent {
     #[must_use]
@@ -59,6 +82,7 @@ impl Agent {
             Self::Director => b"@case_director",
             Self::A => b"@case_a ",
             Self::Design => b"@case_design",
+            Self::Survey => b"@case_survey",
             Self::Review => b"Review this change at the named head",
         }
     }
@@ -101,6 +125,14 @@ pub fn fixture() -> forge::Fixture {
         },
         configure: |value, agent, forge| {
             (landing::fixture().configure)(value, agent, forge);
+            // The direct service fixture has no binary-added deployment project.
+            // Its owner role in project zero makes deployment accounts readable.
+            let mut deployment = value["engine"]["projects"][0].clone();
+            deployment["number"] = 0.into();
+            value["engine"]["projects"].as_array_mut().expect("projects").push(deployment);
+            value["engine"]["limits"]["overrides"]["people.projects"] = 2.into();
+            value["engine"]["limits"]["overrides"]["authority.projects"] = 2.into();
+            value["engine"]["limits"]["overrides"]["tasks.funders"] = 4.into();
             // A runs on the director's explicit choice, distinct from the default.
             let mut model = value["engine"]["llm"]["models"][0].clone();
             model["name"] = OWNER_MODEL.into();
@@ -112,15 +144,18 @@ pub fn fixture() -> forge::Fixture {
             model["name"] = OWNER_MODEL.into();
             model["efforts"] = json!([OWNER_EFFORT]);
             agent["endpoints"][0]["models"].as_array_mut().expect("agent models").push(model);
-            // Delegation and messaging are both needed by the director and A.
-            value["engine"]["rules"]["ceiling"]["tools"] = 3.into();
+            // The director delegates, messages, amends and keeps project notes.
+            value["engine"]["rules"]["ceiling"]["tools"] = 391.into();
+            value["engine"]["rules"]["ceiling"]["notes"] = 2.into();
             // The extra owner adds one delegation level before the change procedure.
             value["engine"]["rules"]["ceiling"]["delegation"]["depth"] = 5.into();
             for project in value["engine"]["projects"].as_array_mut().expect("projects") {
-                project["policy"]["ceiling"]["tools"] = 3.into();
+                project["policy"]["ceiling"]["tools"] = 391.into();
+                project["policy"]["ceiling"]["notes"] = 2.into();
+                project["policy"]["roles"][0]["authority"]["notes"] = 2.into();
                 project["policy"]["ceiling"]["delegation"]["depth"] = 5.into();
                 project["policy"]["roles"][0]["authority"]["delegation"]["depth"] = 5.into();
-                project["policy"]["roles"][0]["authority"]["tools"] = 3.into();
+                project["policy"]["roles"][0]["authority"]["tools"] = 391.into();
             }
             // A tracked owner reserves core news, landing news, an answer and its
             // delegate's result together; the landing fixture's inbox holds 4 KiB.

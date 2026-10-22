@@ -1,4 +1,4 @@
-//! Reference-case.md, 4.1: effects over observations any world can supply.
+//! Reference-case checkpoints: effects over observations any world can supply.
 use super::{
     A, A_REPORT, Agent, DESIGN, DESIGN_DOC, DESIGN_REPORT, DESIGN_WORDS, DIRECTOR, DIRECTOR_REPORT, DRAFT, DRAFT_WORDS,
     GREEN_LIGHT, OWNER_EFFORT, OWNER_MODEL, PROJECT, QUESTION, acts::Read, draft_commit, kit_tree,
@@ -12,12 +12,19 @@ use std::{
 
 #[derive(Clone)]
 pub struct Observed {
-    /// ctl's JSON `task` object, by the act that read it; absent if that act failed.
+    /// ctl's whole JSON document, by the act that read it; absent if that act failed.
     pub documents: BTreeMap<Read, Value>,
     /// Each LLM query in order, by its cue: its messages' texts and tool outputs.
-    pub told: Vec<(Agent, Box<[u8]>)>,
+    pub told: Vec<Told>,
     /// kit's main at its last merged head.
     pub kit: Kit,
+}
+#[derive(Clone)]
+pub struct Told {
+    pub agent: Agent,
+    pub words: Box<[u8]>,
+    pub model: Box<[u8]>,
+    pub credential: Option<u32>,
 }
 #[derive(Clone)]
 pub struct Kit {
@@ -33,17 +40,16 @@ impl Observed {
             if call.exit != Some(Exit::Code(0)) {
                 continue;
             }
-            if let Ok(mut document) = serde_json::from_slice::<Value>(&call.stdout)
-                && let Some(task) = document.get_mut("task")
-            {
-                documents.insert(*read, task.take());
+            if let Ok(document) = serde_json::from_slice::<Value>(&call.stdout) {
+                documents.insert(*read, document);
             }
         }
         let mut told = Vec::new();
         for observation in ran.llm() {
             let skein_fake_peers::llm::Observation::Query { query, .. } = observation else { continue };
             let Some(agent) = cued(&query.system) else { continue };
-            let mut words = Vec::new();
+            let mut words = query.system.to_vec();
+            words.push(b'\n');
             for message in &query.messages {
                 for part in &message.parts {
                     use skein_fake_llm_domain::api::Part;
@@ -56,7 +62,12 @@ impl Observed {
                     }
                 }
             }
-            told.push((agent, words.into_boxed_slice()));
+            told.push(Told {
+                agent,
+                words: words.into_boxed_slice(),
+                model: query.model.clone(),
+                credential: query.credential,
+            });
         }
         Self {
             documents,
@@ -68,7 +79,7 @@ impl Observed {
 fn cued(system: &[u8]) -> Option<Agent> {
     let mut first_at = usize::MAX;
     let mut first = None;
-    for agent in [Agent::Director, Agent::A, Agent::Design, Agent::Review] {
+    for agent in [Agent::Director, Agent::A, Agent::Design, Agent::Review, Agent::Survey] {
         for (at, word) in system.windows(agent.cue().len()).enumerate() {
             if word == agent.cue() {
                 if at < first_at {
@@ -91,12 +102,14 @@ pub struct Miss {
 pub enum Promise {
     Must(&'static str),
     Add(&'static str),
+    Step(&'static str),
 }
 impl fmt::Display for Miss {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (kind, words) = match self.promise {
             Promise::Must(words) => ("Must", words),
             Promise::Add(words) => ("Add", words),
+            Promise::Step(words) => ("Step", words),
         };
         write!(f, "{} {kind} \"{words}\": {}", self.step, self.what)
     }
@@ -127,7 +140,7 @@ pub fn step_4_1(observed: &Observed) -> Vec<Miss> {
     let mut misses = Vec::new();
     let mut docs = Vec::new();
     for (read, expected) in [(Read::DirectorEnded, DIRECTOR), (Read::AEnded, A), (Read::DesignEnded, DESIGN)] {
-        let document = observed.documents.get(&read).unwrap_or(&Value::Null);
+        let document = &observed.documents.get(&read).unwrap_or(&Value::Null)["task"];
         check(
             &mut misses,
             number(document, "/chip/task") == Some(expected),
@@ -183,7 +196,7 @@ fn question_answer(misses: &mut Vec<Miss>, observed: &Observed, a: &Value, direc
     let mut acknowledged = false;
     let mut delivered = false;
     let sent = format!("Message {QUESTION} sent");
-    for (position, (agent, words)) in observed.told.iter().enumerate() {
+    for (position, Told { agent, words, .. }) in observed.told.iter().enumerate() {
         if *agent == Agent::Director && contains(words, DESIGN_REPORT) && report_at.is_none() {
             report_at = Some(position);
         }
@@ -362,7 +375,7 @@ mod tests {
     use super::{
         A, A_REPORT, Agent, BTreeMap, DELEGATE, DESIGN, DESIGN_DOC, DESIGN_REPORT, DESIGN_WORDS, DIRECTOR,
         DIRECTOR_REPORT, GREEN_LIGHT, Kit, MARKDOWN, OWNER_EFFORT, OWNER_MODEL, Observed, PROJECT, QUESTION,
-        QUESTION_ANSWER, Read, Value, assert_met, contains, draft_commit, kit_tree, step_4_1,
+        QUESTION_ANSWER, Read, Told, Value, assert_met, contains, draft_commit, kit_tree, step_4_1,
     };
     use crate::case::{A_SPEC_PREFIX, A_SPEC_SUFFIX};
     use serde_json::json;
@@ -374,7 +387,7 @@ mod tests {
             (Read::AEnded, A, 3, 20, 6, 3, 2, 3, A_REPORT),
             (Read::DesignEnded, DESIGN, 1, 10, 4, 2, 1, 2, ""),
         ] {
-            documents.insert(read, json!({
+            documents.insert(read, json!({"task":{
                 "chip":{"task":task}, "project":PROJECT, "requester":{"task":DIRECTOR},
                 "priority":1, "llm":{"main":{"model":OWNER_MODEL,"effort":OWNER_EFFORT}},
                 "spec":{"specification":{"words":{"bytes":format!("{A_SPEC_PREFIX}{}{A_SPEC_SUFFIX}", draft_commit())}}},
@@ -383,7 +396,7 @@ mod tests {
                     "delegation":{"kinds":[{"charter":1},{"procedure":2}],"tasks":tasks,"depth":depth}}},
                 "budget":{"numbers":{"spent":spent,"spent_below":below}},
                 "result":{"value":{"report":{"bytes":report}}}
-            }));
+            }}));
         }
         let mut main = BTreeMap::new();
         for file in kit_tree() {
@@ -393,9 +406,24 @@ mod tests {
         Observed {
             documents,
             told: vec![
-                (Agent::A, format!("Message {QUESTION} sent").into_bytes().into_boxed_slice()),
-                (Agent::Director, DESIGN_REPORT.as_bytes().into()),
-                (Agent::A, GREEN_LIGHT.as_bytes().into()),
+                Told {
+                    agent: Agent::A,
+                    words: format!("Message {QUESTION} sent").into_bytes().into_boxed_slice(),
+                    model: Box::new([]),
+                    credential: Some(0),
+                },
+                Told {
+                    agent: Agent::Director,
+                    words: DESIGN_REPORT.as_bytes().into(),
+                    model: Box::new([]),
+                    credential: Some(0),
+                },
+                Told {
+                    agent: Agent::A,
+                    words: GREEN_LIGHT.as_bytes().into(),
+                    model: Box::new([]),
+                    credential: Some(0),
+                },
             ],
             kit: Kit { main, merged_green: true },
         }
@@ -412,10 +440,10 @@ mod tests {
         const MISSES: usize = 3;
         const GREEN_LIGHT_QUERIES: usize = 1;
         let mut broken = met().clone();
-        broken.documents.get_mut(&Read::AEnded).expect("A document")["priority"] = Value::Null;
+        broken.documents.get_mut(&Read::AEnded).expect("A document")["task"]["priority"] = Value::Null;
         broken.kit.main.insert(b"src/export.rs".to_vec(), b"fn export() {}\n".to_vec());
         let mut removed = 0;
-        for (agent, words) in &mut broken.told {
+        for Told { agent, words, .. } in &mut broken.told {
             if *agent == Agent::A && contains(words, GREEN_LIGHT) {
                 *words = Box::new([]);
                 removed += 1;
@@ -431,5 +459,394 @@ mod tests {
         assert!(answer.what.contains("green light"));
         assert_eq!(markdown.promise, MARKDOWN);
         assert!(markdown.what.contains("src/export.rs"));
+    }
+}
+
+const ACCOUNT_WAIT: Promise =
+    Promise::Must("an account's states hold the work they pay for, and name the act they wait for (exact)");
+const SURVIVES: Promise = Promise::Add("no session dies, so nothing has to be recreated afterwards");
+
+fn step_check(misses: &mut Vec<Miss>, step: &'static str, met: bool, promise: Promise, what: &str) {
+    if !met {
+        misses.push(Miss { step, promise, what: what.into() });
+    }
+}
+fn document(observed: &Observed, read: Read) -> &Value {
+    observed.documents.get(&read).unwrap_or(&Value::Null)
+}
+
+fn task_document(observed: &Observed, read: Read) -> &Value {
+    let value = document(observed, read);
+    value.get("task").filter(|task| task.is_object()).unwrap_or(value)
+}
+
+#[must_use]
+pub fn step_4_5_refused(observed: &Observed) -> Vec<Miss> {
+    use super::{FIRST_ACCOUNT, REFUSED_A, REFUSED_A_SPEC, RESUMED_REPORT};
+    let mut misses = Vec::new();
+    let waiting = document(observed, Read::AWaiting);
+    let accounts = document(observed, Read::Refused);
+    let a = &document(observed, Read::AEnded)["task"];
+    let director = task_document(observed, Read::DirectorEnded);
+    for (met, promise, what) in [
+        (
+            number(waiting, "/chip/task") == Some(REFUSED_A)
+                && number(waiting, "/run_wait/account/account") == Some(FIRST_ACCOUNT)
+                && text(waiting, "/run_wait/account/why") == "refused",
+            ACCOUNT_WAIT,
+            "A's waiting task must name its account and refused",
+        ),
+        (
+            accounts.pointer("/accounts/deployment").and_then(Value::as_array).is_some_and(|rows| {
+                rows.iter().any(|row| {
+                    number(row, "/number") == Some(FIRST_ACCOUNT) && text(row, "/state/kind") == "sign_in_again"
+                })
+            }),
+            ACCOUNT_WAIT,
+            "the refused account must need sign_in_again",
+        ),
+        (
+            number(a, "/chip/task") == Some(REFUSED_A)
+                && number(a, "/spec_revision/value") == Some(0)
+                && number(a, "/kept_account") == Some(FIRST_ACCOUNT)
+                && a.pointer("/result/ending/task/done").is_some()
+                && text(a, "/result/value/report/bytes") == RESUMED_REPORT,
+            SURVIVES,
+            "A must finish done with its original task, revision and kept account",
+        ),
+        (
+            number(waiting, "/chip/task") == number(a, "/chip/task") && number(a, "/chip/task").is_some(),
+            SURVIVES,
+            "the waiting and ended task numbers must be the same",
+        ),
+        (
+            number(director, "/chip/task") == Some(DIRECTOR)
+                && text(director, "/result/value/report/bytes") == RESUMED_REPORT,
+            SURVIVES,
+            "the original director must finish its report",
+        ),
+        (a["delegates"].as_array().is_some_and(Vec::is_empty), SURVIVES, "A must have no delegate"),
+        (
+            observed.told.iter().all(|told| matches!(told.agent, Agent::A | Agent::Director)),
+            SURVIVES,
+            "no agent beyond the director and A may run",
+        ),
+    ] {
+        step_check(&mut misses, "4.5", met, promise, what);
+    }
+    let resumed = observed.told.iter().position(|told| told.agent == Agent::A && told.credential == Some(1));
+    step_check(
+        &mut misses,
+        "4.5",
+        resumed.is_some_and(|at| {
+            let told = &observed.told[at];
+            contains(&told.words, REFUSED_A_SPEC)
+                && observed.told[..at].iter().all(|told| told.credential == Some(0))
+                && observed.told[..at]
+                    .iter()
+                    .any(|told| told.agent == Agent::A && contains(&told.words, REFUSED_A_SPEC))
+        }),
+        SURVIVES,
+        "A's resumed query must retain its spec on credential 1, after queries on credential 0",
+    );
+    misses
+}
+
+#[cfg(test)]
+mod account_tests {
+    use super::{
+        ACCOUNT_WAIT, Agent, BTreeMap, DIRECTOR, Kit, Observed, Read, SURVIVES, Told, Value, assert_met,
+        step_4_5_refused,
+    };
+    use crate::case::{FIRST_ACCOUNT, REFUSED_A, REFUSED_A_SPEC, RESUMED_REPORT};
+    use serde_json::json;
+
+    fn told(agent: Agent, words: &str, credential: u32) -> Told {
+        Told { agent, words: words.as_bytes().into(), model: Box::new([]), credential: Some(credential) }
+    }
+    fn refused_met() -> Observed {
+        Observed {
+            documents: BTreeMap::from([
+                (
+                    Read::AWaiting,
+                    json!({"chip":{"task":REFUSED_A},
+                    "run_wait":{"account":{"account":FIRST_ACCOUNT,"why":"refused"}}}),
+                ),
+                (
+                    Read::Refused,
+                    json!({"accounts":{"deployment":[{"number":FIRST_ACCOUNT,
+                    "state":{"kind":"sign_in_again"}}]}}),
+                ),
+                (
+                    Read::AEnded,
+                    json!({"task":{"chip":{"task":REFUSED_A},"spec_revision":{"value":0},
+                    "kept_account":FIRST_ACCOUNT,"delegates":[],
+                    "result":{"ending":{"task":{"done":{}}},"value":{"report":{"bytes":RESUMED_REPORT}}}}}),
+                ),
+                (
+                    Read::DirectorEnded,
+                    json!({"task":{"chip":{"task":DIRECTOR},
+                    "result":{"ending":{"task":{"done":{}}},"value":{"report":{"bytes":RESUMED_REPORT}}}}}),
+                ),
+            ]),
+            told: vec![told(Agent::A, REFUSED_A_SPEC, 0), told(Agent::A, REFUSED_A_SPEC, 1)],
+            kit: Kit { main: BTreeMap::new(), merged_green: false },
+        }
+    }
+    #[test]
+    fn refused_checkpoint_met() {
+        assert_met(&step_4_5_refused(&refused_met()));
+    }
+    #[test]
+    fn refused_checkpoint_reports_independent_misses_together() {
+        const MISSES: usize = 3;
+        let mut observed = refused_met();
+        observed.documents.get_mut(&Read::AWaiting).expect("waiting")["run_wait"] = Value::Null;
+        observed.documents.remove(&Read::Refused);
+        observed.told.last_mut().expect("resumed").words = Box::new([]);
+        let misses = step_4_5_refused(&observed);
+        assert_eq!(misses.len(), MISSES);
+        assert!(misses.iter().all(|miss| miss.step == "4.5"));
+        assert!(misses.iter().any(|miss| miss.promise == ACCOUNT_WAIT && miss.what.contains("waiting task")));
+        assert!(misses.iter().any(|miss| miss.promise == ACCOUNT_WAIT && miss.what.contains("sign_in_again")));
+        assert!(misses.iter().any(|miss| miss.promise == SURVIVES && miss.what.contains("resumed query")));
+    }
+}
+
+const PACE_INBOX: Promise = Promise::Must("a question in the person's inbox (exact)");
+const ONE_QUESTION: Promise = Promise::Add("the question waits in one inbox, not in two checks' reports");
+const PACE_KEPT: Promise = Promise::Step("the answer goes into the director's notes");
+const MODELS: Promise = Promise::Must("models amended (exact)");
+const ORDER: Promise = Promise::Must("the holder's order of sources (exact)");
+
+#[must_use]
+pub fn step_4_4(observed: &Observed) -> Vec<Miss> {
+    let mut misses = Vec::new();
+    pace_inbox(&mut misses, observed);
+    pace_note(&mut misses, observed);
+    pace_model(&mut misses, observed);
+    pace_accounts(&mut misses, observed);
+    misses
+}
+fn pace_inbox(misses: &mut Vec<Miss>, observed: &Observed) {
+    use super::{PACE_ANSWER, PACE_QUESTION, PACE_QUESTION_MESSAGE};
+    const ONE: usize = 1;
+    let rows = document(observed, Read::PaceAsked).pointer("/inbox/rows").and_then(Value::as_array);
+    step_check(
+        misses,
+        "4.4",
+        rows.is_some_and(|rows| {
+            rows.iter().any(|row| {
+                number(row, "/task/live/task") == Some(DIRECTOR)
+                    && number(row, "/project") == Some(PROJECT)
+                    && number(row, "/object/question/message") == Some(PACE_QUESTION_MESSAGE)
+            })
+        }),
+        PACE_INBOX,
+        "the inbox must hold A's question on the director in project 1",
+    );
+    step_check(
+        misses,
+        "4.4",
+        rows.is_some_and(|rows| rows.len() == ONE),
+        ONE_QUESTION,
+        "the person's questions inbox must have exactly one row",
+    );
+    let asked =
+        observed.told.iter().position(|told| told.agent == Agent::Director && contains(&told.words, PACE_QUESTION));
+    let answered = observed
+        .told
+        .iter()
+        .position(|told| told.agent == Agent::Director && contains(&told.words, &format!("1: {PACE_ANSWER}")));
+    step_check(
+        misses,
+        "4.4",
+        matches!((asked, answered), (Some(asked), Some(answered)) if asked < answered),
+        PACE_INBOX,
+        "the director must hear A's question, then the person's answer",
+    );
+    let sent = format!("Message {PACE_QUESTION_MESSAGE} sent");
+    step_check(
+        misses,
+        "4.4",
+        observed.told.iter().any(|told| told.agent == Agent::A && contains(&told.words, &sent)),
+        PACE_INBOX,
+        "A must be told the question's named message number",
+    );
+}
+fn pace_note(misses: &mut Vec<Miss>, observed: &Observed) {
+    use super::{PACE_ANSWER, PACE_NOTE};
+    let mut written = None;
+    for (at, told) in observed.told.iter().enumerate() {
+        if told.agent != Agent::Director {
+            continue;
+        }
+        let words = String::from_utf8_lossy(&told.words);
+        for suffix in words.split("Note ").skip(1) {
+            let Some((digits, _)) = suffix.split_once(" revision 1 written") else { continue };
+            if let Ok(note) = digits.parse::<u64>()
+                && note > 0
+            {
+                written = Some((at, note));
+                break;
+            }
+        }
+        if written.is_some() {
+            break;
+        }
+    }
+    step_check(misses, "4.4", written.is_some(), PACE_KEPT, "the director must be told Note N revision 1 written");
+    step_check(
+        misses,
+        "4.4",
+        written.is_some_and(|(at, note)| {
+            let recalled = format!("Note {note} revision 1: {PACE_NOTE}\n{PACE_ANSWER}\n");
+            observed
+                .told
+                .iter()
+                .skip(at + 1)
+                .any(|told| told.agent == Agent::Director && contains(&told.words, &recalled))
+        }),
+        PACE_KEPT,
+        "after writing the note the director must recall its answer",
+    );
+}
+fn pace_model(misses: &mut Vec<Miss>, observed: &Observed) {
+    use super::{DEFAULT_MODEL, PACE_A, PACE_ANSWER};
+    let a = &document(observed, Read::AEnded)["task"];
+    step_check(
+        misses,
+        "4.4",
+        number(a, "/chip/task") == Some(PACE_A)
+            && number(a, "/project") == Some(PROJECT)
+            && number(a, "/spec_revision/value") == Some(1)
+            && text(a, "/llm/main/model") == DEFAULT_MODEL
+            && a.pointer("/llm/main/effort") == Some(&Value::Null),
+        MODELS,
+        "A must have the default model without effort at spec revision 1",
+    );
+    let queries: Vec<_> = observed.told.iter().filter(|told| told.agent == Agent::A).collect();
+    step_check(
+        misses,
+        "4.4",
+        queries.first().is_some_and(|told| told.model.as_ref() == OWNER_MODEL.as_bytes())
+            && queries.last().is_some_and(|told| {
+                told.model.as_ref() == DEFAULT_MODEL.as_bytes() && contains(&told.words, PACE_ANSWER)
+            }),
+        MODELS,
+        "A must first query owner, then use fake with the person's relayed answer",
+    );
+}
+fn pace_accounts(misses: &mut Vec<Miss>, observed: &Observed) {
+    use super::{FIRST_ACCOUNT, PACE_A, SECOND_ACCOUNT, SURVEY, SURVEY_REPORT};
+    let rows = document(observed, Read::Ranked).pointer("/accounts/deployment").and_then(Value::as_array);
+    let ranked = rows.is_some_and(|rows| {
+        let numbers: Vec<_> = rows.iter().map(|row| number(row, "/number")).collect();
+        let places: Vec<_> = rows.iter().map(|row| number(row, "/place")).collect();
+        numbers == [Some(SECOND_ACCOUNT), Some(FIRST_ACCOUNT)] && places == [Some(0), Some(1)]
+    });
+    step_check(misses, "4.4", ranked, ORDER, "deployment accounts must put the second account first");
+    let a = &document(observed, Read::AEnded)["task"];
+    step_check(
+        misses,
+        "4.4",
+        number(a, "/chip/task") == Some(PACE_A) && number(a, "/kept_account") == Some(FIRST_ACCOUNT),
+        ORDER,
+        "A must keep its original account",
+    );
+    let survey = &document(observed, Read::SurveyEnded)["task"];
+    step_check(
+        misses,
+        "4.4",
+        number(survey, "/chip/task") == Some(SURVEY)
+            && number(survey, "/project") == Some(PROJECT)
+            && number(survey, "/kept_account") == Some(SECOND_ACCOUNT)
+            && text(survey, "/result/value/report/bytes") == SURVEY_REPORT,
+        ORDER,
+        "the survey must finish on the newly first account",
+    );
+    let queries: Vec<_> = observed.told.iter().filter(|told| told.agent == Agent::Survey).collect();
+    step_check(
+        misses,
+        "4.4",
+        !queries.is_empty() && queries.iter().all(|told| told.credential == Some(1)),
+        ORDER,
+        "every survey query must use credential 1",
+    );
+}
+
+#[cfg(test)]
+mod pace_tests {
+    use super::{
+        Agent, BTreeMap, DIRECTOR, Kit, MODELS, ORDER, OWNER_MODEL, Observed, PACE_INBOX, PROJECT, Read, Told, Value,
+        assert_met, step_4_4,
+    };
+    use crate::case::{
+        DEFAULT_MODEL, FIRST_ACCOUNT, PACE_A, PACE_ANSWER, PACE_NOTE, PACE_QUESTION, PACE_QUESTION_MESSAGE,
+        SECOND_ACCOUNT, SURVEY, SURVEY_REPORT,
+    };
+    use serde_json::json;
+
+    fn told(agent: Agent, words: &str, model: &str, credential: u32) -> Told {
+        Told { agent, words: words.as_bytes().into(), model: model.as_bytes().into(), credential: Some(credential) }
+    }
+    fn met() -> Observed {
+        Observed {
+            documents: BTreeMap::from([
+                (
+                    Read::PaceAsked,
+                    json!({"inbox":{"rows":[{"task":{"live":{"task":DIRECTOR}},
+                    "project":PROJECT,"object":{"question":{"message":PACE_QUESTION_MESSAGE}}}]}}),
+                ),
+                (
+                    Read::Ranked,
+                    json!({"accounts":{"deployment":[
+                    {"number":SECOND_ACCOUNT,"place":0},{"number":FIRST_ACCOUNT,"place":1}]}}),
+                ),
+                (
+                    Read::AEnded,
+                    json!({"task":{"chip":{"task":PACE_A},"project":PROJECT,
+                    "spec_revision":{"value":1},"llm":{"main":{"model":DEFAULT_MODEL,"effort":null}},
+                    "kept_account":FIRST_ACCOUNT}}),
+                ),
+                (
+                    Read::SurveyEnded,
+                    json!({"task":{"chip":{"task":SURVEY},"project":PROJECT,
+                    "kept_account":SECOND_ACCOUNT,"result":{"value":{"report":{"bytes":SURVEY_REPORT}}}}}),
+                ),
+            ]),
+            told: vec![
+                told(Agent::A, &format!("Message {PACE_QUESTION_MESSAGE} sent"), OWNER_MODEL, 0),
+                told(Agent::Director, PACE_QUESTION, DEFAULT_MODEL, 0),
+                told(Agent::Director, &format!("1: {PACE_ANSWER}\nNote 1 revision 1 written"), DEFAULT_MODEL, 0),
+                told(Agent::A, PACE_ANSWER, DEFAULT_MODEL, 0),
+                told(Agent::Survey, "Begin", DEFAULT_MODEL, 1),
+                told(Agent::Director, &format!("Note 1 revision 1: {PACE_NOTE}\n{PACE_ANSWER}\n"), DEFAULT_MODEL, 0),
+            ],
+            kit: Kit { main: BTreeMap::new(), merged_green: false },
+        }
+    }
+    #[test]
+    fn pace_checkpoint_met() {
+        assert_met(&step_4_4(&met()));
+    }
+    #[test]
+    fn pace_checkpoint_reports_independent_misses_together() {
+        const MISSES: usize = 3;
+        const QUESTION_ROW: usize = 0;
+        let mut observed = met();
+        observed.documents.get_mut(&Read::PaceAsked).expect("inbox")["inbox"]["rows"][QUESTION_ROW]["project"] =
+            Value::Null;
+        observed.documents.get_mut(&Read::AEnded).expect("A")["task"]["spec_revision"] = Value::Null;
+        observed.documents.get_mut(&Read::Ranked).expect("ranked")["accounts"]["deployment"]
+            .as_array_mut()
+            .expect("accounts")
+            .reverse();
+        let misses = step_4_4(&observed);
+        assert_eq!(misses.len(), MISSES);
+        assert!(misses.iter().all(|miss| miss.step == "4.4"));
+        for promise in [PACE_INBOX, MODELS, ORDER] {
+            assert!(misses.iter().any(|miss| miss.promise == promise));
+        }
     }
 }
