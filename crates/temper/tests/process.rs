@@ -14,6 +14,14 @@ fn a_temper_told_to_stop_with_a_sign_in_under_way_ends_at_once() {
     scratch.remove();
 }
 
+#[test]
+fn a_person_signs_in_with_chatgpt_and_a_chat_is_answered_on_the_plan() {
+    let scratch = support::Scratch::new("sign_in_chat");
+    let issuer = support::sign_in::configuration(scratch.path());
+    support::sign_in::answered(scratch.path(), issuer);
+    scratch.remove();
+}
+
 fn ctl_scratch(case: &str) -> support::Scratch {
     let scratch = support::Scratch::new(case);
     support::configuration(scratch.path(), &support::Forge::Unreached);
