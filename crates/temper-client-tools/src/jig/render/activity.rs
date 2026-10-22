@@ -129,10 +129,10 @@ fn owner(row: &c::OwnerActivityLine, out: &mut Text) {
 pub(super) fn chat(thread: &Thread, call: &Call, limits: &Limits, out: &mut Text) {
     for entry in thread.lines().into_boxed() {
         match entry {
-            Line::Turn { name, turn: value } => {
+            Line::Turn { name, turn: value, .. } => {
                 turn::text(thread.task, name, &c::TurnRead::Decoded(value.clone()), call, limits, out);
             }
-            Line::Undecoded { name, why } => {
+            Line::Undecoded { name, why, .. } => {
                 turn::text(thread.task, name, &c::TurnRead::Undecodable { why }, call, limits, out);
             }
             Line::Words { by, words, .. } => {

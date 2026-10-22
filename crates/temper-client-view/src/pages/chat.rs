@@ -440,7 +440,7 @@ pub(crate) fn conversation(
         b.open(Role::Region);
         b.style(look::TURN);
         match line {
-            Line::Words { by, words: message, state } => {
+            Line::Words { by, words: message, state, .. } => {
                 if projected {
                     person_words(b, by, message, state, speakers.person, words);
                 } else {
