@@ -367,7 +367,7 @@ enum State {
     Waiting,
     Starting { deadline: Time, captures: Vec<Option<String>> },
     Ready,
-    Stopping { deadline: Time, ending: Ending, killed: bool, survivors: Vec<u32> },
+    Stopping { deadline: Time, ending: Ending, swept: bool, killed: bool, survivors: Vec<u32> },
     Ended,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -456,7 +456,13 @@ impl Members {
     pub fn stopped(&self) -> Option<&[Stopped]> {
         (self.stopping && !self.settling_client && self.stopped.len() == self.started.len()).then_some(&self.stopped)
     }
-    /// Kill the named member's whole tree, recording an intentional ending.
+    /// Kill the leader, then its remaining tree, recording an intentional ending.
+    // skein-world tree.rs:299–323 signals descendants, then the leader, then
+    // cgroup.kill. A live worker can report an agent's exit through
+    // temper-worker-domain agents.rs:342–367 → jig-domain-host hosted.rs:747–751
+    // → temper-engine-domain link.rs:323–332 as Class::Agent. Kill the leader
+    // alone (end_to_end.rs:240), await its exit, then sweep (end_to_end.rs:256),
+    // so the engine hears a closed link and records Lost instead.
     pub fn kill(&mut self, process: &str) {
         self.end_one(process, Ending::Kill);
     }
@@ -493,14 +499,13 @@ impl Members {
     }
     fn ending(&mut self, i: usize, ending: Ending, now: Time, hosts: &mut [Root]) {
         let binary = hosts[i].member_mut().binary.as_mut().expect("started binary");
-        if ending == Ending::Kill {
-            binary.signal_tree(Signal::Kill);
-        } else if binary.exit_status().is_none() {
-            binary.signal(Signal::Terminate);
+        if binary.exit_status().is_none() {
+            binary.signal(if ending == Ending::Kill { Signal::Kill } else { Signal::Terminate });
         }
         self.states[i] = State::Stopping {
             deadline: now.saturating_add(Duration::from_secs(STOP_SECONDS)),
             ending,
+            swept: false,
             killed: false,
             survivors: Vec::new(),
         };
@@ -528,6 +533,15 @@ impl Members {
                 continue;
             }
             let binary = hosts[i].member_mut().binary.as_mut().expect("started member iterated");
+            if let State::Stopping { ending: Ending::Kill, swept, .. } = state
+                && !*swept
+                && binary.exit_status().is_some()
+            {
+                if binary.counts().is_none() {
+                    binary.signal_tree(Signal::Kill);
+                }
+                *swept = true;
+            }
             let survivors = binary.tree_status().live_at_leader_exit.as_deref().unwrap_or(&[]);
             let timed_out = matches!(state, State::Stopping { deadline, killed: false, .. } if now >= *deadline);
             // skein-world end_to_end.rs:253–260 refreshes tree membership on delivery;
@@ -545,7 +559,7 @@ impl Members {
                 survivors.extend_from_slice(&binary.tree_status().live_pids);
                 survivors.sort_unstable();
                 survivors.dedup();
-                *state = State::Stopping { deadline: now, ending, killed: true, survivors };
+                *state = State::Stopping { deadline: now, ending, swept: true, killed: true, survivors };
                 binary.signal_tree(Signal::Kill);
                 self.stopping = true;
             }
@@ -652,6 +666,7 @@ impl Members {
                 self.states[i] = State::Stopping {
                     deadline: now.saturating_add(Duration::from_secs(STOP_SECONDS)),
                     ending: Ending::Cluster,
+                    swept: false,
                     killed: false,
                     survivors: Vec::new(),
                 };

@@ -926,7 +926,6 @@ fn the_cluster_stops_in_reverse_each_exiting_0() {
 
 // Both the idle threshold and ordinary time allowance hold an open chat's slot.
 // Past the story's deadline, a run that parks has already failed it.
-const KILL_SIGNAL: u32 = 9;
 const CHAT_HOLDS_ITS_SLOT: Duration = support::WITHIN.saturating_mul(2);
 
 // A lost link heals: a stall past the 1 s silence loses it. The worker's contact
@@ -939,6 +938,16 @@ const CHAT_HOLDS_ITS_SLOT: Duration = support::WITHIN.saturating_mul(2);
 #[test]
 fn a_task_runs_on_each_worker() {
     cluster_chats("cluster_each_worker", ClusterStory::Each);
+}
+
+// A waiting reply is uncommitted: killing w1 loses it. The retry on w2
+// resumes without an assistant message, so the same cue replies and waits
+// again. Only after close/end is that reply committed, exactly once; the
+// old attempt ends lost and the replacement finishes done. This covers loss
+// and retry; the hung-worker story will test fencing a surviving old run.
+#[test]
+fn a_worker_killed_mid_run_is_lost_and_its_run_answered_once_on_another() {
+    cluster_chats("cluster_killed", ClusterStory::Kill);
 }
 
 // Jig admits only with an available placement (e7a93cd, jig-domain-core
@@ -985,6 +994,7 @@ fn cluster_chats(case: &str, story: ClusterStory) {
         reading: None,
         checking: std::collections::VecDeque::new(),
         last_read: String::new(),
+        lost_attempt: None,
     });
     for host in hosts {
         world.spawn(|| host);
@@ -1002,10 +1012,14 @@ const FIRST_LIFE: usize = 0;
 const SECOND_LIFE: usize = 1;
 const RESTART_LINKS: usize = 2;
 const REPLY_ONCE: usize = 1;
+const FIRST_LINK: usize = 1;
+const LOST_AND_RETRY: usize = 2; // the killed run and its replacement
+const KILL_SIGNAL: u32 = 9; // Linux SIGKILL, as reported by wait
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ClusterStory {
     Each,
     Unexpected,
+    Kill,
     Later,
     Restart,
 }
@@ -1016,6 +1030,8 @@ enum ClusterChatStage {
     Replied,
     WaitingSlot,
     Crashed,
+    Armed,
+    Killed,
     StoppedOne,
     Relinking,
     Closed,
@@ -1035,6 +1051,7 @@ struct ClusterChatJudge {
     reading: Option<ClusterRead>,
     checking: std::collections::VecDeque<String>,
     last_read: String,
+    lost_attempt: Option<u64>,
 }
 impl ClusterChatJudge {
     fn queue(&self, host: &mut support::cluster::Root, calls: Vec<support::ctl::Call>) {
@@ -1181,6 +1198,24 @@ impl ClusterChatJudge {
                 }
             }
             ClusterChatStage::Replied => self.replied(client, read),
+            ClusterChatStage::Armed => {
+                if self.members.is_up() && self.members.linked("w2") >= FIRST_LINK && read.connected("w2") {
+                    self.members.kill("w1");
+                    self.stage = ClusterChatStage::Killed;
+                }
+                self.poll(client);
+            }
+            ClusterChatStage::Killed => {
+                if self.members.ended("w1")
+                    && read.worker() == Some("w2")
+                    && read.waiting()
+                    && Some(read.attempt()) != self.lost_attempt
+                {
+                    self.close(client, false);
+                } else {
+                    self.poll(client);
+                }
+            }
             ClusterChatStage::Verifying => {
                 assert!(read.owner()["details"]["ending"]["done"].is_object(), "chat ended done: {}", read.task);
                 let text = if self.tasks.first().is_some_and(|task| task == self.current()) {
@@ -1189,6 +1224,9 @@ impl ClusterChatJudge {
                     "Second worker replied."
                 };
                 assert_eq!(read.replies(text), REPLY_ONCE, "reply once across complete committed turns");
+                if self.story == ClusterStory::Kill {
+                    self.loss(read);
+                }
                 self.checking.pop_front().expect("verified chat");
                 if self.checking.is_empty() {
                     if self.story == ClusterStory::Restart && self.tasks.len() < CLUSTER_CHATS {
@@ -1233,6 +1271,11 @@ impl ClusterChatJudge {
                 );
                 self.members.signal("w1", Signal::Kill);
                 self.stage = ClusterChatStage::Crashed;
+            } else if self.story == ClusterStory::Kill {
+                self.lost_attempt = Some(read.attempt());
+                self.members.up(&["w2"]);
+                self.stage = ClusterChatStage::Armed;
+                self.poll(client);
             } else if first {
                 if self.story == ClusterStory::Restart {
                     self.close(client, true);
@@ -1248,6 +1291,21 @@ impl ClusterChatJudge {
         } else {
             self.poll(client);
         }
+    }
+    fn loss(&self, read: &ClusterRead) {
+        let old = self.lost_attempt.expect("killed attempt");
+        let replacement = read.attempt();
+        assert_ne!(replacement, old, "replacement attempt on w2");
+        let lines: Vec<_> = read.rows.iter().map(|row| &row["event"]["owner"]["source"]["line"]).collect();
+        assert_eq!(lines.iter().filter(|line| line["run_began"].is_object()).count(), LOST_AND_RETRY);
+        for (attempt, end) in
+            [(old, serde_json::json!({"failed": {"class": "lost"}})), (replacement, serde_json::json!("finished"))]
+        {
+            assert!(lines.iter().any(|line| line["run_began"]["attempt"] == attempt), "attempt began");
+            let ended = lines.iter().find(|line| line["run_ended"]["attempt"] == attempt).expect("attempt ended");
+            assert_eq!(ended["run_ended"]["end"], end);
+        }
+        assert!(!lines.iter().any(|line| line["turn"]["attempt"] == old), "killed reply was never committed");
     }
     fn close(&mut self, client: &mut support::cluster::Root, first_only: bool) {
         use support::ctl::Call;
@@ -1334,7 +1392,7 @@ impl skein_world::Referee<support::cluster::Root> for ClusterChatJudge {
             self.stage = ClusterChatStage::Relinking;
             self.poll(client);
         }
-        if self.members.is_up() {
+        if self.members.is_up() || self.members.ended("w1") {
             if matches!(self.stage, ClusterChatStage::Start) {
                 self.begin(client);
             } else if client.is_empty() && !matches!(self.stage, ClusterChatStage::Start | ClusterChatStage::Stopping) {
@@ -1361,7 +1419,9 @@ impl skein_world::Referee<support::cluster::Root> for ClusterChatJudge {
                     ClusterChatStage::Replied
                     | ClusterChatStage::WaitingSlot
                     | ClusterChatStage::Relinking
-                    | ClusterChatStage::Verifying => {
+                    | ClusterChatStage::Verifying
+                    | ClusterChatStage::Armed
+                    | ClusterChatStage::Killed => {
                         if let Some(read) = self.read(client, calls.ends()) {
                             self.advance_read(client, &read);
                         }
@@ -1404,11 +1464,19 @@ impl skein_world::Referee<support::cluster::Root> for ClusterChatJudge {
         if let Some(stopped) = self.members.stopped() {
             let expected = if self.story == ClusterStory::Restart {
                 vec![("w1", FIRST_LIFE), ("w1", SECOND_LIFE), ("engine", FIRST_LIFE), ("llm", FIRST_LIFE)]
+            } else if self.story == ClusterStory::Kill {
+                vec![("w1", FIRST_LIFE), ("w2", FIRST_LIFE), ("engine", FIRST_LIFE), ("llm", FIRST_LIFE)]
             } else {
                 vec![("w2", FIRST_LIFE), ("w1", FIRST_LIFE), ("engine", FIRST_LIFE), ("llm", FIRST_LIFE)]
             };
             assert_eq!(stopped.iter().map(|s| (s.name.as_str(), s.life)).collect::<Vec<_>>(), expected);
             for member in stopped {
+                if self.story == ClusterStory::Kill && member.name == "w1" {
+                    assert_eq!(member.ending, support::cluster::Ending::Kill);
+                    assert_eq!(member.exit, Some(Exit::Signal(KILL_SIGNAL)));
+                    assert!(!member.killed && member.survivors.is_empty(), "intentional kill needed no cleanup");
+                    continue;
+                }
                 let alone = self.story == ClusterStory::Restart && member.name == "w1" && member.life == FIRST_LIFE;
                 assert_eq!(
                     member.ending,
@@ -1433,6 +1501,8 @@ impl skein_world::Referee<support::cluster::Root> for ClusterChatJudge {
                     ClusterChatStage::Replied => "waiting run and connected placement",
                     ClusterChatStage::WaitingSlot => "due second chat without attempt or observation",
                     ClusterChatStage::Crashed => "unexpected exit with a call in flight",
+                    ClusterChatStage::Armed => "w2 linked and connected before the kill",
+                    ClusterChatStage::Killed => "w1 tree settled and a new attempt waiting on w2",
                     ClusterChatStage::Closed => "closed chats ended",
                     ClusterChatStage::Verifying => "ended done and complete committed turns",
                     ClusterChatStage::StoppedOne => "w1's first life settled",
