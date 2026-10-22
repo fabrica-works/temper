@@ -105,7 +105,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
                     words,
                     bindings,
                     rows,
-                    super::task::Plan { word: Word::Plan, ended: None },
+                    super::task::Plan { word: Word::Plan, ended: None, goal: None },
                 );
             }
         }

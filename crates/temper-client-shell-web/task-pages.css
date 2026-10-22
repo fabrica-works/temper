@@ -181,3 +181,5 @@
   .temper-change { margin-inline: 14px; }
   .temper-change .temper-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 14px; }
 }
+
+.temper-plan-done > .temper-plan-row > :first-child > a { color: var(--temper-muted); }

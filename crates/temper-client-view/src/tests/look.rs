@@ -15,7 +15,7 @@ fn the_looks_names_pass_skeins_check() {
 }
 #[test]
 fn each_style_or_region_is_named_under_temper() {
-    let named: [(skein_ui::Style, &[u8]); 90] = [
+    let named: [(skein_ui::Style, &[u8]); 91] = [
         (BANNER, b"temper-banner"),
         (NAVIGATION, b"temper-navigation"),
         (MAIN, b"temper-main"),
@@ -104,6 +104,7 @@ fn each_style_or_region_is_named_under_temper() {
         (STEP_CURRENT, b"temper-step-current"),
         (CHANGE_HOLD, b"temper-change-hold"),
         (GATE, b"temper-gate"),
+        (PLAN_DONE, b"temper-plan-done"),
         (ENDED, b"temper-ended"),
         (MENU, b"temper-menu"),
     ];

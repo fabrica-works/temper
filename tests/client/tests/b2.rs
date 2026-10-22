@@ -28,7 +28,7 @@ fn roadmap_b2_through_the_task_pages() {
     let report = b2::goal_reported(world.front(), &planned);
     let budget = fixtures::task_budget(world.front(), planned.goal);
     assert!(budget.numbers.spent_below > 0, "the engine settled the delegates' spend");
-    world.person(person, see_the_goals_report_and_settled_budget(&report, budget));
+    world.person(person, see_the_goals_report_and_settled_budget(&planned, &report, budget));
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
 
@@ -49,8 +49,8 @@ fn open_advisors_result_and_return(advised: &b2::Advised) -> Vec<Step<Address>> 
     let link = in_region(task_link(advised.advisor), b"Latest activity");
     let mut steps = vec![
         see(link.clone()),
-        gone(Find::exactly_named(Role::TreeItem, format!("Task {}", advised.advisor).as_bytes())),
-        see(in_region(Find::text(b"No live tasks."), b"Plan")),
+        see(fixtures::plan_item(advised.advisor, b"Completed")),
+        see(in_region(Find::text(b"Its delegates: 0 live, 1 ended."), b"Plan")),
         Step::Press { find: link },
         see(task_heading(advised.advisor, b2::ADVISOR_BRIEF)),
         see(in_region(Find::exactly_named(Role::Status, b"Completed"), b"Result")),
@@ -65,7 +65,8 @@ fn follow_the_plan_and_each_delegates_lineage(planned: &b2::Planned, attempt: u6
         see(fixtures::plan_item(planned.second, format!("waiting on task {}", planned.first).as_bytes())),
         see(fixtures::dependency_item(planned.second, task_link(planned.first))),
         see(fixtures::dependency_item(planned.second, Find::exactly_named(Role::Status, b"running"))),
-        gone(Find::exactly_named(Role::TreeItem, format!("Task {}", planned.advisor).as_bytes())),
+        see(fixtures::plan_item(planned.advisor, b"Completed")),
+        see(in_region(Find::text(b"Its delegates: 2 live, 1 ended."), b"Plan")),
         Step::Press { find: plan_link(planned.second) },
         see(task_heading(planned.second, b2::SECOND_BRIEF)),
         see(Find::exactly_named(Role::Status, format!("waiting on task {}", planned.first).as_bytes())),
@@ -92,18 +93,28 @@ fn see_the_dependency_completed_and_second_running(planned: &b2::Planned) -> Vec
     vec![
         see(fixtures::dependency_item(planned.second, Find::exactly_named(Role::Status, b"Completed"))),
         see(fixtures::plan_item(planned.second, b"running")),
-        gone(Find::exactly_named(Role::TreeItem, format!("Task {}", planned.first).as_bytes())),
+        see(fixtures::plan_item(planned.first, b"Completed")),
+        see(in_region(Find::text(b"Its delegates: 1 live, 2 ended."), b"Plan")),
     ]
 }
 
 fn see_the_goals_report_and_settled_budget(
+    planned: &b2::Planned,
     report: &[u8],
     budget: jig_domain_core::documents::BudgetLine,
 ) -> Vec<Step<Address>> {
     vec![
         see(in_region(Find::exactly_named(Role::Status, b"Completed"), b"Result")),
         see(in_region(Find::text(report), b"Result")),
+        // The world's engine answers the ended read two rows a page: the third is past it.
+        see(in_region(Find::text(b"Its delegates: 0 live, more than 2 ended."), b"Plan")),
+        see(in_region(Find::text(b"More of its ended tasks are not shown."), b"Plan")),
+        see(fixtures::plan_item(planned.advisor, b"Completed")),
+        see(fixtures::plan_item(planned.first, b"Completed")),
+        gone(Find::exactly_named(Role::TreeItem, format!("Task {}", planned.second).as_bytes())),
+        Step::Press { find: in_region(Find::exactly_named(Role::Button, b"Live only"), b"Plan") },
         see(in_region(Find::text(b"No live tasks."), b"Plan")),
+        gone(Find::exactly_named(Role::TreeItem, format!("Task {}", planned.first).as_bytes())),
         see(in_region(
             Find::text(
                 format!("{} spent · {} left of {}", budget.numbers.spent, budget.left, budget.numbers.budget)

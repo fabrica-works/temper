@@ -24,8 +24,16 @@ What was asked:
   Shown on the forge.
 Plan:
   ## Plan
+  Its delegates: 2 live, 1 ended.
+  [7] All (pressed)
+  [8] Live only
   Plan:
-    - [7] Task 12
+    - [9] Task 11
+      Advise on the change
+      Agent
+      * Completed
+      3 spent
+    - [10] Task 12
       Review the change
       Agent
       * Held
@@ -33,13 +41,13 @@ Plan:
       Held: out of tries
       Hold revision 7
       The next run resumes its conversation; tries count again from zero
-    - [8] Task 13
+    - [11] Task 13
       Write the release notes
       Agent
       * waiting on task 12
       0 spent
       Dependencies of task 13:
-        - [9] Task 12
+        - [12] Task 12
           * Held
     * Held below: 1
 Latest activity:

@@ -264,13 +264,18 @@ impl Amending {
         }
     }
 }
-/// A procedure's ended children, one read out at a time (client/README.md, 5.10).
+/// A goal's or procedure's ended delegates, one read out at a time (client/README.md, 5.8, 5.10).
 #[derive(Debug)]
 pub struct Ended {
     pub handle: Handle,
     pub page: Option<Box<c::TaskPage>>,
     pub reading: bool,
     pub stale: bool,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Filter {
+    All,
+    Live,
 }
 #[derive(Debug)]
 pub struct Task {
@@ -280,6 +285,7 @@ pub struct Task {
     pub activity: Handle,
     pub run: Option<Handle>,
     pub ended: Option<Ended>,
+    pub filter: Filter,
     pub shape: Shape,
     pub latest: Option<Box<c::ActivityPage>>,
     pub thread: jig_client::thread::Thread,
@@ -313,6 +319,7 @@ impl Task {
             activity,
             run: None,
             ended: None,
+            filter: Filter::All,
             shape: Shape::Unknown,
             latest: None,
             thread,
@@ -392,6 +399,7 @@ impl Task {
             | Act::DelegateFate { .. }
             | Act::ClosedChats
             | Act::ChatFilter { .. }
+            | Act::PlanFilter { .. }
             | Act::Filter { .. }
             | Act::OpenResult { .. }
             | Act::Decide { .. }
@@ -486,6 +494,7 @@ impl Task {
             | Act::Older
             | Act::ClosedChats
             | Act::ChatFilter { .. }
+            | Act::PlanFilter { .. }
             | Act::Filter { .. }
             | Act::OpenResult { .. }
             | Act::Decide { .. }
@@ -811,7 +820,12 @@ impl Task {
         );
     }
     fn changed(&mut self, task: &c::Task, out: &mut Queue<Request>) {
-        if let c::Executor::Procedure { .. } = task.chip.executor {
+        let reads_ended = match task.chip.executor {
+            c::Executor::Procedure { .. } => true,
+            c::Executor::Agent { .. } => task.priority.is_some(),
+            c::Executor::Party { .. } | c::Executor::Role { .. } => false,
+        };
+        if reads_ended {
             if self.ended.is_none() {
                 let handle = handle(self.next);
                 self.next = self.next.checked_add(1).expect("task handles fit");
@@ -931,7 +945,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     // Three more document bounds cover the draft base (spec, authority, instructions,
     // dependencies and model), its replacement spec, and its retained outcome.
     // The editor also keeps one bounded specification field and its inline state.
-    // A procedure also keeps one page of ended children and its read state.
+    // A goal or procedure also keeps one page of ended delegates and its read state.
     // An agent's task also retains a chat's thread and its borrowed view lines.
     limits
         .client

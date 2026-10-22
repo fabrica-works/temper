@@ -580,6 +580,7 @@ impl Chat {
             | Act::StartChat
             | Act::Suggest { .. }
             | Act::ChatFilter { .. }
+            | Act::PlanFilter { .. }
             | Act::ClosedChats
             | Act::Filter { .. }
             | Act::Decide { .. }

@@ -199,7 +199,7 @@ mod memory_literal;
 // combined pull/bounds texts fit the existing maximum text envelope.
 // The procedure's ended page and its three phrases move the checked envelope.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274683720297;
+const WEB_BYTES: u64 = 274683720889;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

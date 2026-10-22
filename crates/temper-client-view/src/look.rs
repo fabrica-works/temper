@@ -183,6 +183,8 @@ pub const STEP_CURRENT: Style = Style { owner: owner(), token: 88 };
 pub const CHANGE_HOLD: Style = Style { owner: owner(), token: 89 };
 /// One of a change's gates, CI's among them (5.10).
 pub const GATE: Style = Style { owner: owner(), token: 90 };
+/// An ended plan row (5.8).
+pub const PLAN_DONE: Style = Style { owner: owner(), token: 91 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -279,6 +281,7 @@ pub const NAMES: Names<'static> = Names {
         b"temper-step-current",
         b"temper-change-hold",
         b"temper-gate",
+        b"temper-plan-done",
     ],
     regions: &[b"temper-link"],
 };

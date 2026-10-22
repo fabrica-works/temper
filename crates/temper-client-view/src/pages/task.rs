@@ -85,29 +85,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         if let Some(change) = change {
             super::change::start(b, change, words, bindings);
         }
-        let word = match task.chip.executor {
-            c::Executor::Procedure { .. } => Word::ItsTasks,
-            c::Executor::Agent { .. } | c::Executor::Party { .. } | c::Executor::Role { .. } => Word::Plan,
-        };
-        let ended = match &page.ended {
-            Some(task::Ended { page: Some(page), .. }) if word == Word::ItsTasks => Some((
-                page.as_ref(),
-                match task.chip.phase {
-                    c::Phase::Ended | c::Phase::Done | c::Phase::Failed | c::Phase::Cancelled => true,
-                    c::Phase::Waiting
-                    | c::Phase::Idle
-                    | c::Phase::Due
-                    | c::Phase::Preparing
-                    | c::Phase::Claimed
-                    | c::Phase::Running
-                    | c::Phase::Active
-                    | c::Phase::BackingOff
-                    | c::Phase::Closing
-                    | c::Phase::Held => false,
-                },
-            )),
-            Some(_) | None => None,
-        };
+        let part = Plan::of(page, task);
         let tree = if let Some(document) = root.client().document(page.tree)
             && let Some(Latest::Jig(tree)) = document.latest
         {
@@ -115,8 +93,8 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         } else {
             None
         };
-        if tree.is_some() || ended.is_some() {
-            plan(b, tree, root, words, bindings, rows, Plan { word, ended });
+        if tree.is_some() || part.ended.is_some() {
+            plan(b, tree, root, words, bindings, rows, part);
         }
         if let Some(change) = change {
             super::change::finish(b, change, words);
@@ -651,6 +629,75 @@ fn folded(b: &mut Builder, counts: &[(c::Phase, u32)], held_below: u32, words: &
 pub(crate) struct Plan<'a> {
     pub word: Word,
     pub ended: Option<(&'a c::TaskPage, bool)>,
+    pub goal: Option<(task::Filter, u32)>,
+}
+impl<'a> Plan<'a> {
+    fn of(page: &'a task::Task, task: &c::Task) -> Self {
+        let word = match task.chip.executor {
+            c::Executor::Procedure { .. } => Word::ItsTasks,
+            c::Executor::Agent { .. } | c::Executor::Party { .. } | c::Executor::Role { .. } => Word::Plan,
+        };
+        let ended = match &page.ended {
+            Some(task::Ended { page: Some(page), .. }) => Some((
+                page.as_ref(),
+                match task.chip.phase {
+                    c::Phase::Ended | c::Phase::Done | c::Phase::Failed | c::Phase::Cancelled => true,
+                    c::Phase::Waiting
+                    | c::Phase::Idle
+                    | c::Phase::Due
+                    | c::Phase::Preparing
+                    | c::Phase::Claimed
+                    | c::Phase::Running
+                    | c::Phase::Active
+                    | c::Phase::BackingOff
+                    | c::Phase::Closing
+                    | c::Phase::Held => false,
+                },
+            )),
+            Some(_) | None => None,
+        };
+        let goal = if word == Word::Plan && page.ended.is_some() {
+            let mut live = 0;
+            if let c::ChipPhase::Owner { details, .. } = task.chip.details.as_ref() {
+                live = details.live_delegates;
+            }
+            Some((page.filter, live))
+        } else {
+            None
+        };
+        Self { word, ended, goal }
+    }
+    fn heading(&self, b: &mut Builder, words: &Words, bindings: &mut Bindings, ended_rows: &EndedRows<'_>) {
+        region(b, self.word, words);
+        b.style(look::TASK_CARD);
+        if let Some((filter, live)) = self.goal {
+            if self.ended.is_some() {
+                text(
+                    b,
+                    Role::Paragraph,
+                    &words.say(
+                        if ended_rows.more { Word::PlanMoreCounts } else { Word::PlanCounts },
+                        &[
+                            Hole::Number(u64::from(live)),
+                            Hole::Number(u64::try_from(ended_rows.lines.len()).expect("page fits")),
+                        ],
+                    ),
+                );
+            }
+            b.open(Role::Slot);
+            b.style(look::FILTERS);
+            for (value, word) in [(task::Filter::All, Word::AllPlan), (task::Filter::Live, Word::LivePlan)] {
+                b.open(Role::Button);
+                b.name(&words.say(word, &[]));
+                if filter == value {
+                    b.state(skein_ui::State::Pressed);
+                }
+                b.bind(bindings.insert(Act::PlanFilter { filter: value }));
+                b.close();
+            }
+            b.close();
+        }
+    }
 }
 pub(crate) fn plan(
     b: &mut Builder,
@@ -661,22 +708,27 @@ pub(crate) fn plan(
     rows: u32,
     part: Plan<'_>,
 ) {
-    let Plan { word, ended } = part;
-    region(b, word, words);
-    b.style(look::TASK_CARD);
+    let mut ended_rows = EndedRows::new(part.ended, tree);
+    part.heading(b, words, bindings, &ended_rows);
+    let Plan { word, ended, goal } = part;
+    if let Some((task::Filter::Live, _)) = goal {
+        ended_rows.lines = &[];
+        ended_rows.more = false;
+    }
     b.open(Role::Tree);
     b.style(look::PLAN);
     b.name(&words.say(word, &[]));
-    // A goal keeps its live-only empty word (5.8); a procedure adds its ended page (5.10).
     let mut has_tree_content = false;
-    let mut empty = false;
     match tree {
         Some(c::Delivery::OwnerTree(tree)) => {
             has_tree_content = !tree.rows.is_empty();
-            empty = tree.rows.is_empty() && tree.held_below == 0 && tree.folded.is_empty();
             let mut stack = List::with_capacity(tree.rows.len());
             has_tree_content |= owner_folds(b, tree, tree.root.task, words);
             for row in &tree.rows {
+                if row.parent == tree.root.task && ended_rows.precedes(row.chip.task) {
+                    parent(b, &mut stack, None);
+                    has_tree_content |= ended_rows.before(b, Some(row.chip.task), root, words, bindings, rows);
+                }
                 parent(b, &mut stack, Some(row.parent));
                 chip(b, &row.chip, words, bindings);
                 let facts = if let c::ChipPhase::Owner { details, .. } = row.chip.details.as_ref() {
@@ -704,6 +756,10 @@ pub(crate) fn plan(
         Some(c::Delivery::Tree(tree)) => {
             let mut stack = List::with_capacity(tree.nodes.len());
             for node in &tree.nodes {
+                if node.parent == Some(tree.task) && ended_rows.precedes(node.chip.task) {
+                    parent(b, &mut stack, None);
+                    has_tree_content |= ended_rows.before(b, Some(node.chip.task), root, words, bindings, rows);
+                }
                 parent(b, &mut stack, node.parent);
                 if node.chip.task != tree.task {
                     has_tree_content = true;
@@ -733,86 +789,130 @@ pub(crate) fn plan(
         )
         | None => {}
     }
-    let (has_ended, more) = match ended {
-        Some((page, _)) => ended_rows(b, tree, root, words, bindings, rows, page),
-        None => (false, false),
-    };
+    has_tree_content |= ended_rows.before(b, None, root, words, bindings, rows);
     b.close();
-    if let Some((_, task_ended)) = ended {
-        if !has_tree_content && !has_ended {
-            text(
-                b,
-                Role::Paragraph,
-                &words.say(if task_ended { Word::ItsTasksNone } else { Word::ItsTasksNoneYet }, &[]),
-            );
-        }
-    } else if empty {
-        text(b, Role::Paragraph, &words.say(Word::NoLiveTasks, &[]));
+    if !has_tree_content {
+        let word = match (ended, goal) {
+            (_, Some((task::Filter::Live, _))) | (None, _) => Word::NoLiveTasks,
+            (Some((_, true)), _) => Word::ItsTasksNone,
+            (Some((_, false)), _) => Word::ItsTasksNoneYet,
+        };
+        text(b, Role::Paragraph, &words.say(word, &[]));
     }
-    if more {
+    if ended_rows.more {
         text(b, Role::Paragraph, &words.say(Word::ItsTasksMoreEnded, &[]));
     }
     b.close();
 }
-fn ended_rows(
-    b: &mut Builder,
-    tree: Option<&c::Delivery>,
-    root: &Domain,
-    words: &Words,
-    bindings: &mut Bindings,
-    rows: u32,
-    page: &c::TaskPage,
-) -> (bool, bool) {
-    let mut has_ended = false;
-    let mut more = false;
-    if let c::EndedGroup::Rows { rows: lines, after, cut } = &page.ended {
-        more = after.is_some() || *cut;
-        for line in lines {
-            let mut shown = false;
-            match tree {
-                Some(c::Delivery::OwnerTree(tree)) => {
-                    for row in &tree.rows {
-                        if row.chip.task == line.chip.task {
-                            shown = true;
-                            break;
-                        }
-                    }
-                }
-                Some(c::Delivery::Tree(tree)) => {
-                    for node in &tree.nodes {
-                        if node.chip.task != tree.task && node.chip.task == line.chip.task {
-                            shown = true;
-                            break;
-                        }
-                    }
-                }
-                Some(
-                    c::Delivery::OwnerProject(_)
-                    | c::Delivery::Me(_)
-                    | c::Delivery::Task(_)
-                    | c::Delivery::OwnerProposal(_)
-                    | c::Delivery::Chips(_)
-                    | c::Delivery::Inbox(_)
-                    | c::Delivery::OwnerInbox(_)
-                    | c::Delivery::Tasks(_)
-                    | c::Delivery::Run(_)
-                    | c::Delivery::RunState(_)
-                    | c::Delivery::Deployment(_)
-                    | c::Delivery::OwnerDeployment(_)
-                    | c::Delivery::OwnerAccounts(_),
-                )
-                | None => {}
+/// One cursor through the number-ordered page, with tree matches marked first.
+/// Marking before drawing also handles legacy trees whose roots arrive out of order.
+struct EndedRows<'a> {
+    lines: &'a [c::TaskLine],
+    shown: List<bool>,
+    next: usize,
+    more: bool,
+}
+impl<'a> EndedRows<'a> {
+    fn new(ended: Option<(&'a c::TaskPage, bool)>, tree: Option<&c::Delivery>) -> Self {
+        let (lines, more) = match ended {
+            Some((c::TaskPage { ended: c::EndedGroup::Rows { rows, after, cut }, .. }, _)) => {
+                (rows.as_slice(), after.is_some() || *cut)
             }
-            if !shown {
-                chip(b, &line.chip, words, bindings);
-                controls(b, &line.chip, root, words, bindings, rows);
-                b.close();
-                has_ended = true;
+            Some((c::TaskPage { ended: c::EndedGroup::None, .. }, _)) | None => (&[][..], false),
+        };
+        let mut result =
+            Self { lines, shown: List::with_capacity(u32::try_from(lines.len()).expect("page fits")), next: 0, more };
+        for _ in lines {
+            result.shown.push(false).expect("page matches fit");
+        }
+        match tree {
+            Some(c::Delivery::OwnerTree(tree)) => {
+                for row in &tree.rows {
+                    result.mark(row.chip.task);
+                }
+            }
+            Some(c::Delivery::Tree(tree)) => {
+                for node in &tree.nodes {
+                    if node.chip.task != tree.task {
+                        result.mark(node.chip.task);
+                    }
+                }
+            }
+            Some(
+                c::Delivery::OwnerProject(_)
+                | c::Delivery::Me(_)
+                | c::Delivery::Task(_)
+                | c::Delivery::OwnerProposal(_)
+                | c::Delivery::Chips(_)
+                | c::Delivery::Inbox(_)
+                | c::Delivery::OwnerInbox(_)
+                | c::Delivery::Tasks(_)
+                | c::Delivery::Run(_)
+                | c::Delivery::RunState(_)
+                | c::Delivery::Deployment(_)
+                | c::Delivery::OwnerDeployment(_)
+                | c::Delivery::OwnerAccounts(_),
+            )
+            | None => {}
+        }
+        result
+    }
+    fn mark(&mut self, number: u64) {
+        let mut low = 0;
+        let mut high = self.lines.len();
+        // Each step halves the page; even the largest slice fits in usize::BITS steps.
+        for _ in 0..usize::BITS {
+            if low == high {
+                break;
+            }
+            let half = high.checked_sub(low).expect("ordered search bounds") / 2;
+            let middle = low.checked_add(half).expect("page index fits");
+            match self.lines.get(middle).expect("search index in page").chip.task.cmp(&number) {
+                core::cmp::Ordering::Less => low = middle.checked_add(1).expect("page index fits"),
+                core::cmp::Ordering::Greater => high = middle,
+                core::cmp::Ordering::Equal => {
+                    *self.shown.get_mut(u32::try_from(middle).expect("page index fits")).expect("page match") = true;
+                    break;
+                }
             }
         }
     }
-    (has_ended, more)
+    fn precedes(&self, number: u64) -> bool {
+        match self.lines.get(self.next) {
+            Some(line) => line.chip.task < number,
+            None => false,
+        }
+    }
+    fn before(
+        &mut self,
+        b: &mut Builder,
+        number: Option<u64>,
+        root: &Domain,
+        words: &Words,
+        bindings: &mut Bindings,
+        rows: u32,
+    ) -> bool {
+        let mut drew = false;
+        for index in self.next..self.lines.len() {
+            let line = self.lines.get(index).expect("page index");
+            if let Some(number) = number
+                && line.chip.task >= number
+            {
+                break;
+            }
+            self.next = index.checked_add(1).expect("page index fits");
+            if !self.shown.as_slice().get(index).expect("page match index") {
+                chip(b, &line.chip, words, bindings);
+                b.style(look::PLAN_DONE);
+                controls(b, &line.chip, root, words, bindings, rows);
+                b.close();
+                drew = true;
+            }
+        }
+        drew
+    }
 }
+
 #[expect(
     clippy::too_many_arguments,
     reason = "the supplied dependency line and its facts share the viewer and rendering context"

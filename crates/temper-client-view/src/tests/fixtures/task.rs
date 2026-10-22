@@ -357,6 +357,15 @@ pub fn root_with_optional_tree_and_ended(
     tree: Option<c::Delivery>,
     page: Option<c::TaskPage>,
 ) -> temper_client_domain::Domain {
+    root_with_ended_and_held(document, tree, page, None)
+}
+/// As above, also answering a held delegate's card read before the ended page.
+pub fn root_with_ended_and_held(
+    document: c::Task,
+    tree: Option<c::Delivery>,
+    page: Option<c::TaskPage>,
+    held: Option<c::Task>,
+) -> temper_client_domain::Domain {
     use jig_client::{Event as E, Up};
     use temper_client_domain::{Event, Request};
     let limits = domain_limits();
@@ -378,6 +387,7 @@ pub fn root_with_optional_tree_and_ended(
     }
     if let Some(page) = page {
         let mut token = None;
+        let mut held_token = None;
         while let Some(request) = out.pop() {
             if let Request::Client {
                 request:
@@ -388,7 +398,30 @@ pub fn root_with_optional_tree_and_ended(
             {
                 assert!(token.is_none(), "one ended read");
                 token = Some(read);
+            } else if let Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down: jig_client::Down::Read { read, what: jig_client::Readable::Jig(c::Read::Task { task }) },
+                    },
+            } = request
+                && let Some(held) = &held
+                && held.chip.task == task
+            {
+                held_token = Some(read);
             }
+        }
+        if let Some(held) = held {
+            root_event(
+                &mut root,
+                Event::Client {
+                    event: E::Up {
+                        up: Up::ReadDone {
+                            read: held_token.expect("held card read"),
+                            result: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(Box::new(held)))),
+                        },
+                    },
+                },
+            );
         }
         temper_client_domain::step(
             &mut root,

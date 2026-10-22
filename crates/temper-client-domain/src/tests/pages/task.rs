@@ -1105,6 +1105,7 @@ fn agent_and_person_tasks_do_not_read_ended_children() {
         while fixture.out.pop().is_some() {}
         let mut task = f::task();
         task.chip.executor = executor;
+        task.priority = None;
         f::deliver(&mut fixture.client, fixture.watch, task);
         for handle in [page.document, page.tree] {
             page.told(&fixture.client, Told::Changed { handle }, &mut fixture.out);
@@ -1198,4 +1199,79 @@ fn leaving_a_procedure_unwatches_its_ended_read_handle() {
         f::handles(&mut fixture.out).as_ref(),
         [page.document, page.tree, page.activity, page.run.unwrap(), page.ended.as_ref().unwrap().handle],
     );
+}
+
+fn goal() -> (Task, f::Fixture) {
+    let (mut page, mut fixture) = opened();
+    while fixture.out.pop().is_some() {}
+    let mut task = f::task();
+    task.chip.executor = c::Executor::Agent { charter: 1 };
+    task.priority = Some(PRIORITY);
+    f::deliver(&mut fixture.client, fixture.watch, task);
+    page.told(&fixture.client, Told::Changed { handle: page.document }, &mut fixture.out);
+    (page, fixture)
+}
+#[test]
+fn a_goal_reads_its_ended_delegates_on_its_own_handle() {
+    let (page, mut fixture) = goal();
+    let ended = page.ended.as_ref().unwrap();
+    assert_eq!(page.shape, Shape::Tracked);
+    assert_eq!(page.next, ended.handle.number + 1);
+    assert_ne!(ended.handle, page.document);
+    assert_ne!(ended.handle, page.tree);
+    assert_ne!(ended.handle, page.activity);
+    assert_ne!(Some(ended.handle), page.run);
+    assert!(ended.reading);
+    assert!(!ended.stale);
+    assert_eq!(fixture.out.pop(), Some(ended_read(&page)));
+    assert!(fixture.out.is_empty());
+}
+#[test]
+fn a_goals_tree_and_document_changes_reread_one_page_at_a_time() {
+    let (mut page, mut fixture) = goal();
+    assert_eq!(fixture.out.pop(), Some(ended_read(&page)));
+    for handle in [page.tree, page.document] {
+        let kept = ended_page(false);
+        answer_ended(&mut page, &mut fixture, kept.clone());
+        assert!(fixture.out.is_empty());
+        page.told(&fixture.client, Told::Changed { handle }, &mut fixture.out);
+        assert_eq!(fixture.out.pop(), Some(ended_read(&page)));
+        for handle in [page.document, page.tree, handle] {
+            page.told(&fixture.client, Told::Changed { handle }, &mut fixture.out);
+            assert!(fixture.out.is_empty());
+        }
+        let ended = page.ended.as_ref().unwrap();
+        assert!(ended.reading && ended.stale);
+        assert_eq!(ended.page.as_deref(), Some(&kept));
+        answer_ended(&mut page, &mut fixture, ended_page(true));
+        assert_eq!(fixture.out.pop(), Some(ended_read(&page)));
+        assert!(fixture.out.is_empty());
+        let ended = page.ended.as_ref().unwrap();
+        assert!(ended.reading && !ended.stale);
+    }
+    answer_ended(&mut page, &mut fixture, ended_page(false));
+    assert!(!page.ended.as_ref().unwrap().reading);
+    assert!(fixture.out.is_empty());
+}
+#[test]
+fn a_plan_filter_sends_nothing_and_each_open_starts_with_all() {
+    use crate::pages::task::Filter;
+    let (mut pages, client) = amend_pages(true);
+    assert_eq!(pages.task().unwrap().filter, Filter::All);
+    for filter in [Filter::Live, Filter::All, Filter::Live] {
+        assert!(page_act(&mut pages, &client, Act::PlanFilter { filter }).is_empty());
+        assert_eq!(pages.task().unwrap().filter, filter);
+    }
+    for address in
+        [crate::Address::Inbox { filter: crate::address::Filter::ALL }, crate::Address::Task { task: f::TASK }]
+    {
+        pages::step(
+            &mut pages,
+            &fixtures::env(&fixtures::limits()),
+            &client,
+            pages::Event::Went { address },
+            &mut Queue::with_capacity(OUTPUTS),
+        );
+    }
+    assert_eq!(pages.task().unwrap().filter, Filter::All);
 }

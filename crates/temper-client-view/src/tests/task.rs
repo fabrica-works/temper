@@ -105,7 +105,7 @@ fn a_plans_chip_links_to_its_tasks_page_by_number() {
         &fixtures::words(),
         &mut bindings,
         fixtures::domain_limits().client.domain.rows,
-        crate::pages::task::Plan { word: crate::words::Word::Plan, ended: None },
+        crate::pages::task::Plan { word: crate::words::Word::Plan, ended: None, goal: None },
     );
     let tree = builder.finish();
     let link = &tree.nodes()[index_of(&tree, Role::Link, b"Task 12")];
@@ -133,7 +133,7 @@ fn a_plan_with_no_live_task_says_so_in_its_region() {
             &fixtures::words(),
             &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
             fixtures::domain_limits().client.domain.rows,
-            crate::pages::task::Plan { word: crate::words::Word::Plan, ended: None },
+            crate::pages::task::Plan { word: crate::words::Word::Plan, ended: None, goal: None },
         );
         let tree = builder.finish();
         let region = region_index(&tree, b"Plan");
@@ -526,7 +526,7 @@ fn every_phase_has_the_same_status_token_in_the_header_and_its_plan_row() {
             &fixtures::words(),
             &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
             fixtures::domain_limits().client.domain.rows,
-            crate::pages::task::Plan { word: crate::words::Word::Plan, ended: None },
+            crate::pages::task::Plan { word: crate::words::Word::Plan, ended: None, goal: None },
         );
         let tree = builder.finish();
         for (index, node) in tree.nodes().iter().enumerate() {
@@ -1083,7 +1083,7 @@ fn plan(delivery: &c::Delivery) -> Tree {
         &fixtures::words(),
         &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
         fixtures::domain_limits().client.domain.rows,
-        crate::pages::task::Plan { word: crate::words::Word::Plan, ended: None },
+        crate::pages::task::Plan { word: crate::words::Word::Plan, ended: None, goal: None },
     );
     builder.finish()
 }
@@ -1480,7 +1480,7 @@ fn both_plan_shapes_omit_the_goal_and_its_hold_and_keep_its_folds() {
             &fixtures::words(),
             &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
             fixtures::domain_limits().client.domain.rows,
-            crate::pages::task::Plan { word: crate::words::Word::Plan, ended: None },
+            crate::pages::task::Plan { word: crate::words::Word::Plan, ended: None, goal: None },
         );
         let tree = builder.finish();
         assert!(fixtures::find(&tree, Role::TreeItem, b"Task 9").is_none());
@@ -2391,7 +2391,7 @@ fn its_tasks_delivery(delivery: c::Delivery, phase: c::Phase, page: Option<c::Ta
     builder.finish()
 }
 #[test]
-fn its_ended_tasks_follow_its_live_rows_with_their_endings() {
+fn its_ended_tasks_keep_their_endings_spend_and_muted_links() {
     let lines = [
         ended_line(ENDED_CHILD, c::OwnerTaskStatus::Done),
         ended_line(24, c::OwnerTaskStatus::Failed),
@@ -2409,6 +2409,9 @@ fn its_ended_tasks_follow_its_live_rows_with_their_endings() {
         assert!(named(subtree(&tree, index), Role::Link, number));
         assert!(index >= live + usize::try_from(tree.nodes()[live].size).unwrap(), "ended row is top level");
         assert!(has_style(subtree(&tree, index), look::PLAN_ROW));
+        assert!(tree.nodes()[index].styles.as_slice().contains(&look::PLAN_DONE));
+        assert!(named(subtree(&tree, index), Role::Paragraph, b"5 spent"));
+        assert!(!has_style(subtree(&tree, index), look::DEPENDENCIES));
         previous = index;
     }
     let region = subtree(&tree, region_index(&tree, b"Its tasks"));
@@ -2564,17 +2567,256 @@ fn an_ended_task_still_in_its_live_tree_is_drawn_once_in_that_tree() {
     let child = index_of(&tree, Role::TreeItem, b"Task 12");
     assert!(child > parent && child < parent + usize::try_from(tree.nodes()[parent].size).unwrap());
 }
-#[test]
-fn a_goals_plan_keeps_only_its_live_rows() {
+
+fn goal_root(live: &[c::OwnerTreeRow], page: Option<c::TaskPage>, phase: c::Phase) -> Domain {
     let mut task = f::document();
+    task.chip.task = TASK;
+    task.chip.executor = c::Executor::Agent { charter: CHARTER };
     task.priority = Some(PRIORITY);
-    let root = f::root_with_ended(task, f::tree(), None);
-    assert!(root.pages().task().unwrap().ended.is_none());
-    let mut view = fixtures::view();
-    fixtures::build(&mut view, &root);
-    let tree = view.tree();
-    let region = subtree(tree, region_index(tree, b"Plan"));
-    assert!(named(region, Role::Paragraph, b"No live tasks."));
-    assert!(!named(region, Role::TreeItem, b"Task 23"));
-    assert!(!named(region, Role::Paragraph, b"None yet."));
+    task.chip.phase = phase;
+    let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() else { panic!("owner") };
+    details.live_delegates = 2;
+    let mut delivery = f::tree();
+    let c::Delivery::OwnerTree(tree) = &mut delivery else { panic!("owner tree") };
+    tree.rows = List::with_capacity(u32::try_from(live.len()).unwrap());
+    for row in live {
+        tree.rows.push(row.clone()).unwrap();
+    }
+    f::root_with_ended(task, delivery, page)
+}
+#[test]
+fn a_goals_plan_draws_its_filter_before_the_read_and_binds_both_buttons() {
+    use temper_client_domain::pages::task::Filter;
+    let mut root = goal_root(&[], None, c::Phase::Running);
+    for (filter, label) in [(Filter::All, b"All".as_slice()), (Filter::Live, b"Live only"), (Filter::All, b"All")] {
+        let mut view = fixtures::page_view(&root);
+        let tree = view.tree();
+        let region = region_index(tree, b"Plan");
+        let nodes = subtree(tree, region);
+        assert!(named(nodes, Role::Paragraph, b"No live tasks."));
+        assert!(!contains(tree, b"Its delegates:"));
+        let filters = styled(tree, look::FILTERS);
+        assert!(filters > region && filters < index_of(tree, Role::Tree, b"Plan"));
+        assert_eq!(tree.nodes()[filters].role, Role::Slot);
+        for (value, label) in [(Filter::All, b"All".as_slice()), (Filter::Live, b"Live only")] {
+            let id = index_of(tree, Role::Button, label);
+            assert_eq!(
+                tree.nodes()[id].states.as_slice().contains(&skein_ui::State::Pressed),
+                root.pages().task().unwrap().filter == value
+            );
+        }
+        let id = fixtures::find(view.tree(), Role::Button, label).unwrap();
+        let action = crate::act(&mut view, id, skein_ui::Act::Press).unwrap();
+        assert_eq!(action, Action::Pages(Act::PlanFilter { filter }));
+        fixtures::root_event(&mut root, Event::Act { action });
+        assert_eq!(root.pages().task().unwrap().filter, filter);
+    }
+}
+#[test]
+fn a_goals_counts_use_the_chip_and_the_whole_kept_page_under_either_filter() {
+    for (after, cut, expected) in [
+        (false, false, b"Its delegates: 2 live, 1 ended.".as_slice()),
+        (true, false, b"Its delegates: 2 live, more than 1 ended."),
+        (false, true, b"Its delegates: 2 live, more than 1 ended."),
+    ] {
+        let mut root = goal_root(
+            &[row()],
+            Some(tasks_page(&[ended_line(23, c::OwnerTaskStatus::Done)], after, cut)),
+            c::Phase::Running,
+        );
+        for label in [b"All".as_slice(), b"Live only", b"All"] {
+            press_button(&mut root, label);
+            let view = fixtures::page_view(&root);
+            let tree = view.tree();
+            let nodes = subtree(tree, region_index(tree, b"Plan"));
+            assert!(named(nodes, Role::Paragraph, expected));
+            assert!(index_of(tree, Role::Heading { level: 2 }, b"Plan") < index_of(tree, Role::Paragraph, expected));
+            assert!(index_of(tree, Role::Paragraph, expected) < styled(tree, look::FILTERS));
+            assert!(named(nodes, Role::TreeItem, b"Task 12"));
+            assert_eq!(named(nodes, Role::TreeItem, b"Task 23"), label == b"All");
+            assert_eq!(
+                named(nodes, Role::Paragraph, b"More of its ended tasks are not shown."),
+                label == b"All" && (after || cut)
+            );
+        }
+    }
+}
+#[test]
+fn a_goals_empty_plan_uses_its_read_phase_and_filter_words() {
+    for phase in [c::Phase::Running, c::Phase::Ended] {
+        for answered in [false, true] {
+            let page = if answered { Some(tasks_page(&[], false, false)) } else { None };
+            let mut root = goal_root(&[], page, phase);
+            for label in [b"All".as_slice(), b"Live only"] {
+                press_button(&mut root, label);
+                let view = fixtures::page_view(&root);
+                let nodes = subtree(view.tree(), region_index(view.tree(), b"Plan"));
+                let none = answered && label == b"All";
+                assert_eq!(named(nodes, Role::Paragraph, b"No live tasks."), !none);
+                assert_eq!(named(nodes, Role::Paragraph, b"None yet."), none && phase == c::Phase::Running);
+                assert_eq!(named(nodes, Role::Paragraph, b"None."), none && phase == c::Phase::Ended);
+            }
+        }
+    }
+}
+#[test]
+fn only_a_goals_plan_has_counts_and_a_filter() {
+    // An agent's task page draws no plan region without delegates: check the whole page.
+    for executor in [
+        c::Executor::Procedure { connector: fixtures::FORGE, kind: PROCEDURE },
+        c::Executor::Agent { charter: CHARTER },
+        c::Executor::Party { party: PARTY },
+    ] {
+        let mut task = f::document();
+        task.chip.executor = executor;
+        task.priority = None;
+        let root = f::root_with_ended(task, f::tree(), None);
+        let view = fixtures::page_view(&root);
+        let nodes = view.tree().nodes();
+        assert!(!has_style(nodes, look::FILTERS));
+        assert!(!named(nodes, Role::Button, b"Live only"));
+        assert!(!contains(view.tree(), b"Its delegates:"));
+    }
+    let tree = its_tasks_tree(&[], c::Phase::Running, Some(tasks_page(&[], false, false)));
+    assert!(!has_style(tree.nodes(), look::FILTERS));
+    assert!(!contains(&tree, b"Its delegates:"));
+}
+/// The tree's items by name, in order and none else.
+fn assert_tree_items(tree: &Tree, expected: &[&[u8]]) {
+    let mut at = 0;
+    for node in tree.nodes() {
+        if node.role == Role::TreeItem {
+            assert_eq!(node.name.as_deref(), expected.get(at).copied(), "tree item {at}");
+            at = at.checked_add(1).expect("bounded items");
+        }
+    }
+    assert_eq!(at, expected.len(), "tree items");
+}
+#[test]
+fn ended_rows_merge_among_roots_and_leave_each_roots_delegates_under_it() {
+    let mut first = row();
+    first.chip.task = 12;
+    let mut child = row();
+    child.chip.task = 30;
+    child.parent = 12;
+    child.depth = 2;
+    let mut last = row();
+    last.chip.task = 18;
+    let live = [first, child, last];
+    let lines = [10, 12, 15, 18, 20, 30].map(|number| ended_line(number, c::OwnerTaskStatus::Done));
+    let page = tasks_page(&lines, false, false);
+    let goal = goal_root(&live, Some(page.clone()), c::Phase::Running);
+    let view = fixtures::page_view(&goal);
+    let procedure = its_tasks_tree(&live, c::Phase::Running, Some(page));
+    for tree in [view.tree(), &procedure] {
+        assert_tree_items(tree, &[b"Task 10", b"Task 12", b"Task 30", b"Task 15", b"Task 18", b"Task 20"]);
+        let parent = index_of(tree, Role::TreeItem, b"Task 12");
+        let child = index_of(tree, Role::TreeItem, b"Task 30");
+        assert!(child < parent + usize::try_from(tree.nodes()[parent].size).unwrap());
+        let between = index_of(tree, Role::TreeItem, b"Task 15");
+        assert!(between >= parent + usize::try_from(tree.nodes()[parent].size).unwrap());
+        assert!(!has_style(subtree(tree, index_of(tree, Role::TreeItem, b"Task 12")), look::PLAN_DONE));
+        let ended = index_of(tree, Role::TreeItem, b"Task 10");
+        assert!(tree.nodes()[ended].styles.as_slice().contains(&look::PLAN_DONE));
+        assert!(named(subtree(tree, ended), Role::Status, b"Completed"));
+        assert!(named(subtree(tree, ended), Role::Paragraph, b"5 spent"));
+        assert!(!has_style(subtree(tree, ended), look::DEPENDENCIES));
+    }
+}
+#[test]
+fn legacy_roots_out_of_number_order_draw_each_ended_row_once() {
+    let zero =
+        c::PhaseCounts { ended: 0, waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 };
+    let mut tree = c::Tree { task: TASK, nodes: List::with_capacity(3), folded: zero, held_below: 0 };
+    for number in [18, 12, 15] {
+        let mut chip = row().chip;
+        chip.task = number;
+        tree.nodes
+            .push(c::TreeNode {
+                chip,
+                parent: Some(TASK),
+                dependencies: List::with_capacity(NO_ROWS),
+                proposals: List::with_capacity(NO_ROWS),
+                spend: 0,
+                folded: zero,
+                held_below: 0,
+            })
+            .unwrap();
+    }
+    let lines = [10, 12, 14, 15, 18, 20].map(|number| ended_line(number, c::OwnerTaskStatus::Done));
+    let tree = its_tasks_delivery(
+        c::Delivery::Tree(Box::new(tree)),
+        c::Phase::Running,
+        Some(tasks_page(&lines, false, false)),
+    );
+    assert_tree_items(&tree, &[b"Task 10", b"Task 14", b"Task 18", b"Task 12", b"Task 15", b"Task 20"]);
+    for number in [b"Task 12".as_slice(), b"Task 15", b"Task 18"] {
+        assert!(!has_style(subtree(&tree, index_of(&tree, Role::TreeItem, number)), look::PLAN_DONE));
+    }
+}
+
+#[test]
+fn live_only_keeps_live_rows_folds_held_counts_and_held_cards() {
+    let source = f::held_root();
+    let mut held = source.pages().task().unwrap().document(source.client()).unwrap().clone();
+    held.chip.task = CHILD;
+    held.requester = c::OwnerRequester::Task(TASK);
+    let mut live = row();
+    live.chip = held.chip.clone();
+    let mut delivery = f::tree();
+    let c::Delivery::OwnerTree(tree) = &mut delivery else { panic!("owner") };
+    tree.rows = List::with_capacity(ONE);
+    tree.rows.push(live).unwrap();
+    tree.folded = List::with_capacity(ONE);
+    tree.folded
+        .push(c::OwnerTreeFold {
+            parent: TASK,
+            phases: c::OwnerPhaseCounts { running: 1, ..c::OwnerPhaseCounts::ZERO },
+            held_below: 0,
+        })
+        .unwrap();
+    tree.held_below = 1;
+    let mut goal = f::document();
+    goal.priority = Some(PRIORITY);
+    goal.chip.executor = c::Executor::Agent { charter: CHARTER };
+    let page = tasks_page(&[ended_line(23, c::OwnerTaskStatus::Done)], true, false);
+    let mut root = f::root_with_ended_and_held(goal, Some(delivery), Some(page), Some(held));
+    for label in [b"All".as_slice(), b"Live only"] {
+        press_button(&mut root, label);
+        let view = fixtures::page_view(&root);
+        let nodes = subtree(view.tree(), region_index(view.tree(), b"Plan"));
+        assert!(named(nodes, Role::TreeItem, b"Task 12"));
+        assert!(named(nodes, Role::Paragraph, b"Folded: 1 Running"));
+        assert!(named(nodes, Role::Status, b"Held below: 1"));
+        assert!(has_style(nodes, look::PLAN_HOLD));
+        assert!(named(nodes, Role::Button, b"Release task"));
+        assert!(!named(nodes, Role::Paragraph, b"No live tasks."));
+        assert_eq!(named(nodes, Role::TreeItem, b"Task 23"), label == b"All");
+        assert_eq!(named(nodes, Role::Paragraph, b"More of its ended tasks are not shown."), label == b"All");
+    }
+}
+#[test]
+fn a_goals_folds_and_held_counts_keep_an_empty_live_filter_from_saying_no_live_tasks() {
+    for (folded, held_below) in [(1, 0), (0, 1)] {
+        let mut document = f::document();
+        document.priority = Some(PRIORITY);
+        let mut delivery = f::tree();
+        let c::Delivery::OwnerTree(tree) = &mut delivery else { panic!("owner") };
+        tree.folded = List::with_capacity(ONE);
+        tree.folded
+            .push(c::OwnerTreeFold {
+                parent: TASK,
+                phases: c::OwnerPhaseCounts { running: folded, ..c::OwnerPhaseCounts::ZERO },
+                held_below,
+            })
+            .unwrap();
+        let mut root = f::root_with_ended(document, delivery, Some(tasks_page(&[], false, false)));
+        for label in [b"All".as_slice(), b"Live only"] {
+            press_button(&mut root, label);
+            let view = fixtures::page_view(&root);
+            let nodes = subtree(view.tree(), region_index(view.tree(), b"Plan"));
+            assert!(!named(nodes, Role::Paragraph, b"No live tasks."));
+            assert!(!named(nodes, Role::Paragraph, b"None yet."));
+        }
+    }
 }

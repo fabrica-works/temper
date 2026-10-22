@@ -58,8 +58,24 @@ pub fn page() -> skein_ui::Tree {
     text(&mut b, Role::Paragraph, b"Shown on the forge.");
     b.close();
     region(&mut b, b"Plan");
+    text(&mut b, Role::Paragraph, b"Its delegates: 2 live, 1 ended.");
+    b.open(Role::Slot);
+    b.style(temper_client_view::look::FILTERS);
+    for name in [b"All".as_slice(), b"Live only"] {
+        b.open(Role::Button);
+        b.name(name);
+        if name == b"All" {
+            b.state(skein_ui::State::Pressed);
+        }
+        b.bind(binding());
+        b.close();
+    }
+    b.close();
     b.open(Role::Tree);
     b.name(b"Plan");
+    chip(&mut b, b"Task 11", b"Advise on the change", b"Completed", b"3 spent");
+    b.style(temper_client_view::look::PLAN_DONE);
+    b.close();
     chip(&mut b, b"Task 12", b"Review the change", b"Held", b"4 spent");
     golden_cards::held(&mut b);
     b.close();

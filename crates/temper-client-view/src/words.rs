@@ -315,6 +315,10 @@ pub enum Word {
     ItsTasksNoneYet,
     ItsTasksNone,
     ItsTasksMoreEnded,
+    AllPlan,
+    LivePlan,
+    PlanCounts,
+    PlanMoreCounts,
     MessageOnceRuns,
 }
 // Room for temper, jig, account, card and forge phrases.
@@ -329,8 +333,8 @@ pub enum Word {
 // Forty-seven time form, calendar and placement phrases (5.12).
 // The change panel adds 86 forge phrases (2000–2085).
 // Three empty and partial ended-children phrases (5.10).
-const PHRASES: u32 = 746;
-const ALL: [Word; 298] = [
+const PHRASES: u32 = 750;
+const ALL: [Word; 302] = [
     Word::TimeYesterdayWord,
     Word::TimeJustNow,
     Word::TimeUnderMinute,
@@ -628,6 +632,10 @@ const ALL: [Word; 298] = [
     Word::ItsTasksNoneYet,
     Word::ItsTasksNone,
     Word::ItsTasksMoreEnded,
+    Word::AllPlan,
+    Word::LivePlan,
+    Word::PlanCounts,
+    Word::PlanMoreCounts,
     Word::MessageOnceRuns,
 ];
 impl Word {
@@ -938,6 +946,10 @@ impl Word {
             Self::ItsTasksNoneYet => 1251,
             Self::ItsTasksNone => 1252,
             Self::ItsTasksMoreEnded => 1253,
+            Self::AllPlan => 1254,
+            Self::LivePlan => 1255,
+            Self::PlanCounts => 1256,
+            Self::PlanMoreCounts => 1257,
         };
         let owner =
             if number >= 100 { crate::frame::owner() } else { temper_client_domain::forge::words::owner(connector) };
@@ -1151,7 +1163,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::DelegateBounds => (&[b"Up to ", b" tasks, ", b" deep"], &[Number, Number]),
         Word::DelegateOne => (&[b"Up to 1 task, ", b" deep"], &[Number]),
         Word::Models => (&[b"Models"], &[]),
-        Word::AllModels | Word::AllChats => (&[b"All"], &[]),
+        Word::AllModels | Word::AllChats | Word::AllPlan => (&[b"All"], &[]),
         Word::NoModels | Word::NoDeadline => (&[b"None"], &[]),
         Word::AuthorityCut => (&[b"Some of its authority is not shown."], &[]),
         Word::Amount => (&[b"", b""], &[Number]),
@@ -1336,6 +1348,9 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::NoLiveTasks => (&[b"No live tasks."], &[]),
         Word::ItsTasksNoneYet => (&[b"None yet."], &[]),
         Word::ItsTasksNone => (&[b"None."], &[]),
+        Word::LivePlan => (&[b"Live only"], &[]),
+        Word::PlanCounts => (&[b"Its delegates: ", b" live, ", b" ended."], &[Number, Number]),
+        Word::PlanMoreCounts => (&[b"Its delegates: ", b" live, more than ", b" ended."], &[Number, Number]),
         Word::ItsTasksMoreEnded => (&[b"More of its ended tasks are not shown."], &[]),
         Word::MessageOnceRuns => (&[b"Messages reach it once it runs."], &[]),
         Word::InboxTitle => (&[b"Inbox"], &[]),

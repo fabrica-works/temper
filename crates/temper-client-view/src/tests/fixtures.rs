@@ -73,16 +73,17 @@ fn english(shell: crate::words::Shell) -> crate::words::Words {
 
 pub fn tree_limits() -> skein_ui::Limits {
     skein_ui::Limits {
-        // Two time nodes for each of the six inbox cards.
-        nodes: 140,
+        // Two time nodes for each of the six inbox cards, and a goal's page
+        // with nine plan rows, live and ended (181 nodes).
+        nodes: 192,
         depth: 32,
         text_per_node: 512,
-        text_bytes: 71680,
+        text_bytes: 98304,
         drawing_bytes: 0,
         scene_marks: 0,
         scene_bytes: 0,
         styles_per_node: 2,
-        patches: 700,
+        patches: 960,
         bindings: 128,
         slots: 32,
         markdown_depth: 3,

@@ -82,6 +82,9 @@ pub enum Act {
     ChatFilter {
         filter: chats::Filter,
     },
+    PlanFilter {
+        filter: task::Filter,
+    },
     Filter {
         filter: crate::address::Filter,
     },
@@ -285,6 +288,7 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
         Event::Act { act: Act::Suggest { .. } } => unreachable!("suggestions are resolved by the root"),
         Event::Act { act: Act::ClosedChats } => closed_chats(pages, out),
         Event::Act { act: Act::ChatFilter { filter } } => chat_filter(pages, filter),
+        Event::Act { act: Act::PlanFilter { filter } } => plan_filter(pages, filter),
         Event::Act { act: Act::Filter { filter } } => out.push(Request::Show { address: Address::Inbox { filter } }),
         Event::Act { act: act @ (Act::MessageWords { .. } | Act::Send | Act::Older) } => {
             if let Some(chat) = &mut pages.chat {
@@ -401,6 +405,12 @@ fn closed_chats(pages: &mut Pages, out: &mut Queue<Request>) {
 fn chat_filter(pages: &mut Pages, filter: chats::Filter) {
     if let Some(chats) = &mut pages.chats {
         chats.filter = filter;
+    }
+}
+
+fn plan_filter(pages: &mut Pages, filter: task::Filter) {
+    if let Some(task) = &mut pages.task {
+        task.filter = filter;
     }
 }
 
@@ -602,6 +612,7 @@ fn confirmation(pages: &mut Pages, env: &Env<Limits>, client: &Client, act: Act,
         | Act::Send
         | Act::Older
         | Act::ChatFilter { .. }
+        | Act::PlanFilter { .. }
         | Act::ClosedChats
         | Act::Filter { .. }
         | Act::OpenResult { .. }
