@@ -100,9 +100,9 @@ fn the_default_is_the_owned_example_so_edited() {
             ("/engine/llm/models", json!([owned["engine"]["llm"]["models"][0], demo_model()])),
             ("/engine/charters/0/alternatives", json!(["demo"])),
             ("/engine/charters/1/alternatives", json!(["demo"])),
-            // Written by startup's owned_memory_figures_for_init drift check, at bounded strings.
-            ("/engine/memory_bytes", json!(85_559_617_373_399_u64)),
-            ("/workers/0/memory_bytes", json!(3_266_333_819_083_u64)),
+            // The template's own figures, which startup's owned_memory_figures_for_init drift check writes and checks.
+            ("/engine/memory_bytes", actual["engine"]["memory_bytes"].clone()),
+            ("/workers/0/memory_bytes", actual["workers"][0]["memory_bytes"].clone()),
             (
                 "/application/forges",
                 json!([
