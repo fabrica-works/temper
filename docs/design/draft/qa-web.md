@@ -177,12 +177,20 @@ reading a run's captures against the scenes' expectations and
 departures:
 
 - `look-structure`, failing `<scene>/<width>/order/<region>`,
-  `<scene>/<width>/missing/<role>/<name>` or
-  `<scene>/<width>/extra/<role>/<name>`;
-- `look-style`, failing `<scene>/<width>/style/<region>/<property>`.
+  `<scene>/<width>/missing/<role>[/<name>]`,
+  `<scene>/<width>/extra/<role>[/<name>]`, `<scene>/<width>/ready/<side>`
+  (a side whose readiness was missed) or
+  `<scene>/<width>/trouble/<side>/<kind>[/<host:port>]` (the browser's
+  trouble, 8.2);
+- `look-style`, failing `<scene>/<width>/style/<region>/<property>`,
+  `shown` among the properties: a region drawn on one side and not on
+  the other.
 
-Signatures name the scene, the width, the region and the property, never
-a value (skein's `lab.md`, 7.3).
+Signatures name the scene, the width, the side, the region and the
+property, never a value (skein's `lab.md`, 7.3). A name is
+percent-encoded, since a signature holds no space, and an outline line
+without a name signs its role alone. The checks' contract is skein's
+`lab-browser.md`, 5.4.
 
 ### 5.2 The judge
 
@@ -340,8 +348,9 @@ signed in and on temper's first page, and nothing of the pages' paths.
 
 ### 8.2 The look's
 
-- **The two checks of 5.1,** and the browser's trouble on every capture:
-  a mockup's own errors are a departure; temper's are findings.
+- **The two checks of 5.1,** and the browser's trouble on every capture,
+  signed by `look-structure`: a mockup's own errors are a departure;
+  temper's are findings.
 - **The gallery against the live page:** for each page with a live
   scene, the gallery's outline and the live one's agree, but for the
   parts only a live page has. A disagreement is the gallery's finding,
