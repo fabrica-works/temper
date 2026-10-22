@@ -232,16 +232,16 @@ in the lower world that owns it, never here.
     story checks against T2's tool output ("Message 1 sent") and the
     inbox's entry, since a script cannot read a returned number.
   - **The person's acts,** by `temper ctl`, waiting on watches, never on
-    repeated reads: sign in; start the chat and a watch on its end;
-    wait until the question waits in the inbox (`wait inbox --until
-    waiting`) and T1 is at rest; read T1's tree, which holds T2 alone;
-    adopt the repository then, while the question waits, so that no
-    forge poll runs through the question's wait (the first run's box
-    adopts widget at its start; here it is adopted before the answer that
-    the change waits for); read the question and answer it; join the
-    watch.
+    repeated reads: sign in; adopt the repository first, as the first
+    run's box adopts widget at its start (a home adopted while a chat is
+    parked holds the chat's next run: an engine finding, not this
+    story's); start the chat and a watch on its end; wait until the
+    question waits in the inbox (`wait inbox --until waiting`) and T1 is
+    at rest; read T1's tree, which holds T2 alone; read the question,
+    T1's activity holding its words, and answer it; join the watch.
   - **What it checks:** the question in the inbox, on T1 and message 1,
-    in T2's words, while T1's tree held no change; T1 told the person's
+    and in T1's activity in T2's words (ctl's inbox entry names the
+    question, not its words), while T1's tree held no change; T1 told the person's
     answer after the question, and T2 told it as T1's answer before it
     delegated the change; the change merged with CI green at its head,
     widget's edit on main; T2's report and T1's; no question left in
