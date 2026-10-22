@@ -92,7 +92,26 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
                 c::Executor::Procedure { .. } => Word::ItsTasks,
                 c::Executor::Agent { .. } | c::Executor::Party { .. } | c::Executor::Role { .. } => Word::Plan,
             };
-            plan(b, tree, root, words, bindings, rows, word);
+            let ended = match &page.ended {
+                Some(task::Ended { page: Some(page), .. }) if word == Word::ItsTasks => Some((
+                    page.as_ref(),
+                    match task.chip.phase {
+                        c::Phase::Ended | c::Phase::Done | c::Phase::Failed | c::Phase::Cancelled => true,
+                        c::Phase::Waiting
+                        | c::Phase::Idle
+                        | c::Phase::Due
+                        | c::Phase::Preparing
+                        | c::Phase::Claimed
+                        | c::Phase::Running
+                        | c::Phase::Active
+                        | c::Phase::BackingOff
+                        | c::Phase::Closing
+                        | c::Phase::Held => false,
+                    },
+                )),
+                Some(_) | None => None,
+            };
+            plan(b, tree, root, words, bindings, rows, Plan { word, ended });
         }
         if let Some(change) = change {
             super::change::finish(b, change, words);
@@ -600,9 +619,11 @@ fn parent(b: &mut Builder, stack: &mut List<u64>, parent: Option<u64>) {
     }
     stack.truncate(u32::try_from(keep).expect("tree stack fits"));
 }
-fn folded(b: &mut Builder, counts: &[(c::Phase, u32)], held_below: u32, words: &Words) {
+fn folded(b: &mut Builder, counts: &[(c::Phase, u32)], held_below: u32, words: &Words) -> bool {
+    let mut shown = false;
     for (phase, count) in counts {
         if *count != 0 {
+            shown = true;
             text(
                 b,
                 Role::Paragraph,
@@ -618,7 +639,13 @@ fn folded(b: &mut Builder, counts: &[(c::Phase, u32)], held_below: u32, words: &
     }
     if held_below != 0 {
         text(b, Role::Status, &words.say(Word::HeldBelow, &[Hole::Number(u64::from(held_below))]));
+        shown = true;
     }
+    shown
+}
+pub(crate) struct Plan<'a> {
+    pub word: Word,
+    pub ended: Option<(&'a c::TaskPage, bool)>,
 }
 pub(crate) fn plan(
     b: &mut Builder,
@@ -627,20 +654,23 @@ pub(crate) fn plan(
     words: &Words,
     bindings: &mut Bindings,
     rows: u32,
-    word: Word,
+    part: Plan<'_>,
 ) {
+    let Plan { word, ended } = part;
     region(b, word, words);
     b.style(look::TASK_CARD);
     b.open(Role::Tree);
     b.style(look::PLAN);
     b.name(&words.say(word, &[]));
-    // The tree is live only: once every delegate has ended, it says so (5.8).
+    // A goal keeps its live-only empty word (5.8); a procedure adds its ended page (5.10).
+    let mut has_tree_content = false;
     let mut empty = false;
     match tree {
         c::Delivery::OwnerTree(tree) => {
+            has_tree_content = !tree.rows.is_empty();
             empty = tree.rows.is_empty() && tree.held_below == 0 && tree.folded.is_empty();
             let mut stack = List::with_capacity(tree.rows.len());
-            owner_folds(b, tree, tree.root.task, words);
+            has_tree_content |= owner_folds(b, tree, tree.root.task, words);
             for row in &tree.rows {
                 parent(b, &mut stack, Some(row.parent));
                 chip(b, &row.chip, words, bindings);
@@ -661,24 +691,25 @@ pub(crate) fn plan(
                 );
                 controls(b, &row.chip, root, words, bindings, rows);
                 stack.push(row.chip.task).expect("tree stack fits");
-                owner_folds(b, tree, row.chip.task, words);
+                has_tree_content |= owner_folds(b, tree, row.chip.task, words);
             }
             parent(b, &mut stack, None);
-            folded(b, &[], tree.held_below, words);
+            has_tree_content |= folded(b, &[], tree.held_below, words);
         }
         c::Delivery::Tree(tree) => {
             let mut stack = List::with_capacity(tree.nodes.len());
             for node in &tree.nodes {
                 parent(b, &mut stack, node.parent);
                 if node.chip.task != tree.task {
+                    has_tree_content = true;
                     chip(b, &node.chip, words, bindings);
                     controls(b, &node.chip, root, words, bindings, rows);
                     stack.push(node.chip.task).expect("tree stack fits");
                 }
-                counts(b, node.folded, node.held_below, words);
+                has_tree_content |= counts(b, node.folded, node.held_below, words);
             }
             parent(b, &mut stack, None);
-            counts(b, tree.folded, tree.held_below, words);
+            has_tree_content |= counts(b, tree.folded, tree.held_below, words);
         }
         c::Delivery::OwnerProject(_)
         | c::Delivery::Me(_)
@@ -694,11 +725,82 @@ pub(crate) fn plan(
         | c::Delivery::OwnerDeployment(_)
         | c::Delivery::OwnerAccounts(_) => {}
     }
+    let (has_ended, more) = match ended {
+        Some((page, _)) => ended_rows(b, tree, root, words, bindings, rows, page),
+        None => (false, false),
+    };
     b.close();
-    if empty {
+    if let Some((_, task_ended)) = ended {
+        if !has_tree_content && !has_ended {
+            text(
+                b,
+                Role::Paragraph,
+                &words.say(if task_ended { Word::ItsTasksNone } else { Word::ItsTasksNoneYet }, &[]),
+            );
+        }
+    } else if empty {
         text(b, Role::Paragraph, &words.say(Word::NoLiveTasks, &[]));
     }
+    if more {
+        text(b, Role::Paragraph, &words.say(Word::ItsTasksMoreEnded, &[]));
+    }
     b.close();
+}
+fn ended_rows(
+    b: &mut Builder,
+    tree: &c::Delivery,
+    root: &Domain,
+    words: &Words,
+    bindings: &mut Bindings,
+    rows: u32,
+    page: &c::TaskPage,
+) -> (bool, bool) {
+    let mut has_ended = false;
+    let mut more = false;
+    if let c::EndedGroup::Rows { rows: lines, after, cut } = &page.ended {
+        more = after.is_some() || *cut;
+        for line in lines {
+            let mut shown = false;
+            match tree {
+                c::Delivery::OwnerTree(tree) => {
+                    for row in &tree.rows {
+                        if row.chip.task == line.chip.task {
+                            shown = true;
+                            break;
+                        }
+                    }
+                }
+                c::Delivery::Tree(tree) => {
+                    for node in &tree.nodes {
+                        if node.chip.task != tree.task && node.chip.task == line.chip.task {
+                            shown = true;
+                            break;
+                        }
+                    }
+                }
+                c::Delivery::OwnerProject(_)
+                | c::Delivery::Me(_)
+                | c::Delivery::Task(_)
+                | c::Delivery::OwnerProposal(_)
+                | c::Delivery::Chips(_)
+                | c::Delivery::Inbox(_)
+                | c::Delivery::OwnerInbox(_)
+                | c::Delivery::Tasks(_)
+                | c::Delivery::Run(_)
+                | c::Delivery::RunState(_)
+                | c::Delivery::Deployment(_)
+                | c::Delivery::OwnerDeployment(_)
+                | c::Delivery::OwnerAccounts(_) => {}
+            }
+            if !shown {
+                chip(b, &line.chip, words, bindings);
+                controls(b, &line.chip, root, words, bindings, rows);
+                b.close();
+                has_ended = true;
+            }
+        }
+    }
+    (has_ended, more)
 }
 #[expect(
     clippy::too_many_arguments,
@@ -783,12 +885,13 @@ pub(crate) fn controls(
         }
     }
 }
-fn owner_folds(b: &mut Builder, tree: &c::OwnerTree, parent: u64, words: &Words) {
+fn owner_folds(b: &mut Builder, tree: &c::OwnerTree, parent: u64, words: &Words) -> bool {
     use c::Phase as P;
+    let mut shown = false;
     for fold in &tree.folded {
         if fold.parent == parent {
             let f = fold.phases;
-            folded(
+            shown |= folded(
                 b,
                 &[
                     (P::Waiting, f.waiting),
@@ -807,8 +910,9 @@ fn owner_folds(b: &mut Builder, tree: &c::OwnerTree, parent: u64, words: &Words)
             );
         }
     }
+    shown
 }
-fn counts(b: &mut Builder, f: c::PhaseCounts, held: u32, words: &Words) {
+fn counts(b: &mut Builder, f: c::PhaseCounts, held: u32, words: &Words) -> bool {
     use c::Phase as P;
     folded(
         b,
@@ -824,7 +928,7 @@ fn counts(b: &mut Builder, f: c::PhaseCounts, held: u32, words: &Words) {
         ],
         held,
         words,
-    );
+    )
 }
 pub(crate) fn latest(b: &mut Builder, page: Option<&c::ActivityPage>, words: &Words, bindings: &mut Bindings) {
     region(b, Word::Latest, words);

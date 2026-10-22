@@ -341,3 +341,57 @@ pub fn amended_dependency_facts() -> List<c::Dependency> {
     }
     facts
 }
+
+/// Supply the live tree before the document, then optionally answer its ended read.
+pub fn root_with_ended(
+    document: c::Task,
+    tree: c::Delivery,
+    page: Option<c::TaskPage>,
+) -> temper_client_domain::Domain {
+    use jig_client::{Event as E, Up};
+    use temper_client_domain::{Event, Request};
+    let limits = domain_limits();
+    let (mut root, _, watch, tree_watch) =
+        root_at_with_tree(temper_client_domain::Address::Task { task: document.chip.task }, &limits);
+    let env = Env { now: NO_TIME, wall: AT_EPOCH, limits };
+    let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));
+    for (watch, value) in
+        [(tree_watch.expect("tree watch"), tree), (watch.expect("task watch"), c::Delivery::Task(Box::new(document)))]
+    {
+        temper_client_domain::step(
+            &mut root,
+            &env,
+            Event::Client { event: E::Up { up: Up::Watched { watch, event: c::WatchEvent::Delivered(value) } } },
+            &mut out,
+        );
+    }
+    if let Some(page) = page {
+        let mut token = None;
+        while let Some(request) = out.pop() {
+            if let Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down: jig_client::Down::Read { read, what: jig_client::Readable::Jig(c::Read::Tasks { .. }) },
+                    },
+            } = request
+            {
+                assert!(token.is_none(), "one ended read");
+                token = Some(read);
+            }
+        }
+        temper_client_domain::step(
+            &mut root,
+            &env,
+            Event::Client {
+                event: E::Up {
+                    up: Up::ReadDone {
+                        read: token.expect("ended read"),
+                        result: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Tasks(Box::new(page)))),
+                    },
+                },
+            },
+            &mut out,
+        );
+    }
+    root
+}

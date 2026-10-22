@@ -197,8 +197,9 @@ mod memory_literal;
 // jig 388a71ec counts reads in max_out and prices each as a PendingRead: +12,483,662,288 B.
 // The change panel adds 86 forge phrases (12,728 B); its full address and
 // combined pull/bounds texts fit the existing maximum text envelope.
+// The procedure's ended page and its three phrases move the checked envelope.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274682671245;
+const WEB_BYTES: u64 = 274683720297;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

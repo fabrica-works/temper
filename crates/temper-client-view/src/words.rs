@@ -312,6 +312,9 @@ pub enum Word {
     MainNavigation,
     KindFrom,
     NoLiveTasks,
+    ItsTasksNoneYet,
+    ItsTasksNone,
+    ItsTasksMoreEnded,
     MessageOnceRuns,
 }
 // Room for temper, jig, account, card and forge phrases.
@@ -325,8 +328,9 @@ pub enum Word {
 // A task's name over its words in a chat (client/README.md, 3.5).
 // Forty-seven time form, calendar and placement phrases (5.12).
 // The change panel adds 86 forge phrases (2000–2085).
-const PHRASES: u32 = 743;
-const ALL: [Word; 295] = [
+// Three empty and partial ended-children phrases (5.10).
+const PHRASES: u32 = 746;
+const ALL: [Word; 298] = [
     Word::TimeYesterdayWord,
     Word::TimeJustNow,
     Word::TimeUnderMinute,
@@ -621,6 +625,9 @@ const ALL: [Word; 295] = [
     Word::MainNavigation,
     Word::KindFrom,
     Word::NoLiveTasks,
+    Word::ItsTasksNoneYet,
+    Word::ItsTasksNone,
+    Word::ItsTasksMoreEnded,
     Word::MessageOnceRuns,
 ];
 impl Word {
@@ -928,6 +935,9 @@ impl Word {
             Self::KindFrom => 1064,
             Self::NoLiveTasks => 1065,
             Self::MessageOnceRuns => 1066,
+            Self::ItsTasksNoneYet => 1251,
+            Self::ItsTasksNone => 1252,
+            Self::ItsTasksMoreEnded => 1253,
         };
         let owner =
             if number >= 100 { crate::frame::owner() } else { temper_client_domain::forge::words::owner(connector) };
@@ -1324,6 +1334,9 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::MainNavigation => (&[b"Main navigation"], &[]),
         Word::KindFrom => (&[b"", b" from ", b""], &[Name, Name]),
         Word::NoLiveTasks => (&[b"No live tasks."], &[]),
+        Word::ItsTasksNoneYet => (&[b"None yet."], &[]),
+        Word::ItsTasksNone => (&[b"None."], &[]),
+        Word::ItsTasksMoreEnded => (&[b"More of its ended tasks are not shown."], &[]),
         Word::MessageOnceRuns => (&[b"Messages reach it once it runs."], &[]),
         Word::InboxTitle => (&[b"Inbox"], &[]),
         Word::NeedsYou => (&[b"Needs you"], &[]),

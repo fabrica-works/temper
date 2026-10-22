@@ -264,6 +264,14 @@ impl Amending {
         }
     }
 }
+/// A procedure's ended children, one read out at a time (client/README.md, 5.10).
+#[derive(Debug)]
+pub struct Ended {
+    pub handle: Handle,
+    pub page: Option<Box<c::TaskPage>>,
+    pub reading: bool,
+    pub stale: bool,
+}
 #[derive(Debug)]
 pub struct Task {
     pub number: u64,
@@ -271,6 +279,7 @@ pub struct Task {
     pub tree: Handle,
     pub activity: Handle,
     pub run: Option<Handle>,
+    pub ended: Option<Ended>,
     pub shape: Shape,
     pub latest: Option<Box<c::ActivityPage>>,
     pub thread: jig_client::thread::Thread,
@@ -303,6 +312,7 @@ impl Task {
             tree,
             activity,
             run: None,
+            ended: None,
             shape: Shape::Unknown,
             latest: None,
             thread,
@@ -574,6 +584,9 @@ impl Task {
         for handle in [Some(self.document), Some(self.tree), Some(self.activity), self.run].into_iter().flatten() {
             unwatch(handle, out);
         }
+        if let Some(ended) = &self.ended {
+            unwatch(ended.handle, out);
+        }
         for card in &self.cards {
             unwatch(card.handle, out);
         }
@@ -652,6 +665,16 @@ impl Task {
                     self.final_task = Some(task);
                 }
             }
+            Told::Page { handle, page } if Some(handle) == self.ended_handle() => {
+                let ended = self.ended.as_mut().expect("ended children handle");
+                ended.reading = false;
+                if let Readout::Jig(c::ReadResult::Value(c::ReadValue::Tasks(page))) = page {
+                    ended.page = Some(page);
+                }
+                if ended.stale {
+                    self.read_ended(out);
+                }
+            }
             Told::Page { handle, page } if handle == self.activity => {
                 if let Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(page))) = page {
                     if self.shape == Shape::Agent {
@@ -665,20 +688,23 @@ impl Task {
                     self.thread.failed();
                 }
             }
-            Told::Changed { handle } if handle == self.tree => match latest(client, handle) {
-                Some(Latest::Jig(c::Delivery::OwnerTree(tree))) => {
-                    self.held(&tree.root, out);
-                    for row in &tree.rows {
-                        self.held(&row.chip, out);
+            Told::Changed { handle } if handle == self.tree => {
+                self.read_ended(out);
+                match latest(client, handle) {
+                    Some(Latest::Jig(c::Delivery::OwnerTree(tree))) => {
+                        self.held(&tree.root, out);
+                        for row in &tree.rows {
+                            self.held(&row.chip, out);
+                        }
                     }
-                }
-                Some(Latest::Jig(c::Delivery::Tree(tree))) => {
-                    for node in &tree.nodes {
-                        self.held(&node.chip, out);
+                    Some(Latest::Jig(c::Delivery::Tree(tree))) => {
+                        for node in &tree.nodes {
+                            self.held(&node.chip, out);
+                        }
                     }
+                    Some(Latest::Jig(_) | Latest::Family(_)) | None => {}
                 }
-                Some(Latest::Jig(_) | Latest::Family(_)) | None => {}
-            },
+            }
             Told::Text { handle } if handle == self.tree => {}
             Told::Changed { handle } | Told::Text { handle } if Some(handle) == self.run => {
                 if self.shape == Shape::Agent
@@ -749,7 +775,50 @@ impl Task {
             .expect("held cards bounded");
         read(handle, c::Read::Task { task: chip.task }, out);
     }
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the ended-handle accessor uses a stateless projection of its optional state"
+    )]
+    fn ended_handle(&self) -> Option<Handle> {
+        self.ended.as_ref().map(|ended| ended.handle)
+    }
+    fn read_ended(&mut self, out: &mut Queue<Request>) {
+        let Some(ended) = &mut self.ended else { return };
+        if ended.reading {
+            ended.stale = true;
+            return;
+        }
+        ended.reading = true;
+        ended.stale = false;
+        read(
+            ended.handle,
+            c::Read::Tasks {
+                query: c::TaskQuery {
+                    project: None,
+                    requester: None,
+                    root: None,
+                    parent: Some(self.number),
+                    label: None,
+                    phase: Some(c::PhaseClass::Ended),
+                    executor: None,
+                    tracked: None,
+                    order: c::QueryOrder::Ended,
+                },
+                live: None,
+                ended: None,
+            },
+            out,
+        );
+    }
     fn changed(&mut self, task: &c::Task, out: &mut Queue<Request>) {
+        if let c::Executor::Procedure { .. } = task.chip.executor {
+            if self.ended.is_none() {
+                let handle = handle(self.next);
+                self.next = self.next.checked_add(1).expect("task handles fit");
+                self.ended = Some(Ended { handle, page: None, reading: false, stale: false });
+            }
+            self.read_ended(out);
+        }
         self.shape = match task.chip.executor {
             c::Executor::Agent { .. } if task.priority.is_some() => Shape::Tracked,
             c::Executor::Agent { .. } => Shape::Agent,
@@ -862,15 +931,17 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     // Three more document bounds cover the draft base (spec, authority, instructions,
     // dependencies and model), its replacement spec, and its retained outcome.
     // The editor also keeps one bounded specification field and its inline state.
+    // A procedure also keeps one page of ended children and its read state.
     // An agent's task also retains a chat's thread and its borrowed view lines.
     limits
         .client
         .domain
         .document_bytes
-        .checked_mul(u64::from(limits.client.domain.reads).checked_add(6)?)?
+        .checked_mul(u64::from(limits.client.domain.reads).checked_add(7)?)?
         .checked_add(List::<Card>::worst_case(limits.client.domain.reads)?)?
         .checked_add(List::<(Key, Sending)>::worst_case(4)?)?
         .checked_add(u64::try_from(size_of::<Amending>()).ok()?)?
+        .checked_add(u64::try_from(size_of::<Ended>()).ok()?)?
         .checked_add(u64::from(limits.client.domain.text).checked_mul(2)?)?
         .checked_add(u64::from(limits.client.domain.reads).checked_mul(u64::from(limits.client.domain.text))?)?
         .checked_add(jig_client::thread::worst_case(&super::chat::thread_limits(limits))?)?

@@ -98,7 +98,15 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
                 | c::Delivery::OwnerAccounts(_) => false,
             };
             if delegates || !page.cards.is_empty() {
-                super::task::plan(b, tree, root, words, bindings, rows, Word::Plan);
+                super::task::plan(
+                    b,
+                    tree,
+                    root,
+                    words,
+                    bindings,
+                    rows,
+                    super::task::Plan { word: Word::Plan, ended: None },
+                );
             }
         }
         b.close();

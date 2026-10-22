@@ -1028,3 +1028,174 @@ fn amendment_words_are_bounded_and_must_be_utf8() {
     page_act(&mut pages, &client, Act::AmendWords { words: skein_lib::bytes::zeroed(bound) });
     assert_eq!(pages.task().unwrap().amending.as_ref().unwrap().words.len(), bound);
 }
+
+fn procedure() -> (Task, f::Fixture) {
+    let (mut page, mut fixture) = opened();
+    while fixture.out.pop().is_some() {}
+    let mut task = f::task();
+    task.chip.executor = c::Executor::Procedure { connector: fixtures::FORGE, kind: 2 };
+    f::deliver(&mut fixture.client, fixture.watch, task);
+    page.told(&fixture.client, Told::Changed { handle: page.document }, &mut fixture.out);
+    (page, fixture)
+}
+fn ended_read(page: &Task) -> Request {
+    Request::Client(Event::Read {
+        handle: page.ended.as_ref().expect("procedure's ended children").handle,
+        read: Readable::Jig(c::Read::Tasks {
+            query: c::TaskQuery {
+                project: None,
+                requester: None,
+                root: None,
+                parent: Some(f::TASK),
+                label: None,
+                phase: Some(c::PhaseClass::Ended),
+                executor: None,
+                tracked: None,
+                order: c::QueryOrder::Ended,
+            },
+            live: None,
+            ended: None,
+        }),
+    })
+}
+fn ended_page(cut: bool) -> c::TaskPage {
+    c::TaskPage {
+        live: List::with_capacity(0),
+        live_after: None,
+        ended: c::EndedGroup::Rows { rows: List::with_capacity(0), after: None, cut },
+    }
+}
+fn answer_ended(page: &mut Task, fixture: &mut f::Fixture, reply: c::TaskPage) {
+    let handle = page.ended.as_ref().expect("ended children").handle;
+    assert!(page.told(
+        &fixture.client,
+        Told::Page {
+            handle,
+            page: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Tasks(Box::new(reply)))),
+        },
+        &mut fixture.out,
+    ));
+}
+#[test]
+fn every_procedure_reads_its_ended_children_on_its_own_handle() {
+    for connector in [fixtures::FORGE, fixtures::FORGE + 1] {
+        let (mut page, mut fixture) = opened();
+        while fixture.out.pop().is_some() {}
+        let next = page.next;
+        let mut task = f::task();
+        task.chip.executor = c::Executor::Procedure { connector, kind: 2 };
+        f::deliver(&mut fixture.client, fixture.watch, task);
+        page.told(&fixture.client, Told::Changed { handle: page.document }, &mut fixture.out);
+        assert_eq!(page.ended.as_ref().unwrap().handle.number, next);
+        assert_eq!(page.next, next + 1);
+        assert_eq!(fixture.out.pop(), Some(ended_read(&page)));
+        assert!(fixture.out.is_empty());
+        assert!(page.ended.as_ref().unwrap().reading);
+        assert!(!page.ended.as_ref().unwrap().stale);
+    }
+}
+#[test]
+fn agent_and_person_tasks_do_not_read_ended_children() {
+    for executor in [
+        c::Executor::Agent { charter: 1 },
+        c::Executor::Party { party: 73 },
+        c::Executor::Role { project: fixtures::PROJECT, role: 1 },
+    ] {
+        let (mut page, mut fixture) = opened();
+        while fixture.out.pop().is_some() {}
+        let mut task = f::task();
+        task.chip.executor = executor;
+        f::deliver(&mut fixture.client, fixture.watch, task);
+        for handle in [page.document, page.tree] {
+            page.told(&fixture.client, Told::Changed { handle }, &mut fixture.out);
+        }
+        assert!(page.ended.is_none());
+        assert!(fixture.out.is_empty());
+    }
+}
+#[test]
+fn tree_and_document_changes_read_ended_children_again() {
+    let (mut page, mut fixture) = procedure();
+    assert_eq!(fixture.out.pop(), Some(ended_read(&page)));
+    for handle in [page.tree, page.document] {
+        answer_ended(&mut page, &mut fixture, ended_page(false));
+        assert!(fixture.out.is_empty());
+        page.told(&fixture.client, Told::Changed { handle }, &mut fixture.out);
+        assert_eq!(fixture.out.pop(), Some(ended_read(&page)));
+        assert!(fixture.out.is_empty());
+    }
+}
+#[test]
+fn changes_during_an_ended_read_coalesce_into_one_more_read() {
+    let (mut page, mut fixture) = procedure();
+    assert_eq!(fixture.out.pop(), Some(ended_read(&page)));
+    for handle in [page.tree, page.document, page.tree] {
+        page.told(&fixture.client, Told::Changed { handle }, &mut fixture.out);
+        assert!(fixture.out.is_empty());
+    }
+    assert!(page.ended.as_ref().unwrap().stale);
+    answer_ended(&mut page, &mut fixture, ended_page(false));
+    assert_eq!(fixture.out.pop(), Some(ended_read(&page)));
+    assert!(fixture.out.is_empty());
+    assert!(page.ended.as_ref().unwrap().reading);
+    assert!(!page.ended.as_ref().unwrap().stale);
+    answer_ended(&mut page, &mut fixture, ended_page(true));
+    assert!(fixture.out.is_empty());
+    assert!(!page.ended.as_ref().unwrap().reading);
+}
+#[test]
+fn an_ended_reply_replaces_the_kept_page() {
+    let (mut page, mut fixture) = procedure();
+    while fixture.out.pop().is_some() {}
+    for cut in [false, true] {
+        if cut {
+            page.told(&fixture.client, Told::Changed { handle: page.tree }, &mut fixture.out);
+            assert_eq!(fixture.out.pop(), Some(ended_read(&page)));
+        }
+        let reply = ended_page(cut);
+        answer_ended(&mut page, &mut fixture, reply.clone());
+        assert_eq!(page.ended.as_ref().unwrap().page.as_deref(), Some(&reply));
+        assert!(!page.ended.as_ref().unwrap().reading);
+        assert!(fixture.out.is_empty());
+    }
+}
+#[test]
+fn another_reply_keeps_the_ended_page_and_frees_the_next_read() {
+    let (mut page, mut fixture) = procedure();
+    while fixture.out.pop().is_some() {}
+    let kept = ended_page(false);
+    answer_ended(&mut page, &mut fixture, kept.clone());
+    let handle = page.ended.as_ref().unwrap().handle;
+    for stale in [false, true] {
+        page.told(&fixture.client, Told::Changed { handle: page.tree }, &mut fixture.out);
+        assert_eq!(fixture.out.pop(), Some(ended_read(&page)));
+        if stale {
+            page.told(&fixture.client, Told::Changed { handle: page.document }, &mut fixture.out);
+        }
+        page.told(
+            &fixture.client,
+            Told::Page {
+                handle,
+                page: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(Box::new(f::task())))),
+            },
+            &mut fixture.out,
+        );
+        assert_eq!(page.ended.as_ref().unwrap().page.as_deref(), Some(&kept));
+        assert_eq!(page.ended.as_ref().unwrap().reading, stale);
+        if stale {
+            assert_eq!(fixture.out.pop(), Some(ended_read(&page)));
+        }
+        assert!(fixture.out.is_empty());
+    }
+}
+#[test]
+fn leaving_a_procedure_unwatches_its_ended_read_handle() {
+    let (page, mut fixture) = procedure();
+    while fixture.out.pop().is_some() {}
+    let next = page.leave(&mut fixture.out);
+    assert_eq!(next, page.next);
+    assert_eq!(
+        f::handles(&mut fixture.out).as_ref(),
+        [page.document, page.tree, page.activity, page.run.unwrap(), page.ended.as_ref().unwrap().handle],
+    );
+}
