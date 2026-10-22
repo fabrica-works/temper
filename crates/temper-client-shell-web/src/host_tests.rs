@@ -185,8 +185,11 @@ mod memory_literal;
 // The chat projection adds seven phrases while retaining the agent's work-line words.
 // Amendment editor: sixteen nodes and eleven phrases; the web root also retains
 // its bounded draft, typed specification and separate amendment outcome.
+// Added dependency marks (client/README.md, 5.8): two nodes per dependency,
+// across two plan rows and the brief: (2 * 2 + 2) * 2 = 12 nodes x 1,674,892 B.
+// Their five phrases add five entries' room, 740 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 247939788695;
+const WEB_BYTES: u64 = 247959888139;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

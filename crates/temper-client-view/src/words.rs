@@ -248,12 +248,18 @@ pub enum Word {
     SpecTooLong,
     TaskChanged,
     LookAgain,
+    DependencyAddedByYou,
+    DependencyAddedByPerson,
+    DependencyAddedByTask,
+    DependencyAddedByDeployment,
+    DependencyKeeps,
 }
 // Room for temper, jig, account, card and forge phrases.
 // Seven chat projection phrases, alongside the agent's original work-line words.
-// Eleven amendment editor phrases (client/README.md, 5.11).
-const PHRASES: u32 = 594;
-const ALL: [Word; 232] = [
+// Eleven amendment editor phrases (client/README.md, 5.11), and five added
+// dependency mark phrases (5.8).
+const PHRASES: u32 = 599;
+const ALL: [Word; 237] = [
     Word::WaitRefused,
     Word::DependencyParked,
     Word::WaitInvalid,
@@ -486,6 +492,11 @@ const ALL: [Word; 232] = [
     Word::SpecTooLong,
     Word::TaskChanged,
     Word::LookAgain,
+    Word::DependencyAddedByYou,
+    Word::DependencyAddedByPerson,
+    Word::DependencyAddedByTask,
+    Word::DependencyAddedByDeployment,
+    Word::DependencyKeeps,
 ];
 impl Word {
     #[expect(clippy::too_many_lines, reason = "one exhaustive table keeps the frame phrase IDs stable")]
@@ -728,6 +739,11 @@ impl Word {
             Self::SpecTooLong => 1055,
             Self::TaskChanged => 1056,
             Self::LookAgain => 1057,
+            Self::DependencyAddedByYou => 1058,
+            Self::DependencyAddedByPerson => 1059,
+            Self::DependencyAddedByTask => 1060,
+            Self::DependencyAddedByDeployment => 1061,
+            Self::DependencyKeeps => 1062,
         };
         let owner =
             if number >= 100 { crate::frame::owner() } else { temper_client_domain::forge::words::owner(connector) };
@@ -1128,6 +1144,11 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::TaskChanged => (&[b"This task changed since the editor opened"], &[]),
         Word::LookAgain => (&[b"Look again"], &[]),
         Word::StopHolds => (&[b"Its run stops, and the task is held until it is released."], &[]),
+        Word::DependencyAddedByYou => (&[b"Added by you"], &[]),
+        Word::DependencyAddedByPerson => (&[b"Added by party ", b""], &[Number]),
+        Word::DependencyAddedByTask => (&[b"Added by task ", b""], &[Number]),
+        Word::DependencyAddedByDeployment => (&[b"Added by the deployment"], &[]),
+        Word::DependencyKeeps => (&[b"", b" \xc2\xb7 keeps task ", b" from ending"], &[Name, Number]),
     }
 }
 

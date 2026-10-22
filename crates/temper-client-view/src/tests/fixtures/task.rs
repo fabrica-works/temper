@@ -327,3 +327,17 @@ pub fn activity(conversation: bool) -> c::ActivityPage {
     }
     c::ActivityPage { rows, before: None, after: None, cut: false }
 }
+
+pub fn added_dependency(number: u64, by: c::OwnerRequester, keeps: bool) -> c::Dependency {
+    c::Dependency { number, pending: keeps, added: Some(c::DependencyAdded { at: RUN_SINCE, by }), keeps, status: None }
+}
+pub fn amended_dependency_facts() -> List<c::Dependency> {
+    let added_by_viewer = added_dependency(17, c::OwnerRequester::Person(73), true);
+    let added_by_task = added_dependency(23, c::OwnerRequester::Task(7), false);
+    let original = c::Dependency { number: 13, pending: true, added: None, keeps: true, status: None };
+    let mut facts = List::with_capacity(3);
+    for fact in [added_by_task, original, added_by_viewer] {
+        facts.push(fact).expect("amended dependency facts");
+    }
+    facts
+}

@@ -591,7 +591,21 @@ pub(crate) fn plan(
             for row in &tree.rows {
                 parent(b, &mut stack, Some(row.parent));
                 chip(b, &row.chip, words, bindings);
-                dependencies(b, row.chip.task, &row.dependencies, row.cut, words, bindings);
+                let facts = if let c::ChipPhase::Owner { details, .. } = row.chip.details.as_ref() {
+                    details.dependencies.as_slice()
+                } else {
+                    &[]
+                };
+                dependencies(
+                    b,
+                    row.chip.task,
+                    &row.dependencies,
+                    facts,
+                    row.cut,
+                    root.pages().me(root.client()),
+                    words,
+                    bindings,
+                );
                 controls(b, &row.chip, root, words, bindings, rows);
                 stack.push(row.chip.task).expect("tree stack fits");
                 owner_folds(b, tree, row.chip.task, words);
@@ -630,11 +644,17 @@ pub(crate) fn plan(
     b.close();
     b.close();
 }
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the supplied dependency line and its facts share the viewer and rendering context"
+)]
 pub(crate) fn dependencies(
     b: &mut Builder,
     task: u64,
     links: &List<c::OwnerTaskLink>,
+    facts: &[c::Dependency],
     cut: bool,
+    me: Option<&c::Me>,
     words: &Words,
     bindings: &mut Bindings,
 ) {
@@ -651,6 +671,12 @@ pub(crate) fn dependencies(
         if let Some(value) = task::link_state(link) {
             state(b, value, words);
         }
+        for fact in facts {
+            if fact.number == link.number() {
+                dependency_mark(b, task, fact, me, words);
+                break;
+            }
+        }
         b.close();
     }
     if cut {
@@ -659,6 +685,25 @@ pub(crate) fn dependencies(
         b.close();
     }
     b.close();
+}
+fn dependency_mark(b: &mut Builder, task: u64, fact: &c::Dependency, me: Option<&c::Me>, words: &Words) {
+    let Some(added) = fact.added else { return };
+    let name = match added.by {
+        c::OwnerRequester::Person(number) => {
+            if let Some(me) = me
+                && me.party.number == number
+            {
+                words.say(Word::DependencyAddedByYou, &[])
+            } else {
+                words.say(Word::DependencyAddedByPerson, &[Hole::Number(number)])
+            }
+        }
+        c::OwnerRequester::Task(number) => words.say(Word::DependencyAddedByTask, &[Hole::Number(number)]),
+        c::OwnerRequester::Deployment { .. } => words.say(Word::DependencyAddedByDeployment, &[]),
+    };
+    let name =
+        if fact.keeps { words.say(Word::DependencyKeeps, &[Hole::Name(name), Hole::Number(task)]) } else { name };
+    text(b, Role::Paragraph, &name);
 }
 pub(crate) fn controls(
     b: &mut Builder,

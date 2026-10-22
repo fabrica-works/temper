@@ -95,14 +95,15 @@ impl Limits {
             .checked_add(jig_client::contract::AUTHORITY_MODELS.checked_mul(2)?)?;
         // Each plan row adds a spend paragraph, dependency list and cut item
         // with a paragraph: six nodes including their text children. Each
-        // dependency adds an item, link and status with text: five nodes,
-        // bounded by jig's receiving rows count per row.
-        let dependencies = receiving.rows.checked_mul(5)?.checked_add(6)?.checked_mul(receiving.rows)?;
+        // dependency adds an item, link, status and added mark (client/README.md,
+        // 5.8) with text: seven nodes, bounded by jig's receiving rows count per row.
+        let dependencies = receiving.rows.checked_mul(7)?.checked_add(6)?.checked_mul(receiving.rows)?;
         // An agent's lineage, taskbar, brief and run: 32 fixed nodes including
         // text leaves, plus the spec's markdown and a dependency list. Jig's
         // task translation bounds dependencies by the receiving rows count:
-        // one item, link and status (five nodes with text) per dependency.
-        let agent = markdown.checked_add(33)?.checked_add(receiving.rows.checked_mul(5)?)?;
+        // one item, link, status and added mark (client/README.md, 5.8),
+        // seven nodes with text per dependency.
+        let agent = markdown.checked_add(33)?.checked_add(receiving.rows.checked_mul(7)?)?;
         let nodes = cards
             .checked_add(turns)?
             .checked_add(delegated)?

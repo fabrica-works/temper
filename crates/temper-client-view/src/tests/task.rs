@@ -1036,7 +1036,7 @@ fn dependency_row() -> c::OwnerTreeRow {
     let mut live = f::document().chip;
     live.task = DEPENDENCY;
     owner_phase(&mut live, c::OwnerChipPhase::Active(c::RunStage::Running { attempt: 1 }));
-    row.dependencies = List::with_capacity(3);
+    row.dependencies = List::with_capacity(4);
     for link in [
         c::OwnerTaskLink::Live(live),
         c::OwnerTaskLink::Stored { number: OTHER_DEPENDENCY, status: Some(c::OwnerTaskStatus::Done) },
@@ -1094,6 +1094,60 @@ fn a_rows_dependency_line_lists_its_dependencies() {
             assert_eq!(tree.nodes()[parts.as_slice()[2]].role, Role::TreeItem);
         }
     }
+}
+fn amended_dependency_row() -> c::OwnerTreeRow {
+    let mut row = dependency_row();
+    row.dependencies
+        .push(c::OwnerTaskLink::Stored { number: GRANDCHILD, status: Some(c::OwnerTaskStatus::Done) })
+        .expect("original dependency");
+    let c::ChipPhase::Owner { details, .. } = row.chip.details.as_mut() else { panic!("owner") };
+    details.dependencies = f::amended_dependency_facts();
+    row
+}
+fn assert_dependency_item(tree: &Tree, item: usize, number: u64, status: Option<&[u8]>, mark: Option<&[u8]>) {
+    assert_eq!(tree.nodes()[item].role, Role::Item);
+    assert_eq!(tree.nodes()[item].key, Some(crate::pages::inbox::card_key(c::ObjectKey::Task(number))));
+    let parts = children(tree, item);
+    let link = &tree.nodes()[parts.as_slice()[0]];
+    assert_eq!(link.role, Role::Link);
+    let name = fixtures::words().say(crate::words::Word::Task, &[skein_ui::phrases::Hole::Number(number)]);
+    assert_eq!(link.name.as_deref(), Some(name.as_ref()));
+    assert!(link.binding.is_some());
+    let mut count = 1;
+    if let Some(status) = status {
+        let node = &tree.nodes()[parts.as_slice()[count]];
+        assert_eq!(node.role, Role::Status);
+        assert_eq!(node.name.as_deref(), Some(status));
+        count = count.checked_add(1).expect("dependency children fit");
+    }
+    if let Some(mark) = mark {
+        let index = parts.as_slice()[count];
+        let node = &tree.nodes()[index];
+        assert_eq!(node.role, Role::Paragraph);
+        assert_eq!(node.name.as_deref(), Some(mark));
+        assert_eq!(fixtures::node_text(tree, index).as_ref(), mark);
+        assert!(node.binding.is_none());
+        count = count.checked_add(1).expect("dependency children fit");
+    }
+    assert_eq!(parts.as_slice().len(), count);
+}
+#[test]
+fn an_added_dependency_is_marked_in_its_item() {
+    let tree = plan_with_row(amended_dependency_row());
+    let list = styled(&tree, look::DEPENDENCIES);
+    assert_eq!(tree.nodes()[list].name.as_deref(), Some(b"Dependencies of task 12".as_slice()));
+    let items = children(&tree, list);
+    assert_eq!(items.len(), 4);
+    assert_dependency_item(
+        &tree,
+        items.as_slice()[0],
+        DEPENDENCY,
+        Some(b"running"),
+        Some("Added by you · keeps task 12 from ending".as_bytes()),
+    );
+    assert_dependency_item(&tree, items.as_slice()[1], OTHER_DEPENDENCY, Some(b"Completed"), Some(b"Added by task 7"));
+    assert_dependency_item(&tree, items.as_slice()[2], TASK, None, None);
+    assert_dependency_item(&tree, items.as_slice()[3], GRANDCHILD, Some(b"Completed"), None);
 }
 #[test]
 fn a_cut_dependency_line_ends_with_its_last_line() {
@@ -1424,6 +1478,49 @@ fn the_brief_says_its_spec_who_asked_and_its_dependencies() {
             }
             assert!(named(subtree(tree, items.as_slice()[1]), Role::Status, b"Completed"));
         }
+    }
+}
+#[test]
+fn the_briefs_added_dependency_is_marked() {
+    let mut task = f::delegate();
+    task.dependencies = amended_dependency_row().dependencies;
+    task.dependency_facts = f::amended_dependency_facts();
+    let view = agent(task);
+    let tree = view.tree();
+    let brief = styled(tree, look::AGENT_BRIEF);
+    assert!(named(subtree(tree, brief), Role::List, b"Dependencies of task 9"));
+    let list = index_of(tree, Role::List, b"Dependencies of task 9");
+    let items = children(tree, list);
+    assert_eq!(items.len(), 4);
+    assert_dependency_item(
+        tree,
+        items.as_slice()[0],
+        DEPENDENCY,
+        Some(b"running"),
+        Some("Added by you · keeps task 9 from ending".as_bytes()),
+    );
+    assert_dependency_item(tree, items.as_slice()[1], OTHER_DEPENDENCY, Some(b"Completed"), Some(b"Added by task 7"));
+    assert_dependency_item(tree, items.as_slice()[2], TASK, None, None);
+    assert_dependency_item(tree, items.as_slice()[3], GRANDCHILD, Some(b"Completed"), None);
+}
+#[test]
+fn an_added_dependency_names_another_party_or_the_deployment() {
+    for (by, expected) in [
+        (c::OwnerRequester::Person(74), b"Added by party 74".as_slice()),
+        (c::OwnerRequester::Deployment { project: 1 }, b"Added by the deployment".as_slice()),
+    ] {
+        let mut task = f::delegate();
+        task.dependencies = List::with_capacity(ONE);
+        task.dependencies
+            .push(c::OwnerTaskLink::Stored { number: DEPENDENCY, status: Some(c::OwnerTaskStatus::Done) })
+            .expect("dependency");
+        task.dependency_facts = List::with_capacity(ONE);
+        task.dependency_facts.push(f::added_dependency(DEPENDENCY, by, false)).expect("added dependency");
+        let view = agent(task);
+        let tree = view.tree();
+        let items = children(tree, index_of(tree, Role::List, b"Dependencies of task 9"));
+        assert_eq!(items.len(), 1);
+        assert_dependency_item(tree, items.as_slice()[0], DEPENDENCY, Some(b"Completed"), Some(expected));
     }
 }
 #[test]

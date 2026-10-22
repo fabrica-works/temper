@@ -55,14 +55,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         b.open(Role::Slot);
         b.style(look::THREAD);
         super::task::amendment(b, root, words, bindings);
-        b.open(Role::Region);
-        b.style(look::AGENT_BRIEF);
-        b.name(&words.say(Word::TaskBrief, &[]));
-        text(b, Role::Heading { level: 2 }, &words.say(Word::TaskBrief, &[]));
-        skein_ui::markdown::read(task.spec.specification.words.bytes(), 3, b);
-        super::task::requester(b, task.requester, me, words);
-        super::task::dependencies(b, task.chip.task, &task.dependencies, false, words, bindings);
-        b.close();
+        brief(b, task, me, words, bindings);
         if let Some(run) = task::run(task) {
             run_heading(b, run, words);
         }
@@ -112,6 +105,25 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         composer(b, root, page, task, words, bindings);
     }
     crate::confirm::main(b, root, words, bindings, rows);
+    b.close();
+}
+fn brief(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words: &Words, bindings: &mut Bindings) {
+    b.open(Role::Region);
+    b.style(look::AGENT_BRIEF);
+    b.name(&words.say(Word::TaskBrief, &[]));
+    text(b, Role::Heading { level: 2 }, &words.say(Word::TaskBrief, &[]));
+    skein_ui::markdown::read(task.spec.specification.words.bytes(), 3, b);
+    super::task::requester(b, task.requester, me, words);
+    super::task::dependencies(
+        b,
+        task.chip.task,
+        &task.dependencies,
+        task.dependency_facts.as_slice(),
+        false,
+        me,
+        words,
+        bindings,
+    );
     b.close();
 }
 fn lineage(b: &mut Builder, task: &c::Task, words: &Words, bindings: &mut Bindings) {
