@@ -3,12 +3,16 @@
 use jig_client::contract as c;
 use jig_client_world::harness::{ClientId, Until, World};
 use jig_domain_tasks as tasks;
-use skein_fake_person::{Find, Step};
+use skein_fake_person::{Face, Find, Found, Step, Target, TreeFace};
 use skein_forge::api;
 use skein_lib::Token;
+use skein_ui::Role;
 use skein_world::domain::Verdict;
 use std::fmt::Write as _;
-use temper_client_domain::forge::panel::State;
+use temper_client_domain::forge::{
+    change::{Slots, slot},
+    panel::State,
+};
 use temper_client_protocol_wire::v1 as w;
 use temper_client_world::{app::Temper, fixtures, front::Joint};
 use temper_engine_domain as engine;
@@ -64,6 +68,14 @@ fn keep_panel(world: &World<Temper, Joint>, person: ClientId, panels: &mut Vec<w
                         assert!(
                             order(value.step()) >= order(previous.step()),
                             "panel went backwards: {panels:?} -> {value:?}"
+                        );
+                        let before = slot(previous.step());
+                        let after = slot(value.step());
+                        assert!(after.done >= before.done, "page's done steps went backwards: {before:?} -> {after:?}");
+                        // No current slot means all six are done, after every current slot.
+                        assert!(
+                            after.current.unwrap_or(6) >= before.current.unwrap_or(6),
+                            "page's current step went backwards: {before:?} -> {after:?}"
                         );
                     }
                     panels.push(value.as_ref().clone());
@@ -122,6 +134,146 @@ fn finished(document: &c::Task, goal: u64, pull: u64) {
         panic!("successfully landed change result");
     };
     assert_eq!(part.key, c::OwnerPartKey::Number(pull));
+}
+
+fn page_step(name: &[u8]) -> Find {
+    Find::exactly_named(Role::Item, name)
+        .within(Box::new([Target::ExactRole { role: Role::List, name: b"Steps".as_slice().into() }]))
+}
+
+fn its_task(number: u64) -> Find {
+    let name = format!("Task {number}");
+    Find::exactly_named(Role::Link, name.as_bytes()).within(Box::new([
+        Target::ExactRole { role: Role::Tree, name: b"Its tasks".as_slice().into() },
+        Target::ExactRole { role: Role::TreeItem, name: name.as_bytes().into() },
+    ]))
+}
+
+fn drawn<'a>(world: &'a World<Temper, Joint>, person: ClientId, find: &Find) -> &'a skein_ui::Node {
+    let tree = world.tree(person);
+    let Found::Node(id) = TreeFace::new(tree).find(find) else { panic!("person's tree lacks {find:?}") };
+    tree.find(id).expect("found node")
+}
+
+fn gate_page(
+    world: &mut World<Temper, Joint>,
+    person: ClientId,
+    goal: u64,
+    gate: u64,
+    pull: u64,
+    panel: &w::ChangePanel,
+) {
+    let tag = format!("Change · Task {goal}");
+    let pull_line = format!(
+        "PR #{pull} · acme/shop · {} → {}",
+        std::str::from_utf8(BRANCH).expect("branch"),
+        std::str::from_utf8(BASE).expect("base")
+    );
+    let bounds = format!(
+        "Repairs {} of {} · resolutions {} of {} · updates {} of {}",
+        panel.repairs().used(),
+        panel.repairs().limit(),
+        panel.resolutions().used(),
+        panel.resolutions().limit(),
+        panel.updates().used(),
+        panel.updates().limit()
+    );
+    world.person(
+        person,
+        vec![
+            Step::See { find: Find::text(tag.as_bytes()), within: fixtures::WITHIN },
+            Step::See { find: Find::text(pull_line.as_bytes()), within: fixtures::WITHIN },
+            Step::See { find: page_step(b"Gating"), within: fixtures::WITHIN },
+            Step::See { find: Find::text(b"Waiting for its gates at its head."), within: fixtures::WITHIN },
+            Step::See {
+                find: Find::named(Role::Slot, b"CI at its headPassed").within(Box::new([Target::ExactRole {
+                    role: Role::Region,
+                    name: b"Gates at its head".as_slice().into(),
+                }])),
+                within: fixtures::WITHIN,
+            },
+            Step::See {
+                find: Find::named(Role::Slot, "Gate 1 · review · blockingWaiting".as_bytes()).within(Box::new([
+                    Target::ExactRole { role: Role::Region, name: b"Gates at its head".as_slice().into() },
+                ])),
+                within: fixtures::WITHIN,
+            },
+            Step::See {
+                find: Find::exactly_named(Role::Link, "View on forge ↗".as_bytes()), within: fixtures::WITHIN
+            },
+            Step::See { find: Find::text(bounds.as_bytes()), within: fixtures::WITHIN },
+            Step::See { find: its_task(gate), within: fixtures::WITHIN },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+    assert!(drawn(world, person, &page_step(b"Gating")).states.as_slice().contains(&skein_ui::State::Current));
+    assert_eq!(
+        drawn(world, person, &Find::exactly_named(Role::Link, "View on forge ↗".as_bytes())).external.as_deref(),
+        Some(format!("http://forge.example/acme/shop/pulls/{pull}").as_bytes())
+    );
+}
+
+fn landed_page(world: &mut World<Temper, Joint>, person: ClientId, goal: u64, gate: u64, merge: api::Commit) -> u64 {
+    let mut children: Vec<_> = world
+        .front()
+        .engine
+        .store
+        .rows
+        .values()
+        .filter_map(|record| {
+            if let engine::Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(row))) = record
+                && row.requester == tasks::Party::Task(goal)
+            {
+                Some(row.number)
+            } else {
+                None
+            }
+        })
+        .collect();
+    children.sort_unstable();
+    assert!(children.contains(&gate), "the gate is an ended child");
+    let merge_line =
+        format!("Landed · merge commit {:02x}{:02x}{:02x}{:x}", merge[0], merge[1], merge[2], merge[3] >> 4);
+    let mut script = vec![
+        Step::See { find: page_step(b"Landed"), within: fixtures::WITHIN },
+        Step::See { find: Find::text(merge_line.as_bytes()), within: fixtures::WITHIN },
+    ];
+    for child in &children {
+        script.push(Step::See { find: its_task(*child), within: fixtures::WITHIN });
+    }
+    for absent in ["None.", "None yet.", "More of its ended tasks are not shown."] {
+        script.push(Step::Gone {
+            find: Find::exactly_named(Role::Paragraph, absent.as_bytes())
+                .within(Box::new([Target::ExactRole { role: Role::Region, name: b"Its tasks".as_slice().into() }])),
+            within: fixtures::WITHIN,
+        });
+    }
+    script.push(Step::See {
+        find: Find::exactly_named(Role::Link, "View on forge ↗".as_bytes()),
+        within: fixtures::WITHIN,
+    });
+    world.person(person, script);
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+    let root = world.root(person).person();
+    let page = root
+        .pages()
+        .task()
+        .expect("task page")
+        .ended
+        .as_ref()
+        .expect("ended children read")
+        .page
+        .as_ref()
+        .expect("kept ended children page");
+    let c::EndedGroup::Rows { rows, after, cut } = &page.ended else { panic!("ended children rows") };
+    assert_eq!(after, &None);
+    assert!(!cut);
+    let mut kept: Vec<_> = rows.iter().map(|row| row.chip.task).collect();
+    kept.sort_unstable();
+    assert_eq!(kept, children, "every ended child is kept exactly once");
+    outcome.callbacks
 }
 
 #[test]
@@ -189,6 +341,7 @@ fn a_change_handed_its_pushed_branch_lands_after_ci_and_its_gate() {
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
     keep_panel(&world, person, &mut panels);
     panel_waiting_for_gate(panels.last().expect("gate panel"), &checked);
+    gate_page(&mut world, person, goal, gate.number, checked.pull.number, panels.last().expect("gate panel"));
 
     let verdict = tasks::TaskResult::Verdict { code: 1, fields: Box::new([]), words: b"approved".as_slice().into() };
     world.front().engine.answer(
@@ -222,16 +375,13 @@ fn a_change_handed_its_pushed_branch_lands_after_ci_and_its_gate() {
     assert_eq!(landed.main, merge);
     assert_ne!(merge, checked.main);
 
-    let merge_line = "Landed · merge commit ".as_bytes();
-    world.person(person, vec![Step::See { find: Find::text(merge_line), within: fixtures::WITHIN }]);
-    let outcome = world.run(Until::Done);
-    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+    let callbacks = landed_page(&mut world, person, goal, gate.number, merge);
     keep_panel(&world, person, &mut panels);
     let root = world.root(person).person();
     let document = root.pages().task().expect("task page").document(root.client()).expect("finished task document");
     finished(document, goal, landed.pull.number);
     panels_landed(&panels, goal, head, &opened, &checked, merge);
-    quiet(&mut world, person, goal, panels.last().expect("landed panel"), outcome.callbacks);
+    quiet(&mut world, person, goal, panels.last().expect("landed panel"), callbacks);
 }
 
 fn panel_waiting_for_gate(panel: &w::ChangePanel, facts: &Facts) {
@@ -262,6 +412,7 @@ fn panels_landed(
     assert_eq!(last.head(), &Some(head));
     assert_eq!(last.pull().as_ref().expect("pull in panel").number(), opened.pull.number);
     assert_eq!(last.ci(), &w::Ci::Passed);
+    assert_eq!(slot(last.step()), Slots { current: None, done: 6 });
     let [gate] = last.gates().as_slice() else { panic!("one gate in the panel") };
     assert_eq!(gate.number(), 1);
     assert_eq!(gate.kind(), &w::GateKind::Review);
@@ -332,7 +483,10 @@ fn a_forge_procedure_without_a_change_has_an_unknown_panel() {
     let person = world.client(fixtures::PARTY, fixtures::task_page(task));
     world.person(
         person,
-        vec![Step::See { find: Find::text(b"The forge knows no change for this task."), within: fixtures::WITHIN }],
+        vec![
+            Step::See { find: Find::text(b"The forge knows no change for this task."), within: fixtures::WITHIN },
+            Step::Gone { find: Find::text(b"Shown on the forge."), within: fixtures::WITHIN },
+        ],
     );
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
