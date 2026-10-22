@@ -1,6 +1,6 @@
 # Configuration
 
-Provisional, 2026-10-14, revised 2026-10-21. What temper's processes
+Provisional, 2026-10-14, revised 2026-10-22. What temper's processes
 are told when they start: the one JSON document `temper serve` reads,
 and the forge's setup's commands with it, with jig's parts as jig
 defines them and temper's own members beside them; the private files it
@@ -170,7 +170,12 @@ document says what temper adds. What is open is listed in section 11.
 - **Templates are jig's two defaults,** chat (template 1, label 1) and
   goal (template 2, label 2), as jig's `protocol/configuration.md`,
   3.1 gives them, the chat's executor the charter chats run under;
-  temper defines no template of its own. Its client's lists filter on
+  temper defines no template of its own. One flag departs from jig's
+  defaults: the chat is ended by its requester, `"ended_by":
+  "requester"` (jig's `protocol/configuration.md`, 3.2), so that a chat
+  stays open past its run's turn until its person closes it
+  (`../domain/agent.md`, 4.6); the goal is ended by its result, as
+  every delegation is. Its client's lists filter on
   those labels (`../client/README.md`, 3.5), and a project's policy may override
   their defaults as jig's allows.
 - **A project's permission mapping,** jig's `roles` of each of

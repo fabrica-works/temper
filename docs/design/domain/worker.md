@@ -1,6 +1,6 @@
 # The worker
 
-Provisional, 2026-10-04, revised 2026-10-18. What temper's worker does,
+Provisional, 2026-10-04, revised 2026-10-22. What temper's worker does,
 as a domain layer: its root, which composes jig's hub with smith's host
 domain and temper's checkout; the items an assignment gives a run's
 workspace; and the checkout, which is temper's own. The worker hosts the
@@ -321,6 +321,13 @@ process has exited and its tree is empty. temper's choices:
 - **Its limits** are smith's host limits, and the bounds the hello
   states, from the agent's configuration (`../protocol/configuration.md`,
   section 5).
+- **Its program endpoints,** in the hello's bounds: the endpoint numbers
+  the agent's configuration serves by a program, its `endpoint_programs`
+  keys, as jig's reference launcher declares them (jig's
+  `domain/hosts.md`, 8.1). temper's stock agent serves none, an empty
+  list that proves no endpoint is a program; a chat whose ordinary
+  source is one is refused before it starts, `HostRefused` in its
+  status (`agent.md`, 4.6).
 
 ## 7. Facts
 

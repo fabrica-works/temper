@@ -662,6 +662,21 @@ no commit and no write; a start refused for live tasks past lowered
 limits, or for a malformed page. The forge's own stories are forge.md,
 section 18's.
 
+Its Open chats' stories (`agent.md`, 4.6), in the engine's world on
+temper's chat as configured, Open: a chat whose run answers and
+finishes parks, its reply committed and no try spent, still at rest
+past its idle interval; its person's next words wake it once; its
+person's Close, the client's `close_chat`, ends it with its committed
+turns kept and its delegates' fates as the Close names them; a goal's
+delegate in the same world still ends by its result; and a chat whose
+ordinary source is a program endpoint its worker's hello declares is
+refused with its typed cause, starts nothing, and reads `HostRefused`.
+In the root with the worker and smith's agent, an Open chat's text-only
+reply ends its turn after one call, with no nudge and no failed run.
+The engine's other stories run its walking chat, ended by its result
+as jig's default chat is: what they test is a result's terminal path,
+which temper's goals still take.
+
 Its referees hold the root to jig's promises from outside (jig's
 `domain/core.md`, section 11): the walking referee reads durable rows,
 never the root's state; a referee per promise rejects a fault injected
