@@ -412,7 +412,9 @@ fn read_value(w: World, what: &c::Read, then: Then) -> Option<c::ReadValue> {
             ended: c::EndedGroup::Rows { rows: ended_rows(w), after: None, cut: false },
         }))),
         c::Read::Task { task: number } => Some(c::ReadValue::Task(Box::new(shown_task(w, *number, then)))),
-        c::Read::Activity { task: number, .. } => Some(c::ReadValue::Activity(Box::new(activity_window(w, *number)))),
+        c::Read::Activity { task: number, before } => {
+            Some(c::ReadValue::Activity(Box::new(activity_window(w, *number, before.as_ref()))))
+        }
         c::Read::Proposal { .. } => Some(proposal()),
         c::Read::Question { .. } => Some(c::ReadValue::Question(Box::new(c::Question {
             task: document(Solo, 3).chip,
@@ -1901,18 +1903,26 @@ fn inbox_window(w: World, window: u32) -> c::OwnerInbox {
         selection: None,
     }
 }
-fn activity_window(w: World, task: u64) -> c::ActivityPage {
+// A page of `rows` lines, newest first, from the cursor's row offset; the
+// cursor carries the next page's offset, so a chat filling its window ends.
+fn activity_window(w: World, task: u64, before: Option<&c::Cursor>) -> c::ActivityPage {
     let mut document = activity(w, task);
     let all = document.rows;
+    let from = match before {
+        Some(cursor) => usize::from(*cursor.value.bytes().first().expect("gallery cursor")),
+        None => 0,
+    };
     document.rows = List::with_capacity(limits().client.domain.rows);
-    for row in &all {
+    for row in all.iter().skip(from) {
         if document.rows.len() < document.rows.capacity() {
             document.rows.push(row.clone()).expect("activity window");
         }
     }
-    if all.len() > document.rows.len() {
+    let next = from.checked_add(document.rows.as_slice().len()).expect("gallery offset");
+    if all.as_slice().len() > next {
+        let offset = u8::try_from(next).expect("gallery activity fits a byte");
         document.before =
-            Some(c::Cursor::new(Box::from(b"older".as_slice()), limits().client.domain.text).expect("cursor"));
+            Some(c::Cursor::new(Box::from([offset].as_slice()), limits().client.domain.text).expect("cursor"));
     }
     document
 }
