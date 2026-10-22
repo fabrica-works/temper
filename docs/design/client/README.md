@@ -1245,7 +1245,9 @@ The words for each offered source are:
   "Claude subscription · claude-alice". Its card's heading follows with
   its provider and holder: "ChatGPT · alice@example.com · OpenAI · held
   by Alice", the holder the person's name from `me` for their own, and
-  "held by the deployment" for the deployment's. The card's region is
+  "held by the deployment" for the deployment's; a key-only account's
+  name already holds its provider, so its heading doesn't repeat it:
+  "OpenAI API key · held by Alice". The card's region is
   named by that heading, so a person and a screen reader find an
   account by its name. Each source is its kind in words, "ChatGPT
   sign-in", "API key", "Claude Code login NAME", then its state.
