@@ -697,7 +697,7 @@ fn demo_main(config: &std::path::Path, data: &std::path::Path, root: &std::path:
     let checkout = root.join("widget");
     for (path, bytes) in temper_fake::forge::FILES {
         let expected = if landed && path == b"src/main.rs" {
-            let script = document["application"]["demo"]["llm"]["asked"]
+            let script = document["application"]["demo"]["llm"]["cued"]
                 .as_array()
                 .expect("demo scripts")
                 .iter()

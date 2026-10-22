@@ -102,6 +102,7 @@ pub fn read(document: &Json, at: u32, facts: &Facts<'_>) -> Result<Option<Demo>,
     let provider_at = read::required(&mut o, document, b"provider", &lp)?;
     let key_at = read::required(&mut o, document, b"key", &lp)?;
     let asked_at = read::required(&mut o, document, b"asked", &lp)?;
+    let cued_at = o.member(document, b"cued");
     let otherwise_at = read::required(&mut o, document, b"otherwise", &lp)?;
     read::finish(o, document, &lp)?;
     let listen = read::listen(document, listen_at, &lp.member(b"listen"))?;
@@ -113,8 +114,29 @@ pub fn read(document: &Json, at: u32, facts: &Facts<'_>) -> Result<Option<Demo>,
     let key = data_path(document, key_at, facts.directories, &lp.member(b"key"))?;
     read::absolute(&key, &lp.member(b"key"))?;
     let client = data_path(document, client_at, facts.directories, &p.member(b"client"))?;
+    let asked = llm::scripts(document, asked_at, &lp.member(b"asked"))?;
+    let cp = lp.member(b"cued");
+    let cued = match cued_at {
+        Some(at) => llm::scripts(document, at, &cp)?,
+        None => Box::new([]),
+    };
+    let count = asked.len().checked_add(cued.len()).expect("two bounded script lists");
+    if count > 8 {
+        return Err(read::why(&cp, b"past its bound"));
+    }
+    for (index, script) in cued.iter().enumerate() {
+        for previous in &asked {
+            if previous.cue == script.cue {
+                return Err(read::why(&read::index(&cp, index).member(b"cue"), b"must be unique"));
+            }
+        }
+    }
+    let mut combined = List::with_capacity(u32::try_from(count).expect("eight scripts"));
+    for script in asked.into_iter().chain(cued) {
+        combined.push(script).expect("eight scripts across asked and cued");
+    }
     let scripts = api::Scripts {
-        cued: llm::scripts(document, asked_at, &lp.member(b"asked"))?,
+        cued: combined.into_boxed(),
         asked: Box::new([]),
         otherwise: llm::turns(document, otherwise_at, &lp.member(b"otherwise"))?,
     };

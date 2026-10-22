@@ -21,9 +21,19 @@ fn the_template_shaped_demo_reads_into_its_public_fields() {
             Box::from(b"Add CSV export to widget".as_slice()),
             Box::from(b"Add a dark theme to widget".as_slice()),
             Box::from(b"Fix widget's empty search state".as_slice()),
-            Box::from(b"Export widget's table as CSV".as_slice()),
         ]
     );
+}
+#[test]
+fn a_demo_without_cued_publishes_all_asked() {
+    // Restore the legacy document: its coding script was also suggested.
+    let input = fixtures::demo_application();
+    let input = core::str::from_utf8(&input).unwrap().replace("\"Search\"]}],\n\"cued\":[", "\"Search\"]},");
+    let (members, problems) = application(input.as_bytes(), &fixtures::engine().jig);
+    assert_eq!(&*lines(&problems), b"");
+    let cues = members.unwrap().demo.unwrap().cues;
+    assert_eq!(cues.len(), 4);
+    assert_eq!(cues[3].as_ref(), b"Export widget's table as CSV");
 }
 #[test]
 fn a_null_demo_reads_as_none() {
@@ -59,13 +69,13 @@ fn an_unanswerable_demo_is_refused_at_its_field() {
         (
             "cue count at bound",
             "\"asked\":[",
-            ["\"asked\":[", &"{\"cue\":\"extra\",\"turns\":[\"x\"]},".repeat(4)].concat(),
+            ["\"asked\":[", &"{\"cue\":\"extra\",\"turns\":[\"x\"]},".repeat(5)].concat(),
             "",
         ),
         (
             "cue count past bound",
             "\"asked\":[",
-            ["\"asked\":[", &"{\"cue\":\"extra\",\"turns\":[\"x\"]},".repeat(5)].concat(),
+            ["\"asked\":[", &"{\"cue\":\"extra\",\"turns\":[\"x\"]},".repeat(6)].concat(),
             "application.demo.llm.asked: past its bound\n",
         ),
         (

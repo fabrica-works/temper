@@ -262,10 +262,17 @@ fn demo_refusals() {
 }
 #[test]
 fn demo_acceptance() {
-    for (enabled, window, output) in [(false, 4096, 1024), (true, 4096, 1024), (true, 65536, 32768)] {
+    for (enabled, cued, window, output) in
+        [(false, false, 4096, 1024), (true, false, 4096, 1024), (true, true, 4096, 1024), (true, true, 65536, 32768)]
+    {
         let mut value = fixture();
         value["engine"]["llm"]["models"][1]["window"] = json!(window);
         value["engine"]["llm"]["models"][1]["output"] = json!(output);
+        if cued {
+            value["application"]["demo"]["llm"]["cued"] = json!([
+                {"cue":"coding brief","turns":["coding answer"]}
+            ]);
+        }
         if !enabled {
             value["application"]["demo"] = Value::Null;
         }
@@ -276,8 +283,15 @@ fn demo_acceptance() {
         }
         let demo = demo.unwrap();
         let m = &value["application"]["demo"]["llm"];
+        let combined: Vec<_> = m["asked"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .chain(m.get("cued").and_then(Value::as_array).into_iter().flatten())
+            .cloned()
+            .collect();
         let standalone = json!({"listen":m["listen"], "key":"/data/demo/llm.key", "tls":null,
-            "models":[{"name":"demo","window":window,"output":output}], "cued":m["asked"],
+            "models":[{"name":"demo","window":window,"output":output}], "cued":combined,
             "asked":[], "otherwise":m["otherwise"]});
         assert_eq!(demo.llm(), &llm::Document::decode(&serde_json::to_vec(&standalone).unwrap()).unwrap());
         assert_eq!(demo.provider(), 3);
@@ -285,6 +299,59 @@ fn demo_acceptance() {
         assert_eq!(demo.project(), 1);
         assert_eq!(demo.client(), b"/data/demo/client");
     }
+}
+
+#[test]
+fn cued_scripts_follow_asked_and_play_from_the_brief() {
+    let mut value = fixture();
+    value["application"]["demo"]["llm"]["cued"] = json!([
+        {"cue":"coding brief","turns":["coding answer"]}
+    ]);
+    let demo = read(&value).unwrap().unwrap();
+    let m = &value["application"]["demo"]["llm"];
+    let standalone = json!({"listen":m["listen"], "key":"/data/demo/llm.key", "tls":null,
+        "models":[{"name":"demo","window":4096,"output":1024}],
+        "cued":[m["asked"][0],m["cued"][0]],"asked":[],"otherwise":m["otherwise"]});
+    assert_eq!(demo.llm(), &llm::Document::decode(&serde_json::to_vec(&standalone).unwrap()).unwrap());
+    let answer = super::answer(demo.llm(), 23, super::query(b"coding brief", b"Begin"));
+    assert_eq!(answer.parts.as_ref(), &[Part::Text { text: b"coding answer".as_slice().into() }]);
+}
+
+#[test]
+fn cued_refusals_and_shared_bounds() {
+    let scripts: Vec<_> = (0..8).map(|i| json!({"cue":i.to_string(),"turns":["x"]})).collect();
+    for (cued, expected) in [
+        (json!(null), "application.demo.llm.cued: wrong value kind\n"),
+        (json!({}), "application.demo.llm.cued: wrong value kind\n"),
+        (json!([{"cue":"","turns":["x"]}]), "application.demo.llm.cued[0].cue: must be non-empty\n"),
+        (json!([{"cue":"x".repeat(257),"turns":["x"]}]), "application.demo.llm.cued[0].cue: past its bound\n"),
+        (json!([{"cue":"x","turns":[]}]), "application.demo.llm.cued[0].turns: must be non-empty\n"),
+        (json!([{"cue":"x","turns":vec!["x";9]}]), "application.demo.llm.cued[0].turns: past its bound\n"),
+        (
+            json!([{"cue":"Add CSV export to widget","turns":["x"]}]),
+            "application.demo.llm.cued[0].cue: must be unique\n",
+        ),
+        (json!([scripts[0], scripts[0]]), "application.demo.llm.cued[1].cue: must be unique\n"),
+        (
+            json!((0..7).map(|i| json!({"cue":i.to_string(),"turns":vec!["x".repeat(5000);8]})).collect::<Vec<_>>()),
+            "application.demo.llm.otherwise: scripts past their joint byte bound\n",
+        ),
+        (json!(scripts), "application.demo.llm.cued: past its bound\n"),
+        (json!(vec![scripts[0].clone(); 9]), "application.demo.llm.cued: past its bound\n"),
+    ] {
+        let mut value = fixture();
+        value["application"]["demo"]["llm"]["cued"] = cued;
+        assert_eq!(read(&value).unwrap_err().line().as_ref(), expected.as_bytes());
+    }
+    for cued in [json!([]), json!(&scripts[..7]), json!([{"cue":"x".repeat(256),"turns":vec!["x";8]}])] {
+        let mut value = fixture();
+        value["application"]["demo"]["llm"]["cued"] = cued;
+        assert!(read(&value).unwrap().is_some());
+    }
+    let mut value = fixture();
+    value["application"]["demo"]["llm"]["asked"] = json!([]);
+    value["application"]["demo"]["llm"]["cued"] = json!(scripts);
+    assert!(read(&value).unwrap().is_some());
 }
 
 #[test]
@@ -477,12 +544,16 @@ fn the_csv_coding_agent_reads_edits_and_finishes_the_change() {
 #[test]
 fn the_csv_cues_select_only_their_own_agents_briefs() {
     let value = template();
-    for (index, own, other, tool) in [(0, CHAT, CODING, b"delegate".as_slice()), (1, CODING, RESUMED_CHAT, b"read")] {
-        let cue = value["application"]["demo"]["llm"]["asked"][index]["cue"].as_str().unwrap();
+    for (list, own, other, tool) in
+        [("asked", CHAT, CODING, b"delegate".as_slice()), ("cued", CODING, RESUMED_CHAT, b"read")]
+    {
+        let cue = value["application"]["demo"]["llm"][list][0]["cue"].as_str().unwrap();
         assert!(own.contains(cue));
         assert!(!other.contains(cue));
         let mut only = value.clone();
-        only["application"]["demo"]["llm"]["asked"] = json!([value["application"]["demo"]["llm"]["asked"][index]]);
+        only["application"]["demo"]["llm"]["asked"] = json!([]);
+        only["application"]["demo"]["llm"]["cued"] = json!([]);
+        only["application"]["demo"]["llm"][list] = json!([value["application"]["demo"]["llm"][list][0]]);
         let demo = read(&only).unwrap().unwrap();
         for (system, selected) in [(own, true), (other, false)] {
             let mut query = super::query(system.as_bytes(), b"Begin the work your brief describes.");

@@ -186,10 +186,6 @@ fn demo(port: u16) -> Value {
                     "turns": csv_chat()
                 },
                 {
-                    "cue": "Export widget's table as CSV",
-                    "turns": csv_coding()
-                },
-                {
                     "cue": "Add a dark theme to widget",
                     "turns": [
                         demo_turn("I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.")
@@ -200,6 +196,12 @@ fn demo(port: u16) -> Value {
                     "turns": [
                         demo_turn("I would have widget say when a search finds nothing, name the words searched for and offer to clear them, in place of an empty table that looks broken. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.")
                     ]
+                }
+            ],
+            "cued": [
+                {
+                    "cue": "Export widget's table as CSV",
+                    "turns": csv_coding()
                 }
             ],
             "otherwise": [

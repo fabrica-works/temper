@@ -42,6 +42,8 @@ pub(super) fn parse(
     let llm_path = path.member(b"llm");
     let mut llm = read::object(document, at, &llm_path, problems)?;
     let provider = read::number(&mut llm, document, b"provider", &llm_path, problems)?;
+    // This public view reads asked alone; optional cued is checked by the fake.
+    // These objects are not finished here, so cued needs no consuming read.
     let asked = read::list(&mut llm, document, b"asked", w::CEILINGS.demo_answer_cues, &llm_path, problems)?;
     let mut cues = List::with_capacity(asked.len());
     for (index, at) in asked.iter().enumerate() {
