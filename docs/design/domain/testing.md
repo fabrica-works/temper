@@ -1,11 +1,11 @@
 # Testing temper
 
-Provisional, 2026-10-03, revised 2026-10-21. How temper is tested. The
+Provisional, 2026-10-03, revised 2026-10-22. How temper is tested. The
 strategy is skein's `docs/foundation/testing-strategy.md`: the tiers,
 faults, what every fake shares, what every world checks, scenarios and
 the referee, the two suites, and where a failure is fixed. This document
 keeps what is temper's: its tiers (section 2), its neighbours and their
-fakes (sections 3 and 4), its scenarios and referee (section 5), what its
+fakes (sections 3 and 4), its scenarios, referee and the reference case (section 5), what its
 worlds check beyond the strategy (section 6), its layout (section 7),
 and what is still open (section 10).
 
@@ -43,6 +43,9 @@ and what is still open (section 10).
   wrong fails in the run and on the forge alike.
 - **A referee in every engine world,** on skein's world harness, holds
   its scenarios' expectations (5.2).
+- **The reference case runs in the real loop,** step by step, on its
+  cast, its scripts and an oracle over effects that every world running
+  the case reuses (5.3).
 - **No fake of temper's own components:** the system world runs the real
   engine and worker.
 - **Two suites, and two tiers outside them.** The focused and the fuzzy
@@ -369,6 +372,9 @@ in the lower world that owns it, never here.
   each run to its end. It shares the standalone stories' hosts, fakes
   and checks; the shapes' checks are step tests, and placement, a lost
   worker and its grace the engine's domain world's.
+- **The reference case's stories** (5.3): its act 1, one story for each
+  step's slice that temper can run, on the case's cast, scripts and
+  oracle.
 
 What only the real kernel shows is this tier's: transport, persistence
 and lifecycle, `temper ctl`'s lock and DIRECTORY's files
@@ -1079,6 +1085,68 @@ records and smith's own observations (`tests/system`). The conformance
 world (`tests/conformance`) runs the engine root on jig's conformance
 harness, under its outside referee. The worker's child domain worlds
 keep their checks inline.
+
+### 5.3 The reference case
+
+`../draft/reference-case.md` is one story that holds every move of the
+owners' process. Its steps run as stories of the real loop (2.4), each
+on the case's cast, its scripts and its oracle, written once and run
+again by every world that runs the case: the real loop's cluster, and
+the process tier's (../protocol/README.md, 15.6).
+
+- **The cast is a fixture.** The person is a client's directory, signed
+  in; the director is the person's chat in project 1, on a
+  coordinator's charter; the owners (A, B, C) and their delegates are
+  the agent and procedure tasks the scripts delegate; kit, and app when
+  a step needs it, are repositories on the fake forge, kit's tree
+  holding a draft and the process's documents; the workers are the
+  standalone service's one, and ws, s1 and s2 once the case runs on the
+  cluster. The tasks' numbers are a fresh deployment's, named once and
+  checked against the documents the story reads.
+- **Every judgement is a script.** Each choice the case gives an agent
+  (the director's, an owner's, a delegate's) is a fake LLM script played
+  word for word, cued by the task's words (5.1). Each act of the person
+  is a `temper ctl` call. Nothing on the fakes judges, so the case's
+  judgements are its scripts, and its oracle checks what temper did with
+  them.
+- **The oracle checks effects,** one checkpoint for each step, over
+  what the step's Musts and Adds promise: authority and spend, a message
+  or an answer delivered, work held and resumed, what landed. It reads
+  only what every world that runs the case observes: the person's
+  documents (`temper ctl`'s JSON, by the act that read them), the forge
+  (its main and its checks at each merged head), and what each agent was
+  told (the fake LLM's queries, by their cue). It never judges an
+  agent's words, only their effects, so the same oracle checks a live
+  model's run of the case. It reports every miss at once, each naming
+  its step and its Must or Add.
+- **Time keeps the case's order, not its ratio.** A story waits on
+  conditions, `temper ctl`'s waits, never on time. A timer, deadline,
+  cap, reset or grace that a step runs on is armed where the case arms
+  it, at the shortest length the loop keeps in order, and the story
+  waits for its effect. The case's hours are not mapped to a ratio.
+- **Smoke, as the real loop is** (2.4): a step's story runs its path
+  end to end, once; the cases each Must rests on are tested in the
+  lower worlds that own them. Each story is held to 6.1's guide, and
+  one past it after its cost has been cut is a fuzzy test (6.1).
+- **What a gap holds is named.** A step whose Must needs what temper
+  lacks (`../draft/reference-case.md`, section 9) runs the part that
+  works; its story's name says what it shows, and the table below what
+  it leaves out and what holds it. Behaviour that conflicts with the
+  case is not changed here, and not counted as the case's.
+- **A library of the real-loop world:** `tests/real-loop/src/case.rs`,
+  the cast and its fixture, and `case/`: `scripts.rs`, the judgements
+  for each step; `acts.rs`, the person's acts for each step; and
+  `oracle.rs`, the checkpoints over one type of observations, which
+  each world fills from what it observes. The stories are
+  `tests/real-loop/tests/case_*.rs`, or `fuzzy_case_*.rs` past the
+  guide.
+
+Act 1 (`../draft/reference-case.md`, section 4):
+
+| Step | Its story shows | It leaves out, and what holds it |
+|---|---|---|
+| 4.1 | `a_director_delegates_a_design_and_gives_its_green_light`: the person asks the director to schedule a draft at priority 1; the director delegates A, an agent on the model and effort it names, tracked as a goal at that priority, its brief naming the draft's commit, under authority within its own; A has its design delegated, a change of Markdown alone on kit, which lands through the change procedure with CI green at its head; A sends its design report to the director as a question, and the director answers it with a green light. The oracle: A tracked at its priority, on its model, with its brief, its authority within the director's, and its spend rolled up to the goal; the report delivered to the director, and the answer to A; kit's main holding the design, merged with CI green, and nothing but Markdown changed | A's survey before its design, one more report delegate than the director's own, for 6.1's guide; A's instructions and its pool (jig's `domain/tasks.md`, section 6), which the agent's `delegate` doesn't decode (`agent.md`, 4.3); which workers have room (`../draft/temper-on-temper.md`, 6.7); a host kind, with one worker until the cluster's stories; the fast path for Markdown alone, which is the repository's CI's and not temper's (`../draft/temper-on-temper.md`, 4.3): the fake forge's CI passes at once |
+| 4.2 | none | CI at the tip and the queue's priorities are the forge's worlds' (`forge.md`, sections 8 and 9); a failure at the tip that matches an open finding leaving the queue running is undesigned (`../draft/temper-on-temper.md`, 6.5), and today's pause and repair at a failed tip is the conflict the case names, so the step does not run as the case's |
 
 ## 6. What the tiers check
 
