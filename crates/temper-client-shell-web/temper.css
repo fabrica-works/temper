@@ -686,7 +686,7 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
 /* Folded calls and delegation cards belong to their turn, after its words. */
 .temper-chat .temper-turn > .temper-work { display: inline-flex; gap: 12px; margin: -1px 0 17px 109px; color: #7e786f; }
 .temper-chat .temper-turn > .temper-task-card { margin: 4px 0 22px 109px; border: 0; border-left: 2px solid var(--temper-accent); border-radius: 0; box-shadow: none; background: #f8f5f0; padding: 14px 18px 15px; }
-.temper-chat .temper-task-card > .temper-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 15px; border: 0; margin: 0; padding: 0; color: var(--temper-muted); font-size: 10px; }
+.temper-chat .temper-task-card > .temper-meta:first-child { float: none; display: flex; justify-content: space-between; align-items: baseline; gap: 15px; border: 0; margin: 0; padding: 0; color: var(--temper-muted); font-size: 10px; }
 .temper-chat .temper-task-card > .temper-meta > p { margin: 0; color: #a55b43; font-size: 10px; font-weight: 700; letter-spacing: .09em; }
 .temper-chat .temper-task-card > .temper-meta > [role=status] { color: var(--temper-muted); font-size: 10px; font-weight: 400; padding: 0; border: 0; border-radius: 0; background: transparent; }
 .temper-chat .temper-task-card > .temper-meta > [role=status]::before { content: none; }
@@ -726,11 +726,8 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
   .temper-chat .temper-chatbar > div:last-child { flex-wrap: nowrap; gap: 6px; white-space: nowrap; }
   .temper-chat .temper-chatbar > div:last-child > * { flex: none; }
   .temper-chat .temper-chatbar [role=status] { max-width: none; white-space: nowrap; overflow-wrap: normal; }
-  /* The status yields before the title; its text leaf clips while its dot stays visible. */
-  .temper-chat .temper-chatbar > div:first-child > [role=status] { display: flex; flex: 0 1000 auto; min-width: 5px; overflow: hidden; text-overflow: ellipsis; }
-  .temper-chat .temper-chatbar > div:first-child > [role=status]::before { display: block; margin-right: 0; }
-  .temper-chat .temper-chatbar > div:first-child > [role=status] > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  /* The mockup omits spend in its narrow bar; retain the status and every act. */
+  /* The mockup hides the narrow status and spend, keeping the title and acts. */
+  .temper-chat .temper-chatbar > div:first-child > [role=status] { display: none; }
   .temper-chat .temper-chatbar > div:last-child > p { display: none; }
   .temper-chat .temper-turn > .temper-work, .temper-chat .temper-turn > .temper-task-card { margin-left: 0; }
   .temper-chat .temper-task-card > .temper-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
