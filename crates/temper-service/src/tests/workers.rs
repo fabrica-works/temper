@@ -29,6 +29,30 @@ fn a_missing_identity_or_generation_keeps_its_grant_slot_empty() {
     }
 }
 #[test]
+fn application_grants_answer_either_retained_generation() {
+    let mut values = fixtures::values_with_identity(1, b"first");
+    let next = fixtures::values_with_identity(1, b"second");
+    let (_, value) = next.identities.newest(1).unwrap();
+    assert_eq!(values.identities.put(1, value.clone()), 2);
+    let filled = values.grants(
+        &[
+            fixtures::application_grant(1, 1),
+            fixtures::application_grant(1, 2),
+            fixtures::application_grant(1, 0),
+            fixtures::application_grant(1, 3),
+        ],
+        Time::ZERO,
+    );
+    for (index, token) in [(0, b"first".as_slice()), (1, b"second".as_slice())] {
+        let Some(GrantValue::Application { secret }) = &filled[index] else { panic!("retained generation") };
+        let identity = fixtures::decoded_identity(secret);
+        let temper_protocol_worker_wire::v1::Kind::Forgejo(value) = identity.kind() else { panic!("Forgejo") };
+        assert_eq!(value.token().expose(), token);
+    }
+    assert!(filled[2].is_none());
+    assert!(filled[3].is_none());
+}
+#[test]
 fn identities_are_announced_before_the_restart() {
     let mut service = fixtures::started();
     service.engine.as_mut().expect("engine").store.opened = true;

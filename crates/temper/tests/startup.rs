@@ -783,6 +783,13 @@ fn programs_directories_are_checked_at_the_name_before_startup_effects() {
     }
 }
 
+// The engine now retains two encoded values per identity: one extra 7,057-B
+// value here. Its map value grows Secret (16 B) to generation + newest +
+// previous (40 B), across 11 slots in the single reserved B-tree node.
+// Tokens adds a 32-B map inline to Service; this Forgejo-only document
+// reserves no GitHub entry maps or announcement scratch.
+const GIT_GENERATIONS_GROWTH: u64 = (1 + 4 + 8 * (8 + 4 + 256 + 4 + 512) + 3 * (4 + 256)) + 11 * (40 - 16) + 32;
+
 fn github_identity_growth() -> (u64, u64) {
     // Worker-wire v3: Identity's old token plus three text fields was
     // 4 + 4096 + 3*(4 + 256) = 4,880 B. GitHub's kind has a one-byte tag,
@@ -1049,6 +1056,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + settled_root_growth
             + github_identity_growth
             + start_growth()
+            + GIT_GENERATIONS_GROWTH
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.

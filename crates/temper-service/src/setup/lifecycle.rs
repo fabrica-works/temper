@@ -273,7 +273,7 @@ pub(super) fn accepted(engine: &crate::engine::Engine, forge: u16) -> Box<[u64]>
     }
     Box::new([])
 }
-fn installations(engine: &mut crate::engine::Engine, forge: u16) {
+pub(super) fn installations(engine: &mut crate::engine::Engine, forge: u16) {
     let accepted = accepted(engine, forge);
     for id in &accepted {
         if let Some(info) = engine.setup.lifecycle.installations.get_mut(&(forge, *id))
@@ -284,6 +284,7 @@ fn installations(engine: &mut crate::engine::Engine, forge: u16) {
             installation_event(engine, forge, *id, Some(info));
         }
     }
+    crate::forge::tokens::accepted(engine, forge, &accepted);
     engine.forge.down(connection::Request::Installations { forge, accepted });
 }
 pub(crate) fn connected(engine: &mut crate::engine::Engine, forge: u16) {
@@ -302,7 +303,7 @@ pub(crate) fn connected(engine: &mut crate::engine::Engine, forge: u16) {
     } else {
         // Forgejo still starts from private files (temper-15); its login is the git identity's.
         let mut login = Box::from([]);
-        if let Some(value) = engine.values.identities.get(&config.identity) {
+        if let Some((_, value)) = engine.values.identities.newest(config.identity) {
             let mut reader = skein_lib::Reader::new(value.expose());
             let identity = temper_protocol_worker_wire::v1::Identity::decode(
                 &temper_protocol_worker_wire::v1::CEILINGS,
@@ -315,6 +316,7 @@ pub(crate) fn connected(engine: &mut crate::engine::Engine, forge: u16) {
     };
     state(engine, forge, domain::Connection::Connected { id, login });
     if github {
+        crate::forge::tokens::connected(engine, forge);
         engine.setup.lifecycle.reconcile.insert(forge, ()).expect("one reconcile per forge");
     }
 }
@@ -333,6 +335,9 @@ pub(crate) fn installation(
     account: Option<connection::Account>,
     change: connection::Change,
 ) {
+    if change == connection::Change::Deleted || change == connection::Change::Suspended {
+        crate::forge::tokens::removed(engine, forge, installation);
+    }
     let key = (forge, installation);
     if change == connection::Change::Deleted {
         let known = engine.setup.lifecycle.installations.remove(&key).is_some();

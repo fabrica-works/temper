@@ -5,8 +5,20 @@ use skein_lib::{List, Rng};
 use temper_protocol_records as records;
 
 fn service(states: u32, life: Duration) -> crate::Service {
+    let mut service = routing_service(states, life);
+    let ready = fixtures::ready().engine.expect("engine");
+    service.engine.as_mut().expect("engine").env.limits = ready.env.limits;
+    service.engine.as_mut().expect("engine").domain = ready.domain;
+    service
+}
+// Token routing observes queued root inputs, so it needs no second service's restarted root.
+fn routing_service(states: u32, life: Duration) -> crate::Service {
     let mut config = fixtures::engine();
     config.forges[0].kind = crate::settings::Kind::GitHub;
+    config.identities[0].token = Secret::new(Box::new([]));
+    config.identities[0].login = Box::new([]);
+    config.identities[0].author.name = Box::new([]);
+    config.identities[0].author.email = Box::new([]);
     config.forges[0].api = jig_protocol_config::Address::Addr(skein_io::Addr::Ip(([127, 0, 0, 1], 3000).into()));
     config.forges[0].web = Some(Box::from(b"http://127.0.0.1:3000".as_slice()));
     config.forges[0].api_token = None;
@@ -50,11 +62,9 @@ fn service(states: u32, life: Duration) -> crate::Service {
             &mut engine.events
         ));
     }
-    let ready = fixtures::ready().engine.expect("engine");
-    service.engine.as_mut().expect("engine").env.limits = ready.env.limits;
-    service.engine.as_mut().expect("engine").domain = ready.domain;
     service
 }
+
 fn start(service: &mut crate::Service, run: u64, plan: host::Plan) {
     let run = Token::new(run);
     service.engine.as_mut().expect("engine").setup.staged.insert(run, plan).unwrap();
@@ -513,6 +523,10 @@ fn contains(bytes: &[u8], needle: &[u8]) -> bool {
 fn setup_memory_includes_the_whole_host_and_its_owner() {
     let mut config = fixtures::engine();
     config.forges[0].kind = crate::settings::Kind::GitHub;
+    config.identities[0].token = Secret::new(Box::new([]));
+    config.identities[0].login = Box::new([]);
+    config.identities[0].author.name = Box::new([]);
+    config.identities[0].author.email = Box::new([]);
     config.forges[0].api_token = None;
     let (mut endpoints, _) = crate::forge::prepare(&config, fixtures::forge_runtime()).unwrap();
     let setup = prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2).unwrap();
@@ -586,6 +600,10 @@ fn invalid_host_limits_stop_after_load_and_setup_overrides_are_checked() {
     let mut service = service(8, Duration::from_secs(3600));
     let mut config = fixtures::engine();
     config.forges[0].kind = crate::settings::Kind::GitHub;
+    config.identities[0].token = Secret::new(Box::new([]));
+    config.identities[0].login = Box::new([]);
+    config.identities[0].author.name = Box::new([]);
+    config.identities[0].author.email = Box::new([]);
     config.forges[0].api_token = None;
     config.limits.forge_component.inner = 13;
     let (mut endpoints, _) = crate::forge::prepare(&fixtures::engine(), fixtures::forge_runtime()).unwrap();
@@ -625,6 +643,10 @@ fn stopped_connection_text_has_a_fixed_bound() {
 fn configured(runs: u32, states: u32, tls: bool) -> (crate::settings::Engine, List<crate::ForgeRuntime>) {
     let (mut config, runtime) = if tls { tls_forges() } else { (fixtures::engine(), fixtures::forge_runtime()) };
     config.forges[0].kind = crate::settings::Kind::GitHub;
+    config.identities[0].token = Secret::new(Box::new([]));
+    config.identities[0].login = Box::new([]);
+    config.identities[0].author.name = Box::new([]);
+    config.identities[0].author.email = Box::new([]);
     config.forges[0].api_token = None;
     config.limits.setup.runs = runs;
     config.limits.setup.states = states;
@@ -731,3 +753,6 @@ fn an_unresolved_forge_keeps_its_setup_entry_but_restored_and_asked_connects_nev
     assert!(engine.setup.runs.is_empty(), "the host never receives a held plan");
     assert_eq!(engine.domain.forge_connection(1), temper_engine_domain_forge::Connection::NotConnected);
 }
+
+#[path = "git_tokens.rs"]
+mod git_tokens;

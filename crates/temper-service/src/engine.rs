@@ -58,10 +58,7 @@ impl Engine {
         let Children { accounts, workers, clients, demo, forge, setup, notes, limits: own } = children;
         let max_out = root::max_out(limits);
         let capacity = max_out.checked_mul(2).expect("root routing room");
-        let mut credentials = List::with_capacity(values.identities.len());
-        for (number, _value) in &values.identities {
-            credentials.push(*number).expect("configured identities");
-        }
+        let credentials = values.identities.numbers();
         let mut domain = match root::Domain::new(config, limits) {
             Ok(domain) => domain,
             Err(problem) => {
@@ -509,8 +506,9 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
             skein_forge_connection::Event::Installation { forge, installation, account, change } => {
                 crate::setup::lifecycle::installation(engine, forge, installation, account, change);
             }
-            // temper-02 handles git token values and installation access marks.
-            skein_forge_connection::Event::GitToken { .. } => {}
+            skein_forge_connection::Event::GitToken { forge, installation, account, token, expires } => {
+                crate::forge::tokens::token(engine, forge, installation, account, token, expires);
+            }
             // temper-21 names unknown log origins, without deciding on them.
             skein_forge_connection::Event::Fact { fact: skein_forge_connection::Fact::Origin { .. }, .. } => {}
             // temper-21 logs gaps, without deciding on them.

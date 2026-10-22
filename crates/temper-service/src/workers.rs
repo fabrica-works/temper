@@ -30,7 +30,7 @@ pub struct Workers {
     pub(crate) opened: bool,
     ending: Option<Closing>,
     pub(crate) component_closed: bool,
-    encoding: Encoding,
+    pub(crate) encoding: Encoding,
     pub(crate) forges: Box<[Forge]>,
     pub(crate) bad_parts: u64,
 }

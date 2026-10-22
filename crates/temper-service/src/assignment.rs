@@ -27,7 +27,7 @@ pub fn down(
     channel: Token,
     now: Time,
 ) -> Option<kit::Event> {
-    let items = crate::translate::items(&assignment, forges, &encoding.limits).ok()?;
+    let items = crate::translate::items(&assignment, forges, &values.tokens, &encoding.limits).ok()?;
     let charter = smith_protocol_channel::encode_charter(
         &temper_engine_smith::charter(&assignment),
         &smith_charter::CEILINGS,

@@ -40,7 +40,7 @@ pub(super) fn app(service: &mut crate::Service) {
     .encode();
     row(service, Item::Origin, &origin);
 }
-fn accepted(service: &mut crate::Service, ids: &[u64]) {
+pub(super) fn accepted(service: &mut crate::Service, ids: &[u64]) {
     row(service, Item::Accepted, skein_forge_setup::item::accepted_item(ids).expose());
 }
 fn values(service: &crate::Service) -> Box<[u64]> {

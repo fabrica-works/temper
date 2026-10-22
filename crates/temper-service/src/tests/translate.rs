@@ -14,7 +14,10 @@ fn a_workspace_reaches_items_with_each_remote_made_from_its_base() {
     ] {
         let mut forge = fixtures::engine().forges.into_iter().next().unwrap();
         forge.git = base.into();
-        let items = translate::items(&assignment, &[forge], &limits).unwrap().unwrap().into_parts();
+        let items = translate::items(&assignment, &[forge], &crate::forge::tokens::Tokens::empty(), &limits)
+            .unwrap()
+            .unwrap()
+            .into_parts();
         let first = items.repositories.into_boxed().into_iter().next().unwrap().into_parts();
         assert_eq!(first.tag, 7, "{base:?}");
         assert_eq!(first.remote.as_ref(), remote, "{base:?}");
@@ -42,7 +45,10 @@ fn each_repository_takes_its_forges_git_program() {
         let mut repository = fixtures::repository(7, b"acme", b"shop");
         repository.provider.forge = number;
         let assignment = fixtures::assignment_with(repository);
-        let items = translate::items(&assignment, &forges, &fixtures::wire_limits()).unwrap().unwrap();
+        let items =
+            translate::items(&assignment, &forges, &crate::forge::tokens::Tokens::empty(), &fixtures::wire_limits())
+                .unwrap()
+                .unwrap();
         let repository = items.repositories().get(0).unwrap();
         assert_eq!(repository.git().as_deref(), program, "forge {number}");
         assert_eq!(repository.remote(), b"https://forge.example/acme/shop.git");
@@ -72,7 +78,9 @@ fn each_workspace_start_reaches_its_items() {
     let mut assignment = fixtures::assignment_with(fixtures::repository(7, b"acme", b"shop"));
     for (start, expected) in rows {
         assignment.workspace.repositories[0].start = start;
-        let items = translate::items(&assignment, &settings.forges, &limits).unwrap().unwrap();
+        let items = translate::items(&assignment, &settings.forges, &crate::forge::tokens::Tokens::empty(), &limits)
+            .unwrap()
+            .unwrap();
         assert_eq!(items.repositories().get(0).unwrap().start(), &expected, "{expected:?}");
     }
 }
@@ -92,7 +100,9 @@ fn each_workspace_access_reaches_its_items() {
         ),
     ] {
         assignment.workspace.repositories[0].push = push;
-        let items = translate::items(&assignment, &settings.forges, &limits).unwrap().unwrap();
+        let items = translate::items(&assignment, &settings.forges, &crate::forge::tokens::Tokens::empty(), &limits)
+            .unwrap()
+            .unwrap();
         assert_eq!(items.repositories().get(0).unwrap().access(), &expected, "{expected:?}");
     }
 }
@@ -101,7 +111,10 @@ fn a_workspace_past_the_wire_bound_or_without_a_forge_is_refused() {
     let settings = fixtures::engine();
     let assignment = fixtures::assignment_with(fixtures::repository(7, b"acme", b"shop"));
     let limits = fixtures::wire_limits();
-    assert!(translate::items(&assignment, &[], &limits).is_err(), "unconfigured forge");
+    assert!(
+        translate::items(&assignment, &[], &crate::forge::tokens::Tokens::empty(), &limits).is_err(),
+        "unconfigured forge"
+    );
     for (field, expected) in [("remote", wire::Path::RepositoryRemote), ("repositories", wire::Path::ItemsRepositories)]
     {
         let mut limits = limits;
@@ -110,7 +123,13 @@ fn a_workspace_past_the_wire_bound_or_without_a_forge_is_refused() {
         } else {
             limits.items_repositories = 0;
         }
-        assert_eq!(translate::items(&assignment, &settings.forges, &limits).unwrap_err().path, expected, "{field}");
+        assert_eq!(
+            translate::items(&assignment, &settings.forges, &crate::forge::tokens::Tokens::empty(), &limits)
+                .unwrap_err()
+                .path,
+            expected,
+            "{field}"
+        );
     }
 }
 #[test]
@@ -210,7 +229,15 @@ fn an_empty_workspace_has_no_items() {
     let settings = fixtures::engine();
     let mut assignment = fixtures::assignment_with(fixtures::repository(7, b"acme", b"shop"));
     assignment.workspace.repositories = Box::new([]);
-    assert_eq!(translate::items(&assignment, &settings.forges, &fixtures::wire_limits()), Ok(None));
+    assert_eq!(
+        translate::items(
+            &assignment,
+            &settings.forges,
+            &crate::forge::tokens::Tokens::empty(),
+            &fixtures::wire_limits()
+        ),
+        Ok(None)
+    );
 }
 #[test]
 fn absent_parts_leave_the_roots_parts_empty() {
@@ -237,12 +264,15 @@ fn a_configured_identity_encodes_as_forgejos_kind() {
 }
 
 #[test]
-fn each_repository_item_carries_no_account_yet() {
+fn repositories_without_a_published_entry_carry_no_account() {
     for kind in [crate::settings::Kind::Forgejo, crate::settings::Kind::GitHub] {
         let mut forge = fixtures::forges().into_iter().next().unwrap();
         forge.kind = kind;
         let assignment = fixtures::assignment_with(fixtures::repository(7, b"acme", b"shop"));
-        let items = translate::items(&assignment, &[forge], &fixtures::wire_limits()).unwrap().unwrap();
+        let items =
+            translate::items(&assignment, &[forge], &crate::forge::tokens::Tokens::empty(), &fixtures::wire_limits())
+                .unwrap()
+                .unwrap();
         assert_eq!(*items.repositories().get(0).unwrap().account(), None, "{kind:?}");
     }
 }
@@ -252,7 +282,9 @@ fn a_repositorys_account_reaches_the_workers_domain() {
     let settings = fixtures::engine();
     let assignment = fixtures::assignment_with(fixtures::repository(7, b"acme", b"shop"));
     let limits = fixtures::wire_limits();
-    let original = translate::items(&assignment, &settings.forges, &limits).unwrap().unwrap();
+    let original = translate::items(&assignment, &settings.forges, &crate::forge::tokens::Tokens::empty(), &limits)
+        .unwrap()
+        .unwrap();
     let (mut expected, save) = translate::workspace(Some(&original));
     expected.repositories[0].account = Some(19);
     let mut repositories = List::with_capacity(1);

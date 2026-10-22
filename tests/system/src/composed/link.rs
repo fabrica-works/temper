@@ -40,7 +40,8 @@ pub fn assignment(assignment: &engine::Assignment) -> (host::Assignment, wire::W
         user: 1,
         identity: 1,
     }];
-    let items = translate::items(assignment, &forges, &v1::CEILINGS).expect("world workspace fits the payload");
+    let items = translate::items(assignment, &forges, &temper_service::forge::tokens::Tokens::empty(), &v1::CEILINGS)
+        .expect("world workspace fits the payload");
     let (repositories, save) = translate::workspace(items.as_ref());
     let workspace = items.map(|_| host::Workspace { workstream: assignment.workstream, items: Token::new(0) });
     let hub = host::Assignment {

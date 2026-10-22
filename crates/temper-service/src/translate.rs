@@ -25,6 +25,7 @@ pub fn limits(own: &crate::limits::Limits) -> Option<v1::Limits> {
 pub fn items(
     assignment: &engine::Assignment,
     forges: &[settings::Forge],
+    tokens: &crate::forge::tokens::Tokens,
     limits: &v1::Limits,
 ) -> Result<Option<v1::Items>, v1::Problem> {
     if assignment.workspace.repositories.is_empty() {
@@ -32,7 +33,7 @@ pub fn items(
     }
     let mut repositories = List::with_capacity(limits.items_repositories);
     for repository in &assignment.workspace.repositories {
-        let value = repository_item(repository, forges, limits)?;
+        let value = repository_item(repository, forges, tokens, limits)?;
         repositories.push(value).or(Err(problem(v1::Path::ItemsRepositories)))?;
     }
     Ok(Some(v1::Items::new(limits, v1::ItemsParts { repositories, save: None })?))
@@ -40,6 +41,7 @@ pub fn items(
 fn repository_item(
     repository: &engine::ForgeRepository,
     forges: &[settings::Forge],
+    tokens: &crate::forge::tokens::Tokens,
     limits: &v1::Limits,
 ) -> Result<v1::Repository, v1::Problem> {
     let mut configured = None;
@@ -77,7 +79,10 @@ fn repository_item(
             start: start(&repository.start, limits)?,
             access,
             identity: repository.identity,
-            account: None,
+            account: match forge.kind {
+                settings::Kind::GitHub => crate::forge::tokens::account(tokens, forge.number, &repository.owner),
+                settings::Kind::Forgejo => None,
+            },
         },
     )
 }
@@ -164,6 +169,55 @@ pub fn identity(identity: &settings::Identity, limits: &v1::Limits) -> Result<Se
             login: identity.login.clone(),
             name: identity.author.name.clone(),
             email: identity.author.email.clone(),
+        },
+    )?;
+    Ok(wire::identity(&value))
+}
+
+/// Encode a GitHub value with configuration's login and author or the App bot's defaults.
+pub fn github_identity(
+    entries: List<v1::Entry>,
+    login: &[u8],
+    author: &settings::Author,
+    slug: &[u8],
+    id: u64,
+    limits: &v1::Limits,
+) -> Result<Secret, v1::Problem> {
+    let name = if author.name.is_empty() {
+        let mut name = Writer::new(slug.len().checked_add(5).expect("bot name"));
+        name.put(slug).expect("slug room");
+        name.put(b"[bot]").expect("suffix room");
+        name.finish()
+    } else {
+        author.name.clone()
+    };
+    let email = if author.email.is_empty() {
+        let id = skein_lib::Decimal::of(id);
+        let suffix = b"[bot]@users.noreply.github.com";
+        let mut email = Writer::new(
+            id.as_bytes()
+                .len()
+                .checked_add(1)
+                .expect("separator")
+                .checked_add(slug.len())
+                .expect("slug")
+                .checked_add(suffix.len())
+                .expect("email"),
+        );
+        for part in [id.as_bytes(), b"+", slug, suffix] {
+            email.put(part).expect("measured email");
+        }
+        email.finish()
+    } else {
+        author.email.clone()
+    };
+    let value = v1::Identity::new(
+        limits,
+        v1::IdentityParts {
+            kind: v1::Kind::Github(v1::Entries::new(limits, v1::EntriesParts { entries })?),
+            login: if login.is_empty() { b"x-access-token".as_slice().into() } else { login.into() },
+            name,
+            email,
         },
     )?;
     Ok(wire::identity(&value))

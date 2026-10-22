@@ -16,17 +16,81 @@ pub(crate) fn credential_bytes(engine: &jig_protocol_config::Engine) -> u32 {
     }
     token
 }
+/// The engine's git identities' values (protocol/credentials.md, 4): two newest
+/// generations per number, each encoded once by temper-protocol-worker-wire.
+#[derive(Debug)]
+pub struct Identities {
+    entries: Map<u32, Generations>,
+}
+#[derive(Debug)]
+struct Generations {
+    generation: u64,
+    newest: Secret,
+    previous: Option<Secret>,
+}
+impl Identities {
+    /// Room for each configured identity's number.
+    #[must_use]
+    pub fn with_capacity(identities: u32) -> Self {
+        Self { entries: Map::with_capacity(identities) }
+    }
+    /// Keep the next generation, pushing out the older of the two retained values.
+    pub fn put(&mut self, number: u32, value: Secret) -> u64 {
+        if let Some(entry) = self.entries.get_mut(&number) {
+            entry.previous = Some(core::mem::replace(&mut entry.newest, value));
+            entry.generation = entry.generation.checked_add(1).expect("identity generations");
+            return entry.generation;
+        }
+        self.entries
+            .insert(number, Generations { generation: 1, newest: value, previous: None })
+            .expect("configured identity capacity");
+        1
+    }
+    /// Either of the two newest generations, or none for an older one.
+    #[must_use]
+    pub fn get(&self, number: u32, generation: u64) -> Option<&Secret> {
+        let entry = self.entries.get(&number)?;
+        if generation == entry.generation {
+            Some(&entry.newest)
+        } else if generation != 0 && generation.checked_add(1) == Some(entry.generation) {
+            entry.previous.as_ref()
+        } else {
+            None
+        }
+    }
+    /// The newest generation and its value.
+    #[must_use]
+    pub fn newest(&self, number: u32) -> Option<(u64, &Secret)> {
+        let entry = self.entries.get(&number)?;
+        Some((entry.generation, &entry.newest))
+    }
+    pub(crate) fn numbers(&self) -> List<u32> {
+        let mut numbers = List::with_capacity(self.entries.len());
+        for (number, _) in &self.entries {
+            numbers.push(*number).expect("identity count");
+        }
+        numbers
+    }
+    pub(crate) fn worst_case(count: u32) -> Option<u64> {
+        Map::<u32, Generations>::worst_case(count)
+    }
+}
 #[derive(Debug)]
 pub struct Values {
     pub accounts: Table,
-    /// Configured git identities, encoded once at generation one.
-    pub identities: Map<u32, Secret>,
+    /// The two newest encoded values of each configured git identity.
+    pub identities: Identities,
+    pub tokens: crate::forge::tokens::Tokens,
 }
 impl Values {
     /// Named source slots, bounded by the accounts driver.
     #[must_use]
     pub fn new(accounts: u32, token_bytes: u32) -> Self {
-        Self { accounts: Table::new(accounts, token_bytes), identities: Map::with_capacity(0) }
+        Self {
+            accounts: Table::new(accounts, token_bytes),
+            identities: Identities::with_capacity(0),
+            tokens: crate::forge::tokens::Tokens::empty(),
+        }
     }
 }
 
@@ -40,8 +104,7 @@ impl Values {
                 host::Form::Credential(_) | host::Form::Withdrawn => {
                     account_grant(grant.form, self.accounts.value(grant.account, grant.generation, now))
                 }
-                host::Form::Application if grant.generation == 1 => identity_grant(self.identities.get(&grant.account)),
-                host::Form::Application => None,
+                host::Form::Application => identity_grant(self.identities.get(grant.account, grant.generation)),
                 host::Form::Program(name) => Some(GrantValue::Program { name }),
             };
             values.push(value).expect("one slot per grant");
@@ -73,21 +136,23 @@ fn identity_grant(value: Option<&Secret>) -> Option<GrantValue> {
 impl Values {
     pub(crate) fn fill(
         &mut self,
-        identities: &[crate::settings::Identity],
+        settings: &crate::settings::Engine,
         limits: &temper_protocol_worker_wire::v1::Limits,
     ) -> Result<(), jig_protocol_config::Problems> {
         use jig_protocol_config::What;
-        self.identities = Map::with_capacity(u32::try_from(identities.len()).expect("identity count"));
+        let identities = &settings.identities;
+        self.tokens = crate::forge::tokens::Tokens::new(settings);
+        self.identities = Identities::with_capacity(u32::try_from(identities.len()).expect("identity count"));
         for identity in identities {
-            // GitHub's git-token generation and bot defaults arrive in temper-02.
+            // GitHub gathers tokens until its first Connected.
             if identity.token.expose().is_empty() {
                 continue;
             }
             let value = crate::translate::identity(identity, limits).or(Err(identity_problem(What::Bound)))?;
-            let previous = self.identities.insert(identity.number, value).or(Err(identity_problem(What::Bound)))?;
-            if previous.is_some() {
+            if self.identities.newest(identity.number).is_some() {
                 return Err(identity_problem(What::Duplicate));
             }
+            self.identities.put(identity.number, value);
         }
         Ok(())
     }

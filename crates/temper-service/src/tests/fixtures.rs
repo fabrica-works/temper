@@ -565,11 +565,11 @@ pub fn assignment_with_settings(
 }
 pub fn values_with_identity(number: u32, token: &[u8]) -> crate::values::Values {
     let mut values = crate::values::Values::new(2, 4096);
-    values.identities = skein_lib::Map::with_capacity(1);
+    values.identities = crate::values::Identities::with_capacity(1);
     let mut identity = engine().identities.into_iter().next().unwrap();
     identity.token = Secret::new(token.into());
     let value = crate::translate::identity(&identity, &wire_limits()).unwrap();
-    values.identities.insert(number, value).unwrap();
+    values.identities.put(number, value);
     values
 }
 pub fn application_grant(account: u32, generation: u64) -> jig_domain_host::Grant {

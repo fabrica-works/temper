@@ -110,7 +110,7 @@ impl Service {
         let mut values =
             values::Values::new(settings.jig.limits.driver.accounts, values::credential_bytes(&settings.jig));
         let wire = translate::limits(&settings.limits).ok_or(start_problem(b"limits", What::Bound))?;
-        values.fill(&settings.identities, &wire)?;
+        values.fill(&settings, &wire)?;
         let (forge_config, identities) = crate::forge::config(&settings, seeds.deployment);
         let mut first_periods = List::with_capacity(limits.authority.projects);
         for project in &settings.jig.projects {
@@ -818,11 +818,14 @@ fn memory(
     let identities = u32::try_from(settings.identities.len()).ok()?;
     let wire = translate::limits(&settings.limits)?;
     bytes = bytes
-        .checked_add(Map::<u32, skein_lib::Secret>::worst_case(identities)?)?
+        .checked_add(values::Identities::worst_case(identities)?)?
         .checked_add(List::<u32>::worst_case(identities)?)?
         .checked_add(
-            u64::from(identities).checked_mul(temper_protocol_worker_wire::v1::Identity::worst_case_bytes(&wire)?)?,
+            u64::from(identities)
+                .checked_mul(2)?
+                .checked_mul(temper_protocol_worker_wire::v1::Identity::worst_case_bytes(&wire)?)?,
         )?;
+    bytes = bytes.checked_add(crate::forge::tokens::worst_case(settings)?)?;
     if !settings.jig.llm.providers.is_empty() {
         let driver = settings.jig.limits.driver;
         bytes = bytes.checked_add(accounts::worst_case(&driver, queue.checked_mul(3)?, store.secrets.page.rows)?)?;
