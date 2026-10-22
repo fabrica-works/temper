@@ -6,4 +6,4 @@ waiting on: you: question of task 42 · 1 waiting
 acts:
   stop 41 --key NAME
   cancel 41 REASON --key NAME
-digest: task 81e9086ea1af2538
+digest: task 487472298fa1ca00

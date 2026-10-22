@@ -169,6 +169,122 @@ fn a_tracked_goal_shows_its_deadline_and_instruction_preview() {
     assert_golden("task_goal_tracked", f::read_answer(f::TASK_CALL, f::task_result(task)));
 }
 #[test]
+fn a_tasks_dependencies_show_their_states_and_added_facts() {
+    assert_golden("task_dependencies", f::read_answer(f::TASK_CALL, f::task_result(f::goal_with_dependencies())));
+}
+#[test]
+fn a_tasks_json_keeps_dependency_facts_in_document_order() {
+    let printed = f::read_answer(f::TASK_JSON_CALL, f::task_result(f::goal_with_dependencies()));
+    assert_eq!(printed.status, 0);
+    let from = skein_lib::bytes::find(&printed.stdout, b"\"dependency_facts\":").expect("dependency facts");
+    assert_eq!(&printed.stdout[from - 2..from], b"],");
+    let tail = &printed.stdout[from..];
+    let to = skein_lib::bytes::find(tail, b",\"references\":").expect("next field");
+    assert_eq!(
+        &tail[..to],
+        concat!(
+            "\"dependency_facts\":[",
+            "{\"number\":45,\"pending\":true,\"added\":{\"at\":1792645800000000000,\"by\":{\"task\":7}},\"keeps\":false,\"status\":null},",
+            "{\"number\":43,\"pending\":false,\"added\":null,\"keeps\":false,\"status\":\"done\"},",
+            "{\"number\":44,\"pending\":true,\"added\":{\"at\":1792645800000000000,\"by\":{\"person\":73}},\"keeps\":true,\"status\":null}]",
+        )
+        .as_bytes(),
+    );
+}
+#[test]
+fn a_task_without_dependencies_has_no_dependencies_line() {
+    let printed = f::read_answer(f::TASK_CALL, f::task_result(f::goal(f::TASK, c::WaitsOn::Nothing)));
+    assert_eq!(printed.status, 0);
+    assert!(skein_lib::bytes::find(&printed.stdout, b"dependencies:").is_none());
+}
+#[test]
+fn a_tasks_json_always_carries_dependency_facts() {
+    let printed = f::read_answer(f::TASK_JSON_CALL, f::task_result(f::goal(f::TASK, c::WaitsOn::Nothing)));
+    assert_eq!(printed.status, 0);
+    assert!(skein_lib::bytes::find(&printed.stdout, b"\"dependencies\":[],\"dependency_facts\":[]").is_some());
+}
+fn dependency_text(task: c::Task, expected: &[u8]) {
+    let printed = f::read_answer(f::TASK_CALL, f::task_result(task));
+    assert_eq!(printed.status, 0);
+    let from = skein_lib::bytes::find(&printed.stdout, b"dependencies:").expect("dependency lines");
+    let tail = &printed.stdout[from..];
+    let to = skein_lib::bytes::find(tail, b"\nwaiting on:").expect("next field");
+    assert_eq!(&tail[..to], expected);
+}
+#[test]
+fn stored_dependencies_use_only_their_supplied_status() {
+    for (status, expected) in [
+        (None, b"dependencies:\n  task 43".as_slice()),
+        (Some(c::OwnerTaskStatus::Done), "dependencies:\n  task 43 · Completed".as_bytes()),
+        (Some(c::OwnerTaskStatus::Failed), "dependencies:\n  task 43 · Failed".as_bytes()),
+        (Some(c::OwnerTaskStatus::Cancelled), "dependencies:\n  task 43 · Cancelled".as_bytes()),
+    ] {
+        let mut task = f::goal_with_dependencies();
+        task.dependencies = List::with_capacity(1);
+        task.dependencies.push(c::OwnerTaskLink::Stored { number: 43, status }).expect("stored dependency");
+        dependency_text(task, expected);
+    }
+}
+#[test]
+fn added_dependencies_use_requester_words() {
+    for (by, expected) in [
+        (c::OwnerRequester::Person(3), "dependencies:\n  task 45 · Waiting · added by party 3 at 2026-10-22 05:10 UTC"),
+        (
+            c::OwnerRequester::Deployment { project: 1 },
+            "dependencies:\n  task 45 · Waiting · added by deployment 1 at 2026-10-22 05:10 UTC",
+        ),
+    ] {
+        let mut task = f::goal_with_dependencies();
+        let link = task.dependencies.get(2).expect("retained dependency").clone();
+        task.dependencies = List::with_capacity(1);
+        task.dependencies.push(link).expect("one dependency");
+        task.dependency_facts.get_mut(0).expect("added fact").added.as_mut().expect("amendment").by = by;
+        dependency_text(task, expected.as_bytes());
+    }
+}
+#[test]
+fn dependency_facts_without_a_link_print_nothing() {
+    let mut task = f::goal_with_dependencies();
+    task.dependency_facts.get_mut(0).expect("added fact").number = 99;
+    dependency_text(
+        task,
+        concat!(
+            "dependencies:\n  task 43 · Completed",
+            "\n  task 44 · Running · added by you at 2026-10-22 05:10 UTC · keeps task 41 from ending",
+            "\n  task 45 · Waiting",
+        )
+        .as_bytes(),
+    );
+}
+#[test]
+fn dependency_keeps_is_independent_of_added() {
+    let mut task = f::goal_with_dependencies();
+    task.dependency_facts.get_mut(2).expect("keeping fact").added = None;
+    dependency_text(
+        task,
+        concat!(
+            "dependencies:\n  task 43 · Completed",
+            "\n  task 44 · Running · keeps task 41 from ending",
+            "\n  task 45 · Waiting · added by task 7 at 2026-10-22 05:10 UTC",
+        )
+        .as_bytes(),
+    );
+}
+#[test]
+fn dependency_lines_share_the_tasks_text_budget() {
+    let printed = f::read_answer(f::TASK_CALL, f::task_result(f::goal_with_dependencies_and_long_specification()));
+    assert_eq!(printed.status, 0);
+    assert!(printed.stdout.len() <= usize::try_from(crate::limits::TEXT).expect("text limit fits"));
+    assert!(skein_lib::bytes::find(&printed.stdout, b"bytes left\n").is_some());
+    assert!(
+        skein_lib::bytes::find(
+            &printed.stdout,
+            "task 44 · Running · added by you at 2026-10-22 05:10 UTC · keeps task 41 from ending".as_bytes(),
+        )
+        .is_some()
+    );
+}
+#[test]
 fn report_activity_names_phase_changes_without_history_positions() {
     let mut rows = List::with_capacity(ACTIVITY_ROWS);
     for (position, line) in [

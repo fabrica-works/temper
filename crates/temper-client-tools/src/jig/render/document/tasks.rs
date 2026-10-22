@@ -190,6 +190,12 @@ fn encode_task_from_person_revision(value: &jig_client::contract::Task, out: &mu
         super::encode_owner_task_link(item_9, out, budget);
     }
     out.array_end();
+    out.key(b"dependency_facts");
+    out.array_start();
+    for fact in &value.dependency_facts {
+        super::dependencies::encode(fact, out, budget);
+    }
+    out.array_end();
     out.key(b"references");
     out.array_start();
     for item_10 in &value.references {

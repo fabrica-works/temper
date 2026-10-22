@@ -204,17 +204,7 @@ fn task_text(
     out.put(b"\nasked: ");
     out.words(task.spec.specification.words.bytes());
     out.put(b"\nrequester: ");
-    match task.requester {
-        OwnerRequester::Person(party) => acts::party(party, me, out),
-        OwnerRequester::Task(task) => {
-            out.put(b"task ");
-            out.number(task);
-        }
-        OwnerRequester::Deployment { project } => {
-            out.put(b"deployment ");
-            out.number(u64::from(project));
-        }
-    }
+    requester(task.requester, me, out);
     out.put(b" \xc2\xb7 spent ");
     amount(task.budget.numbers.spent, out);
     out.put(b" of ");
@@ -229,6 +219,7 @@ fn task_text(
     if let Some(instructions) = &task.instructions {
         instruction_words::text(instructions, out);
     }
+    dependencies::text(task, me, book, out);
     llm::text_wait(task.run_wait, out);
     out.put(b"\nwaiting on: ");
     waiting(&task.waits_on, me, book, out);
@@ -258,6 +249,19 @@ fn task_text(
         }
     }
     acts::text(task, me, book, out);
+}
+fn requester(value: OwnerRequester, me: Option<&Me>, out: &mut Text) {
+    match value {
+        OwnerRequester::Person(party) => acts::party(party, me, out),
+        OwnerRequester::Task(task) => {
+            out.put(b"task ");
+            out.number(task);
+        }
+        OwnerRequester::Deployment { project } => {
+            out.put(b"deployment ");
+            out.number(u64::from(project));
+        }
+    }
 }
 fn project(number: u32, me: Option<&Me>, out: &mut Text) {
     if let Some(me) = me {
@@ -533,6 +537,7 @@ pub(crate) mod waiting;
 pub(crate) mod accounts;
 
 mod clock;
+mod dependencies;
 mod instruction_words;
 mod result_words;
 use result_words::text as result_text;

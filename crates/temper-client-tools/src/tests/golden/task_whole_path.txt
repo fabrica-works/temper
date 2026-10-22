@@ -6,6 +6,6 @@ resource: src/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 acts:
   stop 41 --key NAME
   cancel 41 REASON --key NAME
-digest: task 0a53f595b32631af
+digest: task 33f68b6b63da0c1c
 
 57 bytes left
