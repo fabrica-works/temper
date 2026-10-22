@@ -130,7 +130,10 @@ pub fn request(
     let mut reader = skein_lib::Reader::new(&ask.bytes);
     let a = (match v1::Requesting::decode(&limits, &mut reader).expect("whole adoption bytes").into_parts().request {
         v1::Request::Adopt(adopt) => adopt,
-        v1::Request::SetUp(_) => panic!("expected adoption"),
+        v1::Request::SetUp(set_up) => {
+            assert!(reader.is_empty(), "whole setup request");
+            return set_up_request(transport, who, attempt, key, scope, ask, set_up.forge());
+        }
     })
     .into_parts();
     assert!(reader.is_empty());
@@ -185,6 +188,14 @@ pub fn open(
     use jig_client_test_domain::family;
     use jig_client_world::joint::transport::Watched;
     use temper_client_protocol_wire::{self as w, v1};
+    if record.family == w::FORGE
+        && record.version == w::CLIENT_VERSION
+        && let Some(watching) = w::decode_watching(&record.bytes, &v1::CEILINGS)
+        && *watching.watch() == v1::Watch::Forges
+        && scope == jig_client::contract::Scope::Deployment
+    {
+        return open_forges(transport, who, watch, window);
+    }
     if record.family == w::FORGE
         && record.version == w::CLIENT_VERSION
         && let Some(watching) = w::decode_watching(&record.bytes, &v1::CEILINGS)
@@ -313,6 +324,7 @@ pub fn incoming(
     };
     let (to, body) = match delivery {
         Delivery::Panel { watcher, panel } => return Ok(delivered(transport, watcher, *panel)),
+        Delivery::Forges { watcher, forges } => return Ok(delivered_forges(transport, watcher, forges)),
         Delivery::WatchEnded { watcher, why } if is_application(transport, watcher) => {
             return Ok(ended(transport, watcher, wire::watches::ended(why)));
         }
@@ -351,8 +363,7 @@ pub fn incoming(
                 },
             )));
         }
-        delivery @ (Delivery::Forges { .. }
-        | Delivery::SourceSignedOut { .. }
+        delivery @ (Delivery::SourceSignedOut { .. }
         | Delivery::Result { .. }
         | Delivery::Host(_)
         | Delivery::Link { .. }
@@ -411,6 +422,94 @@ fn answered(route: &Reply, body: Option<owner::Answered>) -> (ClientId, client::
             },
         },
     )
+}
+
+fn set_up_request(
+    transport: &mut Transport,
+    who: ClientId,
+    attempt: Token,
+    key: [u8; 16],
+    scope: jig_client::contract::Scope,
+    record: &jig_client::Family,
+    forge: u16,
+) -> engine::Event {
+    let reply_to = transport.reply_to(Reply::Keyed {
+        client: who,
+        attempt,
+        key,
+        owner: KeyedOwner::Application { connector: crate::fixtures::FORGE },
+    });
+    engine::Event::Party(PartyInput::Application {
+        scope: match scope {
+            jig_client::contract::Scope::Deployment => jig_domain_people::ApplicationScope::Deployment,
+            jig_client::contract::Scope::Project(project) => jig_domain_people::ApplicationScope::Project(project),
+            jig_client::contract::Scope::Own => jig_domain_people::ApplicationScope::Own,
+        },
+        reply_to,
+        sign_in: transport.sign_in(who).expect("authenticated setup"),
+        key,
+        digest: skein_lib::sha256::digest(&record.bytes),
+        carried: None,
+        request: owner::Ask::SetUp { forge },
+    })
+}
+fn open_forges(
+    transport: &mut Transport,
+    who: ClientId,
+    watch: Token,
+    window: &jig_client::contract::Window,
+) -> (Vec<engine::Event>, Option<jig_client_world::joint::packets::Incoming>) {
+    use jig_client_test_domain::family;
+    let scope = jig_domain_people::ApplicationScope::Deployment;
+    let watcher = transport.open(
+        who,
+        watch,
+        jig_client_world::joint::transport::Watched::Application {
+            subject: family::Subject { scope: family::Scope::Deployment, kind: family::Kind::Deployment },
+            scope,
+        },
+    );
+    (
+        vec![engine::Event::Party(PartyInput::Watch {
+            watcher,
+            sign_in: transport.sign_in(who).expect("authenticated forges watch"),
+            subject: jig_domain_core::documents::Watched::Application {
+                scope,
+                connector: temper_client_protocol_wire::FORGE,
+                subject: Token::new(0),
+            },
+            window: jig_domain_core::documents::Window { rows: window.rows, after: None },
+        })],
+        None,
+    )
+}
+fn delivered_forges(
+    transport: &mut Transport,
+    watcher: Token,
+    forges: owner::Forges,
+) -> Option<(ClientId, client::Event)> {
+    if !is_application(transport, watcher) {
+        return None;
+    }
+    let route = transport.watch(watcher).expect("original forges route").clone();
+    let bytes = temper_service::family::forges(forges, &temper_client_protocol_wire::v1::CEILINGS)
+        .expect("whole forges document");
+    assert!(transport.delivered(watcher, jig_client_world::joint::transport::Pace::Document));
+    Some((
+        route.client,
+        client::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::FamilyDelivered {
+                    watch: route.native,
+                    record: jig_client::Family {
+                        family: temper_client_protocol_wire::FORGE,
+                        version: temper_client_protocol_wire::CLIENT_VERSION,
+                        bytes,
+                    },
+                },
+            },
+        },
+    ))
 }
 
 #[cfg(test)]
