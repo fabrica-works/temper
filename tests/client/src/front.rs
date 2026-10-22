@@ -43,6 +43,8 @@ fn engine_limits() -> engine::Limits {
     let mut limits = temper_engine_domain_world::fixtures::forge_limits();
     // The world's own bound, not production's: automatic Seen takes a key per arrival.
     limits.people.requests = 5;
+    // A goal's driver plus two clients, as a fresh client at an address beside the person's.
+    limits.people.sign_ins = 3;
     let tools = temper_client_tools::limits::client().client.domain;
     // Frame project allocations must also fit the smaller tools project bound.
     limits.documents.lines = limits.documents.lines.min(tools.projects);
@@ -123,7 +125,6 @@ impl Joint {
             assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
             config.core.authority = domain;
             let mut engine_limits = engine_limits();
-            engine_limits.people.sign_ins = 3;
             engine_limits.fleet.slots = 2;
             engine_limits.fleet.attempts = 4;
             engine_limits.journal.writes = 4096;

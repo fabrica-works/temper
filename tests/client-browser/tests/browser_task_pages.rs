@@ -1,6 +1,7 @@
 //! Real task addresses, a fresh open and the lineage bar, on a procedure's plan (client/README.md,
 //! 5.10), through `temper box`'s demo and its own fakes. The terminal-side proofs of the same pages
-//! are tests/client's `tests/task.rs` and `tests/b2.rs` (roadmap B2) and the agent's page golden
+//! are tests/client's `tests/task.rs`, `b2::roadmap_b2_through_the_task_pages` (including a fresh
+//! client at a delegate's address), and the agent's page golden
 //! `crates/temper-client-shell-terminal/src/tests/golden/agent_task.txt`. `crates/temper/tests/qa_delegation.rs`
 //! opens Task 2 in a box too, but has been broken on main since a2d78e2a4 (its "Task 2" link prints
 //! an outward mark the typist does not match), so it is cited, not relied on. The browser alone
@@ -53,7 +54,7 @@ fn a_procedures_plan_reaches_its_agent_and_back_by_address() {
         press(task(b"Task 2")),
         Step::Address(b"/tasks/2".as_slice().into()),
         see(heading(2, b"Its tasks")),
-        // 5: no terminal match: a fresh browser client opens at its address and receives its first read.
+        // 5: b2::roadmap_b2_through_the_task_pages starts a fresh client at a delegate's address.
         Step::Person(PersonStep::Go { address: b"/tasks/3".as_slice().into() }),
         see(heading(1, agent)),
         see(Find::exactly_named(Role::Region, b"Task brief")),

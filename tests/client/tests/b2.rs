@@ -31,6 +31,18 @@ fn roadmap_b2_through_the_task_pages() {
     world.person(person, see_the_goals_report_and_settled_budget(&report, budget));
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+
+    // A fresh client proves the root's part of opening a delegate by its address.
+    let fresh = world.client(fixtures::PARTY, fixtures::task_page(planned.second));
+    world.person(
+        fresh,
+        vec![
+            see(task_heading(planned.second, b2::SECOND_BRIEF)),
+            see(Find::exactly_named(Role::Region, b"Task brief")),
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
 }
 
 fn open_advisors_result_and_return(advised: &b2::Advised) -> Vec<Step<Address>> {
