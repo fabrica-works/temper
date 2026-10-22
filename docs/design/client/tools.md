@@ -168,7 +168,7 @@ watch's subject, its digest (5.4). It needs no key.
 |---|---|---|
 | `me` | the party, its projects with their roles and pools, what waits for it counted, the bounds of what it may create, configured provider offers and key-byte ceilings, the retention | `me` |
 | `inbox [--project P] [--kind K] [--root N] [--after C]` | what needs the party, then updates, each with its acts | `inbox` |
-| `tasks --project P [--label chat\|goal] [--tracked] [--mine] [--ended] [--order activity\|priority] [--after C]` | task lines of one group: the live tasks, or with `--ended` the ended | `tasks{query}` (jig's `client/domain/contract.md`, 6.1) |
+| `tasks --project P [--parent N] [--label chat\|goal] [--tracked] [--mine] [--ended] [--order activity\|priority] [--after C]` | task lines of one group: the live tasks, or with `--ended` the ended; with `--parent`, task N's delegates alone | `tasks{query}` (jig's `client/domain/contract.md`, 6.1, its parent key) |
 | `task N [--tree] [--activity K] [--run]` | a task's document, with its acts; with its live tree, its K latest activity lines, its live run, in one answer | `task{n}`, `tree{root}`, `activity{n}`, `run{n}` |
 | `chat N [--before C]` | a conversation: turns, words and, where the run's host gives it, provisional text, in order, a page from its end | `activity{n}`, `run{n}`, through `thread` |
 | `activity N [--before C] [--limit K]` | a task's activity, a page from its end | `activity{n}` |
@@ -669,9 +669,14 @@ digest: task 7c1e09a2b44f0d13
   holds, a chip a line. The engine answers the tools' window within its
   own rows (jig's `client/domain/contract.md`, 7.2), so a tree larger
   than either folds the rest, and its text says so on one line after
-  the rows: `cut: 3 more not shown (2 Running, 1 Waiting)`, the folded
-  tasks' count, then each phase that has any, in a chip's words and
-  jig's order of phases. With nothing folded, no line. Under `--json`,
+  the rows: `cut: 3 more not shown (2 Running, 1 Waiting); read on
+  with: tasks --project 1 --parent 41`, the folded tasks' count, then
+  each phase that has any, in a chip's words and jig's order of phases,
+  then the call that lists the root's delegates, the project's number
+  from the root's document. A tree's window opens at its start only
+  (jig's wire carries no cursor for it), so the rest is read as the
+  root's delegates, a page at a time by `--after`, and each one's tree
+  by `task M --tree`. With nothing folded, no line. Under `--json`,
   `more` and `folded` as the document carries them.
 - **An activity page** cut before its first row (jig's
   `protocol/store.md`, 7.3) prints no rows and its `read on with:` call,
@@ -1184,7 +1189,8 @@ rows below the tools' 32-row window: a goal with more delegates than
 those rows, one of them ended with an ended dependency, and `task N
 --tree` answering within a second, cut and saying so, and `activity N
 --json` of the ended one answering its rows, newest first, and reading
-on to its first. Its fixture sets that bound itself, whatever the
+on to its first; the tree's `cut:` line's call followed, page by page,
+to the last delegate. Its fixture sets that bound itself, whatever the
 others' fixtures raise.
 
 ### 11.4 The process tier
