@@ -273,7 +273,11 @@ socket in its directory (director decision 503; skein's
   It is serve's second: once the seed's `ctl` has spent the first, a
   spent link presented again is refused and serve prints a fresh one
   (jig's `protocol/client.md`, section 8), which the runner awaits
-  after that action; no change of temper's (decision 503).
+  after that action (skein's `lab.md`, 4.5); no change of temper's
+  (decision 503). A second `ctl` of the seed's presents it, from a
+  directory of its own, so that the browser signs in once, by the
+  fresh link, and its trouble holds nothing else of the seed's
+  (`lab/README.md`, "The cluster in the browser").
 - **One origin:** it goes only to paths on serve's origin, and a link to
   another host is not followed and says so. So the tool's endpoint is
   its own, as skein's `lab.md`, 6.2 asks of a tool.
@@ -353,8 +357,9 @@ signed in and on temper's first page, and nothing of the pages' paths.
   promises, the story's end.
 - **The browser's trouble:** a check reading the browser's log, failing
   `browser/<kind>/<page>`: the kind an exception, a console error, a
-  policy violation or a dialog; the page by its route's name, never its
-  number.
+  policy violation, a dialog or a request off the origin; the page by
+  its route's name, never its number. The entries of the seed's
+  sign-in calls are left out, by the call they came during.
 - **The report's use failures** (skein's `lab.md`, 6.4): a step the
   agent could not see how to take on a page is that page's finding, of
   its words or its order.

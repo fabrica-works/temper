@@ -430,3 +430,155 @@ check on a transcript that stays in its directory and on ones that
 leave it, use another tool or see a forbidden name.
 The checks' own decisions are skein's, tested there on capture
 fixtures.
+
+# The cluster in the browser
+
+`cluster-web/` is `cluster/`'s cluster with temper's browser bundle
+served and a person's browser beside it, the hand
+(`docs/design/draft/qa-web.md`, section 6; skein's
+`docs/design/lab-browser.md`, section 8): the browser signed in as the
+deployment's owner, and a scripted story, the smoke, driving it
+through `browse`. It has no driver: it is the free smoke W2's later
+experiments stand on, and it costs no model call.
+
+## Its files
+
+- **`cluster/`'s, copied:** `llm.json`, `chat.txt`, `agent.json`,
+  `w1.*`, `w2.*` and `forge-1.*` byte for byte; `engine.json` but for
+  `application.clients.bundle`, `"{proc.engine.dir}/bundle"` where
+  `cluster/`'s is null. `experiment.json`'s processes `llm`, `engine`,
+  `w1` and `w2` are `cluster/`'s member for member, but for `engine`'s
+  `files`, which add the bundle's tree, `{"path": "bundle", "tree":
+  "bundle"}` (skein's `lab.md`, 4.3). Copies, not names: an
+  experiment's digest is its own directory's tree (skein's `lab.md`,
+  2.3), so an experiment that named another's files would run with
+  bytes its key does not hold, and the runner would need a new
+  identity rule; a test holds the copies equal instead (below), and
+  `cluster/` and its Rust reader stay as they are, with no Chromium.
+- **`browser`,** after `engine`: `{browser.program} hand --chromium
+  {browser.chromium} --fonts {browser.fonts} --scratch
+  {proc.browser.dir} --out {dir.hand} --origin
+  http://{proc.engine.ready.clients} --size 1440x900 --listen
+  127.0.0.1:0`, `env` `{}`, `memory_bytes` null, ready by `listening `
+  on its stdout, captured as `address`. At a desktop width: at 760 px
+  and under, the banner's "Sign out" and the navigation sit in a closed
+  disclosure, "Menu".
+- **`dirs`:** `client`, the seed's `temper ctl` directory; `spent`, the
+  directory of the `ctl` that presents the spent link; `hand`, the
+  browser's `--out` (its `trouble.jsonl` and its shots).
+- **`cost`:** `temper-m1-calibration`, `cluster/`'s (`qa.md`, 10.1): 60 s
+  to be ready, 120 s a command, 10 s to stop.
+- **`relink`, `smoke` and `checks/trouble`,** below.
+
+## The seed
+
+Each `{artifact.temper} ctl` action is `qa.md`'s, 5.1. In order:
+
+| Action | Its argv | Its stdin | For |
+|---|---|---|---|
+| `sign-in` | `{artifact.temper} ctl {dir.client} sign-in -` | `http://{proc.engine.ready.link}` | the owner signs in by serve's printed link, which spends it |
+| `add-key` | `{artifact.temper} ctl {dir.client} add-key 1 {proc.llm.dir}/llm.key --deployment --key cluster-web-llm` | | the fake model's key |
+| `usable` | `{artifact.temper} ctl {dir.client} wait accounts --until usable --timeout 100` | | the account usable |
+| `relink` | `/bin/sh {experiment}/relink {artifact.temper} {dir.spent}` | the spent link again | serve refuses it and prints a fresh one, the action's awaited line: `{"process": "engine", "stream": "stdout", "prefix": "http://", "capture": "link"}` (skein's `lab.md`, 4.5) |
+| `browser-sign-in` | `{runner}/hand/sign-in {proc.browser.ready.address}` | `http://{action.relink.link}` | the browser opens the fresh link |
+| `signed-in` | `{runner}/hand/browse {proc.browser.ready.address} wait heading Chats --exact --timeout 60` | | the chats page, signed in |
+| `smoke` | `/bin/sh {experiment}/smoke {runner}/hand/browse {proc.browser.ready.address}` | | the story (below) |
+
+- **A second `ctl` presents the spent link,** not the browser. The
+  browser then signs in once, by the fresh link, so its trouble holds
+  nothing the seed caused but its `sign-in` call's, which the entries'
+  `during` names and the check leaves out (skein's `lab-browser.md`,
+  8.7). A browser shown
+  the spent link would show the signed-out page, and what that page
+  logs after the call's load comes between calls, which the log cannot
+  tell from the pages' own. It is also the product's way to a fresh link
+  (`docs/design/client/README.md`, 11, "A fresh link from the client").
+  The browser's page for a spent link is a story of its own, for the
+  browser tier (`docs/design/client/browser.md`, 2.4).
+- **`relink`,** POSIX sh: runs `TEMPER ctl DIRECTORY sign-in -` with
+  its own stdin, and exits 0 when that exits 1 with `the sign-in link
+  was refused` on its stderr; otherwise it exits 1, saying what it saw.
+  The link is never an argument: it reaches `ctl` on stdin alone, and
+  the browser through `hand/sign-in`'s.
+- **The links in the record:** the first is `engine`'s ready capture,
+  the second `relink`'s awaited capture, both in `run.json`, and both
+  are spent before the smoke starts. What shows a run (a report, a
+  finding's evidence) shows each query as `<link>` (skein's
+  `lab-browser.md`, 8.6).
+
+## The smoke
+
+`smoke BROWSE ADDRESS`, POSIX sh: each step one `browse` call, its
+output printed, and the story ends at the first that does not exit 0,
+with its status, which fails the action (`action/smoke/exit:1`, skein's
+`lab.md`, 7.1). Each expectation is a `wait`, 60 seconds at most, so a
+missed one exits 1 (lab-browser.md, 8.8). The roles are the fake
+person's; the names are o/web-look's words for the pages:
+
+1. `type "text area" "Start a chat"`, its text `cluster-first-chat`,
+   the fake model's cue (`cluster/llm.json`); `press button Start
+   --exact`.
+2. `wait log Conversation`, the chat's page; `wait text "First worker
+   replied." --in log Conversation`: its reply, live.
+3. `address`: the chat's, `/chats/<task>` on the origin, kept.
+4. `go /chats`, `wait heading Chats --exact`; `go` the chat's path,
+   `wait text "First worker replied." --in log Conversation`: its page
+   by its address.
+5. `reload`, the same wait; `shot`.
+6. `back`, `wait heading Chats --exact`; `address`, which must be
+   `/chats` on the origin, or the story exits 1.
+
+## The browser's trouble
+
+The check `trouble` (`qa-web.md`, 8.1): `/usr/bin/python3 -I -B -S
+{experiment}/checks/trouble {collected.hand}/trouble.jsonl`, after the
+live collection `hand`, `/bin/cp -R -- {dir.hand}/. {collect.dir}/.`.
+
+- **Each entry fails `browser/<kind>/<page>`:** its kind as the hand
+  logs it (an exception, a console error, a policy violation, a dialog,
+  a request off the origin: skein's `lab-browser.md`, 8.7), and its
+  page by its address's route, by temper's address codec
+  (`docs/design/client/browser.md`, 2.3): `inbox`, `chats`, `accounts`,
+  `chat`, `task`, `adopt`; `sign-in` for the link's route; `blank` for
+  `about:blank`; `other` for any other path, and `off-origin` for an
+  address off serve's origin. Never a task's or a project's number.
+- **One line a signature,** its summary the entries' count and the first
+  one's text, as the hand redacted it.
+- **Left out:** the entries whose `during` is `sign-in`, the seed's
+  calls.
+- **Statuses** (skein's `lab.md`, 7.2): 0 with no entry left; 1 with
+  one; 2, undecided, when the log is missing or a line unreadable, its
+  failures printed beside.
+- **The codec's table is copied** into the check: a page the codec
+  gains names itself `other` until the table follows it.
+
+## The subject and the command
+
+```sh
+lab/cluster-web-judge SKEIN
+```
+
+From a clean temper checkout at its commit C, as `look-judge` (above):
+builds `temper` (release) and the browser bundle
+(`scripts/bundle.sh --release`) through `heavy`, packs the bundle's
+directory as `look_pack.py` packs the gallery, makes the subject
+(`lab subject --repository TEMPER --commit C --exclude lab --artifact
+temper=… --artifact bundle=…`), validates `cluster-web`, and runs
+skein's `lab judge` on it: three seeds, printing the key and the
+verdict. The lab's `settings.json` names the browser and the cost
+class. It runs on demand, never in the gate; its transcripts are
+evidence, never goldens.
+
+## Its tests
+
+- **`lab/tests/unit/test_cluster_web.py`,** in the gate, pure: the
+  copies equal `cluster/`'s, `engine.json` but for its bundle's line,
+  and the four processes but for `engine`'s tree; `browser` and the
+  seed as above; the check's decisions: the page of each route and of
+  the others, the seed's sign-in left out, one line a signature, the
+  statuses, an unreadable line.
+- **`lab/tests/process/test_cluster_web.py`,** on demand: `relink` and
+  `smoke` under the real shell against stand-ins for `temper ctl` and
+  `browse`: the refusal taken, every other exit refused, the smoke's
+  calls in order, and a missed wait or a wrong address ending it with
+  1.
