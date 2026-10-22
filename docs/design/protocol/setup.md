@@ -388,7 +388,10 @@ it, and nothing but the setup host writes what it makes.
   `api_token`, `git_token`, `user` or `webhook_secret` file, from a
   temper before the records, is not read, and reconcile makes what is
   missing afresh (section 3). Each item reconcile writes is kept as the
-  forge's record; a kept `WebhookSecret` is never drawn again.
+  forge's record; a kept `WebhookSecret` is never drawn again. The one
+  departure, until `TakeOver` and the records reach Forgejo: a fake
+  forge's start-time adoption (8.4) is answered from its handover and
+  its `webhook_secret` file.
 
 ### 5.4 Access at adoption
 
@@ -402,6 +405,10 @@ it, and nothing but the setup host writes what it makes.
   is shown as that scope missing, named with its step.
 - **At each start,** reconcile's step 6 checks each adopted
   repository's access, and repairs what changed.
+- **A fake forge,** until this section is built: its repositories are
+  its entry's, so the setup host runs `Adopt` for each of them at the
+  engine's start, before the forge connects, in place of each
+  adoption's (8.4, the fake's start-time adoption).
 - **Nothing org-wide:** the bot reaches the repositories adopted, a
   person's own among them, and no other.
 - **A connected Forgejo, and a managed one forgotten,** grant nothing at
@@ -1159,9 +1166,13 @@ directory is empty (7.1).
     refused, naming it and the document, as any start is;
   - *the forges' ports:* 8368, forge 3's, the owned Forgejo's (8.3);
     8369, the fake forge's, and 8370, the fake LLM's (8.4), each by the
-    same rule. The four sockets, the clients' and these three, are held
-    until all four ports are chosen, so that no two are the same, then
-    closed.
+    same rule;
+  - *the webhooks' listener's port:* 8371, by the same rule (8.3). The
+    five sockets, the clients', these three and the webhooks', are held
+    until all five ports are chosen, so that no two are the same, then
+    closed. The port is written fixed, since the setup host gives the
+    hook's address from the document at its start (5.3); a listener
+    bound to port 0, its hooks given the address it reports, is later.
 - **What it says,** on stderr: `init: wrote <path>` for each file;
   `init: no bundle at <path>: the browser is not served` when there is
   none; `init: no git on PATH: a real forge's repositories need git
@@ -1188,7 +1199,7 @@ directory is empty (7.1).
   crate tests, on scratch directories, check that the document init writes
   passes configuration.md, section 8, as `temper serve` checks it, with
   the agent's configuration it writes, at the fixed ports and at kernel's
-  ports, the four always distinct, with and without `claude`, a bundle and
+  ports, the five always distinct, with and without `claude`, a bundle and
   git; each refusal writing nothing, the person's fallback login among
   them; the files' modes; and the link's target. The process tier starts a
   box on empty directories (13.4).
@@ -1225,8 +1236,13 @@ defaults for a person's real work are open (section 16).
     person the one init finds, `LOGIN@localhost`, with the org `work`
     (8.2).
 
-  No webhooks' listener: reconcile registers no hook, so the fake has
-  none to deliver to, forge 3 polls (forge.md, section 6), and GitHub's
+- **The webhooks' listener,** `application.webhooks.listener`,
+  `127.0.0.1:<its port>` (8.2), and forge 1's `webhook_secret`,
+  `demo/forge/webhook_secret`, which the box's `temper forge reconcile`
+  step draws before `temper serve` reads it (section 10). The fake's
+  start-time adoption hooks the demo's repository to the listener (8.4).
+  Forge 3 names no secret, so it gets no hook until access at adoption
+  is built for an owned forge, and polls (forge.md, section 6); GitHub's
   hints come from its App's delivery log.
 - **Its LLM providers:** the owned example's `engine.llm`, whole (8.1),
   with no account; and 3, Demo, the demo model's (8.4): one endpoint,
@@ -1282,8 +1298,9 @@ staged. The chat delegates a change on `demo/widget`; its coding agent
 edits a file; the worker commits and pushes the branch with `temper
 fake git`, on the fake forge's git route; the change opens its pull
 request, passes the fake's CI and lands into `main`; and the chat says
-so. The other suggestions answer in text. The engine polls the fake,
-since the box has no webhooks' listener (8.3).
+so. The other suggestions answer in text. The engine hears the fake by
+its deliveries to the box's webhooks' listener (8.3), and polls beside
+them as it does any Forgejo.
 
 - **`application.demo`,** or null for none:
 
@@ -1451,23 +1468,61 @@ since the box has no webhooks' listener (8.3).
 
   The bot is reconcile's, and its access to a repository the adoption's
   collaborator grant, which reaches the fake's domain (skein's
-  `fake-forge.md`, section 4): the seed grants nothing. Until access at
-  adoption is built (5.4), a fake's reconcile stands in for it: its
-  repositories (5.3) are the fake's own, `fake.repositories`, adopted
-  or not, so its step 6 makes the bot a collaborator with write on each
-  before the engine serves, through the forge's own route, and an
-  adoption finds the write it needs. It makes no hook, the box having
-  no listener. It goes with `Adopt` on Forgejo. It serves its
+  `fake-forge.md`, section 4): the seed grants nothing, and the
+  engine's setup host grants it, by `Adopt` (below). It serves its
   git route among its routes (skein's `fake-forge.md`, section 4), and
   no git smart HTTP; it keeps no state across its starts.
+- **The fake's start-time adoption,** in `temper serve`'s setup host,
+  until access at adoption (5.4) and `TakeOver` on Forgejo are built:
+  - *when:* at each start, once the records are loaded, `Adopt {
+    forge, repository }` for each of `fake.repositories`, numbered
+    from 1 in the list's order as the fake numbers them, one after
+    another, since a forge runs one writing plan at once (5.1). Each
+    makes the bot a collaborator with write, and, when the deployment
+    has a webhooks' listener and the forge a `webhook_secret`, the
+    repository's hook at `http://<listener>/hooks/<number>` with that
+    secret. `Adopt` reads before it writes, so a later start finds each
+    done, or repairs it: reconcile's step 6 at each start, for the fake
+    (5.4);
+  - *its given values:* temper-forge-setup's for a Forgejo entry, the
+    same mapping as an owned forge's (5.3); the listener only when the
+    forge names its `webhook_secret`, else none and no hook, since a
+    secret `Adopt` drew would be a record the forge's connection, still
+    built from its files, never reads;
+  - *its answers:* the admin's token is the handover, the entry's
+    `admin_token`, 40 lowercase hexadecimal digits, read once at the
+    start, refused otherwise, naming the file; the setup host holds it
+    as a pasted value until the start's adoptions end, then drops it,
+    and leaves the file, which the box's `temper forge reconcile` step
+    and each later start read. The webhooks' secret is the forge's
+    `webhook_secret`, the file `temper serve` reads at its start. Any
+    other read is answered from the forge's records, none on a fake,
+    and a write is kept as one (5.1);
+  - *the connect:* the forge's connection starts without its access,
+    not connected; once its adoptions end done, the setup host connects
+    it with the access built from its files, so that an adoption finds
+    the write it needs. Until then an adoption is refused as not
+    connected, which the seed's act 4 makes again (below). One that
+    stops leaves the forge not connected, named with its step, as a
+    start's reconcile does (5.1); the engine and every other forge run
+    on;
+  - *what stays:* the box's `temper forge reconcile` step makes the bot
+    and its tokens into the forge's files, and the webhooks' secret
+    when the document names a listener, with no repository adopted, as
+    before the records (configuration.md, section 6); `temper serve`
+    runs no `Reconcile` on a fake, whose steps 2 to 4 would replace
+    those files' tokens, until the records reach Forgejo. `temper forge
+    fetch` and `run` still refuse a fake, "it is fake, not owned".
 - **Its deliveries follow the setup's hooks** (skein's `fake-forge.md`,
   section 4): each event goes to each hook a repository's setup holds
-  that takes it, signed by that hook's secret. Reconcile makes a
-  repository's hook at adoption when the deployment has a webhooks'
-  listener (section 10), at `http://<listener>/hooks/<number>`, so the
-  fake reaches serve's listener as a Forgejo does. The box has no
-  webhooks' listener (8.3), so it registers none and polls; the QA
-  loop's serve has one, on loopback.
+  that takes it, signed by that hook's secret. A repository's hook is
+  made at adoption when the deployment has a webhooks' listener
+  (section 10), at `http://<listener>/hooks/<number>`, so the fake
+  reaches serve's listener as a Forgejo does: a push, a pull request's
+  change, CI's end and the merge each send one. The box's listener is
+  on loopback (8.3), and its fake draws no loss and no latency; it
+  records no delivery, being `without_records`. The QA loop's serve
+  has one too, on loopback.
 - **`temper fake git`,** no step: the demo forge's git, which the
   worker spawns for the fake's repositories by the program their
   records name, the fake entry's `git`, the demo's link (8.2; channel.md,
@@ -1986,6 +2041,16 @@ relies on.
   connect, the row "Connecting" between; a stop leaving the forge not
   connected, named; `failed` leaving it "Set up failed" with its reason;
   with no pipe, the row naming the commands (6.5).
+- **The fake's start-time adoption** (8.4), in temper-service's step
+  tests: at the start, one `Adopt` for each of the fake entry's
+  repositories, in order, its given listener the webhooks' when the
+  forge names a secret and none otherwise; the admin's token answered
+  from the handover and the secret from the forge's file; the forge
+  not connected until the last ends done, then connected with its
+  files' access; a stop leaving it not connected, named; a handover not
+  40 lowercase hexadecimal digits refused, naming it. `temper-init`'s
+  step tests check the document's listener and forge 1's secret, and
+  the binary's crate tests the five ports distinct.
 
 ### 13.2 Reconcile's world
 
@@ -2094,7 +2159,10 @@ it checks of this document:
   change landed, its delegated task ended landed, and the test's own
   clone of `demo/widget` by the demo's link, run as the worker runs
   git, holds `main` one commit past the seeded head, its `src/main.rs`
-  the coding agent's edit (8.4). It lands on polls alone, within the
+  the coding agent's edit (8.4). It lands by the fake's deliveries:
+  `demo/widget` holds one hook, at the box's webhooks' listener, which
+  the test reads on the fake's API with the handover's token, and the
+  story ends well within the time it took on polls alone, within the
   tier's budget. A second box on the same directories signs in again,
   its seed finding its acts done, and its clone holds the seeded head,
   since the fake keeps no state across its starts.

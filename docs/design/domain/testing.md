@@ -533,8 +533,8 @@ and 10).
   prints a sign-in link that signs the owner in; the demo's suggested
   change, sent to the project's chat, is delegated, pushed by `temper
   fake git`, checked and landed into the fake's `main` on the demo
-  model, on polls alone, and the chat says so, its card for the change
-  reading it landed (../protocol/setup.md, 8.4 and 13.4;
+  model, by the fake's deliveries to the box's webhooks' listener, and
+  the chat says so, its card for the change reading it landed (../protocol/setup.md, 8.4 and 13.4;
   ../client/README.md, 5.7). The demo's scripts are data, checked in
   `temper-init`'s step tests; this test alone plays them end to end.
 - **`temper program-login`,** a sixth test, on a scratch directory of
