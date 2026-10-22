@@ -48,7 +48,10 @@ pub(crate) fn delegate(value: &Value) -> Result<engine::Delegate, Problem> {
         symbolic_grants,
         dependencies,
         wake,
-        tracked: None,
+        tracked: match value.field(b"tracked")? {
+            Some(value) => Some(value.required(b"priority")?.small()?),
+            None => None,
+        },
         label: 0,
         flags: tasks::Flags::PLAIN,
         budget: jig_domain_people::Budget::Named,
@@ -83,9 +86,19 @@ pub(crate) fn amendment(value: &Value) -> Result<tasks::Amendment, Problem> {
         None => None,
     };
     Ok(tasks::Amendment {
-        tracked: None,
+        tracked: match value.field(b"tracked")? {
+            Some(Value::String(value)) => match value.as_ref() {
+                b"untracked" => Some(tasks::Tracking::Untracked),
+                _ => return Err(Problem::Range),
+            },
+            Some(value) => Some(tasks::Tracking::Tracked { priority: value.required(b"priority")?.small()? }),
+            None => None,
+        },
         addressed: None,
-        instructions: None,
+        instructions: match value.field(b"instructions")? {
+            Some(value) => Some(value.text()?),
+            None => None,
+        },
         release: None,
         spec,
         wake,

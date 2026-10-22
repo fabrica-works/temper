@@ -1,4 +1,5 @@
 //! Typed boundary tests through the public conversions.
+#![expect(clippy::disallowed_macros, reason = "tests assemble JSON cases from shared fields")]
 
 use jig_domain_accounts as accounts;
 use jig_domain_brief as brief;
@@ -220,6 +221,11 @@ fn every_declared_tool_decodes_its_minimum_shape_and_rejects_a_wrong_shape() {
     ];
     let declared = tools(Duration::from_secs(10));
     assert_eq!(declared.len(), cases.len());
+    for tool in &declared {
+        crate::json::parse(&tool.schema).expect("declared JSON schema");
+        assert!(tool.description.len() <= 8_192, "description: {:?}", tool.name);
+        assert!(tool.schema.len() <= 65_536, "schema: {:?}", tool.name);
+    }
     for (name, valid, invalid) in cases {
         let mut found = false;
         for tool in &declared {
@@ -231,6 +237,145 @@ fn every_declared_tool_decodes_its_minimum_shape_and_rejects_a_wrong_shape() {
         assert!(decoded(name, valid).is_ok(), "valid input for {name:?}");
         assert!(decoded(name, invalid).is_err(), "invalid input for {name:?}");
     }
+}
+
+#[test]
+fn delegate_tracking_is_optional_and_requires_a_priority_object() {
+    let member = r#""executor":{"kind":"agent","charter":1},"spec":{"words":"x"},"contract":{"kind":"report","words":128},"authority":{"tools":1,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},"budget":{"spend":40},"notes":0}"#;
+    for (field, expected) in [("", None), (r#", "tracked":{"priority":4294967295}"#, Some(u32::MAX))] {
+        let input = format!("{{\"batch\":[{{{member}{field}}}]}}");
+        let engine::Tool::Delegate { batch } = decoded(b"delegate", input.as_bytes()).expect("delegate").tool else {
+            panic!("delegate tool")
+        };
+        assert_eq!(batch[0].tracked, expected);
+        assert_eq!(batch[0].label, 0);
+    }
+    for (tracked, problem) in [
+        ("8", Problem::Type),
+        (r#""untracked""#, Problem::Type),
+        (r#"{"priority":"8"}"#, Problem::Type),
+        (r#"{"priority":4294967296}"#, Problem::Range),
+        ("{}", Problem::Missing),
+    ] {
+        let input = format!("{{\"batch\":[{{{member},\"tracked\":{tracked}}}]}}");
+        assert_eq!(decoded(b"delegate", input.as_bytes()), Err(problem), "{tracked}");
+    }
+}
+
+#[test]
+fn only_a_priority_amendment_can_omit_its_revision() {
+    let engine::Tool::Amend { target, revision, amendment } =
+        decoded(b"amend", br#"{"target":3,"amendment":{"reason":"x","tracked":{"priority":8}}}"#)
+            .expect("priority without revision")
+            .tool
+    else {
+        panic!("amend tool")
+    };
+    assert_eq!((target, revision), (3, 0));
+    assert_eq!(amendment.tracked, Some(tasks::Tracking::Tracked { priority: 8 }));
+    for other in [
+        r#", "spec":{"words":"x"}"#,
+        r#", "wake":{"words":{"kind":"never"},"notices":{"kind":"never"},"news":{"kind":"never"},"results":"never","questions":false,"answers":false,"timers":false}"#,
+        r#", "dependencies":[]"#,
+        r#", "authority":{"tools":1,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},"budget":{"spend":40},"notes":0}"#,
+        r#", "instructions":"""#,
+        r#", "llm":{"main":{"model":0}}"#,
+    ] {
+        let input =
+            format!("{{\"target\":3,\"amendment\":{{\"reason\":\"x\",\"tracked\":{{\"priority\":8}}{other}}}}}");
+        assert_eq!(decoded(b"amend", input.as_bytes()), Err(Problem::Missing), "{other}");
+    }
+    assert_eq!(
+        decoded(b"amend", br#"{"target":3,"amendment":{"reason":"x","tracked":"untracked"}}"#),
+        Err(Problem::Missing)
+    );
+    assert_eq!(
+        decoded(b"amend", br#"{"target":3,"revision":"0","amendment":{"reason":"x","tracked":{"priority":8}}}"#),
+        Err(Problem::Type)
+    );
+}
+
+#[test]
+fn amendments_replace_tracking_and_instructions_including_empty_words() {
+    for instructions in ["x", ""] {
+        let input = format!(
+            "{{\"target\":3,\"revision\":1,\"amendment\":{{\"reason\":\"x\",\"tracked\":\"untracked\",\"instructions\":\"{instructions}\"}}}}"
+        );
+        let engine::Tool::Amend { amendment, .. } = decoded(b"amend", input.as_bytes()).expect("amend").tool else {
+            panic!("amend tool")
+        };
+        assert_eq!(amendment.tracked, Some(tasks::Tracking::Untracked));
+        assert_eq!(amendment.instructions.as_deref(), Some(instructions.as_bytes()));
+    }
+    for (tracked, problem) in [
+        ("8", Problem::Type),
+        (r#""tracked""#, Problem::Range),
+        (r#"{"priority":"8"}"#, Problem::Type),
+        (r#"{"priority":4294967296}"#, Problem::Range),
+        ("{}", Problem::Missing),
+    ] {
+        let input = format!("{{\"target\":3,\"revision\":1,\"amendment\":{{\"reason\":\"x\",\"tracked\":{tracked}}}}}");
+        assert_eq!(decoded(b"amend", input.as_bytes()), Err(problem), "{tracked}");
+    }
+    assert_eq!(
+        decoded(b"amend", br#"{"target":3,"revision":1,"amendment":{"reason":"x","instructions":8}}"#),
+        Err(Problem::Type)
+    );
+}
+
+#[test]
+fn the_declared_deadline_example_decodes_the_whole_authority() {
+    const EXAMPLE: &[u8] = br#"{"target":3,"revision":1,"amendment":{"reason":"Finish by Friday.","authority":{"tools":5,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},"budget":{"spend":1000,"deadline":1793404800000000000},"notes":0}}}"#;
+    for tool in tools(Duration::from_secs(10)) {
+        if tool.name.as_ref() == b"amend" {
+            let schema = crate::json::parse(&tool.schema).expect("amend schema");
+            assert_eq!(
+                schema.required(b"examples").expect("examples").array().expect("examples array"),
+                &[crate::json::parse(EXAMPLE).expect("example")]
+            );
+        }
+    }
+    let engine::Tool::Amend { target, revision, amendment } =
+        decoded(b"amend", EXAMPLE).expect("deadline example").tool
+    else {
+        panic!("amend tool")
+    };
+    assert_eq!((target, revision), (3, 1));
+    assert_eq!(
+        amendment.authority,
+        Some(tasks::Authority {
+            tools: tasks::Tools(5),
+            grants: Box::new([]),
+            delegation: tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
+            budget: tasks::Budget {
+                spend: 1000,
+                deadline: Some(skein_lib::Wall::from_nanos(1_793_404_800_000_000_000))
+            },
+            notes: tasks::Scopes(0),
+            note_resources: Box::new([]),
+            models: tasks::Models::NONE,
+        })
+    );
+    assert_eq!(amendment.reason.as_ref(), b"Finish by Friday.");
+    assert!(amendment.tracked.is_none() && amendment.instructions.is_none());
+}
+
+#[test]
+fn proposed_amendments_share_controls_but_still_require_a_revision() {
+    let engine::Tool::Propose { action: engine::ProposedAction::Amend { revision, amendment, .. }, .. } =
+        decoded(b"propose", br#"{"action":"amend","task":3,"revision":1,"amendment":{"reason":"x","tracked":{"priority":8},"instructions":""},"reason":"x"}"#)
+            .expect("proposed amendment").tool
+    else { panic!("proposed amendment") };
+    assert_eq!(revision, 1);
+    assert_eq!(amendment.tracked, Some(tasks::Tracking::Tracked { priority: 8 }));
+    assert_eq!(amendment.instructions.as_deref(), Some(b"".as_slice()));
+    assert_eq!(
+        decoded(
+            b"propose",
+            br#"{"action":"amend","task":3,"amendment":{"reason":"x","tracked":{"priority":8}},"reason":"x"}"#
+        ),
+        Err(Problem::Missing)
+    );
 }
 
 #[test]
