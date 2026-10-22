@@ -134,7 +134,7 @@ a chat that names none, runs with no workspace (worker.md, 4.1).
 | `delegate` | delegate | makes a batch of direct delegates, each with what a party's `Create` names (jig's `domain/tasks.md`, section 4), tracked as a goal at a priority (`tracked`, the lower first) or untracked | | their numbers, their specs' revisions, and what a budget given `AsAllowed` was given; refused, and why |
 | `message` | message | words, a question, or the answer to one, to a task it references (jig's `domain/tasks.md`, 8.5) | the question, for an answer | sent, with the message's number; refused: no reference, the inbox full, too large for a run to read |
 | `introduce` | message | gives two tasks it references a reference to each other | | done; refused, and why |
-| `amend` | amend and cancel | changes a live delegate (jig's `domain/tasks.md`, section 7), naming only what changes: its tracking (a priority, or untracked), its spec, wake, dependencies (the whole list), authority (whole: a deadline is its budget's, the rest restated), instructions (whole; empty leaves none) or models; with a reason, which its live run hears unless new instructions replace it | its spec's revision, as the run last read it; for a change of priority alone, none counts | done, with the spec's revision after the commit, the one its next amendment names, and what changed; refused, and why; moved, with what it is now |
+| `amend` | amend and cancel | changes a live delegate (jig's `domain/tasks.md`, section 7), naming only what changes: its tracking (a priority, or untracked), its spec, wake, dependencies (the whole list), authority (whole: a deadline is its budget's, the rest restated), instructions (whole; empty leaves none) or models; with a reason, which its live run hears unless new instructions replace it | its spec's revision, as the run last read it; a tracked delegate's priority alone needs no revision | done, with the spec's revision after the commit, the one its next amendment names, and what changed; refused, and why; moved, with what it is now |
 | `release` | amend and cancel | lifts a delegate's hold; for an effect held uncertain, says whether to make it again (`again`) | its hold's revision | done, with its spec's revision, which a release leaves as it was; `again` missing for an effect held uncertain, or given for another; refused, and why; moved, with what it is now |
 | `cancel` | amend and cancel | a live delegate and its tree, with a reason | | done; refused, and why |
 | `decide` | decide | accepts, rejects with a reason, or passes up a proposal waiting for it (jig's `domain/tasks.md`, section 9) | the proposal, by its proposer and number | decided, and how; refused, and why |
@@ -168,7 +168,9 @@ permission on it.
 - **Declared, decoded and rendered in one place,** `temper-engine-smith`:
   each tool's JSON Schema, description and effect, written once
   (`delegate`'s and `amend`'s schemas name every field of the spec and
-  the authority, so that a run writes them from its tools alone); a
+  the authority, so that a run writes them from its tools alone, and
+  both take a priority as `{priority}`, where jig's own `delegate` takes
+  a bare number, so that a run learns one shape); a
   call's input decoded into the root's `Tool`, or answered at once as an
   error naming what is wrong, deciding nothing; an answer rendered as
   smith's text, marked an error or not (`../protocol/llm.md`, section 4).
