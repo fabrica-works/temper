@@ -465,6 +465,36 @@ const ANSWER_CASES: &[(engine::CallAnswer, &[u8], bool)] = &[
     ),
     (engine::CallAnswer::Revised { task: CALL_TASK, revision: 2 }, b"Done: task 23 is at spec revision 2", false),
     (
+        engine::CallAnswer::Amended { task: 3, revision: 1, changed: engine::Changed {
+            tracked: None, fields: engine::Changed::AUTHORITY | engine::Changed::INSTRUCTIONS,
+        } },
+        b"Done: task 3 is at spec revision 1; changed: authority, instructions",
+        false,
+    ),
+    (
+        engine::CallAnswer::Amended { task: 3, revision: 0, changed: engine::Changed {
+            tracked: Some(tasks::Tracking::Tracked { priority: 8 }), fields: 0,
+        } },
+        b"Done: task 3 is at spec revision 0; changed: priority 8",
+        false,
+    ),
+    (
+        engine::CallAnswer::Amended { task: 3, revision: 2, changed: engine::Changed {
+            tracked: Some(tasks::Tracking::Untracked), fields: engine::Changed::SPEC,
+        } },
+        b"Done: task 3 is at spec revision 2; changed: untracked, spec",
+        false,
+    ),
+    (
+        engine::CallAnswer::Amended { task: 3, revision: 2, changed: engine::Changed {
+            tracked: Some(tasks::Tracking::Tracked { priority: u32::MAX }),
+            fields: engine::Changed::SPEC | engine::Changed::WAKE | engine::Changed::DEPENDENCIES
+                | engine::Changed::AUTHORITY | engine::Changed::INSTRUCTIONS | engine::Changed::LLM,
+        } },
+        b"Done: task 3 is at spec revision 2; changed: priority 4294967295, spec, wake, dependencies, authority, instructions, llm",
+        false,
+    ),
+    (
         engine::CallAnswer::Moved { task: CALL_TASK, now: jig_domain_people::Moved::Spec { revision: 2 } },
         b"Moved: task 23 is at spec revision 2 now",
         true,

@@ -14,7 +14,42 @@ pub use jig_domain_core::{
     TurnRecord,
 };
 
-/// Exact typed answer kept for replay across a lost channel or root restart.
+/// Fields named by a decoded amendment (domain/agent.md, 4.3).
+/// Joined at the host flight; the core retains only its revision reply.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Changed {
+    pub tracked: Option<jig_domain_tasks::Tracking>,
+    pub fields: u8,
+}
+
+impl Changed {
+    pub const SPEC: u8 = 1;
+    pub const WAKE: u8 = 2;
+    pub const DEPENDENCIES: u8 = 4;
+    pub const AUTHORITY: u8 = 8;
+    pub const INSTRUCTIONS: u8 = 16;
+    pub const LLM: u8 = 32;
+
+    #[must_use]
+    pub fn amendment(amendment: &jig_domain_tasks::Amendment) -> Self {
+        let mut fields = 0;
+        for (named, bit) in [
+            (amendment.spec.is_some(), Self::SPEC),
+            (amendment.wake.is_some(), Self::WAKE),
+            (amendment.dependencies.is_some(), Self::DEPENDENCIES),
+            (amendment.authority.is_some(), Self::AUTHORITY),
+            (amendment.instructions.is_some(), Self::INSTRUCTIONS),
+            (amendment.llm.is_some(), Self::LLM),
+        ] {
+            if named {
+                fields |= bit;
+            }
+        }
+        Self { tracked: amendment.tracked, fields }
+    }
+}
+
+/// Typed call feedback; amendment details are joined from the decoded tool.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum CallAnswer {
     /// A release must name again exactly when its effect is uncertain.
@@ -23,6 +58,8 @@ pub enum CallAnswer {
     PassedUp { task: u64 },
     /// A control committed at the spec revision its next amendment names.
     Revised { task: u64, revision: u64 },
+    /// An amendment committed, naming the controls it changed.
+    Amended { task: u64, revision: u64, changed: Changed },
     /// The revision named by the caller moved to this value.
     Moved { task: u64, now: jig_domain_people::Moved },
     /// A forge write joined the named call's decision; later attempts can reask for its settled result.
@@ -91,7 +128,7 @@ impl CallAnswer {
                 jig_domain_core::CallPart::Again { task: *task, required: *required }
             }
             CallAnswer::PassedUp { task } => jig_domain_core::CallPart::PassedUp { task: *task },
-            CallAnswer::Revised { task, revision } => {
+            CallAnswer::Revised { task, revision } | CallAnswer::Amended { task, revision, .. } => {
                 jig_domain_core::CallPart::Revised { task: *task, revision: *revision }
             }
             CallAnswer::Moved { task, now } => jig_domain_core::CallPart::Moved { task: *task, now: *now },
@@ -164,8 +201,8 @@ impl CallAnswer {
         }
     }
 
-    /// Assemble the core's answer when it owns the complete value. A
-    /// connector marker is assembled from that connector's own table.
+    /// Assemble the core's part. The host flight adds decoded amendment
+    /// fields; a connector marker uses that connector's own table.
     #[must_use]
     pub fn from_core(part: &jig_domain_core::CallPart) -> Option<CallAnswer> {
         Some(match part {
@@ -752,6 +789,7 @@ pub(crate) fn call_answer_bytes(answer: &CallAnswer) -> Option<u64> {
         | CallAnswer::Again { .. }
         | CallAnswer::PassedUp { .. }
         | CallAnswer::Revised { .. }
+        | CallAnswer::Amended { .. }
         | CallAnswer::Moved { .. }
         | CallAnswer::Controlled
         | CallAnswer::EffectRefused(_)

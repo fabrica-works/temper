@@ -27,7 +27,7 @@ pub use decision::{
     committed, fresh, journal_limits, resume, room, takes, uncommitted, worst_case as journal_worst_case,
 };
 pub use store::{
-    CallAnswer, CallKey, CallRecord, CoreRange, Deployment, EscalationDecisionRecord, Family, Key,
+    CallAnswer, CallKey, CallRecord, Changed, CoreRange, Deployment, EscalationDecisionRecord, Family, Key,
     ProposalDecisionRecord, Range, Record, RunProof, TerminalRecord, TurnProof, TurnRecord, Write, record_bytes,
 };
 

@@ -1179,6 +1179,26 @@ fn batch_fixture_custom(
     procedure: bool,
     person: bool,
 ) -> (Driver, engine::Assignment) {
+    let (configuration, bounds) = batch_settings(slots, depth, pool_budget, second_owner, procedure, person);
+    let mut driver = Driver::configured(Store::new(), configuration, &bounds);
+    driver.send(hello_with(Token::new(7), slots, Duration::from_secs(1), Box::new([])));
+    driver.settle();
+    driver.sign_in();
+    driver.settle();
+    chat(&mut driver, 12);
+    driver.settle();
+    let assignment = assigned(&driver);
+    (driver, assignment)
+}
+
+fn batch_settings(
+    slots: u32,
+    depth: u32,
+    pool_budget: u64,
+    second_owner: bool,
+    procedure: bool,
+    person: bool,
+) -> ([engine::Config; 2], engine::Limits) {
     let mut bounds = limits();
     bounds.tasks.tasks = 4;
     // jig's core prices each task's inbox projections (`memory.rs`, `worst_case`).
@@ -1270,15 +1290,7 @@ fn batch_fixture_custom(
         configuration.core.authority = authority;
         configuration
     });
-    let mut driver = Driver::configured(Store::new(), configuration, &bounds);
-    driver.send(hello_with(Token::new(7), slots, Duration::from_secs(1), Box::new([])));
-    driver.settle();
-    driver.sign_in();
-    driver.settle();
-    chat(&mut driver, 12);
-    driver.settle();
-    let assignment = assigned(&driver);
-    (driver, assignment)
+    (configuration, bounds)
 }
 
 // A chat's note scopes are its role's (jig a2616181).
@@ -1904,7 +1916,14 @@ fn an_amendment_reaches_a_live_run() {
     let amendment = task_amendment(Some(b"revised"), Some(wider), b"the target changed");
     let revision = live(&driver, child).revisions.spec;
     tool_call(&mut driver, &parent, 91, engine::Tool::Amend { target: child, revision, amendment });
-    assert_eq!(driver.answered(91), Some(&engine::CallAnswer::Revised { task: child, revision: revision + 1 }));
+    assert_eq!(
+        driver.answered(91),
+        Some(&engine::CallAnswer::Amended {
+            task: child,
+            revision: revision + 1,
+            changed: engine::Changed { tracked: None, fields: engine::Changed::SPEC | engine::Changed::AUTHORITY }
+        })
+    );
     assert!(driver.transactions.iter().any(|writes| {
         writes.iter().any(|write| {
             matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Call(record))))
@@ -1924,6 +1943,213 @@ fn an_amendment_reaches_a_live_run() {
     assert_eq!(live(&driver, parent.task).numbers.reserved, 25);
 }
 
+fn amended_text(driver: &Driver, call: u64, task: u64, revision: u64, changed: engine::Changed) -> Box<[u8]> {
+    let expected = engine::CallAnswer::Amended { task, revision, changed };
+    assert_eq!(driver.answered(call), Some(&expected));
+    let answer = temper_engine_smith::answer(&expected);
+    assert!(!answer.error());
+    answer.text().into()
+}
+
+fn amend_replay(driver: &mut Driver, parent: &engine::Assignment, name: u64, tool: engine::Tool) {
+    let body = engine::Call { completion: 1, position: 92, tool };
+    driver.call(Token::new(7), parent.task, parent.attempt, name, body);
+    for _ in 0..60 {
+        driver.advance(true);
+    }
+}
+
+fn finish_amend_render(driver: &mut Driver, call: u64) {
+    let position = driver
+        .protocol
+        .pending_renders
+        .iter()
+        .position(|(_, name)| name.as_ref() == call.to_be_bytes())
+        .expect("the story deferred this render");
+    let (to, _) = driver.protocol.pending_renders.remove(position);
+    let (body, error) = temper_engine_smith::answer(driver.answered(call).expect("typed answer")).into_parts();
+    driver.send(engine::Event::Worker(engine::WorkerInput::RenderedHostCall {
+        to,
+        answer: jig_domain_core::SettledAnswer::Host { error, body },
+    }));
+    for _ in 0..60 {
+        driver.advance(true);
+    }
+}
+
+#[test]
+#[expect(clippy::too_many_lines, reason = "one live-run story covers four controls and both replay cuts")]
+fn an_agent_changes_a_live_delegates_controls_and_replays_the_answer() {
+    let (configuration, mut bounds) = batch_settings(2, 1, 200, false, false, false);
+    bounds.call_records = 8;
+    bounds.fleet.calls = 4;
+    let mut driver = Driver::configured(Store::new(), configuration, &bounds);
+    driver.send(hello_with(Token::new(7), 2, Duration::from_secs(1), Box::new([])));
+    driver.settle();
+    driver.sign_in();
+    driver.settle();
+    chat(&mut driver, 12);
+    driver.settle();
+    let parent = assigned(&driver);
+    let mut member = report_delegate(b"goal", Box::new([]));
+    member.tracked = Some(3);
+    // Extend an existing deadline so the same run stays live throughout.
+    member.authority.budget.deadline = Some(Wall::from_nanos(Duration::from_secs(60).as_nanos()));
+    let child = call_batch(&mut driver, &parent, 90, Box::new([member]))[0];
+    let running = assigned_task(&driver, child);
+    assert_eq!(live(&driver, child).tracked, Some(3));
+    let revision = live(&driver, child).revisions.spec;
+    let mut priority = task_amendment(None, None, b"do this first");
+    priority.tracked = Some(tasks::Tracking::Tracked { priority: 1 });
+    tool_call(&mut driver, &parent, 91, engine::Tool::Amend { target: child, revision: 0, amendment: priority });
+    amended_text(
+        &driver,
+        91,
+        child,
+        revision,
+        engine::Changed { tracked: Some(tasks::Tracking::Tracked { priority: 1 }), fields: 0 },
+    );
+    assert_eq!(live(&driver, child).tracked, Some(1));
+    assert_eq!(live(&driver, child).revisions.spec, revision);
+    assert!(messages_to(&driver, &running).iter().any(|(_, words)| words.as_ref() == b"do this first"));
+
+    let deadline = Wall::from_nanos(Duration::from_secs(120).as_nanos());
+    let mut authority = live(&driver, child).authority.clone();
+    authority.budget.deadline = Some(deadline);
+    let amendment = task_amendment(None, Some(authority.clone()), b"finish later");
+    let deadline_tool = engine::Tool::Amend { target: child, revision, amendment };
+    driver.protocol.defer_render = true;
+    tool_call(&mut driver, &parent, 92, deadline_tool.clone());
+    let changed = engine::Changed { tracked: None, fields: engine::Changed::AUTHORITY };
+    let text = amended_text(&driver, 92, child, revision + 1, changed);
+    assert_eq!(
+        text.as_ref(),
+        format!("Done: task {child} is at spec revision {}; changed: authority", revision + 1).as_bytes()
+    );
+    assert_eq!(live(&driver, child).authority, authority);
+    assert_eq!(live(&driver, child).authority.budget.deadline, Some(deadline));
+    assert!(messages_to(&driver, &running).iter().any(|(_, words)| words.as_ref() == b"finish later"));
+    let after_deadline = live(&driver, child).clone();
+    amend_replay(&mut driver, &parent, 96, deadline_tool.clone());
+    assert_eq!(amended_text(&driver, 96, child, revision + 1, changed), text);
+    assert_eq!(live(&driver, child), &after_deadline);
+    driver.protocol.defer_render = false;
+
+    let mut instructions = task_amendment(None, None, b"replace your instructions");
+    instructions.instructions = Some(b"Use the full new plan.".as_slice().into());
+    tool_call(
+        &mut driver,
+        &parent,
+        93,
+        engine::Tool::Amend { target: child, revision: revision + 1, amendment: instructions },
+    );
+    amended_text(
+        &driver,
+        93,
+        child,
+        revision + 2,
+        engine::Changed { tracked: None, fields: engine::Changed::INSTRUCTIONS },
+    );
+    assert_eq!(live(&driver, child).instructions.as_deref(), Some(b"Use the full new plan.".as_slice()));
+    assert!(messages_to(&driver, &running).iter().any(|(_, words)| words.as_ref() == b"Use the full new plan."));
+
+    let mut untrack = task_amendment(None, None, b"no longer a goal");
+    untrack.tracked = Some(tasks::Tracking::Untracked);
+    tool_call(
+        &mut driver,
+        &parent,
+        94,
+        engine::Tool::Amend { target: child, revision: revision + 2, amendment: untrack },
+    );
+    amended_text(
+        &driver,
+        94,
+        child,
+        revision + 2,
+        engine::Changed { tracked: Some(tasks::Tracking::Untracked), fields: 0 },
+    );
+    assert_eq!(live(&driver, child).tracked, None);
+    assert_eq!(live(&driver, child).revisions.spec, revision + 2);
+    assert!(messages_to(&driver, &running).iter().any(|(_, words)| words.as_ref() == b"no longer a goal"));
+    assert!(!cancelled(&driver).contains(&(child, running.attempt)));
+
+    // Crash before the deadline answer's render: only the core part is durable.
+    let store = driver.store.fork();
+    let calls = driver.store.header().calls;
+    finish_amend_render(&mut driver, 96);
+    amend_replay(&mut driver, &parent, 99, deadline_tool.clone());
+    assert!(downs(&driver).iter().any(|down| matches!(down,
+        host::LinkDown::Relayed { call, answer: host::Relayed::Answer { error: false, text: replayed }, .. }
+            if call.as_ref() == 99_u64.to_be_bytes() && replayed == &text)));
+
+    let (configuration, _) = batch_settings(2, 1, 200, false, false, false);
+    let mut restarted = Driver::configured(store, configuration, &bounds);
+    let hosting = Box::new([
+        protocol::hosting(parent.task, parent.attempt, host::Phase::Active),
+        protocol::hosting(child, running.attempt, host::Phase::Active),
+    ]);
+    restarted.send(hello_with(Token::new(7), 2, Duration::from_secs(1), hosting));
+    restarted.settle();
+    restarted.protocol.defer_render = true;
+    amend_replay(&mut restarted, &parent, 97, deadline_tool.clone());
+    assert_eq!(amended_text(&restarted, 97, child, revision + 1, changed), text);
+    assert_eq!(restarted.store.header().calls, calls);
+    assert_eq!(live(&restarted, child), live(&driver, child));
+    finish_amend_render(&mut restarted, 97);
+    amend_replay(&mut restarted, &parent, 98, deadline_tool);
+    assert!(downs(&restarted).iter().any(|down| matches!(down,
+        host::LinkDown::Relayed { call, answer: host::Relayed::Answer { error: false, text: replayed }, .. }
+            if call.as_ref() == 98_u64.to_be_bytes() && replayed == &text)));
+}
+
+#[test]
+fn tracking_an_untracked_delegate_requires_its_current_revision() {
+    let (mut driver, parent) = batch_fixture_with(2, 1);
+    let child = call_batch(&mut driver, &parent, 90, Box::new([report_delegate(b"delegate", Box::new([]))]))[0];
+    let first = live(&driver, child).revisions.spec;
+    tool_call(
+        &mut driver,
+        &parent,
+        91,
+        engine::Tool::Amend {
+            target: child,
+            revision: first,
+            amendment: task_amendment(Some(b"revised delegate"), None, b"new plan"),
+        },
+    );
+    let before = live(&driver, child).clone();
+    let revision = before.revisions.spec;
+    assert!(revision >= 1);
+    assert_eq!(before.tracked, None);
+    let mut amendment = task_amendment(None, None, b"make this a goal");
+    amendment.tracked = Some(tasks::Tracking::Tracked { priority: 8 });
+    tool_call(
+        &mut driver,
+        &parent,
+        92,
+        engine::Tool::Amend { target: child, revision: 0, amendment: amendment.clone() },
+    );
+    assert_eq!(
+        driver.answered(92),
+        Some(&engine::CallAnswer::Moved { task: child, now: people::Moved::Spec { revision } })
+    );
+    assert_eq!(live(&driver, child), &before);
+    tool_call(&mut driver, &parent, 93, engine::Tool::Amend { target: child, revision, amendment });
+    assert_eq!(live(&driver, child).revisions.spec, revision);
+    let text = amended_text(
+        &driver,
+        93,
+        child,
+        revision,
+        engine::Changed { tracked: Some(tasks::Tracking::Tracked { priority: 8 }), fields: 0 },
+    );
+    assert_eq!(
+        text.as_ref(),
+        format!("Done: task {child} is at spec revision {revision}; changed: priority 8").as_bytes()
+    );
+    assert_eq!(live(&driver, child).tracked, Some(8));
+}
+
 #[test]
 fn an_ancestor_amends_a_live_grandchild() {
     let (mut driver, root) = batch_fixture_with(3, 2);
@@ -1940,7 +2166,14 @@ fn an_ancestor_amends_a_live_grandchild() {
     let amendment = task_amendment(Some(b"revised by ancestor"), None, b"tree plan changed");
     let revision = live(&driver, grandchild).revisions.spec;
     tool_call(&mut driver, &root, 903, engine::Tool::Amend { target: grandchild, revision, amendment });
-    assert_eq!(driver.answered(903), Some(&engine::CallAnswer::Revised { task: grandchild, revision: revision + 1 }));
+    assert_eq!(
+        driver.answered(903),
+        Some(&engine::CallAnswer::Amended {
+            task: grandchild,
+            revision: revision + 1,
+            changed: engine::Changed { tracked: None, fields: engine::Changed::SPEC }
+        })
+    );
     let row = live(&driver, grandchild);
     assert_eq!(row.spec.words.as_ref(), b"revised by ancestor");
     let amended = row.inbox.iter().find(|word| matches!(word.kind, tasks::MessageKind::Amendment { .. }));

@@ -6,7 +6,7 @@ use alloc::boxed::Box;
 use skein_forge::api;
 use skein_lib::{Decimal, List, Writer, bytes};
 use smith_domain_run::HostAnswer;
-use temper_engine_domain::CallAnswer;
+use temper_engine_domain::{CallAnswer, Changed};
 
 use crate::Problem;
 
@@ -196,6 +196,41 @@ fn rendered(answer: &CallAnswer) -> Result<HostAnswer, Problem> {
             text.add(b"Beyond your authority: task ")?;
             text.number(*task)?;
             text.add(b"'s escalation was passed up")?;
+            false
+        }
+        CallAnswer::Amended { task, revision, changed } => {
+            text.add(b"Done: task ")?;
+            text.number(*task)?;
+            text.add(b" is at spec revision ")?;
+            text.number(*revision)?;
+            text.add(b"; changed: ")?;
+            let mut separator = b"".as_slice();
+            match changed.tracked {
+                Some(jig_domain_tasks::Tracking::Tracked { priority }) => {
+                    text.add(b"priority ")?;
+                    text.number(u64::from(priority))?;
+                    separator = b", ";
+                }
+                Some(jig_domain_tasks::Tracking::Untracked) => {
+                    text.add(b"untracked")?;
+                    separator = b", ";
+                }
+                None => {}
+            }
+            for (bit, name) in [
+                (Changed::SPEC, b"spec".as_slice()),
+                (Changed::WAKE, b"wake"),
+                (Changed::DEPENDENCIES, b"dependencies"),
+                (Changed::AUTHORITY, b"authority"),
+                (Changed::INSTRUCTIONS, b"instructions"),
+                (Changed::LLM, b"llm"),
+            ] {
+                if changed.fields & bit != 0 {
+                    text.add(separator)?;
+                    text.add(name)?;
+                    separator = b", ";
+                }
+            }
             false
         }
         CallAnswer::Revised { task, revision } => {

@@ -116,6 +116,9 @@ pub struct Protocol {
     serial: u64,
     /// Each decided call's typed answer, by its opaque call name, in render order.
     pub answers: Vec<(Box<[u8]>, engine::CallAnswer)>,
+    /// Let a story cut between the durable decision and its rendered answer.
+    pub defer_render: bool,
+    pub pending_renders: Vec<(ReplyTo, Box<[u8]>)>,
     /// Each account component request the root made.
     pub accounts: Vec<accounts::Request>,
     /// Worker channels that received their program-source inventory.
@@ -224,7 +227,12 @@ impl Protocol {
                 match *delivery {
                     engine::HostDelivery::Render { to, name, answer, .. } => {
                         self.answers.push((name.clone(), answer));
-                        Ok(vec![rendered(to, name)])
+                        if self.defer_render {
+                            self.pending_renders.push((to, name));
+                            Ok(Vec::new())
+                        } else {
+                            Ok(vec![rendered(to, name)])
+                        }
                     }
                     other @ engine::HostDelivery::Answer { .. } => Err(Box::new(engine::Request::Worker(
                         engine::WorkerRequest::Deliver(engine::Delivery::Host(Box::new(other))),

@@ -127,7 +127,7 @@ fn replace_dependencies(story: &mut Story, dependencies: Box<[u64]>, revision: u
         engine::Tool::Amend { target: story.target.task, revision, amendment },
     );
     assert!(
-        matches!(story.driver.answered(call), Some(engine::CallAnswer::Revised { task, revision: next }) if *task == story.target.task && *next == revision + 1),
+        matches!(story.driver.answered(call), Some(engine::CallAnswer::Amended { task, revision: next, .. }) if *task == story.target.task && *next == revision + 1),
         "dependency amendment must commit: {:?}",
         story.driver.answered(call)
     );

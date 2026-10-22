@@ -430,12 +430,26 @@ fn an_amends_answer_names_the_revision_its_next_amendment_names() {
     let first = driver.task(child).expect("delegate").revisions.spec;
     let amendment = task_amendment(Some(b"second"), None, b"change");
     tool_call(&mut driver, &parent, FIRST_CALL, Tool::Amend { target: child, revision: first, amendment });
-    assert_eq!(driver.answered(FIRST_CALL), Some(&CallAnswer::Revised { task: child, revision: first + 1 }));
-    let Some(CallAnswer::Revised { revision, .. }) = driver.answered(FIRST_CALL) else { panic!("revised") };
+    assert_eq!(
+        driver.answered(FIRST_CALL),
+        Some(&CallAnswer::Amended {
+            task: child,
+            revision: first + 1,
+            changed: temper_engine_domain::Changed { tracked: None, fields: temper_engine_domain::Changed::SPEC }
+        })
+    );
+    let Some(CallAnswer::Amended { revision, .. }) = driver.answered(FIRST_CALL) else { panic!("revised") };
     let revision = *revision;
     let amendment = task_amendment(Some(b"third"), None, b"next");
     tool_call(&mut driver, &parent, SECOND_CALL, Tool::Amend { target: child, revision, amendment });
-    assert_eq!(driver.answered(SECOND_CALL), Some(&CallAnswer::Revised { task: child, revision: revision + 1 }));
+    assert_eq!(
+        driver.answered(SECOND_CALL),
+        Some(&CallAnswer::Amended {
+            task: child,
+            revision: revision + 1,
+            changed: temper_engine_domain::Changed { tracked: None, fields: temper_engine_domain::Changed::SPEC }
+        })
+    );
     assert_eq!(driver.task(child).expect("delegate").spec.words.as_ref(), b"third");
 }
 

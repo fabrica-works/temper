@@ -30,6 +30,7 @@ pub(crate) struct Flight {
     pub task: u64,
     pub attempt: u64,
     pub key: Option<CallKey>,
+    pub changed: Option<crate::Changed>,
     pub name: Box<[u8]>,
     pub tool: Box<[u8]>,
 }
@@ -37,7 +38,7 @@ pub(crate) struct Flight {
 pub(crate) fn decode(domain: &mut Domain, to: ReplyTo, task: u64, attempt: u64, call: fleet::Call) {
     let right = to.into_token();
     let to = ReplyTo::new(right);
-    let flight = Flight { task, attempt, key: None, name: call.name.clone(), tool: call.tool.clone() };
+    let flight = Flight { task, attempt, key: None, changed: None, name: call.name.clone(), tool: call.tool.clone() };
     assert!(domain.host_calls.insert(right, flight).is_ok(), "typed flights fit fleet calls");
     super::now(
         domain,
@@ -79,7 +80,13 @@ pub(crate) fn decoded(domain: &mut Domain, env: &Env<Limits>, decision: &mut Dec
         domain.work.push(Work::Fleet(fleet::Event::Relayed { to, answer: id.token() }));
         return;
     }
-    domain.host_calls.get_mut(&right).expect("current typed flight").key = Some(key);
+    let flight = domain.host_calls.get_mut(&right).expect("current typed flight");
+    flight.key = Some(key);
+    flight.changed = if let crate::Tool::Amend { amendment, .. } = &body.tool {
+        Some(crate::Changed::amendment(amendment))
+    } else {
+        None
+    };
     let id = domain.payloads.insert(Some(Payload::Call { key, body })).expect("fleet call reserved payload room");
     relay_payload(domain, env, decision, to, Token::new(key.task), Token::new(key.attempt), id.token());
 }
@@ -95,6 +102,12 @@ pub(crate) fn render(domain: &mut Domain, limits: &Limits, decision: &mut Decisi
         settled(domain, limits, decision, to, call);
         return;
     }
+    // Fresh and unsettled replay replies both carry only the core revision.
+    let answer = if let (CallAnswer::Revised { task, revision }, Some(changed)) = (&answer, flight.changed) {
+        CallAnswer::Amended { task: *task, revision: *revision, changed }
+    } else {
+        answer
+    };
     emit(
         decision,
         limits,

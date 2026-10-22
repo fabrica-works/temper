@@ -356,6 +356,7 @@ pub(crate) fn keep_connector_answer(
         | CallAnswer::Again { .. }
         | CallAnswer::PassedUp { .. }
         | CallAnswer::Revised { .. }
+        | CallAnswer::Amended { .. }
         | CallAnswer::Moved { .. }
         | CallAnswer::Controlled
         | CallAnswer::EffectRefused(_)

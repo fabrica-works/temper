@@ -220,7 +220,7 @@ fn duplicate_dependencies_cannot_create_two_waits() {
         Some(engine::CallAnswer::ControlRefused(_)) => {
             assert_eq!(driver.task(report), Some(&before), "duplicate rejection preserves the old list and revision");
         }
-        Some(engine::CallAnswer::Revised { .. }) => {
+        Some(engine::CallAnswer::Amended { .. }) => {
             let row = driver.task(report).expect("live report");
             assert_eq!(row.dependencies.as_ref(), &[prerequisite], "a duplicate represents a single prerequisite");
         }
@@ -497,7 +497,7 @@ fn an_already_done_retained_dependency_does_not_keep() {
     finish_task(&mut driver, *prerequisite);
     amend(&mut driver, &parent, FOLLOWUP_CALL, *report, 0, &[*prerequisite]);
     assert!(
-        matches!(driver.answered(FOLLOWUP_CALL), Some(engine::CallAnswer::Revised { revision: 1, .. })),
+        matches!(driver.answered(FOLLOWUP_CALL), Some(engine::CallAnswer::Amended { revision: 1, .. })),
         "an already done prerequisite is admitted as met: {:?}",
         driver.answered(FOLLOWUP_CALL)
     );

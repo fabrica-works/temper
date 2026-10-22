@@ -43,7 +43,14 @@ fn a_live_delegate_is_kept_until_both_added_dependencies_are_met() {
     let revision = live(&driver, a3).revisions.spec;
     let at = driver.env.wall;
     tool_call(&mut driver, &parent, 911, engine::Tool::Amend { target: a3, revision, amendment });
-    assert_eq!(driver.answered(911), Some(&engine::CallAnswer::Revised { task: a3, revision: revision + 1 }));
+    assert_eq!(
+        driver.answered(911),
+        Some(&engine::CallAnswer::Amended {
+            task: a3,
+            revision: revision + 1,
+            changed: engine::Changed { tracked: None, fields: engine::Changed::DEPENDENCIES }
+        })
+    );
     let row = live(&driver, a3);
     assert_eq!(row.dependencies.as_ref(), [e1, r]);
     assert_eq!(
