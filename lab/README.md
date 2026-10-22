@@ -549,8 +549,11 @@ live collection `hand`, `/bin/cp -R -- {dir.hand}/. {collect.dir}/.`.
 - **Statuses** (skein's `lab.md`, 7.2): 0 with no entry left; 1 with
   one; 2, undecided, when the log is missing or a line unreadable, its
   failures printed beside.
-- **The codec's table is copied** into the check: a page the codec
-  gains names itself `other` until the table follows it.
+- **The codec's table is copied** into the check, which names its
+  source: `docs/design/client/browser.md`, 2.3, and the codec,
+  `crates/temper-client-domain/src/address.rs` (`Address`, its `path`
+  and its parse), each page by its variant's name in lower case. A page
+  the codec gains names itself `other` until the table follows it.
 
 ## The subject and the command
 
