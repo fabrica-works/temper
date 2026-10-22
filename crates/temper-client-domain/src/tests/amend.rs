@@ -181,6 +181,14 @@ fn words_on_a_cut_spec_are_refused() {
     assert_eq!(draft.amendment(), None);
 }
 #[test]
+fn empty_instructions_on_a_task_without_any_are_no_change() {
+    let mut task = goal();
+    task.instructions = None;
+    let mut draft = Draft::of(&task);
+    draft.instructions(text(b""));
+    assert_eq!(draft.amendment(), None);
+}
+#[test]
 fn empty_instructions_are_sent_explicitly() {
     let mut draft = Draft::of(&goal());
     draft.instructions(text(b""));

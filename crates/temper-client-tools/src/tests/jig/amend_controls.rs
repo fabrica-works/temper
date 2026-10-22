@@ -147,11 +147,13 @@ fn amend_reads_instructions_from_stdin() {
 }
 #[test]
 fn amend_sends_empty_instructions() {
+    let mut task = task();
+    task.instructions = Some(f::document_text(b"Run checks"));
     loaded(
         &["amend", "41", "--rev", "7", "--instructions", "-", "because"],
         b"",
         6,
-        task(),
+        task,
         expected(c::Amendment { instructions: Some(f::act_text(b"")), ..no_change() }, REVISION),
     );
 }

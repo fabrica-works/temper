@@ -79,7 +79,7 @@ impl Draft {
     pub fn instructions(&mut self, text: c::Text) {
         let same = match &self.instructions {
             Some(base) => !base.cut && base.bytes == text,
-            None => false,
+            None => text.bytes().is_empty(),
         };
         self.change.instructions = if same { None } else { Some(text) };
     }
