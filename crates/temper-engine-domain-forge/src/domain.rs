@@ -95,7 +95,9 @@ enum Handoff {
 /// The bounded forge connector subtree.
 #[derive(Debug)]
 pub struct Domain {
-    connections: Map<u16, crate::Connection>,
+    connections: Map<u16, (crate::Connection, Option<(Token, crate::SetUpAnswer)>)>,
+    setup_unknown: Option<(Token, crate::SetUpAnswer)>,
+    setup_pending: Map<Token, Token>,
     installations: Map<(u16, u64), crate::Installation>,
     pub(crate) repositories: Map<skein_forge::api::Repository, Repository>,
     names: Map<u64, Box<[Name]>>,
@@ -154,8 +156,37 @@ impl Domain {
     #[must_use]
     pub fn connection(&self, forge: u16) -> crate::Connection {
         match self.connections.get(&forge) {
-            Some(state) => state.clone(),
+            Some((state, _)) => state.clone(),
             None => crate::Connection::NotConnected,
+        }
+    }
+    #[must_use]
+    pub fn forges(&self) -> crate::Forges {
+        let mut rows = List::with_capacity(self.connections.len());
+        for (forge, (state, _)) in &self.connections {
+            rows.push((*forge, state.clone())).expect("bounded connections");
+        }
+        crate::Forges { rows: rows.into_boxed() }
+    }
+    /// Latest volatile setup answer or retained adoption outcome.
+    #[must_use]
+    #[expect(clippy::manual_map, reason = "step code uses explicit matches (programming-model.md, 10)")]
+    pub fn application_answer(&self, token: Token) -> Option<crate::Answered> {
+        for (_, (_, kept)) in &self.connections {
+            if let Some((held, answer)) = kept
+                && *held == token
+            {
+                return Some(crate::Answered::SetUp(*answer));
+            }
+        }
+        if let Some((held, answer)) = self.setup_unknown
+            && held == token
+        {
+            return Some(crate::Answered::SetUp(answer));
+        }
+        match self.application_outcome(token) {
+            Some(outcome) => Some(crate::Answered::Adopt(outcome.clone())),
+            None => None,
         }
     }
     #[must_use]
@@ -328,6 +359,8 @@ impl Domain {
         }
         Ok(Domain {
             connections: Map::with_capacity(l.client.repositories),
+            setup_unknown: None,
+            setup_pending: Map::with_capacity(l.applications),
             installations: Map::with_capacity(l.client.rows),
             repositories: Map::with_capacity(l.repositories),
             names: Map::with_capacity(l.tasks),
@@ -754,18 +787,15 @@ pub const fn max_out(l: &Limits) -> u32 {
 #[expect(clippy::too_many_lines, reason = "one exhaustive connector input dispatcher")]
 pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::SetUp { forge } => {
-            let request = match d.connection(forge) {
-                crate::Connection::NotSetUp | crate::Connection::SetUpFailed { .. } => Request::SetUp { forge },
-                crate::Connection::NotConnected
-                | crate::Connection::SettingUp { .. }
-                | crate::Connection::Connecting
-                | crate::Connection::Connected { .. }
-                | crate::Connection::Stopped { .. } => {
-                    Request::SetUpRefused { forge, why: crate::SetUpRefusal::NotOffered }
+        Event::SetUpAnswered { forge, request, answer } => {
+            if let Some(token) = d.setup_pending.remove(&request) {
+                if let Some((_, kept)) = d.connections.get_mut(&forge) {
+                    *kept = Some((token, answer));
+                } else {
+                    d.setup_unknown = Some((token, answer));
                 }
-            };
-            out.push(request);
+                out.push(Request::ApplicationDone { request, token });
+            }
         }
         Event::Connection { forge, state } => {
             match &state {
@@ -782,7 +812,12 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
                 | crate::Connection::Connecting
                 | crate::Connection::Stopped { .. } => {}
             }
-            d.connections.insert(forge, state).expect("configured forge connections");
+            let kept = match d.connections.get(&forge) {
+                Some((_, kept)) => *kept,
+                None => None,
+            };
+            d.connections.insert(forge, (state, kept)).expect("configured forge connections");
+            out.push(Request::MarkedForges);
         }
         Event::Installation { forge, installation, state } => match state {
             Some(state) => {
@@ -792,9 +827,27 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
                 let _gone = d.installations.remove(&(forge, installation));
             }
         },
-        Event::Application { request, token, retention, adoption } => {
-            adoption::start(d, env, request, token, retention, adoption, out);
-        }
+        Event::Application { request, token, retention, ask } => match ask {
+            crate::Ask::Adopt(adoption) => adoption::start(d, env, request, token, retention, adoption, out),
+            crate::Ask::SetUp { forge } => {
+                if d.setup_pending.insert(request, token).is_err() {
+                    out.push(Request::ApplicationAgain { request, why: jig_domain_people::Again::Busy });
+                } else {
+                    out.push(match d.connection(forge) {
+                        crate::Connection::NotSetUp | crate::Connection::SetUpFailed { .. } => {
+                            Request::SetUp { forge, request }
+                        }
+                        crate::Connection::NotConnected
+                        | crate::Connection::SettingUp { .. }
+                        | crate::Connection::Connecting
+                        | crate::Connection::Connected { .. }
+                        | crate::Connection::Stopped { .. } => {
+                            Request::SetUpRefused { forge, request, why: crate::SetUpRefusal::NotOffered }
+                        }
+                    });
+                }
+            }
+        },
         Event::ApplicationAnswered { request, outcome } => adoption::answered(d, env, request, outcome, out),
         Event::ForgetProjection { goal } => {
             if let Some(row) = d.issues.get(&goal)

@@ -11,6 +11,14 @@ use skein_lib::{CryptoRng, Duration, Env, Map, Queue, Secret, Time, Token, Wall}
 use temper_engine_domain as root;
 use temper_protocol_records::Item;
 
+/// Only the public mode is retained for the forges document (client/README.md, 8).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Mode {
+    Managed,
+    Owned,
+    Fake,
+}
+
 /// Plans are staged in the protocol layer: the root names them, never their credentials.
 pub(crate) struct Layer {
     component: Option<host::Host>,
@@ -22,6 +30,7 @@ pub(crate) struct Layer {
     closing: bool,
     served: Map<u16, ()>,
     unserved: Map<u16, &'static [u8]>,
+    pub(crate) modes: Map<u16, Mode>,
     pub(crate) staged: Map<Token, host::Plan>,
     runs: Map<Token, Run>,
     lifecycle: lifecycle::Lifecycle,
@@ -72,6 +81,7 @@ pub(crate) fn worst_case(
         .checked_add(Map::<u16, ()>::worst_case(l.forges)?)? // lifecycle.reconcile
         .checked_add(Map::<u16, ()>::worst_case(l.forges)?)? // lifecycle.deleting
         .checked_add(Map::<u16, &'static [u8]>::worst_case(l.forges)?)? // unserved
+        .checked_add(Map::<u16, Mode>::worst_case(l.forges)?)?
         .checked_add(Map::<u16, lifecycle::Adoption>::worst_case(l.forges)?)?
         // Each fake holds the handover and its files' access until adoption ends (protocol/setup.md, 8.4).
         .checked_add(
@@ -134,6 +144,7 @@ impl Layer {
             closing: false,
             served,
             unserved: Map::with_capacity(limits.forges),
+            modes: Map::with_capacity(limits.forges),
             staged: Map::with_capacity(limits.runs),
             runs: Map::with_capacity(limits.runs),
             lifecycle: lifecycle::Lifecycle::new(limits.forges, installations),

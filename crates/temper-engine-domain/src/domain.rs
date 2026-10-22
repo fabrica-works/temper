@@ -48,7 +48,7 @@ pub struct Domain {
     pub(crate) brief_sections: Map<u64, Box<[BriefSection]>>,
     pub(crate) run_workspaces: Map<u64, PreparedWorkspace>,
     pub(crate) forge: forge::Domain,
-    pub(crate) application: Option<(Token, forge::Adoption)>,
+    pub(crate) application: Option<(Token, forge::Ask)>,
     pub(crate) next_application_owner: u64,
     pub(crate) adoption_restore: Map<Token, Option<forge::Repository>>,
     pub(crate) forge_subscribing: Map<Token, forge::Subscriber>,
@@ -791,6 +791,7 @@ fn released_into(domain: &mut Domain, _env: &Env<Limits>, released: Released, ou
         | Delivery::ForgeCall { .. }
         | Delivery::Procedure { .. }
         | Delivery::Assigned { .. }
+        | Delivery::Forges { .. }
         | Delivery::Panel { .. }
         | Delivery::Application { .. }
         | Delivery::WebReply { .. }

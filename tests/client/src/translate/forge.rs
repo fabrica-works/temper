@@ -165,7 +165,7 @@ pub fn request(
         key,
         digest: digest(&value),
         carried: None,
-        request: adoption(&value, crate::fixtures::FORGE_HOST),
+        request: temper_engine_domain_forge::Ask::Adopt(adoption(&value, crate::fixtures::FORGE_HOST)),
     })
 }
 /// Open only the forge's whole, project-scoped change subject (client/forge.md, 9.2).
@@ -349,7 +349,8 @@ pub fn incoming(
                 },
             )));
         }
-        delivery @ (Delivery::SourceSignedOut { .. }
+        delivery @ (Delivery::Forges { .. }
+        | Delivery::SourceSignedOut { .. }
         | Delivery::Result { .. }
         | Delivery::Host(_)
         | Delivery::Link { .. }
@@ -376,7 +377,7 @@ pub fn incoming(
     Ok(Some(answered(&route, body)))
 }
 /// The application's outcome, answered on its keyed route as the forge family's bytes.
-fn answered(route: &Reply, body: Option<owner::ApplicationOutcome>) -> (ClientId, client::Event) {
+fn answered(route: &Reply, body: Option<owner::Answered>) -> (ClientId, client::Event) {
     let Reply::Keyed { client, attempt, owner: KeyedOwner::Application { connector }, .. } = *route else {
         panic!("application reply route")
     };

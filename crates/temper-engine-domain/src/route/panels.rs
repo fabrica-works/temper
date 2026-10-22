@@ -13,12 +13,24 @@ pub(crate) fn document(
     scope: ApplicationScope,
     subject: Token,
 ) {
+    let mut forges = if connector == domain.config.forge_connector
+        && scope == ApplicationScope::Deployment
+        && subject == Token::new(0)
+    {
+        Some(domain.forge.forges())
+    } else {
+        None
+    };
     let mut panel = if connector == domain.config.forge_connector {
         domain.forge.panel(subject.raw(), scope, env.wall, &env.limits.forge)
     } else {
         None
     };
-    let outcome = if panel.is_some() { views::Made::Ready } else { views::Made::Gone { why: views::End::Gone } };
+    let outcome = if panel.is_some() || forges.is_some() {
+        views::Made::Ready
+    } else {
+        views::Made::Gone { why: views::End::Gone }
+    };
     let core::Requests::Out(mut requests) = core::step(
         &mut domain.core,
         &environment_core(env),
@@ -33,7 +45,10 @@ pub(crate) fn document(
             emit(
                 decision,
                 &env.limits,
-                Delivery::Panel { watcher, panel: Box::new(panel.take().expect("one whole ready panel")) },
+                match forges.take() {
+                    Some(forges) => Delivery::Forges { watcher, forges },
+                    None => Delivery::Panel { watcher, panel: Box::new(panel.take().expect("one whole ready panel")) },
+                },
             );
         } else {
             let mut forward = Queue::with_capacity(1);
@@ -41,5 +56,5 @@ pub(crate) fn document(
             super::route_core_requests(domain, env, decision, core::Requests::Out(forward));
         }
     }
-    assert!(panel.is_none(), "every ready panel was taken where it was made");
+    assert!(panel.is_none() && forges.is_none(), "every ready document was taken where it was made");
 }

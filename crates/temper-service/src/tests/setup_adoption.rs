@@ -38,6 +38,7 @@ fn configured(hooks: bool) -> crate::settings::Engine {
 fn service(hooks: bool) -> crate::Service {
     let config = configured(hooks);
     let mut service = crate::Service::engine(config, &fixtures::seeds(), None, fixtures::forge_runtime()).unwrap();
+    assert_eq!(service.engine.as_ref().unwrap().setup.modes.get(&1), Some(&crate::setup::Mode::Fake));
     service.engine.as_mut().expect("engine").store = fixtures::records_store();
     advance(service.engine.as_mut().expect("engine"));
     assert!(service.engine.as_ref().expect("engine").setup.runs.is_empty(), "wait for records");
@@ -203,6 +204,7 @@ fn owned_gets_forgejo_given_and_managed_stays_unserved_without_start_time_plans(
         };
         let (mut endpoints, _) = crate::forge::prepare(&config, fixtures::forge_runtime()).unwrap();
         let setup = prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2).unwrap();
+        assert_eq!(setup.modes.get(&1), Some(&if managed { crate::setup::Mode::Managed } else { crate::setup::Mode::Owned }));
         assert!(setup.lifecycle.adoptions.is_empty());
         assert!(setup.runs.is_empty());
         assert!(endpoints.forges.get(0).unwrap().access.is_some());

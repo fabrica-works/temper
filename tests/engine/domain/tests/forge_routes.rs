@@ -714,7 +714,7 @@ impl World {
             key: [91; 16],
             digest: [5; 32],
             carried: None,
-            request: forge_top::Adoption {
+            request: forge_top::Ask::Adopt(forge_top::Adoption {
                 project: 1,
                 home: true,
                 forge: forge_world::REPO.forge,
@@ -726,7 +726,7 @@ impl World {
                 landing: Box::from(&b"main"[..]),
                 ci,
                 checks,
-            },
+            }),
         }));
         self.until(Until::Adopted);
         assert!(matches!(self.adopted.as_slice(), [forge_top::ApplicationOutcome::Adopted(_)]));
@@ -2483,7 +2483,7 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
         key: [98; 16],
         digest: [5; 32],
         carried: None,
-        request: forge_top::Adoption {
+        request: forge_top::Ask::Adopt(forge_top::Adoption {
             project: 1,
             home: false,
             forge: 1,
@@ -2495,7 +2495,7 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
             landing: Box::from(&b"main"[..]),
             ci: true,
             checks: Box::new([]),
-        },
+        }),
     }));
     for _ in 0..100 {
         world.tick();

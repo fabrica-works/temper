@@ -6,12 +6,14 @@ pub(crate) mod box_link;
 
 pub(crate) fn request(engine: &mut Engine, request: root::Request) {
     match request {
-        root::Request::SetUp { forge } => {
+        root::Request::SetUp { forge, request } => {
             let mut out = skein_lib::Queue::with_capacity(3);
-            engine.box_link.ask(forge, &mut out);
+            engine.box_link.ask(forge, request, &mut out);
             box_link::drain(engine, &mut out);
         }
-        root::Request::SetUpRefused { forge, why } => crate::setup::lifecycle::set_up_refused(engine, forge, why),
+        root::Request::SetUpRefused { forge, request, why } => {
+            crate::setup::lifecycle::set_up_refused(engine, forge, request, why)
+        }
         root::Request::Setup { run } => crate::setup::request(engine, run),
         root::Request::Store(request) => store(engine, request),
         root::Request::Account(request) => {

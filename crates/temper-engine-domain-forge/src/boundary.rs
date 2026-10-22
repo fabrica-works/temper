@@ -140,6 +140,29 @@ pub struct Adoption {
     pub ci: bool,
     pub checks: Box<[u32]>,
 }
+/// A FORGE request admitted by the core (client/README.md, 8).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Ask {
+    Adopt(Adoption),
+    SetUp { forge: u16 },
+}
+/// A retained application answer; only adoption outcomes are durable.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Answered {
+    Adopt(ApplicationOutcome),
+    SetUp(SetUpAnswer),
+}
+/// The box link's one answer, independent of the setup's later course.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SetUpAnswer {
+    SettingUp,
+    Refused(SetUpRefusal),
+}
+/// The deployment's connections, ordered by forge number (domain/forge.md, 4.1).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Forges {
+    pub rows: Box<[(u16, Connection)]>,
+}
 /// The admitted repository and its observed collaborators.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Adopted {
@@ -551,9 +574,11 @@ pub struct Installation {
 /// A parent or child input to the connector top.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
-    /// Ask to set up an owned forge, admitted by its connection (domain/forge.md, 4.1).
-    SetUp {
+    /// The routing's answer to a core-admitted setup request.
+    SetUpAnswered {
         forge: u16,
+        request: Token,
+        answer: SetUpAnswer,
     },
     Connection {
         forge: u16,
@@ -569,7 +594,7 @@ pub enum Event {
         request: Token,
         token: Token,
         retention: skein_lib::Duration,
-        adoption: Adoption,
+        ask: Ask,
     },
     /// The core's answer to the application's adoption part.
     ApplicationAnswered {
@@ -807,12 +832,16 @@ pub enum Request {
     /// Ask the box link to set up the forge (protocol/forge.md, 2.8).
     SetUp {
         forge: u16,
+        request: Token,
     },
     /// Name a refused ask without changing state (domain/forge.md, 4.1).
     SetUpRefused {
         forge: u16,
+        request: Token,
         why: SetUpRefusal,
     },
+    /// The deployment's forges document changed.
+    MarkedForges,
     /// Changed panel subjects, bounded by `MARKED` (domain/root.md, 10).
     Marked {
         tasks: Box<[u64]>,

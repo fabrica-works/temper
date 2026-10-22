@@ -15,12 +15,16 @@ pub(super) struct Admission {
     pub(super) carried: Option<core::Carried>,
 }
 
-pub(super) fn start(domain: &mut Domain, admission: Admission, request: forge::Adoption) {
+pub(super) fn start(domain: &mut Domain, admission: Admission, request: forge::Ask) {
     assert!(domain.application.is_none(), "one application admission value");
     let owner = Token::new(domain.next_application_owner);
     domain.next_application_owner = domain.next_application_owner.checked_add(1).expect("application owner counter");
-    domain.application = Some((owner, request));
     let Admission { reply_to, sign_in, key, digest, scope, carried } = admission;
+    let scope = match &request {
+        forge::Ask::SetUp { .. } => people::ApplicationScope::Deployment,
+        forge::Ask::Adopt(_) => scope,
+    };
+    domain.application = Some((owner, request));
     domain.work.push(Work::Core(core::Event::Application {
         reply_to,
         sign_in,
@@ -34,9 +38,9 @@ pub(super) fn start(domain: &mut Domain, admission: Admission, request: forge::A
 }
 
 pub(super) fn admitted(domain: &mut Domain, request: Token, token: Token, owner: Token, retention: Duration) {
-    let (held, adoption) = domain.application.take().expect("one admitted application value");
+    let (held, ask) = domain.application.take().expect("one admitted application value");
     assert_eq!(held, owner, "the core admits the application's owner");
-    domain.work.push(Work::Forge(forge::Event::Application { request, token, retention, adoption }));
+    domain.work.push(Work::Forge(forge::Event::Application { request, token, retention, ask }));
 }
 
 pub(super) fn drop(domain: &mut Domain, owner: Token) {

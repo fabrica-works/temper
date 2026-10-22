@@ -1,7 +1,7 @@
 //! The routing's box link: serve's side of the box's pipe (protocol/forge.md, 2.8).
 
 use alloc::boxed::Box;
-use skein_lib::{Decimal, List, Queue, Writer, bytes};
+use skein_lib::{Decimal, List, Queue, Token, Writer, bytes};
 
 /// The box's word for the step it runs (protocol/setup.md, 7.1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -22,7 +22,7 @@ pub(crate) enum Out {
     /// A line for fd 3, its line feed included.
     Write(Box<[u8]>),
     /// The ask's one answer: setting up, or its refusal.
-    Answered { forge: u16, answer: Result<(), Refused> },
+    Answered { forge: u16, request: Token, answer: Result<(), Refused> },
     /// The forge setting up: `None` at the ask, then each `step` line's step.
     SettingUp { forge: u16, step: Option<Step> },
     /// `started FORGE`: the ask ended, the group started.
@@ -47,7 +47,7 @@ impl Link {
         Link { write: None, piped, asked: None, line_bytes, partial: List::with_capacity(line_bytes), skipping: false }
     }
     /// The caller reserves three output slots before asking.
-    pub(crate) fn ask(&mut self, forge: u16, out: &mut Queue<Out>) {
+    pub(crate) fn ask(&mut self, forge: u16, request: Token, out: &mut Queue<Out>) {
         let refusal = if !self.piped {
             Some(Refused::NotUnderTheBox)
         } else if self.asked.is_some() || self.write.is_some() {
@@ -56,13 +56,13 @@ impl Link {
             None
         };
         if let Some(reason) = refusal {
-            out.push(Out::Answered { forge, answer: Err(reason) });
+            out.push(Out::Answered { forge, request, answer: Err(reason) });
             return;
         }
         self.asked = Some(forge);
         out.push(Out::Write(joined(&[b"start ", Decimal::of(u64::from(forge)).as_bytes(), b"\n"])));
         out.push(Out::SettingUp { forge, step: None });
-        out.push(Out::Answered { forge, answer: Ok(()) });
+        out.push(Out::Answered { forge, request, answer: Ok(()) });
     }
     /// Any chunking is accepted. The caller reserves one output slot per LF in
     /// this chunk (including an LF completing a previous partial line).
@@ -219,14 +219,20 @@ pub(crate) fn drain(engine: &mut crate::engine::Engine, out: &mut Queue<Out>) {
                 // Transitional: M4 (o/forgejo-setup) reads the forge's files and sends Request::Connect here (protocol/forge.md, 2.2).
                 state(engine, forge, Connection::NotConnected);
             }
-            Out::Answered { forge, answer } => match answer {
-                Ok(()) => {}
+            Out::Answered { forge, request, answer } => match answer {
+                Ok(()) => engine.events.push(temper_engine_domain::Event::Forge(Box::new(
+                    temper_engine_domain_forge::Event::SetUpAnswered {
+                        forge,
+                        request,
+                        answer: temper_engine_domain_forge::SetUpAnswer::SettingUp,
+                    },
+                ))),
                 Err(refused) => {
                     let why = match refused {
                         Refused::NotUnderTheBox => SetUpRefusal::NotUnderTheBox,
                         Refused::Busy => SetUpRefusal::Busy,
                     };
-                    set_up_refused(engine, forge, why);
+                    set_up_refused(engine, forge, request, why);
                 }
             },
             Out::Named(line) => engine.notes.push(crate::Note::BoxLink { line }),

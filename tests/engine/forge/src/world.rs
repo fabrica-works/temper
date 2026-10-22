@@ -301,7 +301,7 @@ impl World {
             request: Token::new(100),
             token: Token::new(100),
             retention: Duration::from_secs(60),
-            adoption: top::Adoption {
+            ask: top::Ask::Adopt(top::Adoption {
                 project: 5,
                 home: role != top::Role::Context,
                 forge: REPO.forge,
@@ -313,7 +313,7 @@ impl World {
                 landing: Box::from(&b"main"[..]),
                 ci: true,
                 checks: Box::new([]),
-            },
+            }),
         });
         self.run_for(1);
     }
@@ -532,7 +532,7 @@ impl World {
                 top::Request::ApplicationPart { request, .. } => {
                     top::step(&mut self.top, &self.env, top::Event::Adopt { request }, &mut self.top_out);
                 }
-                top::Request::ApplicationDone { .. } | top::Request::Marked { .. } => {}
+                top::Request::ApplicationDone { .. } | top::Request::MarkedForges | top::Request::Marked { .. } => {}
                 top::Request::ApplicationAgain { .. } => panic!("application capacity available"),
                 top::Request::Adopted { reply_to, result } => {
                     let outcome = match &result {

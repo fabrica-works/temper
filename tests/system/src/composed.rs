@@ -673,7 +673,12 @@ impl World {
             Delivery::SourceSignedOut { .. } => panic!("this story requests no source sign-out"),
             Delivery::Application { to, outcome } => {
                 assert_eq!(to.into_token(), ADOPTION);
-                assert!(matches!(outcome, Some(temper_engine_domain_forge::ApplicationOutcome::Adopted(_))));
+                assert!(matches!(
+                    outcome,
+                    Some(temper_engine_domain_forge::Answered::Adopt(
+                        temper_engine_domain_forge::ApplicationOutcome::Adopted(_)
+                    ))
+                ));
                 self.adoption = Adoption::Adopted;
             }
             Delivery::WebReply { to, reply } => self.web_reply(to.into_token(), reply),
@@ -705,6 +710,7 @@ impl World {
             Delivery::Result { .. } => {}
             other @ (Delivery::Host(_)
             | Delivery::Procedure { .. }
+            | Delivery::Forges { .. }
             | Delivery::Panel { .. }
             | Delivery::Refuse { .. }
             | Delivery::Read { .. }
@@ -747,7 +753,7 @@ impl World {
                 key: [90; 16],
                 digest: [5; 32],
                 carried: None,
-                request: adoption(),
+                request: temper_engine_domain_forge::Ask::Adopt(adoption()),
             }));
         }
     }

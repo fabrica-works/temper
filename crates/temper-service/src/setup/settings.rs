@@ -149,6 +149,14 @@ pub(crate) fn prepare(
         batch,
         own.forge_component.installations,
     );
+    for setup in &config.setup {
+        let mode = match &setup.entry.mode {
+            Mode::Managed { .. } => super::Mode::Managed,
+            Mode::Owned(_) => super::Mode::Owned,
+            Mode::Fake(_) => super::Mode::Fake,
+        };
+        layer.modes.insert(setup.entry.forge, mode).expect("configured setup modes");
+    }
     for forge in &config.forges {
         if !layer.served.contains_key(&forge.number) {
             let reason: &[u8] = match forge.kind {

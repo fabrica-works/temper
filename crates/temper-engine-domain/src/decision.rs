@@ -56,6 +56,11 @@ pub enum Delivery {
         watcher: Token,
         panel: Box<temper_engine_domain_forge::Panel>,
     },
+    /// The deployment's connection document (domain/root.md, 5.1).
+    Forges {
+        watcher: Token,
+        forges: temper_engine_domain_forge::Forges,
+    },
     SourceSignedOut {
         to: ReplyTo,
         channel: Token,
@@ -64,7 +69,7 @@ pub enum Delivery {
     },
     Application {
         to: ReplyTo,
-        outcome: Option<temper_engine_domain_forge::ApplicationOutcome>,
+        outcome: Option<temper_engine_domain_forge::Answered>,
     },
     /// Host protocol handoffs follow their prerequisite commits.
     Host(Box<crate::HostDelivery>),
@@ -415,6 +420,23 @@ impl Decision {
                 panel.within()
                     && owned
                         <= usize::try_from(limits.result_bytes.max(limits.transcript_bytes)).expect("u32 fits usize")
+            }
+            Delivery::Forges { forges, .. } => {
+                let mut owned =
+                    forges.rows.len().saturating_mul(size_of::<(u16, temper_engine_domain_forge::Connection)>());
+                for (_, connection) in &forges.rows {
+                    use temper_engine_domain_forge::Connection;
+                    owned = owned.saturating_add(match connection {
+                        Connection::Connected { login, .. } => login.len(),
+                        Connection::SetUpFailed { why } => why.len(),
+                        Connection::Stopped { reason } => reason.len(),
+                        Connection::NotConnected
+                        | Connection::NotSetUp
+                        | Connection::SettingUp { .. }
+                        | Connection::Connecting => 0,
+                    });
+                }
+                owned <= usize::try_from(limits.result_bytes.max(limits.transcript_bytes)).expect("u32 fits usize")
             }
             Delivery::Fleet(event) => fleet_delivery_within(event),
             Delivery::Relay { word, .. } => {

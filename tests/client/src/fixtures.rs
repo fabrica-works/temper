@@ -879,7 +879,7 @@ fn adopt_goal_repository(driver: &mut Driver) {
         key: ADOPT_KEY,
         digest: ADOPT_DIGEST,
         carried: None,
-        request,
+        request: temper_engine_domain_forge::Ask::Adopt(request),
     }));
     driver.settle();
 }
