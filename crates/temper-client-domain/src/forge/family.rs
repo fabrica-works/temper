@@ -38,7 +38,9 @@ pub fn request(a: &forge::Adoption, limits: &w::Limits) -> Option<jig_client::Fa
     Some(jig_client::Family {
         family: wire::number(wire::Owner::Forge),
         version: wire::CLIENT_VERSION,
-        bytes: wire::adopt(&record),
+        bytes: wire::requesting(
+            &w::Requesting::new(limits, w::RequestingParts { request: w::Request::Adopt(record) }).ok()?,
+        ),
     })
 }
 #[must_use]
@@ -50,7 +52,7 @@ pub fn answer(record: &jig_client::Family, limits: &w::Limits, link: &link::Limi
         return None;
     }
     let mut reader = Reader::new(&record.bytes);
-    let a = w::AdoptAnswer::decode(limits, &mut reader).ok()?.into_parts();
+    let a = w::Answer::decode(limits, &mut reader).ok()?.into_parts();
     if !reader.is_empty() {
         return None;
     }
@@ -102,6 +104,7 @@ pub fn answer(record: &jig_client::Family, limits: &w::Limits, link: &link::Limi
             w::ForgeReason::InvalidAnswer => forge::Reason::InvalidAnswer,
         }),
         w::Outcome::Unknown => forge::Answer::Unknown,
+        w::Outcome::SettingUp | w::Outcome::SetUpRefused(_) => return None,
     })
 }
 #[must_use]

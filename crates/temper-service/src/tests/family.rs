@@ -53,7 +53,7 @@ fn exchange(family: u16, version: u32, record: Box<[u8]>) -> kit::ToApplication 
 fn an_adopt_reaches_the_root_with_its_forges_host() {
     let forges = configured(b"https://forge.example:3000/git");
     let event = family::to_root(
-        exchange(wire::FORGE, wire::CLIENT_VERSION, wire::adopt(&adopt())),
+        exchange(wire::FORGE, wire::CLIENT_VERSION, wire::requesting(&requesting())),
         &forges,
         None,
         &w::CEILINGS,
@@ -83,9 +83,13 @@ fn an_adopt_reaches_the_root_with_its_forges_host() {
 }
 #[test]
 fn an_adopt_naming_no_configured_forge_reaches_the_root_with_no_host() {
-    let event =
-        family::to_root(exchange(wire::FORGE, wire::CLIENT_VERSION, wire::adopt(&adopt())), &[], None, &w::CEILINGS)
-            .unwrap();
+    let event = family::to_root(
+        exchange(wire::FORGE, wire::CLIENT_VERSION, wire::requesting(&requesting())),
+        &[],
+        None,
+        &w::CEILINGS,
+    )
+    .unwrap();
     let root::Event::Party(root::PartyInput::Application { request, .. }) = event else { panic!("adoption") };
     assert!(request.host.is_empty());
     assert_eq!(request.forge, 1);
@@ -93,8 +97,8 @@ fn an_adopt_naming_no_configured_forge_reaches_the_root_with_no_host() {
 #[test]
 fn an_adopt_of_another_version_is_answered_undecodable() {
     for (row, family, version, record, expected) in [
-        ("family", 2, wire::CLIENT_VERSION, wire::adopt(&adopt()), REPLY),
-        ("version", 1, wire::CLIENT_VERSION + 1, wire::adopt(&adopt()), REPLY),
+        ("family", 2, wire::CLIENT_VERSION, wire::requesting(&requesting()), REPLY),
+        ("version", 1, wire::CLIENT_VERSION + 1, wire::requesting(&requesting()), REPLY),
         ("malformed", 1, wire::CLIENT_VERSION, Box::new([]), REPLY),
         ("trailing", 1, wire::CLIENT_VERSION, trailing_adopt(), REPLY),
     ] {
@@ -108,7 +112,7 @@ fn an_adopt_of_another_version_is_answered_undecodable() {
     }
 }
 fn trailing_adopt() -> Box<[u8]> {
-    let record = wire::adopt(&adopt());
+    let record = wire::requesting(&requesting());
     let mut bytes = skein_lib::Writer::new(record.len().checked_add(1).unwrap());
     bytes.put(&record).unwrap();
     bytes.put(&[0]).unwrap();
@@ -279,7 +283,7 @@ fn encoded(outcome: Option<forge::ApplicationOutcome>) -> w::Outcome {
     let jig = jig_protocol_config::profile(jig_protocol_config::Profile::Small).clients.wire;
     let bytes = family::answer(outcome, &w::CEILINGS, &jig).unwrap();
     let mut reader = Reader::new(&bytes);
-    let answer = w::AdoptAnswer::decode(&w::CEILINGS, &mut reader).unwrap();
+    let answer = w::Answer::decode(&w::CEILINGS, &mut reader).unwrap();
     assert!(reader.is_empty());
     answer.into_parts().outcome
 }
@@ -397,9 +401,12 @@ fn an_adopted_repository_keeps_its_protection_rule() {
 fn a_request_under_an_owner_without_records_is_answered_undecodable() {
     for owner in [wire::Owner::Pages, wire::Owner::Runner] {
         let number = wire::number(owner);
-        let Err(answer) =
-            family::to_root(exchange(number, wire::CLIENT_VERSION, wire::adopt(&adopt())), &[], None, &w::CEILINGS)
-        else {
+        let Err(answer) = family::to_root(
+            exchange(number, wire::CLIENT_VERSION, wire::requesting(&requesting())),
+            &[],
+            None,
+            &w::CEILINGS,
+        ) else {
             panic!("owner is not served: {owner:?}")
         };
         let kit::Event::Application(kit::FromApplication::Undecodable { to }) = *answer else {
@@ -441,7 +448,7 @@ fn a_malformed_refusal_encodes_its_fields() {
 }
 #[test]
 fn a_family_request_keeps_its_supplied_admission_scope() {
-    let mut input = exchange(wire::FORGE, wire::CLIENT_VERSION, wire::adopt(&adopt()));
+    let mut input = exchange(wire::FORGE, wire::CLIENT_VERSION, wire::requesting(&requesting()));
     let kit::ToApplication::Request { scope, .. } = &mut input else { panic!("request") };
     *scope = people::ApplicationScope::Deployment;
     let event = family::to_root(input, &[], None, &w::CEILINGS).unwrap();
@@ -761,4 +768,44 @@ fn a_panel_before_the_first_head_has_no_pull_or_running_delegate() {
     assert_eq!(got.step, w::Step::Producing);
     assert_eq!(got.ci, w::Ci::Unknown);
     assert!(got.gates.is_empty());
+}
+
+fn requesting() -> w::Requesting {
+    w::Requesting::new(&w::CEILINGS, w::RequestingParts { request: w::Request::Adopt(adopt()) }).unwrap()
+}
+
+#[test]
+fn setup_requests_are_undecodable_until_task_e_wires_them() {
+    let request = w::Requesting::new(
+        &w::CEILINGS,
+        w::RequestingParts {
+            request: w::Request::SetUp(w::SetUp::new(&w::CEILINGS, w::SetUpParts { forge: 3 }).unwrap()),
+        },
+    )
+    .unwrap();
+    let Err(event) = family::to_root(
+        exchange(wire::FORGE, wire::CLIENT_VERSION, wire::requesting(&request)),
+        &[],
+        None,
+        &w::CEILINGS,
+    ) else {
+        panic!("setup request refused")
+    };
+    let kit::Event::Application(kit::FromApplication::Undecodable { to }) = *event else { panic!("undecodable setup") };
+    assert_eq!(to, REPLY);
+}
+
+#[test]
+fn forges_watches_are_refused_unknown_until_task_e_wires_them() {
+    let watching = w::Watching::new(&w::CEILINGS, w::WatchingParts { watch: w::Watch::Forges }).unwrap();
+    let Err(event) = family::to_root(
+        watch_exchange(wire::FORGE, wire::CLIENT_VERSION, wire::watching(&watching)),
+        &[],
+        None,
+        &w::CEILINGS,
+    ) else {
+        panic!("refused watch")
+    };
+    let kit::Event::WatchRefused { watcher, why } = *event else { panic!("unknown watch") };
+    assert_eq!((watcher, why), (WATCHER, jig_domain_core::WatchRefusal::Unknown));
 }

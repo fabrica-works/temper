@@ -77,11 +77,17 @@ fn adopt_sends_one_keyed_request_and_a_second_press_none() {
     assert_eq!(record.request.key.asker, fixtures::FORGE_ASKER);
     assert_eq!(family.family, temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Forge));
     assert_eq!(family.version, temper_client_protocol_wire::CLIENT_VERSION);
-    let adoption = temper_client_protocol_wire::v1::Adopt::decode(
+    let adoption = (match temper_client_protocol_wire::v1::Requesting::decode(
         &forge::wire_limits(&fixtures::limits().forge).expect("wire bounds"),
         &mut skein_lib::Reader::new(&family.bytes),
     )
     .expect("adoption bytes")
+    .into_parts()
+    .request
+    {
+        temper_client_protocol_wire::v1::Request::Adopt(adopt) => adopt,
+        temper_client_protocol_wire::v1::Request::SetUp(_) => panic!("expected adoption"),
+    })
     .into_parts();
     assert_eq!(
         (adoption.project, adoption.forge, &*adoption.owner, &*adoption.name),
@@ -174,11 +180,17 @@ fn an_adoption_is_the_forges_family_bytes_under_its_asker() {
     assert_eq!(record.request.key.asker, fixtures::FORGE_ASKER);
     let jig_client::Ask::Family { record, .. } = record.request.request else { panic!("opaque family") };
     let mut reader = skein_lib::Reader::new(&record.bytes);
-    let adoption = temper_client_protocol_wire::v1::Adopt::decode(
+    let adoption = (match temper_client_protocol_wire::v1::Requesting::decode(
         &forge::wire_limits(&fixtures::limits().forge).expect("wire bounds"),
         &mut reader,
     )
     .expect("family adoption")
+    .into_parts()
+    .request
+    {
+        temper_client_protocol_wire::v1::Request::Adopt(adopt) => adopt,
+        temper_client_protocol_wire::v1::Request::SetUp(_) => panic!("expected adoption"),
+    })
     .into_parts();
     assert!(reader.is_empty());
     assert_eq!(

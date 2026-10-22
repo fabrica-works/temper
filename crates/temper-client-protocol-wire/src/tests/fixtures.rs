@@ -46,7 +46,7 @@ pub fn adopted() -> v1::Adopted {
     .expect("adopted repository")
 }
 
-pub fn outcome_rows() -> [v1::Outcome; 13] {
+pub fn outcome_rows() -> [v1::Outcome; 17] {
     let limits = limits();
     let original = adopted().into_parts();
     let mut contexts = List::with_capacity(1);
@@ -76,6 +76,10 @@ pub fn outcome_rows() -> [v1::Outcome; 13] {
         forge_refused(v1::ForgeReason::Unreachable),
         forge_refused(v1::ForgeReason::InvalidAnswer),
         v1::Outcome::Unknown,
+        v1::Outcome::SettingUp,
+        set_up_refused(v1::SetUpRefusal::NotOffered),
+        set_up_refused(v1::SetUpRefusal::NotUnderTheBox),
+        set_up_refused(v1::SetUpRefusal::Busy),
     ]
 }
 
@@ -266,7 +270,7 @@ pub enum PanelBound {
     Landing,
 }
 
-fn field_bytes(count: u32) -> Box<[u8]> {
+pub fn field_bytes(count: u32) -> Box<[u8]> {
     let mut bytes = skein_lib::bytes::zeroed(usize::try_from(count).expect("field length fits usize"));
     bytes.fill(b'a');
     bytes
@@ -277,4 +281,8 @@ pub fn trailing(bytes: &[u8]) -> Box<[u8]> {
     writer.put(bytes).expect("record room");
     writer.put(&[0]).expect("trailing byte room");
     writer.finish()
+}
+
+fn set_up_refused(why: v1::SetUpRefusal) -> v1::Outcome {
+    v1::Outcome::SetUpRefused(v1::SetUpRefused::new(&limits(), v1::SetUpRefusedParts { why }).expect("setup refusal"))
 }

@@ -128,7 +128,11 @@ pub fn request(
     assert_eq!(ask.version, w::CLIENT_VERSION);
     let limits = forge::wire_limits(&crate::app::limits().forge).expect("wire bounds");
     let mut reader = skein_lib::Reader::new(&ask.bytes);
-    let a = v1::Adopt::decode(&limits, &mut reader).expect("whole adoption bytes").into_parts();
+    let a = (match v1::Requesting::decode(&limits, &mut reader).expect("whole adoption bytes").into_parts().request {
+        v1::Request::Adopt(adopt) => adopt,
+        v1::Request::SetUp(_) => panic!("expected adoption"),
+    })
+    .into_parts();
     assert!(reader.is_empty());
     let value = forge::Adoption {
         project: a.project,
@@ -184,37 +188,36 @@ pub fn open(
     if record.family == w::FORGE
         && record.version == w::CLIENT_VERSION
         && let Some(watching) = w::decode_watching(&record.bytes, &v1::CEILINGS)
+        && let v1::Watch::Change(change) = watching.into_parts().watch
         && let jig_client::contract::Scope::Project(project) = scope
+        && change.task() > 0
     {
-        let v1::Watch::Change(change) = watching.into_parts().watch;
-        if change.task() > 0 {
-            let scope = jig_domain_people::ApplicationScope::Project(project);
-            let watcher = transport.open(
-                who,
-                watch,
-                Watched::Application {
-                    subject: family::Subject {
-                        scope: family::Scope::Project(project),
-                        kind: family::Kind::Panel(change.task()),
-                    },
-                    scope,
+        let scope = jig_domain_people::ApplicationScope::Project(project);
+        let watcher = transport.open(
+            who,
+            watch,
+            Watched::Application {
+                subject: family::Subject {
+                    scope: family::Scope::Project(project),
+                    kind: family::Kind::Panel(change.task()),
                 },
-            );
-            return (
-                vec![engine::Event::Party(PartyInput::Watch {
-                    watcher,
-                    sign_in: transport.sign_in(who).expect("authenticated watch"),
-                    subject: jig_domain_core::documents::Watched::Application {
-                        scope,
-                        connector: w::FORGE,
-                        subject: Token::new(change.task()),
-                    },
-                    // The family does not use its window: every panel is whole.
-                    window: jig_domain_core::documents::Window { rows: window.rows, after: None },
-                })],
-                None,
-            );
-        }
+                scope,
+            },
+        );
+        return (
+            vec![engine::Event::Party(PartyInput::Watch {
+                watcher,
+                sign_in: transport.sign_in(who).expect("authenticated watch"),
+                subject: jig_domain_core::documents::Watched::Application {
+                    scope,
+                    connector: w::FORGE,
+                    subject: Token::new(change.task()),
+                },
+                // The family does not use its window: every panel is whole.
+                window: jig_domain_core::documents::Window { rows: window.rows, after: None },
+            })],
+            None,
+        );
     }
     (
         Vec::new(),
@@ -496,6 +499,28 @@ mod watch_tests {
             }
         ));
         *watcher
+    }
+
+    #[test]
+    fn an_adoption_request_envelope_decodes_to_the_root_request() {
+        let adoption = forge::Adoption {
+            project: 7,
+            home: true,
+            forge: w::FORGE,
+            owner: b"acme".as_slice().into(),
+            name: b"shop".as_slice().into(),
+            prefix: b"work/".as_slice().into(),
+            landing: b"main".as_slice().into(),
+            role: forge::Role::Owned,
+            ci: true,
+            checks: Box::new([2, 3]),
+        };
+        let limits = forge::wire_limits(&crate::app::limits().forge).expect("wire bounds");
+        let record = forge::family::request(&adoption, &limits).expect("request envelope");
+        let mut transport = transport();
+        let event = super::request(&mut transport, CLIENT, NATIVE, [5; 16], c::Scope::Project(7), &record);
+        let engine::Event::Party(PartyInput::Application { request, .. }) = event else { panic!("root adoption") };
+        assert_eq!(request, super::adoption(&adoption, crate::fixtures::FORGE_HOST));
     }
 
     #[test]
