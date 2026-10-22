@@ -21,19 +21,26 @@ pub(super) fn valid(
     }
     let correct = match spec.kind {
         Kind::Number | Kind::Count => return valid_number(spec, value, argument, limits),
+        Kind::NumberRange { min, max } => {
+            let Value::Number(n) = value else {
+                return Err(Usage::Kind { argument });
+            };
+            *n >= min && *n <= max
+        }
+        Kind::NamedNumber { words, prefix, min, max } => {
+            let Value::Text(bytes) = value else {
+                return Err(Usage::Kind { argument });
+            };
+            named_number(bytes, words, prefix, min, max)
+        }
         Kind::Word { set } => {
             let Value::Word(index) = value else {
                 return Err(Usage::Kind { argument });
             };
             set.get(usize::from(*index)).is_some()
         }
-        Kind::Literal => {
-            let Value::Text(_) = value else {
-                return Err(Usage::Kind { argument });
-            };
-            return valid_text(value, argument, limits);
-        }
-        Kind::Text => return valid_text(value, argument, limits),
+        Kind::Literal if *value == Value::Stdin => false,
+        Kind::Literal | Kind::Text => return valid_text(value, argument, limits),
         Kind::File => {
             if let Value::Text(_) = value
                 && (spec.name == b"instructions" || spec.name == b"spec")
@@ -73,15 +80,7 @@ pub(super) fn valid(
             };
             !bytes.is_empty()
         }
-        Kind::Duration => {
-            let Value::Duration(duration) = value else {
-                return Err(Usage::Kind { argument });
-            };
-            if spec.name == b"timeout" && *duration > limits.wait_most {
-                return Err(Usage::Rows { argument });
-            }
-            duration.as_nanos().checked_rem(1_000_000_000) == Some(0)
-        }
+        Kind::Duration => return valid_duration(spec, value, argument, limits),
         Kind::Proposal => {
             let Value::Proposal(_) = value else {
                 return Err(Usage::Kind { argument });
@@ -118,6 +117,8 @@ pub(super) fn valid(
 pub(crate) fn decode(table: &[&Tool], kind: Kind, word: &[u8]) -> Option<Value> {
     Some(match kind {
         Kind::Number | Kind::Count => Value::Number(number(word)?),
+        Kind::NumberRange { min, max } => Value::Number(bounded_number(word, min, max)?),
+        Kind::NamedNumber { words, prefix, min, max } => Value::Text(named_text(word, words, prefix, min, max)?),
         Kind::Word { set } => {
             let mut found = None;
             for (index, name) in set.iter().enumerate() {
@@ -398,4 +399,32 @@ fn valid_number(spec: &Argument, value: &Value, argument: u8, limits: &Limits) -
         return Err(Usage::Kind { argument });
     }
     Ok(())
+}
+
+fn named_number(word: &[u8], words: &[&[u8]], prefix: &[u8], min: u64, max: u64) -> bool {
+    if words.contains(&word) {
+        return true;
+    }
+    let Some(digits) = word.strip_prefix(prefix) else { return false };
+    match number(digits) {
+        Some(n) => n >= min && n <= max,
+        None => false,
+    }
+}
+
+fn valid_duration(spec: &Argument, value: &Value, argument: u8, limits: &Limits) -> Result<(), Usage> {
+    let Value::Duration(duration) = value else {
+        return Err(Usage::Kind { argument });
+    };
+    if spec.name == b"timeout" && *duration > limits.wait_most {
+        return Err(Usage::Rows { argument });
+    }
+    if duration.as_nanos().checked_rem(1_000_000_000) == Some(0) { Ok(()) } else { Err(Usage::Kind { argument }) }
+}
+fn bounded_number(word: &[u8], min: u64, max: u64) -> Option<u64> {
+    let n = number(word)?;
+    if n < min || n > max { None } else { Some(n) }
+}
+fn named_text(word: &[u8], words: &[&[u8]], prefix: &[u8], min: u64, max: u64) -> Option<Box<[u8]>> {
+    if named_number(word, words, prefix, min, max) { Some(Box::from(word)) } else { None }
 }

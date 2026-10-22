@@ -58,7 +58,9 @@ fn shown(argument: &Argument, out: &mut Writer) -> Result<(), Overflow> {
             }
             Ok(())
         }
-        Kind::Number
+        Kind::NumberRange { .. }
+        | Kind::NamedNumber { .. }
+        | Kind::Number
         | Kind::Count
         | Kind::Text
         | Kind::Literal

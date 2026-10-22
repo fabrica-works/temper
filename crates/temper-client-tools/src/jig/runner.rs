@@ -72,6 +72,18 @@ impl Runner {
     pub fn parts(&mut self, parts: &'static dyn render::Parts) {
         self.parts = Some(parts);
     }
+    pub(crate) fn calls(&self) -> usize {
+        self.waiting
+            .len()
+            .checked_add(self.active.len())
+            .expect("bounded calls")
+            .checked_add(self.acts.len())
+            .expect("bounded calls")
+            .checked_add(self.waits.len())
+            .expect("bounded calls")
+            .checked_add(self.sent.len())
+            .expect("bounded calls")
+    }
     pub(crate) fn forget_kept(&mut self, key: jig_client::Key) {
         self.kept.remove(&key);
     }
@@ -104,17 +116,7 @@ pub fn call(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>,
         finish(called, printed, out);
         return;
     }
-    let count = runner
-        .waiting
-        .len()
-        .checked_add(runner.active.len())
-        .expect("bounded calls")
-        .checked_add(runner.acts.len())
-        .expect("bounded calls")
-        .checked_add(runner.waits.len())
-        .expect("bounded calls")
-        .checked_add(runner.sent.len())
-        .expect("bounded calls");
+    let count = runner.calls();
     if count >= usize::try_from(env.limits.rows).expect("rows fit") {
         let printed = render::failure(b"call limit", called.json, 1);
         finish(called, printed, out);

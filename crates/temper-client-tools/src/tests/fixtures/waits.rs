@@ -393,7 +393,7 @@ pub(crate) fn met_json(read: &[u8]) -> Box<[u8]> {
     appended(&appended(b"{\"task\":", read), b",\"met\":true}")
 }
 impl Harness {
-    fn watch_token(&self, wanted: &client::Watchable) -> Token {
+    pub(crate) fn watch_token(&self, wanted: &client::Watchable) -> Token {
         for (token, subject) in &self.watches {
             if subject == wanted {
                 return *token;

@@ -5,6 +5,7 @@ extern crate alloc;
 pub mod adopt;
 mod amend;
 mod forge;
+mod forges;
 pub mod jig;
 pub mod key;
 pub mod limits;
