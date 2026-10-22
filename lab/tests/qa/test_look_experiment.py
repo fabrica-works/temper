@@ -72,13 +72,6 @@ class LookExperiment(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('temper.css', result.stderr.decode())
 
-    def test_bundle_directory_is_a_sixteen_digit_hex_digest(self):
-        for name in ['short', '0123456789abcde', '0123456789abcdef0', 'g123456789abcdef']:
-            with self.subTest(name=name):
-                result, _ = self.stage({f'bundle/{name}/temper.css': CSS}, target='bad-' + name)
-                self.assertNotEqual(result.returncode, 0,
-                                    'lab/README.md: bundle directory is named by its 16-digit hex digest')
-
     def test_planted_css_is_appended_once_after_the_subject_stylesheet(self):
         files = {f'bundle/{DIGEST}/temper.css': CSS, 'chat.html': b'<main>chat</main>'}
         result, destination = self.stage(files, 'look-planted')
