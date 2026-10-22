@@ -374,7 +374,8 @@ keeps (`../protocol/configuration.md`, section 2).
 - **A task's page** is of its kind, as `task.html` lays each out: a
   tracked task's, a goal's (5.8); an agent's task's, for an agent's
   task with no priority (5.9). A task with the chat label opens as
-  `Chat { task }`. A procedure's task or a person
+  `Chat { task }`. A procedure's task shows a tracked task's header
+  and plan, with its goal and its plan as "Its tasks" (5.10); a person
   task shows a tracked task's header and plan only (section 11).
 - **The forge's parts** of a page (a goal's issue and changes on its
   page; changes in flight and the project's health on the board) are
@@ -1402,6 +1403,29 @@ act but a held task's card (3.6): its acts come later (section 11).
   `.agent-lineage`, `.agent-brief`, `.agent-run-heading`,
   `.agent-run-meta` and `.agent-result` (`browser.md`, 2.5).
 
+### 5.10 A procedure's task's page
+
+A procedure's task, a change among them (`../domain/forge.md`, section
+8), shows a tracked task's header and plan (5.8), as a person task
+does, and two things more, after `task.html`'s change:
+
+- **Its goal:** in the header's first line, after its project and its
+  procedure's part, a slot of "Goal" and the "Task G" link to the goal
+  it serves, the document's `goal` (the nearest tracked task at or
+  above it, itself included: jig's `domain/core.md`, 6.2), when that is
+  another task. A tracked procedure's task serves itself and one under
+  a chat serves none; neither shows the slot.
+- **Its tasks:** its plan's region and tree are named "Its tasks", the
+  tasks its procedure made (the agent producing a change's branch, its
+  repairs and reviews), where a goal's and a person task's say "Plan".
+- **The rest is the forge's:** a change's stages, pull request, branch
+  and gates are the forge's parts (`forge.md`, section 2). The header's
+  procedure part says "Shown on the forge." for them (4.2); the page
+  draws no stage bar, no gates and no "View on forge".
+- **Its words and look:** "Goal" and "Its tasks", two phrases; no new
+  token, since the slot sits in the header's META line and the link is
+  the plan's.
+
 ## 6. The terminal shell
 
 ### 6.1 `temper open DIRECTORY LINK_OR_ADDRESS`
@@ -1901,7 +1925,10 @@ own tests:
   brief with dependencies and none, its run's heading in each phase
   with a start and none, its conversation as a chat's, its result in
   each state and none before it ends, its plan only with a delegate or
-  a card, and no act but a held task's card; the forge's words for every
+  a card, and no act but a held task's card; a procedure's task's
+  page, 5.10: its goal's link when it serves another task and none
+  when it serves itself or none, and "Its tasks" over its plan where a
+  person task's says "Plan"; the forge's words for every
   path shape and every kind, the form and its picker in each state,
   every outcome, the forges' page with a forge in each state of
   `forge.md`, 5.4);
@@ -2015,8 +2042,8 @@ own tests:
   which the forges' page shows (3.5); the "Tasks" list of a project
   and the deployment's hosts, which the mockups draw ("Tasks",
   "Workers"), after jig's pages (`client/domain/pages.md`, 6.3 and 7);
-  a procedure's task and a person task beyond a tracked task's header
-  and plan; making a service and showing its
+  a procedure's task beyond 5.10's page, and a person task beyond a
+  tracked task's header and plan; making a service and showing its
   credential once; another party's kept work. Default: not in temper's
   client; the person acts on them through the engine's configuration,
   or not at all.
