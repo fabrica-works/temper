@@ -139,6 +139,13 @@ impl Domain {
                     verdict = worse(verdict, report.status);
                 }
             }
+            // A gate whose review runs at the current head is pending until it reports.
+            if let Some((_, change::Delegate::Gate { number, head: asked })) = row.delegate
+                && number == gate.number
+                && Some(asked) == head
+            {
+                verdict = worse(verdict, change::Status::Pending);
+            }
             gates
                 .push(PanelGate { number: gate.number, kind: gate.kind, blocking: gate.blocking, verdict })
                 .expect("admitted panel gates");

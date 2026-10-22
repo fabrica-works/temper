@@ -950,9 +950,9 @@ What the connector makes of a change for the client's panel
   repository's record; its branch, landing branch and head; its pull
   request's number; its state, with the step it was held at; the task
   its one delegate runs; its gates and their verdicts, each judged at
-  the current head with its freshness (8.3); and its repairs,
-  resolutions and updates used, with their limits from
-  `change_policy`.
+  the current head with its freshness (8.3), a gate whose review runs at
+  that head pending until it reports; and its repairs, resolutions and
+  updates used, with their limits from `change_policy`.
 - **CI at its head** is what its last step read (5.3), kept in memory
   beside its record, one verdict per change: a restart forgets it, and
   the panel says unknown until the change's next step reads it again.

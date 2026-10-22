@@ -211,6 +211,36 @@ fn gates_are_judged_at_the_head_with_failed_and_pending_verdicts_taking_preceden
     );
 }
 #[test]
+fn a_gate_whose_review_runs_at_the_head_is_pending() {
+    let gate = |number| change::Gate {
+        number,
+        kind: change::GateKind::Agent,
+        blocking: true,
+        freshness: change::Freshness::Exact,
+        eager: false,
+    };
+    for (head, verdict) in [(fixtures::HEAD, change::Status::Pending), (fixtures::BASE, change::Status::Unknown)] {
+        let mut row = fixtures::opening_row();
+        row.change.gates = Box::new([gate(1), gate(2)]);
+        row.change.state = change::State::Gating { head: fixtures::HEAD, asked: Box::new([1]) };
+        row.delegate = Some((90, change::Delegate::Gate { number: 1, head }));
+        let got = panel(&with_row(row));
+        assert_eq!(got.runs, Some(90));
+        assert_eq!(
+            got.gates.as_ref(),
+            &[
+                PanelGate { number: 1, kind: change::GateKind::Agent, blocking: true, verdict },
+                PanelGate {
+                    number: 2,
+                    kind: change::GateKind::Agent,
+                    blocking: true,
+                    verdict: change::Status::Unknown
+                },
+            ]
+        );
+    }
+}
+#[test]
 fn a_fresh_ci_read_marks_a_changed_verdict_and_restart_forgets_it() {
     let (mut d, _) = fixtures::opening();
     fixtures::missing_pull(&mut d);
