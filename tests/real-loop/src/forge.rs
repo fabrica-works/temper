@@ -218,7 +218,11 @@ pub fn peer_limits() -> skein_fake_peers::Limits {
             close_timeout: Duration::from_secs(1),
             retry: Duration::from_millis(1),
         },
-        connections: 4,
+        // Room past the forge client's calls for the peer's other
+        // connections: with only the calls' four, a call found the slots
+        // taken now and then (4 to 6 refusals a fuzzy run) and waited out
+        // its 1 s read retry.
+        connections: protocol_limits().calls + 3,
         queue: 64,
         plaintext: 32_768,
         ciphertext: 32_768,
