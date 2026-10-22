@@ -13,6 +13,7 @@ pub mod forgejo;
 pub mod live;
 pub mod person;
 pub mod program_login;
+pub mod sign_in;
 use std::{fs, net::SocketAddr, os::unix::fs::PermissionsExt, path::Path};
 
 /// `N` distinct loopback addresses that no listener holds now, none of
@@ -233,6 +234,7 @@ enum Process {
     Stdout(Box<StdoutReader>),
     Person(Box<person::Person>),
     Peer(Box<skein_fake_peers::llm::Peer>),
+    Issuer(Box<skein_fake_peers::oauth::Peer>),
 }
 impl Process {
     fn host(&self) -> &dyn Host {
@@ -242,6 +244,7 @@ impl Process {
             Self::Stdout(x) => x.as_ref(),
             Self::Person(x) => x.as_ref(),
             Self::Peer(x) => x.as_ref(),
+            Self::Issuer(x) => x.as_ref(),
         }
     }
     fn host_mut(&mut self) -> &mut dyn Host {
@@ -251,6 +254,7 @@ impl Process {
             Self::Stdout(x) => x.as_mut(),
             Self::Person(x) => x.as_mut(),
             Self::Peer(x) => x.as_mut(),
+            Self::Issuer(x) => x.as_mut(),
         }
     }
 }
@@ -456,7 +460,9 @@ impl Referee<Process> for ChatJudge<'_> {
                     .filter(|observation| matches!(observation, skein_fake_peers::llm::Observation::Query { .. }))
                     .count(),
             ),
-            Process::Binary(_) | Process::Person(_) | Process::Stdout(_) | Process::Calls(_) => None,
+            Process::Binary(_) | Process::Person(_) | Process::Stdout(_) | Process::Calls(_) | Process::Issuer(_) => {
+                None
+            }
         });
         assert!(
             person.failed.is_none(),

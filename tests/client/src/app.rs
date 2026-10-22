@@ -307,7 +307,9 @@ impl App for Temper {
         else {
             return None;
         };
+        // Seen has no kept answer; match jig's client observer.
         Some(match request {
+            jig_client::Ask::Jig(ask) if matches!(ask.as_ref(), jig_client::contract::Ask::Seen { .. }) => return None,
             jig_client::Ask::Family { .. } => {
                 Sent { attempt: *attempt, key: *key, card: Some(adoption_card()), revision: None, words: None }
             }

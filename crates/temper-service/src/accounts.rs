@@ -311,6 +311,7 @@ impl Accounts {
                     self.forgotten.push(source);
                 }
                 translate::Down::SignOut { source } => self.down(driver::Request::SignOut { account: source }),
+                translate::Down::CancelSignIn { source } => self.down(driver::Request::Cancel { account: source }),
                 translate::Down::SignIn { source, provider } => {
                     let Some(template) = self.providers.get(&provider) else {
                         self.above.push(driver::Event::Refused {
@@ -949,7 +950,6 @@ pub(crate) fn worst_case(limits: &driver::Limits, room: u32, page_rows: u32) -> 
         .checked_add(Map::<u32, Box<[u8]>>::worst_case(limits.accounts)?)?
         .checked_add(Map::<u32, Erasing>::worst_case(limits.accounts)?)?
         .checked_add(u64::from(limits.accounts).checked_mul(u64::from(limits.client.scope_bytes))?)?
-        .checked_add(u64::from(limits.accounts).checked_mul(u64::from(table::ACCOUNT_ID_BYTES))?)?
         .checked_add(u64::from(room).checked_mul(record.checked_add(4096)?)?)
 }
 

@@ -293,7 +293,10 @@ impl Calls {
     pub fn ends(&self) -> &[Ended] {
         &self.ends
     }
-    fn new(root: Fd, steps: Vec<Step>, streams: Option<&Streams>, forgejo: Option<u32>) -> Self {
+    pub(super) fn pending(&self) -> Option<&Ended> {
+        self.child.as_ref().map(|child| &child.ended)
+    }
+    pub(super) fn new(root: Fd, steps: Vec<Step>, streams: Option<&Streams>, forgejo: Option<u32>) -> Self {
         let mut calls = Self {
             root: Some(root),
             client: b"client".as_slice().into(),

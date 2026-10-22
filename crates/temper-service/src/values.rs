@@ -101,7 +101,7 @@ impl Values {
         let mut values = List::with_capacity(u32::try_from(grants.len()).expect("bounded grants"));
         for grant in grants {
             let value = match grant.form {
-                host::Form::Credential(_) | host::Form::Withdrawn => {
+                host::Form::Credential(_) => {
                     account_grant(grant.form, self.accounts.value(grant.account, grant.generation, now))
                 }
                 host::Form::Application => identity_grant(self.identities.get(grant.account, grant.generation)),
@@ -118,7 +118,6 @@ fn account_grant(form: host::Form, value: Option<&table::Value>) -> Option<Grant
     let actual = match &value.scheme {
         table::Scheme::Bearer => host::Form::Credential(host::Scheme::Bearer),
         table::Scheme::Key => host::Form::Credential(host::Scheme::Key),
-        table::Scheme::Withdrawn { .. } => host::Form::Withdrawn,
     };
     if form != actual {
         return None;
@@ -126,7 +125,6 @@ fn account_grant(form: host::Form, value: Option<&table::Value>) -> Option<Grant
     Some(match &value.scheme {
         table::Scheme::Bearer => GrantValue::Credential { scheme: Scheme::Bearer, token: value.token.clone() },
         table::Scheme::Key => GrantValue::Credential { scheme: Scheme::Key, token: value.token.clone() },
-        table::Scheme::Withdrawn { id } => GrantValue::Withdrawn { id: id.clone(), bearer: value.token.clone() },
     })
 }
 fn identity_grant(value: Option<&Secret>) -> Option<GrantValue> {

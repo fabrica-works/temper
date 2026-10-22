@@ -50,7 +50,6 @@ impl Problems {
                 | config::What::Form
                 | config::What::Plaintext
                 | config::What::Digest
-                | config::What::HandedIn
                 | config::What::Reserve { .. }
                 | config::What::Budget { .. }
                 | config::What::Grace { .. }

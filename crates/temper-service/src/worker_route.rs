@@ -409,7 +409,6 @@ fn smith_grant(value: hub::Grant) -> Option<smith::Grant> {
     let form = match value.form {
         hub::Form::Credential(hub::Scheme::Bearer) => smith::Form::Credential(smith::Scheme::Bearer),
         hub::Form::Credential(hub::Scheme::Key) => smith::Form::Credential(smith::Scheme::Key),
-        hub::Form::Withdrawn => smith::Form::Withdrawn,
         hub::Form::Program(name) => {
             smith::Form::Program(smith::SourceName::new(name.as_bytes()).expect("same source name grammar"))
         }

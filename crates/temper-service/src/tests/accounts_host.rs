@@ -388,7 +388,7 @@ fn missing_registration_runtime_is_refused_before_start() {
 }
 #[test]
 fn overflowing_account_bounds_are_refused_before_start() {
-    const LAST_ACCOUNT_COUNT: u32 = 536_848_041;
+    const LAST_ACCOUNT_COUNT: u32 = 536_848_049;
     let (config, _) = registered();
     let mut overflow = config.limits.driver;
     overflow.accounts = u32::MAX;

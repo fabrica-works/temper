@@ -738,7 +738,9 @@ fn delivered(peers: &mut Peers, clock: Clock, delivery: root::Delivery) {
                 people::Reply::SignedOut => {}
             }
             let key = peers.requests.remove(&call);
+            // Seen watermarks have no kept request answer.
             if matches!(reply, people::Reply::Outcome(_))
+                && !matches!(reply, people::Reply::Outcome(people::Outcome::MarkedSeen { .. }))
                 && let Some(key) = key
             {
                 requires.push(r::Receipt::Party(1, key));

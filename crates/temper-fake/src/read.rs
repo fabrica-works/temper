@@ -75,7 +75,6 @@ pub(crate) fn kind(p: &Path, what: What) -> Refusal {
         | What::Confidential
         | What::NoProvider
         | What::Digest
-        | What::HandedIn
         | What::Reserve { .. }
         | What::Budget { .. }
         | What::Grace { .. }

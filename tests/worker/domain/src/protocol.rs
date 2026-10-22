@@ -266,7 +266,6 @@ fn smith_grant(value: host::Grant) -> Option<agent::Grant> {
     let form = match value.form {
         host::Form::Credential(host::Scheme::Bearer) => agent::Form::Credential(agent::Scheme::Bearer),
         host::Form::Credential(host::Scheme::Key) => agent::Form::Credential(agent::Scheme::Key),
-        host::Form::Withdrawn => agent::Form::Withdrawn,
         host::Form::Program(name) => {
             agent::Form::Program(agent::SourceName::new(name.as_bytes()).expect("same source name grammar"))
         }

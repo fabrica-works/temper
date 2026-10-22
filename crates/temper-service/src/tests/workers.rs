@@ -88,23 +88,22 @@ fn an_accounts_grant_uses_the_lent_generation_until_it_expires() {
             2,
             jig_protocol_accounts::table::Value {
                 token: skein_lib::Secret::new(b"account-token".as_slice().into()),
-                scheme: jig_protocol_accounts::table::Scheme::Withdrawn {
-                    id: skein_lib::Secret::new(b"account-id".as_slice().into()),
-                },
+                scheme: jig_protocol_accounts::table::Scheme::Bearer,
             },
             Time::from_nanos(9),
         )
         .unwrap();
     let mut grant = fixtures::application_grant(1, 2);
-    grant.form = jig_domain_host::Form::Withdrawn;
+    grant.form = jig_domain_host::Form::Credential(jig_domain_host::Scheme::Bearer);
     for (now, generation, expected) in [(8, 2, true), (9, 2, false), (8, 1, false)] {
         grant.generation = generation;
         let filled = values.grants(&[grant], Time::from_nanos(now));
         assert_eq!(filled[0].is_some(), expected, "{now} {generation}");
         if let Some(value) = &filled[0] {
-            let GrantValue::Withdrawn { id, bearer } = value else { panic!("a withdrawn grant") };
-            assert_eq!(bearer.expose(), b"account-token", "{now} {generation}");
-            assert_eq!(id.expose(), b"account-id", "{now} {generation}");
+            let GrantValue::Credential { scheme: jig_protocol_engine_workers::Scheme::Bearer, token } = value else {
+                panic!("a bearer grant")
+            };
+            assert_eq!(token.expose(), b"account-token", "{now} {generation}");
         }
     }
 }
@@ -459,16 +458,8 @@ fn a_worker_assignment_uses_the_services_configured_forges() {
 #[test]
 fn engine_values_preserve_slots_and_refuse_a_different_declared_form() {
     use jig_protocol_accounts::table::{Scheme, Value};
-    let forms = [
-        host::Form::Credential(host::Scheme::Bearer),
-        host::Form::Credential(host::Scheme::Key),
-        host::Form::Withdrawn,
-    ];
-    for (scheme, actual) in [
-        (Scheme::Bearer, forms[0]),
-        (Scheme::Key, forms[1]),
-        (Scheme::Withdrawn { id: skein_lib::Secret::new(b"provider-account".as_slice().into()) }, forms[2]),
-    ] {
+    let forms = [host::Form::Credential(host::Scheme::Bearer), host::Form::Credential(host::Scheme::Key)];
+    for (scheme, actual) in [(Scheme::Bearer, forms[0]), (Scheme::Key, forms[1])] {
         let mut values = fixtures::values_with_identity(1, b"forge-token");
         values
             .accounts

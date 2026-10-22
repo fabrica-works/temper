@@ -347,7 +347,6 @@ fn fleet_grants(grants: &[jig_domain_accounts::Grant]) -> Box<[fleet::Grant]> {
                         jig_domain_accounts::Scheme::Bearer => fleet::Scheme::Bearer,
                         jig_domain_accounts::Scheme::Key => fleet::Scheme::Key,
                     }),
-                    jig_domain_accounts::Form::Withdrawn => fleet::Form::Withdrawn,
                     jig_domain_accounts::Form::Application => fleet::Form::Application,
                     jig_domain_accounts::Form::Program(name) => {
                         fleet::Form::Program(fleet::SourceName::new(name.as_bytes()).expect("same source name grammar"))

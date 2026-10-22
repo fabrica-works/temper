@@ -6,6 +6,14 @@ use skein_lib::Duration;
 // Each whole-example box story is bounded at 120 seconds.
 const BOX_DEADLINE: Duration = Duration::from_secs(120);
 
+#[test]
+fn a_temper_told_to_stop_with_a_sign_in_under_way_ends_at_once() {
+    let scratch = support::Scratch::new("sign_in_stop");
+    let issuer = support::sign_in::configuration(scratch.path());
+    support::sign_in::run(scratch.path(), issuer);
+    scratch.remove();
+}
+
 fn ctl_scratch(case: &str) -> support::Scratch {
     let scratch = support::Scratch::new(case);
     support::configuration(scratch.path(), &support::Forge::Unreached);
