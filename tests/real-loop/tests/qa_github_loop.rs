@@ -120,21 +120,28 @@ fn read_steps(mut steps: Vec<Step>) -> Vec<Step> {
     steps
 }
 
+// Fresh deployment: chat T1, change T2, coder T3. The push run's chat is
+// its call 4, and the tree read naming the coder its call 6.
+const PUSH_CHAT: usize = 4;
+const PROCEDURE: u64 = 2;
+const CODER: u64 = 3;
+const CODER_SEEN: usize = 6;
+
 fn push_run() -> Ran {
     run_github(github::fixture(), delivered, || {
         let mut steps = account();
         steps.extend([
             adopt("acme", "app", "installed"),
             call(D1, argv!["chat", "--project", "1", "--key", "push", "@forge_chat Make one small edit"]),
-            call(D1, argv!["wait", "task", task(4), "--until", "replied"]),
+            call(D1, argv!["wait", "task", task(PUSH_CHAT), "--until", "replied"]),
             // Fresh deployment: chat T1, change T2, coder T3. The coder's
             // terminal follows its delivery, without waiting for review/landing.
             // The procedure creates its coder after the chat can already park;
             // discover it before opening a watch on that task.
-            until(D1, argv!["task", number(2), "--tree", "--json"], b"\"task\":3", b"\"task\":2"),
-            call(D1, argv!["wait", "task", delegate(6), "--until", "ended", "--json"]),
+            until(D1, argv!["task", number(PROCEDURE), "--tree", "--json"], b"\"task\":3", b"\"task\":2"),
+            call(D1, argv!["wait", "task", delegate(CODER_SEEN), "--until", "ended", "--json"]),
             call(D1, argv!["me", "--json"]),
-            call(D1, argv!["task", number(3), "--json"]),
+            call(D1, argv!["task", number(CODER), "--json"]),
         ]);
         steps
     })
@@ -225,9 +232,11 @@ fn delivered_change_authenticates_every_git_call_and_pushes_the_edit() {
                 .is_some_and(|bytes| bytes.as_slice() == [landing::README, landing::EDIT].concat())
         })
         .collect();
-    assert_eq!(changed.len(), 1, "exactly one branch must hold the coder's edit: {:?}", ran.github().branches);
-    assert_ne!(changed[0].0.as_slice(), b"main", "the coder must push its change branch");
-    assert!(changed[0].1.head > 0);
+    let [(name, branch)] = changed.as_slice() else {
+        panic!("exactly one branch must hold the coder's edit: {:?}", ran.github().branches)
+    };
+    assert_ne!(name.as_slice(), b"main", "the coder must push its change branch");
+    assert!(branch.head > 0);
 }
 
 fn no_git_secret(bytes: &[u8], place: &str) {
