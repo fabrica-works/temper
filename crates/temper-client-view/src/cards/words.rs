@@ -254,12 +254,32 @@ pub fn extend(text: u32, shapes: &mut List<PhraseShape>, phrases: &mut List<Phra
                     .expect("card segments fit");
             }
         }
-        shapes.push(PhraseShape { id: word.id(), holes: holes.into_boxed(), plural: None }).expect("card shapes fit");
-        phrases
-            .push(Phrase {
+        // "May delegate 1 task, depth 1": the delegation's count picks its form.
+        let counted = *word == CardWord::Delegation;
+        shapes
+            .push(PhraseShape {
                 id: word.id(),
-                forms: Box::new([Form { class: PluralClass::Other, segments: segments.into_boxed() }]),
+                holes: holes.into_boxed(),
+                plural: if counted { Some(0) } else { None },
             })
-            .expect("card phrases fit");
+            .expect("card shapes fit");
+        let other = Form { class: PluralClass::Other, segments: segments.into_boxed() };
+        let forms: Box<[Form]> = if counted {
+            Box::new([
+                Form {
+                    class: PluralClass::One,
+                    segments: Box::new([
+                        Segment::Text(copy_of(b"May delegate ")),
+                        Segment::Hole { index: 0, kind: HoleKind::Number },
+                        Segment::Text(copy_of(b" task, depth ")),
+                        Segment::Hole { index: 1, kind: HoleKind::Number },
+                    ]),
+                },
+                other,
+            ])
+        } else {
+            Box::new([other])
+        };
+        phrases.push(Phrase { id: word.id(), forms }).expect("card phrases fit");
     }
 }

@@ -231,13 +231,13 @@ fn proposal_titles_head_the_cards_and_funding_is_said_once_in_both_pages() {
                     assert!(skein_lib::bytes::find(&fixtures::node_text(tree, description), expected).is_some());
                     assert_eq!(occurrences(tree, expected), 1);
                 }
-                for expected in [b"May spend 6".as_slice(), b"May delegate 1 tasks, depth 1", b"Budget 6"] {
+                for expected in [b"May spend 6".as_slice(), b"May delegate 1 task, depth 1", b"Budget 6"] {
                     assert_eq!(occurrences(tree, expected), 1);
                 }
             } else {
                 let funding = b"Funds 40 from your pool \xc2\xb7 120 left, 80 after";
                 assert!(skein_lib::bytes::find(&fixtures::node_text(tree, description), funding).is_some());
-                for expected in [funding.as_slice(), b"May spend 40", b"May delegate 1 tasks, depth 1"] {
+                for expected in [funding.as_slice(), b"May spend 40", b"May delegate 1 task, depth 1"] {
                     assert_eq!(occurrences(tree, expected), 1);
                 }
             }
@@ -306,13 +306,13 @@ fn proposal_facts_are_labelled_joined_and_contained_in_their_rows() {
     for (page, delegation, budget) in [
         (
             owner,
-            "1 tasks, depth 1",
+            "1 task, depth 1",
             "Funded by pool in project 1, person 73, period 1 · Funding needed: 40 · Funding left: 120 · Funding after: 80",
         ),
         (
             document,
             "0 tasks, depth 0",
-            "Funds 40 from your pool · 120 left, 80 after · May spend 40 · May delegate 1 tasks, depth 1",
+            "Funds 40 from your pool · 120 left, 80 after · May spend 40 · May delegate 1 task, depth 1",
         ),
     ] {
         let mut builder = Builder::new(&fixtures::tree_limits());
