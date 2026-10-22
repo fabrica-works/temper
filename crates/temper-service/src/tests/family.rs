@@ -6,6 +6,7 @@ use skein_lib::{List, Reader, ReplyTo, Token};
 use temper_client_protocol_wire::{self as wire, v1 as w};
 use temper_engine_domain as root;
 use temper_engine_domain_forge as forge;
+use temper_engine_domain_forge_change as change;
 const REPLY: ReplyTo = ReplyTo::new(Token::new(19));
 const REQUEST_KEY: [u8; 16] = [5; 16];
 const WATCHER: Token = Token::new(7);
@@ -456,4 +457,276 @@ fn not_installed_projects_to_no_access_until_temper_07_adds_its_wire_reason() {
         panic!("forge refusal")
     };
     assert_eq!(answer.reason(), &w::ForgeReason::NoAccess);
+}
+
+const CHANGE_TASK: u64 = 51;
+fn watching(task: u64) -> Box<[u8]> {
+    wire::watching(
+        &w::Watching::new(
+            &w::CEILINGS,
+            w::WatchingParts {
+                watch: w::Watch::Change(w::ChangeSubject::new(&w::CEILINGS, w::ChangeSubjectParts { task }).unwrap()),
+            },
+        )
+        .unwrap(),
+    )
+}
+fn watch_exchange(family: u16, version: u32, record: Box<[u8]>) -> kit::ToApplication {
+    kit::ToApplication::Watch {
+        watcher: WATCHER,
+        sign_in: 3,
+        family,
+        version,
+        record,
+        scope: people::ApplicationScope::Project(7),
+        window: jig_domain_core::documents::Window { rows: 2, after: None },
+    }
+}
+#[test]
+fn a_change_watch_reaches_the_root_with_its_scope_subject_and_window() {
+    let event = family::to_root(
+        watch_exchange(wire::FORGE, wire::CLIENT_VERSION, watching(CHANGE_TASK)),
+        &[],
+        None,
+        &w::CEILINGS,
+    )
+    .unwrap();
+    let root::Event::Party(root::PartyInput::Watch { watcher, sign_in, subject, window }) = event else {
+        panic!("root watch")
+    };
+    assert_eq!((watcher, sign_in), (WATCHER, 3));
+    assert_eq!(
+        subject,
+        jig_domain_core::documents::Watched::Application {
+            scope: people::ApplicationScope::Project(7),
+            connector: wire::FORGE,
+            subject: Token::new(CHANGE_TASK),
+        }
+    );
+    assert_eq!(window, jig_domain_core::documents::Window { rows: 2, after: None });
+}
+#[test]
+fn invalid_change_watches_are_refused_unknown_without_the_root() {
+    let record = watching(CHANGE_TASK);
+    let mut trailing = skein_lib::Writer::new(record.len().checked_add(1).unwrap());
+    trailing.put(&record).unwrap();
+    trailing.put(&[0]).unwrap();
+    for (row, family, version, record) in [
+        ("family", wire::number(wire::Owner::Pages), wire::CLIENT_VERSION, watching(CHANGE_TASK)),
+        ("version", wire::FORGE, wire::CLIENT_VERSION + 1, watching(CHANGE_TASK)),
+        ("malformed", wire::FORGE, wire::CLIENT_VERSION, Box::new([])),
+        ("trailing", wire::FORGE, wire::CLIENT_VERSION, trailing.finish()),
+        ("zero task", wire::FORGE, wire::CLIENT_VERSION, watching(0)),
+    ] {
+        let Err(answer) = family::to_root(watch_exchange(family, version, record), &[], None, &w::CEILINGS) else {
+            panic!("{row}: refused watch")
+        };
+        let kit::Event::WatchRefused { watcher, why } = *answer else { panic!("{row}: unknown") };
+        assert_eq!((watcher, why), (WATCHER, jig_domain_core::WatchRefusal::Unknown), "{row}");
+    }
+}
+fn panel() -> forge::Panel {
+    forge::Panel {
+        task: CHANGE_TASK,
+        forge: 1,
+        owner: b"acme".as_slice().into(),
+        name: b"shop".as_slice().into(),
+        branch: b"temper/51".as_slice().into(),
+        landing: b"main".as_slice().into(),
+        head: Some([4; 32]),
+        pull: Some(123),
+        step: forge::PanelStep::Queued { place: 3, ahead: Box::new([49, 47]) },
+        hold: Some(change::Hold::Updates),
+        runs: Some(81),
+        ci: change::Status::Pending,
+        gates: Box::new([
+            forge::PanelGate {
+                number: 1,
+                kind: change::GateKind::Agent,
+                blocking: true,
+                verdict: change::Status::Passed,
+            },
+            forge::PanelGate {
+                number: 2,
+                kind: change::GateKind::Person,
+                blocking: true,
+                verdict: change::Status::Failed,
+            },
+            forge::PanelGate {
+                number: 3,
+                kind: change::GateKind::Check,
+                blocking: false,
+                verdict: change::Status::Pending,
+            },
+            forge::PanelGate {
+                number: 4,
+                kind: change::GateKind::Check,
+                blocking: true,
+                verdict: change::Status::Unknown,
+            },
+        ]),
+        repairs: forge::PanelUsed { used: 1, limit: 3 },
+        resolutions: forge::PanelUsed { used: 2, limit: 4 },
+        updates: forge::PanelUsed { used: 3, limit: 5 },
+    }
+}
+fn decoded_panel(value: forge::Panel, forges: &[crate::settings::Forge]) -> w::ChangePanel {
+    let bytes = family::panel(value, forges, &w::CEILINGS).unwrap();
+    wire::decode_change_panel(&bytes, &w::CEILINGS).expect("whole panel at CLIENT_VERSION")
+}
+fn queued(place: u32, tasks: &[u64]) -> w::Step {
+    let mut ahead = List::with_capacity(wire::TASKS_AHEAD);
+    for task in tasks {
+        ahead.push(*task).unwrap();
+    }
+    w::Step::Queued(w::Queued::new(&w::CEILINGS, w::QueuedParts { place, ahead }).unwrap())
+}
+#[test]
+fn a_panel_encodes_and_decodes_back_whole() {
+    let mut gates = List::with_capacity(wire::GATES);
+    for (number, kind, blocks, verdict) in [
+        (1, w::GateKind::Review, true, w::Verdict::Approved),
+        (2, w::GateKind::Approval, true, w::Verdict::Changes),
+        (3, w::GateKind::Check, false, w::Verdict::Pending),
+        (4, w::GateKind::Check, true, w::Verdict::None),
+    ] {
+        gates.push(w::Gate::new(&w::CEILINGS, w::GateParts { number, kind, blocks, verdict }).unwrap()).unwrap();
+    }
+    let expected = w::ChangePanel::new(
+        &w::CEILINGS,
+        w::ChangePanelParts {
+            task: CHANGE_TASK,
+            forge: 1,
+            owner: b"acme".as_slice().into(),
+            name: b"shop".as_slice().into(),
+            branch: b"temper/51".as_slice().into(),
+            landing: b"main".as_slice().into(),
+            head: Some([4; 32]),
+            pull: Some(w::Pull::new(&w::CEILINGS, w::PullParts { number: 123, address: Box::new([]) }).unwrap()),
+            step: queued(3, &[49, 47]),
+            hold: Some(w::Hold::Updates),
+            runs: Some(81),
+            ci: w::Ci::Pending,
+            gates,
+            repairs: w::Used::new(&w::CEILINGS, w::UsedParts { used: 1, limit: 3 }).unwrap(),
+            resolutions: w::Used::new(&w::CEILINGS, w::UsedParts { used: 2, limit: 4 }).unwrap(),
+            updates: w::Used::new(&w::CEILINGS, w::UsedParts { used: 3, limit: 5 }).unwrap(),
+        },
+    )
+    .unwrap();
+    assert_eq!(decoded_panel(panel(), &[]), expected);
+}
+fn repairing(reason: w::Reason) -> w::Step {
+    w::Step::Repairing(w::Repairing::new(&w::CEILINGS, w::RepairingParts { reason }).unwrap())
+}
+#[test]
+fn every_panel_step_keeps_its_payload_on_the_wire() {
+    for (input, expected) in [
+        (forge::PanelStep::Producing, w::Step::Producing),
+        (forge::PanelStep::Opening, w::Step::Opening),
+        (forge::PanelStep::Recreating, w::Step::Recreating),
+        (forge::PanelStep::Reopening, w::Step::Reopening),
+        (forge::PanelStep::Checking, w::Step::Checking),
+        (forge::PanelStep::Gating, w::Step::Gating),
+        (forge::PanelStep::Queued { place: 3, ahead: Box::new([49, 47]) }, queued(3, &[49, 47])),
+        (forge::PanelStep::First, w::Step::First),
+        (forge::PanelStep::Updating, w::Step::Updating),
+        (forge::PanelStep::Resolving, w::Step::Resolving),
+        (forge::PanelStep::Repairing(change::Repair::Ci), repairing(w::Reason::Ci)),
+        (
+            forge::PanelStep::Repairing(change::Repair::Gate(9)),
+            repairing(w::Reason::Gate(w::GateReason::new(&w::CEILINGS, w::GateReasonParts { gate: 9 }).unwrap())),
+        ),
+        (forge::PanelStep::Repairing(change::Repair::Semantic), repairing(w::Reason::Semantic)),
+        (forge::PanelStep::Landing, w::Step::Landing),
+        (
+            forge::PanelStep::Landed { merge: [8; 32] },
+            w::Step::Landed(w::Landed::new(&w::CEILINGS, w::LandedParts { merge: [8; 32] }).unwrap()),
+        ),
+    ] {
+        let mut value = panel();
+        value.step = input;
+        assert_eq!(*decoded_panel(value, &[]).step(), expected);
+    }
+}
+#[test]
+fn every_hold_and_ci_verdict_keeps_its_meaning_on_the_wire() {
+    for (input, expected) in [
+        (None, None),
+        (Some(change::Hold::Stalled), Some(w::Hold::Stalled)),
+        (Some(change::Hold::Repairs), Some(w::Hold::Repairs)),
+        (Some(change::Hold::Resolutions), Some(w::Hold::Resolutions)),
+        (Some(change::Hold::Updates), Some(w::Hold::Updates)),
+        (Some(change::Hold::BranchMoved), Some(w::Hold::Moved)),
+        (Some(change::Hold::BranchMissing), Some(w::Hold::Missing)),
+        (Some(change::Hold::PullClosed), Some(w::Hold::Closed)),
+        (Some(change::Hold::Retargeted), Some(w::Hold::Retargeted)),
+        (Some(change::Hold::Failed), Some(w::Hold::Failed)),
+        (Some(change::Hold::Rejected), Some(w::Hold::Rejected)),
+    ] {
+        let mut value = panel();
+        value.hold = input;
+        assert_eq!(*decoded_panel(value, &[]).hold(), expected);
+    }
+    for (input, expected) in [
+        (change::Status::Unknown, w::Ci::Unknown),
+        (change::Status::Pending, w::Ci::Pending),
+        (change::Status::Passed, w::Ci::Passed),
+        (change::Status::Failed, w::Ci::Failed),
+    ] {
+        let mut value = panel();
+        value.ci = input;
+        assert_eq!(*decoded_panel(value, &[]).ci(), expected);
+    }
+}
+#[test]
+#[expect(clippy::manual_map, reason = "the strict subset uses explicit matches")]
+fn a_panels_pull_address_uses_its_configured_forge_kind_and_web() {
+    use crate::settings::Kind;
+    for (row, kind, web, number, expected) in [
+        (
+            "github",
+            Kind::GitHub,
+            Some(b"https://github.example".as_slice()),
+            1,
+            b"https://github.example/acme/shop/pull/123".as_slice(),
+        ),
+        (
+            "forgejo",
+            Kind::Forgejo,
+            Some(b"https://forge.example/base/".as_slice()),
+            1,
+            b"https://forge.example/base/acme/shop/pulls/123".as_slice(),
+        ),
+        ("no web", Kind::GitHub, None, 1, b"".as_slice()),
+        ("another forge", Kind::Forgejo, Some(b"https://other.example".as_slice()), 2, b"".as_slice()),
+    ] {
+        let mut forges = fixtures::forges();
+        let forge = forges.get_mut(0).unwrap();
+        forge.kind = kind;
+        forge.number = number;
+        forge.web = match web {
+            Some(web) => Some(web.into()),
+            None => None,
+        };
+        let got = decoded_panel(panel(), &forges).into_parts().pull.unwrap();
+        assert_eq!(got.number(), 123, "{row}");
+        assert_eq!(got.address(), expected, "{row}");
+    }
+}
+#[test]
+fn a_panel_before_the_first_head_has_no_pull_or_running_delegate() {
+    let mut value = panel();
+    value.head = None;
+    value.pull = None;
+    value.runs = None;
+    value.hold = None;
+    value.step = forge::PanelStep::Producing;
+    value.ci = change::Status::Unknown;
+    value.gates = Box::new([]);
+    let got = decoded_panel(value, &fixtures::forges()).into_parts();
+    assert_eq!((got.head, got.pull, got.runs, got.hold), (None, None, None, None));
+    assert_eq!(got.step, w::Step::Producing);
+    assert_eq!(got.ci, w::Ci::Unknown);
+    assert!(got.gates.is_empty());
 }

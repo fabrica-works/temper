@@ -1,11 +1,22 @@
 //! The forge family's records at the clients' boundary (client/README.md, 8).
 use alloc::boxed::Box;
 use jig_protocol_engine_clients as kit;
-use skein_lib::{List, Reader, Writer};
+use skein_lib::{Decimal, List, Reader, Token, Writer};
 use temper_client_protocol_wire::{self as wire, v1 as w};
 use temper_engine_domain as root;
 use temper_engine_domain_forge as forge;
+use temper_engine_domain_forge_change as change;
 mod refusals;
+
+// client/README.md, 4.6: connector documents and their wire share every bound.
+const _: () = {
+    assert!(forge::PANEL_AHEAD == wire::TASKS_AHEAD, "panel predecessor bound");
+    assert!(forge::PANEL_GATES == wire::GATES, "panel gate bound");
+    assert!(forge::PANEL_NAME_BYTES == w::CEILINGS.change_panel_owner, "panel owner bound");
+    assert!(forge::PANEL_NAME_BYTES == w::CEILINGS.change_panel_name, "panel repository bound");
+    assert!(forge::PANEL_NAME_BYTES == w::CEILINGS.change_panel_branch, "panel branch bound");
+    assert!(forge::PANEL_NAME_BYTES == w::CEILINGS.change_panel_landing, "panel landing branch bound");
+};
 
 /// Decode the keyed request, preserving its admission envelope and supplied digest.
 pub fn to_root(
@@ -87,10 +98,186 @@ pub fn to_root(
             }
             Err(Box::new(kit::Event::Application(kit::FromApplication::Read { reply, family, record: answer })))
         }
-        kit::ToApplication::Watch { watcher, .. } => {
+        kit::ToApplication::Watch { watcher, sign_in, family, version, record, scope, window } => {
+            if family == wire::FORGE
+                && version == wire::CLIENT_VERSION
+                && let Some(watching) = wire::decode_watching(&record, limits)
+            {
+                let w::Watch::Change(subject) = watching.into_parts().watch;
+                if subject.task() > 0 {
+                    return Ok(root::Event::Party(root::PartyInput::Watch {
+                        watcher,
+                        sign_in,
+                        subject: jig_domain_core::documents::Watched::Application {
+                            scope,
+                            connector: wire::FORGE,
+                            subject: Token::new(subject.task()),
+                        },
+                        window,
+                    }));
+                }
+            }
             Err(Box::new(kit::Event::WatchRefused { watcher, why: jig_domain_core::WatchRefusal::Unknown }))
         }
     }
+}
+
+/// Encode the whole retained panel, deriving its public address from configuration
+/// (client/forge.md, 9.2). No domain record carries a deployment's web address.
+#[must_use]
+pub(crate) fn panel(value: forge::Panel, forges: &[crate::settings::Forge], limits: &w::Limits) -> Option<Box<[u8]>> {
+    let pull = match value.pull {
+        Some(number) => {
+            Some(w::Pull::new(limits, w::PullParts { number, address: address(&value, number, forges)? }).ok()?)
+        }
+        None => None,
+    };
+    let mut gates = List::with_capacity(forge::PANEL_GATES);
+    for gate in value.gates {
+        gates
+            .push(
+                w::Gate::new(
+                    limits,
+                    w::GateParts {
+                        number: gate.number,
+                        kind: match gate.kind {
+                            change::GateKind::Agent => w::GateKind::Review,
+                            change::GateKind::Person => w::GateKind::Approval,
+                            change::GateKind::Check => w::GateKind::Check,
+                        },
+                        blocks: gate.blocking,
+                        verdict: match gate.verdict {
+                            change::Status::Unknown => w::Verdict::None,
+                            change::Status::Pending => w::Verdict::Pending,
+                            change::Status::Passed => w::Verdict::Approved,
+                            change::Status::Failed => w::Verdict::Changes,
+                        },
+                    },
+                )
+                .ok()?,
+            )
+            .ok()?;
+    }
+    let record = w::ChangePanel::new(
+        limits,
+        w::ChangePanelParts {
+            task: value.task,
+            forge: value.forge,
+            owner: value.owner,
+            name: value.name,
+            branch: value.branch,
+            landing: value.landing,
+            head: value.head,
+            pull,
+            step: panel_step(value.step, limits)?,
+            hold: panel_hold(value.hold),
+            runs: value.runs,
+            ci: match value.ci {
+                change::Status::Unknown => w::Ci::Unknown,
+                change::Status::Pending => w::Ci::Pending,
+                change::Status::Passed => w::Ci::Passed,
+                change::Status::Failed => w::Ci::Failed,
+            },
+            gates,
+            repairs: used(value.repairs, limits)?,
+            resolutions: used(value.resolutions, limits)?,
+            updates: used(value.updates, limits)?,
+        },
+    )
+    .ok()?;
+    Some(wire::change_panel(&record))
+}
+
+fn used(value: forge::PanelUsed, limits: &w::Limits) -> Option<w::Used> {
+    w::Used::new(limits, w::UsedParts { used: value.used, limit: value.limit }).ok()
+}
+
+fn panel_step(value: forge::PanelStep, limits: &w::Limits) -> Option<w::Step> {
+    Some(match value {
+        forge::PanelStep::Producing => w::Step::Producing,
+        forge::PanelStep::Opening => w::Step::Opening,
+        forge::PanelStep::Recreating => w::Step::Recreating,
+        forge::PanelStep::Reopening => w::Step::Reopening,
+        forge::PanelStep::Checking => w::Step::Checking,
+        forge::PanelStep::Gating => w::Step::Gating,
+        forge::PanelStep::Queued { place, ahead } => {
+            let mut tasks = List::with_capacity(forge::PANEL_AHEAD);
+            for task in ahead {
+                tasks.push(task).ok()?;
+            }
+            w::Step::Queued(w::Queued::new(limits, w::QueuedParts { place, ahead: tasks }).ok()?)
+        }
+        forge::PanelStep::First => w::Step::First,
+        forge::PanelStep::Updating => w::Step::Updating,
+        forge::PanelStep::Resolving => w::Step::Resolving,
+        forge::PanelStep::Repairing(reason) => w::Step::Repairing(
+            w::Repairing::new(
+                limits,
+                w::RepairingParts {
+                    reason: match reason {
+                        change::Repair::Ci => w::Reason::Ci,
+                        change::Repair::Gate(gate) => {
+                            w::Reason::Gate(w::GateReason::new(limits, w::GateReasonParts { gate }).ok()?)
+                        }
+                        change::Repair::Semantic => w::Reason::Semantic,
+                    },
+                },
+            )
+            .ok()?,
+        ),
+        forge::PanelStep::Landing => w::Step::Landing,
+        forge::PanelStep::Landed { merge } => w::Step::Landed(w::Landed::new(limits, w::LandedParts { merge }).ok()?),
+    })
+}
+
+fn panel_hold(value: Option<change::Hold>) -> Option<w::Hold> {
+    Some(match value? {
+        change::Hold::Stalled => w::Hold::Stalled,
+        change::Hold::Repairs => w::Hold::Repairs,
+        change::Hold::Resolutions => w::Hold::Resolutions,
+        change::Hold::Updates => w::Hold::Updates,
+        change::Hold::BranchMoved => w::Hold::Moved,
+        change::Hold::BranchMissing => w::Hold::Missing,
+        change::Hold::PullClosed => w::Hold::Closed,
+        change::Hold::Retargeted => w::Hold::Retargeted,
+        change::Hold::Failed => w::Hold::Failed,
+        change::Hold::Rejected => w::Hold::Rejected,
+    })
+}
+
+fn address(panel: &forge::Panel, number: u64, forges: &[crate::settings::Forge]) -> Option<Box<[u8]>> {
+    for forge in forges {
+        if forge.number != panel.forge {
+            continue;
+        }
+        let Some(web) = &forge.web else { return Some(Box::default()) };
+        let mut web = web.as_ref();
+        while web.last() == Some(&b'/') {
+            web = web.get(..web.len().checked_sub(1)?).expect("trailing slash");
+        }
+        let route = match forge.kind {
+            crate::settings::Kind::GitHub => b"/pull/".as_slice(),
+            crate::settings::Kind::Forgejo => b"/pulls/".as_slice(),
+        };
+        let digits = Decimal::of(number);
+        let length = web
+            .len()
+            .checked_add(1)?
+            .checked_add(panel.owner.len())?
+            .checked_add(1)?
+            .checked_add(panel.name.len())?
+            .checked_add(route.len())?
+            .checked_add(digits.as_bytes().len())?;
+        if length > usize::try_from(wire::ADDRESS_BYTES).expect("u32 fits usize") {
+            return None;
+        }
+        let mut writer = Writer::new(length);
+        for part in [web, b"/", &panel.owner, b"/", &panel.name, route, digits.as_bytes()] {
+            writer.put(part).ok()?;
+        }
+        return Some(writer.finish());
+    }
+    Some(Box::default())
 }
 /// Keep the authority of an already checked git URL, including its explicit port.
 #[must_use]

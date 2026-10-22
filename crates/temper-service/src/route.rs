@@ -56,6 +56,22 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
                 engine.admission = None;
             }
             let event = match request {
+                root::PartyRequest::Deliver(root::Delivery::Panel { watcher, panel }) => {
+                    match crate::family::panel(
+                        *panel,
+                        &engine.workers.forges,
+                        &temper_client_protocol_wire::v1::CEILINGS,
+                    ) {
+                        Some(record) => Some(jig_protocol_engine_clients::Event::Application(
+                            jig_protocol_engine_clients::FromApplication::Delivery {
+                                watcher,
+                                family: temper_client_protocol_wire::FORGE,
+                                record,
+                            },
+                        )),
+                        None => Some(jig_protocol_engine_clients::Event::Abort),
+                    }
+                }
                 root::PartyRequest::Deliver(root::Delivery::Application { to, outcome }) => {
                     match crate::family::answer(
                         outcome,
