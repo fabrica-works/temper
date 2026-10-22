@@ -555,6 +555,8 @@ fn document(w: World, number: u64) -> c::Task {
         t.goal = Some(number);
         t.flags.conversation = false;
         t.flags.listed = true;
+        // A goal offers amend, stop and cancel (client README 3.5, the Task row).
+        t.acts = offers(&[c::ActKind::Amend, c::ActKind::Stop, c::ActKind::Cancel]);
     }
     t.kept_account = if matches_demo(w) || f.change { None } else { Some(f.account) };
     t.last_activity = Wall::from_nanos(f.activity_at);
