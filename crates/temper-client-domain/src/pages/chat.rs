@@ -224,6 +224,52 @@ impl Chat {
         let document = self.delegation(client, task)?;
         if document.requester == c::OwnerRequester::Task(self.task) { Some(document) } else { None }
     }
+    /// Reconcile independently delivered chat and card documents (client/README.md, 3.5).
+    #[must_use]
+    pub fn waiting_delegates(&self, client: &Client) -> u32 {
+        let Some(task) = self.task(client) else { return 0 };
+        let c::ChipPhase::Owner { details, .. } = task.chip.details.as_ref() else { return 0 };
+        let mut count = details.live_delegates;
+        for delegation in &self.delegations {
+            let Some(document) = self.requested(client, delegation.task) else { continue };
+            let mut live = false;
+            for delegate in &task.delegates {
+                if delegate.chip.task == delegation.task {
+                    live = true;
+                    break;
+                }
+            }
+            let running = match delegation::facts(document).state {
+                delegation::State::Running | delegation::State::Held => true,
+                delegation::State::Landed
+                | delegation::State::Done
+                | delegation::State::Failed
+                | delegation::State::Cancelled
+                | delegation::State::Ended => false,
+            };
+            match (live, running) {
+                (true, false) => count = count.saturating_sub(1),
+                (false, true) => count = count.saturating_add(1),
+                (true, true) | (false, false) => {}
+            }
+        }
+        count
+    }
+    fn heard_result(&self, task: u64) -> bool {
+        for line in &self.thread.lines.rows {
+            if let c::Activity::Owner { source, .. } = &line.event
+                && let c::OwnerActivity::Heard(c::OwnerWord {
+                    from: c::OwnerRequester::Task(number),
+                    kind: c::OwnerMessageKind::Result(_),
+                    ..
+                }) = &source.line
+                && *number == task
+            {
+                return true;
+            }
+        }
+        false
+    }
     fn delegation_handle(&self, handle: Handle) -> Option<u64> {
         for delegation in &self.delegations {
             if delegation.handle == handle {
@@ -284,11 +330,12 @@ impl Chat {
                         task: *task,
                         handle: delegation.handle,
                         final_task: delegation.final_task.take(),
+                        result_read: delegation.result_read,
                     });
                     break;
                 }
             }
-            let delegation = if let Some(kept) = kept {
+            let mut delegation = if let Some(kept) = kept {
                 kept
             } else {
                 let handle = handle(self.next);
@@ -297,8 +344,18 @@ impl Chat {
                     handle,
                     subject: Watchable::Jig(c::Subject::Task { task: *task }),
                 }));
-                delegation::Delegation { task: *task, handle, final_task: None }
+                delegation::Delegation { task: *task, handle, final_task: None, result_read: false }
             };
+            // Hearing the result proves the delegate ended; its watch may still
+            // hold an earlier document. Read its durable result once (5.7).
+            if !delegation.result_read
+                && delegation.final_task.is_none()
+                && self.delegation(client, *task).is_some()
+                && self.heard_result(*task)
+            {
+                read(delegation.handle, Some(c::Read::Task { task: *task }), out);
+                delegation.result_read = true;
+            }
             ordered.push(delegation).expect("bounded delegations");
         }
         self.delegations = ordered;

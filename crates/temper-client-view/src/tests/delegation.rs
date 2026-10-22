@@ -87,6 +87,16 @@ fn root_chat_limits(
     delegates: &[u64],
     receiving: &temper_client_domain::Limits,
 ) -> Domain {
+    root_chat_with_reads(chat_document, documents, activity, delegates, receiving).0
+}
+fn root_chat_with_reads(
+    chat_document: Option<&c::Task>,
+    documents: &[c::Task],
+    activity: c::ActivityPage,
+    delegates: &[u64],
+    receiving: &temper_client_domain::Limits,
+) -> (Domain, Queue<Request>) {
+    let mut reads = Queue::with_capacity(temper_client_domain::max_out(receiving));
     let chat_number = match chat_document {
         Some(chat) => chat.chip.task,
         None => CHAT,
@@ -164,6 +174,12 @@ fn root_chat_limits(
                     up(&mut root, task_delivery(watch, task.clone()), receiving, &mut out);
                 }
             }
+            request @ Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down: jig_client::Down::Read { what: jig_client::Readable::Jig(c::Read::Task { .. }), .. },
+                    },
+            } => reads.push(request),
             Request::Client { .. }
             | Request::Show { .. }
             | Request::SignOut
@@ -172,7 +188,7 @@ fn root_chat_limits(
         }
     }
     assert!(out.is_empty(), "delegation fixture settles");
-    root
+    (root, reads)
 }
 
 fn activity(called: &[u64], heard: bool) -> c::ActivityPage {
@@ -704,6 +720,129 @@ fn the_csv_chat_receives_the_whole_turn_and_anchors_the_landed_card_at_its_call(
     assert_eq!(TreeFace::new(view.tree()).find(&Find::exactly_named(Role::Paragraph, b"delegate")), Found::Absent);
     assert!(fixtures::find(view.tree(), Role::Button, b"Older").is_none());
     assert!(fixtures::find(view.tree(), Role::Status, b"Read").is_none());
+}
+// QA frame 004: the change's result reached the parked chat, before the
+// resumed turn and before its independently watched task document caught up.
+#[test]
+fn the_csv_chat_keeps_its_card_and_header_together_as_the_result_arrives() {
+    use fixtures::first_run as run;
+    let mut receiving = limits();
+    receiving.client.domain.rows = 3;
+    receiving.client.domain.text = 512;
+    receiving.client.domain.turn_text = 2048;
+    let mut activity = run::activity(false, true, receiving.client.domain.turn_text);
+    let mut rows = List::with_capacity(6);
+    for line in &activity.rows {
+        if line.position <= 6 {
+            let mut line = line.clone();
+            if let c::Activity::Owner { source, .. } = &mut line.event
+                && let c::OwnerActivity::Heard(word) = &mut source.line
+            {
+                word.words = run::text(b"0000000000000003000000000000000000000000");
+            }
+            rows.push(line).expect("before resumed turn");
+        }
+    }
+    activity.rows = rows;
+    let mut chat = change();
+    chat.chip.task = CHAT;
+    chat.requester = c::OwnerRequester::Person(fixtures::chat::PARTY);
+    chat.waits_on = c::WaitsOn::News;
+    chat.wake.words = c::WakeRule::Immediate;
+    let c::ChipPhase::Owner { details, .. } = chat.chip.details.as_mut() else { panic!("owner") };
+    details.live_delegates = 0;
+    let mut task = change();
+    task.requester = c::OwnerRequester::Task(CHAT);
+    let (mut root, mut reads) = root_chat_with_reads(Some(&chat), &[task], activity, &[], &receiving);
+    let mut view = crate::View::new(
+        &crate::Limits { tree: fixtures::tree_limits() },
+        &receiving,
+        fixtures::words(),
+        fixtures::FORGE,
+    );
+    fixtures::build(&mut view, &root);
+    assert_csv_card(&view, false);
+    let Some(Request::Client {
+        request:
+            jig_client::Request::Down {
+                down: jig_client::Down::Read { read, what: jig_client::Readable::Jig(c::Read::Task { task: CHANGE }) },
+            },
+    }) = reads.pop()
+    else {
+        panic!("hearing T2's result refreshes its document")
+    };
+    assert!(reads.is_empty(), "one final document read");
+    let mut out = Queue::with_capacity(temper_client_domain::max_out(&receiving));
+    up(
+        &mut root,
+        jig_client::Up::ReadDone {
+            read,
+            result: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(Box::new(landed())))),
+        },
+        &receiving,
+        &mut out,
+    );
+    fixtures::build(&mut view, &root);
+    assert_csv_card(&view, true);
+}
+fn assert_csv_card(view: &crate::View, landed: bool) {
+    assert_eq!(change_cards(view), 1, "the decoded delegate call keeps exactly one card");
+    let mut bare_hex = false;
+    for (index, _) in view.tree().nodes().iter().enumerate() {
+        let text = fixtures::node_text(view.tree(), index);
+        if text.len() == 40 {
+            let mut hex = true;
+            for byte in &text {
+                if !byte.is_ascii_hexdigit() {
+                    hex = false;
+                }
+            }
+            bare_hex |= hex;
+        }
+    }
+    assert!(!bare_hex, "the card owns the result; no bare merge commit text node");
+    status(
+        view,
+        if landed { b"Landed" } else { b"Running" },
+        if landed { look::STATUS_DONE } else { look::STATUS_ACTIVE },
+    );
+    assert_eq!(fixtures::find(view.tree(), Role::Status, b"waiting on 1 delegate").is_some(), !landed);
+    assert_eq!(fixtures::find(view.tree(), Role::Status, b"waiting on your words").is_some(), landed);
+}
+#[test]
+fn the_csv_chat_stops_waiting_when_its_card_lands_before_the_chat_document() {
+    use fixtures::first_run as run;
+    let mut receiving = limits();
+    receiving.client.domain.rows = 3;
+    receiving.client.domain.text = 512;
+    receiving.client.domain.turn_text = 2048;
+    let mut chat = change();
+    chat.chip.task = CHAT;
+    chat.requester = c::OwnerRequester::Person(fixtures::chat::PARTY);
+    chat.waits_on = c::WaitsOn::Delegates;
+    chat.wake.words = c::WakeRule::Immediate;
+    let c::ChipPhase::Owner { details, .. } = chat.chip.details.as_mut() else { panic!("owner") };
+    details.live_delegates = 1;
+    let mut task = change();
+    task.requester = c::OwnerRequester::Task(CHAT);
+    for landed_change in [false, true] {
+        let document = if landed_change { landed() } else { task.clone() };
+        let root = root_chat_limits(
+            Some(&chat),
+            &[document],
+            run::activity(false, false, receiving.client.domain.turn_text),
+            &[CHANGE],
+            &receiving,
+        );
+        let mut view = crate::View::new(
+            &crate::Limits { tree: fixtures::tree_limits() },
+            &receiving,
+            fixtures::words(),
+            fixtures::FORGE,
+        );
+        fixtures::build(&mut view, &root);
+        assert_csv_card(&view, landed_change);
+    }
 }
 #[test]
 fn the_dark_theme_chat_has_its_whole_answer_and_one_end_line() {

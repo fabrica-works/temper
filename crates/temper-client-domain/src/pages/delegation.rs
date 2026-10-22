@@ -10,6 +10,7 @@ pub struct Delegation {
     pub task: u64,
     pub handle: Handle,
     pub final_task: Option<Box<c::Task>>,
+    pub result_read: bool,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {

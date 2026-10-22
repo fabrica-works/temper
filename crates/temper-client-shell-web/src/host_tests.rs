@@ -191,7 +191,7 @@ mod memory_literal;
 // Their five phrases add five entries' room, 740 B.
 // Naming navigation and cards adds two phrases (296 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 262193121391;
+const WEB_BYTES: u64 = 262193121583;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

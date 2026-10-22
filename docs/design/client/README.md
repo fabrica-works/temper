@@ -325,8 +325,12 @@ keeps (`../protocol/configuration.md`, section 2).
   page, is jig's, narrowed as the mockups' "Where each value comes
   from" says: "waiting on 1 delegate", "waiting on N delegates" while
   it waits on its delegates, N its chip's live delegates, as a goal's
-  header says it (5.8); "waiting on your words" while it waits on news
-  and its wake policy wakes it on words (its document's `wake`), from
+  header says it (5.8). On the chat page, the delegated tasks' documents
+  reconcile that count while deliveries catch up: a card still running
+  counts until its final document arrives, and an ended card no longer
+  counts even if the chat's document still lists it. It says "waiting on
+  your words" while it waits on news and its wake policy wakes it on
+  words (its document's `wake`), from
   the person signed in, who requested it; jig's word otherwise. A line
   of the chats page has no wake policy, so it keeps jig's word for
   news.
@@ -1210,7 +1214,10 @@ the change's chip in a chat (`forge.md`, 2.4 and 2.5).
 - **What it reads.** The chat page watches each such task's document
   (`Subject::Task`), as the task's own page does: its chip, its result
   contract, its hold and its result, which stay readable once it has
-  ended. It watches those its thread's calls and results name, the
+  ended. When the chat hears a delegate's result, it reads that task's
+  document again once, so a cached running card takes its durable result
+  without waiting for the chat's resumed turn or the watch's end.
+  It watches those its thread's calls and results name, the
   newest first, then its live delegates, up to the domain's `reads`;
   one past them, or that neither names any longer, is unwatched, and
   leaving the page closes them all. A delegation whose document has

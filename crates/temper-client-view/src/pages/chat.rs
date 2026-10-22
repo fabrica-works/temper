@@ -47,7 +47,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             super::chats::status(
                 b,
                 &task.chip,
-                &task.waits_on,
+                (&task.waits_on, Some(chat.waiting_delegates(root.client()))),
                 (task.project, task.requester),
                 Some(&task.wake),
                 me,

@@ -192,7 +192,7 @@ pub(crate) fn row(b: &mut Builder, root: &Domain, line: &TaskLine, words: &Words
     );
     text(b, Role::Paragraph, line.chip.title.bytes());
     if let Some(me) = root.pages().me(root.client()) {
-        status(b, &line.chip, &line.waits_on, (line.project, line.requester), None, me, words);
+        status(b, &line.chip, (&line.waits_on, None), (line.project, line.requester), None, me, words);
     }
     text(
         b,
@@ -234,30 +234,34 @@ pub(crate) fn outcome_text(b: &mut Builder, words: &Words, outcome: &jig_client:
 pub(crate) fn status(
     b: &mut Builder,
     chip: &jig_client::contract::Chip,
-    waits_on: &jig_client::contract::WaitsOn,
+    (waits_on, delegates): (&jig_client::contract::WaitsOn, Option<u32>),
     (project, requester): (u32, jig_client::contract::OwnerRequester),
     wake: Option<&jig_client::contract::OwnerWakePolicy>,
     me: &jig_client::contract::Me,
     words: &Words,
 ) {
     use jig_client::contract::{ChipPhase, OwnerRequester, WaitsOn, WakeRule};
-    let narrowed = if *waits_on == WaitsOn::Delegates
-        && let ChipPhase::Owner { details, .. } = chip.details.as_ref()
-        && details.live_delegates > 0
-    {
-        Some(words.say(Word::WaitingForDelegates, &[Hole::Number(u64::from(details.live_delegates))]))
-    } else if *waits_on == WaitsOn::News
-        && requester == OwnerRequester::Person(me.party.number)
-        && let Some(wake) = wake
-        && match wake.words {
-            WakeRule::Never => false,
-            WakeRule::Immediate | WakeRule::Batch { .. } => true,
-        }
-    {
-        Some(words.say(Word::WaitingForYourWords, &[]))
+    let live = delegates.unwrap_or(if let ChipPhase::Owner { details, .. } = chip.details.as_ref() {
+        details.live_delegates
     } else {
-        None
-    };
+        0
+    });
+    let waits_on = if delegates == Some(0) && *waits_on == WaitsOn::Delegates { &WaitsOn::News } else { waits_on };
+    let narrowed =
+        if (*waits_on == WaitsOn::Delegates || (delegates.is_some() && *waits_on == WaitsOn::News)) && live > 0 {
+            Some(words.say(Word::WaitingForDelegates, &[Hole::Number(u64::from(live))]))
+        } else if *waits_on == WaitsOn::News
+            && requester == OwnerRequester::Person(me.party.number)
+            && let Some(wake) = wake
+            && match wake.words {
+                WakeRule::Never => false,
+                WakeRule::Immediate | WakeRule::Batch { .. } => true,
+            }
+        {
+            Some(words.say(Word::WaitingForYourWords, &[]))
+        } else {
+            None
+        };
     if let Some(name) = narrowed {
         b.open(Role::Status);
         b.style(crate::look::STATUS_WAITING);
