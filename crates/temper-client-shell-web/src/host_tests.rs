@@ -38,10 +38,8 @@ fn fixture() -> Host {
     host.requests();
     host
 }
-fn build(host: &mut Host) -> Queue<Patch> {
-    let mut patches = Queue::with_capacity(host.bounds.tree.patches);
-    host.build(&mut patches);
-    patches
+fn build(host: &mut Host) -> Vec<Patch> {
+    host.patches()
 }
 fn node(host: &Host, role: Role, name: &[u8]) -> NodeId {
     host.view
@@ -52,7 +50,7 @@ fn node(host: &Host, role: Role, name: &[u8]) -> NodeId {
         .expect("account control")
         .id
 }
-fn input(host: &mut Host, name: &[u8], value: &[u8]) -> Queue<Patch> {
+fn input(host: &mut Host, name: &[u8], value: &[u8]) -> Vec<Patch> {
     let field = node(host, Role::TextField, name);
     host.act(field, Act::Input { value: Box::from(value) });
     build(host)
@@ -200,8 +198,9 @@ mod memory_literal;
 // The procedure's ended page and its three phrases move the checked envelope.
 // Parent-based plan ordering adds 56 B per bounded tree row: 3 rows, 168 B.
 // skein f043ea16: b6ea7b9c's placeholder and completed state; boxed patch attributes, no slotless splice room.
+// The page reserves its patch queue once, at four patches a node.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274394142801;
+const WEB_BYTES: u64 = 274387649105;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {
@@ -347,4 +346,16 @@ fn the_deadline_takes_the_earlier_domain_or_view_time_from_the_same_clocks() {
             expected.map(Time::from_nanos)
         );
     }
+}
+
+#[test]
+fn the_patch_queue_is_reserved_once_at_start() {
+    let mut host = fixture();
+    assert!(!host.patches().is_empty());
+    assert!(host.patches.is_empty());
+    assert_eq!(host.patches.room(), host.bounds.tree.patches);
+    host.went(b"/chats");
+    assert!(!host.patches().is_empty());
+    assert!(host.patches.is_empty());
+    assert_eq!(host.patches.room(), host.bounds.tree.patches);
 }

@@ -2,7 +2,6 @@
 #![cfg(target_arch = "wasm32")]
 #![forbid(unsafe_code)]
 use jig_client_shell_web::{adapter, sign_in};
-use skein_lib::Queue;
 use skein_ui::{Act, NodeId};
 use skein_ui_web::{
     Look, fetch, history,
@@ -113,9 +112,7 @@ impl Shell {
                 new_page = !replace;
             }
         }
-        let mut patches = Queue::with_capacity(self.host.bounds.tree.patches);
-        self.host.build(&mut patches);
-        let patches: Vec<_> = std::iter::from_fn(|| patches.pop()).collect();
+        let patches = self.host.patches();
         let mut ops = Vec::new();
         self.page.borrow_mut().apply(&patches, &mut ops);
         let links = self.page.borrow().links().to_vec();

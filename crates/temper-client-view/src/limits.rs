@@ -141,7 +141,8 @@ impl Limits {
             scene_marks: 0,
             scene_bytes: 0,
             styles_per_node: 2,
-            patches: nodes.checked_mul(5)?,
+            // A diff emits at most four patches a node (skein's ui.md, 7).
+            patches: nodes.checked_mul(4)?,
             bindings: nodes,
             slots: 0,
             markdown_depth: 3,

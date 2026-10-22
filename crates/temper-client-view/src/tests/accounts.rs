@@ -466,8 +466,9 @@ mod memory_literal;
 // combined pull/bounds texts fit the existing maximum text envelope.
 // The procedure's ended page and its three phrases move the checked envelope.
 // skein f043ea16: b6ea7b9c's placeholder and completed state; boxed patch attributes, no slotless splice room.
+// The page reserves its patch queue once, at four patches a node.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 6978564839;
+const ACCOUNT_BYTES: u64 = 6978175079;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

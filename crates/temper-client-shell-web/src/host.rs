@@ -17,6 +17,7 @@ pub struct Host {
     pub bounds: view::Limits,
     env: Env<root::Limits>,
     out: Queue<Request>,
+    patches: Queue<Patch>,
     address: Address,
     mapping: jig_client_protocol_http::Mapping,
     stream: jig_client_protocol_http::Stream,
@@ -36,6 +37,7 @@ impl Host {
             bounds,
             env: Env { now, wall, limits: client },
             out: Queue::with_capacity(root::max_out(&client)),
+            patches: Queue::with_capacity(bounds.tree.patches),
             address: Address::Inbox { filter: Filter::ALL },
             mapping: jig_client_protocol_http::Mapping::new(b"/jig").expect("mapping prefix"),
             stream: jig_client_protocol_http::Stream::new(&limits::stream().expect("stream bounds")),
@@ -202,8 +204,16 @@ impl Host {
             | jig_client::Request::ServiceCredential { .. } => {}
         }
     }
-    pub fn build(&mut self, patches: &mut Queue<Patch>) {
-        view::build(&mut self.view, &self.root, self.env.wall, patches);
+    pub fn build(&mut self) {
+        view::build(&mut self.view, &self.root, self.env.wall, &mut self.patches);
+    }
+    pub fn patches(&mut self) -> Vec<Patch> {
+        self.build();
+        let mut patches = Vec::with_capacity(usize::try_from(self.patches.len()).expect("patch count fits usize"));
+        while let Some(patch) = self.patches.pop() {
+            patches.push(patch);
+        }
+        patches
     }
     #[must_use]
     pub fn deadline(&self) -> Option<Time> {
