@@ -294,9 +294,9 @@ keeps (`../protocol/configuration.md`, section 2).
 
 | Address | Mockup | Shows | Watches and reads | Acts |
 |---|---|---|---|---|
-| `Inbox` (home) | `inbox.html` | what needs the person, across projects, filtered by project, kind and goal (its root): proposals, questions, held tasks, person tasks; then updates (results, replies) | `inbox` with its filters; the `proposal` or `task` an entry's card needs | accept, reject with a reason, answer, release, leave held, take, hand back; seen |
+| `Inbox` (home) | `inbox.html` | what needs the person, across projects, filtered by project, kind and goal (its root): proposals, questions, held tasks, person tasks; then updates (results, replies) | `inbox` with its filters; the `proposal` or `task` an entry's card needs | accept, reject with a reason, answer, release, leave held, take, hand back |
 | `Chats` | `chats.html`; the demo's start at the first run's first step, which `first-run.html` opens | a composer to start a chat, under the level-2 heading "Start a chat", its line and its chooser (5.5) above its text area "Start a chat", with the hint "temper · Enter to start · Shift+Enter for newline"; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats as one list, "Your chats", live and ended together, newest first, under All, Live or Closed (below), each with its number and title, its status, spend and live delegates | `tasks{query}`: requester the person, the chat label, its live group by last activity, its ended pages by when each ended; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request; choose the list's filter; more closed chats |
-| `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the demo's banner while either half holds, in any project (5.1, 5.6), and the context line only in the demo's project while the demo is answered (5.6); the conversation (below): its request, the agent's words with its calls folded, the person's words, provisional text, and its end once it has ended; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer, while the chat lives: its line and its chooser (5.5), its text area "Message" with the hint "Enter to send · Shift+Enter for newline", and "Send", then a message's refusal or failure, if any: a message or the chat's start accepted draws no status of its own, neither at the conversation's end nor in the composer, since the conversation shows its words, "Being sent", then "Sent" (below); while Message is not offered, its line and chooser alone; an ended chat draws no composer and no composer's line | `task`, `activity` a page at a time, older pages while its window has room (5.4), `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
+| `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the demo's banner while either half holds, in any project (5.1, 5.6), and the context line only in the demo's project while the demo is answered (5.6); the conversation (below): its request, the agent's words with its calls folded, the person's words, provisional text, and its end once it has ended; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer, while the chat lives: its line and its chooser (5.5), its text area "Message" with the hint "Enter to send · Shift+Enter for newline", and "Send", then a message's refusal or failure, if any: a message or the chat's start accepted draws no status of its own, neither at the conversation's end nor in the composer, since the conversation shows its words, "Being sent", then "Sent" (below); while Message is not offered, its line and chooser alone; an ended chat draws no composer and no composer's line | `task`, `activity` a page at a time, older pages while its window has room (5.4), `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
 | `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree with each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel (5.11); an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), with Amend, Stop and its composer (5.11); either's own held card while it is held | `task`, `tree`, `activity` a page at a time, older pages on an agent's task's "Older"; `run` while one is live; a change's panel, through the forge's side (`forge.md`, 9.2) | as its document offers them (5.11): on a goal amend, stop, cancel; on an agent's task message, amend, stop; release its own held task or one of its plan |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
@@ -318,9 +318,11 @@ keeps (`../protocol/configuration.md`, section 2).
 - **A conversation's turns** are named "You" when the turn is the
   person's own, "Temper" when it is the agent's, and by the party's
   name otherwise (`chat.html`), on every page that draws a
-  conversation. A chip's executor keeps jig's "Agent". The mockups'
-  time beside each turn is not drawn: the view keeps no clock (section
-  11).
+  conversation. A chip's executor keeps jig's "Agent". On a chat's
+  page each turn's time follows its name, "HH:MM", under the day's
+  rule (5.12): a line's time for the agent's words and the person's,
+  and for the request the conversation's first line's; words not yet
+  read by the engine have none.
 - **A chat's status,** in its chatbar and on its line of the chats
   page, is jig's, narrowed as the mockups' "Where each value comes
   from" says: "waiting on 1 delegate", "waiting on N delegates" while
@@ -361,9 +363,11 @@ keeps (`../protocol/configuration.md`, section 2).
     its task's card where the call that made it is not in the window
     (5.7), drawn on the agent's side, never under "You";
   - *its end,* once the chat has ended, after the conversation: one
-    line, "Ended", then, for a report, " · its report, “REPORT”", the
+    line, "Ended" and the time it ended ("Ended 21:05", 5.12's
+    clock), then, for a report, " · its report, “REPORT”", the
     report's words whole; a failed or cancelled chat's line is its
-    phase's word and its reason. The result is not drawn again.
+    phase's word, its time and its reason. The result is not drawn
+    again.
 - **The chats list** (`chats.html`), under the heading "Your chats",
   under the demo's start too (5.6), is one list: the live group's
   lines by last activity and the ended page's by when each ended,
@@ -375,8 +379,32 @@ keeps (`../protocol/configuration.md`, section 2).
   "No chats yet.", or under a filter "No live chats." or "No closed
   chats.". A line is the chat's number, "TN", a link to its page, then
   its title, its status, its spend as its chatbar says it, and "1
-  delegate" or "N delegates" while it has live ones, and the time it
-  ended or was last active.
+  delegate" or "N delegates" while it has live ones, and when it
+  ended or was last active, as 5.12's ago ("1 h 28 min ago").
+- **The inbox** (`inbox.html`) shows what needs the person, then the
+  updates, each entry its card (section 1). A card that waits on the
+  person says for how long, "Waiting 12 min" (5.12's span), from its
+  object's time: a proposal's wait, a question's, a hold's, a person
+  task's; on a chat's page too, a proposal's card says "waiting 12
+  min". An update says when it came, "12 min ago" (5.12's ago): a
+  result's time, a reply's last activity.
+- **Seen** is how far the person has read: jig's read positions (jig's
+  `client/domain/pages.md`, section 3), one over their results and one
+  over each chat's turns. An update is seen when it is opened, and no
+  page offers "Mark seen":
+  - *a chat's turns,* once its page shows them: as its window loads,
+    and as turns arrive while it is open, through the newest its window
+    holds;
+  - *a result,* when the person follows its entry's link from the
+    inbox: through that result, and so through every result before it,
+    since jig keeps one position over them. A result opened from
+    another page, or its entry left unopened, stays unread.
+
+  A position only moves forward, with one `Seen` in flight for each;
+  one refused or failed is sent again at the next move. What is read
+  leaves the inbox's updates, and a task forgotten once read is erased
+  then (jig's `domain/people.md`, section 6). The pages draw no mark of
+  their own for what is unread.
 - **A task's page** is of its kind, as `task.html` lays each out: a
   tracked task's, a goal's (5.8); an agent's task's, for an agent's
   task with no priority (5.9). A task with the chat label opens as
@@ -935,15 +963,20 @@ of each (`../draft/first-run.md`, 3.6).
   ("Funds 40 from your pool · 120 left, 80 after"), and
   temper's own phrase for what `jig-client`'s `words` does not say (an
   executor, an outcome); temper's bindings for the last tree; its
-  limits.
-- **`build`:** when the domain's shown count moved, it builds the page
-  in one outline (skein's `ui.md`, section 14), in the mockups' order:
+  limits; the instant its words next change (5.12).
+- **`build`:** at the shell's time, when the domain's shown count moved
+  or that time has reached the instant its words next change (5.12),
+  it builds the page in one outline (skein's `ui.md`, section 14), in
+  the mockups' order:
   - *a banner:* temper's name; the project the person is in, and the
     others to choose from; the navigation (5.3) after the projects, as in
     the mockups; the link's state, one word for each of
     `jig-client`'s `Link` states ("Signed out", "Connecting" while
     starting, "Live", "Offline", "Out of date"), and "Behind" while a
-    page's watch reopens; the person's name and "Sign out";
+    page's watch reopens; the person's name and "Sign out"; all but
+    temper's name in one disclosure, "Menu", which a browser folds
+    behind its ☰ at phone width alone (`browser.md`, 2.5) and the
+    terminal and the fake person find whole;
   - *the accounts' banner,* while no account the person's work may use
     is usable (the `accounts` watch; jig's
     `client/domain/contract.md`, 7.1): its words and three buttons
@@ -1419,8 +1452,8 @@ or difference of their amounts (jig's `client/domain/contract.md`,
   when the person signed in added it, "Added by party P", "Added by
   task M" or "Added by the deployment" otherwise; then, while it keeps
   the row's task (jig's `keeps`, jig's `domain/tasks.md`, 5.7), " ·
-  keeps task N from ending". No time: the view keeps no clock, and
-  `ctl task N` prints when (`tools.md`, 6.1). A dependency the facts
+  keeps task N from ending". No time is drawn: `ctl task N` prints
+  when (`tools.md`, 6.1). A dependency the facts
   don't name, or one not added, has no mark; the line keeps its shape
   (section 11).
 - **Latest activity,** a region after "Plan": the latest page of the
@@ -1459,8 +1492,8 @@ or difference of their amounts (jig's `client/domain/contract.md`,
   say what it would.
 - **Not drawn,** besides the mockup's tabs and cards above: what is
   not supplied, the mockup's charter, model, host, account and pool
-  names; what needs the clock the view does not keep, "made
-  yesterday" (section 11); ended delegates as rows, with "Live only"
+  names; the mockup's "made yesterday", a time this page does not
+  say (5.12); ended delegates as rows, with "Live only"
   and the plan's counts, since the owner tree holds live tasks only
   (section 11); and, as defaults the user may change (section 11),
   "Wakes on", "Input", "Writes", "Run N" and the pool's line.
@@ -1530,7 +1563,7 @@ acts on it as its document offers (5.11).
 
   Under a live or a waiting run's heading, "Started MM-DD HH:MMZ" when
   its chip supplies `run_since`, when the run was placed, in universal
-  time as a chats row says a time. A run's earlier runs are the
+  time. A run's earlier runs are the
   conversation's "Run N began" and "Run N ended": the page has no run
   groups.
 - **The conversation,** from the task's bounded thread (jig-client's
@@ -1564,8 +1597,8 @@ acts on it as its document offers (5.11).
     account's, worker's and pool's names ("Implementer · Sonnet ·
     medium", "on s1", "holds a slot of T12's pool"); whose
     specification it took ("from T3's spec"); a run's own spend ("N
-    spent so far"); and, needing the clock the view does not keep, a
-    turn's time (section 11). Nor its context (`Task.context`), which
+    spent so far"); and a turn's time, which a chat's page alone says
+    (5.12). Nor its context (`Task.context`), which
     is optional;
   - its acts are 5.11's, with their own departures there.
 - **Where it is decided:** the domain's task page has the shape
@@ -1742,6 +1775,54 @@ Its rules:
   acts and the composer keep the chat's tokens. `task-pages.css` draws
   them (`browser.md`, 2.5).
 
+### 5.12 Times
+
+- **The view's clock is the shell's.** The view builds at the wall
+  time of the shell's iteration (6.2; `browser.md`, 2.1) and says each
+  time the domain's documents carry against it, both nanoseconds since
+  the epoch. The same documents at the same time give the same words.
+- **Four forms, the mockups' own** (`mockups/pages.js`). For a time T,
+  E is the whole minutes from T to now, and 0 when T is ahead of now,
+  as a machine's clock behind the engine's makes it:
+  - *ago,* when something last happened: "just now" while E is 0;
+    under 12 hours, E as a span with " ago" ("12 min ago", "1 h 28 min
+    ago"); then by the calendar's day, "at HH:MM" on now's day,
+    "yesterday" on the day before, the weekday ("Tue") within the six
+    days before that, and earlier its date ("20 October"), with its
+    year when not now's;
+  - *span,* how long something has waited: "under 1 min" while E is
+    0; "M min" under an hour; "H h M min" under a day, "H h" on the
+    hour; then "N d", in whole days;
+  - *clock,* when a moment of a conversation was: "HH:MM" on now's
+    day, the weekday and "HH:MM" ("Tue 07:20") within the six days
+    before it, and earlier its date and "HH:MM" ("20 October 07:20"),
+    with its year when not now's;
+  - *the day's rule,* a line before the first turn of each day a
+    conversation's window holds, whose turns then say "HH:MM" alone:
+    "Today · Thursday 22 October", "Yesterday · Wednesday 21 October",
+    or the day's name and date ("Tuesday 20 October"), with its year
+    when not now's.
+- **The person's zone** sets the calendar's days and the hours the
+  forms say: universal time, by section 11's default. The words name
+  no zone, as the mockups' don't.
+- **The tick.** With each build, the view keeps the instant at which a
+  word it drew next changes: the next whole minute of an ago under 12
+  hours or of a span under a day, a longer span's next whole day, and
+  the next midnight while it drew a word of the calendar's (a later
+  ago, a clock, a day's rule). The shell wakes at that instant, and the
+  view builds again although the domain's shown count has not moved
+  (6.2; `browser.md`, 2.1). A page that draws no time asks for no wake.
+- **Where they are said:** a chats line's last activity or end, an ago
+  (3.5); a chat's turns and its end, clocks under the day's rules
+  (3.5); a card's wait, a span, in the inbox and on a chat's page; an
+  update's arrival in the inbox, an ago (3.5). The task pages and the
+  accounts page say their moments as their sections do (5.5, 5.8,
+  5.9), in universal time.
+- **Fixed in the tests.** The view world, the terminal's goldens and
+  the gallery build at a fixed time: the fixtures' `NOW`, and each of
+  the gallery's worlds its own (`browser.md`, 7.2). A test of a form
+  steps that time to either side of the bound it reads (section 10).
+
 ## 6. The terminal shell
 
 ### 6.1 `temper open DIRECTORY LINK_OR_ADDRESS`
@@ -1796,6 +1877,9 @@ Its rules:
 - **Time and the seed** are skein-shell's: its clock once per
   iteration, and a seed from the kernel at each start (`seed`), from
   which the client root's children draw their keys' numbers (3.1).
+  The view builds at the iteration's wall time, and the loop's
+  deadline is the earlier of the domain's and the instant the view's
+  words next change (5.12).
 - **Each iteration:** the transport iterates; its loaded records start
   the client (3.4); signing in, by the link or with the token DIRECTORY
   holds (section 7); the token written once signed in by a link; the
@@ -2453,7 +2537,9 @@ own tests:
   open` with the last link, whose refusal makes `temper serve` print a
   fresh one.
 - **The person's time zone:** default universal time (an offset of 0)
-  for every time the view says.
+  for the calendar's days and the hours 5.12's forms say, which name no
+  zone, as the mockups' do; the browser's zone, an input of the shell's,
+  is the candidate.
 - **A browser on another machine.** A sign-in's redirect reaches the
   engine on loopback, so a person who reaches temper through a tunnel
   opens the address on the engine's machine, or, later, moves an
@@ -2531,9 +2617,15 @@ own tests:
   name an account only in that slice, with the readiness cross-check
   and expiry fallback in 5.5; other work names the model alone, with
   the demo provider's exception.
-- **A turn's time** ("21:01" in the mockups, "Just now" in the
-  first-run mockup's earlier draft): the view keeps no clock to say it
-  against. Default: not drawn.
+- **A time's moment on demand:** an ago ("12 min ago") has no title
+  or hover saying its moment, since skein-ui's nodes carry no title.
+  Default: none; a time node with its moment, skein-ui's, is the
+  candidate.
+- **The terminal's reprint:** skein's text shell prints the whole page
+  when it changes (skein's `ui-text.md`, section 4), so a page with a
+  time under 12 hours old prints again each minute while it is shown.
+  Default: as printed; a terminal shell that says every time as its
+  moment, with no wake, is the candidate.
 - **An agent's conversation drawn as a chat's** (5.9): the agent's
   page keeps each call, each result and the run markers as work lines,
   which a chat folds or hides (3.5). Default: as work; the chat's
@@ -2544,10 +2636,10 @@ own tests:
   person's words reach the chat only inside a turn would show none of
   them. Default: as drawn; a turn's message kind from smith's record
   is the candidate, jig's.
-- **"Mark seen" with nothing unseen:** the chat's document carries no
-  unread count (a task query's line does, its `conversation`), so the
-  chatbar offers it always. Default: always; the chat reading its own
-  line is the candidate.
+- **Seen while no one looks:** a chat's page open in a tab the person
+  is not looking at, or in a terminal left open, marks the turns that
+  arrive as seen (3.5). Default: open is seen; the page's visibility,
+  an input of the browser's shell, is the candidate.
 - **A delegation's tasks, keyed** (5.7): jig's thread keeps a
   `delegate` call's `objects` empty, so the domain reads the tasks
   from temper's acknowledgement and, at a result, from temper's inbox

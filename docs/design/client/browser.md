@@ -93,7 +93,9 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   - `host`: the client host: temper's client root and view, jig's
     mapping under `/jig` and its stream; the root's requests to jig's
     adapter (`jig-client-shell-web`'s `adapter`) and skein's transport,
-    and their reports back to the root;
+    and their reports back to the root; and the wake, skein's timer
+    set at the earlier of the root's deadline and the instant the
+    view's words next change (`README.md`, 5.12);
   - `records`: the small store's records, `jig-client`'s alone; from the
     adoption form (section 6), a pending adoption is among them, a kept
     request whose request `temper-client-protocol-wire` encodes
@@ -260,8 +262,20 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   rows. `scripts/bundle.sh` passes the three to `skein-ui-bundle` in
   that order.
 - **The navigation** sits in the banner after the projects, as in the
-  mockups. At phone width the banner wraps and the navigation takes its
-  own row, scrolling sideways if needed; nothing is hidden behind a menu.
+  mockups. At phone width, 760 px and under as in the mockups, the
+  banner keeps temper's name and the view's "Menu" alone (`README.md`,
+  5.1): its summary a ☰, drawn as a mask over its word, and its
+  content the projects, the navigation and the corner (the link's
+  state, the person, "Sign out") in a panel that opens under the
+  banner's end, as `terminal-chat.css` draws the mockups' menu. Theirs
+  holds the navigation alone, which leaves a phone no way to choose a
+  project or sign out; temper's holds the corner and the projects too.
+  Wider, `temper.css` draws the menu's content in the banner whether
+  it is open or not, and its summary not at all, where the browser
+  lets a closed disclosure's content be drawn (`::details-content`);
+  elsewhere the ☰ is drawn at every width. Choosing an entry folds the
+  menu once skein's page folds its disclosures at an address's change
+  (section 5).
 - **Light only:** the mockups' palette is light, and `temper.css` sets
   `color-scheme: light`, where `skein-ui.css` follows the system's dark
   preference. A dark palette is open (section 5).
@@ -426,6 +440,11 @@ tests 4.1's stories take and 4.2's story, the tier reaches its 12.
   `skein-ui.css` does. Default: light only (2.5).
 - **Other browsers** than Chromium are `skein-browser`'s question
   (skein's `browser.md`).
+- **The menu's fold on a choice** (2.5): skein's page keeps a
+  disclosure's open state across patches, so the phone's menu stays
+  open over the page an entry opened. Default: the person folds it with
+  the ☰; skein's page folding its open disclosures when its address
+  changes, a skein change, is the candidate.
 - **The kit's stylesheet without a bundle:** the gallery takes
   `skein-ui.css` by running skein's bundler with no module (7.1).
   Default: so, until skein's bundler offers the stylesheet alone.
@@ -509,6 +528,10 @@ view draws, never changing a view to suit a sample.
   A spend is the contract's whole number (jig's owner numbers), so a
   mockup's fraction is rounded to the nearest (0.8 is 1) until the
   contract holds one.
+- **Its time** is each world's, fixed: the mockup's now, its
+  `world.now`, at which the view builds, and each record's time the
+  mockup's offset from it, so that a time reads as its mockup's
+  ("12 min ago"). The program still reads no clock (7.1).
 - **Its bounds** are the browser's shipped client limits as they are
   (`temper-client-shell-terminal`'s `native()`, which the browser's
   shell takes), never widened, and the view's bounds are derived from
