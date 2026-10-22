@@ -1391,7 +1391,7 @@ by the commands in `docs/development/workflow.md`. In temper:
     owns it, never here"), which the user revisits when the sum reaches
     it;
   - the worlds below the domain, the real loop included, together at
-    most 25 s of the fuzzy suite;
+    most 40 s of the fuzzy suite;
   - a focused protocol-world test at most 0.5 s, and a one-process or
     real-loop story at most 1 s;
   - a GitHub story of the real loop (2.4) at most 0.5 s, so that its
