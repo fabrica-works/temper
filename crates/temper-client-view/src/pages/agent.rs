@@ -206,7 +206,7 @@ fn composer(b: &mut Builder, root: &Domain, page: &task::Task, task: &c::Task, w
             if let c::Refusal::NotWaiting = refusal {
                 words.text(b, Word::MessageOnceRuns, &[]);
             } else {
-                words.refusal(b, &refusal, 0);
+                words.refusal(b, refusal, 0);
             }
             b.close();
             crate::choice::composer(b, root, Some(task), words, bindings);

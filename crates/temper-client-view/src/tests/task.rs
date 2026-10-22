@@ -149,8 +149,12 @@ fn a_plan_with_no_live_task_says_so_in_its_region() {
     }
 }
 fn index_of_text(tree: &Tree, expected: &[u8]) -> Option<usize> {
-    (0..tree.nodes().len())
-        .find(|index| tree.nodes()[*index].role == Role::Paragraph && &*fixtures::node_text(tree, *index) == expected)
+    for (index, node) in tree.nodes().iter().enumerate() {
+        if node.role == Role::Paragraph && &*fixtures::node_text(tree, index) == expected {
+            return Some(index);
+        }
+    }
+    None
 }
 
 fn asked(part: c::Part) -> Tree {
