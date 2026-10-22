@@ -113,3 +113,109 @@ changed docs/rendering/startup paths, which were source-read. Skein's graph
 generation `2026-10-19T04:48:30Z` does not track those fake domain paths, so
 their source is the evidence. No index was written or deleted.
 The process cluster description and its templates live in [cluster/](cluster/).
+
+# The look experiment
+
+`look/` holds temper's pages to the mockups (`docs/design/draft/qa-web.md`,
+sections 3 to 5): the gallery's states captured beside the mockups' at
+1440×900 and 390×844, and checked. It has no driver and no process: a
+seed action prints the gallery, the collection is skein's capture, and
+the checks are skein's look checks (skein's `docs/design/lab-browser.md`,
+4, 5 and 5.4). `look-planted/` is the same with a fault (qa-web.md, 5.4).
+
+## Its files
+
+- `experiment.json`: `name` `look`, cost class `look`, one directory
+  `page`, no processes, no driver, no faults;
+  - the action `stage`: `/bin/sh {experiment}/stage {artifact.gallery}
+    {source} {dir.page}/gallery {experiment}`;
+  - the collection `capture`: `{runner}/look/capture` with the settings'
+    browser by its templates, `--mockups
+    {source}/docs/design/client/mockups`, `--page {dir.page}/gallery`,
+    `--out {collect.dir}/capture` and every scene;
+  - the checks `look-structure` and `look-style`: `{runner}/look/check
+    structure|style --capture {collected.capture}/capture` and every
+    scene.
+- `stage`: runs the gallery from the subject's source tree (its working
+  directory) into the page directory, then, when the experiment holds
+  `planted.css`, appends it to the bundle's `temper.css`, the last word
+  in the cascade for the pages' look. Without it, the gallery's output
+  is served as printed.
+- `scenes/<scene>.json`: `look-scene/1` files (below).
+- **The planted twin,** `look-planted/`: `look/`'s files byte for byte,
+  but `experiment.json`, which differs by `planted` alone, and
+  `planted.css`. So with the stylesheet removed and `planted` cleared it
+  is `look/`, tree and digest. The planted stylesheet changes one token
+  and moves the chat's composer above its conversation. Its token is
+  one whose regions agree with the mockup on the healthy page at both
+  widths, so its signatures are new: `planted` lists
+  `check/look-style/chat/<width>/style/<region>/<property>` and
+  `check/look-structure/chat/<width>/order/composer` at each width.
+
+## The subject
+
+`lab subject --repository TEMPER --commit C --exclude lab --artifact
+gallery=<temper-gallery built at C, release>`. The mockups come from
+the subject's source (`docs/design/client/mockups/`), so a changed
+mockup is a new subject and key (qa-web.md, 5.3); the scenes are the
+experiment's, so a changed scene is a new experiment and key. The
+gallery is the subject's artifact; it prints from its working
+directory, the source tree at the same commit, or from what it
+compiled in.
+
+## The scenes
+
+Each at `desktop` (1440×900) and `phone` (390×844, mobile), each side
+ready by its `main`. The page is the gallery's state by its name
+(`docs/design/client/browser.md`, 7.2), whose names
+`tools/gallery/names.txt` keeps.
+
+| Scene | Mockup | Page | Regions beyond banner, navigation and main |
+|---|---|---|---|
+| `chats` | `/chats.html?world=solo&bare` | `/chats-solo.html` | the chats' list, the composer |
+| `chat` | `/chat.html?world=solo&task=T10&bare` | `/chat-solo-T10.html` | the chatbar, the conversation, the proposal, the composer |
+| `inbox` | `/inbox.html?world=solo&bare` | `/inbox-solo.html` | the first entry's card, the updates |
+| `task` | `/task.html?world=solo&task=T3&bare` | `/task-solo-T3.html` | the task's heading, the plan, the budget's card |
+| `accounts` | `/accounts.html?world=solo&bare` | `/accounts-solo.html` | the first account's card |
+| `first-run` | `/chats.html?world=first-run&step=1&bare` | `/chats-first-run-1.html` | the suggested requests, the composer |
+| `adoption` | none | `/adoption.html` | the form, its first field, its submit button |
+
+- **Regions** are found on temper's side by role and name, as a person
+  finds them, and on the mockup's by role and name or, where its part
+  has no role of its own, by selector.
+- **Names** are the frame's and the controls' words (the navigation's
+  links, Sign out, the composers' Send, a card's acts), never content.
+- **Expectations** are empty until the first campaign's judge writes
+  them; `adoption`, with no mockup, is held to them alone.
+- **Standing departures:** with the network closed, the mockups'
+  Google Fonts stylesheet is refused and their families fall back to
+  the lab's DejaVu, while temper draws its bundled faces; each such
+  difference in `faces` or `font-family`, and the mockups' refused
+  request in their trouble, is a departure citing qa-web.md, 11, until
+  the mockups' fonts sit beside them. Nothing in `client/mockups/`
+  changes.
+
+## Running it
+
+```sh
+lab/look-judge SKEIN EXPERIMENT...
+```
+
+From a clean temper checkout at its commit C: builds the gallery
+through `heavy` (release), makes the subject, and runs skein's `lab
+judge` on each experiment named (`lab/look`, `lab/look-planted`):
+three seeds a key (skein's `lab.md`, section 8), printing each key and
+verdict. More runs of a seed are `lab run --seed N`. The lab is
+`~/src/rust/tmp/lab`, whose `settings.json` names the browser and the
+`look` cost class. It runs on demand, never in the gate; its shots are
+evidence, never goldens.
+
+## Its tests
+
+`lab/tests/unit/test_look.py`, in the gate, fast and with no browser:
+each scene canonical `look-scene/1` with the members above, its page a
+name of `tools/gallery/names.txt`, its mockup's file in
+`client/mockups/`; `experiment.json` naming every scene in its capture
+and both checks; and `look-planted/` byte for byte `look/` but for
+`planted.css` and `experiment.json`'s `planted`. The checks' own
+decisions are skein's, tested there on capture fixtures.
