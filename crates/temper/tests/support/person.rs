@@ -108,8 +108,9 @@ pub fn demo_change() -> Script {
                 find: Find::exactly_named(Role::Heading { level: 1 }, b"Export widget's table as CSV").within(details()),
                 within: START_WITHIN,
             },
-            // Ended, not held: a change that fails to land is held; the clone check reads the merge.
-            Step::See { find: Find::exactly_named(Role::Status, b"Ended").within(details()), within: START_WITHIN },
+            // Completed, not held: a change that fails to land is held; the clone check reads the merge.
+            // client/README.md, 5.8: the header words an ended task by its owner's ending.
+            Step::See { find: Find::exactly_named(Role::Status, b"Completed").within(details()), within: START_WITHIN },
         ]),
     }
 }
