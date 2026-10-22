@@ -715,6 +715,38 @@ fn a_panels_pull_address_uses_its_configured_forge_kind_and_web() {
     }
 }
 #[test]
+#[expect(clippy::disallowed_methods, reason = "the test spells out the expected address")]
+fn a_panels_pull_address_past_its_bound_is_left_out_and_the_panel_still_delivered() {
+    use crate::settings::Kind;
+    let web = b"https://forge.example".as_slice();
+    let owner = core::iter::repeat_n(b'o', 1024).collect::<Box<[u8]>>();
+    for (kind, route) in [(Kind::GitHub, b"/pull/".as_slice()), (Kind::Forgejo, b"/pulls/".as_slice())] {
+        // The longest name whose address, WEB/OWNER/NAME + route + "123", fills
+        // ADDRESS_BYTES exactly; one byte more passes the bound.
+        let fits = usize::try_from(wire::ADDRESS_BYTES).unwrap() - (web.len() + 1 + owner.len() + 1 + route.len() + 3);
+        for (row, length, shown) in [("at the bound", fits, true), ("past the bound", fits + 1, false)] {
+            let name = core::iter::repeat_n(b'n', length).collect::<Box<[u8]>>();
+            let mut forges = fixtures::forges();
+            let forge = forges.get_mut(0).unwrap();
+            forge.kind = kind;
+            forge.web = Some(web.into());
+            let mut value = panel();
+            value.owner = owner.clone();
+            value.name = name.clone();
+            let decoded = decoded_panel(value, &forges);
+            assert_eq!(decoded.owner(), &*owner, "{row}");
+            assert_eq!(decoded.name(), &*name, "{row}");
+            let pull = decoded.into_parts().pull.unwrap();
+            assert_eq!(pull.number(), 123, "{row}");
+            if shown {
+                assert_eq!(pull.address(), [web, b"/", &owner, b"/", &name, route, b"123"].concat(), "{row}");
+            } else {
+                assert_eq!(pull.address(), b"", "{row}");
+            }
+        }
+    }
+}
+#[test]
 fn a_panel_before_the_first_head_has_no_pull_or_running_delegate() {
     let mut value = panel();
     value.head = None;

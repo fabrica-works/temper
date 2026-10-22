@@ -268,8 +268,10 @@ fn address(panel: &forge::Panel, number: u64, forges: &[crate::settings::Forge])
             .checked_add(panel.name.len())?
             .checked_add(route.len())?
             .checked_add(digits.as_bytes().len())?;
+        // An address past its bound is left out, as with no `web`, so one long
+        // owner and name never fail the delivery (client/forge.md, 9.2).
         if length > usize::try_from(wire::ADDRESS_BYTES).expect("u32 fits usize") {
-            return None;
+            return Some(Box::default());
         }
         let mut writer = Writer::new(length);
         for part in [web, b"/", &panel.owner, b"/", &panel.name, route, digits.as_bytes()] {
