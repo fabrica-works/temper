@@ -5,4 +5,5 @@ mod limits;
 mod lines;
 mod machine;
 mod pipe;
+mod ready;
 mod sink;

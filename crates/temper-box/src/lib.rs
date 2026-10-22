@@ -8,6 +8,7 @@ pub mod limits;
 pub mod lines;
 pub mod machine;
 pub mod pipe;
+mod ready;
 mod records;
 pub mod sink;
 #[cfg(test)]

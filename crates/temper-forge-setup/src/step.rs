@@ -48,12 +48,24 @@ pub struct Step {
     name: Box<[u8]>,
     arguments: Box<[Box<[u8]>]>,
     kind: Kind,
+    ready: Option<core::net::SocketAddr>,
 }
 impl Step {
     /// Constructs a step from its display name, arguments and lifetime.
     #[must_use]
     pub fn new(name: Box<[u8]>, arguments: Box<[Box<[u8]>]>, kind: Kind) -> Self {
-        Self { name, arguments, kind }
+        Self { name, arguments, kind, ready: None }
+    }
+    /// Wait for this owned process to answer its version route before continuing.
+    #[must_use]
+    pub fn with_ready(mut self, address: core::net::SocketAddr) -> Self {
+        self.ready = Some(address);
+        self
+    }
+    /// The loopback endpoint whose version proves the process ready.
+    #[must_use]
+    pub fn ready(&self) -> Option<core::net::SocketAddr> {
+        self.ready
     }
     /// How the box runs this step.
     #[must_use]
@@ -113,7 +125,9 @@ pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
                     group.push((Stage::Fetch, forge(b"fetch", flags, e.forge, None))).expect("fetch");
                 }
                 group.push((Stage::Prepare, forge(b"prepare", flags, e.forge, None))).expect("prepare");
-                group.push((Stage::Run, forge(b"run", flags, e.forge, Some(b"forgejo")))).expect("forgejo");
+                group
+                    .push((Stage::Run, forge(b"run", flags, e.forge, Some(b"forgejo")).with_ready(o.listen)))
+                    .expect("forgejo");
                 if o.runner.is_some() {
                     group.push((Stage::Run, forge(b"run", flags, e.forge, Some(b"runner")))).expect("runner");
                 }
