@@ -274,15 +274,17 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   it is open or not, and its summary not at all, where the browser
   lets a closed disclosure's content be drawn (`::details-content`);
   elsewhere the ☰ is drawn at every width. Choosing an entry folds the
-  menu once skein's page folds its disclosures at an address's change
-  (section 5).
+  menu: skein's page folds its open disclosures when its address moves
+  (skein's `ui-web.md`, section 7).
 - **Light only:** the mockups' palette is light, and `temper.css` sets
   `color-scheme: light`, where `skein-ui.css` follows the system's dark
   preference. A dark palette is open (section 5).
 - **The composers** (the chats' and a chat's) are text areas with
   skein-ui's `SubmitsOnEnter`: Enter sends, Shift+Enter is a new line
   (skein's `ui-web.md`, section 7), which the view allows in a
-  composer's words, counted within its bound (`README.md`, 5.1). They
+  composer's words, counted within its bound (`README.md`, 5.1). A
+  chat's shows its placeholder, "Message T6…", while it is empty, as
+  `placeholder`, its name staying "Message" (`README.md`, 3.5). They
   grow with their words and shrink after sending by `temper.css` alone
   (`field-sizing: content`, from one line to a bound), with no
   component and no script of temper's; a browser without it shows an
@@ -444,11 +446,6 @@ tests 4.1's stories take and 4.2's story, the tier reaches its 12.
   `skein-ui.css` does. Default: light only (2.5).
 - **Other browsers** than Chromium are `skein-browser`'s question
   (skein's `browser.md`).
-- **The menu's fold on a choice** (2.5): skein's page keeps a
-  disclosure's open state across patches, so the phone's menu stays
-  open over the page an entry opened. Default: the person folds it with
-  the ☰; skein's page folding its open disclosures when its address
-  changes, a skein change, is the candidate.
 - **The kit's stylesheet without a bundle:** the gallery takes
   `skein-ui.css` by running skein's bundler with no module (7.1).
   Default: so, until skein's bundler offers the stylesheet alone.

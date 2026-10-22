@@ -300,7 +300,7 @@ keeps (`../protocol/configuration.md`, section 2).
 |---|---|---|---|---|
 | `Inbox` (home) | `inbox.html` | what needs the person, across projects, filtered by project, kind and goal (its root): proposals, questions, held tasks, person tasks; then updates (results, replies) | `inbox` with its filters; the `proposal` or `task` an entry's card needs | accept, reject with a reason, answer, release, leave held, take, hand back |
 | `Chats` | `chats.html`; the demo's start at the first run's first step, which `first-run.html` opens | a composer to start a chat, under the level-2 heading "Start a chat", its line and its chooser (5.5) above its text area "Start a chat", with the hint "temper · Enter to start · Shift+Enter for newline"; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats as one list, "Your chats", live and ended together, newest first, under All, Live or Closed (below), each with its number and title, its status, spend and live delegates | `tasks{query}`: requester the person, the chat label, its live group by last activity, its ended pages by when each ended; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request; choose the list's filter; more closed chats |
-| `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the demo's banner while either half holds, in any project (5.1, 5.6), and the context line only in the demo's project while the demo is answered (5.6); the conversation (below): its request, the agent's words with its calls folded, the person's words, provisional text, and its end once it has ended; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer, while the chat lives: its line and its chooser (5.5), its text area "Message" with the hint "Enter to send · Shift+Enter for newline", and "Send", then a message's refusal or failure, if any: a message or the chat's start accepted draws no status of its own, neither at the conversation's end nor in the composer, since the conversation shows its words, "Being sent", then "Sent" (below); while Message is not offered, its line and chooser alone; an ended chat draws no composer and no composer's line | `task`, `activity` a page at a time, older pages while its window has room (5.4), `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place |
+| `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the demo's banner while either half holds, in any project (5.1, 5.6), and the context line only in the demo's project while the demo is answered (5.6); the conversation (below): its request, the agent's words with its calls folded, the person's words, provisional text, and its end once it has ended; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer, while the chat lives: its line and its chooser (5.5), its text area "Message" with the placeholder "Message T6…", T6 the chat's number, shown while it is empty and never its name, and the hint "Enter to send · Shift+Enter for newline", and "Send", then a message's refusal or failure, if any: a message or the chat's start accepted draws no status of its own, neither at the conversation's end nor in the composer, since the conversation shows its words, "Being sent", then "Sent" (below); while Message is not offered, its line and chooser alone; an ended chat draws no composer and no composer's line | `task`, `activity` a page at a time, older pages while its window has room (5.4), `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
 | `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree with each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel (5.11); a change: its header and "View on forge ↗", its steps, its step's line, its hold, its tasks live and ended, its gates at its head and its bounds (5.10); an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), with Amend, Stop and its composer (5.11); either's own held card while it is held | `task`, `tree`, `activity` a page at a time, older pages on an agent's task's "Older"; `run` while one is live; a change's panel, through the forge's side (`forge.md`, 9.2); a procedure's ended tasks, a page read once and again on a change | as its document offers them (5.11): on a goal amend, stop, cancel; on an agent's task message, amend, stop; release its own held task or one of its plan |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
@@ -1305,8 +1305,8 @@ OWNER/NAME is the demo's repository, and the cues the demo's, copied in:
 - **Its names:** the configuration names the demo's provider, model
   and forge by identifiers ("demo"), so the phrasebook names them
   "Demo model" and "Demo forge", as the demo's scripted words do.
-- **Not drawn:** the mockup's placeholder, "Try a suggested request…"
-  (skein-ui's text area has none), and "Reset demo" (section 11).
+- **Not drawn:** the mockup's placeholder, "Try a suggested request…",
+  and "Reset demo" (section 11).
 
 ### 5.7 A delegation's card
 
@@ -1375,10 +1375,11 @@ the change's chip in a chat (`forge.md`, 2.4 and 2.5).
   landing words); any other result's words as they are; a failed
   task's reason.
 - **The steps are a stand-in:** none ticked while the change lives, all
-  four once it has landed, none otherwise. A step's tick is the look's
-  (STEP_DONE), and its words are the card's state, which in the
-  stand-in is every step's, so nothing is said by style alone (5.1).
-  The change's live stages are later (section 11).
+  four once it has landed, none otherwise. A ticked step is skein-ui's
+  `completed` item, its tick the look's (STEP_DONE): a screen reader
+  reads "Branch pushed completed" and the terminal prints "- Branch
+  pushed (completed)" (skein's `ui.md`, 3.2), so nothing is said by
+  style alone (5.1). The change's live stages are later (section 11).
 - **What it stands for:** the call's work summary, its result's, and
   the line that heard the task's result, whose words are the card's: a
   chat that shows a task's card shows none of them.
@@ -1917,7 +1918,7 @@ Its rules:
 - **Against the mockup,** the page's way:
   - the composer's text area is named "Message", the chat's, where the
     mockup's is "Write to agent task" with a placeholder "Write to
-    T12…" (section 11, the composer's placeholder); its hint is the
+    T12…" (section 11, the agent's placeholder); its hint is the
     chat's;
   - the composer carries the chat's model choice line, which the
     mockup's agent page does not draw (3.5);
@@ -2796,9 +2797,11 @@ own tests:
   the deployment, which the engine gives only once it seeds the
   deployment's owner (jig's t31a). Default: the project's role
   meanwhile ("Signed in as the project’s owner").
-- **The composer's placeholder** ("Try a suggested request…", the
-  first-run mockup's earlier draft): skein-ui's text area has none, and adding
-  one is a change to skein's API and a repin. Default: not drawn.
+- **The demo's and the agent's placeholders** ("Try a suggested
+  request…", the first-run mockup's earlier draft; "Write to T12…", the
+  agent's task's composer, 5.11): skein-ui's text area takes a
+  placeholder, which a chat's composer draws (3.5). Default: neither
+  drawn, the agent's waiting for its page's owner.
 - **The composer's selected account and source** (5.5): jig's
   `PayerReadiness` could carry the account and source its selection
   chose (`jig-domain-core`'s `catalogue.rs` already calls `select`).
