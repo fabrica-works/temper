@@ -223,7 +223,7 @@ pub(crate) fn row(
     );
     text(b, Role::Paragraph, line.chip.title.bytes());
     if let Some(me) = root.pages().me(root.client()) {
-        status(b, &line.chip, (&line.waits_on, None), (line.project, line.requester), None, me, words);
+        status(b, &line.chip, (&line.waits_on, None, None), (line.project, line.requester), None, me, words);
     }
     text(
         b,
@@ -274,7 +274,11 @@ pub(crate) fn outcome_text(b: &mut Builder, words: &Words, outcome: &jig_client:
 pub(crate) fn status(
     b: &mut Builder,
     chip: &jig_client::contract::Chip,
-    (waits_on, delegates): (&jig_client::contract::WaitsOn, Option<u32>),
+    (waits_on, delegates, run_wait): (
+        &jig_client::contract::WaitsOn,
+        Option<u32>,
+        Option<&jig_client::contract::TaskRunWait>,
+    ),
     (project, requester): (u32, jig_client::contract::OwnerRequester),
     wake: Option<&jig_client::contract::OwnerWakePolicy>,
     me: &jig_client::contract::Me,
@@ -327,7 +331,7 @@ pub(crate) fn status(
         b.close();
         return;
     }
-    let status = jig_client::facts::chat_status(chip, waits_on, project, me);
+    let status = jig_client::facts::chat_status(chip, waits_on, run_wait, project, me);
     let holes = match &status {
         jig_client::facts::ChatStatus::Tool { tool, .. } => Some(Hole::Name(tool.clone())),
         jig_client::facts::ChatStatus::Starting
@@ -337,13 +341,16 @@ pub(crate) fn status(
         | jig_client::facts::ChatStatus::WaitingFor(_)
         | jig_client::facts::ChatStatus::Parked
         | jig_client::facts::ChatStatus::Retrying { .. }
+        | jig_client::facts::ChatStatus::HostRefused(_)
         | jig_client::facts::ChatStatus::Held(_)
         | jig_client::facts::ChatStatus::Closing
         | jig_client::facts::ChatStatus::Ended { .. } => None,
     };
     let token = match status {
         jig_client::facts::ChatStatus::WaitingForYou { .. } => crate::look::STATUS_YOURS,
-        jig_client::facts::ChatStatus::Held(_) => crate::look::STATUS_HELD,
+        jig_client::facts::ChatStatus::HostRefused(_) | jig_client::facts::ChatStatus::Held(_) => {
+            crate::look::STATUS_HELD
+        }
         jig_client::facts::ChatStatus::Retrying { .. } => crate::look::STATUS_RETRYING,
         jig_client::facts::ChatStatus::Starting
         | jig_client::facts::ChatStatus::Writing
@@ -365,6 +372,7 @@ pub(crate) fn status(
         | jig_client::facts::ChatStatus::WaitingFor(_)
         | jig_client::facts::ChatStatus::Parked
         | jig_client::facts::ChatStatus::Retrying { .. }
+        | jig_client::facts::ChatStatus::HostRefused(_)
         | jig_client::facts::ChatStatus::Held(_)
         | jig_client::facts::ChatStatus::Closing
         | jig_client::facts::ChatStatus::Ended { .. } => {

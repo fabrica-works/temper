@@ -1190,6 +1190,9 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             // Configured forge rows and pending/kept setup answers enlarge the
             // counted engine envelopes at these same bounded strings.
             + 2_067_328
+            // Jig e5140872: run endings/waits and program endpoint evidence
+            // enlarge the bounded engine's retained layouts and carriers.
+            + 106_449_864
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -1213,6 +1216,8 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
         2_343_551_746_598_u64 + worker_growth + admission_growth + grant_wire_growth + GIT_VALIDITY_GROWTH
             // Wire v5 and the smaller account table, at these bounded strings.
             - 8_711
+            // Jig e5140872's host/link layouts at these unchanged bounds.
+            + 260
     );
 
     support::owned::check_memory("../../docs/examples/owned.json", required);

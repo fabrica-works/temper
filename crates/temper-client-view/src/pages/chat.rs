@@ -55,7 +55,7 @@ pub(crate) fn main(
             super::chats::status(
                 b,
                 &task.chip,
-                (&task.waits_on, Some(chat.waiting_delegates(root.client()))),
+                (&task.waits_on, Some(chat.waiting_delegates(root.client())), task.run_wait.as_ref()),
                 (task.project, task.requester),
                 Some(&task.wake),
                 me,

@@ -559,6 +559,7 @@ pub fn assignment_with_settings(
         conversation: 2,
         charter: 1,
         run: Box::new(temper_engine_domain::RunCharter {
+            ended_by: jig_domain_tasks::EndedBy::Result,
             sources: Box::new([Some(1)]),
             accounts: Box::new([jig_domain_authority::AccountBinding { provider: 1, account: 1, source: 1 }]),
             placement: jig_domain_fleet::PlacementConstraint {
@@ -762,6 +763,7 @@ pub fn signed_worker() -> crate::Service {
                 workstreams: Box::new([]),
                 hosting: Box::new([]),
                 bounds: host::Bounds {
+                    program_endpoints: Box::new([]),
                     models: Box::new([host::ModelBound {
                         name: b"small".as_slice().into(),
                         window: 8192,
@@ -912,7 +914,12 @@ pub fn chat(project: u32, words: &[u8]) -> jig_domain_people::Ask {
     member.authority.tools = 1023;
     member.authority.notes = 7;
     member.contract = people::Contract::Report { words: 32 };
-    member.flags = people::Flags { conversation: true, listed: false, retention: people::Retention::Kept };
+    member.flags = people::Flags {
+        ended_by: people::EndedBy::Result,
+        conversation: true,
+        listed: false,
+        retention: people::Retention::Kept,
+    };
     member.label = 1;
     people::Ask::Create { project, batch: Box::new([member]) }
 }

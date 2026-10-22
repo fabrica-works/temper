@@ -383,6 +383,7 @@ fn an_assignment_that_cannot_encode_is_answered_invalid_through_the_link() {
     assert_eq!(
         answer.ending,
         host::Ending::Refused(host::Refusal::Invalid(host::Invalid::Start {
+            cause: host::StartCause::Other,
             why: b"assignment cannot encode".as_slice().into(),
         }))
     );
@@ -448,6 +449,7 @@ fn a_worker_assignment_uses_the_services_configured_forges() {
     assert_eq!(
         answer.ending,
         host::Ending::Refused(host::Refusal::Invalid(host::Invalid::Start {
+            cause: host::StartCause::Other,
             why: b"assignment cannot encode".as_slice().into(),
         }))
     );

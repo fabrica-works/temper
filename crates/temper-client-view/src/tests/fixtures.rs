@@ -721,7 +721,12 @@ pub mod chat {
                 budget: c::TemplateBudget::AsAllowed { cap: None },
                 deadline: c::TemplateDeadline::None,
                 tracked: None,
-                flags: c::TaskFlags { conversation: true, listed: false, retention: c::Retention::Kept },
+                flags: c::TaskFlags {
+                    ended_by: jig_client::contract::EndedBy::Result,
+                    conversation: true,
+                    listed: false,
+                    retention: c::Retention::Kept,
+                },
                 label: CHAT_LABEL,
                 grace: Some(CLOSE_GRACE),
                 llm: None,

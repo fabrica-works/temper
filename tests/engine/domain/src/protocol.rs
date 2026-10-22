@@ -16,6 +16,7 @@ use temper_engine_domain as engine;
 #[must_use]
 pub fn bounds() -> host::Bounds {
     host::Bounds {
+        program_endpoints: Box::new([]),
         models: Box::new([host::ModelBound { name: b"scripted".as_slice().into(), window: 1024, output: 1024 }]),
         turns: 8,
         spend: 1000,

@@ -403,8 +403,12 @@ impl Worker {
             link::Request::Fact { why } => {
                 let reason = match why {
                     skein_channel::Closed::RefusedPeer(code) => Some(crate::Refusal::Peer(code)),
-                    skein_channel::Closed::RefusedHere(2) => Some(crate::Refusal::Terms),
-                    skein_channel::Closed::RefusedHere(3) => Some(crate::Refusal::Malformed),
+                    skein_channel::Closed::RefusedHere(jig_protocol_worker_link::REFUSED_LIMITS) => {
+                        Some(crate::Refusal::Terms)
+                    }
+                    skein_channel::Closed::RefusedHere(jig_protocol_worker_link::REFUSED_FRAMING) => {
+                        Some(crate::Refusal::Malformed)
+                    }
                     skein_channel::Closed::RefusedHere(_)
                     | skein_channel::Closed::Owner
                     | skein_channel::Closed::Framing

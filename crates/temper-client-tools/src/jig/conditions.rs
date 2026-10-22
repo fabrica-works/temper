@@ -99,19 +99,22 @@ fn task_holds(condition: Condition, task: &c::Task, me: Option<&c::Me>) -> Optio
         Condition::Held => task.chip.phase == c::Phase::Held,
         Condition::Phase(phase) => task.chip.phase == phase,
         Condition::WaitingOnMe => waits_on_me(&task.waits_on, task.project, me?),
-        Condition::Replied => match facts::chat_status(&task.chip, &task.waits_on, task.project, me?) {
-            ChatStatus::Parked
-            | ChatStatus::WaitingForYou { .. }
-            | ChatStatus::WaitingFor(_)
-            | ChatStatus::Held(_)
-            | ChatStatus::Closing
-            | ChatStatus::Ended { .. } => true,
-            ChatStatus::Starting
-            | ChatStatus::Writing
-            | ChatStatus::Tool { .. }
-            | ChatStatus::Working { .. }
-            | ChatStatus::Retrying { .. } => false,
-        },
+        Condition::Replied => {
+            match facts::chat_status(&task.chip, &task.waits_on, task.run_wait.as_ref(), task.project, me?) {
+                ChatStatus::HostRefused(_)
+                | ChatStatus::Parked
+                | ChatStatus::WaitingForYou { .. }
+                | ChatStatus::WaitingFor(_)
+                | ChatStatus::Held(_)
+                | ChatStatus::Closing
+                | ChatStatus::Ended { .. } => true,
+                ChatStatus::Starting
+                | ChatStatus::Writing
+                | ChatStatus::Tool { .. }
+                | ChatStatus::Working { .. }
+                | ChatStatus::Retrying { .. } => false,
+            }
+        }
         Condition::Usable | Condition::Settled | Condition::Waiting | Condition::Updates => return None,
     })
 }

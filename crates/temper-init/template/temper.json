@@ -239,7 +239,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 85583997406956,
+    "memory_bytes": 85584103856820,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -835,7 +835,7 @@
           "hub.event_bytes": 4096
         }
       },
-      "memory_bytes": 3266333824592
+      "memory_bytes": 3266333824852
     }
   ],
   "application": {

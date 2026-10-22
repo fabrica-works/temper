@@ -82,6 +82,7 @@ pub fn limits() -> Limits {
             facts: 64,
         },
         bounds: host::Bounds {
+            program_endpoints: Box::new([]),
             models: Box::new([]),
             turns: 8,
             spend: 100,
@@ -138,7 +139,7 @@ pub fn items(names: &[&[u8]]) -> wire::Workspace {
 
 /// The root's refusal of the run as an invalid start, for `why`.
 pub fn refused(why: &[u8]) -> Request {
-    let refusal = host::Refusal::Invalid(host::Invalid::Start { why: Box::from(why) });
+    let refusal = host::Refusal::Invalid(host::Invalid::Start { cause: host::StartCause::Other, why: Box::from(why) });
     Request::Answer {
         run: RUN,
         attempt: ATTEMPT,
@@ -186,6 +187,7 @@ pub fn fields(named: &[(&[u8], &[u8])]) -> agent::Fields {
 pub fn charter() -> agent::Charter {
     use smith_domain_run::charter::{Endpoint, Grants, Llm, Reserve, Tools};
     let value = smith_domain_run::Charter {
+        mode: smith_domain_run::Mode::Finite,
         resume: false,
         waiting: Duration::ZERO,
         instructions: Box::new([]),

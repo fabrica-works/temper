@@ -78,6 +78,7 @@ pub fn config(seed: u64) -> engine::Config {
 pub fn bounds() -> host::Bounds {
     let model = charter().policy.model;
     host::Bounds {
+        program_endpoints: Box::new([]),
         models: Box::new([host::ModelBound { name: model.name, window: model.window, output: model.output }]),
         turns: 64,
         spend: 1000,

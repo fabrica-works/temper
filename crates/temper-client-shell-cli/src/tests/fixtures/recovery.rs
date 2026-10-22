@@ -39,7 +39,12 @@ pub fn chat_me() -> w::Me {
             tracked: None,
             flags: w::TaskFlags::new(
                 &lim,
-                w::TaskFlagsParts { conversation: true, listed: false, retention: w::Retention::Kept },
+                w::TaskFlagsParts {
+                    ended_by: w::EndedBy::Result,
+                    conversation: true,
+                    listed: false,
+                    retention: w::Retention::Kept,
+                },
             )
             .expect("flags"),
             label: jig_client::shapes::CHAT,

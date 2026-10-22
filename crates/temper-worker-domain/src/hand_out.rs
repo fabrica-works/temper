@@ -33,7 +33,7 @@ pub(crate) enum Finish {
     Parked,
     Failed(host::RunFailure),
     /// smith refused the start before any run began.
-    Refused,
+    Refused(host::StartCause),
 }
 
 impl Finish {
@@ -42,7 +42,10 @@ impl Finish {
             agent::RunResult::Accepted { .. } => Finish::Ended,
             agent::RunResult::Parked => Finish::Parked,
             agent::RunResult::Failed { failure } => Finish::Failed(crate::translate::run_failure(failure)),
-            agent::RunResult::Refused { .. } => Finish::Refused,
+            agent::RunResult::Refused { refusal } => Finish::Refused(match refusal {
+                agent::Refusal::Invalid(why) => crate::translate::start_cause(*why),
+                agent::Refusal::Busy => host::StartCause::Other,
+            }),
         }
     }
 }
