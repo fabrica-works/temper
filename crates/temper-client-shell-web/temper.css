@@ -604,12 +604,12 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
 }
 
 /* .terminal-pages .page: Chats has the list width; demo start retains its own frame. */
-.temper-main:not(.temper-page):not(.temper-chat):has(> .temper-entry):not(:has(> .temper-chatbar)) { width: min(1160px, calc(100% - 48px)); }
+.temper-main:not(.temper-page):not(.temper-chat):has(> h1):not(:has(> .temper-chatbar)) { width: min(1160px, calc(100% - 48px)); }
 @media (max-width: 850px) {
-  .temper-main:not(.temper-page):not(.temper-chat):has(> .temper-entry):not(:has(> .temper-chatbar)) { width: calc(100% - 34px); }
+  .temper-main:not(.temper-page):not(.temper-chat):has(> h1):not(:has(> .temper-chatbar)) { width: calc(100% - 34px); }
 }
 @media (max-width: 760px) {
-  .temper-main:not(.temper-page):not(.temper-chat):has(> .temper-entry):not(:has(> .temper-chatbar)) { width: calc(100% - 28px); }
+  .temper-main:not(.temper-page):not(.temper-chat):has(> h1):not(:has(> .temper-chatbar)) { width: calc(100% - 28px); }
 }
 /* .demo-strip: only Chats, Inbox and Accounts; chat and demo-start notices stay boxed. */
 #app:has(> .temper-main:not(.temper-chat) > :is(h1, .temper-heading, .temper-accounts-page)) > section.temper-accounts { width: 100%; margin: 0; padding: 4px 25px; border: 0; border-bottom: 1px solid var(--temper-line); gap: 4px 18px; }
