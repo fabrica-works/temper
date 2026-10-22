@@ -547,7 +547,7 @@ interpreter and executable identity (skein's `lab.md`, 2.3).
 
 | Class | ready, command, stop | driver: seconds, actions, input tokens | triage: seconds, tokens |
 |---|---|---|---|
-| `temper-m1-calibration` | 60 s, 120 s, 10 s | 900 s, 80, 2,500,000 | 600 s, 1,000,000 |
+| `temper-m1-calibration` | 120 s (60 s before the user's doubling of 10-22, provisional), 240 s (120 s before the user's doubling of 10-22, provisional), 20 s (10 s before the user's doubling of 10-22, provisional) | 1800 s (900 s before the user's doubling of 10-22, provisional), 80, 2,500,000 | 1200 s (600 s before the user's doubling of 10-22, provisional), 1,000,000 |
 | `temper-m1` | as calibration's | about 1.5 times the calibration run's measured values, rounded up | as calibration's |
 
 - **The driver** is Codex `gpt-6.1-sol` at medium effort, in the lab's

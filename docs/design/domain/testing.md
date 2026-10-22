@@ -49,8 +49,10 @@ and what is still open (section 10).
 - **No fake of temper's own components:** the system world runs the real
   engine and worker.
 - **Two suites, and two tiers outside them.** The focused and the fuzzy
-  suites keep their 15 s and 60 s, which nextest enforces; the process
-  and live tiers run by their scripts, never at the gate.
+  suites keep their 30 s (15 s before the user's doubling of 10-22,
+  provisional) and 120 s (60 s before the user's doubling of 10-22,
+  provisional), which nextest enforces; the process and live tiers run by
+  their scripts, never at the gate.
 
 ## 2. temper's tiers
 
@@ -245,18 +247,19 @@ in the lower world that owns it, never here.
     question waits in the inbox (`wait inbox --until waiting`) and T1 is
     at rest; read T1's tree, which holds T2 alone; read the question,
     T1's activity holding its words, and answer it; join the watch.
-  - **What it checks:** the question in the inbox, on T1 and message 1,
-    and in T1's activity in T2's words (ctl's inbox entry names the
-    question, not its words), while T1's tree held no change; T1 told the person's
+  - **What it checks:** the question in the inbox, on T1 and message 1, and
+    in T1's activity in T2's words (ctl's inbox entry names the question,
+    not its words), while T1's tree held no change; T1 told the person's
     answer after the question, and T2 told it as T1's answer before it
     delegated the change; the change merged with CI green at its head,
-    widget's edit on main; T2's report and T1's; no question left in
-    the inbox. The fake forge's one repository stands as widget, its
-    tree holding widget's source, and its CI follows the edit (4.2);
-    the story's fixture, scripts and checks are its own, in its test
-    file, on the tier's shared hosts. It is fuzzy, past the 1 s guide by
-    the change procedure's landing path, as `fuzzy_landing` is, and its
-    forge's records stay within the harness's bound.
+    widget's edit on main; T2's report and T1's; no question left in the
+    inbox. The fake forge's one repository stands as widget, its tree
+    holding widget's source, and its CI follows the edit (4.2); the story's
+    fixture, scripts and checks are its own, in its test file, on the tier's
+    shared hosts. It is fuzzy, past the 2 s guide (1 s guide before the
+    user's doubling of 10-22, provisional) by the change procedure's landing
+    path, as `fuzzy_landing` is, and its forge's records stay within the
+    harness's bound.
 - **The first run's repair,** one story (`fuzzy_repair`), on the first
   run's cast, its green light left to `fuzzy_green_light`: the person
   asks their chat T1 "Add CSV export to widget"; T1 delegates the change
@@ -302,10 +305,11 @@ in the lower world that owns it, never here.
     (../client/README.md, 5.7, whose drawing the view's tests own); T1
     told that result before its report. Its fixture sizes the brief's
     CI section to carry the failure whole.
-  - It is fuzzy, past the 1 s guide by the landing path and its
-    repair, as `fuzzy_green_light` is, and its forge's records stay
-    within the harness's bound. Its fixture, scripts and checks are
-    its own, in its test file, on the tier's shared hosts.
+  - It is fuzzy, past the 2 s guide (1 s guide before the user's doubling of
+    10-22, provisional) by the landing path and its repair, as
+    `fuzzy_green_light` is, and its forge's records stay within the
+    harness's bound. Its fixture, scripts and checks are its own, in its
+    test file, on the tier's shared hosts.
 - **An account first,** with area 5's tools (../client/tools.md, 5.5):
   a story whose agents run adds a key the fake LLM peer accepts, from
   the client, before its first task, and waits for its account to be
@@ -492,14 +496,17 @@ in the lower world that owns it, never here.
     root, a fact, a store record but the secrets' store's, a request or
     an answer (../protocol/credentials.md, section 7); and no carried
     value left once its run has ended (../protocol/forge.md, 2.6).
-  - **Each at most 0.5 s,** half the tier's 1 s story guide, or 1.5 s
-    for one that runs a whole chat (its agents, git and `ctl`), and the
-    tier's sum within its 6.5 s ceiling (6.1). Their cases are tested below:
-    the records' and the identity's codecs in step tests, the routing
-    and GitHub's routes on the clients' listener in `temper-service`'s
-    own tests (../protocol/forge.md, section 10; ../client/forge.md,
-    9.1), the connector's state, picker and queue in the system
-    worlds (2.1).
+  - **Each at most 1 s (0.5 s before the user's doubling of 10-22,
+    provisional),** half the tier's 2 s (1 s before the user's doubling of
+    10-22, provisional) story guide, or 3 s (1.5 s before the user's
+    doubling of 10-22, provisional) for one that runs a whole chat (its
+    agents, git and `ctl`), and the tier's sum within its 13 s (6.5 s before
+    the user's doubling of 10-22, provisional) ceiling (6.1). Their cases
+    are tested below: the records' and the identity's codecs in step tests,
+    the routing and GitHub's routes on the clients' listener in
+    `temper-service`'s own tests (../protocol/forge.md, section 10;
+    ../client/forge.md, 9.1), the connector's state, picker and queue in the
+    system worlds (2.1).
 
 - **The cluster's services,** one story (../protocol/README.md, 15.6):
   an engine alone and two workers alone, three `temper-service`
@@ -587,8 +594,8 @@ and 10).
     agent left;
   - no git identity's value or API token in a domain's state, a store
     record or an agent process's environment.
-- **Budget:** a story aims at 1 s (6.1); sweeps of drawn kills are fuzzy
-  tests.
+- **Budget:** a story aims at 2 s (1 s before the user's doubling of 10-22,
+  provisional) (6.1); sweeps of drawn kills are fuzzy tests.
 
 ### 2.6 The process tier
 
@@ -740,18 +747,18 @@ and 10).
   in jig's secrets' store, and the admin's token the preparation's
   handover, `admin_token`, which the setup host takes once
   (../protocol/setup.md, sections 3 and 9).
-- **`temper program-login`,** in two stories of their own, each within
-  five seconds and with no engine, service or deployment secret: it execs
-  smith's fake `claude`, which signs the source in; and the fake's
-  refusal exits with the fake's status, while an exec that fails exits 1
-  with one final `temper program-login:` line, which only smith's
-  secret-free `smith: ` diagnostics may precede
-  (../protocol/credentials.md, section 3). The fake is smith's
+- **`temper program-login`,** in two stories of their own, each within ten
+  seconds (five seconds before the user's doubling of 10-22, provisional)
+  and with no engine, service or deployment secret: it execs smith's fake
+  `claude`, which signs the source in; and the fake's refusal exits with the
+  fake's status, while an exec that fails exits 1 with one final `temper
+  program-login:` line, which only smith's secret-free `smith: ` diagnostics
+  may precede (../protocol/credentials.md, section 3). The fake is smith's
   `smith_fake_claude::main()` at temper's pin, built as
-  `tools/fake-claude`'s `fake-claude` binary and named by the absolute
-  path in `TEMPER_TEST_CLAUDE`. The argument checks, the directories
-  checked at each name and made private, and the command's arguments and
-  environment before the exec are the shell's lower tests.
+  `tools/fake-claude`'s `fake-claude` binary and named by the absolute path
+  in `TEMPER_TEST_CLAUDE`. The argument checks, the directories checked at
+  each name and made private, and the command's arguments and environment
+  before the exec are the shell's lower tests.
 - **The cluster,** its own tests (../protocol/README.md, 15.6), on
   temper's fakes as processes, never on Forgejo: `lab/cluster/`, the
   lab's description of the cluster (../protocol/README.md, 15.5), read
@@ -791,12 +798,14 @@ and 10).
     calls and never a token, show the clone and the push, each by a
     token minted for `acme`'s installation, the push a write, and the
     branch's head the coder's commit; no process outlives the story.
-  - **It aims at 1 s,** as a world's story does (6.1).
+  - **It aims at 2 s (1 s before the user's doubling of 10-22,
+    provisional),** as a world's story does (6.1).
 - **Outside the suites:** nextest profile `process`, run by
   `scripts/proof-one-process.sh`, which builds the binary and the fake
-  `claude` first and sets `TEMPER_TEST_CLAUDE`. It aims at 3 minutes; if
-  CI takes it past, the story with CI becomes a test of its own
-  (../protocol/setup.md, 13.4).
+  `claude` first and sets `TEMPER_TEST_CLAUDE`. It aims at 6 minutes (3
+  minutes before the user's doubling of 10-22, provisional); if CI takes it
+  past, the story with CI becomes a test of its own (../protocol/setup.md,
+  13.4).
 
 ### 2.7 The live tier
 
@@ -850,31 +859,33 @@ section 8; testing-strategy.md, 2.9).
   calls github.com; live calls to GitHub are only skein's opt-in
   conformance (skein's `fake-forge.md`, section 11), run by hand
   (section 2).
-- **The stories:** the process tier's chat, answered by the real model;
-  and one small change, made by the model in a repository of the owned
-  Forgejo, adopted as in 2.6, and pushed by real git. The story
-  ends once the change's branch on the forge is at the run's commit; it
-  does not wait for the change to land. A story also ends at its task's
-  first terminal failure, which fails the test at once, naming it: it
-  never waits out the run's 15 minutes after its task has ended. An
-  account limited, refused or needing sign-in fails the test the same
-  way, naming the account's state and its reset, since its task would
-  wait for it (jig's `domain/authority.md`, 8.3).
+- **The stories:** the process tier's chat, answered by the real model; and
+  one small change, made by the model in a repository of the owned Forgejo,
+  adopted as in 2.6, and pushed by real git. The story ends once the
+  change's branch on the forge is at the run's commit; it does not wait for
+  the change to land. A story also ends at its task's first terminal
+  failure, which fails the test at once, naming it: it never waits out the
+  run's 30 minutes (15 minutes before the user's doubling of 10-22,
+  provisional) after its task has ended. An account limited, refused or
+  needing sign-in fails the test the same way, naming the account's state
+  and its reset, since its task would wait for it (jig's
+  `domain/authority.md`, 8.3).
 - **Its referee:** the process tier's, without the restart; and the
   completions, counted from the engine's transcripts. Each completion is
   a turn of main's conversation on either backend: on the program
   backend, each assistant message the program writes (smith's
   `protocol/programs.md`, 5.5), so the count holds for Claude Code's
   runs as for direct ones.
-- **Budget:** at most 25 completions and 15 minutes in all. The live
-  configuration's charters bound each run's turns so the two stories
-  together make at most 25 completions, which smith's agent holds on
-  either backend (on the program backend with `--max-turns` behind its
-  own count; smith's `protocol/programs.md`, 5.7), the script stops the
-  run at 15 minutes, and the test fails when the transcripts count more
-  than 25.
-  Each run's summary, a failed run's included, records its completions
-  and its wall time, which a plan totals (skein's `development.md`, 5.5).
+- **Budget:** at most 25 completions and 30 minutes (15 minutes before the
+  user's doubling of 10-22, provisional) in all. The live configuration's
+  charters bound each run's turns so the two stories together make at most
+  25 completions, which smith's agent holds on either backend (on the
+  program backend with `--max-turns` behind its own count; smith's
+  `protocol/programs.md`, 5.7), the script stops the run at 30 minutes (15
+  minutes before the user's doubling of 10-22, provisional), and the test
+  fails when the transcripts count more than 25. Each run's summary, a
+  failed run's included, records its completions and its wall time, which a
+  plan totals (skein's `development.md`, 5.5).
 - **Outside the suites:** nextest profile `live`, run only by
   `scripts/proof-live.sh`, one at a time, never at the gate.
 
@@ -1386,48 +1397,58 @@ by the commands in `docs/development/workflow.md`. In temper:
 - **Fuzzy tests** are each world's `tests/fuzzy_*.rs` binaries. A sweep
   settles each random world under every invariant, and reaches every
   ending among them.
-- **Budgets.** The suites' 15 s and 60 s are rules, which nextest
-  enforces. Within them, guides:
+- **Budgets.** The suites' 30 s (15 s before the user's doubling of 10-22,
+  provisional) and 120 s (60 s before the user's doubling of 10-22,
+  provisional) are rules, which nextest enforces. Within them, guides:
   - the worlds below the domain other than the real loop (the protocol,
-    machine, client, one-process and reconcile worlds) together at most
-    4 s of the default suite;
-  - the real-loop world's tests, its stories included, together at
-    most 6.5 s of the default suite: a standing ceiling, the
-    same for each plan, sized to the smoke
-    that 2.4 keeps the real loop to ("one end-to-end path per feature,
-    and each behaviour and corner case tested in the lower world that
-    owns it, never here"), which the user revisits when the sum reaches
-    it;
-  - the worlds below the domain, the real loop included, together at
-    most 40 s of the fuzzy suite;
-  - a focused protocol-world test at most 0.5 s, and a one-process or
-    real-loop story at most 1 s;
-  - a GitHub story of the real loop (2.4) at most 0.5 s, and one that
-    runs a whole chat (its agents, git and `ctl`) at most 1.5 s, so that
-    its eight stay within the real loop's ceiling with the rest; a
-    whole-chat GitHub story that would pass the ceiling goes to the user
-    with its numbers.
+    machine, client, one-process and reconcile worlds) together at most 8 s
+    (4 s before the user's doubling of 10-22, provisional) of the default
+    suite;
+  - the real-loop world's tests, its stories included, together at most 13 s
+    (6.5 s before the user's doubling of 10-22, provisional) of the default
+    suite: a standing ceiling, the same for each plan, sized to the smoke
+    that 2.4 keeps the real loop to ("one end-to-end path per feature, and
+    each behaviour and corner case tested in the lower world that owns it,
+    never here"), which the user revisits when the sum reaches it;
+  - the worlds below the domain, the real loop included, together at most 80
+    s (40 s before the user's doubling of 10-22, provisional) of the fuzzy
+    suite;
+  - a focused protocol-world test at most 1 s (0.5 s before the user's
+    doubling of 10-22, provisional), and a one-process or real-loop story at
+    most 2 s (1 s before the user's doubling of 10-22, provisional);
+  - a GitHub story of the real loop (2.4) at most 1 s (0.5 s before the
+    user's doubling of 10-22, provisional), and one that runs a whole chat
+    (its agents, git and `ctl`) at most 3 s (1.5 s before the user's
+    doubling of 10-22, provisional), so that its eight stay within the real
+    loop's ceiling with the rest; a whole-chat GitHub story that would pass
+    the ceiling goes to the user with its numbers.
 
-  A test that misses its guide is made cheaper or moved to the fuzzy
-  suite, never merged with another and never named as an exception: a
-  real-loop story with CI and webhooks (2.4) is held to the 1 s as any
-  other. If GitHub's stories would push the real loop's sum past 6.5 s,
-  the ceiling goes to the user, as below, and no real-loop story moves to
-  the fuzzy suite to make room for them unless the user so decides.
+  A test that misses its guide is made cheaper or moved to the fuzzy suite,
+  never merged with another and never named as an exception: a real-loop
+  story with CI and webhooks (2.4) is held to the 2 s (1 s before the user's
+  doubling of 10-22, provisional) as any other. If GitHub's stories would
+  push the real loop's sum past 13 s (6.5 s before the user's doubling of
+  10-22, provisional), the ceiling goes to the user, as below, and no
+  real-loop story moves to the fuzzy suite to make room for them unless the
+  user so decides.
 - **The worlds' sums are measured as the suites' rules are:** each test's
   own time, run alone on the idle development machine (testing-strategy.md,
   section 8), with `--profile measure -j 1` through `heavy --gate`, the
   median of three runs. Beside another task, it measures that task.
-- **The sums are the worlds' guides, never a landing's.** A test within
-  its own guide lands. A plan that adds to these worlds gives both
-  default-suite sums at its base and at its end: the other worlds'
-  against 4 s, the real loop's against 6.5 s. When the other worlds
-  together pass 4 s, or the real-loop world 6.5 s, their slowest tests
-  are profiled, then made cheaper at the cause the profile shows or moved
-  to the fuzzy suite, by steps a plan names. A plan whose end finds the
-  real loop's sum at 6.5 s or past it puts the ceiling to the user, as
-  skein's `development.md`, 10.4, "What goes to the user", says; until
-  the user moves it, the 6.5 s stands.
+- **The sums are the worlds' guides, never a landing's.** A test within its
+  own guide lands. A plan that adds to these worlds gives both default-suite
+  sums at its base and at its end: the other worlds' against 8 s (4 s before
+  the user's doubling of 10-22, provisional), the real loop's against 13 s
+  (6.5 s before the user's doubling of 10-22, provisional). When the other
+  worlds together pass 8 s (4 s before the user's doubling of 10-22,
+  provisional), or the real-loop world 13 s (6.5 s before the user's
+  doubling of 10-22, provisional), their slowest tests are profiled, then
+  made cheaper at the cause the profile shows or moved to the fuzzy suite,
+  by steps a plan names. A plan whose end finds the real loop's sum at 13 s
+  (6.5 s before the user's doubling of 10-22, provisional) or past it puts
+  the ceiling to the user, as skein's `development.md`, 10.4, "What goes to
+  the user", says; until the user moves it, the 13 s (6.5 s before the
+  user's doubling of 10-22, provisional) stands.
 - **Outside both suites:** the process tier's binary `process` and the
   live tier's binary `live`, which both suites' filters leave out, run
   under the nextest profiles `process` and `live` by

@@ -69,7 +69,8 @@ the same outside referee after every harness iteration. The narrow engine-domain
 world retains CI job-log contents/truncation and race/permission checks that
 these stories do not exercise.
 
-The world's allocation, measured serially (`--profile measure -j 1`), is
-2 seconds focused and 20 seconds fuzzy. Both suites keep all fourteen
-applicable stories, all 392 shared and native commit cuts, and the same
-outside observations and referee.
+The world's allocation, measured serially (`--profile measure -j 1`), is 4
+seconds (2 seconds before the user's doubling of 10-22, provisional) focused
+and 40 seconds (20 seconds before the user's doubling of 10-22, provisional)
+fuzzy. Both suites keep all fourteen applicable stories, all 392 shared and
+native commit cuts, and the same outside observations and referee.

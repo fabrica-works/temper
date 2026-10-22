@@ -386,9 +386,10 @@ address, an external link that opens a tab of its own.
   (`tests/client-browser`, `temper-client-browser-world`), run by
   temper's gate with a nextest profile `browser`, one test at a time,
   on the bundle the gate builds once, with the dev profile.
-- **A guide: at most 12 tests, and about 60 seconds** on the slowest of
-  the machines that run temper's gate. Past it, a story moves to a world
-  or goes, and the budget stays.
+- **A guide: at most 12 tests, and about 120 seconds** (60 seconds before
+  the user's doubling of 10-22, provisional) on the slowest of the machines
+  that run temper's gate. Past it, a story moves to a world or goes, and the
+  budget stays.
 - **Chromium** is the machine's, at the path its owner configures
   (skein's `browser.md`), which skein's and jig's gates read from
   `SKEIN_TEST_CHROMIUM`, and temper's gate too. A missing Chromium or
@@ -599,5 +600,5 @@ gallery builds it.
 - **The print:** the program run into a scratch directory writes every
   name's page, the index linking each, and the bundle's stylesheets in
   `scripts/bundle.sh`'s order, read from that script.
-- **Their cost:** together at most 0.5 s of the default suite; no
-  fuzzy test.
+- **Their cost:** together at most 1 s (0.5 s before the user's doubling of
+  10-22, provisional) of the default suite; no fuzzy test.

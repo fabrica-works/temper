@@ -28,16 +28,17 @@ keeps the driver from writing this directory. Source: `crates/temper/src/ctl.rs`
 `temper-client-shell-cli/src/{arguments,directory,signing,host}.rs` under
 `crates/`, and `client/tools.md`, 8.1.
 
-The story makes exactly one `chat --project 1 --key smoke-chat` with the exact
-request in qa.md, 3.3; extracts `done: task N, chat`; watches
-`wait task N --until ended --timeout 110`; then reads `task N --tree`.
-The runner must enforce the approved **120s total command budget**. There is no
-sleep, application polling or new deadline. The private Python text reader
-checks the actual task header, historical result JSON, digest, wait's `met`
-and the ended tree root; failures/malformed output exit nonzero. Ended includes
-Failed/Cancelled as ctl's `ended` condition does; it does not establish landing.
-`checks/_end_state.py` judges landing independently. No full story success has
-been exercised against a product cluster yet.
+The story makes exactly one `chat --project 1 --key smoke-chat` with the
+exact request in qa.md, 3.3; extracts `done: task N, chat`; watches `wait
+task N --until ended --timeout 110`; then reads `task N --tree`. The runner
+must enforce the approved **240s (120s before the user's doubling of 10-22,
+provisional) total command budget**. There is no sleep, application polling
+or new deadline. The private Python text reader checks the actual task
+header, historical result JSON, digest, wait's `met` and the ended tree
+root; failures/malformed output exit nonzero. Ended includes
+Failed/Cancelled as ctl's `ended` condition does; it does not establish
+landing. `checks/_end_state.py` judges landing independently. No full story
+success has been exercised against a product cluster yet.
 
 `NOTICE` is exactly `b'Maintained by temper.\n'`, 22 bytes. The private pure
 `_judge` takes explicit completeness/loss knowledge, the last target
