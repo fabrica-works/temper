@@ -243,5 +243,5 @@ fn a_document_at_its_byte_bound_prints_worst_case_json_escapes() {
 
     assert_eq!(printed.status, 0, "{:?}", printed.stderr);
     assert!(u64::try_from(printed.stdout.len()).expect("output length fits") > crate::limits::DOCUMENT);
-    assert!(fixtures::occurrences(&printed.stdout, br"\u0000") > 0, "control text is JSON escaped");
+    assert!(skein_lib::bytes::find(&printed.stdout, br"\u0000").is_some(), "control text is JSON escaped");
 }
