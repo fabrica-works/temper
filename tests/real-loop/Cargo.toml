@@ -44,6 +44,7 @@ skein-lib.workspace = true
 skein-shell.workspace = true
 
 [dev-dependencies]
+skein-forge-client.workspace = true
 temper-worker-domain-checkout.workspace = true
 
 [lints.rust]

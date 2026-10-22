@@ -2981,6 +2981,7 @@ dependencies = [
  "skein-fake-llm-protocol",
  "skein-fake-peers",
  "skein-forge",
+ "skein-forge-client",
  "skein-http",
  "skein-io",
  "skein-json",

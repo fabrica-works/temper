@@ -240,6 +240,15 @@ pub fn fixture_check() -> forge::Fixture {
     forge::Fixture {
         configure: |value, agent, forge| {
             (fixture_placed().configure)(value, agent, forge);
+            // One adopted repository contains one pull. Its initial scan and
+            // the scripted forge hooks supply the listing changes; repeating
+            // the listing every 10 ms adds traffic throughout the timer story.
+            let story_ms = crate::PATIENCE.as_nanos().div_euclid(1_000_000);
+            for name in ["poll_ms", "poll_max_ms"] {
+                value["application"]["limits"]["overrides"][format!("forge.client.{name}")] = (story_ms + 1).into();
+            }
+            // Branch watches keep their 100 ms slow reconciliation: at most
+            // 2 * (PATIENCE / 100 ms + 1) steady reads for the two branches.
             // Subscribe is family 32; cancel shares control (4), already in 391.
             let tools = 0x0187 | 0x0020;
             value["engine"]["rules"]["ceiling"]["tools"] = tools.into();
