@@ -1,4 +1,5 @@
 //! Named story values and one client profile, shared by every story.
+pub mod b2;
 use crate::{app::Temper, front::Joint};
 use jig_client_world::harness::FrontFault;
 use jig_client_world::harness::{Settings, World};
@@ -429,7 +430,7 @@ pub struct Dependents {
 /// A tracked goal with two report delegates; the first has spent, the second waits for it.
 pub fn goal_with_dependent_delegates(front: &mut Joint) -> Dependents {
     use temper_engine_domain_world::fixtures::report_delegate;
-    *front = Joint::with_delegates(SEED, &domain_limits());
+    *front = Joint::with_delegates(SEED, &domain_limits(), DEPENDENT_DELEGATES);
     let goal = make_goal_with_delegation(front, false, Some(DEPENDENT_DELEGATES));
     let driver = &mut front.engine;
     let parent = driver.last_assignment();
@@ -520,24 +521,24 @@ pub fn goal_with_a_finished_dependency(front: &mut Joint) -> Dependents {
 }
 /// Finish the running first delegate with its report and settle its spend.
 pub fn report_first_delegate(front: &mut Joint, task: u64) {
+    report_task(front, task, b"The change is feasible");
+}
+fn report_task(front: &mut Joint, task: u64, words: &[u8]) {
     let driver = &mut front.engine;
-    let first = driver.task(task).expect("running first delegate");
-    let attempt = first.attempt;
-    let spent = first.run_spent;
+    let run = driver.task(task).expect("reporting run");
+    let attempt = run.attempt;
+    let spent = run.run_spent;
     driver.answer(
         QUESTION_WORKER,
         task,
         attempt,
         spent,
-        tasks::End::Finished {
-            result: tasks::TaskResult::Report { words: b"The change is feasible".as_slice().into() },
-            cancel_delegates: false,
-        },
+        tasks::End::Finished { result: tasks::TaskResult::Report { words: words.into() }, cancel_delegates: false },
         engine::Parts::none(),
     );
     driver.settle();
 }
-const BUDGET_WATCH: Token = Token::new(1204);
+const BUDGET_READ: Token = Token::new(1204);
 /// A tracked goal whose worker finished with a report retained by the engine.
 pub fn finished_goal(front: &mut Joint) -> u64 {
     *front = Joint::with_questions(SEED, &domain_limits());
@@ -560,33 +561,63 @@ pub fn finished_goal(front: &mut Joint) -> u64 {
     goal
 }
 /// Read the engine's supplied budget, including availability, without computing it in the story.
+/// A point read also serves ended tasks, whose watches have ended (client/README.md, 5.8).
 pub fn task_budget(front: &mut Joint, task: u64) -> jig_domain_core::documents::BudgetLine {
-    use jig_domain_core::documents::{Document, Watched, Window};
+    use jig_domain_core::{documents::Document, reads};
     let driver = &mut front.engine;
-    driver.send(engine::Event::Party(engine::PartyInput::Watch {
-        watcher: BUDGET_WATCH,
-        sign_in: driver.session(),
-        subject: Watched::Task { task },
-        window: Window { rows: driver.env.limits.documents.rows, after: None },
-    }));
-    driver.settle();
-    let budget = driver
-        .delivered
-        .iter()
-        .rev()
-        .find_map(|delivery| {
-            if let engine::Delivery::Document { watcher: BUDGET_WATCH, document } = delivery
-                && let Document::Task(document) = document.as_ref()
+    // The joint world drains deliveries between phases; the sign-in's durable
+    // identity remains available after its initial reply has been consumed.
+    let sign_in = driver
+        .store
+        .rows
+        .values()
+        .find_map(|record| {
+            if let engine::Record::Core(jig_domain_core::Record::People(jig_domain_people::Stored::SignIn {
+                number,
+                person: PARTY,
+                ..
+            })) = record
             {
-                Some(document.budget)
+                Some(*number)
             } else {
                 None
             }
         })
-        .expect("goal budget document");
-    driver.send(engine::Event::Party(engine::PartyInput::Unwatch { watcher: BUDGET_WATCH }));
+        .expect("fixture person's durable sign-in");
+    driver.send(engine::Event::Party(engine::PartyInput::Read {
+        reply_to: skein_lib::ReplyTo::new(BUDGET_READ),
+        sign_in,
+        read: reads::Read::Task { task },
+    }));
     driver.settle();
-    budget
+    driver
+        .delivered
+        .iter()
+        .rev()
+        .find_map(|delivery| {
+            let engine::Delivery::Read { reply, answer } = delivery else { return None };
+            if *reply != skein_lib::ReplyTo::new(BUDGET_READ) {
+                return None;
+            }
+            match answer {
+                reads::Answer::Document(document) => {
+                    if let Document::Task(document) = document.as_ref() {
+                        Some(document.budget)
+                    } else {
+                        None
+                    }
+                }
+                reads::Answer::Historical(historical) => {
+                    if let reads::Past::Task { document, .. } = &historical.value {
+                        Some(document.budget)
+                    } else {
+                        None
+                    }
+                }
+                reads::Answer::Tasks(_) | reads::Answer::Page(_) | reads::Answer::None(_) => None,
+            }
+        })
+        .expect("goal budget document")
 }
 /// A tracked goal with a failed delegate, held by the real engine.
 pub fn goal_with_held_delegate(front: &mut Joint) -> (u64, u64) {

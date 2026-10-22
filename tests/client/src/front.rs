@@ -161,23 +161,22 @@ impl Joint {
         });
         Self::with_engine(seed, limits, Store::new(), [bootstrap, config], &engine_limits, 2)
     }
-    /// A goal and two dependent delegates fit without changing other stories' bounds.
-    pub(crate) fn with_delegates(seed: u64, limits: &client::Limits) -> Self {
+    /// A goal and its delegated authority fit, with bounds chosen by the story.
+    pub(crate) fn with_delegates(seed: u64, limits: &client::Limits, delegates: u32) -> Self {
         use jig_domain_authority as authority;
-        const TASKS: u32 = 3;
-        const DELEGATES: u32 = 2;
+        let tasks = delegates.checked_add(1).expect("goal plus its delegates");
         let [(bootstrap, engine_limits), (config, _)] = std::array::from_fn(|_| {
             let mut config = walking::config(seed);
             let mut rules = config.core.authority.rules().clone();
-            rules.ceiling.delegation.tasks = TASKS;
+            rules.ceiling.delegation.tasks = tasks;
             rules.ceiling.delegation.depth = 2;
             let mut policy = config.core.authority.policy(fixtures::QUESTION_PROJECT).expect("fixture project").clone();
-            policy.ceiling.delegation.tasks = TASKS;
+            policy.ceiling.delegation.tasks = tasks;
             policy.ceiling.delegation.depth = 2;
-            policy.roles[0].authority.delegation.tasks = TASKS;
+            policy.roles[0].authority.delegation.tasks = tasks;
             policy.roles[0].authority.delegation.depth = 2;
             let mut authority_limits = *config.core.authority.limits();
-            authority_limits.batch = DELEGATES;
+            authority_limits.batch = delegates;
             let mut domain = authority::Domain::new(rules, authority_limits).expect("delegate authority");
             let mut out = skein_lib::Queue::with_capacity(authority::POLICY_MAX_OUT);
             authority::step(
@@ -188,14 +187,14 @@ impl Joint {
             assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: fixtures::QUESTION_PROJECT }));
             config.core.authority = domain;
             let mut engine_limits = engine_limits();
-            engine_limits.tasks.tasks = TASKS;
-            engine_limits.tasks.project_tasks = TASKS;
-            engine_limits.tasks.tree_tasks = TASKS;
-            engine_limits.tasks.delegates = DELEGATES;
-            engine_limits.tasks.batch = DELEGATES;
+            engine_limits.tasks.tasks = tasks;
+            engine_limits.tasks.project_tasks = tasks;
+            engine_limits.tasks.tree_tasks = tasks;
+            engine_limits.tasks.delegates = delegates;
+            engine_limits.tasks.batch = delegates;
             engine_limits.authority = authority_limits;
             // The core prices two inbox projections for each live task.
-            engine_limits.people.inbox_tasks = TASKS * 2;
+            engine_limits.people.inbox_tasks = tasks * 2;
             engine_limits.tasks.inbox_bytes = 512;
             engine_limits.fleet.slots = 2;
             engine_limits.fleet.attempts = 4;
