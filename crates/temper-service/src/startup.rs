@@ -296,7 +296,7 @@ fn load(
             }
         }
         if let Some(at) = application_at {
-            application::worker_alone(&document, at, directories, &mut problems);
+            let _part = application::worker_alone(&document, at, directories, &mut problems);
         }
         return if problems.is_empty() { Ok((shape, None)) } else { Err(problems) };
     }
@@ -457,6 +457,15 @@ pub fn memory_requirements(
     accounts: Option<&AccountsRuntime>,
     forges: List<crate::ForgeRuntime>,
 ) -> Result<Requirements, Problems> {
+    if shape(document, directories)? == Shape::WorkerAlone {
+        let part = worker_part(document, directories)?;
+        check_worker_part(&part, files, agent)?;
+        return Ok(Requirements {
+            engine_bytes: 0,
+            worker_bytes: crate::system::worker_alone_worst_case(&part.worker, agent, &part.limits)
+                .ok_or(problem(indexed(0).member(b"memory_bytes"), What::Jig(config::What::Bound)))?,
+        });
+    }
     Ok(checked_start(document, directories, files, Some(agent), seeds, accounts, forges, None)?.requirements)
 }
 /// Derive envelopes including the checked setup which the shell supplies at startup.
@@ -693,4 +702,83 @@ fn prepare_forges(
     let owned = skein_forge_connection::settings::owned_bytes(&settings)
         .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Jig(config::What::Bound)))?;
     Ok((settings, roots, owned))
+}
+
+/// The worker-only document, with no deployment or engine declarations.
+#[derive(Debug)]
+pub struct WorkerPart {
+    pub worker: settings::Worker,
+    pub limits: crate::limits::Limits,
+    pub named: NamedWorker,
+    pub files: Box<[config::File]>,
+}
+/// Read exactly a worker's part for serve and program-login (protocol/README.md, 15.1).
+pub fn worker_part(input: &[u8], directories: &config::Directories) -> Result<WorkerPart, Problems> {
+    if shape(input, directories)? != Shape::WorkerAlone {
+        return Err(problem(Path::root(), What::WorkerAlone));
+    }
+    let document = config::document(
+        input,
+        &config::DocumentLimits {
+            bytes: 1_048_576,
+            tokens: u32::try_from(input.len()).expect("checked document"),
+            depth: 32,
+        },
+    )
+    .expect("checked shape document");
+    let at = member(&document, 0, b"workers").expect("checked workers");
+    let ats = read::list(&document, at, document.len()).expect("checked worker list");
+    let jig = config::worker(&document, *ats.get(0).expect("one worker"), directories).expect("checked worker");
+    let mut problems = Problems::empty();
+    let (own, limits) = application::worker_alone(
+        &document,
+        member(&document, 0, b"application").expect("checked application"),
+        directories,
+        &mut problems,
+    )
+    .expect("checked worker part");
+    let mut files = config::worker_files(&jig);
+    for file in &mut files {
+        let mut path = indexed(0);
+        for segment in &file.at.segments {
+            path = path.child(segment.clone());
+        }
+        file.at = path;
+    }
+    Ok(WorkerPart {
+        named: NamedWorker { root: own.root.clone(), agent: jig.agent.configuration.clone() },
+        worker: settings::Worker { jig, root: own.root, git: own.git },
+        limits,
+        files,
+    })
+}
+/// Construct a worker-only service; its complete envelope belongs to the worker.
+pub fn worker_alone(
+    part: WorkerPart,
+    files: &settings::Files,
+    agent: &settings::Agent,
+    runtime: WorkerRuntime,
+    seed: u64,
+) -> Result<Service, Problems> {
+    check_worker_part(&part, files, agent)?;
+    match Service::worker_alone(&part.worker, &part.limits, agent, files, runtime, seed) {
+        Ok(service) => Ok(service),
+        Err(found) => Err(Problems::jig(found, &Path::root())),
+    }
+}
+
+fn check_worker_part(part: &WorkerPart, files: &settings::Files, agent: &settings::Agent) -> Result<(), Problems> {
+    let mut problems = Problems::empty();
+    for file in &part.files {
+        match files.contents(&file.path) {
+            Some(bytes) if bytes.len() <= usize::try_from(file.max).expect("file bound") => {}
+            Some(_) => problems.push(file.at.clone(), What::Jig(config::What::Bound)),
+            None => problems.push(file.at.clone(), What::Jig(config::What::Unreadable)),
+        }
+    }
+    checks::worker(&crate::worker_settings::root_limits(&part.worker, agent, &part.limits), &mut problems);
+    if !problems.is_empty() {
+        return Err(problems);
+    }
+    Ok(())
 }

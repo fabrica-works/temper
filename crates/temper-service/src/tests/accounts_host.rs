@@ -16,7 +16,7 @@ fn a_revoked_record_waits_for_erased_and_coalesces_a_sign_out() {
         for _ in 0_u32..8 {
             fixtures::turn(&mut service);
         }
-        let engine = &mut service.engine;
+        let engine = service.engine.as_mut().expect("engine");
         let (config, runtime) = registered();
         let mut accounts = host(&config, runtime);
         accounts.request(domain::Request::Signing(domain::Signing::Restore {
@@ -159,7 +159,7 @@ fn llm_key_work_reaches_the_store_and_the_workers_table_through_the_service() {
     for _ in 0_u32..8 {
         fixtures::turn(&mut service);
     }
-    let engine = &mut service.engine;
+    let engine = service.engine.as_mut().expect("engine");
     let mut accounts = engine.accounts.take().expect("accounts component");
     let carried = carry_llm_key(engine, b"first-llm-key");
     accounts.request(domain::Request::Signing(domain::Signing::Keep { source: 7, carried, replaces: false }));
@@ -187,7 +187,7 @@ fn service_restart_restores_an_llm_key_before_want_and_sweeps_only_unnamed_sourc
     for _ in 0_u32..8 {
         fixtures::turn(&mut service);
     }
-    let engine = &mut service.engine;
+    let engine = service.engine.as_mut().expect("engine");
     let mut accounts = engine.accounts.take().expect("accounts component");
     let carried = carry_llm_key(engine, b"kept-llm-key");
     accounts.request(domain::Request::Signing(domain::Signing::Keep { source: 7, carried, replaces: false }));
@@ -204,7 +204,7 @@ fn service_restart_restores_an_llm_key_before_want_and_sweeps_only_unnamed_sourc
     );
     while engine.store.above.pop().is_some() {}
     let mut fresh_service = fixtures::started();
-    let mut restarted = fresh_service.engine.accounts.take().expect("new component");
+    let mut restarted = fresh_service.engine.as_mut().expect("engine").accounts.take().expect("new component");
     restarted.request(domain::Request::Signing(domain::Signing::Restore {
         source: 7,
         provider: 1,
@@ -254,7 +254,7 @@ fn aborting_does_not_submit_an_llm_key_adoption_to_the_closing_store() {
     for _ in 0_u32..8 {
         fixtures::turn(&mut service);
     }
-    let engine = &mut service.engine;
+    let engine = service.engine.as_mut().expect("engine");
     let mut accounts = engine.accounts.take().expect("accounts component");
     let carried = carry_llm_key(engine, b"aborted-llm-key");
     accounts.request(domain::Request::Signing(domain::Signing::Keep { source: 7, carried, replaces: false }));
@@ -322,7 +322,7 @@ fn dynamic_sources_use_provider_templates_and_restore_their_kept_records() {
     let mut accounts = host(&config, runtime);
     let mut service = fixtures::started();
     fixtures::restart(&mut service);
-    let engine = &mut service.engine;
+    let engine = service.engine.as_mut().expect("engine");
     let _started = pump_accounts(&mut accounts, engine);
     // Source numbers are independent of the provider and configured source.
     accounts.request(domain::Request::Signing(domain::Signing::SignIn { source: 9001, provider: 3 }));
@@ -422,7 +422,7 @@ fn a_d2_input_must_name_a_restored_source() {
     let mut service = fixtures::started();
     fixtures::restart(&mut service);
     accounts.request(domain::Request::Signing(domain::Signing::Restored));
-    pump_accounts(&mut accounts, &mut service.engine);
+    pump_accounts(&mut accounts, service.engine.as_mut().expect("engine"));
     let found = accounts.startup_problem().expect("the explicit source was never restored");
     assert_eq!(found.problems.get(0), Some(&config::Problem { path: Path::root().member(b"D2"), what: What::Refers }));
 }
@@ -450,8 +450,8 @@ fn a_matching_d2_source_is_durable_before_its_withdrawn_value_is_lent() {
     for row in preseed.rows {
         rows.push(root::Write::Save(root::Record::Core(jig_domain_core::Record::Accounts(row)))).unwrap();
     }
-    fixtures::commit(&mut service.engine.store, 1, rows.into_boxed());
-    let _kept = service.engine.store.secrets(
+    fixtures::commit(&mut service.engine.as_mut().expect("engine").store, 1, rows.into_boxed());
+    let _kept = service.engine.as_mut().expect("engine").store.secrets(
         Token::new(123),
         store::Secrets::Replace {
             owner: store::SecretOwner::Source,
@@ -460,7 +460,7 @@ fn a_matching_d2_source_is_durable_before_its_withdrawn_value_is_lent() {
             replaces: None,
         },
     );
-    while service.engine.store.above.pop().is_some() {}
+    while service.engine.as_mut().expect("engine").store.above.pop().is_some() {}
     let mut accounts = host(&config, runtime);
     accounts.request(domain::Request::Signing(domain::Signing::Restore {
         source: SOURCE,
@@ -469,7 +469,7 @@ fn a_matching_d2_source_is_durable_before_its_withdrawn_value_is_lent() {
     }));
     accounts.request(domain::Request::Signing(domain::Signing::Restored));
     accounts.request(domain::Request::Component(domain::ToComponent::Want { account: SOURCE }));
-    let engine = &mut service.engine;
+    let engine = service.engine.as_mut().expect("engine");
     let mut events = Queue::with_capacity(64);
     for _ in 0_u32..32 {
         while let Some(event) = engine.store.above.pop() {

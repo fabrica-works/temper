@@ -15,16 +15,16 @@ fn the_worker_dials_workers_and_its_hello_reaches_the_engine() {
 #[test]
 fn the_worker_iterates_only_once_the_engine_listens() {
     let mut stand = fixtures::one_process();
-    stand.service.engine.store.opened = false;
+    stand.service.engine.as_mut().expect("engine").store.opened = false;
     crate::iterate(&mut stand.service, Time::ZERO, Wall::EPOCH);
     assert!(!stand.service.worker.as_ref().unwrap().started, "store still closed");
-    stand.service.engine.store.opened = true;
+    stand.service.engine.as_mut().expect("engine").store.opened = true;
     crate::iterate(&mut stand.service, Time::ZERO, Wall::EPOCH);
     assert!(!stand.service.worker.as_ref().unwrap().started, "listener still opening");
     for _ in 0_u8..4 {
         stand.turn();
     }
-    assert!(stand.service.engine.workers.opened());
+    assert!(stand.service.engine.as_ref().expect("engine").workers.opened());
     assert!(stand.service.worker.as_ref().unwrap().started);
 }
 #[test]

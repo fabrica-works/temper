@@ -19,8 +19,19 @@ fn command(
 ) -> Result<std::process::Command, String> {
     let name = source_name(name)?;
     let bytes = directories.read()?;
-    let super::setup::Deployment { named, .. } = super::setup::check(&bytes, &directories.jig())?;
-    let agent = super::agent::preflight(&named)?;
+    let agent = match temper_service::startup::shape(&bytes, &directories.jig())
+        .map_err(|why| String::from_utf8_lossy(&temper_service::startup::lines(&why)).into_owned())?
+    {
+        temper_service::startup::Shape::WorkerAlone => {
+            let part = temper_service::startup::worker_part(&bytes, &directories.jig())
+                .map_err(|why| String::from_utf8_lossy(&temper_service::startup::lines(&why)).into_owned())?;
+            super::agent::preflight_worker(&part.named)?
+        }
+        temper_service::startup::Shape::Standalone | temper_service::startup::Shape::EngineAlone => {
+            let super::setup::Deployment { named, .. } = super::setup::check(&bytes, &directories.jig())?;
+            super::agent::preflight(&named)?
+        }
+    };
     let program = agent
         .programs
         .iter()

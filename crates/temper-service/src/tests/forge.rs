@@ -11,7 +11,10 @@ fn a_stopped_forge_is_named_and_only_its_calls_are_not_connected() {
     face.connected(&mut service);
     face.answer(&mut service, b"HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n");
     assert_eq!(service.end(), None);
-    assert!(service.engine.drain.is_none(), "a stopped forge never starts the engine's drain");
+    assert!(
+        service.engine.as_ref().expect("engine").drain.is_none(),
+        "a stopped forge never starts the engine's drain"
+    );
     assert_eq!(service.notes().capacity(), 2);
     assert_eq!(
         service.notes().pop(),
@@ -24,7 +27,7 @@ fn a_stopped_forge_is_named_and_only_its_calls_are_not_connected() {
     face.capture_answers(); // Scripted calls have no outstanding client token in the root.
     for (number, call) in [(1, Token::new(7)), (2, Token::new(8))] {
         crate::route::request(
-            &mut service.engine,
+            service.engine.as_mut().expect("engine"),
             root::Request::Forge {
                 call,
                 repository: Repository { forge: number, repository: 0 },
@@ -57,7 +60,7 @@ fn a_stopped_forge_is_named_and_only_its_calls_are_not_connected() {
         ]
     );
     assert_eq!(service.end(), None);
-    assert!(service.engine.drain.is_none());
+    assert!(service.engine.as_ref().expect("engine").drain.is_none());
     assert!(service.notes().is_empty());
 }
 fn forge_ok(body: &[u8]) -> Box<[u8]> {
@@ -87,20 +90,19 @@ fn a_forge_call_waiting_past_its_deadline_reaches_the_root_unavailable() {
     face.connected(&mut service);
     face.refuse(&mut service);
     crate::route::request(
-        &mut service.engine,
+        service.engine.as_mut().expect("engine"),
         root::Request::Forge {
             call,
             repository: skein_forge::api::Repository { forge: 1, repository: 2 },
             op: skein_forge::api::Op::Read(skein_forge::api::Read::Settings),
         },
     );
-    service.engine.forge.env.now = Time::from_nanos(11_000_000_000);
-    service.engine.forge.component.fire(
-        &service.engine.forge.env,
-        &mut service.engine.forge.above,
-        &mut service.engine.forge.io,
-    );
-    let Some(skein_forge_connection::Event::Answered(answer)) = service.engine.forge.above.pop() else {
+    service.engine.as_mut().expect("engine").forge.env.now = Time::from_nanos(11_000_000_000);
+    let engine = service.engine.as_mut().expect("engine");
+    engine.forge.component.fire(&engine.forge.env, &mut engine.forge.above, &mut engine.forge.io);
+    let Some(skein_forge_connection::Event::Answered(answer)) =
+        service.engine.as_mut().expect("engine").forge.above.pop()
+    else {
         panic!("call terminal")
     };
     assert_eq!(
@@ -117,13 +119,14 @@ fn a_forge_call_waiting_past_its_deadline_reaches_the_root_unavailable() {
         panic!("forge event");
     };
     assert_eq!(forge::back(event).unwrap().call, call);
-    assert_eq!(service.engine.forge.above.len(), 0);
+    assert_eq!(service.engine.as_ref().expect("engine").forge.above.len(), 0);
 }
 #[test]
 fn an_answer_the_root_cannot_take_is_offered_again_next_pass() {
     let mut service = fixtures::ready();
     for number in 2..16 {
-        if root::try_step(&mut service.engine.domain, &service.engine.env, fixtures::period(number)).is_err() {
+        let engine = service.engine.as_mut().expect("engine");
+        if root::try_step(&mut engine.domain, &engine.env, fixtures::period(number)).is_err() {
             break;
         }
     }
@@ -134,12 +137,15 @@ fn an_answer_the_root_cannot_take_is_offered_again_next_pass() {
         cost: 0,
         result: Err(skein_forge::api::Error::Unavailable),
     };
-    assert!(root::try_step(&mut service.engine.domain, &service.engine.env, forge::event(answer.clone())).is_err());
-    service.engine.forge.above.push(skein_forge_connection::Event::Answered(answer.clone()));
-    crate::engine::forge_pass(&mut service.engine);
-    assert_eq!(service.engine.forge.above.len(), 0);
-    service.engine.forge.down(skein_forge_connection::Request::Offer);
-    let Some(skein_forge_connection::Event::Answered(offered)) = service.engine.forge.above.pop() else {
+    let engine = service.engine.as_mut().expect("engine");
+    assert!(root::try_step(&mut engine.domain, &engine.env, forge::event(answer.clone())).is_err());
+    service.engine.as_mut().expect("engine").forge.above.push(skein_forge_connection::Event::Answered(answer.clone()));
+    crate::engine::forge_pass(service.engine.as_mut().expect("engine"));
+    assert_eq!(service.engine.as_ref().expect("engine").forge.above.len(), 0);
+    service.engine.as_mut().expect("engine").forge.down(skein_forge_connection::Request::Offer);
+    let Some(skein_forge_connection::Event::Answered(offered)) =
+        service.engine.as_mut().expect("engine").forge.above.pop()
+    else {
         panic!("offered answer")
     };
     assert_eq!(offered, answer);
@@ -159,15 +165,15 @@ fn an_answer_returned_in_the_drain_is_never_offered_again() {
         },
     );
     for _ in 0_u32..4 {
-        service.engine.forge.down(skein_forge_connection::Request::Offer);
+        service.engine.as_mut().expect("engine").forge.down(skein_forge_connection::Request::Offer);
         assert_eq!(fixtures::ForgeFace::pending(&service), 0);
     }
     for _ in 0_u32..64 {
         fixtures::turn(&mut service);
     }
     assert_eq!(service.end(), Some(&End::Drained));
-    assert!(service.engine.forge.closed);
-    assert_eq!(service.engine.forge.above.len(), 0);
+    assert!(service.engine.as_ref().expect("engine").forge.closed);
+    assert_eq!(service.engine.as_ref().expect("engine").forge.above.len(), 0);
 }
 #[test]
 fn routing_news_and_hints_returned_during_the_drain_are_dropped() {
@@ -176,17 +182,19 @@ fn routing_news_and_hints_returned_during_the_drain_are_dropped() {
         service.shutdown();
         if hint {
             // forge_pass skips hints once drain is set; exercise the returned root boundary too.
-            service.engine.events.push(forge::hinted(skein_forge_connection::hooks::Hinted {
-                connection: Token::new(7),
-                hint: skein_forge::api::Hint {
-                    repository: skein_forge::api::Repository { forge: 1, repository: 2 },
-                    change: skein_forge::api::Change::Item(7),
-                    key: None,
+            service.engine.as_mut().expect("engine").events.push(forge::hinted(
+                skein_forge_connection::hooks::Hinted {
+                    connection: Token::new(7),
+                    hint: skein_forge::api::Hint {
+                        repository: skein_forge::api::Repository { forge: 1, repository: 2 },
+                        change: skein_forge::api::Change::Item(7),
+                        key: None,
+                    },
                 },
-            }));
+            ));
         } else {
             crate::setup::lifecycle::state(
-                &mut service.engine,
+                service.engine.as_mut().expect("engine"),
                 1,
                 temper_engine_domain_forge::Connection::Connected { id: 42, login: Box::from(b"temper".as_slice()) },
             );
@@ -198,8 +206,12 @@ fn routing_news_and_hints_returned_during_the_drain_are_dropped() {
             }
         }
         assert_eq!(service.end(), Some(&End::Drained));
-        assert_eq!(service.engine.forge.returned, 0, "no news or hint is returned to the component");
-        assert!(service.engine.forge.closed);
+        assert_eq!(
+            service.engine.as_ref().expect("engine").forge.returned,
+            0,
+            "no news or hint is returned to the component"
+        );
+        assert!(service.engine.as_ref().expect("engine").forge.closed);
     }
 }
 #[test]
@@ -237,16 +249,19 @@ fn a_hint_the_root_cannot_take_is_offered_again_next_pass() {
     let mut service = fixtures::ready();
     let hinted = fixtures::hook(&mut service);
     for number in 2..16 {
-        if root::try_step(&mut service.engine.domain, &service.engine.env, fixtures::period(number)).is_err() {
+        let engine = service.engine.as_mut().expect("engine");
+        if root::try_step(&mut engine.domain, &engine.env, fixtures::period(number)).is_err() {
             break;
         }
     }
-    assert!(root::try_step(&mut service.engine.domain, &service.engine.env, forge::hinted(hinted.clone())).is_err());
-    service.engine.forge.above.push(skein_forge_connection::Event::Hint(hinted.clone()));
-    crate::engine::forge_pass(&mut service.engine);
-    assert_eq!(service.engine.forge.above.len(), 0);
-    service.engine.forge.down(skein_forge_connection::Request::Offer);
-    let Some(skein_forge_connection::Event::Hint(offered)) = service.engine.forge.above.pop() else {
+    let engine = service.engine.as_mut().expect("engine");
+    assert!(root::try_step(&mut engine.domain, &engine.env, forge::hinted(hinted.clone())).is_err());
+    service.engine.as_mut().expect("engine").forge.above.push(skein_forge_connection::Event::Hint(hinted.clone()));
+    crate::engine::forge_pass(service.engine.as_mut().expect("engine"));
+    assert_eq!(service.engine.as_ref().expect("engine").forge.above.len(), 0);
+    service.engine.as_mut().expect("engine").forge.down(skein_forge_connection::Request::Offer);
+    let Some(skein_forge_connection::Event::Hint(offered)) = service.engine.as_mut().expect("engine").forge.above.pop()
+    else {
         panic!("offered hint")
     };
     assert_eq!(offered, hinted);
@@ -254,8 +269,8 @@ fn a_hint_the_root_cannot_take_is_offered_again_next_pass() {
 #[test]
 fn a_lost_webhooks_listener_drains_the_service_and_stops_it() {
     let mut service = fixtures::started();
-    service.engine.forge.above.push(skein_forge_connection::Event::ListenerLost);
-    crate::engine::forge_pass(&mut service.engine);
+    service.engine.as_mut().expect("engine").forge.above.push(skein_forge_connection::Event::ListenerLost);
+    crate::engine::forge_pass(service.engine.as_mut().expect("engine"));
     let mut forge = fixtures::ForgeFace::new();
     for _ in 0_u32..64 {
         forge.turn(&mut service);
@@ -267,7 +282,13 @@ fn a_lost_webhooks_listener_drains_the_service_and_stops_it() {
 fn a_bound_webhooks_listener_announces_its_address_once() {
     let mut service = fixtures::started();
     let addr = ([127, 0, 0, 1], 54321).into();
-    service.engine.forge.above.push(skein_forge_connection::Event::Listening { addr: skein_io::Addr::Ip(addr) });
+    service
+        .engine
+        .as_mut()
+        .expect("engine")
+        .forge
+        .above
+        .push(skein_forge_connection::Event::Listening { addr: skein_io::Addr::Ip(addr) });
     let mut forge = fixtures::ForgeFace::new();
     for _ in 0_u32..64 {
         forge.turn(&mut service);
@@ -443,13 +464,15 @@ fn a_full_notes_queue_keeps_its_first_diagnostic_and_the_engine_running() {
     for user in [7, 8] {
         service
             .engine
+            .as_mut()
+            .expect("engine")
             .forge
             .above
             .push(skein_forge_connection::Event::Stopped { forge: 1, why: Stopped::OtherUser { user } });
     }
-    crate::engine::forge_pass(&mut service.engine);
+    crate::engine::forge_pass(service.engine.as_mut().expect("engine"));
     assert_eq!(service.end(), None);
-    assert!(service.engine.drain.is_none());
+    assert!(service.engine.as_ref().expect("engine").drain.is_none());
     assert_eq!(
         service.notes().pop(),
         Some(crate::Note::ForgeStopped { number: 1, why: Stopped::OtherUser { user: 7 } })
@@ -461,12 +484,12 @@ fn a_full_notes_queue_keeps_its_first_diagnostic_and_the_engine_running() {
 fn connected_then_token_refused_keeps_the_note_and_engine_running() {
     let mut service = fixtures::ready();
     let why = Stopped::TokenRefused { installation: 7, status: 401 };
-    service.engine.forge.above.push(skein_forge_connection::Event::Connected { forge: 1 });
-    service.engine.forge.above.push(skein_forge_connection::Event::Stopped { forge: 1, why });
-    crate::engine::forge_pass(&mut service.engine);
+    service.engine.as_mut().expect("engine").forge.above.push(skein_forge_connection::Event::Connected { forge: 1 });
+    service.engine.as_mut().expect("engine").forge.above.push(skein_forge_connection::Event::Stopped { forge: 1, why });
+    crate::engine::forge_pass(service.engine.as_mut().expect("engine"));
     assert_eq!(service.notes().pop(), Some(crate::Note::ForgeStopped { number: 1, why }));
     assert_eq!(service.end(), None);
-    assert!(service.engine.drain.is_none());
+    assert!(service.engine.as_ref().expect("engine").drain.is_none());
 }
 
 fn records_service() -> (crate::Service, skein_lib::Secret) {
@@ -506,7 +529,7 @@ fn records_service() -> (crate::Service, skein_lib::Secret) {
     fixtures::fill_files(&mut settings);
     let file_token = settings.forges[0].api_token.clone().unwrap();
     let mut service = crate::Service::engine(settings, &fixtures::seeds(), None, runtime).unwrap();
-    service.engine.store = fixtures::records_store();
+    service.engine.as_mut().expect("engine").store = fixtures::records_store();
     (service, file_token)
 }
 #[expect(clippy::disallowed_macros, reason = "ordinary fixtures build versioned row bytes")]
@@ -584,6 +607,8 @@ fn records_start_routes_two_pages_without_erasing_or_reading_carried_values() {
         assert!(
             service
                 .engine
+                .as_mut()
+                .expect("engine")
                 .store
                 .secrets(
                     Token::new(123),
@@ -591,31 +616,43 @@ fn records_start_routes_two_pages_without_erasing_or_reading_carried_values() {
                 )
                 .is_none()
         );
-        let Some(jig_protocol_store::Event::Kept { .. }) = service.engine.store.above.pop() else { panic!("row kept") };
+        let Some(jig_protocol_store::Event::Kept { .. }) = service.engine.as_mut().expect("engine").store.above.pop()
+        else {
+            panic!("row kept")
+        };
     }
     let mut face = fixtures::ForgeFace::new();
     for _ in 0_u32..40 {
         face.turn(&mut service);
     }
-    assert!(service.engine.forge_records.done());
-    assert!(service.engine.forge_records.rows.forge(2).is_some(), "setup retains the loaded rows");
-    assert!(service.engine.forge_records.rows.forge(77).is_none(), "unconfigured values are not retained");
-    assert_eq!(service.engine.store.forge_loads.len(), 2);
-    for cursor in &service.engine.store.forge_loads {
+    assert!(service.engine.as_ref().expect("engine").forge_records.done());
+    assert!(
+        service.engine.as_ref().expect("engine").forge_records.rows.forge(2).is_some(),
+        "setup retains the loaded rows"
+    );
+    assert!(
+        service.engine.as_ref().expect("engine").forge_records.rows.forge(77).is_none(),
+        "unconfigured values are not retained"
+    );
+    assert_eq!(service.engine.as_ref().expect("engine").store.forge_loads.len(), 2);
+    for cursor in &service.engine.as_ref().expect("engine").store.forge_loads {
         assert!(cursor.is_none_or(|number| number < records::CARRIED));
     }
-    assert_eq!(service.engine.store.erases, 0);
-    for number in &service.engine.forge_records.inspected {
+    assert_eq!(service.engine.as_ref().expect("engine").store.erases, 0);
+    for number in &service.engine.as_ref().expect("engine").forge_records.inspected {
         assert!(*number < records::CARRIED);
     }
-    assert_eq!(service.engine.forge_records.inspected.len(), kept.len().checked_sub(2).unwrap());
-    assert_eq!(service.engine.forge.starts.len(), 1);
-    let (number, access) = service.engine.forge.starts.get(0).unwrap();
+    assert_eq!(
+        service.engine.as_ref().expect("engine").forge_records.inspected.len(),
+        kept.len().checked_sub(2).unwrap()
+    );
+    assert_eq!(service.engine.as_ref().expect("engine").forge.starts.len(), 1);
+    let (number, access) = service.engine.as_mut().expect("engine").forge.starts.get(0).unwrap();
     assert_eq!((*number, access.user), (2, 9));
     let skein_forge::credential::Credential::App { id, key } = &access.credential else { panic!("App credential") };
     assert_eq!(*id, 7);
     assert!(key.expose() == skein_fake_forge_github::keys::KEYS[0]);
-    assert_eq!(service.engine.forge.accepted.get(0).unwrap(), &(2, Box::from([1_u64])));
+    assert_eq!(service.engine.as_ref().expect("engine").forge.accepted.get(0).unwrap(), &(2, Box::from([1_u64])));
     let mut notes = List::with_capacity(9);
     while let Some(note) = service.notes().pop() {
         notes.push(note).unwrap();
@@ -666,7 +703,7 @@ fn records_start_routes_two_pages_without_erasing_or_reading_carried_values() {
     assert!(face.sent().windows(file_token.expose().len()).any(|part| part == file_token.expose()));
     face.capture_answers();
     for number in 3..=9 {
-        service.engine.forge.down(skein_forge_connection::Request::Call {
+        service.engine.as_mut().expect("engine").forge.down(skein_forge_connection::Request::Call {
             call: Token::new(u64::from(number)),
             repository: skein_forge::api::Repository { forge: number, repository: 0 },
             op: skein_forge::api::Op::Read(skein_forge::api::Read::Settings),
@@ -685,15 +722,15 @@ fn records_start_routes_two_pages_without_erasing_or_reading_carried_values() {
 #[test]
 fn an_unkept_installation_only_emits_its_diagnostic() {
     let mut service = fixtures::ready();
-    service.engine.forge.above.push(skein_forge_connection::Event::Fact {
+    service.engine.as_mut().expect("engine").forge.above.push(skein_forge_connection::Event::Fact {
         forge: 1,
         fact: skein_forge_connection::Fact::Unkept { installation: 93 },
     });
-    crate::engine::forge_pass(&mut service.engine);
+    crate::engine::forge_pass(service.engine.as_mut().expect("engine"));
     assert_eq!(service.notes().pop(), Some(crate::Note::ForgeUnkept { number: 1, installation: 93 }));
-    assert!(service.engine.events.is_empty());
+    assert!(service.engine.as_ref().expect("engine").events.is_empty());
     assert_eq!(service.end(), None);
-    assert!(service.engine.drain.is_none());
+    assert!(service.engine.as_ref().expect("engine").drain.is_none());
 }
 
 fn assert_records_untouched(service: &mut crate::Service, kept: &skein_lib::List<(u64, skein_lib::Secret)>) {
@@ -701,6 +738,8 @@ fn assert_records_untouched(service: &mut crate::Service, kept: &skein_lib::List
     for (number, original) in kept {
         let Some(jig_protocol_store::Event::Secret { value: Some(found), .. }) = service
             .engine
+            .as_mut()
+            .expect("engine")
             .store
             .secrets(Token::new(124), Secrets::Get { owner: SecretOwner::Application, number: *number })
         else {
@@ -715,14 +754,21 @@ fn a_refused_or_corrupt_records_load_stops_the_engine_named() {
     for corrupt in [true, false] {
         let mut service = fixtures::started();
         if corrupt {
-            service.engine.store.above.push(jig_protocol_store::Event::Corrupt { owner: forge::records::LOAD });
+            service
+                .engine
+                .as_mut()
+                .expect("engine")
+                .store
+                .above
+                .push(jig_protocol_store::Event::Corrupt { owner: forge::records::LOAD });
         } else {
             let (root, core, profile) = fixtures::store_limits();
             let limits = crate::store::limits(&root, &core, &root.forge, &profile).unwrap();
-            service.engine.store = crate::store::Store::new(&root, &limits, &[], fixtures::seeds().installation);
-            service.engine.store.opened = true; // The closed store refuses the loader's synchronous read.
+            service.engine.as_mut().expect("engine").store =
+                crate::store::Store::new(&root, &limits, &[], fixtures::seeds().installation);
+            service.engine.as_mut().expect("engine").store.opened = true; // The closed store refuses the loader's synchronous read.
         }
-        crate::engine::iterate(&mut service.engine, Time::from_nanos(1), skein_lib::Wall::EPOCH);
+        crate::engine::iterate(service.engine.as_mut().expect("engine"), Time::from_nanos(1), skein_lib::Wall::EPOCH);
         let mut expected = jig_protocol_config::Problems::empty();
         expected.push(jig_protocol_config::Path::root().member(b"forge records"), jig_protocol_config::What::Refers);
         assert_eq!(service.end(), Some(&End::Stopped(Stop::Start(expected))));
@@ -741,9 +787,11 @@ fn a_records_key_that_cannot_sign_stops_only_its_forge() {
         };
         let _write = service
             .engine
+            .as_mut()
+            .expect("engine")
             .store
             .secrets(Token::new(123), Secrets::Keep { owner: SecretOwner::Application, number, value });
-        let _kept = service.engine.store.above.pop();
+        let _kept = service.engine.as_mut().expect("engine").store.above.pop();
     }
     let mut face = fixtures::ForgeFace::new();
     for _ in 0_u32..40 {
@@ -764,5 +812,5 @@ fn a_records_key_that_cannot_sign_stops_only_its_forge() {
     assert_eq!(service.end(), None);
     face.select(1);
     assert!(face.sent().starts_with(b"GET /api/v1/user "));
-    assert_eq!(service.engine.store.erases, 0);
+    assert_eq!(service.engine.as_ref().expect("engine").store.erases, 0);
 }

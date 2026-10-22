@@ -13,7 +13,7 @@ const PROCESS_UPTIME: skein_lib::Time = skein_lib::Time::from_nanos(600_000_000_
 #[test]
 fn a_link_printed_on_the_first_clock_tick_is_live() {
     let mut service = super::fixtures::started();
-    let engine = &mut service.engine;
+    let engine = service.engine.as_mut().expect("engine");
     engine.clients.iterate(PROCESS_UPTIME, skein_lib::Wall::EPOCH, &mut engine.events, &[], None);
     let Some(skein_io::Request::Listen { owner, addr }) = engine.clients.io.pop() else { panic!("listen") };
     assert!(engine.clients.up(skein_io::Event::Listening { owner, listener: LISTENER, addr }));
@@ -169,18 +169,22 @@ fn the_next_clients_stream_opens_once_a_peer_ends_its_own() {
     const CLIENTS: u32 = 3;
     let mut service = super::fixtures::ready();
     let link = service.links().pop().unwrap();
-    let body = peer::link_body(&service.engine, &link);
-    let mut sign_in = peer::Peer::new(&mut service.engine, b"POST", b"/jig/v1/sign-in/link", &body, None);
-    sign_in.pump(&mut service.engine, true);
-    let jig_client_protocol_wire::v11::SignInAnswer::SignedIn(answer) = sign_in.sign_in_answer(&service.engine) else {
+    let body = peer::link_body(service.engine.as_ref().expect("engine"), &link);
+    let mut sign_in =
+        peer::Peer::new(service.engine.as_mut().expect("engine"), b"POST", b"/jig/v1/sign-in/link", &body, None);
+    sign_in.pump(service.engine.as_mut().expect("engine"), true);
+    let jig_client_protocol_wire::v11::SignInAnswer::SignedIn(answer) =
+        sign_in.sign_in_answer(service.engine.as_ref().expect("engine"))
+    else {
         panic!("signed in")
     };
     let bearer = peer::bearer(answer.token().as_ref().expect("native credential").expose());
     let mut third_opened = false;
     for _ in 0..CLIENTS {
-        let mut stream = peer::Peer::new(&mut service.engine, b"GET", b"/jig/v1/stream", &[], Some(&bearer));
-        third_opened = stream.read_hello(&mut service.engine);
-        stream.end(&mut service.engine);
+        let mut stream =
+            peer::Peer::new(service.engine.as_mut().expect("engine"), b"GET", b"/jig/v1/stream", &[], Some(&bearer));
+        third_opened = stream.read_hello(service.engine.as_mut().expect("engine"));
+        stream.end(service.engine.as_mut().expect("engine"));
     }
     assert!(third_opened, "the third client receives its hello before a heartbeat");
 }
@@ -197,15 +201,18 @@ fn the_engine_prints_one_sign_in_link_at_start() {
 fn a_link_sign_in_reaches_the_root_and_answers_a_token() {
     let mut service = super::fixtures::ready();
     let link = service.links().pop().unwrap();
-    let body = peer::link_body(&service.engine, &link);
-    let mut peer = peer::Peer::new(&mut service.engine, b"POST", b"/jig/v1/sign-in/link", &body, None);
-    peer.pump(&mut service.engine, true);
-    let jig_client_protocol_wire::v11::SignInAnswer::SignedIn(answer) = peer.sign_in_answer(&service.engine) else {
+    let body = peer::link_body(service.engine.as_ref().expect("engine"), &link);
+    let mut peer =
+        peer::Peer::new(service.engine.as_mut().expect("engine"), b"POST", b"/jig/v1/sign-in/link", &body, None);
+    peer.pump(service.engine.as_mut().expect("engine"), true);
+    let jig_client_protocol_wire::v11::SignInAnswer::SignedIn(answer) =
+        peer.sign_in_answer(service.engine.as_ref().expect("engine"))
+    else {
         panic!("signed in")
     };
     assert_eq!(answer.party(), 1);
     assert!(super::fixtures::get(&mut service, core::Key::People(people::Key::SignIn(1))).is_some());
-    let engine = &mut service.engine;
+    let engine = service.engine.as_mut().expect("engine");
     let Some(jig_protocol_store::Event::Secret { value: Some(secret), .. }) = engine.store.secrets(
         Token::new(1),
         jig_protocol_store::Secrets::Get { owner: jig_protocol_store::SecretOwner::SignIn, number: 1 },
@@ -222,7 +229,7 @@ fn a_link_sign_in_reaches_the_root_and_answers_a_token() {
 #[test]
 fn a_request_before_decisions_open_is_answered_not_ready() {
     let mut service = super::fixtures::started();
-    let engine = &mut service.engine;
+    let engine = service.engine.as_mut().expect("engine");
     engine.clients.iterate(
         skein_lib::Time::ZERO,
         skein_lib::Wall::EPOCH,

@@ -38,21 +38,21 @@ fn configured(hooks: bool) -> crate::settings::Engine {
 fn service(hooks: bool) -> crate::Service {
     let config = configured(hooks);
     let mut service = crate::Service::engine(config, &fixtures::seeds(), None, fixtures::forge_runtime()).unwrap();
-    service.engine.store = fixtures::records_store();
-    advance(&mut service.engine);
-    assert!(service.engine.setup.runs.is_empty(), "wait for records");
-    service.engine.forge.iterate(Time::ZERO, Wall::EPOCH);
-    for _ in 0..service.engine.forge.io.len() {
-        let Some(skein_io::Request::Listen { .. }) = service.engine.forge.io.pop() else {
+    service.engine.as_mut().expect("engine").store = fixtures::records_store();
+    advance(service.engine.as_mut().expect("engine"));
+    assert!(service.engine.as_ref().expect("engine").setup.runs.is_empty(), "wait for records");
+    service.engine.as_mut().expect("engine").forge.iterate(Time::ZERO, Wall::EPOCH);
+    for _ in 0..service.engine.as_mut().expect("engine").forge.io.len() {
+        let Some(skein_io::Request::Listen { .. }) = service.engine.as_mut().expect("engine").forge.io.pop() else {
             panic!("no API connection without access")
         };
     }
     for _ in 0_u32..8 {
-        crate::forge::records::advance(&mut service.engine);
+        crate::forge::records::advance(service.engine.as_mut().expect("engine"));
     }
-    advance(&mut service.engine);
-    assert!(service.engine.forge_records.done());
-    assert_eq!(service.engine.setup.runs.len(), 1);
+    advance(service.engine.as_mut().expect("engine"));
+    assert!(service.engine.as_ref().expect("engine").forge_records.done());
+    assert_eq!(service.engine.as_ref().expect("engine").setup.runs.len(), 1);
     service
 }
 fn sent(service: &mut crate::Service, face: &mut Face, request: &[u8]) {
@@ -62,11 +62,17 @@ fn sent(service: &mut crate::Service, face: &mut Face, request: &[u8]) {
 }
 fn repository(service: &mut crate::Service, face: &mut Face, second: bool) {
     sent(service, face, b"GET /api/v1/user ");
-    let run = *service.engine.setup.runs.first().unwrap().0;
-    assert_eq!(service.engine.setup.runs.get(&run).unwrap().kind, Kind::Adopt);
-    assert!(service.engine.setup.runs.get(&run).unwrap().internal);
-    assert_eq!(service.engine.setup.lifecycle.adoptions.get(&1).unwrap().next.get(), if second { 2 } else { 1 });
-    assert_eq!(service.engine.setup.answers.pop(), Some((run, host::Answer::Read(Some(Secret::new(HANDOVER.into()))))));
+    let run = *service.engine.as_mut().expect("engine").setup.runs.first().unwrap().0;
+    assert_eq!(service.engine.as_ref().expect("engine").setup.runs.get(&run).unwrap().kind, Kind::Adopt);
+    assert!(service.engine.as_ref().expect("engine").setup.runs.get(&run).unwrap().internal);
+    assert_eq!(
+        service.engine.as_ref().expect("engine").setup.lifecycle.adoptions.get(&1).unwrap().next.get(),
+        if second { 2 } else { 1 }
+    );
+    assert_eq!(
+        service.engine.as_mut().expect("engine").setup.answers.pop(),
+        Some((run, host::Answer::Read(Some(Secret::new(HANDOVER.into())))))
+    );
     face.reply(service, br#"{"id":1,"login":"temper-admin","is_admin":true}"#);
     sent(service, face, if second { b"GET /api/v1/repositories/2 " } else { b"GET /api/v1/repositories/1 " });
     face.reply(
@@ -89,7 +95,7 @@ fn repository(service: &mut crate::Service, face: &mut Face, second: bool) {
         },
     );
     assert!(contains(&face.wire.received, br#""permission":"write""#));
-    assert!(service.engine.forge.starts.is_empty());
+    assert!(service.engine.as_ref().expect("engine").forge.starts.is_empty());
     face.wire.write(b"HTTP/1.1 204 No Content\r\n\r\n");
     for _ in 0_u32..1024 {
         face.turn(service);
@@ -103,9 +109,9 @@ fn fake_repositories_are_adopted_in_order_then_connected_with_the_files_access()
         for second in [false, true] {
             repository(&mut service, &mut face, second);
             if hooks {
-                let run = *service.engine.setup.runs.first().unwrap().0;
+                let run = *service.engine.as_mut().expect("engine").setup.runs.first().unwrap().0;
                 assert_eq!(
-                    service.engine.setup.answers.pop(),
+                    service.engine.as_mut().expect("engine").setup.answers.pop(),
                     Some((run, host::Answer::Read(Some(Secret::new(HOOK.into())))))
                 );
                 sent(&mut service, &mut face, b"GET /api/v1/settings/api ");
@@ -123,29 +129,31 @@ fn fake_repositories_are_adopted_in_order_then_connected_with_the_files_access()
                 );
                 assert!(contains(&face.wire.received, b"http://127.0.0.1:7101/hooks/1"));
                 assert!(contains(&face.wire.received, HOOK));
-                assert!(service.engine.forge.starts.is_empty());
+                assert!(service.engine.as_ref().expect("engine").forge.starts.is_empty());
                 face.reply(
                     &mut service,
                     br#"{"id":1,"config":{"url":"http://127.0.0.1:7101/hooks/1"},"events":["push"],"active":true}"#,
                 );
             }
-            assert_eq!(service.engine.forge.starts.len(), u32::from(second));
+            assert_eq!(service.engine.as_ref().expect("engine").forge.starts.len(), u32::from(second));
         }
-        assert!(service.engine.setup.lifecycle.adoptions.is_empty());
-        assert!(service.engine.setup.runs.is_empty());
-        let (forge, access) = service.engine.forge.starts.get(0).unwrap();
+        assert!(service.engine.as_ref().expect("engine").setup.lifecycle.adoptions.is_empty());
+        assert!(service.engine.as_ref().expect("engine").setup.runs.is_empty());
+        let (forge, access) = service.engine.as_mut().expect("engine").forge.starts.get(0).unwrap();
         assert_eq!((*forge, access.user), (1, 42));
         assert_eq!(
             access.credential,
             skein_forge::credential::Credential::Token(Secret::new(b"api-token".as_slice().into()))
         );
         assert_eq!(access.webhook_secret, if hooks { Some(Secret::new(HOOK.into())) } else { None });
-        assert!(!service.engine.forge.io.is_empty(), "Connect starts the Forgejo user check");
-        lifecycle::connected(&mut service.engine, 1);
-        advance(&mut service.engine);
-        assert!(service.engine.setup.runs.is_empty(), "no fake Reconcile");
-        let Some(root::Event::Forge(_)) = service.engine.events.pop() else { panic!("Forgejo connected event") };
-        assert!(service.engine.workers.forges[0].api_token.is_none());
+        assert!(!service.engine.as_ref().expect("engine").forge.io.is_empty(), "Connect starts the Forgejo user check");
+        lifecycle::connected(service.engine.as_mut().expect("engine"), 1);
+        advance(service.engine.as_mut().expect("engine"));
+        assert!(service.engine.as_ref().expect("engine").setup.runs.is_empty(), "no fake Reconcile");
+        let Some(root::Event::Forge(_)) = service.engine.as_mut().expect("engine").events.pop() else {
+            panic!("Forgejo connected event")
+        };
+        assert!(service.engine.as_ref().expect("engine").workers.forges[0].api_token.is_none());
     }
 }
 #[test]
@@ -157,11 +165,11 @@ fn a_stopped_fake_adoption_names_its_step_and_drops_the_remaining_repositories_a
     let root::SetupEnd::Stopped { forge, reason } = terminal(&mut service) else { panic!("stopped adoption") };
     assert_eq!(forge, 1);
     assert_eq!(reason.as_ref(), b"setup Admin temper-admin: NotAdmin");
-    assert!(service.engine.setup.lifecycle.adoptions.is_empty());
-    assert!(service.engine.setup.runs.is_empty());
-    assert!(service.engine.forge.starts.is_empty());
-    assert!(service.engine.setup.io.is_empty());
-    assert_eq!(service.engine.domain.forge_connection(1), domain::Connection::NotConnected);
+    assert!(service.engine.as_ref().expect("engine").setup.lifecycle.adoptions.is_empty());
+    assert!(service.engine.as_ref().expect("engine").setup.runs.is_empty());
+    assert!(service.engine.as_ref().expect("engine").forge.starts.is_empty());
+    assert!(service.engine.as_ref().expect("engine").setup.io.is_empty());
+    assert_eq!(service.engine.as_ref().expect("engine").domain.forge_connection(1), domain::Connection::NotConnected);
     assert!(service.end().is_none(), "the engine runs on");
 }
 #[test]
@@ -205,13 +213,16 @@ fn owned_gets_forgejo_given_and_managed_stays_unserved_without_start_time_plans(
             let host::Kind::Forgejo(_) = &settings.forges.get(0).unwrap().kind else { panic!("owned Forgejo Given") };
         }
         let mut service = crate::Service::engine(config, &fixtures::seeds(), None, fixtures::forge_runtime()).unwrap();
-        service.engine.store = fixtures::records_store();
+        service.engine.as_mut().expect("engine").store = fixtures::records_store();
         for _ in 0_u32..8 {
-            crate::forge::records::advance(&mut service.engine);
+            crate::forge::records::advance(service.engine.as_mut().expect("engine"));
         }
-        advance(&mut service.engine);
-        assert!(service.engine.setup.runs.is_empty(), "no start-time writing plan for owned or managed");
-        assert!(service.engine.setup.io.is_empty());
+        advance(service.engine.as_mut().expect("engine"));
+        assert!(
+            service.engine.as_ref().expect("engine").setup.runs.is_empty(),
+            "no start-time writing plan for owned or managed"
+        );
+        assert!(service.engine.as_ref().expect("engine").setup.io.is_empty());
     }
 }
 
@@ -223,12 +234,12 @@ fn an_unserved_fake_drops_its_adoptions_and_names_the_exclusion_without_connecti
     let setup = prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2).unwrap();
     assert!(endpoints.forges.get(0).unwrap().access.is_none());
     let mut service = service(false);
-    service.engine.setup = setup;
+    service.engine.as_mut().expect("engine").setup = setup;
     let root::SetupEnd::Stopped { forge, reason } = terminal(&mut service) else { panic!("unserved fake") };
     assert_eq!(forge, 1);
     assert_eq!(reason.as_ref(), b"setup host serves plaintext only on loopback");
-    assert!(service.engine.setup.lifecycle.adoptions.is_empty());
-    assert!(service.engine.setup.runs.is_empty());
-    assert!(service.engine.forge.starts.is_empty());
-    assert!(service.engine.setup.io.is_empty());
+    assert!(service.engine.as_ref().expect("engine").setup.lifecycle.adoptions.is_empty());
+    assert!(service.engine.as_ref().expect("engine").setup.runs.is_empty());
+    assert!(service.engine.as_ref().expect("engine").forge.starts.is_empty());
+    assert!(service.engine.as_ref().expect("engine").setup.io.is_empty());
 }

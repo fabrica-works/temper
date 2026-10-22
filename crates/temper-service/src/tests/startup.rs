@@ -226,7 +226,7 @@ fn the_checked_fake_git_program_reaches_the_services_forge_settings() {
         Some(&checked),
     )
     .unwrap();
-    let forge = &service.engine.workers.forges[0];
+    let forge = &service.engine.as_ref().expect("engine").workers.forges[0];
     assert_eq!(forge.git_program.as_deref(), Some(b"/data/demo/bin/git".as_slice()));
     assert_eq!(forge.git.as_ref(), b"http://127.0.0.1:9");
 }
@@ -534,19 +534,19 @@ fn startup_makes_the_one_process_from_the_example() {
         Ok(service) => service,
         Err(problems) => panic!("startup: {}", core::str::from_utf8(&lines(&problems)).unwrap()),
     };
-    service.engine.store = fixtures::memory_store();
+    service.engine.as_mut().expect("engine").store = fixtures::memory_store();
     let mut stand = fixtures::system::SystemStand { service, kernel: fixtures::Kernel::new() };
     fixtures::until_hosting(&mut stand);
     let (channel, hello) = fixtures::hello(&stand.service).expect("worker linked through bytes");
     assert_eq!(channel, skein_lib::Token::new(1));
     assert_eq!(hello.slots, 1);
     for _ in 0_u16..256 {
-        if stand.service.engine.domain.ready() {
+        if stand.service.engine.as_mut().expect("engine").domain.ready() {
             break;
         }
         stand.turn();
     }
-    assert!(stand.service.engine.domain.ready(), "engine restored its store");
+    assert!(stand.service.engine.as_ref().expect("engine").domain.ready(), "engine restored its store");
     assert_eq!(stand.service.end(), None);
 }
 #[test]
@@ -983,8 +983,8 @@ fn a_configured_github_forge_without_records_starts_not_connected() {
         fixtures::forge_runtime(),
     )
     .unwrap();
-    assert_eq!(service.engine.workers.forges[0].kind, settings::Kind::GitHub);
-    service.engine.store = fixtures::memory_store();
+    assert_eq!(service.engine.as_ref().expect("engine").workers.forges[0].kind, settings::Kind::GitHub);
+    service.engine.as_mut().expect("engine").store = fixtures::memory_store();
     let mut face = fixtures::ForgeFace::new();
     for _ in 0_u8..32 {
         face.turn(&mut service);
@@ -993,10 +993,10 @@ fn a_configured_github_forge_without_records_starts_not_connected() {
         service.notes().pop(),
         Some(crate::Note::ForgeNotConnected { number: 1, why: crate::NotConnected::NoRecords })
     );
-    assert!(service.engine.credentials.is_empty());
-    assert!(service.engine.forge.starts.is_empty());
-    assert!(service.engine.forge_records.done());
-    assert!(service.engine.domain.ready());
+    assert!(service.engine.as_ref().expect("engine").credentials.is_empty());
+    assert!(service.engine.as_ref().expect("engine").forge.starts.is_empty());
+    assert!(service.engine.as_ref().expect("engine").forge_records.done());
+    assert!(service.engine.as_ref().expect("engine").domain.ready());
     assert_eq!(service.end(), None);
 }
 
@@ -1105,7 +1105,14 @@ fn a_store_reader_derives_serves_limits_or_their_problem_path() {
         1,
     );
     for (name, input, expected) in [
-        ("serve", document.as_ref(), Ok((service.engine.store.opening_limits(), service.engine.env.limits.forge))),
+        (
+            "serve",
+            document.as_ref(),
+            Ok((
+                service.engine.as_ref().expect("engine").store.opening_limits(),
+                service.engine.as_ref().expect("engine").env.limits.forge,
+            )),
+        ),
         ("limits", refused.as_bytes(), Err(b"engine.limits: past its bound\n".as_slice())),
     ] {
         let found = crate::store_limits(input, &directories);
@@ -1297,4 +1304,36 @@ fn fake_start(
         fixtures::forge_runtime(),
         Some(checked),
     )
+}
+
+#[test]
+fn a_worker_alones_complete_envelope_must_fit_its_own_memory() {
+    let input = fixtures::worker_alone_document();
+    let directories = jig_protocol_config::Directories::working();
+    let required = crate::startup::memory_requirements(
+        &input,
+        &directories,
+        &fixtures::files(),
+        &fixtures::startup_agent(),
+        &fixtures::seeds(),
+        None,
+        List::with_capacity(0),
+    )
+    .unwrap();
+    assert_eq!(required.engine_bytes, 0);
+    let part = crate::startup::worker_part(&input, &directories).unwrap();
+    let worker = crate::worker_worst_case(&part.worker, &fixtures::startup_agent(), &part.limits).unwrap();
+    assert!(required.worker_bytes > worker, "includes shared IO and process routing");
+    let input = fixtures::with(&input, b"workers[0].memory_bytes", (required.worker_bytes - 1).to_string().as_bytes());
+    let part = crate::startup::worker_part(&input, &directories).unwrap();
+    let found = crate::startup::worker_alone(
+        part,
+        &fixtures::files(),
+        &fixtures::startup_agent(),
+        fixtures::worker_runtime(),
+        7,
+    )
+    .err()
+    .unwrap();
+    assert_eq!(lines(&found).as_ref(), b"workers[0].memory_bytes: the worst case passes memory_bytes by 1 bytes\n");
 }

@@ -25,8 +25,8 @@ fn a_restored_key_is_durable_before_its_value_is_lent() {
     ] {
         rows.push(Write::Save(Record::Core(jig_domain_core::Record::Accounts(row)))).unwrap();
     }
-    fixtures::commit(&mut service.engine.store, 1, rows.into_boxed());
-    let _kept = service.engine.store.secrets(
+    fixtures::commit(&mut service.engine.as_mut().expect("engine").store, 1, rows.into_boxed());
+    let _kept = service.engine.as_mut().expect("engine").store.secrets(
         Token::new(crate::tokens::ACCOUNTS | 1),
         Secrets::Replace {
             owner: SecretOwner::Source,
@@ -35,18 +35,29 @@ fn a_restored_key_is_durable_before_its_value_is_lent() {
             replaces: None,
         },
     );
-    while service.engine.store.above.pop().is_some() {}
+    while service.engine.as_mut().expect("engine").store.above.pop().is_some() {}
     for _ in 0_u32..24 {
         fixtures::turn(&mut service);
-        let lent = service.engine.values.accounts.value(1, 1, Time::from_nanos(1)).is_some();
-        let Some(StoreEvent::Secret { value, .. }) =
-            service.engine.store.secrets(Token::new(99), Secrets::Get { owner: SecretOwner::Source, number: 1 })
+        let lent = service.engine.as_mut().expect("engine").values.accounts.value(1, 1, Time::from_nanos(1)).is_some();
+        let Some(StoreEvent::Secret { value, .. }) = service
+            .engine
+            .as_mut()
+            .expect("engine")
+            .store
+            .secrets(Token::new(99), Secrets::Get { owner: SecretOwner::Source, number: 1 })
         else {
             panic!("a get is answered at once");
         };
         assert!(!lent || value.is_some(), "no value is lent before its record is kept");
     }
-    let value = service.engine.values.accounts.value(1, 1, Time::from_nanos(1)).expect("restored key");
+    let value = service
+        .engine
+        .as_mut()
+        .expect("engine")
+        .values
+        .accounts
+        .value(1, 1, Time::from_nanos(1))
+        .expect("restored key");
     assert_eq!(value.token.expose(), TOKEN);
     assert_eq!(value.scheme, jig_protocol_accounts::table::Scheme::Key);
 }

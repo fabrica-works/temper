@@ -31,6 +31,7 @@ mod init;
 pub mod open;
 mod program_login;
 mod setup;
+mod worker_alone;
 pub use host::Host;
 pub const USAGE: &str = "usage: temper init [DIRECTORIES] | temper serve [DIRECTORIES] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge fetch [DIRECTORIES] FORGE | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper fake llm --document FILE [--ready PREFIX] [--seed N] | temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge check [DIRECTORIES] N OBSERVATIONS STORE | temper fake seed [DIRECTORIES] | temper fake git ARGS... | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
 const CONFIG_BYTES: u32 = 1 << 20;
@@ -311,8 +312,7 @@ fn prepare_with_store(
         .map_err(|why| String::from_utf8_lossy(&service::startup::lines(&why)).into_owned())?
         == service::startup::Shape::WorkerAlone
     {
-        // Until M2's worker-alone start (o/cluster-build) replaces this refusal.
-        return Err("a worker alone is checked; its start is not built yet".into());
+        return worker_alone::prepare(directories, bytes, owned).map(|service| (service, Box::new([]) as Box<[u8]>));
     }
     let setup::Deployment { named, checked, .. } = setup::check(bytes, &directories.jig())?;
     let document =

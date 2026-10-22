@@ -43,9 +43,9 @@ fn a_call_of_another_activation_is_answered_an_error() {
 #[test]
 fn an_unknown_tool_is_answered_an_error_with_no_commit() {
     let (mut service, run) = fixtures::claimed_chat();
-    let commits = service.engine.domain.deployment().commits;
+    let commits = service.engine.as_mut().expect("engine").domain.deployment().commits;
     let call = call(run.attempt, b"no_such_tool", b"{}");
-    service.engine.step(root::Event::Worker(root::WorkerInput::Link {
+    service.engine.as_mut().expect("engine").step(root::Event::Worker(root::WorkerInput::Link {
         channel: Token::new(7),
         link: root::Link::Up {
             parts: root::Parts::none(),
@@ -73,7 +73,7 @@ fn an_unknown_tool_is_answered_an_error_with_no_commit() {
         assert!(answer.replace(relayed).is_none(), "one answer");
     }
     assert_eq!(answer, Some(host::Relayed::Answer { error: true, text: b"unknown tool".as_slice().into() }));
-    assert_eq!(service.engine.domain.deployment().commits, commits);
+    assert_eq!(service.engine.as_ref().expect("engine").domain.deployment().commits, commits);
     assert_eq!(service.end(), None);
 }
 #[test]

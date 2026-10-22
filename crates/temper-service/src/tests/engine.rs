@@ -52,31 +52,35 @@ fn the_restart_asks_one_load_at_a_time() {
             break;
         }
     }
-    let event = service.engine.store.above.pop();
+    let event = service.engine.as_mut().expect("engine").store.above.pop();
     let Some(jig_protocol_store::Event::Restored { owner, rows, next }) = event else {
         panic!("first restart load: {event:?}")
     };
     assert!(rows.is_empty());
     assert_eq!(next, None);
-    assert!(service.engine.store.above.is_empty());
+    assert!(service.engine.as_ref().expect("engine").store.above.is_empty());
     fixtures::turn(&mut service);
-    assert!(service.engine.store.above.is_empty(), "no next load before the first answer");
-    service.engine.store.above.push(jig_protocol_store::Event::Restored { owner, rows, next });
+    assert!(service.engine.as_ref().expect("engine").store.above.is_empty(), "no next load before the first answer");
+    service.engine.as_mut().expect("engine").store.above.push(jig_protocol_store::Event::Restored {
+        owner,
+        rows,
+        next,
+    });
     for _ in 0_u32..16 {
         fixtures::turn(&mut service);
-        if !service.engine.store.above.is_empty() {
+        if !service.engine.as_mut().expect("engine").store.above.is_empty() {
             break;
         }
     }
     assert_eq!(service.end(), None);
-    assert_eq!(service.engine.store.above.len(), 1, "one next store operation");
+    assert_eq!(service.engine.as_ref().expect("engine").store.above.len(), 1, "one next store operation");
     fixtures::restart(&mut service);
 }
 /// Whether the store has answered the engine. The accounts' answers, as
 /// their handed-in record kept (jig's protocol/store.md, 9), are taken on
 /// the next turn.
 fn store_answered(service: &crate::Service) -> bool {
-    for event in &service.engine.store.above {
+    for event in &service.engine.as_ref().expect("engine").store.above {
         let jig_protocol_store::Event::Kept { owner } = event else { return true };
         if !crate::accounts::owns(*owner) {
             return true;
@@ -87,7 +91,7 @@ fn store_answered(service: &crate::Service) -> bool {
 #[test]
 fn a_store_answer_is_taken_with_the_journal_full() {
     let mut service = fixtures::ready();
-    let engine = &mut service.engine;
+    let engine = service.engine.as_mut().expect("engine");
     let mut number = 2;
     for _ in 0_u32..engine.env.limits.journal.commits.checked_add(1).unwrap() {
         if root::try_step(&mut engine.domain, &engine.env, fixtures::period(number)).is_err() {
@@ -112,7 +116,7 @@ fn a_store_answer_is_taken_with_the_journal_full() {
 #[test]
 fn a_failed_commit_releases_nothing_after_it() {
     let mut service = fixtures::ready();
-    let engine = &mut service.engine;
+    let engine = service.engine.as_mut().expect("engine");
     let first = engine.domain.deployment().commits.checked_add(1).unwrap();
     root::try_step(&mut engine.domain, &engine.env, fixtures::period(2)).unwrap();
     root::try_step(&mut engine.domain, &engine.env, fixtures::period(3)).unwrap();
@@ -120,8 +124,8 @@ fn a_failed_commit_releases_nothing_after_it() {
     engine.store.above.push(jig_protocol_store::Event::Committed { number: first.checked_add(1).unwrap(), fill: 0 });
     fixtures::turn(&mut service);
     assert_eq!(service.end(), Some(&crate::End::Stopped(crate::Stop::CommitFailed { number: first })));
-    assert!(service.engine.requests.is_empty(), "later outputs stayed behind the barrier");
-    assert!(service.engine.store.above.is_empty());
+    assert!(service.engine.as_ref().expect("engine").requests.is_empty(), "later outputs stayed behind the barrier");
+    assert!(service.engine.as_ref().expect("engine").store.above.is_empty());
 }
 
 #[test]
@@ -178,16 +182,16 @@ const WATCHER: skein_lib::Token = skein_lib::Token::new(17);
 fn a_notes_page_waiting_for_its_owner() -> crate::Service {
     use skein_lib::{Queue, ReplyTo, Token, Wall};
     let mut service = fixtures::signed_worker();
-    service.engine.step(root::Event::Party(root::PartyInput::Watch {
+    service.engine.as_mut().expect("engine").step(root::Event::Party(root::PartyInput::Watch {
         watcher: WATCHER,
         sign_in: 1,
         subject: jig_domain_core::documents::Watched::Frame,
         window: jig_domain_core::documents::Window { rows: 1, after: None },
     }));
     fixtures::settle_root(&mut service, &mut Queue::with_capacity(32));
-    service.engine.step(root::Event::Party(root::PartyInput::Delivered { watcher: WATCHER }));
+    service.engine.as_mut().expect("engine").step(root::Event::Party(root::PartyInput::Delivered { watcher: WATCHER }));
     fixtures::settle_root(&mut service, &mut Queue::with_capacity(32));
-    service.engine.step(root::Event::Party(root::PartyInput::Ask {
+    service.engine.as_mut().expect("engine").step(root::Event::Party(root::PartyInput::Ask {
         models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(101)),
         sign_in: 1,
@@ -196,14 +200,19 @@ fn a_notes_page_waiting_for_its_owner() -> crate::Service {
     }));
     // Startup is settled; the created task's preparation now reads its notes.
     for _ in 0..OWNER_PASSES {
-        crate::engine::iterate(&mut service.engine, Time::from_nanos(1), Wall::from_nanos(1));
-        if let Some(jig_protocol_store::Event::Loaded { .. }) = service.engine.store.above.iter().next() {
-            let event = service.engine.store.above.pop().expect("notes page");
-            crate::store::route::up(&mut service.engine.store.routes, event, &mut service.engine.store.routed);
-            let Some(crate::store::route::Up::Root(event)) = service.engine.store.routed.pop() else {
+        crate::engine::iterate(service.engine.as_mut().expect("engine"), Time::from_nanos(1), Wall::from_nanos(1));
+        if let Some(jig_protocol_store::Event::Loaded { .. }) =
+            service.engine.as_mut().expect("engine").store.above.iter().next()
+        {
+            let event = service.engine.as_mut().expect("engine").store.above.pop().expect("notes page");
+            let engine = service.engine.as_mut().expect("engine");
+            crate::store::route::up(&mut engine.store.routes, event, &mut engine.store.routed);
+            let Some(crate::store::route::Up::Root(event)) =
+                service.engine.as_mut().expect("engine").store.routed.pop()
+            else {
                 panic!("notes page routed to the root")
             };
-            service.engine.step(*event);
+            service.engine.as_mut().expect("engine").step(*event);
             return service;
         }
     }
@@ -214,7 +223,7 @@ fn a_notes_page_waiting_for_its_owner() -> crate::Service {
 fn an_unwatch_refused_behind_owner_work_is_admitted() {
     use skein_lib::Wall;
     let mut service = a_notes_page_waiting_for_its_owner();
-    let engine = &mut service.engine;
+    let engine = service.engine.as_mut().expect("engine");
     engine.step(root::Event::Party(root::PartyInput::Unwatch { watcher: WATCHER }));
     let refused = engine.blocked && engine.pending.is_some();
     for _ in 0..OWNER_PASSES {

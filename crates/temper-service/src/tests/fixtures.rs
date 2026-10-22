@@ -454,7 +454,7 @@ fn start_with_worker(
     let io = crate::startup::checks::process_io(&settings.jig.limits.io, worker_io.as_ref()).unwrap();
     let mut service = crate::Service::new(settings, &seeds(), None, runtime, worker, worker_bytes, io).unwrap();
 
-    service.engine.store = store;
+    service.engine.as_mut().expect("engine").store = store;
     service
 }
 mod agent;
@@ -477,7 +477,7 @@ pub fn restart(service: &mut crate::Service) {
             break;
         }
     }
-    assert!(service.engine.domain.ready(), "restart ready");
+    assert!(service.engine.as_ref().expect("engine").domain.ready(), "restart ready");
     assert_eq!(service.end(), None);
 }
 pub fn ready() -> crate::Service {
@@ -494,7 +494,7 @@ pub fn period(number: u64) -> temper_engine_domain::Event {
     })
 }
 pub fn get(service: &mut crate::Service, key: jig_domain_core::Key) -> Option<jig_domain_core::Record> {
-    let engine = &mut service.engine;
+    let engine = service.engine.as_mut().expect("engine");
     let owner = Token::new(991);
     engine.store.ask(jig_protocol_store::Request::Get { owner, key: jig_protocol_store::Get::Jig(key) });
     for _ in 0_u32..engine.store.above.len() {
@@ -628,7 +628,7 @@ pub fn settle_root(
     delivered: &mut skein_lib::Queue<temper_engine_domain::Delivery>,
 ) -> Option<temper_engine_domain::Assignment> {
     use temper_engine_domain as root;
-    let engine = &mut service.engine;
+    let engine = service.engine.as_mut().expect("engine");
     let mut assignment = None;
     for _ in 0_u32..256 {
         if let Some(event) = engine.events.pop() {
@@ -686,7 +686,7 @@ fn restored_key() -> crate::Service {
     use jig_protocol_store::{SecretOwner, Secrets};
     use temper_engine_domain::{Record, StoreRequest, Write};
     let mut bootstrap = ready();
-    let mut header = bootstrap.engine.domain.deployment();
+    let mut header = bootstrap.engine.as_mut().expect("engine").domain.deployment();
     header.commits = header.commits.checked_add(1).unwrap();
     let mut writes = skein_lib::List::with_capacity(4);
     writes
@@ -707,8 +707,15 @@ fn restored_key() -> crate::Service {
     ] {
         writes.push(Write::Save(Record::Core(jig_domain_core::Record::Accounts(row)))).unwrap();
     }
-    assert!(bootstrap.engine.store.down(StoreRequest::Commit { number: header.commits, writes: writes.into_boxed() }));
-    let _later = bootstrap.engine.store.secrets(
+    assert!(
+        bootstrap
+            .engine
+            .as_mut()
+            .expect("engine")
+            .store
+            .down(StoreRequest::Commit { number: header.commits, writes: writes.into_boxed() })
+    );
+    let _later = bootstrap.engine.as_mut().expect("engine").store.secrets(
         Token::new(crate::tokens::ACCOUNTS),
         Secrets::Replace {
             owner: SecretOwner::Source,
@@ -717,8 +724,8 @@ fn restored_key() -> crate::Service {
             replaces: None,
         },
     );
-    while bootstrap.engine.store.above.pop().is_some() {}
-    let mut service = start_with_store(&[(1, 100)], Some(bootstrap.engine.store));
+    while bootstrap.engine.as_mut().expect("engine").store.above.pop().is_some() {}
+    let mut service = start_with_store(&[(1, 100)], Some(bootstrap.engine.expect("engine").store));
     restart(&mut service);
     service
 }
@@ -726,7 +733,7 @@ fn restored_key() -> crate::Service {
 pub fn signed_worker() -> crate::Service {
     use temper_engine_domain as root;
     let mut service = restored_key();
-    service.engine.step(root::Event::Worker(root::WorkerInput::Link {
+    service.engine.as_mut().expect("engine").step(root::Event::Worker(root::WorkerInput::Link {
         channel: Token::new(7),
         link: root::Link::Hello {
             worker: 0,
@@ -754,12 +761,12 @@ pub fn signed_worker() -> crate::Service {
         },
     }));
     settle_root(&mut service, &mut skein_lib::Queue::with_capacity(32));
-    service.engine.step(root::Event::Worker(root::WorkerInput::Link {
+    service.engine.as_mut().expect("engine").step(root::Event::Worker(root::WorkerInput::Link {
         channel: Token::new(7),
         link: root::Link::Up { up: host::LinkUp::Logins { logins: Box::new([]) }, parts: root::Parts::none() },
     }));
     settle_root(&mut service, &mut skein_lib::Queue::with_capacity(32));
-    service.engine.step(root::Event::Party(root::PartyInput::SignedIn {
+    service.engine.as_mut().expect("engine").step(root::Event::Party(root::PartyInput::SignedIn {
         reply_to: skein_lib::ReplyTo::new(Token::new(100)),
         identity: jig_domain_people::Identity {
             key: jig_domain_people::IdentityKey { provider: 1, subject: b"owner-a".as_slice().into() },
@@ -773,7 +780,7 @@ pub fn signed_worker() -> crate::Service {
 pub fn claimed_chat() -> (crate::Service, temper_engine_domain::Assignment) {
     use temper_engine_domain as root;
     let mut service = signed_worker();
-    service.engine.step(root::Event::Party(root::PartyInput::Ask {
+    service.engine.as_mut().expect("engine").step(root::Event::Party(root::PartyInput::Ask {
         models: Box::new([]),
         reply_to: skein_lib::ReplyTo::new(Token::new(101)),
         sign_in: 1,

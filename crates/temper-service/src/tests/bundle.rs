@@ -106,5 +106,5 @@ fn the_printed_links_route_serves_the_page() {
     let (service, peer, status, _) = get(b"/jig/v1/sign-in/link?secret=AAAA", b"");
     assert_eq!(status, 200);
     assert_eq!(fixtures::bundle::body(&peer), b"<!doctype html><title>t</title>");
-    assert_eq!(service.engine.clients.early.len(), 0, "nothing reached the root");
+    assert_eq!(service.engine.as_ref().expect("engine").clients.early.len(), 0, "nothing reached the root");
 }

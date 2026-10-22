@@ -33,20 +33,25 @@ pub fn server_call(
 }
 const CONNECTION: skein_lib::Token = skein_lib::Token::new(1);
 pub fn listening(service: &mut Service) {
-    service.engine.clients.iterate(Time::ZERO, Wall::EPOCH, &mut service.engine.events, &[], None);
-    while let Some(request) = service.engine.clients.io.pop() {
+    let engine = service.engine.as_mut().expect("engine");
+    engine.clients.iterate(Time::ZERO, Wall::EPOCH, &mut engine.events, &[], None);
+    while let Some(request) = service.engine.as_mut().expect("engine").clients.io.pop() {
         if let skein_io::Request::Listen { owner, addr } = request {
-            assert!(service.engine.clients.up(skein_io::Event::Listening { owner, listener: LISTENER, addr }));
+            assert!(service.engine.as_mut().expect("engine").clients.up(skein_io::Event::Listening {
+                owner,
+                listener: LISTENER,
+                addr
+            }));
         }
     }
 }
 pub fn request(service: &mut Service, bytes: &[u8]) -> Peer {
     listening(service);
-    Peer::raw(&mut service.engine, bytes)
+    Peer::raw(service.engine.as_mut().expect("engine"), bytes)
 }
 const LISTENER: skein_lib::Token = skein_lib::Token::new(99);
 pub fn answered(service: &mut Service, peer: &mut Peer) -> (u16, Box<[skein_http::Header]>) {
-    peer.pump(&mut service.engine, false);
+    peer.pump(service.engine.as_mut().expect("engine"), false);
     let bytes = peer.received();
     let mut status = 0_u16;
     for byte in &bytes[9..12] {

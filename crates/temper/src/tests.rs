@@ -291,28 +291,38 @@ fn forge_commands_refuse_managed_and_fake_entries_by_name() {
     std::fs::remove_dir_all(directory).expect("remove command scratch");
 }
 
-#[test]
-fn serve_preparation_refuses_a_checked_worker_alone_before_opening_anything() {
-    let directory = std::path::Path::new("/temper-worker-shape-test");
-    let (_, input) = configuration::documents(directory, "/missing/temper");
+pub(crate) fn worker_document(directory: &std::path::Path) -> (Vec<u8>, serde_json::Value) {
+    let (agent, input) = configuration::documents(directory, "/missing/temper");
     let mut input: serde_json::Value = serde_json::from_slice(&input).expect("fixture document");
     input.as_object_mut().expect("document object").remove("engine");
     input["workers"][0]["engine"] = serde_json::json!({"socket":"127.0.0.1:7100"});
-    input["application"] = serde_json::json!({
-        "workers":input["application"]["workers"],
-        "limits":input["application"]["limits"],
-    });
+    input["application"] =
+        serde_json::json!({"workers":input["application"]["workers"],"limits":input["application"]["limits"]});
+    (agent, input)
+}
+#[test]
+fn serve_prepares_a_worker_alone_without_a_deployment_or_setup_host() {
+    use std::{fs, os::unix::fs::PermissionsExt};
+    let directory = std::env::temp_dir().join(format!("temper-worker-alone-{}", std::process::id()));
+    fs::create_dir(&directory).expect("worker-alone fixture");
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).expect("worker-alone fixture");
+    let (agent, input) = worker_document(&directory);
+    fs::write(directory.join("agent.json"), agent).expect("worker-alone fixture");
+    fs::write(directory.join("root.der"), skein_tls_world::pki::ROOT).expect("worker-alone fixture");
+    let secret = directory.join("worker.secret");
+    fs::write(&secret, b"worker-secret").expect("worker-alone fixture");
+    fs::set_permissions(secret, fs::Permissions::from_mode(0o600)).expect("worker-alone fixture");
     let mut owned = Vec::new();
-    let refused = super::prepare_with_store(
-        &configuration::directories(directory),
-        &serde_json::to_vec(&input).expect("worker document"),
+    let (service, store) = super::prepare_with_store(
+        &configuration::directories(&directory),
+        &serde_json::to_vec(&input).expect("worker-alone fixture"),
         &mut owned,
     )
-    .err()
-    .expect("checked worker-only start is refused");
-    assert_eq!(
-        super::prefixed("temper serve", &refused),
-        "temper serve: a worker alone is checked; its start is not built yet\n"
-    );
-    assert!(owned.is_empty());
+    .expect("worker-alone fixture");
+    assert!(store.is_empty(), "no deployment root");
+    assert_eq!(owned.len(), 1, "only the worker root");
+    assert!(service.setup_page(1, b"state", skein_lib::Time::ZERO).is_none());
+    assert!(!directory.join("state").exists(), "no store directory created");
+    super::close(owned);
+    fs::remove_dir_all(directory).expect("worker-alone fixture");
 }

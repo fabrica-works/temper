@@ -30,20 +30,26 @@ fn a_missing_identity_or_generation_keeps_its_grant_slot_empty() {
 #[test]
 fn identities_are_announced_before_the_restart() {
     let mut service = fixtures::started();
-    service.engine.store.opened = true;
-    let _listen = service.engine.workers.io.pop().unwrap();
-    assert_eq!(service.engine.domain.next_deadline(&service.engine.env), None);
+    service.engine.as_mut().expect("engine").store.opened = true;
+    let _listen = service.engine.as_mut().expect("engine").workers.io.pop().unwrap();
+    assert_eq!(
+        service.engine.as_ref().expect("engine").domain.next_deadline(&service.engine.as_ref().expect("engine").env),
+        None
+    );
     for _ in 0_u8..8 {
-        crate::engine::iterate(&mut service.engine, Time::ZERO, skein_lib::Wall::EPOCH);
-        if service.engine.credentials.is_empty() {
+        crate::engine::iterate(service.engine.as_mut().expect("engine"), Time::ZERO, skein_lib::Wall::EPOCH);
+        if service.engine.as_mut().expect("engine").credentials.is_empty() {
             break;
         }
-        assert!(service.engine.store.routed.is_empty(), "records precede Restart");
+        assert!(service.engine.as_ref().expect("engine").store.routed.is_empty(), "records precede Restart");
     }
-    assert!(service.engine.forge_records.done());
-    assert!(service.engine.credentials.is_empty());
-    assert_eq!(service.engine.domain.next_deadline(&service.engine.env), Some(Time::from_nanos(u64::MAX)));
-    assert!(service.engine.store.routed.is_empty(), "the restart has not asked for a load");
+    assert!(service.engine.as_ref().expect("engine").forge_records.done());
+    assert!(service.engine.as_ref().expect("engine").credentials.is_empty());
+    assert_eq!(
+        service.engine.as_ref().expect("engine").domain.next_deadline(&service.engine.as_ref().expect("engine").env),
+        Some(Time::from_nanos(u64::MAX))
+    );
+    assert!(service.engine.as_ref().expect("engine").store.routed.is_empty(), "the restart has not asked for a load");
     fixtures::restart(&mut service);
 }
 
@@ -377,7 +383,7 @@ fn the_roots_facts_are_drained_and_counted_after_each_step() {
             },
         },
     };
-    service.engine.step(root::Event::Worker(root::WorkerInput::Link {
+    service.engine.as_mut().expect("engine").step(root::Event::Worker(root::WorkerInput::Link {
         channel: Token::new(7),
         link: root::Link::Up {
             up,
@@ -385,11 +391,11 @@ fn the_roots_facts_are_drained_and_counted_after_each_step() {
         },
     }));
     fixtures::settle_root(&mut service, &mut skein_lib::Queue::with_capacity(32));
-    assert_eq!(service.engine.facts, 1);
-    assert_eq!(service.engine.domain.pop_fact(), None);
-    assert_eq!(service.engine.domain.facts_lost(), 0);
-    service.engine.step(root::Event::Resume);
-    assert_eq!(service.engine.facts, 1);
+    assert_eq!(service.engine.as_ref().expect("engine").facts, 1);
+    assert_eq!(service.engine.as_mut().expect("engine").domain.pop_fact(), None);
+    assert_eq!(service.engine.as_ref().expect("engine").domain.facts_lost(), 0);
+    service.engine.as_mut().expect("engine").step(root::Event::Resume);
+    assert_eq!(service.engine.as_ref().expect("engine").facts, 1);
 }
 
 #[test]
@@ -399,7 +405,7 @@ fn a_worker_assignment_uses_the_services_configured_forges() {
     let mut assignment = fixtures::assignment_with(fixtures::repository(7, b"acme", b"shop"));
     assignment.workspace.repositories[0].provider.forge = 99;
     crate::route::request(
-        &mut service.engine,
+        service.engine.as_mut().expect("engine"),
         root::Request::Worker(root::WorkerRequest::Deliver(root::Delivery::Assigned {
             channel: Token::new(8),
             assignment,
@@ -408,7 +414,7 @@ fn a_worker_assignment_uses_the_services_configured_forges() {
     let Some(root::Event::Worker(root::WorkerInput::Link {
         channel,
         link: root::Link::Up { up: host::LinkUp::Answer { run, attempt, answer }, parts },
-    })) = service.engine.events.pop()
+    })) = service.engine.as_mut().expect("engine").events.pop()
     else {
         panic!("worker assignment refused through its root input")
     };

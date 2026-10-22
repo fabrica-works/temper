@@ -186,7 +186,12 @@ pub fn worker_worst_case(worker: &settings::Worker, agent: &settings::Agent, own
     for argument in &jig.agent.arguments {
         command = command.checked_add(u64::try_from(argument.len()).ok()?)?;
     }
+    let remote = match prepared.address {
+        io::Addr::InProcess(_) => 0,
+        io::Addr::Ip(_) => crate::worker::remote_worst_case(u32::try_from(jig.name.len()).ok()?, prepared.lower)?,
+    };
     root::worst_case(&prepared.root)?
+        .checked_add(remote)?
         .checked_add(programs_worst_case(&agent.programs)?)?
         .checked_add(crate::program_sources::worst_case(jig.limits.hub.detail_bytes)?)?
         .checked_add(

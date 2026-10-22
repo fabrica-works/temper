@@ -47,7 +47,7 @@ pub struct Worker {
     pub(crate) undecodable_values: u64,
     payload: temper_protocol_worker_wire::v1::Limits,
     pub(super) io: Queue<io::Request>,
-    address: io::Addr,
+    connection: Connection,
     socket: Option<Token>,
     prefix: u64,
     next: u64,
@@ -61,6 +61,22 @@ pub struct Worker {
     closed: bool,
     stopping: bool,
     pub(super) aborted: Option<()>,
+}
+// In-process workers keep no operator diagnostics; socket workers own their
+// endpoint, bounded notes and service ending together (protocol/README.md, 15).
+#[derive(Debug)]
+enum Connection {
+    InProcess(io::Name),
+    Socket(Box<Remote>),
+}
+#[derive(Debug)]
+struct Remote {
+    address: core::net::SocketAddr,
+    worker: Box<[u8]>,
+    notes: Queue<crate::Note>,
+    end: Option<crate::End>,
+    hello_pending: bool,
+    last_refusal: Option<(core::net::SocketAddr, crate::Refusal)>,
 }
 impl Worker {
     pub fn new(
@@ -122,7 +138,17 @@ impl Worker {
             undecodable_values: 0,
             payload: prepared.payload,
             io: Queue::with_capacity(prepared.lower),
-            address: prepared.address,
+            connection: match prepared.address {
+                io::Addr::InProcess(name) => Connection::InProcess(name),
+                io::Addr::Ip(address) => Connection::Socket(Box::new(Remote {
+                    address,
+                    worker: config.name.clone(),
+                    notes: Queue::with_capacity(prepared.lower),
+                    end: None,
+                    hello_pending: false,
+                    last_refusal: None,
+                })),
+            },
             socket: None,
             prefix: prepared.prefix,
             next: 2,
@@ -143,6 +169,23 @@ impl Worker {
         resources: crate::program_sources::Resources,
     ) -> Result<(), crate::program_sources::Resources> {
         self.sources.configure(resources)
+    }
+    pub(crate) fn stopping(&self) -> bool {
+        self.stopping
+    }
+    pub(crate) fn end(&self) -> Option<&crate::End> {
+        match &self.connection {
+            Connection::Socket(remote) => remote.end.as_ref(),
+            Connection::InProcess(_) => None,
+        }
+    }
+    pub(crate) fn set_end(&mut self, end: crate::End) {
+        let Connection::Socket(remote) = &mut self.connection else { unreachable!("worker alone has a socket") };
+        remote.end = Some(end);
+    }
+    pub(crate) fn notes(&mut self) -> &mut Queue<crate::Note> {
+        let Connection::Socket(remote) = &mut self.connection else { unreachable!("worker alone has a socket") };
+        &mut remote.notes
     }
     pub fn stop(&mut self) {
         if !self.stopping {
@@ -193,6 +236,13 @@ impl Worker {
         self.io.room() >= root::max_out(&self.env.limits).checked_mul(link::MAX_OUT_DOWN).expect("worker batch")
             && self.events.room() >= link::MAX_OUT_DOWN
             && self.process_events.room() >= 8
+            && match &self.connection {
+                Connection::InProcess(_) => true,
+                Connection::Socket(remote) => {
+                    remote.notes.room()
+                        >= root::max_out(&self.env.limits).checked_mul(link::MAX_OUT_DOWN).expect("worker notes batch")
+                }
+            }
     }
     pub fn up(&mut self, now: Time, mut event: io::Event) {
         if self.git.component.accepts(&event) {
@@ -276,10 +326,20 @@ impl Worker {
         }
         self.values.expire(now);
     }
-    pub(crate) fn link(&mut self, now: Time, request: link::Request) {
+    pub(crate) fn link(&mut self, _now: Time, request: link::Request) {
         match request {
-            link::Request::Ready => self.events.push(root::Event::Ready),
-            link::Request::Lost => self.events.push(root::Event::Lost),
+            link::Request::Ready => {
+                if let Connection::Socket(remote) = &mut self.connection {
+                    remote.hello_pending = true;
+                }
+                self.events.push(root::Event::Ready);
+            }
+            link::Request::Lost => {
+                if let Connection::Socket(remote) = &mut self.connection {
+                    remote.hello_pending = false;
+                }
+                self.events.push(root::Event::Lost);
+            }
             link::Request::GracePassed => self.events.push(root::Event::GracePassed),
             link::Request::Resend { run, attempt, turn } => {
                 self.events.push(root::Event::Resend { run, attempt, turn });
@@ -317,11 +377,11 @@ impl Worker {
                 self.values.granted(account, generation, value, expires).expect("wire values fit tables");
             }
             link::Request::Dial => {
-                if self.stopping {
-                    self.link.down(now, link::Event::Unreachable, &mut self.link_out);
-                } else {
-                    self.io.push(io::Request::Connect { owner: Token::new(self.prefix), addr: self.address });
-                }
+                let addr = match &self.connection {
+                    Connection::InProcess(name) => io::Addr::InProcess(*name),
+                    Connection::Socket(remote) => io::Addr::Ip(remote.address),
+                };
+                self.io.push(io::Request::Connect { owner: Token::new(self.prefix), addr });
             }
             link::Request::Lower { lower, .. } => {
                 if let Some(socket) = self.socket {
@@ -343,7 +403,29 @@ impl Worker {
                 }
             }
             link::Request::Closed => self.closed = true,
-            link::Request::Fact { .. } => {}
+            link::Request::Fact { why } => {
+                let reason = match why {
+                    skein_channel::Closed::RefusedPeer(code) => Some(crate::Refusal::Peer(code)),
+                    skein_channel::Closed::RefusedHere(2) => Some(crate::Refusal::Terms),
+                    skein_channel::Closed::RefusedHere(3) => Some(crate::Refusal::Malformed),
+                    skein_channel::Closed::RefusedHere(_)
+                    | skein_channel::Closed::Owner
+                    | skein_channel::Closed::Framing
+                    | skein_channel::Closed::Stream
+                    | skein_channel::Closed::Truncated => None,
+                };
+                if let Some(reason) = reason
+                    && let Connection::Socket(remote) = &mut self.connection
+                    && remote.last_refusal != Some((remote.address, reason))
+                {
+                    remote.last_refusal = Some((remote.address, reason));
+                    remote.notes.push(crate::Note::Refused {
+                        worker: remote.worker.clone(),
+                        address: Box::new(remote.address),
+                        reason,
+                    });
+                }
+            }
         }
     }
     fn identity(&mut self, account: u32, generation: u64, secret: &skein_lib::Secret) {
@@ -385,7 +467,18 @@ impl Worker {
                 );
             }
             root::Request::SourceFault => self.link_down(self.env.now, link::Event::SourceFault),
-            root::Request::Hello(hello) => self.link_down(self.env.now, link::Event::Hello { hello }),
+            root::Request::Hello(hello) => {
+                self.link_down(self.env.now, link::Event::Hello { hello });
+                if let Connection::Socket(remote) = &mut self.connection
+                    && remote.hello_pending
+                {
+                    remote.hello_pending = false;
+                    remote.last_refusal = None;
+                    remote
+                        .notes
+                        .push(crate::Note::Linked { worker: remote.worker.clone(), address: Box::new(remote.address) });
+                }
+            }
             root::Request::Link(up) => self.link_down(self.env.now, link::Event::Up { up, parts: Box::default() }),
             root::Request::Answer { run, attempt, answer, work, preparation } => {
                 let parts = worker_route::answer_parts(&answer, &work, preparation.as_ref());
@@ -772,4 +865,16 @@ fn owner_of(event: &mut io::Event, new: Token) {
         | io::Event::Resized
         | io::Event::Shutdown { .. } => {}
     }
+}
+
+/// Additional retained data for a socket worker; in-process envelopes stay fixed.
+pub(crate) fn remote_worst_case(name: u32, room: u32) -> Option<u64> {
+    u64::try_from(size_of::<Remote>())
+        .ok()?
+        .checked_add(u64::from(name))?
+        .checked_add(Queue::<crate::Note>::worst_case(room)?)?
+        .checked_add(
+            u64::from(room)
+                .checked_mul(u64::from(name).checked_add(u64::try_from(size_of::<core::net::SocketAddr>()).ok()?)?)?,
+        )
 }

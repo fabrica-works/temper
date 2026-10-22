@@ -724,3 +724,243 @@ fn repeated(byte: u8, len: usize) -> Box<[u8]> {
 fn program_worker_settings() -> (crate::settings::Worker, crate::settings::Agent, crate::limits::Limits) {
     (fixtures::worker_settings(), fixtures::worker_agent(), fixtures::worker_limits())
 }
+
+fn socket_stand() -> fixtures::WorkerStand {
+    let mut settings = fixtures::worker_settings();
+    settings.jig.engine = jig_protocol_config::Address::Addr(io::Addr::Ip(([127, 0, 0, 1], 7100).into()));
+    let mut stand = fixtures::WorkerStand::new();
+    stand.worker = crate::Worker::new(
+        &settings,
+        &fixtures::worker_agent(),
+        &fixtures::worker_limits(),
+        &fixtures::worker_files(),
+        fixtures::worker_runtime(),
+        7,
+    )
+    .unwrap();
+    for _ in 0_u16..1000 {
+        if !stand.turn() {
+            return stand;
+        }
+    }
+    panic!("socket worker starts");
+}
+
+#[test]
+fn stopping_keeps_a_dial_until_the_root_sends_stop() {
+    let mut stand = socket_stand();
+    stand.worker.stop();
+    stand.worker.link(fixtures::NOW, link::Request::Dial);
+    let request = stand.worker.io().pop().expect("stopping worker still dials");
+    let io::Request::Connect { addr, .. } = request else { panic!("dial reaches IO") };
+    assert_eq!(addr, io::Addr::Ip(([127, 0, 0, 1], 7100).into()));
+}
+
+#[test]
+fn linked_is_emitted_after_ready_at_each_opening() {
+    let mut stand = socket_stand();
+    assert!(stand.worker.notes().is_empty(), "never before Ready");
+    LinkPeer::new().open(&mut stand.worker);
+    let expected =
+        crate::Note::Linked { worker: b"worker-a".as_slice().into(), address: Box::new(([127, 0, 0, 1], 7100).into()) };
+    assert_eq!(stand.worker.notes().pop(), Some(expected));
+    assert!(stand.worker.notes().is_empty());
+    let owner = Token::new(
+        worker_settings::prepare(&fixtures::worker_settings(), &fixtures::worker_agent(), &fixtures::worker_limits())
+            .unwrap()
+            .prefix,
+    );
+    stand.worker.up(fixtures::NOW, io::Event::Closed { owner });
+    stand.worker.iterate(fixtures::NOW, Wall::EPOCH);
+    let at = stand.worker.next_deadline().expect("redial");
+    stand.worker.iterate(at, Wall::EPOCH);
+    let Some(io::Request::Connect { .. }) = stand.worker.io().pop() else { panic!("redial before reopening") };
+    LinkPeer::new().open(&mut stand.worker);
+    assert_eq!(
+        stand.worker.notes().pop(),
+        Some(crate::Note::Linked {
+            worker: b"worker-a".as_slice().into(),
+            address: Box::new(([127, 0, 0, 1], 7100).into())
+        })
+    );
+    assert!(stand.worker.notes().is_empty(), "one per opening");
+}
+
+#[test]
+fn refusals_are_notes_and_leave_later_dials_intact() {
+    use skein_channel::Closed;
+    let mut stand = socket_stand();
+    for (why, reason) in [
+        (Closed::RefusedPeer(256), crate::Refusal::Peer(256)),
+        (Closed::RefusedPeer(257), crate::Refusal::Peer(257)),
+        (Closed::RefusedPeer(258), crate::Refusal::Peer(258)),
+        (Closed::RefusedPeer(259), crate::Refusal::Peer(259)),
+        (Closed::RefusedPeer(260), crate::Refusal::Peer(260)),
+        (Closed::RefusedPeer(261), crate::Refusal::Peer(261)),
+        (Closed::RefusedPeer(42), crate::Refusal::Peer(42)),
+        (Closed::RefusedHere(2), crate::Refusal::Terms),
+        (Closed::RefusedHere(3), crate::Refusal::Malformed),
+    ] {
+        stand.worker.link(fixtures::NOW, link::Request::Fact { why });
+        assert_eq!(
+            stand.worker.notes().pop(),
+            Some(crate::Note::Refused {
+                worker: b"worker-a".as_slice().into(),
+                address: Box::new(([127, 0, 0, 1], 7100).into()),
+                reason
+            })
+        );
+        stand.worker.link(fixtures::NOW, link::Request::Dial);
+        let Some(io::Request::Connect { .. }) = stand.worker.io().pop() else { panic!("redial reaches IO") };
+    }
+    stand.worker.link(fixtures::NOW, link::Request::Fact { why: Closed::Stream });
+    assert!(stand.worker.notes().is_empty());
+}
+
+fn alone_service() -> crate::Service {
+    let part =
+        crate::startup::worker_part(&fixtures::worker_alone_document(), &jig_protocol_config::Directories::working())
+            .unwrap();
+    crate::startup::worker_alone(part, &fixtures::files(), &fixtures::startup_agent(), fixtures::worker_runtime(), 7)
+        .expect("worker alone prepared")
+}
+
+#[test]
+fn a_worker_alone_has_no_engine_or_store_and_a_second_signal_aborts() {
+    let mut service = alone_service();
+    assert!(service.engine.is_none());
+    assert_eq!(service.adopt_store(io::kernel::Fd::new(99), 1000), Err(io::kernel::Fd::new(99)));
+    service.shutdown();
+    assert!(service.worker.as_ref().unwrap().stopping());
+    assert_eq!(service.end(), None);
+    service.shutdown();
+    assert_eq!(service.end(), Some(&crate::End::Aborted));
+}
+
+fn settle_worker_service(linked: bool) {
+    let mut service = alone_service();
+    let mut stand = socket_stand();
+    if linked {
+        LinkPeer::new().open(&mut stand.worker);
+    } else {
+        let owner = Token::new(
+            worker_settings::prepare(
+                &fixtures::worker_settings(),
+                &fixtures::worker_agent(),
+                &fixtures::worker_limits(),
+            )
+            .unwrap()
+            .prefix,
+        );
+        stand.worker.up(fixtures::NOW, io::Event::Failed { owner, error: io::Error::Unreachable });
+    }
+    service.worker = Some(stand.worker);
+    service.shutdown();
+    stand.worker = service.worker.take().unwrap();
+    let now = if linked { fixtures::NOW } else { fixtures::NOW.saturating_add(Duration::from_secs(60)) };
+    for _ in 0_u16..1000 {
+        stand.worker.iterate(now, Wall::EPOCH);
+        // The link's Close is answered by its socket owner, as IO would.
+        for _ in 0..stand.worker.io().len() {
+            let request = stand.worker.io().pop().unwrap();
+            match request {
+                io::Request::Close { .. } | io::Request::Abort { .. } => {
+                    stand.worker.up(
+                        now,
+                        io::Event::Closed {
+                            owner: Token::new(
+                                worker_settings::prepare(
+                                    &fixtures::worker_settings(),
+                                    &fixtures::worker_agent(),
+                                    &fixtures::worker_limits(),
+                                )
+                                .unwrap()
+                                .prefix,
+                            ),
+                        },
+                    );
+                }
+                io::Request::Connect { owner, .. } => {
+                    stand.worker.up(now, io::Event::Failed { owner, error: io::Error::Unreachable });
+                }
+                io::Request::Stream { stream, .. } | io::Request::Output { stream, .. } if stream == Token::new(44) => {
+                }
+                other @ (io::Request::Listen { .. }
+                | io::Request::Bind { .. }
+                | io::Request::Reject { .. }
+                | io::Request::Stream { .. }
+                | io::Request::Output { .. }
+                | io::Request::Spawn { .. }
+                | io::Request::Signal { .. }
+                | io::Request::Usage { .. }
+                | io::Request::Window { .. }) => stand.below.out.io.push(other),
+            }
+        }
+        stand.drain();
+        stand.input();
+        if stand.worker.is_empty() {
+            break;
+        }
+    }
+    assert!(stand.worker.is_empty(), "all worker children and its root closed");
+    service.worker = Some(stand.worker);
+    crate::iterate(&mut service, now, Wall::EPOCH);
+    assert_eq!(service.end(), Some(&crate::End::Drained));
+    assert!(service.is_empty());
+}
+#[test]
+fn the_first_signal_drains_a_linked_worker_without_waiting_for_grace() {
+    settle_worker_service(true);
+}
+#[test]
+fn a_worker_stopped_unlinked_has_ended_past_its_grace() {
+    settle_worker_service(false);
+}
+
+#[test]
+fn signals_route_to_a_worker_alone_then_abort() {
+    let mut service = alone_service();
+    service.told.push(io::Event::Shutdown { signal: io::kernel::ServiceSignal::Terminate });
+    crate::iterate(&mut service, fixtures::NOW, Wall::EPOCH);
+    assert!(service.worker.as_ref().unwrap().stopping());
+    assert_eq!(service.end(), None, "its root is still closing");
+    service.told.push(io::Event::Shutdown { signal: io::kernel::ServiceSignal::Terminate });
+    crate::iterate(&mut service, fixtures::NOW, Wall::EPOCH);
+    assert_eq!(service.end(), Some(&crate::End::Aborted));
+}
+
+#[test]
+fn repeated_refusals_are_noted_once_until_the_reason_changes_or_the_worker_links() {
+    use skein_channel::Closed;
+    const ONE_REFUSAL: u32 = 1;
+    const TWO_REFUSALS: u32 = 2;
+    let mut stand = socket_stand();
+    for _ in 0_u8..2 {
+        stand.worker.link(fixtures::NOW, link::Request::Fact { why: Closed::RefusedPeer(256) });
+    }
+    assert_eq!(stand.worker.notes().len(), ONE_REFUSAL);
+    stand.worker.link(fixtures::NOW, link::Request::Fact { why: Closed::RefusedHere(2) });
+    assert_eq!(stand.worker.notes().len(), TWO_REFUSALS);
+    LinkPeer::new().open(&mut stand.worker);
+    stand.worker.link(fixtures::NOW, link::Request::Fact { why: Closed::RefusedPeer(256) });
+    for reason in [crate::Refusal::Peer(256), crate::Refusal::Terms] {
+        assert_eq!(stand.worker.notes().pop(), Some(refusal_note(reason)));
+    }
+    assert_eq!(
+        stand.worker.notes().pop(),
+        Some(crate::Note::Linked {
+            worker: b"worker-a".as_slice().into(),
+            address: Box::new(([127, 0, 0, 1], 7100).into()),
+        })
+    );
+    assert_eq!(stand.worker.notes().pop(), Some(refusal_note(crate::Refusal::Peer(256))));
+    assert!(stand.worker.notes().is_empty(), "three refusals with Linked between the second and third");
+}
+
+fn refusal_note(reason: crate::Refusal) -> crate::Note {
+    crate::Note::Refused {
+        worker: b"worker-a".as_slice().into(),
+        address: Box::new(([127, 0, 0, 1], 7100).into()),
+        reason,
+    }
+}

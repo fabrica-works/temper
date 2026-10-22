@@ -139,6 +139,13 @@ fn note_line(note: temper_service::Note) -> String {
             };
             format!("listening {name} {addr}\n")
         }
+        temper_service::Note::Linked { worker, address } => {
+            format!("linked {} {address}\n", String::from_utf8_lossy(&worker))
+        }
+        temper_service::Note::Refused { worker, address, reason } => {
+            let reason = refusal(reason);
+            format!("refused {} {address} {reason}\n", String::from_utf8_lossy(&worker))
+        }
         temper_service::Note::ForgeLacking { number, names } => {
             format!("temper serve: forge {number}: App lacks {}\n", String::from_utf8_lossy(&names))
         }
@@ -152,6 +159,22 @@ fn note_line(note: temper_service::Note) -> String {
         temper_service::Note::ForgeUnkept { number, installation } => {
             format!("temper serve: forge {number}: installation {installation}: not kept\n")
         }
+    }
+}
+fn refusal(reason: temper_service::Refusal) -> String {
+    use temper_service::WorkerRefusalReason as Reason;
+    match reason {
+        temper_service::Refusal::Terms => "terms".into(),
+        temper_service::Refusal::Malformed => "malformed".into(),
+        temper_service::Refusal::Peer(code) => match Reason::from_code(code) {
+            Some(Reason::Unauthorized) => "unauthorized".into(),
+            Some(Reason::Application) => "application".into(),
+            Some(Reason::Busy) => "busy".into(),
+            Some(Reason::Replaced) => "replaced".into(),
+            Some(Reason::NotAdmitted) => "not-admitted".into(),
+            Some(Reason::Stopping) => "stopping".into(),
+            None => format!("code-{code}"),
+        },
     }
 }
 fn stopped_line(number: u16, why: skein_forge_connection::Stopped) -> String {
@@ -303,6 +326,35 @@ fn listening_notes_print_each_listener_and_socket_address_exactly() {
             (([0, 0, 0, 0, 0, 0, 0, 1], 41733).into(), "[::1]:41733"),
         ] {
             assert_eq!(note_line(Note::Listening { listener, addr }), format!("listening {name} {printed}\n"));
+        }
+    }
+}
+
+#[test]
+fn worker_link_notes_print_each_address_and_refusal_exactly() {
+    use temper_service::{Note, Refusal};
+    for (address, printed) in
+        [(([127, 0, 0, 1], 7100).into(), "127.0.0.1:7100"), (([0, 0, 0, 0, 0, 0, 0, 1], 7100).into(), "[::1]:7100")]
+    {
+        assert_eq!(
+            note_line(Note::Linked { worker: b"worker-a".as_slice().into(), address: Box::new(address) }),
+            format!("linked worker-a {printed}\n")
+        );
+        for (reason, expected) in [
+            (Refusal::Peer(256), "unauthorized"),
+            (Refusal::Peer(257), "application"),
+            (Refusal::Peer(258), "busy"),
+            (Refusal::Peer(259), "replaced"),
+            (Refusal::Peer(260), "not-admitted"),
+            (Refusal::Peer(261), "stopping"),
+            (Refusal::Terms, "terms"),
+            (Refusal::Malformed, "malformed"),
+            (Refusal::Peer(42), "code-42"),
+        ] {
+            assert_eq!(
+                note_line(Note::Refused { worker: b"worker-a".as_slice().into(), address: Box::new(address), reason }),
+                format!("refused worker-a {printed} {expected}\n")
+            );
         }
     }
 }

@@ -36,7 +36,7 @@ fn refused(bytes: &[u8], expected: u16) {
     let mut call = fixtures::request(&mut service, bytes);
     let (status, _) = fixtures::answered(&mut service, &mut call);
     assert_eq!(status, expected);
-    assert_eq!(service.engine.clients.early.len(), 0, "nothing reached the root");
+    assert_eq!(service.engine.as_ref().expect("engine").clients.early.len(), 0, "nothing reached the root");
 }
 #[test]
 fn a_path_outside_jig_is_answered_not_found() {
@@ -52,7 +52,7 @@ fn a_get_of_the_printed_links_route_is_not_found_with_no_referrer() {
     let (status, headers) = fixtures::answered(&mut service, &mut call);
     assert_eq!(status, 404);
     assert_eq!(fixtures::header(&headers, b"referrer-policy"), Some(b"no-referrer".as_slice()));
-    assert_eq!(service.engine.clients.early.len(), 0, "nothing reached the root");
+    assert_eq!(service.engine.as_ref().expect("engine").clients.early.len(), 0, "nothing reached the root");
 }
 #[test]
 fn a_host_off_the_list_is_answered_421_with_nothing_done() {
@@ -70,11 +70,17 @@ fn a_cookie_without_the_browser_header_is_answered_403_with_nothing_done() {
 fn a_post_under_jig_reaches_the_component_as_its_message() {
     let mut service = fixtures::started();
     fixtures::listening(&mut service);
-    let link = service.engine.clients.links.pop().expect("printed link");
-    let body = fixtures::http::link_body(&service.engine, &link);
-    let mut peer = fixtures::http::Peer::new(&mut service.engine, b"POST", b"/jig/v1/sign-in/link", &body, None);
-    peer.pump(&mut service.engine, false);
-    assert_eq!(service.engine.clients.early.len(), 1, "sign in reached the root");
+    let link = service.engine.as_mut().expect("engine").clients.links.pop().expect("printed link");
+    let body = fixtures::http::link_body(service.engine.as_ref().expect("engine"), &link);
+    let mut peer = fixtures::http::Peer::new(
+        service.engine.as_mut().expect("engine"),
+        b"POST",
+        b"/jig/v1/sign-in/link",
+        &body,
+        None,
+    );
+    peer.pump(service.engine.as_mut().expect("engine"), false);
+    assert_eq!(service.engine.as_ref().expect("engine").clients.early.len(), 1, "sign in reached the root");
 }
 #[test]
 fn the_printed_link_names_the_bound_address_and_the_secret() {
@@ -234,23 +240,33 @@ fn a_call_past_the_mounts_room_is_answered_busy() {
     let mut peers = skein_lib::List::with_capacity(capacity);
     for number in 0..capacity {
         let socket = Token::new(fixtures::http::SOCKET.raw().checked_add(u64::from(number)).unwrap());
-        let mut peer = fixtures::http::Peer::raw_on(&mut service.engine, HELD_READ_HEAD, socket);
-        peer.hold_body(&mut service.engine);
+        let mut peer = fixtures::http::Peer::raw_on(service.engine.as_mut().expect("engine"), HELD_READ_HEAD, socket);
+        peer.hold_body(service.engine.as_mut().expect("engine"));
         assert!(peers.push(peer).is_ok(), "one peer per mounted call");
     }
     let busy_socket = Token::new(fixtures::http::SOCKET.raw().checked_add(u64::from(capacity)).unwrap());
-    let mut busy = fixtures::http::Peer::raw_on(&mut service.engine, EMPTY_READ_HEAD, busy_socket);
+    let mut busy = fixtures::http::Peer::raw_on(service.engine.as_mut().expect("engine"), EMPTY_READ_HEAD, busy_socket);
     let (status, _) = fixtures::answered(&mut service, &mut busy);
     assert_eq!(status, 503);
     let body = skein_lib::bytes::find(busy.received(), b"\r\n\r\n").unwrap().checked_add(4).unwrap();
     assert_eq!(busy.received().get(body..), Some(b"".as_slice()));
-    assert_eq!(service.engine.clients.early.len(), 0, "nothing reached the root");
+    assert_eq!(service.engine.as_ref().expect("engine").clients.early.len(), 0, "nothing reached the root");
     // Only handling the HTTP terminal and retiring its call with server.done closes this socket.
     assert_eq!(busy.closed(), 1);
-    peers.get_mut(0).unwrap().close(&mut service.engine);
-    let link = service.engine.clients.links.pop().expect("printed link");
-    let body = fixtures::http::link_body(&service.engine, &link);
-    let mut admitted = fixtures::http::Peer::new(&mut service.engine, b"POST", b"/jig/v1/sign-in/link", &body, None);
-    admitted.handoff(&mut service.engine);
-    assert_eq!(service.engine.clients.early.len(), 1, "the released slot mounts another call");
+    peers.get_mut(0).unwrap().close(service.engine.as_mut().expect("engine"));
+    let link = service.engine.as_mut().expect("engine").clients.links.pop().expect("printed link");
+    let body = fixtures::http::link_body(service.engine.as_ref().expect("engine"), &link);
+    let mut admitted = fixtures::http::Peer::new(
+        service.engine.as_mut().expect("engine"),
+        b"POST",
+        b"/jig/v1/sign-in/link",
+        &body,
+        None,
+    );
+    admitted.handoff(service.engine.as_mut().expect("engine"));
+    assert_eq!(
+        service.engine.as_ref().expect("engine").clients.early.len(),
+        1,
+        "the released slot mounts another call"
+    );
 }

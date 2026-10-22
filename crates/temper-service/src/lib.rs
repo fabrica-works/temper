@@ -71,6 +71,15 @@ pub enum Note {
         listener: Listening,
         addr: core::net::SocketAddr,
     },
+    Linked {
+        worker: Box<[u8]>,
+        address: Box<core::net::SocketAddr>,
+    },
+    Refused {
+        worker: Box<[u8]>,
+        address: Box<core::net::SocketAddr>,
+        reason: Refusal,
+    },
     ForgeLacking {
         number: u16,
         names: Box<[u8]>,
@@ -102,3 +111,13 @@ pub enum Listening {
     /// The forge webhooks listener.
     Webhooks,
 }
+
+/// The peer's refusal code, or a local opening/decoding refusal.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Refusal {
+    Peer(u16),
+    Terms,
+    Malformed,
+}
+
+pub use jig_protocol_worker_wire::Reason as WorkerRefusalReason;

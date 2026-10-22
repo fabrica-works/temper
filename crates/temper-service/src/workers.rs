@@ -621,8 +621,8 @@ mod tests {
             bounds: crate::tests::fixtures::worker_agent().bounds,
         };
         let mut events = Queue::with_capacity(1);
-        service.engine.workers.out.push(kit::Request::Hello { channel, worker: 1, hello });
-        service.engine.workers.drain(&mut events);
+        service.engine.as_mut().expect("engine").workers.out.push(kit::Request::Hello { channel, worker: 1, hello });
+        service.engine.as_mut().expect("engine").workers.drain(&mut events);
         let Some(root::Event::Worker(root::WorkerInput::Link {
             channel: forwarded_channel,
             link: root::Link::Hello { worker, .. },

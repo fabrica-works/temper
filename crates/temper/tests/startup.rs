@@ -1267,3 +1267,53 @@ fn box_initializes_only_absent_or_empty_configuration_directories() {
         scratch.remove();
     }
 }
+
+#[test]
+fn owned_memory_figures_for_a_worker_alone_include_its_process_and_no_engine() {
+    let scratch = support::Scratch::startup("worker-alone-memory-figures");
+    let bounded = support::owned::bounded(scratch.path());
+    let mut document: serde_json::Value = serde_json::from_slice(&bounded.document).expect("bounded document");
+    document.as_object_mut().expect("worker-alone fixture").remove("engine");
+    document["workers"][0]["engine"] = serde_json::json!({"socket":"127.0.0.1:7100"});
+    document["application"] =
+        serde_json::json!({"workers":document["application"]["workers"], "limits":document["application"]["limits"]});
+    let input = serde_json::to_vec(&document).expect("worker-alone fixture");
+    let required = temper_service::startup::memory_requirements(
+        &input,
+        &jig_protocol_config::Directories::working(),
+        &bounded.files,
+        &bounded.agent,
+        &bounded.seeds,
+        None,
+        skein_lib::List::with_capacity(0),
+    )
+    .expect("worker-alone fixture");
+    assert_eq!(required.engine_bytes, 0);
+    let figure = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/figures/worker-alone-memory.txt");
+    if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1") {
+        fs::write(&figure, format!("{}\n", required.worker_bytes)).expect("worker-alone fixture");
+    }
+    let kept: u64 =
+        fs::read_to_string(figure).expect("worker-alone fixture").trim().parse().expect("worker-alone fixture");
+    assert_eq!(
+        required.worker_bytes, kept,
+        "regenerate with SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper --test startup -E 'test(owned_memory_figures)'"
+    );
+    document["workers"][0]["memory_bytes"] = required.worker_bytes.into();
+    let part = temper_service::startup::worker_part(
+        &serde_json::to_vec(&document).expect("worker-alone fixture"),
+        &jig_protocol_config::Directories::working(),
+    )
+    .expect("worker-alone fixture");
+    let service = temper_service::startup::worker_alone(
+        part,
+        &bounded.files,
+        &bounded.agent,
+        temper_service::WorkerRuntime { root: skein_io::kernel::Fd::new(9), path: b"/worker".as_slice().into() },
+        7,
+    )
+    .expect("worker-alone fixture");
+    assert_eq!(service.worst_case(), kept);
+    assert!(service.setup_page(1, b"state", skein_lib::Time::ZERO).is_none());
+    scratch.remove();
+}

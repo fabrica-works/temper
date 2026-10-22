@@ -25,44 +25,47 @@ fn service(states: u32, life: Duration) -> crate::Service {
         })
         .unwrap();
     let mut service = crate::Service::engine(config, &fixtures::seeds(), None, runtime).unwrap();
-    service.engine.store = fixtures::records_store();
-    assert!(service.engine.setup.component.is_none(), "no host before the rows load");
+    service.engine.as_mut().expect("engine").store = fixtures::records_store();
+    assert!(service.engine.as_ref().expect("engine").setup.component.is_none(), "no host before the rows load");
     for _ in 0_u32..8 {
-        crate::forge::records::advance(&mut service.engine);
+        crate::forge::records::advance(service.engine.as_mut().expect("engine"));
     }
-    advance(&mut service.engine);
-    assert!(service.engine.setup.component.is_some());
-    assert!(service.engine.forge_records.done());
-    for _ in 0..service.engine.notes.len() {
-        let _startup_note = service.engine.notes.pop();
+    advance(service.engine.as_mut().expect("engine"));
+    assert!(service.engine.as_ref().expect("engine").setup.component.is_some());
+    assert!(service.engine.as_ref().expect("engine").forge_records.done());
+    for _ in 0..service.engine.as_mut().expect("engine").notes.len() {
+        let _startup_note = service.engine.as_mut().expect("engine").notes.pop();
     }
     // These routing tests fake the listeners, leaving the host and forge as their real components.
-    for _ in 0..service.engine.workers.io.len() {
-        let skein_io::Request::Listen { owner, addr } = service.engine.workers.io.pop().unwrap() else {
+    for _ in 0..service.engine.as_mut().expect("engine").workers.io.len() {
+        let skein_io::Request::Listen { owner, addr } =
+            service.engine.as_mut().expect("engine").workers.io.pop().unwrap()
+        else {
             panic!("worker listener")
         };
-        assert!(service.engine.workers.up(
+        let engine = service.engine.as_mut().expect("engine");
+        assert!(engine.workers.up(
             Time::ZERO,
             skein_io::Event::Listening { owner, listener: Token::new(78), addr },
-            &mut service.engine.events
+            &mut engine.events
         ));
     }
-    let ready = fixtures::ready();
-    service.engine.env.limits = ready.engine.env.limits;
-    service.engine.domain = ready.engine.domain;
+    let ready = fixtures::ready().engine.expect("engine");
+    service.engine.as_mut().expect("engine").env.limits = ready.env.limits;
+    service.engine.as_mut().expect("engine").domain = ready.domain;
     service
 }
 fn start(service: &mut crate::Service, run: u64, plan: host::Plan) {
     let run = Token::new(run);
-    service.engine.setup.staged.insert(run, plan).unwrap();
-    crate::route::request(&mut service.engine, root::Request::Setup { run });
+    service.engine.as_mut().expect("engine").setup.staged.insert(run, plan).unwrap();
+    crate::route::request(service.engine.as_mut().expect("engine"), root::Request::Setup { run });
 }
 fn terminal(service: &mut crate::Service) -> root::SetupEnd {
     for _ in 0_u32..4 {
-        advance(&mut service.engine);
+        advance(service.engine.as_mut().expect("engine"));
     }
-    for _ in 0..service.engine.events.len() {
-        if let Some(root::Event::Setup { end, .. }) = service.engine.events.pop() {
+    for _ in 0..service.engine.as_mut().expect("engine").events.len() {
+        if let Some(root::Event::Setup { end, .. }) = service.engine.as_mut().expect("engine").events.pop() {
             return end;
         }
     }
@@ -76,7 +79,7 @@ fn manifest(service: &mut crate::Service, run: u64) -> Box<[u8]> {
     state
 }
 fn row(service: &mut crate::Service, item: Item, bytes: &[u8]) {
-    service.engine.forge_records.rows.push(
+    service.engine.as_mut().expect("engine").forge_records.rows.push(
         records::number(1, item),
         Secret::new(records::encode(bytes).into_boxed_slice()),
         4096,
@@ -96,9 +99,9 @@ fn the_host_starts_after_loading_with_temper_urls_and_the_configured_limits() {
     ] {
         assert!(contains(page, expected));
     }
-    assert_eq!(service.engine.setup.env.limits.runs, 8);
-    assert_eq!(service.engine.setup.env.limits.states, 8);
-    assert!(service.engine.setup.io.is_empty(), "manifest is local");
+    assert_eq!(service.engine.as_ref().expect("engine").setup.env.limits.runs, 8);
+    assert_eq!(service.engine.as_ref().expect("engine").setup.env.limits.states, 8);
+    assert!(service.engine.as_ref().expect("engine").setup.io.is_empty(), "manifest is local");
 }
 #[test]
 #[expect(clippy::manual_map, reason = "the step subset uses explicit matches")]
@@ -110,7 +113,10 @@ fn reads_use_the_retained_row_past_its_version_and_absence_answers_none() {
         }
         start(&mut service, 1, host::Plan::Install { forge: 1 });
         let end = terminal(&mut service);
-        let (_, host::Answer::Read(value)) = service.engine.setup.answers.pop().unwrap() else { panic!("read answer") };
+        let (_, host::Answer::Read(value)) = service.engine.as_mut().expect("engine").setup.answers.pop().unwrap()
+        else {
+            panic!("read answer")
+        };
         assert_eq!(
             match &value {
                 Some(value) => Some(value.expose().len()),
@@ -125,7 +131,7 @@ fn reads_use_the_retained_row_past_its_version_and_absence_answers_none() {
             root::SetupEnd::Stopped { reason, .. } => assert!(reason.ends_with(b"Missing")),
             root::SetupEnd::Done { .. } => panic!("install terminal"),
         }
-        assert!(service.engine.setup.io.is_empty());
+        assert!(service.engine.as_ref().expect("engine").setup.io.is_empty());
     }
 }
 #[test]
@@ -137,10 +143,10 @@ fn pages_expire_on_their_done_clock_and_reload_does_not_consume_them() {
     }
     assert!(service.setup_page(2, &state, Time::ZERO).is_none());
     assert!(service.setup_page(1, &state, Time::ZERO.saturating_add(Duration::from_secs(3))).is_none());
-    service.engine.env.now = Time::ZERO.saturating_add(Duration::from_secs(3));
-    advance(&mut service.engine);
-    assert!(service.engine.setup.pages.is_empty());
-    assert_eq!(service.engine.setup.next_deadline(), None);
+    service.engine.as_mut().expect("engine").env.now = Time::ZERO.saturating_add(Duration::from_secs(3));
+    advance(service.engine.as_mut().expect("engine"));
+    assert!(service.engine.as_ref().expect("engine").setup.pages.is_empty());
+    assert_eq!(service.engine.as_ref().expect("engine").setup.next_deadline(), None);
 }
 #[test]
 fn the_oldest_page_is_dropped_at_capacity() {
@@ -159,13 +165,16 @@ fn an_install_can_evict_a_manifests_state_while_its_page_lives() {
     assert!(let_done(terminal(&mut service)));
     assert!(service.setup_page(1, &state, Time::ZERO).is_some());
     // The slug above only made an Install-purpose state; no App remains in this host-state fixture.
-    service.engine.forge_records.rows =
-        crate::forge::records::Loader::new(&fixtures::engine().limits, &service.engine.workers.forges).rows;
+    service.engine.as_mut().expect("engine").forge_records.rows = crate::forge::records::Loader::new(
+        &fixtures::engine().limits,
+        &service.engine.as_ref().expect("engine").workers.forges,
+    )
+    .rows;
     start(&mut service, 3, host::Plan::Convert { forge: 1, code: code(), state });
     let root::SetupEnd::Stopped { forge, reason } = terminal(&mut service) else { panic!("evicted state refused") };
     assert_eq!(forge, 1);
     assert!(reason.ends_with(b"Unknown"));
-    assert!(service.engine.setup.io.is_empty(), "evicted state sends no conversion");
+    assert!(service.engine.as_ref().expect("engine").setup.io.is_empty(), "evicted state sends no conversion");
 }
 fn let_done(end: root::SetupEnd) -> bool {
     match end {
@@ -186,17 +195,27 @@ impl Face {
         Self { owner: None, wire: skein_world::stream::Wire::new(7) }
     }
     fn turn(&mut self, service: &mut crate::Service) {
-        for _ in 0_u32..service.engine.setup.io.len() {
-            match service.engine.setup.io.pop().unwrap() {
+        for _ in 0_u32..service.engine.as_mut().expect("engine").setup.io.len() {
+            match service.engine.as_mut().expect("engine").setup.io.pop().unwrap() {
                 skein_io::Request::Connect { owner, .. } => {
                     self.owner = Some(owner);
                     self.wire = skein_world::stream::Wire::new(7);
-                    service.engine.setup.up(skein_io::Event::Connecting { owner, socket: Token::new(123) });
-                    service.engine.setup.up(skein_io::Event::Connected { owner });
+                    service
+                        .engine
+                        .as_mut()
+                        .expect("engine")
+                        .setup
+                        .up(skein_io::Event::Connecting { owner, socket: Token::new(123) });
+                    service.engine.as_mut().expect("engine").setup.up(skein_io::Event::Connected { owner });
                 }
                 skein_io::Request::Stream { down, .. } => self.wire.take(down),
                 skein_io::Request::Close { .. } | skein_io::Request::Abort { .. } => {
-                    service.engine.setup.up(skein_io::Event::Closed { owner: self.owner.take().unwrap() });
+                    service
+                        .engine
+                        .as_mut()
+                        .expect("engine")
+                        .setup
+                        .up(skein_io::Event::Closed { owner: self.owner.take().unwrap() });
                 }
                 skein_io::Request::Listen { .. }
                 | skein_io::Request::Bind { .. }
@@ -211,9 +230,9 @@ impl Face {
         if let Some(owner) = self.owner
             && let Some(up) = self.wire.answer()
         {
-            service.engine.setup.up(skein_io::Event::Stream { owner, up });
+            service.engine.as_mut().expect("engine").setup.up(skein_io::Event::Stream { owner, up });
         }
-        advance(&mut service.engine);
+        advance(service.engine.as_mut().expect("engine"));
     }
     fn reply(&mut self, service: &mut crate::Service, body: &[u8]) {
         let length = skein_lib::Decimal::of(u64::try_from(body.len()).unwrap());
@@ -268,15 +287,15 @@ fn writing() -> (crate::Service, Face) {
     face.reply(&mut service, br#"{"id":7,"slug":"app-fixture"}"#);
     face.sent(&mut service);
     face.reply(&mut service, br#"{"id":9,"login":"app-fixture[bot]"}"#);
-    if service.engine.setup.writes.is_empty() {
-        if let Some(root::Event::Setup { end, .. }) = service.engine.events.pop() {
+    if service.engine.as_mut().expect("engine").setup.writes.is_empty() {
+        if let Some(root::Event::Setup { end, .. }) = service.engine.as_mut().expect("engine").events.pop() {
             panic!("conversion terminal: {end:?}");
         }
         panic!(
             "conversion pending: owner {}, incoming {}, outgoing {}",
             face.owner.is_some(),
-            service.engine.setup.above.len(),
-            service.engine.setup.io.len()
+            service.engine.as_mut().expect("engine").setup.above.len(),
+            service.engine.as_mut().expect("engine").setup.io.len()
         );
     }
     (service, face)
@@ -285,42 +304,48 @@ fn writing() -> (crate::Service, Face) {
 fn written_is_answered_only_after_kept_and_the_routing_rows_follow_each_keep() {
     let (mut service, mut face) = writing();
     for expected in [Item::AppId, Item::AppSlug, Item::AppKey, Item::User] {
-        assert!(service.engine.setup.answers.is_empty(), "Written must wait for Kept");
+        assert!(service.engine.as_ref().expect("engine").setup.answers.is_empty(), "Written must wait for Kept");
         assert!(
-            (match service.engine.forge_records.rows.forge(1) {
+            (match service.engine.as_ref().expect("engine").forge_records.rows.forge(1) {
                 Some(rows) => rows.get(expected).ok(),
                 None => None,
             })
             .is_none(),
             "unkept row is invisible"
         );
-        let owner = *service.engine.setup.writes.first().unwrap().0;
-        let write = service.engine.setup.writes.get(&owner).unwrap();
+        let owner = *service.engine.as_mut().expect("engine").setup.writes.first().unwrap().0;
+        let write = service.engine.as_mut().expect("engine").setup.writes.get(&owner).unwrap();
         assert_eq!(write.number, records::number(1, expected));
         assert_eq!(write.value.expose().first(), Some(&records::VERSION));
-        answer(&mut service.engine, StoreEvent::Kept { owner });
-        assert_eq!(service.engine.setup.answers.pop(), Some((Token::new(2), host::Answer::Written)));
-        service.engine.forge_records.rows.forge(1).unwrap().get(expected).unwrap();
+        answer(service.engine.as_mut().expect("engine"), StoreEvent::Kept { owner });
+        assert_eq!(
+            service.engine.as_mut().expect("engine").setup.answers.pop(),
+            Some((Token::new(2), host::Answer::Written))
+        );
+        service.engine.as_mut().expect("engine").forge_records.rows.forge(1).unwrap().get(expected).unwrap();
         face.turn(&mut service);
     }
-    advance(&mut service.engine);
-    let owner = *service.engine.setup.writes.first().unwrap().0;
-    assert_eq!(service.engine.setup.writes.get(&owner).unwrap().number, records::number(1, Item::Origin));
-    answer(&mut service.engine, StoreEvent::Kept { owner });
+    advance(service.engine.as_mut().expect("engine"));
+    let owner = *service.engine.as_mut().expect("engine").setup.writes.first().unwrap().0;
+    assert_eq!(
+        service.engine.as_ref().expect("engine").setup.writes.get(&owner).unwrap().number,
+        records::number(1, Item::Origin)
+    );
+    answer(service.engine.as_mut().expect("engine"), StoreEvent::Kept { owner });
     assert!(let_done(terminal(&mut service)));
 }
 #[test]
 fn a_failed_keep_stops_the_engine_and_never_answers_written() {
     let (mut service, _face) = writing();
-    let owner = *service.engine.setup.writes.first().unwrap().0;
-    let Some(StoreEvent::Kept { owner: kept }) = service.engine.store.above.pop() else {
+    let owner = *service.engine.as_mut().expect("engine").setup.writes.first().unwrap().0;
+    let Some(StoreEvent::Kept { owner: kept }) = service.engine.as_mut().expect("engine").store.above.pop() else {
         panic!("pending keep terminal")
     };
     assert_eq!(kept, owner);
-    service.engine.store.above.push(StoreEvent::Corrupt { owner });
-    crate::engine::iterate(&mut service.engine, Time::ZERO, Wall::EPOCH);
+    service.engine.as_mut().expect("engine").store.above.push(StoreEvent::Corrupt { owner });
+    crate::engine::iterate(service.engine.as_mut().expect("engine"), Time::ZERO, Wall::EPOCH);
     assert!(service.end().is_some());
-    assert!(service.engine.setup.answers.is_empty());
+    assert!(service.engine.as_ref().expect("engine").setup.answers.is_empty());
 }
 #[test]
 fn draining_closes_the_host_and_waits_for_closed() {
@@ -329,14 +354,14 @@ fn draining_closes_the_host_and_waits_for_closed() {
     start(&mut service, 2, host::Plan::Convert { forge: 1, code: code(), state });
     let mut face = Face::new();
     face.sent(&mut service);
-    crate::stop::shutdown(&mut service.engine);
-    crate::stop::drained(&mut service.engine);
-    advance(&mut service.engine);
-    assert!(!service.engine.setup.closed, "Closed waits for the live socket");
+    crate::stop::shutdown(service.engine.as_mut().expect("engine"));
+    crate::stop::drained(service.engine.as_mut().expect("engine"));
+    advance(service.engine.as_mut().expect("engine"));
+    assert!(!service.engine.as_ref().expect("engine").setup.closed, "Closed waits for the live socket");
     face.turn(&mut service);
-    assert!(service.engine.setup.closed);
-    assert!(service.engine.setup.pages.is_empty());
-    assert_eq!(service.engine.setup.next_deadline(), None);
+    assert!(service.engine.as_ref().expect("engine").setup.closed);
+    assert!(service.engine.as_ref().expect("engine").setup.pages.is_empty());
+    assert_eq!(service.engine.as_ref().expect("engine").setup.next_deadline(), None);
 }
 fn tls_forges() -> (crate::settings::Engine, List<crate::ForgeRuntime>) {
     // Skein's fixed TLS-world root, carried here without another test dependency.
@@ -441,32 +466,32 @@ fn admitted_tls_starts_after_rows_and_serves_a_local_manifest() {
     config.jig.memory = required;
     let mut service = crate::Service::engine(config, &fixtures::seeds(), None, runtime).unwrap();
     assert_eq!(service.worst_case(), required);
-    assert!(service.engine.setup.component.is_none(), "no host before the rows load");
-    let (settings, _) = service.engine.setup.pending.as_ref().unwrap();
+    assert!(service.engine.as_ref().expect("engine").setup.component.is_none(), "no host before the rows load");
+    let (settings, _) = service.engine.as_ref().expect("engine").setup.pending.as_ref().unwrap();
     assert_eq!(settings.forges.len(), 2);
     for entry in &settings.forges {
         let host::Transport::Tls { .. } = &entry.transport else { panic!("admitted TLS") };
-        assert!(service.engine.setup.served.contains_key(&entry.number()));
+        assert!(service.engine.as_ref().expect("engine").setup.served.contains_key(&entry.number()));
     }
-    service.engine.store = fixtures::records_store();
+    service.engine.as_mut().expect("engine").store = fixtures::records_store();
     for _ in 0_u32..8 {
-        crate::forge::records::advance(&mut service.engine);
+        crate::forge::records::advance(service.engine.as_mut().expect("engine"));
     }
-    advance(&mut service.engine);
-    assert!(service.engine.forge_records.done());
-    assert!(service.engine.setup.component.is_some());
-    for _ in 0..service.engine.notes.len() {
-        let _startup_note = service.engine.notes.pop();
+    advance(service.engine.as_mut().expect("engine"));
+    assert!(service.engine.as_ref().expect("engine").forge_records.done());
+    assert!(service.engine.as_ref().expect("engine").setup.component.is_some());
+    for _ in 0..service.engine.as_mut().expect("engine").notes.len() {
+        let _startup_note = service.engine.as_mut().expect("engine").notes.pop();
     }
     let state = manifest(&mut service, 1);
     assert!(service.setup_page(1, &state, Time::ZERO).is_some());
     assert!(service.end().is_none());
-    assert!(service.engine.setup.io.is_empty(), "manifest is local");
+    assert!(service.engine.as_ref().expect("engine").setup.io.is_empty(), "manifest is local");
 }
 #[test]
 fn the_host_names_the_metadata_limits_and_rejects_bad_start_limits() {
     let mut service = service(8, Duration::from_secs(3600));
-    let setup = &mut service.engine.setup;
+    let setup = &mut service.engine.as_mut().expect("engine").setup;
     assert_eq!(setup.env.limits.inner, 32);
     let mut found = jig_protocol_config::Problems::empty();
     settings::problems(host::Unusable::GitHubMetadata { inner: 1, string_bytes: 1 }, &mut found);
@@ -564,8 +589,9 @@ fn invalid_host_limits_stop_after_load_and_setup_overrides_are_checked() {
     config.forges[0].api_token = None;
     config.limits.forge_component.inner = 13;
     let (mut endpoints, _) = crate::forge::prepare(&fixtures::engine(), fixtures::forge_runtime()).unwrap();
-    service.engine.setup = prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2).unwrap();
-    advance(&mut service.engine);
+    service.engine.as_mut().expect("engine").setup =
+        prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2).unwrap();
+    advance(service.engine.as_mut().expect("engine"));
     assert!(service.end().is_some());
     let mut own = crate::limits::profile(crate::limits::Profile::Small);
     for name in [b"setup.states".as_slice(), b"setup.runs", b"setup.state_life_ms", b"setup.orgs"] {

@@ -20,8 +20,8 @@ fn a_drain_closes_accounts_then_the_store() {
         }
     }
     assert_eq!(service.end(), Some(&End::Drained));
-    assert!(service.engine.accounts.as_ref().unwrap().is_empty());
-    assert!(service.engine.store.closed());
+    assert!(service.engine.as_ref().expect("engine").accounts.as_ref().unwrap().is_empty());
+    assert!(service.engine.as_ref().expect("engine").store.closed());
 }
 #[test]
 fn signals_routed_from_io_drain_then_abort() {
@@ -43,8 +43,18 @@ fn signals_routed_from_io_drain_then_abort() {
 
 fn refused(why: OpenRefusal, expected: Stop) {
     let mut service = fixtures::started();
-    service.engine.store.above.push(jig_protocol_store::Event::OpenRefused { owner: skein_lib::Token::new(1), why });
-    crate::engine::iterate(&mut service.engine, skein_lib::Time::from_nanos(1), skein_lib::Wall::EPOCH);
+    service
+        .engine
+        .as_mut()
+        .expect("engine")
+        .store
+        .above
+        .push(jig_protocol_store::Event::OpenRefused { owner: skein_lib::Token::new(1), why });
+    crate::engine::iterate(
+        service.engine.as_mut().expect("engine"),
+        skein_lib::Time::from_nanos(1),
+        skein_lib::Wall::EPOCH,
+    );
     assert_eq!(service.end(), Some(&End::Stopped(expected)), "{why:?}");
 }
 fn version(family: Family) {

@@ -205,7 +205,10 @@ fn the_demo_read_answers_the_configured_demo() {
 #[test]
 fn the_demo_answer_carries_no_key_path_socket_or_placeholder() {
     let service = fixtures::demo_service();
-    let record = demo_record(demo_read(people::ApplicationScope::Deployment), service.engine.demo.as_ref().unwrap());
+    let record = demo_record(
+        demo_read(people::ApplicationScope::Deployment),
+        service.engine.as_ref().expect("engine").demo.as_ref().unwrap(),
+    );
     // The answer's security rule: no key path, listen socket or placeholder.
     for forbidden in [b"llm.key".as_slice(), b"demo/llm", b"$", b"socket"] {
         assert_eq!(skein_lib::bytes::find(&record, forbidden), None, "{forbidden:?}");
@@ -223,7 +226,9 @@ fn a_configured_demo_does_not_answer_other_or_malformed_reads() {
         let mut input = demo_read(people::ApplicationScope::Deployment);
         let kit::ToApplication::Read { family: f, version: v, record: r, .. } = &mut input else { panic!("read") };
         (*f, *v, *r) = (family, version, record);
-        let Err(answer) = family::to_root(input, &[], service.engine.demo.as_ref(), &w::CEILINGS) else {
+        let Err(answer) =
+            family::to_root(input, &[], service.engine.as_ref().expect("engine").demo.as_ref(), &w::CEILINGS)
+        else {
             panic!("{row}: read answer")
         };
         let kit::Event::Application(kit::FromApplication::Read { record, .. }) = *answer else { panic!("{row}: read") };

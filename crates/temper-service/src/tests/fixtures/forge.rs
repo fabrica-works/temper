@@ -68,7 +68,12 @@ impl ForgeFace {
     pub fn refuse(&mut self, service: &mut crate::Service) {
         for (owner, peer) in &self.peers {
             if peer.number == self.selected {
-                service.engine.forge.up(io::Event::Failed { owner: *owner, error: io::Error::Refused });
+                service
+                    .engine
+                    .as_mut()
+                    .expect("engine")
+                    .forge
+                    .up(io::Event::Failed { owner: *owner, error: io::Error::Refused });
                 break;
             }
         }
@@ -78,7 +83,7 @@ impl ForgeFace {
         self.turn(service);
     }
     pub fn turn(&mut self, service: &mut crate::Service) {
-        let engine = &mut service.engine;
+        let engine = service.engine.as_mut().expect("engine");
         for _ in 0_u32..engine.clients.io.len() {
             match engine.clients.io.pop().unwrap() {
                 io::Request::Listen { owner, addr } => {
@@ -201,13 +206,13 @@ impl ForgeFace {
     }
 
     pub fn pending(service: &crate::Service) -> u32 {
-        service.engine.forge.above.len()
+        service.engine.as_ref().expect("engine").forge.above.len()
     }
     pub fn returned(service: &mut crate::Service, answer: skein_forge_connection::Answered) {
         let temper_engine_domain::Event::Forge(event) = crate::forge::event(answer) else {
             panic!("forge event");
         };
-        crate::route::request(&mut service.engine, temper_engine_domain::Request::Busy(event));
+        crate::route::request(service.engine.as_mut().expect("engine"), temper_engine_domain::Request::Busy(event));
     }
 }
 /// Install a real listener connection and return its first verified hint.
@@ -223,7 +228,7 @@ pub fn hook(service: &mut crate::Service) -> skein_forge_connection::hooks::Hint
         Some(Secret::new(Box::from(SECRET)));
     settings.webhooks =
         Some(skein_forge_connection::hooks::Webhooks { listener: io::Addr::Ip(([127, 0, 0, 1], 7200).into()) });
-    let layer = &mut service.engine.forge;
+    let layer = &mut service.engine.as_mut().expect("engine").forge;
     layer.component = skein_forge_connection::Component::new(
         settings,
         &layer.env.limits,
