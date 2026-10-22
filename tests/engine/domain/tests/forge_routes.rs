@@ -2358,7 +2358,7 @@ fn a_chat_made_before_its_home_was_adopted_reads_the_home_and_says_why() {
     world.restart(true, true);
     world.until(Until::Ready);
     world.send(protocol::hello_slots(Token::new(7), 2, Box::new([])));
-    let reason = b"This chat began before org/repo was adopted, so you can read org/repo but not push to it. A new chat can push. Tell the person this in your next reply.";
+    let reason = b"This chat began before org/repo was adopted, so you can read org/repo but not push to it. Tell the person, in your next reply: \"This chat began before org/repo was adopted, so I can read it but not push. Start a new chat to push.\"";
     for (chat, key) in chats.iter().zip([96, 97]) {
         let assignment = assigned_chat(
             &mut world,

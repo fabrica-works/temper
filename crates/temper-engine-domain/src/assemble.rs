@@ -145,7 +145,7 @@ fn explain_home_access(
 }
 
 fn append_home_access(text: &mut Box<[u8]>, owner: &[u8], repository: &[u8], budget: u32) {
-    let parts: [&[u8]; 10] = [
+    let parts: [&[u8]; 14] = [
         text,
         b"\n\nThis chat began before ",
         owner,
@@ -155,7 +155,11 @@ fn append_home_access(text: &mut Box<[u8]>, owner: &[u8], repository: &[u8], bud
         owner,
         b"/",
         repository,
-        b" but not push to it. A new chat can push. Tell the person this in your next reply.",
+        b" but not push to it. Tell the person, in your next reply: \"This chat began before ",
+        owner,
+        b"/",
+        repository,
+        b" was adopted, so I can read it but not push. Start a new chat to push.\"",
     ];
     let mut needed = 0_usize;
     for part in parts {
@@ -292,7 +296,7 @@ mod tests {
     #[test]
     fn the_home_access_reason_must_fit_the_task_budget_whole() {
         let original = b"Work in the home";
-        let explained = b"Work in the home\n\nThis chat began before org/repo was adopted, so you can read org/repo but not push to it. A new chat can push. Tell the person this in your next reply.";
+        let explained = b"Work in the home\n\nThis chat began before org/repo was adopted, so you can read org/repo but not push to it. Tell the person, in your next reply: \"This chat began before org/repo was adopted, so I can read it but not push. Start a new chat to push.\"";
         let fits = u32::try_from(explained.len()).expect("fixture byte count");
         for (budget, expected) in [(fits, explained.as_slice()), (fits - 1, original.as_slice())] {
             let mut text = Box::from(original.as_slice());
