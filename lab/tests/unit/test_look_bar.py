@@ -106,6 +106,17 @@ class BarTests(unittest.TestCase):
         self.judge()
         self.assertIn('unjudged: none', self.bar()[0])
 
+    def test_unsigned_finding_judges_nothing_and_prints_none(self):
+        value = judgements()
+        value['differences'][0]['signatures'] = []
+        self.judge(value)
+        text, holds = self.bar()
+        self.assertIn(SIG + ' — no difference (3 runs)', text)
+        self.assertFalse(holds)
+        text = look.batch(self.judged, self.lab, 'look', 'key')
+        self.assertIn('  Signatures: none\n', text)
+        self.assertIn('  Pair: ', text)
+
     def test_question_judges_signature(self):
         value = judgements()
         value['differences'] = [judgement('silent')]
@@ -245,6 +256,50 @@ class BarTests(unittest.TestCase):
         self.assertEqual(path.stat().st_mode & 0o777, 0o600)
         self.assertEqual(path.read_bytes(), look.canonical(judgements()))
 
+    def page_capture(self):
+        capture = self.lab / 'keys/look/key/runs/r0/collected/capture/capture'
+        value = json.loads((capture / 'capture.json').read_bytes())
+        w = value['scenes'][0]['widths'][0]
+        for record in [w] + w['regions']:
+            record['mockup'] = None
+            del record['pair']
+        w['page']['shot'] = file('chat/desktop/page/page.png')
+        w['regions'][0]['page']['shot'] = file('chat/desktop/page/composer.png')
+        w['regions'].append(dict(name='unrelated', page=dict(shot=file('missing.png'))))
+        for record in [w, w['regions'][0]]:
+            path = capture / record['page']['shot']['path']
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b'picture')
+        return capture, value
+
+    def test_batch_page_pictures_without_mockup(self):
+        capture, value = self.page_capture()
+        self.write(capture / 'capture.json', value)
+        self.judge()
+        text = look.batch(self.judged, self.lab, 'look', 'key')
+        paths = [line.removeprefix('  Page: ') for line in text.splitlines() if line.startswith('  Page: ')]
+        self.assertEqual(paths, [str(capture / 'chat/desktop/page/page.png'),
+                                 str(capture / 'chat/desktop/page/composer.png')])
+        self.assertTrue(all(Path(p).is_file() for p in paths))
+        self.assertNotIn('  Pair: ', text)
+
+    def test_batch_refuses_page_path_outside_capture_or_missing(self):
+        capture, value = self.page_capture()
+        outside = self.root / 'outside.png'
+        outside.write_bytes(b'picture')
+        (capture / 'link.png').symlink_to(outside)
+        w = value['scenes'][0]['widths'][0]
+        self.judge()
+        for record in [w, w['regions'][0]]:
+            original = record['page']['shot']['path']
+            for path in (str(outside), '../../../../../outside.png', 'link.png', 'missing.png', '.'):
+                with self.subTest(record=record['name'], path=path):
+                    record['page']['shot']['path'] = path
+                    self.write(capture / 'capture.json', value)
+                    with self.assertRaisesRegex(ValueError, 'page path missing or outside capture'):
+                        look.batch(self.judged, self.lab, 'look', 'key')
+            record['page']['shot']['path'] = original
+
     def test_batch_entries_under_finding_and_question(self):
         value = judgements()
         value['differences'].append(judgement('silent', 'order', 'order/composer'))
@@ -259,6 +314,18 @@ class BarTests(unittest.TestCase):
 
 
 class JudgementTests(unittest.TestCase):
+    def test_empty_signatures_only_for_mockup(self):
+        for place in ('mockup', 'page', 'silent'):
+            with self.subTest(place=place):
+                value = judgements()
+                value['differences'] = [judgement(place)]
+                value['differences'][0]['signatures'] = []
+                if place == 'mockup':
+                    self.assertEqual(look.load_judgements(look.canonical(value)), value)
+                else:
+                    with self.assertRaisesRegex(ValueError, 'signatures: expected at least 1 entries'):
+                        look.load_judgements(look.canonical(value))
+
     def test_experiment_class_accepted_other_class_refused(self):
         value = judgements()
         value['differences'][0]['finding']['class'] = 'experiment'
@@ -291,7 +358,6 @@ class JudgementTests(unittest.TestCase):
             (('differences',), False, 'differences'),
             (('differences', 0, 'id'), 'Bad', '.id'),
             (('differences', 0, 'width'), 'phone', '.width'),
-            (('differences', 0, 'signatures'), [], 'signatures'),
             (('differences', 0, 'signatures'), ['a b'], 'signatures.0'),
             (('differences', 0, 'signatures'), ['/a'], 'signatures.0'),
             (('differences', 0, 'signatures'), [7], 'signatures.0'),

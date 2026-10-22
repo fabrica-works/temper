@@ -314,12 +314,18 @@ canonical JSON (skein's `lab.md`, 2.2), shown spread out:
   signatures stay as they are. The questions and the notes go to the
   user in one batch at the end of the judging. `python3 -I lab/look_bar.py batch` prints the three
   lists from the files, each with its scene, width, signatures, the
-  pair's paths and its citation.
+  pair's paths (the page's own pictures for a scene without a mockup)
+  and its citation.
 
 A `mockup` or `silent` difference may also list the `departures` and
 `expectations` written for the part of its line judged the page's way:
 the line keeps failing by its other part, and is judged by its finding
 or question.
+
+A `mockup` difference may list no signature: a finding no look line signs,
+seen in the pictures or the page's tree (words the look doesn't compare,
+or a role or name a scene's finder holds), whose test belongs to the
+page's own tiers (qa-web.md, 9). It judges no line.
 
 ### The bar
 

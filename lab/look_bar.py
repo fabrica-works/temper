@@ -121,7 +121,8 @@ def load_judgements(data):
         width = d.get('width')
         if type(width) is not str or width not in widths:
             error(path + '.width', 'not among widths')
-        for j, signature in enumerate(items(d.get('signatures'), path + '.signatures', 1)):
+        for j, signature in enumerate(items(d.get('signatures'), path + '.signatures',
+                                            0 if place == 'mockup' else 1)):
             p = f'{path}.signatures.{j}'
             text(signature, p)
             if type(signature) is str:
@@ -270,23 +271,26 @@ def bar(lab, experiment_dir, key, judgements_dir, healthy_key=None):
     return '\n'.join(lines) + '\n', holds
 
 
-def _pair_paths(run, scene, difference):
+def _picture_paths(run, scene, difference):
     width = next((w for s in run['capture']['scenes'] if s['name'] == scene
                   for w in s['widths'] if w['name'] == difference['width']), None)
     if width is None:
         raise ValueError(f"{scene}/{difference['width']}: absent from first judged run")
     regions = {parts[1] for signature in difference['signatures']
                if len(parts := signature.split('/')) >= 2 and parts[0] in ('style', 'order')}
-    files = [width['pair']] + [r['pair'] for r in width['regions'] if r['name'] in regions]
+    records = [width] + [r for r in width['regions'] if r['name'] in regions]
+    page_only = width.get('mockup') is None
+    label = 'Page' if page_only else 'Pair'
+    files = [(r.get('page') or {}).get('shot') if page_only else r['pair'] for r in records]
     paths = []
     for file in files:
         if file is None:
             continue
         path = (run['directory'] / file['path']).resolve()
         if not path.is_relative_to(run['directory'].resolve()) or not path.is_file():
-            raise ValueError(f'pair path missing or outside capture: {path}')
+            raise ValueError(f'{label.lower()} path missing or outside capture: {path}')
         paths.append(str(path))
-    return paths
+    return label, paths
 
 
 def batch(judgements_dir, lab, name, key):
@@ -301,8 +305,9 @@ def batch(judgements_dir, lab, name, key):
             title = finding['title'] if finding else d['seen']
             item = [f"- {scene}/{d['id']} — {d['width']}; {d['tag']}" +
                     (f"; {finding['class']}" if finding else '') + ': ' + title,
-                    '  Signatures: ' + ', '.join(d['signatures']), '  Cites: ' + d['cites']]
-            item.extend('  Pair: ' + p for p in _pair_paths(runs[0], scene, d))
+                    '  Signatures: ' + (', '.join(d['signatures']) or 'none'), '  Cites: ' + d['cites']]
+            label, paths = _picture_paths(runs[0], scene, d)
+            item.extend(f'  {label}: ' + p for p in paths)
             entries = d.get('departures', []) + d.get('expectations', [])
             if d['place'] in ('mockup', 'silent') and entries:
                 item.append('  entries: ' + ', '.join(entries))
