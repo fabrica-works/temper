@@ -580,7 +580,7 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 
 /* Existing unavailable guidance uses the Accounts card and reading column. */
 .temper-main:has(> .temper-unavailable) { width: 100%; padding-top: 164px; }
-.temper-unavailable, body > noscript, #app:not(:empty):not(:has(*)) { width: min(760px, calc(100% - 48px)); margin: 0 auto; border: 1px solid #dbd4ca; border-radius: 9px; background: #fffefd; padding: 20px; color: var(--temper-ink); font: 12px/1.58 var(--temper-mono); overflow-wrap: anywhere; }
+.temper-unavailable, body > noscript, #app:not(:empty):not(:has(*)) { width: min(760px, calc(100% - 48px)); margin: 0 auto; border: 1px solid #dbd4ca; border-radius: 9px; background: var(--temper-paper); padding: 20px; color: var(--temper-ink); font: 12px/1.58 var(--temper-mono); overflow-wrap: anywhere; }
 /* The shell has no banner: align its existing messages with the status card. */
 body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
 #app:not(:empty):not(:has(*)) { color: var(--temper-red); }
