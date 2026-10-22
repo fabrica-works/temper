@@ -176,8 +176,9 @@ mod memory_literal;
 // A goal's result, contract and budget card add 392,869,712 B: 123,706,718,172 B.
 // Plan rows add 32 x 574,364 B, phrases 2,368 B and a tool name 256 B,
 // less 8 B of root stack: +18,382,264 B, giving 123,725,100,436 B.
+// Lower-case phase words add 16 phrases' room, 2,368 B: 123,725,102,804 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 123725100436;
+const WEB_BYTES: u64 = 123725102804;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

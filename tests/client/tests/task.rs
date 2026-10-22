@@ -149,7 +149,7 @@ fn a_goals_page_shows_its_plan_with_the_held_task_marked() {
         person,
         vec![
             Step::See { find: Find::named(Role::Heading { level: 2 }, b"Plan"), within: fixtures::WITHIN },
-            Step::See { find: fixtures::plan_item(held, b"Held"), within: fixtures::WITHIN },
+            Step::See { find: fixtures::plan_item(held, b"held"), within: fixtures::WITHIN },
         ],
     );
     let outcome = world.run(Until::Done);

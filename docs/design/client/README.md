@@ -1146,7 +1146,9 @@ or difference of their amounts (jig's `client/domain/contract.md`,
     observation is supplied, which jig allows, or for any other work;
   - ended, with its owner's ending: "Completed", "Failed" or
     "Cancelled", as 5.7 words them;
-  - otherwise, jig's word for its phase.
+  - otherwise, jig's word for its phase in lower case: "held",
+    "retrying", "waiting for news". A held task's card and a
+    delegation's card keep theirs (3.6, 5.7).
 
   Each carries its phase's status token: a waiting state and a
   cancelled one are quiet, a running one active, a completed one done,

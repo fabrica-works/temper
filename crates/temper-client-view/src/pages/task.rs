@@ -4,6 +4,7 @@ use crate::{
     look,
     words::{Word, Words},
 };
+use alloc::boxed::Box;
 use jig_client::{Latest, contract as c};
 use skein_lib::{List, bytes::copy_of};
 use skein_ui::{Builder, Role, Run, phrases::Hole};
@@ -126,7 +127,7 @@ fn requester(b: &mut Builder, by: c::OwnerRequester, me: Option<&c::Me>, words: 
 }
 fn state(b: &mut Builder, state: State, words: &Words) {
     let (name, token) = match state {
-        State::Phase(phase) => (words.say_word(jig_client::words::Word::Phase(phase), &[]), phase_token(phase)),
+        State::Phase(phase) => (phase_word(phase, words), phase_token(phase)),
         State::WaitingFor(number) => (words.say(Word::WaitingForTask, &[Hole::Number(number)]), look::STATUS_QUIET),
         State::WaitingForTasks { count, more } => (
             words.say(
@@ -165,6 +166,25 @@ fn state(b: &mut Builder, state: State, words: &Words) {
     b.name(&name);
     b.text(Run::Plain, &name);
     b.close();
+}
+// jig's word for a live phase in lower case (5.8); an ended one keeps 5.7's.
+fn phase_word(phase: c::Phase, words: &Words) -> Box<[u8]> {
+    let word = match phase {
+        c::Phase::Waiting => Word::PhaseWaiting,
+        c::Phase::Idle => Word::PhaseIdle,
+        c::Phase::Due => Word::PhaseDue,
+        c::Phase::Preparing => Word::PhasePreparing,
+        c::Phase::Claimed => Word::PhaseClaimed,
+        c::Phase::Running => Word::Running,
+        c::Phase::Active => Word::PhaseActive,
+        c::Phase::BackingOff => Word::PhaseRetrying,
+        c::Phase::Closing => Word::PhaseClosing,
+        c::Phase::Held => Word::PhaseHeld,
+        c::Phase::Ended | c::Phase::Done | c::Phase::Failed | c::Phase::Cancelled => {
+            return words.say_word(jig_client::words::Word::Phase(phase), &[]);
+        }
+    };
+    words.say(word, &[])
 }
 fn phase_token(phase: c::Phase) -> skein_ui::Style {
     match phase {

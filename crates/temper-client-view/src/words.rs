@@ -208,10 +208,19 @@ pub enum Word {
     Writing,
     RunningTool,
     GoalPriority,
+    PhaseWaiting,
+    PhaseIdle,
+    PhaseDue,
+    PhasePreparing,
+    PhaseClaimed,
+    PhaseActive,
+    PhaseRetrying,
+    PhaseClosing,
+    PhaseHeld,
 }
 // Room for temper, jig, account, card and forge phrases.
-const PHRASES: u32 = 560;
-const ALL: [Word; 193] = [
+const PHRASES: u32 = 576;
+const ALL: [Word; 202] = [
     Word::WaitRefused,
     Word::DependencyParked,
     Word::WaitInvalid,
@@ -405,6 +414,15 @@ const ALL: [Word; 193] = [
     Word::Writing,
     Word::RunningTool,
     Word::GoalPriority,
+    Word::PhaseWaiting,
+    Word::PhaseIdle,
+    Word::PhaseDue,
+    Word::PhasePreparing,
+    Word::PhaseClaimed,
+    Word::PhaseActive,
+    Word::PhaseRetrying,
+    Word::PhaseClosing,
+    Word::PhaseHeld,
 ];
 impl Word {
     #[expect(clippy::too_many_lines, reason = "one exhaustive table keeps the frame phrase IDs stable")]
@@ -608,6 +626,15 @@ impl Word {
             Self::Writing => 331,
             Self::RunningTool => 332,
             Self::GoalPriority => 334,
+            Self::PhaseWaiting => 335,
+            Self::PhaseIdle => 336,
+            Self::PhaseDue => 337,
+            Self::PhasePreparing => 338,
+            Self::PhaseClaimed => 339,
+            Self::PhaseActive => 340,
+            Self::PhaseRetrying => 341,
+            Self::PhaseClosing => 342,
+            Self::PhaseHeld => 343,
         };
         let owner =
             if number >= 100 { crate::frame::owner() } else { temper_client_domain::forge::words::owner(connector) };
@@ -964,6 +991,15 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::Writing => (&[b"running \xc2\xb7 writing"], &[]),
         Word::RunningTool => (&[b"running \xc2\xb7 a tool \xc2\xb7 ", b""], &[Name]),
         Word::GoalPriority => (&[b"Goal \xc2\xb7 priority ", b""], &[Number]),
+        Word::PhaseWaiting => (&[b"waiting"], &[]),
+        Word::PhaseIdle => (&[b"waiting for news"], &[]),
+        Word::PhaseDue => (&[b"due to run"], &[]),
+        Word::PhasePreparing => (&[b"preparing a host"], &[]),
+        Word::PhaseClaimed => (&[b"claimed by a host"], &[]),
+        Word::PhaseActive => (&[b"executor active"], &[]),
+        Word::PhaseRetrying => (&[b"retrying"], &[]),
+        Word::PhaseClosing => (&[b"closing"], &[]),
+        Word::PhaseHeld => (&[b"held"], &[]),
     }
 }
 

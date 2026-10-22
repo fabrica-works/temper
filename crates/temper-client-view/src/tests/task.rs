@@ -929,7 +929,7 @@ fn a_plan_row_says_what_its_task_waits_for() {
         (&[DEPENDENCY], true, true, b"waiting on more than 1 tasks"),
         (&[], true, true, b"waiting on more than 0 tasks"),
         (&[], false, true, b"waiting on its resources"),
-        (&[], false, false, b"Waiting"),
+        (&[], false, false, b"waiting"),
     ];
     for (numbers, more, holds, expected) in cases {
         let mut row = row();
