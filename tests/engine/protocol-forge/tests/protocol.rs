@@ -473,6 +473,57 @@ fn held_branch(world: &mut Protocol) -> (top::Name, skein_forge::api::Commit) {
 }
 
 #[test]
+fn github_git_tokens_of_every_accepted_installation_come_before_connected() {
+    use skein_forge_connection::{Event, Request};
+    use skein_forge_machine_world::joint::{self, Joint};
+    use skein_lib::Duration;
+
+    let mut world = Joint::github(
+        11,
+        0,
+        fixtures::limits(),
+        fixtures::github_settings(),
+        fixtures::protocol_shared(),
+        joint::checks(1000),
+    );
+    world.action(Request::Installations { forge: fixtures::FORGE, accepted: Box::from([1, 2]) });
+    for _ in 0..10_000 {
+        world.tick();
+        if world.connected != 0 {
+            break;
+        }
+        world.time(world.now().saturating_add(Duration::from_nanos(100_000)));
+    }
+    assert_eq!(world.connected, 1);
+    assert!(world.stopped.is_empty());
+    let connected = world.events.iter().position(|event| event.starts_with("Connected {")).expect("Connected");
+    assert_eq!(world.events[..connected].iter().filter(|event| event.starts_with("GitToken {")).count(), 2);
+    assert_eq!(world.git_tokens.len(), 2);
+
+    // Provenance is asserted from events alone: the joint's fake service is private.
+    for (installation_id, account_id, login) in [(1, 22, b"acme".as_slice()), (2, 23, b"example".as_slice())] {
+        let mut matching = world
+            .git_tokens
+            .iter()
+            .filter(|event| matches!(event, Event::GitToken { installation, .. } if *installation == installation_id));
+        let Some(Event::GitToken { forge, account, token, expires, .. }) = matching.next() else {
+            panic!("accepted installation's git token");
+        };
+        assert!(matching.next().is_none());
+        assert_eq!(*forge, fixtures::FORGE);
+        assert_eq!(account.id, account_id);
+        assert_eq!(account.login.as_ref(), login);
+        assert!(!token.expose().is_empty());
+        assert!(*expires > world.env.wall);
+    }
+    let [Event::GitToken { token: first, .. }, Event::GitToken { token: second, .. }] = world.git_tokens.as_slice()
+    else {
+        panic!("exactly two git tokens");
+    };
+    assert!(first.expose() != second.expose());
+}
+
+#[test]
 fn github_reaches_ready_through_its_accepted_installations() {
     use skein_forge_machine_world::machine::{Answer, Machine};
     let mut world = Machine::github(
