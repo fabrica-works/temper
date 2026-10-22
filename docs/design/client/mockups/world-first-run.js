@@ -1,9 +1,9 @@
 // A third world: a person's first run, after `temper box` (setup.md, 8.2
 // to 8.4). The default document's deployment: one project, the chat and
 // coding charters, one worker in temper's process, three forges (the
-// demo's fake, GitHub, an owned Forgejo not set up), and the demo's model
-// as its one account. The demo model plays its scripts, so every word an
-// agent writes here is setup.md 8.4's. Times are minutes from Thursday
+// demo's fake, GitHub, an owned Forgejo not set up). The welcome offers
+// the demo or real setup; neither has started yet. The demo model plays
+// its scripts, so every word an agent writes here is setup.md 8.4's. Times are minutes from Thursday
 // 22 October, 21:00 UTC.
 (function () {
   const MOCKUPS = window.MOCKUPS = window.MOCKUPS || { worlds: {} };
@@ -26,6 +26,7 @@
         // The owned example's providers: OpenAI, with keys only (setup.md,
         // 8.1), and the demo's.
         ways: ['Use an API key'],
+        providers: ['OpenAI'],
         restart: 'temper box',
       },
 
@@ -33,25 +34,16 @@
       // its cues, copied in (setup.md, 8.4). Each cue the mockup plays is
       // drawn at a step.
       demo: {
-        provider: 'Demo', forge: 1, repo: 'widget',
+        state: 'not started', provider: 'Demo', forge: 1, repo: 'widget',
         cues: [CSV, DARK, 'Fix widget’s empty search state'],
         plays: { [CSV]: ['2', 'T1'], [DARK]: ['4', 'T4'] },
       },
 
-      repos: {
-        widget: {
-          name: 'demo/widget', forge: 1, branch: 'main',
-          tip: '9f2c0a7',
-          ci: { state: 'passing', at: 0 },
-          after: null,
-          queue: [],
-        },
-      },
+      repos: {},
 
       // The default document's forges, by number (setup.md, 8.3).
       forges: [
-        { n: 1, kind: 'Forgejo', name: 'Demo forge', web: 'http://127.0.0.1:8369', mode: 'fake', state: 'connected', login: 'temper', id: 2,
-          load: { used: 9, rate: 600, window: 'minute', reserve: 60, uses: [['fresh reads', 5], ['writes', 0], ['keeping up', 4], ['the slow pass', 0]], outbox: { waiting: 0, uncertain: 0 }, hooks: [['demo/widget', 0]] } },
+        { n: 1, kind: 'Forgejo', name: 'Demo forge', web: 'http://127.0.0.1:8369', mode: 'fake', state: 'not started' },
         { n: 2, kind: 'GitHub', web: 'https://github.com', mode: 'connected', state: 'not connected' },
         { n: 3, kind: 'Forgejo', web: 'http://127.0.0.1:8368', mode: 'owned', state: 'not set up', box: true, versions: { forgejo: '17.0.0', runner: '13.2.0' }, label: 'temper-host', person: 'sam', setup: { org: 'work', repo: 'hello', project: 'hello', newProject: true } },
       ],
@@ -63,12 +55,7 @@
         { name: 'worker', kind: 'workers', what: 'In temper’s process', slots: 2, logins: [] },
       ],
 
-      // The demo model's key, which the seed adds (setup.md, 8.4); the
-      // phrasebook names it Demo model (client README, 5.6).
-      accounts: [
-        { name: 'Demo', display: 'Demo model', provider: 'Demo', holder: 'Sam',
-          sources: [{ name: 'demo', kind: 'key', use: 'Idle', usage: null }] },
-      ],
+      accounts: [],
 
       tasks: {},
       children: {},
@@ -85,8 +72,17 @@
 
   const steps = [
     {
-      id: '1', label: '1', hour: 0, act: 1, title: 'The link opened',
-      summary: 'Sam opens the link temper box printed. The chats page is the demo’s start: its banner, the context line, three suggested requests. Nothing has run yet, so there is no task and no number.',
+      id: '0', label: '0', hour: 0, act: 1, title: 'The link opened',
+      summary: 'temper box started temper serve alone: the demo is configured but not started, and no forge or model is Sam’s. The link opens the welcome: try the demo, or set temper up.',
+      look: [
+        ['welcome.html', 'The welcome: the demo, or set up'],
+        ['chats.html', 'Chats behind it: the setup strip'],
+      ],
+      apply() {},
+    },
+    {
+      id: '1', label: '1', hour: 0, act: 1, title: 'The demo chosen',
+      summary: 'Sam chooses Try the demo. The engine asks temper box for the demo’s fakes, adds the demo model’s account and adopts demo/widget into Default itself, and the link’s page is the demo’s start.',
       look: [
         ['chats.html', 'Chats: the demo’s start'],
         ['accounts.html', 'Accounts: the demo model’s key, the one account'],
@@ -94,7 +90,17 @@
         ['workers.html', 'Workers: one, in temper’s process'],
         ['changes.html', 'Changes: demo/widget on Demo forge, nothing in flight'],
       ],
-      apply() {},
+      apply(w) {
+        w.demo.state = 'running';
+        w.accounts.push({ name: 'Demo', display: 'Demo model', provider: 'Demo', holder: 'Sam',
+          sources: [{ name: 'demo', kind: 'key', use: 'Idle', usage: null }] });
+        Object.assign(w.forges[0], { n: 1, kind: 'Forgejo', name: 'Demo forge', web: 'http://127.0.0.1:8369', mode: 'fake', state: 'connected', login: 'temper', id: 2,
+          load: { used: 9, rate: 600, window: 'minute', reserve: 60, uses: [['fresh reads', 5], ['writes', 0], ['keeping up', 4], ['the slow pass', 0]], outbox: { waiting: 0, uncertain: 0 }, hooks: [['demo/widget', 0]] } });
+        w.repos.widget = {
+          name: 'demo/widget', forge: 1, branch: 'main', tip: '9f2c0a7',
+          ci: { state: 'passing', at: 0 }, after: null, queue: [],
+        };
+      },
     },
     {
       id: '2', label: '2', hour: 2 / 60, act: 1, title: 'A request sent',
@@ -193,9 +199,9 @@
     },
     {
       id: '5', label: '5', hour: 15 / 60, act: 2, title: 'A model connected',
-      summary: 'Sam follows “Connect a model” and adds an OpenAI API key. Another provider’s account is usable, so the model’s half of the demo ends: the banner says a demo forge alone, the chats page is a chats page, and T1’s next run takes the first of its charter’s models with an account, gpt-6-luna (setup.md, 8.3).',
+      summary: 'Sam follows “Connect a model” and adds an OpenAI API key. Another provider’s account is usable, so the model’s half of the demo ends: the banner says a demo forge alone, the chats page is a chats page, and T1’s next run takes the first of its charter’s models with an account, gpt-6-luna (setup.md, 8.3). The demo model steps aside: its account is gone from Accounts.',
       look: [
-        ['accounts.html', 'Accounts: the new key, and the demo model’s'],
+        ['accounts.html', 'Accounts: the new key; the demo model gone'],
         ['chats.html', 'Chats: no demo’s start; the banner, a demo forge alone'],
         ['chat.html?task=T1', 'T1: its composer’s line names the new key'],
         ['connect-forge.html', 'Connect a forge: GitHub, Forgejo on this machine, a Forgejo elsewhere'],
@@ -203,6 +209,7 @@
         ['forges.html', 'Forges: still no forge of yours'],
       ],
       apply(w, id) {
+        w.accounts = w.accounts.filter(a => a.provider !== w.demo.provider);
         w.accounts.unshift({ name: 'OpenAI', provider: 'OpenAI', holder: 'Sam', at: id,
           sources: [{ name: 'sam-key', kind: 'key', use: 'Idle', usage: null }] });
         Object.assign(w.tasks.T1, { model: 'gpt-6-luna', account: 'OpenAI' });
@@ -225,11 +232,14 @@
     },
     {
       id: '7', label: '7', hour: 19 / 60, act: 2, title: 'A Forgejo connected',
-      summary: 'Forgejo and its runner started. temper connected as its bot, made work/hello with a README and a CI workflow, and adopted it into the new project hello; the workflow’s first run passed. The flow ends on the work: Sam opens hello, a project with no chat yet. A real model and a real forge are connected, so the demo’s banner is gone.',
+      summary: 'Forgejo and its runner started. temper connected as its bot, made work/hello with a README and a CI workflow, and adopted it into the new project hello; the workflow’s first run passed. The flow ends on the work: Sam opens hello, a project with no chat yet. A real model and a real forge are connected, so the demo’s banner is gone. Sam’s first forge is connected, so the demo ends: its forge stops and leaves the Forges page, its open chat ends, and demo/widget leaves Default; what the demo did stays readable.',
       look: [
         ['connect-forge.html?forge=3', 'Connect a forge: ready, and Open hello'],
         ['chats.html?project=hello', 'Chats in hello: no chat yet, no banner'],
-        ['forges.html', 'Forges: forge 3, and the demo’s line'],
+        ['forges.html', 'Forges: forge 3 alone'],
+        ['chats.html', 'Chats in Default: the demo’s chats, ended'],
+        ['chat.html?task=T1', 'T1: ended with the demo'],
+        ['changes.html', 'Changes in Default: the demo’s landing kept'],
         ['changes.html?project=hello', 'Changes in hello: work/hello, CI passing'],
         ['connect-forge.html', 'Connect a forge: GitHub and a Forgejo elsewhere left'],
         ['connect-forge.html#other-states', 'Connect a forge, below: its other paths'],
@@ -241,13 +251,18 @@
           load: { used: 14, rate: 600, window: 'minute', reserve: 60, uses: [['fresh reads', 8], ['writes', 3], ['keeping up', 3], ['the slow pass', 0]], outbox: { waiting: 0, uncertain: 0 }, hooks: [['work/hello', 18]] } });
         delete f.setup.step;
         w.repos.hello = { name: 'work/hello', forge: 3, branch: 'main', tip: 'a41c9e2', ci: { state: 'passing', at: 18 }, after: null, queue: [], project: 'hello' };
+        w.demo.state = 'retired';
+        w.forges[0].state = 'retired';
+        w.repos.widget.retired = true;
+        Object.assign(w.tasks.T1, { phase: 'done', ended: 19,
+          endedWhy: 'the demo ended when Forgejo on this machine connected' });
       },
     },
   ];
 
   MOCKUPS.worlds['first-run'] = {
     name: 'First run',
-    about: 'the owner’s first run after temper box: the demo’s start, a suggested request landed on the demo forge by the demo model’s script, a text-only one, then a real model connected, and a Forgejo set up here',
+    about: 'the owner’s first run after temper box: the welcome, the demo chosen and its end once a forge connects, a suggested request landed on the demo forge by the demo model’s script, a text-only one, then a real model connected, and a Forgejo set up here',
     HOUR0: Date.UTC(2026, 9, 22, 21, 0),
     initial, steps, upcoming: [], acts: { 1: 'The demo', 2: 'Going real' },
   };

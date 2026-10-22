@@ -27,15 +27,16 @@ Each file also opens directly in a browser, with no build step; serving it keeps
 | Connecting a forge: choose, the details, setting up, ready (?forge=N) | `connect-forge.html` | none: drawn ahead (below) |
 | The workers, their slots and health | `workers.html` | none: jig's `client/domain/pages.md`, 7 |
 | The LLM accounts, their sources and plans' windows | `accounts.html` | `Accounts` |
-| The first run, at its first step: the link `temper box` prints | `first-run.html` | opens `chats.html` in the first run |
+| The welcome: try the demo, or set up temper | `welcome.html` | drawn ahead (below) |
+| The first run, at its first step: the link `temper box` prints | `first-run.html` | opens `welcome.html` at step 0 in the first run |
 
 "Adopt a repository" is in the navigation, in the order of the client README's 5.3, but has no mockup (4.4).
 
 ## A world, at a step
 
-- **The worlds.** `world-reference.js` holds the reference case (`../../draft/reference-case.md`): a director, owners on two machines, pools, findings, an ops application, at hour 0, with the steps that move it on. `world-solo.js` holds a workflow unlike it: one developer, one repository, one laptop, chats and a goal set by hand, no coordinator, timers, pools or ops application. `world-first-run.js` holds a person's first run after `temper box`, on the demo's model and forge (below). A page that reads wrong in one world assumed another's workflow.
+- **The worlds.** `world-reference.js` holds the reference case (`../../draft/reference-case.md`): a director, owners on two machines, pools, findings, an ops application, at hour 0, with the steps that move it on. `world-solo.js` holds a workflow unlike it: one developer, one repository, one laptop, chats and a goal set by hand, no coordinator, timers, pools or ops application. `world-first-run.js` holds a person's first run after `temper box`, from the welcome through the demo and its end (below). `world-first-run-real.js` follows the welcome’s real setup, without starting the demo. A page that reads wrong in one world assumed another's workflow.
 - **The step.** `pages.js` draws every page from the world at the step in the address (`?world=`, `?step=`), so the pages agree at each step. The dark bar above each page is the mockups' own: ‹ and › move the step, **Steps** lists the whole case, the step's title opens what it shows and where to look, and **View** switches the world and what is marked.
-- **What is drawn:** the reference case's hour 0, the solo world's one step, and the first run's seven. The case's later steps are listed, and are added one act at a time.
+- **What is drawn:** the reference case's hour 0, the solo world's one step, and the first run’s eight and real setup’s four. The case's later steps are listed, and are added one act at a time.
 - **Acts:** a button or link for an act shows a note instead of acting, unless a later step draws what it does: then it leads to that step (the first run's suggested requests). Nothing is sent anywhere.
 - **For a capture:** `?bare` draws the page alone, without the bar and the marks, and every link keeps it (`chat.html?world=solo&task=T10&bare`). A page's state is its address: the world, the step and the task. `?project=` shows another project; the chats, tasks, board and changes pages follow it.
 
@@ -65,7 +66,7 @@ What temper does not have yet, drawn as temper-on-temper.md's section 6 wants it
 - **6.5, open findings:** a finding on a goal's page, the board and the changes page, where a failure that matches an open finding attaches to it and leaves the queue running.
 - **6.7, fleet occupancy:** a worker's free slots, and the director's read of them.
 
-Marked "ahead" (slate, with the annotations): what the owned Forgejo’s rows draw before temper designs it. **client:** the flow as a page of its own. **B4 M4:** the set-up’s first repository, and "New repository", made by temper with the admin’s token once temper-15 moves that token into the engine. **jig:** a project made after the first start; jig makes projects only at a deployment’s first start. **sign-in:** "Open Forgejo" signing the person in through temper, as Forgejo’s OpenID provider; until then, the person signs in with the password the preparation wrote.
+Marked "ahead" (slate, with the annotations): what the owned Forgejo’s rows draw before temper designs it. **client:** the flow as a page of its own. **B4 M4:** the set-up’s first repository, and "New repository", made by temper with the admin’s token once temper-15 moves that token into the engine. **jig:** a project made after the first start; jig makes projects only at a deployment’s first start. **welcome:** the first run’s welcome and an explicitly chosen demo, with no mission yet. **demo’s end:** retirement after the first personal forge connects, with no mission yet. **sign-in:** "Open Forgejo" signing the person in through temper, as Forgejo’s OpenID provider; until then, the person signs in with the password the preparation wrote.
 
 Two pages follow jig's pages, which temper's client leaves out (the client README, 5.3 and 11): **Tasks**, every task of the project as one tree (jig's `client/domain/pages.md`, 6.3), and **Workers**, the deployment's hosts (7).
 
@@ -73,15 +74,31 @@ Not drawn: two ideas that would change temper's engine, not only its pages. A ch
 
 ## The first run
 
-`world-first-run.js` is the deployment `temper init` writes (`../../protocol/setup.md`, 8.2 and 8.3): the project Default, the charters `chat` and `coding`, one worker in temper's process, three forges (the demo's fake, GitHub not connected, a Forgejo here not set up), and the demo model's key as the one account. Every word an agent says is the demo's script (8.4). [first-run.html](first-run.html), the address the documents cite, opens it at its first step. Its steps:
+`world-first-run.js` is the deployment `temper init` writes (`../../protocol/setup.md`, 8.2 and 8.3): the project Default, the charters `chat` and `coding`, one worker in temper's process, three forges (the demo's fake, GitHub not connected, a Forgejo here not set up), and no account, repository or forge started yet. Every word an agent says is the demo's script (8.4). [first-run.html](first-run.html), the address the documents cite, opens it at its first step. Its steps:
 
-1. **The link opened:** the chats page is the demo's start (client README, 5.6): the banner under the navigation, as on every page; a chatbar with no task and no number; the context line; the three suggested requests.
+0. **The link opened:** the welcome offers Try the demo or Set up temper. Chats behind it has the setup strip, no model and a disabled send button.
+1. **The demo chosen:** the engine asks temper box for the demo’s fakes, adds the Demo model’s account and adopts demo/widget into Default. The chats page is the demo's start (client README, 5.6): the banner under the navigation, as on every page; a chatbar with no task and no number; the context line; the three suggested requests.
 2. **A request sent:** "Add CSV export to widget" starts the chat T1; its agent delegates the change T2, whose agent T3 edits `src/main.rs`. T2's card says Running with no step ticked (5.7).
 3. **The change landed:** T2's card says Landed, every step ticked, "CI passed. Landed · merge commit e3b8d41"; T1 says so in its script's third turn.
 4. **A text-only request:** "Add a dark theme to widget", the chat T4, answered in words; then its script's `finish` ends it, so its page has no composer.
-5. **A model connected:** an OpenAI API key added. The model's half of the demo ends (4.8): the banner says a demo forge alone, the chats page has no demo's start, and the composers' line names the new key.
+5. **A model connected:** an OpenAI API key added, and the Demo model’s account removed from Accounts. The model's half of the demo ends (4.8): the banner says a demo forge alone, the chats page has no demo's start, and the composers' line names the new key.
 6. **Setting up a Forgejo:** chosen in the flow, its defaults kept (work/hello, a new project hello); the box has fetched and is preparing. The flow shows each step, and the banner says where it is.
-7. **A Forgejo connected:** temper connected as its bot, made work/hello and adopted it into the new project hello; its first CI run passed. The flow ends on the new project, opened with no chat yet. The banner is gone.
+7. **A Forgejo connected:** temper connected as its bot, made work/hello and adopted it into the new project hello; its first CI run passed. The flow ends on the new project, opened with no chat yet. The demo is retired: forge 1 stops and disappears, T1 ends at 21:19 with the reason, and demo/widget leaves Default’s repository lists. Its landing and transcripts stay readable; Recent landings names it “demo/widget · the demo’s, ended”. The banner is gone.
+
+## The first run, set up
+
+`welcome.html` has a bare topbar (temper, Sam, Sign out), and Welcome → Forge → Model → Ready. Its default view follows the deployment: the welcome before any forge is acted on, Model while a forge sets up without a model, then Ready. Once the demo runs it shows a mock-note linking to Chats. `?at=welcome|forge|model|ready` selects a view; `?forge=2|3|elsewhere` keeps the forge’s details inside the wizard. The forge cards and setup pieces are shared with `connect-forge.html`. Later opens Chats; trying the demo explicitly switches to first-run step 1.
+
+`world-first-run-real.js` reuses the first-run world’s fresh `initial`:
+
+1. **The link opened:** Sam chooses Set up temper, then Forgejo on this machine, with its defaults.
+2. **Setting up a Forgejo:** the box fetches Forgejo and its runner; Model opens while that proceeds, with an Each step disclosure. The mock gallery shows sign-in ways only where a configuration would offer them.
+3. **A model connected:** the OpenAI API key is the only account, and Ready waits while the forge starts. Open hello is disabled.
+4. **Ready:** the forge is connected as temper; work/hello is adopted into hello with its first CI passed. Open hello opens that project with no chat yet. The demo, never started, is retired and nothing of it shows.
+
+The demo’s explicit states are `not started`, `running`, and `retired`; an absent state retains the older worlds’ running behavior. Its model and forge halves and context draw only while running. The first usable account from another provider ends the model half and removes the Demo account; the first connected forge of the person’s retires the demo’s forge and repository and ends its open chats, keeping history.
+
+While the demo is not started and a forge or model is missing, the setup strip takes the demo strip’s place. It states what is missing, shows any forge setup status with View, and links to Continue setting up and (until a personal forge connects) Try the demo. Welcome, Accounts, Forges and Connect a forge omit it. With no account, a composer says “No model yet · Connect a model” and cannot send.
 
 Where the documents disagree, or leave a word open, the mockup takes one side and says so here:
 
@@ -98,4 +115,4 @@ The earlier first-run mockup, a story of its own, also drew "Reset demo", a turn
 
 - `style.css`, `terminal-chat.css` and `terminal-pages.css`: the product's look, from which `temper.css` takes its rules (`../browser.md`, 2.5).
 - `mockup.css`: the mockups' own marks and bar, never the product.
-- `pages.js`, `world-reference.js`, `world-solo.js` and `world-first-run.js`: every page and its worlds; each HTML file is a shell that loads them, and `first-run.html` opens the first run.
+- `pages.js`, `world-reference.js`, `world-solo.js`, `world-first-run.js` and `world-first-run-real.js`: every page and its worlds; each HTML file is a shell that loads them, and `first-run.html` opens the first run.

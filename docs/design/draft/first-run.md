@@ -9,7 +9,8 @@ first run stands once the accounts and GitHub work land
 directories, `temper init`, the box, the client) on purpose; an owner
 splits it. It builds on `draft/github.md` as it lands: forges connected
 from the client, credentials taken at runtime and the forges' records
-in jig's secrets' store.
+in jig's secrets' store. Amended with the user on 2026-10-23: the
+welcome, and the demo's end (2.3).
 
 The first run is sugar. Every piece below has a place of its own in the
 layering and is useful without the first run; the first run only
@@ -20,12 +21,15 @@ arranges them. Nothing here shapes a piece for the first run's sake.
 - **One command, no argument:** `temper box`. With an empty
   configuration directory it writes a default document there, starts
   what that document names, and prints one link (section 2).
-- **The link signs the person in** and opens the default project's
-  chat, on a demo repository, with a demo model and a demo forge:
-  temper's fakes, which run as the box's steps (sections 3.5, 3.6).
-- **Real backends are added, never swapped in.** Codex or Claude is an
-  LLM account beside the demo model; GitHub or a Forgejo is a forge
-  beside the demo forge. The demo project stays on its fakes (2.2).
+- **The link signs the person in** and opens a welcome: try the demo,
+  or set temper up (2.3). The demo is the default project's chat, on a
+  demo repository, with a demo model and a demo forge: temper's fakes,
+  which start only when the person chooses the demo (sections 3.5,
+  3.6, 2.3).
+- **Real backends replace the demo** (2.3, amending 2.2): the person's
+  first usable model ends the demo model, and their first connected
+  forge ends the demo forge, its open chats and its repository's place
+  in the project. What the demo did stays readable.
 - **Three directories,** XDG's: configuration, data and cache, each a
   flag, an environment variable and a default, in that order of
   precedence (3.1, 3.2).
@@ -69,6 +73,9 @@ The mockup of what the person sees is `../client/mockups/first-run.html`.
 
 ### 2.2 Going real
 
+*Amended by 2.3: the demo ends as real backends arrive; the bullets
+below that keep it are superseded.*
+
 - **A model.** The accounts page, as the accounts work leaves it:
   Continue with ChatGPT, use a Claude subscription, or an API key. The
   new account becomes the deployment's default; the demo model stays an
@@ -85,6 +92,43 @@ The mockup of what the person sees is `../client/mockups/first-run.html`.
   yet.
 - **The demo** can be hidden; its forge and model stay in the document,
   so a demo is always there to show someone.
+
+### 2.3 The welcome, and the demo's end
+
+With the user, 2026-10-23. Mockups: `../client/mockups/welcome.html`,
+in the first-run world (its step 0, the demo chosen at step 1, its end
+at step 7) and the first-run-real world (the wizard to a connected
+Forgejo and model).
+
+- **The link opens a welcome,** in the browser: "Try the demo" or "Set
+  up temper". The terminal asks nothing, since the box also runs
+  unattended and going real needs the browser. A document whose
+  `application.demo` is null has no demo, and its welcome no demo card.
+- **Set up temper is a wizard:** Welcome, Forge, Model, Ready. Forge is
+  the client's "Connect a forge" flow; Model is the accounts' ways the
+  document offers; the forge comes first, so an owned forge's set-up
+  runs while the person adds a model. Ready ends on the new project.
+  Each step offers Later, and "Try the demo" stays offered until a
+  forge of the person's connects.
+- **The demo starts only when chosen.** Its state is the engine's: not
+  started, running, ended. The fakes become asked groups of the box,
+  started on the engine's ask; the engine sets the demo up itself, the
+  demo model's account and `demo/widget` adopted into the project, as
+  forgejo-setup's M4 makes and adopts an owned forge's first
+  repository. The seed (3.6) and its link step go: serve's first link
+  is the person's.
+- **The demo ends for good.** The person's first usable model ends the
+  demo model's account. Their first connected forge, other than the
+  demo's (`application.demo.forge`, never every fake), ends the demo:
+  the engine records it, asks the box to stop the fake forge (a pipe
+  line, `stop FORGE`), and leaves the forge in its domain as ended, so
+  that nothing that lists forges shows it. The demo's open chats end;
+  `demo/widget` leaves the project's repositories; its tasks, chats and
+  landings stay readable. A start reads the same record, so a restart
+  and the moment of the end look alike. A demo never started is ended
+  the same way, and never starts.
+- **Without the box** there is no pipe: the engine ends the demo and
+  ignores the fake; stopping it is the service manager's.
 
 ## 3. The pieces
 
@@ -263,6 +307,9 @@ experience; good defaults for a person's real work are open (section 8).
 4. **Going real from the client:** fetch, the dormant owned forge, the
    box's pipe, the handover at runtime, and the client's banner and
    wording.
+5. **The welcome and the demo's end** (2.3): the demo's state in the
+   engine, the fakes asked, the seed's acts in the engine, `stop` on
+   the pipe, the welcome and its wizard in the client.
 
 ## 6. Testing
 
