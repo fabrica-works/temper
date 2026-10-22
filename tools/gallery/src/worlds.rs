@@ -330,7 +330,15 @@ fn inbox_document(w: World) -> c::Inbox {
                 project: PROJECT,
                 group: *group,
                 position: 1,
-                at: Wall::EPOCH,
+                at: match object {
+                    c::ObjectKey::Proposal(_) => offset(w, -12),
+                    c::ObjectKey::Question { .. } => offset(w, -18),
+                    c::ObjectKey::Task(task) => document(w, *task).last_activity,
+                    c::ObjectKey::Escalation(_)
+                    | c::ObjectKey::PersonTask(_)
+                    | c::ObjectKey::Result(_)
+                    | c::ObjectKey::Note { .. } => unreachable!("world inbox has proposals, questions and replies"),
+                },
             })
             .expect("entry");
     }
@@ -399,7 +407,7 @@ fn proposal() -> c::ReadValue {
         funding: c::Budget { total: 50, own: 10, ended: 0, reserved: 0, left: 40, funder: c::Actor::Party(73) },
         waiting: c::Recipient::Party(73),
         trail: List::with_capacity(0),
-        since: Wall::EPOCH,
+        since: offset(Solo, -12),
         acts: offers(&[c::ActKind::Accept, c::ActKind::Reject]),
         ending: None,
     }))
@@ -421,7 +429,7 @@ fn read_value(w: World, what: &c::Read, then: Then) -> Option<c::ReadValue> {
             from: Some(c::OwnerRequester::Task(3)),
             message: 1,
             words: text(QUESTION),
-            since: Wall::EPOCH,
+            since: offset(Solo, -18),
             acts: offers(&[c::ActKind::Answer]),
             ending: None,
         }))),
@@ -1387,11 +1395,20 @@ fn activity(w: World, task: u64) -> c::ActivityPage {
         }
         _ => {}
     }
+    let minutes: &[i64] = match (w, task) {
+        (Reference, 1) => &[-64, -50, -50],
+        (Solo, 6) => &[-118, -117, -88],
+        (Solo, 10) => &[-12, -12],
+        (FirstRun { step: 2 }, 1) => &[1, 1, 1],
+        (FirstRun { step: 3 | 4 }, 1) => &[1, 1, 1, 4, 4],
+        (FirstRun { step: 4 }, 4) => &[5, 5],
+        _ => &[],
+    };
     let mut rows = List::with_capacity(events.len());
     for i in (0..events.len()).rev() {
         rows.push(c::ActivityLine {
             position: u64::from(i).checked_add(1).expect("position"),
-            at: Wall::EPOCH,
+            at: offset(w, *minutes.get(usize::try_from(i).expect("event index")).expect("transcript time")),
             event: events.get(i).expect("event").clone(),
         })
         .expect("activity row");
@@ -2015,4 +2032,33 @@ fn deployment(w: World) -> c::OwnerDeployment {
         readiness: List::with_capacity(0),
         readiness_cut: false,
     }
+}
+
+/// Mockup world clocks, without reading the host's clock (client/browser.md, 7.2).
+pub(super) fn now(w: World) -> Wall {
+    let minutes = match w {
+        FirstRun { step } => match step {
+            1 => 0,
+            2 => 2,
+            3 => 4,
+            4 => 6,
+            5 => 15,
+            _ => unreachable!("mockup first-run step"),
+        },
+        Reference | Solo | World::Bare => 0,
+    };
+    offset(w, minutes)
+}
+
+fn offset(w: World, minutes: i64) -> Wall {
+    let hour0 = match w {
+        Reference => 1_792_656_000_000_000_000_u64,
+        Solo => 1_793_093_400_000_000_000,
+        FirstRun { .. } => 1_792_702_800_000_000_000,
+        World::Bare => 0,
+    };
+    let delta = minutes.unsigned_abs().checked_mul(60_000_000_000).expect("mockup offset fits");
+    Wall::from_nanos(
+        if minutes < 0 { hour0.checked_sub(delta) } else { hour0.checked_add(delta) }.expect("mockup time fits"),
+    )
 }

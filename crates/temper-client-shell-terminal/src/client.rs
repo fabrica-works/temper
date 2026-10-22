@@ -353,6 +353,12 @@ impl NativeClient {
         }
     }
 }
+fn deadline(policy: Option<Time>, next: Option<Wall>, now: Time, wall: Wall) -> Option<Time> {
+    let view = next.map(|next| {
+        now.saturating_add(skein_lib::Duration::from_nanos(next.as_nanos().saturating_sub(wall.as_nanos())))
+    });
+    [policy, view].into_iter().flatten().min()
+}
 impl Host for NativeClient {
     fn iterate(&mut self, now: Time, wall: Wall) {
         self.env.now = now;
@@ -396,7 +402,7 @@ impl Host for NativeClient {
             self.outputs();
             domain::take(&mut self.root, &self.env, &mut self.out);
             self.outputs();
-            view::build(&mut self.view, &self.root, &mut self.patches);
+            view::build(&mut self.view, &self.root, wall, &mut self.patches);
             if !self.patches.is_empty() {
                 self.seen.builds = self.seen.builds.saturating_add(1);
             }
@@ -427,7 +433,9 @@ impl Host for NativeClient {
             || (!matches!(self.phase, Phase::Closing { .. }) && self.started() && self.dirty)
     }
     fn next_deadline(&self) -> Option<Time> {
-        [self.shell.next_deadline(), self.next_policy_deadline()].into_iter().flatten().min()
+        let policy = [self.shell.next_deadline(), self.next_policy_deadline()].into_iter().flatten().min();
+        let next = if matches!(self.phase, Phase::Closing { .. }) { None } else { self.view.next_change() };
+        deadline(policy, next, self.env.now, self.env.wall)
     }
     fn next_policy_deadline(&self) -> Option<Time> {
         if matches!(self.phase, Phase::Closing { .. }) { None } else { domain::next_deadline(&self.root) }

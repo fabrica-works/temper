@@ -94,7 +94,7 @@ fn built(sample: &Sample) -> (temper_client_view::View, temper_client_view::Limi
     let bounds = temper_client_view::Limits::of(&limits, &words).expect("shipped view bounds");
     let mut view = temper_client_view::View::new(&bounds, &limits, words, temper_client_protocol_wire::FORGE);
     let mut patches = Queue::with_capacity(bounds.tree.patches);
-    temper_client_view::build(&mut view, &root, &mut patches);
+    temper_client_view::build(&mut view, &root, worlds::now(sample.world), &mut patches);
     let mut collected = Vec::new();
     for _ in 0..patches.len() {
         collected.push(patches.pop().expect("queued patch"));

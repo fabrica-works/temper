@@ -193,8 +193,9 @@ mod memory_literal;
 // The forge side's kept change panel (client/README.md 4.6): its handle, its box
 // and the panel's bounded heap add 4,976 B.
 // A task's name over its words in a chat adds one phrase (148 B).
+// The four time forms add 47 phrases x 148 B = 6,956 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 262198989273;
+const WEB_BYTES: u64 = 262198996229;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {
@@ -321,4 +322,23 @@ fn the_first_task_activity_answer_survives_transport_sign_in() {
     build(&mut host);
     let shown = host.view.tree().nodes().iter().filter(|node| node.name.as_deref() == Some(b"Run 44 began")).count();
     assert_eq!(shown, usize::try_from(ONE_LINE).expect("one line fits"), "first activity answer must reach the page");
+}
+
+#[test]
+fn the_deadline_takes_the_earlier_domain_or_view_time_from_the_same_clocks() {
+    let now = Time::from_nanos(100);
+    let wall = Wall::from_nanos(1000);
+    for (domain, next, expected) in [
+        (Some(105), Some(1020), Some(105)),
+        (Some(130), Some(1020), Some(120)),
+        (None, Some(1020), Some(120)),
+        (Some(130), None, Some(130)),
+        (None, None, None),
+        (None, Some(990), Some(100)),
+    ] {
+        assert_eq!(
+            deadline(domain.map(Time::from_nanos), next.map(Wall::from_nanos), now, wall),
+            expected.map(Time::from_nanos)
+        );
+    }
 }

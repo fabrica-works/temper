@@ -203,14 +203,21 @@ impl Host {
         }
     }
     pub fn build(&mut self, patches: &mut Queue<Patch>) {
-        view::build(&mut self.view, &self.root, patches);
+        view::build(&mut self.view, &self.root, self.env.wall, patches);
     }
     #[must_use]
     pub fn deadline(&self) -> Option<Time> {
-        root::next_deadline(&self.root)
+        deadline(root::next_deadline(&self.root), self.view.next_change(), self.env.now, self.env.wall)
     }
 }
 
 #[cfg(test)]
 #[path = "host_tests.rs"]
 mod tests;
+
+fn deadline(domain: Option<Time>, next: Option<Wall>, now: Time, wall: Wall) -> Option<Time> {
+    let view = next.map(|next| {
+        now.saturating_add(skein_lib::Duration::from_nanos(next.as_nanos().saturating_sub(wall.as_nanos())))
+    });
+    [domain, view].into_iter().flatten().min()
+}

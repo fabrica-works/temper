@@ -136,7 +136,7 @@ fn first_run_page(address: client::Address, landed: bool) -> skein_ui::Tree {
     assert!(out.is_empty(), "first run fixture settles");
     let mut view =
         temper_client_view::View::new(&temper_client_view::Limits { tree: tree_limits() }, &limits, page_words(), 1);
-    temper_client_view::build(&mut view, &root, &mut Queue::with_capacity(tree_limits().patches));
+    temper_client_view::build(&mut view, &root, super::NOW, &mut Queue::with_capacity(tree_limits().patches));
     copy_tree(view.tree())
 }
 fn demo_me() -> contract::Me {

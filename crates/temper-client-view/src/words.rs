@@ -10,6 +10,54 @@ use skein_ui::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
+    TimeYesterdayWord,
+    TimeJustNow,
+    TimeUnderMinute,
+    TimeMinutes,
+    TimeHours,
+    TimeHoursMinutes,
+    TimeDays,
+    TimeAgo,
+    TimeAt,
+    TimeClock,
+    TimePair,
+    TimeDate,
+    TimeDateYear,
+    TimeToday,
+    TimeYesterday,
+    TimeWaiting,
+    TimeWaitingChat,
+    TimeEnded,
+    TimeEndedReport,
+    TimeFailed,
+    TimeCancelled,
+    TimeSundayShort,
+    TimeMondayShort,
+    TimeTuesdayShort,
+    TimeWednesdayShort,
+    TimeThursdayShort,
+    TimeFridayShort,
+    TimeSaturdayShort,
+    TimeSunday,
+    TimeMonday,
+    TimeTuesday,
+    TimeWednesday,
+    TimeThursday,
+    TimeFriday,
+    TimeSaturday,
+    TimeJanuary,
+    TimeFebruary,
+    TimeMarch,
+    TimeApril,
+    TimeMay,
+    TimeJune,
+    TimeJuly,
+    TimeAugust,
+    TimeSeptember,
+    TimeOctober,
+    TimeNovember,
+    TimeDecember,
+
     ChangeModel,
     UsingModel,
     UsingDefault,
@@ -275,8 +323,56 @@ pub enum Word {
 // An empty plan's line (5.8) and a waiting agent's Message note (5.11).
 // The composer's line and its chooser replace seven choice phrases (5.5).
 // A task's name over its words in a chat (client/README.md, 3.5).
-const PHRASES: u32 = 610;
-const ALL: [Word; 248] = [
+// Forty-seven time form, calendar and placement phrases (5.12).
+const PHRASES: u32 = 657;
+const ALL: [Word; 295] = [
+    Word::TimeYesterdayWord,
+    Word::TimeJustNow,
+    Word::TimeUnderMinute,
+    Word::TimeMinutes,
+    Word::TimeHours,
+    Word::TimeHoursMinutes,
+    Word::TimeDays,
+    Word::TimeAgo,
+    Word::TimeAt,
+    Word::TimeClock,
+    Word::TimePair,
+    Word::TimeDate,
+    Word::TimeDateYear,
+    Word::TimeToday,
+    Word::TimeYesterday,
+    Word::TimeWaiting,
+    Word::TimeWaitingChat,
+    Word::TimeEnded,
+    Word::TimeEndedReport,
+    Word::TimeFailed,
+    Word::TimeCancelled,
+    Word::TimeSundayShort,
+    Word::TimeMondayShort,
+    Word::TimeTuesdayShort,
+    Word::TimeWednesdayShort,
+    Word::TimeThursdayShort,
+    Word::TimeFridayShort,
+    Word::TimeSaturdayShort,
+    Word::TimeSunday,
+    Word::TimeMonday,
+    Word::TimeTuesday,
+    Word::TimeWednesday,
+    Word::TimeThursday,
+    Word::TimeFriday,
+    Word::TimeSaturday,
+    Word::TimeJanuary,
+    Word::TimeFebruary,
+    Word::TimeMarch,
+    Word::TimeApril,
+    Word::TimeMay,
+    Word::TimeJune,
+    Word::TimeJuly,
+    Word::TimeAugust,
+    Word::TimeSeptember,
+    Word::TimeOctober,
+    Word::TimeNovember,
+    Word::TimeDecember,
     Word::ChangeModel,
     Word::UsingModel,
     Word::UsingDefault,
@@ -530,6 +626,54 @@ impl Word {
     #[expect(clippy::too_many_lines, reason = "one exhaustive table keeps the frame phrase IDs stable")]
     fn id(self, connector: u16) -> PhraseId {
         let number = match self {
+            Self::TimeYesterdayWord => 1250,
+            Self::TimeJustNow => 1200,
+            Self::TimeUnderMinute => 1201,
+            Self::TimeMinutes => 1202,
+            Self::TimeHours => 1203,
+            Self::TimeHoursMinutes => 1204,
+            Self::TimeDays => 1205,
+            Self::TimeAgo => 1206,
+            Self::TimeAt => 1207,
+            Self::TimeClock => 1208,
+            Self::TimePair => 1209,
+            Self::TimeDate => 1210,
+            Self::TimeDateYear => 1211,
+            Self::TimeToday => 1212,
+            Self::TimeYesterday => 1213,
+            Self::TimeWaiting => 1214,
+            Self::TimeWaitingChat => 1215,
+            Self::TimeEnded => 1216,
+            Self::TimeEndedReport => 1217,
+            Self::TimeFailed => 1218,
+            Self::TimeCancelled => 1219,
+            Self::TimeSundayShort => 1220,
+            Self::TimeMondayShort => 1221,
+            Self::TimeTuesdayShort => 1222,
+            Self::TimeWednesdayShort => 1223,
+            Self::TimeThursdayShort => 1224,
+            Self::TimeFridayShort => 1225,
+            Self::TimeSaturdayShort => 1226,
+            Self::TimeSunday => 1227,
+            Self::TimeMonday => 1228,
+            Self::TimeTuesday => 1229,
+            Self::TimeWednesday => 1230,
+            Self::TimeThursday => 1231,
+            Self::TimeFriday => 1232,
+            Self::TimeSaturday => 1233,
+            Self::TimeJanuary => 1234,
+            Self::TimeFebruary => 1235,
+            Self::TimeMarch => 1236,
+            Self::TimeApril => 1237,
+            Self::TimeMay => 1238,
+            Self::TimeJune => 1239,
+            Self::TimeJuly => 1240,
+            Self::TimeAugust => 1241,
+            Self::TimeSeptember => 1242,
+            Self::TimeOctober => 1243,
+            Self::TimeNovember => 1244,
+            Self::TimeDecember => 1245,
+
             Self::SignedOut => 180,
             Self::OutOfDate => 181,
             Self::SignedOutMain => 182,
@@ -926,11 +1070,6 @@ impl Words {
     pub fn say_word(&self, word: jig_client::words::Word, holes: &[Hole]) -> Box<[u8]> {
         self.book.say(self.language, word.id(), holes).expect("checked jig word").text
     }
-    /// Absolute UTC time: the view has delivered instants, but no current clock.
-    pub(crate) fn chat_time(&self, at: skein_lib::Wall) -> Box<[u8]> {
-        self.say(Word::ChatTime, &[Hole::Name(copy_of(&chat_clock(at)))])
-    }
-
     /// A run's supplied placement time in absolute UTC.
     pub(crate) fn run_started(&self, at: skein_lib::Wall) -> Box<[u8]> {
         self.say(Word::RunStarted, &[Hole::Name(copy_of(&chat_clock(at)))])
@@ -1061,6 +1200,53 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::ToolCalls => (&[b"", b" tool calls"], &[Number]),
         Word::ToolSeparator => (&[b" \xc2\xb7 "], &[]),
         Word::ToolRepeated => (&[b"", b" \xc3\x97", b""], &[Name, Number]),
+        Word::TimeYesterdayWord => (&[b"yesterday"], &[]),
+        Word::TimeJustNow => (&[b"just now"], &[]),
+        Word::TimeUnderMinute => (&[b"under 1 min"], &[]),
+        Word::TimeMinutes => (&[b"", b" min"], &[Number]),
+        Word::TimeHours => (&[b"", b" h"], &[Number]),
+        Word::TimeHoursMinutes => (&[b"", b" h ", b" min"], &[Number, Number]),
+        Word::TimeDays => (&[b"", b" d"], &[Number]),
+        Word::TimeAgo => (&[b"", b" ago"], &[Name]),
+        Word::TimeAt => (&[b"at ", b""], &[Name]),
+        Word::TimeClock => (&[b"", b":", b""], &[Name, Name]),
+        Word::TimePair => (&[b"", b" ", b""], &[Name, Name]),
+        Word::TimeDate => (&[b"", b" ", b""], &[Number, Name]),
+        Word::TimeDateYear => (&[b"", b" ", b""], &[Name, Number]),
+        Word::TimeToday => (&[b"Today \xc2\xb7 ", b""], &[Name]),
+        Word::TimeYesterday => (&[b"Yesterday \xc2\xb7 ", b""], &[Name]),
+        Word::TimeWaiting => (&[b"Waiting ", b""], &[Name]),
+        Word::TimeWaitingChat => (&[b"waiting ", b""], &[Name]),
+        Word::TimeEnded => (&[b"Ended ", b""], &[Name]),
+        Word::TimeEndedReport => (&[b"Ended ", b" \xc2\xb7 its report, \xe2\x80\x9c", b"\xe2\x80\x9d"], &[Name, Name]),
+        Word::TimeFailed => (&[b"Failed ", b" \xc2\xb7 ", b""], &[Name, Name]),
+        Word::TimeCancelled => (&[b"Cancelled ", b" \xc2\xb7 ", b""], &[Name, Name]),
+        Word::TimeSundayShort => (&[b"Sun"], &[]),
+        Word::TimeMondayShort => (&[b"Mon"], &[]),
+        Word::TimeTuesdayShort => (&[b"Tue"], &[]),
+        Word::TimeWednesdayShort => (&[b"Wed"], &[]),
+        Word::TimeThursdayShort => (&[b"Thu"], &[]),
+        Word::TimeFridayShort => (&[b"Fri"], &[]),
+        Word::TimeSaturdayShort => (&[b"Sat"], &[]),
+        Word::TimeSunday => (&[b"Sunday"], &[]),
+        Word::TimeMonday => (&[b"Monday"], &[]),
+        Word::TimeTuesday => (&[b"Tuesday"], &[]),
+        Word::TimeWednesday => (&[b"Wednesday"], &[]),
+        Word::TimeThursday => (&[b"Thursday"], &[]),
+        Word::TimeFriday => (&[b"Friday"], &[]),
+        Word::TimeSaturday => (&[b"Saturday"], &[]),
+        Word::TimeJanuary => (&[b"January"], &[]),
+        Word::TimeFebruary => (&[b"February"], &[]),
+        Word::TimeMarch => (&[b"March"], &[]),
+        Word::TimeApril => (&[b"April"], &[]),
+        Word::TimeMay => (&[b"May"], &[]),
+        Word::TimeJune => (&[b"June"], &[]),
+        Word::TimeJuly => (&[b"July"], &[]),
+        Word::TimeAugust => (&[b"August"], &[]),
+        Word::TimeSeptember => (&[b"September"], &[]),
+        Word::TimeOctober => (&[b"October"], &[]),
+        Word::TimeNovember => (&[b"November"], &[]),
+        Word::TimeDecember => (&[b"December"], &[]),
         Word::ChatEnded => (&[b"Ended"], &[]),
         Word::ChatEndedReport => (&[b"Ended \xc2\xb7 its report, \xe2\x80\x9c", b"\xe2\x80\x9d"], &[Name]),
         Word::ChatFailed => (&[b"Failed \xc2\xb7 ", b""], &[Name]),
@@ -1325,4 +1511,185 @@ mod clock_tests {
             assert_eq!(&super::chat_clock(skein_lib::Wall::from_nanos(seconds * 1_000_000_000)), expected);
         }
     }
+}
+
+/// The four forms of client/README.md, 5.12, against the shell's wall clock.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TimeForm {
+    Ago,
+    Span,
+    Clock,
+    Day,
+}
+const MINUTE: u64 = 60_000_000_000;
+const DAY: u64 = 86_400_000_000_000;
+
+/// A build accumulates only the times it actually draws.
+#[derive(Debug)]
+pub(crate) struct Times {
+    pub(crate) now: skein_lib::Wall,
+    pub(crate) next: Option<skein_lib::Wall>,
+}
+impl Times {
+    pub(crate) fn new(now: skein_lib::Wall) -> Self {
+        Self { now, next: None }
+    }
+    pub(crate) fn say(&mut self, words: &Words, form: TimeForm, at: skein_lib::Wall) -> Box<[u8]> {
+        let (text, next) = words.time(form, at, self.now);
+        self.next = [self.next, next].into_iter().flatten().min();
+        text
+    }
+}
+impl Words {
+    /// Words and the instant at which to reconsider them. No clock is read here.
+    #[must_use]
+    pub fn time(
+        &self,
+        form: TimeForm,
+        at: skein_lib::Wall,
+        now: skein_lib::Wall,
+    ) -> (Box<[u8]>, Option<skein_lib::Wall>) {
+        let elapsed = now.as_nanos().saturating_sub(at.as_nanos());
+        let minutes = elapsed / MINUTE;
+        let unit = match form {
+            TimeForm::Ago if minutes < 720 => Some(MINUTE),
+            TimeForm::Span if elapsed < DAY => Some(MINUTE),
+            TimeForm::Span => Some(DAY),
+            TimeForm::Ago | TimeForm::Clock | TimeForm::Day => None,
+        };
+        let next = next_tick(at, now, elapsed, unit);
+        let said = match form {
+            TimeForm::Span => self.time_span(minutes),
+            TimeForm::Ago if minutes == 0 => self.say(Word::TimeJustNow, &[]),
+            TimeForm::Ago if minutes < 720 => self.say(Word::TimeAgo, &[Hole::Name(self.time_span(minutes))]),
+            TimeForm::Ago | TimeForm::Clock | TimeForm::Day => self.calendar_time(form, at, now),
+        };
+        (said, next)
+    }
+    fn time_span(&self, minutes: u64) -> Box<[u8]> {
+        match minutes {
+            0 => self.say(Word::TimeUnderMinute, &[]),
+            1..60 => self.say(Word::TimeMinutes, &[Hole::Number(minutes)]),
+            60..1440 if minutes.is_multiple_of(60) => self.say(Word::TimeHours, &[Hole::Number(minutes / 60)]),
+            60..1440 => self.say(Word::TimeHoursMinutes, &[Hole::Number(minutes / 60), Hole::Number(minutes % 60)]),
+            _ => self.say(Word::TimeDays, &[Hole::Number(minutes / 1440)]),
+        }
+    }
+    fn calendar_time(&self, form: TimeForm, at: skein_lib::Wall, now: skein_lib::Wall) -> Box<[u8]> {
+        let day = at.as_nanos() / DAY;
+        let today = now.as_nanos() / DAY;
+        let days = today.checked_sub(day);
+        let clock = self.time_clock(at);
+        match form {
+            TimeForm::Ago if day == today => self.say(Word::TimeAt, &[Hole::Name(clock)]),
+            TimeForm::Ago if days == Some(1) => self.say(Word::TimeYesterdayWord, &[]),
+            TimeForm::Ago if days >= Some(2) && days <= Some(7) => self.time_weekday(day, false),
+            TimeForm::Ago => self.time_date(at, now),
+            TimeForm::Clock if day == today => clock,
+            TimeForm::Clock => {
+                let date = if days >= Some(1) && days <= Some(6) {
+                    self.time_weekday(day, false)
+                } else {
+                    self.time_date(at, now)
+                };
+                self.say(Word::TimePair, &[Hole::Name(date), Hole::Name(clock)])
+            }
+            TimeForm::Day => {
+                let date = self.say(
+                    Word::TimePair,
+                    &[Hole::Name(self.time_weekday(day, true)), Hole::Name(self.time_date(at, now))],
+                );
+                match days {
+                    Some(0) => self.say(Word::TimeToday, &[Hole::Name(date)]),
+                    Some(1) => self.say(Word::TimeYesterday, &[Hole::Name(date)]),
+                    _ => date,
+                }
+            }
+            TimeForm::Span => unreachable!("spans have no calendar words"),
+        }
+    }
+    fn time_clock(&self, at: skein_lib::Wall) -> Box<[u8]> {
+        let minute = at.as_nanos() / MINUTE;
+        self.say(
+            Word::TimeClock,
+            &[Hole::Name(copy_of(&two_digits((minute / 60) % 24))), Hole::Name(copy_of(&two_digits(minute % 60)))],
+        )
+    }
+    fn time_weekday(&self, day: u64, full: bool) -> Box<[u8]> {
+        let short = [
+            Word::TimeSundayShort,
+            Word::TimeMondayShort,
+            Word::TimeTuesdayShort,
+            Word::TimeWednesdayShort,
+            Word::TimeThursdayShort,
+            Word::TimeFridayShort,
+            Word::TimeSaturdayShort,
+        ];
+        let long = [
+            Word::TimeSunday,
+            Word::TimeMonday,
+            Word::TimeTuesday,
+            Word::TimeWednesday,
+            Word::TimeThursday,
+            Word::TimeFriday,
+            Word::TimeSaturday,
+        ];
+        let index = usize::try_from(day.checked_add(4).expect("epoch day fits") % 7).expect("weekday fits");
+        self.say(*if full { long.get(index) } else { short.get(index) }.expect("weekday in week"), &[])
+    }
+    fn time_date(&self, at: skein_lib::Wall, now: skein_lib::Wall) -> Box<[u8]> {
+        let (year, month, day) = civil_date(at);
+        let months = [
+            Word::TimeJanuary,
+            Word::TimeFebruary,
+            Word::TimeMarch,
+            Word::TimeApril,
+            Word::TimeMay,
+            Word::TimeJune,
+            Word::TimeJuly,
+            Word::TimeAugust,
+            Word::TimeSeptember,
+            Word::TimeOctober,
+            Word::TimeNovember,
+            Word::TimeDecember,
+        ];
+        let month = months
+            .get(usize::try_from(month.checked_sub(1).expect("months start at one")).expect("month fits"))
+            .expect("month in year");
+        let date = self.say(Word::TimeDate, &[Hole::Number(day), Hole::Name(self.say(*month, &[]))]);
+        if year == civil_date(now).0 {
+            date
+        } else {
+            self.say(Word::TimeDateYear, &[Hole::Name(date), Hole::Number(year)])
+        }
+    }
+}
+#[expect(clippy::arithmetic_side_effects, reason = "each input is below 100; each output is a decimal digit")]
+fn two_digits(value: u64) -> [u8; 2] {
+    let value = u8::try_from(value).expect("clock field fits");
+    [b'0' + value / 10, b'0' + value % 10]
+}
+// Gregorian civil date; u64 nanoseconds bound the year to 2554.
+#[expect(clippy::arithmetic_side_effects, reason = "epoch days and Gregorian era intermediates fit u64")]
+fn civil_date(at: skein_lib::Wall) -> (u64, u64, u64) {
+    let days = at.as_nanos() / DAY + 719_468;
+    let era = days / 146_097;
+    let doe = days % 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    (era * 400 + yoe + u64::from(month <= 2), month, day)
+}
+
+fn next_tick(at: skein_lib::Wall, now: skein_lib::Wall, elapsed: u64, unit: Option<u64>) -> Option<skein_lib::Wall> {
+    let nanos = match unit {
+        Some(unit) => {
+            let delta = elapsed.checked_div(unit)?.checked_add(1)?.checked_mul(unit)?;
+            at.as_nanos().checked_add(delta)?
+        }
+        None => (now.as_nanos() / DAY).checked_add(1)?.checked_mul(DAY)?,
+    };
+    Some(skein_lib::Wall::from_nanos(nanos))
 }

@@ -2,6 +2,7 @@ use jig_client::contract;
 use jig_client_protocol_link as link;
 use skein_lib::{RequestRecord, Token};
 use temper_client_domain as client;
+pub const NOW: skein_lib::Wall = skein_lib::Wall::EPOCH;
 pub const ATTEMPT: Token = Token::new(101);
 pub const READ: Token = Token::new(102);
 pub const SERVICE: u64 = 7;
@@ -188,7 +189,7 @@ pub fn copy_tree(source: &skein_ui::Tree) -> skein_ui::Tree {
     visible(builder.finish())
 }
 pub fn page(address: &temper_client_domain::Address, signed_out: bool) -> skein_ui::Tree {
-    use skein_lib::{Env, Queue, Wall};
+    use skein_lib::{Env, Queue};
     use temper_client_domain::Event;
     let mut limits = crate::limits::native().client;
     limits.client.domain.text = 32;
@@ -196,7 +197,7 @@ pub fn page(address: &temper_client_domain::Address, signed_out: bool) -> skein_
     limits.client.domain.rows = 8;
     limits.client.domain.document_bytes = 16_384;
     limits.client.domain.requests.bytes = 4096;
-    let env = Env { now: skein_lib::Time::ZERO, wall: Wall::EPOCH, limits };
+    let env = Env { now: skein_lib::Time::ZERO, wall: NOW, limits };
     let forge = page_words();
     let mut view =
         temper_client_view::View::new(&temper_client_view::Limits { tree: tree_limits() }, &limits, forge, 1);
@@ -230,7 +231,7 @@ pub fn page(address: &temper_client_domain::Address, signed_out: bool) -> skein_
     }
     let settled = Env { now: env.now.saturating_add(skein_lib::Duration::ZERO), ..env };
     client::fire(&mut root, &settled, &mut out);
-    temper_client_view::build(&mut view, &root, &mut Queue::with_capacity(tree_limits().patches));
+    temper_client_view::build(&mut view, &root, NOW, &mut Queue::with_capacity(tree_limits().patches));
     copy_tree(view.tree())
 }
 fn populate_page(
@@ -411,6 +412,24 @@ pub fn inbox_page() -> skein_ui::Tree {
             builder.open(Role::Link);
             builder.name(b"Task 9");
             builder.link(binding());
+            builder.close();
+            // These synthetic records all carry the fixture's epoch time.
+            let (time, _) = page_words().time(
+                if heading == b"Needs you" {
+                    temper_client_view::words::TimeForm::Span
+                } else {
+                    temper_client_view::words::TimeForm::Ago
+                },
+                NOW,
+                NOW,
+            );
+            let time = if heading == b"Needs you" {
+                page_words().say(temper_client_view::words::Word::TimeWaiting, &[skein_ui::phrases::Hole::Name(time)])
+            } else {
+                time
+            };
+            builder.open(Role::Paragraph);
+            builder.text(Run::Plain, &time);
             builder.close();
             builder.open(Role::Paragraph);
             builder.text(Run::Plain, body);
@@ -794,6 +813,9 @@ pub fn chats_page() -> skein_ui::Tree {
             b.text(Run::Plain, delegates);
             b.close();
         }
+        b.open(Role::Paragraph);
+        b.text(Run::Plain, &page_words().time(temper_client_view::words::TimeForm::Ago, NOW, NOW).0);
+        b.close();
         b.close();
     }
     b.close();

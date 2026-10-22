@@ -461,8 +461,9 @@ mod memory_literal;
 // Naming navigation and cards adds two phrases (296 B).
 // A committed turn's own text budget prices both conversation drawings.
 // A task's name over its words in a chat adds one phrase (148 B).
+// The four time forms add 47 phrases x 148 B = 6,956 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 6995924867;
+const ACCOUNT_BYTES: u64 = 6995931823;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

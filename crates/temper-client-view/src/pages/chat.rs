@@ -2,7 +2,7 @@
 use crate::{cards::P, look};
 use crate::{
     frame::Bindings,
-    words::{Word, Words},
+    words::{TimeForm, Times, Word, Words},
 };
 use alloc::boxed::Box;
 use jig_client::{
@@ -27,7 +27,15 @@ fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], ac
     b.bind(bindings.insert(act));
     b.close();
 }
-pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32, text_limit: u32) {
+pub(crate) fn main(
+    b: &mut Builder,
+    root: &Domain,
+    words: &Words,
+    bindings: &mut Bindings,
+    rows: u32,
+    text_limit: u32,
+    times: &mut Times,
+) {
     b.open(Role::Main);
     b.style(look::MAIN);
     b.style(look::CHAT);
@@ -98,6 +106,12 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             b.name(&super::inbox::card_name(root, card.object, Word::Proposal, words));
             b.style(look::CARD);
             b.key(super::inbox::card_key(card.object));
+            if let Some(page) = &card.page
+                && let Some(since) = super::inbox::waiting_since(page)
+            {
+                let span = times.say(words, TimeForm::Span, since);
+                text(b, Role::Paragraph, &words.say(Word::TimeWaitingChat, &[Hole::Name(span)]));
+            }
             crate::confirm::card(b, root, card, words, bindings, rows);
             b.close();
         }
@@ -112,7 +126,8 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             b.close();
         }
         if let Some(result) = &task.result {
-            result_text(b, result, words);
+            let clock = end_clock(task, result, words, times);
+            result_text(b, result, words, clock.as_deref());
         }
         act_status(b, root, chat, words);
         b.close();
@@ -212,45 +227,93 @@ pub(crate) fn context(b: &mut Builder, root: &Domain, project: u32, words: &Word
     b.close();
 }
 
+#[expect(clippy::manual_map, reason = "step code spells out the supplied end clock")]
+fn end_clock(task: &c::Task, result: &c::TaskResult, words: &Words, times: &mut Times) -> Option<Box<[u8]>> {
+    let at = match task.chip.details.as_ref() {
+        c::ChipPhase::Owner { details, .. } => details.ended_at,
+        c::ChipPhase::Active(_)
+        | c::ChipPhase::Waiting { .. }
+        | c::ChipPhase::Idle { .. }
+        | c::ChipPhase::Starting
+        | c::ChipPhase::Running { .. }
+        | c::ChipPhase::WaitingForWords { .. }
+        | c::ChipPhase::BackingOff { .. }
+        | c::ChipPhase::Procedure { .. }
+        | c::ChipPhase::Person { .. }
+        | c::ChipPhase::Closing(_)
+        | c::ChipPhase::Held { .. }
+        | c::ChipPhase::Ended { .. } => match result {
+            c::TaskResult::Document(result) => result.at,
+            c::TaskResult::Ending(_) => None,
+        },
+    };
+    match at {
+        Some(at) => Some(times.say(words, TimeForm::Clock, at)),
+        None => None,
+    }
+}
+fn reason_bytes(reason: Option<&c::Text>) -> Option<&[u8]> {
+    match reason {
+        Some(reason) => Some(reason.bytes()),
+        None => None,
+    }
+}
 // A chat owns one end line; goal/result cards keep their independent drawing.
-fn result_text(b: &mut Builder, result: &c::TaskResult, words: &Words) {
+fn result_text(b: &mut Builder, result: &c::TaskResult, words: &Words, clock: Option<&[u8]>) {
     match result {
-        c::TaskResult::Ending(ending) => owner_end(b, ending, words),
+        c::TaskResult::Ending(ending) => owner_end(b, ending, words, clock),
         c::TaskResult::Document(result) => match &result.ending {
-            c::Ending::Task(ending) => owner_end(b, ending, words),
-            c::Ending::Failed { reason } => end_reason(b, Word::ChatFailed, reason.as_ref(), words),
-            c::Ending::Cancelled { reason, .. } => end_reason(b, Word::ChatCancelled, reason.as_ref(), words),
-            c::Ending::Withdrawn { reason } => end_reason(b, Word::ChatCancelled, Some(reason), words),
+            c::Ending::Task(ending) => owner_end(b, ending, words, clock),
+            c::Ending::Failed { reason } => {
+                end_reason(b, Word::ChatFailed, reason_bytes(reason.as_ref()), words, clock);
+            }
+            c::Ending::Cancelled { reason, .. } => {
+                end_reason(b, Word::ChatCancelled, reason_bytes(reason.as_ref()), words, clock);
+            }
+            c::Ending::Withdrawn { reason } => end_reason(b, Word::ChatCancelled, Some(reason.bytes()), words, clock),
             c::Ending::Done | c::Ending::Deleted | c::Ending::Decided { .. } => {
-                end_report(b, result.value.as_ref(), words);
+                end_report(b, result.value.as_ref(), words, clock);
             }
         },
     }
 }
-fn owner_end(b: &mut Builder, ending: &c::OwnerChipEnding, words: &Words) {
+fn owner_end(b: &mut Builder, ending: &c::OwnerChipEnding, words: &Words, clock: Option<&[u8]>) {
     match ending {
-        c::OwnerChipEnding::Done(value) => end_report(b, Some(value), words),
+        c::OwnerChipEnding::Done(value) => end_report(b, Some(value), words, clock),
         c::OwnerChipEnding::Failed(reason) => {
-            end_line(b, &words.say(Word::ChatFailed, &[crate::cards::name(reason.bytes())]));
+            end_reason(b, Word::ChatFailed, Some(reason.bytes()), words, clock);
         }
         c::OwnerChipEnding::Cancelled { reason, .. } => {
-            end_line(b, &words.say(Word::ChatCancelled, &[crate::cards::name(reason.bytes())]));
+            end_reason(b, Word::ChatCancelled, Some(reason.bytes()), words, clock);
         }
     }
 }
-fn end_reason(b: &mut Builder, word: Word, reason: Option<&c::Text>, words: &Words) {
+fn end_reason(b: &mut Builder, word: Word, reason: Option<&[u8]>, words: &Words, clock: Option<&[u8]>) {
     let reason = match reason {
-        Some(reason) => reason.bytes(),
+        Some(reason) => reason,
         None => b"",
     };
-    end_line(b, &words.say(word, &[crate::cards::name(reason)]));
+    let said = match clock {
+        Some(clock) => words.say(
+            if word == Word::ChatFailed { Word::TimeFailed } else { Word::TimeCancelled },
+            &[crate::cards::name(clock), crate::cards::name(reason)],
+        ),
+        None => words.say(word, &[crate::cards::name(reason)]),
+    };
+    end_line(b, &said);
 }
-fn end_report(b: &mut Builder, value: Option<&c::ResultValue>, words: &Words) {
+fn end_report(b: &mut Builder, value: Option<&c::ResultValue>, words: &Words, clock: Option<&[u8]>) {
     let said = match value {
-        Some(c::ResultValue::Report(report)) if !report.bytes().is_empty() => {
-            words.say(Word::ChatEndedReport, &[crate::cards::name(report.bytes())])
-        }
-        _ => words.say(Word::ChatEnded, &[]),
+        Some(c::ResultValue::Report(report)) if !report.bytes().is_empty() => match clock {
+            Some(clock) => {
+                words.say(Word::TimeEndedReport, &[crate::cards::name(clock), crate::cards::name(report.bytes())])
+            }
+            None => words.say(Word::ChatEndedReport, &[crate::cards::name(report.bytes())]),
+        },
+        _ => match clock {
+            Some(clock) => words.say(Word::TimeEnded, &[crate::cards::name(clock)]),
+            None => words.say(Word::ChatEnded, &[]),
+        },
     };
     end_line(b, &said);
 }
@@ -331,6 +394,7 @@ pub(crate) fn conversation(
     drawn: Drawn<'_>,
     bindings: &mut Bindings,
 ) {
+    // client/README.md, 5.12: add turns’ clocks and day rules when thread lines carry their time.
     let (rows, text_limit) = limits;
     let (projected, request, delegations) = match drawn {
         Drawn::Chat { request, delegations } => (true, request, delegations),

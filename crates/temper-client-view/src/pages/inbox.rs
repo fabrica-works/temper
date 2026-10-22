@@ -2,7 +2,7 @@
 use crate::{
     frame::Bindings,
     look,
-    words::{Word, Words},
+    words::{TimeForm, Times, Word, Words},
 };
 use alloc::boxed::Box;
 use jig_client::contract::{InboxGroup, ObjectKey, OwnerHistoricalValue, Proposer, ReadValue, ResultValue};
@@ -30,7 +30,14 @@ fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], ac
     }
     b.close();
 }
-pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32) {
+pub(crate) fn main(
+    b: &mut Builder,
+    root: &Domain,
+    words: &Words,
+    bindings: &mut Bindings,
+    rows: u32,
+    times: &mut Times,
+) {
     b.open(Role::Main);
     b.style(look::MAIN);
     b.style(look::PAGE);
@@ -76,7 +83,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
                         }
                         opened = true;
                     }
-                    entry(b, root, card, words, bindings, rows);
+                    entry(b, root, card, words, bindings, rows, times);
                 }
             }
         }
@@ -164,7 +171,15 @@ fn filters(b: &mut Builder, root: &Domain, filter: Filter, words: &Words, bindin
     b.close();
     b.close();
 }
-fn entry(b: &mut Builder, root: &Domain, card: &Card, words: &Words, bindings: &mut Bindings, rows: u32) {
+fn entry(
+    b: &mut Builder,
+    root: &Domain,
+    card: &Card,
+    words: &Words,
+    bindings: &mut Bindings,
+    rows: u32,
+    times: &mut Times,
+) {
     b.open(Role::Item);
     b.key(card_key(card.object));
     b.style(look::CARD);
@@ -204,6 +219,7 @@ fn entry(b: &mut Builder, root: &Domain, card: &Card, words: &Words, bindings: &
             Act::Go { address: Address::Task { task } },
         );
     }
+    card_time(b, card, words, times);
     b.close();
     if let Some(page) = &card.page {
         body(b, page, words);
@@ -376,4 +392,115 @@ pub(crate) fn card_key(object: ObjectKey) -> skein_ui::Key {
         ObjectKey::Note { project, note } => (6, u64::from(project), note),
     };
     skein_ui::Key { owner: crate::frame::owner(), kind, a, b }
+}
+
+/// Only the inbox and chat call this; task-page decision facts carry no wait.
+pub(crate) fn waiting_since(page: &ReadValue) -> Option<skein_lib::Wall> {
+    match page {
+        ReadValue::OwnerProposal(proposal) => Some(proposal.waiting.since),
+        ReadValue::Proposal(proposal) => Some(proposal.since),
+        ReadValue::Question(question) => Some(question.since),
+        ReadValue::Escalation(held) => Some(held.hold.since),
+        ReadValue::OwnerEscalation(escalation) => match escalation.task.hold.as_ref() {
+            Some(jig_client::contract::TaskHold::Document(hold)) => Some(hold.since),
+            Some(jig_client::contract::TaskHold::Owner(hold)) => hold.hold_wait_since,
+            None => None,
+        },
+        ReadValue::PersonTask(task) => task.since,
+        ReadValue::OwnerPersonTask(task) => task.since,
+        ReadValue::Tasks(_)
+        | ReadValue::OwnerProject(_)
+        | ReadValue::Historical(_)
+        | ReadValue::Me(_)
+        | ReadValue::Turn(_)
+        | ReadValue::Task(_)
+        | ReadValue::Result(_)
+        | ReadValue::Ended(_)
+        | ReadValue::OwnerEnded(_)
+        | ReadValue::History(_)
+        | ReadValue::Activity(_)
+        | ReadValue::Inbox(_)
+        | ReadValue::OwnerInbox(_)
+        | ReadValue::Spend(_)
+        | ReadValue::OwnerSpend(_)
+        | ReadValue::Project(_)
+        | ReadValue::Notes(_)
+        | ReadValue::Deployment(_)
+        | ReadValue::OwnerDeployment(_) => None,
+    }
+}
+fn card_time(b: &mut Builder, card: &Card, words: &Words, times: &mut Times) {
+    let Some(page) = &card.page else { return };
+    let (at, wait) = match card.group {
+        InboxGroup::Proposals | InboxGroup::Questions | InboxGroup::Escalations | InboxGroup::PersonTasks => {
+            (waiting_since(page), true)
+        }
+        InboxGroup::Results | InboxGroup::Replies => (arrival(page, card.group == InboxGroup::Replies), false),
+    };
+    let Some(at) = at else { return };
+    let said = times.say(words, if wait { TimeForm::Span } else { TimeForm::Ago }, at);
+    let said = if wait { words.say(Word::TimeWaiting, &[Hole::Name(said)]) } else { said };
+    text(b, Role::Paragraph, &said);
+}
+
+fn arrival(page: &ReadValue, reply: bool) -> Option<skein_lib::Wall> {
+    match page {
+        ReadValue::Result(result) => {
+            if reply {
+                None
+            } else {
+                result.at
+            }
+        }
+        ReadValue::Task(task) => {
+            if reply {
+                Some(task.last_activity)
+            } else {
+                None
+            }
+        }
+        ReadValue::Historical(history) => match &history.value {
+            OwnerHistoricalValue::Task { document, result } => {
+                if reply {
+                    Some(document.last_activity)
+                } else {
+                    result.at
+                }
+            }
+            OwnerHistoricalValue::PersonTask { result, .. } => {
+                if reply {
+                    None
+                } else {
+                    result.at
+                }
+            }
+            OwnerHistoricalValue::Proposal(_)
+            | OwnerHistoricalValue::PersonProposal { .. }
+            | OwnerHistoricalValue::Escalation { .. }
+            | OwnerHistoricalValue::Question { .. } => None,
+        },
+        ReadValue::Tasks(_)
+        | ReadValue::OwnerProject(_)
+        | ReadValue::Me(_)
+        | ReadValue::Turn(_)
+        | ReadValue::Proposal(_)
+        | ReadValue::OwnerProposal(_)
+        | ReadValue::Escalation(_)
+        | ReadValue::OwnerEscalation(_)
+        | ReadValue::Question(_)
+        | ReadValue::PersonTask(_)
+        | ReadValue::OwnerPersonTask(_)
+        | ReadValue::Ended(_)
+        | ReadValue::OwnerEnded(_)
+        | ReadValue::History(_)
+        | ReadValue::Activity(_)
+        | ReadValue::Inbox(_)
+        | ReadValue::OwnerInbox(_)
+        | ReadValue::Spend(_)
+        | ReadValue::OwnerSpend(_)
+        | ReadValue::Project(_)
+        | ReadValue::Notes(_)
+        | ReadValue::Deployment(_)
+        | ReadValue::OwnerDeployment(_) => None,
+    }
 }

@@ -3,6 +3,7 @@ use crate::{Address, Event, Limits, Request, forge};
 use jig_client::contract::{self, Delivery, DocumentText, HeldRole, Me, MeParty, Needs, PartyKind, WatchEvent};
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Token, Wall};
 pub const FORGE_ASKER: jig_client::Asker = jig_client::Asker(1);
+pub const NOW: Wall = Wall::EPOCH;
 pub const FORGE: u16 = temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Forge);
 pub const PROJECT: u32 = 1;
 pub const SEED: u64 = 11;
@@ -55,7 +56,7 @@ pub fn limits() -> Limits {
     }
 }
 pub fn env(limits: &Limits) -> Env<Limits> {
-    Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits }
+    Env { now: Time::ZERO, wall: NOW, limits: *limits }
 }
 pub fn frame(party: u64) -> WatchEvent {
     WatchEvent::Delivered(Delivery::Me(Box::new(Me {

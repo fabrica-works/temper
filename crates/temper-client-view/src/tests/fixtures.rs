@@ -5,6 +5,7 @@ use jig_client::contract::{OwnerPart, OwnerPartKey, OwnerPartKind, Part};
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Token, Wall, Writer};
 use temper_client_domain::{Limits, forge};
 use temper_client_protocol_wire::{self as wire, v1 as w};
+pub const NOW: Wall = Wall::EPOCH;
 pub const FORGE: u16 = temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Forge);
 pub const PROJECT: u32 = 1;
 pub const SECOND_PROJECT: u32 = 2;
@@ -71,15 +72,16 @@ fn english(shell: crate::words::Shell) -> crate::words::Words {
 
 pub fn tree_limits() -> skein_ui::Limits {
     skein_ui::Limits {
-        nodes: 128,
+        // Two time nodes for each of the six inbox cards.
+        nodes: 140,
         depth: 32,
         text_per_node: 512,
-        text_bytes: 65536,
+        text_bytes: 71680,
         drawing_bytes: 0,
         scene_marks: 0,
         scene_bytes: 0,
         styles_per_node: 2,
-        patches: 640,
+        patches: 700,
         bindings: 128,
         slots: 32,
         markdown_depth: 3,
@@ -149,7 +151,7 @@ pub fn built() -> crate::View {
     assert!(envelope.tree.nodes >= 128);
     let limits = crate::Limits { tree: tree_limits() };
     let mut view = crate::View::new(&limits, &domain, forge, FORGE);
-    crate::build(&mut view, &root, &mut Queue::with_capacity(limits.tree.patches));
+    crate::build(&mut view, &root, NOW, &mut Queue::with_capacity(limits.tree.patches));
     view
 }
 pub fn view() -> crate::View {
@@ -161,7 +163,7 @@ pub fn view_of(words: crate::words::Words) -> crate::View {
     crate::View::new(&limits, &domain, words, FORGE)
 }
 pub fn build<'a>(view: &'a mut crate::View, root: &temper_client_domain::Domain) -> &'a skein_ui::Tree {
-    crate::build(view, root, &mut Queue::with_capacity(view.limits().tree.patches));
+    crate::build(view, root, NOW, &mut Queue::with_capacity(view.limits().tree.patches));
     view.tree()
 }
 pub fn find(tree: &skein_ui::Tree, role: skein_ui::Role, name: &[u8]) -> Option<skein_ui::NodeId> {
@@ -231,7 +233,7 @@ fn root_at_with_demo(
 ) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>) {
     use jig_client::contract::{Delivery, Subject, WatchEvent};
     use temper_client_domain::{Event, Request};
-    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
+    let env = Env { now: Time::ZERO, wall: NOW, limits: *limits };
     let mut root = temper_client_domain::unlinked(limits, SEED);
     let mut out = Queue::with_capacity(temper_client_domain::max_out(limits));
     temper_client_domain::step(
@@ -316,7 +318,7 @@ pub fn root_event(root: &mut temper_client_domain::Domain, event: temper_client_
     let limits = domain_limits();
     temper_client_domain::step(
         root,
-        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
+        &Env { now: Time::ZERO, wall: NOW, limits },
         event,
         &mut Queue::with_capacity(temper_client_domain::max_out(&limits)),
     );
@@ -385,7 +387,7 @@ fn inbox_with_proposer(
     // Six card reads beside the frame's own bounded reads.
     limits.client.domain.reads = 8;
     let (mut root, _, watch) = root_at(temper_client_domain::Address::Inbox { filter }, &limits);
-    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+    let env = Env { now: Time::ZERO, wall: NOW, limits };
     let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));
     let mut entries = List::with_capacity(6);
     for (object, group) in [
@@ -545,7 +547,15 @@ pub mod chat {
     pub fn chat_header() -> skein_ui::Tree {
         let mut b = Builder::new(&fixtures::tree_limits());
         let mut bindings = crate::frame::Bindings::new(fixtures::tree_limits().bindings);
-        crate::pages::chat::main(&mut b, &chat_root(), &fixtures::words(), &mut bindings, LINES, TEXT);
+        crate::pages::chat::main(
+            &mut b,
+            &chat_root(),
+            &fixtures::words(),
+            &mut bindings,
+            LINES,
+            TEXT,
+            &mut crate::words::Times::new(fixtures::NOW),
+        );
         b.finish()
     }
     pub fn provisional() -> Thread {
@@ -704,7 +714,7 @@ pub mod chat {
         let mut out = skein_lib::Queue::with_capacity(PROPOSAL_OUTPUTS);
         temper_client_domain::step(
             &mut root,
-            &skein_lib::Env { now: PROPOSAL_NOW, wall: Wall::EPOCH, limits },
+            &skein_lib::Env { now: PROPOSAL_NOW, wall: fixtures::NOW, limits },
             Event::Client {
                 event: jig_client::Event::Up {
                     up: jig_client::Up::Watched {

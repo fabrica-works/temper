@@ -1,7 +1,7 @@
 //! The person's chats: a composer and one filtered list of live and closed lines.
 use crate::{
     frame::Bindings,
-    words::{Word, Words},
+    words::{TimeForm, Times, Word, Words},
 };
 use alloc::boxed::Box;
 use jig_client::contract::{EndedGroup, TaskLine};
@@ -27,7 +27,14 @@ fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], ac
     }
     b.close();
 }
-pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, text_limit: u32) {
+pub(crate) fn main(
+    b: &mut Builder,
+    root: &Domain,
+    words: &Words,
+    bindings: &mut Bindings,
+    text_limit: u32,
+    times: &mut Times,
+) {
     b.open(Role::Main);
     b.style(crate::look::MAIN);
     let demo = demo_start(root);
@@ -76,11 +83,11 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             }
             b.close();
         }
-        list(b, root, words, bindings);
+        list(b, root, words, bindings, times);
     }
     b.close();
 }
-fn list(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings) {
+fn list(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, times: &mut Times) {
     let Some(chats) = root.pages().chats() else { return };
     text(b, Role::Heading { level: 2 }, &words.say(Word::YourChats, &[]));
     b.open(Role::Slot);
@@ -141,7 +148,7 @@ fn list(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings) 
                 }
             }
             let Some(chosen) = next else { break };
-            row(b, root, chosen, words, bindings);
+            row(b, root, chosen, words, bindings, times);
             previous = Some((chosen.ended_at.unwrap_or(chosen.last_activity), chosen.chip.task));
         }
         b.close();
@@ -184,7 +191,14 @@ fn start(
     suggestions(b, root, demo, words, bindings);
 }
 
-pub(crate) fn row(b: &mut Builder, root: &Domain, line: &TaskLine, words: &Words, bindings: &mut Bindings) {
+pub(crate) fn row(
+    b: &mut Builder,
+    root: &Domain,
+    line: &TaskLine,
+    words: &Words,
+    bindings: &mut Bindings,
+    times: &mut Times,
+) {
     b.open(Role::Item);
     b.style(crate::look::ROW);
     b.key(skein_ui::Key { owner: crate::frame::owner(), kind: 10, a: line.chip.task, b: 0 });
@@ -214,7 +228,7 @@ pub(crate) fn row(b: &mut Builder, root: &Domain, line: &TaskLine, words: &Words
     }
     b.open(Role::Paragraph);
     b.style(crate::look::TIME);
-    b.text(Run::Plain, &words.chat_time(line.ended_at.unwrap_or(line.last_activity)));
+    b.text(Run::Plain, &times.say(words, TimeForm::Ago, line.ended_at.unwrap_or(line.last_activity)));
     b.close();
     b.close();
 }

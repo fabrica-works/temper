@@ -79,6 +79,9 @@ pub(super) fn line() -> TaskLine {
     }
 }
 pub(super) fn tree(line: &TaskLine) -> (skein_ui::Tree, crate::frame::Bindings) {
+    tree_at(line, fixtures::NOW)
+}
+fn tree_at(line: &TaskLine, now: Wall) -> (skein_ui::Tree, crate::frame::Bindings) {
     let mut b = Builder::new(&fixtures::tree_limits());
     let mut bindings = crate::frame::Bindings::new(fixtures::tree_limits().bindings);
     crate::pages::chats::row(
@@ -87,6 +90,7 @@ pub(super) fn tree(line: &TaskLine) -> (skein_ui::Tree, crate::frame::Bindings) 
         line,
         &fixtures::words(),
         &mut bindings,
+        &mut crate::words::Times::new(now),
     );
     (b.finish(), bindings)
 }
@@ -243,12 +247,12 @@ fn the_entry_contains_the_composer_hint_and_start_in_order() {
 #[test]
 fn a_row_shows_the_real_activity_or_end_time() {
     let mut live = line();
-    live.last_activity = Wall::from_nanos(1_792_523_940_000_000_000);
-    let (shown, _) = tree(&live);
-    assert!(skein_lib::bytes::find(&fixtures::text(&shown), b"10-20 19:19Z").is_some());
-    live.ended_at = Some(Wall::EPOCH);
-    let (shown, _) = tree(&live);
-    assert!(skein_lib::bytes::find(&fixtures::text(&shown), b"01-01 00:00Z").is_some());
+    let now = Wall::from_nanos(720_000_000_000);
+    let (shown, _) = tree_at(&live, now);
+    assert!(skein_lib::bytes::find(&fixtures::text(&shown), b"12 min ago").is_some());
+    live.ended_at = Some(Wall::from_nanos(360_000_000_000));
+    let (shown, _) = tree_at(&live, now);
+    assert!(skein_lib::bytes::find(&fixtures::text(&shown), b"6 min ago").is_some());
 }
 
 fn open_chats(root: &mut Domain, env: &Env<temper_client_domain::Limits>, out: &mut Queue<Request>) -> (Token, Token) {

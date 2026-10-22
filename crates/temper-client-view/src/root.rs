@@ -4,7 +4,7 @@ use crate::{
     words::{Word, Words},
 };
 use alloc::boxed::Box;
-use skein_lib::Queue;
+use skein_lib::{Queue, Wall};
 use skein_ui::{Act, Builder, NodeId, Patch, Role, Tree};
 use temper_client_domain::{Action, Domain};
 /// The composed semantic tree and jig's bindings for its last build.
@@ -18,6 +18,8 @@ pub struct View {
     limits: Limits,
     rows: u32,
     text: u32,
+    next_change: Option<Wall>,
+    clock_revision: u64,
 }
 impl View {
     #[must_use]
@@ -33,6 +35,8 @@ impl View {
             limits: *limits,
             rows: domain.client.domain.rows,
             text: domain.client.domain.text,
+            next_change: None,
+            clock_revision: 0,
         }
     }
     fn task_main(&mut self, b: &mut Builder, root: &Domain) {
@@ -50,6 +54,11 @@ impl View {
         b.close();
         b.close();
     }
+    /// Earliest change among the time words drawn by the last build.
+    #[must_use]
+    pub const fn next_change(&self) -> Option<Wall> {
+        self.next_change
+    }
     #[must_use]
     pub fn tree(&self) -> &Tree {
         self.render.tree()
@@ -59,11 +68,24 @@ impl View {
         &self.limits
     }
 }
-pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
+pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>) {
     let shown = temper_client_domain::shown(root).checked_add(view.accounts.revision()).expect("view revisions fit");
-    if !view.render.stale(shown) {
+    let shown = shown.checked_add(view.clock_revision).expect("view clock revisions fit");
+    let due = match view.next_change {
+        Some(next) => wall >= next,
+        None => false,
+    };
+    if !view.render.stale(shown) && !due {
         return;
     }
+    // skein-ui also gates finish by its revision: a clock wake advances it.
+    let shown = if due {
+        view.clock_revision = view.clock_revision.checked_add(1).expect("view clock revisions fit");
+        shown.checked_add(1).expect("view revisions fit")
+    } else {
+        shown
+    };
+    let mut times = crate::words::Times::new(wall);
     view.forge.begin();
     view.pages.begin();
     view.accounts.begin(root.pages().accounts().is_none());
@@ -95,7 +117,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
         builder.close();
         builder.close();
     } else if let temper_client_domain::Address::Inbox { .. } = root.pages().address() {
-        crate::pages::inbox::main(&mut builder, root, &view.forge_words, &mut view.pages, view.rows);
+        crate::pages::inbox::main(&mut builder, root, &view.forge_words, &mut view.pages, view.rows, &mut times);
     } else if *root.pages().address() == temper_client_domain::Address::Chats {
         crate::pages::chats::main(
             &mut builder,
@@ -103,9 +125,18 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
             &view.forge_words,
             &mut view.pages,
             view.limits.tree.text_per_node,
+            &mut times,
         );
     } else if let temper_client_domain::Address::Chat { .. } = root.pages().address() {
-        crate::pages::chat::main(&mut builder, root, &view.forge_words, &mut view.pages, view.rows, view.text);
+        crate::pages::chat::main(
+            &mut builder,
+            root,
+            &view.forge_words,
+            &mut view.pages,
+            view.rows,
+            view.text,
+            &mut times,
+        );
     } else if let temper_client_domain::Address::Task { .. } = root.pages().address() {
         view.task_main(&mut builder, root);
     } else if *root.pages().address() == temper_client_domain::Address::Accounts {
@@ -120,6 +151,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
         view.adoption_main(&mut builder, root);
     }
     builder.close();
+    view.next_change = times.next;
     view.render.finish(builder, shown, out);
 }
 #[must_use]

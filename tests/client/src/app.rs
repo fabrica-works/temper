@@ -154,7 +154,7 @@ impl App for Temper {
     }
     fn build(view: &mut Self::View, root: &Self::Root, patches: &mut Queue<Patch>) {
         match (view, root) {
-            (View::Person(view), Root::Person(root)) => view::build(view, root, patches),
+            (View::Person(view), Root::Person(root)) => view::build(view, root, fixtures::NOW, patches),
             (View::Agent { render, .. }, Root::Agent(agent)) => agent.build(render, patches),
             _ => panic!("root and view must belong to the same client"),
         }

@@ -896,12 +896,18 @@ fn committed_text_exceeds_field_text_on_both_conversation_pages() {
 }
 
 fn result_view(result: c::TaskResult) -> crate::View {
+    result_view_at(result, None)
+}
+fn result_view_at(result: c::TaskResult, at: Option<Wall>) -> crate::View {
     use temper_client_domain::{Address, Event};
     let (mut root, _, watch) = fixtures::root_at(Address::Chat { task: TASK }, &fixtures::domain_limits());
     let live = messaging_root();
     let mut task = live.pages().chat().expect("chat").task(live.client()).expect("task").clone();
     // Keep Message offered: the same result which draws the end must suppress the whole foot.
     task.result = Some(result);
+    if let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() {
+        details.ended_at = at;
+    }
     fixtures::root_event(
         &mut root,
         Event::Client {
@@ -983,4 +989,29 @@ fn a_live_chat_keeps_its_choice_line_and_composer() {
     assert!(style_position(view.tree().nodes(), crate::look::CHOICE).is_some());
     assert!(style_position(view.tree().nodes(), crate::look::ACCOUNT_LINE).is_some());
     assert!(fixtures::find(view.tree(), Role::TextArea, b"Message").is_some());
+}
+
+#[test]
+fn a_chats_end_and_its_phase_keep_the_supplied_clock() {
+    use fixtures::first_run::text;
+    for (ending, expected) in [
+        (
+            c::OwnerChipEnding::Done(c::ResultValue::Report(c::DocumentText::complete(text(b"A report")))),
+            "Ended 00:00 · its report, “A report”",
+        ),
+        (c::OwnerChipEnding::Failed(c::DocumentText::complete(text(b"Checks failed"))), "Failed 00:00 · Checks failed"),
+        (
+            c::OwnerChipEnding::Cancelled {
+                reason: c::DocumentText::complete(text(b"No longer needed")),
+                result: None,
+                by: c::OwnerRequester::Person(PARTY),
+                at: Wall::EPOCH,
+            },
+            "Cancelled 00:00 · No longer needed",
+        ),
+    ] {
+        let view = result_view_at(c::TaskResult::Ending(Box::new(ending)), Some(fixtures::NOW));
+        assert!(skein_lib::bytes::find(&fixtures::text(view.tree()), expected.as_bytes()).is_some());
+        assert_eq!(view.next_change(), Some(Wall::from_nanos(86_400_000_000_000)));
+    }
 }

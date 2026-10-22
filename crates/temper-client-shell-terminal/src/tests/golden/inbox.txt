@@ -20,6 +20,7 @@ temper
 - ### Proposal
   Project 1
   [16] Task 9
+  Waiting under 1 min
   Add OAuth login
   It touches sign-in.
   ### Proposed tasks
@@ -29,10 +30,12 @@ temper
 - ### Question
   Project 1
   [17] Task 9
+  Waiting under 1 min
   Which provider first?
 - ### Held
   Project 1
   [18] Task 9
+  Waiting under 1 min
   Review needs attention
   Held: out of tries
   Hold revision 7
@@ -40,14 +43,17 @@ temper
 - ### Person task
   Project 1
   [19] Task 9
+  Waiting under 1 min
   Choose a provider
 ## Updates
 - ### Updates
   Project 1
   [20] Task 9
+  just now
   Accessibility pass is done
 - ### Reply
   Project 1
   [21] Task 9
+  just now
   OAuth login? replied
 [22] Mark seen

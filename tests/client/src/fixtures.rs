@@ -13,6 +13,7 @@ use temper_client_domain::{Limits, forge};
 use temper_client_view as view;
 use temper_engine_domain as engine;
 use temper_engine_domain_world::direct::Driver;
+pub const NOW: skein_lib::Wall = skein_lib::Wall::EPOCH;
 pub const FORGE: u16 = temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Forge);
 pub const FORGE_HOST: &[u8] = b"forge.example";
 pub const REPOSITORIES: &[(&[u8], &[u8], u32)] = &[(b"acme", b"shop", 7), (b"acme", b"second", 8)];

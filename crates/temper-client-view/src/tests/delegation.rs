@@ -858,7 +858,7 @@ fn the_dark_theme_chat_has_its_whole_answer_and_one_end_line() {
     use fixtures::first_run as run;
     let view = first_run_view(true, false);
     let said = fixtures::text(view.tree());
-    let ending = "Ended · its report, “The demo changes nothing.”".as_bytes();
+    let ending = "Ended 00:00 · its report, “The demo changes nothing.”".as_bytes();
     in_order(&said, &[b"You", run::DARK, b"Temper", run::DARK_ANSWER, b"1 tool call", b"finish", ending]);
     let at = skein_lib::bytes::find(&said, ending).expect("end line");
     assert!(skein_lib::bytes::find(&said[at + ending.len()..], ending).is_none());

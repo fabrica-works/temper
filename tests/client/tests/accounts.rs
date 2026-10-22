@@ -113,7 +113,12 @@ fn a_client_shows_a_third_account_at_two_rows() {
     let words = fixtures::phrasebooks(&limits);
     let bounds = fixtures::view_bounds(&limits, &words);
     let mut view = temper_client_view::View::new(&bounds, &limits, words, fixtures::FORGE);
-    temper_client_view::build(&mut view, root.person(), &mut skein_lib::Queue::with_capacity(bounds.tree.patches));
+    temper_client_view::build(
+        &mut view,
+        root.person(),
+        fixtures::NOW,
+        &mut skein_lib::Queue::with_capacity(bounds.tree.patches),
+    );
     let text: Vec<u8> =
         view.tree().nodes().iter().flat_map(|node| node.text.iter().flat_map(|run| run.text.iter().copied())).collect();
     assert!(String::from_utf8(text).expect("view text").contains(&format!("Account {third}")));
