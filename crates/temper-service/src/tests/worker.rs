@@ -113,7 +113,10 @@ fn undecodable_items_refuse_the_start_as_invalid_naming_them() {
     let hub::LinkUp::Answer { answer, .. } = up else { panic!("refused answer") };
     assert_eq!(
         answer.ending,
-        hub::Ending::Refused(hub::Refusal::Invalid(hub::Invalid::Start { why: b"workspace items".as_slice().into() }))
+        hub::Ending::Refused(hub::Refusal::Invalid(hub::Invalid::Start {
+            cause: hub::StartCause::Other,
+            why: b"workspace items".as_slice().into()
+        }))
     );
     assert!(parts.is_empty());
     assert_eq!(worker.root.host().hosted(), 0);
@@ -664,7 +667,7 @@ fn key_values_reach_smith_at_their_bound_and_fit_the_workers_memory() {
     const SOURCE: u32 = 17;
     use jig_protocol_accounts::table::{Scheme, Value};
     use smith_host_domain as smith;
-    let key_bytes = jig_client_protocol_wire::v11::CEILINGS.keyed_value_some;
+    let key_bytes = jig_client_protocol_wire::v12::CEILINGS.keyed_value_some;
     let mut settings = fixtures::worker_settings();
     settings.jig.limits.token = 1;
     let agent = fixtures::worker_agent();
@@ -797,8 +800,8 @@ fn refusals_are_notes_and_leave_later_dials_intact() {
         (Closed::RefusedPeer(260), crate::Refusal::Peer(260)),
         (Closed::RefusedPeer(261), crate::Refusal::Peer(261)),
         (Closed::RefusedPeer(42), crate::Refusal::Peer(42)),
-        (Closed::RefusedHere(2), crate::Refusal::Terms),
-        (Closed::RefusedHere(3), crate::Refusal::Malformed),
+        (Closed::RefusedHere(jig_protocol_worker_link::REFUSED_LIMITS), crate::Refusal::Terms),
+        (Closed::RefusedHere(jig_protocol_worker_link::REFUSED_FRAMING), crate::Refusal::Malformed),
     ] {
         stand.worker.link(fixtures::NOW, link::Request::Fact { why });
         assert_eq!(
@@ -938,7 +941,10 @@ fn repeated_refusals_are_noted_once_until_the_reason_changes_or_the_worker_links
         stand.worker.link(fixtures::NOW, link::Request::Fact { why: Closed::RefusedPeer(256) });
     }
     assert_eq!(stand.worker.notes().len(), ONE_REFUSAL);
-    stand.worker.link(fixtures::NOW, link::Request::Fact { why: Closed::RefusedHere(2) });
+    stand.worker.link(
+        fixtures::NOW,
+        link::Request::Fact { why: Closed::RefusedHere(jig_protocol_worker_link::REFUSED_LIMITS) },
+    );
     assert_eq!(stand.worker.notes().len(), TWO_REFUSALS);
     LinkPeer::new().open(&mut stand.worker);
     stand.worker.link(fixtures::NOW, link::Request::Fact { why: Closed::RefusedPeer(256) });

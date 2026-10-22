@@ -88,6 +88,7 @@ pub fn hello_bounds(bounds: host::Bounds) -> fleet::Bounds {
             .expect("one slot per model");
     }
     fleet::Bounds {
+        program_endpoints: bounds.program_endpoints,
         models: models.into_boxed(),
         turns: bounds.turns,
         spend: bounds.spend,
@@ -272,13 +273,31 @@ pub(crate) fn answer(domain: &mut Domain, run: Token, attempt: Token, payload: T
     domain.work.push(Work::Core(event));
 }
 
+/// Whether the agent refused the start for its grants, which the core
+/// settles apart from other refusals.
+fn grants_refused(ending: &host::Ending) -> bool {
+    match ending {
+        host::Ending::Refused(refusal) => match refusal {
+            host::Refusal::Invalid(invalid) => match invalid {
+                host::Invalid::Start { cause, .. } => *cause == host::StartCause::Grants,
+                host::Invalid::Charter
+                | host::Invalid::Transcript
+                | host::Invalid::Grants
+                | host::Invalid::Messages => false,
+            },
+            host::Refusal::Busy => false,
+        },
+        host::Ending::Ended { .. } | host::Ending::Parked { .. } | host::Ending::Failed { .. } => false,
+    }
+}
+
 /// The answer's task terminal, with temper's saved work translated and what
 /// it left on the forge kept for a lost run (domain/forge.md).
 pub(crate) fn result_event(domain: &mut Domain, payload: Token, end: tasks::End) -> Option<core::Event> {
-    let (task, attempt, cumulative, read, refused, parts) =
+    let (task, attempt, cumulative, read, refused, parts, grants_refused) =
         match domain.payloads.get(skein_lib::Id::from_token(payload)) {
-            Some(Some(Payload::Answer { task, attempt, cumulative, read, refused, parts, .. })) => {
-                (*task, *attempt, *cumulative, *read, refused.clone(), parts.clone())
+            Some(Some(Payload::Answer { task, attempt, cumulative, read, refused, parts, ending })) => {
+                (*task, *attempt, *cumulative, *read, refused.clone(), parts.clone(), grants_refused(ending))
             }
             Some(
                 Some(
@@ -314,6 +333,7 @@ pub(crate) fn result_event(domain: &mut Domain, payload: Token, end: tasks::End)
         end,
         saved,
         invalid_saved,
+        grants_refused,
         read,
         refused,
     })
@@ -514,6 +534,7 @@ mod tests {
     #[test]
     fn hello_advertises_the_public_bounds_conversion() {
         let bounds = host::Bounds {
+            program_endpoints: Box::new([7]),
             models: Box::new([host::ModelBound { name: Box::from(b"model".as_slice()), window: 8192, output: 1024 }]),
             turns: 8,
             spend: 100,
@@ -533,6 +554,7 @@ mod tests {
             bounds: bounds.clone(),
         });
         assert_eq!(hello.bounds, converted);
+        assert_eq!(hello.bounds.program_endpoints.as_ref(), &[7]);
         assert_eq!(hello.bounds.models[0].name, bounds.models[0].name);
         assert_eq!(hello.bounds.models[0].window, bounds.models[0].window);
         assert_eq!(hello.bounds.models[0].output, bounds.models[0].output);

@@ -276,7 +276,7 @@ pub(super) fn chat_line() -> TaskLine {
         requester: OwnerRequester::Person(fixtures::PARTY),
         tracked: None,
         label: fixtures::chat::LABEL,
-        flags: TaskFlags { conversation: true, listed: false, retention: Retention::Kept },
+        flags: TaskFlags { ended_by: EndedBy::Result, conversation: true, listed: false, retention: Retention::Kept },
         changed: skein_lib::Wall::EPOCH,
         last_activity: skein_lib::Wall::EPOCH,
         ended_at: None,

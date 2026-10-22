@@ -1,6 +1,6 @@
 //! Jig's complete refusal facts at its pinned people-store version.
 use jig_domain_people as p;
-use jig_protocol_store::people_v6 as w;
+use jig_protocol_store::people_v7 as w;
 use skein_lib::Wall;
 pub(super) fn encode_failure_class(value: p::FailureClass, _l: &w::Limits) -> w::FailureClass {
     match value {
@@ -325,6 +325,7 @@ pub(super) fn encode_refusal(value: &p::Refusal, l: &w::Limits) -> Result<w::Ref
                     p::Malformed::Cycle => w::Malformed::Cycle,
                     p::Malformed::AsAllowedTwice => w::Malformed::AsAllowedTwice,
                     p::Malformed::Conversation => w::Malformed::Conversation,
+                    p::Malformed::EndedBy => w::Malformed::EndedBy,
                 },
             },
         )?),
@@ -412,6 +413,7 @@ pub(super) fn decode_refusal(value: w::Refusal) -> p::Refusal {
                 w::Malformed::Cycle => p::Malformed::Cycle,
                 w::Malformed::AsAllowedTwice => p::Malformed::AsAllowedTwice,
                 w::Malformed::Conversation => p::Malformed::Conversation,
+                w::Malformed::EndedBy => p::Malformed::EndedBy,
             },
         },
         w::Refusal::Role(value) => p::Refusal::Role {

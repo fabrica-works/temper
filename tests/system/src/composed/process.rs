@@ -415,7 +415,11 @@ fn grants(grants: &[agent::Grant]) -> Box<[smith::Grant]> {
     let mut translated = Vec::with_capacity(grants.len());
     for grant in grants {
         let name = smith::GrantName { account: grant.account, generation: grant.generation };
-        translated.push(smith::Grant { name, valid: grant.valid });
+        translated.push(smith::Grant {
+            name,
+            valid: grant.valid,
+            renewable: matches!(grant.form, agent::Form::Credential(agent::Scheme::Bearer)),
+        });
     }
     translated.into_boxed_slice()
 }

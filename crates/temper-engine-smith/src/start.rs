@@ -91,6 +91,12 @@ pub fn start(
         match grant.form.table() {
             accounts::GrantTable::Accounts | accounts::GrantTable::Name => grants
                 .push(smith::Grant {
+                    renewable: match grant.form {
+                        accounts::Form::Credential(accounts::Scheme::Bearer) => true,
+                        accounts::Form::Credential(accounts::Scheme::Key)
+                        | accounts::Form::Application
+                        | accounts::Form::Program(_) => false,
+                    },
                     name: smith::GrantName { account: grant.account, generation: grant.generation },
                     valid: grant.valid,
                 })
@@ -134,6 +140,7 @@ pub fn charter(assignment: &engine::Assignment) -> run::Charter {
     }
     let outcome = contract(&assignment.run.contract);
     run::Charter {
+        mode: run::Mode::Finite,
         resume: policy.resume && !assignment.transcript.is_empty(),
         waiting: policy.waiting,
         instructions: policy.instructions.clone(),

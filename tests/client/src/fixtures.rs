@@ -982,8 +982,9 @@ pub fn done_task(printed: &temper_client_tools::jig::Printed) -> u64 {
 /// tools.md, 12: two 16 KiB parts within the tools' 32 KiB text bound.
 pub const LARGE_TURN_TEXT: usize = 24_576;
 /// The encoded turn's single row fits `LOAD_BYTES`; its activity row crosses it.
-// Jig 2a62db26's task-record fields add 14 B to the owner row; trim padding only.
-pub const LARGE_TURN_OPAQUE: usize = 38_558;
+// Jig e5140872 adds another 8 B to the owner row; trim only opaque padding
+// so the single row still fits and the activity join still crosses the bound.
+pub const LARGE_TURN_OPAQUE: usize = 38_550;
 #[must_use]
 pub fn codec_for(limits: &jig_client::DomainLimits) -> jig_protocol_transcript::Limits {
     let bytes = limits.document_bytes.min(u64::from(jig_client_protocol_wire::CEILINGS.turn_carried_bytes));

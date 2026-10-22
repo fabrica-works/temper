@@ -73,6 +73,7 @@ pub fn agent() -> settings::Agent {
         limits,
         host_limits,
         bounds: jig_domain_host::Bounds {
+            program_endpoints: Box::new([]),
             models: Box::new([jig_domain_host::ModelBound {
                 name: b"small".as_slice().into(),
                 window: 8192,

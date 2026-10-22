@@ -1349,7 +1349,7 @@ fn the_chatbar_and_chats_line_share_every_status_phrase() {
         crate::pages::chats::status(
             &mut b,
             &line.chip,
-            (&line.waits_on, Some(details.live_delegates)),
+            (&line.waits_on, Some(details.live_delegates), None),
             (line.project, line.requester),
             Some(&details.wake),
             me,

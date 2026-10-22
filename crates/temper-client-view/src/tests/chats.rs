@@ -67,7 +67,7 @@ pub(super) fn line() -> TaskLine {
         requester: OwnerRequester::Person(73),
         tracked: None,
         label: LABEL,
-        flags: TaskFlags { conversation: true, listed: false, retention: Retention::Kept },
+        flags: TaskFlags { ended_by: EndedBy::Result, conversation: true, listed: false, retention: Retention::Kept },
         changed: Wall::EPOCH,
         last_activity: Wall::EPOCH,
         ended_at: None,

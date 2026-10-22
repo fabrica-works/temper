@@ -135,7 +135,12 @@ pub(crate) fn chat_me(budget: u64) -> c::Me {
             budget: c::TemplateBudget::Amount(budget),
             deadline: c::TemplateDeadline::Span(CHAT_SPAN),
             tracked: None,
-            flags: c::TaskFlags { conversation: true, listed: false, retention: c::Retention::Kept },
+            flags: c::TaskFlags {
+                ended_by: jig_client::contract::EndedBy::Result,
+                conversation: true,
+                listed: false,
+                retention: c::Retention::Kept,
+            },
             label: jig_client::shapes::CHAT,
             grace: Some(CHAT_SPAN),
             llm: None,
@@ -204,7 +209,7 @@ pub(crate) fn act_text(bytes: &[u8]) -> c::Text {
 }
 pub(crate) fn encoded(ask: &client::Ask) -> Box<[u8]> {
     let client::Ask::Jig(ask) = ask else { panic!("jig ask") };
-    let wire = jig_client_protocol_link::translate::asks::ask(ask, &jig_client_protocol_wire::v11::CEILINGS)
+    let wire = jig_client_protocol_link::translate::asks::ask(ask, &jig_client_protocol_wire::v12::CEILINGS)
         .expect("wire ask");
     let mut out = skein_lib::Writer::new(usize::try_from(wire.measure()).expect("wire bytes fit"));
     wire.encode(&mut out).expect("measured ask");

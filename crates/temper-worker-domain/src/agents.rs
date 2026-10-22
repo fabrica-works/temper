@@ -235,7 +235,7 @@ pub(crate) fn decoded(domain: &mut Domain, env: &Env<Limits>, owner: Token, star
                 Invalid::CallName => b"call name",
                 Invalid::Evidence => b"delivery evidence",
             };
-            host::FromAgent::StartRefused { owner, why: Box::from(why) }
+            host::FromAgent::StartRefused { owner, cause: host::StartCause::Other, why: Box::from(why) }
         }
     };
     route::host_step(domain, env, host::Event::from_agent(event));
@@ -276,11 +276,13 @@ pub(crate) fn encoded(domain: &mut Domain, env: &Env<Limits>, owner: Token, enco
                         read,
                         finish: host::Finish::Failed { failure },
                     },
-                    Finish::Refused => host::FromAgent::StartRefused { owner, why: body },
+                    Finish::Refused(cause) => host::FromAgent::StartRefused { owner, cause, why: body },
                 },
                 // A refusal comes before smith admits the run, a failure after.
                 Encoded::Undecodable => match finish {
-                    Finish::Refused => host::FromAgent::StartRefused { owner, why: Box::from(&b"refusal"[..]) },
+                    Finish::Refused(cause) => {
+                        host::FromAgent::StartRefused { owner, cause, why: Box::from(&b"refusal"[..]) }
+                    }
                     Finish::Ended | Finish::Parked | Finish::Failed(_) => {
                         host::FromAgent::Faulted { owner, fault: host::AgentFailure::Rules }
                     }
@@ -349,7 +351,7 @@ fn ended(domain: &mut Domain, env: &Env<Limits>, owner: Token, end: smith::End, 
     };
     assert!(started || unstarted, "an agent that ran started first");
     if let Some(why) = translate::unstarted(end) {
-        let refused = host::FromAgent::StartRefused { owner, why: Box::from(why) };
+        let refused = host::FromAgent::StartRefused { owner, cause: host::StartCause::Other, why: Box::from(why) };
         route::host_step(domain, env, host::Event::from_agent(refused));
     } else if hand_out_pending(domain, owner) {
         let old = domain.gone.insert(owner, detail).expect("room for every agent's end");

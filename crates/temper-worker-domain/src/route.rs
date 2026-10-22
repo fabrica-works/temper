@@ -111,7 +111,12 @@ fn assign(
         Ok(items) => items,
         Err(wire::Undecodable) => {
             let why = words(b"workspace items", env.limits.host.detail_bytes);
-            return refuse(run, attempt, host::Refusal::Invalid(host::Invalid::Start { why }), out);
+            return refuse(
+                run,
+                attempt,
+                host::Refusal::Invalid(host::Invalid::Start { cause: host::StartCause::Other, why }),
+                out,
+            );
         }
     };
     let checked = if !items.repositories.is_empty() && assignment.assignment.workspace.is_none() {
@@ -121,7 +126,12 @@ fn assign(
     };
     if let Err(why) = checked {
         let why = words(why, env.limits.host.detail_bytes);
-        return refuse(run, attempt, host::Refusal::Invalid(host::Invalid::Start { why }), out);
+        return refuse(
+            run,
+            attempt,
+            host::Refusal::Invalid(host::Invalid::Start { cause: host::StartCause::Other, why }),
+            out,
+        );
     }
     match workspace::stage(domain, assignment, items, save) {
         Some(assignment) => host_step(domain, env, host::Event::Down(host::LinkDown::Assign { assignment })),

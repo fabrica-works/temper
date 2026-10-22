@@ -9,6 +9,8 @@ const FORGE: u16 = temper_client_protocol_wire::FORGE;
 const PROJECT: u32 = 1;
 const SEED: u64 = 11;
 const CHAT_LABEL: u32 = 1;
+const CHAT_FLAGS: c::TaskFlags =
+    c::TaskFlags { ended_by: c::EndedBy::Result, conversation: true, listed: false, retention: c::Retention::Kept };
 pub(super) const PROPOSAL: c::ProposalKey = c::ProposalKey { proposer: c::Proposer::Task(10), number: 1 };
 const JSON_TITLE: &str = "JSON output for tally report";
 const JSON_WHY: &str = "It changes report’s output and its tests, and lands into main: more than a chat does alone.";
@@ -1798,7 +1800,7 @@ fn base_frame(person: &str, project: &str) -> c::Me {
             budget: c::TemplateBudget::AsAllowed { cap: None },
             deadline: c::TemplateDeadline::None,
             tracked: None,
-            flags: c::TaskFlags { conversation: true, listed: false, retention: c::Retention::Kept },
+            flags: CHAT_FLAGS,
             label: CHAT_LABEL,
             grace: Some(Duration::from_secs(30)),
             llm: None,
@@ -1881,7 +1883,7 @@ fn base_task(number: u64, title: &str) -> c::Task {
             }),
         },
         label: CHAT_LABEL,
-        flags: c::TaskFlags { conversation: true, listed: false, retention: c::Retention::Kept },
+        flags: CHAT_FLAGS,
         last_activity: Wall::EPOCH,
         waits_on: c::WaitsOn::Nothing,
         goal: None,

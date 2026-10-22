@@ -142,6 +142,7 @@ impl Workers {
                             turns: 0,
                             spent: 0,
                             ending: host::Ending::Refused(host::Refusal::Invalid(host::Invalid::Start {
+                                cause: host::StartCause::Other,
                                 why: b"assignment cannot encode".as_slice().into(),
                             })),
                         },

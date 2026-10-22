@@ -108,6 +108,7 @@ pub fn limits() -> Limits {
             facts: 256,
         },
         bounds: host::Bounds {
+            program_endpoints: Box::new([]),
             models: Box::new([host::ModelBound { name: Box::from(&b"fake"[..]), window: 1_048_576, output: 512 }]),
             turns: 8,
             spend: 100,

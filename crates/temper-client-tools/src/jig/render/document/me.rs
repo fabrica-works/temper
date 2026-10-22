@@ -20,6 +20,7 @@ pub(super) fn encode_malformed(value: jig_client::contract::Malformed, out: &mut
         jig_client::contract::Malformed::TwoAsAllowed => out.string(b"two_as_allowed"),
         jig_client::contract::Malformed::ConversationNotAgent => out.string(b"conversation_not_agent"),
         jig_client::contract::Malformed::Cycle => out.string(b"cycle"),
+        jig_client::contract::Malformed::EndedBy => out.string(b"ended_by"),
         jig_client::contract::Malformed::ProposedAsAllowed => out.string(b"proposed_as_allowed"),
     }
 }

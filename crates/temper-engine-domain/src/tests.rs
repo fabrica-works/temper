@@ -512,6 +512,7 @@ fn deep_child_rows_and_arbitrary_internal_payloads_are_refused_before_retention(
             workstreams: Box::new([]),
             hosting: Box::new([]),
             bounds: fleet::Bounds {
+                program_endpoints: Box::new([]),
                 models: Box::new([]),
                 turns: 1,
                 spend: 1,
@@ -573,6 +574,7 @@ fn held_assignment() -> crate::Assignment {
         conversation: 1,
         charter: 1,
         run: Box::new(crate::RunCharter {
+            ended_by: jig_domain_tasks::EndedBy::Result,
             sources: Box::new([Some(1)]),
             accounts: Box::new([jig_domain_authority::AccountBinding { provider: 1, account: 1, source: 1 }]),
             placement: jig_domain_fleet::PlacementConstraint {

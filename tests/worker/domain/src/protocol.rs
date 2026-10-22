@@ -17,37 +17,56 @@ pub fn endpoints() -> Endpoints {
     Endpoints::new(entries)
 }
 
-// smith's smallest v3 charter, as jig's reference worker's fixture takes it.
-const SMALLEST: [u8; 120] = {
-    let mut bytes = [0; 120];
-    bytes[1] = 3;
-    bytes
-};
-
-/// A charter as the engine writes it: smith's smallest, with a budget, a
-/// report contract and a model.
+/// A finite charter as the engine writes it, with a budget, a report
+/// contract and a model.
 #[must_use]
 pub fn charter() -> Box<[u8]> {
     use smith_charter::{
-        Budget, BudgetParts, CEILINGS, Charter, Contract, ContractParts, Llm, Prices, PricesParts, Reserve,
-        ReserveParts, TextRule, TextRuleParts,
+        Budget, BudgetParts, CEILINGS, Charter, CharterParts, Contract, ContractParts, Families, FamiliesParts, Llm,
+        LlmParts, Mode, Prices, PricesParts, Reserve, ReserveParts, TextRule, TextRuleParts, Tools, ToolsParts,
     };
-    let source = Charter::decode(&CEILINGS, &mut Reader::new(&SMALLEST)).expect("smith's smallest charter");
-    let mut parts = source.into_parts();
     let reserve = Reserve::new(&CEILINGS, ReserveParts { turns: 0, time: Duration::ZERO }).expect("reserve");
-    parts.budget = Budget::new(&CEILINGS, BudgetParts { turns: 1, spend: 2, time: Duration::from_secs(60), reserve })
+    let budget = Budget::new(&CEILINGS, BudgetParts { turns: 1, spend: 2, time: Duration::from_secs(60), reserve })
         .expect("budget");
     let report = TextRule::new(&CEILINGS, TextRuleParts { max: 128, fields: List::with_capacity(0) }).expect("report");
-    let contract =
-        ContractParts { report: Some(report), verdicts: List::with_capacity(0), change: None, failure: None };
-    parts.contract = Contract::new(&CEILINGS, contract).expect("contract");
-    let mut llm = parts.main.into_parts();
-    llm.model = Box::from(&b"fake"[..]);
-    llm.window = 1_048_576;
-    llm.output = 512;
-    let prices = PricesParts { input: 1, cached: 1, cache_write: None, output: 1, unit: 1_000_000 };
-    llm.prices = Prices::new(&CEILINGS, prices).expect("prices");
-    parts.main = Llm::new(&CEILINGS, llm).expect("model");
+    let contract = Contract::new(
+        &CEILINGS,
+        ContractParts { report: Some(report), verdicts: List::with_capacity(0), change: None, failure: None },
+    )
+    .expect("contract");
+    let prices =
+        Prices::new(&CEILINGS, PricesParts { input: 1, cached: 1, cache_write: None, output: 1, unit: 1_000_000 })
+            .expect("prices");
+    let main = Llm::new(
+        &CEILINGS,
+        LlmParts {
+            endpoint: Box::new([]),
+            account: None,
+            model: Box::from(&b"fake"[..]),
+            effort: None,
+            window: 1_048_576,
+            output: 512,
+            prices,
+        },
+    )
+    .expect("model");
+    let families = Families::new(&CEILINGS, FamiliesParts { skein_bools: [false; 4] }).expect("families");
+    let tools =
+        Tools::new(&CEILINGS, ToolsParts { families, wait: false, deliver: None, host: List::with_capacity(0) })
+            .expect("tools");
+    let parts = CharterParts {
+        instructions: Box::new([]),
+        brief: List::with_capacity(0),
+        tools,
+        contract,
+        conventions: None,
+        budget,
+        main,
+        models: List::with_capacity(0),
+        waiting: Duration::ZERO,
+        resume: false,
+        mode: Mode::Finite,
+    };
     let record = Charter::new(&CEILINGS, parts).expect("charter");
     let mut writer = Writer::new(usize::try_from(record.measure()).expect("charter size"));
     record.encode(&mut writer).expect("measured charter");
