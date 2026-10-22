@@ -145,12 +145,7 @@ pub fn templates_ending(chat: jig_domain_tasks::EndedBy) -> Box<[jig_domain_core
             budget: TemplateBudget::AsAllowed { cap: None },
             deadline: TemplateDeadline::None,
             tracked: None,
-            flags: Flags {
-                ended_by: chat,
-                conversation: true,
-                listed: false,
-                retention: Retention::Kept,
-            },
+            flags: Flags { ended_by: chat, conversation: true, listed: false, retention: Retention::Kept },
             label: 1,
             grace: Some(skein_lib::Duration::from_millis(5000)),
             llm: None,
