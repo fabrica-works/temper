@@ -685,17 +685,7 @@ impl Task {
                 }
             }
             Told::Page { handle, page } if handle == self.activity => {
-                if let Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(page))) = page {
-                    if self.shape == Shape::Agent {
-                        if let Some(reading) = self.thread.page(*page) {
-                            read(self.activity, reading, out);
-                        }
-                    } else {
-                        self.latest = Some(page);
-                    }
-                } else {
-                    self.thread.failed();
-                }
+                self.activity_page(client, page, out);
             }
             Told::Changed { handle } if handle == self.tree => {
                 self.read_ended(out);
@@ -737,6 +727,25 @@ impl Task {
             self.thread.end_run();
         }
         true
+    }
+    fn activity_page(&mut self, client: &Client, page: Readout, out: &mut Queue<Request>) {
+        if let Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(page))) = page {
+            if self.shape == Shape::Agent {
+                if let Some(reading) = self.thread.page(*page) {
+                    read(self.activity, reading, out);
+                }
+            } else {
+                self.latest = Some(page);
+            }
+        } else if let Readout::Jig(c::ReadResult::None(c::ReadNone::SignedOut)) = page
+            && client.link().state == jig_client::Link::Starting
+            && super::awaits_first_read(&self.thread)
+            && self.latest.is_none()
+        {
+            read(self.activity, c::Read::Activity { task: self.number, before: None }, out);
+        } else {
+            self.thread.failed();
+        }
     }
     pub(crate) fn held(&mut self, chip: &c::Chip, out: &mut Queue<Request>) {
         if chip.phase != c::Phase::Held {

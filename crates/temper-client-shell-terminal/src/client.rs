@@ -197,6 +197,22 @@ impl NativeClient {
             self.shell.close();
         }
     }
+    fn loaded(&mut self, credential: Option<skein_lib::Secret>, records: Vec<jig_client::Record>) {
+        self.loaded = true;
+        self.credential.clone_from(&credential);
+        self.phase = Phase::Running;
+        let mut kept = List::with_capacity(u32::try_from(records.len()).expect("bounded store"));
+        let bounds = link::Limits::new(self.env.limits.client.domain, self.env.limits.client.exchanges)
+            .expect("checked link bounds");
+        for record in records {
+            if let Some(key) = kept_key(&record, &bounds) {
+                self.kept_keys.insert(key).expect("bounded kept keys");
+            }
+            kept.push(record).expect("counted store");
+        }
+        let with = self.with.take().or_else(|| credential.map(jig_client::With::Held));
+        self.event(domain::Event::Start { address: self.address.clone(), kept, with });
+    }
     fn event(&mut self, event: domain::Event) {
         if let Some(notice) = crate::terminal::native::event(&event) {
             self.notices.push(Shown::Terminal(notice));
@@ -369,23 +385,7 @@ impl Host for NativeClient {
             return;
         }
         if let Some((credential, records)) = self.shell.loaded() {
-            self.loaded = true;
-            self.credential.clone_from(&credential);
-            self.phase = Phase::Running;
-            let mut kept = List::with_capacity(u32::try_from(records.len()).expect("bounded store"));
-            let bounds = link::Limits::new(self.env.limits.client.domain, self.env.limits.client.exchanges)
-                .expect("checked link bounds");
-            for record in records {
-                if let Some(key) = kept_key(&record, &bounds) {
-                    self.kept_keys.insert(key).expect("bounded kept keys");
-                }
-                kept.push(record).expect("counted store");
-            }
-            self.event(domain::Event::Start { address: self.address.clone(), kept, with: None });
-            let with = self.with.take().or_else(|| credential.map(jig_client::With::Held));
-            if let Some(with) = with {
-                self.event(domain::Event::Client { event: jig_client::Event::SignIn { with } });
-            }
+            self.loaded(credential, records);
             self.outputs();
         }
         if let Some(ok) = self.shell.kept()

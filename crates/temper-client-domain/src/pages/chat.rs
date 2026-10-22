@@ -122,6 +122,11 @@ impl Chat {
                 if let Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(page))) = page {
                     read(self.activity, self.thread.page(*page), out);
                     self.fill(out);
+                } else if let Readout::Jig(c::ReadResult::None(c::ReadNone::SignedOut)) = page
+                    && client.link().state == jig_client::Link::Starting
+                    && super::awaits_first_read(&self.thread)
+                {
+                    read(self.activity, Some(c::Read::Activity { task: self.task, before: None }), out);
                 } else {
                     self.thread.failed();
                 }

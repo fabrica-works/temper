@@ -693,6 +693,18 @@ fn me_changed(pages: &mut Pages, client: &Client, out: &mut Queue<Request>) {
         }
     }
 }
+// jig ends every pending read at a credential boundary and replays none
+// (jig's `client/domain/client.md`, 7): a page that has read nothing yet asks
+// once more when a successful sign-in has ended its first read.
+fn awaits_first_read(thread: &jig_client::thread::Thread) -> bool {
+    thread.loaded == 0
+        && thread.lines.rows.is_empty()
+        && match &thread.reading {
+            Some(jig_client::thread::Reading::Latest { known }) => *known == 0,
+            Some(jig_client::thread::Reading::Older | jig_client::thread::Reading::Newer) | None => false,
+        }
+}
+
 fn link_changed(pages: &mut Pages, link: Link, out: &mut Queue<Request>) {
     match link {
         Link::SignedOut | Link::OutOfDate => {
