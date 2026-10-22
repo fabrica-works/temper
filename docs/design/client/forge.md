@@ -1,6 +1,6 @@
 # The forge in temper's client
 
-Provisional, 2026-10-05, revised 2026-10-20. What the forge connector
+Provisional, 2026-10-05, revised 2026-10-22. What the forge connector
 adds to temper's client: a change's way to landing and its result, a
 project's landing queues, approvals at a head, the forge's holds in
 words, repositories with their health and landing rules, the picker of
@@ -102,6 +102,13 @@ producing ─ opening ─ checking ─ gating ─ queued ─ first ─ landing �
 | recreating, reopening | after drift released (6.2): its branch made again at the head temper last knew, or its pull request reopened or retargeted back |
 | landing | merging at its head |
 | landed | its merge commit, and when |
+
+On the change's task page, the steps its panel carries (9.2) and their
+words are `README.md`'s, 5.10: the steps as the mockup's six, each side
+step at the one it serves, and a line for the step it is at, with the
+task it runs as a link. What this table names beyond the panel (how
+long CI has run, which requirements wait, when it landed) waits for
+the panel to carry it (section 10).
 
 Where the landing branch requires GitHub's merge queue
 (`../domain/forge.md`, on merging through it), temper's own queue
@@ -742,8 +749,9 @@ made by the forge connector from what it keeps of the change
   9.2). Default: left out until the connector keeps them beside the
   change's record (a judgment of each requirement at the current head,
   its heads with what made each, each context's state and its failing
-  job), each a field of `ChangePanel` added in the version move that
-  first needs it.
+  job, and a step's and a stall's times, which 2.1's "for how long"
+  and 6.1's "since when" need), each a field of `ChangePanel` added in
+  the version move that first needs it.
 - **A change's files in the client:** whether the panel lists the files a
   change touches, from the connector's read, short of showing the diff.
 - **Conflicts seen early** (`../domain/forge.md`, section 20):

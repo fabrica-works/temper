@@ -302,7 +302,7 @@ keeps (`../protocol/configuration.md`, section 2).
 | `Chats` | `chats.html`; the demo's start at the first run's first step, which `first-run.html` opens | a composer to start a chat, under the level-2 heading "Start a chat", its line and its chooser (5.5) above its text area "Start a chat", with the hint "temper · Enter to start · Shift+Enter for newline"; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats as one list, "Your chats", live and ended together, newest first, under All, Live or Closed (below), each with its number and title, its status, spend and live delegates | `tasks{query}`: requester the person, the chat label, its live group by last activity, its ended pages by when each ended; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request; choose the list's filter; more closed chats |
 | `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the demo's banner while either half holds, in any project (5.1, 5.6), and the context line only in the demo's project while the demo is answered (5.6); the conversation (below): its request, the agent's words with its calls folded, the person's words, provisional text, and its end once it has ended; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer, while the chat lives: its line and its chooser (5.5), its text area "Message" with the hint "Enter to send · Shift+Enter for newline", and "Send", then a message's refusal or failure, if any: a message or the chat's start accepted draws no status of its own, neither at the conversation's end nor in the composer, since the conversation shows its words, "Being sent", then "Sent" (below); while Message is not offered, its line and chooser alone; an ended chat draws no composer and no composer's line | `task`, `activity` a page at a time, older pages while its window has room (5.4), `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
-| `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree with each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel (5.11); an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), with Amend, Stop and its composer (5.11); either's own held card while it is held | `task`, `tree`, `activity` a page at a time, older pages on an agent's task's "Older"; `run` while one is live; a change's panel, through the forge's side (`forge.md`, 9.2) | as its document offers them (5.11): on a goal amend, stop, cancel; on an agent's task message, amend, stop; release its own held task or one of its plan |
+| `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree with each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel (5.11); a change: its header and "View on forge ↗", its steps, its step's line, its hold, its tasks live and ended, its gates at its head and its bounds (5.10); an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), with Amend, Stop and its composer (5.11); either's own held card while it is held | `task`, `tree`, `activity` a page at a time, older pages on an agent's task's "Older"; `run` while one is live; a change's panel, through the forge's side (`forge.md`, 9.2); a procedure's ended tasks, a page read once and again on a change | as its document offers them (5.11): on a goal amend, stop, cancel; on an agent's task message, amend, stop; release its own held task or one of its plan |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
 | `Adopt { project }` | none: 4.4 | the adoption form, with the picker of the repositories temper can reach on the chosen forge | `me`; the chosen forge's deployment part, for its kind, mode, user and installations (`forge.md`, 5.4); the picker's page, a `Reachable` request (section 8) | adopt a repository (4.4) |
 | `Forges` | `forges.html` | each configured forge: its connection, its mode, on GitHub temper's App and its installations, a connect under way and how the last ended, its load | the forge's, through the forge's side (4.2) | connect; replace a key or tokens; install on another account; forget the admin's token (section 8) |
@@ -435,7 +435,8 @@ keeps (`../protocol/configuration.md`, section 2).
   tracked task's, a goal's (5.8); an agent's task's, for an agent's
   task with no priority (5.9). A task with the chat label opens as
   `Chat { task }`. A procedure's task shows a tracked task's header
-  and plan, with its goal and its plan as "Its tasks" (5.10); a person
+  and plan, with its goal and its plan as "Its tasks", its ended tasks
+  among them, and a change's task its panel (5.10); a person
   task shows a tracked task's header and plan only (section 11).
 - **The forge's parts** of a page (a goal's issue and changes on its
   page; changes in flight and the project's health on the board) are
@@ -675,7 +676,10 @@ paragraph:
 
 > Shown on the forge.
 
-Such a part never shows loading, and never an error.
+Such a part never shows loading, and never an error. A change's
+procedure part on its task's page is not such a part: the forge's side
+watches its panel (`forge.md`, 9.2), and the page draws it, or says it
+is loading, unknown or cannot be shown (5.10).
 
 ### 4.3 Where the form is
 
@@ -1055,12 +1059,14 @@ of each (`../draft/first-run.md`, 3.6).
 
 - **Words:** the forge's phrases in temper's phrasebook: the connector,
   resources, patterns and kinds (4.1); "Shown on the forge." (4.2);
-  the form's title, field names, roles, rules and button (4.4), its
-  title by the project's number included; the picker's nodes, "Not
-  listed" and its refusals (4.4); the outcome (4.7); the form's
-  out-of-date sentence (4.4); the forges' page's (`forge.md`, 5.4 and
-  5.5); the navigation entries. Names (owners, repositories, branches,
-  logins) are copied in, never translated.
+  a change's panel's: its tag, its pull request's line, its steps,
+  its step's lines, its holds, its gates' rows, its bounds and its
+  panel's slot words (5.10); the form's title, field names, roles,
+  rules and button (4.4), its title by the project's number included;
+  the picker's nodes, "Not listed" and its refusals (4.4); the outcome
+  (4.7); the form's out-of-date sentence (4.4); the forges' page's
+  (`forge.md`, 5.4 and 5.5); the navigation entries. Names (owners,
+  repositories, branches, logins) are copied in, never translated.
 - **The parts:** a connector, resource, pattern or kind is one text
   node of its words; a part the forge's side does not read is the
   paragraph of 4.2; a part it reads is shown as `forge.md` says.
@@ -1658,24 +1664,155 @@ acts on it as its document offers (5.11).
 
 A procedure's task, a change among them (`../domain/forge.md`, section
 8), shows a tracked task's header and plan (5.8), as a person task
-does, and two things more, after `task.html`'s change:
+does, with its goal and "Its tasks". A forge procedure's task, whose
+panel the forge's side watches while its page is open (`forge.md`,
+9.2), draws its panel as `task.html`'s change does: its steps, its
+hold, its gates and its bounds. Each fact is drawn as the panel
+supplies it: the page computes none (jig's `client/domain/contract.md`,
+5.1).
 
+- **Its parts, in order:** the bar; the header; "View on forge ↗"; the
+  change's card, holding its steps, its step's line, its hold, "Its
+  tasks", "Gates at its head" and its bounds. At phone width the order
+  is the same, and the steps take three columns. Until its panel is
+  shown, and for any other procedure, the page is the bar, the header
+  and "Its tasks".
 - **Its goal:** in the header's first line, after its project and its
   procedure's part, a slot of "Goal" and the "Task G" link to the goal
   it serves, the document's `goal` (the nearest tracked task at or
   above it, itself included: jig's `domain/core.md`, 6.2), when that is
   another task. A tracked procedure's task serves itself and one under
   a chat serves none; neither shows the slot.
-- **Its tasks:** its plan's region and tree are named "Its tasks", the
-  tasks its procedure made (the agent producing a change's branch, its
-  repairs and reviews), where a goal's and a person task's say "Plan".
-- **The rest is the forge's:** a change's stages, pull request, branch
-  and gates are the forge's parts (`forge.md`, section 2). The header's
-  procedure part says "Shown on the forge." for them (4.2); the page
-  draws no stage bar, no gates and no "View on forge".
-- **Its words and look:** "Goal", the existing word, and "Its tasks",
-  a new phrase; no new token, since the slot sits in the header's META
-  line and the link is the plan's.
+- **The header, its panel shown:** its first line begins with the tag
+  "Change · Task N" where 5.8's says "Task N" and its executor, then
+  its project, then its goal's slot; the procedure's part is the panel
+  itself, so the line has no "Shown on the forge.". Its title follows,
+  its state and who asked, as 5.8's; then a line naming its pull
+  request, "PR #N · OWNER/NAME · BRANCH → LANDING", or "No pull
+  request yet · OWNER/NAME · BRANCH → LANDING" before one is opened,
+  the repository, its branch and its landing branch as supplied.
+- **The header, its panel not shown:** 5.8's, its procedure's part
+  saying where the panel is (jig's `client/domain/root.md`, section 6):
+  "Loading the change from the forge." until its first delivery; "The
+  forge knows no change for this task." when the forge answers unknown
+  (a task that is no change, or one whose subject left the engine);
+  "The forge cannot show this change." when its watch ends for any
+  other reason. A procedure the forge does not run says "Shown on the
+  forge." as before (4.2).
+- **"View on forge ↗":** an external link (6.5) to its pull request's
+  address on the forge, in a toolbar after the header, only when the
+  panel supplies an address (`forge.md`, 9.2); a forge with no `web`
+  gives none, as `temper box`'s demo does.
+- **Its steps:** a list of six, as the mockup's: "Producing",
+  "Opening", "Checking", "Gating", "Queued", "Landed". The one its step
+  is at is current, those before it done, and all six done once it has
+  landed. The steps 2.1 draws beside the way show at the one they
+  serve: recreating and reopening at "Opening"; a repair of CI at
+  "Checking", of a gate at "Gating", of a semantic conflict at
+  "Queued"; first, updating and resolving at "Queued"; landing at
+  "Landed", current. "Queued" reads "Queued · Nth" while it has a place
+  in its queue, "Queued · 1st" when first, the place an English
+  ordinal ("1st", "2nd", "3rd", "4th", "11th", "12th", "13th",
+  "21st").
+- **Its step's line,** after the steps, then the "Task N" link of the
+  task its step runs, when the panel names one (`runs`):
+
+  | Step | Its line |
+  |---|---|
+  | producing | "Producing its branch." |
+  | opening | "Opening its pull request." |
+  | recreating | "Making its branch again at the head temper last knew." |
+  | reopening | "Reopening its pull request." |
+  | checking | "Waiting for CI at its head." |
+  | gating | "Waiting for its gates at its head." |
+  | queued | "Nth in the queue for LANDING, after Task A, Task B and N more.": the tasks ahead it names, nearest first, as links; "and N more" for those it does not name; "after N tasks" when it names none; and no "after" when nothing is ahead |
+  | first | "First in the queue for LANDING." |
+  | updating | "Updating from LANDING." |
+  | resolving | "Resolving its conflicts with LANDING." |
+  | repairing | "Repairing: CI failed at its head.", "Repairing: gate N asked for changes." or "Repairing: a semantic conflict with LANDING." |
+  | landing | "Merging at its head." |
+  | landed | "Landed · merge commit ABCDEFG", its first seven digits, as a delegation's card says it (5.7) |
+
+- **Its hold,** while it is held, a notice after its step's line: "Held
+  while STEP: REASON.", STEP the step it was held at in lower case as
+  the table names it ("first in the queue" for first), and REASON:
+
+  | Hold | Its reason |
+  |---|---|
+  | stalled | "its wait stalled" |
+  | repairs | "its repairs are spent" |
+  | resolutions | "its resolutions are spent" |
+  | updates | "its updates are spent" |
+  | moved | "its branch was moved on the forge" |
+  | missing | "its branch is missing on the forge" |
+  | closed | "its pull request was closed on the forge" |
+  | retargeted | "its pull request was retargeted on the forge" |
+  | failed | "a delegate or a write failed for good" |
+  | rejected | "a person rejected a gate" |
+
+  The reasons are 6.1's and 6.2's, in the panel's measure (`forge.md`,
+  section 6): the held card says the rest.
+- **Its tasks:** a region and tree named "Its tasks", the tasks its
+  procedure made (the agent producing a change's branch, its repairs
+  and reviews), where a goal's and a person task's say "Plan". Its
+  live tasks are 5.8's plan rows. Its ended ones follow, read once
+  from the engine, its children by their ending
+  (`Read::Tasks`, a `TaskQuery` by `parent` and the ended phase, in
+  the order they ended), and read again when its tree or its document
+  changes, one read out at a time; each is a plan row, its state its
+  ending in 5.8's words. Until that read answers, an empty tree says
+  "No live tasks." as 5.8's; after it, a region with no row says "None
+  yet." while the task lives, "None." once it has ended. When the
+  read's page holds less than all of them, a last line: "More of its
+  ended tasks are not shown." The page reads no older page (section
+  11). Every procedure's task reads them, its panel shown or not.
+- **Gates at its head:** a region of rows, each a name and its state.
+  First "CI at its head": "Not yet" while CI is unknown, "Running"
+  while pending, "Passed", "Failed". Then each gate, in the supplied
+  order: "Gate N · review", "· approval" or "· check", then "·
+  blocking" or "· advisory", and its verdict: "Not yet" with none,
+  "Waiting" pending, "Approved", "Changes asked". With no gate, a last
+  row, "No other gate."
+- **Its bounds,** the card's last line: "Repairs N of M · resolutions N
+  of M · updates N of M", each used of its limit (2.2).
+- **Against its mockup,** the page's way:
+  - links name a task "Task N", the tag "Change · Task N", the mockup's
+    "T28" and "Change · T28" (3.5, "Links are by number");
+  - not drawn, since the panel does not carry them (`forge.md`, 9.2):
+    the "Fixes finding" notice (findings are a gap,
+    `mockups/README.md`); the head's requirements, its heads in order,
+    CI's contexts, the pull request's title and mergeability, how long
+    a step has waited and when a stall began;
+  - not drawn: the mockup's case name beside the tag, a reference
+    world's;
+  - not drawn: the "Changes" breadcrumb, the bar naming its way as
+    5.1's does (the `Changes` page is not built); "Its tasks"'s
+    subtitle ("made by the change procedure…"); and "its landing rules
+    add none" after "No other gate.", which the panel cannot tell from
+    a rule not read;
+  - its tasks' rows are 5.8's plan rows, with their executor, state
+    and spend, where the mockup draws each as a gate's row with its
+    kind and phase; a gate is named by its number and kind, where the
+    mockup names it by the landing rule that adds it;
+  - its hold, the step's line and its bounds are temper's: the mockup
+    draws none.
+- **Where it is decided:** the domain's task page holds the forge's
+  side's panel (`forge::panel`, its state loading, shown, unknown or
+  ended) and its ended children's page, its one read and whether it is
+  stale; pure functions of the domain's forge side read the panel: the
+  step's slot and the steps done (`forge::change::slot`), the line's
+  facts and the hold's step. The view lays them out with the forge's
+  words (4.2).
+- **Its words and look:** "Goal", the existing word; "Its tasks", "None
+  yet.", "None." and the more line, the page's; the change's words, a
+  forge table beside its parts' (`forge::words`). CHANGE on the card,
+  CHANGE_TAG on the header's tag, STEPS, STEP and STEP_DONE as a
+  delegation's card's (5.7) and STEP_CURRENT on the current step,
+  CHANGE_HOLD on the hold, GATE on each row of "Gates at its head",
+  META on the pull request's line and the bounds, TASK_ACTS on the
+  toolbar; `task-pages.css` draws them as the mockup's `.tag.accent`,
+  `.steps`, `.step.current`, `.notice` and `.gate` (`browser.md`, 2.5),
+  the steps in six columns, three at phone width.
 
 ### 5.11 A task's page's acts
 
@@ -2354,7 +2491,12 @@ own tests:
   dependency's from each kind of link; an agent's task's, 5.9: its
   shape from its executor, priority and label, its thread as a chat's
   (opened, a page, a document's change, a run's text and its end), and
-  its run's heading in each phase, with an attempt and none; a task's
+  its run's heading in each phase, with an attempt and none; a
+  procedure's task's, 5.10: its ended tasks read as it opens, by its
+  parent and the ended phase, read again on its tree's or its
+  document's change, one read out at a time, one asked while another
+  is out read once that answers, and the read's page cut; the panel's
+  slot in each state; each step's slot and the steps done; a task's
   page's acts, 5.11: Message, Stop, Cancel and Release each as its
   request, Stop and Cancel only once confirmed, one request per kind
   at a time, an act not offered, proposable or refused sending
@@ -2398,7 +2540,14 @@ own tests:
   request's revision named or not as 3.7 says; a procedure's task's
   page, 5.10: its goal's link when it serves another task and none
   when it serves itself or none, and "Its tasks" over its plan where a
-  person task's says "Plan"; the forge's words for every
+  person task's says "Plan"; its header with its panel shown and its
+  part's words loading, unknown and ended; "View on forge ↗" with an
+  address and none; each step at its slot with its line, the task it
+  runs and none, a queue's place with the tasks ahead named, more and
+  none; each hold's notice; CI and each verdict at its head, blocking
+  and advisory, and no gate; its bounds; and its ended tasks after its
+  live ones, "No live tasks." before the read, "None yet.", "None."
+  and the more line; the forge's words for every
   path shape and every kind, the form and its picker in each state,
   every outcome, the forges' page with a forge in each state of
   `forge.md`, 5.4);
@@ -2471,8 +2620,11 @@ own tests:
   following its steps in order, never going back, its pull request's
   number, CI passed at its head,
   its gate's verdict, and at its end its merge commit, the watch kept
-  open with nothing moving it; a task that is no change watched as
-  unknown; the banner with no
+  open with nothing moving it; that page read at each step, its steps,
+  its step's line and its pull request's line as 5.10 draws them, to
+  "Landed · merge commit" with all six done; an ended procedure's "Its
+  tasks" listing its ended tasks with their endings; a task that is no
+  change watched as unknown, its part saying so; the banner with no
   account, a key added on the accounts page and the banner gone, and
   the key in no record of the small store; a key's request lost and
   sent again by the person, making one account; a sign-in started, its
@@ -2690,7 +2842,8 @@ own tests:
   steps are a stand-in, ticked from the result. The engine publishing
   the change's step as its task's part, which the forge's side reads,
   is the candidate, about 1.5 to 3 thousand lines. Default: the
-  stand-in.
+  stand-in. The change's task page draws its live step from its panel
+  (5.10); the card does not watch it.
 - **"Landed into main"** (the first-run mockup's earlier draft): the
   branch a change lands into is a parameter of the forge's procedure,
   which jig's contract does not type, and the landing words name the
@@ -2712,7 +2865,8 @@ own tests:
   mockup's done rows, its "Live only" and its
   counts ("3 running, 3 in queues, 7 ended") have no document to come
   from. Default: as supplied; they wait for a supplied source, such as
-  a task query's phases.
+  a task query's phases, which a procedure's "Its tasks" reads (5.10)
+  and a goal's plan does not yet.
 - **An added dependency** on a task's page (5.8, 5.9):
   `Dependency.added` says when and by whom a dependency was added.
   Default: a mark in its item of the dependency line, who added it and
@@ -2761,3 +2915,18 @@ own tests:
     changed;
   - a goal's page has no composer, as the mockup, though the engine
     offers Message on a goal.
+- **A change's page against its mockup** (5.10), each a default the
+  user may change:
+  - "Its tasks"'s rows: 5.8's plan rows, with their executor, state and
+    spend, where the mockup draws each as a gate's row, its kind and
+    its phase, and heads the region "made by the change procedure…";
+  - a gate named "Gate N · kind", where the mockup names the landing
+    rule that adds it, and "No other gate." with no "its landing rules
+    add none", since the panel carries the gates, not the rules;
+  - its step's line, its hold and its bounds, which the mockup does
+    not draw;
+  - the "Changes" breadcrumb, not drawn until the `Changes` page is.
+- **A procedure's older ended tasks** (5.10): the page reads one page
+  of them and says "More of its ended tasks are not shown." past it.
+  Default: one page, since a change makes a handful; an "Older" read,
+  as an agent's task's conversation has, is the candidate.

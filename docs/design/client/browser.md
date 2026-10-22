@@ -369,9 +369,12 @@ their addresses: one story opens each present page's address directly
 and reads its heading. The task pages' story runs on `temper box`'s demo,
 with its own fakes, from a procedure's plan to its agent and back by
 the lineage bar, each by its address, and opens the agent's page fresh
-by its address. A later page that has such behaviour brings its
-story with it: the accounts page's sign-in address, an external link
-that opens a tab of its own.
+by its address; the procedure's page is the demo's change (`README.md`,
+5.10), read to landed: its six steps done, its merge commit's line, its
+agent among its ended tasks, and no "View on forge ↗", since the
+demo's forge has no `web`. A later page that has such behaviour brings
+its story with it: the accounts page's sign-in address, an external
+link that opens a tab of its own.
 
 ### 4.3 Its budget and the gate
 
