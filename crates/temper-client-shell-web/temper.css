@@ -5,6 +5,7 @@
   --temper-paper: #fffefd;
   --temper-ink: #34312c;
   --temper-muted: #898278;
+  --temper-faint: #a09c93;
   --temper-line: #e9e4db;
   --temper-accent: #b8664e;
   --temper-accent-dark: #9d5139;
@@ -349,6 +350,7 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 .temper-page .temper-heading, .temper-main:has(> .temper-chatbar) > .temper-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 21px; margin-bottom: 9px; }
 .temper-pagebar + .temper-heading, .temper-pagebar + h2 { margin-top: 22px; }
 .temper-entry + .temper-heading { margin-top: 23px; }
+.temper-heading > .temper-subtle-count { margin: 0 auto 0 -9px; color: var(--temper-faint); font: 500 11px/1.58 var(--temper-mono); white-space: nowrap; }
 /* The chats page: its composer keeps the welcome's 760px and More its own width, at the column's left. */
 .temper-main.temper-page > :is(.temper-choice, .temper-entry), .temper-main.temper-page > .temper-rows + button { margin-left: max(24px, calc((100% - 1160px) / 2)); margin-right: auto; }
 .temper-main.temper-page > :is(.temper-choice, .temper-entry) { width: min(760px, calc(100% - 48px)); }
@@ -375,15 +377,21 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 .temper-page .temper-card code { font: inherit; }
 /* .meta-row and .tag: kind words and the supplied project and task path. */
 .temper-meta { display: flex; flex-wrap: wrap; gap: 7px 12px; align-items: center; color: var(--temper-muted); font-size: 11px; }
-.temper-meta h3 { display: inline-flex; align-items: center; white-space: nowrap; border-radius: 3px; padding: 2px 6px; margin: 0; background: #f3f1eb; color: #6d695f; font: 600 10px/1.58 var(--temper-mono); letter-spacing: -.015em; }
+.temper-page .temper-meta .temper-inbox-tag { display: inline-flex; align-items: center; white-space: nowrap; border-radius: 3px; padding: 2px 6px; margin: 0; background: #f3f1eb; color: #6d695f; font: 600 10px/1.58 var(--temper-mono); letter-spacing: -.015em; }
 .temper-page .temper-meta p { color: var(--temper-muted); margin: 0; }
 .temper-meta a::before { content: "›" / ""; margin-right: 7px; }
 .temper-meta a { margin-left: -5px; }
-.temper-kind-proposal > .temper-meta h3 { background: var(--temper-accent-pale); color: var(--temper-accent-dark); }
-.temper-kind-question > .temper-meta h3 { background: var(--temper-amber-pale); color: var(--temper-amber); }
-.temper-kind-held > .temper-meta h3 { background: var(--temper-red-pale); color: var(--temper-red); }
-.temper-kind-person-task > .temper-meta h3 { background: var(--temper-green-pale); color: var(--temper-green); }
-/* .inbox-card h3 and .proposal-items: a title paragraph and supplied facts. */
+.temper-kind-proposal > .temper-meta .temper-inbox-tag { background: var(--temper-accent-pale); color: var(--temper-accent-dark); }
+.temper-kind-question > .temper-meta .temper-inbox-tag { background: var(--temper-amber-pale); color: var(--temper-amber); }
+.temper-kind-held > .temper-meta .temper-inbox-tag { background: var(--temper-red-pale); color: var(--temper-red); }
+.temper-kind-person-task > .temper-meta .temper-inbox-tag { background: var(--temper-green-pale); color: var(--temper-green); }
+.temper-page .temper-meta .temper-wait { margin-left: auto; }
+.temper-kind-menu { position: relative; flex: none; }
+.temper-kind-menu > summary { list-style: none; cursor: pointer; border: 1px solid var(--temper-line); background: #f7f5f0; border-radius: 4px; padding: 5px 9px; color: var(--temper-muted); font: 600 11px/1.35 var(--temper-mono); }
+.temper-kind-menu > summary::-webkit-details-marker { display: none; }
+.temper-kind-menu > summary::after { content: "⌄" / ""; margin-left: 8px; }
+.temper-kind-menu > div { position: absolute; z-index: 10; top: calc(100% + 5px); right: 0; min-width: max-content; display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 6px; border: 1px solid var(--temper-line); border-radius: 6px; background: var(--temper-paper); box-shadow: 0 8px 24px #30291f18; }
+/* .inbox-card h3 and .proposal-items: the title and supplied facts. */
 .temper-page .temper-card .temper-title { font-size: 13px; font-weight: 700; line-height: 1.35; letter-spacing: -.025em; color: var(--temper-ink); margin: 6px 0; }
 .temper-page .temper-meta + p:not(.temper-title) { margin-top: 6px; }
 .temper-details { display: flex; flex-wrap: wrap; gap: 8px 28px; background: #faf8f4; border-radius: 3px; margin: 10px 0; padding: 9px 12px; font-size: 11px; }
@@ -406,10 +414,11 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 .temper-updates > .temper-card::before { grid-column: 1; grid-row: 1 / span 99; border: 1px solid var(--temper-line); width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-size: 15px; }
 .temper-updates > .temper-card > * { grid-column: 2; min-width: 0; }
 .temper-kind-result::before { content: "✓" / ""; color: var(--temper-green); }
-.temper-kind-reply::before { content: "✳" / ""; color: var(--temper-accent); }
+.temper-kind-reply::before { content: "✳" / ""; color: var(--temper-green); }
 .temper-page .temper-updates .temper-title { font-size: 11px; }
 .temper-page .temper-updates p { color: var(--temper-muted); margin: 4px 0 0; }
 .temper-page .temper-updates .temper-meta p { margin: 0; }
+.temper-page .temper-updates .temper-update-time { color: var(--temper-faint); font-size: 10px; }
 /* .page at 850px. */
 @media (max-width: 850px) {
   .temper-page > :not(.temper-pagebar):not(dialog) { width: calc(100% - 34px); }
@@ -746,7 +755,8 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
 .temper-proposal-facts > [role=term] { color: var(--temper-muted); font-size: 11px; }
 .temper-proposal-facts > [role=definition] { min-width: 0; }
 .temper-proposal-facts [role=definition] > p { margin: 0; font-size: 11px; }
-.temper-kind-proposal h2 { color: var(--temper-ink); font: 700 14px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin: 6px 0; }
+.temper-kind-proposal h2, .temper-page .temper-kind-proposal > h3 { color: var(--temper-ink); font: 700 14px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin: 6px 0; }
+.temper-page .temper-kind-proposal > h3 { font-size: 13px; }
 .temper-chat .temper-turn > .temper-kind-proposal { margin: 4px 0 22px 109px; border: 0; border-left: 2px solid var(--temper-accent); border-radius: 0; box-shadow: none; background: #f8f5f0; padding: 14px 18px 15px; }
 .temper-chat .temper-cards { padding: 0; }
 .temper-chat .temper-kind-proposal > a { display: inline-block; margin-top: 13px; color: var(--temper-accent-dark); font-size: 11px; }
@@ -770,5 +780,5 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
 
 .temper-proposal-kicker, .temper-main .temper-kind-proposal .temper-proposal-kicker { margin: 0; color: #a55b43; font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
 
-/* Shared proposal headings and rows keep the card’s own surface in the inbox. */
-.temper-kind-proposal > .temper-details:has(> .temper-proposal-facts) { display: contents; }
+/* .proposal-items: the inbox keeps the mockup's compact labelled fact rows. */
+.temper-page .temper-proposal-facts { grid-template-columns: 64px minmax(0, 1fr); padding: 9px 12px; border-radius: 3px; background: #faf8f4; }

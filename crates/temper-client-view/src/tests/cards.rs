@@ -138,7 +138,7 @@ pub(super) fn batch_proposal() -> c::ReadValue {
 fn a_proposals_title_and_labelled_facts_follow_the_mockup() {
     use skein_ui::Role;
     let mut builder = Builder::new(&fixtures::tree_limits());
-    crate::cards::proposal(&mut builder, &batch_proposal(), &fixtures::words(), 4, true);
+    crate::cards::proposal(&mut builder, &batch_proposal(), &fixtures::words(), 4);
     let tree = builder.finish();
     assert!(fixtures::find(&tree, Role::Heading { level: 2 }, b"Ship update").is_some());
     assert!(fixtures::find(&tree, Role::Heading { level: 3 }, b"Proposed tasks").is_none());
@@ -224,8 +224,12 @@ fn proposal_titles_head_the_cards_and_funding_is_said_once_in_both_pages() {
             let budget = super::chat::named_position(tree.nodes(), Role::Term, Some(b"Budget")).expect("Budget row");
             let description = budget.checked_add(usize::try_from(tree.nodes()[budget].size).unwrap()).unwrap();
             if owner {
-                let title = super::chat::named_position(tree.nodes(), Role::Heading { level: 2 }, Some(b"Ship update"))
-                    .expect("proposal title heads the card");
+                let title = super::chat::named_position(
+                    tree.nodes(),
+                    Role::Heading { level: if root.pages().inbox().is_some() { 3 } else { 2 } },
+                    Some(b"Ship update"),
+                )
+                .expect("proposal title heads the card");
                 assert!(title < budget);
                 for expected in [b"Funding needed: 40".as_slice(), b"Funding left: 120", b"Funding after: 80"] {
                     assert!(skein_lib::bytes::find(&fixtures::node_text(tree, description), expected).is_some());
@@ -269,8 +273,8 @@ fn a_proposal_kicker_precedes_the_title_in_a_chat_but_not_in_the_inbox() {
     ] {
         let view = fixtures::page_view(&root);
         let tree = view.tree();
-        let title =
-            super::chat::named_position(tree.nodes(), Role::Heading { level: 2 }, Some(b"Ship update")).unwrap();
+        let level = if kicked { 2 } else { 3 };
+        let title = super::chat::named_position(tree.nodes(), Role::Heading { level }, Some(b"Ship update")).unwrap();
         let mut kickers = 0_u32;
         let mut first = None;
         for (at, node) in tree.nodes().iter().enumerate() {
@@ -316,7 +320,7 @@ fn proposal_facts_are_labelled_joined_and_contained_in_their_rows() {
         ),
     ] {
         let mut builder = Builder::new(&fixtures::tree_limits());
-        crate::cards::proposal(&mut builder, &page, &fixtures::words(), 4, true);
+        crate::cards::proposal(&mut builder, &page, &fixtures::words(), 4);
         let tree = builder.finish();
         let mut rows = None;
         for (at, node) in tree.nodes().iter().enumerate() {

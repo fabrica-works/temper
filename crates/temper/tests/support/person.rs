@@ -19,7 +19,7 @@ impl<'a> ReplyFace<'a> {
 }
 impl Face for ReplyFace<'_> {
     fn find(&mut self, find: &Find) -> Found {
-        if find.target == Find::named(skein_ui::Role::Heading { level: 3 }, b"Reply").target
+        if find.target == Find::named(skein_ui::Role::Heading { level: 3 }, b"replied").target
             && let [scope @ Target::Role { role: skein_ui::Role::Item, .. }] = find.within.as_ref()
         {
             let item = Find { within: Box::new([]), target: scope.clone() };
@@ -619,7 +619,7 @@ const FORGE_CHAT_REPLY: &[u8] = b"Reply from T2";
 #[must_use]
 pub fn inbox_reply(entry: &[u8]) -> Step<Address> {
     Step::See {
-        find: Find::named(skein_ui::Role::Heading { level: 3 }, b"Reply")
+        find: Find::named(skein_ui::Role::Heading { level: 3 }, b"replied")
             .within(Box::new([Target::Role { role: skein_ui::Role::Item, name: entry.into() }])),
         within: super::WITHIN,
     }

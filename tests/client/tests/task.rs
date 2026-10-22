@@ -494,7 +494,7 @@ fn a_chat_reply_is_identified_by_its_task_in_the_native_inbox() {
     let person = world.client(fixtures::PARTY, fixtures::inbox());
     // An inbox entry is named by its kind and its source task (client/README.md, 3.5).
     let entry = |kind: &str| format!("{kind} from T{task}").into_bytes().into_boxed_slice();
-    let reply = Find::named(Role::Heading { level: 3 }, b"Reply")
+    let reply = Find::named(Role::Heading { level: 3 }, b"replied")
         .within(Box::new([skein_fake_person::Target::Role { role: Role::Item, name: entry("Reply") }]));
     world.person(person, vec![Step::See { find: reply, within: fixtures::WITHIN }]);
     let outcome = world.run(Until::Done);
@@ -505,14 +505,14 @@ fn a_chat_reply_is_identified_by_its_task_in_the_native_inbox() {
         person,
         vec![
             Step::See { find: Find::named(Role::Status, b"Done"), within: fixtures::WITHIN },
-            Step::See { find: Find::named(Role::Heading { level: 3 }, b"Reply"), within: fixtures::WITHIN },
+            Step::See { find: Find::named(Role::Heading { level: 3 }, b"replied"), within: fixtures::WITHIN },
         ],
     );
     assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);
     let tree = world.tree(person);
     for (object, heading, name) in [
-        (jig_client::contract::ObjectKey::Result(task), b"Updates".as_slice(), entry("Updates")),
-        (jig_client::contract::ObjectKey::Task(task), b"Reply".as_slice(), entry("Reply")),
+        (jig_client::contract::ObjectKey::Result(task), format!("T{task} Hello is done").as_bytes(), entry("Updates")),
+        (jig_client::contract::ObjectKey::Task(task), format!("T{task} Hello replied").as_bytes(), entry("Reply")),
     ] {
         let item = tree
             .nodes()

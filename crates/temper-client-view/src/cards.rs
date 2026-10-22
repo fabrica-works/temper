@@ -270,15 +270,20 @@ impl Words {
         ending(b, value, self);
     }
 }
-pub fn proposal(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, kicker: bool) {
-    proposal::draw(b, page, words, rows, kicker);
+pub fn proposal(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32) {
+    proposal_at(b, page, words, rows, 2);
 }
 
+/// Project the same proposal at its caller's heading level.
+pub fn proposal_at(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, level: u8) {
+    proposal::reason(b, page);
+    proposal::facts(b, page, words, rows, level);
+}
 pub(crate) fn proposal_reason(b: &mut Builder, page: &c::ReadValue) {
     proposal::reason(b, page);
 }
-pub(crate) fn proposal_facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, kicker: bool) {
-    proposal::facts(b, page, words, rows, kicker);
+pub(crate) fn proposal_facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, level: u8) {
+    proposal::facts(b, page, words, rows, level);
 }
 
 pub fn hold(b: &mut Builder, value: &c::HoldCategory, words: &Words) {

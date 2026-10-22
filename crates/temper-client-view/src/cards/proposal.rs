@@ -3,10 +3,6 @@ use super::{P, phrase, specification, status, text};
 use crate::words::{Word, Words};
 use jig_client::contract as c;
 use skein_ui::{Builder, Role, phrases::Hole};
-pub(super) fn draw(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, kicker: bool) {
-    reason(b, page);
-    facts(b, page, words, rows, kicker);
-}
 fn batch(page: &c::ReadValue) -> Option<&skein_lib::List<c::ProposedTask>> {
     match page {
         c::ReadValue::OwnerProposal(proposal) => match &proposal.action {
@@ -55,10 +51,10 @@ pub(super) fn reason(b: &mut Builder, page: &c::ReadValue) {
         why(b, page);
     }
 }
-/// The kicker is the caller's: a chat's card says its kind above its title,
-/// an inbox card's tag says it already.
-fn title(b: &mut Builder, tasks: &skein_lib::List<c::ProposedTask>, words: &Words, kicker: bool) {
-    if kicker {
+/// The heading level is the caller's, and the kicker with it: a chat's card (h2)
+/// says its kind above its title; an inbox card (h3) has a tag that says it already.
+fn title(b: &mut Builder, tasks: &skein_lib::List<c::ProposedTask>, words: &Words, level: u8) {
+    if level == 2 {
         b.open(Role::Paragraph);
         b.style(crate::look::PROPOSAL_KICKER);
         let kicker = words.say(Word::Proposal, &[]);
@@ -69,9 +65,13 @@ fn title(b: &mut Builder, tasks: &skein_lib::List<c::ProposedTask>, words: &Word
     for task in tasks {
         let written = task.spec.specification.words.bytes();
         let end = skein_lib::bytes::find(written, b"\n").unwrap_or(written.len());
-        text(b, Role::Heading { level: 2 }, written.get(..end).expect("title prefix"));
+        text(b, Role::Heading { level }, written.get(..end).expect("title prefix"));
         if end < written.len() {
-            skein_ui::markdown::read(written.get(end..).expect("spec body"), 3, b);
+            skein_ui::markdown::read(
+                written.get(end..).expect("spec body"),
+                level.checked_add(1).expect("proposal heading fits"),
+                b,
+            );
         }
     }
 }
@@ -105,9 +105,9 @@ fn why(b: &mut Builder, page: &c::ReadValue) {
         | c::ReadValue::OwnerDeployment(_) => {}
     }
 }
-pub(super) fn facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, kicker: bool) {
+pub(super) fn facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, level: u8) {
     if let Some(tasks) = batch(page) {
-        title(b, tasks, words, kicker);
+        title(b, tasks, words, level);
         batch_facts(b, page, tasks, words, rows);
         return;
     }

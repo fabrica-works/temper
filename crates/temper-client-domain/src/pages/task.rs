@@ -784,6 +784,7 @@ impl Task {
                 group: c::InboxGroup::Escalations,
                 project: None,
                 position: None,
+                unread: None,
                 handle,
                 page: None,
                 words: None,

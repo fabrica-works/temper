@@ -266,7 +266,7 @@ fn live_updates_do_not_replace_an_older_closed_page() {
     assert!(out.is_empty(), "an older page stays put");
 }
 
-fn chat_line() -> TaskLine {
+pub(super) fn chat_line() -> TaskLine {
     let task = fixtures::chat::task();
     let ChipPhase::Owner { details, .. } = task.chip.details.as_ref() else { panic!("owner") };
     let budget = details.budget.clone();

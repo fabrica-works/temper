@@ -462,6 +462,7 @@ fn rejecting_pages() -> crate::pages::Pages {
             group: c::InboxGroup::Proposals,
             project: Some(fixtures::PROJECT),
             position: None,
+            unread: None,
             handle,
             page: Some(fixtures::acts::proposal(c::ActKind::Reject, c::Admission::Allowed)),
             words: None,

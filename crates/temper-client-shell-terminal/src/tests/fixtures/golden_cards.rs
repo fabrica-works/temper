@@ -15,8 +15,7 @@ pub fn proposal(builder: &mut Builder) {
     proposal.funding.left = LEFT;
     let page = c::ReadValue::Proposal(Box::new(proposal));
     let words = super::page_words();
-    // An inbox card: its tag says the kind, so no kicker.
-    temper_client_view::cards::proposal(builder, &page, &words, WINDOW, false);
+    temper_client_view::cards::proposal_at(builder, &page, &words, WINDOW, 3);
 }
 pub fn held(builder: &mut Builder) {
     let mut task = jig_client_world::stories::task();
@@ -41,7 +40,7 @@ pub fn held(builder: &mut Builder) {
         .expect("release offer fits");
     let page = c::ReadValue::Task(Box::new(task));
     let words = super::page_words();
-    temper_client_view::cards::proposal(builder, &page, &words, WINDOW, false);
+    temper_client_view::cards::proposal(builder, &page, &words, WINDOW);
     temper_client_view::cards::decision(builder, &words, Some(&page), c::ActKind::Release);
 }
 pub fn report(builder: &mut Builder, bytes: &[u8]) {

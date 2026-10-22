@@ -226,3 +226,101 @@ fn result_seen_pending_and_answer_survive_navigation() {
     answer_seen(&mut pages, key, answered());
     shown(&mut open_result(&mut pages, POSITION));
 }
+
+#[test]
+fn reply_counts_and_source_cut_survive_both_inbox_documents() {
+    let count = contract::Count { value: 5, limited: true };
+    let mut line = super::chats::chat_line();
+    line.chip.task = TASK;
+    line.conversation = Some(contract::ConversationRead { seen: POSITION, unread: count });
+    for owner in [false, true] {
+        let (mut root, watch) = fixtures::inbox_home(Filter::ALL);
+        let mut entries = rows(ObjectKey::Task(TASK), InboxGroup::Replies, PROJECT);
+        entries.get_mut(0).unwrap().reply = Some(Box::new(line.clone()));
+        let object = contract::OwnerInboxObject::Reply { message: MESSAGE };
+        let cursor = contract::OwnerInboxCursor::Inbox { task: TASK, object, at: None };
+        let delivery = if owner {
+            let mut updates = List::with_capacity(1);
+            updates
+                .push(contract::OwnerInboxEntry {
+                    reply: Some(Box::new(line.clone())),
+                    task: contract::OwnerTaskLink::Live(line.chip.clone()),
+                    project: Some(PROJECT),
+                    object,
+                    activity: None,
+                    at: None,
+                    unread: Some(true),
+                    cursor,
+                })
+                .unwrap();
+            contract::Delivery::OwnerInbox(Box::new(contract::OwnerInbox {
+                party: fixtures::PARTY,
+                needs: List::with_capacity(0),
+                updates,
+                next: Some(cursor),
+                cached_needs: 0,
+                cached_updates: count,
+                results_seen: 0,
+                updates_time_complete: true,
+                selection: None,
+            }))
+        } else {
+            contract::Delivery::Inbox(Box::new(contract::Inbox {
+                entries,
+                needs: contract::Needs { proposals: 0, questions: 0, escalations: 0, person_tasks: 0 },
+                updates: count,
+                results_seen: 0,
+                replies_seen: List::with_capacity(0),
+                more: true,
+            }))
+        };
+        let mut out = Queue::with_capacity(crate::max_out(&fixtures::limits()));
+        crate::step(
+            &mut root,
+            &fixtures::env(&fixtures::limits()),
+            crate::Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Watched { watch, event: contract::WatchEvent::Delivered(delivery) },
+                },
+            },
+            &mut out,
+        );
+        let inbox = root.pages().inbox().unwrap();
+        assert_eq!(inbox.cards.get(0).unwrap().unread, Some(count));
+        assert_eq!(inbox.cut, [true, true]);
+    }
+}
+#[test]
+fn filtered_cut_is_kept_for_each_section_and_both_page_shapes() {
+    use jig_client::{Readout, Told};
+    for owner in [false, true] {
+        let (mut root, watch) = fixtures::inbox_home(Filter { goal: Some(GOAL), ..Filter::ALL });
+        let mut out = fixtures::inbox_entries(&mut root, watch, List::with_capacity(0));
+        let handles = root.pages().inbox().unwrap().queries;
+        for (index, handle) in handles.into_iter().enumerate() {
+            let page = if owner {
+                contract::ReadValue::OwnerInbox(Box::new(contract::OwnerInboxPage {
+                    selection: None,
+                    cut: index == 1,
+                    rows: List::with_capacity(0),
+                    before: None,
+                    after: None,
+                }))
+            } else {
+                contract::ReadValue::Inbox(Box::new(contract::InboxPage {
+                    cut: index == 1,
+                    rows: List::with_capacity(0),
+                    before: None,
+                    after: None,
+                }))
+            };
+            crate::route::told(
+                &mut root,
+                &fixtures::env(&fixtures::limits()),
+                Told::Page { handle, page: Readout::Jig(contract::ReadResult::Value(page)) },
+                &mut out,
+            );
+        }
+        assert_eq!(root.pages().inbox().unwrap().cut, [false, true]);
+    }
+}

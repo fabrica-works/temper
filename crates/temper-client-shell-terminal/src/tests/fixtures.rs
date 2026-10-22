@@ -376,22 +376,21 @@ pub fn inbox_page() -> skein_ui::Tree {
     builder.open(Role::Heading { level: 1 });
     builder.text(Run::Plain, b"Inbox");
     builder.close();
-    for name in [
-        b"All projects".as_slice(),
-        b"Shop",
-        b"Second",
-        b"All kinds",
-        b"Proposal",
-        b"Question",
-        b"Held",
-        b"Person task",
-        b"All goals",
-    ] {
+    for name in [b"All projects".as_slice(), b"Shop", b"Second", b"All goals"] {
         builder.open(Role::Button);
         builder.name(name);
         builder.bind(binding());
         builder.close();
     }
+    builder.open(Role::Disclosure);
+    builder.name(b"Kind");
+    for name in [b"All kinds".as_slice(), b"Proposal", b"Question", b"Held", b"Person task"] {
+        builder.open(Role::Button);
+        builder.name(name);
+        builder.bind(binding());
+        builder.close();
+    }
+    builder.close();
     builder.open(Role::TextField);
     builder.name(b"Goal");
     builder.value(b"", 0);
@@ -401,11 +400,16 @@ pub fn inbox_page() -> skein_ui::Tree {
         builder.open(Role::Heading { level: 2 });
         builder.text(Run::Plain, heading);
         builder.close();
+        builder.open(Role::Paragraph);
+        builder.text(Run::Plain, if heading == b"Needs you" { b"4" } else { b"2 new" });
+        builder.close();
         for (kind, body) in cards {
             builder.open(Role::Item);
-            builder.open(Role::Heading { level: 3 });
-            builder.text(Run::Plain, kind);
-            builder.close();
+            if heading == b"Needs you" {
+                builder.open(Role::Paragraph);
+                builder.text(Run::Plain, kind);
+                builder.close();
+            }
             builder.open(Role::Paragraph);
             builder.text(Run::Plain, b"Project 1");
             builder.close();
@@ -428,14 +432,21 @@ pub fn inbox_page() -> skein_ui::Tree {
             } else {
                 time
             };
-            builder.open(Role::Paragraph);
-            builder.text(Run::Plain, &time);
-            builder.close();
-            builder.open(if *kind == b"Proposal" { Role::Heading { level: 2 } } else { Role::Paragraph });
+            if heading == b"Needs you" {
+                builder.open(Role::Paragraph);
+                builder.text(Run::Plain, &time);
+                builder.close();
+            }
+            builder.open(Role::Heading { level: 3 });
             builder.text(Run::Plain, body);
             builder.close();
             if *kind == b"Proposal" {
                 golden_cards::proposal(&mut builder);
+            }
+            if heading == b"Updates" {
+                builder.open(Role::Paragraph);
+                builder.text(Run::Plain, &time);
+                builder.close();
             }
             if *kind == b"Held" {
                 golden_cards::held(&mut builder);
@@ -452,8 +463,8 @@ const INBOX_CARDS: [(&[u8], &[u8]); 6] = [
     (b"Question", b"Which provider first?"),
     (b"Held", b"Review needs attention"),
     (b"Person task", b"Choose a provider"),
-    (b"Updates", b"Accessibility pass is done"),
-    (b"Reply", b"OAuth login? replied"),
+    (b"Updates", b"T9 Accessibility pass is done"),
+    (b"Reply", b"T9 OAuth login? replied"),
 ];
 pub fn task_page() -> skein_ui::Tree {
     task::page()

@@ -450,6 +450,15 @@ fn inbox_with_proposer(
     document: Option<(c::Read, c::ReadValue)>,
     proposer: c::Proposer,
 ) -> temper_client_domain::Domain {
+    inbox_facts(filter, document, proposer, false, None)
+}
+pub fn inbox_facts(
+    filter: temper_client_domain::address::Filter,
+    document: Option<(c::Read, c::ReadValue)>,
+    proposer: c::Proposer,
+    cut: bool,
+    unread: Option<c::Count>,
+) -> temper_client_domain::Domain {
     use jig_client::contract::{self, InboxGroup as Group, ObjectKey as Object};
     let mut limits = domain_limits();
     // Six card reads beside the frame's own bounded reads.
@@ -468,7 +477,16 @@ fn inbox_with_proposer(
     ] {
         entries
             .push(contract::InboxEntry {
-                reply: None,
+                reply: if group == Group::Replies {
+                    let mut line = super::chats::line();
+                    line.chip.task = INBOX_REPLY_TASK;
+                    if let Some(unread) = unread {
+                        line.conversation = Some(c::ConversationRead { seen: 0, unread });
+                    }
+                    Some(Box::new(line))
+                } else {
+                    None
+                },
                 lineage: List::with_capacity(0),
                 goal: None,
                 recipient: None,
@@ -487,7 +505,7 @@ fn inbox_with_proposer(
         updates: contract::Count { value: 2, limited: false },
         results_seen: 0,
         replies_seen: List::with_capacity(0),
-        more: false,
+        more: cut,
     };
     temper_client_domain::step(
         &mut root,

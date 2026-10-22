@@ -28,6 +28,7 @@ pub fn held_pages() -> crate::pages::Pages {
             group: c::InboxGroup::Escalations,
             project: Some(PROJECT),
             position: None,
+            unread: None,
             handle: jig_client::Handle { asker: crate::owner::Owner::Pages.asker(), number: FIRST },
             page: Some(c::ReadValue::Task(Box::new(task))),
             words: None,

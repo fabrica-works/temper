@@ -32,11 +32,14 @@ fn button(b: &mut Builder, bindings: &mut Bindings, words: &Words, word: Word, a
 pub(crate) fn card(b: &mut Builder, root: &Domain, card: &Card, words: &Words, bindings: &mut Bindings, rows: u32) {
     let Some(page) = &card.page else { return };
     crate::cards::proposal_reason(b, page);
-    facts(b, page, words, rows, true);
+    facts(b, page, words, rows);
     controls(b, root, card, words, bindings);
 }
-pub(crate) fn facts(b: &mut Builder, page: &ReadValue, words: &Words, rows: u32, kicker: bool) {
-    crate::cards::proposal_facts(b, page, words, rows, kicker);
+pub(crate) fn facts(b: &mut Builder, page: &ReadValue, words: &Words, rows: u32) {
+    facts_at(b, page, words, rows, 2);
+}
+pub(crate) fn facts_at(b: &mut Builder, page: &ReadValue, words: &Words, rows: u32, level: u8) {
+    crate::cards::proposal_facts(b, page, words, rows, level);
     if !crate::cards::proposal_has_rows(page) {
         crate::cards::decision(b, words, Some(page), ActKind::Accept);
     }
@@ -61,7 +64,7 @@ pub(crate) fn controls(b: &mut Builder, root: &Domain, card: &Card, words: &Word
         b.close();
     }
 }
-fn card_controls(b: &mut Builder, root: &Domain, card: &Card, words: &Words, bindings: &mut Bindings) {
+pub(crate) fn card_controls(b: &mut Builder, root: &Domain, card: &Card, words: &Words, bindings: &mut Bindings) {
     let Some(page) = &card.page else { return };
     if let Some(outcome) = &card.outcome {
         match outcome {
@@ -189,7 +192,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         b.open(Role::Dialog);
         b.name(&words.say(word, &[]));
         b.text(Run::Plain, &words.say(word, &[]));
-        crate::cards::proposal(b, page, words, rows, true);
+        crate::cards::proposal(b, page, words, rows);
         if open.act != ActKind::Accept || !crate::cards::proposal_has_rows(page) {
             crate::cards::decision(b, words, Some(page), open.act);
         }

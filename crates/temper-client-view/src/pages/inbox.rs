@@ -64,6 +64,20 @@ pub(crate) fn main(
         b.open(Role::Slot);
         b.style(look::HEADING);
         text(b, Role::Heading { level: 2 }, &words.say(heading, &[]));
+        let updates = heading == Word::InboxUpdates;
+        let mut count = 0_u64;
+        for card in &inbox.cards {
+            if groups.contains(&Some(card.group)) {
+                count = count.checked_add(1).expect("listed cards fit");
+            }
+        }
+        let limited = *inbox.cut.get(usize::from(updates)).expect("two sections");
+        b.open(Role::Paragraph);
+        b.style(look::SUBTLE_COUNT);
+        let said = count_words(words, count, limited, updates && count != 0);
+        b.name(&said);
+        b.text(Run::Plain, &said);
+        b.close();
         if heading == Word::NeedsYou {
             filters(b, root, inbox.filter, words, bindings);
         }
@@ -86,6 +100,13 @@ pub(crate) fn main(
             }
         }
         if opened {
+            b.close();
+        } else {
+            b.open(Role::Paragraph);
+            b.style(look::EMPTY);
+            let said = words.say(if updates { Word::InboxUpdatesEmpty } else { Word::InboxNeedsEmpty }, &[]);
+            b.name(&said);
+            b.text(Run::Plain, &said);
             b.close();
         }
     }
@@ -130,6 +151,24 @@ fn filters(b: &mut Builder, root: &Domain, filter: Filter, words: &Words, bindin
         }
     }
     b.close();
+    b.open(Role::Disclosure);
+    b.style(look::KIND_MENU);
+    let chosen = match filter.kind {
+        None => words.say(Word::Kind, &[]),
+        Some(kind) => words.say(
+            Word::KindChosen,
+            &[Hole::Name(words.say(
+                match kind {
+                    Kind::Proposal => Word::Proposal,
+                    Kind::Question => Word::Question,
+                    Kind::Held => Word::Held,
+                    Kind::PersonTask => Word::PersonTask,
+                },
+                &[],
+            ))],
+        ),
+    };
+    b.name(&chosen);
     b.open(Role::Slot);
     for (kind, word) in [
         (None, Word::AllKinds),
@@ -140,6 +179,7 @@ fn filters(b: &mut Builder, root: &Domain, filter: Filter, words: &Words, bindin
     ] {
         filter_control(b, bindings, &words.say(word, &[]), Filter { kind, ..filter }, filter.kind == kind);
     }
+    b.close();
     b.close();
     b.open(Role::Slot);
     filter_control(
@@ -193,7 +233,18 @@ fn entry(
     b.style(style);
     b.open(Role::Slot);
     b.style(look::META);
-    text(b, Role::Heading { level: 3 }, &words.say(kind, &[]));
+    let update = match card.group {
+        InboxGroup::Results | InboxGroup::Replies => true,
+        InboxGroup::Proposals | InboxGroup::Questions | InboxGroup::Escalations | InboxGroup::PersonTasks => false,
+    };
+    if !update {
+        b.open(Role::Paragraph);
+        b.style(look::INBOX_TAG);
+        let said = words.say(kind, &[]);
+        b.name(&said);
+        b.text(Run::Plain, &said);
+        b.close();
+    }
     if let Some(project) = card.project {
         let fallback = words.say(Word::Project, &[Hole::Number(u64::from(project))]);
         let mut name = fallback.as_ref();
@@ -229,18 +280,31 @@ fn entry(
             },
         );
     }
-    card_time(b, card, words, times);
+    if !update {
+        card_time(b, card, words, times);
+    }
     b.close();
     if let Some(page) = &card.page {
+        if update {
+            update_body(b, card, page, words);
+            card_time(b, card, words, times);
+            b.close();
+            return;
+        }
         body(b, page, words);
         crate::cards::proposal_reason(b, page);
         if has_facts(page) {
-            b.open(Role::Slot);
-            b.style(look::DETAILS);
-            crate::confirm::facts(b, page, words, rows, false);
-            b.close();
+            let proposal = crate::cards::proposal_has_rows(page);
+            if !proposal {
+                b.open(Role::Slot);
+                b.style(look::DETAILS);
+            }
+            crate::confirm::facts_at(b, page, words, rows, 3);
+            if !proposal {
+                b.close();
+            }
         }
-        crate::confirm::controls(b, root, card, words, bindings);
+        crate::confirm::card_controls(b, root, card, words, bindings);
     }
     b.close();
 }
@@ -315,7 +379,7 @@ fn has_facts(page: &ReadValue) -> bool {
         || decision.funds.is_some()
 }
 fn title(b: &mut Builder, value: &[u8]) {
-    b.open(Role::Paragraph);
+    b.open(Role::Heading { level: 3 });
     b.style(look::TITLE);
     b.name(value);
     b.text(Run::Plain, value);
@@ -332,42 +396,21 @@ fn body(b: &mut Builder, page: &ReadValue, words: &Words) {
             title(b, held.task.chip.title.bytes());
             crate::cards::specification(b, &held.task.spec, words);
         }
-        ReadValue::PersonTask(task) => crate::cards::specification(b, &task.spec, words),
-        ReadValue::OwnerPersonTask(task) => crate::cards::specification(b, &task.spec, words),
+        ReadValue::PersonTask(task) => {
+            title(b, task.task.title.bytes());
+            crate::cards::specification(b, &task.spec, words);
+        }
+        ReadValue::OwnerPersonTask(task) => {
+            title(b, task.task.title.bytes());
+            crate::cards::specification(b, &task.spec, words);
+        }
         ReadValue::Task(task) => {
             title(b, task.chip.title.bytes());
             crate::cards::specification(b, &task.spec, words);
         }
-        ReadValue::Historical(page) => match &page.value {
-            OwnerHistoricalValue::Task { document, .. } => title(b, document.chip.title.bytes()),
-            OwnerHistoricalValue::Proposal(_)
-            | OwnerHistoricalValue::PersonProposal { .. }
-            | OwnerHistoricalValue::Escalation { .. }
-            | OwnerHistoricalValue::Question { .. }
-            | OwnerHistoricalValue::PersonTask { .. } => {}
-        },
-        ReadValue::Result(result) => {
-            title(b, result.task.title.bytes());
-            words.ending(b, &result.ending);
-            let value = match &result.value {
-                Some(
-                    ResultValue::Report(text)
-                    | ResultValue::Failure(text)
-                    | ResultValue::Words(text)
-                    | ResultValue::OwnerVerdict { words: text, .. }
-                    | ResultValue::Verdict { words: text, .. }
-                    | ResultValue::Connector { summary: text, .. }
-                    | ResultValue::Change { words: text, .. }
-                    | ResultValue::Choice { reason: text, .. },
-                ) => Some(text),
-                Some(ResultValue::Approved { words, .. }) => words.as_ref(),
-                None => None,
-            };
-            if let Some(value) = value {
-                crate::cards::document(b, value);
-            }
-        }
-        ReadValue::OwnerProposal(_)
+        ReadValue::Historical(_)
+        | ReadValue::Result(_)
+        | ReadValue::OwnerProposal(_)
         | ReadValue::Proposal(_)
         | ReadValue::Tasks(_)
         | ReadValue::OwnerProject(_)
@@ -449,8 +492,23 @@ fn card_time(b: &mut Builder, card: &Card, words: &Words, times: &mut Times) {
     };
     let Some(at) = at else { return };
     let said = times.say(words, if wait { TimeForm::Span } else { TimeForm::Ago }, at);
-    let said = if wait { words.say(Word::TimeWaiting, &[Hole::Name(said)]) } else { said };
-    text(b, Role::Paragraph, &said);
+    let said = if wait {
+        words.say(Word::TimeWaiting, &[Hole::Name(said)])
+    } else if let Some(count) = &card.unread
+        && count.value != 0
+    {
+        words.say(
+            Word::UpdateTime,
+            &[Hole::Name(count_words(words, u64::from(count.value), count.limited, true)), Hole::Name(said)],
+        )
+    } else {
+        said
+    };
+    b.open(Role::Paragraph);
+    b.style(if wait { look::WAIT } else { look::UPDATE_TIME });
+    b.name(&said);
+    b.text(Run::Plain, &said);
+    b.close();
 }
 
 fn arrival(page: &ReadValue, reply: bool) -> Option<skein_lib::Wall> {
@@ -512,5 +570,144 @@ fn arrival(page: &ReadValue, reply: bool) -> Option<skein_lib::Wall> {
         | ReadValue::Notes(_)
         | ReadValue::Deployment(_)
         | ReadValue::OwnerDeployment(_) => None,
+    }
+}
+
+fn count_words(words: &Words, count: u64, limited: bool, new: bool) -> Box<[u8]> {
+    words.say(
+        match (limited, new) {
+            (false, false) => Word::Count,
+            (true, false) => Word::CountLimited,
+            (false, true) => Word::NewCount,
+            (true, true) => Word::NewCountLimited,
+        },
+        &[Hole::Number(count)],
+    )
+}
+fn update_body(b: &mut Builder, card: &Card, page: &ReadValue, words: &Words) {
+    let reply = card.group == InboxGroup::Replies;
+    let (chip, result) = match page {
+        ReadValue::Task(task) => (&task.chip, None),
+        ReadValue::Result(result) => (&result.task, Some(result.as_ref())),
+        ReadValue::Historical(history) => match &history.value {
+            OwnerHistoricalValue::Task { document, result } => (&document.chip, Some(result.as_ref())),
+            OwnerHistoricalValue::PersonTask { result, .. } => (&result.task, Some(result.as_ref())),
+            OwnerHistoricalValue::Proposal(_)
+            | OwnerHistoricalValue::PersonProposal { .. }
+            | OwnerHistoricalValue::Escalation { .. }
+            | OwnerHistoricalValue::Question { .. } => return,
+        },
+        ReadValue::Tasks(_)
+        | ReadValue::OwnerProject(_)
+        | ReadValue::Me(_)
+        | ReadValue::Turn(_)
+        | ReadValue::Proposal(_)
+        | ReadValue::OwnerProposal(_)
+        | ReadValue::Escalation(_)
+        | ReadValue::OwnerEscalation(_)
+        | ReadValue::Question(_)
+        | ReadValue::PersonTask(_)
+        | ReadValue::OwnerPersonTask(_)
+        | ReadValue::Ended(_)
+        | ReadValue::OwnerEnded(_)
+        | ReadValue::History(_)
+        | ReadValue::Activity(_)
+        | ReadValue::Inbox(_)
+        | ReadValue::OwnerInbox(_)
+        | ReadValue::Spend(_)
+        | ReadValue::OwnerSpend(_)
+        | ReadValue::Project(_)
+        | ReadValue::Notes(_)
+        | ReadValue::Deployment(_)
+        | ReadValue::OwnerDeployment(_) => return,
+    };
+    let word = if reply {
+        Word::UpdateReplied
+    } else if match result {
+        Some(result) => is_done(&result.ending),
+        None => false,
+    } {
+        Word::UpdateDone
+    } else {
+        Word::UpdateEnded
+    };
+    let task = words.say(Word::TaskWho, &[Hole::Number(chip.task)]);
+    title(b, &words.say(word, &[Hole::Name(task), Hole::Name(skein_lib::bytes::copy_of(chip.title.bytes()))]));
+    if reply {
+        return;
+    }
+    let Some(result) = result else {
+        return;
+    };
+    let embedded = match &result.ending {
+        jig_client::contract::Ending::Task(ending) => match ending.as_ref() {
+            jig_client::contract::OwnerChipEnding::Done(value) => {
+                words.status(b, crate::cards::P::Done, &[]);
+                Some(value)
+            }
+            jig_client::contract::OwnerChipEnding::Failed(_) => {
+                words.status(b, crate::cards::P::Failed, &[]);
+                None
+            }
+            jig_client::contract::OwnerChipEnding::Cancelled { result, .. } => {
+                words.status(b, crate::cards::P::Cancelled, &[]);
+                result.as_ref()
+            }
+        },
+        jig_client::contract::Ending::Done
+        | jig_client::contract::Ending::Failed { .. }
+        | jig_client::contract::Ending::Cancelled { .. }
+        | jig_client::contract::Ending::Withdrawn { .. }
+        | jig_client::contract::Ending::Decided { .. }
+        | jig_client::contract::Ending::Deleted => {
+            words.ending(b, &result.ending);
+            None
+        }
+    };
+    result_excerpt(b, result.value.as_ref().or(embedded));
+}
+fn result_excerpt(b: &mut Builder, value: Option<&ResultValue>) {
+    let value = match value {
+        Some(
+            ResultValue::Report(text)
+            | ResultValue::Failure(text)
+            | ResultValue::Words(text)
+            | ResultValue::OwnerVerdict { words: text, .. }
+            | ResultValue::Verdict { words: text, .. }
+            | ResultValue::Connector { summary: text, .. }
+            | ResultValue::Change { words: text, .. }
+            | ResultValue::Choice { reason: text, .. },
+        ) => Some(text),
+        Some(ResultValue::Approved { words, .. }) => words.as_ref(),
+        None => None,
+    };
+    if let Some(value) = value {
+        let mut start = 0;
+        for end in 0..=value.bytes().len() {
+            if end == value.bytes().len() || value.bytes().get(end) == Some(&b'\n') {
+                let line = value.bytes().get(start..end).expect("line bounds").trim_ascii();
+                if !line.is_empty() {
+                    text(b, Role::Paragraph, line);
+                    break;
+                }
+                start = end.checked_add(1).expect("line bounds");
+            }
+        }
+    }
+}
+
+fn is_done(ending: &jig_client::contract::Ending) -> bool {
+    match ending {
+        jig_client::contract::Ending::Done => true,
+        jig_client::contract::Ending::Task(ending) => match ending.as_ref() {
+            jig_client::contract::OwnerChipEnding::Done(_) => true,
+            jig_client::contract::OwnerChipEnding::Failed(_)
+            | jig_client::contract::OwnerChipEnding::Cancelled { .. } => false,
+        },
+        jig_client::contract::Ending::Failed { .. }
+        | jig_client::contract::Ending::Cancelled { .. }
+        | jig_client::contract::Ending::Withdrawn { .. }
+        | jig_client::contract::Ending::Decided { .. }
+        | jig_client::contract::Ending::Deleted => false,
     }
 }

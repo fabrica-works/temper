@@ -405,7 +405,15 @@ fn inbox_document(w: World) -> c::Inbox {
     for (object, group) in keys {
         entries
             .push(c::InboxEntry {
-                reply: None,
+                reply: match object {
+                    c::ObjectKey::Task(task) => Some(Box::new(reply_line(w, *task))),
+                    c::ObjectKey::Proposal(_)
+                    | c::ObjectKey::Escalation(_)
+                    | c::ObjectKey::Question { .. }
+                    | c::ObjectKey::PersonTask(_)
+                    | c::ObjectKey::Result(_)
+                    | c::ObjectKey::Note { .. } => None,
+                },
                 lineage: List::with_capacity(0),
                 goal: None,
                 recipient: None,
@@ -1944,6 +1952,11 @@ fn ended_rows(w: World) -> List<c::TaskLine> {
     }
     rows
 }
+fn reply_line(w: World, task: u64) -> c::TaskLine {
+    let mut line = task_line(document(w, task));
+    line.conversation = Some(c::ConversationRead { seen: 0, unread: c::Count { value: 1, limited: false } });
+    line
+}
 fn inbox_window(w: World, window: u32) -> c::OwnerInbox {
     // The engine allocates needs and updates independently, each at the requested window.
     let source = inbox_document(w);
@@ -1963,8 +1976,7 @@ fn inbox_window(w: World, window: u32) -> c::OwnerInbox {
             | c::ObjectKey::Note { .. } => unreachable!("world inbox has proposals, questions and replies"),
         };
         let cursor = c::OwnerInboxCursor::Inbox { task, object, at: Some(row.at) };
-        let reply =
-            if row.group == c::InboxGroup::Replies { Some(Box::new(task_line(document(w, task)))) } else { None };
+        let reply = if row.group == c::InboxGroup::Replies { Some(Box::new(reply_line(w, task))) } else { None };
         let entry = c::OwnerInboxEntry {
             reply,
             task: c::OwnerTaskLink::Live(chip(w, task)),

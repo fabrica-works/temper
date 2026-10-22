@@ -458,6 +458,7 @@ impl Chat {
                     group: c::InboxGroup::Proposals,
                     project: Some(task.project),
                     position: None,
+                    unread: None,
                     handle,
                     page: None,
                     words: None,

@@ -128,7 +128,7 @@ fn the_card_reports_client_outcomes_in_jigs_words() {
 fn the_inbox_keeps_proposal_and_decision_facts_before_its_controls() {
     let view = fixtures::page_view(&root(ActKind::Accept, Admission::Allowed));
     let tree = view.tree();
-    let details = super::inbox::styled(tree, crate::look::DETAILS);
+    let details = super::inbox::styled(tree, crate::look::PROPOSAL_FACTS);
     let facts = super::inbox::subtree(tree, details);
     for expected in ACCEPT_WORDS {
         let mut found = false;
@@ -157,6 +157,7 @@ fn the_inbox_keeps_proposal_and_decision_facts_before_its_controls() {
         assert_ne!(node.role, Role::Button);
         assert_ne!(node.role, Role::TextArea);
     }
+
     assert!(reason.expect("reason") > details);
 }
 

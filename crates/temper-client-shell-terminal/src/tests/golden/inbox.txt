@@ -10,49 +10,50 @@ Menu:
 [6] All projects
 [7] Shop
 [8] Second
-[9] All kinds
-[10] Proposal
-[11] Question
-[12] Held
-[13] Person task
-[14] All goals
+[9] All goals
+Kind:
+  [10] All kinds
+  [11] Proposal
+  [12] Question
+  [13] Held
+  [14] Person task
 [15] Goal: (empty)
 ## Needs you
-- ### Proposal
+4
+- Proposal
   Project 1
   [16] Task 9
   Waiting under 1 min
-  ## Add OAuth login
+  ### Add OAuth login
   Why:
     It touches sign-in.
   Budget:
     Funds 40 from your pool · 120 left, 80 after · May spend 40 · May delegate 1 task, depth 1
-- ### Question
+- Question
   Project 1
   [17] Task 9
   Waiting under 1 min
-  Which provider first?
-- ### Held
+  ### Which provider first?
+- Held
   Project 1
   [18] Task 9
   Waiting under 1 min
-  Review needs attention
+  ### Review needs attention
   Held: out of tries
   Hold revision 7
   The next run resumes its conversation; tries count again from zero
-- ### Person task
+- Person task
   Project 1
   [19] Task 9
   Waiting under 1 min
-  Choose a provider
+  ### Choose a provider
 ## Updates
-- ### Updates
-  Project 1
+2 new
+- Project 1
   [20] Task 9
+  ### T9 Accessibility pass is done
   just now
-  Accessibility pass is done
-- ### Reply
-  Project 1
+- Project 1
   [21] Task 9
+  ### T9 OAuth login? replied
   just now
-  OAuth login? replied

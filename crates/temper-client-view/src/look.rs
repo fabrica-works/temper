@@ -193,6 +193,16 @@ pub const PROPOSAL_FACTS: Style = Style { owner: owner(), token: 93 };
 pub const EMPTY: Style = Style { owner: owner(), token: 94 };
 /// The proposal type above its title.
 pub const PROPOSAL_KICKER: Style = Style { owner: owner(), token: 95 };
+/// Inbox presentation (client/README.md, 3.5).
+pub const INBOX_TAG: Style = Style { owner: owner(), token: 96 };
+/// Inbox presentation (client/README.md, 3.5).
+pub const SUBTLE_COUNT: Style = Style { owner: owner(), token: 97 };
+/// Inbox presentation (client/README.md, 3.5).
+pub const KIND_MENU: Style = Style { owner: owner(), token: 98 };
+/// Inbox presentation (client/README.md, 3.5).
+pub const WAIT: Style = Style { owner: owner(), token: 99 };
+/// Inbox presentation (client/README.md, 3.5).
+pub const UPDATE_TIME: Style = Style { owner: owner(), token: 100 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -294,6 +304,11 @@ pub const NAMES: Names<'static> = Names {
         b"temper-proposal-facts",
         b"temper-empty",
         b"temper-proposal-kicker",
+        b"temper-inbox-tag",
+        b"temper-subtle-count",
+        b"temper-kind-menu",
+        b"temper-wait",
+        b"temper-update-time",
     ],
     regions: &[b"temper-link"],
 };

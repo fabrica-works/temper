@@ -16,6 +16,7 @@ pub struct Card {
     pub group: InboxGroup,
     pub project: Option<u32>,
     pub position: Option<u64>,
+    pub unread: Option<contract::Count>,
     pub handle: Handle,
     pub page: Option<ReadValue>,
     pub words: Option<contract::Text>,
@@ -28,6 +29,8 @@ pub struct Inbox {
     pub filter: Filter,
     pub entries: Handle,
     pub cards: List<Card>,
+    /// Incomplete source documents, for needs and updates respectively.
+    pub cut: [bool; 2],
     previous: List<Card>,
     pub queries: [Handle; 2],
     pub next: u64,
@@ -40,6 +43,7 @@ impl Inbox {
     pub(super) fn new(filter: Filter, first: u64, limits: &Limits, out: &mut Queue<Request>) -> Self {
         let inbox = Self {
             filter,
+            cut: [false; 2],
             entries: handle(first),
             queries: [
                 handle(first.checked_add(1).expect("inbox handles fit")),
@@ -73,6 +77,7 @@ impl Inbox {
         for card in &self.cards {
             client(out, jig_client::Event::Unwatch { handle: card.handle });
         }
+        self.cut = [false; 2];
         self.previous.clear();
         core::mem::swap(&mut self.cards, &mut self.previous);
         for index in 0..self.previous.len() {
@@ -111,13 +116,29 @@ impl Inbox {
             None => None,
         };
         if let Some(Latest::Jig(Delivery::Inbox(inbox))) = latest {
+            self.cut = [inbox.more; 2];
             for row in &inbox.entries {
-                self.add(row.object, row.group, Some(row.project), Some(row.position), out);
+                self.add(
+                    row.object,
+                    row.group,
+                    Some(row.project),
+                    Some(row.position),
+                    unread(row.reply.as_deref()),
+                    out,
+                );
             }
         } else if let Some(Latest::Jig(Delivery::OwnerInbox(inbox))) = latest {
+            self.cut = [inbox.next.is_some(); 2];
             for rows in [&inbox.needs, &inbox.updates] {
                 for row in rows {
-                    self.add(row.card_key(), row.group(), row.project, position(row.object), out);
+                    self.add(
+                        row.card_key(),
+                        row.group(),
+                        row.project,
+                        position(row.object),
+                        unread(row.reply.as_deref()),
+                        out,
+                    );
                 }
             }
         }
@@ -128,6 +149,7 @@ impl Inbox {
         group: InboxGroup,
         project: Option<u32>,
         position: Option<u64>,
+        unread: Option<contract::Count>,
         out: &mut Queue<Request>,
     ) {
         if self.cards.len() == self.cards.capacity() {
@@ -160,7 +182,18 @@ impl Inbox {
         let handle = Handle { asker: Owner::Pages.asker(), number: self.next };
         self.next = self.next.checked_add(1).expect("inbox handles fit");
         self.cards
-            .push(Card { object, group, project, position, handle, page: None, words: None, key: None, outcome: None })
+            .push(Card {
+                object,
+                group,
+                project,
+                position,
+                unread,
+                handle,
+                page: None,
+                words: None,
+                key: None,
+                outcome: None,
+            })
             .expect("inbox cards bounded");
         for index in 0..self.previous.len() {
             let old = self.previous.get_mut(index).expect("bounded card");
@@ -186,13 +219,30 @@ impl Inbox {
             return false;
         };
         if self.queries.contains(&handle) && self.filter.goal.is_some() {
+            let index = usize::from(handle == self.queries[1]);
             if let ReadValue::Inbox(page) = value {
+                *self.cut.get_mut(index).expect("query names one section") = page.cut;
                 for row in &page.rows {
-                    self.add(row.object, row.group, Some(row.project), Some(row.position), out);
+                    self.add(
+                        row.object,
+                        row.group,
+                        Some(row.project),
+                        Some(row.position),
+                        unread(row.reply.as_deref()),
+                        out,
+                    );
                 }
             } else if let ReadValue::OwnerInbox(page) = value {
+                *self.cut.get_mut(index).expect("query names one section") = page.cut;
                 for row in &page.rows {
-                    self.add(row.card_key(), row.group(), row.project, position(row.object), out);
+                    self.add(
+                        row.card_key(),
+                        row.group(),
+                        row.project,
+                        position(row.object),
+                        unread(row.reply.as_deref()),
+                        out,
+                    );
                 }
             }
         } else {
@@ -250,4 +300,15 @@ fn handle(number: u64) -> Handle {
 }
 fn position(object: contract::OwnerInboxObject) -> Option<u64> {
     if let contract::OwnerInboxObject::Result { position } = object { Some(position) } else { None }
+}
+
+#[expect(clippy::manual_map, reason = "step code spells out optional reply facts")]
+fn unread(reply: Option<&contract::TaskLine>) -> Option<contract::Count> {
+    match reply {
+        Some(line) => match &line.conversation {
+            Some(conversation) => Some(conversation.unread),
+            None => None,
+        },
+        None => None,
+    }
 }

@@ -59,10 +59,7 @@ fn entries_show_proposals_questions_held_and_person_tasks_then_updates() {
             headings.push(node.name.as_deref().expect("named heading")).expect("eight headings");
         }
     }
-    assert_eq!(
-        headings.as_slice(),
-        [b"Needs you".as_slice(), b"Proposal", b"Question", b"Held", b"Person task", b"Updates", b"Updates", b"Reply"]
-    );
+    assert_eq!(headings.as_slice(), [b"Needs you".as_slice(), b"Updates"]);
 }
 #[test]
 fn an_entry_naming_a_task_links_to_its_page_by_number() {
@@ -145,7 +142,7 @@ fn headings_hold_the_page_title_and_filters_without_mark_seen() {
         assert_ne!(node.name.as_deref(), Some(b"Mark seen".as_slice()));
     }
     let updates = subtree(tree, heading(tree, b"Updates"));
-    assert_eq!(updates.len(), 3);
+    assert_eq!(updates.len(), 5);
     for node in tree.nodes() {
         assert_ne!(node.name.as_deref(), Some(b"Mark seen".as_slice()));
     }
@@ -213,8 +210,11 @@ fn cards_are_grouped_in_lists_with_kinds_and_named_project_paths() {
         assert!(card > list && card < list.checked_add(subtree(tree, list).len()).expect("list end"));
         let meta = subtree(tree, card.checked_add(1).expect("meta index"));
         assert_eq!(meta[0].styles.as_slice(), [look::META]);
-        assert_eq!(meta[1].role, Role::Heading { level: 3 });
-        let project = role_node(meta, Role::Paragraph);
+        if i < 4 {
+            assert_eq!(meta[1].role, Role::Paragraph);
+            assert_eq!(meta[1].styles.as_slice(), [look::INBOX_TAG]);
+        }
+        let project = &meta[if i < 4 { 3 } else { 1 }];
         assert_eq!(project.name.as_deref(), Some(b"Shop".as_slice()));
         let link = role_node(meta, Role::Link);
         assert_eq!(link.name.as_deref(), Some(if i == 5 { b"Task 10".as_slice() } else { b"Task 9".as_slice() }));
@@ -247,6 +247,13 @@ fn absent_groups_have_no_empty_lists() {
     );
     let view = fixtures::page_view(&root);
     assert_eq!(style_count(view.tree().nodes(), look::CARDS), 0);
+    assert_eq!(style_count(view.tree().nodes(), look::EMPTY), 2);
+    for message in [b"Nothing needs you.".as_slice(), b"No updates."] {
+        assert!(fixtures::find(view.tree(), Role::Paragraph, message).is_some());
+    }
+    for section in [b"Needs you".as_slice(), b"Updates"] {
+        assert!(has_styled_name(subtree(view.tree(), heading(view.tree(), section)), look::SUBTLE_COUNT, b"0"));
+    }
     let filtered =
         fixtures::page_view(&fixtures::inbox_root_filtered(Filter { kind: Some(Kind::Question), ..Filter::ALL }));
     assert_eq!(style_count(filtered.tree().nodes(), look::CARDS), 1);
@@ -272,12 +279,12 @@ pub(super) fn question_root() -> Domain {
     )
 }
 #[test]
-fn a_title_stays_a_paragraph_and_empty_facts_are_absent() {
+fn a_title_is_the_heading_and_empty_facts_are_absent() {
     let root = question_root();
     let view = fixtures::page_view(&root);
     let tree = view.tree();
     let title = styled(tree, look::TITLE);
-    assert_eq!(tree.nodes()[title].role, Role::Paragraph);
+    assert_eq!(tree.nodes()[title].role, Role::Heading { level: 3 });
     assert_eq!(tree.nodes()[title].name, Some(fixtures::task::document().chip.title.bytes().into()));
     assert_eq!(style_count(tree.nodes(), look::DETAILS), 0);
 }
@@ -370,13 +377,13 @@ fn a_reply_card_names_its_task_after_the_task_ends() {
     );
     let view = fixtures::page_view(&root);
     let mut face = TreeFace::new(view.tree());
-    let find = Find::named(Role::Heading { level: 3 }, b"Reply")
+    let find = Find::named(Role::Heading { level: 3 }, b"T10 Land a small change replied")
         .within(Box::new([Target::Role { role: Role::Item, name: Box::from(b"Reply from T10".as_slice()) }]));
     let found = match face.find(&find) {
         Found::Node(_) => true,
         Found::Absent | Found::Pending => false,
     };
-    assert!(found, "ended task's named Item holds H3 Reply");
+    assert!(found, "ended task's named Item holds its reply heading");
 }
 
 #[test]
@@ -414,8 +421,8 @@ fn loaded_task_held_and_result_titles_keep_the_title_token() {
         assert!(loaded, "{read:?}");
         let view = fixtures::page_view(&root);
         let title = &view.tree().nodes()[styled(view.tree(), look::TITLE)];
-        assert_eq!(title.role, Role::Paragraph);
-        assert_eq!(title.name.as_deref(), Some(task.chip.title.bytes()));
+        assert_eq!(title.role, Role::Heading { level: 3 });
+        assert!(skein_lib::bytes::find(title.name.as_deref().unwrap(), task.chip.title.bytes()).is_some());
     }
 }
 
@@ -440,4 +447,144 @@ fn a_result_entry_marks_seen_when_its_link_is_followed() {
             through: fixtures::INBOX_POSITION
         }))
     );
+}
+
+fn has_named(nodes: &[Node], role: Role, name: &[u8]) -> bool {
+    for node in nodes {
+        if node.role == role && node.name.as_deref() == Some(name) {
+            return true;
+        }
+    }
+    false
+}
+fn has_styled_name(nodes: &[Node], style: skein_ui::Style, name: &[u8]) -> bool {
+    for node in nodes {
+        if node.styles.as_slice().contains(&style) && node.name.as_deref() == Some(name) {
+            return true;
+        }
+    }
+    false
+}
+#[test]
+fn section_counts_use_listed_cards_and_the_sources_cut_fact() {
+    for (cut, needs, updates) in [(false, b"4".as_slice(), b"2 new".as_slice()), (true, b"4+", b"2+ new")] {
+        let root = fixtures::inbox_facts(Filter::ALL, None, c::Proposer::Task(fixtures::INBOX_TASK), cut, None);
+        let view = fixtures::page_view(&root);
+        for (section, expected) in [(b"Needs you".as_slice(), needs), (b"Updates".as_slice(), updates)] {
+            assert!(has_styled_name(subtree(view.tree(), heading(view.tree(), section)), look::SUBTLE_COUNT, expected));
+        }
+    }
+}
+#[test]
+fn the_kind_disclosure_names_the_choice_and_keeps_the_five_buttons_folded() {
+    for (kind, name, pressed) in [
+        (None, b"Kind".as_slice(), b"All kinds".as_slice()),
+        (Some(Kind::Question), "Kind · Question".as_bytes(), b"Question"),
+    ] {
+        let view = fixtures::page_view(&fixtures::inbox_root_filtered(Filter { kind, ..Filter::ALL }));
+        let tree = view.tree();
+        let menu = styled(tree, look::KIND_MENU);
+        assert_eq!(tree.nodes()[menu].role, Role::Disclosure);
+        assert_eq!(tree.nodes()[menu].name.as_deref(), Some(name));
+        assert!(tree.nodes()[menu].states.is_empty());
+        let mut buttons = 0_u32;
+        let mut selected = 0_u32;
+        for node in subtree(tree, menu) {
+            if node.role == Role::Button {
+                buttons = buttons.checked_add(1).unwrap();
+                if node.states.as_slice().contains(&State::Pressed) {
+                    selected = selected.checked_add(1).unwrap();
+                    assert_eq!(node.name.as_deref(), Some(pressed));
+                }
+            }
+        }
+        assert_eq!((buttons, selected), (5, 1));
+    }
+}
+#[test]
+fn the_inbox_proposal_projects_the_same_rows_with_an_h3_and_no_chat_kicker_or_self_link() {
+    let root = fixtures::inbox_with_document(
+        Filter::ALL,
+        Some((
+            c::Read::Proposal {
+                proposal: c::ProposalKey {
+                    proposer: c::Proposer::Task(fixtures::INBOX_TASK),
+                    number: fixtures::INBOX_QUESTION,
+                },
+            },
+            super::cards::batch_proposal(),
+        )),
+    );
+    let view = fixtures::page_view(&root);
+    let tree = view.tree();
+    let card = subtree(tree, styled(tree, look::KIND_PROPOSAL));
+    assert!(has_named(card, Role::Heading { level: 3 }, b"Ship update"));
+    for node in card {
+        assert_ne!(node.role, Role::Heading { level: 2 });
+    }
+    assert_eq!(style_count(card, look::PROPOSAL_KICKER), 0);
+    assert!(!has_named(card, Role::Link, "Open in inbox ↗".as_bytes()));
+    for label in [b"Why".as_slice(), b"Goal", b"Landing", b"Budget"] {
+        assert!(has_named(card, Role::Term, label));
+    }
+}
+#[test]
+fn reply_updates_show_the_task_heading_and_unread_age_without_the_request() {
+    for (unread, expected) in [
+        (None, b"12 min ago".as_slice()),
+        (Some(c::Count { value: 0, limited: false }), b"12 min ago"),
+        (Some(c::Count { value: 1, limited: false }), "1 new · 12 min ago".as_bytes()),
+        (Some(c::Count { value: 5, limited: true }), "5+ new · 12 min ago".as_bytes()),
+    ] {
+        let mut task = fixtures::task::document();
+        task.chip.task = fixtures::INBOX_REPLY_TASK;
+        task.chip.title = c::DocumentText::complete(c::Text::new(Box::from(*b"Ship update"), 32).unwrap());
+        task.last_activity = skein_lib::Wall::EPOCH;
+        let request = skein_lib::bytes::copy_of(task.spec.specification.words.bytes());
+        let root = fixtures::inbox_facts(
+            Filter::ALL,
+            Some((c::Read::Task { task: fixtures::INBOX_REPLY_TASK }, c::ReadValue::Task(Box::new(task)))),
+            c::Proposer::Task(fixtures::INBOX_TASK),
+            false,
+            unread,
+        );
+        let mut view = fixtures::view();
+        let mut patches = skein_lib::Queue::with_capacity(view.limits().tree.patches);
+        crate::build(&mut view, &root, skein_lib::Wall::from_nanos(720_000_000_000), &mut patches);
+        let card = subtree(view.tree(), styled(view.tree(), look::KIND_REPLY));
+        assert!(has_named(card, Role::Heading { level: 3 }, b"T10 Ship update replied"));
+        assert!(has_styled_name(card, look::UPDATE_TIME, expected));
+        assert!(!has_named(card, Role::Paragraph, &request));
+    }
+}
+#[test]
+fn result_updates_name_the_ending_and_show_only_the_first_nonempty_result_line() {
+    let report = c::ResultValue::Report(c::DocumentText::complete(
+        c::Text::new(Box::from(*b"\n  \nFirst line\nSecond line"), 64).unwrap(),
+    ));
+    for (ending, value, heading) in [
+        (c::Ending::Done, Some(report.clone()), b"T9 Ship update is done".as_slice()),
+        (c::Ending::Deleted, Some(report.clone()), b"T9 Ship update ended"),
+        (c::Ending::Task(Box::new(c::OwnerChipEnding::Done(report))), None, b"T9 Ship update is done"),
+    ] {
+        let mut chip = fixtures::task::document().chip;
+        chip.task = fixtures::INBOX_TASK;
+        chip.title = c::DocumentText::complete(c::Text::new(Box::from(*b"Ship update"), 32).unwrap());
+        let result = c::Result {
+            task: chip,
+            ending,
+            value,
+            at: Some(skein_lib::Wall::EPOCH),
+            details: None,
+            acts: skein_lib::List::with_capacity(0),
+        };
+        let view = fixtures::page_view(&fixtures::inbox_with_document(
+            Filter::ALL,
+            Some((c::Read::Result { task: fixtures::INBOX_TASK }, c::ReadValue::Result(Box::new(result)))),
+        ));
+        let card = subtree(view.tree(), styled(view.tree(), look::KIND_RESULT));
+        assert!(has_named(card, Role::Heading { level: 3 }, heading));
+        assert!(has_named(card, Role::Paragraph, b"First line"));
+        assert!(skein_lib::bytes::find(&fixtures::text(view.tree()), b"Second line").is_none());
+    }
 }

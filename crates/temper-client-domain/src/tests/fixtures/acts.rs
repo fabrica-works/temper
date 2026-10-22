@@ -187,6 +187,7 @@ pub fn pages(object: ObjectKey, page: ReadValue) -> Pages {
             group: InboxGroup::Proposals,
             project: Some(PROJECT),
             position: None,
+            unread: None,
             handle: jig_client::Handle { asker: crate::owner::Owner::Pages.asker(), number: MESSAGE },
             page: Some(page),
             words: None,
