@@ -905,6 +905,10 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // the existing forge slot grows 32 -> 40 B. Two pending bound addresses
     // add 32 B inline each, for 232 B total engine growth.
     let listening_growth = 40 + 3 * 40 + (40 - 32) + 2 * 32;
+    // A host flight keeps its decoded amendment's changed controls (12 B),
+    // growing Flight 80 -> 96 B: the 32-call host flight map grows 1,232 B
+    // in each of 3,076 owned envelope copies; worker inputs stay fixed.
+    let amendment_changes_growth = 3_076 * 1_232;
     assert_eq!(
         required.engine_bytes,
         79_659_997_210_050_u64
@@ -923,6 +927,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + forge_body_intake_growth
             + demo_growth
             + listening_growth
+            + amendment_changes_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
