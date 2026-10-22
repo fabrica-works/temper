@@ -489,8 +489,10 @@ fn a_chat_reply_is_identified_by_its_task_in_the_native_inbox() {
     let mut world = fixtures::world(fixtures::SEED);
     let task = fixtures::replied_chat(world.front(), b"Hello");
     let person = world.client(fixtures::PARTY, fixtures::inbox());
+    // An inbox entry is named by its kind and its source task (client/README.md, 3.5).
+    let entry = |kind: &str| format!("{kind} from T{task}").into_bytes().into_boxed_slice();
     let reply = Find::named(Role::Heading { level: 3 }, b"Reply")
-        .within(Box::new([skein_fake_person::Target::Role { role: Role::Item, name: Box::from(*b"Hello") }]));
+        .within(Box::new([skein_fake_person::Target::Role { role: Role::Item, name: entry("Reply") }]));
     world.person(person, vec![Step::See { find: reply, within: fixtures::WITHIN }]);
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
@@ -505,9 +507,9 @@ fn a_chat_reply_is_identified_by_its_task_in_the_native_inbox() {
     );
     assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);
     let tree = world.tree(person);
-    for (object, heading) in [
-        (jig_client::contract::ObjectKey::Result(task), b"Updates".as_slice()),
-        (jig_client::contract::ObjectKey::Task(task), b"Reply".as_slice()),
+    for (object, heading, name) in [
+        (jig_client::contract::ObjectKey::Result(task), b"Updates".as_slice(), entry("Updates")),
+        (jig_client::contract::ObjectKey::Task(task), b"Reply".as_slice(), entry("Reply")),
     ] {
         let item = tree
             .nodes()
@@ -515,7 +517,7 @@ fn a_chat_reply_is_identified_by_its_task_in_the_native_inbox() {
             .find(|node| node.role == Role::Item && Temper::card(tree, node.id) == Some(observe::key(object)))
             .expect("independent same-task inbox card");
         let mut face = TreeFace::subtree(tree, item.id).expect("card subtree");
-        assert_eq!(face.find(&Find::named(Role::Item, b"Hello")), Found::Node(item.id));
+        assert_eq!(face.find(&Find::named(Role::Item, &name)), Found::Node(item.id));
         assert!(matches!(face.find(&Find::exactly_named(Role::Heading { level: 3 }, heading)), Found::Node(_)));
     }
     let root = world.root(person).person();
