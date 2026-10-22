@@ -821,6 +821,61 @@ fn an_owners_person_words_have_a_person_shell_and_one_paragraph_per_line() {
 }
 
 #[test]
+fn a_tasks_words_have_an_agent_shell_named_by_the_task() {
+    let mut thread = Thread::new(TASK, &jig_client::thread::Limits { lines: LINES, bytes: BYTES, text: TEXT });
+    thread.reading = Some(jig_client::thread::Reading::Latest { known: 0 });
+    let mut rows = List::with_capacity(1);
+    rows.push(c::ActivityLine {
+        position: 1,
+        at: Wall::EPOCH,
+        event: c::Activity::Owner {
+            source: Box::new(c::OwnerActivityLine {
+                task: TASK,
+                position: 1,
+                at: Wall::EPOCH,
+                line: c::OwnerActivity::Words {
+                    message: MESSAGE,
+                    by: c::OwnerRequester::Task(2),
+                    kind: c::OwnerMessageKind::Question,
+                    words: fixtures::first_run::text(b"First line\nSecond line"),
+                },
+            }),
+            decoded: None,
+        },
+    })
+    .expect("owner words");
+    thread.page(c::ActivityPage { rows, before: None, after: None, cut: false });
+    let mut b = skein_ui::Builder::new(&fixtures::tree_limits());
+    crate::pages::chat::conversation(
+        &mut b,
+        &thread,
+        &fixtures::words(),
+        (LINES, TEXT),
+        crate::pages::chat::Speakers { person: Some(PARTY), requester: true },
+        crate::pages::chat::Drawn::Chat { request: None, delegations: None },
+        &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+    );
+    let tree = b.finish();
+    let turn = styled(&tree, crate::look::TURN);
+    let message = styled(&tree, crate::look::BY_AGENT);
+    let mut agent_in_turn = false;
+    for node in subtree(&tree, turn) {
+        if node.styles.as_slice().contains(&crate::look::BY_AGENT) {
+            agent_in_turn = true;
+        }
+    }
+    assert!(agent_in_turn);
+    let mut paragraphs = List::with_capacity(3);
+    for node in subtree(&tree, message) {
+        assert_ne!(node.role, Role::Status);
+        if node.role == Role::Paragraph {
+            paragraphs.push(node.name.as_deref().expect("named paragraph")).expect("three paragraphs");
+        }
+    }
+    assert_eq!(paragraphs.as_slice(), [b"T2".as_slice(), b"First line", b"Second line"]);
+}
+
+#[test]
 fn committed_text_exceeds_field_text_on_both_conversation_pages() {
     use fixtures::first_run as run;
     let value = [b'x'; 256];

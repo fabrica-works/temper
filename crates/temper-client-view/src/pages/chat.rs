@@ -469,9 +469,19 @@ fn provisional(b: &mut Builder, message: &[u8], cut: bool, words: &Words, text_l
     b.close();
 }
 fn owner_line(b: &mut Builder, line: &c::OwnerActivity, projected: bool, person: Option<u64>, words: &Words) {
-    if projected && let c::OwnerActivity::Words { by: c::OwnerRequester::Person(by), words: message, .. } = line {
-        let label = if Some(*by) == person { words.say_card(P::You, &[]) } else { words.say_card(P::Person, &[]) };
-        person_message(b, &label, message.bytes(), WordState::Read { message: 0 }, words);
+    if projected && let c::OwnerActivity::Words { by, words: message, .. } = line {
+        let (label, side) = match by {
+            c::OwnerRequester::Person(by) => (
+                if Some(*by) == person { words.say_card(P::You, &[]) } else { words.say_card(P::Person, &[]) },
+                look::BY_PERSON,
+            ),
+            c::OwnerRequester::Task(task) => (words.say(Word::TaskWho, &[Hole::Number(*task)]), look::BY_AGENT),
+            c::OwnerRequester::Deployment { .. } => {
+                super::task::owner_activity(b, line, words);
+                return;
+            }
+        };
+        words_message(b, &label, message.bytes(), WordState::Read { message: 0 }, side, words);
         return;
     }
     super::task::owner_activity(b, line, words);
@@ -530,9 +540,19 @@ fn person_words(
     person_message(b, &label, message, state, words);
 }
 fn person_message(b: &mut Builder, label: &[u8], message: &[u8], state: WordState, words: &Words) {
+    words_message(b, label, message, state, look::BY_PERSON, words);
+}
+fn words_message(
+    b: &mut Builder,
+    label: &[u8],
+    message: &[u8],
+    state: WordState,
+    side: skein_ui::Style,
+    words: &Words,
+) {
     b.open(Role::Slot);
     b.style(look::MESSAGE);
-    b.style(look::BY_PERSON);
+    b.style(side);
     b.open(Role::Slot);
     b.style(look::WHO);
     text(b, Role::Paragraph, label);
