@@ -966,6 +966,9 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // Jig ed4141db -> 197305b5: bounded open-question facts and their census
     // reads grow the engine and its owned envelope copies by 886,277,472 B.
     let open_questions_growth = 886_277_472;
+    // The root's settled Option<(Time, Wall)> adds 24 B inline through Engine
+    // in Service. Payload envelopes and worker-owned state are unchanged.
+    let settled_root_growth = 24;
     assert_eq!(
         required.engine_bytes,
         79_659_997_210_050_u64
@@ -989,6 +992,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + fake_adoption_growth
             + forgejo_setup_growth
             + open_questions_growth
+            + settled_root_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
