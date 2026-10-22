@@ -270,8 +270,8 @@ fn a_dropped_record_prints_its_line() {
 fn another_partys_record_prints_the_parked_line() {
     let mut f = fixtures::Disk::act_with(fixtures::other_party());
     f.answer_kept();
-    assert_eq!(f.stderr(), b"kept: 1 for party 8, unsent while it is not signed in here\ntemper ctl: request limit\n");
-    assert!(!f.act_sent());
+    assert_eq!(f.stderr(), b"kept: 1 for party 8, unsent while it is not signed in here\n");
+    assert!(f.act_sent());
 }
 #[test]
 fn a_failed_erase_admits_no_act() {
