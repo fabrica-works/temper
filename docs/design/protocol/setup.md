@@ -645,6 +645,24 @@ files: at a first preparation, and for a runner older than its pin
   removed after its `Done`, never before; a `TakeOver` that stops leaves
   it, and the forge not connected, named. A start with no file uses the
   record.
+- **Until temper-15, the box takes the handover.** The engine runs no
+  `TakeOver` and no `Reconcile` on an owned forge yet: `temper forge
+  reconcile DIRS FORGE`, a once step of the box, takes `admin_token` and
+  reconciles as managed's plans do (section 5), into the forge's files
+  `api_token`, `git_token`, `user` and, when the forge names a
+  `webhook_secret`, that secret, each private, which the forge's members
+  name (section 8). It runs after the owned forges' processes and before
+  `temper serve` when a group runs in its place, and last in an asked
+  group, so that the box answers `started` only once it has exited 0
+  (7.1): `started` means connectable. The engine then reads those files,
+  builds the forge's access from them as its start does, and sends
+  `Request::Connect` (forge.md, 2.2). At start, an owned forge whose
+  setup says `"start": "asked"` and whose files are absent, any of them,
+  is not set up: no access and no connect, never a refusal, and every
+  other forge starts as it would; any other forge's absent file refuses
+  the start as configuration.md, section 6 says. temper-15 moves the
+  handover and reconcile into the engine, on the records, and the step
+  and the files go.
 - **Then reconcile runs as managed's** (section 5), and makes each of
   the person's orgs that is missing, owned by the person (`POST
   /api/v1/admin/users/{person}/orgs`).
@@ -746,7 +764,8 @@ temper box
 ├── temper forge prepare DIRS 3       once, per owned forge
 ├── forgejo web                       long: temper forge run DIRS 3 forgejo
 ├── forgejo-runner daemon             long: temper forge run DIRS 3 runner
-│                                     these four, the forge's group: here, or asked (below)
+├── temper forge reconcile DIRS 3     once, until temper-15: the handover, into the forge's files (6.5)
+│                                     these, the forge's group: here, or asked (below)
 ├── temper serve DIRS --box           long: its own tree (README.md, section 4); its setup
 │                                     host takes each handover and reconciles (section 5);
 │                                     fds 3 and 4 its pipe to the box (below)
@@ -760,7 +779,7 @@ temper box
   never writes the document: a configuration directory with entries but
   no document is refused as every command refuses it.
 - **An owned forge's group,** its fetch, its preparation, its Forgejo
-  and its runner, runs in its place in the order at every start of the
+  and its runner, and until temper-15 its reconcile last (6.5), runs in its place in the order at every start of the
   box when its setup has no `start`. With `"start": "asked"` (section 8)
   the box knows the group's steps and starts none of them until
   `temper serve` asks on the pipe, or until the box's record
@@ -775,15 +794,17 @@ temper box
   is named on its stderr, and its group stays dormant.
 - **The pipe,** two of them, made again at each spawn of `temper
   serve`: its fd 3, serve to box, and its fd 4, box to serve. `--box`
-  tells `temper serve` to adopt them; without it, as under every other
-  arrangement (7.4), serve has no pipe. One line each, ending in a line
+  tells `temper serve` to adopt them, and a serve given `--box` whose
+  fd 3 or 4 is not an open pipe refuses its start, naming the fd;
+  without it, as under every other arrangement (7.4), serve has no pipe
+  and leaves fds 3 and 4 alone. One line each, ending in a line
   feed, `FORGE` the forge's number:
 
   | Line | From | Says |
   |---|---|---|
   | `start FORGE` | serve, at the client's ask (6.5) | start the forge's group |
-  | `step FORGE STEP` | the box | the group's step `fetch`, `prepare` or `run` is starting, for the client's row (`../client/forge.md`, 5.4) |
-  | `started FORGE` | the box | the group's long steps are started, and its record written |
+  | `step FORGE STEP` | the box | the group's step `fetch`, `prepare` or `run` is starting (its reconcile, until temper-15, says `run`), for the client's row (`../client/forge.md`, 5.4) |
+  | `started FORGE` | the box | the group's long steps are started, its reconcile has exited 0 (6.5), and its record written |
   | `failed FORGE WHY` | the box | the group stopped: `WHY` names the step by its name, as the box's stderr prefixes it (7.2), such as `prepare 3 exited 1`: `<step> exited <code>`, `<step> killed by signal <n>`, `<step> did not start`, or `record not written`, cut to fit the line's bound, and holds no secret; a step's own lines are on the box's stderr (7.2) |
 
   One ask at a time: a `start` for another forge while a group starts,
@@ -952,7 +973,9 @@ running its commands, and the client names them (6.5).
   | `fake.owner` | a Forgejo login | other than the bot's and `temper-admin`: the user who owns the fake's repositories |
   | `fake.repositories` | a list of `{"name", "landing"}` | at least 1, at most 8, each `name` a Forgejo repository name, unique ignoring ASCII case as Forgejo's are, and `landing` a branch name; their contents are `temper-fake`'s (8.4) |
 
-  The code's entry keeps `orgs` at the entry and the fake entry has none,
+  The code reads an owned entry's orgs from `person.orgs`, and still
+  takes the entry's own `orgs`, the older form, in their place, never
+  both; a managed entry keeps its `orgs` and a fake entry has none,
   until the entry's form is brought to this table (temper-15).
 
 - **A Forgejo with no `setup` entry** is connected's alone; GitHub takes
@@ -1215,14 +1238,17 @@ directory is empty (7.1).
   the facts, checks the refusals and writes the files, on skein-io.
 - **Checked:** temper-init's step tests check that its `engine.llm` is the
   owned example's with the demo's provider (8.3), that the digest is the
-  secret's, and the files' names, directories and order. The binary's
+  secret's, the files' names, directories and order, and forge 3's
+  entries with the person's login found and fallen back. The binary's
   crate tests, on scratch directories, check that the document init writes
   passes configuration.md, section 8, as `temper serve` checks it, with
   the agent's configuration it writes, at the fixed ports and at kernel's
   ports, the five always distinct, with and without `claude`, a bundle and
   git; each refusal writing nothing, the person's fallback login among
-  them; the files' modes; and the link's target. The process tier starts a
-  box on empty directories (13.4).
+  them; the files' modes; and the link's target. A box on a fresh init,
+  among those tests, reaches `temper serve`'s sign-in link with forge 3
+  dormant: no `forge-3` directory and nothing in the cache. The process
+  tier starts a box on empty directories (13.4).
 
 ### 8.3 The default document
 
@@ -1241,7 +1267,10 @@ defaults for a person's real work are open (section 16).
     `api` `127.0.0.1:<its port>`, 8368 (8.2), plaintext, `git`
     `http://127.0.0.1:<its port>`, and one git identity whose `login`
     is the bot's, `temper`; dormant, not connected until the person sets
-    it up from the client (`../draft/first-run.md`, 3.8; 6.5).
+    it up from the client (`../draft/first-run.md`, 3.8; 6.5). Until
+    temper-15 it names, as each Forgejo forge does, its files in
+    `forge-3`, `api_token`, `user` and its identity's `git_token`,
+    absent until its group's reconcile writes them (6.5).
 
   GitHub and the owned Forgejo are in the document from the first run,
   so that connecting either from the client needs no restart. A start
@@ -1320,7 +1349,7 @@ defaults for a person's real work are open (section 16).
 - **Its box's steps:** the fake LLM, forge 1's preparation and its fake,
   `temper serve` and the seed (7.1); and forge 3's group, dormant until
   the client asks for it: its fetch, its preparation, Forgejo's web and
-  the runner's daemon.
+  the runner's daemon, and until temper-15 its reconcile (6.5).
 
 ### 8.4 The demo
 
@@ -2191,7 +2220,8 @@ it checks of this document:
   resolves a default under `$HOME`.
 - **Owned in place of the test's support:** the test runs `temper forge
   prepare`, `run forgejo` and `run runner` itself, then `temper serve`,
-  whose setup host takes the handover and reconciles, with the binaries
+  whose setup host takes the handover and reconciles (until temper-15,
+  `temper forge reconcile` before `temper serve`, 6.5), with the binaries
   `TEMPER_FORGEJO` and `TEMPER_FORGEJO_RUNNER` name, and webhooks on.
   Its repository runs Actions, so its landing rule asks for CI.
 - **The hinted story:** the same story with the keep's `poll`,
@@ -2232,9 +2262,10 @@ it checks of this document:
   Forgejo here" through the client; forge 3's row goes through "Setting
   up" and "Connecting" to connected, with no restart; the person's
   repository, made on Forgejo's API as the person, is adopted, and a
-  worker clones it by the machine's git. A second box on the same
-  directories starts the group at once, by its record, and fetches
-  nothing.
+  worker clones it by the machine's git. Until temper-15, "Connecting"
+  is the engine's connect from the files the group's reconcile wrote
+  (6.5). A second box on the same directories starts the group at once,
+  by its record, and fetches nothing.
 
 ## 15. Later
 

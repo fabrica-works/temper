@@ -346,9 +346,10 @@ under; it must be the `number` of one of `engine.charters`. Feeds
 and the checks of the forge's own members against each entry are
 setup.md, section 8's. An owned forge's orgs are its person's,
 `mode.owned.person.orgs`, which reconcile makes when missing; a setup
-names no other orgs. `temper serve` checks it whole, and the engine's
-setup host reconciles each managed and owned forge at each start,
-and an owned forge whose setup says `"start": "asked"` once the box has
+names no other orgs (the code still takes an owned entry's older `orgs`
+in their place, never both, until temper-15: setup.md, section 8).
+`temper serve` checks it whole, and the engine's setup host reconciles
+each managed and owned forge at each start, and an owned forge whose setup says `"start": "asked"` once the box has
 started it (setup.md, 7.1; the setup host in the engine). A fake forge
 runs start-time adoption instead (setup.md, 8.4). Of the files `setup`
 names, `temper serve` reads one: the handover, `admin_token`, taken
@@ -806,7 +807,9 @@ have one, an engine alone none. Each:
     nor a record of one, is not set up until the client asks the box
     for it (setup.md, 6.5);
   - under the box, `temper serve --box` adopts the box's pipe, its fds 3
-    and 4 (setup.md, 7.1); a start without the flag has none;
+    and 4, and refuses its start, naming the fd, when either is not an
+    open pipe (setup.md, 7.1); a start without the flag has none, and
+    leaves fds 3 and 4 alone;
   - every identity whose forge has a value is announced at generation 1
     before the root's restart; a GitHub forge's, once its first tokens
     are minted (credentials.md, section 4). Every connected forge's user

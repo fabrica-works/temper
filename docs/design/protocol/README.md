@@ -158,7 +158,7 @@ from jig's reference binary. Its commands, `temper ctl`'s as
 `../client/tools.md` designs them:
 
 ```
-temper serve [DIRECTORIES]
+temper serve [DIRECTORIES] [--box]
 temper init [DIRECTORIES]
 temper agent AGENT.json
 temper open DIRECTORY LINK_OR_ADDRESS
@@ -190,6 +190,8 @@ default; the document is `temper.json` in the configuration directory
     notes, the lines of 15.3 (each TCP listener once bound, and a worker
     alone's link at each opening) and the reason of a failure. A worker
     alone prints no sign-in link.
+  - `--box`, given by `temper box` alone, adopts the box's pipe, its fds
+    3 and 4 (setup.md, 7.1).
   - A first termination signal drains it (jig's `protocol/service.md`,
     section 5), and a worker alone's runs its worker's ending (jig's
     `protocol/service.md`, section 6); a second turns either into an

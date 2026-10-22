@@ -250,7 +250,10 @@ skein-io socket
   set up: one whose setup says `"start": "asked"`, with neither the
   handover file nor an `AdminToken` row, has its access `None` and no
   run until the box answers `started` on its pipe (2.2); then its
-  `TakeOver`, its `Reconcile` and its `Connect`, as at a start.
+  `TakeOver`, its `Reconcile` and its `Connect`, as at a start. Until
+  temper-15 the box's reconcile step takes the handover into the forge's
+  files, and such a forge is the one whose files are absent (setup.md,
+  6.5).
 - **The mode is no record** (setup.md, the modes): owned is the
   configuration's (a `setup` entry owning the forge), managed is an
   `AdminToken` row on a forge not owned, and connected is neither.
@@ -285,7 +288,10 @@ skein-io socket
   `start FORGE`, one ask at a time, and refuses it "not under the box"
   with no pipe; it tells the root each `step` line, the forge setting
   up and at which step; at `started FORGE`, the forge's `TakeOver`,
-  then its `Reconcile`, then `Request::Connect`; at `failed FORGE WHY`,
+  then its `Reconcile`, then `Request::Connect` (until temper-15, the
+  group's reconcile has done the first two into the forge's files, and
+  the routing reads them, builds the access from them as at start and
+  sends `Request::Connect`: setup.md, 6.5); at `failed FORGE WHY`,
   the forge set up failed, with `WHY`. An answer for a forge it did not
   ask for is named in the log and dropped.
 - **Until then** each call on the forge is answered `NotConnected` at
