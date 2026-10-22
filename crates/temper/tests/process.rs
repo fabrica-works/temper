@@ -22,6 +22,20 @@ fn a_person_signs_in_with_chatgpt_and_a_chat_is_answered_on_the_plan() {
     scratch.remove();
 }
 
+#[test]
+fn a_first_owner_adds_a_key_under_the_deployments_accounts() {
+    let scratch = support::Scratch::new("deployment_accounts");
+    let _issuer = support::sign_in::configuration(scratch.path());
+    let clock = skein_shell::Clock::new();
+    let started = clock.now().now;
+    let seen = support::run_box(scratch.path(), support::person::deployment_account(), support::WITHIN);
+    let elapsed = clock.now().now.saturating_since(started);
+    assert!(seen.finished, "the first owner saw the deployment's account");
+    assert!(elapsed < Duration::from_secs(5), "accounts story took {elapsed:?}");
+    eprintln!("deployment accounts story: {elapsed:?}");
+    scratch.remove();
+}
+
 fn ctl_scratch(case: &str) -> support::Scratch {
     let scratch = support::Scratch::new(case);
     support::configuration(scratch.path(), &support::Forge::Unreached);

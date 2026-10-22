@@ -13,6 +13,8 @@ fn call(front: &mut Joint, root: &mut Root, number: u32, words: &[&[u8]], value:
 }
 #[test]
 fn a_lost_tools_key_answer_recovers_one_account() {
+    // The first owner also sees the fixture's preseeded deployment account.
+    const ADDED_PARTY_ACCOUNTS: usize = 1;
     let (mut front, mut root) = accounts::tools_fixture(fixtures::SEED);
     accounts::lose_next(&mut front);
     call(&mut front, &mut root, 1, ADD, Some(Secret::new(KEY.into())));
@@ -25,8 +27,6 @@ fn a_lost_tools_key_answer_recovers_one_account() {
     call(&mut front, &mut root, 4, &[b"accounts", b"--json"], None);
     let printed = root.agent().printed(4).expect("one account projection");
     let text = std::str::from_utf8(&printed.stdout).expect("JSON");
-    // The first owner also sees the fixture's preseeded deployment account.
-    const ADDED_PARTY_ACCOUNTS: usize = 1;
     assert_eq!(text.matches("\"holder\":{\"party\":").count(), ADDED_PARTY_ACCOUNTS, "{text}");
     accounts::assert_no_carried(&front);
 }

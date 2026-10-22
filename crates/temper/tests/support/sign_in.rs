@@ -136,7 +136,7 @@ fn issuer(address: std::net::SocketAddr, registration: &serde_json::Value, redir
     peer
 }
 
-fn start(directory: &Path) -> skein_world::end_to_end::Binary {
+pub(super) fn start(directory: &Path) -> skein_world::end_to_end::Binary {
     use skein_world::end_to_end::{Binary, Command, Mode};
     // A fresh init's demo forge is prepared by box before it starts serve.
     Binary::start(

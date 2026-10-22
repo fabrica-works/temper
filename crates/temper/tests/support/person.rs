@@ -53,6 +53,7 @@ const CLOSE: Token = Token::new(u64::MAX - 1);
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Begin {
     LinkWithKey,
+    LinkWithOpenAiKey,
     Token,
     Link,
 }
@@ -71,6 +72,24 @@ pub fn answered_chat(words: &[u8], answer: &[u8]) -> Script {
             Step::Type { find: Find::named(skein_ui::Role::TextArea, b"Start a chat"), words: words.into() },
             Step::Press { find: Find::named(skein_ui::Role::Button, b"Start") },
             Step::See { find: Find::text(answer), within: START_WITHIN },
+        ]),
+    }
+}
+/// The configured first owner adds a deployment key through the accounts page.
+#[must_use]
+pub fn deployment_account() -> Script {
+    use skein_ui::Role;
+    Script {
+        begin: Begin::LinkWithOpenAiKey,
+        steps: Box::new([
+            Step::See {
+                find: Find::exactly_named(Role::Heading { level: 2 }, b"Deployment accounts"),
+                within: START_WITHIN,
+            },
+            Step::See {
+                find: Find::exactly_named(Role::Region, b"OpenAI API key \xc2\xb7 held by the deployment"),
+                within: START_WITHIN,
+            },
         ]),
     }
 }
@@ -269,13 +288,19 @@ impl Person {
         self.bytes.push(b'\n');
     }
     fn build(root: Fd, input: Option<Fd>, output: Option<Fd>, script: Script) -> Self {
-        let steps = if script.begin == Begin::LinkWithKey {
+        let steps = if matches!(script.begin, Begin::LinkWithKey | Begin::LinkWithOpenAiKey) {
             use skein_ui::Role;
+            let key_way: &[u8] =
+                if script.begin == Begin::LinkWithOpenAiKey { b"Use an OpenAI API key" } else { b"Use an API key" };
             let mut setup = vec![
                 Step::Go { address: Address::Accounts },
+                Step::See {
+                    find: Find::exactly_named(Role::Heading { level: 2 }, b"Deployment accounts"),
+                    within: START_WITHIN,
+                },
                 Step::See { find: Find::named(Role::Button, b"Use deployment accounts"), within: START_WITHIN },
                 Step::Press { find: Find::named(Role::Button, b"Use deployment accounts") },
-                Step::Press { find: Find::named(Role::Button, b"Use an API key") },
+                Step::Press { find: Find::named(Role::Button, key_way) },
                 Step::Type {
                     find: Find::named(Role::TextField, b"Key (pasted once)"),
                     words: jig_channel_world::fixtures::KEY.into(),
@@ -435,7 +460,7 @@ impl Person {
                 self.wake = Some(self.wake.map_or(retry, |at| at.min(retry)));
             }
         }
-        if client.started() && self.project == ProjectSelection::Pending && select_project(client, self.begin) {
+        if client.started() && self.project == ProjectSelection::Pending && select_project(client) {
             self.project = ProjectSelection::Selected;
             self.wake = Some(now);
         }
@@ -471,18 +496,13 @@ fn an_unnamed_project(name: Option<&[u8]>) -> bool {
     let Some(number) = name.and_then(|name| name.strip_prefix(b"Project ".as_slice())) else { return false };
     !number.is_empty() && number.iter().all(u8::is_ascii_digit)
 }
-// Channel fixtures offer project zero and one. Init offers just one, already
-// selected. The demo uses that button; older scripts still choose the other one.
-fn select_project(client: &mut NativeClient, begin: Begin) -> bool {
+// Project zero is absent from me; the sole configured project may already be selected.
+fn select_project(client: &mut NativeClient) -> bool {
     let node = client
         .tree()
         .nodes()
         .iter()
-        .find(|node| {
-            node.role == skein_ui::Role::Button
-                && an_unnamed_project(node.name.as_deref())
-                && (begin == Begin::Link || !node.states.as_slice().contains(&skein_ui::State::Pressed))
-        })
+        .find(|node| node.role == skein_ui::Role::Button && an_unnamed_project(node.name.as_deref()))
         .map(|node| node.id);
     let Some(node) = node else { return false };
     assert!(client.act(node, skein_ui::Act::Press), "offered project selection");

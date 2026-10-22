@@ -658,6 +658,11 @@ and 10).
   board and its plan on its page, and finds the same after the restart.
   The forge's state is the story's proof of the change, read through
   Forgejo's API.
+- **The first owner's deployment accounts,** a separate smoke on the
+  fake-issuer sign-in configuration: the configured first owner signs in
+  by the printed link, sees "Deployment accounts", adds an API key with
+  "Use deployment accounts", and sees its deployment-held account there.
+  It runs in under five seconds, without an LLM call or a real account.
 - **Its endings.** The crash is the tier's one deliberate kill. It
   proves what a crash of every process keeps on disk, the page cache
   surviving it, not what a power loss does, which the one-process world

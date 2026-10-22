@@ -418,6 +418,7 @@ pub struct Seen {
 #[derive(Clone, Copy)]
 enum Ending {
     Stop,
+    Box,
     Crash,
 }
 struct ChatJudge<'a> {
@@ -449,7 +450,7 @@ impl Referee<Process> for ChatJudge<'_> {
                 panic!("binary");
             };
             match self.ending {
-                Ending::Stop => binary.signal(Signal::Terminate),
+                Ending::Stop | Ending::Box => binary.signal(Signal::Terminate),
                 Ending::Crash => binary.signal_tree(Signal::Kill),
             }
             for proc in procs {
@@ -497,7 +498,7 @@ impl Referee<Process> for ChatJudge<'_> {
             String::from_utf8_lossy(binary.stderr())
         );
         match self.ending {
-            Ending::Stop => assert!(
+            Ending::Stop | Ending::Box => assert!(
                 binary.exit_status().is_none_or(|exit| exit == Exit::Code(0)),
                 "temper serve did not stop cleanly: {}",
                 String::from_utf8_lossy(binary.stderr())
@@ -532,6 +533,11 @@ pub fn run(
     deadline: Duration,
 ) -> Seen {
     run_story(directory, script, peer, deadline, None, Ending::Stop)
+}
+/// Run the native person's script on the initialized box, including its demo setup.
+#[must_use]
+pub fn run_box(directory: &Path, script: person::Script, deadline: Duration) -> Seen {
+    run_story(directory, script, None, deadline, None, Ending::Box)
 }
 /// domain/testing.md 2.6 bounds each landing story at 360 seconds.
 pub const LANDING: Duration = Duration::from_secs(360);
@@ -573,6 +579,7 @@ fn run_story(
     let clock = Clock::new();
     let mut binary = match ending {
         Ending::Stop => serve(directory),
+        Ending::Box => sign_in::start(directory),
         Ending::Crash => {
             Binary::start_with_tree(serve_command(directory), Mode::Pipes, 65_536, Expectation::Supervise, false)
                 .expect("temper serve starts for a whole-tree crash")
