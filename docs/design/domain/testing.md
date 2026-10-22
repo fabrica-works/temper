@@ -130,7 +130,11 @@ in temper.
   start's load of each forge's records, a connect at runtime, a forge
   stopped, GitHub's installations, git's tokens' generations and pasted
   values are `temper-service`'s own tests (../protocol/forge.md, section
-  10).
+  10). The joint's GitHub stories hold the component's half of git's
+  tokens under temper's settings: every accepted installation's token
+  before the forge's first `Connected`, and each renewed before it
+  expires on the fake's clock, at GitHub's hour (../protocol/credentials.md,
+  section 4).
 - **Reconcile's,** in skein (skein's `forge-setup.md`, section 7):
   reconcile's machine against the fake forge's protocol layer serving the
   setup's routes, through bytes: a forge converged from empty and again,
