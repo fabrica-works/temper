@@ -358,3 +358,70 @@ fn nonempty_sections_have_lists_and_empty_sections_have_none() {
         }
     }
 }
+
+#[test]
+fn an_empty_demo_start_has_only_its_invitation_heading() {
+    let root = fixtures::demo_root(temper_client_domain::Address::Chats, fixtures::PROJECT, true);
+    let view = fixtures::page_view(&root);
+    assert!(fixtures::find(view.tree(), Role::Heading { level: 2 }, b"Live chats").is_none());
+    assert!(fixtures::find(view.tree(), Role::Heading { level: 2 }, b"Closed chats").is_none());
+    let mut heading = None;
+    for node in view.tree().nodes() {
+        if node.role == (Role::Heading { level: 1 }) {
+            assert!(heading.is_none(), "one level-1 heading");
+            heading = node.name.as_deref();
+        }
+    }
+    assert_eq!(heading, Some(b"What shall we change?".as_slice()));
+}
+
+#[test]
+fn a_live_demo_chat_brings_back_its_section_heading() {
+    use skein_lib::{Env, Queue, Time};
+    use temper_client_domain::{Address, Event, Request};
+    let mut root = fixtures::demo_root(
+        Address::Inbox { filter: temper_client_domain::address::Filter::ALL },
+        fixtures::PROJECT,
+        true,
+    );
+    let limits = fixtures::domain_limits();
+    let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));
+    temper_client_domain::step(
+        &mut root,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
+        Event::Went { place: temper_client_domain::Place::Address(Address::Chats) },
+        &mut out,
+    );
+    let mut watch = None;
+    while let Some(request) = out.pop() {
+        if let Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down:
+                        jig_client::Down::Open { watch: token, subject: jig_client::Watchable::Jig(Subject::Tasks { .. }) },
+                },
+        } = request
+        {
+            watch = Some(token);
+        }
+    }
+    let mut rows = List::with_capacity(1);
+    rows.push(line()).expect("live row");
+    fixtures::root_event(
+        &mut root,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch: watch.expect("live watch"),
+                    event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks { rows, more: false }))),
+                },
+            },
+        },
+    );
+    let view = fixtures::page_view(&root);
+    assert!(fixtures::find(view.tree(), Role::Heading { level: 2 }, b"Live chats").is_some());
+    assert!(fixtures::find(view.tree(), Role::Link, b"Chat 9").is_some());
+    assert!(fixtures::find(view.tree(), Role::Paragraph, b"Hello").is_some());
+    assert!(fixtures::find(view.tree(), Role::Heading { level: 2 }, b"Closed chats").is_none());
+    assert!(fixtures::find(view.tree(), Role::Button, b"More closed chats").is_none());
+}

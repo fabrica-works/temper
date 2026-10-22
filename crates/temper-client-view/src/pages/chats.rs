@@ -25,8 +25,9 @@ fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], ac
 pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, text_limit: u32) {
     b.open(Role::Main);
     b.style(crate::look::MAIN);
-    if demo_start(root) {
-        start(b, root, words, bindings);
+    let demo = demo_start(root);
+    if let Some(demo) = demo {
+        start(b, root, demo, words, bindings);
     } else {
         text(b, Role::Heading { level: 1 }, &words.say(Word::Chats, &[]));
     }
@@ -65,8 +66,15 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         if let Some(outcome) = &chats.outcome {
             outcome_text(b, words, outcome, text_limit);
         }
-        text(b, Role::Heading { level: 2 }, &words.say(Word::LiveChats, &[]));
-        if let Some(live) = chats.live(root.client())
+        let live = chats.live(root.client());
+        let has_live = match live {
+            Some(live) => !live.rows.is_empty(),
+            None => false,
+        };
+        if demo.is_none() || has_live {
+            text(b, Role::Heading { level: 2 }, &words.say(Word::LiveChats, &[]));
+        }
+        if let Some(live) = live
             && !live.rows.is_empty()
         {
             b.open(Role::List);
@@ -76,10 +84,21 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             }
             b.close();
         }
-        text(b, Role::Heading { level: 2 }, &words.say(Word::ClosedChats, &[]));
-        if let Some(page) = &chats.page
+        let closed = if let Some(page) = &chats.page
             && let EndedGroup::Rows { rows, after, .. } = &page.ended
         {
+            Some((rows, after))
+        } else {
+            None
+        };
+        let has_closed = match closed {
+            Some((rows, after)) => !rows.is_empty() || after.is_some(),
+            None => false,
+        };
+        if demo.is_none() || has_closed {
+            text(b, Role::Heading { level: 2 }, &words.say(Word::ClosedChats, &[]));
+        }
+        if let Some((rows, after)) = closed {
             if !rows.is_empty() {
                 b.open(Role::List);
                 b.style(crate::look::ROWS);
@@ -95,7 +114,13 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
     }
     b.close();
 }
-fn start(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings) {
+fn start(
+    b: &mut Builder,
+    root: &Domain,
+    demo: &temper_client_domain::forge::Demo,
+    words: &Words,
+    bindings: &mut Bindings,
+) {
     b.open(Role::Slot);
     b.style(crate::look::CHATBAR);
     b.open(Role::Slot);
@@ -115,7 +140,7 @@ fn start(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings)
     if let Some(project) = root.pages().project() {
         super::chat::context(b, root, project, words);
     }
-    suggestions(b, root, words, bindings);
+    suggestions(b, root, demo, words, bindings);
 }
 
 pub(crate) fn row(b: &mut Builder, root: &Domain, line: &TaskLine, words: &Words, bindings: &mut Bindings) {
@@ -211,21 +236,24 @@ pub(crate) fn status(
     b.close();
 }
 
-pub(crate) fn demo_start(root: &Domain) -> bool {
+/// The demo whose start the Chats page shows, when it shows one.
+pub(crate) fn demo_start(root: &Domain) -> Option<&temper_client_domain::forge::Demo> {
     if *root.pages().address() != Address::Chats {
-        return false;
+        return None;
     }
     match root.demo() {
-        Some((demo, halves)) => halves.model && root.pages().project() == Some(demo.project),
-        None => false,
+        Some((demo, halves)) if halves.model && root.pages().project() == Some(demo.project) => Some(demo),
+        _ => None,
     }
 }
 
-fn suggestions(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings) {
-    let Some((demo, halves)) = root.demo() else { return };
-    if !halves.model || root.pages().project() != Some(demo.project) {
-        return;
-    }
+fn suggestions(
+    b: &mut Builder,
+    root: &Domain,
+    demo: &temper_client_domain::forge::Demo,
+    words: &Words,
+    bindings: &mut Bindings,
+) {
     let Some(chats) = root.pages().chats() else { return };
     b.open(Role::Slot);
     b.style(crate::look::INVITATION);

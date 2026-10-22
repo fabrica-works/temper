@@ -71,7 +71,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     crate::frame::banner(&mut builder, root, &view.forge_words, &mut view.pages);
     match root.pages().address() {
         temper_client_domain::Address::Chat { .. } => {}
-        temper_client_domain::Address::Chats if crate::pages::chats::demo_start(root) => {}
+        temper_client_domain::Address::Chats if crate::pages::chats::demo_start(root).is_some() => {}
         temper_client_domain::Address::Chats
         | temper_client_domain::Address::Inbox { .. }
         | temper_client_domain::Address::Task { .. }
