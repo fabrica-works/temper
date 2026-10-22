@@ -27,6 +27,8 @@ pub fn page(
     builder.text(skein_ui::Run::Plain, &title);
     builder.close();
     builder.close();
+    builder.open(Role::Region);
+    builder.name(&title);
     builder.open(Role::Slot);
     builder.style(crate::look::CARD);
     builder.open(Role::Slot);
@@ -86,6 +88,7 @@ pub fn page(
     if let Some(answer) = &form.outcome {
         outcome(builder, form, answer, words, text_limit);
     }
+    builder.close();
     builder.close();
 }
 fn text_field(

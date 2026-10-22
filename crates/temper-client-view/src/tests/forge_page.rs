@@ -312,3 +312,55 @@ fn the_adoption_page_for_a_project_me_does_not_name_is_titled_by_its_number() {
     let tree = fixtures::build(&mut view, &root);
     assert!(fixtures::find(tree, Role::Heading { level: 1 }, b"Adopt a repository into project 7").is_some());
 }
+
+#[test]
+fn the_adoption_region_is_named_by_its_heading_and_contains_the_whole_form() {
+    for (project, title) in [
+        (fixtures::PROJECT, b"Adopt a repository into shop".as_slice()),
+        (7, b"Adopt a repository into project 7".as_slice()),
+    ] {
+        let mut view = fixtures::view();
+        let root = fixtures::adoption_page(project, b"shop");
+        let tree = fixtures::build(&mut view, &root);
+        let nodes = tree.nodes();
+        let mut heading = None;
+        let mut region = None;
+        for (index, node) in nodes.iter().enumerate() {
+            if node.role == (Role::Heading { level: 1 }) {
+                assert_eq!(node.name.as_deref(), Some(title));
+                heading = Some(index);
+            }
+            if node.role == Role::Region && node.name.as_deref() == Some(title) {
+                assert!(region.is_none(), "one region for the form");
+                region = Some(index);
+            }
+        }
+        let heading = heading.expect("page heading");
+        let at = region.expect("named adoption region");
+        assert!(heading < at);
+        assert!(nodes[at].styles.as_slice().is_empty());
+        let end = at + usize::try_from(nodes[at].size).unwrap();
+        assert_eq!(end, nodes.len(), "the region includes everything after the heading slot");
+        for (role, name) in [
+            (Role::TextField, b"Forge number".as_slice()),
+            (Role::TextField, b"Owner"),
+            (Role::TextField, b"Name"),
+            (Role::TextField, b"Branch prefix"),
+            (Role::TextField, b"Landing branch"),
+            (Role::TextField, b"Checks: gate numbers, separated by spaces or commas"),
+            (Role::ChoiceGroup, b"Role"),
+            (Role::Check, b"Make it the project's home"),
+            (Role::Check, b"It runs CI"),
+            (Role::Button, b"Adopt"),
+        ] {
+            let mut found = false;
+            for node in &nodes[at + 1..end] {
+                if node.role == role && node.name.as_deref() == Some(name) {
+                    found = true;
+                    break;
+                }
+            }
+            assert!(found, "region contains {role:?}: {name:?}");
+        }
+    }
+}

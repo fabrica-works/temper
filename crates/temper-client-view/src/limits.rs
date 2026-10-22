@@ -129,7 +129,9 @@ impl Limits {
             // The merge retains only scalar keys and borrowed lines on the stack.
             .checked_add(4)?
             // Start a chat heading and its text outside the demo start.
-            .checked_add(2)?;
+            .checked_add(2)?
+            // The adoption form's region, named by the page's heading.
+            .checked_add(1)?;
         let tree = skein_ui::Limits {
             nodes,
             depth: receiving.rows.checked_add(34)?,

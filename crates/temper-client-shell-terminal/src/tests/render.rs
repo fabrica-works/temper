@@ -31,6 +31,9 @@ fn each_adoption_form_state_prints_as_its_golden_file() {
     ] {
         let tree = fixtures::adoption_page(&form, &words);
         let print = fixtures::print(&tree);
+        if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some() {
+            std::fs::write(fixtures::golden(name), print.text.as_slice()).expect("write adoption golden file");
+        }
         let golden = std::fs::read(fixtures::golden(name)).expect("adoption golden file");
         assert_eq!(print.text.as_slice(), golden, "page {name}");
     }
