@@ -112,6 +112,7 @@ fn list(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings) 
         text(b, Role::Paragraph, &words.say(word, &[]));
     } else {
         b.open(Role::List);
+        b.name(&words.say(Word::YourChats, &[]));
         b.style(crate::look::ROWS);
         // Select from the two bounded windows without allocating scratch or
         // cloning documents. Only the previous key survives each selection.

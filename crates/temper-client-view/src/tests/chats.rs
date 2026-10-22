@@ -389,10 +389,19 @@ fn chats_have_one_list_or_the_empty_sentence() {
     assert!(fixtures::find(empty.tree(), Role::Paragraph, b"No chats yet.").is_some());
     let view = fixtures::page_view(&listed_root());
     assert_eq!(fixtures::styles(view.tree(), Role::List).as_ref(), [Box::from([crate::look::ROWS])]);
+    let list = fixtures::find(view.tree(), Role::List, b"Your chats").expect("named chats list");
     let nodes = view.tree().nodes();
     for (index, node) in nodes.iter().enumerate() {
-        if node.role == Role::List {
-            assert_eq!(nodes[index + 1].role, Role::Item);
+        if node.id == list {
+            assert_eq!(node.role, Role::List);
+            let end = index.checked_add(usize::try_from(node.size).expect("list size")).expect("list end");
+            let mut child = index + 1;
+            for task in [8, 9] {
+                assert_eq!(nodes[child].role, Role::Item);
+                assert_eq!(nodes[child].key.expect("chat line key").a, task);
+                child = child.checked_add(usize::try_from(nodes[child].size).expect("line size")).expect("next line");
+            }
+            assert_eq!(child, end, "both lines belong to the named list");
         }
     }
 }

@@ -826,15 +826,27 @@ impl Words {
                 }
             }
             let id = word.id(connector);
-            let plural = if word == Word::WaitingForDelegates || (word == Word::ToolCalls || word == Word::ChatDelegates) { Some(0) } else { None };
+            let plural = if word == Word::WaitingForDelegates || word == Word::ToolCalls || word == Word::ChatDelegates
+            {
+                Some(0)
+            } else {
+                None
+            };
             shapes.push(PhraseShape { id, holes: holes.into_boxed(), plural }).expect("closed shapes fit");
             let other = Form { class: PluralClass::Other, segments: segments.into_boxed() };
-            let forms: Box<[Form]> = if word == Word::WaitingForDelegates || (word == Word::ToolCalls || word == Word::ChatDelegates) {
+            let forms: Box<[Form]> = if word == Word::WaitingForDelegates
+                || word == Word::ToolCalls
+                || word == Word::ChatDelegates
+            {
                 Box::new([
                     Form {
                         class: PluralClass::One,
                         segments: Box::new([
-                            Segment::Text(copy_of(if (word == Word::ToolCalls || word == Word::ChatDelegates) { b"" } else { b"waiting on " })),
+                            Segment::Text(copy_of(if word == Word::ToolCalls || word == Word::ChatDelegates {
+                                b""
+                            } else {
+                                b"waiting on "
+                            })),
                             Segment::Hole { index: 0, kind: HoleKind::Number },
                             Segment::Text(copy_of(if word == Word::ToolCalls { b" tool call" } else { b" delegate" })),
                         ]),

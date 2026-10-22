@@ -12,12 +12,13 @@ temper
 [8] All (pressed)
 [9] Live
 [10] Closed
-- [11] T9
-  Hello
-  * Writing
-  Spent 7; delegates spent 2
-  1 delegate
-- [12] T8
-  Earlier
-  * Ended
-  Spent 4; delegates spent 0
+Your chats:
+  - [11] T9
+    Hello
+    * Writing
+    Spent 7; delegates spent 2
+    1 delegate
+  - [12] T8
+    Earlier
+    * Ended
+    Spent 4; delegates spent 0

@@ -460,7 +460,7 @@ mod memory_literal;
 // Their five phrases add five entries' room, 740 B.
 // Naming navigation and cards adds two phrases (296 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 6989605531;
+const ACCOUNT_BYTES: u64 = 6991903727;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

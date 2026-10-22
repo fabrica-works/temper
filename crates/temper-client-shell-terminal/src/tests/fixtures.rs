@@ -767,6 +767,7 @@ pub fn chats_page() -> skein_ui::Tree {
         b.close();
     }
     b.open(Role::List);
+    b.name(b"Your chats");
     for (number, title, status, spend, delegates) in [
         (
             b"T9".as_slice(),

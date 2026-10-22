@@ -33,7 +33,7 @@ fn every_link_has_an_address() {
 }
 
 // Expected words are the shipped view's; available counts are the worlds'
-// live/closed chat lists. Each list is capped independently by the shipped window.
+// live/closed windows, combined in the named Your chats list.
 const SOLO_LIVE: u32 = 2;
 const SOLO_CLOSED: u32 = 1;
 const REFERENCE_LIVE: u32 = 1;
@@ -192,7 +192,7 @@ const HOLDS: [Holds; samples::N] = [
         name: "chats-empty",
         heading: "Chats",
         parts: &[
-            Part::Named { role: Role::Heading { level: 2 }, name: "Live chats" },
+            Part::Named { role: Role::Heading { level: 2 }, name: "Your chats" },
             Part::Chats { live: 0, closed: 0 },
         ],
     },
@@ -286,22 +286,28 @@ fn each_state_holds_what_its_name_says() {
                     );
                 }
                 Part::Chats { live, closed } => {
+                    let available = (*live).min(driver::limits().client.domain.rows)
+                        + (*closed).min(driver::limits().client.domain.rows);
+                    if available == 0 {
+                        assert_eq!(main.find(&in_main(Role::List, "Your chats")), Found::Absent, "{}", sample.name);
+                        continue;
+                    }
+                    let list = find(tree, Role::List, "Your chats", sample.name);
+                    let nodes = tree.nodes();
+                    let start = nodes.iter().position(|node| node.id == list).expect("chats list");
+                    let end = start + usize::try_from(nodes[start].size).expect("chats subtree");
                     let mut count = 0;
-                    for node in tree.nodes() {
+                    for node in &nodes[start..end] {
                         if node.role == Role::Link
                             && let Some(name) = &node.name
-                            && name.starts_with(b"Chat ")
+                            && name
+                                .strip_prefix(b"T")
+                                .is_some_and(|number| !number.is_empty() && number.iter().all(u8::is_ascii_digit))
                         {
                             count += 1;
                         }
                     }
-                    let window = driver::limits().client.domain.rows;
-                    assert_eq!(
-                        count,
-                        (*live).min(window) + (*closed).min(window),
-                        "{}: windowed chat rows",
-                        sample.name
-                    );
+                    assert_eq!(count, available, "{}: windowed chat rows", sample.name);
                 }
                 Part::Plan { live, title } => {
                     let plan = find(tree, Role::Tree, "Plan", sample.name);
