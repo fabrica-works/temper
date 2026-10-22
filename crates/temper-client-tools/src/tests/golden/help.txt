@@ -87,7 +87,7 @@ me
   Read the party, projects and waiting counts
 inbox [--project P] [--kind K] [--root N] [--after C]
   Read what needs the party and its updates
-tasks --project P [--label chat|goal] [--tracked] [--mine] [--ended] [--order activity|priority] [--after C]
+tasks --project P [--label chat|goal] [--tracked] [--mine] [--ended] [--order activity|priority] [--after C] [--parent N]
   Read task lines
 task N [--tree] [--activity K] [--run]
   Read a task and selected related documents

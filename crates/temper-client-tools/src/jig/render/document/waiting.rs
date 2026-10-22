@@ -53,7 +53,7 @@ pub(super) fn text(
         match delivery {
             c::Delivery::Me(me) => super::me_text(me, book, limits, out),
             c::Delivery::Task(task) => super::task_text(task, wait.me, book, vocabulary, out),
-            c::Delivery::Tree(_) | c::Delivery::OwnerTree(_) => super::super::lists::tree(delivery, book, out),
+            c::Delivery::Tree(_) | c::Delivery::OwnerTree(_) => super::super::lists::tree(delivery, None, book, out),
             c::Delivery::Tasks(tasks) => {
                 for row in tasks.rows.as_slice().iter().take(most) {
                     super::super::lists::chip(&row.chip, book, out);

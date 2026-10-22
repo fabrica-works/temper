@@ -292,7 +292,7 @@ pub(crate) fn task_query(call: &Call, me: &c::Me) -> Option<c::TaskQuery> {
         project: Some(project),
         requester: if value(call, 3).is_some() { Some(c::OwnerRequester::Person(me.party.number)) } else { None },
         root: None,
-        parent: None,
+        parent: number(call, 7),
         label: match value(call, 1) {
             Some(Value::Word(0)) => Some(jig_client::shapes::CHAT),
             Some(Value::Word(1)) => Some(jig_client::shapes::GOAL),

@@ -159,3 +159,136 @@ fn a_met_notice_keeps_its_dependency_and_removal_flag_in_json() {
         fixtures::read_answer(&["activity", "41", "--json"], c::ReadResult::Value(c::ReadValue::Activity(page)));
     assert!(skein_lib::bytes::find(&printed.stdout, br#""met":{"dependency":12,"removed":true}"#).is_some());
 }
+
+#[test]
+fn parent_tasks_keep_the_other_query_keys_and_continuation() {
+    let argv = [
+        "tasks",
+        "--project",
+        "3",
+        "--label",
+        "goal",
+        "--tracked",
+        "--mine",
+        "--ended",
+        "--order",
+        "priority",
+        "--after",
+        "1122",
+        "--parent",
+        "41",
+    ];
+    let (root, call) = fixtures::read_call(&argv);
+    let c::Read::Tasks { query, live, ended } = &root.reads.get(&call).expect("task query").1 else { panic!("tasks") };
+    assert_eq!(
+        query,
+        &c::TaskQuery {
+            project: Some(3),
+            requester: Some(c::OwnerRequester::Person(fixtures::PARTY)),
+            root: None,
+            parent: Some(41),
+            label: Some(jig_client::shapes::GOAL),
+            phase: Some(c::PhaseClass::Ended),
+            executor: None,
+            tracked: Some(true),
+            order: c::QueryOrder::Priority,
+        }
+    );
+    assert_eq!((live.as_ref(), ended.as_ref()), (None, Some(&fixtures::cursor())));
+    assert_eq!(fixtures::back(&fixtures::call(&argv)), fixtures::owned(&argv));
+    for bad in ["x", "-1", "18446744073709551616"] {
+        assert_eq!(
+            fixtures::parse(&["tasks", "--project", "3", "--parent", bad]),
+            Err(crate::jig::argv::Usage::Kind { argument: 7 })
+        );
+    }
+}
+
+#[test]
+fn help_tasks_describes_parent() {
+    let bytes = fixtures::help(Some(2));
+    assert!(skein_lib::bytes::find(&bytes, b"[--parent N]").is_some());
+    assert!(skein_lib::bytes::find(&bytes, b"Only this task's delegates").is_some());
+}
+
+fn tree_answer(folded: bool) -> crate::jig::Printed {
+    use jig_client::{Latest, Watchable};
+    use skein_lib::List;
+    let (mut root, call) = fixtures::read_call(&["task", "41", "--tree"]);
+    let mut task = fixtures::goal(41, c::WaitsOn::Nothing);
+    task.chip.title = fixtures::document_text(b"Root");
+    let Latest::Jig(c::Delivery::OwnerTree(mut tree)) = fixtures::owner_tree_at(task.chip.clone()) else {
+        panic!("owner tree")
+    };
+    tree.rows = List::with_capacity(2);
+    for number in [42, 43] {
+        tree.rows
+            .push(c::OwnerTreeRow {
+                chip: {
+                    let mut chip = fixtures::goal(number, c::WaitsOn::Nothing).chip;
+                    chip.title = fixtures::document_text(b"Delegate");
+                    chip
+                },
+                parent: 41,
+                depth: 1,
+                proposals: List::with_capacity(0),
+                spent: 0,
+                dependencies: List::with_capacity(0),
+                cut: false,
+            })
+            .expect("tree row");
+    }
+    tree.folded = List::with_capacity(2);
+    // Independent parents ensure the summary adds every fold, not just the root's.
+    for (parent, waiting, running) in [(41, 1, 1), (42, 0, 1)] {
+        tree.folded
+            .push(c::OwnerTreeFold {
+                parent,
+                phases: c::OwnerPhaseCounts {
+                    waiting: if folded { waiting } else { 0 },
+                    running: if folded { running } else { 0 },
+                    ..c::OwnerPhaseCounts::ZERO
+                },
+                held_below: 0,
+            })
+            .expect("fold");
+    }
+    root.serve(call, fixtures::task_result(task));
+    root.deliver_subject(
+        &Watchable::Jig(c::Subject::Tree { task: 41, window: crate::limits::ROWS }),
+        c::Delivery::OwnerTree(tree),
+    );
+    root.answer(call).expect("tree answer")
+}
+
+#[test]
+fn a_tree_says_what_is_folded_and_how_to_read_on() {
+    let answer = tree_answer(true);
+    let start = skein_lib::bytes::find(&answer.stdout, b"tree:\n").expect("tree").checked_add(6).expect("tree start");
+    let tree = answer.stdout.get(start..).expect("tree text");
+    let end = skein_lib::bytes::find(tree, b"digest:").expect("digest");
+    assert_eq!(tree.get(..end).expect("tree rows"), fixtures::golden("task_tree_cut").as_ref());
+}
+
+#[test]
+fn a_tree_with_nothing_folded_has_no_cut_line() {
+    assert!(skein_lib::bytes::find(&tree_answer(false).stdout, b"cut:").is_none());
+}
+
+#[test]
+fn an_activity_page_cut_before_its_first_row_reads_on() {
+    let c::ReadResult::Value(c::ReadValue::Activity(mut page)) = fixtures::activity_words() else { panic!("activity") };
+    page.rows = skein_lib::List::with_capacity(0);
+    page.cut = true;
+    page.before = Some(fixtures::cursor());
+    let printed =
+        fixtures::read_answer(&["activity", "41"], c::ReadResult::Value(c::ReadValue::Activity(page.clone())));
+    assert_eq!(printed.stdout, fixtures::golden("activity_empty_cut"));
+    let printed =
+        fixtures::read_answer(&["activity", "41", "--json"], c::ReadResult::Value(c::ReadValue::Activity(page)));
+    for field in
+        [br#""cut":true"#.as_slice(), br#""before":{"value":"1122"}"#, br#""read_on":"activity 41 --before 1122""#]
+    {
+        assert!(skein_lib::bytes::find(&printed.stdout, field).is_some());
+    }
+}

@@ -50,7 +50,7 @@ pub(super) fn chip(chip: &c::Chip, book: &Phrasebook, out: &mut Text) {
     out.put(&book.say(0, Word::Phase(chip.phase).id(), &[]).expect("phase phrase").text);
     out.put(b"\n");
 }
-pub(super) fn tree(delivery: &c::Delivery, book: &Phrasebook, out: &mut Text) {
+pub(super) fn tree(delivery: &c::Delivery, project: Option<u32>, book: &Phrasebook, out: &mut Text) {
     out.put(b"tree:\n");
     match delivery {
         c::Delivery::Tree(tree) => {
@@ -63,6 +63,7 @@ pub(super) fn tree(delivery: &c::Delivery, book: &Phrasebook, out: &mut Text) {
             for row in &tree.rows {
                 chip(&row.chip, book, out);
             }
+            tree_cut(tree, project, book, out);
         }
         c::Delivery::OwnerProject(_)
         | c::Delivery::Me(_)
@@ -78,6 +79,76 @@ pub(super) fn tree(delivery: &c::Delivery, book: &Phrasebook, out: &mut Text) {
         | c::Delivery::OwnerDeployment(_)
         | c::Delivery::OwnerAccounts(_) => unreachable!("tree watch delivers a tree"),
     }
+}
+// The owner's counters retain their field order, independently of visible rows.
+fn tree_cut(tree: &c::OwnerTree, project: Option<u32>, book: &Phrasebook, out: &mut Text) {
+    let mut counts = [0u64; 10];
+    for fold in &tree.folded {
+        let p = fold.phases;
+        for (count, supplied) in counts.iter_mut().zip([
+            p.waiting,
+            p.idle,
+            p.starting,
+            p.running,
+            p.backing_off,
+            p.closing,
+            p.held,
+            p.done,
+            p.failed,
+            p.cancelled,
+        ]) {
+            *count = count.checked_add(u64::from(supplied)).expect("bounded folded tasks");
+        }
+    }
+    let mut total = 0u64;
+    for count in counts {
+        total = total.checked_add(count).expect("bounded folded tasks");
+    }
+    if total == 0 {
+        return;
+    }
+    out.put(b"cut: ");
+    out.number(total);
+    out.put(b" more not shown (");
+    let mut separator = b"".as_slice();
+    for (count, phase) in counts.into_iter().zip([
+        c::Phase::Waiting,
+        c::Phase::Idle,
+        c::Phase::Preparing,
+        c::Phase::Running,
+        c::Phase::BackingOff,
+        c::Phase::Closing,
+        c::Phase::Held,
+        c::Phase::Done,
+        c::Phase::Failed,
+        c::Phase::Cancelled,
+    ]) {
+        if count > 0 {
+            out.put(separator);
+            out.number(count);
+            out.put(b" ");
+            out.put(&book.say(0, Word::Phase(phase).id(), &[]).expect("phase phrase").text);
+            separator = b", ";
+        }
+    }
+    out.put(b"); read on with: ");
+    let project = if let c::ChipPhase::Owner { details, .. } = tree.root.details.as_ref() {
+        details.project
+    } else {
+        project.expect("the tree call read its root's project")
+    };
+    let values = Box::new([
+        Some(Values::One(Value::Project(crate::jig::call::Project::Number(project)))),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        Some(Values::One(Value::Number(tree.root.task))),
+    ]);
+    write_call(&Call { tool: 2, form: 0, values, key: None }, out);
+    out.put(b"\n");
 }
 pub(super) fn next(call: &Call, index: usize, cursor: Option<&c::Cursor>, out: &mut Text) {
     let Some(cursor) = cursor else {

@@ -53,7 +53,16 @@ pub(super) fn text(
     for (local, document) in &reading.documents {
         match local {
             3 => {
-                super::super::lists::tree(document, book, out);
+                let mut project = None;
+                for page in reading.pages.values() {
+                    if let Readout::Jig(c::ReadResult::Value(value)) = page
+                        && let Some((task, _)) = super::super::read_task(value)
+                    {
+                        project = Some(task.project);
+                        break;
+                    }
+                }
+                super::super::lists::tree(document, project, book, out);
                 super::subjects::text_digest(
                     b"tree",
                     &super::super::Part::delivery(document).expect("tree form"),

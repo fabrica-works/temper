@@ -37,6 +37,7 @@ pub const TASKS: Tool = Tool {
         switch(b"ended", b"Only ended tasks"),
         flag(b"order", b"O", Kind::Order, Optional, b"activity or priority; number by default"),
         flag(b"after", b"C", Kind::Cursor, Optional, b"Continue after this cursor"),
+        flag(b"parent", b"N", Kind::Number, Optional, b"Only this task's delegates"),
     ]],
     keyed: Keyed::Never,
     area: 1,

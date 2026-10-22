@@ -38,7 +38,7 @@ fn the_help_prints_as_its_golden_files() {
 const USAGES: &[&[u8]] = &[
     b"me\n",
     b"inbox [--project P] [--kind K] [--root N] [--after C]\n",
-    b"tasks --project P [--label chat|goal] [--tracked] [--mine] [--ended] [--order activity|priority] [--after C]\n",
+    b"tasks --project P [--label chat|goal] [--tracked] [--mine] [--ended] [--order activity|priority] [--after C] [--parent N]\n",
     b"task N [--tree] [--activity K] [--run]\n",
     b"chat N [--before C]\n",
     b"activity N [--before C] [--limit K]\n",
