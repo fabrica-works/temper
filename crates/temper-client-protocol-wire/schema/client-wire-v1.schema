@@ -24,7 +24,10 @@ record SetUpFailed { why: bytes 256 }
 record Connected { id: u64 login: bytes 1024 }
 record Stopped { reason: bytes 1024 }
 enum Connection { not_connected, not_set_up, setting_up: SettingUp, set_up_failed: SetUpFailed, connecting, connected: Connected, stopped: Stopped }
-record ForgeRow { number: u16 kind: Kind mode: Mode connection: Connection }
+# Whether the deployment offers to set the forge up here (client/README.md, 4.6):
+# the forge domain's, from its configuration, the box and its state.
+enum Offer { not_offered, not_under_the_box, offered }
+record ForgeRow { number: u16 kind: Kind mode: Mode connection: Connection offer: Offer }
 versioned record Forges { forges: list 16 ForgeRow }
 
 # The family's read name and its demo answer (client/README.md, 4.6).

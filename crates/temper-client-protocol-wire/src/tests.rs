@@ -283,6 +283,7 @@ fn forges_rows(numbers: &[u16], connection: &v1::Connection) -> v1::Forges {
                         kind: v1::Kind::Forgejo,
                         mode: v1::Mode::Owned,
                         connection: connection.clone(),
+                        offer: v1::Offer::Offered,
                     },
                 )
                 .expect("row"),
@@ -290,6 +291,30 @@ fn forges_rows(numbers: &[u16], connection: &v1::Connection) -> v1::Forges {
             .expect("row capacity");
     }
     v1::Forges::new(&limits, v1::ForgesParts { forges }).expect("forges")
+}
+
+#[test]
+fn each_forge_offer_round_trips() {
+    let limits = fixtures::limits();
+    let mut forges = List::with_capacity(3);
+    for (number, offer) in [(1, v1::Offer::NotOffered), (2, v1::Offer::NotUnderTheBox), (3, v1::Offer::Offered)] {
+        let row = v1::ForgeRow::new(
+            &limits,
+            v1::ForgeRowParts {
+                number,
+                kind: v1::Kind::Forgejo,
+                mode: v1::Mode::Owned,
+                connection: v1::Connection::NotSetUp,
+                offer,
+            },
+        )
+        .expect("forge row");
+        forges.push(row).expect("three rows");
+    }
+    let record = v1::Forges::new(&limits, v1::ForgesParts { forges }).expect("forges");
+    let bytes = crate::forges(&record);
+    assert_eq!(crate::decode_forges(&bytes, &limits), Some(record));
+    assert_eq!(crate::decode_forges(&fixtures::trailing(&bytes), &limits), None);
 }
 
 #[test]
@@ -359,7 +384,13 @@ fn forge_fields_refuse_one_past_their_bounds_on_construction_and_decode() {
     ] {
         let row = v1::ForgeRow::new(
             &v1::CEILINGS,
-            v1::ForgeRowParts { number: 1, kind: v1::Kind::Github, mode: v1::Mode::Connected, connection },
+            v1::ForgeRowParts {
+                number: 1,
+                kind: v1::Kind::Github,
+                mode: v1::Mode::Connected,
+                connection,
+                offer: v1::Offer::NotOffered,
+            },
         )
         .expect("schema row");
         let mut forges = List::with_capacity(1);
@@ -388,6 +419,7 @@ fn forges_refuse_seventeen_rows_unsorted_rows_and_duplicate_numbers() {
                 kind: v1::Kind::Github,
                 mode: v1::Mode::Fake,
                 connection: v1::Connection::NotSetUp,
+                offer: v1::Offer::NotOffered,
             },
         )
         .expect("row"),
@@ -437,7 +469,13 @@ fn forge_login_and_stop_reason_round_trip_at_schema_ceilings() {
                 {
                     let row = v1::ForgeRow::new(
                         &limits,
-                        v1::ForgeRowParts { number: u16::MAX, kind: kind.clone(), mode: mode.clone(), connection },
+                        v1::ForgeRowParts {
+                            number: u16::MAX,
+                            kind: kind.clone(),
+                            mode: mode.clone(),
+                            connection,
+                            offer: v1::Offer::NotOffered,
+                        },
                     )
                     .expect("forge row");
                     let mut forges = List::with_capacity(1);
