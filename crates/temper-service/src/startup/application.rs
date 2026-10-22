@@ -73,6 +73,7 @@ pub fn clients(document: &Document, at: u32, path: &Path, bundle: bool, problems
 }
 #[derive(Debug)]
 pub struct Forge {
+    pub records_only: bool,
     pub number: u16,
     pub kind: settings::Kind,
     pub api: config::Address,
@@ -302,6 +303,7 @@ fn nullable_text(
         }
     }
 }
+#[expect(clippy::too_many_lines, reason = "one reader preserves old and records-only diagnostic order until temper-15")]
 fn forge(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Forge> {
     let mut object = read::object(document, at, path, problems)?;
     let number = read::short(&mut object, document, b"number", path, problems);
@@ -352,14 +354,20 @@ fn forge(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> 
         read::form(git_base(web), path.member(b"web"), problems);
     }
     // Transitional file members are refused on GitHub; temper-15 removes them.
-    let api_token = if github {
-        absent(&mut object, document, b"api_token", path, problems);
+    let records = !github
+        && object.member(document, b"api_token").is_none()
+        && object.member(document, b"user").is_none()
+        && object.member(document, b"webhook_secret").is_none();
+    let api_token = if github || records {
+        if github {
+            absent(&mut object, document, b"api_token", path, problems);
+        }
         Some(Box::from(b"".as_slice()))
     } else {
         read::text(&mut object, document, b"api_token", path, problems)
     };
     let mut webhook_secret = None;
-    let user = if github {
+    let user = if github || records {
         absent(&mut object, document, b"webhook_secret", path, problems);
         absent(&mut object, document, b"user", path, problems);
         Some(User::Id(0)) // No file user: temper-02 supplies the records' bot identity.
@@ -391,6 +399,7 @@ fn forge(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> 
     let transport = transport?;
     forge_endpoint(&api, &transport, path, problems);
     Some(Forge {
+        records_only: records,
         number: number?,
         kind,
         api,
@@ -537,11 +546,22 @@ fn references(
                 joined = Some(forge.number);
                 forge.identity = number;
                 match forge.kind {
-                    settings::Kind::Forgejo => {
+                    // temper-15 removes the old file identity branch. Presence selects it.
+                    settings::Kind::Forgejo if !forge.records_only || identity.token_configured => {
+                        if forge.records_only {
+                            let fp = read::index(
+                                &Path::root().member(b"application").member(b"forges"),
+                                usize::try_from(forge_index).expect("bounded forges"),
+                            );
+                            for name in [b"api_token".as_slice(), b"webhook_secret", b"user"] {
+                                problems.push(fp.member(name), What::Jig(config::What::Missing));
+                            }
+                        }
                         read::form(!identity.token.is_empty(), path.member(b"token"), problems);
                         read::form(!identity.login.is_empty(), path.member(b"login"), problems);
                         read::form(!identity.author.name.is_empty(), path.member(b"author"), problems);
                     }
+                    settings::Kind::Forgejo => {}
                     settings::Kind::GitHub => read::form(!identity.token_configured, path.member(b"token"), problems),
                 }
             }
@@ -826,7 +846,8 @@ fn listed_files(members: &Members, api_token_bytes: u32, token_bytes: u32, asked
     for (index, forge) in members.forges.iter().enumerate() {
         let path = read::index(&Path::root().member(b"application").member(b"forges"), index);
         let include = members.asked_owned.contains(&forge.number) == asked;
-        if include && forge.kind == settings::Kind::Forgejo {
+        // temper-15 removes file reads; records-only entries never name a file.
+        if include && forge.kind == settings::Kind::Forgejo && !forge.records_only {
             files
                 .push(config::File {
                     at: path.member(b"api_token"),
@@ -1010,7 +1031,7 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
         let path = read::index(&Path::root().member(b"application").member(b"forges"), index);
         let missing = missing_asked_files(members, files, forge.number);
         let token = match forge.kind {
-            settings::Kind::Forgejo if missing => None,
+            settings::Kind::Forgejo if missing || forge.records_only => None,
             settings::Kind::Forgejo => Some(config::secret(contents(
                 files,
                 &forge.api_token,
@@ -1121,6 +1142,7 @@ fn resolve_forge(directories: &config::Directories, forge: &mut Forge, fp: &Path
         *trust = value;
     }
     if forge.kind == settings::Kind::Forgejo
+        && !forge.records_only
         && let Some(value) =
             joined(directories, config::Directory::Data, &forge.api_token, &fp.member(b"api_token"), problems)
     {

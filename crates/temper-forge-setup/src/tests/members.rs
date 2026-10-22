@@ -169,3 +169,27 @@ fn a_set_up_forge_without_a_webhook_secret_is_refused() {
     members.forges[0].webhook_secret = None;
     refused_webhooks(&members, b"application.forges[0].webhook_secret: invalid form\n");
 }
+
+#[test]
+fn records_only_local_members_skip_files_but_keep_local_checks() {
+    let mut members = fixtures::members();
+    for index in [1, 2] {
+        let f = &mut members.forges[index];
+        f.api_token = Box::new([]);
+        f.user = User::Id(0);
+        f.identity_token = Box::new([]);
+        f.webhook_secret = None;
+    }
+    let checked = check::checked(
+        &fixtures::document(&fixtures::three()),
+        0,
+        &jig_protocol_config::Directories::working(),
+        &members,
+        None,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(checked.records_only.as_ref(), &[2, 3]);
+    members.forges[1].plaintext = false;
+    refused(&fixtures::three(), &members, b"application.forges[1].transport: invalid form\n");
+}

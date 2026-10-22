@@ -757,6 +757,38 @@ pub fn bounded(directory: &Path) -> Bounded {
     )
 }
 
+/// The same admitted inputs with file-free owned access and nested orgs.
+#[must_use]
+pub fn bounded_records(directory: &Path) -> Bounded {
+    let owned =
+        Owned { forgejo: "127.255.255.254:65535".parse().expect("bounded records fixture"), ..Owned::example() };
+    lay(directory, &owned);
+    let mut value: serde_json::Value =
+        serde_json::from_slice(&example_document(directory, &owned)).expect("bounded records fixture");
+    let forge = value["application"]["forges"][0].as_object_mut().expect("bounded records fixture");
+    for name in ["api_token", "user", "webhook_secret"] {
+        forge.remove(name);
+    }
+    value["application"]["identities"][0].as_object_mut().expect("bounded records fixture").remove("token");
+    let orgs = value["application"]["setup"][0]
+        .as_object_mut()
+        .expect("bounded records fixture")
+        .remove("orgs")
+        .expect("bounded records fixture");
+    value["application"]["setup"][0]["mode"]["owned"]["person"]["orgs"] = orgs;
+    bounded_document(
+        directory,
+        value,
+        temper_service::ForgeRuntime {
+            number: 1,
+            address: owned.forgejo,
+            transport: skein_forge_connection::settings::Transport::Plaintext { name: None },
+            trust_roots: 0,
+            trust_root_bytes: 0,
+        },
+    )
+}
+
 /// Init's own document and agent, with the same counted paths at their bounds.
 #[must_use]
 pub fn bounded_template(directory: &Path) -> Bounded {

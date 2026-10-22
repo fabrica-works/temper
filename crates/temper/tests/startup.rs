@@ -1193,6 +1193,8 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             // Jig e5140872: run endings/waits and program endpoint evidence
             // enlarge the bounded engine's retained layouts and carriers.
             + 106_449_864
+            // Checked entry, resolved clone and their owned strings coexist at construction.
+            + 960 + u64::try_from(size_of::<Option<temper_forge_setup::check::Checked>>()).expect("checked layout")
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -1253,6 +1255,15 @@ fn check_bounded_startup(bounded: &support::owned::Bounded, required: temper_ser
             format!("{path}: the worst case passes memory_bytes by 1 bytes\n")
         );
     }
+}
+
+#[test]
+fn records_only_owned_memory_admits_checked_input_at_the_exact_bound() {
+    let scratch = support::Scratch::startup("records-owned-memory");
+    let bounded = support::owned::bounded_records(scratch.path());
+    let required = bounded.requirements();
+    check_bounded_startup(&bounded, required);
+    scratch.remove();
 }
 
 #[test]

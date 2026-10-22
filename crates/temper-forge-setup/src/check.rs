@@ -39,6 +39,8 @@ pub struct Members {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Checked {
     pub fetch_bytes: u64,
+    /// Local forges admitted without any file credential members.
+    pub records_only: Box<[u16]>,
     pub setup: Setup,
     pub limits: Limits,
 }
@@ -87,19 +89,29 @@ pub fn members(setup: &Setup, members: &Members, webhooks: bool, ps: &mut Proble
             }
         }
         let fp = fp.child(Segment::Index(fi));
-        if webhooks {
-            require(
-                f.webhook_secret == Some(joined(&[&e.directory, b"/webhook_secret"])),
-                fp.member(b"webhook_secret"),
-                ps,
-            );
+        let records = f.api_token.is_empty()
+            && f.user == User::Id(0)
+            && f.webhook_secret.is_none()
+            && f.identity_token.is_empty();
+        // temper-15 removes the old file cross-check, preserving its exact refusals.
+        if !records {
+            if webhooks {
+                require(
+                    f.webhook_secret == Some(joined(&[&e.directory, b"/webhook_secret"])),
+                    fp.member(b"webhook_secret"),
+                    ps,
+                );
+            }
+            require(f.api_token == joined(&[&e.directory, b"/api_token"]), fp.member(b"api_token"), ps);
+            require(f.user == User::File(joined(&[&e.directory, b"/user"])), fp.member(b"user"), ps);
+            require(f.identity_token == joined(&[&e.directory, b"/git_token"]), p.member(b"forge"), ps);
+            require(f.identity_login == e.bot.login, p.member(b"bot").member(b"login"), ps);
         }
-        require(f.api_token == joined(&[&e.directory, b"/api_token"]), fp.member(b"api_token"), ps);
-        require(f.user == User::File(joined(&[&e.directory, b"/user"])), fp.member(b"user"), ps);
-        require(f.identity_token == joined(&[&e.directory, b"/git_token"]), p.member(b"forge"), ps);
-        require(f.identity_login == e.bot.login, p.member(b"bot").member(b"login"), ps);
         match &e.mode {
-            Mode::Managed { .. } => require(!e.asked, p.member(b"start"), ps),
+            Mode::Managed { .. } => {
+                require(!records, p.member(b"mode"), ps);
+                require(!e.asked, p.member(b"start"), ps);
+            }
             Mode::Owned(o) => {
                 let op = p.member(b"mode").member(b"owned");
                 require(
@@ -207,5 +219,21 @@ pub fn checked(
             }
         }
     }
-    if ps.is_empty() { Ok(Checked { fetch_bytes, setup: setup.expect("clean parse"), limits }) } else { Err(ps) }
+    if ps.is_empty() {
+        let mut records_only =
+            skein_lib::List::with_capacity(u32::try_from(members_value.forges.len()).expect("bounded forges"));
+        for f in &members_value.forges {
+            if f.api_token.is_empty()
+                && f.user == User::Id(0)
+                && f.webhook_secret.is_none()
+                && f.identity_token.is_empty()
+            {
+                records_only.push(f.number).expect("one entry per forge");
+            }
+        }
+        let records_only = records_only.into_boxed();
+        Ok(Checked { fetch_bytes, records_only, setup: setup.expect("clean parse"), limits })
+    } else {
+        Err(ps)
+    }
 }

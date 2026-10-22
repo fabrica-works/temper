@@ -15,7 +15,9 @@ use skein_lib::List;
 pub fn setup_files(checked: &temper_forge_setup::check::Checked) -> Box<[config::File]> {
     let mut files = List::with_capacity(u32::try_from(checked.setup.entries.len()).expect("checked setup entries"));
     for (index, entry) in checked.setup.entries.iter().enumerate() {
-        if let temper_forge_setup::setup::Mode::Fake(_) = &entry.mode {
+        if !checked.records_only.contains(&entry.forge)
+            && let temper_forge_setup::setup::Mode::Fake(_) = &entry.mode
+        {
             files
                 .push(config::File {
                     at: setup_path(index).member(b"admin_token"),
@@ -47,7 +49,9 @@ fn setup_values(
     let mut values = List::with_capacity(u32::try_from(checked.setup.entries.len()).expect("checked setup entries"));
     for (index, entry) in checked.setup.entries.iter().enumerate() {
         let mut handover = None;
-        if let temper_forge_setup::setup::Mode::Fake(_) = &entry.mode {
+        if !checked.records_only.contains(&entry.forge)
+            && let temper_forge_setup::setup::Mode::Fake(_) = &entry.mode
+        {
             let at = setup_path(index).member(b"admin_token");
             if let Some(bytes) = application::contents(files, &handover_path(entry), 40, at.clone(), problems) {
                 let mut valid = bytes.len() == 40;
@@ -508,6 +512,24 @@ fn checked_start(
         Some(_) => Some(agent.ok_or(problem(indexed(0).member(b"agent"), What::Agent))?),
         None => None,
     };
+    // Only the shell's checked local entry enables a file-free Forgejo.
+    for (index, forge) in parsed.application.forges.iter().enumerate() {
+        let admitted = match setup {
+            Some(checked) => {
+                checked.records_only.contains(&forge.number) && checked.setup.entry(forge.number).is_some()
+            }
+            None => false,
+        };
+        if forge.kind == settings::Kind::Forgejo && forge.records_only && !admitted {
+            return Err(problem(
+                Path::root()
+                    .member(b"application")
+                    .member(b"forges")
+                    .child(Segment::Index(u32::try_from(index).expect("bounded forges"))),
+                What::Jig(config::What::Refers),
+            ));
+        }
+    }
     check_files(&parsed, files)?;
     let mut problems = Problems::empty();
     let resolved = application::resolve(&parsed.application, files, &mut problems);
@@ -600,6 +622,11 @@ fn checked_start(
         forges: resolved.forges,
         demo: parsed.application.demo,
         setup: setup_values,
+        // 14a1-ii connects these from records after the root restores.
+        records_only: match setup {
+            Some(checked) => checked.records_only.clone(),
+            None => Box::new([]),
+        },
         identities: resolved.identities,
         landing: parsed.application.landing,
         charter: parsed.application.charter,

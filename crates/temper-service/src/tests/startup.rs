@@ -179,29 +179,38 @@ fn the_standalone_example_reads_into_its_members() {
 }
 
 fn checked_fake_setup() -> temper_forge_setup::check::Checked {
+    checked_local_setup(false)
+}
+fn checked_local_setup(records: bool) -> temper_forge_setup::check::Checked {
     use temper_forge_setup::check;
     let input = br#"[{"forge":1,"directory":"demo/forge","bot":{"login":"temper","email":"temper@example.test"},
         "mode":{"fake":{"listen":{"socket":"127.0.0.1:9"},"git":"demo/bin/git","owner":"demo",
         "repositories":[{"name":"widget","landing":"main"}]}}}]"#;
     let document = config::document(input, &config::DocumentLimits { bytes: 65_536, tokens: 1024, depth: 32 }).unwrap();
+    let mut members = check::Members {
+        forges: Box::new([check::Forge {
+            number: 1,
+            api: Some("127.0.0.1:9".parse().unwrap()),
+            plaintext: true,
+            git: b"http://127.0.0.1:9".as_slice().into(),
+            user: check::User::File(b"/data/demo/forge/user".as_slice().into()),
+            api_token: b"/data/demo/forge/api_token".as_slice().into(),
+            webhook_secret: None,
+            identity_token: b"/data/demo/forge/git_token".as_slice().into(),
+            identity_login: b"temper".as_slice().into(),
+        }]),
+        listeners: Box::new([]),
+    };
+    if records {
+        members.forges[0].api_token = Box::new([]);
+        members.forges[0].user = check::User::Id(0);
+        members.forges[0].identity_token = Box::new([]);
+    }
     check::checked(
         &document,
         0,
         &config::Directories::given(b"/config", b"/data", b"/cache").unwrap(),
-        &check::Members {
-            forges: Box::new([check::Forge {
-                number: 1,
-                api: Some("127.0.0.1:9".parse().unwrap()),
-                plaintext: true,
-                git: b"http://127.0.0.1:9".as_slice().into(),
-                user: check::User::File(b"/data/demo/forge/user".as_slice().into()),
-                api_token: b"/data/demo/forge/api_token".as_slice().into(),
-                webhook_secret: None,
-                identity_token: b"/data/demo/forge/git_token".as_slice().into(),
-                identity_login: b"temper".as_slice().into(),
-            }]),
-            listeners: Box::new([]),
-        },
+        &members,
         None,
         &[],
     )
@@ -1532,4 +1541,60 @@ fn forge_configuration_keeps_kind_mode_and_asked_start() {
         application::configured(&settings).as_ref(),
         [Configured { number: 1, kind: Kind::Forgejo, mode: Mode::Owned, asked: true }]
     );
+}
+
+#[test]
+fn records_only_local_entries_need_the_checked_boundary_and_name_no_files() {
+    let input = records_only_document();
+    // The inverse join is retained until temper-15; no token member is present.
+    let named = crate::named(&input, &config::Directories::working()).unwrap();
+    assert!(named.files.iter().all(|file| !file.path.is_empty()));
+    assert!(named.files.iter().all(|file| !file.path.starts_with(b"secrets/forge-1")));
+    let checked = checked_local_setup(true);
+    assert!(crate::startup::setup_files(&checked).is_empty());
+    for (setup, admitted) in [(None, false), (Some(&checked), true)] {
+        let result = crate::startup::with_setup(
+            &input,
+            &config::Directories::working(),
+            &fixtures::files(),
+            Some(&fixtures::startup_agent()),
+            &fixtures::seeds(),
+            None,
+            Some(fixtures::worker_runtime()),
+            fixtures::forge_runtime(),
+            setup,
+            false,
+        );
+        assert_eq!(result.is_ok(), admitted, "checked local input: {:?}", result.err());
+    }
+}
+
+fn records_only_document() -> Box<[u8]> {
+    let input = fixtures::document();
+    let input = fixtures::with(&input, b"application.forges[0]", br#"{"number":1,"kind":"forgejo","api":{"socket":"127.0.0.1:9"},"transport":"plaintext","git":"http://127.0.0.1:9","identity":1}"#);
+    fixtures::with(
+        &input,
+        b"application.identities[0]",
+        br#"{"number":1,"login":"temper","author":{"name":"Temper","email":"temper@example.test"}}"#,
+    )
+}
+#[test]
+fn any_old_member_keeps_the_partial_old_forms_missing_member_refusals() {
+    let input = records_only_document();
+    let text = core::str::from_utf8(&input).unwrap();
+    for (member, expected) in [
+        (
+            "\"api_token\":\"old\",",
+            "application.forges[0].webhook_secret: missing\napplication.forges[0].user: missing\n",
+        ),
+        ("\"user\":42,", "application.forges[0].api_token: missing\napplication.forges[0].webhook_secret: missing\n"),
+        ("\"webhook_secret\":null,", "application.forges[0].api_token: missing\napplication.forges[0].user: missing\n"),
+    ] {
+        let partial = text.replace("\"kind\":\"forgejo\",", &[member, "\"kind\":\"forgejo\","].concat());
+        let refused = crate::named(partial.as_bytes(), &config::Directories::working()).unwrap_err();
+        assert_eq!(lines(&refused).as_ref(), expected.as_bytes());
+    }
+    let partial = text.replace("\"number\":1,\"login\"", "\"token\":\"old\",\"number\":1,\"login\"");
+    let refused = crate::named(partial.as_bytes(), &config::Directories::working()).unwrap_err();
+    assert_eq!(lines(&refused).as_ref(), b"application.forges[0].api_token: missing\napplication.forges[0].webhook_secret: missing\napplication.forges[0].user: missing\n");
 }

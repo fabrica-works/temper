@@ -80,6 +80,7 @@ pub fn engine() -> settings::Engine {
     )
     .expect("engine document");
     settings::Engine {
+        records_only: Box::new([]),
         jig: jig_protocol_config::engine(&document, 0, &jig_protocol_config::Directories::working())
             .expect("typed jig engine"),
         webhooks: None,

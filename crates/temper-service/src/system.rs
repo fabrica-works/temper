@@ -814,11 +814,27 @@ pub(crate) fn startup_worst_case(
             .ok_or(start_problem(b"memory_bytes", What::Bound))?,
     )
     .ok_or(start_problem(b"memory_bytes", What::Bound))?;
+    // Checked input and its resolved entry clones coexist with construction.
+    let checked = checked_setup_bytes(settings).ok_or(start_problem(b"memory_bytes", What::Bound))?;
     bytes
+        .checked_add(checked)
+        .ok_or(start_problem(b"memory_bytes", What::Bound))?
         .checked_add(forge_bytes.0)
         .ok_or(start_problem(b"memory_bytes", What::Bound))?
         .checked_add(setup)
         .ok_or(start_problem(b"memory_bytes", What::Bound))
+}
+fn checked_setup_bytes(settings: &settings::Engine) -> Option<u64> {
+    let mut bytes = u64::try_from(settings.records_only.len()).ok()?.checked_mul(4)?;
+    if !settings.setup.is_empty() {
+        bytes = bytes.checked_add(u64::try_from(size_of::<Option<temper_forge_setup::check::Checked>>()).ok()?)?;
+    }
+    for setup in &settings.setup {
+        bytes = bytes
+            .checked_add(setup.entry.heap_bytes()?.checked_mul(2)?)?
+            .checked_add(u64::try_from(size_of::<settings::Setup>()).ok()?.checked_mul(2)?)?;
+    }
+    Some(bytes)
 }
 fn startup_operations(io: &io::Limits, queue: u32, worker_operations: u32) -> Option<u32> {
     io::operations(io)?.checked_add(queue.checked_mul(4)?)?.checked_add(worker_operations)

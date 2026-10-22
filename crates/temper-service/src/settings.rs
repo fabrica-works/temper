@@ -104,6 +104,8 @@ pub struct Engine {
     pub forges: Box<[Forge]>,
     pub demo: Option<Demo>,
     pub setup: Box<[Setup]>,
+    /// Checked local entries whose access comes from records.
+    pub records_only: Box<[u16]>,
     pub identities: Box<[Identity]>,
     pub landing: temper_engine_domain::LandingPolicy,
     pub charter: u32,
