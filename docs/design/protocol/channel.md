@@ -270,7 +270,9 @@ record Entry    { account: u64  account_login: text  token: secret }
   are not secret. No root, fact, store record or log holds the value.
 - **Its size** must fit jig's bound on a grant's value (section 8), which
   configuration checks for every identity at start; a GitHub forge's
-  grows with `forges.installations`.
+  grows with `forges.installations`. A GitHub entry's token is bounded
+  by the forge component's `token_bytes` (configuration.md, section 7),
+  not by Forgejo's token's bound, so that the list fits jig's bound.
 
 ## 7. Translation
 
@@ -341,6 +343,11 @@ the routing in the step that routes the record:
   so `temper serve` refuses limits under which the engine could send an
   item larger than the worker takes, rather than a link that never
   opens.
+  A worker started alone takes a GitHub value's entries and an entry's
+  token at the defaults of `forges.installations` and
+  `forge_component.token_bytes`, and the worker in the engine's process
+  takes the engine's; an engine whose limits pass a worker's is refused
+  at the opening.
 - **The remote fits the worker's names.** The longest remote the routing
   can make, the longest `git` base, two `/`, an owner and a name of the
   forge's `name_bytes` and `.git`, must be within the checkout's

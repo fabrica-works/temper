@@ -145,7 +145,10 @@ temper's workspace items beside it:
   - the identity for every git operation on it: one of temper's
     application credentials (jig's `domain/engine.md`, 12.1), granted
     with the assignment, which the protocol layer maps to a token and a
-    commit author.
+    commit author; and on GitHub the account whose entry of that
+    identity's value authenticates git on it (`../protocol/channel.md`,
+    sections 4 and 6), carried with the identity into each git operation
+    that reaches the forge, which the domain copies and never reads.
 - **Saving.** Whether to save unfinished work, and to which branch.
 - **Charter.** smith's, as the engine wrote it (agent.md, section 4),
   carried as bytes. The worker gives it to the agent with the workspace
