@@ -52,20 +52,41 @@ fn a_pull_forgejo_is_checking_waits_by_doubling_reads_then_merges() {
 }
 
 #[test]
-fn a_pull_not_mergeable_past_settle_is_taken_as_conflicted() {
-    let mut world = first_on_a_checked_pull(World::new(5), Duration::from_secs(40));
+fn a_pull_checking_past_poll_is_read_every_poll_then_merges() {
+    let mut world = first_on_a_checked_pull(World::new(5), Duration::from_secs(11));
     let t0 = world.wall();
+    let calls = world.calls();
     let mut asked = Vec::new();
-    for entry in 1..=6 {
+    for entry in 1..=5 {
         let at = world.wall();
         let until = wait(&mut world, entry);
         asked.push(seconds(until, at));
         world.run_to(until);
     }
-    assert_eq!(asked, [1, 1, 2, 4, 8, 14]);
+    assert_eq!(asked, [1, 1, 2, 4, 5]);
+    assert_eq!(world.calls() - calls, 35, "five steps of seven fresh reads");
+    assert_eq!(seconds(world.wall(), t0), 13);
+    let merged = change_step(&mut world, 6, change::Status::Passed, Box::new([]));
+    assert!(matches!(merged, change::Decision::Effect(change::Effect::Merge { .. })), "{merged:?}");
+    assert_eq!(world.calls() - calls, 46, "six steps of seven fresh reads and four calls to land the merge");
+    assert_eq!(world.writes(), 1, "never resolved");
+}
+
+#[test]
+fn a_pull_not_mergeable_past_settle_is_taken_as_conflicted() {
+    let mut world = first_on_a_checked_pull(World::new(5), Duration::from_secs(40));
+    let t0 = world.wall();
+    let mut asked = Vec::new();
+    for entry in 1..=9 {
+        let at = world.wall();
+        let until = wait(&mut world, entry);
+        asked.push(seconds(until, at));
+        world.run_to(until);
+    }
+    assert_eq!(asked, [1, 1, 2, 4, 5, 5, 5, 5, 2]);
     assert_eq!(seconds(world.wall(), t0), 30);
     assert_eq!(
-        change_step(&mut world, 7, change::Status::Passed, Box::new([])),
+        change_step(&mut world, 10, change::Status::Passed, Box::new([])),
         change::Decision::Delegate(change::Delegate::Resolve { base: translate::commit(world.branch(b"main")) })
     );
 }

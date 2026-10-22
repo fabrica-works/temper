@@ -471,9 +471,9 @@ part:
   (skein's `forge.md`, section 9). So, within `settle` of a move of
   its head or base (known by a hint, a read or temper's own push), a
   pull request that reads not mergeable is read again at `hinted`,
-  doubling, until it reads mergeable or `settle` has passed; and a
-  commit a job's hint named whose CI reads pending is read again the
-  same way. These rereads are temper's fresh reads. `settle` is a limit
+  doubling up to `poll` apart, until it reads mergeable or `settle`
+  has passed; and a commit a job's hint named whose CI reads pending
+  is read again the same way. These rereads are temper's fresh reads. `settle` is a limit
   of the forge client's, which checks only that it is above 0 and runs
   no window (skein's `forge-client.md`, sections 4 and 5).
 - **The window is the change procedure's own wait.** Until `settle` has

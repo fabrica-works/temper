@@ -1936,8 +1936,9 @@ that they cover what its work waits on.
   `forge-client.md`, section 4; `../domain/forge.md`, 5.2).
 - **What Forgejo settles after it delivers,** a pull request's
   mergeability, which it answers not mergeable while it checks (skein's
-  `forge.md`, section 9), is read again at `hinted`, doubling, within
-  `settle` of the move, as is a hinted job's CI that reads pending.
+  `forge.md`, section 9), is read again at `hinted`, doubling up to
+  `poll` apart, within `settle` of the move, as is a hinted job's CI
+  that reads pending.
   These are the owner's fresh reads: the client runs no window (skein's
   `forge-client.md`, sections 4 and 5). A pull request that reads not
   mergeable within `settle` of the move is never taken as conflicted

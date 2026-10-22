@@ -102,13 +102,18 @@ pub(crate) fn window(d: &Domain, task: u64) -> Option<(Wall, Wall)> {
     d.settling.get(&task)?.open
 }
 
-/// Bring a timed wait forward to the next doubling read, bounded by its end.
+/// Bring a timed wait forward to the next read: doubling, at most `poll` apart, bounded by its end.
 pub(crate) fn cap(d: &Domain, env: &Env<Limits>, task: u64, decision: change::Decision) -> change::Decision {
     let Some((start, end)) = window(d, task) else { return decision };
     match decision {
         change::Decision::Wait { until: Some(until) } => {
-            let interval =
-                env.wall.as_nanos().saturating_sub(start.as_nanos()).max(env.limits.client.hinted.as_nanos());
+            let hinted = env.limits.client.hinted.as_nanos();
+            let interval = env
+                .wall
+                .as_nanos()
+                .saturating_sub(start.as_nanos())
+                .max(hinted)
+                .min(env.limits.client.poll.as_nanos().max(hinted));
             let next = Wall::from_nanos(env.wall.as_nanos().saturating_add(interval));
             change::Decision::Wait { until: Some(next.min(end).min(until)) }
         }
