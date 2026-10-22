@@ -93,7 +93,7 @@ pub fn signed_in_account(signing: &[u8], name: &[u8]) -> Script {
                 }])),
                 within: START_WITHIN,
             },
-            Step::See { find: Find::exactly_named(Role::Status, b"Signed in; account 1"), within: START_WITHIN },
+            Step::See { find: Find::exactly_named(Role::Status, b"Signed in to ChatGPT"), within: START_WITHIN },
         ]),
     }
 }

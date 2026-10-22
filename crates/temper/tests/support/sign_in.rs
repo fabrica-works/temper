@@ -269,17 +269,24 @@ pub fn run(directory: &Path, issuer: oauth::Peer) {
     assert!(outcome.procs.iter().all(Host::is_empty), "all sign-in io settled");
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Observation {
+    Waiting,
+    Signing,
+    Visited,
+}
 struct AnswerJudge {
-    observing: bool,
-    visited: bool,
+    observation: Observation,
     stopped: bool,
     settled: bool,
     deadline: Time,
 }
 impl Referee<Process> for AnswerJudge {
     fn act(&mut self, _now: Time, procs: &mut [Process]) {
+        // Go and See must finish before authorization can complete the sign-in.
+        const SIGNING_SEEN: u32 = 2;
         let Process::Calls(calls) = &procs[1] else { panic!("ctl calls") };
-        if !self.observing
+        if self.observation == Observation::Waiting
             && let [_, me, _, pending, ..] = calls.ends()
         {
             let party = ctl::json(me)["party"]["number"].as_u64().expect("signed-in person");
@@ -299,13 +306,11 @@ impl Referee<Process> for AnswerJudge {
             let link = calls.link().to_vec();
             let Process::Person(person) = &mut procs[5] else { panic!("native observer") };
             person.observe(&link, super::person::signed_in_account(signing.as_bytes(), name.as_bytes()));
-            self.observing = true;
+            self.observation = Observation::Signing;
         }
         let Process::Person(person) = &procs[5] else { panic!("native observer") };
         assert!(person.failed.is_none(), "{:?}", person.failed);
-        // Go and See must finish before authorization can complete the sign-in.
-        const SIGNING_SEEN: u32 = 2;
-        if !self.visited && self.observing && person.steps_seen() >= SIGNING_SEEN {
+        if self.observation == Observation::Signing && person.steps_seen() >= SIGNING_SEEN {
             let Process::Calls(calls) = &procs[1] else { panic!("ctl calls") };
             let connected = &calls.ends()[2];
             let address = connected
@@ -316,7 +321,7 @@ impl Referee<Process> for AnswerJudge {
                 .to_vec();
             let Process::Visitor(visitor) = &mut procs[3] else { panic!("browser") };
             visitor.hand(&address);
-            self.visited = true;
+            self.observation = Observation::Visited;
         }
         let Process::Calls(calls) = &procs[1] else { panic!("ctl calls") };
         for (index, ended) in calls.ends().iter().enumerate() {
@@ -354,10 +359,10 @@ impl Referee<Process> for AnswerJudge {
         let Process::Calls(calls) = &procs[1] else { panic!("ctl calls") };
         assert!(
             now < self.deadline || self.settled,
-            "signed-in chat did not settle: observer step {}, finished {}, visited {}, calls {}",
+            "signed-in chat did not settle: observer step {}, finished {}, observation {:?}, calls {}",
             person.steps_seen(),
             person.finished,
-            self.visited,
+            self.observation,
             calls.ends().len()
         );
     }
@@ -373,7 +378,7 @@ impl Referee<Process> for AnswerJudge {
 }
 const ANSWER_CALLS: usize = 8;
 
-pub fn answered(directory: &Path, issuer: oauth::Peer) {
+fn answer_peer() -> skein_fake_peers::llm::Peer {
     let mut script = jig_channel_world::fixtures::one_chat(b"Hello");
     script.result = br#"{"form":"report","text":"Process answer","fields":{}}"#.as_slice().into();
     let mut recipe = temper_real_loop_world::llm::scripted(Box::new([skein_fake_llm_domain::api::Script {
@@ -381,7 +386,7 @@ pub fn answered(directory: &Path, issuer: oauth::Peer) {
         turns: jig_channel_world::fixtures::provider_turns(&script),
     }]));
     recipe.credential = skein_llm::Credential::bearer(ACCESS.into());
-    let peer = skein_fake_peers::llm::Peer::new(
+    skein_fake_peers::llm::Peer::new(
         "127.0.0.1:34443".parse().expect("fake LLM address"),
         Transport::Tls,
         recipe.limits,
@@ -391,7 +396,11 @@ pub fn answered(directory: &Path, issuer: oauth::Peer) {
         recipe.domain,
         recipe.domain_limits,
     )
-    .expect("fake LLM peer");
+    .expect("fake LLM peer")
+}
+
+pub fn answered(directory: &Path, issuer: oauth::Peer) {
+    let peer = answer_peer();
     let clock = Clock::new();
     let mut binary = start(directory);
     let streams = binary.take_streams().expect("serve pipes");
@@ -399,8 +408,7 @@ pub fn answered(directory: &Path, issuer: oauth::Peer) {
     let root = skein_shell::open_root(directory).expect("scratch root");
     fds.push(root);
     let mut world = real::World::new(AnswerJudge {
-        observing: false,
-        visited: false,
+        observation: Observation::Waiting,
         stopped: false,
         settled: false,
         deadline: clock.now().now.saturating_add(super::WITHIN),

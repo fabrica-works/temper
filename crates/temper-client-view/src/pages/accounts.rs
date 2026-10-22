@@ -382,10 +382,14 @@ fn named_end(b: &mut Builder, w: &Words, rows: &skein_lib::List<c::OwnerAccountL
             continue;
         }
         let Some(name) = provider_name(row.provider_name.as_ref()) else { return false };
-        if row.display.bytes().is_empty() {
-            return false;
-        }
         let (_, plan) = words::provider_words(name);
+        if row.display.bytes().is_empty() {
+            if word == W::RenewedNamed {
+                return false;
+            }
+            b.run(Run::Plain, &words::say(w, W::MadePlan, &[Hole::Name(skein_lib::bytes::copy_of(plan))]));
+            return true;
+        }
         let holes = [
             Hole::Name(skein_lib::bytes::copy_of(plan)),
             Hole::Name(skein_lib::bytes::copy_of(row.display.bytes())),

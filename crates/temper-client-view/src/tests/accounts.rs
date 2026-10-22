@@ -611,9 +611,9 @@ fn a_sign_in_end_keeps_the_number_when_its_account_has_not_arrived() {
     }
 }
 #[test]
-fn a_sign_in_end_keeps_the_number_when_its_display_is_empty() {
+fn a_sign_in_end_without_a_display_names_the_plan_unless_renewed() {
     for (end, expected) in [
-        (c::OwnerAccountEnd::Made { account: 1, declined: false }, b"Signed in; account 1".as_slice()),
+        (c::OwnerAccountEnd::Made { account: 1, declined: false }, b"Signed in to ChatGPT".as_slice()),
         (
             c::OwnerAccountEnd::Renewed { account: 1, declined: false },
             b"Signed in to the same account again; account 1",

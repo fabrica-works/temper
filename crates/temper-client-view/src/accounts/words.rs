@@ -149,6 +149,7 @@ pub(crate) enum Word {
     ProgramCommand,
     MadeNamed,
     RenewedNamed,
+    MadePlan,
 }
 const ROWS: &[(Word, &[u8])] = &[
     (Word::AccountsOmitted, b"Accounts left out: "),
@@ -333,6 +334,7 @@ const ENDS: &[EndWords] = &[
         ],
         indices: &[1, 0, 2],
     },
+    EndWords { literals: &[b"Signed in to ", b""], indices: &[0] },
 ];
 fn id(number: u16) -> PhraseId {
     PhraseId { owner: super::owner(), number }
@@ -352,6 +354,8 @@ pub(crate) fn say(words: &Words, word: Word, holes: &[Hole]) -> Box<[u8]> {
         220
     } else if word == Word::RenewedNamed {
         221
+    } else if word == Word::MadePlan {
+        222
     } else {
         let mut number = None;
         for (index, (candidate, _, _)) in NAMED.iter().enumerate() {
