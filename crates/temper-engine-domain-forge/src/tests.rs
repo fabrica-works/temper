@@ -294,6 +294,8 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::ApplicationPart { .. }
         | Request::ApplicationDone { .. }
         | Request::ApplicationAgain { .. }
+        | Request::SetUp { .. }
+        | Request::SetUpRefused { .. }
         | Request::RestartDone { .. } => panic!("permission call"),
     };
     assert_eq!(op, skein_forge::api::Op::Read(skein_forge::api::Read::Permission { user: 7 }));
@@ -345,6 +347,8 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::ApplicationPart { .. }
         | Request::ApplicationDone { .. }
         | Request::ApplicationAgain { .. }
+        | Request::SetUp { .. }
+        | Request::SetUpRefused { .. }
         | Request::RestartDone { .. } => panic!("branches call"),
     };
     assert!(
@@ -396,6 +400,8 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::ApplicationPart { .. }
         | Request::ApplicationDone { .. }
         | Request::ApplicationAgain { .. }
+        | Request::SetUp { .. }
+        | Request::SetUpRefused { .. }
         | Request::RestartDone { .. } => panic!("settings follows collision read"),
     }
 }
@@ -911,15 +917,19 @@ fn a_ci_sections_words_keep_their_end_and_others_their_start() {
     }
 }
 
-#[test]
-fn routing_connection_states_are_volatile_and_connected_gives_the_writer_once() {
-    let mut d = Domain::new(
+fn routing_domain() -> Domain {
+    Domain::new(
         &LIMITS,
         4,
         skein_forge_client::Config { namespace: Box::from(b"test".as_slice()), writers: Box::new([]) },
         &[GitIdentity { forge: 1, credential: 1 }],
     )
-    .unwrap();
+    .unwrap()
+}
+
+#[test]
+fn routing_connection_states_are_volatile_and_connected_gives_the_writer_once() {
+    let mut d = routing_domain();
     assert_eq!(d.connection(1), Connection::NotConnected);
     for state in [Connection::Connecting, Connection::Stopped { reason: Box::from(b"key refused".as_slice()) }] {
         assert!(outputs(&mut d, Event::Connection { forge: 1, state: state.clone() }).is_empty());
@@ -944,6 +954,56 @@ fn routing_connection_states_are_volatile_and_connected_gives_the_writer_once() 
     );
     assert_eq!(restarted.connection(1), Connection::NotConnected, "restored writer is no connection claim");
 }
+#[test]
+fn set_up_is_admitted_when_not_set_up_and_when_set_up_failed() {
+    let mut d = domain();
+    let forge = 1;
+    for state in [Connection::NotSetUp, Connection::SetUpFailed { why: Box::from(b"fetch failed".as_slice()) }] {
+        outputs(&mut d, Event::Connection { forge, state: state.clone() });
+        assert_eq!(outputs(&mut d, Event::SetUp { forge }).as_ref(), [Request::SetUp { forge }]);
+        assert_eq!(d.connection(forge), state, "asking leaves the connection unchanged");
+    }
+}
+
+#[test]
+fn set_up_is_refused_not_offered_in_every_other_state() {
+    let mut d = domain();
+    let configured = 1;
+    let unconfigured = 2;
+    for (forge, state) in [
+        (configured, Some(Connection::NotConnected)),
+        (unconfigured, None),
+        (configured, Some(Connection::SettingUp { step: None })),
+        (configured, Some(Connection::SettingUp { step: Some(SetUpStep::Prepare) })),
+        (configured, Some(Connection::Connecting)),
+        (configured, Some(Connection::Connected { id: 7, login: Box::from(b"writer".as_slice()) })),
+        (configured, Some(Connection::Stopped { reason: Box::from(b"key refused".as_slice()) })),
+    ] {
+        if let Some(state) = &state {
+            outputs(&mut d, Event::Connection { forge, state: state.clone() });
+        }
+        assert_eq!(
+            outputs(&mut d, Event::SetUp { forge }).as_ref(),
+            [Request::SetUpRefused { forge, why: SetUpRefusal::NotOffered }],
+            "forge {forge}, connection {state:?}",
+        );
+    }
+}
+
+#[test]
+fn set_up_states_are_kept_as_told_and_give_no_writer() {
+    let mut d = routing_domain();
+    for state in [
+        Connection::NotSetUp,
+        Connection::SettingUp { step: None },
+        Connection::SettingUp { step: Some(SetUpStep::Prepare) },
+        Connection::SetUpFailed { why: Box::from(b"the box closed the pipe".as_slice()) },
+    ] {
+        assert!(outputs(&mut d, Event::Connection { forge: 1, state: state.clone() }).is_empty());
+        assert_eq!(d.connection(1), state);
+    }
+}
+
 #[test]
 fn routing_installations_keep_their_stray_and_suspended_states_without_durable_rows() {
     let mut d = domain();

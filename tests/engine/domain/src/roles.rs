@@ -522,6 +522,8 @@ impl World {
                 | engine::Request::Party(_)
                 | engine::Request::Store(_)
                 | engine::Request::Account(_)
+                | engine::Request::SetUp { .. }
+                | engine::Request::SetUpRefused { .. }
                 | engine::Request::Setup { .. }
                 | engine::Request::Busy(_)
                 | engine::Request::Drained) => panic!("unexpected role output {other:?}"),

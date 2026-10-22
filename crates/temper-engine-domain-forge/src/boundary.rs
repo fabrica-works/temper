@@ -508,9 +508,38 @@ pub enum RestartStage {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Connection {
     NotConnected,
+    /// An owned forge the box starts when asked, its files absent (protocol/forge.md, 8.1).
+    NotSetUp,
+    /// The box runs the forge's group, at the step it last named (protocol/forge.md, 2.8).
+    SettingUp {
+        step: Option<SetUpStep>,
+    },
+    /// The box's `failed`, or its pipe closed during the ask, with why (protocol/forge.md, 2.8).
+    SetUpFailed {
+        why: Box<[u8]>,
+    },
     Connecting,
-    Connected { id: u64, login: Box<[u8]> },
-    Stopped { reason: Box<[u8]> },
+    Connected {
+        id: u64,
+        login: Box<[u8]>,
+    },
+    Stopped {
+        reason: Box<[u8]>,
+    },
+}
+/// The box's word for the step it runs (protocol/setup.md, 7.1).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SetUpStep {
+    Fetch,
+    Prepare,
+    Run,
+}
+/// Why a `SetUp` is refused (protocol/forge.md, 2.8; domain/forge.md, 4.1).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SetUpRefusal {
+    NotOffered,
+    NotUnderTheBox,
+    Busy,
 }
 /// Installation information for the deployment's page (protocol/forge.md, 2.4).
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -522,6 +551,10 @@ pub struct Installation {
 /// A parent or child input to the connector top.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
+    /// Ask to set up an owned forge, admitted by its connection (domain/forge.md, 4.1).
+    SetUp {
+        forge: u16,
+    },
     Connection {
         forge: u16,
         state: Connection,
@@ -771,6 +804,15 @@ pub enum Event {
 /// The connector's output to the root, including child API calls.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    /// Ask the box link to set up the forge (protocol/forge.md, 2.8).
+    SetUp {
+        forge: u16,
+    },
+    /// Name a refused ask without changing state (domain/forge.md, 4.1).
+    SetUpRefused {
+        forge: u16,
+        why: SetUpRefusal,
+    },
     /// Changed panel subjects, bounded by `MARKED` (domain/root.md, 10).
     Marked {
         tasks: Box<[u64]>,

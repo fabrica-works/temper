@@ -79,7 +79,11 @@ pub(crate) fn start(
     }
     let connected = match d.connection(adoption.forge) {
         crate::Connection::Connected { .. } => true,
-        crate::Connection::Connecting | crate::Connection::Stopped { .. } => false,
+        crate::Connection::NotSetUp
+        | crate::Connection::SettingUp { .. }
+        | crate::Connection::SetUpFailed { .. }
+        | crate::Connection::Connecting
+        | crate::Connection::Stopped { .. } => false,
         // Direct domain worlds may supply writers; the service configures none.
         crate::Connection::NotConnected => d.writers.contains_key(&adoption.forge),
     };

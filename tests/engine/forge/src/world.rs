@@ -581,7 +581,9 @@ impl World {
                     };
                     self.seen.push(top::Request::RestartDone { stage }).expect("world output capacity");
                 }
-                other @ (top::Request::Resource { .. }
+                other @ (top::Request::SetUp { .. }
+                | top::Request::SetUpRefused { .. }
+                | top::Request::Resource { .. }
                 | top::Request::Taken { .. }
                 | top::Request::Refused { .. }
                 | top::Request::Outcome { .. }
