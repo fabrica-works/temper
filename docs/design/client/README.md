@@ -1751,8 +1751,11 @@ acts on it as its document offers (5.11).
 - **The conversation,** from the task's bounded thread (jig-client's
   `thread`), read as the chat's page reads it, is drawn as work, not as
   a chat's (3.5): its latest window; committed turns, the agent's
-  "Temper"; each call and result as a work line, a `delegate` call's
-  too, since a delegation's card is the chat's (5.7); "Run N began" and
+  "Temper"; a message's calls folded as a chat's (3.5), in one
+  disclosure after its text, named by the chat's fold line and
+  listing each call as a work line, a `delegate` call's too, since a
+  delegation's card is the chat's (5.7); each result as a work line,
+  where its message has it; "Run N began" and
   "Run N ended"; the lines omitted before the window; and a live run's
   provisional text, as the chat's provisional turn.
 - **Its result,** once it has ended: a region "Result" after the
@@ -1772,9 +1775,9 @@ acts on it as its document offers (5.11).
     mockup names the charter (3.5);
   - the demo's banner stays where the frame draws it, before the page,
     where the mockup draws it under the taskbar (5.1);
-  - a turn's calls are the chat's work lines, one by one, where the
-    mockup folds them ("7 tool calls · read ×6 · recall"): this page
-    draws its conversation as the chat does (section 11);
+  - a message's calls folded as the mockup folds them ("7 tool calls
+    · read ×6 · recall") and as a chat does (3.5), its results still
+    work lines (section 11);
   - not drawn, since no document supplies them: the charter's, model's,
     account's, worker's and pool's names ("Implementer · Sonnet ·
     medium", "on s1", "holds a slot of T12's pool"); whose
@@ -3023,9 +3026,10 @@ own tests:
   Default: as printed; a terminal shell that says every time as its
   moment, with no wake, is the candidate.
 - **An agent's conversation drawn as a chat's** (5.9): the agent's
-  page keeps each call, each result and the run markers as work lines,
-  which a chat folds or hides (3.5). Default: as work; the chat's
-  drawing is the candidate, the task pages'.
+  page folds a message's calls as a chat does, and keeps each result
+  and the run markers as work lines, which a chat hides (3.5).
+  Default: as work; the chat's drawing is the candidate, the task
+  pages'.
 - **Which person messages are the person's** (3.5): jig's turns keep no
   provenance, so a chat draws none of a turn's person messages, and
   the person's words from the thread's words alone. A charter whose
@@ -3095,9 +3099,10 @@ own tests:
     document's `cut` does not say which list was cut; a cut of its own
     on the dependencies, as a plan row's, is the candidate (a jig
     change);
-  - a turn's calls: the chat's work lines, one by one, not the
-    mockup's folded "N tool calls", which would change the chat's
-    page too;
+  - a message's calls: folded as a chat's, in the disclosure named
+    "N tool calls · NAMES" (3.5), each call a work line inside it;
+    its results stay work lines where their message has them, which
+    the mockup doesn't draw;
   - its plan: drawn while its tree holds a delegate or a held card,
     where the mockup draws none;
   - its acts are 5.11's.
