@@ -1221,7 +1221,8 @@ directory is empty (7.1).
   none; `init: no git on PATH: a real forge's repositories need git
   2.41 or later, set as workers[].git` when there is none; `init:
   LOGIN cannot be a Forgejo login: forge 3's person is person` when
-  the login falls back (above); and last,
+  the login falls back (above); `init: uid UID has no login in
+  /etc/passwd: forge 3's person is person` with no login; and last,
   `init: start it with temper box`, with the flags init was given. Its
   stdout is empty; exit 0.
 - **Nothing else:** no account, no forge credential, no repository and
@@ -1269,8 +1270,8 @@ defaults for a person's real work are open (section 16).
     is the bot's, `temper`; dormant, not connected until the person sets
     it up from the client (`../draft/first-run.md`, 3.8; 6.5). Until
     temper-15 it names, as each Forgejo forge does, its files in
-    `forge-3`, `api_token`, `user` and its identity's `git_token`,
-    absent until its group's reconcile writes them (6.5).
+    `forge-3`, `api_token`, `user`, `webhook_secret` and its identity's
+    `git_token`, absent until its group's reconcile writes them (6.5).
 
   GitHub and the owned Forgejo are in the document from the first run,
   so that connecting either from the client needs no restart. A start
@@ -1299,9 +1300,10 @@ defaults for a person's real work are open (section 16).
   `demo/forge/webhook_secret`, which the box's `temper forge reconcile`
   step draws before `temper serve` reads it (section 10). The fake's
   start-time adoption hooks the demo's repository to the listener (8.4).
-  Forge 3 names no secret, so it gets no hook until access at adoption
-  is built for an owned forge, and polls (forge.md, section 6); GitHub's
-  hints come from its App's delivery log.
+  Forge 3's, `forge-3/webhook_secret`, is drawn by its group's reconcile
+  (6.5); it gets no hook until access at adoption is built for an owned
+  forge, and polls until then (forge.md, section 6). GitHub's hints come
+  from its App's delivery log.
 - **Its LLM providers:** the owned example's `engine.llm`, whole (8.1),
   with no account; and 3, Demo, the demo model's (8.4): one endpoint,
   `demo`, at `127.0.0.1:<the fake LLM's port>`, plaintext, OpenAI's
@@ -1340,7 +1342,9 @@ defaults for a person's real work are open (section 16).
   directory, its `git` the machine's, or null (8.2); the deployment's directory
   `deployment` in the data directory; the clients' listener
   `127.0.0.1:<port>` (8.2).
-- **Its limits:** the owned example's (8.1). Its `memory_bytes` are
+- **Its limits:** the owned example's (8.1), but room for its three
+  forges: `forge.repositories` and `forge.client.repositories` 3, and
+  `forge.output` 82. Its `memory_bytes` are
   derived as the owned example's are, with its own strings at their
   bounds, the fake entry's `git`, which the engine names to the worker,
   among them; two literals of `temper-init`'s checked by its tests the

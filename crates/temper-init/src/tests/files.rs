@@ -44,8 +44,8 @@ fn the_files_are_named_in_order() {
         ("agent", b"agent.json".as_slice(), Directory::Config, Some(false)),
         ("document last", b"temper.json".as_slice(), Directory::Config, Some(false)),
     ];
-    assert_eq!(answered.len(), expected.len());
-    for (actual, (row, name, directory, private)) in answered.iter().zip(expected) {
+    assert_eq!(answered.files.len(), expected.len());
+    for (actual, (row, name, directory, private)) in answered.files.iter().zip(expected) {
         assert_eq!((actual.name, actual.directory), (name, directory), "{row}");
         match &actual.content {
             Content::Bytes { private: actual, .. } => assert_eq!(Some(*actual), private, "{row}"),

@@ -72,6 +72,7 @@ fn the_owned_example_offers_openai_keys_at_the_public_api() {
 }
 
 #[test]
+#[expect(clippy::too_many_lines, reason = "one table checks the whole default document against the owned example")]
 fn the_default_is_the_owned_example_so_edited() {
     let owned = parse(fixtures::OWNED);
     for (row, facts) in cases() {
@@ -80,15 +81,24 @@ fn the_default_is_the_owned_example_so_edited() {
         let ports = [
             "/application/clients/listener/socket",
             "/application/forges/0/api/socket",
+            "/application/forges/2/api/socket",
             "/application/demo/llm/listen/socket",
             "/application/webhooks/listener/socket",
         ]
         .map(|path| actual.pointer(path).expect("written listener").as_str().expect("socket"));
         for (index, port) in ports.iter().enumerate() {
-            assert!(!ports[..index].contains(port), "{row}: four distinct ports");
+            assert!(!ports[..index].contains(port), "{row}: five distinct ports");
         }
+        assert_eq!(
+            actual["application"]["forges"][2]["api"]["socket"],
+            format!("127.0.0.1:{}", facts.ports.owned),
+            "{row}"
+        );
         let mut expected = owned.clone();
         assert_eq!(replace_org_patterns(&mut expected), 40, "{row}");
+        expected["application"]["limits"]["overrides"]["forge.client.repositories"] = json!(3_u32);
+        expected["application"]["limits"]["overrides"]["forge.repositories"] = json!(3_u32);
+        expected["application"]["limits"]["overrides"]["forge.output"] = json!(82_u32);
         for (path, value) in [
             (
                 "/engine/llm/providers",
@@ -119,7 +129,10 @@ fn the_default_is_the_owned_example_so_edited() {
                     {"number": 1_u16, "kind": "forgejo", "api": {"socket": format!("127.0.0.1:{}", facts.ports.forge)},
                      "transport": "plaintext", "git": format!("http://127.0.0.1:{}", facts.ports.forge), "web": null,
                      "api_token": "demo/forge/api_token", "user": {"file": "demo/forge/user"}, "webhook_secret": "demo/forge/webhook_secret"},
-                    {"number": 2_u16, "kind": "github", "api": null, "transport": null, "git": null, "web": null}
+                    {"number": 2_u16, "kind": "github", "api": null, "transport": null, "git": null, "web": null},
+                    {"number": 3_u16, "kind": "forgejo", "api": {"socket": format!("127.0.0.1:{}", facts.ports.owned)},
+                     "transport": "plaintext", "git": format!("http://127.0.0.1:{}", facts.ports.owned), "web": null,
+                     "api_token": "forge-3/api_token", "user": {"file": "forge-3/user"}, "webhook_secret": "forge-3/webhook_secret"}
                 ]),
             ),
             (
@@ -127,6 +140,8 @@ fn the_default_is_the_owned_example_so_edited() {
                 json!([
                     {"number": 1_u32, "forge": 2_u16, "login": null, "author": null},
                     {"number": 2_u32, "forge": 1_u16, "token": "demo/forge/git_token", "login": "temper",
+                     "author": {"name": "Temper", "email": "temper@localhost"}},
+                    {"number": 3_u32, "forge": 3_u16, "token": "forge-3/git_token", "login": "temper",
                      "author": {"name": "Temper", "email": "temper@localhost"}}
                 ]),
             ),
@@ -136,6 +151,14 @@ fn the_default_is_the_owned_example_so_edited() {
                     "forge": 1_u16, "directory": "demo/forge", "bot": {"login": "temper", "email": "temper@localhost"},
                     "mode": {"fake": {"listen": {"socket": format!("127.0.0.1:{}", facts.ports.forge)},
                         "git": "demo/bin/git", "owner": "demo", "repositories": [{"name": "widget", "landing": "main"}]}}
+                }, {
+                    "forge": 3_u16, "directory": "forge-3", "bot": {"login": "temper", "email": "temper@localhost"},
+                    "start": "asked",
+                    "mode": {"owned": {"forgejo": "fetched", "runner": {
+                        "binary": "fetched", "labels": ["temper-host:host"], "capacity": 1_u32,
+                        "path": "/usr/local/bin:/usr/bin:/bin"},
+                        "listen": {"socket": format!("127.0.0.1:{}", facts.ports.owned)},
+                        "person": {"login": "ada", "email": "ada@localhost", "orgs": ["work"]}}}
                 }]),
             ),
             ("/application/demo", demo(facts.ports.llm.get())),
@@ -378,6 +401,10 @@ fn no_placeholder_is_left() {
                 (b"\"$bundle\"".as_slice(), 1),
                 (b"\"$forge\"".as_slice(), 2),
                 (b"\"$forge_git\"".as_slice(), 1),
+                (b"\"$owned\"".as_slice(), 2),
+                (b"\"$owned_git\"".as_slice(), 1),
+                (b"\"$login\"".as_slice(), 1),
+                (b"\"$email\"".as_slice(), 1),
                 (b"\"$llm\"".as_slice(), 2),
                 (b"\"$webhooks\"".as_slice(), 1),
             ]
@@ -393,5 +420,44 @@ fn no_placeholder_is_left() {
         }
         assert_eq!(bytes::count(source, b"\"$", u32::MAX), count, "{row}: only known tokens");
         parse(source);
+    }
+}
+
+#[test]
+fn the_person_keeps_a_forgejo_login_or_falls_back() {
+    use crate::Person::{FellBack, Found};
+    for (row, login, written, person) in [
+        ("valid", Some(b"ada".as_slice()), "ada", Found),
+        ("case kept", Some(b"Ada".as_slice()), "Ada", Found),
+        ("reserved", Some(b"admin".as_slice()), "person", FellBack),
+        ("reserved case", Some(b"Admin".as_slice()), "person", FellBack),
+        ("reserved pattern", Some(b"x.keys".as_slice()), "person", FellBack),
+        ("pattern case", Some(b"X.GPG".as_slice()), "person", FellBack),
+        ("pattern is suffix", Some(b"x.keys.other".as_slice()), "x.keys.other", Found),
+        ("invalid start", Some(b"-ada".as_slice()), "person", FellBack),
+        (
+            "at bound",
+            Some(b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_slice()),
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            Found,
+        ),
+        ("past bound", Some(b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_slice()), "person", FellBack),
+        ("bot", Some(b"temper".as_slice()), "person", FellBack),
+        ("admin account", Some(b"temper-admin".as_slice()), "person", FellBack),
+        ("org", Some(b"work".as_slice()), "person", FellBack),
+        ("bot case", Some(b"Temper".as_slice()), "person", FellBack),
+        ("empty", Some(b"".as_slice()), "person", FellBack),
+        ("nontext", Some(b"\xff".as_slice()), "person", FellBack),
+        ("absent", None, "person", FellBack),
+    ] {
+        let facts = crate::Facts { login, ..fixtures::facts() };
+        let answer = files(&facts, &DIRECTORIES, &[0; 32], &[0xab; 32]).expect("login never refuses init");
+        assert_eq!(answer.person, person, "{row}");
+        let document = parse(content(&answer, b"temper.json"));
+        assert_eq!(
+            document["application"]["setup"][1]["mode"]["owned"]["person"],
+            json!({"login": written, "email": format!("{written}@localhost"), "orgs": ["work"]}),
+            "{row}"
+        );
     }
 }

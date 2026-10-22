@@ -49,22 +49,28 @@ fn path_lookup_uses_only_absolute_executable_candidates_in_order() {
     }
 }
 #[test]
-fn a_taken_default_webhooks_port_gets_a_distinct_kernel_port() {
-    let holder = match TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 8371)) {
-        Ok(listener) => Some(listener),
-        Err(why) if why.kind() == std::io::ErrorKind::AddrInUse => None,
-        Err(why) => panic!("hold webhooks port: {why}"),
-    };
-    let mut io = Io::open().expect("startup io");
-    let ports = io.ports([0, 0, 0, 8371]).expect("reserved ports");
-    assert_ne!(ports.webhooks.get(), 8371);
-    for other in [ports.clients, ports.forge, ports.llm] {
-        assert_ne!(ports.webhooks, other);
+fn taken_default_owned_and_webhooks_ports_get_distinct_kernel_ports() {
+    for (preferred_port, at) in [(8368, 1), (8371, 4)] {
+        let holder = match TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, preferred_port)) {
+            Ok(listener) => Some(listener),
+            Err(why) if why.kind() == std::io::ErrorKind::AddrInUse => None,
+            Err(why) => panic!("hold default port: {why}"),
+        };
+        let mut io = Io::open().expect("startup io");
+        let mut preferred = [0; 5];
+        preferred[at] = preferred_port;
+        let ports = io.ports(preferred).expect("reserved ports");
+        let chosen = [ports.clients, ports.owned, ports.forge, ports.llm, ports.webhooks];
+        assert_ne!(chosen[at].get(), preferred_port);
+        for (index, port) in chosen.iter().enumerate() {
+            assert!(!chosen[..index].contains(port), "five distinct ports");
+        }
+        drop(holder);
     }
-    drop(holder);
 }
 
 #[test]
+#[expect(clippy::too_many_lines, reason = "one facts table checks reservations, file modes and optional programs")]
 fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
     let mut rows = Vec::new();
     for held in [false, true] {
@@ -90,13 +96,14 @@ fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
         }
         let listeners = [
             TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred clients listener"),
+            TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred owned listener"),
             TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred forge listener"),
             TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred LLM listener"),
             TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred webhooks listener"),
         ];
         let mut preferred = listeners.each_ref().map(|listener| listener.local_addr().expect("port").port());
         if same {
-            preferred = [preferred[0], preferred[0], preferred[2], preferred[0]];
+            preferred = [preferred[0], preferred[0], preferred[0], preferred[3], preferred[0]];
         }
         let holder = if held {
             Some(listeners)
@@ -130,7 +137,7 @@ fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
             .expect("webhooks address")
             .parse()
             .expect("webhooks socket");
-        assert_eq!(webhooks.port() == preferred[3], !held && !same, "{row}");
+        assert_eq!(webhooks.port() == preferred[4], !held && !same, "{row}");
         for other in [address, forge, llm] {
             assert_ne!(webhooks.port(), other.port(), "{row}: webhooks reservation differs");
         }
@@ -149,14 +156,31 @@ fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
         assert_ne!(address.port(), forge.port(), "{row}: clients and forge reservations differ");
         assert_ne!(address.port(), llm.port(), "{row}: clients and LLM reservations differ");
         assert_ne!(forge.port(), llm.port(), "{row}: forge and LLM reservations differ");
-        assert_eq!(forge.port() == preferred[1], !held && !same, "{row}");
+        let owned: std::net::SocketAddr = document["application"]["forges"][2]["api"]["socket"]
+            .as_str()
+            .expect("owned address")
+            .parse()
+            .expect("owned socket");
+        let ports = [address.port(), owned.port(), forge.port(), llm.port(), webhooks.port()];
+        for (index, port) in ports.iter().enumerate() {
+            assert!(!ports[..index].contains(port), "{row}: five distinct reservations");
+        }
+        assert_eq!(owned.port() == preferred[1], !held && !same, "{row}");
+        assert!(TcpListener::bind(owned).is_ok(), "{row}: owned reservation released");
+        assert_eq!(document["application"]["forges"][2]["git"], format!("http://{owned}"), "{row}");
+        assert_eq!(
+            document["application"]["setup"][1]["mode"]["owned"]["listen"],
+            serde_json::json!({"socket": owned.to_string()}),
+            "{row}"
+        );
+        assert_eq!(forge.port() == preferred[2], !held && !same, "{row}");
         assert!(TcpListener::bind(forge).is_ok(), "{row}: forge reservation released");
         assert_eq!(
             document["engine"]["llm"]["endpoints"][1]["address"],
             serde_json::json!({"socket": llm.to_string()}),
             "{row}"
         );
-        assert_eq!(llm.port() == preferred[2], !held, "{row}");
+        assert_eq!(llm.port() == preferred[3], !held, "{row}");
         assert!(TcpListener::bind(llm).is_ok(), "{row}: LLM reservation released");
         assert_eq!(agent["programs"].as_object().expect("programs").contains_key("claude_code"), claude);
         assert_eq!(written.missing_bundle.is_none(), bundle);
@@ -239,7 +263,7 @@ fn init_refusals_leave_every_file_and_directory_untouched() {
             fs::write(&destination, b"kept").expect("existing file");
         }
         let before = snapshot(&root);
-        let why = write(&dirs, &env, &root.join("bin/temper"), [0, 0, 0, 0]).expect_err("refused");
+        let why = write(&dirs, &env, &root.join("bin/temper"), [0, 0, 0, 0, 0]).expect_err("refused");
         assert_eq!(why, format!("{}: already exists", destination.display()));
         assert_eq!(snapshot(&root), before, "{row}: every file and directory untouched");
         fs::remove_dir_all(root).expect("cleanup");
@@ -270,13 +294,32 @@ fn generated_configuration_passes_the_same_checks_as_serve() {
     let root = scratch("acceptance");
     let dirs = directories(&root);
     let env = environment(&root, true);
-    write(&dirs, &env, &root.join("bin/temper"), [0, 0, 0, 0]).expect("init");
+    write(&dirs, &env, &root.join("bin/temper"), [0, 0, 0, 0, 0]).expect("init");
     let bytes = fs::read(dirs.document()).expect("document");
     let deployment = crate::setup::check(&bytes, &dirs.jig()).expect("init document passes setup and named");
+    let owned = deployment.checked.setup.entry(3).expect("init declares the owned forge");
+    assert!(owned.asked, "forge 3 waits for the client");
+    assert!(matches!(owned.mode, temper_forge_setup::setup::Mode::Owned(_)));
     let demo = deployment.demo.expect("init declares the demo");
     assert_eq!(demo.provider(), 3);
     assert_eq!(demo.forge(), 1);
     assert_eq!(demo.project(), 1);
     assert_eq!(demo.client(), path(&dirs.data).join("demo/client").as_os_str().as_bytes());
     fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn the_person_diagnostic_names_the_login_or_the_uid() {
+    use temper_init::Person::{FellBack, Found};
+    for (person, login, expected) in [
+        (Found, Some(b"ada".as_slice()), None),
+        (
+            FellBack,
+            Some(b"Admin".as_slice()),
+            Some("init: Admin cannot be a Forgejo login: forge 3's person is person"),
+        ),
+        (FellBack, None, Some("init: uid 42 has no login in /etc/passwd: forge 3's person is person")),
+    ] {
+        assert_eq!(person_line(person, login, 42).as_deref(), expected);
+    }
 }

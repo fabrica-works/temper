@@ -1191,6 +1191,8 @@ fn owned_memory_figures_for_init_match_its_own_document() {
     // The decoded worker pick adds github_worker_pick_growth() = 1,056 B to
     // both examples and the worker-alone figure; the engine does not grow.
     // Grant validity adds GIT_VALIDITY_GROWTH = 48 B to each worker figure.
+    // Forge 3 and its repository/output room add 1,023,147,519 B to the engine;
+    // the worker's credential slots already cover its identity, so it does not grow.
     support::owned::check_memory("../temper-init/template/temper.json", required);
     eprintln!("init requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
     check_bounded_startup(&bounded, required);

@@ -466,6 +466,20 @@ fn serve(directories: &Directories, boxed: bool) -> Result<Exit, String> {
     host.store = store;
     Ok(skein_shell::drive(&mut kernel, &Clock::new(), &mut host))
 }
+/// The effective user's passwd login; forge commands preserve lookup refusals.
+pub(crate) fn login(user: u32) -> Result<Box<[u8]>, String> {
+    let passwd = skein_shell::read_file(std::path::Path::new("/etc/passwd"), 1 << 20)
+        .map_err(|why| format!("user: {}", unread(why)))?;
+    for line in passwd.split(|c| *c == b'\n') {
+        let fields: Vec<_> = line.split(|c| *c == b':').collect();
+        if fields.get(2).and_then(|id| std::str::from_utf8(id).ok()).and_then(|id| id.parse::<u32>().ok()) == Some(user)
+        {
+            return Ok(fields[0].into());
+        }
+    }
+    Err(format!("user {user}: no login in /etc/passwd"))
+}
+
 #[cfg(test)]
 mod tests;
 

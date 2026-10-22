@@ -220,7 +220,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 85577934507301,
+    "memory_bytes": 85578957654308,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -843,6 +843,21 @@
         "transport": null,
         "git": null,
         "web": null
+      },
+      {
+        "number": 3,
+        "kind": "forgejo",
+        "api": {
+          "socket": "$owned"
+        },
+        "transport": "plaintext",
+        "git": "$owned_git",
+        "web": null,
+        "api_token": "forge-3/api_token",
+        "user": {
+          "file": "forge-3/user"
+        },
+        "webhook_secret": "forge-3/webhook_secret"
       }
     ],
     "identities": [
@@ -856,6 +871,16 @@
         "number": 2,
         "forge": 1,
         "token": "demo/forge/git_token",
+        "login": "temper",
+        "author": {
+          "name": "Temper",
+          "email": "temper@localhost"
+        }
+      },
+      {
+        "number": 3,
+        "forge": 3,
+        "token": "forge-3/git_token",
         "login": "temper",
         "author": {
           "name": "Temper",
@@ -922,6 +947,38 @@
                 "landing": "main"
               }
             ]
+          }
+        }
+      },
+      {
+        "forge": 3,
+        "directory": "forge-3",
+        "bot": {
+          "login": "temper",
+          "email": "temper@localhost"
+        },
+        "start": "asked",
+        "mode": {
+          "owned": {
+            "forgejo": "fetched",
+            "runner": {
+              "binary": "fetched",
+              "labels": [
+                "temper-host:host"
+              ],
+              "capacity": 1,
+              "path": "/usr/local/bin:/usr/bin:/bin"
+            },
+            "listen": {
+              "socket": "$owned"
+            },
+            "person": {
+              "login": "$login",
+              "email": "$email",
+              "orgs": [
+                "work"
+              ]
+            }
           }
         }
       }
@@ -1205,7 +1262,10 @@
     "limits": {
       "profile": "small",
       "overrides": {
-        "checkout.message_bytes": 4098
+        "checkout.message_bytes": 4098,
+        "forge.client.repositories": 3,
+        "forge.repositories": 3,
+        "forge.output": 82
       }
     },
     "workers": [

@@ -88,18 +88,6 @@ fn pinned(which: Which) -> (&'static str, &'static str) {
         Which::Runner => ("runner", RUNNER_VERSION),
     }
 }
-fn login(user: u32) -> Result<Box<[u8]>, String> {
-    let passwd = skein_shell::read_file(std::path::Path::new("/etc/passwd"), 1 << 20)
-        .map_err(|why| format!("user: {}", super::unread(why)))?;
-    for line in passwd.split(|c| *c == b'\n') {
-        let fields: Vec<_> = line.split(|c| *c == b':').collect();
-        if fields.get(2).and_then(|id| std::str::from_utf8(id).ok()).and_then(|id| id.parse::<u32>().ok()) == Some(user)
-        {
-            return Ok(fields[0].into());
-        }
-    }
-    Err(format!("user {user}: no login in /etc/passwd"))
-}
 fn run_refusal(why: Refusal, launch: &run::Launch, number: u16, directories: &super::Directories) -> String {
     let flags = directories.flags().iter().map(|arg| text(arg)).collect::<Vec<_>>().join(" ");
     let prepare = |why: String| format!("{why}: run temper forge prepare {flags} {number}");
@@ -223,7 +211,8 @@ pub(crate) fn start(
         prepare_fake(&directory.join("admin_token")).map_err(refused)?;
         return Ok(0);
     };
-    let place = Place { directory: directory.as_os_str().as_bytes().into(), user: login(user).map_err(refused)? };
+    let place =
+        Place { directory: directory.as_os_str().as_bytes().into(), user: super::login(user).map_err(refused)? };
     let limits = jig_protocol_config::profile(jig_protocol_config::Profile::Small).io;
     if let Some(which) = which {
         let launch = run::launch(owned, &place, which).map_err(|_| refused("the setup has no runner".into()))?;

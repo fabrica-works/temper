@@ -94,24 +94,23 @@ impl Io {
         }
         result
     }
-    fn ports(&mut self, preferred: [u16; 4]) -> Result<temper_init::Ports, String> {
-        let (clients_socket, clients) = self.port(preferred[0])?;
+    fn ports(&mut self, preferred: [u16; 5]) -> Result<temper_init::Ports, String> {
+        let mut held = Vec::with_capacity(preferred.len());
         let result = (|| {
-            let (forge_socket, forge) = self.port(preferred[1])?;
-            let result = (|| {
-                let (llm_socket, llm) = self.port(preferred[2])?;
-                let result = (|| {
-                    let (webhooks_socket, webhooks) = self.port(preferred[3])?;
-                    self.close(webhooks_socket);
-                    Ok(temper_init::Ports { clients, forge, llm, webhooks })
-                })();
-                self.close(llm_socket);
-                result
-            })();
-            self.close(forge_socket);
-            result
+            for port in preferred {
+                held.push(self.port(port)?);
+            }
+            Ok(temper_init::Ports {
+                clients: held[0].1,
+                owned: held[1].1,
+                forge: held[2].1,
+                llm: held[3].1,
+                webhooks: held[4].1,
+            })
         })();
-        self.close(clients_socket);
+        for (fd, _) in held {
+            self.close(fd);
+        }
         result
     }
     fn close(&mut self, fd: Fd) {
@@ -158,14 +157,16 @@ pub(crate) struct Written {
     pub paths: Vec<PathBuf>,
     pub missing_bundle: Option<PathBuf>,
     pub missing_git: bool,
+    pub person: temper_init::Person,
+    pub login: Option<Box<[u8]>>,
 }
 /// Refusals are checked before directories or files are created. The held
-/// listeners reserve all four ports until they have all been chosen, then close.
+/// listeners reserve all five ports until they have all been chosen, then close.
 pub(crate) fn write(
     directories: &Directories,
     environment: &[EnvironmentEntry],
     binary: &Path,
-    preferred: [u16; 4],
+    preferred: [u16; 5],
 ) -> Result<Written, String> {
     let document = directories.document();
     for destination in [
@@ -189,13 +190,15 @@ pub(crate) fn write(
     let ports = io.ports(preferred)?;
     let secret = skein_shell::crypto_seed().map_err(|errno| format!("random secret: errno {errno}"))?;
     let demo_key = skein_shell::crypto_seed().map_err(|errno| format!("random demo key: errno {errno}"))?;
-    let files = temper_init::files(
+    let login = crate::login(skein_shell::effective_user()).ok();
+    let answer = temper_init::files(
         &temper_init::Facts {
             binary: binary.as_os_str().as_bytes(),
             git: git.as_ref().map(|path| path.as_os_str().as_bytes()),
             claude: claude.as_ref().map(|path| path.as_os_str().as_bytes()),
             bundle: bundle.map(|path| path.as_os_str().as_bytes()),
             ports,
+            login: login.as_deref(),
         },
         &temper_init::Directories { config: &directories.config, data: &directories.data },
         secret.expose().try_into().expect("32-byte seed"),
@@ -211,8 +214,8 @@ pub(crate) fn write(
         make_private(config, skein_shell::effective_user())?;
     }
     make_private(&config.join("charters"), skein_shell::effective_user())?;
-    let mut paths = Vec::with_capacity(files.len());
-    for file in files {
+    let mut paths = Vec::with_capacity(answer.files.len());
+    for file in answer.files {
         let root = match file.directory {
             temper_init::Directory::Config => config,
             temper_init::Directory::Data => path(&directories.data),
@@ -231,22 +234,31 @@ pub(crate) fn write(
         result.map_err(|why| format!("{}: {why}", destination.display()))?;
         paths.push(destination);
     }
-    Ok(Written { paths, missing_bundle: bundle.is_none().then_some(bundle_path.clone()), missing_git: git.is_none() })
+    Ok(Written {
+        paths,
+        missing_bundle: bundle.is_none().then_some(bundle_path.clone()),
+        missing_git: git.is_none(),
+        person: answer.person,
+        login,
+    })
 }
 pub(crate) fn core(directories: &Directories) -> Result<Written, String> {
     let binary = std::env::current_exe().map_err(|why| why.to_string())?;
-    write(directories, &skein_shell::environment(), &binary, [8367, 8369, 8370, 8371])
+    write(directories, &skein_shell::environment(), &binary, [8367, 8368, 8369, 8370, 8371])
 }
 pub(crate) fn run(directories: &Directories) -> Result<u8, String> {
     let written = core(directories)?;
     for path in written.paths {
         eprintln!("init: wrote {}", path.display());
     }
+    if let Some(path) = written.missing_bundle {
+        eprintln!("init: no bundle at {}: the browser is not served", path.display());
+    }
     if written.missing_git {
         eprintln!("init: no git on PATH: a real forge's repositories need git 2.41 or later, set as workers[].git");
     }
-    if let Some(path) = written.missing_bundle {
-        eprintln!("init: no bundle at {}: the browser is not served", path.display());
+    if let Some(line) = person_line(written.person, written.login.as_deref(), skein_shell::effective_user()) {
+        eprintln!("{line}");
     }
     eprintln!("init: after starting, add an OpenAI API key from the accounts page");
     let mut line = String::from("init: start it with temper box");
@@ -260,6 +272,18 @@ pub(crate) fn run(directories: &Directories) -> Result<u8, String> {
     }
     eprintln!("{line}");
     Ok(0)
+}
+fn person_line(person: temper_init::Person, login: Option<&[u8]>, user: u32) -> Option<String> {
+    match person {
+        temper_init::Person::Found => None,
+        temper_init::Person::FellBack => Some(match login {
+            Some(login) => format!(
+                "init: {} cannot be a Forgejo login: forge 3's person is person",
+                String::from_utf8_lossy(login)
+            ),
+            None => format!("init: uid {user} has no login in /etc/passwd: forge 3's person is person"),
+        }),
+    }
 }
 #[cfg(test)]
 mod tests;

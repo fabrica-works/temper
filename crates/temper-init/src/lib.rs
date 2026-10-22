@@ -9,6 +9,7 @@ use skein_lib::{Writer, bytes, sha256};
 
 mod hex;
 mod path;
+mod person;
 mod template;
 #[cfg(test)]
 mod tests;
@@ -26,11 +27,14 @@ pub struct Facts<'a> {
     pub bundle: Option<&'a [u8]>,
     /// The listeners' ports on 127.0.0.1.
     pub ports: Ports,
+    /// The effective uid's name in /etc/passwd, or none.
+    pub login: Option<&'a [u8]>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Ports {
     pub clients: NonZeroU16,
+    pub owned: NonZeroU16,
     pub forge: NonZeroU16,
     pub llm: NonZeroU16,
     pub webhooks: NonZeroU16,
@@ -68,6 +72,19 @@ pub enum Content {
     Link {
         target: Box<[u8]>,
     },
+}
+
+/// The files to write and whether the machine's login names forge 3's person.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Answer {
+    pub files: Box<[File]>,
+    pub person: Person,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Person {
+    Found,
+    FellBack,
 }
 
 /// The fact or directory refused, and why; nothing is answered.
@@ -108,7 +125,7 @@ pub fn files(
     directories: &Directories<'_>,
     secret: &[u8; 32],
     demo_key: &[u8; 32],
-) -> Result<Box<[File]>, Refusal> {
+) -> Result<Answer, Refusal> {
     path::check(Fact::Binary, facts.binary, b"")?;
     if let Some(git) = facts.git {
         path::check(Fact::Git, git, b"")?;
@@ -124,49 +141,53 @@ pub fn files(
 
     let digits = hex::digits(secret);
     let digest = hex::digits(&sha256::digest(&digits));
-    let (document, agent) = template::documents(facts, directories);
-    Ok(Box::new([
-        File {
-            directory: Directory::Data,
-            name: b"worker.secret",
-            content: Content::Bytes { bytes: line(&digits), private: true },
-        },
-        File {
-            directory: Directory::Data,
-            name: b"worker.digest",
-            content: Content::Bytes { bytes: line(&digest), private: true },
-        },
-        File {
-            directory: Directory::Data,
-            name: b"demo/llm.key",
-            content: Content::Bytes { bytes: line(&hex::digits(demo_key)), private: true },
-        },
-        File {
-            directory: Directory::Data,
-            name: b"demo/bin/git",
-            content: Content::Link { target: bytes::copy_of(facts.binary) },
-        },
-        File {
-            directory: Directory::Config,
-            name: b"charters/chat.txt",
-            content: Content::Bytes { bytes: bytes::copy_of(template::CHAT), private: false },
-        },
-        File {
-            directory: Directory::Config,
-            name: b"charters/coding.txt",
-            content: Content::Bytes { bytes: bytes::copy_of(template::CODING), private: false },
-        },
-        File {
-            directory: Directory::Config,
-            name: b"agent.json",
-            content: Content::Bytes { bytes: agent, private: false },
-        },
-        File {
-            directory: Directory::Config,
-            name: b"temper.json",
-            content: Content::Bytes { bytes: document, private: false },
-        },
-    ]))
+    let (login, person) = person::login(facts.login);
+    let (document, agent) = template::documents(facts, directories, login);
+    Ok(Answer {
+        person,
+        files: Box::new([
+            File {
+                directory: Directory::Data,
+                name: b"worker.secret",
+                content: Content::Bytes { bytes: line(&digits), private: true },
+            },
+            File {
+                directory: Directory::Data,
+                name: b"worker.digest",
+                content: Content::Bytes { bytes: line(&digest), private: true },
+            },
+            File {
+                directory: Directory::Data,
+                name: b"demo/llm.key",
+                content: Content::Bytes { bytes: line(&hex::digits(demo_key)), private: true },
+            },
+            File {
+                directory: Directory::Data,
+                name: b"demo/bin/git",
+                content: Content::Link { target: bytes::copy_of(facts.binary) },
+            },
+            File {
+                directory: Directory::Config,
+                name: b"charters/chat.txt",
+                content: Content::Bytes { bytes: bytes::copy_of(template::CHAT), private: false },
+            },
+            File {
+                directory: Directory::Config,
+                name: b"charters/coding.txt",
+                content: Content::Bytes { bytes: bytes::copy_of(template::CODING), private: false },
+            },
+            File {
+                directory: Directory::Config,
+                name: b"agent.json",
+                content: Content::Bytes { bytes: agent, private: false },
+            },
+            File {
+                directory: Directory::Config,
+                name: b"temper.json",
+                content: Content::Bytes { bytes: document, private: false },
+            },
+        ]),
+    })
 }
 
 fn line(digits: &[u8]) -> Box<[u8]> {

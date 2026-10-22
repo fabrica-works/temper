@@ -723,14 +723,16 @@ pub fn bounded(directory: &Path) -> Bounded {
 pub fn bounded_template(directory: &Path) -> Bounded {
     use std::num::NonZeroU16;
     use temper_init::{Content, Directories, Facts, Ports};
-    let files = temper_init::files(
+    let answer = temper_init::files(
         &Facts {
             binary: b"/usr/local/bin/temper",
             git: Some(b"/usr/bin/git"),
             claude: Some(b"/usr/bin/claude"),
             bundle: None,
+            login: Some(b"ada"),
             ports: Ports {
                 clients: NonZeroU16::new(8367).expect("clients port"),
+                owned: NonZeroU16::new(8368).expect("owned forge port"),
                 forge: NonZeroU16::new(8369).expect("the fake forge port is nonzero"),
                 llm: NonZeroU16::new(8370).expect("LLM port"),
                 webhooks: NonZeroU16::new(8371).expect("webhooks port"),
@@ -741,7 +743,7 @@ pub fn bounded_template(directory: &Path) -> Bounded {
         &[8; 32],
     )
     .expect("template files");
-    for file in files {
+    for file in answer.files {
         match file.content {
             Content::Bytes { bytes, .. } => {
                 let path = directory.join(std::ffi::OsStr::from_bytes(file.name));
@@ -813,13 +815,15 @@ fn bounded_document(directory: &Path, mut value: serde_json::Value, forge: tempe
         temper_service::limits::profile(temper_service::limits::Profile::Small).forge_component.token_bytes;
     for file in named_files {
         let bytes = match file.path.as_ref() {
-            b"forge-1/api_token" | b"demo/forge/api_token" => {
+            b"forge-1/api_token" | b"demo/forge/api_token" | b"forge-3/api_token" => {
                 vec![b't'; usize::try_from(token_bytes).expect("token bound")]
             }
-            b"forge-1/user" | b"demo/forge/user" => b"42".to_vec(),
-            b"forge-1/webhook_secret" | b"demo/forge/webhook_secret" => b"webhook-secret".to_vec(),
+            b"forge-1/user" | b"demo/forge/user" | b"forge-3/user" => b"42".to_vec(),
+            b"forge-1/webhook_secret" | b"demo/forge/webhook_secret" | b"forge-3/webhook_secret" => {
+                b"webhook-secret".to_vec()
+            }
             b"demo/forge/admin_token" => b"0123456789abcdef0123456789abcdef01234567".to_vec(),
-            b"forge-1/git_token" | b"demo/forge/git_token" => b"git-token".to_vec(),
+            b"forge-1/git_token" | b"demo/forge/git_token" | b"forge-3/git_token" => b"git-token".to_vec(),
             name => fs::read(directory.join(std::ffi::OsStr::from_bytes(name))).expect("fixture file"),
         };
         entries.push((file.path, Secret::new(bytes.into_boxed_slice()))).expect("named file count");

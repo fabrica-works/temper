@@ -17,7 +17,7 @@ pub(crate) const AGENT: &[u8] = include_bytes!("../template/agent.json");
 pub(crate) const CHAT: &[u8] = include_bytes!("../template/charters/chat.txt");
 pub(crate) const CODING: &[u8] = include_bytes!("../template/charters/coding.txt");
 
-pub(crate) fn documents(facts: &Facts<'_>, directories: &Directories<'_>) -> (Box<[u8]>, Box<[u8]>) {
+pub(crate) fn documents(facts: &Facts<'_>, directories: &Directories<'_>, login: &[u8]) -> (Box<[u8]>, Box<[u8]>) {
     let agent = path::join(directories.config, b"agent.json");
     let programs = path::join(directories.data, b"programs");
     let forge = listener(facts.ports.forge);
@@ -25,6 +25,15 @@ pub(crate) fn documents(facts: &Facts<'_>, directories: &Directories<'_>) -> (Bo
     forge_git.put(b"http://").expect("the scheme was counted");
     forge_git.put(&forge).expect("the socket was counted");
     let forge_git = forge_git.finish();
+    let owned = listener(facts.ports.owned);
+    let mut owned_git = Writer::new(7_usize.checked_add(owned.len()).expect("an HTTP base fits"));
+    owned_git.put(b"http://").expect("the scheme was counted");
+    owned_git.put(&owned).expect("the socket was counted");
+    let owned_git = owned_git.finish();
+    let mut email = Writer::new(login.len().checked_add(10).expect("a login and @localhost fit"));
+    email.put(login).expect("the login was counted");
+    email.put(b"@localhost").expect("the domain was counted");
+    let email = email.finish();
     let llm = listener(facts.ports.llm);
     let webhooks = listener(facts.ports.webhooks);
     let listener = listener(facts.ports.clients);
@@ -35,6 +44,10 @@ pub(crate) fn documents(facts: &Facts<'_>, directories: &Directories<'_>) -> (Bo
         (b"listener".as_slice(), json(Value::Text(Some(&listener)))),
         (b"forge".as_slice(), json(Value::Text(Some(&forge)))),
         (b"forge_git".as_slice(), json(Value::Text(Some(&forge_git)))),
+        (b"owned".as_slice(), json(Value::Text(Some(&owned)))),
+        (b"owned_git".as_slice(), json(Value::Text(Some(&owned_git)))),
+        (b"login".as_slice(), json(Value::Text(Some(login)))),
+        (b"email".as_slice(), json(Value::Text(Some(&email)))),
         (b"llm".as_slice(), json(Value::Text(Some(&llm)))),
         (b"webhooks".as_slice(), json(Value::Text(Some(&webhooks)))),
         (b"bundle".as_slice(), json(Value::Text(facts.bundle))),
