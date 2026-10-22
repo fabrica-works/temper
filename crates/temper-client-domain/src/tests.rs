@@ -1,5 +1,6 @@
 mod acts;
 mod address;
+mod amend;
 mod demo;
 mod fixtures;
 mod forge_words;

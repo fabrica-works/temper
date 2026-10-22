@@ -8,6 +8,7 @@
 extern crate alloc;
 pub mod acts;
 pub mod address;
+pub mod amend;
 pub mod boundary;
 pub mod domain;
 pub mod forge;
