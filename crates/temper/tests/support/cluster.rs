@@ -58,14 +58,23 @@ impl Cluster {
         cluster.probe_cost = probe_cost;
         cluster
     }
+    /// Read a story's own lab-format description, with the same cgroup preflight.
+    #[must_use]
+    pub fn read_from(scratch: &Path, directory: &Path) -> Self {
+        let probe_cost = probe(scratch);
+        let mut cluster = Self::description_from(scratch, directory);
+        cluster.probe_cost = probe_cost;
+        cluster
+    }
     fn description(scratch: &Path) -> Self {
-        let experiment =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../lab/cluster").canonicalize().expect("lab/cluster");
+        Self::description_from(scratch, &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../lab/cluster"))
+    }
+    fn description_from(scratch: &Path, directory: &Path) -> Self {
+        let experiment = directory.canonicalize().expect("description directory");
         let value: Value =
             serde_json::from_slice(&fs::read(experiment.join("experiment.json")).expect("cluster description"))
                 .expect("cluster JSON");
         assert_eq!(value["format"], "lab-experiment/1");
-        assert_eq!(value["name"], "cluster");
         assert_eq!(value["cost"], "temper-m1-calibration");
         assert!(list(&value["dirs"]).is_empty(), "cluster has no run directories");
         let specs = list(&value["processes"]).to_vec();
@@ -87,6 +96,10 @@ impl Cluster {
             );
         }
         Self { experiment, specs, bindings, probe_cost: Duration::ZERO }
+    }
+    /// A story-owned template binding, fixed before rendering any document.
+    pub fn bind(&mut self, name: &str, value: &str) {
+        assert!(self.bindings.insert(name.into(), value.into()).is_none(), "duplicate binding {name}");
     }
     /// The process's directory, `{proc.P.dir}`.
     #[must_use]

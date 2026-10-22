@@ -1817,3 +1817,9 @@ exec "$@"
     assert_eq!(ended.exit, Some(Exit::Code(0)), "{diagnostic}");
     assert_eq!(ended.left, Some(Vec::new()), "no process outlived the box: {diagnostic}");
 }
+
+// domain/testing.md, 2.6: the worker receives its repository's installation token.
+#[test]
+fn a_worker_pushes_to_github_by_its_installations_token() {
+    support::github::push();
+}

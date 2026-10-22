@@ -4,6 +4,7 @@ pub mod cluster;
 pub mod configuration;
 pub mod ctl;
 pub mod fetch;
+pub mod github;
 pub mod owned;
 pub mod terminal;
 pub mod webhooks;
