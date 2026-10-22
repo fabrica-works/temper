@@ -75,7 +75,7 @@ Not drawn: two ideas that would change temper's engine, not only its pages. A ch
 
 `world-first-run.js` is the deployment `temper init` writes (`../../protocol/setup.md`, 8.2 and 8.3): the project Default, the charters `chat` and `coding`, one worker in temper's process, three forges (the demo's fake, GitHub not connected, a Forgejo here not set up), and the demo model's key as the one account. Every word an agent says is the demo's script (8.4). [first-run.html](first-run.html), the address the documents cite, opens it at its first step. Its steps:
 
-1. **The link opened:** the chats page is the demo's start (client README, 5.6): a chatbar with no task and no number, the banner, the context line, the three suggested requests.
+1. **The link opened:** the chats page is the demo's start (client README, 5.6): the banner under the navigation, as on every page; a chatbar with no task and no number; the context line; the three suggested requests.
 2. **A request sent:** "Add CSV export to widget" starts the chat T1; its agent delegates the change T2, whose agent T3 edits `src/main.rs`. T2's card says Running with no step ticked (5.7).
 3. **The change landed:** T2's card says Landed, every step ticked, "CI passed. Landed · merge commit e3b8d41"; T1 says so in its script's third turn.
 4. **A text-only request:** "Add a dark theme to widget", the chat T4, answered in words; then its script's `finish` ends it, so its page has no composer.

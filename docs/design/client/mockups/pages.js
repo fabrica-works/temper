@@ -296,6 +296,10 @@
     const words = m && f ? 'This is a demo, running on a demo model and a demo forge.' : m ? 'This is a demo, running on a demo model.' : 'This is a demo, running on a demo forge.';
     return `<aside class="first-run-banner" aria-label="Demo"><p>${fact('temper: the demo, as the forge’s side reads it, and which of its halves hold (client README, 4.8)', words)}</p><div class="terminal-proposal-actions">${m ? `<a href="${u('accounts.html')}">Connect a model</a>` : ''}${f ? forgeBannerAct() : ''}</div></aside>`;
   }
+  function demoStrip() {
+    const banner = demoBanner();
+    return banner ? `<div class="demo-strip">${banner}</div>` : '';
+  }
   function forgeBannerAct() {
     const f = world.forges.find(f => f.mode !== 'fake' && ['setting up', 'connecting'].includes(f.state));
     return f ? `<span class="banner-status">${fact('temper: the forge’s name and set-up state', esc(`${forgeName(f)} · ${f.state}${f.setup?.step ? `: ${f.setup.step}` : ''}`))}</span> <a href="${esc(u(`connect-forge.html?forge=${f.n}`))}">View</a>` : `<a href="${esc(u('connect-forge.html'))}">Connect a forge</a>`;
@@ -486,13 +490,14 @@
   }
 
   // The frame draws the demo's banner under the navigation, on every page
-  // but the accounts and the forges pages (client README, 5.1); a page
-  // that draws it itself gives its own head, and no crumbs.
+  // but the accounts and the forges pages (client README, 5.1), a chat's
+  // and the demo's start among them; a page with a chatbar gives it as
+  // its head, under the banner, and no crumbs.
   function listPage(active, crumbs, body, actions = '', head = null) {
     const trail = (crumbs || []).map((c, i) => i === crumbs.length - 1 ? `<strong>${c[0]}</strong>` : `<a href="${u(c[1])}">${c[0]}</a><span class="sep">/</span>`).join('');
-    const banner = ['accounts', 'forges', 'connect-forge'].includes(page) ? '' : demoBanner();
+    const strip = ['accounts', 'forges', 'connect-forge'].includes(page) ? '' : demoStrip();
     document.body.classList.add('terminal-pages');
-    return `${topbar(active)}${head ?? (banner ? `<div class="demo-strip">${banner}</div>` : '')}<div class="app"><main class="main">
+    return `${topbar(active)}${strip}${head ?? ''}<div class="app"><main class="main">
       ${crumbs ? `<header class="topbar"><div class="breadcrumbs">${trail}</div><div class="top-actions">${actions}<button class="icon-button" aria-label="More" title="Visual mockup"></button></div></header>` : ''}
       <div class="page">${body}</div>
     </main></div>`;
@@ -772,7 +777,7 @@
       <p>Try a request in ${fact('temper: the demo’s repository', esc(world.repos[demo.repo].name))}. Follow the task from its branch to a landed change.</p>
       <ul class="suggestions" aria-label="Suggested requests">${demo.cues.map(suggestion).join('')}</ul>
       <p class="first-run-hint">The demo model plays these requests from a script.</p></section>`;
-    return listPage('chats', null, `${demoBanner()}${demoContext()}${start}<div class="welcome">${composer}</div>${list}`, '', chatbar);
+    return listPage('chats', null, `${demoContext()}${start}<div class="welcome">${composer}</div>${list}`, '', chatbar);
   };
 
   // A suggested request: the cue's words, copied in from the demo's
@@ -918,11 +923,11 @@
       : `<div class="agent-run-heading"><strong>${t.run ? fact(`jig: run ${t.run.n} of ${id}`, `Run ${t.run.n} · ${live ? 'live now' : 'waiting'}`) : 'No run now'}</strong></div>
          <div class="agent-run-meta">${t.run ? fact('jig: when its run started, and on which worker', `Started ${clock(t.run.since)}${t.worker ? ` on ${esc(t.worker)}` : ''}`) : conf('its charter’s host kind', `Host kind ${esc(t.hostKind)}`)} · ${spent(id)} spent so far</div>
          ${world.transcripts[id] ? conversation(id, new Set()) : `<div class="agent-event"><strong>${phase(id)}</strong> <span class="mock-note">Its transcript is not drawn in these mockups.</span></div>`}`;
-    return `<div class="terminal-shell">${topbar('tasks')}
+    return `<div class="terminal-shell">${topbar('tasks')}${demoStrip()}
       <div class="agent-lineage"><a href="${href(t.parent)}">← ${t.parent} ${esc(parent.title)}</a><span>/</span><span class="agent-lineage-current">${id} ${esc(t.title)}</span></div>
       <div class="terminal-chatbar agent-taskbar"><div class="terminal-chat-identity"><h1 class="chatbar-heading"><span class="terminal-number">${id}</span><span class="visually-hidden"> · </span><strong class="terminal-title">${title(id)}</strong></h1>${ref(t.ref)}<span class="terminal-phase${stateClass(id) === 'waiting' ? ' waiting' : stateClass(id) === 'done' ? ' closed' : ''}"><i class="pill-dot"></i> ${phase(id, true)}</span></div>
         <div class="terminal-chat-meta"><span class="agent-charter">${kind(id)} · ${model(id)}</span><span class="agent-spend">${spent(id)} spent</span>${isLive(id) ? '<button type="button" data-later>Amend</button><button type="button" data-later>Stop</button>' : ''}</div></div>
-      <main class="terminal-thread" aria-label="Agent task"><div class="terminal-thread-inner">${demoBanner()}
+      <main class="terminal-thread" aria-label="Agent task"><div class="terminal-thread-inner">
         <div class="agent-brief"><span class="agent-kicker">TASK BRIEF</span><div class="agent-brief-text">${said(t.briefBy || t.by, md(t.brief), t.made)}</div><div class="agent-brief-meta">Asked by ${esc(t.parent)}${t.briefBy && t.briefBy !== t.parent ? `, from ${esc(t.briefBy)}’s spec` : ''} · ${fact('jig: the account its runs use', esc(t.account))} · ${model(id)}${t.pool ? ` · ${fact(`jig: a slot of ${t.parent}'s pool`, `holds a slot of ${t.parent}’s pool`)}` : ''}</div></div>
         ${body}
       </div></main>
@@ -946,10 +951,10 @@
     // A chat its agent finished has ended, with its report; it takes no
     // more words, so its page has no composer.
     const end = live ? '' : `<div class="terminal-day terminal-ended">${fact(`jig: ${id}'s run ended, and its result`, `Ended ${clock(t.ended)}`)}${t.result ? ` · ${said(id, `its report, “${esc(t.result)}”`, t.ended)}` : ''}</div>`;
-    return `<div class="terminal-shell">${topbar('chats')}
+    return `<div class="terminal-shell">${topbar('chats')}${demoStrip()}
       <div class="terminal-chatbar"><div class="terminal-chat-identity"><h1 class="chatbar-heading"><span class="terminal-number">${id}</span><span class="visually-hidden"> · </span><strong class="terminal-title">${title(id)}</strong></h1>${ref(t.ref)}<span class="terminal-phase ${live ? 'waiting' : 'closed'}"><i class="pill-dot"></i> ${phase(id)}</span></div>
         <div class="terminal-chat-meta"><span>${kind(id)} · ${model(id)} · ${conf('its charter’s host kind', esc(t.hostKind))}</span><span>${fact('jig: what it spent, and its budget', `${t.spend} spent · ${t.budget ? `of ${t.budget}` : 'as allowed'}`)}</span>${notes.length ? '<button type="button" data-notes aria-expanded="false">Notes</button>' : ''}${kids(id).length ? `<a href="${u('tasks.html')}" class="chatbar-link">${fact('jig: its delegates, live or ended', liveKids(id).length ? plural(liveKids(id).length, 'delegate') : `${plural(kids(id).length, 'delegate')}, ended`)}</a>` : ''}${live ? '<button type="button" data-later>Stop</button><button type="button" data-later>Close</button>' : ''}</div></div>
-      <main class="terminal-thread" aria-label="Conversation"><div class="terminal-thread-inner">${demoBanner()}${demoContext()}${lines}${after}${end}</div></main>
+      <main class="terminal-thread" aria-label="Conversation"><div class="terminal-thread-inner">${demoContext()}${lines}${after}${end}</div></main>
       ${live ? `<footer class="terminal-composer-area"><div class="composer-line">${usingLine(id)}</div><div class="terminal-composer"><span class="terminal-input-prompt" aria-hidden="true">›</span><textarea rows="1" aria-label="Message ${id}" placeholder="Message ${esc(id)}…"></textarea><span class="terminal-input-hint">Enter to send · Shift+Enter for newline</span><button type="button" class="terminal-send" aria-label="Send message" data-later>↑</button></div></footer>` : ''}
     </div>
     ${notes.length ? `<aside class="drawer" id="notes" hidden aria-label="Notes ${id} wrote">
