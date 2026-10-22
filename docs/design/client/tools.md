@@ -404,8 +404,50 @@ area lands with its stories (section 11).
    of 5.2; `wait`; every act of 5.3.
 2. **Goals and plans:** `goal --project P [--priority I] [--budget A |
    --as-allowed] [--deadline T] TEXT` (`shapes::set_goal`, keyed),
-   `proposal P/K`, `amend N --spec R CHANGE... REASON`, `withdraw P/K`,
+   `proposal P/K`, `amend N [--rev R] CHANGE... REASON`, `withdraw P/K`,
    `seen`.
+
+   - **`amend`'s changes,** one or more, each a control of the task,
+     the rest kept as the task's document shows them (jig's
+     `domain/tasks.md`, section 7), drafted by the client domain's
+     amendment editor (`README.md`, 3.7):
+
+     | Change | Sets |
+     |---|---|
+     | `--priority P` \| `--untracked` | its tracking: tracked at priority P, or untracked |
+     | `--deadline T` \| `--no-deadline` | its authority's deadline, T as `2026-10-24T17:00Z` (UTC, to the minute), the rest of its authority restated as shown |
+     | `--instructions FILE` | its instructions, whole: FILE's bytes, less a final newline; empty is none, said explicitly |
+     | `--spec FILE` | its spec's words, whole; its parameters and inputs kept |
+     | `--dependency M`... \| `--no-dependencies` | its dependencies, whole: those named, in order; what it names anew is added, what it leaves out removed |
+     | `--model M [--effort E]` | its main model and effort (area 5) |
+
+     FILE is a path, or `-` for stdin, used once, as TEXT is.
+   - **`--rev R` is the spec's revision** that `task N` prints, as the
+     task's offered `amend` act carries it: `task N`'s acts print it as
+     `amend 41 --rev 8 CHANGE... REASON --key NAME`. A change of a
+     tracked task's priority alone names none (jig's `domain/tasks.md`, section 7;
+     `../domain/agent.md`, 4.3); every other amendment does, and one
+     without it exits 1, `temper ctl: amend needs --rev R`, nothing
+     sent. The tool reads the task's document, drafts the change on
+     it, and sends nothing when the document's revision is no longer R:
+     `temper ctl: task 41 moved: its spec revision is 9, not 7; read
+     again: task 41`, exit 1.
+   - **What the document must hold whole:** a deadline restates the
+     task's authority, a spec's words its spec. Where the document cut
+     it to the client's bounds, the tool sends nothing and exits 1,
+     `temper ctl: task 41's authority is cut in this read; amend its
+     deadline from a client with wider bounds` (or `spec`, `words`).
+   - **Beyond the party's bounds,** an amendment follows 5.3, compared
+     by jig's admission for the task's offered `amend` act: within,
+     sent; past what the party holds but proposable, a deadline later
+     than its funder allows among them, sent as `Propose`, and
+     `proposed: t41/3, to …`; past the bounds, refused, nothing sent.
+     Each change is proposable (jig's `domain/tasks.md`, 4 and 7); what
+     fails another check than authority (a dependency out of reach, a
+     circle, a goal past the project's goals) is the engine's refusal,
+     exit 2.
+   - **The same flag twice, or both of a pair,** exits 1 as usage;
+     `--dependency` alone may repeat.
 3. **Several parties:** `service --project P --role R --out FILE`
    (jig's `MakeService`, keyed; section 9), `sign-in --service FILE`,
    `project P`, `deployment`, `move N REASON`, a person task's `take`,
@@ -632,6 +674,21 @@ digest: task 7c1e09a2b44f0d13
   prints them whole)`. They are the task's instructions in force, its
   charter's or an amendment's, and the document does not say which
   (section 15). With none, no line.
+- **Its dependencies,** when it has any, after its instructions: a
+  line `dependencies:`, then one indented line per dependency, in the
+  document's order: `task M`, its state as a tree's chip says it, or an
+  ended one's supplied status (`Completed`, `Failed`, `Cancelled`), or
+  none; then, for one added by an amendment (its `dependency_facts`,
+  jig's `Dependency.added`), ` · added by WHO at 2026-10-22 05:10 UTC`,
+  WHO as the requester is said (`you`, `party 3`, `task 7`,
+  `deployment 1`); then, while it keeps the task (jig's `keeps`, jig's
+  `domain/tasks.md`, 5.7), ` · keeps task N from ending`:
+
+  ```
+  dependencies:
+    task 43 · Completed
+    task 44 · Running · added by you at 2026-10-22 05:10 UTC · keeps task 41 from ending
+  ```
 - **A resource** in the forge's words (`README.md`, 4.1): `resource:
   branch temper/1/c2 of repository 1 on forge 1`, never its bytes.
 - **A result** in temper's words, never its record: `result:`, its
@@ -716,6 +773,11 @@ in the table, in snake case, numbers as jig's integers, no floats. The
 JSON is the contract for scripts; the text follows temper's words, and
 may change with them.
 
+- **A task's document** prints its fields as jig's client gives them:
+  its `dependencies` as links, and beside them its `dependency_facts`,
+  one object per dependency, `number`, `pending`, `added` (`null`, or
+  `at`, a wall in nanoseconds, and `by`, the requester as `requester`
+  prints it), `keeps` and `status`.
 - **`help TOOL --json`** prints the tool's record of the table.
 - **`--call`'s arguments** are named as the table names them:
   `decide`'s are `proposal`, or `task` and `hold`, then `outcome` and
@@ -1368,8 +1430,7 @@ Each is named here and designed when it comes.
 - **Instructions, the charter's or an amendment's:** a task's document
   carries the instructions in force, and nothing says whether an
   amendment set them (6.1). Default: `task N` prints them as they are;
-  a word for their source once jig's document says it (o/controls'
-  M4, or later).
+  a word for their source once jig's document says it.
 - **A milestone's phase in `activity`:** the activity line holds only
   the position of the task's history row (jig's `OwnerActivity::
   Milestone`), and the phase is on that row (`OwnerMilestoneLine`).

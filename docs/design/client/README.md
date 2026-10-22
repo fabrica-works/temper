@@ -234,6 +234,7 @@ temper-client-domain/src/
 ├── pages.rs        the pages: their handles, the project the person is in, navigation (3.1)
 ├── pages/          one module per page: what it watches and reads, its state, its acts
 ├── acts.rs         acts as jig's operations, through jig's helpers; the confirmation (3.6)
+├── amend.rs        the amendment editor: a draft of a task's controls, to jig's Amendment (3.7)
 ├── forge.rs        the forge's client side (section 4), with its modules below forge/
 ├── limits.rs       jig-client's limits, the pages', the forge side's, and their sum
 └── tests.rs
@@ -491,6 +492,55 @@ keeps (`../protocol/configuration.md`, section 2).
   the engine refuses, past the
   deployment's `records.value_bytes` among them, shows its refusal
   (section 8). The client reads no configuration, so its bound is jig's.
+
+### 3.7 The amendment editor
+
+One editor drafts a person's amendment of a task, for every page and
+command that amends one: the task's pages (5.8, 5.9) and `temper ctl
+amend` (`tools.md`, 5.5). It is `temper-client-domain`'s `amend`
+module, beside `acts.rs`, and pure: it reads a document and builds
+jig's `Amendment`; it sends nothing, judges no bounds and keeps no
+clock. Each caller lays out its own fields, compares the change with
+the task's offered `amend` act by jig's admission (`c::admission::
+amendment`), and sends it, as `Amend` or `Propose`, as 3.6 says.
+
+- **A draft is made from the task's document** as read,
+  `amend::Draft::of(&c::Task)`: its base is the document's
+  `spec_revision`, and the controls the amendment names, as the
+  document shows them, the same as jig's `OwnerAmendmentState` holds
+  them, with the tracking and the LLM choice: its tracking (`priority`,
+  tracked when supplied), its spec (`SpecificationDocument::whole()`),
+  its authority (`OwnerAuthorityDocument::whole()`), its instructions,
+  its dependencies (its links' numbers, in order) and its `llm`.
+- **An edit sets one control,** whole, and leaves the rest as the
+  base holds them:
+
+  | Edit | Sets in the `Amendment` |
+  |---|---|
+  | `track(Tracking)` | `tracked`: `Tracked { priority }` or `Untracked` |
+  | `deadline(Option<Wall>)` | `authority`: the base's, with its `deadline` replaced |
+  | `instructions(Text)` | `instructions`: whole; empty is none, explicitly |
+  | `words(Text)` | `spec`: the base's, with its `words` replaced |
+  | `dependencies(List<u64>)` | `dependencies`: the whole list |
+  | `llm(LlmChoice)` | `llm`: the whole choice |
+
+  An edit equal to the base is no change. A deadline needs the base's
+  whole authority and words its whole spec: where the document cut it,
+  the edit answers `Cut::Authority` or `Cut::Spec`, and the draft is
+  unchanged, so a page shows the field read only and `ctl` says so.
+- **Its revision.** `Draft::revision()` is the base's. `Draft::moved
+  (&c::Task)` says whether a document read since has another
+  `spec_revision`: a page's draft is then stale, and says so before
+  sending; `ctl` compares it with its `--rev R`.
+- **The change,** `Draft::amendment() -> Option<Drafted>`: none
+  without a change; else `Drafted { revision: Option<Revision>,
+  change: c::Amendment }`, the revision absent exactly when the change
+  is a tracked task's priority alone (jig's `domain/tasks.md`, section
+  7), and the base's otherwise.
+- **What is whose.** The editor holds the rules of a draft (what
+  each edit keeps, what is cut, when a revision is named). The words
+  and fields are the caller's: a page's form, `ctl`'s flags and its
+  lines on stderr.
 
 ## 4. The forge's client family
 
@@ -1256,8 +1306,17 @@ or difference of their amounts (jig's `client/domain/contract.md`,
   not shown." The browser shows the list's name before its items. In a
   row's tree item come the row, its dependency line, its held task's
   card (3.6), then its children. The mockup's worlds declare no
-  dependency, so it draws none: this line is temper's, for B2. An
-  added dependency's facts (`Dependency.added`) are not drawn yet
+  dependency, so it draws none: this line is temper's, for B2.
+- **An added dependency's mark:** in its item of the dependency line,
+  after its link and its state, read only, for a dependency an
+  amendment added (the row's chip's `dependencies`, jig's
+  `Dependency.added`, matched by number): a paragraph, "Added by you"
+  when the person signed in added it, "Added by party P", "Added by
+  task M" or "Added by the deployment" otherwise; then, while it keeps
+  the row's task (jig's `keeps`, jig's `domain/tasks.md`, 5.7), " ·
+  keeps task N from ending". No time: the view keeps no clock, and
+  `ctl task N` prints when (`tools.md`, 6.1). A dependency the facts
+  don't name, or one not added, has no mark; the line keeps its shape
   (section 11).
 - **Budget and authority,** a region after "Latest activity", as the
   mockup's side card: "S spent · L left of B", what the goal spent
@@ -1337,9 +1396,11 @@ acts on it as its document offers (5.11).
   task N"); then its dependency line, as a plan row's (5.8): the list
   "Dependencies of task N", one item per dependency of its document
   (`dependencies`), in order, keyed by its task, with its "Task M"
-  link and its state. The document's `cut` does not say which of its
-  lists was cut, so the line has no last item (section 11). The
-  mockup's worlds declare no dependency: the line is temper's, for B2.
+  link and its state, and an added one's mark (5.8), from the
+  document's `dependency_facts`. The document's `cut` does not say
+  which of its lists was cut, so the line has no last item (section
+  11). The mockup's worlds declare no dependency: the line is
+  temper's, for B2.
 - **The run's heading,** one, for its current or its last run, from its
   chip's owner phase and its `attempt` (jig's `client/domain/objects.md`,
   section 3):
@@ -2327,9 +2388,11 @@ own tests:
   counts ("3 running, 3 in queues, 7 ended") have no document to come
   from. Default: as supplied; they wait for a supplied source, such as
   a task query's phases.
-- **An added dependency** on a goal's plan (5.8): `Dependency.added`
-  says when and by whom a dependency was added. Default: a mark in its
-  item of the dependency line, which keeps its shape.
+- **An added dependency** on a task's page (5.8, 5.9):
+  `Dependency.added` says when and by whom a dependency was added.
+  Default: a mark in its item of the dependency line, who added it and
+  whether it keeps the task, which keeps the line's shape; when, in
+  `ctl task N` alone.
 - **The rest of a goal's authority:** its tools, grants, executor kinds
   and note scopes, which jig supplies as codes and patterns, not
   words. Default: not on the goal's page.
