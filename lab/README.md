@@ -615,12 +615,23 @@ temper's agent processes do not give (`docs/design/protocol/llm.md`,
 ## Its files
 
 - **`cluster-web/`'s, copied** byte for byte, as `cluster-web/`
-  copies `cluster/`'s (above), but `llm.json`, which adds one cue,
-  `look-live-chat`: a reply and `wait`, a second reply and `wait`, then
-  `finish`. So the person's message wakes the first wait, the first
-  reply commits, and the second turn waits 60 s uncommitted: a quiet
-  page to capture, its composer kept, where `cluster-first-chat`'s
-  second turn would finish the chat and take its composer away.
+  copies `cluster/`'s (above), but two:
+  - **`llm.json`** adds one cue, `look-live-chat`: a reply and `wait`,
+    a second reply and `wait`, then `finish`. The person's message
+    wakes the first wait and the first reply commits; the second turn
+    then waits uncommitted, a quiet page whose composer stays, where
+    `cluster-first-chat`'s second turn would finish the chat and take
+    its composer away.
+  - **`engine.json`'s chat charter** waits 300 s (`waiting_ms`), its
+    time and the policy's bounds widened to hold it, as temper's
+    startup checks require: the quiet window, about ten times the
+    30 s its steps and captures take. No turn commits inside it, so
+    the chatbar holds still (its status "waiting on your words", its
+    spend). When it closes, the second reply commits, the spend moves,
+    and the chat finishes at once, taking its composer: each live
+    scene is ready by the composer (`textbox "Message"`; the dialog in
+    `chat-closing`), so a capture after the window is `missed`, never
+    a wrong picture.
   `experiment.json`'s processes are `cluster-web/`'s member for
   member; the browser is at 1440×900, and the capture changes its
   viewport for each width (lab-browser.md, 8.10).
@@ -689,7 +700,7 @@ A live capture is `{runner}/look/capture` with the settings' browser by
 its templates, `--mockups {source}/docs/design/client/mockups --live
 {proc.browser.ready.address} --live-out {dir.hand} --ready-seconds 20`.
 The three captures and their steps take about 30 s, inside the second
-turn's quiet minute.
+turn's quiet five minutes.
 
 ## The checks
 
@@ -708,13 +719,18 @@ turn's quiet minute.
   `/chat-solo-T6.html`, the chat at rest; `chat-closing`,
   `/chat-closing.html`, its Close pressed. A gallery scene's names are
   its live scene's.
-  - **What agrees:** at each width, the page sides' outlines (5.3
-    there), their named lines alone, each as an entry with its
-    landmarks (`banner > navigation "Main navigation" > link "Chats"`),
-    counted. A named line is the frame's or a control's (the scenes'
-    names); the lines with no name are the page's content (turns,
-    cards, their counts), which a live page has and the gallery's
-    sample does not: the parts only a live page has.
+  - **What agrees: the frame, line for line.** At each width, the
+    page sides' outlines (lab-browser.md, 5.3) are cut to the frame:
+    the `banner`'s subtree, the chatbar's (`main`'s first `region`),
+    each `dialog`'s, and the composer's lines (`textbox "Message"`,
+    `button "Send"`) wherever they sit under `main`. Every line there
+    is compared as the outline prints it, with its landmarks
+    (`banner > navigation "Main navigation" > link "Chats"`), counted;
+    the outline prints only the scene's names, so a title, a project's
+    name or a count of the page's data is never compared. Everything
+    else under `main`, the conversation whole (its turns, folded
+    calls, delegates' cards), is what only a live page has, and is left
+    out, whatever its names.
   - **Each disagreement fails** `<scene>/<width>/gallery/missing/<role>[/<name>]`
     (fewer on the live page than in the gallery) or
     `.../gallery/extra/...` (more), its role and name signed as
@@ -734,7 +750,8 @@ digest stands for its regions' crops alone, its viewports' shots
 listed as null: the live page's viewport shows its turns' times and
 the day, which move with the clock, so its digest moves with every
 run. A width is live when its record's page side holds `focus`
-(lab-browser.md, 5.2). The judge still reads the pair. The planted
+(lab-browser.md, 5.2), which no served side has: `look/`'s digests and
+bar stay as they are. The judge still reads the pair. The planted
 twin and the blind judge are `look/`'s alone.
 
 ## Running it
@@ -761,8 +778,14 @@ demand, never in the gate.
   `tools/gallery/names.txt` and its names its live scene's; the seed's
   order and the checks' captures; and the gallery check's decisions on
   outlines written as fixtures: agreeing, an entry missing and one
-  extra, unnamed lines left out, counts, landmarks apart, the
-  statuses.
+  extra, counts, landmarks apart, the statuses, and the conversation
+  left out whole: a content control that differs between the sides
+  (a folded call, a delegate's card, one named by a scene's name)
+  fails nothing.
+- **`lab/tests/unit/test_look_bar.py`:** `look_bar.py` is `look/`'s
+  too, so its live rule is tested both ways: a width with `focus` on
+  its page side digests its crops alone, and a `look/` record's
+  digests and bar are unchanged.
 - **`lab/tests/process/test_look_live.py`,** on demand: `steps` under
   the real shell against a stand-in for `browse`: each phase's calls
   in order, and a missed wait ending it with 1.

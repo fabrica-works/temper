@@ -392,11 +392,11 @@ signed in and on temper's first page, and nothing of the pages' paths.
   scene, the gallery's outline and the live one's agree, but for the
   parts only a live page has. A disagreement is the gallery's finding,
   classed `experiment`. The gallery's state that stands for the page is
-  the live scene's experiment's to name; the outlines agree in their
-  named lines, the frame's and the controls' (3.1), each with its
-  landmarks and its count, and the lines with no name, the page's
-  content, are the parts only a live page has (`lab/README.md`, "The
-  live scenes").
+  the live scene's experiment's to name; the outlines agree in the
+  frame, every line under its regions (the banner, the chatbar, the
+  composer, a dialog) with its landmarks and its count, and the rest of
+  the page, its content whole, is the parts only a live page has, so no
+  run's data can fail it (`lab/README.md`, "The live scenes").
 
 ## 9. Findings
 
