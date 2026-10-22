@@ -82,6 +82,10 @@ impl Seen {
     pub fn main_file(&self, path: &[u8]) -> &[u8] {
         self.main.get(path).expect("main file")
     }
+    #[must_use]
+    pub fn main(&self) -> &std::collections::BTreeMap<Vec<u8>, Vec<u8>> {
+        &self.main
+    }
     pub(crate) fn collect(&mut self, peer: &Peer, handle: &Rc<RefCell<Forge>>) {
         self.deliveries = peer
             .observations()
