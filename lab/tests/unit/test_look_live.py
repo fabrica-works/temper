@@ -155,7 +155,7 @@ class FilesTests(unittest.TestCase):
             dict(name='look-' + kind, env=env, argv=['{runner}/look/check', kind] + captures + scenes)
             for kind in ('structure', 'style')] + [dict(name='gallery', env={}, argv=[
                 '/usr/bin/python3', '-I', '-B', '-S', '{experiment}/checks/gallery', '--live',
-                '{collected.look}', '--gallery', '{collected.gallery}/capture',
+                '{collected.look}', '--gallery', '{collected.gallery}/capture', '--scenes', '{experiment}/scenes',
                 'chat-sent=chat', 'chat-reloaded=chat', 'chat-closing=chat-closing:modal'])])
 
 
@@ -256,9 +256,69 @@ CONTENT = '''  region "Conversation"
 '''
 
 
+def tree(text):
+    """Tree entries whose outline is text: a line's indent its depth."""
+    entries = []
+    for line in text.splitlines():
+        own = line.lstrip(' ')
+        role, name = gallery.label(own)
+        role, _, level = role.partition(' ')
+        entries.append(dict(depth=(len(line) - len(own)) // 2, role=role, name=name or '',
+                            level=int(level) if level.isdigit() else 0, node=None))
+    return entries
+
+
 class GalleryTests(unittest.TestCase):
     def compare(self, live=FRAME, reference=FRAME):
         return gallery.compare(live, reference, 'chat-sent', 'desktop')
+
+    def test_projects_count_as_one_or_more(self):
+        # The banner's unnamed buttons are its projects, data: their number
+        # and names never compared, but a banner without one still fails.
+        live = FRAME.replace('banner\n', 'banner\n  button\n  button\n')
+        reference = FRAME.replace('banner\n', 'banner\n  button\n')
+        self.assertEqual(self.compare(live, reference), [])
+        self.assertEqual(gallery.frame(live)['banner > button'], 1)
+        self.assertEqual(self.compare(FRAME, reference), [dict(
+            fail='chat-sent/desktop/gallery/missing/button', summary='banner > button: live 0, gallery 1')])
+
+    def test_a_trailing_count_is_left_off_a_name(self):
+        names = ['Inbox', 'Chats', 'Step 2']
+        def links(*words):
+            return gallery.outline([dict(depth=0, role='banner', name='', level=0)] + [
+                dict(depth=1, role='link', name=word, level=0) for word in words], names)
+        self.assertEqual(links('Inbox 2', 'Inbox', 'Inbox 12'),
+                         'banner\n  link "Inbox"\n  link "Inbox"\n  link "Inbox"\n')
+        # Digits alone after a space; a name of the scene's is kept whole.
+        self.assertEqual(links('Inbox2', 'Inbox 2a', 'Inbox  2', 'Step 2', 'Mail 2'),
+                         'banner\n' + '  link\n' * 3 + '  link "Step 2"\n  link\n')
+        self.assertEqual(gallery.compare(links('Inbox 2'), links('Inbox'), 'chat-sent', 'desktop'), [])
+        self.assertEqual({r['fail'] for r in gallery.compare(
+            links('Messages 2'), links('Inbox'), 'chat-sent', 'desktop')},
+            {'chat-sent/desktop/gallery/missing/link/Inbox', 'chat-sent/desktop/gallery/extra/link'})
+
+    def test_outline_is_skeins_with_no_dialog_line(self):
+        entries = tree(FRAME + CONTENT.replace('  ', '', 1))
+        self.assertEqual(gallery.outline(entries, ['Main navigation', 'Chats', 'Sign out', 'Close',
+                                                   'Message', 'Send']), '''banner
+  navigation "Main navigation"
+    link "Chats"
+  button "Sign out"
+main
+  region
+    heading 1
+    button "Close"
+  textbox "Message"
+  button "Send"
+button "Close"
+region
+  list (0)
+  button "Close"
+  button
+  region
+    heading 2
+    button "Chats"
+''')
 
     def test_agrees_and_ignores_whole_conversation(self):
         self.assertEqual(self.compare(), [])
@@ -312,7 +372,7 @@ class GalleryTests(unittest.TestCase):
         self.assertIn('chat-sent/desktop/gallery/missing/button/Sign%20out', fails)
 
     def test_modal_pair_syntax(self):
-        status, records = gallery.judge(Path('/nonexistent'), Path('/nonexistent'),
+        status, records = gallery.judge(Path('/nonexistent'), Path('/nonexistent'), Path('/nonexistent'),
                                         ['chat-closing=chat-closing:other'])
         self.assertEqual((status, records), (2, [dict(
             undecided='chat-closing=chat-closing:other: expected LIVE=GALLERY[:modal]')]))
@@ -336,6 +396,10 @@ class GalleryInputsTests(unittest.TestCase):
         self.root = Path(temporary.name)
         self.live = self.root / 'live'
         self.reference = self.root / 'gallery'
+        self.scenes = self.root / 'scenes'
+        self.scenes.mkdir()
+        (self.scenes / 'chat-sent.json').write_bytes(canonical(dict(names=[
+            'Main navigation', 'Chats', 'Sign out', 'Close', 'Message', 'Send'])))
         self.pairs = ['chat-sent=chat']
         self.capture(self.live / 'chat-sent', 'chat-sent')
         self.capture(self.reference, 'chat')
@@ -344,18 +408,18 @@ class GalleryInputsTests(unittest.TestCase):
         directory.mkdir(parents=True, exist_ok=True)
         records = []
         for width in widths:
-            data = text.encode()
-            path = scene + '/' + width + '/page/outline.txt'
+            data = canonical(dict(tree=tree(text)))
+            path = scene + '/' + width + '/page/tree.json'
             output = directory / path
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_bytes(data)
-            records.append(dict(name=width, page=dict(outline=dict(
+            records.append(dict(name=width, page=dict(tree=dict(
                 path=path, bytes=len(data), sha256='sha256:' + hashlib.sha256(data).hexdigest()))))
         (directory / 'capture.json').write_bytes(canonical(dict(format='look-capture/1', scenes=[
             dict(name=scene, widths=records)])))
 
     def judge(self):
-        return gallery.judge(self.live, self.reference, self.pairs)
+        return gallery.judge(self.live, self.reference, self.scenes, self.pairs)
 
     def test_success_and_status_one_with_undecided(self):
         self.assertEqual(self.judge(), (0, []))
@@ -386,12 +450,23 @@ class GalleryInputsTests(unittest.TestCase):
         self.assertIn('phone', records[0]['undecided'])
         self.pairs = ['bad-pair', '../escape=chat', 'chat-sent=absent']
         self.assertEqual(self.judge()[0], 2)
+        self.capture(self.live / 'chat-sent', 'chat-sent')
+        self.pairs = ['chat-sent=chat']
+        for names in (None, b'{', canonical(dict(names='Chats')), canonical(dict(names=[1]))):
+            with self.subTest(names=names):
+                path = self.scenes / 'chat-sent.json'
+                path.unlink(missing_ok=True)
+                if names is not None:
+                    path.write_bytes(names)
+                status, records = self.judge()
+                self.assertEqual(status, 2)
+                self.assertIn('chat-sent=chat', records[0]['undecided'])
 
-    def test_outline_missing_unreadable_size_and_digest(self):
+    def test_tree_missing_unreadable_size_and_digest(self):
         directory = self.live / 'chat-sent'
         record = read(directory / 'capture.json')
         width = record['scenes'][0]['widths'][0]
-        outline = width['page']['outline']
+        outline = width['page']['tree']
         path = directory / outline['path']
         original = path.read_bytes()
         for data in (None, b'wrong size', b'x' * len(original)):
@@ -402,21 +477,22 @@ class GalleryInputsTests(unittest.TestCase):
                     path.write_bytes(data)
                 self.assertEqual(self.judge()[0], 2)
                 path.write_bytes(original)
-        for data in (b'\xff', b'   button\n'):
-            self.capture(directory, 'chat-sent', text=data.decode('latin1'))
-            if data == b'\xff':
+        for data in (b'\xff', b'[]', b'{"tree":{}}', b'{"tree":[{"depth":"0","role":"main","name":""}]}',
+                     b'{"tree":[{"depth":0,"role":"main"}]}'):
+            with self.subTest(data=data):
                 current = read(directory / 'capture.json')
-                file = current['scenes'][0]['widths'][0]['page']['outline']
+                file = current['scenes'][0]['widths'][0]['page']['tree']
                 (directory / file['path']).write_bytes(data)
                 file.update(bytes=len(data), sha256='sha256:' + hashlib.sha256(data).hexdigest())
                 (directory / 'capture.json').write_bytes(canonical(current))
-            self.assertEqual(self.judge()[0], 2)
+                self.assertEqual(self.judge()[0], 2)
 
     def test_output_contract(self):
         self.capture(self.live / 'chat-sent', 'chat-sent', FRAME.replace('    link "Chats"\n', ''))
         output = io.StringIO()
         with redirect_stdout(output):
-            status = gallery.main(['--live', str(self.live), '--gallery', str(self.reference), *self.pairs])
+            status = gallery.main(['--live', str(self.live), '--gallery', str(self.reference),
+                                   '--scenes', str(self.scenes), *self.pairs])
         self.assertEqual(status, 1)
         self.assertTrue(all(set(json.loads(line)) == {'fail', 'summary'} for line in output.getvalue().splitlines()))
 

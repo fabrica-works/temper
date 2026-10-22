@@ -715,14 +715,19 @@ turn's quiet five minutes.
   values, as `look/`'s.
 - **`gallery`** (qa-web.md, 8.2): `/usr/bin/python3 -I -B -S
   {experiment}/checks/gallery --live {collected.look} --gallery
-  {collected.gallery}/capture chat-sent=chat chat-reloaded=chat
-  chat-closing=chat-closing:modal`, each pair a live scene and the gallery
+  {collected.gallery}/capture --scenes {experiment}/scenes
+  chat-sent=chat chat-reloaded=chat chat-closing=chat-closing:modal`,
+  each pair a live scene and the gallery
   scene of `gallery/` that stands for its page: `chat`,
   `/chat-solo-T6.html`, the chat at rest; `chat-closing`,
   `/chat-closing.html`, its Close pressed. A gallery scene's names are
   its live scene's.
-  - **What agrees: the frame, line for line.** At each width, the
-    page sides' outlines (lab-browser.md, 5.3) are cut to the frame:
+  - **What agrees: the frame, line for line.** At each width, each
+    page side's outline is made from its tree as lab-browser.md 5.3
+    makes it, with the live scene's names, but that a name is its
+    words before a trailing count (a space, then digits alone): the
+    gallery's "Inbox 2" and the live "Inbox" are both `link "Inbox"`,
+    while a renamed link still fails. The outlines are cut to the frame:
     the `banner`'s subtree, the chatbar's (`main`'s first `region`),
     each `dialog`'s, and the composer's lines (`textbox "Message"`,
     `button "Send"`) wherever they sit under `main`. A pair declared
@@ -734,7 +739,10 @@ turn's quiet five minutes.
     is compared as the outline prints it, with its landmarks
     (`banner > navigation "Main navigation" > link "Chats"`), counted;
     the outline prints only the scene's names, so a title, a project's
-    name or a count of the page's data is never compared. Everything
+    name or a count of the page's data is never compared. The banner's
+    unnamed buttons are its projects, the person's data as the
+    conversation is: they count as one, whatever their number, so two
+    projects agree with one, and a banner without any still fails. Everything
     else under `main`, the conversation whole (its turns, folded
     calls, delegates' cards), is what only a live page has, and is left
     out, whatever its names.
@@ -784,11 +792,12 @@ demand, never in the gate.
   in `client/mockups/`; each gallery scene's page a name of
   `tools/gallery/names.txt` and its names its live scene's; the seed's
   order and the checks' captures; and the gallery check's decisions on
-  outlines written as fixtures: agreeing, an entry missing and one
-  extra, counts, landmarks apart, the statuses, and the conversation
-  left out whole: a content control that differs between the sides
-  (a folded call, a delegate's card, one named by a scene's name)
-  fails nothing.
+  outlines and trees written as fixtures: agreeing, an entry missing
+  and one extra, counts, landmarks apart, the statuses, and the
+  conversation left out whole: a content control that differs between
+  the sides (a folded call, a delegate's card, one named by a scene's
+  name) fails nothing; the projects' number and the Inbox's count
+  agree, a banner without projects and a renamed link fail.
 - **`lab/tests/unit/test_look_bar.py`:** `look_bar.py` is `look/`'s
   too, so its live rule is tested both ways: a width with `focus` on
   its page side digests its crops alone, and a `look/` record's

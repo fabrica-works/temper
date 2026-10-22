@@ -13,6 +13,46 @@ LANDMARKS = {'banner', 'navigation', 'main', 'complementary', 'contentinfo',
              'region', 'form', 'search', 'dialog'}
 NAME = re.compile(r'[a-z][a-z0-9-]*\Z')
 LABEL = re.compile(r'([a-z][a-z0-9-]*(?: [1-6]| \([0-9]+\))?)(?: (".*"))?\Z')
+# skein scripts/lab/look/outline.py's roles; a dialog prints no line there.
+CONTROLS = {'button', 'link', 'textbox', 'searchbox', 'checkbox', 'radio', 'combobox', 'tab',
+            'menuitem', 'switch'}
+COUNT = re.compile(r'(.+) [0-9]+\Z')
+PROJECTS = 'banner > button'
+
+
+def outline(entries, names):
+    """skein's outline (scripts/lab/look/outline.py), a name's trailing count taken off.
+
+    A count is the page's data ("Inbox 2"): the name is its words before it.
+    """
+    names, landmarks, lines = set(names), [], []
+    for index, entry in enumerate(entries):
+        depth, role, name = entry['depth'], entry['role'], entry['name']
+        if type(depth) is not int or type(role) is not str or type(name) is not str:
+            raise ValueError('unreadable tree entry')
+        while landmarks and landmarks[-1] >= depth:
+            landmarks.pop()
+        text = role
+        if role == 'heading':
+            text += ' ' + str(entry['level'])
+        elif role == 'list':
+            count = 0
+            for child in entries[index + 1:]:
+                if child['depth'] <= depth:
+                    break
+                count += child['depth'] == depth + 1 and child['role'] == 'listitem'
+            text += f' ({count})'
+        elif role not in LANDMARKS - {'dialog'} and role not in CONTROLS:
+            continue
+        counted = COUNT.fullmatch(name)
+        if name not in names and counted and counted.group(1) in names:
+            name = counted.group(1)
+        if name in names:
+            text += ' ' + json.dumps(name, ensure_ascii=False)
+        lines.append('  ' * len(landmarks) + text + '\n')
+        if role in LANDMARKS - {'dialog'}:
+            landmarks.append(depth)
+    return ''.join(lines)
 
 
 def label(text):
@@ -48,6 +88,10 @@ def frame(text):
             counts[' > '.join([part[0] for part in landmarks] + [own])] += 1
         if role in LANDMARKS:
             landmarks.append([own, selected, False, role])
+    # The banner's unnamed buttons are its projects, the person's data as
+    # the conversation is: one or more, whatever their number and names.
+    if counts[PROJECTS] > 1:
+        counts[PROJECTS] = 1
     return counts
 
 
@@ -135,25 +179,35 @@ def scene_widths(record, scene):
     return result
 
 
-def read_outline(directory, width):
-    file = width['page']['outline']
+def read_outline(directory, width, names):
+    file = width['page']['tree']
     if (type(file) is not dict or set(file) != {'path', 'bytes', 'sha256'}
             or type(file['path']) is not str or type(file['bytes']) is not int
             or file['bytes'] < 0 or type(file['sha256']) is not str):
-        raise ValueError('unreadable outline record')
+        raise ValueError('unreadable tree record')
     relative = Path(file['path'])
     if relative.is_absolute() or '..' in relative.parts:
-        raise ValueError('outline path outside capture')
+        raise ValueError('tree path outside capture')
     path = (directory / relative).resolve()
     if not path.is_relative_to(directory.resolve()):
-        raise ValueError('outline path outside capture')
+        raise ValueError('tree path outside capture')
     data = path.read_bytes()
     if len(data) != file['bytes'] or 'sha256:' + hashlib.sha256(data).hexdigest() != file['sha256']:
-        raise ValueError('outline size or digest differs')
-    return data.decode('utf-8')
+        raise ValueError('tree size or digest differs')
+    tree = parse(data.decode('utf-8'))
+    if type(tree) is not dict or type(tree.get('tree')) is not list:
+        raise ValueError('unreadable tree')
+    return outline(tree['tree'], names)
 
 
-def judge(live_dir, gallery_dir, pairs):
+def scene_names(scenes_dir, scene):
+    names = parse((scenes_dir / (scene + '.json')).read_bytes())['names']
+    if type(names) is not list or not all(type(name) is str for name in names):
+        raise ValueError('unreadable names')
+    return names
+
+
+def judge(live_dir, gallery_dir, scenes_dir, pairs):
     records = []
     errors = (OSError, ValueError, KeyError, TypeError, UnicodeError)
     for pair in pairs:
@@ -167,6 +221,7 @@ def judge(live_dir, gallery_dir, pairs):
             directory = live_dir / live
             a = scene_widths(parse((directory / 'capture.json').read_bytes()), live)
             b = scene_widths(parse((gallery_dir / 'capture.json').read_bytes()), gallery)
+            names = scene_names(scenes_dir, live)
         except errors as error:
             records.append(dict(undecided=f'{pair}: {error}'))
             continue
@@ -174,8 +229,8 @@ def judge(live_dir, gallery_dir, pairs):
             try:
                 if width not in a or width not in b:
                     raise ValueError('width absent from one capture')
-                records.extend(compare(read_outline(directory, a[width]),
-                                       read_outline(gallery_dir, b[width]), live, width, modal))
+                records.extend(compare(read_outline(directory, a[width], names),
+                                       read_outline(gallery_dir, b[width], names), live, width, modal))
             except errors as error:
                 records.append(dict(undecided=f'{live}/{width}: {error}'))
     status = 1 if any('fail' in record for record in records) else 2 if records else 0
@@ -186,9 +241,10 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live', type=Path, required=True)
     parser.add_argument('--gallery', type=Path, required=True)
+    parser.add_argument('--scenes', type=Path, required=True)
     parser.add_argument('pairs', nargs='+')
     args = parser.parse_args(argv)
-    status, records = judge(args.live, args.gallery, args.pairs)
+    status, records = judge(args.live, args.gallery, args.scenes, args.pairs)
     for record in records:
         print(json.dumps(record, sort_keys=True, separators=(',', ':'), ensure_ascii=False))
     return status
