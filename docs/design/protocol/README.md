@@ -900,11 +900,12 @@ w1, w2       temper serve DIRS     after the engine: each a worker alone
   `{proc.P.ready.C}` is the capture, known once P is ready. A name of any
   other kind (a seed's, a run's, a run directory's, the browser's) fails
   the test, naming it: the description uses none.
-- **Its cost class,** `temper-cluster`, is the binding's (`../qa.md`,
-  10.1), as every experiment's is (skein's `lab.md`, 6.5): the reader
-  holds its `ready_seconds` and `stop_seconds` as that table gives
-  them, the first bounding each process's ready lines from its start,
-  the second each process's stop.
+- **Its cost class,** `temper-m1-calibration`, is the binding's
+  (`../qa.md`, 10.1), as every experiment's is (skein's `lab.md`, 6.5),
+  until the cluster has a class of its own: the reader holds its
+  `ready_seconds` and `stop_seconds` as that table gives them, the
+  first bounding each process's ready lines from its start, the second
+  each process's stop.
 - **The fake forge waits** on `temper serve` reconciling a fake forge at
   its start (setup.md, 5.1). Until then an engine on a fake forge needs
   `temper forge reconcile` run once before it, a step the lab's format
