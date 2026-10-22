@@ -703,3 +703,29 @@ fn a_program_sign_out_counts_its_retained_worker_failures() {
     let expected = size_of::<people::AccountHostFailure>() + name.len();
     assert_eq!(crate::record_bytes(&row), Some(u64::try_from(expected).expect("bounded owned bytes")));
 }
+
+#[test]
+fn set_up_leaves_the_root_admitted_or_refused_with_no_commit() {
+    use temper_engine_domain_forge as forge;
+    let (mut domain, env) = resume_fixture::root();
+    let mut out = Queue::with_capacity(crate::max_out(&env.limits));
+    let forge = 1;
+    for (state, expected) in [
+        (forge::Connection::NotSetUp, crate::Request::SetUp { forge }),
+        (
+            forge::Connection::Connected { id: 1, login: Box::from(b"writer".as_slice()) },
+            crate::Request::SetUpRefused { forge, why: forge::SetUpRefusal::NotOffered },
+        ),
+    ] {
+        crate::try_step(&mut domain, &env, crate::Event::Forge(Box::new(forge::Event::Connection { forge, state })))
+            .unwrap();
+        crate::try_step(&mut domain, &env, crate::Event::Forge(Box::new(forge::Event::SetUp { forge }))).unwrap();
+        // The door pass releases staged outputs; the following pass takes the route's `now` output.
+        crate::release(&mut domain, &env, &mut out);
+        assert!(out.is_empty(), "the door pass requests no commit");
+        crate::release(&mut domain, &env, &mut out);
+        assert_eq!(out.pop(), Some(expected));
+        assert!(out.is_empty(), "no store commit or other output");
+        assert_eq!(domain.deployment().commits, 0);
+    }
+}

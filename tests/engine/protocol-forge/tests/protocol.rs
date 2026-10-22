@@ -355,7 +355,9 @@ fn land_change(world: &mut Protocol) -> bool {
                 top::Request::ChangeDecision { decision: change::Decision::Delegate(_), .. } => {
                     panic!("unexpected delegate")
                 }
-                top::Request::ChangeDecision { .. }
+                top::Request::SetUp { .. }
+                | top::Request::SetUpRefused { .. }
+                | top::Request::ChangeDecision { .. }
                 | top::Request::Resource { .. }
                 | top::Request::Adopted { .. }
                 | top::Request::Save { .. }

@@ -1,18 +1,17 @@
 //! Exhaustive root routing to its protocol components.
 use crate::{engine::Engine, stop};
 use temper_engine_domain as root;
+use temper_engine_domain_forge::SetUpRefusal;
 
 pub(crate) fn request(engine: &mut Engine, request: root::Request) {
     match request {
-        root::Request::Setup { run } => crate::setup::request(engine, run),
-        root::Request::Store(request) => {
-            if let root::StoreRequest::Commit { number, writes } = &request {
-                engine.clients.commit(*number, writes);
-            }
-            if !engine.store.down(request) {
-                stop::unavailable(engine, b"deployment");
-            }
+        root::Request::SetUp { forge } => {
+            // Transitional: task C (o/forgejo-setup-m2) gives SetUp to the box link.
+            crate::setup::lifecycle::set_up_refused(engine, forge, SetUpRefusal::NotUnderTheBox);
         }
+        root::Request::SetUpRefused { forge, why } => crate::setup::lifecycle::set_up_refused(engine, forge, why),
+        root::Request::Setup { run } => crate::setup::request(engine, run),
+        root::Request::Store(request) => store(engine, request),
         root::Request::Account(request) => {
             if let Some(accounts) = &mut engine.accounts {
                 accounts.request(request);
@@ -97,6 +96,15 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
                 engine.clients.down(event);
             }
         }
+    }
+}
+
+fn store(engine: &mut Engine, request: root::StoreRequest) {
+    if let root::StoreRequest::Commit { number, writes } = &request {
+        engine.clients.commit(*number, writes);
+    }
+    if !engine.store.down(request) {
+        stop::unavailable(engine, b"deployment");
     }
 }
 

@@ -82,6 +82,11 @@ pub enum Note {
         number: u16,
         names: Box<[u8]>,
     },
+    /// A set-up ask refused by admission or the box link (protocol/forge.md, 2.8).
+    SetUpRefused {
+        number: u16,
+        why: temper_engine_domain_forge::SetUpRefusal,
+    },
     ForgeStopped {
         number: u16,
         why: skein_forge_connection::Stopped,

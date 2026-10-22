@@ -81,8 +81,16 @@ impl Lifecycle {
 fn connected_in_root(root: &root::Domain, forge: u16) -> bool {
     match root.forge_connection(forge) {
         domain::Connection::Connected { .. } => true,
-        domain::Connection::NotConnected | domain::Connection::Connecting | domain::Connection::Stopped { .. } => false,
+        domain::Connection::NotConnected
+        | domain::Connection::NotSetUp
+        | domain::Connection::SettingUp { .. }
+        | domain::Connection::SetUpFailed { .. }
+        | domain::Connection::Connecting
+        | domain::Connection::Stopped { .. } => false,
     }
+}
+pub(crate) fn set_up_refused(engine: &mut crate::engine::Engine, forge: u16, why: domain::SetUpRefusal) {
+    engine.notes.push(crate::Note::SetUpRefused { number: forge, why });
 }
 pub(crate) fn stopped_connection(engine: &mut crate::engine::Engine, forge: u16) {
     engine.setup.lifecycle.reconcile.remove(&forge);

@@ -754,6 +754,19 @@ pub const fn max_out(l: &Limits) -> u32 {
 #[expect(clippy::too_many_lines, reason = "one exhaustive connector input dispatcher")]
 pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::SetUp { forge } => {
+            let request = match d.connection(forge) {
+                crate::Connection::NotSetUp | crate::Connection::SetUpFailed { .. } => Request::SetUp { forge },
+                crate::Connection::NotConnected
+                | crate::Connection::SettingUp { .. }
+                | crate::Connection::Connecting
+                | crate::Connection::Connected { .. }
+                | crate::Connection::Stopped { .. } => {
+                    Request::SetUpRefused { forge, why: crate::SetUpRefusal::NotOffered }
+                }
+            };
+            out.push(request);
+        }
         Event::Connection { forge, state } => {
             match &state {
                 crate::Connection::Connected { id, .. } => {
@@ -762,8 +775,12 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
                         "same forge writer"
                     );
                 }
-                crate::Connection::NotConnected | crate::Connection::Connecting | crate::Connection::Stopped { .. } => {
-                }
+                crate::Connection::NotConnected
+                | crate::Connection::NotSetUp
+                | crate::Connection::SettingUp { .. }
+                | crate::Connection::SetUpFailed { .. }
+                | crate::Connection::Connecting
+                | crate::Connection::Stopped { .. } => {}
             }
             d.connections.insert(forge, state).expect("configured forge connections");
         }

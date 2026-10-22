@@ -603,6 +603,8 @@ impl World {
                 | engine::PartyRequest::RunText { .. },
             )
             | engine::Request::Account(_)
+            | engine::Request::SetUp { .. }
+            | engine::Request::SetUpRefused { .. }
             | engine::Request::Setup { .. }
             | engine::Request::Busy(_)
             | engine::Request::Drained
@@ -635,6 +637,8 @@ impl World {
             | engine::Request::Party(_)
             | engine::Request::Forge { .. }
             | engine::Request::Account(_)
+            | engine::Request::SetUp { .. }
+            | engine::Request::SetUpRefused { .. }
             | engine::Request::Setup { .. }
             | engine::Request::ToChild(_)
             | engine::Request::Busy(_)

@@ -149,6 +149,15 @@ fn note_line(note: temper_service::Note) -> String {
         temper_service::Note::ForgeLacking { number, names } => {
             format!("temper serve: forge {number}: App lacks {}\n", String::from_utf8_lossy(&names))
         }
+        temper_service::Note::SetUpRefused { number, why } => {
+            use temper_engine_domain_forge::SetUpRefusal;
+            let why = match why {
+                SetUpRefusal::NotUnderTheBox => "not under the box",
+                SetUpRefusal::NotOffered => "not offered",
+                SetUpRefusal::Busy => "busy",
+            };
+            format!("temper serve: forge {number}: set up refused: {why}\n")
+        }
         temper_service::Note::ForgeStopped { number, why } => stopped_line(number, why),
         temper_service::Note::ForgeNotConnected { number, why } => {
             format!("temper serve: forge {number}: not connected: {why}\n")

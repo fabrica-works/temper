@@ -461,6 +461,15 @@ pub enum PartyInput {
 /// and 4). Every output crosses the journal door in its peer's vocabulary.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    /// Routed to the protocol layer's box link; nothing committed (domain/root.md, 5.1).
+    SetUp {
+        forge: u16,
+    },
+    /// Routed to the protocol layer's box link; nothing committed (domain/root.md, 5.1).
+    SetUpRefused {
+        forge: u16,
+        why: forge::SetUpRefusal,
+    },
     /// Run the staged plan named by this token; credential values stay in routing.
     Setup {
         run: Token,
