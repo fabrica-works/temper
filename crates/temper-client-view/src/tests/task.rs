@@ -2119,7 +2119,11 @@ fn amendment_has_specification_and_goal_tracking_controls_and_discard() {
         let region = styled(tree, look::TASK_AMEND);
         assert_eq!(tree.nodes()[region].role, Role::Region);
         assert_eq!(tree.nodes()[region].name.as_deref(), Some(b"Amend task 9".as_slice()));
+        assert!(named(subtree(tree, region), Role::Heading { level: 2 }, b"Amend task 9"));
         assert!(named(subtree(tree, region), Role::TextArea, b"Specification"));
+        // Its label is drawn by the view, just before the text area, not by the shell.
+        let label = index_of(tree, Role::Paragraph, b"Specification");
+        assert!(region < label && label < index_of(tree, Role::TextArea, b"Specification"));
         assert_eq!(named(subtree(tree, region), Role::Check, b"Tracked"), !agent);
         assert_eq!(named(subtree(tree, region), Role::TextField, b"Priority"), !agent);
         assert!(named(subtree(tree, region), Role::Button, b"Send amendment"));

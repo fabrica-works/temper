@@ -171,7 +171,9 @@ pub(crate) fn amendment(b: &mut Builder, root: &Domain, words: &Words, bindings:
     let Some(task) = page.document(root.client()) else { return };
     b.open(Role::Region);
     b.style(look::TASK_AMEND);
-    b.name(&words.say(Word::AmendTask, &[Hole::Number(page.number)]));
+    let title = words.say(Word::AmendTask, &[Hole::Number(page.number)]);
+    b.name(&title);
+    text(b, Role::Heading { level: 2 }, &title);
     if open.done {
         amendment_outcome(b, root, words, bindings);
         b.close();
@@ -180,6 +182,8 @@ pub(crate) fn amendment(b: &mut Builder, root: &Domain, words: &Words, bindings:
     if open.cut {
         text(b, Role::Paragraph, &words.say(Word::SpecTooLong, &[]));
     } else {
+        // The text area's name is its label too, drawn where a person sees it.
+        text(b, Role::Paragraph, &words.say(Word::Specification, &[]));
         b.open(Role::TextArea);
         b.name(&words.say(Word::Specification, &[]));
         b.value(&open.words, 0);
