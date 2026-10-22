@@ -18,6 +18,8 @@ pub(super) enum Kind {
     Install,
     Accept,
     Reconcile,
+    LocalReconcile,
+    LocalConnect,
     Adopt,
     Follow,
 }
@@ -35,22 +37,60 @@ pub(super) struct Adoption {
     pub(super) admin_token: Secret,
     pub(super) access: connection::Access,
 }
+#[derive(Debug)]
+pub(super) struct Local {
+    pub(super) pending: bool,
+    pub(super) restored: bool,
+    pub(super) limits: skein_forge_setup::limits::Limits,
+    pub(super) webhooks: bool,
+    pub(super) bot_login: Box<[u8]>,
+    pub(super) identity: crate::settings::Identity,
+}
+#[derive(Debug)]
+pub(super) enum Reconcile {
+    GitHub,
+    Local(Local),
+}
 pub(super) struct Lifecycle {
     pub(super) adoptions: Map<u16, Adoption>,
-    reconcile: Map<u16, ()>,
+    pub(super) reconcile: Map<u16, Reconcile>,
     deleted: Map<(u16, u64), ()>,
     deleting: Map<u16, ()>,
     pub(super) installations: Map<(u16, u64), domain::Installation>,
     next_run: u64,
 }
 impl Lifecycle {
+    pub(super) fn local(&self, forge: u16) -> Option<&Local> {
+        match self.reconcile.get(&forge) {
+            Some(Reconcile::Local(local)) => Some(local),
+            Some(Reconcile::GitHub) | None => None,
+        }
+    }
+    pub(super) fn local_mut(&mut self, forge: u16) -> Option<&mut Local> {
+        match self.reconcile.get_mut(&forge) {
+            Some(Reconcile::Local(local)) => Some(local),
+            Some(Reconcile::GitHub) | None => None,
+        }
+    }
     pub(super) fn ready(&self, runs: &Map<Token, Run>, limit: u32, domain: &root::Domain) -> bool {
+        for (_, pending) in &self.reconcile {
+            if let Reconcile::Local(local) = pending
+                && local.pending
+                && local.restored
+            {
+                return true;
+            }
+        }
         for (forge, _) in &self.adoptions {
             if runs.len() < limit && !running(runs, *forge) {
                 return true;
             }
         }
-        for (forge, ()) in &self.reconcile {
+        for (forge, pending) in &self.reconcile {
+            match pending {
+                Reconcile::Local(_) => continue,
+                Reconcile::GitHub => {}
+            }
             if runs.len() < limit
                 && connected_in_root(domain, *forge)
                 && !self.deleting.contains_key(forge)
@@ -103,7 +143,9 @@ pub(crate) fn set_up_refused(
     })));
 }
 pub(crate) fn stopped_connection(engine: &mut crate::engine::Engine, forge: u16) {
-    engine.setup.lifecycle.reconcile.remove(&forge);
+    if engine.setup.lifecycle.local(forge).is_none() {
+        engine.setup.lifecycle.reconcile.remove(&forge);
+    }
 }
 pub(super) fn kind(plan: &host::Plan) -> Kind {
     match plan {
@@ -114,8 +156,9 @@ pub(super) fn kind(plan: &host::Plan) -> Kind {
         host::Plan::Reconcile { .. } => Kind::Reconcile,
         host::Plan::Adopt { .. } => Kind::Adopt,
         host::Plan::Paste { .. } => unreachable!("temper-13 stages Paste"),
+        // 14a1-iii introduces the handover and TakeOver; Check remains a later plan.
         host::Plan::Check { .. } | host::Plan::TakeOver { .. } => {
-            unreachable!("Check and TakeOver are not staged yet")
+            unreachable!("Check is not staged; 14a1-iii introduces TakeOver")
         }
         host::Plan::Reachable { .. } => unreachable!("temper-10 stages Reachable"),
     }
@@ -167,11 +210,18 @@ pub(super) fn keep(engine: &mut crate::engine::Engine, forge: u16, item: Item, b
 pub(super) enum Purpose {
     Host(Token),
     Origin(Token),
+    LocalOrigin(Token),
     Deleted(u16),
 }
 pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: reconcile::Outcome) {
     let run = engine.setup.runs.get(&token).expect("ended setup run");
     let (forge, kind) = (run.forge, run.kind);
+    if kind == Kind::LocalReconcile {
+        engine.setup.runs.get_mut(&token).expect("reconcile done").kind = Kind::LocalConnect;
+        let origin = records::origin(connection::settings::Kind::Forgejo, &configured(engine, forge).api).encode();
+        keep(engine, forge, Item::Origin, &origin, Purpose::LocalOrigin(token));
+        return;
+    }
     if kind == Kind::Adopt {
         let adoption = engine.setup.lifecycle.adoptions.get_mut(&forge).expect("live start-time adoption");
         if adoption.next.get() < adoption.repositories {
@@ -217,6 +267,19 @@ pub(super) fn stopped(engine: &mut crate::engine::Engine, token: Token, failure:
     if run.kind == Kind::Adopt {
         engine.setup.lifecycle.adoptions.remove(&run.forge);
     }
+    if run.kind == Kind::LocalReconcile {
+        let forge = run.forge;
+        engine.notes.push(crate::Note::ForgeSetupStopped {
+            number: forge,
+            why: crate::SetupStopped::Stopped {
+                plan: crate::SetupPlan::Reconcile,
+                step: crate::SetupStep { stage: failure.step, why: failure.why },
+            },
+        });
+        engine.setup.runs.remove(&token);
+        state(engine, forge, domain::Connection::NotConnected);
+        return;
+    }
     let mut reason = failure_text(&failure);
     if run.kind == Kind::Convert && failure.why == reconcile::Why::Refused(404) {
         reason = Box::from(
@@ -247,6 +310,10 @@ fn finish(engine: &mut crate::engine::Engine, token: Token, end: root::SetupEnd)
 }
 pub(super) fn kept(engine: &mut crate::engine::Engine, purpose: Purpose) {
     match purpose {
+        Purpose::LocalOrigin(run) => {
+            let active = engine.setup.runs.remove(&run).expect("reconcile waits for Origin Kept");
+            connect_local(engine, active.forge);
+        }
         Purpose::Host(run) => engine.setup.down(host::Request::Answer { run, answer: host::Answer::Written }),
         Purpose::Origin(run) => {
             let active = engine.setup.runs.get_mut(&run).expect("conversion waits on Origin");
@@ -318,6 +385,11 @@ pub(crate) fn connected(engine: &mut crate::engine::Engine, forge: u16) {
         login.put(slug).expect("slug room");
         login.put(domain::BOT_LOGIN_SUFFIX).expect("suffix room");
         (id, login.finish())
+    } else if let Some(local) = engine.setup.lifecycle.local(forge) {
+        let rows = engine.forge_records.rows.forge(forge).expect("Connected has records");
+        let id =
+            skein_forge_setup::item::user(rows.get(Item::User).expect("connected User")).expect("valid User").get();
+        (id, local.bot_login.clone())
     } else {
         // Forgejo still starts from private files (temper-15); its login is the git identity's.
         let mut login = Box::from([]);
@@ -335,7 +407,7 @@ pub(crate) fn connected(engine: &mut crate::engine::Engine, forge: u16) {
     state(engine, forge, domain::Connection::Connected { id, login });
     if github {
         crate::forge::tokens::connected(engine, forge);
-        engine.setup.lifecycle.reconcile.insert(forge, ()).expect("one reconcile per forge");
+        engine.setup.lifecycle.reconcile.insert(forge, Reconcile::GitHub).expect("one reconcile per forge");
     }
 }
 fn installation_event(
@@ -394,6 +466,12 @@ pub(crate) fn installation(
         installation_event(engine, forge, installation, Some(info));
     }
 }
+fn next_run(lifecycle: &mut Lifecycle) -> Token {
+    assert!(lifecycle.next_run < (1_u64 << 60_u32), "internal setup names");
+    let run = Token::new(crate::tokens::SETUP | lifecycle.next_run);
+    lifecycle.next_run = lifecycle.next_run.checked_add(1).expect("setup run names");
+    run
+}
 pub(super) fn advance(engine: &mut crate::engine::Engine) {
     if engine.setup.closing || engine.drain.is_some() || engine.end.is_some() || engine.setup.component.is_none() {
         return;
@@ -407,8 +485,14 @@ pub(super) fn advance(engine: &mut crate::engine::Engine) {
             || !engine.store.room()
             || !engine.forge.room(2)
             || engine.events.room() < 4
-            || busy(engine, *forge)
+            || engine.notes.room() == 0
         {
+            continue;
+        }
+        if start_pending(engine, *forge) {
+            continue;
+        }
+        if busy(engine, *forge) {
             continue;
         }
         if let Some(adoption) = engine.setup.lifecycle.adoptions.get(forge) {
@@ -416,9 +500,7 @@ pub(super) fn advance(engine: &mut crate::engine::Engine) {
                 continue;
             }
             let repository = adoption.next;
-            assert!(engine.setup.lifecycle.next_run < (1_u64 << 60_u32), "internal setup names");
-            let run = Token::new(crate::tokens::SETUP | engine.setup.lifecycle.next_run);
-            engine.setup.lifecycle.next_run = engine.setup.lifecycle.next_run.checked_add(1).expect("setup run names");
+            let run = next_run(&mut engine.setup.lifecycle);
             if !engine.setup.served.contains_key(forge) {
                 let reason = *engine.setup.unserved.get(forge).expect("configured setup exclusion");
                 engine.setup.lifecycle.adoptions.remove(forge);
@@ -463,14 +545,13 @@ pub(super) fn advance(engine: &mut crate::engine::Engine) {
             engine.setup.lifecycle.deleting.insert(*forge, ()).expect("one rewrite per forge");
             let bytes = skein_forge_setup::item::accepted_item(remaining.as_slice());
             keep(engine, *forge, Item::Accepted, bytes.expose(), Purpose::Deleted(*forge));
-        } else if engine.setup.lifecycle.reconcile.contains_key(forge)
+        } else if engine.setup.lifecycle.local(*forge).is_none()
+            && engine.setup.lifecycle.reconcile.contains_key(forge)
             && connected_in_root(&engine.domain, *forge)
             && engine.setup.runs.len() < engine.setup.env.limits.runs
         {
             engine.setup.lifecycle.reconcile.remove(forge);
-            assert!(engine.setup.lifecycle.next_run < (1_u64 << 60_u32), "internal setup names");
-            let run = Token::new(crate::tokens::SETUP | engine.setup.lifecycle.next_run);
-            engine.setup.lifecycle.next_run = engine.setup.lifecycle.next_run.checked_add(1).expect("setup run names");
+            let run = next_run(&mut engine.setup.lifecycle);
             if !engine.setup.served.contains_key(forge) {
                 let reason = *engine.setup.unserved.get(forge).expect("configured setup exclusion");
                 ended(engine, run, root::SetupEnd::Stopped { forge: *forge, reason: Box::from(reason) });
@@ -506,4 +587,133 @@ pub(super) fn refused(engine: &mut crate::engine::Engine, run: Token, forge: u16
     } else {
         ended(engine, run, root::SetupEnd::Stopped { forge, reason });
     }
+}
+
+/// Called only once the root has completed its restore, never by the records loader.
+pub(crate) fn restored(engine: &mut crate::engine::Engine) {
+    for forge in &engine.workers.forges {
+        if let Some(local) = engine.setup.lifecycle.local_mut(forge.number) {
+            local.restored = true;
+        }
+    }
+}
+fn local_stopped(engine: &mut crate::engine::Engine, forge: u16, why: crate::SetupStopped) {
+    engine.notes.push(crate::Note::ForgeSetupStopped { number: forge, why });
+    state(engine, forge, domain::Connection::NotConnected);
+}
+fn start_pending(engine: &mut crate::engine::Engine, forge: u16) -> bool {
+    if let Some(local) = engine.setup.lifecycle.local(forge)
+        && local.restored
+        && local.pending
+    {
+        start_local(engine, forge);
+        return true;
+    }
+    false
+}
+fn start_local(engine: &mut crate::engine::Engine, forge: u16) {
+    engine.setup.lifecycle.local_mut(forge).expect("local start").pending = false;
+    if busy(engine, forge) || engine.setup.runs.len() == engine.setup.env.limits.runs {
+        local_stopped(engine, forge, crate::SetupStopped::Busy);
+        return;
+    }
+    if !engine.setup.served.contains_key(&forge) || engine.forge.unreachable(forge).is_some() {
+        local_stopped(engine, forge, crate::SetupStopped::Missing);
+        return;
+    }
+    // 14a1-iii introduces TakeOver; only an already kept AdminToken can start here.
+    let Some(rows) = engine.forge_records.rows.forge(forge) else {
+        local_stopped(engine, forge, crate::SetupStopped::NotPrepared);
+        return;
+    };
+    if !rows.has(Item::AdminToken) {
+        local_stopped(engine, forge, crate::SetupStopped::NotPrepared);
+        return;
+    }
+    let valid = match rows.get(Item::AdminToken) {
+        Ok(bytes) => skein_forge_setup::item::fits(
+            skein_forge_setup::item::Item::AdminToken,
+            bytes,
+            &engine.forge_records.bounds,
+        ),
+        Err(_) => false,
+    };
+    if !valid {
+        engine.notes.push(crate::Note::ForgeNotConnected { number: forge, why: records::NotConnected::Unreadable });
+        return;
+    }
+    let expected = records::origin(connection::settings::Kind::Forgejo, &configured(engine, forge).api);
+    if rows.has(Item::Origin) {
+        let origin = match rows.get(Item::Origin) {
+            Ok(bytes) => records::Origin::decode(bytes).ok(),
+            Err(_) => None,
+        };
+        let why = match origin {
+            Some(found) if found != expected => {
+                Some(records::NotConnected::OtherForge { kind: found.kind, api: found.api })
+            }
+            None => Some(records::NotConnected::Unreadable),
+            Some(_) => None,
+        };
+        if let Some(why) = why {
+            engine.notes.push(crate::Note::ForgeNotConnected { number: forge, why });
+            return;
+        }
+    }
+    let adopted = engine.domain.adopted_ids(forge);
+    let local = engine.setup.lifecycle.local(forge).expect("local start");
+    let limits = &local.limits;
+    assert!(
+        skein_forge_setup::given::check_adopted(&adopted, limits).is_ok(),
+        "restored adopted ids are checked at their entrance"
+    );
+    let run = next_run(&mut engine.setup.lifecycle);
+    engine
+        .setup
+        .runs
+        .insert(
+            run,
+            Run { forge, kind: Kind::LocalReconcile, internal: true, previous: domain::Connection::NotConnected },
+        )
+        .expect("admitted local reconcile");
+    state(engine, forge, domain::Connection::Connecting);
+    super::run_plan(engine, run, host::Plan::Reconcile { forge, adopted });
+}
+fn connect_local(engine: &mut crate::engine::Engine, forge: u16) {
+    let expected = records::origin(connection::settings::Kind::Forgejo, &configured(engine, forge).api);
+    let rows = engine.forge_records.rows.forge(forge).expect("reconciled records");
+    let local = engine.setup.lifecycle.local_mut(forge).expect("local connection");
+    let start = records::access(
+        connection::settings::Kind::Forgejo,
+        &expected,
+        rows,
+        &engine.forge_records.bounds,
+        local.webhooks,
+    );
+    let start = match start {
+        Ok(start) => start,
+        Err(why) => {
+            crate::forge::connect(engine, forge, Err(why));
+            return;
+        }
+    };
+    let token = rows.get(Item::GitToken).expect("reconciled GitToken");
+    assert!(
+        skein_forge_setup::item::fits(skein_forge_setup::item::Item::GitToken, token, &engine.forge_records.bounds),
+        "kept GitToken validated"
+    );
+    if engine.values.identities.newest(local.identity.number).is_none() {
+        local.identity.token = Secret::new(Box::from(token));
+        let value = crate::translate::identity(&local.identity, &engine.workers.encoding.limits)
+            .expect("checked identity bounds");
+        local.identity.token = Secret::new(Box::new([]));
+        let number = local.identity.number;
+        let generation = engine.values.identities.put(number, value);
+        engine.events.push(root::Event::Credential {
+            number,
+            generation,
+            valid: skein_lib::Duration::from_nanos(u64::MAX),
+        });
+    }
+    crate::forge::connect(engine, forge, Ok(crate::forge::Start::Restored(start)));
 }

@@ -160,6 +160,33 @@ fn note_line(note: temper_service::Note) -> String {
         }
         temper_service::Note::BoxLink { line } => format!("{}\n", String::from_utf8_lossy(&line)),
         temper_service::Note::ForgeStopped { number, why } => stopped_line(number, why),
+        temper_service::Note::ForgeSetupStopped { number, why } => {
+            use temper_service::{SetupPlan, SetupStopped, SetupWhy};
+            let why = match why {
+                SetupStopped::NotPrepared => "prepare it with `temper forge prepare`".into(),
+                SetupStopped::Missing => "setup host missing".into(),
+                SetupStopped::Busy => "setup host busy".into(),
+                SetupStopped::Stopped { plan: SetupPlan::Reconcile, step } => {
+                    let reason = match step.why {
+                        SetupWhy::Refused(status) => format!("refused {status}"),
+                        why @ (SetupWhy::Missing
+                        | SetupWhy::NotAdmin
+                        | SetupWhy::BotIsAdmin
+                        | SetupWhy::Unmarked
+                        | SetupWhy::OtherUser
+                        | SetupWhy::OtherApp
+                        | SetupWhy::KeyForm
+                        | SetupWhy::Unknown
+                        | SetupWhy::Busy
+                        | SetupWhy::Crowded
+                        | SetupWhy::Down
+                        | SetupWhy::Unexpected) => format!("{why:?}"),
+                    };
+                    format!("reconciling stopped at {:?}: {reason}", step.stage)
+                }
+            };
+            format!("temper serve: forge {number}: Not connected: {why}\n")
+        }
         temper_service::Note::ForgeNotConnected { number, why } => {
             format!("temper serve: forge {number}: not connected: {why}\n")
         }
@@ -366,5 +393,27 @@ fn worker_link_notes_print_each_address_and_refusal_exactly() {
                 format!("refused worker-a {printed} {expected}\n")
             );
         }
+    }
+}
+
+#[test]
+fn setup_stops_print_the_forge_plan_and_typed_step_without_a_subject() {
+    use temper_service::{Note, SetupPlan, SetupStage, SetupStep, SetupStopped, SetupWhy};
+    for (why, line) in [
+        (SetupStopped::NotPrepared, "prepare it with `temper forge prepare`"),
+        (SetupStopped::Missing, "setup host missing"),
+        (SetupStopped::Busy, "setup host busy"),
+        (
+            SetupStopped::Stopped {
+                plan: SetupPlan::Reconcile,
+                step: SetupStep { stage: SetupStage::Repository, why: SetupWhy::Refused(403) },
+            },
+            "reconciling stopped at Repository: refused 403",
+        ),
+    ] {
+        assert_eq!(
+            note_line(Note::ForgeSetupStopped { number: 3, why }),
+            format!("temper serve: forge 3: Not connected: {line}\n")
+        );
     }
 }

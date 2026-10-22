@@ -84,6 +84,11 @@ impl Domain {
     pub fn forge_connection(&self, forge: u16) -> forge::Connection {
         self.forge.connection(forge)
     }
+    /// Restored provider ids for the setup host's start-time reconcile.
+    #[must_use]
+    pub fn adopted_ids(&self, forge: u16) -> Box<[u64]> {
+        self.forge.adopted_ids(forge)
+    }
     #[must_use]
     pub fn forge_installation(&self, forge: u16, installation: u64) -> Option<&forge::Installation> {
         self.forge.installation(forge, installation)

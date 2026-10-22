@@ -221,6 +221,10 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     if !engine.forge_records.loading() || engine.end.is_some() || engine.drain.is_some() {
         engine.forge.iterate(now, wall);
     }
+    // Reconcile must observe the root's restored repositories.
+    if !engine.begin && engine.domain.ready() {
+        crate::setup::lifecycle::restored(engine);
+    }
     crate::setup::advance(engine);
     forge_pass(engine);
     engine.workers.iterate(now, &mut engine.events);

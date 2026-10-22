@@ -15,6 +15,7 @@ use skein_lib::List;
 pub fn setup_files(checked: &temper_forge_setup::check::Checked) -> Box<[config::File]> {
     let mut files = List::with_capacity(u32::try_from(checked.setup.entries.len()).expect("checked setup entries"));
     for (index, entry) in checked.setup.entries.iter().enumerate() {
+        // temper-15 removes the old-form Fake handover read.
         if !checked.records_only.contains(&entry.forge)
             && let temper_forge_setup::setup::Mode::Fake(_) = &entry.mode
         {
@@ -49,6 +50,7 @@ fn setup_values(
     let mut values = List::with_capacity(u32::try_from(checked.setup.entries.len()).expect("checked setup entries"));
     for (index, entry) in checked.setup.entries.iter().enumerate() {
         let mut handover = None;
+        // temper-15 removes the old-form Fake handover read.
         if !checked.records_only.contains(&entry.forge)
             && let temper_forge_setup::setup::Mode::Fake(_) = &entry.mode
         {
@@ -622,7 +624,7 @@ fn checked_start(
         forges: resolved.forges,
         demo: parsed.application.demo,
         setup: setup_values,
-        // 14a1-ii connects these from records after the root restores.
+        // Records-only local starts wait for the root to restore.
         records_only: match setup {
             Some(checked) => checked.records_only.clone(),
             None => Box::new([]),

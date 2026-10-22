@@ -1195,6 +1195,11 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + 106_449_864
             // Checked entry, resolved clone and their owned strings coexist at construction.
             + 960 + u64::try_from(size_of::<Option<temper_forge_setup::check::Checked>>()).expect("checked layout")
+            // Local reconcile state shares the existing map; restored/check scratch,
+            // staged ids and the records/identity handoff add 18,056 B. Worker unchanged.
+            + 18_056
+            // The resolved client-capacity pair retained beside Checked: 24 + 25 B.
+            + 49
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.

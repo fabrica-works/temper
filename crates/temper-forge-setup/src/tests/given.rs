@@ -137,3 +137,41 @@ fn each_kit_item_names_its_temper_file() {
         assert_eq!(place::item(item), expected, "{item:?}");
     }
 }
+
+#[test]
+fn configured_repository_capacity_reaches_checked_given_and_names_its_refusal() {
+    use super::fixtures;
+    let directories = jig_protocol_config::Directories::working();
+    for capacity in [1_u64, 3] {
+        let checked = crate::check::checked(
+            &fixtures::document(fixtures::TWO),
+            0,
+            &directories,
+            &fixtures::members(),
+            None,
+            &[(b"forge.client.repositories".as_slice().into(), capacity)],
+        )
+        .unwrap();
+        let given = crate::given::values(checked.setup.entry(2).unwrap(), Some(fixtures::listener()), &checked.limits);
+        assert_eq!(u64::from(given.limits.repositories), capacity);
+    }
+    let refused = crate::check::checked(
+        &fixtures::document(fixtures::TWO),
+        0,
+        &directories,
+        &fixtures::members(),
+        None,
+        &[(b"forge.client.repositories".as_slice().into(), 0)],
+    )
+    .unwrap_err();
+    assert_eq!(
+        problem::lines(&refused).as_ref(),
+        b"application.limits.overrides.forge.client.repositories: outside its type\n"
+    );
+    for place in [Place::Repositories, Place::Repository(1), Place::RepositoriesLimit] {
+        assert_eq!(
+            problem::lines(&crate::given::refusal(0, Refused { place, other: None })).as_ref(),
+            b"application.limits.overrides.forge.client.repositories: outside its type\n"
+        );
+    }
+}

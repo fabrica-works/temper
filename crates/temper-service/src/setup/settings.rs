@@ -107,7 +107,7 @@ fn forgejo(
         }
         match &setup.entry.mode {
             Mode::Owned(_) | Mode::Fake(_) => {
-                let listener = if source.webhook_secret.is_some() {
+                let listener = if config.records_only.contains(&source.number) || source.webhook_secret.is_some() {
                     match &config.webhooks {
                         Some(hooks) => match hooks.listener {
                             skein_io::Addr::Ip(address) => Some(address),
@@ -118,7 +118,10 @@ fn forgejo(
                 } else {
                     None
                 };
-                let given = temper_forge_setup::given::values(&setup.entry, listener, &config.limits.setup.plan());
+                // temper-14h replaces this configured listener with its bound address.
+                let mut limits = config.limits.setup.plan();
+                limits.repositories = config.limits.forge.client.repositories;
+                let given = temper_forge_setup::given::values(&setup.entry, listener, &limits);
                 if let Err(refused) = skein_forge_setup::given::check(&given) {
                     let mut found = Problems::empty();
                     problems(host::Unusable::Given { forge: source.number, refused }, &mut found);
@@ -170,6 +173,8 @@ pub(crate) fn prepare(
             layer.unserved.insert(forge.number, reason).expect("configured setup exclusions");
         }
     }
+    local_starts(config, &mut layer)?;
+    // temper-15 removes the old file access and fake handover/adoption branch.
     for setup in &config.setup {
         if let Mode::Fake(fake) = &setup.entry.mode {
             for index in 0..forges.forges.len() {
@@ -197,6 +202,52 @@ pub(crate) fn prepare(
         }
     }
     Ok(layer)
+}
+fn local_starts(config: &crate::settings::Engine, layer: &mut super::Layer) -> Result<(), Problems> {
+    let own = &config.limits;
+    for setup in &config.setup {
+        if !config.records_only.contains(&setup.entry.forge) {
+            continue; // temper-15 removes old-form file startup and its fake adoption.
+        }
+        let source = source_forge(config, setup.entry.forge);
+        assert!(source.api_token.is_none(), "records-only starts without access");
+        let mut joined = None;
+        for identity in &config.identities {
+            if identity.number == source.identity {
+                joined = Some(identity);
+            }
+        }
+        let identity = joined.expect("checked identity");
+        let login = &setup.entry.bot.login;
+        let local = super::lifecycle::Local {
+            pending: true,
+            restored: false,
+            limits: {
+                let mut limits = own.setup.plan();
+                limits.repositories = own.forge.client.repositories;
+                limits
+            },
+            webhooks: config.webhooks.is_some(),
+            bot_login: login.clone(),
+            identity: crate::settings::Identity {
+                number: identity.number,
+                forge: source.number,
+                token: skein_lib::Secret::new(Box::new([])),
+                login: if identity.login.is_empty() { login.clone() } else { identity.login.clone() },
+                author: identity.author.clone(),
+            },
+        };
+        let wire = crate::translate::limits(&config.limits).ok_or(problem(b"checkout.name_bytes"))?;
+        if crate::translate::identity(&local.identity, &wire).is_err() {
+            return Err(problem(b"checkout.name_bytes"));
+        }
+        layer
+            .lifecycle
+            .reconcile
+            .insert(source.number, super::lifecycle::Reconcile::Local(local))
+            .expect("one local start per forge");
+    }
+    Ok(())
 }
 fn source_forge(config: &crate::settings::Engine, number: u16) -> &crate::settings::Forge {
     for forge in &config.forges {

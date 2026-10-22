@@ -223,7 +223,15 @@ pub fn checked(
         let mut records_only =
             skein_lib::List::with_capacity(u32::try_from(members_value.forges.len()).expect("bounded forges"));
         for f in &members_value.forges {
-            if f.api_token.is_empty()
+            let local = match setup.as_ref().expect("clean parse").entry(f.number) {
+                Some(entry) => match &entry.mode {
+                    Mode::Owned(_) | Mode::Fake(_) => true,
+                    Mode::Managed { .. } => false,
+                },
+                None => false,
+            };
+            if local
+                && f.api_token.is_empty()
                 && f.user == User::Id(0)
                 && f.webhook_secret.is_none()
                 && f.identity_token.is_empty()

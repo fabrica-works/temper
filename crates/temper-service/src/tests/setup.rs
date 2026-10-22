@@ -198,11 +198,13 @@ fn code() -> Secret {
 
 struct Face {
     owner: Option<Token>,
+    hold_done: bool,
+    done: Option<host::Event>,
     wire: skein_world::stream::Wire,
 }
 impl Face {
     fn new() -> Self {
-        Self { owner: None, wire: skein_world::stream::Wire::new(7) }
+        Self { owner: None, hold_done: false, done: None, wire: skein_world::stream::Wire::new(7) }
     }
     fn turn(&mut self, service: &mut crate::Service) {
         for _ in 0_u32..service.engine.as_mut().expect("engine").setup.io.len() {
@@ -241,6 +243,18 @@ impl Face {
             && let Some(up) = self.wire.answer()
         {
             service.engine.as_mut().expect("engine").setup.up(skein_io::Event::Stream { owner, up });
+        }
+        if self.hold_done {
+            let engine = service.engine.as_mut().unwrap();
+            for _ in 0..engine.setup.above.len() {
+                let event = engine.setup.above.pop().unwrap();
+                match event {
+                    done @ host::Event::Done { .. } => self.done = Some(done),
+                    other @ (host::Event::Need { .. } | host::Event::Stop { .. } | host::Event::Closed) => {
+                        engine.setup.above.push(other);
+                    }
+                }
+            }
         }
         advance(service.engine.as_mut().expect("engine"));
     }
@@ -756,3 +770,400 @@ fn an_unresolved_forge_keeps_its_setup_entry_but_restored_and_asked_connects_nev
 
 #[path = "git_tokens.rs"]
 mod git_tokens;
+
+fn local_config(records: bool, fake: bool) -> crate::settings::Engine {
+    let mut config = fixtures::engine();
+    config.forges[0].api = jig_protocol_config::Address::Addr(skein_io::Addr::Ip(([127, 0, 0, 1], 9).into()));
+    config.setup = Box::new([fixtures::owned_setup(1)]);
+    config.setup[0].entry.asked = false;
+    if fake {
+        config.setup[0].entry.mode = temper_forge_setup::setup::Mode::Fake(temper_forge_setup::setup::Fake {
+            listen: ([127, 0, 0, 1], 9).into(),
+            git: b"/data/git".as_slice().into(),
+            owner: b"demo".as_slice().into(),
+            repositories: Box::new([]),
+        });
+    }
+    if records {
+        config.records_only = Box::new([1]);
+        config.forges[0].api_token = None;
+        config.forges[0].user = 0;
+        config.identities[0].token = Secret::new(Box::new([]));
+        config.identities[0].login = if fake { Box::new([]) } else { b"git-user".as_slice().into() };
+    }
+    config.limits.forge.client.repositories = 3;
+    config.limits.forge.output = 96;
+    fixtures::fill_files(&mut config);
+    config
+}
+fn kept_record(store: &mut crate::store::Store, forge: u16, item: Item, bytes: &[u8]) {
+    let owner = Token::new(901);
+    assert!(
+        store
+            .secrets(
+                owner,
+                jig_protocol_store::Secrets::Keep {
+                    owner: jig_protocol_store::SecretOwner::Application,
+                    number: records::number(forge, item),
+                    value: Secret::new(records::encode(bytes).into_boxed_slice()),
+                }
+            )
+            .is_none()
+    );
+    let Some(StoreEvent::Kept { owner: found }) = store.above.pop() else {
+        panic!("durable seed");
+    };
+    assert_eq!(found, owner);
+}
+fn local_store(token: bool) -> crate::store::Store {
+    use temper_engine_domain_forge::{Kinds, Protection, Repository, Role, Stored};
+    let mut store = fixtures::records_store();
+    if token {
+        kept_record(&mut store, 1, Item::AdminToken, b"test-admin");
+    }
+    for (item, value) in
+        [(Item::ApiToken, b"test-api".as_slice()), (Item::GitToken, b"test-git"), (Item::User, &42_u64.to_le_bytes())]
+    {
+        kept_record(&mut store, 1, item, value);
+    }
+    let row = Repository {
+        project: 1,
+        home: true,
+        provider: skein_forge::api::Repository { forge: 1, repository: 41 },
+        host: b"forge.example".as_slice().into(),
+        owner: b"demo".as_slice().into(),
+        name: b"widget".as_slice().into(),
+        prefix: b"temper/".as_slice().into(),
+        role: Role::Owned,
+        ci: true,
+        checks: Box::new([]),
+        kinds: Kinds {
+            read: true,
+            push: true,
+            open: true,
+            land: true,
+            review: true,
+            status: true,
+            comment: true,
+            issue: true,
+            branch: true,
+        },
+        protection: Protection::Absent,
+        settings: skein_forge::api::Settings {
+            default_branch: b"main".as_slice().into(),
+            merge: true,
+            squash: true,
+            rebase: false,
+        },
+    };
+    fixtures::commit(
+        &mut store,
+        1,
+        Box::new([root::Write::Save(root::Record::Forge { row: Box::new(Stored::Repository(row)) })]),
+    );
+    let Some(StoreEvent::Committed { number: 1, .. }) = store.above.pop() else {
+        panic!("durable repository");
+    };
+    store
+}
+fn local_service(config: crate::settings::Engine, store: crate::store::Store) -> crate::Service {
+    let mut service = crate::Service::engine(config, &fixtures::seeds(), None, fixtures::forge_runtime()).unwrap();
+    service.engine.as_mut().unwrap().store = store;
+    service
+}
+fn restore_local(service: &mut crate::Service) {
+    for _ in 0_u32..4096 {
+        fixtures::turn(service);
+        let engine = service.engine.as_mut().unwrap();
+        if engine.domain.ready() {
+            // Drain the shell's IO until restore, then hold setup IO at its stream seam.
+            crate::engine::iterate(engine, Time::from_nanos(1), Wall::from_nanos(1));
+            return;
+        }
+    }
+    panic!("root restore completes");
+}
+fn local_sent(service: &mut crate::Service, face: &mut Face, path: &[u8]) {
+    face.sent(service);
+    assert!(contains(&face.wire.received, path), "wanted path {path:?}");
+}
+fn reconcile_to_repository(service: &mut crate::Service, face: &mut Face) {
+    local_sent(service, face, b"GET /api/v1/user ");
+    assert!(contains(&face.wire.received, b"test-admin"));
+    face.reply(service, br#"{"id":1,"login":"temper-admin","is_admin":true}"#);
+    local_sent(service, face, b"GET /api/v1/users/temper ");
+    face.reply(service, br#"{"id":42,"login":"temper","full_name":"temper:bot","is_admin":false}"#);
+    for token in [b"test-api".as_slice(), b"test-git"] {
+        local_sent(service, face, b"GET /api/v1/user ");
+        assert!(contains(&face.wire.received, token));
+        face.reply(service, br#"{"id":42,"login":"temper"}"#);
+    }
+    local_sent(service, face, b"GET /api/v1/repositories/41 ");
+    face.reply(service, br#"{"id":41,"owner":{"id":1,"login":"demo"},"name":"widget","object_format_name":"sha1","default_branch":"main","default_merge_style":"merge","allow_merge_commits":true,"allow_squash_merge":true,"allow_rebase":true,"html_url":"http://127.0.0.1:9/demo/widget"}"#);
+    local_sent(service, face, b"/collaborators/temper/permission ");
+}
+#[test]
+fn kept_local_records_wait_for_restore_done_and_origin_before_connecting_as_the_recorded_bot() {
+    for fake in [false, true] {
+        let mut service = local_service(local_config(true, fake), local_store(true));
+        let engine = service.engine.as_mut().unwrap();
+        for _ in 0_u32..8 {
+            crate::forge::records::advance(engine);
+        }
+        advance(engine);
+        assert!(engine.setup.runs.is_empty(), "no Reconcile before root restore");
+        assert!(engine.forge.starts.is_empty());
+        assert!(engine.domain.adopted_ids(1).is_empty());
+        restore_local(&mut service);
+        assert_eq!(service.engine.as_ref().unwrap().domain.adopted_ids(1).as_ref(), &[41]);
+        let mut face = Face::new();
+        reconcile_to_repository(&mut service, &mut face);
+        assert!(service.engine.as_ref().unwrap().forge.starts.is_empty(), "held Reconcile has no access");
+        face.hold_done = true;
+        face.reply(&mut service, br#"{"permission":"write","user":{"id":42,"login":"temper"}}"#);
+        assert!(face.done.is_some(), "the actual host completed Reconcile");
+        assert!(service.engine.as_ref().unwrap().setup.writes.is_empty(), "no Origin before Done");
+        assert!(service.engine.as_ref().unwrap().forge.starts.is_empty());
+        service.engine.as_mut().unwrap().setup.above.push(face.done.take().unwrap());
+        advance(service.engine.as_mut().unwrap());
+        let engine = service.engine.as_mut().unwrap();
+        assert_eq!(engine.setup.writes.len(), 1);
+        let write = engine.setup.writes.first().unwrap().1;
+        assert_eq!(write.number, records::number(1, Item::Origin), "never writes AdminToken");
+        assert!(engine.forge.starts.is_empty(), "Origin Kept is held");
+        assert!(engine.values.identities.newest(1).is_none());
+        let Some(StoreEvent::Kept { owner }) = engine.store.above.pop() else {
+            panic!("durable Origin");
+        };
+        answer(engine, StoreEvent::Kept { owner });
+        assert_eq!(engine.forge.starts.get(0).unwrap().1.user, 42);
+        assert!(engine.forge.accepted.is_empty(), "Forgejo has no installation set");
+        let (generation, value) = engine.values.identities.newest(1).unwrap();
+        assert_eq!(generation, 1);
+        let value = fixtures::decoded_identity(value);
+        assert_eq!(value.login(), if fake { b"temper".as_slice() } else { b"git-user" });
+        assert_eq!(
+            match value.kind() {
+                temper_protocol_worker_wire::v1::Kind::Forgejo(token) => token.token(),
+                temper_protocol_worker_wire::v1::Kind::Github(_) => panic!("Forgejo identity"),
+            },
+            &Secret::new(b"test-git".as_slice().into())
+        );
+        let mut credentials = 0_u32;
+        for event in &engine.events {
+            if let root::Event::Credential { number, generation, .. } = event {
+                assert_eq!((*number, *generation), (1, 1));
+                credentials = credentials.checked_add(1).unwrap();
+            }
+        }
+        assert_eq!(credentials, 1);
+        lifecycle::connected(engine, 1);
+        let mut connected = false;
+        for event in &engine.events {
+            if let root::Event::Forge(value) = event
+                && let temper_engine_domain_forge::Event::Connection {
+                    forge: 1,
+                    state: temper_engine_domain_forge::Connection::Connected { id, login },
+                } = value.as_ref()
+            {
+                assert_eq!(*id, 42);
+                assert_eq!(login.as_ref(), b"temper");
+                connected = true;
+            }
+        }
+        assert!(connected);
+        assert!(engine.notes.is_empty(), "no credentials in Notes");
+        no_setup_events(engine);
+        advance(engine);
+        assert!(engine.setup.runs.is_empty(), "Forgejo does not reconcile from Connected");
+        // A second start uses exactly the durable store, including its AdminToken and Origin.
+        let mut store = core::mem::replace(&mut engine.store, fixtures::records_store());
+        for _ in 0..store.above.len() {
+            let _terminal = store.above.pop();
+        }
+        let mut restarted = local_service(local_config(true, fake), store);
+        restore_local(&mut restarted);
+        let mut face = Face::new();
+        local_sent(&mut restarted, &mut face, b"GET /api/v1/user ");
+        assert!(contains(&face.wire.received, b"test-admin"));
+    }
+}
+
+#[test]
+fn local_given_uses_the_one_repository_capacity_nested_orgs_and_configured_listener() {
+    let mut config = local_config(true, false);
+    let temper_forge_setup::setup::Mode::Owned(owned) = &mut config.setup[0].entry.mode else {
+        panic!("owned");
+    };
+    owned.orgs = Box::new([b"nested".as_slice().into()]);
+    config.webhooks =
+        Some(skein_forge_connection::hooks::Webhooks { listener: skein_io::Addr::Ip(([127, 0, 0, 1], 7101).into()) });
+    let (endpoints, _) = crate::forge::prepare(&config, fixtures::forge_runtime()).unwrap();
+    assert!(endpoints.forges.get(0).unwrap().access.is_none());
+    let (host, _) = settings::fixed(&config, &endpoints).unwrap();
+    let entry = host.forges.get(0).unwrap();
+    assert_eq!(entry.address, endpoints.forges.get(0).unwrap().address);
+    let host::Kind::Forgejo(given) = &entry.kind else {
+        panic!("local Given");
+    };
+    assert_eq!(given.limits.repositories, config.limits.forge.client.repositories);
+    assert_eq!(given.limits.repositories, 3);
+    assert_eq!(given.orgs.as_ref(), &[Box::<[u8]>::from(b"nested".as_slice())]);
+    assert_eq!(given.org_owner.as_deref(), Some(b"owner".as_slice()));
+    assert_eq!(given.listener, Some(([127, 0, 0, 1], 7101).into()));
+    assert_eq!(prepare(&config, &mut { endpoints }, &fixtures::seeds().crypto, 2).unwrap().served.len(), 1);
+}
+#[test]
+fn an_old_form_owned_start_makes_no_reconcile() {
+    for token in [false, true] {
+        let mut service = local_service(local_config(false, false), local_store(token));
+        restore_local(&mut service);
+        let engine = service.engine.as_ref().unwrap();
+        assert!(engine.setup.lifecycle.local(1).is_none());
+        assert!(engine.setup.runs.is_empty());
+        assert!(engine.setup.io.is_empty());
+        assert!(engine.setup.writes.is_empty(), "no AdminToken Keep");
+        assert!(engine.setup.lifecycle.adoptions.is_empty(), "no handover use");
+        assert!(engine.notes.is_empty());
+        assert!(engine.values.identities.newest(1).is_some(), "retained file identity");
+    }
+}
+fn local_with_other(config: crate::settings::Engine, store: crate::store::Store) -> crate::Service {
+    let mut config = config;
+    let mut other = fixtures::forges().into_iter().next().unwrap();
+    other.number = 2;
+    other.kind = crate::settings::Kind::GitHub;
+    other.api_token = None;
+    other.api = jig_protocol_config::Address::Addr(skein_io::Addr::Ip(([127, 0, 0, 1], 3000).into()));
+    config.forges = Box::new([config.forges.into_iter().next().unwrap(), other]);
+    let mut runtime = List::with_capacity(2);
+    runtime.push(fixtures::forge_runtime().into_boxed().into_iter().next().unwrap()).unwrap();
+    let mut other = fixtures::forge_runtime().into_boxed().into_iter().next().unwrap();
+    other.number = 2;
+    other.address = ([127, 0, 0, 1], 3000).into();
+    runtime.push(other).unwrap();
+    let mut service = crate::Service::engine(config, &fixtures::seeds(), None, runtime).unwrap();
+    service.engine.as_mut().unwrap().store = store;
+    service
+}
+fn other_progresses(service: &mut crate::Service) {
+    while service.notes().pop().is_some() {}
+    start(service, 77, host::Plan::Manifest { forge: 2, target: Target::Personal });
+    let root::SetupEnd::Done { forge: 2, .. } = terminal(service) else {
+        panic!("other forge progresses");
+    };
+    for (_, write) in &service.engine.as_ref().unwrap().setup.writes {
+        assert_ne!(write.number, records::number(1, Item::AdminToken));
+    }
+}
+#[test]
+fn no_kept_admin_token_names_preparation_and_leaves_the_other_forge_served() {
+    let mut service = local_with_other(local_config(true, false), local_store(false));
+    restore_local(&mut service);
+    let mut prepared = false;
+    for note in service.notes().iter() {
+        if let crate::Note::ForgeSetupStopped { number: 1, why: crate::SetupStopped::NotPrepared } = note {
+            prepared = true;
+        }
+    }
+    assert!(prepared);
+    assert!(service.engine.as_ref().unwrap().setup.io.is_empty());
+    assert!(service.engine.as_ref().unwrap().forge.starts.is_empty());
+    other_progresses(&mut service);
+}
+#[test]
+fn local_stops_missing_busy_and_origin_mismatch_leave_the_other_forge_served() {
+    for fault in [0_u8, 1, 2, 3, 4, 5] {
+        let mut store = local_store(true);
+        if fault == 3 || fault == 4 {
+            let origin = records::origin(
+                if fault == 3 {
+                    skein_forge_connection::settings::Kind::GitHub
+                } else {
+                    skein_forge_connection::settings::Kind::Forgejo
+                },
+                &jig_protocol_config::Address::Addr(skein_io::Addr::Ip(([127, 0, 0, 1], 10).into())),
+            )
+            .encode();
+            kept_record(&mut store, 1, Item::Origin, &origin);
+        }
+        if fault == 5 {
+            kept_record(&mut store, 1, Item::AdminToken, b"");
+        }
+        let mut service = local_with_other(local_config(true, false), store);
+        // Hold root restore while setting the host's actual admission conditions.
+        for _ in 0_u32..8 {
+            crate::forge::records::advance(service.engine.as_mut().unwrap());
+        }
+        advance(service.engine.as_mut().unwrap());
+        if fault == 1 {
+            service.engine.as_mut().unwrap().setup.served.remove(&1);
+        }
+        if fault == 2 {
+            service
+                .engine
+                .as_mut()
+                .unwrap()
+                .setup
+                .runs
+                .insert(
+                    Token::new(76),
+                    Run {
+                        forge: 1,
+                        kind: Kind::Adopt,
+                        internal: true,
+                        previous: temper_engine_domain_forge::Connection::NotConnected,
+                    },
+                )
+                .unwrap();
+        }
+        restore_local(&mut service);
+        if fault == 0 {
+            let mut face = Face::new();
+            local_sent(&mut service, &mut face, b"GET /api/v1/user ");
+            face.wire.write(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n");
+            for _ in 0_u32..1024 {
+                face.turn(&mut service);
+            }
+        }
+        let expected = match fault {
+            0 => Some(crate::SetupStopped::Stopped {
+                plan: crate::SetupPlan::Reconcile,
+                step: crate::SetupStep { stage: reconcile::Stage::Admin, why: reconcile::Why::Refused(403) },
+            }),
+            1 => Some(crate::SetupStopped::Missing),
+            2 => Some(crate::SetupStopped::Busy),
+            _ => None,
+        };
+        let engine = service.engine.as_ref().unwrap();
+        let mut named = false;
+        for note in &engine.notes {
+            named |= match (note, expected) {
+                (crate::Note::ForgeSetupStopped { number: 1, why }, Some(expected)) => *why == expected,
+                (crate::Note::ForgeNotConnected { number: 1, why: records::NotConnected::OtherForge { .. } }, None) => {
+                    fault != 5
+                }
+                (crate::Note::ForgeNotConnected { number: 1, why: records::NotConnected::Unreadable }, None) => {
+                    fault == 5
+                }
+                _ => false,
+            };
+        }
+        assert!(named);
+        if fault != 0 {
+            assert!(engine.setup.io.is_empty(), "refused before any request");
+        }
+        assert!(engine.forge.starts.is_empty());
+        assert!(engine.setup.writes.is_empty());
+        no_setup_events(engine);
+        other_progresses(&mut service);
+    }
+}
+
+fn no_setup_events(engine: &crate::engine::Engine) {
+    for event in &engine.events {
+        if let root::Event::Setup { .. } = event {
+            panic!("admin and setup stop text never enter root events");
+        }
+    }
+}

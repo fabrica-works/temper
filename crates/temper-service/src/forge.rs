@@ -517,9 +517,11 @@ pub(crate) fn connect(engine: &mut crate::engine::Engine, number: u16, start: Re
     match start {
         Ok(Start::Restored(start)) => {
             engine.forge.down(skein_forge_connection::Request::Connect { forge: number, access: start.access });
-            engine
-                .forge
-                .down(skein_forge_connection::Request::Installations { forge: number, accepted: start.accepted });
+            if start.slug.is_some() {
+                engine
+                    .forge
+                    .down(skein_forge_connection::Request::Installations { forge: number, accepted: start.accepted });
+            }
         }
         Ok(Start::Adopted(access)) => {
             engine.forge.down(skein_forge_connection::Request::Connect { forge: number, access });

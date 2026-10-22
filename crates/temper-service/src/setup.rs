@@ -68,8 +68,33 @@ pub(crate) fn worst_case(
     // Handed-up items, pages/links with state, failure subjects, or missing access.
     let payload =
         u64::from(l.body_bytes_in).max(page).max(u64::from(config.limits.records.value_bytes)).max(name).max(lacking);
-    host.checked_add(Map::<u16, ()>::worst_case(l.forges)?)? // served
-        .checked_add(Map::<u16, ()>::worst_case(l.forges)?)? // lifecycle.reconcile
+    let mut local_bytes = 0_u64;
+    for identity in &config.identities {
+        if !config.records_only.contains(&identity.forge) {
+            continue;
+        }
+        let mut bot = 0_usize;
+        for setup in &config.setup {
+            if setup.entry.forge == identity.forge {
+                bot = setup.entry.bot.login.len();
+            }
+        }
+        let login = if identity.login.is_empty() { bot } else { identity.login.len() };
+        local_bytes = local_bytes.checked_add(
+            u64::try_from(
+                bot.checked_add(login)?
+                    .checked_add(identity.author.name.len())?
+                    .checked_add(identity.author.email.len())?,
+            )
+            .ok()?,
+        )?;
+    }
+    // Retained strings, codec parts and their encoded copy can coexist.
+    host.checked_add(local_bytes.checked_mul(3)?)?
+        // Token, encoded identity, and copied parts overlap during the records handoff.
+        .checked_add(u64::from(config.limits.records.value_bytes).checked_mul(4)?)?
+        .checked_add(Map::<u16, ()>::worst_case(l.forges)?)? // served
+        .checked_add(Map::<u16, lifecycle::Reconcile>::worst_case(l.forges)?)? // lifecycle.reconcile
         .checked_add(Map::<u16, ()>::worst_case(l.forges)?)? // lifecycle.deleting
         .checked_add(Map::<u16, &'static [u8]>::worst_case(l.forges)?)? // unserved
         .checked_add(Map::<u16, lifecycle::Adoption>::worst_case(l.forges)?)?
@@ -82,7 +107,15 @@ pub(crate) fn worst_case(
             )
             .checked_mul(u64::from(l.forges))?,
         )?
-        // Internal Reconcile has empty adopted data; Adopt retains only its repository id.
+        // Each staged start retains its restored ids. check_adopted's sorted
+        // (id,index) tuples coexist with the snapshot; host::worst_case owns running plans.
+        .checked_add(
+            u64::from(config.limits.forge.client.repositories)
+                .checked_mul(u64::try_from(size_of::<u64>().checked_add(size_of::<(u64, u32)>())?).ok()?)?,
+        )?
+        .checked_add(
+            u64::from(config.limits.forge.client.repositories).checked_mul(8)?.checked_mul(u64::from(l.runs))?,
+        )?
         .checked_add(Map::<Token, host::Plan>::worst_case(l.runs)?)?
         .checked_add(Map::<Token, Run>::worst_case(l.runs)?)?
         .checked_add(
@@ -111,6 +144,9 @@ pub(crate) fn worst_case(
 }
 
 impl Layer {
+    pub(crate) fn records_only(&self, forge: u16) -> bool {
+        self.lifecycle.local(forge).is_some()
+    }
     pub(crate) fn new(
         settings: host::Settings,
         limits: host::Limits,

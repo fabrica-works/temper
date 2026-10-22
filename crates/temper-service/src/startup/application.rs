@@ -160,6 +160,10 @@ fn configured_limits(
         }
         read::finish(object, document, &path, problems);
     }
+    // Pass the resolved client capacity once, including the profile default.
+    handed
+        .push((bytes::copy_of(b"forge.client.repositories"), u64::from(limits.forge.client.repositories)))
+        .expect("bounded setup inputs");
     Some(limits)
 }
 fn transport(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Transport> {
@@ -561,7 +565,9 @@ fn references(
                         read::form(!identity.login.is_empty(), path.member(b"login"), problems);
                         read::form(!identity.author.name.is_empty(), path.member(b"author"), problems);
                     }
-                    settings::Kind::Forgejo => {}
+                    settings::Kind::Forgejo => {
+                        read::form(!identity.author.name.is_empty(), path.member(b"author"), problems);
+                    }
                     settings::Kind::GitHub => read::form(!identity.token_configured, path.member(b"token"), problems),
                 }
             }
@@ -1030,6 +1036,7 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
     for (index, forge) in members.forges.iter().enumerate() {
         let path = read::index(&Path::root().member(b"application").member(b"forges"), index);
         let missing = missing_asked_files(members, files, forge.number);
+        // temper-15 removes the old-form file token branch.
         let token = match forge.kind {
             settings::Kind::Forgejo if missing || forge.records_only => None,
             settings::Kind::Forgejo => Some(config::secret(contents(
@@ -1141,6 +1148,7 @@ fn resolve_forge(directories: &config::Directories, forge: &mut Forge, fp: &Path
     {
         *trust = value;
     }
+    // temper-15 removes the old-form token path resolution.
     if forge.kind == settings::Kind::Forgejo
         && !forge.records_only
         && let Some(value) =

@@ -38,7 +38,8 @@ pub fn refusal(index: u32, why: Refused) -> Problems {
         }
         Place::ReachableLimit | Place::Page => unreachable!("no picker until temper-10; reachable is fixed nonzero"),
         Place::Repositories | Place::Repository(_) | Place::RepositoriesLimit => {
-            unreachable!("temper adopts nothing until temper-14a; repositories is fixed nonzero (limits::small)")
+            what = What::Reason(b"outside its type");
+            limits.member(b"forge.client.repositories")
         }
         Place::Word => {
             what = What::Own(b"temper's word");
@@ -64,9 +65,7 @@ pub fn refusal(index: u32, why: Refused) -> Problems {
             Place::ReachableLimit | Place::Page => {
                 unreachable!("no picker until temper-10; reachable is fixed nonzero")
             }
-            Place::Repositories | Place::Repository(_) | Place::RepositoriesLimit => {
-                unreachable!("temper adopts nothing until temper-14a; repositories is fixed nonzero (limits::small)")
-            }
+            Place::Repositories | Place::Repository(_) | Place::RepositoriesLimit => b"forge.client.repositories",
             Place::Word
             | Place::BotLogin
             | Place::BotEmail
@@ -107,7 +106,7 @@ pub fn values(
                 }
             }
         },
-        // None adopted until temper-14a gives the owned forge’s adopted list.
+        // The runtime supplies the restored adopted ids in its Reconcile plan.
         adopted: Box::new([]),
         org_owner: match &entry.mode {
             crate::setup::Mode::Managed { .. } | crate::setup::Mode::Fake(_) => None,

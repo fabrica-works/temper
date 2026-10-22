@@ -827,6 +827,10 @@ pub(crate) fn startup_worst_case(
 fn checked_setup_bytes(settings: &settings::Engine) -> Option<u64> {
     let mut bytes = u64::try_from(settings.records_only.len()).ok()?.checked_mul(4)?;
     if !settings.setup.is_empty() {
+        // The shell retains the resolved repositories pair alongside Checked.
+        bytes = bytes.checked_add(
+            u64::try_from(size_of::<(Box<[u8]>, u64)>().checked_add(b"forge.client.repositories".len())?).ok()?,
+        )?;
         bytes = bytes.checked_add(u64::try_from(size_of::<Option<temper_forge_setup::check::Checked>>()).ok()?)?;
     }
     for setup in &settings.setup {

@@ -156,6 +156,8 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
                     Err(why) => Err(why),
                 };
                 crate::forge::connect(engine, number, start);
+            } else if engine.setup.records_only(number) {
+                // The root restore releases Reconcile; the loader never starts it.
             } else if let Some(host) = engine.forge.unreachable(number) {
                 // Forgejo connects nothing until temper-15; a held one is still named.
                 engine

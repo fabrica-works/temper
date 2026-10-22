@@ -99,7 +99,7 @@ pub enum Refused {
 /// The shipped profile (forge-setup decision 5).
 #[must_use]
 pub fn small() -> Limits {
-    // forge.client.repositories shipped value (setup.md 5.3); temper-14a feeds that member.
+    // Legacy command default; checked startup supplies forge.client.repositories.
     let repositories = 2;
     Limits {
         orgs: 8,
@@ -112,13 +112,22 @@ pub fn small() -> Limits {
 }
 /// Applies a dotted setup override, refusing zero and overflow.
 pub fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), Refused> {
-    if ![b"setup.orgs".as_slice(), b"setup.deadline_ms", b"setup.backoff_ms", b"setup.backoff_max_ms"].contains(&name) {
+    if ![
+        b"setup.orgs".as_slice(),
+        b"setup.deadline_ms",
+        b"setup.backoff_ms",
+        b"setup.backoff_max_ms",
+        b"forge.client.repositories",
+    ]
+    .contains(&name)
+    {
         return Err(Refused::Unknown);
     }
     if value == 0 {
         return Err(Refused::Range);
     }
     match name {
+        b"forge.client.repositories" => limits.repositories = u32::try_from(value).or(Err(Refused::Range))?,
         b"setup.orgs" => limits.orgs = u32::try_from(value).or(Err(Refused::Range))?,
         b"setup.deadline_ms" => limits.deadline = duration(value)?,
         b"setup.backoff_ms" => limits.backoff = duration(value)?,

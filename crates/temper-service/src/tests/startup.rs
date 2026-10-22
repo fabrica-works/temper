@@ -687,15 +687,22 @@ fn a_missing_setup_or_demo_is_refused_naming_its_path() {
 
 #[test]
 fn a_setup_or_box_override_is_handed_on_with_its_value() {
-    let input = core::str::from_utf8(fixtures::APPLICATION)
-        .unwrap()
-        .replace("\"overrides\":{}", "\"overrides\":{\"setup.orgs\":2,\"box.steps\":3}");
-    let (members, problems) = application(input.as_bytes(), &fixtures::engine().jig);
-    assert_eq!(&*lines(&problems), b"");
-    assert_eq!(
-        &*members.unwrap().overrides,
-        &[(b"setup.orgs".as_slice().into(), 2), (b"box.steps".as_slice().into(), 3)]
-    );
+    for (override_value, repositories) in [("", 2_u64), (",\"forge.client.repositories\":3", 3)] {
+        let input = core::str::from_utf8(fixtures::APPLICATION).unwrap().replace(
+            "\"overrides\":{}",
+            &["\"overrides\":{\"setup.orgs\":2,\"box.steps\":3", override_value, "}"].concat(),
+        );
+        let (members, problems) = application(input.as_bytes(), &fixtures::engine().jig);
+        assert_eq!(&*lines(&problems), b"");
+        assert_eq!(
+            members.unwrap().overrides.as_ref(),
+            &[
+                (b"setup.orgs".as_slice().into(), 2),
+                (b"box.steps".as_slice().into(), 3),
+                (b"forge.client.repositories".as_slice().into(), repositories),
+            ]
+        );
+    }
 }
 
 #[test]
@@ -1597,4 +1604,11 @@ fn any_old_member_keeps_the_partial_old_forms_missing_member_refusals() {
     let partial = text.replace("\"number\":1,\"login\"", "\"token\":\"old\",\"number\":1,\"login\"");
     let refused = crate::named(partial.as_bytes(), &config::Directories::working()).unwrap_err();
     assert_eq!(lines(&refused).as_ref(), b"application.forges[0].api_token: missing\napplication.forges[0].webhook_secret: missing\napplication.forges[0].user: missing\n");
+}
+
+#[test]
+fn a_records_only_forgejo_identity_still_requires_its_configured_author() {
+    let input = fixtures::with(&records_only_document(), b"application.identities[0].author", b"null");
+    let refused = crate::named(&input, &config::Directories::working()).unwrap_err();
+    assert_eq!(lines(&refused).as_ref(), b"application.identities[0].author: invalid form\n");
 }

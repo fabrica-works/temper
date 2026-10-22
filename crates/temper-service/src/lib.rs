@@ -61,6 +61,26 @@ pub enum Stop {
 }
 use jig_protocol_config::Problems;
 
+pub use skein_forge_setup::reconcile::{Stage as SetupStage, Why as SetupWhy};
+
+/// A startup setup failure contains only closed, credential-free values.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SetupStopped {
+    NotPrepared,
+    Stopped { plan: SetupPlan, step: SetupStep },
+    Missing,
+    Busy,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SetupPlan {
+    Reconcile,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct SetupStep {
+    pub stage: skein_forge_setup::reconcile::Stage,
+    pub why: skein_forge_setup::reconcile::Why,
+}
+
 /// Operator diagnostics taken by the shell (protocol/forge.md, 2.3).
 #[derive(PartialEq, Eq, Debug)]
 pub enum Note {
@@ -94,6 +114,10 @@ pub enum Note {
     ForgeStopped {
         number: u16,
         why: skein_forge_connection::Stopped,
+    },
+    ForgeSetupStopped {
+        number: u16,
+        why: SetupStopped,
     },
     ForgeNotConnected {
         number: u16,

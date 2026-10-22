@@ -595,6 +595,18 @@ impl Domain {
             && self.brief_held.is_empty()
     }
 
+    /// Snapshot the provider ids restored for one forge, within the client's capacity.
+    #[must_use]
+    pub fn adopted_ids(&self, forge: u16) -> Box<[u64]> {
+        let mut ids = List::with_capacity(self.repositories.len());
+        for (repository, _) in &self.repositories {
+            if repository.forge == forge {
+                ids.push(u64::from(repository.repository)).expect("bounded adopted repositories");
+            }
+        }
+        ids.into_boxed()
+    }
+
     /// Transfer one completed section to the parent assembling an assignment.
     pub fn take_brief(&mut self, section: Token) -> Option<Box<[u8]>> {
         match self.brief_held.remove(&section) {
